@@ -1,0 +1,148 @@
+/*
+ * This program source code file is part of KiCad, a free EDA CAD application.
+ *
+ * Copyright (C) 2026 KiCad Developers, see AUTHORS.txt for contributors.
+ *
+ * This program is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along
+ * with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+/*
+ * wizards.proto
+ * Messages that describe content generation wizards
+ */
+
+syntax = "proto3";
+
+package kiapi.common.types;
+
+import "google/protobuf/any.proto";
+
+
+enum WizardParameterDataType
+{
+  WPDT_UNKNOWN = 0;
+  WPDT_DISTANCE = 1;  // int32 nanometers
+  WPDT_AREA = 2;      // int32 square nanometers
+  WPDT_VOLUME = 3;    // int32 cubic nanometers (not currently supported in KiCad)
+  WPDT_TIME = 4;      // int32 picoseconds
+  WPDT_ANGLE = 5;     // double degrees
+  WPDT_STRING = 6;
+  WPDT_INTEGER = 7;   // int32 (quantity, etc)
+  WPDT_REAL = 8;      // double value
+  WPDT_BOOL = 9;      // boolean flag
+  // TODO(JE) consider supporting enums
+}
+
+enum WizardParameterCategory
+{
+  WPC_UNKNOWN = 0;
+  WPC_PACKAGE = 1;
+  WPC_PADS = 2;
+  WPC_3DMODEL = 3;
+  WPC_METADATA = 4;
+  WPC_RULES = 5;
+}
+
+message WizardIntParameter
+{
+  int32 value = 1;
+  int32 default = 2;
+  optional int32 min = 3;
+  optional int32 max = 4;
+
+  // If present, will require the value to be a multiple of this number
+  optional int32 multiple = 5;
+}
+
+message WizardRealParameter
+{
+  double value = 1;
+  double default = 2;
+  optional double min = 3;
+  optional double max = 4;
+}
+
+message WizardBoolParameter
+{
+  bool value = 1;
+  bool default = 2;
+}
+
+message WizardStringParameter
+{
+  string value = 1;
+  string default = 2;
+  optional string validation_regex = 3;
+}
+
+message WizardParameterList
+{
+  repeated WizardParameter parameters = 1;
+}
+
+message WizardParameter
+{
+  // An internal identifier for this parameter; must be unique within a wizard
+  string identifier = 1;
+
+  // The human-readable name for this parameter (may be translated)
+  string name = 2;
+
+  // A human-readable description / tooltip string (may be translated)
+  string description = 3;
+
+  WizardParameterCategory category = 4;
+  WizardParameterDataType type = 5;
+  oneof value {
+    WizardIntParameter int = 6;
+    WizardRealParameter real = 7;
+    WizardBoolParameter bool = 8;
+    WizardStringParameter string = 9;
+  }
+}
+
+enum WizardContentType
+{
+  WCT_UNKNOWN = 0;
+  WCT_SYMBOL = 1;
+  WCT_FOOTPRINT = 2;
+}
+
+message WizardInfo
+{
+  WizardMetaInfo meta = 1;
+  repeated WizardParameter parameters = 2;
+}
+
+message WizardMetaInfo
+{
+  string identifier = 1;
+  string name = 2;
+  string description = 3;
+  repeated WizardContentType types_generated = 4;
+}
+
+enum WizardGenerationStatus
+{
+  WGS_UNKNOWN = 0;
+  WGS_OK = 1;
+  WGS_ERROR = 2;
+}
+
+message WizardGeneratedContent
+{
+  WizardGenerationStatus status = 1;
+  google.protobuf.Any content = 2;
+  string error_message = 3;
+}

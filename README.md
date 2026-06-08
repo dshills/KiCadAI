@@ -4,14 +4,15 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation phas
 
 ## Current Phase
 
-Phase 0 is implemented:
+Phase 0 and Phase 1 are implemented:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
 - Shared connection configuration package.
 - Baseline tests and Make targets.
+- Vendored KiCad API protobuf definitions pinned to an upstream commit.
 
-The client does not connect to KiCad yet. Connectivity starts in later phases after KiCad protobuf bindings and IPC transport are added.
+The client does not connect to KiCad yet. Phase 1 only pins the upstream API definitions; active KiCad connectivity starts after protobuf generation and IPC transport are added in later phases.
 
 ## Requirements
 
@@ -25,6 +26,18 @@ go test ./...
 go run ./cmd/kicadai --help
 go run ./cmd/kicadai --json config
 ```
+
+## Vendored KiCad API Protos
+
+KiCad's IPC API protobuf definitions are vendored under `third_party/kicad/api/proto` so Go code generation will be reproducible. The pinned upstream commit is recorded in `third_party/kicad/VERSION`.
+
+To refresh the vendored proto files intentionally:
+
+```sh
+make refresh-kicad-proto
+```
+
+Set `KICAD_REF=<commit-or-tag>` to refresh from a different KiCad ref.
 
 ## KiCad Configuration
 

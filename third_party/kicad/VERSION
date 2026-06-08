@@ -1,0 +1,10 @@
+source: KiCad Source Code
+repository: https://gitlab.com/kicad/code/kicad
+source_ref: 030baaeac904084a640784320f7d055a80f1bf91
+commit: 030baaeac904084a640784320f7d055a80f1bf91
+archive: https://gitlab.com/api/v4/projects/kicad%2Fcode%2Fkicad/repository/archive.tar.gz?sha=030baaeac904084a640784320f7d055a80f1bf91&path=api/proto
+vendored_paths:
+  - api/proto
+  - LICENSE*
+  - AUTHORS.txt
+notes: Only the KiCad IPC API protobuf definitions and attribution files are vendored.
