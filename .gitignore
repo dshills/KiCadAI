@@ -1,0 +1,15 @@
+.DS_Store
+
+# Go build outputs
+/bin/
+/dist/
+.gocache/
+*.test
+coverage.out
+
+# Local environment
+.env
+.env.*
+
+# Generated KiCad protobuf bindings will be reproducible.
+/internal/kiapi/gen/
