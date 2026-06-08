@@ -23,6 +23,7 @@ type Explicit struct {
 	ClientName  string
 	TimeoutMS   int
 	Environment []string
+	RuntimeOS   string
 }
 
 type Config struct {
@@ -34,12 +35,27 @@ type Config struct {
 
 func Resolve(explicit Explicit) (Config, error) {
 	env := environMap(explicit.Environment)
+	runtimeOS := firstNonEmpty(strings.TrimSpace(explicit.RuntimeOS), runtime.GOOS)
+	socketPath := strings.TrimSpace(explicit.SocketPath)
+	envSocketPath := strings.TrimSpace(env[EnvSocketPath])
+	token := strings.TrimSpace(explicit.Token)
+	envToken := strings.TrimSpace(env[EnvToken])
+	clientName := strings.TrimSpace(explicit.ClientName)
+	envClientName := strings.TrimSpace(env[EnvClientName])
+
+	if explicit.SocketPath != "" && socketPath == "" {
+		return Config{}, fmt.Errorf("socket path must not be blank")
+	}
 
 	cfg := Config{
-		SocketPath: firstNonEmpty(explicit.SocketPath, env[EnvSocketPath], defaultSocketPath()),
-		Token:      firstNonEmpty(explicit.Token, env[EnvToken]),
-		ClientName: firstNonEmpty(explicit.ClientName, env[EnvClientName], defaultClientName()),
+		SocketPath: firstNonEmpty(socketPath, envSocketPath, defaultSocketPath(runtimeOS)),
+		Token:      firstNonEmpty(token, envToken),
+		ClientName: firstNonEmpty(clientName, envClientName, defaultClientName()),
 		TimeoutMS:  DefaultTimeoutMS,
+	}
+
+	if explicit.TimeoutMS < 0 {
+		return Config{}, fmt.Errorf("timeout must not be negative")
 	}
 
 	if explicit.TimeoutMS > 0 {
@@ -57,6 +73,8 @@ func Resolve(explicit Explicit) (Config, error) {
 		return Config{}, fmt.Errorf("%s is required and no platform default is available", EnvSocketPath)
 	}
 
+	cfg.SocketPath = normalizeSocketPath(cfg.SocketPath, runtimeOS)
+
 	return cfg, nil
 }
 
@@ -70,12 +88,31 @@ func (c Config) Redacted() Config {
 	return redacted
 }
 
-func defaultSocketPath() string {
-	if runtime.GOOS == "windows" {
+func NormalizeSocketPath(socketPath string, runtimeOS ...string) string {
+	targetOS := runtime.GOOS
+	if len(runtimeOS) > 0 && strings.TrimSpace(runtimeOS[0]) != "" {
+		targetOS = strings.TrimSpace(runtimeOS[0])
+	}
+
+	return normalizeSocketPath(socketPath, targetOS)
+}
+
+func defaultSocketPath(runtimeOS string) string {
+	if runtimeOS == "windows" {
 		return ""
 	}
 
 	return "ipc:///tmp/kicad/api.sock"
+}
+
+func normalizeSocketPath(socketPath string, runtimeOS string) string {
+	trimmed := strings.TrimSpace(socketPath)
+
+	if trimmed == "" || strings.Contains(trimmed, "://") || runtimeOS == "windows" {
+		return trimmed
+	}
+
+	return "ipc://" + trimmed
 }
 
 func defaultClientName() string {
