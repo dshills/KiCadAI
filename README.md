@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Phase
 
-Phase 0 through Phase 9 are implemented:
+Phase 0 through Phase 10 are implemented:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -18,6 +18,7 @@ Phase 0 through Phase 9 are implemented:
 - Open document discovery and CLI `documents` listing.
 - Optional live KiCad integration test harness.
 - Capability detection for schematic read versus missing schematic write commands.
+- Schematic domain request types and validation for planned symbol, wire, and label operations.
 
 Schematic automation is planned next.
 
