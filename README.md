@@ -2,9 +2,9 @@
 
 KiCadAI is an early Go client for KiCad's IPC API. The first implementation establishes the Go project skeleton, CLI entrypoint, shared configuration rules, protobuf envelope client, and connection probes that later phases will use for document discovery and schematic automation.
 
-## Current Phase
+## Current Status
 
-Phase 0 through Phase 14 are implemented through the current safe execution boundary:
+Implementation phases are complete through Phase 14, with Phase 15 documented as a roadmap. The current functional surface is:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -25,6 +25,10 @@ Phase 0 through Phase 14 are implemented through the current safe execution boun
 - Developer setup, troubleshooting, integration-test, and protobuf regeneration docs.
 
 Actual schematic mutation remains gated until KiCad exposes compatible schematic write commands in the generated API surface.
+
+## Roadmap
+
+Phase 15 records follow-up work in the [Phase 15 Roadmap](specs/initial/FUTURE.md). Those items are outside the current implementation scope.
 
 ## AI Workflow Boundary
 
