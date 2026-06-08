@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Phase
 
-Phase 0 through Phase 13 are implemented through the current safe execution boundary:
+Phase 0 through Phase 14 are implemented through the current safe execution boundary:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -22,6 +22,7 @@ Phase 0 through Phase 13 are implemented through the current safe execution boun
 - Deterministic LED demo planning and `plan-led-demo` CLI output.
 - LED demo execution boundary and `draw-led-demo --execute`, currently blocked by missing schematic write capability.
 - AI-ready workflow registry with safe named operations and structured validation issues.
+- Developer setup, troubleshooting, integration-test, and protobuf regeneration docs.
 
 Actual schematic mutation remains gated until KiCad exposes compatible schematic write commands in the generated API surface.
 
@@ -38,12 +39,41 @@ Use `workflows.PlanOperation` with a structured `{operation, payload}` request e
 ## Requirements
 
 - Go 1.22 or newer.
-- KiCad 9.0 or newer will be required for future IPC work.
+- A KiCad build exposing the vendored IPC API shape; the current generated bindings target KiCad 9+ API definitions.
+- A running KiCad instance with the IPC API enabled for live probes.
+
+The default Unix IPC endpoint is `ipc:///tmp/kicad/api.sock`. Windows named pipes are not implemented yet, so Windows users must pass an explicit endpoint once support is added.
+
+## KiCad API Setup
+
+Enable KiCad's API in KiCad, then open a project and the editor you want to inspect. For schematic automation work, open the schematic editor before running `documents`, `capabilities`, or LED demo commands.
+
+Start with the resolved config:
+
+```sh
+go run ./cmd/kicadai --json config
+```
+
+Pass connection settings with flags:
+
+```sh
+go run ./cmd/kicadai --socket ipc:///tmp/kicad/api.sock --token "$KICAD_API_TOKEN" --json ping
+```
+
+Or with environment variables:
+
+```sh
+export KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock
+export KICAD_API_TOKEN=your-token-if-required
+export KICAD_CLIENT_NAME=kicadai-dev
+export KICAD_TIMEOUT_MS=5000
+```
+
+The client captures KiCad's returned token in memory when no token is configured. It does not persist tokens to disk; set `KICAD_API_TOKEN` yourself if a later process needs to reuse a token. Tokens are redacted from `config` output.
 
 ## Commands
 
 ```sh
-go test ./...
 go run ./cmd/kicadai --help
 go run ./cmd/kicadai --json config
 go run ./cmd/kicadai --json ping
@@ -52,11 +82,11 @@ go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
 go run ./cmd/kicadai --document / --json plan-led-demo
 go run ./cmd/kicadai --document / --execute --json draw-led-demo
-make proto
-make proto-check
 ```
 
-## Live KiCad Integration Tests
+`plan-led-demo` is deterministic and does not mutate KiCad. `draw-led-demo --execute` currently performs capability preflight and returns a structured failure when schematic write commands are unavailable in the generated API.
+
+## Testing
 
 Normal tests do not require KiCad:
 
@@ -64,13 +94,35 @@ Normal tests do not require KiCad:
 make test
 ```
 
+`make test` wraps `go test ./...` with workspace-local Go cache paths.
+
+Generated protobuf output can be checked with:
+
+```sh
+make proto
+make proto-check
+```
+
+## Live KiCad Integration Tests
+
 To run live tests, start KiCad with the API enabled, set the socket endpoint, and use the `integration` build tag:
 
 ```sh
 KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock go test -tags=integration ./...
 ```
 
-Common live-test failures are an API-disabled KiCad instance, a stale or wrong socket path, a token mismatch, multiple KiCad instances, or running against an endpoint without an open editor document.
+Live tests are skipped unless `KICAD_API_SOCKET` is set.
+
+## Troubleshooting
+
+- `cannot dial` or connection timeout: KiCad is not running, the API is disabled, or `KICAD_API_SOCKET` points at the wrong endpoint. Verify with `go run ./cmd/kicadai --json config`, then pass `--socket` explicitly.
+- `AS_NOT_READY`: KiCad has started but is not ready to service API requests. Wait a moment, make sure the project/editor has finished loading, then retry.
+- `AS_TOKEN_MISMATCH`: The configured token does not match the KiCad instance. For repeated CLI commands, get the token for the running KiCad instance and set `KICAD_API_TOKEN`; in-memory capture only helps within a single long-lived Go client process.
+- Multiple KiCad instances: each instance may use a different socket and token. Use explicit `KICAD_API_SOCKET` and avoid relying on defaults while more than one instance is open.
+- Wrong endpoint or no open editor: `documents` should show the expected schematic or PCB document. Open the schematic editor and rerun `go run ./cmd/kicadai --json documents`.
+- Schematic commands unavailable: `capabilities` may report schematic read support while `schematic.write` and symbol placement remain missing. In that state, `plan-led-demo` works and `draw-led-demo --execute` returns a structured preflight failure instead of mutating KiCad.
+- `AS_UNIMPLEMENTED` or `AS_UNHANDLED`: the running KiCad version does not implement the requested command. Check `version` and `capabilities`, then keep the workflow in planning mode.
+- `AS_BUSY` or timeout: KiCad is doing another operation. Retry after the editor is idle or increase `KICAD_TIMEOUT_MS`.
 
 ## Vendored KiCad API Protos
 
@@ -83,6 +135,14 @@ make refresh-kicad-proto
 ```
 
 Set `KICAD_REF=<commit-or-tag>` to refresh from a different KiCad ref.
+
+After refreshing, run:
+
+```sh
+make proto
+make proto-check
+make test
+```
 
 ## Protobuf Generation
 
@@ -118,3 +178,5 @@ KICAD_TIMEOUT_MS
 ```
 
 Tokens are redacted from CLI output.
+
+Connection precedence is flag first, environment second, platform default last. Any socket string without a scheme receives the `ipc://` prefix. Use absolute socket paths for reliable behavior from any working directory; if you must use a relative socket, prefer an explicit form such as `./api.sock`, which normalizes to `ipc://./api.sock`.
