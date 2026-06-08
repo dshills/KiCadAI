@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -175,6 +176,45 @@ func TestRunDocumentsJSON(t *testing.T) {
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got %s", want, output)
+		}
+	}
+}
+
+func TestRunCapabilitiesJSON(t *testing.T) {
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{
+			version: &commontypes.KiCadVersion{Major: 9, Minor: 1, Patch: 0, FullVersion: "9.1.0"},
+		}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--json",
+		"capabilities",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	var capabilities kiapi.Capabilities
+	if err := json.Unmarshal(stdout.Bytes(), &capabilities); err != nil {
+		t.Fatalf("unmarshal capabilities JSON: %v", err)
+	}
+	if capabilities.KiCadVersion != "9.1.0" {
+		t.Fatalf("KiCadVersion = %q", capabilities.KiCadVersion)
+	}
+	if !capabilities.Supports(kiapi.CapabilitySchematicRead) {
+		t.Fatalf("expected schematic read in supported capabilities")
+	}
+	for _, missing := range []kiapi.Capability{
+		kiapi.CapabilitySchematicWrite,
+		kiapi.CapabilitySymbolPlace,
+	} {
+		if capabilities.Supports(missing) {
+			t.Fatalf("expected %s to be missing, got supported", missing)
 		}
 	}
 }

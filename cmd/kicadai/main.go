@@ -22,11 +22,12 @@ Usage:
   kicadai [global flags] <command>
 
 Commands:
-  config    Print resolved connection configuration
-  documents List open KiCad documents
-  ping      Check whether KiCad responds to the API
-  version   Print KiCad version information
-  help      Print this help text
+  capabilities  Report detected KiCad API capabilities
+  config        Print resolved connection configuration
+  documents     List open KiCad documents
+  ping          Check whether KiCad responds to the API
+  version       Print KiCad version information
+  help          Print this help text
 
 Global flags:
   --socket string       KiCad IPC endpoint, for example ipc:///tmp/kicad/api.sock
@@ -84,6 +85,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "", "help":
 		fmt.Fprint(stdout, usage)
 		return nil
+	case "capabilities":
+		return a.runCapabilities(opts, stdout)
 	case "config":
 		return runConfig(opts, stdout)
 	case "documents":
@@ -249,6 +252,46 @@ func (a app) runDocuments(opts cliOptions, stdout io.Writer) error {
 	}
 	for _, document := range documents {
 		fmt.Fprintf(stdout, "%s\t%s\n", document.Type, document.Identifier)
+	}
+	return nil
+}
+
+func (a app) runCapabilities(opts cliOptions, stdout io.Writer) error {
+	resolved, client, ctx, cancel, err := a.connect(opts)
+	if err != nil {
+		return writeProbeFailure(opts, stdout, resolved, err)
+	}
+	defer cancel()
+	defer client.Close()
+
+	version, err := client.GetVersion(ctx)
+	if err != nil {
+		if opts.jsonOutput {
+			capabilities := kiapi.CapabilitiesForVersion(nil)
+			capabilities.Error = err.Error()
+			if encodeErr := writeJSON(stdout, capabilities); encodeErr != nil {
+				return fmt.Errorf("encode capabilities error response: %v: %w", err, encodeErr)
+			}
+		}
+		return err
+	}
+	capabilities := kiapi.CapabilitiesForVersion(version)
+	if opts.jsonOutput {
+		if encodeErr := writeJSON(stdout, capabilities); encodeErr != nil {
+			return encodeErr
+		}
+		return nil
+	}
+
+	fmt.Fprintf(stdout, "kicad_version: %s\n", capabilities.KiCadVersion)
+	for _, capability := range capabilities.Supported {
+		fmt.Fprintf(stdout, "supported: %s\n", capability)
+	}
+	for _, capability := range capabilities.Missing {
+		fmt.Fprintf(stdout, "missing: %s\n", capability)
+	}
+	for _, note := range capabilities.Notes {
+		fmt.Fprintf(stdout, "note: %s\n", note)
 	}
 	return nil
 }
