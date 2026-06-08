@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Phase
 
-Phase 0 through Phase 7 are implemented:
+Phase 0 through Phase 8 are implemented:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -16,6 +16,7 @@ Phase 0 through Phase 7 are implemented:
 - Low-level KiCad protobuf envelope client with token capture and API status errors.
 - CLI `ping` and `version` probes.
 - Open document discovery and CLI `documents` listing.
+- Optional live KiCad integration test harness.
 
 Schematic automation is planned next.
 
@@ -36,6 +37,22 @@ go run ./cmd/kicadai --json documents
 make proto
 make proto-check
 ```
+
+## Live KiCad Integration Tests
+
+Normal tests do not require KiCad:
+
+```sh
+make test
+```
+
+To run live tests, start KiCad with the API enabled, set the socket endpoint, and use the `integration` build tag:
+
+```sh
+KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock go test -tags=integration ./...
+```
+
+Common live-test failures are an API-disabled KiCad instance, a stale or wrong socket path, a token mismatch, multiple KiCad instances, or running against an endpoint without an open editor document.
 
 ## Vendored KiCad API Protos
 
