@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Phase
 
-Phase 0 through Phase 12 are implemented through the current safe execution boundary:
+Phase 0 through Phase 13 are implemented through the current safe execution boundary:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -21,8 +21,19 @@ Phase 0 through Phase 12 are implemented through the current safe execution boun
 - Schematic domain request types and validation for planned symbol, wire, and label operations.
 - Deterministic LED demo planning and `plan-led-demo` CLI output.
 - LED demo execution boundary and `draw-led-demo --execute`, currently blocked by missing schematic write capability.
+- AI-ready workflow registry with safe named operations and structured validation issues.
 
 Actual schematic mutation remains gated until KiCad exposes compatible schematic write commands in the generated API surface.
+
+## AI Workflow Boundary
+
+Future AI-generated design logic should call named workflow operations in `internal/workflows`, not generated protobuf packages or transport clients directly. The safe registry currently exposes:
+
+- `create_led_indicator` implemented as a deterministic LED schematic plan.
+- `place_decoupling_capacitor` reserved for a future workflow.
+- `create_connector_block` reserved for a future workflow.
+
+Use `workflows.PlanOperation` with a structured `{operation, payload}` request envelope and inspect `OperationResult.Issues` before attempting execution. Go callers can use `workflows.NewCreateLEDIndicatorRequest` to build the initial implemented payload.
 
 ## Requirements
 
