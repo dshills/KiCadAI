@@ -11,6 +11,8 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/ipc"
 	"kicadai/internal/kiapi/gen/common"
+	commoncommands "kicadai/internal/kiapi/gen/common/commands"
+	commontypes "kicadai/internal/kiapi/gen/common/types"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
@@ -220,6 +222,19 @@ func (c *Client) Send(ctx context.Context, command proto.Message, response proto
 	}
 
 	return nil
+}
+
+func (c *Client) Ping(ctx context.Context) error {
+	return c.Send(ctx, &commoncommands.Ping{}, nil)
+}
+
+func (c *Client) GetVersion(ctx context.Context) (*commontypes.KiCadVersion, error) {
+	var response commoncommands.GetVersionResponse
+	if err := c.Send(ctx, &commoncommands.GetVersion{}, &response); err != nil {
+		return nil, err
+	}
+
+	return response.GetVersion(), nil
 }
 
 func newRequestHeader(clientName string, token string) (*common.ApiRequestHeader, error) {

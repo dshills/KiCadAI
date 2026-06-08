@@ -1,10 +1,10 @@
 # KiCadAI
 
-KiCadAI is an early Go client for KiCad's IPC API. The first implementation phase establishes the Go project skeleton, CLI entrypoint, and shared configuration rules that later phases will use for protobuf generation, IPC transport, document discovery, and schematic automation.
+KiCadAI is an early Go client for KiCad's IPC API. The first implementation establishes the Go project skeleton, CLI entrypoint, shared configuration rules, protobuf envelope client, and connection probes that later phases will use for document discovery and schematic automation.
 
 ## Current Phase
 
-Phase 0 through Phase 4 are implemented:
+Phase 0 through Phase 6 are implemented:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -13,8 +13,10 @@ Phase 0 through Phase 4 are implemented:
 - Vendored KiCad API protobuf definitions pinned to an upstream commit.
 - Generated Go protobuf bindings under `internal/kiapi/gen`.
 - IPC transport abstraction with fake and Mangos-backed request/reply implementations.
+- Low-level KiCad protobuf envelope client with token capture and API status errors.
+- CLI `ping` and `version` probes.
 
-The client does not send KiCad API envelopes yet. Active request/response commands start after the low-level envelope client is added in the next phase.
+Document discovery and schematic automation are planned next.
 
 ## Requirements
 
@@ -27,6 +29,8 @@ The client does not send KiCad API envelopes yet. Active request/response comman
 go test ./...
 go run ./cmd/kicadai --help
 go run ./cmd/kicadai --json config
+go run ./cmd/kicadai --json ping
+go run ./cmd/kicadai --json version
 make proto
 make proto-check
 ```
@@ -67,7 +71,7 @@ make proto
 
 ## KiCad Configuration
 
-Future phases will use these environment variables:
+The CLI uses these environment variables:
 
 ```text
 KICAD_API_SOCKET
