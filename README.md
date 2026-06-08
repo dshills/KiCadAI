@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Phase
 
-Phase 0 through Phase 11 are implemented:
+Phase 0 through Phase 12 are implemented through the current safe execution boundary:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -20,8 +20,9 @@ Phase 0 through Phase 11 are implemented:
 - Capability detection for schematic read versus missing schematic write commands.
 - Schematic domain request types and validation for planned symbol, wire, and label operations.
 - Deterministic LED demo planning and `plan-led-demo` CLI output.
+- LED demo execution boundary and `draw-led-demo --execute`, currently blocked by missing schematic write capability.
 
-Schematic automation is planned next.
+Actual schematic mutation remains gated until KiCad exposes compatible schematic write commands in the generated API surface.
 
 ## Requirements
 
@@ -39,6 +40,7 @@ go run ./cmd/kicadai --json version
 go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
 go run ./cmd/kicadai --document / --json plan-led-demo
+go run ./cmd/kicadai --document / --execute --json draw-led-demo
 make proto
 make proto-check
 ```

@@ -11,6 +11,7 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
+	"kicadai/internal/workflows"
 )
 
 func TestRunDefaultsToHelp(t *testing.T) {
@@ -246,6 +247,48 @@ func TestRunPlanLEDDemoJSON(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got %s", want, output)
 		}
+	}
+}
+
+func TestRunDrawLEDDemoJSONRequiresExecute(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--document", "/",
+		"--json",
+		"draw-led-demo",
+	}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "requires --execute") {
+		t.Fatalf("run error = %v, want --execute requirement", err)
+	}
+	if !strings.Contains(stdout.String(), `"success": false`) || !strings.Contains(stdout.String(), `"draw-led-demo requires --execute"`) {
+		t.Fatalf("expected structured error result, got %s", stdout.String())
+	}
+}
+
+func TestRunDrawLEDDemoJSONReportsMissingWriteCapability(t *testing.T) {
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{
+			version: &commontypes.KiCadVersion{Major: 9, Minor: 1, Patch: 0, FullVersion: "9.1.0"},
+		}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--document", "/",
+		"--execute",
+		"--json",
+		"draw-led-demo",
+	}, &stdout, &stderr)
+	if !errors.Is(err, workflows.ErrMissingSchematicWriteCapability) {
+		t.Fatalf("run error = %v, want %v", err, workflows.ErrMissingSchematicWriteCapability)
+	}
+	if !strings.Contains(stdout.String(), `"operations_completed": 0`) {
+		t.Fatalf("expected structured result, got %s", stdout.String())
 	}
 }
 

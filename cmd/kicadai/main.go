@@ -18,7 +18,7 @@ import (
 	"kicadai/internal/workflows"
 )
 
-const usage = `kicadai is a Go client for KiCad's IPC API.
+const usageTemplate = `kicadai is a Go client for KiCad's IPC API.
 
 Usage:
   kicadai [global flags] <command>
@@ -27,6 +27,7 @@ Commands:
   capabilities  Report detected KiCad API capabilities
   config        Print resolved connection configuration
   documents     List open KiCad documents
+  draw-led-demo Execute the LED indicator schematic plan when supported
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
   version       Print KiCad version information
@@ -42,12 +43,28 @@ Global flags:
   --origin-x int64      Plan origin X in KiCad internal units (1 mm = 1,000,000 IU)
   --origin-y int64      Plan origin Y in KiCad internal units (1 mm = 1,000,000 IU)
   --prefix string        Reference/value prefix for plan commands
-  --lib-vcc string      VCC symbol library ID for LED demo (default: power:VCC)
-  --lib-gnd string      GND symbol library ID for LED demo (default: power:GND)
-  --lib-resistor string Resistor symbol library ID for LED demo (default: Device:R)
-  --lib-led string      LED symbol library ID for LED demo (default: Device:LED)
+  --lib-vcc string      VCC symbol library ID for LED demo (default: %[1]s)
+  --lib-gnd string      GND symbol library ID for LED demo (default: %[2]s)
+  --lib-resistor string Resistor symbol library ID for LED demo (default: %[3]s)
+  --lib-led string      LED symbol library ID for LED demo (default: %[4]s)
+  --execute             Required for mutation commands
   --json                Print command output as JSON when supported
 `
+
+const (
+	defaultLibraryIDVCC      = "power:VCC"
+	defaultLibraryIDGND      = "power:GND"
+	defaultLibraryIDResistor = "Device:R"
+	defaultLibraryIDLED      = "Device:LED"
+)
+
+var usage = fmt.Sprintf(
+	usageTemplate,
+	defaultLibraryIDVCC,
+	defaultLibraryIDGND,
+	defaultLibraryIDResistor,
+	defaultLibraryIDLED,
+)
 
 type cliOptions struct {
 	socket        string
@@ -63,6 +80,7 @@ type cliOptions struct {
 	libGND        string
 	libResistor   string
 	libLED        string
+	execute       bool
 	jsonOutput    bool
 }
 
@@ -110,6 +128,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runConfig(opts, stdout)
 	case "documents":
 		return a.runDocuments(opts, stdout)
+	case "draw-led-demo":
+		return a.runDrawLEDDemo(opts, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
@@ -135,10 +155,11 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Int64Var(&opts.originX, "origin-x", 0, "plan origin X")
 	flags.Int64Var(&opts.originY, "origin-y", 0, "plan origin Y")
 	flags.StringVar(&opts.prefix, "prefix", workflows.DefaultLEDDemoPrefix, "plan prefix")
-	flags.StringVar(&opts.libVCC, "lib-vcc", "", "VCC symbol library ID")
-	flags.StringVar(&opts.libGND, "lib-gnd", "", "GND symbol library ID")
-	flags.StringVar(&opts.libResistor, "lib-resistor", "", "resistor symbol library ID")
-	flags.StringVar(&opts.libLED, "lib-led", "", "LED symbol library ID")
+	flags.StringVar(&opts.libVCC, "lib-vcc", defaultLibraryIDVCC, "VCC symbol library ID")
+	flags.StringVar(&opts.libGND, "lib-gnd", defaultLibraryIDGND, "GND symbol library ID")
+	flags.StringVar(&opts.libResistor, "lib-resistor", defaultLibraryIDResistor, "resistor symbol library ID")
+	flags.StringVar(&opts.libLED, "lib-led", defaultLibraryIDLED, "LED symbol library ID")
+	flags.BoolVar(&opts.execute, "execute", false, "execute mutation command")
 	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
 
 	if err := flags.Parse(args); err != nil {
@@ -338,19 +359,9 @@ func (a app) runCapabilities(opts cliOptions, stdout io.Writer) error {
 }
 
 func (a app) runPlanLEDDemo(opts cliOptions, stdout io.Writer) error {
-	plan, err := workflows.PlanLEDDemo(workflows.LEDDemoIntent{
-		Document: schematic.DocumentRef{Type: kiapi.DocumentTypeSchematic, Identifier: opts.documentID},
-		Origin:   schematic.Point{X: opts.originX, Y: opts.originY},
-		Prefix:   opts.prefix,
-		Libraries: workflows.LEDDemoLibraries{
-			VCC:      opts.libVCC,
-			GND:      opts.libGND,
-			Resistor: opts.libResistor,
-			LED:      opts.libLED,
-		},
-	})
+	plan, err := workflows.PlanLEDDemo(ledDemoIntent(opts))
 	if err != nil {
-		return err
+		return writeAutomationError(opts, stdout, err)
 	}
 
 	if opts.jsonOutput {
@@ -363,6 +374,69 @@ func (a app) runPlanLEDDemo(opts cliOptions, stdout io.Writer) error {
 		}
 	}
 	return nil
+}
+
+func (a app) runDrawLEDDemo(opts cliOptions, stdout io.Writer) error {
+	if !opts.execute {
+		err := fmt.Errorf("draw-led-demo requires --execute")
+		return writeAutomationError(opts, stdout, err)
+	}
+
+	plan, err := workflows.PlanLEDDemo(ledDemoIntent(opts))
+	if err != nil {
+		return writeAutomationError(opts, stdout, err)
+	}
+
+	resolved, client, ctx, cancel, err := a.connect(opts)
+	if err != nil {
+		return writeProbeFailure(opts, stdout, resolved, err)
+	}
+	defer cancel()
+	defer client.Close()
+
+	version, err := client.GetVersion(ctx)
+	if err != nil {
+		return writeAutomationError(opts, stdout, err)
+	}
+
+	result, err := workflows.ExecuteLEDDemoPlan(plan, kiapi.CapabilitiesForVersion(version))
+	if opts.jsonOutput {
+		if encodeErr := writeJSON(stdout, result); encodeErr != nil {
+			return encodeErr
+		}
+		return err
+	}
+
+	if _, writeErr := fmt.Fprintf(stdout, "operations_completed: %d\n", result.OperationsCompleted); writeErr != nil {
+		return writeErr
+	}
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func ledDemoIntent(opts cliOptions) workflows.LEDDemoIntent {
+	return workflows.LEDDemoIntent{
+		Document: schematic.DocumentRef{Type: kiapi.DocumentTypeSchematic, Identifier: opts.documentID},
+		Origin:   schematic.Point{X: opts.originX, Y: opts.originY},
+		Prefix:   opts.prefix,
+		Libraries: workflows.LEDDemoLibraries{
+			VCC:      opts.libVCC,
+			GND:      opts.libGND,
+			Resistor: opts.libResistor,
+			LED:      opts.libLED,
+		},
+	}
+}
+
+func writeAutomationError(opts cliOptions, stdout io.Writer, err error) error {
+	if opts.jsonOutput {
+		if encodeErr := writeJSON(stdout, workflows.AutomationResult{Success: false, Error: err.Error()}); encodeErr != nil {
+			return errors.Join(encodeErr, err)
+		}
+	}
+	return err
 }
 
 type probeResult struct {
