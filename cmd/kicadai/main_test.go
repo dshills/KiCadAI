@@ -219,6 +219,36 @@ func TestRunCapabilitiesJSON(t *testing.T) {
 	}
 }
 
+func TestRunPlanLEDDemoJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--document", "/",
+		"--origin-x", "1000",
+		"--origin-y", "2000",
+		"--prefix", "STATUS",
+		"--lib-resistor", "Custom:R_US",
+		"--json",
+		"plan-led-demo",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		`"operations": [`,
+		`"kind": "add_symbol"`,
+		`Custom:R_US`,
+		`STATUS_OUT`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, output)
+		}
+	}
+}
+
 type fakeAPIClient struct {
 	pingErr   error
 	version   *commontypes.KiCadVersion

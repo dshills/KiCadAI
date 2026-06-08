@@ -14,6 +14,8 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
+	"kicadai/internal/schematic"
+	"kicadai/internal/workflows"
 )
 
 const usage = `kicadai is a Go client for KiCad's IPC API.
@@ -25,6 +27,7 @@ Commands:
   capabilities  Report detected KiCad API capabilities
   config        Print resolved connection configuration
   documents     List open KiCad documents
+  plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
   version       Print KiCad version information
   help          Print this help text
@@ -35,6 +38,14 @@ Global flags:
   --client-name string  Client name sent to KiCad
   --timeout-ms int      IPC timeout in milliseconds
   --document-type string Document filter: all, schematic, pcb, symbol, footprint, drawing_sheet, project
+  --document string      Schematic document identifier for plan commands
+  --origin-x int64      Plan origin X in KiCad internal units (1 mm = 1,000,000 IU)
+  --origin-y int64      Plan origin Y in KiCad internal units (1 mm = 1,000,000 IU)
+  --prefix string        Reference/value prefix for plan commands
+  --lib-vcc string      VCC symbol library ID for LED demo (default: power:VCC)
+  --lib-gnd string      GND symbol library ID for LED demo (default: power:GND)
+  --lib-resistor string Resistor symbol library ID for LED demo (default: Device:R)
+  --lib-led string      LED symbol library ID for LED demo (default: Device:LED)
   --json                Print command output as JSON when supported
 `
 
@@ -44,6 +55,14 @@ type cliOptions struct {
 	clientName    string
 	timeoutMS     int
 	documentType  string
+	documentID    string
+	originX       int64
+	originY       int64
+	prefix        string
+	libVCC        string
+	libGND        string
+	libResistor   string
+	libLED        string
 	jsonOutput    bool
 }
 
@@ -91,6 +110,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runConfig(opts, stdout)
 	case "documents":
 		return a.runDocuments(opts, stdout)
+	case "plan-led-demo":
+		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
 		return a.runPing(opts, stdout)
 	case "version":
@@ -110,6 +131,14 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.clientName, "client-name", "", "client name sent to KiCad")
 	flags.IntVar(&opts.timeoutMS, "timeout-ms", 0, "IPC timeout in milliseconds")
 	flags.StringVar(&opts.documentType, "document-type", "all", "document type filter")
+	flags.StringVar(&opts.documentID, "document", "", "schematic document identifier")
+	flags.Int64Var(&opts.originX, "origin-x", 0, "plan origin X")
+	flags.Int64Var(&opts.originY, "origin-y", 0, "plan origin Y")
+	flags.StringVar(&opts.prefix, "prefix", workflows.DefaultLEDDemoPrefix, "plan prefix")
+	flags.StringVar(&opts.libVCC, "lib-vcc", "", "VCC symbol library ID")
+	flags.StringVar(&opts.libGND, "lib-gnd", "", "GND symbol library ID")
+	flags.StringVar(&opts.libResistor, "lib-resistor", "", "resistor symbol library ID")
+	flags.StringVar(&opts.libLED, "lib-led", "", "LED symbol library ID")
 	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
 
 	if err := flags.Parse(args); err != nil {
@@ -247,11 +276,15 @@ func (a app) runDocuments(opts cliOptions, stdout io.Writer) error {
 		return err
 	}
 	if len(documents) == 0 {
-		fmt.Fprintln(stdout, "documents: none")
+		if _, err := fmt.Fprintln(stdout, "documents: none"); err != nil {
+			return err
+		}
 		return nil
 	}
 	for _, document := range documents {
-		fmt.Fprintf(stdout, "%s\t%s\n", document.Type, document.Identifier)
+		if _, err := fmt.Fprintf(stdout, "%s\t%s\n", document.Type, document.Identifier); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -283,15 +316,51 @@ func (a app) runCapabilities(opts cliOptions, stdout io.Writer) error {
 		return nil
 	}
 
-	fmt.Fprintf(stdout, "kicad_version: %s\n", capabilities.KiCadVersion)
+	if _, err := fmt.Fprintf(stdout, "kicad_version: %s\n", capabilities.KiCadVersion); err != nil {
+		return err
+	}
 	for _, capability := range capabilities.Supported {
-		fmt.Fprintf(stdout, "supported: %s\n", capability)
+		if _, err := fmt.Fprintf(stdout, "supported: %s\n", capability); err != nil {
+			return err
+		}
 	}
 	for _, capability := range capabilities.Missing {
-		fmt.Fprintf(stdout, "missing: %s\n", capability)
+		if _, err := fmt.Fprintf(stdout, "missing: %s\n", capability); err != nil {
+			return err
+		}
 	}
 	for _, note := range capabilities.Notes {
-		fmt.Fprintf(stdout, "note: %s\n", note)
+		if _, err := fmt.Fprintf(stdout, "note: %s\n", note); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (a app) runPlanLEDDemo(opts cliOptions, stdout io.Writer) error {
+	plan, err := workflows.PlanLEDDemo(workflows.LEDDemoIntent{
+		Document: schematic.DocumentRef{Type: kiapi.DocumentTypeSchematic, Identifier: opts.documentID},
+		Origin:   schematic.Point{X: opts.originX, Y: opts.originY},
+		Prefix:   opts.prefix,
+		Libraries: workflows.LEDDemoLibraries{
+			VCC:      opts.libVCC,
+			GND:      opts.libGND,
+			Resistor: opts.libResistor,
+			LED:      opts.libLED,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	if opts.jsonOutput {
+		return writeJSON(stdout, plan)
+	}
+
+	for i, operation := range plan.Operations {
+		if _, err := fmt.Fprintf(stdout, "%d. %s\t%s\n", i+1, operation.Kind, operation.Summary); err != nil {
+			return err
+		}
 	}
 	return nil
 }
