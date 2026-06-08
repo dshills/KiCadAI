@@ -1,2 +1,2 @@
-// Package ipc will contain the KiCad request/reply transport abstraction.
+// Package ipc contains KiCad request/reply transport implementations.
 package ipc

@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation phas
 
 ## Current Phase
 
-Phase 0 through Phase 2 are implemented:
+Phase 0 through Phase 4 are implemented:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -12,8 +12,9 @@ Phase 0 through Phase 2 are implemented:
 - Baseline tests and Make targets.
 - Vendored KiCad API protobuf definitions pinned to an upstream commit.
 - Generated Go protobuf bindings under `internal/kiapi/gen`.
+- IPC transport abstraction with fake and Mangos-backed request/reply implementations.
 
-The client does not connect to KiCad yet. Active KiCad connectivity starts after IPC transport and envelope client work are added in later phases.
+The client does not send KiCad API envelopes yet. Active request/response commands start after the low-level envelope client is added in the next phase.
 
 ## Requirements
 

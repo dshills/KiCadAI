@@ -4,6 +4,7 @@
 /bin/
 /dist/
 .gocache/
+.gomodcache/
 *.test
 coverage.out
 

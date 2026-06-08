@@ -1,13 +1,14 @@
 .PHONY: test run-help refresh-kicad-proto proto proto-check
 
 GOCACHE_DIR := $(CURDIR)/.gocache
+GOMODCACHE_DIR := $(CURDIR)/.gomodcache
 PATH_WITH_TOOLS := $(CURDIR)/bin:$(PATH)
 
 test:
-	GOCACHE=$(GOCACHE_DIR) go test ./...
+	GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) go test ./...
 
 run-help:
-	GOCACHE=$(GOCACHE_DIR) go run ./cmd/kicadai --help
+	GOCACHE=$(GOCACHE_DIR) GOMODCACHE=$(GOMODCACHE_DIR) go run ./cmd/kicadai --help
 
 refresh-kicad-proto:
 	./scripts/refresh-kicad-proto.sh
