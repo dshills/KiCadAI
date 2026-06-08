@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/config"
+	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 )
 
@@ -142,9 +143,46 @@ func TestRunPingJSONFailureReturnsError(t *testing.T) {
 	}
 }
 
+func TestRunDocumentsJSON(t *testing.T) {
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{
+			documents: []kiapi.Document{{
+				Type:       kiapi.DocumentTypeSchematic,
+				Identifier: "/",
+				SheetPath:  "/",
+			}},
+		}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--document-type", "schematic",
+		"--json",
+		"documents",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		`"documents": [`,
+		`"type": "schematic"`,
+		`"sheet_path": "/"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, output)
+		}
+	}
+}
+
 type fakeAPIClient struct {
-	pingErr error
-	version *commontypes.KiCadVersion
+	pingErr   error
+	version   *commontypes.KiCadVersion
+	documents []kiapi.Document
 }
 
 func (c *fakeAPIClient) Ping(context.Context) error {
@@ -153,6 +191,10 @@ func (c *fakeAPIClient) Ping(context.Context) error {
 
 func (c *fakeAPIClient) GetVersion(context.Context) (*commontypes.KiCadVersion, error) {
 	return c.version, nil
+}
+
+func (c *fakeAPIClient) GetOpenDocuments(context.Context, kiapi.DocumentType) ([]kiapi.Document, error) {
+	return c.documents, nil
 }
 
 func (c *fakeAPIClient) Close() error {

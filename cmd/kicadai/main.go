@@ -23,6 +23,7 @@ Usage:
 
 Commands:
   config    Print resolved connection configuration
+  documents List open KiCad documents
   ping      Check whether KiCad responds to the API
   version   Print KiCad version information
   help      Print this help text
@@ -32,6 +33,7 @@ Global flags:
   --token string        KiCad API token
   --client-name string  Client name sent to KiCad
   --timeout-ms int      IPC timeout in milliseconds
+  --document-type string Document filter: all, schematic, pcb, symbol, footprint, drawing_sheet, project
   --json                Print command output as JSON when supported
 `
 
@@ -40,12 +42,14 @@ type cliOptions struct {
 	apiCredential string
 	clientName    string
 	timeoutMS     int
+	documentType  string
 	jsonOutput    bool
 }
 
 type apiClient interface {
 	Ping(context.Context) error
 	GetVersion(context.Context) (*commontypes.KiCadVersion, error)
+	GetOpenDocuments(context.Context, kiapi.DocumentType) ([]kiapi.Document, error)
 	Close() error
 }
 
@@ -82,6 +86,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return nil
 	case "config":
 		return runConfig(opts, stdout)
+	case "documents":
+		return a.runDocuments(opts, stdout)
 	case "ping":
 		return a.runPing(opts, stdout)
 	case "version":
@@ -100,6 +106,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.apiCredential, "token", "", "KiCad API token")
 	flags.StringVar(&opts.clientName, "client-name", "", "client name sent to KiCad")
 	flags.IntVar(&opts.timeoutMS, "timeout-ms", 0, "IPC timeout in milliseconds")
+	flags.StringVar(&opts.documentType, "document-type", "all", "document type filter")
 	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
 
 	if err := flags.Parse(args); err != nil {
@@ -201,6 +208,51 @@ func (a app) runVersion(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
+func (a app) runDocuments(opts cliOptions, stdout io.Writer) error {
+	documentType, err := kiapi.ParseDocumentType(opts.documentType)
+	if err != nil {
+		return err
+	}
+
+	resolved, client, ctx, cancel, err := a.connect(opts)
+	if err != nil {
+		return writeProbeFailure(opts, stdout, resolved, err)
+	}
+	defer cancel()
+	defer client.Close()
+
+	documents, err := client.GetOpenDocuments(ctx, documentType)
+	result := documentsResult{
+		SocketPath: resolved.SocketPath,
+		ClientName: resolved.ClientName,
+		Documents:  documents,
+	}
+	if err != nil {
+		result.Error = err.Error()
+	}
+
+	if opts.jsonOutput {
+		if result.Documents == nil {
+			result.Documents = []kiapi.Document{}
+		}
+		if encodeErr := writeJSON(stdout, result); encodeErr != nil {
+			return encodeErr
+		}
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	if len(documents) == 0 {
+		fmt.Fprintln(stdout, "documents: none")
+		return nil
+	}
+	for _, document := range documents {
+		fmt.Fprintf(stdout, "%s\t%s\n", document.Type, document.Identifier)
+	}
+	return nil
+}
+
 type probeResult struct {
 	SocketPath string       `json:"socket_path"`
 	ClientName string       `json:"client_name"`
@@ -214,6 +266,13 @@ type versionInfo struct {
 	Minor       uint32 `json:"minor"`
 	Patch       uint32 `json:"patch"`
 	FullVersion string `json:"full_version"`
+}
+
+type documentsResult struct {
+	SocketPath string           `json:"socket_path"`
+	ClientName string           `json:"client_name"`
+	Documents  []kiapi.Document `json:"documents"`
+	Error      string           `json:"error,omitempty"`
 }
 
 func (a app) connect(opts cliOptions) (config.Config, apiClient, context.Context, context.CancelFunc, error) {

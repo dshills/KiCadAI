@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Phase
 
-Phase 0 through Phase 6 are implemented:
+Phase 0 through Phase 7 are implemented:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -15,8 +15,9 @@ Phase 0 through Phase 6 are implemented:
 - IPC transport abstraction with fake and Mangos-backed request/reply implementations.
 - Low-level KiCad protobuf envelope client with token capture and API status errors.
 - CLI `ping` and `version` probes.
+- Open document discovery and CLI `documents` listing.
 
-Document discovery and schematic automation are planned next.
+Schematic automation is planned next.
 
 ## Requirements
 
@@ -31,6 +32,7 @@ go run ./cmd/kicadai --help
 go run ./cmd/kicadai --json config
 go run ./cmd/kicadai --json ping
 go run ./cmd/kicadai --json version
+go run ./cmd/kicadai --json documents
 make proto
 make proto-check
 ```
