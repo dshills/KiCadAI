@@ -25,6 +25,7 @@ type ProjectFile struct {
 	Generator     string
 	PageSettings  PageSettings
 	NetClasses    []NetClass
+	Sheets        []Sheet
 	TextVariables map[string]string
 }
 
@@ -38,6 +39,11 @@ type NetClass struct {
 	TrackWidth  kicadfiles.IU
 	ViaDiameter kicadfiles.IU
 	ViaDrill    kicadfiles.IU
+}
+
+type Sheet struct {
+	UUID string
+	Name string
 }
 
 func Validate(project ProjectFile) error {
@@ -129,12 +135,22 @@ func Write(w io.Writer, project ProjectFile) error {
 }
 
 type document struct {
-	DesignID      string            `json:"design_id"`
-	Generator     string            `json:"generator"`
-	Meta          meta              `json:"meta"`
-	PageSettings  pageSettings      `json:"page_settings"`
-	NetSettings   netSettings       `json:"net_settings"`
-	TextVariables map[string]string `json:"text_variables,omitempty"`
+	Board                  map[string]any    `json:"board"`
+	Boards                 []string          `json:"boards"`
+	ComponentClassSettings map[string]any    `json:"component_class_settings"`
+	Cvpcb                  map[string]any    `json:"cvpcb"`
+	DesignID               string            `json:"design_id"`
+	ERC                    map[string]any    `json:"erc"`
+	Generator              string            `json:"generator"`
+	Libraries              map[string]any    `json:"libraries"`
+	Meta                   meta              `json:"meta"`
+	PageSettings           pageSettings      `json:"page_settings"`
+	NetSettings            netSettings       `json:"net_settings"`
+	PCBNew                 map[string]any    `json:"pcbnew"`
+	Schematic              map[string]any    `json:"schematic"`
+	Sheets                 []sheet           `json:"sheets"`
+	TextVariables          map[string]string `json:"text_variables"`
+	TimeDomainParameters   map[string]any    `json:"time_domain_parameters"`
 }
 
 type meta struct {
@@ -159,6 +175,8 @@ type netClass struct {
 	ViaDrill    float64 `json:"via_drill"`
 }
 
+type sheet []string
+
 func newDocument(project ProjectFile) document {
 	settings := pageSettings{Paper: strings.TrimSpace(project.PageSettings.Paper.Name)}
 	if project.PageSettings.Paper.Width != 0 {
@@ -180,13 +198,38 @@ func newDocument(project ProjectFile) document {
 	}
 
 	return document{
-		DesignID:      string(project.DesignID),
-		Generator:     strings.TrimSpace(project.Generator),
-		Meta:          meta{Version: formatVersionNumber(project.FormatVersion)},
-		PageSettings:  settings,
-		NetSettings:   netSettings{Classes: classes},
-		TextVariables: project.TextVariables,
+		Board:                  map[string]any{"design_settings": map[string]any{}},
+		Boards:                 []string{},
+		ComponentClassSettings: map[string]any{},
+		Cvpcb:                  map[string]any{},
+		DesignID:               string(project.DesignID),
+		ERC:                    map[string]any{},
+		Generator:              strings.TrimSpace(project.Generator),
+		Libraries:              map[string]any{},
+		Meta:                   meta{Version: 1},
+		PageSettings:           settings,
+		NetSettings:            netSettings{Classes: classes},
+		PCBNew:                 map[string]any{},
+		Schematic:              map[string]any{},
+		Sheets:                 renderSheets(project.Sheets),
+		TextVariables:          textVariables(project.TextVariables),
+		TimeDomainParameters:   map[string]any{},
 	}
+}
+
+func renderSheets(projectSheets []Sheet) []sheet {
+	sheets := make([]sheet, 0, len(projectSheets))
+	for _, projectSheet := range projectSheets {
+		sheets = append(sheets, sheet{projectSheet.UUID, projectSheet.Name})
+	}
+	return sheets
+}
+
+func textVariables(values map[string]string) map[string]string {
+	if values == nil {
+		return map[string]string{}
+	}
+	return values
 }
 
 func mmNumber(value kicadfiles.IU) float64 {

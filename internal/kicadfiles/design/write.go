@@ -184,11 +184,15 @@ func designFiles(design Design) ([]generatedFile, error) {
 	if err := validateFileComponent(name); err != nil {
 		return nil, err
 	}
+	projectFile := design.Project
+	if len(projectFile.Sheets) == 0 {
+		projectFile.Sheets = projectSheets(design)
+	}
 	files := []generatedFile{{
 		Path: name + ".kicad_pro",
 		Mode: 0o644,
 		Write: func(w io.Writer) error {
-			return project.Write(w, design.Project)
+			return project.Write(w, projectFile)
 		},
 	}}
 	if design.Schematic != nil {
@@ -245,6 +249,20 @@ func designFiles(design Design) ([]generatedFile, error) {
 		})
 	}
 	return validateGeneratedFiles(files)
+}
+
+func projectSheets(design Design) []project.Sheet {
+	var sheets []project.Sheet
+	if design.Schematic != nil {
+		sheets = append(sheets, project.Sheet{UUID: string(design.Schematic.UUID), Name: "Root"})
+	}
+	for _, sheetFile := range design.SheetFiles {
+		if sheetFile != nil {
+			name := strings.TrimSuffix(path.Base(strings.TrimSpace(sheetFile.Filename)), ".kicad_sch")
+			sheets = append(sheets, project.Sheet{UUID: string(sheetFile.UUID), Name: name})
+		}
+	}
+	return sheets
 }
 
 func validateGeneratedFiles(files []generatedFile) ([]generatedFile, error) {

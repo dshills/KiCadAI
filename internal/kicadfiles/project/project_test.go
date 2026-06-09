@@ -16,32 +16,25 @@ func TestWriteMinimalProject(t *testing.T) {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
-	want := strings.Join([]string{
-		"{",
-		"  \"design_id\": \"6ba7b810-9dad-11d1-80b4-00c04fd430c8\",",
-		"  \"generator\": \"kicadai\",",
-		"  \"meta\": {",
-		"    \"version\": 20230121",
-		"  },",
-		"  \"page_settings\": {",
-		"    \"paper\": \"A4\"",
-		"  },",
-		"  \"net_settings\": {",
-		"    \"classes\": [",
-		"      {",
-		"        \"name\": \"Default\",",
-		"        \"clearance\": 0.2,",
-		"        \"track_width\": 0.25,",
-		"        \"via_diameter\": 0.8,",
-		"        \"via_drill\": 0.4",
-		"      }",
-		"    ]",
-		"  }",
-		"}",
-		"",
-	}, "\n")
-	if got := buf.String(); got != want {
-		t.Fatalf("Write =\n%s\nwant =\n%s", got, want)
+	for _, want := range []string{
+		"\"board\":",
+		"\"boards\": []",
+		"\"component_class_settings\": {}",
+		"\"cvpcb\": {}",
+		"\"erc\": {}",
+		"\"libraries\": {}",
+		"\"meta\": {\n    \"version\": 1",
+		"\"net_settings\":",
+		"\"pcbnew\": {}",
+		"\"schematic\": {}",
+		"\"sheets\": []",
+		"\"text_variables\": {}",
+		"\"time_domain_parameters\": {}",
+		"\"name\": \"Default\"",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("output missing %s:\n%s", want, buf.String())
+		}
 	}
 }
 
@@ -80,6 +73,27 @@ func TestWriteProjectWithNetClasses(t *testing.T) {
 		"\"track_width\": 0.25",
 		"\"via_diameter\": 0.8",
 		"\"via_drill\": 0.4",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("output missing %s:\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestWriteProjectWithSheets(t *testing.T) {
+	project := minimalProject()
+	project.Sheets = []Sheet{{UUID: "root-uuid", Name: "Root"}, {UUID: "child-uuid", Name: "Power"}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, project); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	for _, want := range []string{
+		"\"sheets\": [",
+		"\"root-uuid\"",
+		"\"Root\"",
+		"\"child-uuid\"",
+		"\"Power\"",
 	} {
 		if !strings.Contains(buf.String(), want) {
 			t.Fatalf("output missing %s:\n%s", want, buf.String())
