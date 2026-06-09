@@ -108,6 +108,56 @@ func TestWriteIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestLEDIndicatorSchematicIsDeterministic(t *testing.T) {
+	input := LEDIndicatorInput{
+		Name:     "led_indicator",
+		DesignID: kicadfiles.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+		Seed:     "fixture",
+	}
+	first, err := LEDIndicatorSchematic(input)
+	if err != nil {
+		t.Fatalf("LEDIndicatorSchematic returned error: %v", err)
+	}
+	second, err := LEDIndicatorSchematic(input)
+	if err != nil {
+		t.Fatalf("LEDIndicatorSchematic returned error: %v", err)
+	}
+
+	var firstOutput bytes.Buffer
+	var secondOutput bytes.Buffer
+	if err := Write(&firstOutput, first); err != nil {
+		t.Fatalf("first Write returned error: %v", err)
+	}
+	if err := Write(&secondOutput, second); err != nil {
+		t.Fatalf("second Write returned error: %v", err)
+	}
+	if firstOutput.String() != secondOutput.String() {
+		t.Fatalf("LED fixture is not deterministic")
+	}
+	for _, want := range []string{"(lib_symbols", "\"Device:R\"", "\"Device:LED\"", "\"LED_OUT\"", "(wire"} {
+		if !strings.Contains(firstOutput.String(), want) {
+			t.Fatalf("LED output missing %s:\n%s", want, firstOutput.String())
+		}
+	}
+}
+
+func TestValidateRejectsInvalidElements(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{UUID: schematic.UUID, LibraryID: "", Reference: "R1", Value: "1k"}}
+	schematic.Wires = []Wire{{UUID: schematic.UUID, Points: []kicadfiles.Point{{}, {}}}}
+	schematic.Labels = []Label{{UUID: schematic.UUID, Text: "", Kind: "bad"}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
+		}
+	}
+}
+
 func minimalSchematic() SchematicFile {
 	return SchematicFile{
 		Version:   kicadfiles.KiCadFormatV20230121,
