@@ -23,6 +23,8 @@ type PCBFile struct {
 	Tracks               []Track
 	Vias                 []Via
 	Drawings             []Drawing
+	Zones                []Zone
+	Dimensions           []Dimension
 	TitleBlock           kicadfiles.TitleBlock
 	RequireClosedOutline bool
 }
@@ -61,6 +63,7 @@ type Footprint struct {
 	Layer     kicadfiles.BoardLayer
 	Texts     []FootprintText
 	Pads      []Pad
+	Graphics  []FootprintGraphic
 }
 
 type FootprintText struct {
@@ -84,10 +87,13 @@ type Pad struct {
 }
 
 type Drawing struct {
-	UUID  kicadfiles.UUID
-	Layer kicadfiles.BoardLayer
-	Kind  string
-	Line  *LineDrawing
+	UUID   kicadfiles.UUID
+	Layer  kicadfiles.BoardLayer
+	Kind   string
+	Line   *LineDrawing
+	Circle *CircleDrawing
+	Arc    *ArcDrawing
+	Poly   *PolylineDrawing
 }
 
 type LineDrawing struct {
@@ -95,6 +101,26 @@ type LineDrawing struct {
 	End   kicadfiles.Point
 	Width kicadfiles.IU
 }
+
+type CircleDrawing struct {
+	Center kicadfiles.Point
+	End    kicadfiles.Point
+	Width  kicadfiles.IU
+}
+
+type ArcDrawing struct {
+	Start kicadfiles.Point
+	Mid   kicadfiles.Point
+	End   kicadfiles.Point
+	Width kicadfiles.IU
+}
+
+type PolylineDrawing struct {
+	Points []kicadfiles.Point
+	Width  kicadfiles.IU
+}
+
+type FootprintGraphic Drawing
 
 type Track struct {
 	UUID    kicadfiles.UUID
@@ -112,6 +138,25 @@ type Via struct {
 	Drill    kicadfiles.IU
 	NetCode  int
 	Layers   []kicadfiles.BoardLayer
+}
+
+type Zone struct {
+	UUID     kicadfiles.UUID
+	NetCode  int
+	Layers   []kicadfiles.BoardLayer
+	Polygons [][]kicadfiles.Point
+	Priority int
+}
+
+type Dimension struct {
+	UUID     kicadfiles.UUID
+	Type     string
+	Layer    kicadfiles.BoardLayer
+	Points   []kicadfiles.Point
+	Height   kicadfiles.IU
+	Text     string
+	Position kicadfiles.Point
+	Rotation kicadfiles.Angle
 }
 
 func DefaultTwoLayerStack() []LayerDefinition {
@@ -207,6 +252,12 @@ func Validate(board PCBFile) error {
 	for i, via := range board.Vias {
 		errs = append(errs, validateVia(i, via, validNetCodes)...)
 	}
+	for i, zone := range board.Zones {
+		errs = append(errs, validateZone(i, zone, validNetCodes)...)
+	}
+	for i, dimension := range board.Dimensions {
+		errs = append(errs, validateDimension(i, dimension)...)
+	}
 	return errs.Err()
 }
 
@@ -253,6 +304,12 @@ func render(board PCBFile) (sexpr.List, error) {
 	}
 	for _, via := range board.Vias {
 		nodes = append(nodes, renderVia(via))
+	}
+	for _, zone := range board.Zones {
+		nodes = append(nodes, renderZone(zone, netNames))
+	}
+	for _, dimension := range board.Dimensions {
+		nodes = append(nodes, renderDimension(dimension))
 	}
 	return sexpr.L(nodes...), nil
 }
@@ -311,6 +368,9 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	for _, pad := range footprint.Pads {
 		nodes = append(nodes, renderPad(pad, netNames[pad.NetCode]))
 	}
+	for _, graphic := range footprint.Graphics {
+		nodes = append(nodes, renderFootprintGraphic(graphic))
+	}
 	return sexpr.L(nodes...)
 }
 
@@ -345,17 +405,47 @@ func renderPad(pad Pad, netName string) sexpr.List {
 }
 
 func renderDrawing(drawing Drawing) sexpr.List {
-	if drawing.Line == nil {
-		return sexpr.L(sexpr.A("gr_unsupported"), sexpr.S(drawing.Kind))
+	return renderGraphic("gr", Drawing(drawing))
+}
+
+func renderFootprintGraphic(graphic FootprintGraphic) sexpr.List {
+	return renderGraphic("fp", Drawing(graphic))
+}
+
+func renderGraphic(prefix string, drawing Drawing) sexpr.List {
+	nodes := []sexpr.Node{sexpr.A(prefix + "_" + drawingKind(drawing))}
+	switch {
+	case drawing.Line != nil:
+		nodes = append(nodes,
+			sexpr.L(sexpr.A("start"), fixed(drawing.Line.Start.X), fixed(drawing.Line.Start.Y)),
+			sexpr.L(sexpr.A("end"), fixed(drawing.Line.End.X), fixed(drawing.Line.End.Y)),
+			renderStroke(drawing.Line.Width),
+		)
+	case drawing.Circle != nil:
+		nodes = append(nodes,
+			sexpr.L(sexpr.A("center"), fixed(drawing.Circle.Center.X), fixed(drawing.Circle.Center.Y)),
+			sexpr.L(sexpr.A("end"), fixed(drawing.Circle.End.X), fixed(drawing.Circle.End.Y)),
+			renderStroke(drawing.Circle.Width),
+		)
+	case drawing.Arc != nil:
+		nodes = append(nodes,
+			sexpr.L(sexpr.A("start"), fixed(drawing.Arc.Start.X), fixed(drawing.Arc.Start.Y)),
+			sexpr.L(sexpr.A("mid"), fixed(drawing.Arc.Mid.X), fixed(drawing.Arc.Mid.Y)),
+			sexpr.L(sexpr.A("end"), fixed(drawing.Arc.End.X), fixed(drawing.Arc.End.Y)),
+			renderStroke(drawing.Arc.Width),
+		)
+	case drawing.Poly != nil:
+		nodes = append(nodes, renderPoints(drawing.Poly.Points), renderStroke(drawing.Poly.Width), sexpr.L(sexpr.A("fill"), sexpr.A("none")))
 	}
-	return sexpr.L(
-		sexpr.A("gr_line"),
-		sexpr.L(sexpr.A("start"), fixed(drawing.Line.Start.X), fixed(drawing.Line.Start.Y)),
-		sexpr.L(sexpr.A("end"), fixed(drawing.Line.End.X), fixed(drawing.Line.End.Y)),
-		sexpr.L(sexpr.A("stroke"), sexpr.L(sexpr.A("width"), fixed(drawing.Line.Width)), sexpr.L(sexpr.A("type"), sexpr.A("solid"))),
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(drawing.Layer))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(drawing.UUID))),
 	)
+	return sexpr.L(nodes...)
+}
+
+func renderStroke(width kicadfiles.IU) sexpr.List {
+	return sexpr.L(sexpr.A("stroke"), sexpr.L(sexpr.A("width"), fixed(width)), sexpr.L(sexpr.A("type"), sexpr.A("solid")))
 }
 
 func renderTrack(track Track) sexpr.List {
@@ -380,6 +470,41 @@ func renderVia(via Via) sexpr.List {
 		sexpr.L(sexpr.A("net"), sexpr.I(int64(via.NetCode))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(via.UUID))),
 	)
+}
+
+func renderZone(zone Zone, netNames map[int]string) sexpr.List {
+	nodes := []sexpr.Node{
+		sexpr.A("zone"),
+		sexpr.L(sexpr.A("net"), sexpr.I(int64(zone.NetCode))),
+		sexpr.L(sexpr.A("net_name"), sexpr.S(netNames[zone.NetCode])),
+		renderLayerList("layers", zone.Layers),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(zone.UUID))),
+		sexpr.L(sexpr.A("priority"), sexpr.I(int64(zone.Priority))),
+	}
+	for _, polygon := range zone.Polygons {
+		nodes = append(nodes, sexpr.L(sexpr.A("polygon"), renderPoints(polygon)))
+	}
+	return sexpr.L(nodes...)
+}
+
+func renderDimension(dimension Dimension) sexpr.List {
+	return sexpr.L(
+		sexpr.A("dimension"),
+		sexpr.L(sexpr.A("type"), sexpr.A(dimension.Type)),
+		sexpr.L(sexpr.A("layer"), sexpr.S(string(dimension.Layer))),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(dimension.UUID))),
+		renderPoints(dimension.Points),
+		sexpr.L(sexpr.A("height"), fixed(dimension.Height)),
+		sexpr.L(sexpr.A("gr_text"), sexpr.S(dimension.Text), renderAt(dimension.Position, dimension.Rotation)),
+	)
+}
+
+func renderPoints(points []kicadfiles.Point) sexpr.List {
+	nodes := []sexpr.Node{sexpr.A("pts")}
+	for _, point := range points {
+		nodes = append(nodes, sexpr.L(sexpr.A("xy"), fixed(point.X), fixed(point.Y)))
+	}
+	return sexpr.L(nodes...)
 }
 
 func renderAt(point kicadfiles.Point, rotation kicadfiles.Angle) sexpr.List {
@@ -486,6 +611,9 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 		}
 		padNames[pad.Name] = struct{}{}
 	}
+	for graphicIndex, graphic := range footprint.Graphics {
+		errs = append(errs, validateGraphic(indexedValue(prefix("graphics"), graphicIndex), Drawing(graphic))...)
+	}
 	return errs
 }
 
@@ -538,26 +666,51 @@ func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{
 }
 
 func validateDrawing(index int, drawing Drawing) kicadfiles.ValidationErrors {
+	return validateGraphic(indexedValue("drawings", index), drawing)
+}
+
+func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
-	prefix := func(field string) string { return indexed("drawings", index, field) }
 	if !drawing.UUID.Valid() {
-		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
-	}
-	if drawing.Kind != "" && drawing.Kind != "line" {
-		errs = append(errs, fieldError(prefix("kind"), "unsupported"))
-	}
-	if drawing.Line == nil {
-		errs = append(errs, fieldError(prefix("line"), "required"))
-		return errs
+		errs = append(errs, fieldError(prefix+".uuid", "valid UUID required"))
 	}
 	if !kicadfiles.IsValidBoardLayer(drawing.Layer) {
-		errs = append(errs, fieldError(prefix("layer"), "invalid"))
+		errs = append(errs, fieldError(prefix+".layer", "invalid"))
 	}
-	if drawing.Line.Width <= 0 {
-		errs = append(errs, fieldError(prefix("line.width"), "must be positive"))
+	shapes := countShapes(drawing)
+	if shapes != 1 {
+		errs = append(errs, fieldError(prefix, "exactly one shape required"))
+		return errs
 	}
-	if drawing.Line.Start == drawing.Line.End {
-		errs = append(errs, fieldError(prefix("line"), "must have non-zero length"))
+	switch {
+	case drawing.Line != nil:
+		if drawing.Line.Width <= 0 {
+			errs = append(errs, fieldError(prefix+".line.width", "must be positive"))
+		}
+		if drawing.Line.Start == drawing.Line.End {
+			errs = append(errs, fieldError(prefix+".line", "must have non-zero length"))
+		}
+	case drawing.Circle != nil:
+		if drawing.Circle.Width <= 0 {
+			errs = append(errs, fieldError(prefix+".circle.width", "must be positive"))
+		}
+		if drawing.Circle.Center == drawing.Circle.End {
+			errs = append(errs, fieldError(prefix+".circle", "must have non-zero radius"))
+		}
+	case drawing.Arc != nil:
+		if drawing.Arc.Width <= 0 {
+			errs = append(errs, fieldError(prefix+".arc.width", "must be positive"))
+		}
+		if drawing.Arc.Start == drawing.Arc.Mid || drawing.Arc.Mid == drawing.Arc.End || drawing.Arc.Start == drawing.Arc.End {
+			errs = append(errs, fieldError(prefix+".arc", "points must be distinct"))
+		}
+	case drawing.Poly != nil:
+		if drawing.Poly.Width <= 0 {
+			errs = append(errs, fieldError(prefix+".poly.width", "must be positive"))
+		}
+		if countDistinctPoints(drawing.Poly.Points) < 2 {
+			errs = append(errs, fieldError(prefix+".poly.points", "at least two distinct points required"))
+		}
 	}
 	return errs
 }
@@ -626,6 +779,98 @@ func validateVia(index int, via Via, netCodes map[int]struct{}) kicadfiles.Valid
 		errs = append(errs, fieldError(prefix("layers"), "at least two copper layers required"))
 	}
 	return errs
+}
+
+func validateZone(index int, zone Zone, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	prefix := func(field string) string { return indexed("zones", index, field) }
+	if !zone.UUID.Valid() {
+		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
+	}
+	if _, ok := netCodes[zone.NetCode]; !ok {
+		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
+	}
+	if len(zone.Layers) == 0 {
+		errs = append(errs, fieldError(prefix("layers"), "required"))
+	}
+	for layerIndex, layer := range zone.Layers {
+		if !kicadfiles.IsValidBoardLayer(layer) {
+			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "invalid"))
+		}
+	}
+	if len(zone.Polygons) == 0 {
+		errs = append(errs, fieldError(prefix("polygons"), "required"))
+	}
+	for polygonIndex, polygon := range zone.Polygons {
+		if countDistinctPoints(polygon) < 3 {
+			errs = append(errs, fieldError(indexed(prefix("polygons"), polygonIndex, "points"), "at least three distinct points required"))
+		}
+	}
+	return errs
+}
+
+func validateDimension(index int, dimension Dimension) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	prefix := func(field string) string { return indexed("dimensions", index, field) }
+	if !dimension.UUID.Valid() {
+		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
+	}
+	if strings.TrimSpace(dimension.Type) == "" {
+		errs = append(errs, fieldError(prefix("type"), "required"))
+	}
+	if !kicadfiles.IsValidBoardLayer(dimension.Layer) {
+		errs = append(errs, fieldError(prefix("layer"), "invalid"))
+	}
+	if countDistinctPoints(dimension.Points) < 2 {
+		errs = append(errs, fieldError(prefix("points"), "at least two distinct points required"))
+	}
+	if dimension.Height <= 0 {
+		errs = append(errs, fieldError(prefix("height"), "must be positive"))
+	}
+	if strings.TrimSpace(dimension.Text) == "" {
+		errs = append(errs, fieldError(prefix("text"), "required"))
+	}
+	return errs
+}
+
+func countShapes(drawing Drawing) int {
+	count := 0
+	if drawing.Line != nil {
+		count++
+	}
+	if drawing.Circle != nil {
+		count++
+	}
+	if drawing.Arc != nil {
+		count++
+	}
+	if drawing.Poly != nil {
+		count++
+	}
+	return count
+}
+
+func drawingKind(drawing Drawing) string {
+	switch {
+	case drawing.Line != nil:
+		return "line"
+	case drawing.Circle != nil:
+		return "circle"
+	case drawing.Arc != nil:
+		return "arc"
+	case drawing.Poly != nil:
+		return "poly"
+	default:
+		return drawing.Kind
+	}
+}
+
+func countDistinctPoints(points []kicadfiles.Point) int {
+	seen := make(map[kicadfiles.Point]struct{}, len(points))
+	for _, point := range points {
+		seen[point] = struct{}{}
+	}
+	return len(seen)
 }
 
 func countDistinctCopperLayers(layers []kicadfiles.BoardLayer) int {

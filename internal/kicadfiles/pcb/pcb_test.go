@@ -523,6 +523,97 @@ func TestValidateRequiresClosedOutline(t *testing.T) {
 	}
 }
 
+func TestWriteAdvancedGeometry(t *testing.T) {
+	board := advancedGeometryPCB()
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(fp_line",
+		"(fp_circle",
+		"(fp_arc",
+		"(fp_poly",
+		"(gr_line",
+		"(gr_circle",
+		"(gr_arc",
+		"(gr_poly",
+		"(zone",
+		"(net_name \"GND\")",
+		"(polygon",
+		"(dimension",
+		"(type aligned)",
+		"(gr_text",
+		"\"20 mm\"",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestValidateRejectsGraphicWithMultipleShapes(t *testing.T) {
+	board := minimalPCB()
+	board.Drawings = []Drawing{{
+		UUID:  kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Layer: kicadfiles.LayerDwgs,
+		Line:  &LineDrawing{Start: point(1, 1), End: point(2, 1), Width: kicadfiles.MM(0.1)},
+		Circle: &CircleDrawing{
+			Center: point(1, 1),
+			End:    point(2, 1),
+			Width:  kicadfiles.MM(0.1),
+		},
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "exactly one shape") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidZone(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "GND"}}
+	board.Zones = []Zone{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		NetCode:  1,
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0)}},
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "zones[0].polygons[0].points") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidDimension(t *testing.T) {
+	board := minimalPCB()
+	board.Dimensions = []Dimension{{
+		UUID:   kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Layer:  kicadfiles.LayerDwgs,
+		Points: []kicadfiles.Point{point(0, 0), point(1, 0)},
+		Height: kicadfiles.MM(2),
+		Text:   "1 mm",
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "dimensions[0].type") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestWriteValidatesBeforeRendering(t *testing.T) {
 	var buf bytes.Buffer
 	err := Write(&buf, PCBFile{})
@@ -533,6 +624,46 @@ func TestWriteValidatesBeforeRendering(t *testing.T) {
 	if buf.Len() != 0 {
 		t.Fatalf("Write emitted output despite validation error: %q", buf.String())
 	}
+}
+
+func advancedGeometryPCB() PCBFile {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "GND"}}
+	footprint := minimalFootprint("11111111-1111-4111-8111-111111111111", "U1")
+	footprint.Graphics = []FootprintGraphic{
+		{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Layer: kicadfiles.LayerFSilkS, Line: &LineDrawing{Start: point(0, 0), End: point(2, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Layer: kicadfiles.LayerFSilkS, Circle: &CircleDrawing{Center: point(0, 0), End: point(1, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("44444444-4444-4444-8444-444444444444"), Layer: kicadfiles.LayerFSilkS, Arc: &ArcDrawing{Start: point(0, 0), Mid: point(1, 1), End: point(2, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("55555555-5555-4555-8555-555555555555"), Layer: kicadfiles.LayerFSilkS, Poly: &PolylineDrawing{Points: []kicadfiles.Point{point(0, 0), point(1, 0), point(1, 1)}, Width: kicadfiles.MM(0.1)}},
+	}
+	board.Footprints = []Footprint{footprint}
+	board.Drawings = []Drawing{
+		{UUID: kicadfiles.UUID("66666666-6666-4666-8666-666666666666"), Layer: kicadfiles.LayerDwgs, Line: &LineDrawing{Start: point(0, 0), End: point(20, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("77777777-7777-4777-8777-777777777777"), Layer: kicadfiles.LayerDwgs, Circle: &CircleDrawing{Center: point(5, 5), End: point(6, 5), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("88888888-8888-4888-8888-888888888888"), Layer: kicadfiles.LayerDwgs, Arc: &ArcDrawing{Start: point(0, 0), Mid: point(1, 1), End: point(2, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("99999999-9999-4999-8999-999999999999"), Layer: kicadfiles.LayerDwgs, Poly: &PolylineDrawing{Points: []kicadfiles.Point{point(0, 0), point(20, 0), point(20, 10), point(0, 0)}, Width: kicadfiles.MM(0.1)}},
+	}
+	board.Zones = []Zone{{
+		UUID:     kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		NetCode:  1,
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		Polygons: [][]kicadfiles.Point{{point(0, 0), point(20, 0), point(20, 10), point(0, 10)}},
+		Priority: 1,
+	}}
+	board.Dimensions = []Dimension{{
+		UUID:     kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		Type:     "aligned",
+		Layer:    kicadfiles.LayerDwgs,
+		Points:   []kicadfiles.Point{point(0, 0), point(20, 0)},
+		Height:   kicadfiles.MM(2),
+		Text:     "20 mm",
+		Position: point(10, -2),
+	}}
+	return board
+}
+
+func point(x, y float64) kicadfiles.Point {
+	return kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
 }
 
 func minimalFootprint(uuid, reference string) Footprint {
