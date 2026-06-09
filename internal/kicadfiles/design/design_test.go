@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/library"
 )
 
 func TestLEDIndicatorDesignValidates(t *testing.T) {
@@ -124,6 +125,97 @@ func TestValidateRejectsProjectSchematicNameMismatch(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "schematic.filename") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsUnresolvedSymbolLibrary(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.LibSymbols = nil
+	design.Schematic.Symbols[1].LibraryID = "Missing:R"
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unresolved library Missing") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAllowsSymbolLibraryTableReference(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.LibSymbols = nil
+	design.Schematic.Symbols = design.Schematic.Symbols[:1]
+	design.Schematic.Symbols[0].LibraryID = "local_symbols:Thing"
+	design.SymbolTables = []library.TableEntry{{
+		Name: "local_symbols",
+		Type: "KiCad",
+		URI:  "${KIPRJMOD}/local_symbols.kicad_sym",
+	}}
+	design.PCB = nil
+	design.ExpectedNets = nil
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateAllowsKnownExternalSymbolLibrary(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.LibSymbols = nil
+	design.Schematic.Symbols = design.Schematic.Symbols[:1]
+	design.Schematic.Symbols[0].LibraryID = "Device:R"
+	design.KnownSymbolLibraries = []string{"Device"}
+	design.PCB = nil
+	design.ExpectedNets = nil
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateTrimsLibraryIDNickname(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.LibSymbols = nil
+	design.Schematic.Symbols = design.Schematic.Symbols[:1]
+	design.Schematic.Symbols[0].LibraryID = " Device : R "
+	design.KnownSymbolLibraries = []string{"Device"}
+	design.PCB = nil
+	design.ExpectedNets = nil
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsUnresolvedNonInlineFootprintLibrary(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB.Footprints[0].LibraryID = "Missing:R_0603"
+	design.PCB.Footprints[0].Pads = nil
+	design.PCB.Footprints[0].Graphics = nil
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "unresolved library Missing") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAllowsFootprintLibraryTableReference(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB.Footprints[0].LibraryID = "local_footprints:R_0603"
+	design.PCB.Footprints[0].Pads = nil
+	design.PCB.Footprints[0].Graphics = nil
+	design.FootprintTables = []library.TableEntry{{
+		Name: "local_footprints",
+		Type: "KiCad",
+		URI:  "${KIPRJMOD}/footprints.pretty",
+	}}
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
 	}
 }
 

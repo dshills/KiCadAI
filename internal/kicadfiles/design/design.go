@@ -1,6 +1,7 @@
 package design
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 
@@ -12,13 +13,15 @@ import (
 )
 
 type Design struct {
-	Name            string
-	Project         project.ProjectFile
-	Schematic       *schematic.SchematicFile
-	PCB             *pcb.PCBFile
-	SymbolTables    []library.TableEntry
-	FootprintTables []library.TableEntry
-	ExpectedNets    []string
+	Name                    string
+	Project                 project.ProjectFile
+	Schematic               *schematic.SchematicFile
+	PCB                     *pcb.PCBFile
+	SymbolTables            []library.TableEntry
+	FootprintTables         []library.TableEntry
+	KnownSymbolLibraries    []string
+	KnownFootprintLibraries []string
+	ExpectedNets            []string
 }
 
 type LEDIndicatorInput struct {
@@ -108,11 +111,13 @@ func Validate(design Design) error {
 			errs = append(errs, nestedErrors(err)...)
 		}
 		errs = append(errs, validateSchematicReferences(design.Schematic)...)
+		errs = append(errs, validateSymbolLibraryReferences(design)...)
 	}
 	if design.PCB != nil {
 		if err := pcb.Validate(*design.PCB); err != nil {
 			errs = append(errs, nestedErrors(err)...)
 		}
+		errs = append(errs, validateFootprintLibraryReferences(design)...)
 		errs = append(errs, validateFootprintReferences(design)...)
 		errs = append(errs, validateExpectedNets(design)...)
 	}
@@ -171,6 +176,96 @@ func validateSchematicReferences(schematicFile *schematic.SchematicFile) kicadfi
 		seen[symbol.Reference] = struct{}{}
 	}
 	return errs
+}
+
+func validateSymbolLibraryReferences(design Design) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if design.Schematic == nil {
+		return errs
+	}
+	embedded := map[string]struct{}{}
+	for _, symbol := range design.Schematic.LibSymbols {
+		embedded[symbol.LibraryID] = struct{}{}
+	}
+	tables := tableNicknames(design.SymbolTables)
+	known := nameSet(design.KnownSymbolLibraries)
+	for i, symbol := range design.Schematic.Symbols {
+		if _, ok := embedded[symbol.LibraryID]; ok {
+			continue
+		}
+		nickname, err := libraryNickname(symbol.LibraryID)
+		if err != nil {
+			errs = append(errs, designError("schematic.symbols["+strconv.Itoa(i)+"].library_id", err.Error()))
+			continue
+		}
+		if _, ok := tables[nickname]; ok {
+			continue
+		}
+		if _, ok := known[nickname]; ok {
+			continue
+		}
+		errs = append(errs, designError("schematic.symbols["+strconv.Itoa(i)+"].library_id", "unresolved library "+nickname))
+	}
+	return errs
+}
+
+func validateFootprintLibraryReferences(design Design) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if design.PCB == nil {
+		return errs
+	}
+	tables := tableNicknames(design.FootprintTables)
+	known := nameSet(design.KnownFootprintLibraries)
+	for i, footprint := range design.PCB.Footprints {
+		if len(footprint.Pads) > 0 || len(footprint.Graphics) > 0 {
+			continue
+		}
+		nickname, err := libraryNickname(footprint.LibraryID)
+		if err != nil {
+			errs = append(errs, designError("pcb.footprints["+strconv.Itoa(i)+"].library_id", err.Error()))
+			continue
+		}
+		if _, ok := tables[nickname]; ok {
+			continue
+		}
+		if _, ok := known[nickname]; ok {
+			continue
+		}
+		errs = append(errs, designError("pcb.footprints["+strconv.Itoa(i)+"].library_id", "unresolved library "+nickname))
+	}
+	return errs
+}
+
+func libraryNickname(libID string) (string, error) {
+	parts := strings.SplitN(strings.TrimSpace(libID), ":", 2)
+	if len(parts) != 2 {
+		return "", fmt.Errorf("must be library_nickname:item_name")
+	}
+	nickname := strings.TrimSpace(parts[0])
+	item := strings.TrimSpace(parts[1])
+	if nickname == "" || item == "" {
+		return "", fmt.Errorf("must be library_nickname:item_name")
+	}
+	return nickname, nil
+}
+
+func tableNicknames(entries []library.TableEntry) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, entry := range entries {
+		names[strings.TrimSpace(entry.Name)] = struct{}{}
+	}
+	return names
+}
+
+func nameSet(values []string) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, value := range values {
+		name := strings.TrimSpace(value)
+		if name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
 }
 
 func schematicSymbolsByReference(schematicFile *schematic.SchematicFile) map[string]*schematic.SchematicSymbol {
