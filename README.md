@@ -4,7 +4,7 @@ KiCadAI is an early Go client for KiCad's IPC API. The first implementation esta
 
 ## Current Status
 
-Implementation phases are complete through Phase 14, with Phase 15 documented as a roadmap. The current functional surface is:
+Implementation phases are complete through direct KiCad file generation. The current functional surface is:
 
 - Go module and package layout.
 - CLI entrypoint at `cmd/kicadai`.
@@ -20,7 +20,9 @@ Implementation phases are complete through Phase 14, with Phase 15 documented as
 - Capability detection for schematic read versus missing schematic write commands.
 - Schematic domain request types and validation for planned symbol, wire, and label operations.
 - Deterministic LED demo planning and `plan-led-demo` CLI output.
-- LED demo execution boundary and `draw-led-demo --execute`, currently blocked by missing schematic write capability.
+- LED demo execution boundary and `draw-led-demo --execute`, currently blocked by missing live IPC schematic write capability.
+- Direct KiCad file writers for `.kicad_pro`, `.kicad_sch`, and `.kicad_pcb`.
+- Safe project directory generation and `generate-led-demo` / `generate-project` CLI commands.
 - AI-ready workflow registry with safe named operations and structured validation issues.
 - Developer setup, troubleshooting, integration-test, and protobuf regeneration docs.
 
@@ -84,11 +86,16 @@ go run ./cmd/kicadai --json ping
 go run ./cmd/kicadai --json version
 go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
+go run ./cmd/kicadai --output led_indicator --name led_indicator --seed demo --with-pcb --json generate-led-demo
 go run ./cmd/kicadai --document / --json plan-led-demo
 go run ./cmd/kicadai --document / --execute --json draw-led-demo
 ```
 
+`generate-led-demo` and `generate-project` write KiCad files directly and do not dial KiCad. If `--name` is omitted, it is derived from the `--output` directory basename; otherwise the output directory basename must match `--name`. Omit `--with-pcb` to generate only project and schematic files. Use `--overwrite` to replace an existing generated project directory through the safe directory-swap writer.
+
 `plan-led-demo` is deterministic and does not mutate KiCad. `draw-led-demo --execute` currently performs capability preflight and returns a structured failure when schematic write commands are unavailable in the generated API.
+
+More details are in [KiCad Direct File Writers](docs/kicad-file-writers.md).
 
 ## Testing
 
@@ -110,6 +117,16 @@ make coverage-check
 `make coverage` prints both the raw total and the hand-written total excluding `internal/kiapi/gen/**`. `make coverage-check` fails when the generated-excluded total drops below `COVERAGE_THRESHOLD`, which defaults to `75.0`.
 
 Normal coverage does not enable the `integration` build tag and does not require a running KiCad instance.
+
+Direct generated-file validation with KiCad CLI is opt-in:
+
+```sh
+KICAD_VALIDATE_GENERATED_FILES=1 \
+KICAD_CLI=/path/to/kicad-cli \
+go test -tags=integration ./internal/kicadfiles/design
+```
+
+This generates an LED project, exports a schematic netlist, and runs PCB DRC with violation exit codes enabled.
 
 Generated protobuf output can be checked with:
 

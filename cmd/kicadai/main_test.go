@@ -208,6 +208,23 @@ func TestRunGenerateProjectOmitsPCBByDefault(t *testing.T) {
 	}
 }
 
+func TestRunGenerateRejectsCurrentDirectoryOutput(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--output", ".",
+		"--json",
+		"generate-project",
+	}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), "project directory") {
+		t.Fatalf("expected project directory error JSON, got %s", stdout.String())
+	}
+}
+
 func TestRunPingJSON(t *testing.T) {
 	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
 		return &fakeAPIClient{}, nil

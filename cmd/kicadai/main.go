@@ -173,7 +173,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Int64Var(&opts.originY, "origin-y", 0, "plan origin Y")
 	flags.StringVar(&opts.prefix, "prefix", workflows.DefaultLEDDemoPrefix, "plan prefix")
 	flags.StringVar(&opts.output, "output", "", "output project directory")
-	flags.StringVar(&opts.name, "name", "led_indicator", "project/design name")
+	flags.StringVar(&opts.name, "name", "", "project/design name")
 	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
 	flags.StringVar(&opts.libVCC, "lib-vcc", defaultLibraryIDVCC, "VCC symbol library ID")
 	flags.StringVar(&opts.libGND, "lib-gnd", defaultLibraryIDGND, "GND symbol library ID")
@@ -471,14 +471,22 @@ type generationResult struct {
 
 func (a app) runGenerateLEDDemo(opts cliOptions, stdout io.Writer) error {
 	name := opts.name
-	if name == "" {
-		name = "led_indicator"
-	}
 	output := opts.output
 	if output == "" {
+		if name == "" {
+			name = "led_indicator"
+		}
 		output = name
 	}
-	if filepath.Base(filepath.Clean(output)) != name {
+	outputBase := filepath.Base(filepath.Clean(output))
+	if outputBase == "." || outputBase == ".." || outputBase == string(filepath.Separator) || outputBase == "" {
+		err := fmt.Errorf("output directory must name a project directory")
+		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
+	}
+	if name == "" {
+		name = outputBase
+	}
+	if outputBase != name {
 		err := fmt.Errorf("output directory basename must match --name %q", name)
 		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
 	}
