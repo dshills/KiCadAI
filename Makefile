@@ -17,9 +17,9 @@ coverage:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test ./... -coverprofile="$(COVER_PROFILE)"
 	awk 'NR == 1 || $$0 !~ /$(GEN_COVER_EXCLUDE)/' "$(COVER_PROFILE)" > "$(COVER_NOGEN_PROFILE)"
 	@printf "\nRaw coverage including generated protobuf code:\n"
-	go tool cover -func="$(COVER_PROFILE)" | grep '^total:'
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go tool cover -func="$(COVER_PROFILE)" | grep '^total:'
 	@printf "\nCoverage excluding internal/kiapi/gen/**:\n"
-	go tool cover -func="$(COVER_NOGEN_PROFILE)" | grep '^total:'
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go tool cover -func="$(COVER_NOGEN_PROFILE)" | grep '^total:'
 	@printf "\nProfiles:\n  %s\n  %s\n" "$(COVER_PROFILE)" "$(COVER_NOGEN_PROFILE)"
 
 run-help:

@@ -61,6 +61,61 @@ func TestRunConfigJSON(t *testing.T) {
 	}
 }
 
+func TestRunConfigTextRedactsToken(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--token", "secret-token",
+		"--client-name", "test-client",
+		"config",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"socket_path: ipc:///tmp/kicad/api.sock",
+		"client_name: test-client",
+		"token: <redacted>",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, output)
+		}
+	}
+	if strings.Contains(output, "secret-token") {
+		t.Fatalf("token leaked in output: %s", output)
+	}
+}
+
+func TestRunUnknownCommandReturnsUsage(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"bogus"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("run returned nil error")
+	}
+	if !strings.Contains(err.Error(), `unknown command "bogus"`) || !strings.Contains(err.Error(), "Usage:") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunHelpFlagPrintsUsage(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--help"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "Usage:") {
+		t.Fatalf("expected usage, got %s", stdout.String())
+	}
+}
+
 func TestRunPingJSON(t *testing.T) {
 	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
 		return &fakeAPIClient{}, nil
@@ -88,6 +143,58 @@ func TestRunPingJSON(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got %s", want, output)
 		}
+	}
+}
+
+func TestRunPingJSONConnectFailure(t *testing.T) {
+	want := errors.New("dial failed")
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return nil, want
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--client-name", "test-client",
+		"--json",
+		"ping",
+	}, &stdout, &stderr)
+	if !errors.Is(err, want) {
+		t.Fatalf("run error = %v, want %v", err, want)
+	}
+	output := stdout.String()
+	for _, wantText := range []string{
+		`"socket_path": "ipc:///tmp/kicad/api.sock"`,
+		`"client_name": "test-client"`,
+		`"reachable": false`,
+		`"error": "dial failed"`,
+	} {
+		if !strings.Contains(output, wantText) {
+			t.Fatalf("expected output to contain %q, got %s", wantText, output)
+		}
+	}
+}
+
+func TestRunPingTextConnectFailureDoesNotWriteJSON(t *testing.T) {
+	want := errors.New("dial failed")
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return nil, want
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"ping",
+	}, &stdout, &stderr)
+	if !errors.Is(err, want) {
+		t.Fatalf("run error = %v, want %v", err, want)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no text output on connect failure, got %s", stdout.String())
 	}
 }
 
@@ -123,6 +230,28 @@ func TestRunVersionJSON(t *testing.T) {
 	}
 }
 
+func TestRunVersionJSONFailureReturnsStructuredResult(t *testing.T) {
+	want := errors.New("version failed")
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{versionErr: want}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--json",
+		"version",
+	}, &stdout, &stderr)
+	if !errors.Is(err, want) {
+		t.Fatalf("run error = %v, want %v", err, want)
+	}
+	if !strings.Contains(stdout.String(), `"reachable": false`) || !strings.Contains(stdout.String(), `"error": "version failed"`) {
+		t.Fatalf("expected structured version failure, got %s", stdout.String())
+	}
+}
+
 func TestRunPingJSONFailureReturnsError(t *testing.T) {
 	want := errors.New("not reachable")
 	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
@@ -142,6 +271,19 @@ func TestRunPingJSONFailureReturnsError(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"reachable": false`) {
 		t.Fatalf("expected failure JSON, got %s", stdout.String())
+	}
+}
+
+func TestRunDocumentsInvalidType(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--document-type", "invalid",
+		"documents",
+	}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "unsupported document type") {
+		t.Fatalf("run error = %v, want unknown document type", err)
 	}
 }
 
@@ -178,6 +320,29 @@ func TestRunDocumentsJSON(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got %s", want, output)
 		}
+	}
+}
+
+func TestRunDocumentsJSONFailureReturnsStructuredResult(t *testing.T) {
+	want := errors.New("documents failed")
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{documentsErr: want}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--json",
+		"documents",
+	}, &stdout, &stderr)
+	if !errors.Is(err, want) {
+		t.Fatalf("run error = %v, want %v", err, want)
+	}
+	output := stdout.String()
+	if !strings.Contains(output, `"documents": []`) || !strings.Contains(output, `"error": "documents failed"`) {
+		t.Fatalf("expected structured documents failure, got %s", output)
 	}
 }
 
@@ -220,6 +385,28 @@ func TestRunCapabilitiesJSON(t *testing.T) {
 	}
 }
 
+func TestRunCapabilitiesJSONVersionFailure(t *testing.T) {
+	want := errors.New("version failed")
+	app := appWithClientFactory(func(ctx context.Context, cfg config.Config) (apiClient, error) {
+		return &fakeAPIClient{versionErr: want}, nil
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := app.run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--json",
+		"capabilities",
+	}, &stdout, &stderr)
+	if !errors.Is(err, want) {
+		t.Fatalf("run error = %v, want %v", err, want)
+	}
+	if !strings.Contains(stdout.String(), `"kicad_version": "unknown"`) || !strings.Contains(stdout.String(), `"error": "version failed"`) {
+		t.Fatalf("expected structured capabilities failure, got %s", stdout.String())
+	}
+}
+
 func TestRunPlanLEDDemoJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -247,6 +434,38 @@ func TestRunPlanLEDDemoJSON(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got %s", want, output)
 		}
+	}
+}
+
+func TestRunPlanLEDDemoJSONMissingDocument(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--json",
+		"plan-led-demo",
+	}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("run returned nil error")
+	}
+	if !strings.Contains(stdout.String(), `"success": false`) || !strings.Contains(stdout.String(), `"document is required"`) {
+		t.Fatalf("expected structured planning error, got %s", stdout.String())
+	}
+}
+
+func TestRunPlanLEDDemoTextOutput(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--document", "/",
+		"plan-led-demo",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "1. add_symbol") {
+		t.Fatalf("expected text plan output, got %s", stdout.String())
 	}
 }
 
@@ -293,9 +512,12 @@ func TestRunDrawLEDDemoJSONReportsMissingWriteCapability(t *testing.T) {
 }
 
 type fakeAPIClient struct {
-	pingErr   error
-	version   *commontypes.KiCadVersion
-	documents []kiapi.Document
+	pingErr      error
+	version      *commontypes.KiCadVersion
+	versionErr   error
+	documents    []kiapi.Document
+	documentsErr error
+	closeErr     error
 }
 
 func (c *fakeAPIClient) Ping(context.Context) error {
@@ -303,15 +525,21 @@ func (c *fakeAPIClient) Ping(context.Context) error {
 }
 
 func (c *fakeAPIClient) GetVersion(context.Context) (*commontypes.KiCadVersion, error) {
+	if c.versionErr != nil {
+		return nil, c.versionErr
+	}
 	return c.version, nil
 }
 
 func (c *fakeAPIClient) GetOpenDocuments(context.Context, kiapi.DocumentType) ([]kiapi.Document, error) {
+	if c.documentsErr != nil {
+		return nil, c.documentsErr
+	}
 	return c.documents, nil
 }
 
 func (c *fakeAPIClient) Close() error {
-	return nil
+	return c.closeErr
 }
 
 func appWithClientFactory(factory func(context.Context, config.Config) (apiClient, error)) app {
