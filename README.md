@@ -100,6 +100,15 @@ make test
 
 `make test` wraps `go test ./...` with workspace-local Go cache paths.
 
+Coverage reports exclude generated KiCad protobuf bindings from the actionable total:
+
+```sh
+make coverage
+make coverage-check
+```
+
+`make coverage` prints both the raw total and the hand-written total excluding `internal/kiapi/gen/**`. `make coverage-check` fails when the generated-excluded total drops below `COVERAGE_THRESHOLD`, which defaults to `75.0`.
+
 Generated protobuf output can be checked with:
 
 ```sh
