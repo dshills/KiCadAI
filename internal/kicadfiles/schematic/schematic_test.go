@@ -158,6 +158,112 @@ func TestValidateRejectsInvalidElements(t *testing.T) {
 	}
 }
 
+func TestWriteRendersSheet(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Name:     "Power",
+		Filename: "power.kicad_sch",
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		Size:     kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(15)},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	for _, want := range []string{
+		"(sheet",
+		"\"Sheetname\"\n      \"Power\"",
+		"\"Sheetfile\"\n      \"power.kicad_sch\"",
+		"(id 0)",
+		"(id 1)",
+		"(size 30.0 15.0)",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("output missing %s:\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestValidateRejectsInvalidSheet(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{{
+		UUID:     "",
+		Name:     "",
+		Filename: "../outside.kicad_sch",
+		Size:     kicadfiles.Point{},
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{"sheets[0].uuid", "sheets[0].name", "sheets[0].filename", "sheets[0].size"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
+		}
+	}
+}
+
+func TestValidateSheetFilenameAllowsDoubleDotInsideComponent(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Name:     "OddName",
+		Filename: "sub_sheet..kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+	}}
+
+	if err := Validate(schematic); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsWindowsAbsoluteSheetFilename(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Name:     "Bad",
+		Filename: "C:/tmp/bad.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "sheets[0].filename") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateSheetName(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{
+		{
+			UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+			Name:     "Power",
+			Filename: "power.kicad_sch",
+			Size:     kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		},
+		{
+			UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+			Name:     "Power",
+			Filename: "power2.kicad_sch",
+			Size:     kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		},
+	}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "duplicate Power") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func minimalSchematic() SchematicFile {
 	return SchematicFile{
 		Version:   kicadfiles.KiCadFormatV20230121,

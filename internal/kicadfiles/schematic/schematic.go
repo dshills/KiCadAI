@@ -2,6 +2,7 @@ package schematic
 
 import (
 	"io"
+	"path"
 	"strconv"
 	"strings"
 
@@ -80,6 +81,7 @@ type Sheet struct {
 	Name     string
 	Filename string
 	Position kicadfiles.Point
+	Size     kicadfiles.Point
 }
 
 type SymbolInstance struct {
@@ -133,6 +135,17 @@ func Validate(schematic SchematicFile) error {
 			errs = append(errs, fieldError(indexed("junctions", i, "uuid"), "valid UUID required"))
 		}
 	}
+	seenSheets := map[string]struct{}{}
+	for i, sheet := range schematic.Sheets {
+		errs = append(errs, validateSheet(i, sheet)...)
+		name := strings.TrimSpace(sheet.Name)
+		if name != "" {
+			if _, ok := seenSheets[name]; ok {
+				errs = append(errs, fieldError(indexed("sheets", i, "name"), "duplicate "+name))
+			}
+			seenSheets[name] = struct{}{}
+		}
+	}
 	return errs.Err()
 }
 
@@ -176,6 +189,9 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	}
 	for _, junction := range schematic.Junctions {
 		nodes = append(nodes, renderJunction(junction))
+	}
+	for _, sheet := range schematic.Sheets {
+		nodes = append(nodes, renderSheet(sheet))
 	}
 	if len(schematic.Instances) > 0 {
 		nodes = append(nodes, renderInstances(schematic.Instances))
@@ -257,6 +273,38 @@ func validateWire(index int, wire Wire) kicadfiles.ValidationErrors {
 	return errs
 }
 
+func validateSheet(index int, sheet Sheet) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	prefix := func(field string) string { return indexed("sheets", index, field) }
+	if !sheet.UUID.Valid() {
+		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
+	}
+	if strings.TrimSpace(sheet.Name) == "" {
+		errs = append(errs, fieldError(prefix("name"), "required"))
+	}
+	filename := strings.TrimSpace(sheet.Filename)
+	if filename == "" {
+		errs = append(errs, fieldError(prefix("filename"), "required"))
+	} else if !validSheetFilename(filename) {
+		errs = append(errs, fieldError(prefix("filename"), "must be a relative KiCad path"))
+	}
+	if sheet.Size.X <= 0 || sheet.Size.Y <= 0 {
+		errs = append(errs, fieldError(prefix("size"), "positive size required"))
+	}
+	return errs
+}
+
+func validSheetFilename(filename string) bool {
+	if strings.Contains(filename, "\\") || strings.ContainsRune(filename, '\x00') {
+		return false
+	}
+	if path.IsAbs(filename) || (len(filename) > 1 && filename[1] == ':') {
+		return false
+	}
+	cleaned := path.Clean(filename)
+	return cleaned != "." && cleaned != ".." && !strings.HasPrefix(cleaned, "../")
+}
+
 func validateLabel(index int, label Label) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	if !label.UUID.Valid() {
@@ -323,6 +371,30 @@ func renderJunction(junction Junction) sexpr.List {
 		sexpr.A("junction"),
 		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(junction.Position.X)), sexpr.X(kicadfiles.ToMMString(junction.Position.Y))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(junction.UUID))),
+	)
+}
+
+func renderSheet(sheet Sheet) sexpr.List {
+	return sexpr.L(
+		sexpr.A("sheet"),
+		renderAt(sheet.Position, 0),
+		sexpr.L(sexpr.A("size"), sexpr.X(kicadfiles.ToMMString(sheet.Size.X)), sexpr.X(kicadfiles.ToMMString(sheet.Size.Y))),
+		sexpr.L(sexpr.A("stroke"), sexpr.L(sexpr.A("width"), sexpr.X("0.1524")), sexpr.L(sexpr.A("type"), sexpr.A("solid"))),
+		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.X("0.0000"))),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(sheet.UUID))),
+		renderSheetProperty(0, "Sheetname", strings.TrimSpace(sheet.Name), kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y - kicadfiles.MM(2.54)}),
+		renderSheetProperty(1, "Sheetfile", strings.TrimSpace(sheet.Filename), kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y + sheet.Size.Y + kicadfiles.MM(2.54)}),
+	)
+}
+
+func renderSheetProperty(id int64, name, value string, at kicadfiles.Point) sexpr.List {
+	return sexpr.L(
+		sexpr.A("property"),
+		sexpr.S(name),
+		sexpr.S(value),
+		sexpr.L(sexpr.A("id"), sexpr.I(id)),
+		renderAt(at, 0),
+		sexpr.L(sexpr.A("effects"), sexpr.L(sexpr.A("font"), sexpr.L(sexpr.A("size"), sexpr.X("1.27"), sexpr.X("1.27")))),
 	)
 }
 
