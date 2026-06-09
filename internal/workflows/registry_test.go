@@ -68,6 +68,23 @@ func TestPlanOperationRejectsInvalidPayload(t *testing.T) {
 	assertIssue(t, result, "invalid_payload")
 }
 
+func TestPlanOperationRejectsInvalidLEDIntent(t *testing.T) {
+	payload, err := json.Marshal(LEDDemoIntent{})
+	if err != nil {
+		t.Fatalf("json.Marshal returned error: %v", err)
+	}
+
+	result, err := PlanOperation(OperationRequest{
+		Operation: OperationCreateLEDIndicator,
+		Payload:   payload,
+	})
+	if !errors.Is(err, schematic.ErrMissingDocument) {
+		t.Fatalf("PlanOperation error = %v, want %v", err, schematic.ErrMissingDocument)
+	}
+	assertIssue(t, result, "invalid_intent")
+	assertOperationErrorIssue(t, err, "invalid_intent")
+}
+
 func TestPlanOperationRejectsFutureOperation(t *testing.T) {
 	result, err := PlanOperation(OperationRequest{Operation: OperationCreateConnectorBlock})
 	if !errors.Is(err, ErrOperationNotImplemented) {
@@ -100,6 +117,50 @@ func TestBuildRegistryRejectsDuplicateOperationName(t *testing.T) {
 			{descriptor: OperationDescriptor{Name: OperationCreateLEDIndicator}},
 		})
 	})
+}
+
+func TestOperationErrorFormatting(t *testing.T) {
+	cause := errors.New("boom")
+
+	tests := []struct {
+		name string
+		err  *OperationError
+		want string
+	}{
+		{
+			name: "issues without cause",
+			err: &OperationError{
+				Operation: OperationCreateLEDIndicator,
+				Issues: []ValidationIssue{
+					{Message: "first"},
+					{Message: "second"},
+				},
+			},
+			want: "workflow create_led_indicator: first; second",
+		},
+		{
+			name: "cause without issues",
+			err: &OperationError{
+				Operation: OperationCreateConnectorBlock,
+				Cause:     cause,
+			},
+			want: "workflow create_connector_block: boom",
+		},
+		{
+			name: "no issues or cause",
+			err: &OperationError{
+				Operation: OperationPlaceDecouplingCapacitor,
+			},
+			want: "workflow place_decoupling_capacitor: operation failed",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := test.err.Error(); got != test.want {
+				t.Errorf("Error() = %q, want %q", got, test.want)
+			}
+		})
+	}
 }
 
 func assertIssue(t *testing.T, result OperationResult, code string) {

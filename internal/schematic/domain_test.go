@@ -37,9 +37,34 @@ func TestValidateAddSymbol(t *testing.T) {
 	}
 
 	request.Reference = "R?"
-	request.RotationDegrees = math.Inf(1)
-	if _, err := PlanAddSymbol(request); !errors.Is(err, ErrInvalidRotation) {
-		t.Fatalf("PlanAddSymbol error = %v, want %v", err, ErrInvalidRotation)
+	request.Value = ""
+	if _, err := PlanAddSymbol(request); !errors.Is(err, ErrMissingValue) {
+		t.Fatalf("PlanAddSymbol error = %v, want %v", err, ErrMissingValue)
+	}
+
+	request.Value = "1k"
+	rotations := []struct {
+		name  string
+		value float64
+	}{
+		{name: "inf", value: math.Inf(1)},
+		{name: "neg_inf", value: math.Inf(-1)},
+		{name: "nan", value: math.NaN()},
+	}
+	for _, rotation := range rotations {
+		t.Run(rotation.name, func(t *testing.T) {
+			req := AddSymbolRequest{
+				Document:        testDocument(),
+				LibraryID:       "Device:R",
+				Reference:       "R?",
+				Value:           "1k",
+				Position:        Point{X: 1000, Y: 2000},
+				RotationDegrees: rotation.value,
+			}
+			if _, err := PlanAddSymbol(req); !errors.Is(err, ErrInvalidRotation) {
+				t.Errorf("PlanAddSymbol error = %v, want %v", err, ErrInvalidRotation)
+			}
+		})
 	}
 }
 
@@ -89,11 +114,41 @@ func TestValidateAddLabel(t *testing.T) {
 	if _, err := PlanAddLabel(request); !errors.Is(err, ErrInvalidLabelType) {
 		t.Fatalf("PlanAddLabel error = %v, want %v", err, ErrInvalidLabelType)
 	}
+
+	request.LabelType = LabelTypeLocal
+	rotations := []struct {
+		name  string
+		value float64
+	}{
+		{name: "inf", value: math.Inf(1)},
+		{name: "neg_inf", value: math.Inf(-1)},
+		{name: "nan", value: math.NaN()},
+	}
+	for _, rotation := range rotations {
+		t.Run(rotation.name, func(t *testing.T) {
+			req := AddLabelRequest{
+				Document:        testDocument(),
+				Text:            "LED_OUT",
+				LabelType:       LabelTypeLocal,
+				Position:        Point{X: 0, Y: 0},
+				RotationDegrees: rotation.value,
+			}
+			if _, err := PlanAddLabel(req); !errors.Is(err, ErrInvalidRotation) {
+				t.Errorf("PlanAddLabel error = %v, want %v", err, ErrInvalidRotation)
+			}
+		})
+	}
 }
 
 func TestValidateDocument(t *testing.T) {
 	if err := ValidateDocument(DocumentRef{}); !errors.Is(err, ErrMissingDocument) {
 		t.Fatalf("ValidateDocument error = %v, want %v", err, ErrMissingDocument)
+	}
+	if err := ValidateDocument(DocumentRef{Type: kiapi.DocumentTypeUnknown, Identifier: "/"}); !errors.Is(err, ErrMissingDocument) {
+		t.Fatalf("ValidateDocument unknown type error = %v, want %v", err, ErrMissingDocument)
+	}
+	if err := ValidateDocument(DocumentRef{Type: kiapi.DocumentTypeSchematic, Identifier: " "}); !errors.Is(err, ErrMissingDocument) {
+		t.Fatalf("ValidateDocument blank identifier error = %v, want %v", err, ErrMissingDocument)
 	}
 }
 

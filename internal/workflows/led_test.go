@@ -63,3 +63,19 @@ func TestPlanLEDDemoSanitizesPrefix(t *testing.T) {
 		t.Fatalf("label summary = %q", got)
 	}
 }
+
+func TestPlanLEDDemoUsesDefaultPrefixWhenSanitizedPrefixIsEmpty(t *testing.T) {
+	plan, err := PlanLEDDemo(LEDDemoIntent{
+		Document: schematic.DocumentRef{Type: kiapi.DocumentTypeSchematic, Identifier: "/"},
+		Prefix:   " ! ",
+	})
+	if err != nil {
+		t.Fatalf("PlanLEDDemo returned error: %v", err)
+	}
+	if len(plan.Operations) == 0 {
+		t.Fatalf("expected at least one operation")
+	}
+	if got := plan.Operations[len(plan.Operations)-1].Summary; !strings.Contains(got, DefaultLEDDemoPrefix+"_OUT") {
+		t.Fatalf("label summary = %q", got)
+	}
+}
