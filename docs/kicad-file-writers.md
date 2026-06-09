@@ -22,7 +22,7 @@ led_indicator/led_indicator.kicad_sch
 led_indicator/led_indicator.kicad_pcb
 ```
 
-If `--name` is omitted, the CLI derives it from the `--output` directory basename. When both are supplied, the output directory basename must match `--name`. This keeps the generated directory and KiCad project basename aligned.
+If `--name` is omitted, the CLI derives it from the `--output` directory basename. When both are supplied, the output directory basename and KiCad project basename may differ; generated root files still use `--name`.
 
 Use `--overwrite` to replace an existing generated project directory. Overwrite uses a temporary project directory, backup directory, and recovery journal instead of writing directly into the target.
 

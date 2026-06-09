@@ -133,7 +133,7 @@ func TestRunHelpIncludesGenerateCommands(t *testing.T) {
 }
 
 func TestRunGenerateLEDDemoJSON(t *testing.T) {
-	root := filepath.Join(t.TempDir(), "led_indicator")
+	root := filepath.Join(t.TempDir(), "demo-output")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 

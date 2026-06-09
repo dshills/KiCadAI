@@ -27,6 +27,7 @@ type WriteResult struct {
 }
 
 func WriteProjectDirectory(root string, design Design, opts WriteOptions) (WriteResult, error) {
+	design.Name = norm.NFC.String(design.Name)
 	if err := validateFileComponent(design.Name); err != nil {
 		return WriteResult{}, err
 	}
@@ -39,8 +40,8 @@ func WriteProjectDirectory(root string, design Design, opts WriteOptions) (Write
 	if base == "." || base == string(filepath.Separator) || base == "" {
 		return WriteResult{}, fmt.Errorf("target must name a project directory: %s", root)
 	}
-	if norm.NFC.String(base) != norm.NFC.String(design.Name) {
-		return WriteResult{}, fmt.Errorf("target directory name must match design name %q", design.Name)
+	if err := validateFileComponent(base); err != nil {
+		return WriteResult{}, fmt.Errorf("target directory name: %w", err)
 	}
 	journalPath := filepath.Join(parent, "."+base+".kicadai-journal")
 	if _, err := os.Stat(journalPath); err == nil {
@@ -151,6 +152,9 @@ func WriteProjectDirectory(root string, design Design, opts WriteOptions) (Write
 
 func writeDesignFiles(root string, design Design) ([]string, error) {
 	name := norm.NFC.String(design.Name)
+	if err := validateFileComponent(name); err != nil {
+		return nil, err
+	}
 	var written []string
 	projectPath := filepath.Join(root, name+".kicad_pro")
 	if err := writeFile(projectPath, func(file *os.File) error { return project.Write(file, design.Project) }); err != nil {

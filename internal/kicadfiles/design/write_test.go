@@ -141,15 +141,18 @@ func TestWriteProjectDirectoryRejectsCurrentDirectoryTarget(t *testing.T) {
 	}
 }
 
-func TestWriteProjectDirectoryRequiresTargetNameMatch(t *testing.T) {
+func TestWriteProjectDirectoryAllowsTargetNameMismatch(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "other")
 
-	_, err := WriteProjectDirectory(root, validLEDDesign(t), WriteOptions{})
-	if err == nil {
-		t.Fatal("expected error")
+	result, err := WriteProjectDirectory(root, validLEDDesign(t), WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteProjectDirectory returned error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "target directory name") {
-		t.Fatalf("error = %v", err)
+	if _, err := os.Stat(filepath.Join(root, "led_indicator.kicad_pro")); err != nil {
+		t.Fatalf("project file missing: %v", err)
+	}
+	if result.ProjectDir != root {
+		t.Fatalf("ProjectDir = %q, want %q", result.ProjectDir, root)
 	}
 }
 
@@ -165,6 +168,18 @@ func TestWriteProjectDirectoryRejectsReservedWindowsName(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "reserved Windows") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestWriteProjectDirectoryRejectsReservedTargetDirectoryName(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "CON")
+
+	_, err := WriteProjectDirectory(root, validLEDDesign(t), WriteOptions{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "target directory name") || !strings.Contains(err.Error(), "reserved Windows") {
 		t.Fatalf("error = %v", err)
 	}
 }

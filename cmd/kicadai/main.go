@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"time"
 
+	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
@@ -486,10 +487,7 @@ func (a app) runGenerateLEDDemo(opts cliOptions, stdout io.Writer) error {
 	if name == "" {
 		name = outputBase
 	}
-	if outputBase != name {
-		err := fmt.Errorf("output directory basename must match --name %q", name)
-		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
-	}
+	name = norm.NFC.String(name)
 	designID, err := generationDesignID(name, opts.seed)
 	if err != nil {
 		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
