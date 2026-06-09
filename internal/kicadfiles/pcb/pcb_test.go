@@ -232,6 +232,297 @@ func TestWriteSortsNetsByCode(t *testing.T) {
 	}
 }
 
+func TestLEDIndicatorPCBWritesDeterministicBoard(t *testing.T) {
+	input := LEDIndicatorInput{
+		DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Seed:     "phase-7",
+	}
+	board, err := LEDIndicatorPCB(input)
+	if err != nil {
+		t.Fatalf("LEDIndicatorPCB returned error: %v", err)
+	}
+
+	var first bytes.Buffer
+	if err := Write(&first, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	var second bytes.Buffer
+	if err := Write(&second, board); err != nil {
+		t.Fatalf("second Write returned error: %v", err)
+	}
+	if first.String() != second.String() {
+		t.Fatal("LED board output is not deterministic")
+	}
+
+	output := first.String()
+	for _, want := range []string{
+		"(title \"LED Indicator\")",
+		"(net 1 \"VCC\")",
+		"(net 2 \"LED_OUT\")",
+		"(net 3 \"GND\")",
+		"\"LED_SMD:LED_0805_2012Metric\"",
+		"\"Resistor_SMD:R_0805_2012Metric\"",
+		"\"D1\"",
+		"roundrect",
+		"(roundrect_rratio 0.25)",
+		"(layers \"F.Cu\" \"F.Paste\" \"F.Mask\")",
+		"(gr_line",
+		"(segment",
+		"(via",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestWriteSortsFootprintsByReference(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	resistor := minimalFootprint("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "R1")
+	led := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "D1")
+	board.Footprints = []Footprint{resistor, led}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	first := strings.Index(output, "\"D1\"")
+	second := strings.Index(output, "\"R1\"")
+	if !(first >= 0 && second >= 0 && first < second) {
+		t.Fatalf("footprints not sorted by reference:\n%s", output)
+	}
+}
+
+func TestValidateRejectsInvalidFootprint(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+	footprint.Texts = footprint.Texts[:1]
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "footprints[0].texts.value") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsUnknownPadNet(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+	footprint.Pads[0].NetCode = 99
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pads[0].net_code") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestWriteRendersDrilledPadAsThruHole(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].Drill = kicadfiles.MM(0.6)
+	footprint.Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	board.Footprints = []Footprint{footprint}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{"thru_hole", "(layers \"*.Cu\" \"*.Mask\")", "(drill 0.6)"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestValidateAcceptsDrilledPadWithExplicitCopperAndMaskLayers(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].Drill = kicadfiles.MM(0.6)
+	footprint.Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu, kicadfiles.LayerFMask, kicadfiles.LayerBMask}
+	board.Footprints = []Footprint{footprint}
+
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestWriteRendersCustomRoundRectRatio(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].Shape = "roundrect"
+	footprint.Pads[0].RoundRectRRatio = 0.125
+	board.Footprints = []Footprint{footprint}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "(roundrect_rratio 0.125)") {
+		t.Fatalf("custom roundrect ratio missing:\n%s", buf.String())
+	}
+}
+
+func TestValidateRejectsInvalidRoundRectRatio(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].Shape = "roundrect"
+	footprint.Pads[0].RoundRectRRatio = 1.5
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "roundrect_rratio") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDrilledPadWithoutThroughHoleLayers(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].Drill = kicadfiles.MM(0.6)
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pads[0].layers") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateReportsInvalidPadLayerIndex(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].Layers = []kicadfiles.BoardLayer{"Nope.Layer"}
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if strings.Contains(err.Error(), "layers[0].name") {
+		t.Fatalf("error path should reference layer index, not .name: %v", err)
+	}
+	if !strings.Contains(err.Error(), "pads[0].layers[0]") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidTrack(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.Tracks = []Track{{
+		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(1)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFSilkS,
+		NetCode: 1,
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "tracks[0].layer") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
+	board := minimalPCB()
+	board.Layers = append(board.Layers, LayerDefinition{Number: 1, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.Tracks = []Track{{
+		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(1)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.BoardLayer("In1.Cu"),
+		NetCode: 1,
+	}}
+	board.Vias = []Via{{
+		UUID:     kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+		Size:     kicadfiles.MM(0.8),
+		Drill:    kicadfiles.MM(0.4),
+		NetCode:  1,
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.BoardLayer("In1.Cu"), kicadfiles.LayerBCu},
+	}}
+
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidVia(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.Vias = []Via{{
+		UUID:     kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+		Size:     kicadfiles.MM(0.4),
+		Drill:    kicadfiles.MM(0.4),
+		NetCode:  1,
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "vias[0].drill") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRequiresClosedOutline(t *testing.T) {
+	board := minimalPCB()
+	board.RequireClosedOutline = true
+	board.Drawings = []Drawing{{
+		UUID:  kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Layer: kicadfiles.LayerEdge,
+		Kind:  "line",
+		Line: &LineDrawing{
+			Start: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+			End:   kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(1)},
+			Width: kicadfiles.MM(0.1),
+		},
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "drawings.edge_cuts") {
+		t.Fatalf("error = %v", err)
+	}
+	if got := strings.Count(err.Error(), "outline endpoint"); got != 2 {
+		t.Fatalf("reported %d open endpoints, want 2: %v", got, err)
+	}
+}
+
 func TestWriteValidatesBeforeRendering(t *testing.T) {
 	var buf bytes.Buffer
 	err := Write(&buf, PCBFile{})
@@ -241,6 +532,25 @@ func TestWriteValidatesBeforeRendering(t *testing.T) {
 	}
 	if buf.Len() != 0 {
 		t.Fatalf("Write emitted output despite validation error: %q", buf.String())
+	}
+}
+
+func minimalFootprint(uuid, reference string) Footprint {
+	return Footprint{
+		UUID:      kicadfiles.UUID(uuid),
+		Path:      "root.component." + strings.ToLower(reference),
+		LibraryID: "Test:Footprint",
+		Reference: reference,
+		Value:     "value",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+		Layer:     kicadfiles.LayerFCu,
+		Texts: []FootprintText{
+			{Kind: "reference", Text: reference, Layer: kicadfiles.LayerFSilkS},
+			{Kind: "value", Text: "value", Layer: kicadfiles.LayerFSilkS},
+		},
+		Pads: []Pad{
+			{Name: "1", NetCode: 1, Shape: "rect", Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu}},
+		},
 	}
 }
 

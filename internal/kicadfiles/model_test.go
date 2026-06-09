@@ -108,14 +108,24 @@ func TestUUIDValidation(t *testing.T) {
 }
 
 func TestBoardLayerValidation(t *testing.T) {
-	valid := []BoardLayer{LayerFCu, LayerBCu, LayerAllCu, LayerAllMask, LayerAll, LayerEdge}
+	valid := []BoardLayer{
+		LayerFCu, LayerBCu, BoardLayer("In1.Cu"), BoardLayer("In30.Cu"),
+		LayerFAdhes, LayerBAdhes, LayerFPaste, LayerBPaste,
+		LayerFSilkS, LayerBSilkS, LayerFMask, LayerBMask,
+		LayerFCrtYd, LayerBCrtYd, LayerFFab, LayerBFab,
+		LayerEdge, LayerMargin, LayerDwgs, LayerCmts, LayerEco1, LayerEco2,
+		LayerUserDwgs, LayerUserCmts, LayerAllCu, LayerAllMask, LayerAll,
+	}
 	for _, layer := range valid {
 		if !IsValidBoardLayer(layer) {
 			t.Fatalf("valid layer rejected: %s", layer)
 		}
 	}
-	if IsValidBoardLayer(BoardLayer("Inner.Cu")) {
-		t.Fatal("invalid layer accepted")
+	invalid := []BoardLayer{BoardLayer("Inner.Cu"), BoardLayer("In0.Cu"), BoardLayer("In31.Cu")}
+	for _, layer := range invalid {
+		if IsValidBoardLayer(layer) {
+			t.Fatalf("invalid layer accepted: %s", layer)
+		}
 	}
 }
 

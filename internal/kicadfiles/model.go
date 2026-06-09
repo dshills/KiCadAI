@@ -43,16 +43,31 @@ type TitleBlock struct {
 type BoardLayer string
 
 const (
-	LayerFCu     BoardLayer = "F.Cu"
-	LayerBCu     BoardLayer = "B.Cu"
-	LayerFSilkS  BoardLayer = "F.SilkS"
-	LayerBSilkS  BoardLayer = "B.SilkS"
-	LayerFMask   BoardLayer = "F.Mask"
-	LayerBMask   BoardLayer = "B.Mask"
-	LayerEdge    BoardLayer = "Edge.Cuts"
-	LayerAllCu   BoardLayer = "*.Cu"
-	LayerAllMask BoardLayer = "*.Mask"
-	LayerAll     BoardLayer = "All"
+	LayerFCu      BoardLayer = "F.Cu"
+	LayerBCu      BoardLayer = "B.Cu"
+	LayerFAdhes   BoardLayer = "F.Adhes"
+	LayerBAdhes   BoardLayer = "B.Adhes"
+	LayerFPaste   BoardLayer = "F.Paste"
+	LayerBPaste   BoardLayer = "B.Paste"
+	LayerFSilkS   BoardLayer = "F.SilkS"
+	LayerBSilkS   BoardLayer = "B.SilkS"
+	LayerFMask    BoardLayer = "F.Mask"
+	LayerBMask    BoardLayer = "B.Mask"
+	LayerFCrtYd   BoardLayer = "F.CrtYd"
+	LayerBCrtYd   BoardLayer = "B.CrtYd"
+	LayerFFab     BoardLayer = "F.Fab"
+	LayerBFab     BoardLayer = "B.Fab"
+	LayerEdge     BoardLayer = "Edge.Cuts"
+	LayerMargin   BoardLayer = "Margin"
+	LayerDwgs     BoardLayer = "Dwgs.User"
+	LayerCmts     BoardLayer = "Cmts.User"
+	LayerEco1     BoardLayer = "Eco1.User"
+	LayerEco2     BoardLayer = "Eco2.User"
+	LayerUserDwgs BoardLayer = "User.Drawings"
+	LayerUserCmts BoardLayer = "User.Comments"
+	LayerAllCu    BoardLayer = "*.Cu"
+	LayerAllMask  BoardLayer = "*.Mask"
+	LayerAll      BoardLayer = "All"
 )
 
 const (
@@ -61,6 +76,7 @@ const (
 )
 
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+var internalCopperLayerPattern = regexp.MustCompile(`^In([1-9]|[12][0-9]|30)\.Cu$`)
 
 func MM(value float64) IU {
 	return IU(math.Round(value * iuPerMM))
@@ -148,10 +164,20 @@ func (uuid UUID) Valid() bool {
 
 func IsValidBoardLayer(layer BoardLayer) bool {
 	switch layer {
-	case LayerFCu, LayerBCu, LayerFSilkS, LayerBSilkS, LayerFMask, LayerBMask, LayerEdge, LayerAllCu, LayerAllMask, LayerAll:
+	case LayerFCu, LayerBCu,
+		LayerFAdhes, LayerBAdhes,
+		LayerFPaste, LayerBPaste,
+		LayerFSilkS, LayerBSilkS,
+		LayerFMask, LayerBMask,
+		LayerFCrtYd, LayerBCrtYd,
+		LayerFFab, LayerBFab,
+		LayerEdge, LayerMargin,
+		LayerDwgs, LayerCmts, LayerEco1, LayerEco2,
+		LayerUserDwgs, LayerUserCmts,
+		LayerAllCu, LayerAllMask, LayerAll:
 		return true
 	default:
-		return false
+		return internalCopperLayerPattern.MatchString(string(layer))
 	}
 }
 
