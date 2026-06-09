@@ -1,6 +1,7 @@
 package design
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -248,7 +249,34 @@ func designFiles(design Design) ([]generatedFile, error) {
 			},
 		})
 	}
+	artifactEntries, err := artifactFiles(design.RuleFiles, design.WorksheetFiles, design.AssetFiles)
+	if err != nil {
+		return nil, err
+	}
+	files = append(files, artifactEntries...)
 	return validateGeneratedFiles(files)
+}
+
+func artifactFiles(groups ...[]TextArtifact) ([]generatedFile, error) {
+	var files []generatedFile
+	for _, artifacts := range groups {
+		for _, artifact := range artifacts {
+			cleaned, err := normalizeGeneratedPath(artifact.Path)
+			if err != nil {
+				return nil, err
+			}
+			contents := append([]byte(nil), artifact.Contents...)
+			files = append(files, generatedFile{
+				Path: cleaned,
+				Mode: 0o644,
+				Write: func(w io.Writer) error {
+					_, err := io.Copy(w, bytes.NewReader(contents))
+					return err
+				},
+			})
+		}
+	}
+	return files, nil
 }
 
 func projectSheets(design Design) []project.Sheet {

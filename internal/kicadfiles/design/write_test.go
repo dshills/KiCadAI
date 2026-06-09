@@ -142,6 +142,37 @@ func TestWriteProjectDirectoryWritesChildSheetFiles(t *testing.T) {
 	}
 }
 
+func TestWriteProjectDirectoryWritesOptionalArtifacts(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "artifacts")
+	design := validLEDDesign(t)
+	design.RuleFiles = []TextArtifact{{Path: "rules/demo.kicad_dru", Contents: []byte("(version 1)\n")}}
+	design.WorksheetFiles = []TextArtifact{{Path: "layout/page.kicad_wks", Contents: []byte("(page_layout)\n")}}
+	design.AssetFiles = []TextArtifact{{Path: "models/readme.txt", Contents: []byte("asset\n")}}
+
+	if _, err := WriteProjectDirectory(root, design, WriteOptions{}); err != nil {
+		t.Fatalf("WriteProjectDirectory returned error: %v", err)
+	}
+	for _, name := range []string{"rules/demo.kicad_dru", "layout/page.kicad_wks", "models/readme.txt"} {
+		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(name))); err != nil {
+			t.Fatalf("missing %s: %v", name, err)
+		}
+	}
+}
+
+func TestWriteProjectDirectoryRejectsInvalidArtifactExtension(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "artifacts")
+	design := validLEDDesign(t)
+	design.RuleFiles = []TextArtifact{{Path: "rules/demo.txt", Contents: []byte("(version 1)\n")}}
+
+	_, err := WriteProjectDirectory(root, design, WriteOptions{})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "must use .kicad_dru extension") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestWriteProjectDirectoryRefusesExistingJournal(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, "led_indicator")

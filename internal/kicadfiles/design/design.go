@@ -22,7 +22,15 @@ type Design struct {
 	FootprintTables         []library.TableEntry
 	KnownSymbolLibraries    []string
 	KnownFootprintLibraries []string
+	RuleFiles               []TextArtifact
+	WorksheetFiles          []TextArtifact
+	AssetFiles              []TextArtifact
 	ExpectedNets            []string
+}
+
+type TextArtifact struct {
+	Path     string
+	Contents []byte
 }
 
 type LEDIndicatorInput struct {
@@ -130,7 +138,29 @@ func Validate(design Design) error {
 	if err := library.ValidateTableEntries("fp_lib_table", design.FootprintTables); err != nil {
 		errs = append(errs, nestedErrors(err)...)
 	}
+	errs = append(errs, validateArtifacts("rule_files", design.RuleFiles, ".kicad_dru")...)
+	errs = append(errs, validateArtifacts("worksheet_files", design.WorksheetFiles, ".kicad_wks")...)
+	errs = append(errs, validateArtifacts("asset_files", design.AssetFiles, "")...)
 	return errs.Err()
+}
+
+func validateArtifacts(field string, artifacts []TextArtifact, requiredExt string) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	for i, artifact := range artifacts {
+		if strings.TrimSpace(artifact.Path) == "" {
+			errs = append(errs, designError(field+"["+strconv.Itoa(i)+"].path", "required"))
+			continue
+		}
+		cleaned, err := normalizeGeneratedPath(artifact.Path)
+		if err != nil {
+			errs = append(errs, designError(field+"["+strconv.Itoa(i)+"].path", err.Error()))
+			continue
+		}
+		if requiredExt != "" && !strings.HasSuffix(strings.ToLower(cleaned), strings.ToLower(requiredExt)) {
+			errs = append(errs, designError(field+"["+strconv.Itoa(i)+"].path", "must use "+requiredExt+" extension"))
+		}
+	}
+	return errs
 }
 
 func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
