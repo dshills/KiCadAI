@@ -93,7 +93,15 @@ Live KiCad tests must remain opt-in with the `integration` build tag and environ
 - `ping`, `version`, and `documents` against a running KiCad instance.
 - Capability reporting for the running version.
 
-Integration tests must be skipped when `KICAD_API_SOCKET` is not set.
+Integration tests must be skipped when `KICAD_API_SOCKET` is not set. They are not included in the normal `make coverage` or `make coverage-check` thresholds; those gates measure deterministic unit coverage for hand-written code.
+
+Live verification uses:
+
+```text
+KICAD_API_SOCKET   required socket endpoint
+KICAD_API_TOKEN    optional token when the KiCad instance requires one
+KICAD_TIMEOUT_MS   optional request timeout override
+```
 
 ### Regression Tests
 

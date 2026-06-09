@@ -109,6 +109,8 @@ make coverage-check
 
 `make coverage` prints both the raw total and the hand-written total excluding `internal/kiapi/gen/**`. `make coverage-check` fails when the generated-excluded total drops below `COVERAGE_THRESHOLD`, which defaults to `75.0`.
 
+Normal coverage does not enable the `integration` build tag and does not require a running KiCad instance.
+
 Generated protobuf output can be checked with:
 
 ```sh
@@ -124,7 +126,15 @@ To run live tests, start KiCad with the API enabled, set the socket endpoint, an
 KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock go test -tags=integration ./...
 ```
 
-Live tests are skipped unless `KICAD_API_SOCKET` is set.
+Live tests are skipped unless `KICAD_API_SOCKET` is set. They are intentionally excluded from `make test`, `make coverage`, and `make coverage-check`; use them to verify real KiCad transport/API behavior after the deterministic unit suite is green.
+
+Live-test configuration:
+
+```text
+KICAD_API_SOCKET   required socket endpoint
+KICAD_API_TOKEN    optional token when the KiCad instance requires one
+KICAD_TIMEOUT_MS   optional request timeout override
+```
 
 ## Troubleshooting
 
