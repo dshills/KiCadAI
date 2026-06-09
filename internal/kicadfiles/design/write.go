@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"golang.org/x/text/unicode/norm"
+	"kicadai/internal/kicadfiles/library"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/project"
 	"kicadai/internal/kicadfiles/schematic"
@@ -205,6 +206,24 @@ func designFiles(design Design) ([]generatedFile, error) {
 			Mode: 0o644,
 			Write: func(w io.Writer) error {
 				return pcb.Write(w, *design.PCB)
+			},
+		})
+	}
+	if len(design.SymbolTables) > 0 {
+		files = append(files, generatedFile{
+			Path: "sym-lib-table",
+			Mode: 0o644,
+			Write: func(w io.Writer) error {
+				return library.WriteSymbolLibraryTable(w, design.SymbolTables)
+			},
+		})
+	}
+	if len(design.FootprintTables) > 0 {
+		files = append(files, generatedFile{
+			Path: "fp-lib-table",
+			Mode: 0o644,
+			Write: func(w io.Writer) error {
+				return library.WriteFootprintLibraryTable(w, design.FootprintTables)
 			},
 		})
 	}

@@ -5,17 +5,20 @@ import (
 	"strings"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/library"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/project"
 	"kicadai/internal/kicadfiles/schematic"
 )
 
 type Design struct {
-	Name         string
-	Project      project.ProjectFile
-	Schematic    *schematic.SchematicFile
-	PCB          *pcb.PCBFile
-	ExpectedNets []string
+	Name            string
+	Project         project.ProjectFile
+	Schematic       *schematic.SchematicFile
+	PCB             *pcb.PCBFile
+	SymbolTables    []library.TableEntry
+	FootprintTables []library.TableEntry
+	ExpectedNets    []string
 }
 
 type LEDIndicatorInput struct {
@@ -114,6 +117,12 @@ func Validate(design Design) error {
 		errs = append(errs, validateExpectedNets(design)...)
 	}
 	errs = append(errs, validateUniqueUUIDs(design)...)
+	if err := library.ValidateTableEntries("sym_lib_table", design.SymbolTables); err != nil {
+		errs = append(errs, nestedErrors(err)...)
+	}
+	if err := library.ValidateTableEntries("fp_lib_table", design.FootprintTables); err != nil {
+		errs = append(errs, nestedErrors(err)...)
+	}
 	return errs.Err()
 }
 

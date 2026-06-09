@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/library"
 )
 
 func TestWriteProjectDirectoryCreatesFiles(t *testing.T) {
@@ -80,6 +81,36 @@ func TestWriteProjectDirectoryOmitsPCBWhenNil(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(root, "led_indicator.kicad_pcb")); !os.IsNotExist(err) {
 		t.Fatalf("PCB should be omitted, stat error: %v", err)
+	}
+}
+
+func TestWriteProjectDirectoryWritesLibraryTables(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "led_indicator")
+	design := validLEDDesign(t)
+	design.SymbolTables = []library.TableEntry{{
+		Name: "local_symbols",
+		Type: "KiCad",
+		URI:  "${KIPRJMOD}/lib/local_symbols.kicad_sym",
+	}}
+	design.FootprintTables = []library.TableEntry{{
+		Name: "local_footprints",
+		Type: "KiCad",
+		URI:  "${KIPRJMOD}/footprints.pretty",
+	}}
+
+	result, err := WriteProjectDirectory(root, design, WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteProjectDirectory returned error: %v", err)
+	}
+	for _, name := range []string{"sym-lib-table", "fp-lib-table"} {
+		if _, err := os.Stat(filepath.Join(root, name)); err != nil {
+			t.Fatalf("missing %s: %v", name, err)
+		}
+	}
+	for _, want := range []string{filepath.Join(root, "sym-lib-table"), filepath.Join(root, "fp-lib-table")} {
+		if !containsString(result.WrittenFiles, want) {
+			t.Fatalf("written files missing %s: %v", want, result.WrittenFiles)
+		}
 	}
 }
 
@@ -278,4 +309,13 @@ func testGeneratedFile(path string) generatedFile {
 			return err
 		},
 	}
+}
+
+func containsString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }
