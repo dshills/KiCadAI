@@ -1,6 +1,7 @@
 package design
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -197,5 +198,84 @@ func TestWriteProjectDirectoryRejectsTrailingWindowsCharacters(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "space or period") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateGeneratedFilesRejectsTraversal(t *testing.T) {
+	_, err := validateGeneratedFiles([]generatedFile{testGeneratedFile("../outside.kicad_sch")})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "escapes project directory") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateGeneratedFilesRejectsBackslashTraversal(t *testing.T) {
+	_, err := validateGeneratedFiles([]generatedFile{testGeneratedFile("..\\outside.kicad_sch")})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "escapes project directory") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateGeneratedFilesRejectsDuplicatePath(t *testing.T) {
+	_, err := validateGeneratedFiles([]generatedFile{
+		testGeneratedFile("sch/child.kicad_sch"),
+		testGeneratedFile("./sch/child.kicad_sch"),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "duplicate generated path") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateGeneratedFilesRejectsCaseInsensitiveCollision(t *testing.T) {
+	_, err := validateGeneratedFiles([]generatedFile{
+		testGeneratedFile("Project.kicad_sch"),
+		testGeneratedFile("project.kicad_sch"),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "case-insensitive") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateGeneratedFilesRejectsFileDirectoryCollision(t *testing.T) {
+	_, err := validateGeneratedFiles([]generatedFile{
+		testGeneratedFile("lib"),
+		testGeneratedFile("lib/symbol.kicad_sym"),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "conflicts with directory") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateGeneratedFilesRejectsReservedCharacters(t *testing.T) {
+	_, err := validateGeneratedFiles([]generatedFile{testGeneratedFile("bad:name.kicad_sch")})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "generated path component") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func testGeneratedFile(path string) generatedFile {
+	return generatedFile{
+		Path: path,
+		Write: func(w io.Writer) error {
+			_, err := io.WriteString(w, "test\n")
+			return err
+		},
 	}
 }

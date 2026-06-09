@@ -3,7 +3,9 @@ package design
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -24,6 +26,12 @@ type WriteResult struct {
 	Warnings     []string
 	BackupDir    string
 	JournalPath  string
+}
+
+type generatedFile struct {
+	Path  string
+	Mode  os.FileMode
+	Write func(io.Writer) error
 }
 
 func WriteProjectDirectory(root string, design Design, opts WriteOptions) (WriteResult, error) {
@@ -155,27 +163,112 @@ func writeDesignFiles(root string, design Design) ([]string, error) {
 	if err := validateFileComponent(name); err != nil {
 		return nil, err
 	}
-	var written []string
-	projectPath := filepath.Join(root, name+".kicad_pro")
-	if err := writeFile(projectPath, func(file *os.File) error { return project.Write(file, design.Project) }); err != nil {
+	files, err := designFiles(design)
+	if err != nil {
 		return nil, err
 	}
-	written = append(written, name+".kicad_pro")
-	if design.Schematic != nil {
-		schematicPath := filepath.Join(root, name+".kicad_sch")
-		if err := writeFile(schematicPath, func(file *os.File) error { return schematic.Write(file, *design.Schematic) }); err != nil {
+	written := make([]string, 0, len(files))
+	for _, file := range files {
+		target := filepath.Join(root, filepath.FromSlash(file.Path))
+		if err := writeFile(target, file.Mode, file.Write); err != nil {
 			return nil, err
 		}
-		written = append(written, name+".kicad_sch")
-	}
-	if design.PCB != nil {
-		pcbPath := filepath.Join(root, name+".kicad_pcb")
-		if err := writeFile(pcbPath, func(file *os.File) error { return pcb.Write(file, *design.PCB) }); err != nil {
-			return nil, err
-		}
-		written = append(written, name+".kicad_pcb")
+		written = append(written, file.Path)
 	}
 	return written, nil
+}
+
+func designFiles(design Design) ([]generatedFile, error) {
+	name := norm.NFC.String(design.Name)
+	if err := validateFileComponent(name); err != nil {
+		return nil, err
+	}
+	files := []generatedFile{{
+		Path: name + ".kicad_pro",
+		Mode: 0o644,
+		Write: func(w io.Writer) error {
+			return project.Write(w, design.Project)
+		},
+	}}
+	if design.Schematic != nil {
+		files = append(files, generatedFile{
+			Path: name + ".kicad_sch",
+			Mode: 0o644,
+			Write: func(w io.Writer) error {
+				return schematic.Write(w, *design.Schematic)
+			},
+		})
+	}
+	if design.PCB != nil {
+		files = append(files, generatedFile{
+			Path: name + ".kicad_pcb",
+			Mode: 0o644,
+			Write: func(w io.Writer) error {
+				return pcb.Write(w, *design.PCB)
+			},
+		})
+	}
+	return validateGeneratedFiles(files)
+}
+
+func validateGeneratedFiles(files []generatedFile) ([]generatedFile, error) {
+	normalized := make([]generatedFile, 0, len(files))
+	seen := map[string]string{}
+	seenFolded := map[string]string{}
+	directories := map[string]string{}
+	for _, file := range files {
+		cleaned, err := normalizeGeneratedPath(file.Path)
+		if err != nil {
+			return nil, err
+		}
+		if prior, ok := seen[cleaned]; ok {
+			return nil, fmt.Errorf("duplicate generated path %q also used by %q", cleaned, prior)
+		}
+		folded := strings.ToLower(cleaned)
+		if prior, ok := seenFolded[folded]; ok {
+			return nil, fmt.Errorf("case-insensitive generated path collision %q and %q", prior, cleaned)
+		}
+		for dir := path.Dir(cleaned); dir != "."; dir = path.Dir(dir) {
+			if prior, ok := seen[dir]; ok {
+				return nil, fmt.Errorf("generated path %q conflicts with directory needed by %q", prior, cleaned)
+			}
+			directories[dir] = cleaned
+		}
+		if child, ok := directories[cleaned]; ok {
+			return nil, fmt.Errorf("generated path %q conflicts with directory needed by %q", cleaned, child)
+		}
+		file.Path = cleaned
+		if file.Mode == 0 {
+			file.Mode = 0o644
+		}
+		seen[cleaned] = cleaned
+		seenFolded[folded] = cleaned
+		normalized = append(normalized, file)
+	}
+	return normalized, nil
+}
+
+func normalizeGeneratedPath(raw string) (string, error) {
+	if raw == "" {
+		return "", fmt.Errorf("generated path must not be empty")
+	}
+	if strings.ContainsRune(raw, '\x00') {
+		return "", fmt.Errorf("generated path contains null byte")
+	}
+	if filepath.IsAbs(raw) || path.IsAbs(raw) {
+		return "", fmt.Errorf("generated path must be relative: %s", raw)
+	}
+	forward := strings.ReplaceAll(raw, "\\", "/")
+	cleaned := path.Clean(forward)
+	if cleaned == "." || cleaned == ".." || strings.HasPrefix(cleaned, "../") {
+		return "", fmt.Errorf("generated path escapes project directory: %s", raw)
+	}
+	for _, component := range strings.Split(cleaned, "/") {
+		if err := validateFileComponent(component); err != nil {
+			return "", fmt.Errorf("generated path component %q: %w", component, err)
+		}
+	}
+	return cleaned, nil
 }
 
 func finalWrittenFiles(root string, names []string) []string {
@@ -231,8 +324,11 @@ func syncDir(path string) error {
 	return dir.Sync()
 }
 
-func writeFile(path string, write func(*os.File) error) error {
-	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
+func writeFile(path string, mode os.FileMode, write func(io.Writer) error) error {
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	file, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {
 		return err
 	}
