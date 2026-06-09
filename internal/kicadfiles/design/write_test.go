@@ -1,9 +1,11 @@
 package design
 
 import (
+	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 
@@ -156,6 +158,80 @@ func TestWriteProjectDirectoryWritesOptionalArtifacts(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(root, filepath.FromSlash(name))); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}
+	}
+}
+
+func TestWriteProjectDirectoryDemoLikeStructure(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo-output")
+	design := validLEDDesign(t)
+	design.Name = "demo_project"
+	design.Project.Name = "demo_project"
+	design.Schematic.Filename = "demo_project.kicad_sch"
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Power",
+		Filename: "sch/power.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("sch/power.kicad_sch")
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+	design.SymbolTables = []library.TableEntry{{Name: "local_symbols", Type: "KiCad", URI: "${KIPRJMOD}/lib/local_symbols.kicad_sym"}}
+	design.FootprintTables = []library.TableEntry{{Name: "local_footprints", Type: "KiCad", URI: "${KIPRJMOD}/footprints.pretty"}}
+	design.RuleFiles = []TextArtifact{{Path: "rules/demo.kicad_dru", Contents: []byte("(version 1)\n")}}
+	design.WorksheetFiles = []TextArtifact{{Path: "layout/demo.kicad_wks", Contents: []byte("(page_layout)\n")}}
+
+	if _, err := WriteProjectDirectory(root, design, WriteOptions{}); err != nil {
+		t.Fatalf("WriteProjectDirectory returned error: %v", err)
+	}
+	var files []string
+	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
+		if err != nil || d.IsDir() {
+			return err
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(rel))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	want := []string{
+		"demo_project.kicad_pro",
+		"demo_project.kicad_sch",
+		"fp-lib-table",
+		"layout/demo.kicad_wks",
+		"rules/demo.kicad_dru",
+		"sch/power.kicad_sch",
+		"sym-lib-table",
+	}
+	if strings.Join(files, "\n") != strings.Join(want, "\n") {
+		t.Fatalf("files = %v, want %v", files, want)
+	}
+	projectBytes, err := os.ReadFile(filepath.Join(root, "demo_project.kicad_pro"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var projectJSON map[string]any
+	if err := json.Unmarshal(projectBytes, &projectJSON); err != nil {
+		t.Fatalf("invalid project JSON: %v", err)
+	}
+	for _, key := range []string{"board", "boards", "erc", "libraries", "net_settings", "pcbnew", "schematic", "sheets", "text_variables", "time_domain_parameters"} {
+		if _, ok := projectJSON[key]; !ok {
+			t.Fatalf("project JSON missing key %s", key)
+		}
+	}
+	rootSchematic, err := os.ReadFile(filepath.Join(root, "demo_project.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(rootSchematic), "\"sch/power.kicad_sch\"") {
+		t.Fatalf("root schematic missing child sheet reference:\n%s", rootSchematic)
 	}
 }
 
