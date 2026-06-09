@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -113,6 +115,96 @@ func TestRunHelpFlagPrintsUsage(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "Usage:") {
 		t.Fatalf("expected usage, got %s", stdout.String())
+	}
+}
+
+func TestRunHelpIncludesGenerateCommands(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"help"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	for _, want := range []string{"generate-led-demo", "generate-project", "--output", "--with-pcb", "--overwrite"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("help missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunGenerateLEDDemoJSON(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "led_indicator")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--output", root,
+		"--name", "led_indicator",
+		"--seed", "cli-test",
+		"--lib-resistor", "Custom:R_US",
+		"--with-pcb",
+		"--json",
+		"generate-led-demo",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+
+	var result generationResult
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("invalid JSON: %v\n%s", err, stdout.String())
+	}
+	if result.ProjectName != "led_indicator" || len(result.WrittenFiles) != 3 {
+		t.Fatalf("unexpected result: %+v", result)
+	}
+	if _, err := os.Stat(filepath.Join(root, "led_indicator.kicad_pcb")); err != nil {
+		t.Fatalf("PCB not written: %v", err)
+	}
+	schematicBytes, err := os.ReadFile(filepath.Join(root, "led_indicator.kicad_sch"))
+	if err != nil {
+		t.Fatalf("schematic not readable: %v", err)
+	}
+	if !strings.Contains(string(schematicBytes), "Custom:R_US") {
+		t.Fatalf("custom library ID missing from schematic:\n%s", schematicBytes)
+	}
+}
+
+func TestRunGenerateLEDDemoRefusesOverwrite(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "led_indicator")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--output", root,
+		"--json",
+		"generate-led-demo",
+	}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"target exists`) {
+		t.Fatalf("expected target exists JSON, got %s", stdout.String())
+	}
+}
+
+func TestRunGenerateProjectOmitsPCBByDefault(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "led_indicator")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--output", root,
+		"--json",
+		"generate-project",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "led_indicator.kicad_pcb")); !os.IsNotExist(err) {
+		t.Fatalf("PCB should be omitted by default, stat error: %v", err)
 	}
 }
 

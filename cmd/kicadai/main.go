@@ -8,12 +8,15 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"reflect"
 	"time"
 
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
+	"kicadai/internal/kicadfiles"
+	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/schematic"
 	"kicadai/internal/workflows"
 )
@@ -28,6 +31,8 @@ Commands:
   config        Print resolved connection configuration
   documents     List open KiCad documents
   draw-led-demo Execute the LED indicator schematic plan when supported
+  generate-led-demo Generate a direct-file LED indicator KiCad project
+  generate-project  Generate a direct-file LED indicator KiCad project
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
   version       Print KiCad version information
@@ -43,11 +48,16 @@ Global flags:
   --origin-x int64      Plan origin X in KiCad internal units (1 mm = 1,000,000 IU)
   --origin-y int64      Plan origin Y in KiCad internal units (1 mm = 1,000,000 IU)
   --prefix string        Reference/value prefix for plan commands
+  --output string        Output project directory for generation commands
+  --name string          Project/design name for generation commands
+  --seed string          Deterministic seed for generation commands
   --lib-vcc string      VCC symbol library ID for LED demo (default: %[1]s)
   --lib-gnd string      GND symbol library ID for LED demo (default: %[2]s)
   --lib-resistor string Resistor symbol library ID for LED demo (default: %[3]s)
   --lib-led string      LED symbol library ID for LED demo (default: %[4]s)
   --execute             Required for mutation commands
+  --with-pcb            Include PCB output for generation commands
+  --overwrite           Allow generation commands to replace an existing project directory
   --json                Print command output as JSON when supported
 `
 
@@ -76,11 +86,16 @@ type cliOptions struct {
 	originX       int64
 	originY       int64
 	prefix        string
+	output        string
+	name          string
+	seed          string
 	libVCC        string
 	libGND        string
 	libResistor   string
 	libLED        string
 	execute       bool
+	withPCB       bool
+	overwrite     bool
 	jsonOutput    bool
 }
 
@@ -130,6 +145,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return a.runDocuments(opts, stdout)
 	case "draw-led-demo":
 		return a.runDrawLEDDemo(opts, stdout)
+	case "generate-led-demo", "generate-project":
+		return a.runGenerateLEDDemo(opts, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
@@ -155,11 +172,16 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Int64Var(&opts.originX, "origin-x", 0, "plan origin X")
 	flags.Int64Var(&opts.originY, "origin-y", 0, "plan origin Y")
 	flags.StringVar(&opts.prefix, "prefix", workflows.DefaultLEDDemoPrefix, "plan prefix")
+	flags.StringVar(&opts.output, "output", "", "output project directory")
+	flags.StringVar(&opts.name, "name", "led_indicator", "project/design name")
+	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
 	flags.StringVar(&opts.libVCC, "lib-vcc", defaultLibraryIDVCC, "VCC symbol library ID")
 	flags.StringVar(&opts.libGND, "lib-gnd", defaultLibraryIDGND, "GND symbol library ID")
 	flags.StringVar(&opts.libResistor, "lib-resistor", defaultLibraryIDResistor, "resistor symbol library ID")
 	flags.StringVar(&opts.libLED, "lib-led", defaultLibraryIDLED, "LED symbol library ID")
 	flags.BoolVar(&opts.execute, "execute", false, "execute mutation command")
+	flags.BoolVar(&opts.withPCB, "with-pcb", false, "include PCB output")
+	flags.BoolVar(&opts.overwrite, "overwrite", false, "overwrite existing project directory")
 	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
 
 	if err := flags.Parse(args); err != nil {
@@ -437,6 +459,92 @@ func writeAutomationError(opts cliOptions, stdout io.Writer, err error) error {
 		}
 	}
 	return err
+}
+
+type generationResult struct {
+	ProjectName  string   `json:"project_name"`
+	ProjectDir   string   `json:"project_dir"`
+	WrittenFiles []string `json:"written_files"`
+	Warnings     []string `json:"warnings,omitempty"`
+	Error        string   `json:"error,omitempty"`
+}
+
+func (a app) runGenerateLEDDemo(opts cliOptions, stdout io.Writer) error {
+	name := opts.name
+	if name == "" {
+		name = "led_indicator"
+	}
+	output := opts.output
+	if output == "" {
+		output = name
+	}
+	if filepath.Base(filepath.Clean(output)) != name {
+		err := fmt.Errorf("output directory basename must match --name %q", name)
+		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
+	}
+	designID, err := generationDesignID(name, opts.seed)
+	if err != nil {
+		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
+	}
+	generated, err := kicaddesign.LEDIndicatorDesign(kicaddesign.LEDIndicatorInput{
+		Name:            name,
+		DesignID:        designID,
+		Seed:            opts.seed,
+		IncludePCB:      opts.withPCB,
+		LibraryVCC:      opts.libVCC,
+		LibraryGND:      opts.libGND,
+		LibraryResistor: opts.libResistor,
+		LibraryLED:      opts.libLED,
+	})
+	if err != nil {
+		return writeGenerationFailure(opts, stdout, generationResult{ProjectName: name, ProjectDir: output}, err)
+	}
+	writeResult, err := kicaddesign.WriteProjectDirectory(output, generated, kicaddesign.WriteOptions{Overwrite: opts.overwrite})
+	result := generationResult{
+		ProjectName:  name,
+		ProjectDir:   writeResult.ProjectDir,
+		WrittenFiles: writeResult.WrittenFiles,
+		Warnings:     writeResult.Warnings,
+	}
+	if err != nil {
+		result.Error = err.Error()
+		return writeGenerationFailure(opts, stdout, result, err)
+	}
+	if opts.jsonOutput {
+		return writeJSON(stdout, result)
+	}
+	fmt.Fprintf(stdout, "project_name: %s\n", result.ProjectName)
+	fmt.Fprintf(stdout, "project_dir: %s\n", result.ProjectDir)
+	for _, file := range result.WrittenFiles {
+		fmt.Fprintf(stdout, "written: %s\n", file)
+	}
+	for _, warning := range result.Warnings {
+		fmt.Fprintf(stdout, "warning: %s\n", warning)
+	}
+	return nil
+}
+
+func writeGenerationFailure(opts cliOptions, stdout io.Writer, result generationResult, err error) error {
+	if opts.jsonOutput {
+		if result.Error == "" {
+			result.Error = err.Error()
+		}
+		if encodeErr := writeJSON(stdout, result); encodeErr != nil {
+			return errors.Join(encodeErr, err)
+		}
+	}
+	return err
+}
+
+func generationDesignID(name, seed string) (kicadfiles.UUID, error) {
+	if seed == "" {
+		seed = name
+	}
+	generator, err := kicadfiles.NewDeterministicIDGenerator(kicadfiles.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"), seed)
+	if err != nil {
+		return "", err
+	}
+	return generator.New("root.design", name), nil
 }
 
 type probeResult struct {

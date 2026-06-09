@@ -19,10 +19,14 @@ type Design struct {
 }
 
 type LEDIndicatorInput struct {
-	Name       string
-	DesignID   kicadfiles.UUID
-	Seed       string
-	IncludePCB bool
+	Name            string
+	DesignID        kicadfiles.UUID
+	Seed            string
+	IncludePCB      bool
+	LibraryVCC      string
+	LibraryGND      string
+	LibraryResistor string
+	LibraryLED      string
 }
 
 func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
@@ -47,9 +51,13 @@ func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
 		}},
 	}
 	schematicFile, err := schematic.LEDIndicatorSchematic(schematic.LEDIndicatorInput{
-		Name:     input.Name,
-		DesignID: input.DesignID,
-		Seed:     input.Seed,
+		Name:            input.Name,
+		DesignID:        input.DesignID,
+		Seed:            input.Seed,
+		LibraryVCC:      input.LibraryVCC,
+		LibraryGND:      input.LibraryGND,
+		LibraryResistor: input.LibraryResistor,
+		LibraryLED:      input.LibraryLED,
 	})
 	if err != nil {
 		return Design{}, err

@@ -90,10 +90,14 @@ type SymbolInstance struct {
 }
 
 type LEDIndicatorInput struct {
-	Name       string
-	DesignID   kicadfiles.UUID
-	Seed       string
-	IncludePCB bool
+	Name            string
+	DesignID        kicadfiles.UUID
+	Seed            string
+	IncludePCB      bool
+	LibraryVCC      string
+	LibraryGND      string
+	LibraryResistor string
+	LibraryLED      string
 }
 
 func Validate(schematic SchematicFile) error {

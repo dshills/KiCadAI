@@ -12,15 +12,27 @@ func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
 	if input.Seed == "" {
 		input.Seed = input.Name
 	}
+	if input.LibraryVCC == "" {
+		input.LibraryVCC = "power:VCC"
+	}
+	if input.LibraryGND == "" {
+		input.LibraryGND = "power:GND"
+	}
+	if input.LibraryResistor == "" {
+		input.LibraryResistor = "Device:R"
+	}
+	if input.LibraryLED == "" {
+		input.LibraryLED = "Device:LED"
+	}
 	generator, err := kicadfiles.NewDeterministicIDGenerator(input.DesignID, input.Seed)
 	if err != nil {
 		return SchematicFile{}, err
 	}
 
-	powerVCC := symbol(generator, "vcc", "power:VCC", "#PWR01", "VCC", kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(25.4)})
-	resistor := symbol(generator, "r1", "Device:R", "R1", "1k", kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(25.4)})
-	led := symbol(generator, "d1", "Device:LED", "D1", "LED", kicadfiles.Point{X: kicadfiles.MM(76.2), Y: kicadfiles.MM(25.4)})
-	powerGND := symbol(generator, "gnd", "power:GND", "#PWR02", "GND", kicadfiles.Point{X: kicadfiles.MM(101.6), Y: kicadfiles.MM(25.4)})
+	powerVCC := symbol(generator, "vcc", input.LibraryVCC, "#PWR01", "VCC", kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(25.4)})
+	resistor := symbol(generator, "r1", input.LibraryResistor, "R1", "1k", kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(25.4)})
+	led := symbol(generator, "d1", input.LibraryLED, "D1", "LED", kicadfiles.Point{X: kicadfiles.MM(76.2), Y: kicadfiles.MM(25.4)})
+	powerGND := symbol(generator, "gnd", input.LibraryGND, "#PWR02", "GND", kicadfiles.Point{X: kicadfiles.MM(101.6), Y: kicadfiles.MM(25.4)})
 	vccPin := offsetX(powerVCC.Position, kicadfiles.MM(5.08))
 	resistorLeft := offsetX(resistor.Position, -kicadfiles.MM(5.08))
 	resistorRight := offsetX(resistor.Position, kicadfiles.MM(5.08))
@@ -38,10 +50,10 @@ func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
 			Title: "LED Indicator",
 		},
 		LibSymbols: []EmbeddedSymbol{
-			{LibraryID: "power:VCC", Body: powerSymbolBody("power:VCC", "power_out", 5.08)},
-			{LibraryID: "power:GND", Body: powerSymbolBody("power:GND", "power_in", -5.08)},
-			{LibraryID: "Device:R", Body: twoPinSymbolBody("Device:R", "passive")},
-			{LibraryID: "Device:LED", Body: twoPinSymbolBody("Device:LED", "passive")},
+			{LibraryID: input.LibraryVCC, Body: powerSymbolBody(input.LibraryVCC, "power_out", 5.08)},
+			{LibraryID: input.LibraryGND, Body: powerSymbolBody(input.LibraryGND, "power_in", -5.08)},
+			{LibraryID: input.LibraryResistor, Body: twoPinSymbolBody(input.LibraryResistor, "passive")},
+			{LibraryID: input.LibraryLED, Body: twoPinSymbolBody(input.LibraryLED, "passive")},
 		},
 		Symbols: []SchematicSymbol{powerVCC, resistor, led, powerGND},
 		Wires: []Wire{
