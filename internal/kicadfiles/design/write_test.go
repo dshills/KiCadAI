@@ -9,6 +9,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/library"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 func TestWriteProjectDirectoryCreatesFiles(t *testing.T) {
@@ -111,6 +112,33 @@ func TestWriteProjectDirectoryWritesLibraryTables(t *testing.T) {
 		if !containsString(result.WrittenFiles, want) {
 			t.Fatalf("written files missing %s: %v", want, result.WrittenFiles)
 		}
+	}
+}
+
+func TestWriteProjectDirectoryWritesChildSheetFiles(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "hierarchical")
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Power",
+		Filename: "sch/power.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("sch/power.kicad_sch")
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	result, err := WriteProjectDirectory(root, design, WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteProjectDirectory returned error: %v", err)
+	}
+	childPath := filepath.Join(root, "sch", "power.kicad_sch")
+	if _, err := os.Stat(childPath); err != nil {
+		t.Fatalf("child sheet missing: %v", err)
+	}
+	if !containsString(result.WrittenFiles, childPath) {
+		t.Fatalf("written files missing child: %v", result.WrittenFiles)
 	}
 }
 
@@ -308,6 +336,16 @@ func testGeneratedFile(path string) generatedFile {
 			_, err := io.WriteString(w, "test\n")
 			return err
 		},
+	}
+}
+
+func minimalChildSheet(filename string) schematic.SchematicFile {
+	return schematic.SchematicFile{
+		Filename:  filename,
+		Version:   kicadfiles.KiCadFormatV20230121,
+		Generator: "kicadai",
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789abe"),
+		Paper:     kicadfiles.Paper{Name: "A4"},
 	}
 }
 

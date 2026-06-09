@@ -200,6 +200,23 @@ func designFiles(design Design) ([]generatedFile, error) {
 			},
 		})
 	}
+	for _, sheetFile := range design.SheetFiles {
+		if sheetFile == nil {
+			continue
+		}
+		file := sheetFile
+		childPath, err := normalizeGeneratedPath(strings.TrimSpace(file.Filename))
+		if err != nil {
+			return nil, err
+		}
+		files = append(files, generatedFile{
+			Path: childPath,
+			Mode: 0o644,
+			Write: func(w io.Writer) error {
+				return schematic.Write(w, *file)
+			},
+		})
+	}
 	if design.PCB != nil {
 		files = append(files, generatedFile{
 			Path: name + ".kicad_pcb",

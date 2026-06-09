@@ -6,6 +6,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/library"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 func TestLEDIndicatorDesignValidates(t *testing.T) {
@@ -216,6 +217,116 @@ func TestValidateAllowsFootprintLibraryTableReference(t *testing.T) {
 
 	if err := Validate(design); err != nil {
 		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsMissingChildSheetFile(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Power",
+		Filename: "power.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "missing child schematic power.kicad_sch") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateChildSheetFilename(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{
+		{
+			UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+			Name:     "Power",
+			Filename: "power.kicad_sch",
+			Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}
+	child1 := minimalChildSheet("power.kicad_sch")
+	child2 := minimalChildSheet("power.kicad_sch")
+	child2.UUID = kicadfiles.UUID("12345678-1234-5678-9234-123456789abf")
+	design.SheetFiles = []*schematic.SchematicFile{&child1, &child2}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "duplicate power.kicad_sch") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateUUIDInsideChildSheet(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Power",
+		Filename: "power.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("power.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{{
+		UUID:      design.Schematic.Symbols[0].UUID,
+		LibraryID: "Device:R",
+		Reference: "R99",
+		Value:     "1k",
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsCircularChildSheetReferences(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "A",
+		Filename: "a.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	childA := minimalChildSheet("a.kicad_sch")
+	childA.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abf"),
+		Name:     "B",
+		Filename: "b.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	childB := minimalChildSheet("b.kicad_sch")
+	childB.UUID = kicadfiles.UUID("12345678-1234-5678-9234-123456789ac0")
+	childB.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789ac1"),
+		Name:     "AAgain",
+		Filename: "a.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&childA, &childB}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "circular sheet reference") {
+		t.Fatalf("error = %v", err)
 	}
 }
 

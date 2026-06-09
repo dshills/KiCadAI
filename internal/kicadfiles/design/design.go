@@ -16,6 +16,7 @@ type Design struct {
 	Name                    string
 	Project                 project.ProjectFile
 	Schematic               *schematic.SchematicFile
+	SheetFiles              []*schematic.SchematicFile
 	PCB                     *pcb.PCBFile
 	SymbolTables            []library.TableEntry
 	FootprintTables         []library.TableEntry
@@ -112,6 +113,7 @@ func Validate(design Design) error {
 		}
 		errs = append(errs, validateSchematicReferences(design.Schematic)...)
 		errs = append(errs, validateSymbolLibraryReferences(design)...)
+		errs = append(errs, validateSheetFiles(design)...)
 	}
 	if design.PCB != nil {
 		if err := pcb.Validate(*design.PCB); err != nil {
@@ -330,6 +332,28 @@ func validateUniqueUUIDs(design Design) kicadfiles.ValidationErrors {
 			add(sheet.UUID, uuidLocation{collection: "schematic.sheets", index: i, field: "uuid"})
 		}
 	}
+	for fileIndex, sheetFile := range design.SheetFiles {
+		if sheetFile == nil {
+			errs = append(errs, designError("sheet_files["+strconv.Itoa(fileIndex)+"]", "nil"))
+			continue
+		}
+		add(sheetFile.UUID, uuidLocation{collection: "sheet_files", index: fileIndex, field: "uuid"})
+		for i, symbol := range sheetFile.Symbols {
+			add(symbol.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].symbols", index: i, field: "uuid"})
+		}
+		for i, wire := range sheetFile.Wires {
+			add(wire.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].wires", index: i, field: "uuid"})
+		}
+		for i, label := range sheetFile.Labels {
+			add(label.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].labels", index: i, field: "uuid"})
+		}
+		for i, junction := range sheetFile.Junctions {
+			add(junction.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].junctions", index: i, field: "uuid"})
+		}
+		for i, sheet := range sheetFile.Sheets {
+			add(sheet.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].sheets", index: i, field: "uuid"})
+		}
+	}
 	if design.PCB != nil {
 		for i, footprint := range design.PCB.Footprints {
 			add(footprint.UUID, uuidLocation{collection: "pcb.footprints", index: i, field: "uuid"})
@@ -351,6 +375,102 @@ func validateUniqueUUIDs(design Design) kicadfiles.ValidationErrors {
 		}
 	}
 	return errs
+}
+
+func validateSheetFiles(design Design) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	children := map[string]*schematic.SchematicFile{}
+	for i, sheetFile := range design.SheetFiles {
+		if sheetFile == nil {
+			errs = append(errs, designError("sheet_files["+strconv.Itoa(i)+"]", "nil"))
+			continue
+		}
+		filename := strings.TrimSpace(sheetFile.Filename)
+		if filename == "" {
+			errs = append(errs, designError("sheet_files["+strconv.Itoa(i)+"].filename", "required"))
+			continue
+		}
+		if _, ok := children[filename]; ok {
+			errs = append(errs, designError("sheet_files["+strconv.Itoa(i)+"].filename", "duplicate "+filename))
+		}
+		children[filename] = sheetFile
+		if err := schematic.Validate(*sheetFile); err != nil {
+			errs = append(errs, nestedErrors(err)...)
+		}
+	}
+	refs := map[string]struct{}{}
+	collect := func(prefix string, sheets []schematic.Sheet) {
+		for i, sheet := range sheets {
+			filename := strings.TrimSpace(sheet.Filename)
+			if filename == "" {
+				continue
+			}
+			refs[filename] = struct{}{}
+			if _, ok := children[filename]; !ok {
+				errs = append(errs, designError(prefix+"["+strconv.Itoa(i)+"].filename", "missing child schematic "+filename))
+			}
+		}
+	}
+	if design.Schematic != nil {
+		collect("schematic.sheets", design.Schematic.Sheets)
+	}
+	for fileIndex, sheetFile := range design.SheetFiles {
+		if sheetFile != nil {
+			collect("sheet_files["+strconv.Itoa(fileIndex)+"].sheets", sheetFile.Sheets)
+		}
+	}
+	for filename := range children {
+		if _, ok := refs[filename]; !ok {
+			errs = append(errs, designError("sheet_files."+filename, "unreferenced child schematic"))
+		}
+	}
+	errs = append(errs, validateSheetCycles(design, children)...)
+	return errs
+}
+
+func validateSheetCycles(design Design, children map[string]*schematic.SchematicFile) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	const root = "<root>"
+	graph := map[string][]string{root: sheetFilenames(design.Schematic)}
+	for filename, sheetFile := range children {
+		graph[filename] = sheetFilenames(sheetFile)
+	}
+	visiting := map[string]struct{}{}
+	visited := map[string]struct{}{}
+	var visit func(string, []string)
+	visit = func(node string, stack []string) {
+		if _, ok := visited[node]; ok {
+			return
+		}
+		if _, ok := visiting[node]; ok {
+			errs = append(errs, designError("sheet_files", "circular sheet reference "+strings.Join(append(stack, node), " -> ")))
+			return
+		}
+		visiting[node] = struct{}{}
+		for _, next := range graph[node] {
+			if _, ok := graph[next]; ok {
+				visit(next, append(stack, node))
+			}
+		}
+		delete(visiting, node)
+		visited[node] = struct{}{}
+	}
+	visit(root, nil)
+	return errs
+}
+
+func sheetFilenames(file *schematic.SchematicFile) []string {
+	if file == nil {
+		return nil
+	}
+	names := make([]string, 0, len(file.Sheets))
+	for _, sheet := range file.Sheets {
+		name := strings.TrimSpace(sheet.Filename)
+		if name != "" {
+			names = append(names, name)
+		}
+	}
+	return names
 }
 
 type uuidLocation struct {
