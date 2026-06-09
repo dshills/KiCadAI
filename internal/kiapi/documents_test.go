@@ -58,22 +58,49 @@ func TestParseDocumentType(t *testing.T) {
 	for raw, want := range map[string]DocumentType{
 		"":              DocumentTypeUnknown,
 		"all":           DocumentTypeUnknown,
+		"unknown":       DocumentTypeUnknown,
 		"schematic":     DocumentTypeSchematic,
 		"SCHEMATIC":     DocumentTypeSchematic,
+		"symbol":        DocumentTypeSymbol,
 		"pcb":           DocumentTypePCB,
+		"footprint":     DocumentTypeFootprint,
 		"drawing_sheet": DocumentTypeSheet,
+		"project":       DocumentTypeProject,
 	} {
 		got, err := ParseDocumentType(raw)
 		if err != nil {
-			t.Fatalf("ParseDocumentType(%q) returned error: %v", raw, err)
+			t.Errorf("ParseDocumentType(%q) returned error: %v", raw, err)
+			continue
 		}
 		if got != want {
-			t.Fatalf("ParseDocumentType(%q) = %q, want %q", raw, got, want)
+			t.Errorf("ParseDocumentType(%q) = %q, want %q", raw, got, want)
 		}
 	}
 
 	if _, err := ParseDocumentType("bogus"); err == nil {
 		t.Fatalf("ParseDocumentType returned nil error for bogus type")
+	}
+}
+
+func TestDocumentTypeMappings(t *testing.T) {
+	for documentType, wantProto := range map[DocumentType]commontypes.DocumentType{
+		DocumentTypeUnknown:   commontypes.DocumentType_DOCTYPE_UNKNOWN,
+		DocumentTypeSchematic: commontypes.DocumentType_DOCTYPE_SCHEMATIC,
+		DocumentTypeSymbol:    commontypes.DocumentType_DOCTYPE_SYMBOL,
+		DocumentTypePCB:       commontypes.DocumentType_DOCTYPE_PCB,
+		DocumentTypeFootprint: commontypes.DocumentType_DOCTYPE_FOOTPRINT,
+		DocumentTypeSheet:     commontypes.DocumentType_DOCTYPE_DRAWING_SHEET,
+		DocumentTypeProject:   commontypes.DocumentType_DOCTYPE_PROJECT,
+	} {
+		if got := documentTypeProto(documentType); got != wantProto {
+			t.Errorf("documentTypeProto(%q) = %s, want %s", documentType, got, wantProto)
+		}
+		if got := documentTypeFromProto(wantProto); got != documentType {
+			t.Errorf("documentTypeFromProto(%s) = %q, want %q", wantProto, got, documentType)
+		}
+	}
+	if got := documentTypeFromProto(commontypes.DocumentType(999)); got != DocumentTypeUnknown {
+		t.Fatalf("documentTypeFromProto(999) = %q", got)
 	}
 }
 
@@ -85,6 +112,64 @@ func TestDocumentFromProtoUsesProjectIdentifier(t *testing.T) {
 
 	if document.Identifier != "/tmp/demo" {
 		t.Fatalf("identifier = %q", document.Identifier)
+	}
+}
+
+func TestDocumentFromProtoHandlesNilAndIdentifiers(t *testing.T) {
+	if document := documentFromProto(nil); document.Type != DocumentTypeUnknown {
+		t.Fatalf("nil document = %+v", document)
+	}
+
+	board := documentFromProto(&commontypes.DocumentSpecifier{
+		Type: commontypes.DocumentType_DOCTYPE_PCB,
+		Identifier: &commontypes.DocumentSpecifier_BoardFilename{
+			BoardFilename: " board.kicad_pcb ",
+		},
+	})
+	if board.Type != DocumentTypePCB || board.Identifier != "board.kicad_pcb" || board.BoardFilename != "board.kicad_pcb" {
+		t.Fatalf("board document = %+v", board)
+	}
+
+	library := documentFromProto(&commontypes.DocumentSpecifier{
+		Type: commontypes.DocumentType_DOCTYPE_SYMBOL,
+		Identifier: &commontypes.DocumentSpecifier_LibId{
+			LibId: &commontypes.LibraryIdentifier{
+				LibraryNickname: "Device",
+				EntryName:       "R",
+			},
+		},
+	})
+	if library.Identifier != "Device:R" || library.LibraryID != "Device:R" {
+		t.Fatalf("library document = %+v", library)
+	}
+
+	entryOnly := documentFromProto(&commontypes.DocumentSpecifier{
+		Type: commontypes.DocumentType_DOCTYPE_SYMBOL,
+		Identifier: &commontypes.DocumentSpecifier_LibId{
+			LibId: &commontypes.LibraryIdentifier{EntryName: "LED"},
+		},
+	})
+	if entryOnly.Identifier != "LED" || entryOnly.LibraryID != "LED" {
+		t.Fatalf("entry-only document = %+v", entryOnly)
+	}
+
+	nicknameOnly := documentFromProto(&commontypes.DocumentSpecifier{
+		Type: commontypes.DocumentType_DOCTYPE_FOOTPRINT,
+		Identifier: &commontypes.DocumentSpecifier_LibId{
+			LibId: &commontypes.LibraryIdentifier{LibraryNickname: "Connector"},
+		},
+	})
+	if nicknameOnly.Identifier != "Connector" || nicknameOnly.LibraryID != "Connector" {
+		t.Fatalf("nickname-only document = %+v", nicknameOnly)
+	}
+}
+
+func TestFirstNonEmptyTrimsValues(t *testing.T) {
+	if got := firstNonEmpty(" ", "\tvalue\n", "later"); got != "value" {
+		t.Fatalf("firstNonEmpty = %q", got)
+	}
+	if got := firstNonEmpty("", " "); got != "" {
+		t.Fatalf("firstNonEmpty blank = %q", got)
 	}
 }
 
