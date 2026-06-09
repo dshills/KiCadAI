@@ -54,7 +54,7 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 func twoPadFootprint(generator kicadfiles.IDGenerator, key, libraryID, reference, value string, position kicadfiles.Point, leftNet, rightNet int) Footprint {
 	path := "root.component." + key
 	return Footprint{
-		UUID:      generator.New(path),
+		UUID:      generator.New("root.pcb.footprint."+key, path),
 		Path:      path,
 		LibraryID: libraryID,
 		Reference: reference,
