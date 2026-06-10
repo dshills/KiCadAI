@@ -1,0 +1,46 @@
+{
+  "board": {
+    "design_settings": {}
+  },
+  "boards": [],
+  "component_class_settings": {},
+  "cvpcb": {},
+  "erc": {},
+  "libraries": {},
+  "meta": {
+    "version": 1
+  },
+  "net_settings": {
+    "classes": [
+      {
+        "name": "Default",
+        "clearance": 0.2,
+        "track_width": 0.25,
+        "via_diameter": 0.8,
+        "via_drill": 0.4
+      }
+    ]
+  },
+  "pcbnew": {},
+  "schematic": {},
+  "sheets": [
+    [
+      "55555555-5555-4555-8555-555555555555",
+      "Root"
+    ],
+    [
+      "55555555-5555-4555-8555-555555555556",
+      "Power"
+    ],
+    [
+      "55555555-5555-4555-8555-555555555557",
+      "MCU"
+    ],
+    [
+      "55555555-5555-4555-8555-555555555558",
+      "Sensors"
+    ]
+  ],
+  "text_variables": {},
+  "time_domain_parameters": {}
+}
