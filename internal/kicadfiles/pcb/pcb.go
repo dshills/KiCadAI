@@ -3,6 +3,7 @@ package pcb
 import (
 	"cmp"
 	"io"
+	"math/big"
 	"slices"
 	"strconv"
 	"strings"
@@ -23,6 +24,7 @@ type PCBFile struct {
 	Nets                 []Net
 	Footprints           []Footprint
 	Tracks               []Track
+	TrackArcs            []TrackArc
 	Vias                 []Via
 	Drawings             []Drawing
 	Zones                []Zone
@@ -295,13 +297,25 @@ type Track struct {
 	NetCode int
 }
 
+type TrackArc struct {
+	UUID    kicadfiles.UUID
+	Start   kicadfiles.Point
+	Mid     kicadfiles.Point
+	End     kicadfiles.Point
+	Width   kicadfiles.IU
+	Layer   kicadfiles.BoardLayer
+	NetCode int
+}
+
 type Via struct {
-	UUID     kicadfiles.UUID
-	Position kicadfiles.Point
-	Size     kicadfiles.IU
-	Drill    kicadfiles.IU
-	NetCode  int
-	Layers   []kicadfiles.BoardLayer
+	UUID         kicadfiles.UUID
+	Position     kicadfiles.Point
+	Size         kicadfiles.IU
+	Drill        kicadfiles.IU
+	NetCode      int
+	Layers       []kicadfiles.BoardLayer
+	TentingFront bool
+	TentingBack  bool
 }
 
 type Zone struct {
@@ -547,6 +561,9 @@ func Validate(board PCBFile) error {
 	for i, track := range board.Tracks {
 		errs = append(errs, validateTrack(i, track, validNetCodes)...)
 	}
+	for i, arc := range board.TrackArcs {
+		errs = append(errs, validateTrackArc(i, arc, validNetCodes)...)
+	}
 	for i, via := range board.Vias {
 		errs = append(errs, validateVia(i, via, validNetCodes)...)
 	}
@@ -612,6 +629,9 @@ func render(board PCBFile) (sexpr.List, error) {
 	}
 	for _, track := range board.Tracks {
 		nodes = append(nodes, renderTrack(track))
+	}
+	for _, arc := range board.TrackArcs {
+		nodes = append(nodes, renderTrackArc(arc))
 	}
 	for _, via := range board.Vias {
 		nodes = append(nodes, renderVia(via))
@@ -1022,16 +1042,35 @@ func renderTrack(track Track) sexpr.List {
 	)
 }
 
-func renderVia(via Via) sexpr.List {
+func renderTrackArc(arc TrackArc) sexpr.List {
 	return sexpr.L(
+		sexpr.A("arc"),
+		sexpr.L(sexpr.A("start"), fixed(arc.Start.X), fixed(arc.Start.Y)),
+		sexpr.L(sexpr.A("mid"), fixed(arc.Mid.X), fixed(arc.Mid.Y)),
+		sexpr.L(sexpr.A("end"), fixed(arc.End.X), fixed(arc.End.Y)),
+		sexpr.L(sexpr.A("width"), fixed(arc.Width)),
+		sexpr.L(sexpr.A("layer"), sexpr.S(string(arc.Layer))),
+		sexpr.L(sexpr.A("net"), sexpr.I(int64(arc.NetCode))),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(arc.UUID))),
+	)
+}
+
+func renderVia(via Via) sexpr.List {
+	nodes := []sexpr.Node{
 		sexpr.A("via"),
 		sexpr.L(sexpr.A("at"), fixed(via.Position.X), fixed(via.Position.Y)),
 		sexpr.L(sexpr.A("size"), fixed(via.Size)),
 		sexpr.L(sexpr.A("drill"), fixed(via.Drill)),
 		renderLayerList("layers", via.Layers),
+	}
+	if via.TentingFront || via.TentingBack {
+		nodes = append(nodes, renderSidePair("tenting", via.TentingFront, via.TentingBack))
+	}
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("net"), sexpr.I(int64(via.NetCode))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(via.UUID))),
 	)
+	return sexpr.L(nodes...)
 }
 
 func renderZone(zone Zone, netNames map[int]string) sexpr.List {
@@ -1423,6 +1462,36 @@ func validateTrack(index int, track Track, netCodes map[int]struct{}) kicadfiles
 		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
 	}
 	return errs
+}
+
+func validateTrackArc(index int, arc TrackArc, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	prefix := func(field string) string { return indexed("track_arcs", index, field) }
+	if !arc.UUID.Valid() {
+		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
+	}
+	if arc.Start == arc.Mid || arc.Mid == arc.End || arc.Start == arc.End {
+		errs = append(errs, fieldError(prefix("points"), "start, mid, and end must be distinct"))
+	}
+	if collinear(arc.Start, arc.Mid, arc.End) {
+		errs = append(errs, fieldError(prefix("points"), "start, mid, and end must not be collinear"))
+	}
+	if arc.Width <= 0 {
+		errs = append(errs, fieldError(prefix("width"), "must be positive"))
+	}
+	if !isCopperLayer(arc.Layer) {
+		errs = append(errs, fieldError(prefix("layer"), "must be copper"))
+	}
+	if _, ok := netCodes[arc.NetCode]; !ok {
+		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
+	}
+	return errs
+}
+
+func collinear(a, b, c kicadfiles.Point) bool {
+	left := new(big.Int).Mul(big.NewInt(int64(b.Y-a.Y)), big.NewInt(int64(c.X-b.X)))
+	right := new(big.Int).Mul(big.NewInt(int64(c.Y-b.Y)), big.NewInt(int64(b.X-a.X)))
+	return left.Cmp(right) == 0
 }
 
 func validateVia(index int, via Via, netCodes map[int]struct{}) kicadfiles.ValidationErrors {

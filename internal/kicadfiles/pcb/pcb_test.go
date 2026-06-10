@@ -712,6 +712,69 @@ func TestValidateRejectsInvalidVia(t *testing.T) {
 	}
 }
 
+func TestWriteRendersTrackArcAndViaTenting(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.TrackArcs = []TrackArc{{
+		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Start:   point(1, 1),
+		Mid:     point(2, 2),
+		End:     point(3, 1),
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+	}}
+	board.Vias = []Via{{
+		UUID:         kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		Position:     point(2, 2),
+		Size:         kicadfiles.MM(0.8),
+		Drill:        kicadfiles.MM(0.4),
+		NetCode:      1,
+		Layers:       []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+		TentingFront: true,
+		TentingBack:  true,
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(arc",
+		"(mid 2.0 2.0)",
+		"(tenting",
+		"(front yes)",
+		"(back yes)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestValidateRejectsInvalidTrackArc(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.TrackArcs = []TrackArc{{
+		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Start:   point(1, 1),
+		Mid:     point(1, 1),
+		End:     point(2, 1),
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+	}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "track_arcs[0].points") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestValidateRequiresClosedOutline(t *testing.T) {
 	board := minimalPCB()
 	board.RequireClosedOutline = true
