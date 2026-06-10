@@ -1,0 +1,265 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "effd51da-96cb-54f2-a333-a66015d12195")
+  (paper "A4")
+  (title_block
+    (title "LED Indicator")
+  )
+  (lib_symbols
+    (symbol
+      "power:VCC"
+      (pin
+        power_out
+        line
+        (at 5.08 0.0 180)
+        (length 2.54)
+        (name "power:VCC")
+        (number "1")
+      )
+    )
+    (symbol
+      "power:GND"
+      (pin
+        power_in
+        line
+        (at -5.08 0.0 180)
+        (length 2.54)
+        (name "power:GND")
+        (number "1")
+      )
+    )
+    (symbol
+      "Device:R"
+      (pin
+        passive
+        line
+        (at -5.08 0.0 0)
+        (length 2.54)
+        (name "~")
+        (number "1")
+      )
+      (pin
+        passive
+        line
+        (at 5.08 0.0 180)
+        (length 2.54)
+        (name "~")
+        (number "2")
+      )
+    )
+    (symbol
+      "Device:LED"
+      (pin
+        passive
+        line
+        (at -5.08 0.0 0)
+        (length 2.54)
+        (name "~")
+        (number "1")
+      )
+      (pin
+        passive
+        line
+        (at 5.08 0.0 180)
+        (length 2.54)
+        (name "~")
+        (number "2")
+      )
+    )
+  )
+  (label
+    "LED_OUT"
+    (at 63.5 25.4 0)
+    (effects
+      (font
+        (size 1.27 1.27)
+      )
+    )
+    (uuid "752ccbd8-5fdd-54ee-b6c8-bc79a6dc14c1")
+  )
+  (wire
+    (pts
+      (xy 30.48 25.4)
+      (xy 45.72 25.4)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "7f02a049-1ceb-5008-b177-8397ad2ae00e")
+  )
+  (wire
+    (pts
+      (xy 55.88 25.4)
+      (xy 71.12 25.4)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "69fbc958-96b4-5755-9325-bd62656e6e90")
+  )
+  (wire
+    (pts
+      (xy 81.28 25.4)
+      (xy 96.52 25.4)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c20fe032-b325-5fb2-9af0-50cb4ad10b1d")
+  )
+  (junction
+    (at 76.2 25.4)
+    (diameter 0)
+    (color 0 0 0 0)
+    (uuid "e75920b8-3eaa-5228-bb89-2f6e6f2cdd40")
+  )
+  (symbol
+    (lib_id "power:VCC")
+    (at 25.4 25.4 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "57604239-29de-51e2-b4fc-74532bfe2a17")
+    (property
+      "Reference"
+      "#PWR01"
+      (at 25.4 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "VCC"
+      (at 25.4 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 50.8 25.4 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "a78140f3-3c3d-501f-a79c-315839916d3a")
+    (property
+      "Reference"
+      "R1"
+      (at 50.8 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "1k"
+      (at 50.8 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "Device:LED")
+    (at 76.2 25.4 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "62e91dbb-bf50-5c42-98cd-f191395ee701")
+    (property
+      "Reference"
+      "D1"
+      (at 76.2 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LED"
+      (at 76.2 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+  )
+  (symbol
+    (lib_id "power:GND")
+    (at 101.6 25.4 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "d0f240d1-fb39-552b-9fd4-3f3d29bc7ac3")
+    (property
+      "Reference"
+      "#PWR02"
+      (at 101.6 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "GND"
+      (at 101.6 25.4 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+  )
+)
