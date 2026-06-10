@@ -11,6 +11,8 @@ compare the resulting files against our originals.
 The goal is to discover every structural difference KiCad rewrites so the writer
 can emit native-looking files before KiCad touches them.
 
+Implementation workflow: [README.md](../../internal/kicadfiles/roundtrip/README.md).
+
 ## 2. Golden Corpus Tests
 
 Use real KiCad demo projects as fixtures for project, schematic, and PCB file
@@ -81,4 +83,3 @@ Expected operations include:
 
 The goal is to let agents build schematics and PCBs from design intent while the
 lower-level writer guarantees KiCad-native output.
-
