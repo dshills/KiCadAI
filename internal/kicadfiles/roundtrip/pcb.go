@@ -68,6 +68,39 @@ func RoundTripPCB(ctx context.Context, cli KiCadCLI, inputPath string, opts Opti
 	comparison.Stdout = result.Stdout
 	comparison.Stderr = result.Stderr
 	comparison.ExitCode = result.ExitCode
+	originalSummary, originalSummaryErr := SummarizePCB(inputPath)
+	roundTripSummary, roundTripSummaryErr := SummarizePCB(copyPath)
+	if originalSummaryErr != nil {
+		comparison.Differences = append(comparison.Differences, Difference{
+			Category: "summary-error",
+			Message:  originalSummaryErr.Error(),
+		})
+		comparison.Equal = false
+	}
+	if roundTripSummaryErr != nil {
+		comparison.Differences = append(comparison.Differences, Difference{
+			Category: "summary-error",
+			Message:  roundTripSummaryErr.Error(),
+		})
+		comparison.Equal = false
+	}
+	if originalSummaryErr == nil && roundTripSummaryErr == nil {
+		originalSummaryText := originalSummary.String()
+		roundTripSummaryText := roundTripSummary.String()
+		if originalSummaryText != roundTripSummaryText {
+			comparison.Differences = append(comparison.Differences, Difference{
+				Category: "summary-diff",
+				Message:  "PCB section summary changed",
+			})
+			comparison.Equal = false
+		}
+		if opts.KeepArtifacts {
+			path, err := workspace.WriteText("summary.txt", "original:\n"+originalSummaryText+"\nround-tripped:\n"+roundTripSummaryText)
+			if err == nil {
+				comparison.SummaryPath = path
+			}
+		}
+	}
 	return comparison, nil
 }
 
