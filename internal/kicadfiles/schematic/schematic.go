@@ -24,6 +24,7 @@ type SchematicFile struct {
 	LibSymbols       []EmbeddedSymbol
 	Symbols          []SchematicSymbol
 	Wires            []Wire
+	NoConnects       []NoConnect
 	Labels           []Label
 	Junctions        []Junction
 	Sheets           []Sheet
@@ -111,11 +112,15 @@ type Wire struct {
 }
 
 type Label struct {
-	UUID     kicadfiles.UUID
-	Text     string
-	Kind     LabelKind
-	Position kicadfiles.Point
-	Rotation kicadfiles.Angle
+	UUID             kicadfiles.UUID
+	Text             string
+	Kind             LabelKind
+	Shape            LabelShape
+	Position         kicadfiles.Point
+	Rotation         kicadfiles.Angle
+	Locked           bool
+	FieldsAutoplaced bool
+	Fields           []Field
 }
 
 type LabelKind string
@@ -127,9 +132,33 @@ const (
 	LabelDirective    LabelKind = "directive_label"
 )
 
+type LabelShape string
+
+const (
+	LabelShapeInput         LabelShape = "input"
+	LabelShapeOutput        LabelShape = "output"
+	LabelShapeBidirectional LabelShape = "bidirectional"
+	LabelShapeTriState      LabelShape = "tri_state"
+	LabelShapePassive       LabelShape = "passive"
+)
+
 type Junction struct {
 	UUID     kicadfiles.UUID
 	Position kicadfiles.Point
+	Diameter kicadfiles.IU
+	Color    Color
+}
+
+type NoConnect struct {
+	UUID     kicadfiles.UUID
+	Position kicadfiles.Point
+}
+
+type Color struct {
+	R int
+	G int
+	B int
+	A int
 }
 
 type Sheet struct {
@@ -256,13 +285,16 @@ func Validate(schematic SchematicFile) error {
 	for i, wire := range schematic.Wires {
 		errs = append(errs, validateWire(i, wire)...)
 	}
+	for i, noConnect := range schematic.NoConnects {
+		if !noConnect.UUID.Valid() {
+			errs = append(errs, fieldError(indexed("no_connects", i, "uuid"), "valid UUID required"))
+		}
+	}
 	for i, label := range schematic.Labels {
 		errs = append(errs, validateLabel(i, label)...)
 	}
 	for i, junction := range schematic.Junctions {
-		if !junction.UUID.Valid() {
-			errs = append(errs, fieldError(indexed("junctions", i, "uuid"), "valid UUID required"))
-		}
+		errs = append(errs, validateJunction(i, junction)...)
 	}
 	seenSheets := map[string]struct{}{}
 	for i, sheet := range schematic.Sheets {
@@ -324,9 +356,12 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 }
 
 func renderItems(schematic SchematicFile) []renderItem {
-	items := make([]renderItem, 0, len(schematic.Junctions)+len(schematic.Wires)+len(schematic.Labels)+len(schematic.Symbols)+len(schematic.Sheets))
+	items := make([]renderItem, 0, len(schematic.Junctions)+len(schematic.NoConnects)+len(schematic.Wires)+len(schematic.Labels)+len(schematic.Symbols)+len(schematic.Sheets))
 	for _, junction := range schematic.Junctions {
 		items = append(items, renderItem{kind: schematicItemJunction, uuid: junction.UUID, node: renderJunction(junction)})
+	}
+	for _, noConnect := range schematic.NoConnects {
+		items = append(items, renderItem{kind: schematicItemNoConnect, uuid: noConnect.UUID, node: renderNoConnect(noConnect)})
 	}
 	for _, wire := range schematic.Wires {
 		items = append(items, renderItem{kind: schematicItemLine, uuid: wire.UUID, node: renderWire(wire)})
@@ -626,7 +661,60 @@ func validateLabel(index int, label Label) kicadfiles.ValidationErrors {
 	if label.Kind != LabelLocal && label.Kind != LabelGlobal && label.Kind != LabelHierarchical && label.Kind != LabelDirective {
 		errs = append(errs, fieldError(indexed("labels", index, "kind"), "invalid"))
 	}
+	if label.Kind != LabelLocal && !validLabelShape(labelShape(label)) {
+		errs = append(errs, fieldError(indexed("labels", index, "shape"), "invalid"))
+	}
+	seenFields := map[string]struct{}{}
+	for fieldIndex, field := range label.Fields {
+		name := strings.TrimSpace(field.Name)
+		if name == "" {
+			errs = append(errs, fieldError(indexed("labels", index, "fields")+"["+strconv.Itoa(fieldIndex)+"].name", "required"))
+		}
+		key := strings.ToLower(name)
+		if _, ok := seenFields[key]; ok && key != "" {
+			errs = append(errs, fieldError(indexed("labels", index, "fields")+"["+strconv.Itoa(fieldIndex)+"].name", "duplicate "+name))
+		}
+		seenFields[key] = struct{}{}
+	}
 	return errs
+}
+
+func validateJunction(index int, junction Junction) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if !junction.UUID.Valid() {
+		errs = append(errs, fieldError(indexed("junctions", index, "uuid"), "valid UUID required"))
+	}
+	if junction.Diameter < 0 {
+		errs = append(errs, fieldError(indexed("junctions", index, "diameter"), "must be non-negative"))
+	}
+	if !validColor(junction.Color) {
+		errs = append(errs, fieldError(indexed("junctions", index, "color"), "components must be between 0 and 255"))
+	}
+	return errs
+}
+
+func validColor(color Color) bool {
+	return validColorComponent(color.R) && validColorComponent(color.G) && validColorComponent(color.B) && validColorComponent(color.A)
+}
+
+func validColorComponent(value int) bool {
+	return value >= 0 && value <= 255
+}
+
+func validLabelShape(shape LabelShape) bool {
+	switch shape {
+	case LabelShapeInput, LabelShapeOutput, LabelShapeBidirectional, LabelShapeTriState, LabelShapePassive:
+		return true
+	default:
+		return false
+	}
+}
+
+func labelShape(label Label) LabelShape {
+	if label.Shape != "" {
+		return label.Shape
+	}
+	return LabelShapeInput
 }
 
 func renderLibSymbols(symbols []EmbeddedSymbol) sexpr.List {
@@ -831,13 +919,20 @@ func renderWire(wire Wire) sexpr.List {
 }
 
 func renderLabel(label Label) sexpr.List {
-	return sexpr.L(
+	nodes := []sexpr.Node{
 		sexpr.A(labelToken(label.Kind)),
 		sexpr.S(label.Text),
+		sexpr.OmitIf(label.Kind == LabelLocal, sexpr.L(sexpr.A("shape"), sexpr.A(string(labelShape(label))))),
 		renderAt(label.Position, label.Rotation),
 		renderEffects(false),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(label.UUID))),
-	)
+		sexpr.OmitIf(!label.Locked, sexpr.L(sexpr.A("locked"), sexpr.A("yes"))),
+		sexpr.OmitIf(!label.FieldsAutoplaced, sexpr.L(sexpr.A("fields_autoplaced"), sexpr.A("yes"))),
+	}
+	for _, field := range label.Fields {
+		nodes = append(nodes, renderProperty(propertyFromField(field)))
+	}
+	return sexpr.L(nodes...)
 }
 
 func labelToken(kind LabelKind) string {
@@ -858,12 +953,28 @@ func labelToken(kind LabelKind) string {
 }
 
 func renderJunction(junction Junction) sexpr.List {
+	diameter := sexpr.Node(sexpr.I(0))
+	if junction.Diameter != 0 {
+		diameter = sexpr.X(kicadfiles.ToMMString(junction.Diameter))
+	}
+	color := junction.Color
+	if (color.R != 0 || color.G != 0 || color.B != 0) && color.A == 0 {
+		color.A = 255
+	}
 	return sexpr.L(
 		sexpr.A("junction"),
 		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(junction.Position.X)), sexpr.X(kicadfiles.ToMMString(junction.Position.Y))),
-		sexpr.L(sexpr.A("diameter"), sexpr.I(0)),
-		sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.I(0)),
+		sexpr.L(sexpr.A("diameter"), diameter),
+		sexpr.L(sexpr.A("color"), sexpr.I(int64(color.R)), sexpr.I(int64(color.G)), sexpr.I(int64(color.B)), sexpr.I(int64(color.A))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(junction.UUID))),
+	)
+}
+
+func renderNoConnect(noConnect NoConnect) sexpr.List {
+	return sexpr.L(
+		sexpr.A("no_connect"),
+		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(noConnect.Position.X)), sexpr.X(kicadfiles.ToMMString(noConnect.Position.Y))),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(noConnect.UUID))),
 	)
 }
 

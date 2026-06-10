@@ -169,6 +169,10 @@ func TestWriteOrdersItemsByKiCadKindThenUUID(t *testing.T) {
 			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
 		},
 	}}
+	schematic.NoConnects = []NoConnect{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(5), Y: kicadfiles.MM(5)},
+	}}
 	schematic.Junctions = []Junction{{
 		UUID:     kicadfiles.UUID("99999999-9999-4999-8999-999999999999"),
 		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
@@ -182,6 +186,7 @@ func TestWriteOrdersItemsByKiCadKindThenUUID(t *testing.T) {
 	assertInOrder(t, output,
 		"(lib_symbols)",
 		"(junction",
+		"(no_connect",
 		"(wire",
 		"(label",
 		"(global_label",
@@ -189,6 +194,51 @@ func TestWriteOrdersItemsByKiCadKindThenUUID(t *testing.T) {
 		"22222222-2222-4222-8222-222222222222",
 		"33333333-3333-4333-8333-333333333333",
 	)
+}
+
+func TestWriteRendersLabelShapesAndNoConnects(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Labels = []Label{{
+		UUID:             kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:             "OUT",
+		Kind:             LabelGlobal,
+		Shape:            LabelShapeOutput,
+		Position:         kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		Locked:           true,
+		FieldsAutoplaced: true,
+		Fields:           []Field{{Name: "Netclass", Value: "Fast", Visible: true}},
+	}}
+	schematic.NoConnects = []NoConnect{{
+		UUID:     kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(20)},
+	}}
+	schematic.Junctions = []Junction{{
+		UUID:     kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+		Diameter: kicadfiles.MM(1),
+		Color:    Color{R: 1, G: 2, B: 3, A: 4},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(junction",
+		"(diameter 1.0)",
+		"(color 1 2 3 4)",
+		"(no_connect",
+		"(global_label",
+		"(shape output)",
+		"(locked yes)",
+		"(fields_autoplaced yes)",
+		"\"Netclass\"",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
 }
 
 func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
@@ -310,12 +360,40 @@ func TestValidateRejectsInvalidElements(t *testing.T) {
 	schematic.Symbols = []SchematicSymbol{{UUID: schematic.UUID, LibraryID: "", Reference: "R1", Value: "1k"}}
 	schematic.Wires = []Wire{{UUID: schematic.UUID, Points: []kicadfiles.Point{{}, {}}}}
 	schematic.Labels = []Label{{UUID: schematic.UUID, Text: "", Kind: "bad"}}
+	schematic.NoConnects = []NoConnect{{UUID: ""}}
+	schematic.Junctions = []Junction{{
+		UUID:     "",
+		Diameter: -1,
+		Color:    Color{R: 300},
+	}}
 
 	err := Validate(schematic)
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind"} {
+	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind", "no_connects[0].uuid", "junctions[0].uuid", "junctions[0].diameter", "junctions[0].color"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
+		}
+	}
+}
+
+func TestValidateRejectsInvalidLabelShapeAndNoConnect(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Labels = []Label{{
+		UUID:   kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:   "OUT",
+		Kind:   LabelGlobal,
+		Shape:  "sideways",
+		Fields: []Field{{Name: ""}},
+	}}
+	schematic.NoConnects = []NoConnect{{UUID: ""}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{"labels[0].shape", "labels[0].fields[0].name", "no_connects[0].uuid"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %s: %v", want, err)
 		}
