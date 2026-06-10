@@ -109,26 +109,26 @@ type PCBPlotParams struct {
 
 const (
 	kicad10LayerFCu      = 0
-	kicad10LayerFMask    = 1
-	kicad10LayerBCu      = 2
-	kicad10LayerBMask    = 3
-	kicad10LayerFSilkS   = 5
-	kicad10LayerBSilkS   = 7
-	kicad10LayerFAdhes   = 9
-	kicad10LayerBAdhes   = 11
-	kicad10LayerFPaste   = 13
-	kicad10LayerBPaste   = 15
-	kicad10LayerDwgs     = 17
-	kicad10LayerCmts     = 19
-	kicad10LayerEco1     = 21
-	kicad10LayerEco2     = 23
-	kicad10LayerEdge     = 25
-	kicad10LayerMargin   = 27
-	kicad10LayerBCrtYd   = 29
-	kicad10LayerFCrtYd   = 31
-	kicad10LayerBFab     = 33
-	kicad10LayerFFab     = 35
-	kicad10LayerUserBase = 37
+	kicad10LayerBCu      = 31
+	kicad10LayerBAdhes   = 32
+	kicad10LayerFAdhes   = 33
+	kicad10LayerBPaste   = 34
+	kicad10LayerFPaste   = 35
+	kicad10LayerBSilkS   = 36
+	kicad10LayerFSilkS   = 37
+	kicad10LayerBMask    = 38
+	kicad10LayerFMask    = 39
+	kicad10LayerDwgs     = 40
+	kicad10LayerCmts     = 41
+	kicad10LayerEco1     = 42
+	kicad10LayerEco2     = 43
+	kicad10LayerEdge     = 44
+	kicad10LayerMargin   = 45
+	kicad10LayerBCrtYd   = 46
+	kicad10LayerFCrtYd   = 47
+	kicad10LayerBFab     = 48
+	kicad10LayerFFab     = 49
+	kicad10LayerUserBase = kicad10LayerFFab
 
 	defaultTextSizeMM      = 1.0
 	defaultTextThicknessMM = 0.15
@@ -397,7 +397,7 @@ func DefaultTwoLayerStack() []LayerDefinition {
 		{Number: kicad10LayerBFab, Name: kicadfiles.LayerBFab, Kind: "user"},
 	}
 	for i := 1; i <= 45; i++ {
-		layers = append(layers, LayerDefinition{Number: kicad10LayerUserBase + i*2, Name: kicadfiles.BoardLayer("User." + strconv.Itoa(i)), Kind: "user"})
+		layers = append(layers, LayerDefinition{Number: kicad10LayerUserBase + i, Name: kicadfiles.BoardLayer("User." + strconv.Itoa(i)), Kind: "user"})
 	}
 	return layers
 }

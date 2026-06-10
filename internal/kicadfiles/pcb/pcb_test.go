@@ -25,11 +25,11 @@ func TestWriteMinimalPCB(t *testing.T) {
 		"(thickness 1.6)",
 		"(legacy_teardrops no)",
 		"(0 \"F.Cu\" signal)",
-		"(2 \"B.Cu\" signal)",
-		"(5 \"F.SilkS\" user \"F.Silkscreen\")",
-		"(7 \"B.SilkS\" user \"B.Silkscreen\")",
-		"(25 \"Edge.Cuts\" user)",
-		"(127 \"User.45\" user)",
+		"(31 \"B.Cu\" signal)",
+		"(37 \"F.SilkS\" user \"F.Silkscreen\")",
+		"(36 \"B.SilkS\" user \"B.Silkscreen\")",
+		"(44 \"Edge.Cuts\" user)",
+		"(94 \"User.45\" user)",
 		"(allow_soldermask_bridges_in_footprints no)",
 		"(tenting",
 		"(front yes)",
@@ -680,7 +680,7 @@ func TestValidateRejectsInvalidTrack(t *testing.T) {
 
 func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
 	board := minimalPCB()
-	board.Layers = append(board.Layers, LayerDefinition{Number: 4, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
+	board.Layers = append(board.Layers, LayerDefinition{Number: 1, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
 	board.Nets = []Net{{Code: 1, Name: "A"}}
 	board.Tracks = []Track{{
 		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
