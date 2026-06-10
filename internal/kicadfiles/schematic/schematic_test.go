@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/sexpr"
 )
 
 func TestWriteMinimalSchematic(t *testing.T) {
@@ -282,6 +283,58 @@ func TestWriteRendersBusesPolylinesBusEntriesAndText(t *testing.T) {
 	}
 }
 
+func TestWritePreservesRawSchematicItemsInKiCadOrder(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:      kicadfiles.UUID("55555555-5555-4555-8555-555555555555"),
+		LibraryID: "Device:R",
+		Reference: "R1",
+		Value:     "1k",
+	}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Body: sexpr.Raw(`
+			(rule_area (name "Preserved") (uuid "33333333-3333-4333-8333-333333333333"))`),
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	assertInOrder(t, output,
+		"(lib_symbols)",
+		"(rule_area",
+		"\"Preserved\"",
+		"(symbol",
+	)
+}
+
+func TestWritePreservesUnknownRawSchematicItems(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:      kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		LibraryID: "Device:R",
+		Reference: "R1",
+		Value:     "1k",
+	}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("77777777-7777-4777-8777-777777777777"),
+		Body: sexpr.Raw(`(future_widget (uuid "77777777-7777-4777-8777-777777777777") (value "preserve me"))`),
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	assertInOrder(t, buf.String(),
+		"(symbol",
+		"(future_widget",
+		"\"preserve me\"",
+		"(sheet_instances",
+	)
+}
+
 func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
 	showName := true
 	doNotAutoplace := true
@@ -411,15 +464,121 @@ func TestValidateRejectsInvalidElements(t *testing.T) {
 	schematic.Polylines = []Polyline{{UUID: "", Points: []kicadfiles.Point{{}, {}}}}
 	schematic.BusEntries = []BusEntry{{UUID: "", Size: kicadfiles.Point{}}}
 	schematic.Texts = []Text{{UUID: "", Value: ""}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: "",
+		Kind: RawItemBitmap,
+		Body: sexpr.Raw(`(rule_area (name "wrong")`),
+	}}
 
 	err := Validate(schematic)
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind", "no_connects[0].uuid", "junctions[0].uuid", "junctions[0].diameter", "junctions[0].color", "buses[0].uuid", "buses[0].points", "polylines[0].uuid", "polylines[0].points", "bus_entries[0].uuid", "bus_entries[0].size", "texts[0].uuid", "texts[0].value"} {
+	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind", "no_connects[0].uuid", "junctions[0].uuid", "junctions[0].diameter", "junctions[0].color", "buses[0].uuid", "buses[0].points", "polylines[0].uuid", "polylines[0].points", "bus_entries[0].uuid", "bus_entries[0].size", "texts[0].uuid", "texts[0].value", "raw_items[0].uuid", "raw_items[0].body"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %s: %v", want, err)
 		}
+	}
+}
+
+func TestValidateRejectsRawItemKindMismatch(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Kind: RawItemBitmap,
+		Body: sexpr.Raw(`(rule_area (name "Preserved") (uuid "33333333-3333-4333-8333-333333333333"))`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].kind") {
+		t.Fatalf("error missing raw item kind mismatch: %v", err)
+	}
+}
+
+func TestValidateRejectsRawItemUUIDMismatch(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Body: sexpr.Raw(`(rule_area (name "33333333-3333-4333-8333-333333333333") (uuid "44444444-4444-4444-8444-444444444444"))`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].body") {
+		t.Fatalf("error missing raw item UUID mismatch: %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateRawItemUUID(t *testing.T) {
+	schematic := minimalSchematic()
+	duplicateUUID := kicadfiles.UUID("33333333-3333-4333-8333-333333333333")
+	schematic.Wires = []Wire{{
+		UUID: duplicateUUID,
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: duplicateUUID,
+		Body: sexpr.Raw(`(rule_area (name "Preserved") (uuid "33333333-3333-4333-8333-333333333333"))`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].uuid") || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("error missing duplicate raw item UUID: %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateNestedRawItemUUID(t *testing.T) {
+	schematic := minimalSchematic()
+	nestedDuplicateUUID := kicadfiles.UUID("33333333-3333-4333-8333-333333333333")
+	schematic.Wires = []Wire{{
+		UUID: nestedDuplicateUUID,
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+		Body: sexpr.Raw(`(future_widget (uuid "44444444-4444-4444-8444-444444444444") (child (uuid "33333333-3333-4333-8333-333333333333")))`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].body") || !strings.Contains(err.Error(), "duplicate") {
+		t.Fatalf("error missing duplicate nested raw item UUID: %v", err)
+	}
+}
+
+func TestValidateIgnoresRawUUIDPatternInsideString(t *testing.T) {
+	schematic := minimalSchematic()
+	mentionedUUID := kicadfiles.UUID("33333333-3333-4333-8333-333333333333")
+	schematic.Wires = []Wire{{
+		UUID: mentionedUUID,
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+		Body: sexpr.Raw(`(future_widget (uuid "44444444-4444-4444-8444-444444444444") (name "(uuid \"33333333-3333-4333-8333-333333333333\")"))`),
+	}}
+
+	if err := Validate(schematic); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
 	}
 }
 

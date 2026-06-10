@@ -32,6 +32,7 @@ type SchematicFile struct {
 	BusEntries       []BusEntry
 	Texts            []Text
 	Sheets           []Sheet
+	RawItems         []RawSchematicItem
 	Instances        []SymbolInstance
 	SheetInstances   []SheetInstance
 }
@@ -239,6 +240,37 @@ const (
 	SheetPinPassive       SheetPinKind = "passive"
 )
 
+type RawSchematicItem struct {
+	UUID kicadfiles.UUID
+	// Kind is the KiCad schematic item node name, such as "bitmap" or
+	// "rule_area". When omitted, the writer infers it from Body. Body must be
+	// a comment-free S-expression fragment whose UUID matches UUID.
+	Kind RawSchematicItemKind
+	Body sexpr.Raw
+}
+
+type RawSchematicItemKind string
+
+const (
+	RawItemJunction          RawSchematicItemKind = "junction"
+	RawItemNoConnect         RawSchematicItemKind = "no_connect"
+	RawItemBusEntry          RawSchematicItemKind = "bus_entry"
+	RawItemWire              RawSchematicItemKind = "wire"
+	RawItemBus               RawSchematicItemKind = "bus"
+	RawItemPolyline          RawSchematicItemKind = "polyline"
+	RawItemBitmap            RawSchematicItemKind = "bitmap"
+	RawItemTable             RawSchematicItemKind = "table"
+	RawItemText              RawSchematicItemKind = "text"
+	RawItemLabel             RawSchematicItemKind = "label"
+	RawItemGlobalLabel       RawSchematicItemKind = "global_label"
+	RawItemHierarchicalLabel RawSchematicItemKind = "hierarchical_label"
+	RawItemRuleArea          RawSchematicItemKind = "rule_area"
+	RawItemDirectiveLabel    RawSchematicItemKind = "directive_label"
+	RawItemSymbol            RawSchematicItemKind = "symbol"
+	RawItemGroup             RawSchematicItemKind = "group"
+	RawItemSheet             RawSchematicItemKind = "sheet"
+)
+
 type SheetInstance struct {
 	Project string
 	Path    string
@@ -268,6 +300,7 @@ const (
 	schematicItemGroup             schematicItemKind = 150
 	schematicItemSheetPin          schematicItemKind = 160
 	schematicItemSheet             schematicItemKind = 170
+	schematicItemUnknownRaw        schematicItemKind = 10000
 )
 
 const schematicHeaderNodeCapacity = 8
@@ -275,7 +308,7 @@ const schematicHeaderNodeCapacity = 8
 type renderItem struct {
 	kind schematicItemKind
 	uuid kicadfiles.UUID
-	node sexpr.List
+	node sexpr.Node
 }
 
 type LEDIndicatorInput struct {
@@ -355,9 +388,16 @@ func Validate(schematic SchematicFile) error {
 			seenSheets[name] = struct{}{}
 		}
 	}
+	rawMetadata := make([]rawSchematicItemValidationMetadata, len(schematic.RawItems))
+	for i, raw := range schematic.RawItems {
+		rawErrs, metadata := validateRawSchematicItem(i, raw)
+		errs = append(errs, rawErrs...)
+		rawMetadata[i] = metadata
+	}
 	for i, instance := range schematic.SheetInstances {
 		errs = append(errs, validateSheetInstance(indexed("sheet_instances", i, ""), instance)...)
 	}
+	errs = append(errs, validateUniqueSchematicItemUUIDs(schematic, rawMetadata)...)
 	return errs.Err()
 }
 
@@ -584,7 +624,10 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	if err != nil {
 		return nil, err
 	}
-	items := renderItems(schematic)
+	items, err := renderItems(schematic)
+	if err != nil {
+		return nil, err
+	}
 	nodes := make([]sexpr.Node, 0, len(items)+schematicHeaderNodeCapacity)
 	nodes = append(nodes,
 		sexpr.A("kicad_sch"),
@@ -610,8 +653,12 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	return sexpr.L(nodes...), nil
 }
 
-func renderItems(schematic SchematicFile) []renderItem {
-	items := make([]renderItem, 0, len(schematic.Junctions)+len(schematic.NoConnects)+len(schematic.BusEntries)+len(schematic.Wires)+len(schematic.Buses)+len(schematic.Polylines)+len(schematic.Texts)+len(schematic.Labels)+len(schematic.Symbols)+len(schematic.Sheets))
+func renderItems(schematic SchematicFile) ([]renderItem, error) {
+	itemCount := len(schematic.Junctions) + len(schematic.NoConnects) + len(schematic.BusEntries) +
+		len(schematic.Wires) + len(schematic.Buses) + len(schematic.Polylines) +
+		len(schematic.Texts) + len(schematic.Labels) + len(schematic.Symbols) +
+		len(schematic.Sheets) + len(schematic.RawItems)
+	items := make([]renderItem, 0, itemCount)
 	for _, junction := range schematic.Junctions {
 		items = append(items, renderItem{kind: schematicItemJunction, uuid: junction.UUID, node: renderJunction(junction)})
 	}
@@ -643,6 +690,14 @@ func renderItems(schematic SchematicFile) []renderItem {
 	for _, sheet := range schematic.Sheets {
 		items = append(items, renderItem{kind: schematicItemSheet, uuid: sheet.UUID, node: renderSheet(sheet)})
 	}
+	for i, raw := range schematic.RawItems {
+		effectiveKind := raw.effectiveKind()
+		kind, ok := rawSchematicItemKind(effectiveKind)
+		if !ok {
+			return nil, fieldError(indexed("raw_items", i, "kind"), "unsupported schematic item kind "+string(effectiveKind))
+		}
+		items = append(items, renderItem{kind: kind, uuid: raw.UUID, node: sexpr.R(string(raw.Body))})
+	}
 	// Keep the sort stable so invalid duplicate UUID input still renders
 	// reproducibly before validation grows strict global UUID checks.
 	slices.SortStableFunc(items, func(a, b renderItem) int {
@@ -651,7 +706,7 @@ func renderItems(schematic SchematicFile) []renderItem {
 		}
 		return cmp.Compare(a.uuid, b.uuid)
 	})
-	return items
+	return items, nil
 }
 
 func labelItemKind(kind LabelKind) schematicItemKind {
@@ -666,6 +721,55 @@ func labelItemKind(kind LabelKind) schematicItemKind {
 		return schematicItemDirectiveLabel
 	default:
 		return schematicItemLabel
+	}
+}
+
+func (raw RawSchematicItem) effectiveKind() RawSchematicItemKind {
+	if raw.Kind != "" {
+		return raw.Kind
+	}
+	return RawSchematicItemKind(rawSchematicItemTopLevelAtom(strings.TrimSpace(string(raw.Body))))
+}
+
+func rawSchematicItemKind(kind RawSchematicItemKind) (schematicItemKind, bool) {
+	switch kind {
+	case RawItemJunction:
+		return schematicItemJunction, true
+	case RawItemNoConnect:
+		return schematicItemNoConnect, true
+	case RawItemBusEntry:
+		// The structured BusEntry type currently represents KiCad's wire-to-bus
+		// entry item and is sorted with the same internal kind.
+		return schematicItemWireToBusEntry, true
+	case RawItemWire, RawItemBus, RawItemPolyline:
+		return schematicItemLine, true
+	case RawItemBitmap:
+		return schematicItemBitmap, true
+	case RawItemTable:
+		return schematicItemTable, true
+	case RawItemText:
+		return schematicItemText, true
+	case RawItemLabel:
+		return schematicItemLabel, true
+	case RawItemGlobalLabel:
+		return schematicItemGlobalLabel, true
+	case RawItemHierarchicalLabel:
+		return schematicItemHierarchicalLabel, true
+	case RawItemRuleArea:
+		return schematicItemRuleArea, true
+	case RawItemDirectiveLabel:
+		return schematicItemDirectiveLabel, true
+	case RawItemSymbol:
+		return schematicItemSymbol, true
+	case RawItemGroup:
+		return schematicItemGroup, true
+	case RawItemSheet:
+		return schematicItemSheet, true
+	default:
+		if strings.TrimSpace(string(kind)) == "" {
+			return 0, false
+		}
+		return schematicItemUnknownRaw, true
 	}
 }
 
@@ -998,6 +1102,216 @@ func validateJunction(index int, junction Junction) kicadfiles.ValidationErrors 
 		errs = append(errs, fieldError(indexed("junctions", index, "color"), "components must be between 0 and 255"))
 	}
 	return errs
+}
+
+type rawSchematicItemValidationMetadata struct {
+	uuids []kicadfiles.UUID
+}
+
+func validateRawSchematicItem(index int, raw RawSchematicItem) (kicadfiles.ValidationErrors, rawSchematicItemValidationMetadata) {
+	var errs kicadfiles.ValidationErrors
+	var metadata rawSchematicItemValidationMetadata
+	prefix := func(field string) string { return indexed("raw_items", index, field) }
+	if !raw.UUID.Valid() {
+		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
+	}
+	body := strings.TrimSpace(string(raw.Body))
+	if !sexpr.ValidRaw(body) {
+		errs = append(errs, fieldError(prefix("body"), "valid S-expression fragment required"))
+		return errs, metadata
+	}
+	bodyKind := RawSchematicItemKind(rawSchematicItemTopLevelAtom(body))
+	if bodyKind == "" {
+		errs = append(errs, fieldError(prefix("body"), "top-level item kind required"))
+		return errs, metadata
+	}
+	if raw.Kind != "" && raw.Kind != bodyKind {
+		errs = append(errs, fieldError(prefix("kind"), "does not match body kind "+string(bodyKind)))
+	}
+	metadata.uuids = rawSchematicItemUUIDs(body)
+	if raw.UUID.Valid() && !rawSchematicItemUUIDListContains(metadata.uuids, raw.UUID) {
+		errs = append(errs, fieldError(prefix("body"), "must contain matching uuid "+string(raw.UUID)))
+	}
+	effectiveKind := raw.Kind
+	if effectiveKind == "" {
+		effectiveKind = bodyKind
+	}
+	if _, ok := rawSchematicItemKind(effectiveKind); !ok {
+		errs = append(errs, fieldError(prefix("kind"), "unsupported schematic item kind "+string(effectiveKind)))
+	}
+	return errs, metadata
+}
+
+func validateUniqueSchematicItemUUIDs(schematic SchematicFile, rawMetadata []rawSchematicItemValidationMetadata) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	seen := map[kicadfiles.UUID]string{}
+	add := func(field string, uuid kicadfiles.UUID) {
+		if !uuid.Valid() {
+			return
+		}
+		if previous, ok := seen[uuid]; ok {
+			errs = append(errs, fieldError(field, "duplicate "+string(uuid)+" also used by "+previous))
+			return
+		}
+		seen[uuid] = field
+	}
+	for i, symbol := range schematic.Symbols {
+		add(indexed("symbols", i, "uuid"), symbol.UUID)
+	}
+	for i, wire := range schematic.Wires {
+		add(indexed("wires", i, "uuid"), wire.UUID)
+	}
+	for i, bus := range schematic.Buses {
+		add(indexed("buses", i, "uuid"), bus.UUID)
+	}
+	for i, polyline := range schematic.Polylines {
+		add(indexed("polylines", i, "uuid"), polyline.UUID)
+	}
+	for i, entry := range schematic.BusEntries {
+		add(indexed("bus_entries", i, "uuid"), entry.UUID)
+	}
+	for i, text := range schematic.Texts {
+		add(indexed("texts", i, "uuid"), text.UUID)
+	}
+	for i, label := range schematic.Labels {
+		add(indexed("labels", i, "uuid"), label.UUID)
+	}
+	for i, junction := range schematic.Junctions {
+		add(indexed("junctions", i, "uuid"), junction.UUID)
+	}
+	for i, noConnect := range schematic.NoConnects {
+		add(indexed("no_connects", i, "uuid"), noConnect.UUID)
+	}
+	for i, sheet := range schematic.Sheets {
+		add(indexed("sheets", i, "uuid"), sheet.UUID)
+		for pinIndex, pin := range sheet.Pins {
+			add(indexed(indexed("sheets", i, "pins"), pinIndex, "uuid"), pin.UUID)
+		}
+	}
+	for i, raw := range schematic.RawItems {
+		add(indexed("raw_items", i, "uuid"), raw.UUID)
+		ownUUIDSeen := false
+		for uuidIndex, uuid := range rawMetadata[i].uuids {
+			if uuid == raw.UUID && !ownUUIDSeen {
+				ownUUIDSeen = true
+				continue
+			}
+			add(indexed("raw_items", i, "body")+"[uuid "+strconv.Itoa(uuidIndex)+"]", uuid)
+		}
+	}
+	return errs
+}
+
+func rawSchematicItemTopLevelAtom(value string) string {
+	// Raw fragments preserve KiCad S-expressions, but this helper only infers
+	// the first item atom from already-trimmed, comment-free fragments.
+	if !strings.HasPrefix(value, "(") {
+		return ""
+	}
+	value = strings.TrimLeft(value[1:], " \t\r\n")
+	if value == "" {
+		return ""
+	}
+	end := 0
+	for end < len(value) {
+		switch value[end] {
+		case ' ', '\t', '\r', '\n', '(', ')':
+			return value[:end]
+		default:
+			end++
+		}
+	}
+	return value
+}
+
+func rawSchematicItemUUIDListContains(uuids []kicadfiles.UUID, uuid kicadfiles.UUID) bool {
+	for _, candidate := range uuids {
+		if candidate == uuid {
+			return true
+		}
+	}
+	return false
+}
+
+func rawSchematicItemUUIDs(body string) []kicadfiles.UUID {
+	var uuids []kicadfiles.UUID
+	inString := false
+	escaped := false
+	for i := 0; i < len(body); i++ {
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			switch body[i] {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		if body[i] == '"' {
+			inString = true
+			continue
+		}
+		if body[i] != '(' || i+5 > len(body) || body[i+1:i+5] != "uuid" {
+			continue
+		}
+		start := i + len("(uuid")
+		if start >= len(body) || !isSExprSpace(body[start]) {
+			continue
+		}
+		pos := skipSExprSpace(body, start)
+		if pos >= len(body) || body[pos] != '"' {
+			continue
+		}
+		pos++
+		valueEnd, ok := rawSchematicStringEnd(body, pos)
+		if !ok {
+			return uuids
+		}
+		candidate := kicadfiles.UUID(body[pos:valueEnd])
+		afterValue := skipSExprSpace(body, valueEnd+1)
+		if afterValue < len(body) && body[afterValue] == ')' && candidate.Valid() {
+			uuids = append(uuids, candidate)
+		}
+		i = afterValue
+	}
+	return uuids
+}
+
+func rawSchematicStringEnd(value string, start int) (int, bool) {
+	escaped := false
+	for i := start; i < len(value); i++ {
+		if escaped {
+			escaped = false
+			continue
+		}
+		switch value[i] {
+		case '\\':
+			escaped = true
+		case '"':
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+func skipSExprSpace(value string, pos int) int {
+	for pos < len(value) && isSExprSpace(value[pos]) {
+		pos++
+	}
+	return pos
+}
+
+func isSExprSpace(value byte) bool {
+	switch value {
+	case ' ', '\t', '\r', '\n':
+		return true
+	default:
+		return false
+	}
 }
 
 func validColor(color Color) bool {
