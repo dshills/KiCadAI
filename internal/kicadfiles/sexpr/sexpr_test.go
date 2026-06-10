@@ -103,6 +103,23 @@ func TestRenderFixedNumeric(t *testing.T) {
 	}
 }
 
+func TestRenderRawFragment(t *testing.T) {
+	got, err := Format(L(A("root"), R(`(embedded_fonts no)`)))
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	if !strings.Contains(got, "(embedded_fonts no)") {
+		t.Fatalf("Format = %q", got)
+	}
+}
+
+func TestRenderRejectsInvalidRawFragment(t *testing.T) {
+	_, err := Format(R(`(embedded_fonts no))`))
+	if err == nil {
+		t.Fatal("expected error")
+	}
+}
+
 func TestRenderRejectsInvalidFixedNumeric(t *testing.T) {
 	_, err := Format(X("1e10"))
 	if !errors.Is(err, ErrInvalidFixed) {

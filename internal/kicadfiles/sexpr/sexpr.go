@@ -34,6 +34,7 @@ type String string
 type Int int64
 type Float float64
 type Fixed string
+type Raw string
 type List []Node
 type Omit struct{}
 
@@ -57,8 +58,19 @@ func X(value string) Fixed {
 	return Fixed(value)
 }
 
+func R(value string) Raw {
+	return Raw(value)
+}
+
 func L(nodes ...Node) List {
 	return List(nodes)
+}
+
+func OmitIf(condition bool, node Node) Node {
+	if condition {
+		return Omit{}
+	}
+	return node
 }
 
 func Format(node Node) (string, error) {
@@ -104,11 +116,55 @@ func (r renderer) writeNode(node Node, indent int) error {
 		return err
 	case Fixed:
 		return r.writeFixed(string(value))
+	case Raw:
+		raw := strings.TrimSpace(string(value))
+		if !ValidRaw(raw) {
+			return fmt.Errorf("%w: invalid raw fragment", ErrInvalidNode)
+		}
+		_, err := io.WriteString(r.w, raw)
+		return err
 	case List:
 		return r.writeList(value, indent)
 	default:
 		return fmt.Errorf("%w: %T", ErrInvalidNode, node)
 	}
+}
+
+func ValidRaw(value string) bool {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "(") || !strings.HasSuffix(value, ")") {
+		return false
+	}
+	depth := 0
+	inString := false
+	escaped := false
+	for _, r := range value {
+		if inString {
+			if escaped {
+				escaped = false
+				continue
+			}
+			switch r {
+			case '\\':
+				escaped = true
+			case '"':
+				inString = false
+			}
+			continue
+		}
+		switch r {
+		case '"':
+			inString = true
+		case '(':
+			depth++
+		case ')':
+			depth--
+			if depth < 0 {
+				return false
+			}
+		}
+	}
+	return depth == 0 && !inString && !escaped
 }
 
 func (r renderer) writeList(list List, indent int) error {

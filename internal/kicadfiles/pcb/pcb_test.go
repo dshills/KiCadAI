@@ -214,6 +214,19 @@ func TestWriteRendersTitleBlock(t *testing.T) {
 	}
 }
 
+func TestWriteRendersPreservedNodes(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{{Raw: `(embedded_fonts no)`}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "(embedded_fonts no)") {
+		t.Fatalf("preserved node missing:\n%s", buf.String())
+	}
+}
+
 func TestWriteSortsNetsByCode(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 2, Name: "LED_OUT"}, {Code: 1, Name: "GND"}}

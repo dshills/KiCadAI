@@ -29,8 +29,13 @@ type PCBFile struct {
 	Drawings             []Drawing
 	Zones                []Zone
 	Dimensions           []Dimension
+	Preserved            []PreservedNode
 	TitleBlock           kicadfiles.TitleBlock
 	RequireClosedOutline bool
+}
+
+type PreservedNode struct {
+	Raw string
 }
 
 type PCBGeneral struct {
@@ -604,6 +609,14 @@ func Validate(board PCBFile) error {
 	for i, dimension := range board.Dimensions {
 		errs = append(errs, validateDimension(i, dimension)...)
 	}
+	for i, preserved := range board.Preserved {
+		raw := strings.TrimSpace(preserved.Raw)
+		if raw == "" {
+			errs = append(errs, fieldError(indexed("preserved", i, "raw"), "required"))
+		} else if !sexpr.ValidRaw(raw) {
+			errs = append(errs, fieldError(indexed("preserved", i, "raw"), "invalid s-expression syntax"))
+		}
+	}
 	return errs.Err()
 }
 
@@ -672,6 +685,9 @@ func render(board PCBFile) (sexpr.List, error) {
 	}
 	for _, dimension := range board.Dimensions {
 		nodes = append(nodes, renderDimension(dimension))
+	}
+	for _, preserved := range board.Preserved {
+		nodes = append(nodes, sexpr.R(preserved.Raw))
 	}
 	return sexpr.L(nodes...), nil
 }
