@@ -55,21 +55,38 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 func twoPadFootprint(generator kicadfiles.IDGenerator, key, libraryID, reference, value string, position kicadfiles.Point, leftNet, rightNet int) Footprint {
 	path := "root.component." + key
 	return Footprint{
-		UUID:      generator.New("root.pcb.footprint."+key, path),
-		Path:      path,
-		LibraryID: libraryID,
-		Reference: reference,
-		Value:     value,
-		Position:  position,
-		Layer:     kicadfiles.LayerFCu,
-		Texts: []FootprintText{
-			{Kind: "reference", Text: reference, Position: kicadfiles.Point{X: 0, Y: kicadfiles.MM(-1.5)}, Layer: kicadfiles.LayerFSilkS},
-			{Kind: "value", Text: value, Position: kicadfiles.Point{X: 0, Y: kicadfiles.MM(1.5)}, Layer: kicadfiles.LayerFSilkS},
-		},
+		UUID:       generator.New("root.pcb.footprint."+key, path),
+		Path:       path,
+		LibraryID:  libraryID,
+		Reference:  reference,
+		Value:      value,
+		Position:   position,
+		Layer:      kicadfiles.LayerFCu,
+		Properties: footprintProperties(generator, key, reference, value),
+		Attributes: []string{"smd"},
 		Pads: []Pad{
 			{Name: "1", NetCode: leftNet, Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(-1.1), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1.45)}, Layers: smdPadLayers()},
 			{Name: "2", NetCode: rightNet, Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(1.1), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1.45)}, Layers: smdPadLayers()},
 		},
+	}
+}
+
+func footprintProperties(generator kicadfiles.IDGenerator, key, reference, value string) []FootprintProperty {
+	return []FootprintProperty{
+		footprintProperty(generator, key, "Reference", reference, kicadfiles.Point{X: 0, Y: kicadfiles.MM(-1.5)}, kicadfiles.LayerFSilkS, false),
+		footprintProperty(generator, key, "Value", value, kicadfiles.Point{X: 0, Y: kicadfiles.MM(1.5)}, kicadfiles.LayerFSilkS, false),
+	}
+}
+
+func footprintProperty(generator kicadfiles.IDGenerator, key, name, value string, position kicadfiles.Point, layer kicadfiles.BoardLayer, hide bool) FootprintProperty {
+	return FootprintProperty{
+		UUID:     generator.New("root.pcb.footprint."+key+".property", name),
+		Name:     name,
+		Value:    value,
+		Position: position,
+		Layer:    layer,
+		Hide:     hide,
+		Unlocked: true,
 	}
 }
 

@@ -318,6 +318,10 @@ func TestLEDIndicatorPCBWritesDeterministicBoard(t *testing.T) {
 		"(net 3 \"GND\")",
 		"\"LED_SMD:LED_0805_2012Metric\"",
 		"\"Resistor_SMD:R_0805_2012Metric\"",
+		"(property",
+		"\"Reference\"",
+		"\"Value\"",
+		"(attr smd)",
 		"\"D1\"",
 		"roundrect",
 		"(roundrect_rratio 0.25)",
@@ -329,6 +333,91 @@ func TestLEDIndicatorPCBWritesDeterministicBoard(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
+	}
+}
+
+func TestWriteRendersFootprintPropertiesAndModel(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+	footprint.Texts = nil
+	footprint.Description = "Chip resistor"
+	footprint.Tags = "resistor"
+	footprint.SheetName = "/"
+	footprint.SheetFile = "test.kicad_sch"
+	footprint.Attributes = []string{"smd"}
+	footprint.Properties = []FootprintProperty{
+		{
+			UUID:     kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+			Name:     "Reference",
+			Value:    "R1",
+			Position: point(0, -1),
+			Layer:    kicadfiles.LayerFSilkS,
+			Unlocked: true,
+		},
+		{
+			UUID:     kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+			Name:     "Value",
+			Value:    "value",
+			Position: point(0, 1),
+			Layer:    kicadfiles.LayerFFab,
+		},
+	}
+	embeddedFonts := false
+	footprint.EmbeddedFonts = &embeddedFonts
+	footprint.Models = []Model3D{{
+		Path:   "${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0603_1608Metric.wrl",
+		Offset: XYZ{X: 1},
+	}}
+	board.Footprints = []Footprint{footprint}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(descr \"Chip resistor\")",
+		"(tags \"resistor\")",
+		"(property",
+		"\"Reference\"",
+		"\"R1\"",
+		"(unlocked yes)",
+		"(effects",
+		"(sheetname \"/\")",
+		"(sheetfile \"test.kicad_sch\")",
+		"(attr smd)",
+		"(embedded_fonts no)",
+		"(model",
+		"\"${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0603_1608Metric.wrl\"",
+		"(offset",
+		"(xyz 1 0 0)",
+		"(scale",
+		"(xyz 1 1 1)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestValidateRejectsFootprintPropertyWithoutUUID(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+	footprint.Texts = nil
+	footprint.Properties = []FootprintProperty{
+		{Name: "Reference", Value: "R1", Layer: kicadfiles.LayerFSilkS},
+		{UUID: kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), Name: "Value", Value: "value", Layer: kicadfiles.LayerFFab},
+	}
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "properties[0].uuid") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -744,8 +833,8 @@ func minimalFootprint(uuid, reference string) Footprint {
 		Position:  kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
 		Layer:     kicadfiles.LayerFCu,
 		Texts: []FootprintText{
-			{Kind: "reference", Text: reference, Layer: kicadfiles.LayerFSilkS},
-			{Kind: "value", Text: "value", Layer: kicadfiles.LayerFSilkS},
+			{UUID: kicadfiles.UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd"), Kind: "reference", Text: reference, Layer: kicadfiles.LayerFSilkS},
+			{UUID: kicadfiles.UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"), Kind: "value", Text: "value", Layer: kicadfiles.LayerFSilkS},
 		},
 		Pads: []Pad{
 			{Name: "1", NetCode: 1, Shape: "rect", Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu}},

@@ -122,6 +122,9 @@ const (
 	kicad10LayerBFab     = 33
 	kicad10LayerFFab     = 35
 	kicad10LayerUserBase = 37
+
+	defaultTextSizeMM      = 1.0
+	defaultTextThicknessMM = 0.15
 )
 
 type Net struct {
@@ -136,25 +139,65 @@ type NetRegistry struct {
 }
 
 type Footprint struct {
-	UUID      kicadfiles.UUID
-	Path      string
-	LibraryID string
-	Reference string
-	Value     string
-	Position  kicadfiles.Point
-	Rotation  kicadfiles.Angle
-	Layer     kicadfiles.BoardLayer
-	Texts     []FootprintText
-	Pads      []Pad
-	Graphics  []FootprintGraphic
+	UUID          kicadfiles.UUID
+	Path          string
+	LibraryID     string
+	Reference     string
+	Value         string
+	Description   string
+	Tags          string
+	SheetName     string
+	SheetFile     string
+	Attributes    []string
+	Position      kicadfiles.Point
+	Rotation      kicadfiles.Angle
+	Layer         kicadfiles.BoardLayer
+	Properties    []FootprintProperty
+	Texts         []FootprintText
+	Pads          []Pad
+	Graphics      []FootprintGraphic
+	Models        []Model3D
+	EmbeddedFonts *bool
 }
 
 type FootprintText struct {
+	UUID     kicadfiles.UUID
 	Kind     string
 	Text     string
 	Position kicadfiles.Point
 	Rotation kicadfiles.Angle
 	Layer    kicadfiles.BoardLayer
+}
+
+type FootprintProperty struct {
+	UUID     kicadfiles.UUID
+	Name     string
+	Value    string
+	Position kicadfiles.Point
+	Rotation kicadfiles.Angle
+	Layer    kicadfiles.BoardLayer
+	Hide     bool
+	Unlocked bool
+	Effects  TextEffects
+}
+
+type TextEffects struct {
+	FontSize      kicadfiles.Point
+	FontThickness kicadfiles.IU
+	Justify       []string
+}
+
+type Model3D struct {
+	Path   string
+	Offset XYZ
+	Scale  XYZ
+	Rotate XYZ
+}
+
+type XYZ struct {
+	X float64
+	Y float64
+	Z float64
 }
 
 type Pad struct {
@@ -668,30 +711,137 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 		sexpr.A("footprint"),
 		sexpr.S(footprint.LibraryID),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(footprint.Layer))),
-		renderAt(footprint.Position, footprint.Rotation),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(footprint.UUID))),
-		sexpr.L(sexpr.A("path"), sexpr.S(footprint.Path)),
+		renderAt(footprint.Position, footprint.Rotation),
+	}
+	if strings.TrimSpace(footprint.Description) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("descr"), sexpr.S(footprint.Description)))
+	}
+	if strings.TrimSpace(footprint.Tags) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("tags"), sexpr.S(footprint.Tags)))
+	}
+	for _, property := range footprint.Properties {
+		nodes = append(nodes, renderFootprintProperty(property))
+	}
+	if strings.TrimSpace(footprint.Path) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("path"), sexpr.S(footprint.Path)))
+	}
+	if strings.TrimSpace(footprint.SheetName) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("sheetname"), sexpr.S(footprint.SheetName)))
+	}
+	if strings.TrimSpace(footprint.SheetFile) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("sheetfile"), sexpr.S(footprint.SheetFile)))
+	}
+	if len(footprint.Attributes) > 0 {
+		attrNodes := []sexpr.Node{sexpr.A("attr")}
+		for _, attr := range footprint.Attributes {
+			attrNodes = append(attrNodes, sexpr.A(attr))
+		}
+		nodes = append(nodes, sexpr.L(attrNodes...))
 	}
 	for _, text := range footprint.Texts {
 		nodes = append(nodes, renderFootprintText(text))
 	}
+	for _, graphic := range footprint.Graphics {
+		nodes = append(nodes, renderFootprintGraphic(graphic))
+	}
 	for _, pad := range footprint.Pads {
 		nodes = append(nodes, renderPad(pad, netNames[pad.NetCode]))
 	}
-	for _, graphic := range footprint.Graphics {
-		nodes = append(nodes, renderFootprintGraphic(graphic))
+	if footprint.EmbeddedFonts != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("embedded_fonts"), yesNo(*footprint.EmbeddedFonts)))
+	}
+	for _, model := range footprint.Models {
+		nodes = append(nodes, renderModel3D(model))
 	}
 	return sexpr.L(nodes...)
 }
 
-func renderFootprintText(text FootprintText) sexpr.List {
+func renderFootprintProperty(property FootprintProperty) sexpr.List {
+	nodes := []sexpr.Node{
+		sexpr.A("property"),
+		sexpr.S(property.Name),
+		sexpr.S(property.Value),
+		renderAt(property.Position, property.Rotation),
+	}
+	if property.Unlocked {
+		nodes = append(nodes, sexpr.L(sexpr.A("unlocked"), sexpr.A("yes")))
+	}
+	nodes = append(nodes, sexpr.L(sexpr.A("layer"), sexpr.S(string(property.Layer))))
+	if property.Hide {
+		nodes = append(nodes, sexpr.L(sexpr.A("hide"), sexpr.A("yes")))
+	}
+	nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(property.UUID))), renderEffects(property.Effects))
+	return sexpr.L(nodes...)
+}
+
+func renderEffects(effects TextEffects) sexpr.List {
+	size := effects.FontSize
+	if size.X == 0 {
+		size.X = kicadfiles.MM(defaultTextSizeMM)
+	}
+	if size.Y == 0 {
+		size.Y = kicadfiles.MM(defaultTextSizeMM)
+	}
+	thickness := effects.FontThickness
+	if thickness == 0 {
+		thickness = kicadfiles.MM(defaultTextThicknessMM)
+	}
+	font := sexpr.L(
+		sexpr.A("font"),
+		sexpr.L(sexpr.A("size"), fixed(size.X), fixed(size.Y)),
+		sexpr.L(sexpr.A("thickness"), fixed(thickness)),
+	)
+	nodes := []sexpr.Node{sexpr.A("effects"), font}
+	if len(effects.Justify) > 0 {
+		justify := []sexpr.Node{sexpr.A("justify")}
+		for _, value := range effects.Justify {
+			justify = append(justify, sexpr.A(value))
+		}
+		nodes = append(nodes, sexpr.L(justify...))
+	}
+	return sexpr.L(nodes...)
+}
+
+func renderModel3D(model Model3D) sexpr.List {
 	return sexpr.L(
+		sexpr.A("model"),
+		sexpr.S(model.Path),
+		sexpr.L(sexpr.A("offset"), renderXYZ(model.Offset)),
+		sexpr.L(sexpr.A("scale"), renderXYZ(defaultScale(model.Scale))),
+		sexpr.L(sexpr.A("rotate"), renderXYZ(model.Rotate)),
+	)
+}
+
+func renderXYZ(value XYZ) sexpr.List {
+	return sexpr.L(sexpr.A("xyz"), sexpr.F(value.X), sexpr.F(value.Y), sexpr.F(value.Z))
+}
+
+func defaultScale(value XYZ) XYZ {
+	if value.X == 0 {
+		value.X = 1
+	}
+	if value.Y == 0 {
+		value.Y = 1
+	}
+	if value.Z == 0 {
+		value.Z = 1
+	}
+	return value
+}
+
+func renderFootprintText(text FootprintText) sexpr.List {
+	nodes := []sexpr.Node{
 		sexpr.A("fp_text"),
 		sexpr.A(text.Kind),
 		sexpr.S(text.Text),
 		renderAt(text.Position, text.Rotation),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(text.Layer))),
-	)
+	}
+	if text.UUID.Valid() {
+		nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(text.UUID))))
+	}
+	return sexpr.L(nodes...)
 }
 
 func renderPad(pad Pad, netName string) sexpr.List {
@@ -907,18 +1057,48 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 	if !kicadfiles.IsValidBoardLayer(footprint.Layer) {
 		errs = append(errs, fieldError(prefix("layer"), "invalid"))
 	}
+	referenceProperty := ""
+	valueProperty := ""
+	hasReferenceProperty := false
+	hasValueProperty := false
+	for propertyIndex, property := range footprint.Properties {
+		errs = append(errs, validateFootprintProperty(prefix("properties"), propertyIndex, property)...)
+		switch property.Name {
+		case "Reference":
+			referenceProperty = property.Value
+			hasReferenceProperty = true
+		case "Value":
+			valueProperty = property.Value
+			hasValueProperty = true
+		}
+	}
 	textKinds := map[string]string{}
 	for textIndex, text := range footprint.Texts {
 		errs = append(errs, validateFootprintText(prefix("texts"), textIndex, text)...)
 		textKinds[text.Kind] = text.Text
 	}
-	referenceText, hasReferenceText := textKinds["reference"]
-	if !hasReferenceText || referenceText != footprint.Reference {
-		errs = append(errs, fieldError(prefix("texts.reference"), "must match footprint reference"))
-	}
-	valueText, hasValueText := textKinds["value"]
-	if !hasValueText || valueText != footprint.Value {
-		errs = append(errs, fieldError(prefix("texts.value"), "must match footprint value"))
+	if len(footprint.Properties) > 0 {
+		if !hasReferenceProperty {
+			referenceProperty = textKinds["reference"]
+		}
+		if !hasValueProperty {
+			valueProperty = textKinds["value"]
+		}
+		if referenceProperty != footprint.Reference {
+			errs = append(errs, fieldError(prefix("properties.Reference"), "must match footprint reference"))
+		}
+		if valueProperty != footprint.Value {
+			errs = append(errs, fieldError(prefix("properties.Value"), "must match footprint value"))
+		}
+	} else {
+		referenceText, hasReferenceText := textKinds["reference"]
+		if !hasReferenceText || referenceText != footprint.Reference {
+			errs = append(errs, fieldError(prefix("texts.reference"), "must match footprint reference"))
+		}
+		valueText, hasValueText := textKinds["value"]
+		if !hasValueText || valueText != footprint.Value {
+			errs = append(errs, fieldError(prefix("texts.value"), "must match footprint value"))
+		}
 	}
 	padNames := make(map[string]struct{}, len(footprint.Pads))
 	for padIndex, pad := range footprint.Pads {
@@ -931,6 +1111,25 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 	for graphicIndex, graphic := range footprint.Graphics {
 		errs = append(errs, validateGraphic(indexedValue(prefix("graphics"), graphicIndex), Drawing(graphic))...)
 	}
+	for modelIndex, model := range footprint.Models {
+		if strings.TrimSpace(model.Path) == "" {
+			errs = append(errs, fieldError(indexed(prefix("models"), modelIndex, "path"), "required"))
+		}
+	}
+	return errs
+}
+
+func validateFootprintProperty(collection string, index int, property FootprintProperty) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if !property.UUID.Valid() {
+		errs = append(errs, fieldError(indexed(collection, index, "uuid"), "valid UUID required"))
+	}
+	if strings.TrimSpace(property.Name) == "" {
+		errs = append(errs, fieldError(indexed(collection, index, "name"), "required"))
+	}
+	if !kicadfiles.IsValidBoardLayer(property.Layer) {
+		errs = append(errs, fieldError(indexed(collection, index, "layer"), "invalid"))
+	}
 	return errs
 }
 
@@ -941,6 +1140,9 @@ func validateFootprintText(collection string, index int, text FootprintText) kic
 	}
 	if strings.TrimSpace(text.Text) == "" {
 		errs = append(errs, fieldError(indexed(collection, index, "text"), "required"))
+	}
+	if !text.UUID.Valid() {
+		errs = append(errs, fieldError(indexed(collection, index, "uuid"), "valid UUID required"))
 	}
 	if !kicadfiles.IsValidBoardLayer(text.Layer) {
 		errs = append(errs, fieldError(indexed(collection, index, "layer"), "invalid"))
