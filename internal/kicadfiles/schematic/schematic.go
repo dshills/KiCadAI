@@ -36,31 +36,73 @@ type EmbeddedSymbol struct {
 }
 
 type SchematicSymbol struct {
-	UUID           kicadfiles.UUID
-	Path           string
-	LibraryID      string
-	Reference      string
-	Value          string
-	Position       kicadfiles.Point
-	Rotation       kicadfiles.Angle
-	Unit           int
-	BodyStyle      int
-	ExcludeFromSim bool
-	InBOM          *bool
-	OnBoard        *bool
-	InPositionFile *bool
-	DoNotPopulate  bool
-	Fields         []Field
+	UUID             kicadfiles.UUID
+	Path             string
+	LibraryID        string
+	Reference        string
+	Value            string
+	Position         kicadfiles.Point
+	Rotation         kicadfiles.Angle
+	Mirror           SymbolMirror
+	Unit             int
+	BodyStyle        int
+	ExcludeFromSim   bool
+	InBOM            *bool
+	OnBoard          *bool
+	InPositionFile   *bool
+	DoNotPopulate    bool
+	Passthrough      SymbolPassthrough
+	Locked           bool
+	FieldsAutoplaced bool
+	Properties       []Property
+	Fields           []Field
+	Pins             []SymbolPin
+	Instances        []SymbolInstance
 }
 
 type Field struct {
-	Name     string
-	Value    string
+	Name  string
+	Value string
+	// Visible is the legacy field visibility flag. Hidden takes precedence
+	// when both are set during compatibility conversion.
 	Visible  bool
 	Hidden   bool
 	Position kicadfiles.Point
 	Rotation kicadfiles.Angle
 }
+
+type Property struct {
+	Name           string
+	Value          string
+	Private        bool
+	Hidden         bool
+	ShowName       *bool
+	DoNotAutoplace *bool
+	Position       kicadfiles.Point
+	Rotation       kicadfiles.Angle
+}
+
+type SymbolPin struct {
+	Number    string
+	UUID      kicadfiles.UUID
+	Alternate string
+}
+
+type SymbolMirror string
+
+const (
+	SymbolMirrorNone SymbolMirror = ""
+	SymbolMirrorX    SymbolMirror = "x"
+	SymbolMirrorY    SymbolMirror = "y"
+)
+
+type SymbolPassthrough string
+
+const (
+	SymbolPassthroughDefault SymbolPassthrough = ""
+	SymbolPassthroughYes     SymbolPassthrough = "yes"
+	SymbolPassthroughNo      SymbolPassthrough = "no"
+)
 
 type Wire struct {
 	UUID   kicadfiles.UUID
@@ -98,6 +140,7 @@ type Sheet struct {
 }
 
 type SymbolInstance struct {
+	Project   string
 	Path      string
 	Reference string
 	Unit      int
@@ -328,19 +371,101 @@ func validateSymbol(index int, symbol SchematicSymbol) kicadfiles.ValidationErro
 	if strings.TrimSpace(symbol.Value) == "" {
 		errs = append(errs, fieldError(prefix("value"), "required"))
 	}
+	if !validSymbolMirror(symbol.Mirror) {
+		errs = append(errs, fieldError(prefix("mirror"), "invalid"))
+	}
+	if !validSymbolPassthrough(symbol.Passthrough) {
+		errs = append(errs, fieldError(prefix("passthrough"), "invalid"))
+	}
+	seenProperties := map[string]struct{}{}
+	for propertyIndex, property := range symbol.Properties {
+		name := strings.TrimSpace(property.Name)
+		key := strings.ToLower(name)
+		if name == "" {
+			errs = append(errs, fieldError(indexed(prefix("properties"), propertyIndex, "name"), "required"))
+		}
+		if _, ok := seenProperties[key]; ok && name != "" {
+			errs = append(errs, fieldError(indexed(prefix("properties"), propertyIndex, "name"), "duplicate "+name))
+		}
+		seenProperties[key] = struct{}{}
+	}
 	seenFields := map[string]struct{}{}
 	for fieldIndex, field := range symbol.Fields {
 		name := strings.TrimSpace(field.Name)
+		key := strings.ToLower(name)
 		if name == "" {
 			errs = append(errs, fieldError(indexed(prefix("fields"), fieldIndex, "name"), "required"))
 			continue
 		}
-		if _, ok := seenFields[name]; ok {
+		if strings.EqualFold(name, "Reference") || strings.EqualFold(name, "Value") {
+			errs = append(errs, fieldError(indexed(prefix("fields"), fieldIndex, "name"), "reserved; use symbol."+strings.ToLower(name)))
+		}
+		if _, ok := seenProperties[key]; ok {
 			errs = append(errs, fieldError(indexed(prefix("fields"), fieldIndex, "name"), "duplicate "+name))
 		}
-		seenFields[name] = struct{}{}
+		if _, ok := seenFields[key]; ok {
+			errs = append(errs, fieldError(indexed(prefix("fields"), fieldIndex, "name"), "duplicate "+name))
+		}
+		seenFields[key] = struct{}{}
+	}
+	seenPinUUIDs := map[kicadfiles.UUID]struct{}{}
+	seenPinNumbers := map[string]struct{}{}
+	for pinIndex, pin := range symbol.Pins {
+		number := strings.TrimSpace(pin.Number)
+		if number == "" {
+			errs = append(errs, fieldError(indexed(prefix("pins"), pinIndex, "number"), "required"))
+		} else {
+			if _, ok := seenPinNumbers[number]; ok {
+				errs = append(errs, fieldError(indexed(prefix("pins"), pinIndex, "number"), "duplicate "+number))
+			}
+			seenPinNumbers[number] = struct{}{}
+		}
+		if !pin.UUID.Valid() {
+			errs = append(errs, fieldError(indexed(prefix("pins"), pinIndex, "uuid"), "valid UUID required"))
+		} else if _, ok := seenPinUUIDs[pin.UUID]; ok {
+			errs = append(errs, fieldError(indexed(prefix("pins"), pinIndex, "uuid"), "duplicate "+string(pin.UUID)))
+		} else {
+			seenPinUUIDs[pin.UUID] = struct{}{}
+		}
+	}
+	seenInstancePaths := map[string]struct{}{}
+	for instanceIndex, instance := range symbol.Instances {
+		path := strings.TrimSpace(instance.Path)
+		if path == "" {
+			errs = append(errs, fieldError(indexed(prefix("instances"), instanceIndex, "path"), "required"))
+		} else if !strings.HasPrefix(path, "/") {
+			errs = append(errs, fieldError(indexed(prefix("instances"), instanceIndex, "path"), "must start with /"))
+		} else if _, ok := seenInstancePaths[path]; ok {
+			errs = append(errs, fieldError(indexed(prefix("instances"), instanceIndex, "path"), "duplicate "+path))
+		} else {
+			seenInstancePaths[path] = struct{}{}
+		}
+		if strings.TrimSpace(instance.Reference) == "" {
+			errs = append(errs, fieldError(indexed(prefix("instances"), instanceIndex, "reference"), "required"))
+		}
+		if instance.Unit < 0 {
+			errs = append(errs, fieldError(indexed(prefix("instances"), instanceIndex, "unit"), "must be non-negative"))
+		}
 	}
 	return errs
+}
+
+func validSymbolMirror(mirror SymbolMirror) bool {
+	switch mirror {
+	case SymbolMirrorNone, SymbolMirrorX, SymbolMirrorY:
+		return true
+	default:
+		return false
+	}
+}
+
+func validSymbolPassthrough(passthrough SymbolPassthrough) bool {
+	switch passthrough {
+	case SymbolPassthroughDefault, SymbolPassthroughYes, SymbolPassthroughNo:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateWire(index int, wire Wire) kicadfiles.ValidationErrors {
@@ -422,6 +547,7 @@ func renderSymbol(symbol SchematicSymbol) sexpr.List {
 		sexpr.A("symbol"),
 		sexpr.L(sexpr.A("lib_id"), sexpr.S(symbol.LibraryID)),
 		renderAt(symbol.Position, symbol.Rotation),
+		renderSymbolMirror(symbol.Mirror),
 		sexpr.L(sexpr.A("unit"), sexpr.I(int64(defaultPositive(symbol.Unit, 1)))),
 		sexpr.L(sexpr.A("body_style"), sexpr.I(int64(defaultPositive(symbol.BodyStyle, 1)))),
 		sexpr.L(sexpr.A("exclude_from_sim"), yesNo(symbol.ExcludeFromSim)),
@@ -429,12 +555,169 @@ func renderSymbol(symbol SchematicSymbol) sexpr.List {
 		sexpr.L(sexpr.A("on_board"), yesNo(defaultBool(symbol.OnBoard, true))),
 		sexpr.L(sexpr.A("in_pos_files"), yesNo(defaultBool(symbol.InPositionFile, true))),
 		sexpr.L(sexpr.A("dnp"), yesNo(symbol.DoNotPopulate)),
+		renderSymbolPassthrough(symbol.Passthrough),
+		sexpr.OmitIf(!symbol.Locked, sexpr.L(sexpr.A("locked"), sexpr.A("yes"))),
+		sexpr.OmitIf(!symbol.FieldsAutoplaced, sexpr.L(sexpr.A("fields_autoplaced"), sexpr.A("yes"))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(symbol.UUID))),
-		renderSymbolProperty("Reference", symbol.Reference, symbol.Position, symbol.Rotation, false),
-		renderSymbolProperty("Value", symbol.Value, symbol.Position, symbol.Rotation, false),
 	}
+	for _, property := range symbolProperties(symbol) {
+		nodes = append(nodes, renderProperty(property))
+	}
+	for _, pin := range symbol.Pins {
+		nodes = append(nodes, renderSymbolPin(pin))
+	}
+	if len(symbol.Instances) > 0 {
+		nodes = append(nodes, renderSymbolInstances(symbol.Instances))
+	}
+	return sexpr.L(nodes...)
+}
+
+func renderSymbolMirror(mirror SymbolMirror) sexpr.Node {
+	switch mirror {
+	case SymbolMirrorX:
+		return sexpr.L(sexpr.A("mirror"), sexpr.A("x"))
+	case SymbolMirrorY:
+		return sexpr.L(sexpr.A("mirror"), sexpr.A("y"))
+	default:
+		return sexpr.Omit{}
+	}
+}
+
+func renderSymbolPassthrough(passthrough SymbolPassthrough) sexpr.Node {
+	if passthrough == SymbolPassthroughDefault {
+		return sexpr.Omit{}
+	}
+	return sexpr.L(sexpr.A("passthrough"), sexpr.A(string(passthrough)))
+}
+
+func symbolProperties(symbol SchematicSymbol) []Property {
+	if len(symbol.Properties) > 0 {
+		reference := Property{Name: "Reference", Value: symbol.Reference, Position: symbol.Position, Rotation: symbol.Rotation}
+		value := Property{Name: "Value", Value: symbol.Value, Position: symbol.Position, Rotation: symbol.Rotation}
+		properties := make([]Property, 0, len(symbol.Properties)+len(symbol.Fields)+2)
+		extras := make([]Property, 0, len(symbol.Properties)+len(symbol.Fields))
+		seen := map[string]struct{}{}
+		for _, property := range symbol.Properties {
+			name := strings.TrimSpace(property.Name)
+			seen[strings.ToLower(name)] = struct{}{}
+			switch {
+			case strings.EqualFold(name, "Reference"):
+				property.Name = "Reference"
+				reference = property
+			case strings.EqualFold(name, "Value"):
+				property.Name = "Value"
+				value = property
+			default:
+				extras = append(extras, property)
+			}
+		}
+		for _, field := range symbol.Fields {
+			name := strings.TrimSpace(field.Name)
+			if strings.EqualFold(name, "Reference") || strings.EqualFold(name, "Value") {
+				continue
+			}
+			if _, ok := seen[strings.ToLower(name)]; ok {
+				continue
+			}
+			extras = append(extras, propertyFromField(field))
+		}
+		properties = append(properties, reference, value)
+		properties = append(properties, extras...)
+		return properties
+	}
+	properties := make([]Property, 0, len(symbol.Fields)+2)
+	properties = append(properties,
+		Property{Name: "Reference", Value: symbol.Reference, Position: symbol.Position, Rotation: symbol.Rotation},
+		Property{Name: "Value", Value: symbol.Value, Position: symbol.Position, Rotation: symbol.Rotation},
+	)
 	for _, field := range symbol.Fields {
-		nodes = append(nodes, renderSymbolProperty(field.Name, field.Value, field.Position, field.Rotation, field.Hidden || !field.Visible))
+		name := strings.TrimSpace(field.Name)
+		if name == "Reference" || name == "Value" {
+			continue
+		}
+		properties = append(properties, propertyFromField(field))
+	}
+	return properties
+}
+
+func propertyFromField(field Field) Property {
+	return Property{
+		Name:     field.Name,
+		Value:    field.Value,
+		Hidden:   legacyFieldHidden(field),
+		Position: field.Position,
+		Rotation: field.Rotation,
+	}
+}
+
+func legacyFieldHidden(field Field) bool {
+	return field.Hidden || !field.Visible
+}
+
+func renderProperty(property Property) sexpr.List {
+	nodes := []sexpr.Node{sexpr.A("property")}
+	if property.Private {
+		// KiCad saveField writes the private marker before the canonical name.
+		nodes = append(nodes, sexpr.A("private"))
+	}
+	nodes = append(nodes,
+		sexpr.S(property.Name),
+		sexpr.S(property.Value),
+		renderAt(property.Position, property.Rotation),
+		// KiCad saveField writes property hide directly, before show_name.
+		sexpr.OmitIf(!property.Hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
+		sexpr.L(sexpr.A("show_name"), yesNo(defaultBool(property.ShowName, false))),
+		sexpr.L(sexpr.A("do_not_autoplace"), yesNo(defaultBool(property.DoNotAutoplace, false))),
+		renderEffects(false),
+	)
+	return sexpr.L(nodes...)
+}
+
+func renderSymbolPin(pin SymbolPin) sexpr.List {
+	number := strings.TrimSpace(pin.Number)
+	nodes := []sexpr.Node{
+		sexpr.A("pin"),
+		sexpr.S(number),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(pin.UUID))),
+	}
+	if alternate := strings.TrimSpace(pin.Alternate); alternate != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("alternate"), sexpr.S(alternate)))
+	}
+	return sexpr.L(nodes...)
+}
+
+func renderSymbolInstances(instances []SymbolInstance) sexpr.List {
+	grouped := map[string][]SymbolInstance{}
+	projects := make([]string, 0)
+	for _, instance := range instances {
+		project := strings.TrimSpace(instance.Project)
+		if project == "" {
+			project = "project"
+		}
+		if _, ok := grouped[project]; !ok {
+			projects = append(projects, project)
+		}
+		grouped[project] = append(grouped[project], instance)
+	}
+	slices.Sort(projects)
+	nodes := []sexpr.Node{sexpr.A("instances")}
+	for _, project := range projects {
+		projectInstances := grouped[project]
+		slices.SortFunc(projectInstances, func(a, b SymbolInstance) int {
+			return cmp.Compare(a.Path, b.Path)
+		})
+		projectNodes := []sexpr.Node{sexpr.A("project"), sexpr.S(project)}
+		for _, instance := range projectInstances {
+			path := strings.TrimSpace(instance.Path)
+			reference := strings.TrimSpace(instance.Reference)
+			projectNodes = append(projectNodes, sexpr.L(
+				sexpr.A("path"),
+				sexpr.S(path),
+				sexpr.L(sexpr.A("reference"), sexpr.S(reference)),
+				sexpr.L(sexpr.A("unit"), sexpr.I(int64(defaultPositive(instance.Unit, 1)))),
+			))
+		}
+		nodes = append(nodes, sexpr.L(projectNodes...))
 	}
 	return sexpr.L(nodes...)
 }
@@ -509,19 +792,6 @@ func renderSheetProperty(id int64, name, value string, at kicadfiles.Point) sexp
 	)
 }
 
-func renderSymbolProperty(name, value string, at kicadfiles.Point, rotation kicadfiles.Angle, hidden bool) sexpr.List {
-	return sexpr.L(
-		sexpr.A("property"),
-		sexpr.S(name),
-		sexpr.S(value),
-		renderAt(at, rotation),
-		sexpr.L(sexpr.A("show_name"), sexpr.A("no")),
-		sexpr.L(sexpr.A("do_not_autoplace"), sexpr.A("no")),
-		sexpr.OmitIf(!hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
-		renderEffects(false),
-	)
-}
-
 func renderStroke(width float64, strokeType string) sexpr.List {
 	var widthNode sexpr.Node = sexpr.I(0)
 	if width != 0 {
@@ -561,20 +831,6 @@ func yesNo(value bool) sexpr.Atom {
 		return sexpr.A("yes")
 	}
 	return sexpr.A("no")
-}
-
-func renderInstances(instances []SymbolInstance) sexpr.List {
-	nodes := []sexpr.Node{sexpr.A("symbol_instances")}
-	for _, instance := range instances {
-		nodes = append(nodes, sexpr.L(
-			sexpr.A("path"),
-			sexpr.S(instance.Path),
-			sexpr.L(sexpr.A("reference"), sexpr.S(instance.Reference)),
-			sexpr.L(sexpr.A("unit"), sexpr.I(int64(instance.Unit))),
-			sexpr.L(sexpr.A("value"), sexpr.S(instance.Value)),
-		))
-	}
-	return sexpr.L(nodes...)
 }
 
 func renderPoints(points []kicadfiles.Point) sexpr.List {

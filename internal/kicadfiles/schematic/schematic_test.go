@@ -185,6 +185,75 @@ func TestWriteOrdersItemsByKiCadKindThenUUID(t *testing.T) {
 	)
 }
 
+func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
+	showName := true
+	doNotAutoplace := true
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:             kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		LibraryID:        "Device:R",
+		Reference:        "R1",
+		Value:            "1k",
+		Position:         kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		Rotation:         90,
+		Mirror:           SymbolMirrorX,
+		Passthrough:      SymbolPassthroughYes,
+		Locked:           true,
+		FieldsAutoplaced: true,
+		Properties: []Property{
+			{
+				Name:           "Reference",
+				Value:          "R1",
+				Private:        true,
+				Hidden:         true,
+				ShowName:       &showName,
+				DoNotAutoplace: &doNotAutoplace,
+				Position:       kicadfiles.Point{X: kicadfiles.MM(11), Y: kicadfiles.MM(21)},
+			},
+			{Name: "Value", Value: "1k", Position: kicadfiles.Point{X: kicadfiles.MM(12), Y: kicadfiles.MM(22)}},
+		},
+		Fields: []Field{{Name: "Footprint", Value: "Resistor_SMD:R_0603", Visible: true}},
+		Pins: []SymbolPin{
+			{Number: "2", UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333")},
+			{Number: "1", UUID: kicadfiles.UUID("44444444-4444-4444-8444-444444444444"), Alternate: "ALT"},
+		},
+		Instances: []SymbolInstance{
+			{Project: "demo", Path: "/22222222-2222-4222-8222-222222222222", Reference: "R1", Unit: 1},
+		},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(mirror x)",
+		"(passthrough yes)",
+		"(locked yes)",
+		"(fields_autoplaced yes)",
+		"private",
+		"\"Reference\"",
+		"\"Footprint\"",
+		"\"Resistor_SMD:R_0603\"",
+		"(hide yes)",
+		"(show_name yes)",
+		"(do_not_autoplace yes)",
+		"\"1\"",
+		"(alternate \"ALT\")",
+		"(instances",
+		"\"demo\"",
+		"\"/22222222-2222-4222-8222-222222222222\"",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, "symbol_instances") {
+		t.Fatalf("output contains legacy top-level symbol_instances:\n%s", output)
+	}
+}
+
 func TestLEDIndicatorSchematicIsDeterministic(t *testing.T) {
 	input := LEDIndicatorInput{
 		Name:     "led_indicator",
@@ -241,6 +310,46 @@ func TestValidateRejectsInvalidElements(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
+		}
+	}
+}
+
+func TestValidateRejectsInvalidSymbolDetails(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:        kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		LibraryID:   "Device:R",
+		Reference:   "R1",
+		Value:       "1k",
+		Mirror:      "diagonal",
+		Passthrough: "maybe",
+		Properties: []Property{
+			{Name: "Reference", Value: "R1"},
+			{Name: "Reference", Value: "R2"},
+		},
+		Pins: []SymbolPin{
+			{Number: "1", UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333")},
+			{Number: "1", UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333")},
+		},
+		Instances: []SymbolInstance{{Path: "relative", Reference: "", Unit: -1}},
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{
+		"symbols[0].mirror",
+		"symbols[0].passthrough",
+		"symbols[0].properties[1].name",
+		"symbols[0].pins[1].number",
+		"symbols[0].pins[1].uuid",
+		"symbols[0].instances[0].path",
+		"symbols[0].instances[0].reference",
+		"symbols[0].instances[0].unit",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %s: %v", want, err)
 		}
