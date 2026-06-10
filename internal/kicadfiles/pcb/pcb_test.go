@@ -958,6 +958,63 @@ func TestValidateRejectsInvalidZone(t *testing.T) {
 	}
 }
 
+func TestWriteRendersRichZone(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "GND"}}
+	board.Zones = []Zone{{
+		UUID:                 kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		NetCode:              1,
+		NetName:              "GND",
+		Name:                 "GND pour",
+		Layers:               []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		HatchStyle:           "full",
+		HatchPitch:           kicadfiles.MM(0.1),
+		Priority:             2,
+		ConnectPads:          true,
+		Clearance:            kicadfiles.MM(0.2),
+		MinThickness:         kicadfiles.MM(0.25),
+		FilledAreasThickness: false,
+		Fill: ZoneFillSettings{
+			Enabled:            true,
+			ThermalGap:         kicadfiles.MM(0.5),
+			ThermalBridgeWidth: kicadfiles.MM(0.5),
+			IslandRemovalMode:  1,
+			IslandAreaMin:      10,
+		},
+		Attributes: []ZoneAttribute{{Name: "teardrop", Values: map[string]string{"type": "padvia"}}},
+		Polygons: [][]kicadfiles.Point{{
+			point(0, 0), point(10, 0), point(10, 10), point(0, 10),
+		}},
+		FilledPolygons: []ZoneFilledPolygon{{
+			Layer:  kicadfiles.LayerFCu,
+			Points: []kicadfiles.Point{point(1, 1), point(9, 1), point(9, 9), point(1, 9)},
+		}},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(name \"GND pour\")",
+		"(hatch full 0.1)",
+		"(connect_pads",
+		"yes",
+		"(min_thickness 0.25)",
+		"(fill",
+		"(thermal_gap 0.5)",
+		"(attr",
+		"(teardrop",
+		"\"padvia\"",
+		"(filled_polygon",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestValidateRejectsInvalidDimension(t *testing.T) {
 	board := minimalPCB()
 	board.Dimensions = []Dimension{{

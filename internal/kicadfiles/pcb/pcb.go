@@ -319,11 +319,42 @@ type Via struct {
 }
 
 type Zone struct {
-	UUID     kicadfiles.UUID
-	NetCode  int
-	Layers   []kicadfiles.BoardLayer
-	Polygons [][]kicadfiles.Point
-	Priority int
+	UUID           kicadfiles.UUID
+	NetCode        int
+	NetName        string
+	Name           string
+	Layers         []kicadfiles.BoardLayer
+	Polygons       [][]kicadfiles.Point
+	FilledPolygons []ZoneFilledPolygon
+	HatchStyle     string
+	HatchPitch     kicadfiles.IU
+	Priority       int
+	ConnectPads    bool
+	// ConnectPadsMode takes precedence over ConnectPads when set.
+	ConnectPadsMode      string
+	Clearance            kicadfiles.IU
+	MinThickness         kicadfiles.IU
+	FilledAreasThickness bool
+	Fill                 ZoneFillSettings
+	Attributes           []ZoneAttribute
+}
+
+type ZoneFillSettings struct {
+	Enabled            bool
+	ThermalGap         kicadfiles.IU
+	ThermalBridgeWidth kicadfiles.IU
+	IslandRemovalMode  int
+	IslandAreaMin      float64
+}
+
+type ZoneFilledPolygon struct {
+	Layer  kicadfiles.BoardLayer
+	Points []kicadfiles.Point
+}
+
+type ZoneAttribute struct {
+	Name   string
+	Values map[string]string
 }
 
 type Dimension struct {
@@ -568,7 +599,7 @@ func Validate(board PCBFile) error {
 		errs = append(errs, validateVia(i, via, validNetCodes)...)
 	}
 	for i, zone := range board.Zones {
-		errs = append(errs, validateZone(i, zone, validNetCodes)...)
+		errs = append(errs, validateZone(i, zone, validNetCodes, validNetNames)...)
 	}
 	for i, dimension := range board.Dimensions {
 		errs = append(errs, validateDimension(i, dimension)...)
@@ -1030,6 +1061,20 @@ func fillMode(fill string) string {
 	return fill
 }
 
+func defaultString(value, fallback string) string {
+	if strings.TrimSpace(value) == "" {
+		return fallback
+	}
+	return value
+}
+
+func defaultIU(value, fallback kicadfiles.IU) kicadfiles.IU {
+	if value == 0 {
+		return fallback
+	}
+	return value
+}
+
 func renderTrack(track Track) sexpr.List {
 	return sexpr.L(
 		sexpr.A("segment"),
@@ -1074,18 +1119,74 @@ func renderVia(via Via) sexpr.List {
 }
 
 func renderZone(zone Zone, netNames map[int]string) sexpr.List {
+	netName := netNames[zone.NetCode]
+	if strings.TrimSpace(zone.NetName) != "" {
+		netName = zone.NetName
+	}
 	nodes := []sexpr.Node{
 		sexpr.A("zone"),
 		sexpr.L(sexpr.A("net"), sexpr.I(int64(zone.NetCode))),
-		sexpr.L(sexpr.A("net_name"), sexpr.S(netNames[zone.NetCode])),
+		sexpr.L(sexpr.A("net_name"), sexpr.S(netName)),
 		renderLayerList("layers", zone.Layers),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(zone.UUID))),
-		sexpr.L(sexpr.A("priority"), sexpr.I(int64(zone.Priority))),
 	}
+	if strings.TrimSpace(zone.Name) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("name"), sexpr.S(zone.Name)))
+	}
+	nodes = append(nodes, sexpr.L(sexpr.A("hatch"), sexpr.A(defaultString(zone.HatchStyle, "edge")), fixed(defaultIU(zone.HatchPitch, kicadfiles.MM(0.5)))))
+	if zone.Priority > 0 {
+		nodes = append(nodes, sexpr.L(sexpr.A("priority"), sexpr.I(int64(zone.Priority))))
+	}
+	for _, attr := range zone.Attributes {
+		nodes = append(nodes, renderZoneAttribute(attr))
+	}
+	nodes = append(nodes,
+		sexpr.L(sexpr.A("connect_pads"), sexpr.A(zoneConnectMode(zone)), sexpr.L(sexpr.A("clearance"), fixed(zone.Clearance))),
+		sexpr.L(sexpr.A("min_thickness"), fixed(defaultIU(zone.MinThickness, kicadfiles.MM(0.25)))),
+		sexpr.L(sexpr.A("filled_areas_thickness"), yesNo(zone.FilledAreasThickness)),
+		renderZoneFill(zone.Fill),
+	)
 	for _, polygon := range zone.Polygons {
 		nodes = append(nodes, sexpr.L(sexpr.A("polygon"), renderPoints(polygon)))
 	}
+	for _, polygon := range zone.FilledPolygons {
+		nodes = append(nodes, sexpr.L(sexpr.A("filled_polygon"), sexpr.L(sexpr.A("layer"), sexpr.S(string(polygon.Layer))), renderPoints(polygon.Points)))
+	}
 	return sexpr.L(nodes...)
+}
+
+func renderZoneAttribute(attr ZoneAttribute) sexpr.List {
+	children := []sexpr.Node{sexpr.A(attr.Name)}
+	keys := make([]string, 0, len(attr.Values))
+	for key := range attr.Values {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		children = append(children, sexpr.L(sexpr.A(key), sexpr.S(attr.Values[key])))
+	}
+	return sexpr.L(sexpr.A("attr"), sexpr.L(children...))
+}
+
+func zoneConnectMode(zone Zone) string {
+	if strings.TrimSpace(zone.ConnectPadsMode) != "" {
+		return zone.ConnectPadsMode
+	}
+	if zone.ConnectPads {
+		return "yes"
+	}
+	return "no"
+}
+
+func renderZoneFill(fill ZoneFillSettings) sexpr.List {
+	return sexpr.L(
+		sexpr.A("fill"),
+		yesNo(fill.Enabled),
+		sexpr.L(sexpr.A("thermal_gap"), fixed(fill.ThermalGap)),
+		sexpr.L(sexpr.A("thermal_bridge_width"), fixed(fill.ThermalBridgeWidth)),
+		sexpr.L(sexpr.A("island_removal_mode"), sexpr.I(int64(fill.IslandRemovalMode))),
+		sexpr.L(sexpr.A("island_area_min"), sexpr.F(fill.IslandAreaMin)),
+	)
 }
 
 func renderDimension(dimension Dimension) sexpr.List {
@@ -1518,7 +1619,7 @@ func validateVia(index int, via Via, netCodes map[int]struct{}) kicadfiles.Valid
 	return errs
 }
 
-func validateZone(index int, zone Zone, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+func validateZone(index int, zone Zone, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	prefix := func(field string) string { return indexed("zones", index, field) }
 	if !zone.UUID.Valid() {
@@ -1526,6 +1627,9 @@ func validateZone(index int, zone Zone, netCodes map[int]struct{}) kicadfiles.Va
 	}
 	if _, ok := netCodes[zone.NetCode]; !ok {
 		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
+	}
+	if expected, ok := netNames[zone.NetCode]; ok && strings.TrimSpace(zone.NetName) != "" && zone.NetName != expected {
+		errs = append(errs, fieldError(prefix("net_name"), "must match net code"))
 	}
 	if len(zone.Layers) == 0 {
 		errs = append(errs, fieldError(prefix("layers"), "required"))
@@ -1543,7 +1647,33 @@ func validateZone(index int, zone Zone, netCodes map[int]struct{}) kicadfiles.Va
 			errs = append(errs, fieldError(indexed(prefix("polygons"), polygonIndex, "points"), "at least three distinct points required"))
 		}
 	}
+	for polygonIndex, polygon := range zone.FilledPolygons {
+		if !kicadfiles.IsValidBoardLayer(polygon.Layer) {
+			errs = append(errs, fieldError(indexed(prefix("filled_polygons"), polygonIndex, "layer"), "invalid"))
+		}
+		if countDistinctPoints(polygon.Points) < 3 {
+			errs = append(errs, fieldError(indexed(prefix("filled_polygons"), polygonIndex, "points"), "at least three distinct points required"))
+		}
+	}
+	if zone.Priority < 0 {
+		errs = append(errs, fieldError(prefix("priority"), "must be non-negative"))
+	}
+	if !isValidZoneConnectMode(zoneConnectMode(zone)) {
+		errs = append(errs, fieldError(prefix("connect_pads"), "invalid"))
+	}
+	if zone.MinThickness < 0 {
+		errs = append(errs, fieldError(prefix("min_thickness"), "must be non-negative"))
+	}
 	return errs
+}
+
+func isValidZoneConnectMode(value string) bool {
+	switch value {
+	case "yes", "no", "thru_hole_only":
+		return true
+	default:
+		return false
+	}
 }
 
 func validateDimension(index int, dimension Dimension) kicadfiles.ValidationErrors {
