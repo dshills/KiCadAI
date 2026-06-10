@@ -492,6 +492,76 @@ func TestWriteRendersDrilledPadAsThruHole(t *testing.T) {
 	}
 }
 
+func TestWriteRendersPadMetadata(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	removeUnused := false
+	thermalAngle := 45.0
+	footprint.Pads[0] = Pad{
+		Name:               "1",
+		Type:               "thru_hole",
+		NetCode:            1,
+		NetName:            "A",
+		Shape:              "oval",
+		Position:           point(0, 0),
+		Size:               point(2, 2),
+		Drill:              kicadfiles.MM(1),
+		Layers:             []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask},
+		RemoveUnusedLayers: &removeUnused,
+		PinFunction:        "Pin_1",
+		PinType:            "passive",
+		ThermalBridgeAngle: &thermalAngle,
+		Teardrops: &TeardropSettings{
+			BestLengthRatio:      0.5,
+			MaxLength:            kicadfiles.MM(1),
+			BestWidthRatio:       1,
+			MaxWidth:             kicadfiles.MM(2),
+			FilterRatio:          0.9,
+			Enabled:              true,
+			AllowTwoSegments:     true,
+			PreferZoneConnection: true,
+		},
+	}
+	board.Footprints = []Footprint{footprint}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"thru_hole",
+		"oval",
+		"(remove_unused_layers no)",
+		"(pinfunction \"Pin_1\")",
+		"(pintype \"passive\")",
+		"(thermal_bridge_angle 45)",
+		"(teardrops",
+		"(prefer_zone_connections yes)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestValidateRejectsPadNetNameMismatch(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].NetName = "B"
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pads[0].net_name") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestValidateAcceptsDrilledPadWithExplicitCopperAndMaskLayers(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

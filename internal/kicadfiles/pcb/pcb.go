@@ -201,15 +201,34 @@ type XYZ struct {
 }
 
 type Pad struct {
-	Name            string
-	NetCode         int
-	Shape           string
-	RoundRectRRatio float64
-	Position        kicadfiles.Point
-	Rotation        kicadfiles.Angle
-	Size            kicadfiles.Point
-	Drill           kicadfiles.IU
-	Layers          []kicadfiles.BoardLayer
+	Name               string
+	Type               string
+	NetCode            int
+	NetName            string
+	Shape              string
+	RoundRectRRatio    float64
+	PinFunction        string
+	PinType            string
+	Position           kicadfiles.Point
+	Rotation           kicadfiles.Angle
+	Size               kicadfiles.Point
+	Drill              kicadfiles.IU
+	Layers             []kicadfiles.BoardLayer
+	RemoveUnusedLayers *bool
+	ThermalBridgeAngle *float64
+	Teardrops          *TeardropSettings
+}
+
+type TeardropSettings struct {
+	BestLengthRatio      float64
+	MaxLength            kicadfiles.IU
+	BestWidthRatio       float64
+	MaxWidth             kicadfiles.IU
+	CurvedEdges          bool
+	FilterRatio          float64
+	Enabled              bool
+	AllowTwoSegments     bool
+	PreferZoneConnection bool
 }
 
 type Drawing struct {
@@ -496,8 +515,9 @@ func Validate(board PCBFile) error {
 		netNames[net.Name] = struct{}{}
 	}
 	validNetCodes := netCodeSet(board.Nets)
+	validNetNames := netNameMap(board.Nets)
 	for i, footprint := range board.Footprints {
-		errs = append(errs, validateFootprint(i, footprint, validNetCodes)...)
+		errs = append(errs, validateFootprint(i, footprint, validNetCodes, validNetNames)...)
 	}
 	for i, drawing := range board.Drawings {
 		errs = append(errs, validateDrawing(i, drawing)...)
@@ -845,6 +865,9 @@ func renderFootprintText(text FootprintText) sexpr.List {
 }
 
 func renderPad(pad Pad, netName string) sexpr.List {
+	if strings.TrimSpace(pad.NetName) != "" {
+		netName = pad.NetName
+	}
 	nodes := []sexpr.Node{
 		sexpr.A("pad"),
 		sexpr.S(pad.Name),
@@ -858,10 +881,40 @@ func renderPad(pad Pad, netName string) sexpr.List {
 	if pad.Drill > 0 {
 		nodes = append(nodes, sexpr.L(sexpr.A("drill"), fixed(pad.Drill)))
 	}
+	if pad.RemoveUnusedLayers != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("remove_unused_layers"), yesNo(*pad.RemoveUnusedLayers)))
+	}
+	if strings.TrimSpace(pad.PinFunction) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("pinfunction"), sexpr.S(pad.PinFunction)))
+	}
+	if strings.TrimSpace(pad.PinType) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("pintype"), sexpr.S(pad.PinType)))
+	}
+	if pad.ThermalBridgeAngle != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("thermal_bridge_angle"), sexpr.F(*pad.ThermalBridgeAngle)))
+	}
 	if pad.Shape == "roundrect" {
 		nodes = append(nodes, sexpr.L(sexpr.A("roundrect_rratio"), sexpr.F(roundRectRRatio(pad))))
 	}
+	if pad.Teardrops != nil {
+		nodes = append(nodes, renderTeardrops(*pad.Teardrops))
+	}
 	return sexpr.L(nodes...)
+}
+
+func renderTeardrops(teardrops TeardropSettings) sexpr.List {
+	return sexpr.L(
+		sexpr.A("teardrops"),
+		sexpr.L(sexpr.A("best_length_ratio"), sexpr.F(teardrops.BestLengthRatio)),
+		sexpr.L(sexpr.A("max_length"), fixed(teardrops.MaxLength)),
+		sexpr.L(sexpr.A("best_width_ratio"), sexpr.F(teardrops.BestWidthRatio)),
+		sexpr.L(sexpr.A("max_width"), fixed(teardrops.MaxWidth)),
+		sexpr.L(sexpr.A("curved_edges"), yesNo(teardrops.CurvedEdges)),
+		sexpr.L(sexpr.A("filter_ratio"), sexpr.F(teardrops.FilterRatio)),
+		sexpr.L(sexpr.A("enabled"), yesNo(teardrops.Enabled)),
+		sexpr.L(sexpr.A("allow_two_segments"), yesNo(teardrops.AllowTwoSegments)),
+		sexpr.L(sexpr.A("prefer_zone_connections"), yesNo(teardrops.PreferZoneConnection)),
+	)
 }
 
 func renderDrawing(drawing Drawing) sexpr.List {
@@ -1039,7 +1092,7 @@ func hasNetZero(nets []Net) bool {
 	return false
 }
 
-func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	prefix := func(field string) string { return indexed("footprints", index, field) }
 	if !footprint.UUID.Valid() {
@@ -1102,7 +1155,7 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 	}
 	padNames := make(map[string]struct{}, len(footprint.Pads))
 	for padIndex, pad := range footprint.Pads {
-		errs = append(errs, validatePad(prefix("pads"), padIndex, pad, netCodes)...)
+		errs = append(errs, validatePad(prefix("pads"), padIndex, pad, netCodes, netNames)...)
 		if _, ok := padNames[pad.Name]; ok {
 			errs = append(errs, fieldError(indexed(prefix("pads"), padIndex, "name"), "duplicate"))
 		}
@@ -1150,13 +1203,20 @@ func validateFootprintText(collection string, index int, text FootprintText) kic
 	return errs
 }
 
-func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	if strings.TrimSpace(pad.Name) == "" {
 		errs = append(errs, fieldError(indexed(collection, index, "name"), "required"))
 	}
+	padType := padType(pad)
+	if !isValidPadType(padType) {
+		errs = append(errs, fieldError(indexed(collection, index, "type"), "invalid"))
+	}
 	if strings.TrimSpace(pad.Shape) == "" {
 		errs = append(errs, fieldError(indexed(collection, index, "shape"), "required"))
+	}
+	if !isValidPadShape(pad.Shape) {
+		errs = append(errs, fieldError(indexed(collection, index, "shape"), "invalid"))
 	}
 	if pad.Shape == "roundrect" && (pad.RoundRectRRatio < 0 || pad.RoundRectRRatio > 1) {
 		errs = append(errs, fieldError(indexed(collection, index, "roundrect_rratio"), "must be between 0 and 1"))
@@ -1175,11 +1235,20 @@ func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{
 			errs = append(errs, fieldError(indexedValue(indexed(collection, index, "layers"), layerIndex), "invalid"))
 		}
 	}
+	if (padType == "thru_hole" || padType == "np_thru_hole") && pad.Drill <= 0 {
+		errs = append(errs, fieldError(indexed(collection, index, "drill"), "required for through-hole pads"))
+	}
+	if padType == "smd" && pad.Drill > 0 {
+		errs = append(errs, fieldError(indexed(collection, index, "drill"), "not allowed for SMD pads"))
+	}
 	if pad.Drill > 0 && !validDrilledPadLayers(pad.Layers) {
 		errs = append(errs, fieldError(indexed(collection, index, "layers"), "drilled pads require through copper and mask layers"))
 	}
 	if _, ok := netCodes[pad.NetCode]; !ok {
 		errs = append(errs, fieldError(indexed(collection, index, "net_code"), "unknown"))
+	}
+	if strings.TrimSpace(pad.NetName) != "" && pad.NetName != netNames[pad.NetCode] {
+		errs = append(errs, fieldError(indexed(collection, index, "net_name"), "must match net code"))
 	}
 	return errs
 }
@@ -1408,10 +1477,31 @@ func isCopperLayer(layer kicadfiles.BoardLayer) bool {
 }
 
 func padType(pad Pad) string {
+	if strings.TrimSpace(pad.Type) != "" {
+		return pad.Type
+	}
 	if pad.Drill > 0 {
 		return "thru_hole"
 	}
 	return "smd"
+}
+
+func isValidPadType(value string) bool {
+	switch value {
+	case "smd", "thru_hole", "np_thru_hole", "connect":
+		return true
+	default:
+		return false
+	}
+}
+
+func isValidPadShape(value string) bool {
+	switch value {
+	case "rect", "circle", "oval", "trapezoid", "roundrect", "custom":
+		return true
+	default:
+		return false
+	}
 }
 
 func roundRectRRatio(pad Pad) float64 {
