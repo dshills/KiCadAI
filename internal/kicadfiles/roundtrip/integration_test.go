@@ -11,6 +11,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 func TestKiCadRoundTripCheckedInGeneratedPCB(t *testing.T) {
@@ -52,6 +53,48 @@ func TestKiCadRoundTripGeneratedLEDPCB(t *testing.T) {
 	}
 	if !result.Equal {
 		t.Fatalf("round trip changed generated board: %s", firstResultDifference(result))
+	}
+}
+
+func TestKiCadRoundTripCheckedInGeneratedSchematic(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	path := repoPath(t, "examples", "01_led_indicator", "led_indicator.kicad_sch")
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	result, err := RoundTripSchematic(ctx, cli, path, OptionsFromEnv())
+	if err != nil {
+		t.Fatalf("RoundTripSchematic returned error: %v\nresult=%#v", err, result)
+	}
+	if !result.Equal {
+		t.Fatalf("round trip changed fixture: %s", firstResultDifference(result))
+	}
+}
+
+func TestKiCadRoundTripGeneratedLEDSchematic(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	sch, err := schematic.LEDIndicatorSchematic(schematic.LEDIndicatorInput{
+		DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Seed:     "roundtrip-integration",
+	})
+	if err != nil {
+		t.Fatalf("LEDIndicatorSchematic returned error: %v", err)
+	}
+	var out bytes.Buffer
+	if err := schematic.Write(&out, sch); err != nil {
+		t.Fatalf("schematic.Write returned error: %v", err)
+	}
+	schematicPath := filepath.Join(t.TempDir(), "generated.kicad_sch")
+	writeIntegrationTestFile(t, schematicPath, out.String())
+	ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+	defer cancel()
+
+	result, err := RoundTripSchematic(ctx, cli, schematicPath, OptionsFromEnv())
+	if err != nil {
+		t.Fatalf("RoundTripSchematic returned error: %v\nresult=%#v", err, result)
+	}
+	if !result.Equal {
+		t.Fatalf("round trip changed generated schematic: %s", firstResultDifference(result))
 	}
 }
 

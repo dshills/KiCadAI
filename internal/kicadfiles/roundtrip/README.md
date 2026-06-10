@@ -1,6 +1,6 @@
 # KiCad Round-Trip Validation
 
-This package validates generated KiCad files by copying them to a temporary
+This package validates generated KiCad PCB and schematic files by copying them to a temporary
 artifact workspace, running KiCad CLI on the copy, and comparing the KiCad-saved
 result against the original.
 
@@ -26,18 +26,32 @@ KICADAI_KICAD_CLI="/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli" \
 go test ./internal/kicadfiles/roundtrip
 ```
 
+The schematic harness uses:
+
+```sh
+kicad-cli sch upgrade --force <file.kicad_sch>
+```
+
+The PCB harness uses:
+
+```sh
+kicad-cli pcb upgrade --force <file.kicad_pcb>
+```
+
 Preserve generated, round-tripped, diff, and summary artifacts:
 
 ```sh
 KICADAI_RUN_KICAD_CLI=1 \
 KICADAI_KEEP_ROUNDTRIP_ARTIFACTS=1 \
-KICADAI_ROUNDTRIP_ARTIFACT_DIR=/tmp/kicadai-roundtrip \
+KICADAI_ROUNDTRIP_ARTIFACT_DIR=examples/roundtrip_artifacts \
 go test ./internal/kicadfiles/roundtrip
 ```
 
-`KICADAI_ROUNDTRIP_ARTIFACT_DIR` selects the parent directory. It does not imply
-preservation by itself; set `KICADAI_KEEP_ROUNDTRIP_ARTIFACTS=1` to keep the run
-directory after tests finish.
+`KICADAI_ROUNDTRIP_ARTIFACT_DIR` selects the parent directory. Prefer a stable
+project-owned directory such as `examples/roundtrip_artifacts` when debugging
+KiCad working-directory issues. It does not imply preservation by itself; set
+`KICADAI_KEEP_ROUNDTRIP_ARTIFACTS=1` to keep the run directory after tests
+finish.
 
 Adjust the external command timeout:
 

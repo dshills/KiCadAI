@@ -17,3 +17,4 @@ coverage.out
 **/.history/
 *.kicad_prl
 ~*.kicad_*.lck
+examples/roundtrip_artifacts/
