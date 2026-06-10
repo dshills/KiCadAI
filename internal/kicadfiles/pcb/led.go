@@ -26,6 +26,7 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 	gnd := nets.EnsureNet("GND").Code
 	resistor := twoPadFootprint(generator, "r1", "Resistor_SMD:R_0805_2012Metric", "R1", "1k", kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)}, vcc, ledOut)
 	led := twoPadFootprint(generator, "d1", "LED_SMD:LED_0805_2012Metric", "D1", "LED", kicadfiles.Point{X: kicadfiles.MM(45), Y: kicadfiles.MM(20)}, ledOut, gnd)
+	embeddedFonts := false
 
 	return PCBFile{
 		Version:          kicadfiles.KiCadPCBFormatV20260206,
@@ -48,25 +49,31 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 			via(generator, "gnd", kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}, gnd),
 		},
 		TitleBlock:           kicadfiles.TitleBlock{Title: "LED Indicator"},
+		EmbeddedFonts:        &embeddedFonts,
 		RequireClosedOutline: true,
 	}, nil
 }
 
 func twoPadFootprint(generator kicadfiles.IDGenerator, key, libraryID, reference, value string, position kicadfiles.Point, leftNet, rightNet int) Footprint {
 	path := "root.component." + key
+	uuid := generator.New("root.pcb.footprint."+key, path)
+	embeddedFonts := false
+	duplicatePadNumbersAreJumpers := false
 	return Footprint{
-		UUID:       generator.New("root.pcb.footprint."+key, path),
-		Path:       path,
-		LibraryID:  libraryID,
-		Reference:  reference,
-		Value:      value,
-		Position:   position,
-		Layer:      kicadfiles.LayerFCu,
-		Properties: footprintProperties(generator, key, reference, value),
-		Attributes: []string{"smd"},
+		UUID:                          uuid,
+		Path:                          path,
+		LibraryID:                     libraryID,
+		Reference:                     reference,
+		Value:                         value,
+		Position:                      position,
+		Layer:                         kicadfiles.LayerFCu,
+		Properties:                    footprintProperties(generator, key, reference, value),
+		Attributes:                    []string{"smd"},
+		EmbeddedFonts:                 &embeddedFonts,
+		DuplicatePadNumbersAreJumpers: &duplicatePadNumbersAreJumpers,
 		Pads: []Pad{
-			{Name: "1", NetCode: leftNet, Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(-1.1), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1.45)}, Layers: smdPadLayers()},
-			{Name: "2", NetCode: rightNet, Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(1.1), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1.45)}, Layers: smdPadLayers()},
+			{Name: "1", UUID: generator.New("root.pcb.footprint."+key+".pad", "1"), NetCode: leftNet, Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(-1.1), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1.45)}, Layers: smdPadLayers()},
+			{Name: "2", UUID: generator.New("root.pcb.footprint."+key+".pad", "2"), NetCode: rightNet, Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(1.1), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1.45)}, Layers: smdPadLayers()},
 		},
 	}
 }
@@ -75,6 +82,8 @@ func footprintProperties(generator kicadfiles.IDGenerator, key, reference, value
 	return []FootprintProperty{
 		footprintProperty(generator, key, "Reference", reference, kicadfiles.Point{X: 0, Y: kicadfiles.MM(-1.5)}, kicadfiles.LayerFSilkS, false),
 		footprintProperty(generator, key, "Value", value, kicadfiles.Point{X: 0, Y: kicadfiles.MM(1.5)}, kicadfiles.LayerFSilkS, false),
+		footprintProperty(generator, key, "Datasheet", "", kicadfiles.Point{X: 0, Y: 0}, kicadfiles.LayerFFab, true),
+		footprintProperty(generator, key, "Description", "", kicadfiles.Point{X: 0, Y: 0}, kicadfiles.LayerFFab, true),
 	}
 }
 
@@ -87,11 +96,15 @@ func footprintProperty(generator kicadfiles.IDGenerator, key, name, value string
 		Layer:    layer,
 		Hide:     hide,
 		Unlocked: true,
+		Effects: TextEffects{
+			FontSize:          kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)},
+			OmitFontThickness: hide,
+		},
 	}
 }
 
 func smdPadLayers() []kicadfiles.BoardLayer {
-	return []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFPaste, kicadfiles.LayerFMask}
+	return []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste}
 }
 
 func rectangleOutline(generator kicadfiles.IDGenerator, topLeft, bottomRight kicadfiles.Point) []Drawing {

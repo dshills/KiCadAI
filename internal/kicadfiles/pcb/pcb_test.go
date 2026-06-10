@@ -31,13 +31,13 @@ func TestWriteMinimalPCB(t *testing.T) {
 		"(44 \"Edge.Cuts\" user)",
 		"(94 \"User.45\" user)",
 		"(allow_soldermask_bridges_in_footprints no)",
+		"(pad_to_mask_clearance 0.0)",
 		"(tenting",
 		"(front yes)",
 		"(back yes)",
 		"(pcbplotparams",
 		"(usegerberattributes yes)",
 		"(outputdirectory \"\")",
-		"(net 0 \"\")",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
@@ -133,6 +133,7 @@ func TestValidateRejectsInvalidSetup(t *testing.T) {
 			name: "zero thickness",
 			board: func() PCBFile {
 				board := minimalPCB()
+				board.Setup.HasStackup = true
 				board.Setup.Stackup.Thickness = 0
 				return board
 			}(),
@@ -227,9 +228,20 @@ func TestWriteRendersPreservedNodes(t *testing.T) {
 	}
 }
 
-func TestWriteSortsNetsByCode(t *testing.T) {
+func TestWriteUsesNetNamesForPadsAndRoutes(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 2, Name: "LED_OUT"}, {Code: 1, Name: "GND"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "D1")
+	footprint.Pads[0].NetCode = 2
+	board.Footprints = []Footprint{footprint}
+	board.Tracks = []Track{{
+		UUID:    kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		Start:   point(1, 1),
+		End:     point(2, 1),
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+	}}
 
 	var buf bytes.Buffer
 	if err := Write(&buf, board); err != nil {
@@ -237,11 +249,13 @@ func TestWriteSortsNetsByCode(t *testing.T) {
 	}
 
 	output := buf.String()
-	first := strings.Index(output, "(net 0 \"\")")
-	second := strings.Index(output, "(net 1 \"GND\")")
-	third := strings.Index(output, "(net 2 \"LED_OUT\")")
-	if !(first < second && second < third) {
-		t.Fatalf("nets not ordered by code:\n%s", output)
+	for _, want := range []string{`(net "LED_OUT")`, `(net "GND")`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+	if strings.Contains(output, `(net 1 "GND")`) || strings.Contains(output, `(net 2 "LED_OUT")`) {
+		t.Fatalf("top-level net declarations should not be rendered:\n%s", output)
 	}
 }
 
@@ -282,8 +296,8 @@ func TestWriteNormalizesNetZeroBeforeValidation(t *testing.T) {
 	if err := Write(&buf, board); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
-	if !strings.Contains(buf.String(), "(net 0 \"\")") {
-		t.Fatalf("normalized net 0 missing:\n%s", buf.String())
+	if !strings.Contains(buf.String(), `(net "A")`) {
+		t.Fatalf("net name resolution missing:\n%s", buf.String())
 	}
 }
 
@@ -326,22 +340,26 @@ func TestLEDIndicatorPCBWritesDeterministicBoard(t *testing.T) {
 	output := first.String()
 	for _, want := range []string{
 		"(title \"LED Indicator\")",
-		"(net 1 \"VCC\")",
-		"(net 2 \"LED_OUT\")",
-		"(net 3 \"GND\")",
+		"(net \"VCC\")",
+		"(net \"LED_OUT\")",
+		"(net \"GND\")",
 		"\"LED_SMD:LED_0805_2012Metric\"",
 		"\"Resistor_SMD:R_0805_2012Metric\"",
 		"(property",
 		"\"Reference\"",
 		"\"Value\"",
+		"\"Datasheet\"",
+		"\"Description\"",
 		"(attr smd)",
+		"(duplicate_pad_numbers_are_jumpers no)",
 		"\"D1\"",
 		"roundrect",
 		"(roundrect_rratio 0.25)",
-		"(layers \"F.Cu\" \"F.Paste\" \"F.Mask\")",
+		"(layers \"F.Cu\" \"F.Mask\" \"F.Paste\")",
 		"(gr_line",
 		"(segment",
 		"(via",
+		"(embedded_fonts no)",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
@@ -556,6 +574,21 @@ func TestWriteRendersPadMetadata(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
+	}
+}
+
+func TestWriteOmitsNetForUnconnectedPad(t *testing.T) {
+	board := minimalPCB()
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Pads[0].NetCode = 0
+	board.Footprints = []Footprint{footprint}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	if strings.Contains(buf.String(), "(net ") {
+		t.Fatalf("unconnected pad should not render net:\n%s", buf.String())
 	}
 }
 

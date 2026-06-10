@@ -31,6 +31,7 @@ type PCBFile struct {
 	Dimensions           []Dimension
 	Preserved            []PreservedNode
 	TitleBlock           kicadfiles.TitleBlock
+	EmbeddedFonts        *bool
 	RequireClosedOutline bool
 }
 
@@ -44,6 +45,7 @@ type PCBGeneral struct {
 }
 
 type PCBSetup struct {
+	HasStackup                         bool
 	Stackup                            PCBStackup
 	SolderMaskMinWidth                 kicadfiles.IU
 	PadToMaskClearance                 kicadfiles.IU
@@ -165,6 +167,8 @@ type Footprint struct {
 	Graphics      []FootprintGraphic
 	Models        []Model3D
 	EmbeddedFonts *bool
+	// KiCad 10 writes this flag explicitly on saved footprints.
+	DuplicatePadNumbersAreJumpers *bool
 }
 
 type FootprintText struct {
@@ -189,9 +193,10 @@ type FootprintProperty struct {
 }
 
 type TextEffects struct {
-	FontSize      kicadfiles.Point
-	FontThickness kicadfiles.IU
-	Justify       []string
+	FontSize          kicadfiles.Point
+	FontThickness     kicadfiles.IU
+	OmitFontThickness bool
+	Justify           []string
 }
 
 type Model3D struct {
@@ -208,6 +213,7 @@ type XYZ struct {
 }
 
 type Pad struct {
+	UUID               kicadfiles.UUID
 	Name               string
 	Type               string
 	NetCode            int
@@ -300,6 +306,7 @@ type Track struct {
 	Width   kicadfiles.IU
 	Layer   kicadfiles.BoardLayer
 	NetCode int
+	NetName string
 }
 
 type TrackArc struct {
@@ -310,6 +317,7 @@ type TrackArc struct {
 	Width   kicadfiles.IU
 	Layer   kicadfiles.BoardLayer
 	NetCode int
+	NetName string
 }
 
 type Via struct {
@@ -318,6 +326,7 @@ type Via struct {
 	Size         kicadfiles.IU
 	Drill        kicadfiles.IU
 	NetCode      int
+	NetName      string
 	Layers       []kicadfiles.BoardLayer
 	TentingFront bool
 	TentingBack  bool
@@ -529,7 +538,7 @@ func Validate(board PCBFile) error {
 	if board.General.Thickness <= 0 {
 		errs = append(errs, fieldError("general.thickness", "must be positive"))
 	}
-	if board.Setup.Stackup.Thickness <= 0 {
+	if board.Setup.HasStackup && board.Setup.Stackup.Thickness <= 0 {
 		errs = append(errs, fieldError("setup.stackup.thickness", "must be positive"))
 	}
 	if board.Setup.SolderMaskMinWidth < 0 {
@@ -661,9 +670,6 @@ func render(board PCBFile) (sexpr.List, error) {
 		nodes = append(nodes, title)
 	}
 	nodes = append(nodes, renderLayers(board.Layers), renderSetup(board.Setup))
-	for _, net := range sortedNets(board.Nets) {
-		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.I(int64(net.Code)), sexpr.S(net.Name)))
-	}
 	netNames := netNameMap(board.Nets)
 	for _, footprint := range sortedFootprints(board.Footprints) {
 		nodes = append(nodes, renderFootprint(footprint, netNames))
@@ -672,19 +678,22 @@ func render(board PCBFile) (sexpr.List, error) {
 		nodes = append(nodes, renderDrawing(drawing))
 	}
 	for _, track := range board.Tracks {
-		nodes = append(nodes, renderTrack(track))
+		nodes = append(nodes, renderTrack(track, netNames))
 	}
 	for _, arc := range board.TrackArcs {
-		nodes = append(nodes, renderTrackArc(arc))
+		nodes = append(nodes, renderTrackArc(arc, netNames))
 	}
 	for _, via := range board.Vias {
-		nodes = append(nodes, renderVia(via))
+		nodes = append(nodes, renderVia(via, netNames))
 	}
 	for _, zone := range board.Zones {
 		nodes = append(nodes, renderZone(zone, netNames))
 	}
 	for _, dimension := range board.Dimensions {
 		nodes = append(nodes, renderDimension(dimension))
+	}
+	if board.EmbeddedFonts != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("embedded_fonts"), yesNo(*board.EmbeddedFonts)))
 	}
 	for _, preserved := range board.Preserved {
 		nodes = append(nodes, sexpr.R(preserved.Raw))
@@ -715,11 +724,17 @@ func renderLayers(layers []LayerDefinition) sexpr.List {
 }
 
 func renderSetup(setup PCBSetup) sexpr.List {
-	return sexpr.L(
-		sexpr.A("setup"),
-		sexpr.L(sexpr.A("stackup"), sexpr.L(sexpr.A("thickness"), fixed(setup.Stackup.Thickness))),
-		sexpr.L(sexpr.A("solder_mask_min_width"), fixed(setup.SolderMaskMinWidth)),
+	nodes := []sexpr.Node{sexpr.A("setup")}
+	if setup.HasStackup {
+		nodes = append(nodes, sexpr.L(sexpr.A("stackup"), sexpr.L(sexpr.A("thickness"), fixed(setup.Stackup.Thickness))))
+	}
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("pad_to_mask_clearance"), fixed(setup.PadToMaskClearance)),
+	)
+	if setup.SolderMaskMinWidth > 0 {
+		nodes = append(nodes, sexpr.L(sexpr.A("solder_mask_min_width"), fixed(setup.SolderMaskMinWidth)))
+	}
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("allow_soldermask_bridges_in_footprints"), yesNo(setup.AllowSoldermaskBridgesInFootprints)),
 		renderSidePair("tenting", setup.TentingFront, setup.TentingBack),
 		renderSidePair("covering", setup.CoveringFront, setup.CoveringBack),
@@ -728,6 +743,7 @@ func renderSetup(setup PCBSetup) sexpr.List {
 		sexpr.L(sexpr.A("filling"), yesNo(setup.Filling)),
 		renderPlotParams(setup.PlotParams),
 	)
+	return sexpr.L(nodes...)
 }
 
 func renderSidePair(name string, front, back bool) sexpr.List {
@@ -845,6 +861,9 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 		}
 		nodes = append(nodes, sexpr.L(attrNodes...))
 	}
+	if footprint.DuplicatePadNumbersAreJumpers != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("duplicate_pad_numbers_are_jumpers"), yesNo(*footprint.DuplicatePadNumbersAreJumpers)))
+	}
 	for _, text := range footprint.Texts {
 		nodes = append(nodes, renderFootprintText(text))
 	}
@@ -889,15 +908,18 @@ func renderEffects(effects TextEffects) sexpr.List {
 	if size.Y == 0 {
 		size.Y = kicadfiles.MM(defaultTextSizeMM)
 	}
-	thickness := effects.FontThickness
-	if thickness == 0 {
-		thickness = kicadfiles.MM(defaultTextThicknessMM)
-	}
-	font := sexpr.L(
+	fontNodes := []sexpr.Node{
 		sexpr.A("font"),
 		sexpr.L(sexpr.A("size"), fixed(size.X), fixed(size.Y)),
-		sexpr.L(sexpr.A("thickness"), fixed(thickness)),
-	)
+	}
+	if !effects.OmitFontThickness {
+		thickness := effects.FontThickness
+		if thickness == 0 {
+			thickness = kicadfiles.MM(defaultTextThicknessMM)
+		}
+		fontNodes = append(fontNodes, sexpr.L(sexpr.A("thickness"), fixed(thickness)))
+	}
+	font := sexpr.L(fontNodes...)
 	nodes := []sexpr.Node{sexpr.A("effects"), font}
 	if len(effects.Justify) > 0 {
 		justify := []sexpr.Node{sexpr.A("justify")}
@@ -962,7 +984,6 @@ func renderPad(pad Pad, netName string) sexpr.List {
 		renderAt(pad.Position, pad.Rotation),
 		sexpr.L(sexpr.A("size"), fixed(pad.Size.X), fixed(pad.Size.Y)),
 		renderLayerList("layers", pad.Layers),
-		sexpr.L(sexpr.A("net"), sexpr.I(int64(pad.NetCode)), sexpr.S(netName)),
 	}
 	if pad.Drill > 0 {
 		nodes = append(nodes, sexpr.L(sexpr.A("drill"), fixed(pad.Drill)))
@@ -981,6 +1002,12 @@ func renderPad(pad Pad, netName string) sexpr.List {
 	}
 	if pad.Shape == "roundrect" {
 		nodes = append(nodes, sexpr.L(sexpr.A("roundrect_rratio"), sexpr.F(roundRectRRatio(pad))))
+	}
+	if pad.NetCode > 0 || strings.TrimSpace(pad.NetName) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.S(netName)))
+	}
+	if pad.UUID.Valid() {
+		nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(pad.UUID))))
 	}
 	if pad.Teardrops != nil {
 		nodes = append(nodes, renderTeardrops(*pad.Teardrops))
@@ -1091,19 +1118,19 @@ func defaultIU(value, fallback kicadfiles.IU) kicadfiles.IU {
 	return value
 }
 
-func renderTrack(track Track) sexpr.List {
+func renderTrack(track Track, netNames map[int]string) sexpr.List {
 	return sexpr.L(
 		sexpr.A("segment"),
 		sexpr.L(sexpr.A("start"), fixed(track.Start.X), fixed(track.Start.Y)),
 		sexpr.L(sexpr.A("end"), fixed(track.End.X), fixed(track.End.Y)),
 		sexpr.L(sexpr.A("width"), fixed(track.Width)),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(track.Layer))),
-		sexpr.L(sexpr.A("net"), sexpr.I(int64(track.NetCode))),
+		sexpr.L(sexpr.A("net"), sexpr.S(routedNetName(track.NetCode, track.NetName, netNames))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(track.UUID))),
 	)
 }
 
-func renderTrackArc(arc TrackArc) sexpr.List {
+func renderTrackArc(arc TrackArc, netNames map[int]string) sexpr.List {
 	return sexpr.L(
 		sexpr.A("arc"),
 		sexpr.L(sexpr.A("start"), fixed(arc.Start.X), fixed(arc.Start.Y)),
@@ -1111,12 +1138,12 @@ func renderTrackArc(arc TrackArc) sexpr.List {
 		sexpr.L(sexpr.A("end"), fixed(arc.End.X), fixed(arc.End.Y)),
 		sexpr.L(sexpr.A("width"), fixed(arc.Width)),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(arc.Layer))),
-		sexpr.L(sexpr.A("net"), sexpr.I(int64(arc.NetCode))),
+		sexpr.L(sexpr.A("net"), sexpr.S(routedNetName(arc.NetCode, arc.NetName, netNames))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(arc.UUID))),
 	)
 }
 
-func renderVia(via Via) sexpr.List {
+func renderVia(via Via, netNames map[int]string) sexpr.List {
 	nodes := []sexpr.Node{
 		sexpr.A("via"),
 		sexpr.L(sexpr.A("at"), fixed(via.Position.X), fixed(via.Position.Y)),
@@ -1128,10 +1155,17 @@ func renderVia(via Via) sexpr.List {
 		nodes = append(nodes, renderSidePair("tenting", via.TentingFront, via.TentingBack))
 	}
 	nodes = append(nodes,
-		sexpr.L(sexpr.A("net"), sexpr.I(int64(via.NetCode))),
+		sexpr.L(sexpr.A("net"), sexpr.S(routedNetName(via.NetCode, via.NetName, netNames))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(via.UUID))),
 	)
 	return sexpr.L(nodes...)
+}
+
+func routedNetName(code int, explicit string, netNames map[int]string) string {
+	if strings.TrimSpace(explicit) != "" {
+		return explicit
+	}
+	return netNames[code]
 }
 
 func renderZone(zone Zone, netNames map[int]string) sexpr.List {

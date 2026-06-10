@@ -78,10 +78,6 @@
     (94 "User.45" user)
   )
   (setup
-    (stackup
-      (thickness 1.6)
-    )
-    (solder_mask_min_width 0.0)
     (pad_to_mask_clearance 0.0)
     (allow_soldermask_bridges_in_footprints no)
     (tenting
@@ -135,10 +131,6 @@
       (outputdirectory "")
     )
   )
-  (net 0 "")
-  (net 1 "VCC")
-  (net 2 "LED_OUT")
-  (net 3 "GND")
   (footprint
     "LED_SMD:LED_0805_2012Metric"
     (layer "F.Cu")
@@ -153,7 +145,7 @@
       (uuid "bd04d146-0b8f-5f24-9c16-ad1de12798b5")
       (effects
         (font
-          (size 1.0 1.0)
+          (size 1.27 1.27)
           (thickness 0.15)
         )
       )
@@ -167,22 +159,52 @@
       (uuid "4377b0c0-30a3-5b7f-926b-a1a92e3e01dd")
       (effects
         (font
-          (size 1.0 1.0)
+          (size 1.27 1.27)
           (thickness 0.15)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0.0 0.0)
+      (unlocked yes)
+      (layer "F.Fab")
+      (hide yes)
+      (uuid "a8a03353-875b-5ff1-9f17-09b130fe7f75")
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0.0 0.0)
+      (unlocked yes)
+      (layer "F.Fab")
+      (hide yes)
+      (uuid "43d186fc-2b5c-5091-ac2c-5964269e7ec3")
+      (effects
+        (font
+          (size 1.27 1.27)
         )
       )
     )
     (path "root.component.d1")
     (attr smd)
+    (duplicate_pad_numbers_are_jumpers no)
     (pad
       "1"
       smd
       roundrect
       (at -1.1 0.0)
       (size 1.0 1.45)
-      (layers "F.Cu" "F.Paste" "F.Mask")
-      (net 2 "LED_OUT")
+      (layers "F.Cu" "F.Mask" "F.Paste")
       (roundrect_rratio 0.25)
+      (net "LED_OUT")
+      (uuid "f2c1ec8e-8b9e-58a3-b2c2-0064cd35bbac")
     )
     (pad
       "2"
@@ -190,10 +212,12 @@
       roundrect
       (at 1.1 0.0)
       (size 1.0 1.45)
-      (layers "F.Cu" "F.Paste" "F.Mask")
-      (net 3 "GND")
+      (layers "F.Cu" "F.Mask" "F.Paste")
       (roundrect_rratio 0.25)
+      (net "GND")
+      (uuid "d2b69caf-d338-5b74-82b3-5d44bab048cb")
     )
+    (embedded_fonts no)
   )
   (footprint
     "Resistor_SMD:R_0805_2012Metric"
@@ -209,7 +233,7 @@
       (uuid "08d9ed4a-1e24-5ee5-a251-87e87c5b03c6")
       (effects
         (font
-          (size 1.0 1.0)
+          (size 1.27 1.27)
           (thickness 0.15)
         )
       )
@@ -223,22 +247,52 @@
       (uuid "f2c1da65-f7e4-585a-9c33-65efdfa8a5e7")
       (effects
         (font
-          (size 1.0 1.0)
+          (size 1.27 1.27)
           (thickness 0.15)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0.0 0.0)
+      (unlocked yes)
+      (layer "F.Fab")
+      (hide yes)
+      (uuid "265a3fdd-5ef1-5a30-a638-cb1cc45a9c78")
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0.0 0.0)
+      (unlocked yes)
+      (layer "F.Fab")
+      (hide yes)
+      (uuid "143a6eba-14ee-5fee-b87e-ccda4a5f54f6")
+      (effects
+        (font
+          (size 1.27 1.27)
         )
       )
     )
     (path "root.component.r1")
     (attr smd)
+    (duplicate_pad_numbers_are_jumpers no)
     (pad
       "1"
       smd
       roundrect
       (at -1.1 0.0)
       (size 1.0 1.45)
-      (layers "F.Cu" "F.Paste" "F.Mask")
-      (net 1 "VCC")
+      (layers "F.Cu" "F.Mask" "F.Paste")
       (roundrect_rratio 0.25)
+      (net "VCC")
+      (uuid "b8e18544-ee4b-551a-b1f9-87e2a4a615f2")
     )
     (pad
       "2"
@@ -246,10 +300,12 @@
       roundrect
       (at 1.1 0.0)
       (size 1.0 1.45)
-      (layers "F.Cu" "F.Paste" "F.Mask")
-      (net 2 "LED_OUT")
+      (layers "F.Cu" "F.Mask" "F.Paste")
       (roundrect_rratio 0.25)
+      (net "LED_OUT")
+      (uuid "3b4340d1-31d8-52f0-9802-947067ea5c81")
     )
+    (embedded_fonts no)
   )
   (gr_line
     (start 10.0 10.0)
@@ -296,7 +352,7 @@
     (end 23.9 20.0)
     (width 0.25)
     (layer "F.Cu")
-    (net 1)
+    (net "VCC")
     (uuid "a5dcc765-258e-507d-9d30-aeaf62048d9a")
   )
   (segment
@@ -304,7 +360,7 @@
     (end 43.9 20.0)
     (width 0.25)
     (layer "F.Cu")
-    (net 2)
+    (net "LED_OUT")
     (uuid "0927e047-cb70-53ac-9456-0d3ff7ffa835")
   )
   (segment
@@ -312,7 +368,7 @@
     (end 50.0 20.0)
     (width 0.25)
     (layer "F.Cu")
-    (net 3)
+    (net "GND")
     (uuid "142a9e91-812e-5155-bc7d-3e9bea5af4ac")
   )
   (via
@@ -320,7 +376,7 @@
     (size 0.8)
     (drill 0.4)
     (layers "F.Cu" "B.Cu")
-    (net 1)
+    (net "VCC")
     (uuid "5dd61c37-2bd8-5b2a-a952-308e04bb0121")
   )
   (via
@@ -328,7 +384,8 @@
     (size 0.8)
     (drill 0.4)
     (layers "F.Cu" "B.Cu")
-    (net 3)
+    (net "GND")
     (uuid "58a012cc-abb7-5a30-8b7f-947a3ca18e62")
   )
+  (embedded_fonts no)
 )

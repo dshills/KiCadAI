@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 )
 
@@ -36,7 +37,7 @@ func RoundTripPCB(ctx context.Context, cli KiCadCLI, inputPath string, opts Opti
 	}
 
 	runCtx, cancelRun := context.WithTimeout(ctx, timeout)
-	stdout, stderr, exitCode, err := runKiCad(runCtx, cli.Path, "pcb", "upgrade", "--force", copyPath)
+	stdout, stderr, exitCode, err := runKiCad(runCtx, filepath.Dir(copyPath), cli.Path, "pcb", "upgrade", "--force", copyPath)
 	cancelRun()
 
 	result := Result{
@@ -111,8 +112,11 @@ func RoundTripPCB(ctx context.Context, cli KiCadCLI, inputPath string, opts Opti
 	return comparison, nil
 }
 
-func runKiCad(ctx context.Context, path string, args ...string) (string, string, int, error) {
+func runKiCad(ctx context.Context, workingDir, path string, args ...string) (string, string, int, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
+	if strings.TrimSpace(workingDir) != "" {
+		cmd.Dir = workingDir
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
