@@ -63,7 +63,10 @@ type SchematicSymbol struct {
 	Properties       []Property
 	Fields           []Field
 	Pins             []SymbolPin
-	Instances        []SymbolInstance
+	// PinAnchors are absolute schematic coordinates supplied by generators for
+	// connectivity validation. The writer does not derive them from libraries.
+	PinAnchors []kicadfiles.Point
+	Instances  []SymbolInstance
 }
 
 type Field struct {
@@ -188,6 +191,10 @@ type Color struct {
 	B int
 	A int
 }
+
+// 10 mils in KiCad internal units; close enough to catch visual near-misses
+// without masking intentional grid-separated endpoints.
+const connectivityNearMissDistance = kicadfiles.IU(254000)
 
 type Sheet struct {
 	UUID             kicadfiles.UUID
@@ -352,6 +359,213 @@ func Validate(schematic SchematicFile) error {
 		errs = append(errs, validateSheetInstance(indexed("sheet_instances", i, ""), instance)...)
 	}
 	return errs.Err()
+}
+
+func ValidateGeneratedConnectivity(schematic SchematicFile) error {
+	if err := Validate(schematic); err != nil {
+		return err
+	}
+	anchors := schematicConnectivityAnchors(schematic)
+	anchorIndex := newAnchorIndex(anchors)
+	symbolAnchors := schematicSymbolPinAnchorSet(schematic)
+	var errs kicadfiles.ValidationErrors
+	for wireIndex, wire := range schematic.Wires {
+		for _, endpoint := range wireEndpoints(wire) {
+			pointIndex := endpoint.index
+			point := endpoint.point
+			if anchors[point] > 1 {
+				continue
+			}
+			if near, ok := anchorIndex.nearest(point); ok {
+				errs = append(errs, fieldError(indexed("wires", wireIndex, "points")+"["+strconv.Itoa(pointIndex)+"]", "endpoint is near but not on anchor at "+formatPoint(near)))
+				continue
+			}
+			errs = append(errs, fieldError(indexed("wires", wireIndex, "points")+"["+strconv.Itoa(pointIndex)+"]", "endpoint is not connected to a known anchor"))
+		}
+	}
+	for labelIndex, label := range schematic.Labels {
+		if anchors[label.Position] <= 1 {
+			errs = append(errs, fieldError(indexed("labels", labelIndex, "position"), "label is not connected to a known anchor"))
+		}
+	}
+	for junctionIndex, junction := range schematic.Junctions {
+		if anchors[junction.Position] <= 1 {
+			errs = append(errs, fieldError(indexed("junctions", junctionIndex, "position"), "junction is not connected to a known anchor"))
+		}
+	}
+	for noConnectIndex, noConnect := range schematic.NoConnects {
+		if anchors[noConnect.Position] <= 1 {
+			errs = append(errs, fieldError(indexed("no_connects", noConnectIndex, "position"), "no-connect is not connected to a known anchor"))
+		} else if _, ok := symbolAnchors[noConnect.Position]; !ok {
+			errs = append(errs, fieldError(indexed("no_connects", noConnectIndex, "position"), "no-connect must be placed on a symbol pin anchor"))
+		}
+	}
+	for symbolIndex, symbol := range schematic.Symbols {
+		for pinIndex, point := range symbol.PinAnchors {
+			if anchors[point] <= 1 {
+				errs = append(errs, fieldError(indexed("symbols", symbolIndex, "pin_anchors")+"["+strconv.Itoa(pinIndex)+"]", "symbol pin anchor is not connected"))
+			}
+		}
+	}
+	for sheetIndex, sheet := range schematic.Sheets {
+		for pinIndex, pin := range sheet.Pins {
+			if anchors[pin.Position] <= 1 {
+				errs = append(errs, fieldError(indexed(indexed("sheets", sheetIndex, "pins"), pinIndex, "position"), "sheet pin is not connected to a known anchor"))
+			}
+		}
+	}
+	return errs.Err()
+}
+
+func schematicSymbolPinAnchorSet(schematic SchematicFile) map[kicadfiles.Point]struct{} {
+	anchors := map[kicadfiles.Point]struct{}{}
+	for _, symbol := range schematic.Symbols {
+		for _, point := range symbol.PinAnchors {
+			anchors[point] = struct{}{}
+		}
+	}
+	return anchors
+}
+
+func schematicConnectivityAnchors(schematic SchematicFile) map[kicadfiles.Point]int {
+	anchors := make(map[kicadfiles.Point]int, len(schematic.Wires)*2+len(schematic.Labels)+len(schematic.Junctions)+len(schematic.NoConnects))
+	seen := map[kicadfiles.Point]struct{}{}
+	for _, wire := range schematic.Wires {
+		clear(seen)
+		for _, point := range wire.Points {
+			seen[point] = struct{}{}
+		}
+		addAnchorPoints(anchors, seen)
+	}
+	for _, label := range schematic.Labels {
+		// Separate schematic items at the same coordinate are distinct anchors.
+		anchors[label.Position]++
+	}
+	for _, junction := range schematic.Junctions {
+		anchors[junction.Position]++
+	}
+	for _, noConnect := range schematic.NoConnects {
+		anchors[noConnect.Position]++
+	}
+	for _, symbol := range schematic.Symbols {
+		clear(seen)
+		for _, point := range symbol.PinAnchors {
+			seen[point] = struct{}{}
+		}
+		addAnchorPoints(anchors, seen)
+	}
+	for _, sheet := range schematic.Sheets {
+		clear(seen)
+		for _, pin := range sheet.Pins {
+			seen[pin.Position] = struct{}{}
+		}
+		addAnchorPoints(anchors, seen)
+	}
+	return anchors
+}
+
+func addAnchorPoints(anchors map[kicadfiles.Point]int, points map[kicadfiles.Point]struct{}) {
+	for point := range points {
+		anchors[point]++
+	}
+}
+
+type wireEndpoint struct {
+	index int
+	point kicadfiles.Point
+}
+
+func wireEndpoints(wire Wire) []wireEndpoint {
+	if len(wire.Points) == 0 {
+		return nil
+	}
+	if len(wire.Points) == 1 {
+		return []wireEndpoint{{index: 0, point: wire.Points[0]}}
+	}
+	return []wireEndpoint{
+		{index: 0, point: wire.Points[0]},
+		{index: len(wire.Points) - 1, point: wire.Points[len(wire.Points)-1]},
+	}
+}
+
+type anchorBucket struct {
+	x int64
+	y int64
+}
+
+type anchorIndex map[anchorBucket][]kicadfiles.Point
+
+func newAnchorIndex(anchors map[kicadfiles.Point]int) anchorIndex {
+	index := make(anchorIndex, len(anchors))
+	for point := range anchors {
+		bucket := anchorBucketFor(point)
+		index[bucket] = append(index[bucket], point)
+	}
+	return index
+}
+
+func (index anchorIndex) nearest(point kicadfiles.Point) (kicadfiles.Point, bool) {
+	var nearest kicadfiles.Point
+	var nearestDistance kicadfiles.IU
+	found := false
+	center := anchorBucketFor(point)
+	for dx := int64(-1); dx <= 1; dx++ {
+		for dy := int64(-1); dy <= 1; dy++ {
+			for _, anchor := range index[anchorBucket{x: center.x + dx, y: center.y + dy}] {
+				if anchor == point {
+					continue
+				}
+				distance := manhattanDistance(point, anchor)
+				if distance > connectivityNearMissDistance {
+					continue
+				}
+				if !found || distance < nearestDistance || (distance == nearestDistance && pointLess(anchor, nearest)) {
+					found = true
+					nearest = anchor
+					nearestDistance = distance
+				}
+			}
+		}
+	}
+	return nearest, found
+}
+
+func anchorBucketFor(point kicadfiles.Point) anchorBucket {
+	return anchorBucket{
+		x: floorDiv(int64(point.X), int64(connectivityNearMissDistance)),
+		y: floorDiv(int64(point.Y), int64(connectivityNearMissDistance)),
+	}
+}
+
+func floorDiv(value, divisor int64) int64 {
+	quotient := value / divisor
+	remainder := value % divisor
+	if remainder != 0 && ((remainder < 0) != (divisor < 0)) {
+		quotient--
+	}
+	return quotient
+}
+
+func pointLess(a, b kicadfiles.Point) bool {
+	if a.X != b.X {
+		return a.X < b.X
+	}
+	return a.Y < b.Y
+}
+
+func manhattanDistance(a, b kicadfiles.Point) kicadfiles.IU {
+	return absIU(a.X-b.X) + absIU(a.Y-b.Y)
+}
+
+func absIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func formatPoint(point kicadfiles.Point) string {
+	return "(" + kicadfiles.ToMMString(point.X) + "," + kicadfiles.ToMMString(point.Y) + ")"
 }
 
 func Write(w io.Writer, schematic SchematicFile) error {

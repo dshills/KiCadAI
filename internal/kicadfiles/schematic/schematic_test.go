@@ -445,6 +445,86 @@ func TestValidateRejectsInvalidLabelShapeAndNoConnect(t *testing.T) {
 	}
 }
 
+func TestValidateGeneratedConnectivityAcceptsKnownAnchors(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Wires = []Wire{{
+		UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.Labels = []Label{{
+		UUID:     kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Text:     "IN",
+		Kind:     LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+	}}
+	schematic.Junctions = []Junction{{
+		UUID:     kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+
+	if err := ValidateGeneratedConnectivity(schematic); err != nil {
+		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)
+	}
+}
+
+func TestValidateGeneratedConnectivityAcceptsSymbolPinAnchors(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:       kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		LibraryID:  "Device:R",
+		Reference:  "R1",
+		Value:      "1k",
+		PinAnchors: []kicadfiles.Point{{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}},
+	}}
+	schematic.Wires = []Wire{{
+		UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.Labels = []Label{{
+		UUID:     kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Text:     "OUT",
+		Kind:     LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+
+	if err := ValidateGeneratedConnectivity(schematic); err != nil {
+		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)
+	}
+}
+
+func TestValidateGeneratedConnectivityRejectsOpenEndpointAndNearMiss(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Wires = []Wire{{
+		UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.Labels = []Label{{
+		UUID:     kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Text:     "IN",
+		Kind:     LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(10.1), Y: kicadfiles.MM(10)},
+	}}
+
+	err := ValidateGeneratedConnectivity(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{"near but not on anchor", "endpoint is not connected"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
+		}
+	}
+}
+
 func TestValidateRejectsInvalidSymbolDetails(t *testing.T) {
 	schematic := minimalSchematic()
 	schematic.Symbols = []SchematicSymbol{{
