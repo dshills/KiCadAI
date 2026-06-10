@@ -23,6 +23,7 @@ func TestWriteMinimalSchematic(t *testing.T) {
 		"  (generator_version \"10.0\")",
 		"  (uuid \"6ba7b810-9dad-11d1-80b4-00c04fd430c8\")",
 		"  (paper \"A4\")",
+		"  (lib_symbols)",
 		")",
 		"",
 	}, "\n")
@@ -122,6 +123,68 @@ func TestWriteIsDeterministic(t *testing.T) {
 	}
 }
 
+func TestWriteOrdersItemsByKiCadKindThenUUID(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{
+		{
+			UUID:      kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+			LibraryID: "Device:R",
+			Reference: "R2",
+			Value:     "2k",
+		},
+		{
+			UUID:      kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+			LibraryID: "Device:R",
+			Reference: "R1",
+			Value:     "1k",
+		},
+	}
+	schematic.Labels = []Label{
+		{
+			UUID: kicadfiles.UUID("88888888-8888-4888-8888-888888888888"),
+			Text: "HIER",
+			Kind: LabelHierarchical,
+		},
+		{
+			UUID: kicadfiles.UUID("77777777-7777-4777-8777-777777777777"),
+			Text: "GLOBAL",
+			Kind: LabelGlobal,
+		},
+		{
+			UUID: kicadfiles.UUID("66666666-6666-4666-8666-666666666666"),
+			Text: "LOCAL",
+			Kind: LabelLocal,
+		},
+	}
+	schematic.Wires = []Wire{{
+		UUID: kicadfiles.UUID("55555555-5555-4555-8555-555555555555"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.Junctions = []Junction{{
+		UUID:     kicadfiles.UUID("99999999-9999-4999-8999-999999999999"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	assertInOrder(t, output,
+		"(lib_symbols)",
+		"(junction",
+		"(wire",
+		"(label",
+		"(global_label",
+		"(hierarchical_label",
+		"22222222-2222-4222-8222-222222222222",
+		"33333333-3333-4333-8333-333333333333",
+	)
+}
+
 func TestLEDIndicatorSchematicIsDeterministic(t *testing.T) {
 	input := LEDIndicatorInput{
 		Name:     "led_indicator",
@@ -152,6 +215,18 @@ func TestLEDIndicatorSchematicIsDeterministic(t *testing.T) {
 		if !strings.Contains(firstOutput.String(), want) {
 			t.Fatalf("LED output missing %s:\n%s", want, firstOutput.String())
 		}
+	}
+}
+
+func assertInOrder(t *testing.T, output string, needles ...string) {
+	t.Helper()
+	remainder := output
+	for _, needle := range needles {
+		index := strings.Index(remainder, needle)
+		if index == -1 {
+			t.Fatalf("output missing %s:\n%s", needle, output)
+		}
+		remainder = remainder[index+len(needle):]
 	}
 }
 

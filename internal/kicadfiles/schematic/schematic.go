@@ -1,9 +1,11 @@
 package schematic
 
 import (
+	"cmp"
 	"fmt"
 	"io"
 	"path"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -79,6 +81,7 @@ const (
 	LabelLocal        LabelKind = "label"
 	LabelGlobal       LabelKind = "global_label"
 	LabelHierarchical LabelKind = "hierarchical_label"
+	LabelDirective    LabelKind = "directive_label"
 )
 
 type Junction struct {
@@ -99,6 +102,38 @@ type SymbolInstance struct {
 	Reference string
 	Unit      int
 	Value     string
+}
+
+type schematicItemKind int
+
+const (
+	// Values intentionally follow KiCad schematic item save order from typeinfo.h.
+	// Leave gaps so new supported item types can be inserted without renumbering.
+	schematicItemJunction          schematicItemKind = 10
+	schematicItemNoConnect         schematicItemKind = 20
+	schematicItemWireToBusEntry    schematicItemKind = 30
+	schematicItemBusToBusEntry     schematicItemKind = 40
+	schematicItemLine              schematicItemKind = 50
+	schematicItemBitmap            schematicItemKind = 60
+	schematicItemTable             schematicItemKind = 70
+	schematicItemTableCell         schematicItemKind = 80
+	schematicItemLabel             schematicItemKind = 90
+	schematicItemGlobalLabel       schematicItemKind = 100
+	schematicItemHierarchicalLabel schematicItemKind = 110
+	schematicItemRuleArea          schematicItemKind = 120
+	schematicItemDirectiveLabel    schematicItemKind = 130
+	schematicItemSymbol            schematicItemKind = 140
+	schematicItemGroup             schematicItemKind = 150
+	schematicItemSheetPin          schematicItemKind = 160
+	schematicItemSheet             schematicItemKind = 170
+)
+
+const schematicHeaderNodeCapacity = 8
+
+type renderItem struct {
+	kind schematicItemKind
+	uuid kicadfiles.UUID
+	node sexpr.List
 }
 
 type LEDIndicatorInput struct {
@@ -182,11 +217,13 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	if err != nil {
 		return nil, err
 	}
-	nodes := []sexpr.Node{
+	items := renderItems(schematic)
+	nodes := make([]sexpr.Node, 0, len(items)+schematicHeaderNodeCapacity)
+	nodes = append(nodes,
 		sexpr.A("kicad_sch"),
 		sexpr.L(sexpr.A("version"), sexpr.I(version)),
 		sexpr.L(sexpr.A("generator"), sexpr.S(strings.TrimSpace(schematic.Generator))),
-	}
+	)
 	if generatorVersion := strings.TrimSpace(schematic.GeneratorVersion); generatorVersion != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("generator_version"), sexpr.S(generatorVersion)))
 	}
@@ -197,25 +234,55 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	if title := renderTitleBlock(schematic.TitleBlock); len(title) > 1 {
 		nodes = append(nodes, title)
 	}
-	if len(schematic.LibSymbols) > 0 {
-		nodes = append(nodes, renderLibSymbols(schematic.LibSymbols))
-	}
-	for _, label := range schematic.Labels {
-		nodes = append(nodes, renderLabel(label))
-	}
-	for _, wire := range schematic.Wires {
-		nodes = append(nodes, renderWire(wire))
-	}
-	for _, junction := range schematic.Junctions {
-		nodes = append(nodes, renderJunction(junction))
-	}
-	for _, symbol := range schematic.Symbols {
-		nodes = append(nodes, renderSymbol(symbol))
-	}
-	for _, sheet := range schematic.Sheets {
-		nodes = append(nodes, renderSheet(sheet))
+	// KiCad's schematic writer emits lib_symbols even when the cache is empty.
+	nodes = append(nodes, renderLibSymbols(schematic.LibSymbols))
+	for _, item := range items {
+		nodes = append(nodes, item.node)
 	}
 	return sexpr.L(nodes...), nil
+}
+
+func renderItems(schematic SchematicFile) []renderItem {
+	items := make([]renderItem, 0, len(schematic.Junctions)+len(schematic.Wires)+len(schematic.Labels)+len(schematic.Symbols)+len(schematic.Sheets))
+	for _, junction := range schematic.Junctions {
+		items = append(items, renderItem{kind: schematicItemJunction, uuid: junction.UUID, node: renderJunction(junction)})
+	}
+	for _, wire := range schematic.Wires {
+		items = append(items, renderItem{kind: schematicItemLine, uuid: wire.UUID, node: renderWire(wire)})
+	}
+	for _, label := range schematic.Labels {
+		items = append(items, renderItem{kind: labelItemKind(label.Kind), uuid: label.UUID, node: renderLabel(label)})
+	}
+	for _, symbol := range schematic.Symbols {
+		items = append(items, renderItem{kind: schematicItemSymbol, uuid: symbol.UUID, node: renderSymbol(symbol)})
+	}
+	for _, sheet := range schematic.Sheets {
+		items = append(items, renderItem{kind: schematicItemSheet, uuid: sheet.UUID, node: renderSheet(sheet)})
+	}
+	// Keep the sort stable so invalid duplicate UUID input still renders
+	// reproducibly before validation grows strict global UUID checks.
+	slices.SortStableFunc(items, func(a, b renderItem) int {
+		if a.kind != b.kind {
+			return cmp.Compare(a.kind, b.kind)
+		}
+		return cmp.Compare(a.uuid, b.uuid)
+	})
+	return items
+}
+
+func labelItemKind(kind LabelKind) schematicItemKind {
+	switch kind {
+	case LabelLocal:
+		return schematicItemLabel
+	case LabelGlobal:
+		return schematicItemGlobalLabel
+	case LabelHierarchical:
+		return schematicItemHierarchicalLabel
+	case LabelDirective:
+		return schematicItemDirectiveLabel
+	default:
+		return schematicItemLabel
+	}
 }
 
 func renderTitleBlock(title kicadfiles.TitleBlock) sexpr.List {
@@ -332,7 +399,7 @@ func validateLabel(index int, label Label) kicadfiles.ValidationErrors {
 	if strings.TrimSpace(label.Text) == "" {
 		errs = append(errs, fieldError(indexed("labels", index, "text"), "required"))
 	}
-	if label.Kind != LabelLocal && label.Kind != LabelGlobal && label.Kind != LabelHierarchical {
+	if label.Kind != LabelLocal && label.Kind != LabelGlobal && label.Kind != LabelHierarchical && label.Kind != LabelDirective {
 		errs = append(errs, fieldError(indexed("labels", index, "kind"), "invalid"))
 	}
 	return errs
@@ -383,12 +450,29 @@ func renderWire(wire Wire) sexpr.List {
 
 func renderLabel(label Label) sexpr.List {
 	return sexpr.L(
-		sexpr.A(string(label.Kind)),
+		sexpr.A(labelToken(label.Kind)),
 		sexpr.S(label.Text),
 		renderAt(label.Position, label.Rotation),
 		renderEffects(false),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(label.UUID))),
 	)
+}
+
+func labelToken(kind LabelKind) string {
+	// Keep this as an explicit mapping so future label kinds cannot
+	// accidentally render arbitrary unvalidated atoms.
+	switch kind {
+	case LabelLocal:
+		return "label"
+	case LabelGlobal:
+		return "global_label"
+	case LabelHierarchical:
+		return "hierarchical_label"
+	case LabelDirective:
+		return "directive_label"
+	default:
+		return "label"
+	}
 }
 
 func renderJunction(junction Junction) sexpr.List {
