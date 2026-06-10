@@ -24,6 +24,12 @@ func TestWriteMinimalSchematic(t *testing.T) {
 		"  (uuid \"6ba7b810-9dad-11d1-80b4-00c04fd430c8\")",
 		"  (paper \"A4\")",
 		"  (lib_symbols)",
+		"  (sheet_instances",
+		"    (path",
+		"      \"/\"",
+		"      (page \"1\")",
+		"    )",
+		"  )",
 		")",
 		"",
 	}, "\n")
@@ -374,12 +380,56 @@ func TestWriteRendersSheet(t *testing.T) {
 		"(sheet",
 		"\"Sheetname\"\n      \"Power\"",
 		"\"Sheetfile\"\n      \"power.kicad_sch\"",
-		"(id 0)",
-		"(id 1)",
 		"(size 30.0 15.0)",
+		"(exclude_from_sim no)",
+		"(in_bom yes)",
+		"(on_board yes)",
+		"(dnp no)",
 	} {
 		if !strings.Contains(buf.String(), want) {
 			t.Fatalf("output missing %s:\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestWriteRendersSheetPinsAndInstances(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Name:     "Power",
+		Filename: "power.kicad_sch",
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		Size:     kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(15)},
+		Locked:   true,
+		Pins: []SheetPin{{
+			UUID:     kicadfiles.UUID("22345678-1234-5678-9234-123456789abc"),
+			Text:     "VIN",
+			Kind:     SheetPinInput,
+			Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(25)},
+			Rotation: 180,
+		}},
+		Instances: []SheetInstance{{Project: "demo", Path: "/12345678-1234-5678-9234-123456789abc", Page: "2"}},
+	}}
+	schematic.SheetInstances = []SheetInstance{{Path: "/", Page: "1"}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(locked yes)",
+		"(pin",
+		"\"VIN\"",
+		"input",
+		"(at 10.0 25.0 180)",
+		"(instances",
+		"\"demo\"",
+		"(page \"2\")",
+		"(sheet_instances",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
 		}
 	}
 }
@@ -398,6 +448,44 @@ func TestValidateRejectsInvalidSheet(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	for _, want := range []string{"sheets[0].uuid", "sheets[0].name", "sheets[0].filename", "sheets[0].size"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
+		}
+	}
+}
+
+func TestValidateRejectsInvalidSheetPinAndInstance(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Sheets = []Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Name:     "Power",
+		Filename: "power.kicad_sch",
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+		Size:     kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(15)},
+		Pins: []SheetPin{{
+			UUID:     "",
+			Text:     "",
+			Kind:     "sideways",
+			Position: kicadfiles.Point{X: kicadfiles.MM(12), Y: kicadfiles.MM(22)},
+		}},
+		Instances: []SheetInstance{{Path: "relative", Page: ""}},
+	}}
+	schematic.SheetInstances = []SheetInstance{{Path: "relative", Page: ""}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{
+		"sheets[0].pins[0].uuid",
+		"sheets[0].pins[0].text",
+		"sheets[0].pins[0].kind",
+		"sheets[0].pins[0].position",
+		"sheets[0].instances[0].path",
+		"sheets[0].instances[0].page",
+		"sheet_instances[0].path",
+		"sheet_instances[0].page",
+	} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %s: %v", want, err)
 		}

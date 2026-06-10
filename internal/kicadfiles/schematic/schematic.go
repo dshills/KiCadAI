@@ -28,6 +28,7 @@ type SchematicFile struct {
 	Junctions        []Junction
 	Sheets           []Sheet
 	Instances        []SymbolInstance
+	SheetInstances   []SheetInstance
 }
 
 type EmbeddedSymbol struct {
@@ -132,11 +133,20 @@ type Junction struct {
 }
 
 type Sheet struct {
-	UUID     kicadfiles.UUID
-	Name     string
-	Filename string
-	Position kicadfiles.Point
-	Size     kicadfiles.Point
+	UUID             kicadfiles.UUID
+	Name             string
+	Filename         string
+	Position         kicadfiles.Point
+	Size             kicadfiles.Point
+	ExcludeFromSim   bool
+	InBOM            *bool
+	OnBoard          *bool
+	DoNotPopulate    bool
+	Locked           bool
+	FieldsAutoplaced bool
+	Properties       []Property
+	Pins             []SheetPin
+	Instances        []SheetInstance
 }
 
 type SymbolInstance struct {
@@ -145,6 +155,30 @@ type SymbolInstance struct {
 	Reference string
 	Unit      int
 	Value     string
+}
+
+type SheetPin struct {
+	UUID     kicadfiles.UUID
+	Text     string
+	Kind     SheetPinKind
+	Position kicadfiles.Point
+	Rotation kicadfiles.Angle
+}
+
+type SheetPinKind string
+
+const (
+	SheetPinInput         SheetPinKind = "input"
+	SheetPinOutput        SheetPinKind = "output"
+	SheetPinBidirectional SheetPinKind = "bidirectional"
+	SheetPinTriState      SheetPinKind = "tri_state"
+	SheetPinPassive       SheetPinKind = "passive"
+)
+
+type SheetInstance struct {
+	Project string
+	Path    string
+	Page    string
 }
 
 type schematicItemKind int
@@ -241,6 +275,9 @@ func Validate(schematic SchematicFile) error {
 			seenSheets[name] = struct{}{}
 		}
 	}
+	for i, instance := range schematic.SheetInstances {
+		errs = append(errs, validateSheetInstance(indexed("sheet_instances", i, ""), instance)...)
+	}
 	return errs.Err()
 }
 
@@ -282,6 +319,7 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 	for _, item := range items {
 		nodes = append(nodes, item.node)
 	}
+	nodes = append(nodes, renderRootSheetInstances(schematic.SheetInstances))
 	return sexpr.L(nodes...), nil
 }
 
@@ -501,6 +539,67 @@ func validateSheet(index int, sheet Sheet) kicadfiles.ValidationErrors {
 	}
 	if sheet.Size.X <= 0 || sheet.Size.Y <= 0 {
 		errs = append(errs, fieldError(prefix("size"), "positive size required"))
+	}
+	for pinIndex, pin := range sheet.Pins {
+		errs = append(errs, validateSheetPin(prefix, pinIndex, sheet, pin)...)
+	}
+	for instanceIndex, instance := range sheet.Instances {
+		errs = append(errs, validateSheetInstance(indexed(prefix("instances"), instanceIndex, ""), instance)...)
+	}
+	return errs
+}
+
+func validateSheetPin(prefix func(string) string, index int, sheet Sheet, pin SheetPin) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	field := func(name string) string { return indexed(prefix("pins"), index, name) }
+	if !pin.UUID.Valid() {
+		errs = append(errs, fieldError(field("uuid"), "valid UUID required"))
+	}
+	if strings.TrimSpace(pin.Text) == "" {
+		errs = append(errs, fieldError(field("text"), "required"))
+	}
+	if !validSheetPinKind(pin.Kind) {
+		errs = append(errs, fieldError(field("kind"), "invalid"))
+	}
+	if sheet.Size.X > 0 && sheet.Size.Y > 0 && !sheetPinOnBorder(sheet, pin.Position) {
+		errs = append(errs, fieldError(field("position"), "must be on sheet border"))
+	}
+	return errs
+}
+
+func validSheetPinKind(kind SheetPinKind) bool {
+	switch kind {
+	case SheetPinInput, SheetPinOutput, SheetPinBidirectional, SheetPinTriState, SheetPinPassive:
+		return true
+	default:
+		return false
+	}
+}
+
+func sheetPinOnBorder(sheet Sheet, point kicadfiles.Point) bool {
+	// Points use integer internal units, so exact border comparisons are stable.
+	left := sheet.Position.X
+	right := sheet.Position.X + sheet.Size.X
+	top := sheet.Position.Y
+	bottom := sheet.Position.Y + sheet.Size.Y
+	onVertical := (point.X == left || point.X == right) && point.Y >= top && point.Y <= bottom
+	onHorizontal := (point.Y == top || point.Y == bottom) && point.X >= left && point.X <= right
+	return onVertical || onHorizontal
+}
+
+func validateSheetInstance(fieldPrefix string, instance SheetInstance) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	prefix := strings.TrimSuffix(fieldPrefix, ".")
+	pathField := strings.TrimSuffix(prefix+".path", ".")
+	pageField := strings.TrimSuffix(prefix+".page", ".")
+	path := strings.TrimSpace(instance.Path)
+	if path == "" {
+		errs = append(errs, fieldError(pathField, "required"))
+	} else if !strings.HasPrefix(path, "/") {
+		errs = append(errs, fieldError(pathField, "must start with /"))
+	}
+	if strings.TrimSpace(instance.Page) == "" {
+		errs = append(errs, fieldError(pageField, "required"))
 	}
 	return errs
 }
@@ -769,26 +868,115 @@ func renderJunction(junction Junction) sexpr.List {
 }
 
 func renderSheet(sheet Sheet) sexpr.List {
-	return sexpr.L(
+	nodes := []sexpr.Node{
 		sexpr.A("sheet"),
 		renderAt(sheet.Position, 0),
 		sexpr.L(sexpr.A("size"), sexpr.X(kicadfiles.ToMMString(sheet.Size.X)), sexpr.X(kicadfiles.ToMMString(sheet.Size.Y))),
+		sexpr.L(sexpr.A("exclude_from_sim"), yesNo(sheet.ExcludeFromSim)),
+		sexpr.L(sexpr.A("in_bom"), yesNo(defaultBool(sheet.InBOM, true))),
+		sexpr.L(sexpr.A("on_board"), yesNo(defaultBool(sheet.OnBoard, true))),
+		sexpr.L(sexpr.A("dnp"), yesNo(sheet.DoNotPopulate)),
+		sexpr.OmitIf(!sheet.Locked, sexpr.L(sexpr.A("locked"), sexpr.A("yes"))),
+		sexpr.OmitIf(!sheet.FieldsAutoplaced, sexpr.L(sexpr.A("fields_autoplaced"), sexpr.A("yes"))),
 		renderStroke(0.1524, "solid"),
 		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.X("0.0000"))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(sheet.UUID))),
-		renderSheetProperty(0, "Sheetname", strings.TrimSpace(sheet.Name), kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y - kicadfiles.MM(2.54)}),
-		renderSheetProperty(1, "Sheetfile", strings.TrimSpace(sheet.Filename), kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y + sheet.Size.Y + kicadfiles.MM(2.54)}),
+	}
+	for _, property := range sheetProperties(sheet) {
+		nodes = append(nodes, renderProperty(property))
+	}
+	for _, pin := range sheet.Pins {
+		nodes = append(nodes, renderSheetPin(pin))
+	}
+	if len(sheet.Instances) > 0 {
+		nodes = append(nodes, renderSheetInstances(sheet.Instances))
+	}
+	return sexpr.L(nodes...)
+}
+
+func sheetProperties(sheet Sheet) []Property {
+	// Modern KiCad schematic properties no longer write legacy numeric IDs.
+	name := Property{Name: "Sheetname", Value: strings.TrimSpace(sheet.Name), Position: kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y - kicadfiles.MM(2.54)}}
+	file := Property{Name: "Sheetfile", Value: strings.TrimSpace(sheet.Filename), Position: kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y + sheet.Size.Y + kicadfiles.MM(2.54)}}
+	properties := make([]Property, 0, len(sheet.Properties)+2)
+	extras := make([]Property, 0, len(sheet.Properties))
+	for _, property := range sheet.Properties {
+		switch {
+		case strings.EqualFold(strings.TrimSpace(property.Name), "Sheetname"):
+			property.Name = "Sheetname"
+			name = property
+		case strings.EqualFold(strings.TrimSpace(property.Name), "Sheetfile"):
+			property.Name = "Sheetfile"
+			file = property
+		default:
+			extras = append(extras, property)
+		}
+	}
+	properties = append(properties, name, file)
+	properties = append(properties, extras...)
+	return properties
+}
+
+func renderSheetPin(pin SheetPin) sexpr.List {
+	return sexpr.L(
+		sexpr.A("pin"),
+		sexpr.S(strings.TrimSpace(pin.Text)),
+		sexpr.A(string(pin.Kind)),
+		renderAt(pin.Position, pin.Rotation),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(pin.UUID))),
+		renderEffects(false),
 	)
 }
 
-func renderSheetProperty(id int64, name, value string, at kicadfiles.Point) sexpr.List {
+func renderRootSheetInstances(instances []SheetInstance) sexpr.List {
+	if len(instances) == 0 {
+		instances = []SheetInstance{{Path: "/", Page: "1"}}
+	}
+	nodes := []sexpr.Node{sexpr.A("sheet_instances")}
+	for _, instance := range sortedSheetInstances(instances) {
+		nodes = append(nodes, renderSheetInstancePath(instance))
+	}
+	return sexpr.L(nodes...)
+}
+
+func renderSheetInstances(instances []SheetInstance) sexpr.List {
+	grouped := map[string][]SheetInstance{}
+	projects := make([]string, 0)
+	for _, instance := range instances {
+		project := strings.TrimSpace(instance.Project)
+		if project == "" {
+			project = "project"
+		}
+		if _, ok := grouped[project]; !ok {
+			projects = append(projects, project)
+		}
+		grouped[project] = append(grouped[project], instance)
+	}
+	slices.Sort(projects)
+	nodes := []sexpr.Node{sexpr.A("instances")}
+	for _, project := range projects {
+		projectNodes := []sexpr.Node{sexpr.A("project"), sexpr.S(project)}
+		for _, instance := range sortedSheetInstances(grouped[project]) {
+			projectNodes = append(projectNodes, renderSheetInstancePath(instance))
+		}
+		nodes = append(nodes, sexpr.L(projectNodes...))
+	}
+	return sexpr.L(nodes...)
+}
+
+func sortedSheetInstances(instances []SheetInstance) []SheetInstance {
+	out := append([]SheetInstance(nil), instances...)
+	slices.SortFunc(out, func(a, b SheetInstance) int {
+		return cmp.Compare(strings.TrimSpace(a.Path), strings.TrimSpace(b.Path))
+	})
+	return out
+}
+
+func renderSheetInstancePath(instance SheetInstance) sexpr.List {
 	return sexpr.L(
-		sexpr.A("property"),
-		sexpr.S(name),
-		sexpr.S(value),
-		sexpr.L(sexpr.A("id"), sexpr.I(id)),
-		renderAt(at, 0),
-		renderEffects(false),
+		sexpr.A("path"),
+		sexpr.S(strings.TrimSpace(instance.Path)),
+		sexpr.L(sexpr.A("page"), sexpr.S(strings.TrimSpace(instance.Page))),
 	)
 }
 
