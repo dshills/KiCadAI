@@ -241,6 +241,47 @@ func TestWriteRendersLabelShapesAndNoConnects(t *testing.T) {
 	}
 }
 
+func TestWriteRendersBusesPolylinesBusEntriesAndText(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Buses = []Bus{{
+		UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}}
+	schematic.Polylines = []Polyline{{
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+			{X: kicadfiles.MM(20), Y: kicadfiles.MM(25)},
+		},
+	}}
+	schematic.BusEntries = []BusEntry{{
+		UUID:     kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		Size:     kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)},
+	}}
+	schematic.Texts = []Text{{
+		UUID:     kicadfiles.UUID("55555555-5555-4555-8555-555555555555"),
+		Value:    "Bus note",
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(30)},
+		Locked:   true,
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{"(bus_entry", "(size 2.54 2.54)", "(bus", "(polyline", "(text", "\"Bus note\"", "(locked yes)"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+}
+
 func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
 	showName := true
 	doNotAutoplace := true
@@ -366,12 +407,16 @@ func TestValidateRejectsInvalidElements(t *testing.T) {
 		Diameter: -1,
 		Color:    Color{R: 300},
 	}}
+	schematic.Buses = []Bus{{UUID: "", Points: []kicadfiles.Point{{}}}}
+	schematic.Polylines = []Polyline{{UUID: "", Points: []kicadfiles.Point{{}, {}}}}
+	schematic.BusEntries = []BusEntry{{UUID: "", Size: kicadfiles.Point{}}}
+	schematic.Texts = []Text{{UUID: "", Value: ""}}
 
 	err := Validate(schematic)
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind", "no_connects[0].uuid", "junctions[0].uuid", "junctions[0].diameter", "junctions[0].color"} {
+	for _, want := range []string{"symbols[0].library_id", "wires[0].points", "labels[0].text", "labels[0].kind", "no_connects[0].uuid", "junctions[0].uuid", "junctions[0].diameter", "junctions[0].color", "buses[0].uuid", "buses[0].points", "polylines[0].uuid", "polylines[0].points", "bus_entries[0].uuid", "bus_entries[0].size", "texts[0].uuid", "texts[0].value"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %s: %v", want, err)
 		}

@@ -27,6 +27,10 @@ type SchematicFile struct {
 	NoConnects       []NoConnect
 	Labels           []Label
 	Junctions        []Junction
+	Buses            []Bus
+	Polylines        []Polyline
+	BusEntries       []BusEntry
+	Texts            []Text
 	Sheets           []Sheet
 	Instances        []SymbolInstance
 	SheetInstances   []SheetInstance
@@ -109,6 +113,30 @@ const (
 type Wire struct {
 	UUID   kicadfiles.UUID
 	Points []kicadfiles.Point
+}
+
+type Bus struct {
+	UUID   kicadfiles.UUID
+	Points []kicadfiles.Point
+}
+
+type Polyline struct {
+	UUID   kicadfiles.UUID
+	Points []kicadfiles.Point
+}
+
+type BusEntry struct {
+	UUID     kicadfiles.UUID
+	Position kicadfiles.Point
+	Size     kicadfiles.Point
+}
+
+type Text struct {
+	UUID     kicadfiles.UUID
+	Value    string
+	Position kicadfiles.Point
+	Rotation kicadfiles.Angle
+	Locked   bool
 }
 
 type Label struct {
@@ -223,6 +251,7 @@ const (
 	schematicItemBitmap            schematicItemKind = 60
 	schematicItemTable             schematicItemKind = 70
 	schematicItemTableCell         schematicItemKind = 80
+	schematicItemText              schematicItemKind = 85
 	schematicItemLabel             schematicItemKind = 90
 	schematicItemGlobalLabel       schematicItemKind = 100
 	schematicItemHierarchicalLabel schematicItemKind = 110
@@ -284,6 +313,18 @@ func Validate(schematic SchematicFile) error {
 	}
 	for i, wire := range schematic.Wires {
 		errs = append(errs, validateWire(i, wire)...)
+	}
+	for i, bus := range schematic.Buses {
+		errs = append(errs, validateLineLike(indexed("buses", i, ""), bus.UUID, bus.Points)...)
+	}
+	for i, polyline := range schematic.Polylines {
+		errs = append(errs, validateLineLike(indexed("polylines", i, ""), polyline.UUID, polyline.Points)...)
+	}
+	for i, entry := range schematic.BusEntries {
+		errs = append(errs, validateBusEntry(i, entry)...)
+	}
+	for i, text := range schematic.Texts {
+		errs = append(errs, validateText(i, text)...)
 	}
 	for i, noConnect := range schematic.NoConnects {
 		if !noConnect.UUID.Valid() {
@@ -356,15 +397,28 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 }
 
 func renderItems(schematic SchematicFile) []renderItem {
-	items := make([]renderItem, 0, len(schematic.Junctions)+len(schematic.NoConnects)+len(schematic.Wires)+len(schematic.Labels)+len(schematic.Symbols)+len(schematic.Sheets))
+	items := make([]renderItem, 0, len(schematic.Junctions)+len(schematic.NoConnects)+len(schematic.BusEntries)+len(schematic.Wires)+len(schematic.Buses)+len(schematic.Polylines)+len(schematic.Texts)+len(schematic.Labels)+len(schematic.Symbols)+len(schematic.Sheets))
 	for _, junction := range schematic.Junctions {
 		items = append(items, renderItem{kind: schematicItemJunction, uuid: junction.UUID, node: renderJunction(junction)})
 	}
 	for _, noConnect := range schematic.NoConnects {
 		items = append(items, renderItem{kind: schematicItemNoConnect, uuid: noConnect.UUID, node: renderNoConnect(noConnect)})
 	}
+	for _, entry := range schematic.BusEntries {
+		items = append(items, renderItem{kind: schematicItemWireToBusEntry, uuid: entry.UUID, node: renderBusEntry(entry)})
+	}
 	for _, wire := range schematic.Wires {
 		items = append(items, renderItem{kind: schematicItemLine, uuid: wire.UUID, node: renderWire(wire)})
+	}
+	// KiCad saves wires, buses, and graphical polylines as SCH_LINE_T items.
+	for _, bus := range schematic.Buses {
+		items = append(items, renderItem{kind: schematicItemLine, uuid: bus.UUID, node: renderBus(bus)})
+	}
+	for _, polyline := range schematic.Polylines {
+		items = append(items, renderItem{kind: schematicItemLine, uuid: polyline.UUID, node: renderPolyline(polyline)})
+	}
+	for _, text := range schematic.Texts {
+		items = append(items, renderItem{kind: schematicItemText, uuid: text.UUID, node: renderText(text)})
 	}
 	for _, label := range schematic.Labels {
 		items = append(items, renderItem{kind: labelItemKind(label.Kind), uuid: label.UUID, node: renderLabel(label)})
@@ -553,6 +607,45 @@ func validateWire(index int, wire Wire) kicadfiles.ValidationErrors {
 		if wire.Points[i] == wire.Points[i-1] {
 			errs = append(errs, fieldError(indexed("wires", index, "points"), "adjacent points must differ"))
 		}
+	}
+	return errs
+}
+
+func validateLineLike(prefix string, uuid kicadfiles.UUID, points []kicadfiles.Point) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	prefix = strings.TrimSuffix(prefix, ".")
+	if !uuid.Valid() {
+		errs = append(errs, fieldError(prefix+".uuid", "valid UUID required"))
+	}
+	if len(points) < 2 {
+		errs = append(errs, fieldError(prefix+".points", "at least two points required"))
+	}
+	for i := 1; i < len(points); i++ {
+		if points[i] == points[i-1] {
+			errs = append(errs, fieldError(prefix+".points", "adjacent points must differ"))
+		}
+	}
+	return errs
+}
+
+func validateBusEntry(index int, entry BusEntry) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if !entry.UUID.Valid() {
+		errs = append(errs, fieldError(indexed("bus_entries", index, "uuid"), "valid UUID required"))
+	}
+	if entry.Size.X == 0 && entry.Size.Y == 0 {
+		errs = append(errs, fieldError(indexed("bus_entries", index, "size"), "non-zero size required"))
+	}
+	return errs
+}
+
+func validateText(index int, text Text) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if !text.UUID.Valid() {
+		errs = append(errs, fieldError(indexed("texts", index, "uuid"), "valid UUID required"))
+	}
+	if strings.TrimSpace(text.Value) == "" {
+		errs = append(errs, fieldError(indexed("texts", index, "value"), "required"))
 	}
 	return errs
 }
@@ -910,11 +1003,44 @@ func renderSymbolInstances(instances []SymbolInstance) sexpr.List {
 }
 
 func renderWire(wire Wire) sexpr.List {
+	return renderLineLike("wire", wire.Points, wire.UUID)
+}
+
+func renderBus(bus Bus) sexpr.List {
+	return renderLineLike("bus", bus.Points, bus.UUID)
+}
+
+func renderPolyline(polyline Polyline) sexpr.List {
+	return renderLineLike("polyline", polyline.Points, polyline.UUID)
+}
+
+func renderLineLike(token string, points []kicadfiles.Point, uuid kicadfiles.UUID) sexpr.List {
 	return sexpr.L(
-		sexpr.A("wire"),
-		renderPoints(wire.Points),
+		sexpr.A(token),
+		renderPoints(points),
 		renderStroke(0, "default"),
-		sexpr.L(sexpr.A("uuid"), sexpr.S(string(wire.UUID))),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(uuid))),
+	)
+}
+
+func renderBusEntry(entry BusEntry) sexpr.List {
+	return sexpr.L(
+		sexpr.A("bus_entry"),
+		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(entry.Position.X)), sexpr.X(kicadfiles.ToMMString(entry.Position.Y))),
+		sexpr.L(sexpr.A("size"), sexpr.X(kicadfiles.ToMMString(entry.Size.X)), sexpr.X(kicadfiles.ToMMString(entry.Size.Y))),
+		renderStroke(0, "default"),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(entry.UUID))),
+	)
+}
+
+func renderText(text Text) sexpr.List {
+	return sexpr.L(
+		sexpr.A("text"),
+		sexpr.S(text.Value),
+		renderAt(text.Position, text.Rotation),
+		renderEffects(false),
+		sexpr.L(sexpr.A("uuid"), sexpr.S(string(text.UUID))),
+		sexpr.OmitIf(!text.Locked, sexpr.L(sexpr.A("locked"), sexpr.A("yes"))),
 	)
 }
 
