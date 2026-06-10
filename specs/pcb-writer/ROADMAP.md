@@ -22,6 +22,16 @@ The goal is to assert that our writer includes the same required sections,
 ordering, metadata, layer tables, setup blocks, project sidecar files, and object
 shapes used by KiCad-generated designs.
 
+Initial PCB corpus coverage lives in `internal/kicadfiles/pcb`. The normal unit
+tests use synthetic fixtures, and the external KiCad demo corpus can be scanned
+locally with:
+
+```sh
+KICADAI_RUN_KICAD_DEMO_CORPUS=1 \
+KICADAI_KICAD_DEMO_CORPUS="/Users/dshills/Documents/KiCad Demos" \
+go test ./internal/kicadfiles/pcb -run TestScanCorpusExternalKiCadDemos
+```
+
 ## 3. PCB Object Correctness
 
 Tighten the writer for all PCB object types:
