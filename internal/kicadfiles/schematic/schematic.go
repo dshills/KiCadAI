@@ -11,19 +11,20 @@ import (
 )
 
 type SchematicFile struct {
-	Filename   string
-	Version    kicadfiles.KiCadFormatVersion
-	Generator  string
-	UUID       kicadfiles.UUID
-	Paper      kicadfiles.Paper
-	TitleBlock kicadfiles.TitleBlock
-	LibSymbols []EmbeddedSymbol
-	Symbols    []SchematicSymbol
-	Wires      []Wire
-	Labels     []Label
-	Junctions  []Junction
-	Sheets     []Sheet
-	Instances  []SymbolInstance
+	Filename         string
+	Version          kicadfiles.KiCadFormatVersion
+	Generator        string
+	GeneratorVersion string
+	UUID             kicadfiles.UUID
+	Paper            kicadfiles.Paper
+	TitleBlock       kicadfiles.TitleBlock
+	LibSymbols       []EmbeddedSymbol
+	Symbols          []SchematicSymbol
+	Wires            []Wire
+	Labels           []Label
+	Junctions        []Junction
+	Sheets           []Sheet
+	Instances        []SymbolInstance
 }
 
 type EmbeddedSymbol struct {
@@ -32,20 +33,28 @@ type EmbeddedSymbol struct {
 }
 
 type SchematicSymbol struct {
-	UUID      kicadfiles.UUID
-	Path      string
-	LibraryID string
-	Reference string
-	Value     string
-	Position  kicadfiles.Point
-	Rotation  kicadfiles.Angle
-	Fields    []Field
+	UUID           kicadfiles.UUID
+	Path           string
+	LibraryID      string
+	Reference      string
+	Value          string
+	Position       kicadfiles.Point
+	Rotation       kicadfiles.Angle
+	Unit           int
+	BodyStyle      int
+	ExcludeFromSim bool
+	InBOM          *bool
+	OnBoard        *bool
+	InPositionFile *bool
+	DoNotPopulate  bool
+	Fields         []Field
 }
 
 type Field struct {
 	Name     string
 	Value    string
 	Visible  bool
+	Hidden   bool
 	Position kicadfiles.Point
 	Rotation kicadfiles.Angle
 }
@@ -169,32 +178,34 @@ func render(schematic SchematicFile) (sexpr.List, error) {
 		sexpr.A("kicad_sch"),
 		sexpr.L(sexpr.A("version"), sexpr.I(version)),
 		sexpr.L(sexpr.A("generator"), sexpr.S(strings.TrimSpace(schematic.Generator))),
+	}
+	if generatorVersion := strings.TrimSpace(schematic.GeneratorVersion); generatorVersion != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("generator_version"), sexpr.S(generatorVersion)))
+	}
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(schematic.UUID))),
 		sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(schematic.Paper.Name))),
-	}
+	)
 	if title := renderTitleBlock(schematic.TitleBlock); len(title) > 1 {
 		nodes = append(nodes, title)
 	}
 	if len(schematic.LibSymbols) > 0 {
 		nodes = append(nodes, renderLibSymbols(schematic.LibSymbols))
 	}
-	for _, symbol := range schematic.Symbols {
-		nodes = append(nodes, renderSymbol(symbol))
+	for _, label := range schematic.Labels {
+		nodes = append(nodes, renderLabel(label))
 	}
 	for _, wire := range schematic.Wires {
 		nodes = append(nodes, renderWire(wire))
 	}
-	for _, label := range schematic.Labels {
-		nodes = append(nodes, renderLabel(label))
-	}
 	for _, junction := range schematic.Junctions {
 		nodes = append(nodes, renderJunction(junction))
 	}
+	for _, symbol := range schematic.Symbols {
+		nodes = append(nodes, renderSymbol(symbol))
+	}
 	for _, sheet := range schematic.Sheets {
 		nodes = append(nodes, renderSheet(sheet))
-	}
-	if len(schematic.Instances) > 0 {
-		nodes = append(nodes, renderInstances(schematic.Instances))
 	}
 	return sexpr.L(nodes...), nil
 }
@@ -262,8 +273,8 @@ func validateWire(index int, wire Wire) kicadfiles.ValidationErrors {
 	if !wire.UUID.Valid() {
 		errs = append(errs, fieldError(indexed("wires", index, "uuid"), "valid UUID required"))
 	}
-	if len(wire.Points) < 2 {
-		errs = append(errs, fieldError(indexed("wires", index, "points"), "at least two points required"))
+	if len(wire.Points) != 2 {
+		errs = append(errs, fieldError(indexed("wires", index, "points"), "exactly two points required"))
 	}
 	for i := 1; i < len(wire.Points); i++ {
 		if wire.Points[i] == wire.Points[i-1] {
@@ -336,15 +347,19 @@ func renderSymbol(symbol SchematicSymbol) sexpr.List {
 		sexpr.A("symbol"),
 		sexpr.L(sexpr.A("lib_id"), sexpr.S(symbol.LibraryID)),
 		renderAt(symbol.Position, symbol.Rotation),
+		sexpr.L(sexpr.A("unit"), sexpr.I(int64(defaultPositive(symbol.Unit, 1)))),
+		sexpr.L(sexpr.A("body_style"), sexpr.I(int64(defaultPositive(symbol.BodyStyle, 1)))),
+		sexpr.L(sexpr.A("exclude_from_sim"), yesNo(symbol.ExcludeFromSim)),
+		sexpr.L(sexpr.A("in_bom"), yesNo(defaultBool(symbol.InBOM, true))),
+		sexpr.L(sexpr.A("on_board"), yesNo(defaultBool(symbol.OnBoard, true))),
+		sexpr.L(sexpr.A("in_pos_files"), yesNo(defaultBool(symbol.InPositionFile, true))),
+		sexpr.L(sexpr.A("dnp"), yesNo(symbol.DoNotPopulate)),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(symbol.UUID))),
-		sexpr.L(sexpr.A("property"), sexpr.S("Reference"), sexpr.S(symbol.Reference), renderAt(symbol.Position, symbol.Rotation)),
-		sexpr.L(sexpr.A("property"), sexpr.S("Value"), sexpr.S(symbol.Value), renderAt(symbol.Position, symbol.Rotation)),
-	}
-	if symbol.Path != "" {
-		nodes = append(nodes, sexpr.L(sexpr.A("path"), sexpr.S(symbol.Path)))
+		renderSymbolProperty("Reference", symbol.Reference, symbol.Position, symbol.Rotation, false),
+		renderSymbolProperty("Value", symbol.Value, symbol.Position, symbol.Rotation, false),
 	}
 	for _, field := range symbol.Fields {
-		nodes = append(nodes, sexpr.L(sexpr.A("property"), sexpr.S(field.Name), sexpr.S(field.Value), renderAt(field.Position, field.Rotation)))
+		nodes = append(nodes, renderSymbolProperty(field.Name, field.Value, field.Position, field.Rotation, field.Hidden || !field.Visible))
 	}
 	return sexpr.L(nodes...)
 }
@@ -353,6 +368,7 @@ func renderWire(wire Wire) sexpr.List {
 	return sexpr.L(
 		sexpr.A("wire"),
 		renderPoints(wire.Points),
+		renderStroke(0, "default"),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(wire.UUID))),
 	)
 }
@@ -362,6 +378,7 @@ func renderLabel(label Label) sexpr.List {
 		sexpr.A(string(label.Kind)),
 		sexpr.S(label.Text),
 		renderAt(label.Position, label.Rotation),
+		renderEffects(false),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(label.UUID))),
 	)
 }
@@ -370,6 +387,8 @@ func renderJunction(junction Junction) sexpr.List {
 	return sexpr.L(
 		sexpr.A("junction"),
 		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(junction.Position.X)), sexpr.X(kicadfiles.ToMMString(junction.Position.Y))),
+		sexpr.L(sexpr.A("diameter"), sexpr.I(0)),
+		sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.I(0)),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(junction.UUID))),
 	)
 }
@@ -379,7 +398,7 @@ func renderSheet(sheet Sheet) sexpr.List {
 		sexpr.A("sheet"),
 		renderAt(sheet.Position, 0),
 		sexpr.L(sexpr.A("size"), sexpr.X(kicadfiles.ToMMString(sheet.Size.X)), sexpr.X(kicadfiles.ToMMString(sheet.Size.Y))),
-		sexpr.L(sexpr.A("stroke"), sexpr.L(sexpr.A("width"), sexpr.X("0.1524")), sexpr.L(sexpr.A("type"), sexpr.A("solid"))),
+		renderStroke(0.1524, "solid"),
 		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("color"), sexpr.I(0), sexpr.I(0), sexpr.I(0), sexpr.X("0.0000"))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(sheet.UUID))),
 		renderSheetProperty(0, "Sheetname", strings.TrimSpace(sheet.Name), kicadfiles.Point{X: sheet.Position.X, Y: sheet.Position.Y - kicadfiles.MM(2.54)}),
@@ -394,8 +413,62 @@ func renderSheetProperty(id int64, name, value string, at kicadfiles.Point) sexp
 		sexpr.S(value),
 		sexpr.L(sexpr.A("id"), sexpr.I(id)),
 		renderAt(at, 0),
-		sexpr.L(sexpr.A("effects"), sexpr.L(sexpr.A("font"), sexpr.L(sexpr.A("size"), sexpr.X("1.27"), sexpr.X("1.27")))),
+		renderEffects(false),
 	)
+}
+
+func renderSymbolProperty(name, value string, at kicadfiles.Point, rotation kicadfiles.Angle, hidden bool) sexpr.List {
+	return sexpr.L(
+		sexpr.A("property"),
+		sexpr.S(name),
+		sexpr.S(value),
+		renderAt(at, rotation),
+		sexpr.L(sexpr.A("show_name"), sexpr.A("no")),
+		sexpr.L(sexpr.A("do_not_autoplace"), sexpr.A("no")),
+		sexpr.OmitIf(!hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
+		renderEffects(false),
+	)
+}
+
+func renderStroke(width float64, strokeType string) sexpr.List {
+	var widthNode sexpr.Node = sexpr.I(0)
+	if width != 0 {
+		widthNode = sexpr.X(kicadfiles.ToMMString(kicadfiles.MM(width)))
+	}
+	return sexpr.L(
+		sexpr.A("stroke"),
+		sexpr.L(sexpr.A("width"), widthNode),
+		sexpr.L(sexpr.A("type"), sexpr.A(strokeType)),
+	)
+}
+
+func renderEffects(hidden bool) sexpr.List {
+	return sexpr.L(
+		sexpr.A("effects"),
+		sexpr.L(sexpr.A("font"), sexpr.L(sexpr.A("size"), sexpr.X("1.27"), sexpr.X("1.27"))),
+		sexpr.OmitIf(!hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
+	)
+}
+
+func defaultPositive(value, fallback int) int {
+	if value > 0 {
+		return value
+	}
+	return fallback
+}
+
+func defaultBool(value *bool, fallback bool) bool {
+	if value == nil {
+		return fallback
+	}
+	return *value
+}
+
+func yesNo(value bool) sexpr.Atom {
+	if value {
+		return sexpr.A("yes")
+	}
+	return sexpr.A("no")
 }
 
 func renderInstances(instances []SymbolInstance) sexpr.List {

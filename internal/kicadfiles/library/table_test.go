@@ -19,6 +19,7 @@ func TestWriteSymbolLibraryTable(t *testing.T) {
 	}
 	want := strings.Join([]string{
 		"(sym_lib_table",
+		"  (version 7)",
 		"  (lib",
 		"    (name \"local_symbols\")",
 		"    (type \"KiCad\")",

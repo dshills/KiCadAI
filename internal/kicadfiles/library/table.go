@@ -59,7 +59,7 @@ func writeTable(w io.Writer, root, section string, entries []TableEntry) error {
 	if err := ValidateTableEntries(section, entries); err != nil {
 		return err
 	}
-	nodes := []sexpr.Node{sexpr.A(root)}
+	nodes := []sexpr.Node{sexpr.A(root), sexpr.L(sexpr.A("version"), sexpr.I(7))}
 	for _, entry := range entries {
 		nodes = append(nodes, sexpr.L(
 			sexpr.A("lib"),

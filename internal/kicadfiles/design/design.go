@@ -54,8 +54,8 @@ func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
 	projectFile := project.ProjectFile{
 		Name:          input.Name,
 		DesignID:      input.DesignID,
-		FormatVersion: kicadfiles.KiCadFormatV20230121,
-		Generator:     "kicadai",
+		FormatVersion: kicadfiles.KiCadFormatV20260306,
+		Generator:     "eeschema",
 		PageSettings:  project.PageSettings{Paper: kicadfiles.Paper{Name: "A4"}},
 		NetClasses: []project.NetClass{{
 			Name:        "Default",

@@ -12,3 +12,8 @@ coverage.out
 # Local environment
 .env
 .env.*
+
+# KiCad generated history backups
+**/.history/
+*.kicad_prl
+~*.kicad_*.lck

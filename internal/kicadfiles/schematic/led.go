@@ -41,11 +41,12 @@ func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
 	gndPin := offsetX(powerGND.Position, -kicadfiles.MM(5.08))
 
 	return SchematicFile{
-		Filename:  input.Name + ".kicad_sch",
-		Version:   kicadfiles.KiCadFormatV20230121,
-		Generator: "kicadai",
-		UUID:      generator.New("root.schematic"),
-		Paper:     kicadfiles.Paper{Name: "A4"},
+		Filename:         input.Name + ".kicad_sch",
+		Version:          kicadfiles.KiCadFormatV20260306,
+		Generator:        "eeschema",
+		GeneratorVersion: "10.0",
+		UUID:             generator.New("root.schematic"),
+		Paper:            kicadfiles.Paper{Name: "A4"},
 		TitleBlock: kicadfiles.TitleBlock{
 			Title: "LED Indicator",
 		},

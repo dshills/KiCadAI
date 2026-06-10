@@ -36,6 +36,15 @@ func TestWriteMinimalProject(t *testing.T) {
 			t.Fatalf("output missing %s:\n%s", want, buf.String())
 		}
 	}
+	for _, unwanted := range []string{
+		"\"design_id\"",
+		"\"generator\"",
+		"\"page_settings\"",
+	} {
+		if strings.Contains(buf.String(), unwanted) {
+			t.Fatalf("output includes KiCad-removed key %s:\n%s", unwanted, buf.String())
+		}
+	}
 }
 
 func TestWriteProjectWithTextVariablesUsesStableOrdering(t *testing.T) {

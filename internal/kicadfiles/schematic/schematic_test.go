@@ -18,8 +18,9 @@ func TestWriteMinimalSchematic(t *testing.T) {
 
 	want := strings.Join([]string{
 		"(kicad_sch",
-		"  (version 20230121)",
-		"  (generator \"kicadai\")",
+		"  (version 20260306)",
+		"  (generator \"eeschema\")",
+		"  (generator_version \"10.0\")",
 		"  (uuid \"6ba7b810-9dad-11d1-80b4-00c04fd430c8\")",
 		"  (paper \"A4\")",
 		")",
@@ -266,9 +267,10 @@ func TestValidateRejectsDuplicateSheetName(t *testing.T) {
 
 func minimalSchematic() SchematicFile {
 	return SchematicFile{
-		Version:   kicadfiles.KiCadFormatV20230121,
-		Generator: "kicadai",
-		UUID:      kicadfiles.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
-		Paper:     kicadfiles.Paper{Name: "A4"},
+		Version:          kicadfiles.KiCadFormatV20260306,
+		Generator:        "eeschema",
+		GeneratorVersion: "10.0",
+		UUID:             kicadfiles.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
+		Paper:            kicadfiles.Paper{Name: "A4"},
 	}
 }

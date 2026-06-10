@@ -139,12 +139,9 @@ type document struct {
 	Boards                 []string          `json:"boards"`
 	ComponentClassSettings map[string]any    `json:"component_class_settings"`
 	Cvpcb                  map[string]any    `json:"cvpcb"`
-	DesignID               string            `json:"design_id"`
 	ERC                    map[string]any    `json:"erc"`
-	Generator              string            `json:"generator"`
 	Libraries              map[string]any    `json:"libraries"`
 	Meta                   meta              `json:"meta"`
-	PageSettings           pageSettings      `json:"page_settings"`
 	NetSettings            netSettings       `json:"net_settings"`
 	PCBNew                 map[string]any    `json:"pcbnew"`
 	Schematic              map[string]any    `json:"schematic"`
@@ -178,14 +175,6 @@ type netClass struct {
 type sheet []string
 
 func newDocument(project ProjectFile) document {
-	settings := pageSettings{Paper: strings.TrimSpace(project.PageSettings.Paper.Name)}
-	if project.PageSettings.Paper.Width != 0 {
-		settings.Width = mmNumber(project.PageSettings.Paper.Width)
-	}
-	if project.PageSettings.Paper.Height != 0 {
-		settings.Height = mmNumber(project.PageSettings.Paper.Height)
-	}
-
 	classes := make([]netClass, 0, len(project.NetClasses))
 	for _, class := range project.NetClasses {
 		classes = append(classes, netClass{
@@ -202,12 +191,9 @@ func newDocument(project ProjectFile) document {
 		Boards:                 []string{},
 		ComponentClassSettings: map[string]any{},
 		Cvpcb:                  map[string]any{},
-		DesignID:               string(project.DesignID),
 		ERC:                    map[string]any{},
-		Generator:              strings.TrimSpace(project.Generator),
 		Libraries:              map[string]any{},
 		Meta:                   meta{Version: 1},
-		PageSettings:           settings,
 		NetSettings:            netSettings{Classes: classes},
 		PCBNew:                 map[string]any{},
 		Schematic:              map[string]any{},
