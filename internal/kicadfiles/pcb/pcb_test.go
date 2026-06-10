@@ -738,6 +738,91 @@ func TestValidateRequiresClosedOutline(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsClosedRectOutline(t *testing.T) {
+	board := minimalPCB()
+	board.RequireClosedOutline = true
+	board.Drawings = []Drawing{{
+		UUID:  kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Layer: kicadfiles.LayerEdge,
+		Rect:  &RectDrawing{Start: point(0, 0), End: point(10, 10), Width: kicadfiles.MM(0.1)},
+	}}
+
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsDanglingLineWithRectOutline(t *testing.T) {
+	board := minimalPCB()
+	board.RequireClosedOutline = true
+	board.Drawings = []Drawing{
+		{
+			UUID:  kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+			Layer: kicadfiles.LayerEdge,
+			Rect:  &RectDrawing{Start: point(0, 0), End: point(10, 10), Width: kicadfiles.MM(0.1)},
+		},
+		{
+			UUID:  kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+			Layer: kicadfiles.LayerEdge,
+			Line:  &LineDrawing{Start: point(20, 20), End: point(21, 20), Width: kicadfiles.MM(0.1)},
+		},
+	}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "drawings.edge_cuts") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestWriteRendersRectTextAndCopperPoly(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "GND"}}
+	board.Drawings = []Drawing{
+		{
+			UUID:       kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+			Layer:      kicadfiles.LayerEdge,
+			StrokeType: "default",
+			Fill:       "none",
+			Rect:       &RectDrawing{Start: point(0, 0), End: point(10, 10), Width: kicadfiles.MM(0.1)},
+		},
+		{
+			UUID:  kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+			Layer: kicadfiles.LayerCmts,
+			Text:  &TextDrawing{Text: "hello", Position: point(5, 5)},
+		},
+		{
+			UUID:    kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+			Layer:   kicadfiles.LayerFCu,
+			Fill:    "yes",
+			NetCode: 1,
+			NetName: "GND",
+			Poly:    &PolylineDrawing{Points: []kicadfiles.Point{point(1, 1), point(2, 1), point(2, 2)}, Width: 0},
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(gr_rect",
+		"(type default)",
+		"(gr_text",
+		"\"hello\"",
+		"(gr_poly",
+		"(fill yes)",
+		"(net 1)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestWriteAdvancedGeometry(t *testing.T) {
 	board := advancedGeometryPCB()
 

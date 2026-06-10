@@ -232,16 +232,28 @@ type TeardropSettings struct {
 }
 
 type Drawing struct {
-	UUID   kicadfiles.UUID
-	Layer  kicadfiles.BoardLayer
-	Kind   string
-	Line   *LineDrawing
-	Circle *CircleDrawing
-	Arc    *ArcDrawing
-	Poly   *PolylineDrawing
+	UUID       kicadfiles.UUID
+	Layer      kicadfiles.BoardLayer
+	Kind       string
+	StrokeType string
+	Fill       string
+	NetCode    int
+	NetName    string
+	Line       *LineDrawing
+	Rect       *RectDrawing
+	Circle     *CircleDrawing
+	Arc        *ArcDrawing
+	Poly       *PolylineDrawing
+	Text       *TextDrawing
 }
 
 type LineDrawing struct {
+	Start kicadfiles.Point
+	End   kicadfiles.Point
+	Width kicadfiles.IU
+}
+
+type RectDrawing struct {
 	Start kicadfiles.Point
 	End   kicadfiles.Point
 	Width kicadfiles.IU
@@ -263,6 +275,13 @@ type ArcDrawing struct {
 type PolylineDrawing struct {
 	Points []kicadfiles.Point
 	Width  kicadfiles.IU
+}
+
+type TextDrawing struct {
+	Text     string
+	Position kicadfiles.Point
+	Rotation kicadfiles.Angle
+	Effects  TextEffects
 }
 
 type FootprintGraphic Drawing
@@ -520,7 +539,7 @@ func Validate(board PCBFile) error {
 		errs = append(errs, validateFootprint(i, footprint, validNetCodes, validNetNames)...)
 	}
 	for i, drawing := range board.Drawings {
-		errs = append(errs, validateDrawing(i, drawing)...)
+		errs = append(errs, validateDrawing(i, drawing, validNetCodes, validNetNames)...)
 	}
 	if board.RequireClosedOutline {
 		errs = append(errs, validateClosedOutline(board.Drawings)...)
@@ -932,33 +951,63 @@ func renderGraphic(prefix string, drawing Drawing) sexpr.List {
 		nodes = append(nodes,
 			sexpr.L(sexpr.A("start"), fixed(drawing.Line.Start.X), fixed(drawing.Line.Start.Y)),
 			sexpr.L(sexpr.A("end"), fixed(drawing.Line.End.X), fixed(drawing.Line.End.Y)),
-			renderStroke(drawing.Line.Width),
+			renderStroke(drawing.Line.Width, drawing.StrokeType),
+		)
+	case drawing.Rect != nil:
+		nodes = append(nodes,
+			sexpr.L(sexpr.A("start"), fixed(drawing.Rect.Start.X), fixed(drawing.Rect.Start.Y)),
+			sexpr.L(sexpr.A("end"), fixed(drawing.Rect.End.X), fixed(drawing.Rect.End.Y)),
+			renderStroke(drawing.Rect.Width, drawing.StrokeType),
+			sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))),
 		)
 	case drawing.Circle != nil:
 		nodes = append(nodes,
 			sexpr.L(sexpr.A("center"), fixed(drawing.Circle.Center.X), fixed(drawing.Circle.Center.Y)),
 			sexpr.L(sexpr.A("end"), fixed(drawing.Circle.End.X), fixed(drawing.Circle.End.Y)),
-			renderStroke(drawing.Circle.Width),
+			renderStroke(drawing.Circle.Width, drawing.StrokeType),
+			sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))),
 		)
 	case drawing.Arc != nil:
 		nodes = append(nodes,
 			sexpr.L(sexpr.A("start"), fixed(drawing.Arc.Start.X), fixed(drawing.Arc.Start.Y)),
 			sexpr.L(sexpr.A("mid"), fixed(drawing.Arc.Mid.X), fixed(drawing.Arc.Mid.Y)),
 			sexpr.L(sexpr.A("end"), fixed(drawing.Arc.End.X), fixed(drawing.Arc.End.Y)),
-			renderStroke(drawing.Arc.Width),
+			renderStroke(drawing.Arc.Width, drawing.StrokeType),
+			sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))),
 		)
 	case drawing.Poly != nil:
-		nodes = append(nodes, renderPoints(drawing.Poly.Points), renderStroke(drawing.Poly.Width), sexpr.L(sexpr.A("fill"), sexpr.A("none")))
+		nodes = append(nodes, renderPoints(drawing.Poly.Points), renderStroke(drawing.Poly.Width, drawing.StrokeType), sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))))
+	case drawing.Text != nil:
+		nodes = append(nodes,
+			sexpr.S(drawing.Text.Text),
+			renderAt(drawing.Text.Position, drawing.Text.Rotation),
+		)
 	}
 	nodes = append(nodes,
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(drawing.Layer))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(drawing.UUID))),
 	)
+	if drawing.Text != nil {
+		nodes = append(nodes, renderEffects(drawing.Text.Effects))
+	}
+	if drawing.NetCode > 0 && drawing.Poly != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.I(int64(drawing.NetCode))))
+	}
 	return sexpr.L(nodes...)
 }
 
-func renderStroke(width kicadfiles.IU) sexpr.List {
-	return sexpr.L(sexpr.A("stroke"), sexpr.L(sexpr.A("width"), fixed(width)), sexpr.L(sexpr.A("type"), sexpr.A("solid")))
+func renderStroke(width kicadfiles.IU, strokeType string) sexpr.List {
+	if strings.TrimSpace(strokeType) == "" {
+		strokeType = "solid"
+	}
+	return sexpr.L(sexpr.A("stroke"), sexpr.L(sexpr.A("width"), fixed(width)), sexpr.L(sexpr.A("type"), sexpr.A(strokeType)))
+}
+
+func fillMode(fill string) string {
+	if strings.TrimSpace(fill) == "" {
+		return "none"
+	}
+	return fill
 }
 
 func renderTrack(track Track) sexpr.List {
@@ -1253,8 +1302,20 @@ func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{
 	return errs
 }
 
-func validateDrawing(index int, drawing Drawing) kicadfiles.ValidationErrors {
-	return validateGraphic(indexedValue("drawings", index), drawing)
+func validateDrawing(index int, drawing Drawing, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
+	errs := validateGraphic(indexedValue("drawings", index), drawing)
+	if drawing.NetCode > 0 {
+		if drawing.Poly == nil {
+			errs = append(errs, fieldError(indexed("drawings", index, "net_code"), "only supported for copper polygons"))
+		}
+		if _, ok := netCodes[drawing.NetCode]; !ok {
+			errs = append(errs, fieldError(indexed("drawings", index, "net_code"), "unknown"))
+		}
+		if strings.TrimSpace(drawing.NetName) != "" && drawing.NetName != netNames[drawing.NetCode] {
+			errs = append(errs, fieldError(indexed("drawings", index, "net_name"), "must match net code"))
+		}
+	}
+	return errs
 }
 
 func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors {
@@ -1278,9 +1339,16 @@ func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors
 		if drawing.Line.Start == drawing.Line.End {
 			errs = append(errs, fieldError(prefix+".line", "must have non-zero length"))
 		}
+	case drawing.Rect != nil:
+		if drawing.Rect.Width < 0 {
+			errs = append(errs, fieldError(prefix+".rect.width", "must be non-negative"))
+		}
+		if drawing.Rect.Start.X == drawing.Rect.End.X || drawing.Rect.Start.Y == drawing.Rect.End.Y {
+			errs = append(errs, fieldError(prefix+".rect", "must have non-zero area"))
+		}
 	case drawing.Circle != nil:
-		if drawing.Circle.Width <= 0 {
-			errs = append(errs, fieldError(prefix+".circle.width", "must be positive"))
+		if drawing.Circle.Width < 0 {
+			errs = append(errs, fieldError(prefix+".circle.width", "must be non-negative"))
 		}
 		if drawing.Circle.Center == drawing.Circle.End {
 			errs = append(errs, fieldError(prefix+".circle", "must have non-zero radius"))
@@ -1293,11 +1361,15 @@ func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors
 			errs = append(errs, fieldError(prefix+".arc", "points must be distinct"))
 		}
 	case drawing.Poly != nil:
-		if drawing.Poly.Width <= 0 {
-			errs = append(errs, fieldError(prefix+".poly.width", "must be positive"))
+		if drawing.Poly.Width < 0 {
+			errs = append(errs, fieldError(prefix+".poly.width", "must be non-negative"))
 		}
 		if countDistinctPoints(drawing.Poly.Points) < 2 {
 			errs = append(errs, fieldError(prefix+".poly.points", "at least two distinct points required"))
+		}
+	case drawing.Text != nil:
+		if strings.TrimSpace(drawing.Text.Text) == "" {
+			errs = append(errs, fieldError(prefix+".text", "required"))
 		}
 	}
 	return errs
@@ -1306,7 +1378,12 @@ func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors
 func validateClosedOutline(drawings []Drawing) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	degrees := map[kicadfiles.Point]int{}
+	hasClosedShape := false
 	for _, drawing := range drawings {
+		if drawing.Layer == kicadfiles.LayerEdge && (drawing.Rect != nil || drawing.Circle != nil || drawing.Poly != nil) {
+			hasClosedShape = true
+			continue
+		}
 		if drawing.Layer != kicadfiles.LayerEdge || drawing.Line == nil {
 			continue
 		}
@@ -1314,6 +1391,9 @@ func validateClosedOutline(drawings []Drawing) kicadfiles.ValidationErrors {
 		degrees[drawing.Line.End]++
 	}
 	if len(degrees) == 0 {
+		if hasClosedShape {
+			return nil
+		}
 		return append(errs, fieldError("drawings.edge_cuts", "closed outline required"))
 	}
 	for point, degree := range degrees {
@@ -1426,6 +1506,9 @@ func countShapes(drawing Drawing) int {
 	if drawing.Line != nil {
 		count++
 	}
+	if drawing.Rect != nil {
+		count++
+	}
 	if drawing.Circle != nil {
 		count++
 	}
@@ -1435,6 +1518,9 @@ func countShapes(drawing Drawing) int {
 	if drawing.Poly != nil {
 		count++
 	}
+	if drawing.Text != nil {
+		count++
+	}
 	return count
 }
 
@@ -1442,12 +1528,16 @@ func drawingKind(drawing Drawing) string {
 	switch {
 	case drawing.Line != nil:
 		return "line"
+	case drawing.Rect != nil:
+		return "rect"
 	case drawing.Circle != nil:
 		return "circle"
 	case drawing.Arc != nil:
 		return "arc"
 	case drawing.Poly != nil:
 		return "poly"
+	case drawing.Text != nil:
+		return "text"
 	default:
 		return drawing.Kind
 	}
