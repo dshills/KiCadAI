@@ -2,6 +2,10 @@
 
 These examples are hand-authored KiCad project fixtures that range from a single LED indicator to a hierarchical sensor node. They are intended as small reference projects for the direct file writers and for AI-assisted schematic generation experiments.
 
+Only `01_led_indicator` currently has a matching Go generator. The remaining
+schematic examples are checked-in fixtures and should not be mechanically
+rewritten until dedicated generators exist for them.
+
 | Example | Focus |
 |---|---|
 | `01_led_indicator` | Single resistor and LED from VCC to GND. |
@@ -12,3 +16,20 @@ These examples are hand-authored KiCad project fixtures that range from a single
 | `06_class_ab_headphone_amp` | Op-amp gain stage with diode-biased class AB headphone output. |
 
 Open each directory in KiCad by opening its `.kicad_pro` file.
+
+Round-trip validation for the Go-generated LED schematic, Go-generated LED PCB,
+checked-in LED schematic fixture, and checked-in generated PCB fixture is
+available as an opt-in integration test. Run this command from the repository
+root:
+
+```sh
+KICADAI_RUN_KICAD_CLI=1 \
+KICADAI_KEEP_ROUNDTRIP_ARTIFACTS=1 \
+KICADAI_ROUNDTRIP_ARTIFACT_DIR="$(pwd)/examples/roundtrip_artifacts" \
+go test ./internal/kicadfiles/roundtrip
+```
+
+KiCad CLI 7.0 or later is required. Set `KICADAI_KICAD_CLI` when `kicad-cli`
+is not available on `PATH`; its value should be the absolute path to the
+`kicad-cli` executable. The `examples/roundtrip_artifacts/` output directory
+is created by the test harness when needed and ignored by git.
