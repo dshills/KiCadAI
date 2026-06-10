@@ -404,6 +404,34 @@ func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
 	}
 }
 
+func TestNewSymbolUsesWriterDerivedProperties(t *testing.T) {
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+	)
+
+	if symbol.Reference != "R1" || symbol.Value != "1k" {
+		t.Fatalf("NewSymbol compatibility fields = %q/%q", symbol.Reference, symbol.Value)
+	}
+	if len(symbol.Properties) != 0 {
+		t.Fatalf("NewSymbol properties length = %d, want 0", len(symbol.Properties))
+	}
+
+	properties := symbolProperties(symbol)
+	if len(properties) != 2 {
+		t.Fatalf("derived properties length = %d, want 2", len(properties))
+	}
+	if properties[0].Name != "Reference" || properties[0].Value != "R1" {
+		t.Fatalf("derived reference property = %#v", properties[0])
+	}
+	if properties[1].Name != "Value" || properties[1].Value != "1k" {
+		t.Fatalf("derived value property = %#v", properties[1])
+	}
+}
+
 func TestLEDIndicatorSchematicIsDeterministic(t *testing.T) {
 	input := LEDIndicatorInput{
 		Name:     "led_indicator",

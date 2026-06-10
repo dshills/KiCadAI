@@ -33,8 +33,11 @@ type SchematicFile struct {
 	Texts            []Text
 	Sheets           []Sheet
 	RawItems         []RawSchematicItem
-	Instances        []SymbolInstance
-	SheetInstances   []SheetInstance
+	// Instances is retained for compatibility with early generators. KiCad 10
+	// output renders per-symbol instances from SchematicSymbol.Instances.
+	Instances []SymbolInstance
+	// SheetInstances renders the root sheet_instances block.
+	SheetInstances []SheetInstance
 }
 
 type EmbeddedSymbol struct {
@@ -62,8 +65,10 @@ type SchematicSymbol struct {
 	Locked           bool
 	FieldsAutoplaced bool
 	Properties       []Property
-	Fields           []Field
-	Pins             []SymbolPin
+	// Fields is retained for compatibility with early generators. New code
+	// should prefer Properties so KiCad property flags can be represented.
+	Fields []Field
+	Pins   []SymbolPin
 	// PinAnchors are absolute schematic coordinates supplied by generators for
 	// connectivity validation. The writer does not derive them from libraries.
 	PinAnchors []kicadfiles.Point
