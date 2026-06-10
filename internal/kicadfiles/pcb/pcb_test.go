@@ -16,32 +16,32 @@ func TestWriteMinimalPCB(t *testing.T) {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
-	want := strings.Join([]string{
-		"(kicad_pcb",
-		"  (version 20230121)",
-		"  (generator \"kicadai\")",
-		"  (general)",
-		"  (paper \"A4\")",
-		"  (layers",
-		"    (0 \"F.Cu\" signal)",
-		"    (31 \"B.Cu\" signal)",
-		"    (36 \"B.SilkS\" user)",
-		"    (37 \"F.SilkS\" user)",
-		"    (44 \"Edge.Cuts\" user)",
-		"  )",
-		"  (setup",
-		"    (stackup",
-		"      (thickness 1.6)",
-		"    )",
-		"    (solder_mask_min_width 0.0)",
-		"    (pad_to_mask_clearance 0.0)",
-		"  )",
-		"  (net 0 \"\")",
-		")",
-		"",
-	}, "\n")
-	if got := buf.String(); got != want {
-		t.Fatalf("Write =\n%s\nwant =\n%s", got, want)
+	output := buf.String()
+	for _, want := range []string{
+		"(version 20260206)",
+		"(generator \"pcbnew\")",
+		"(generator_version \"10.0\")",
+		"(general",
+		"(thickness 1.6)",
+		"(legacy_teardrops no)",
+		"(0 \"F.Cu\" signal)",
+		"(2 \"B.Cu\" signal)",
+		"(5 \"F.SilkS\" user \"F.Silkscreen\")",
+		"(7 \"B.SilkS\" user \"B.Silkscreen\")",
+		"(25 \"Edge.Cuts\" user)",
+		"(127 \"User.45\" user)",
+		"(allow_soldermask_bridges_in_footprints no)",
+		"(tenting",
+		"(front yes)",
+		"(back yes)",
+		"(pcbplotparams",
+		"(usegerberattributes yes)",
+		"(outputdirectory \"\")",
+		"(net 0 \"\")",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
 	}
 }
 
@@ -452,7 +452,7 @@ func TestValidateRejectsInvalidTrack(t *testing.T) {
 
 func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
 	board := minimalPCB()
-	board.Layers = append(board.Layers, LayerDefinition{Number: 1, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
+	board.Layers = append(board.Layers, LayerDefinition{Number: 4, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
 	board.Nets = []Net{{Code: 1, Name: "A"}}
 	board.Tracks = []Track{{
 		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
@@ -687,12 +687,12 @@ func minimalFootprint(uuid, reference string) Footprint {
 
 func minimalPCB() PCBFile {
 	return PCBFile{
-		Version:   kicadfiles.KiCadFormatV20230121,
-		Generator: "kicadai",
-		Paper:     kicadfiles.Paper{Name: "A4"},
-		Layers:    DefaultTwoLayerStack(),
-		Setup: PCBSetup{
-			Stackup: PCBStackup{Thickness: kicadfiles.MM(1.6)},
-		},
+		Version:          kicadfiles.KiCadPCBFormatV20260206,
+		Generator:        "pcbnew",
+		GeneratorVersion: "10.0",
+		General:          DefaultGeneral(),
+		Paper:            kicadfiles.Paper{Name: "A4"},
+		Layers:           DefaultTwoLayerStack(),
+		Setup:            DefaultSetup(),
 	}
 }

@@ -15,7 +15,11 @@ import (
 
 type KiCadFormatVersion string
 
-const KiCadFormatV20230121 KiCadFormatVersion = "20230121"
+const (
+	KiCadFormatV20230121    KiCadFormatVersion = "20230121"
+	KiCadPCBFormatV20260206 KiCadFormatVersion = "20260206"
+	KiCadFormatV20260306    KiCadFormatVersion = "20260306"
+)
 
 type UUID string
 type IU int64
@@ -177,7 +181,15 @@ func IsValidBoardLayer(layer BoardLayer) bool {
 		LayerAllCu, LayerAllMask, LayerAll:
 		return true
 	default:
-		return internalCopperLayerPattern.MatchString(string(layer))
+		name := string(layer)
+		if internalCopperLayerPattern.MatchString(name) {
+			return true
+		}
+		if strings.HasPrefix(name, "User.") {
+			number, err := strconv.Atoi(strings.TrimPrefix(name, "User."))
+			return err == nil && number >= 1 && number <= 45
+		}
+		return false
 	}
 }
 

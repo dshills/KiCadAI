@@ -29,14 +29,16 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 	led := twoPadFootprint(generator, "d1", "LED_SMD:LED_0805_2012Metric", "D1", "LED", kicadfiles.Point{X: kicadfiles.MM(45), Y: kicadfiles.MM(20)}, 2, 3)
 
 	return PCBFile{
-		Version:    kicadfiles.KiCadFormatV20230121,
-		Generator:  "kicadai",
-		Paper:      kicadfiles.Paper{Name: "A4"},
-		Layers:     DefaultTwoLayerStack(),
-		Setup:      PCBSetup{Stackup: PCBStackup{Thickness: kicadfiles.MM(1.6)}},
-		Nets:       nets,
-		Footprints: []Footprint{led, resistor},
-		Drawings:   rectangleOutline(generator, kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}, kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(30)}),
+		Version:          kicadfiles.KiCadPCBFormatV20260206,
+		Generator:        "pcbnew",
+		GeneratorVersion: "10.0",
+		General:          DefaultGeneral(),
+		Paper:            kicadfiles.Paper{Name: "A4"},
+		Layers:           DefaultTwoLayerStack(),
+		Setup:            DefaultSetup(),
+		Nets:             nets,
+		Footprints:       []Footprint{led, resistor},
+		Drawings:         rectangleOutline(generator, kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}, kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(30)}),
 		Tracks: []Track{
 			track(generator, "vcc-r1", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(23.9), Y: kicadfiles.MM(20)}, 1),
 			track(generator, "r1-d1", kicadfiles.Point{X: kicadfiles.MM(26.1), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(43.9), Y: kicadfiles.MM(20)}, 2),

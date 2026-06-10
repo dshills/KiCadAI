@@ -14,6 +14,7 @@ import (
 type PCBFile struct {
 	Version              kicadfiles.KiCadFormatVersion
 	Generator            string
+	GeneratorVersion     string
 	General              PCBGeneral
 	Paper                kicadfiles.Paper
 	Layers               []LayerDefinition
@@ -29,12 +30,25 @@ type PCBFile struct {
 	RequireClosedOutline bool
 }
 
-type PCBGeneral struct{}
+type PCBGeneral struct {
+	Thickness       kicadfiles.IU
+	LegacyTeardrops bool
+}
 
 type PCBSetup struct {
-	Stackup            PCBStackup
-	SolderMaskMinWidth kicadfiles.IU
-	PadToMaskClearance kicadfiles.IU
+	Stackup                            PCBStackup
+	SolderMaskMinWidth                 kicadfiles.IU
+	PadToMaskClearance                 kicadfiles.IU
+	AllowSoldermaskBridgesInFootprints bool
+	TentingFront                       bool
+	TentingBack                        bool
+	CoveringFront                      bool
+	CoveringBack                       bool
+	PluggingFront                      bool
+	PluggingBack                       bool
+	Capping                            bool
+	Filling                            bool
+	PlotParams                         PCBPlotParams
 }
 
 type PCBStackup struct {
@@ -42,10 +56,72 @@ type PCBStackup struct {
 }
 
 type LayerDefinition struct {
-	Number int
-	Name   kicadfiles.BoardLayer
-	Kind   string
+	Number      int
+	Name        kicadfiles.BoardLayer
+	Kind        string
+	DisplayName string
 }
+
+type PCBPlotParams struct {
+	LayerSelection              string
+	PlotOnAllLayersSelection    string
+	DisableApertureMacros       bool
+	UseGerberExtensions         bool
+	UseGerberAttributes         bool
+	UseGerberAdvancedAttributes bool
+	CreateGerberJobFile         bool
+	DashedLineDashRatio         int
+	DashedLineGapRatio          int
+	SVGPrecision                int
+	PlotFrameRef                bool
+	Mode                        int
+	UseAuxOrigin                bool
+	PDFFrontFPPropertyPopups    bool
+	PDFBackFPPropertyPopups     bool
+	PDFMetadata                 bool
+	PDFSingleDocument           bool
+	DXFPolygonMode              bool
+	DXFImperialUnits            bool
+	DXFUsePcbNewFont            bool
+	PSNegative                  bool
+	PSA4Output                  bool
+	PlotBlackAndWhite           bool
+	SketchPadsOnFab             bool
+	PlotPadNumbers              bool
+	HideDNPOnFab                bool
+	SketchDNPOnFab              bool
+	CrossoutDNPOnFab            bool
+	SubtractMaskFromSilk        bool
+	OutputFormat                int
+	Mirror                      bool
+	DrillShape                  int
+	ScaleSelection              int
+	OutputDirectory             string
+}
+
+const (
+	kicad10LayerFCu      = 0
+	kicad10LayerFMask    = 1
+	kicad10LayerBCu      = 2
+	kicad10LayerBMask    = 3
+	kicad10LayerFSilkS   = 5
+	kicad10LayerBSilkS   = 7
+	kicad10LayerFAdhes   = 9
+	kicad10LayerBAdhes   = 11
+	kicad10LayerFPaste   = 13
+	kicad10LayerBPaste   = 15
+	kicad10LayerDwgs     = 17
+	kicad10LayerCmts     = 19
+	kicad10LayerEco1     = 21
+	kicad10LayerEco2     = 23
+	kicad10LayerEdge     = 25
+	kicad10LayerMargin   = 27
+	kicad10LayerBCrtYd   = 29
+	kicad10LayerFCrtYd   = 31
+	kicad10LayerBFab     = 33
+	kicad10LayerFFab     = 35
+	kicad10LayerUserBase = 37
+)
 
 type Net struct {
 	Code int
@@ -160,12 +236,71 @@ type Dimension struct {
 }
 
 func DefaultTwoLayerStack() []LayerDefinition {
-	return []LayerDefinition{
-		{Number: 0, Name: kicadfiles.LayerFCu, Kind: "signal"},
-		{Number: 31, Name: kicadfiles.LayerBCu, Kind: "signal"},
-		{Number: 36, Name: kicadfiles.LayerBSilkS, Kind: "user"},
-		{Number: 37, Name: kicadfiles.LayerFSilkS, Kind: "user"},
-		{Number: 44, Name: kicadfiles.LayerEdge, Kind: "user"},
+	layers := []LayerDefinition{
+		{Number: kicad10LayerFCu, Name: kicadfiles.LayerFCu, Kind: "signal"},
+		{Number: kicad10LayerBCu, Name: kicadfiles.LayerBCu, Kind: "signal"},
+		{Number: kicad10LayerFAdhes, Name: kicadfiles.LayerFAdhes, Kind: "user", DisplayName: "F.Adhesive"},
+		{Number: kicad10LayerBAdhes, Name: kicadfiles.LayerBAdhes, Kind: "user", DisplayName: "B.Adhesive"},
+		{Number: kicad10LayerFPaste, Name: kicadfiles.LayerFPaste, Kind: "user"},
+		{Number: kicad10LayerBPaste, Name: kicadfiles.LayerBPaste, Kind: "user"},
+		{Number: kicad10LayerFSilkS, Name: kicadfiles.LayerFSilkS, Kind: "user", DisplayName: "F.Silkscreen"},
+		{Number: kicad10LayerBSilkS, Name: kicadfiles.LayerBSilkS, Kind: "user", DisplayName: "B.Silkscreen"},
+		{Number: kicad10LayerFMask, Name: kicadfiles.LayerFMask, Kind: "user"},
+		{Number: kicad10LayerBMask, Name: kicadfiles.LayerBMask, Kind: "user"},
+		{Number: kicad10LayerDwgs, Name: kicadfiles.LayerDwgs, Kind: "user", DisplayName: "User.Drawings"},
+		{Number: kicad10LayerCmts, Name: kicadfiles.LayerCmts, Kind: "user", DisplayName: "User.Comments"},
+		{Number: kicad10LayerEco1, Name: kicadfiles.LayerEco1, Kind: "user", DisplayName: "User.Eco1"},
+		{Number: kicad10LayerEco2, Name: kicadfiles.LayerEco2, Kind: "user", DisplayName: "User.Eco2"},
+		{Number: kicad10LayerEdge, Name: kicadfiles.LayerEdge, Kind: "user"},
+		{Number: kicad10LayerMargin, Name: kicadfiles.LayerMargin, Kind: "user"},
+		{Number: kicad10LayerFCrtYd, Name: kicadfiles.LayerFCrtYd, Kind: "user", DisplayName: "F.Courtyard"},
+		{Number: kicad10LayerBCrtYd, Name: kicadfiles.LayerBCrtYd, Kind: "user", DisplayName: "B.Courtyard"},
+		{Number: kicad10LayerFFab, Name: kicadfiles.LayerFFab, Kind: "user"},
+		{Number: kicad10LayerBFab, Name: kicadfiles.LayerBFab, Kind: "user"},
+	}
+	for i := 1; i <= 45; i++ {
+		layers = append(layers, LayerDefinition{Number: kicad10LayerUserBase + i*2, Name: kicadfiles.BoardLayer("User." + strconv.Itoa(i)), Kind: "user"})
+	}
+	return layers
+}
+
+func DefaultGeneral() PCBGeneral {
+	return PCBGeneral{Thickness: kicadfiles.MM(1.6)}
+}
+
+func DefaultSetup() PCBSetup {
+	return PCBSetup{
+		Stackup:                            PCBStackup{Thickness: kicadfiles.MM(1.6)},
+		AllowSoldermaskBridgesInFootprints: false,
+		TentingFront:                       true,
+		TentingBack:                        true,
+		PlotParams:                         DefaultPlotParams(),
+	}
+}
+
+func DefaultPlotParams() PCBPlotParams {
+	return PCBPlotParams{
+		LayerSelection:              "0x00000000_00000000_55555555_5755f5ff",
+		PlotOnAllLayersSelection:    "0x00000000_00000000_00000000_00000000",
+		UseGerberAttributes:         true,
+		UseGerberAdvancedAttributes: true,
+		CreateGerberJobFile:         true,
+		DashedLineDashRatio:         12,
+		DashedLineGapRatio:          3,
+		SVGPrecision:                4,
+		Mode:                        1,
+		PDFFrontFPPropertyPopups:    true,
+		PDFBackFPPropertyPopups:     true,
+		PDFMetadata:                 true,
+		DXFPolygonMode:              true,
+		DXFImperialUnits:            true,
+		DXFUsePcbNewFont:            true,
+		PlotBlackAndWhite:           true,
+		SketchDNPOnFab:              true,
+		CrossoutDNPOnFab:            true,
+		OutputFormat:                1,
+		DrillShape:                  1,
+		ScaleSelection:              1,
 	}
 }
 
@@ -179,8 +314,14 @@ func Validate(board PCBFile) error {
 	if strings.TrimSpace(board.Generator) == "" {
 		errs = append(errs, fieldError("generator", "required"))
 	}
+	if strings.TrimSpace(board.GeneratorVersion) == "" {
+		errs = append(errs, fieldError("generator_version", "required"))
+	}
 	if strings.TrimSpace(board.Paper.Name) == "" {
 		errs = append(errs, fieldError("paper", "required"))
+	}
+	if board.General.Thickness <= 0 {
+		errs = append(errs, fieldError("general.thickness", "must be positive"))
 	}
 	if board.Setup.Stackup.Thickness <= 0 {
 		errs = append(errs, fieldError("setup.stackup.thickness", "must be positive"))
@@ -281,14 +422,14 @@ func render(board PCBFile) (sexpr.List, error) {
 		sexpr.A("kicad_pcb"),
 		sexpr.L(sexpr.A("version"), sexpr.I(version)),
 		sexpr.L(sexpr.A("generator"), sexpr.S(strings.TrimSpace(board.Generator))),
-		sexpr.L(sexpr.A("general")),
+		sexpr.L(sexpr.A("generator_version"), sexpr.S(strings.TrimSpace(board.GeneratorVersion))),
+		renderGeneral(board.General),
 		sexpr.L(sexpr.A("paper"), sexpr.S(strings.TrimSpace(board.Paper.Name))),
-		renderLayers(board.Layers),
-		renderSetup(board.Setup),
 	}
 	if title := renderTitleBlock(board.TitleBlock); len(title) > 1 {
 		nodes = append(nodes, title)
 	}
+	nodes = append(nodes, renderLayers(board.Layers), renderSetup(board.Setup))
 	for _, net := range sortedNets(board.Nets) {
 		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.I(int64(net.Code)), sexpr.S(net.Name)))
 	}
@@ -314,12 +455,24 @@ func render(board PCBFile) (sexpr.List, error) {
 	return sexpr.L(nodes...), nil
 }
 
+func renderGeneral(general PCBGeneral) sexpr.List {
+	return sexpr.L(
+		sexpr.A("general"),
+		sexpr.L(sexpr.A("thickness"), fixed(general.Thickness)),
+		sexpr.L(sexpr.A("legacy_teardrops"), yesNo(general.LegacyTeardrops)),
+	)
+}
+
 func renderLayers(layers []LayerDefinition) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("layers")}
 	ordered := slices.Clone(layers)
 	slices.SortFunc(ordered, func(a, b LayerDefinition) int { return cmp.Compare(a.Number, b.Number) })
 	for _, layer := range ordered {
-		nodes = append(nodes, sexpr.L(sexpr.I(int64(layer.Number)), sexpr.S(string(layer.Name)), sexpr.A(layer.Kind)))
+		layerNodes := []sexpr.Node{sexpr.I(int64(layer.Number)), sexpr.S(string(layer.Name)), sexpr.A(layer.Kind)}
+		if strings.TrimSpace(layer.DisplayName) != "" {
+			layerNodes = append(layerNodes, sexpr.S(layer.DisplayName))
+		}
+		nodes = append(nodes, sexpr.L(layerNodes...))
 	}
 	return sexpr.L(nodes...)
 }
@@ -327,10 +480,79 @@ func renderLayers(layers []LayerDefinition) sexpr.List {
 func renderSetup(setup PCBSetup) sexpr.List {
 	return sexpr.L(
 		sexpr.A("setup"),
-		sexpr.L(sexpr.A("stackup"), sexpr.L(sexpr.A("thickness"), sexpr.X(kicadfiles.ToMMString(setup.Stackup.Thickness)))),
-		sexpr.L(sexpr.A("solder_mask_min_width"), sexpr.X(kicadfiles.ToMMString(setup.SolderMaskMinWidth))),
-		sexpr.L(sexpr.A("pad_to_mask_clearance"), sexpr.X(kicadfiles.ToMMString(setup.PadToMaskClearance))),
+		sexpr.L(sexpr.A("stackup"), sexpr.L(sexpr.A("thickness"), fixed(setup.Stackup.Thickness))),
+		sexpr.L(sexpr.A("solder_mask_min_width"), fixed(setup.SolderMaskMinWidth)),
+		sexpr.L(sexpr.A("pad_to_mask_clearance"), fixed(setup.PadToMaskClearance)),
+		sexpr.L(sexpr.A("allow_soldermask_bridges_in_footprints"), yesNo(setup.AllowSoldermaskBridgesInFootprints)),
+		renderSidePair("tenting", setup.TentingFront, setup.TentingBack),
+		renderSidePair("covering", setup.CoveringFront, setup.CoveringBack),
+		renderSidePair("plugging", setup.PluggingFront, setup.PluggingBack),
+		sexpr.L(sexpr.A("capping"), yesNo(setup.Capping)),
+		sexpr.L(sexpr.A("filling"), yesNo(setup.Filling)),
+		renderPlotParams(setup.PlotParams),
 	)
+}
+
+func renderSidePair(name string, front, back bool) sexpr.List {
+	return sexpr.L(
+		sexpr.A(name),
+		sexpr.L(sexpr.A("front"), yesNo(front)),
+		sexpr.L(sexpr.A("back"), yesNo(back)),
+	)
+}
+
+func renderPlotParams(params PCBPlotParams) sexpr.List {
+	params = normalizePlotParams(params)
+	return sexpr.L(
+		sexpr.A("pcbplotparams"),
+		sexpr.L(sexpr.A("layerselection"), sexpr.A(params.LayerSelection)),
+		sexpr.L(sexpr.A("plot_on_all_layers_selection"), sexpr.A(params.PlotOnAllLayersSelection)),
+		sexpr.L(sexpr.A("disableapertmacros"), yesNo(params.DisableApertureMacros)),
+		sexpr.L(sexpr.A("usegerberextensions"), yesNo(params.UseGerberExtensions)),
+		sexpr.L(sexpr.A("usegerberattributes"), yesNo(params.UseGerberAttributes)),
+		sexpr.L(sexpr.A("usegerberadvancedattributes"), yesNo(params.UseGerberAdvancedAttributes)),
+		sexpr.L(sexpr.A("creategerberjobfile"), yesNo(params.CreateGerberJobFile)),
+		sexpr.L(sexpr.A("dashed_line_dash_ratio"), sexpr.I(int64(params.DashedLineDashRatio))),
+		sexpr.L(sexpr.A("dashed_line_gap_ratio"), sexpr.I(int64(params.DashedLineGapRatio))),
+		sexpr.L(sexpr.A("svgprecision"), sexpr.I(int64(params.SVGPrecision))),
+		sexpr.L(sexpr.A("plotframeref"), yesNo(params.PlotFrameRef)),
+		sexpr.L(sexpr.A("mode"), sexpr.I(int64(params.Mode))),
+		sexpr.L(sexpr.A("useauxorigin"), yesNo(params.UseAuxOrigin)),
+		sexpr.L(sexpr.A("pdf_front_fp_property_popups"), yesNo(params.PDFFrontFPPropertyPopups)),
+		sexpr.L(sexpr.A("pdf_back_fp_property_popups"), yesNo(params.PDFBackFPPropertyPopups)),
+		sexpr.L(sexpr.A("pdf_metadata"), yesNo(params.PDFMetadata)),
+		sexpr.L(sexpr.A("pdf_single_document"), yesNo(params.PDFSingleDocument)),
+		sexpr.L(sexpr.A("dxfpolygonmode"), yesNo(params.DXFPolygonMode)),
+		sexpr.L(sexpr.A("dxfimperialunits"), yesNo(params.DXFImperialUnits)),
+		sexpr.L(sexpr.A("dxfusepcbnewfont"), yesNo(params.DXFUsePcbNewFont)),
+		sexpr.L(sexpr.A("psnegative"), yesNo(params.PSNegative)),
+		sexpr.L(sexpr.A("psa4output"), yesNo(params.PSA4Output)),
+		sexpr.L(sexpr.A("plot_black_and_white"), yesNo(params.PlotBlackAndWhite)),
+		sexpr.L(sexpr.A("sketchpadsonfab"), yesNo(params.SketchPadsOnFab)),
+		sexpr.L(sexpr.A("plotpadnumbers"), yesNo(params.PlotPadNumbers)),
+		sexpr.L(sexpr.A("hidednponfab"), yesNo(params.HideDNPOnFab)),
+		sexpr.L(sexpr.A("sketchdnponfab"), yesNo(params.SketchDNPOnFab)),
+		sexpr.L(sexpr.A("crossoutdnponfab"), yesNo(params.CrossoutDNPOnFab)),
+		sexpr.L(sexpr.A("subtractmaskfromsilk"), yesNo(params.SubtractMaskFromSilk)),
+		sexpr.L(sexpr.A("outputformat"), sexpr.I(int64(params.OutputFormat))),
+		sexpr.L(sexpr.A("mirror"), yesNo(params.Mirror)),
+		sexpr.L(sexpr.A("drillshape"), sexpr.I(int64(params.DrillShape))),
+		sexpr.L(sexpr.A("scaleselection"), sexpr.I(int64(params.ScaleSelection))),
+		sexpr.L(sexpr.A("outputdirectory"), sexpr.S(params.OutputDirectory)),
+	)
+}
+
+func normalizePlotParams(params PCBPlotParams) PCBPlotParams {
+	if params == (PCBPlotParams{}) {
+		return DefaultPlotParams()
+	}
+	if strings.TrimSpace(params.LayerSelection) == "" {
+		params.LayerSelection = "0x00000000_00000000_00000000_00000000"
+	}
+	if strings.TrimSpace(params.PlotOnAllLayersSelection) == "" {
+		params.PlotOnAllLayersSelection = "0x00000000_00000000_00000000_00000000"
+	}
+	return params
 }
 
 func renderTitleBlock(title kicadfiles.TitleBlock) sexpr.List {
@@ -525,6 +747,13 @@ func renderLayerList(name string, layers []kicadfiles.BoardLayer) sexpr.List {
 
 func fixed(value kicadfiles.IU) sexpr.Fixed {
 	return sexpr.X(kicadfiles.ToMMString(value))
+}
+
+func yesNo(value bool) sexpr.Atom {
+	if value {
+		return sexpr.A("yes")
+	}
+	return sexpr.A("no")
 }
 
 func sortedNets(nets []Net) []Net {
