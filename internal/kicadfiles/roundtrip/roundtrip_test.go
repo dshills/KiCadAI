@@ -120,6 +120,15 @@ func TestNormalizeTextPreservesSemanticLayerChanges(t *testing.T) {
 	}
 }
 
+func TestNormalizeTextIgnoresSExpressionFormattingAndComments(t *testing.T) {
+	a := NormalizeText("(layers ; comment\n  (1 \"F.Mask\" user)\n)\n")
+	b := NormalizeText("(layers\n\t(1 \"F.Mask\" user))\n")
+
+	if a != b {
+		t.Fatalf("normalized forms differ:\na=%q\nb=%q", a, b)
+	}
+}
+
 func TestCompareFilesEqualAfterNormalization(t *testing.T) {
 	dir := t.TempDir()
 	original := filepath.Join(dir, "original.kicad_pcb")
@@ -153,8 +162,8 @@ func TestCompareFilesReportsNormalizedDifference(t *testing.T) {
 	if len(result.Differences) == 0 {
 		t.Fatal("expected differences")
 	}
-	if !strings.Contains(result.Differences[0].Message, "F.Mask") {
-		t.Fatalf("difference message = %q", result.Differences[0].Message)
+	if !strings.Contains(result.Differences[0].Diff, "\"F.Mask\"") {
+		t.Fatalf("difference diff missing layer context:\n%s", result.Differences[0].Diff)
 	}
 }
 

@@ -215,6 +215,9 @@ func NormalizeText(input string) string {
 }
 
 func NormalizeBytes(input []byte) string {
+	if normalized, ok := normalizedSExprText(input); ok {
+		return normalized
+	}
 	var out strings.Builder
 	lineCount := 0
 	pendingBlank := 0
@@ -230,6 +233,78 @@ func NormalizeBytes(input []byte) string {
 	})
 	out.WriteString("\n")
 	return out.String()
+}
+
+func normalizedSExprText(input []byte) (string, bool) {
+	var out strings.Builder
+	tokenCount := 0
+	depth := 0
+	for i := 0; i < len(input); {
+		switch input[i] {
+		case ' ', '\t', '\n', '\r':
+			i++
+		case ';':
+			for i < len(input) && input[i] != '\n' && input[i] != '\r' {
+				i++
+			}
+		case '(', ')':
+			if input[i] == '(' {
+				depth++
+			} else {
+				depth--
+				if depth < 0 {
+					return "", false
+				}
+			}
+			writeNormalizedToken(&out, &tokenCount, string(input[i]))
+			i++
+		case '"':
+			start := i
+			i++
+			escaped := false
+			for i < len(input) {
+				switch {
+				case escaped:
+					escaped = false
+				case input[i] == '\\':
+					escaped = true
+				case input[i] == '"':
+					i++
+					writeNormalizedToken(&out, &tokenCount, string(input[start:i]))
+					goto nextToken
+				}
+				i++
+			}
+			return "", false
+		default:
+			start := i
+			for i < len(input) && !isSExprWhitespace(input[i]) && input[i] != '(' && input[i] != ')' && input[i] != ';' {
+				i++
+			}
+			if start == i {
+				return "", false
+			}
+			writeNormalizedToken(&out, &tokenCount, string(input[start:i]))
+		}
+	nextToken:
+	}
+	if tokenCount == 0 || depth != 0 {
+		return "", false
+	}
+	out.WriteString("\n")
+	return out.String(), true
+}
+
+func writeNormalizedToken(out *strings.Builder, tokenCount *int, token string) {
+	if *tokenCount > 0 {
+		out.WriteString("\n")
+	}
+	out.WriteString(token)
+	*tokenCount = *tokenCount + 1
+}
+
+func isSExprWhitespace(value byte) bool {
+	return value == ' ' || value == '\t' || value == '\n' || value == '\r'
 }
 
 func forEachNormalizedLine(input []byte, yield func(string)) {

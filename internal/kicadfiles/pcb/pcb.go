@@ -111,26 +111,26 @@ type PCBPlotParams struct {
 
 const (
 	kicad10LayerFCu      = 0
-	kicad10LayerBCu      = 31
-	kicad10LayerBAdhes   = 32
-	kicad10LayerFAdhes   = 33
-	kicad10LayerBPaste   = 34
-	kicad10LayerFPaste   = 35
-	kicad10LayerBSilkS   = 36
-	kicad10LayerFSilkS   = 37
-	kicad10LayerBMask    = 38
-	kicad10LayerFMask    = 39
-	kicad10LayerDwgs     = 40
-	kicad10LayerCmts     = 41
-	kicad10LayerEco1     = 42
-	kicad10LayerEco2     = 43
-	kicad10LayerEdge     = 44
-	kicad10LayerMargin   = 45
-	kicad10LayerBCrtYd   = 46
-	kicad10LayerFCrtYd   = 47
-	kicad10LayerBFab     = 48
-	kicad10LayerFFab     = 49
-	kicad10LayerUserBase = kicad10LayerFFab
+	kicad10LayerFMask    = 1
+	kicad10LayerBCu      = 2
+	kicad10LayerBMask    = 3
+	kicad10LayerFSilkS   = 5
+	kicad10LayerBSilkS   = 7
+	kicad10LayerFAdhes   = 9
+	kicad10LayerBAdhes   = 11
+	kicad10LayerFPaste   = 13
+	kicad10LayerBPaste   = 15
+	kicad10LayerDwgs     = 17
+	kicad10LayerCmts     = 19
+	kicad10LayerEco1     = 21
+	kicad10LayerEco2     = 23
+	kicad10LayerEdge     = 25
+	kicad10LayerMargin   = 27
+	kicad10LayerBCrtYd   = 29
+	kicad10LayerFCrtYd   = 31
+	kicad10LayerBFab     = 33
+	kicad10LayerFFab     = 35
+	kicad10LayerUserBase = 39
 
 	defaultTextSizeMM      = 1.0
 	defaultTextThicknessMM = 0.15
@@ -406,7 +406,7 @@ func DefaultTwoLayerStack() []LayerDefinition {
 		{Number: kicad10LayerBFab, Name: kicadfiles.LayerBFab, Kind: "user"},
 	}
 	for i := 1; i <= 45; i++ {
-		layers = append(layers, LayerDefinition{Number: kicad10LayerUserBase + i, Name: kicadfiles.BoardLayer("User." + strconv.Itoa(i)), Kind: "user"})
+		layers = append(layers, LayerDefinition{Number: kicad10LayerUserBase + (i-1)*2, Name: kicadfiles.BoardLayer("User." + strconv.Itoa(i)), Kind: "user"})
 	}
 	return layers
 }
@@ -671,20 +671,17 @@ func render(board PCBFile) (sexpr.List, error) {
 	}
 	nodes = append(nodes, renderLayers(board.Layers), renderSetup(board.Setup))
 	netNames := netNameMap(board.Nets)
-	for _, footprint := range sortedFootprints(board.Footprints) {
+	layerNumbers := layerNumberMap(board.Layers)
+	footprints := sortedFootprints(board.Footprints)
+	routeNetCodes := routedNetSortCodes(footprints, netNames)
+	for _, footprint := range footprints {
 		nodes = append(nodes, renderFootprint(footprint, netNames))
 	}
-	for _, drawing := range board.Drawings {
+	for _, drawing := range sortedDrawings(board.Drawings, layerNumbers) {
 		nodes = append(nodes, renderDrawing(drawing))
 	}
-	for _, track := range board.Tracks {
-		nodes = append(nodes, renderTrack(track, netNames))
-	}
-	for _, arc := range board.TrackArcs {
-		nodes = append(nodes, renderTrackArc(arc, netNames))
-	}
-	for _, via := range board.Vias {
-		nodes = append(nodes, renderVia(via, netNames))
+	for _, item := range sortedRoutedItems(board.Tracks, board.TrackArcs, board.Vias, layerNumbers, netNames, routeNetCodes) {
+		nodes = append(nodes, item.render(netNames))
 	}
 	for _, zone := range board.Zones {
 		nodes = append(nodes, renderZone(zone, netNames))
@@ -711,9 +708,7 @@ func renderGeneral(general PCBGeneral) sexpr.List {
 
 func renderLayers(layers []LayerDefinition) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("layers")}
-	ordered := slices.Clone(layers)
-	slices.SortFunc(ordered, func(a, b LayerDefinition) int { return cmp.Compare(a.Number, b.Number) })
-	for _, layer := range ordered {
+	for _, layer := range layers {
 		layerNodes := []sexpr.Node{sexpr.I(int64(layer.Number)), sexpr.S(string(layer.Name)), sexpr.A(layer.Kind)}
 		if strings.TrimSpace(layer.DisplayName) != "" {
 			layerNodes = append(layerNodes, sexpr.S(layer.DisplayName))
@@ -887,7 +882,7 @@ func renderFootprintProperty(property FootprintProperty) sexpr.List {
 		sexpr.A("property"),
 		sexpr.S(property.Name),
 		sexpr.S(property.Value),
-		renderAt(property.Position, property.Rotation),
+		renderAtWithRotation(property.Position, property.Rotation),
 	}
 	if property.Unlocked {
 		nodes = append(nodes, sexpr.L(sexpr.A("unlocked"), sexpr.A("yes")))
@@ -1267,6 +1262,10 @@ func renderAt(point kicadfiles.Point, rotation kicadfiles.Angle) sexpr.List {
 	return sexpr.L(nodes...)
 }
 
+func renderAtWithRotation(point kicadfiles.Point, rotation kicadfiles.Angle) sexpr.List {
+	return sexpr.L(sexpr.A("at"), fixed(point.X), fixed(point.Y), sexpr.F(float64(rotation)))
+}
+
 func renderLayerList(name string, layers []kicadfiles.BoardLayer) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A(name)}
 	for _, layer := range layers {
@@ -1276,7 +1275,12 @@ func renderLayerList(name string, layers []kicadfiles.BoardLayer) sexpr.List {
 }
 
 func fixed(value kicadfiles.IU) sexpr.Fixed {
-	return sexpr.X(kicadfiles.ToMMString(value))
+	formatted := kicadfiles.ToMMString(value)
+	if strings.Contains(formatted, ".") {
+		formatted = strings.TrimRight(formatted, "0")
+		formatted = strings.TrimSuffix(formatted, ".")
+	}
+	return sexpr.X(formatted)
 }
 
 func yesNo(value bool) sexpr.Atom {
@@ -1298,12 +1302,275 @@ func sortedNets(nets []Net) []Net {
 func sortedFootprints(footprints []Footprint) []Footprint {
 	ordered := slices.Clone(footprints)
 	slices.SortFunc(ordered, func(a, b Footprint) int {
-		if byReference := cmp.Compare(a.Reference, b.Reference); byReference != 0 {
-			return byReference
+		return cmp.Compare(string(a.UUID), string(b.UUID))
+	})
+	return ordered
+}
+
+func routedNetSortCodes(footprints []Footprint, netNames map[int]string) map[string]int {
+	codes := map[string]int{}
+	next := 1
+	for _, footprint := range footprints {
+		for _, pad := range footprint.Pads {
+			netName := routedNetName(pad.NetCode, pad.NetName, netNames)
+			if strings.TrimSpace(netName) == "" {
+				continue
+			}
+			if _, ok := codes[netName]; ok {
+				continue
+			}
+			codes[netName] = next
+			next++
+		}
+	}
+	return codes
+}
+
+func sortedDrawings(drawings []Drawing, layers map[kicadfiles.BoardLayer]int) []Drawing {
+	ordered := slices.Clone(drawings)
+	slices.SortFunc(ordered, func(a, b Drawing) int {
+		if byType := cmp.Compare(drawingTypeOrder(a), drawingTypeOrder(b)); byType != 0 {
+			return byType
+		}
+		if byLayer := cmp.Compare(layerNumber(a.Layer, layers), layerNumber(b.Layer, layers)); byLayer != 0 {
+			return byLayer
+		}
+		if drawingTypeOrder(a) == kicadTypePCBShape {
+			if byShape := compareShape(a, b); byShape != 0 {
+				return byShape
+			}
 		}
 		return cmp.Compare(string(a.UUID), string(b.UUID))
 	})
 	return ordered
+}
+
+type routedItem struct {
+	kind    int
+	netCode int
+	layer   kicadfiles.BoardLayer
+	uuid    kicadfiles.UUID
+	track   *Track
+	arc     *TrackArc
+	via     *Via
+}
+
+func (item routedItem) render(netNames map[int]string) sexpr.List {
+	switch {
+	case item.track != nil:
+		return renderTrack(*item.track, netNames)
+	case item.arc != nil:
+		return renderTrackArc(*item.arc, netNames)
+	case item.via != nil:
+		return renderVia(*item.via, netNames)
+	default:
+		return nil
+	}
+}
+
+func sortedRoutedItems(tracks []Track, arcs []TrackArc, vias []Via, layers map[kicadfiles.BoardLayer]int, netNames map[int]string, netSortCodes map[string]int) []routedItem {
+	items := make([]routedItem, 0, len(tracks)+len(arcs)+len(vias))
+	for i := range tracks {
+		items = append(items, routedItem{
+			kind:    kicadTypePCBTrace,
+			netCode: routedItemNetSortCode(tracks[i].NetCode, tracks[i].NetName, netNames, netSortCodes),
+			layer:   tracks[i].Layer,
+			uuid:    tracks[i].UUID,
+			track:   &tracks[i],
+		})
+	}
+	for i := range arcs {
+		items = append(items, routedItem{
+			kind:    kicadTypePCBArc,
+			netCode: routedItemNetSortCode(arcs[i].NetCode, arcs[i].NetName, netNames, netSortCodes),
+			layer:   arcs[i].Layer,
+			uuid:    arcs[i].UUID,
+			arc:     &arcs[i],
+		})
+	}
+	for i := range vias {
+		items = append(items, routedItem{
+			kind:    kicadTypePCBVia,
+			netCode: routedItemNetSortCode(vias[i].NetCode, vias[i].NetName, netNames, netSortCodes),
+			layer:   viaTopLayer(vias[i]),
+			uuid:    vias[i].UUID,
+			via:     &vias[i],
+		})
+	}
+	slices.SortFunc(items, func(a, b routedItem) int {
+		if byNet := cmp.Compare(a.netCode, b.netCode); byNet != 0 {
+			return byNet
+		}
+		if byLayer := cmp.Compare(layerNumber(a.layer, layers), layerNumber(b.layer, layers)); byLayer != 0 {
+			return byLayer
+		}
+		if byType := cmp.Compare(a.kind, b.kind); byType != 0 {
+			return byType
+		}
+		return cmp.Compare(string(a.uuid), string(b.uuid))
+	})
+	return items
+}
+
+func routedItemNetSortCode(code int, explicit string, netNames map[int]string, netSortCodes map[string]int) int {
+	name := routedNetName(code, explicit, netNames)
+	if sortCode, ok := netSortCodes[name]; ok {
+		return sortCode
+	}
+	return code
+}
+
+const (
+	kicadTypePCBShape = 5
+	kicadTypePCBText  = 9
+	kicadTypePCBTrace = 13
+	kicadTypePCBVia   = 14
+	kicadTypePCBArc   = 15
+
+	kicadShapeSegment = 0
+	kicadShapeRect    = 1
+	kicadShapeArc     = 2
+	kicadShapeCircle  = 3
+	kicadShapePoly    = 4
+)
+
+func drawingTypeOrder(drawing Drawing) int {
+	if drawing.Text != nil {
+		return kicadTypePCBText
+	}
+	return kicadTypePCBShape
+}
+
+func compareShape(a, b Drawing) int {
+	aStart, aEnd := shapeStartEnd(a)
+	bStart, bEnd := shapeStartEnd(b)
+	if byStart := comparePoint(aStart, bStart); byStart != 0 {
+		return byStart
+	}
+	if byEnd := comparePoint(aEnd, bEnd); byEnd != 0 {
+		return byEnd
+	}
+	if byShape := cmp.Compare(shapeOrder(a), shapeOrder(b)); byShape != 0 {
+		return byShape
+	}
+	if shapeOrder(a) == kicadShapeArc {
+		if byMid := comparePoint(a.Arc.Mid, b.Arc.Mid); byMid != 0 {
+			return byMid
+		}
+	}
+	if shapeOrder(a) == kicadShapePoly {
+		if byVertices := cmp.Compare(len(a.Poly.Points), len(b.Poly.Points)); byVertices != 0 {
+			return byVertices
+		}
+		for i := range a.Poly.Points {
+			if byPoint := comparePoint(a.Poly.Points[i], b.Poly.Points[i]); byPoint != 0 {
+				return byPoint
+			}
+		}
+	}
+	if byWidth := cmp.Compare(shapeWidth(a), shapeWidth(b)); byWidth != 0 {
+		return byWidth
+	}
+	return cmp.Compare(fillOrder(a.Fill), fillOrder(b.Fill))
+}
+
+func shapeStartEnd(drawing Drawing) (kicadfiles.Point, kicadfiles.Point) {
+	switch {
+	case drawing.Line != nil:
+		return drawing.Line.Start, drawing.Line.End
+	case drawing.Rect != nil:
+		return drawing.Rect.Start, drawing.Rect.End
+	case drawing.Arc != nil:
+		return drawing.Arc.Start, drawing.Arc.End
+	case drawing.Circle != nil:
+		return drawing.Circle.Center, drawing.Circle.End
+	case drawing.Poly != nil && len(drawing.Poly.Points) > 0:
+		return drawing.Poly.Points[0], drawing.Poly.Points[len(drawing.Poly.Points)-1]
+	default:
+		return kicadfiles.Point{}, kicadfiles.Point{}
+	}
+}
+
+func shapeOrder(drawing Drawing) int {
+	switch {
+	case drawing.Line != nil:
+		return kicadShapeSegment
+	case drawing.Rect != nil:
+		return kicadShapeRect
+	case drawing.Arc != nil:
+		return kicadShapeArc
+	case drawing.Circle != nil:
+		return kicadShapeCircle
+	case drawing.Poly != nil:
+		return kicadShapePoly
+	default:
+		return kicadShapeSegment
+	}
+}
+
+func shapeWidth(drawing Drawing) kicadfiles.IU {
+	switch {
+	case drawing.Line != nil:
+		return drawing.Line.Width
+	case drawing.Rect != nil:
+		return drawing.Rect.Width
+	case drawing.Arc != nil:
+		return drawing.Arc.Width
+	case drawing.Circle != nil:
+		return drawing.Circle.Width
+	case drawing.Poly != nil:
+		return drawing.Poly.Width
+	default:
+		return 0
+	}
+}
+
+func comparePoint(a, b kicadfiles.Point) int {
+	if byX := cmp.Compare(a.X, b.X); byX != 0 {
+		return byX
+	}
+	return cmp.Compare(a.Y, b.Y)
+}
+
+func fillOrder(fill string) int {
+	switch fillMode(fill) {
+	case "solid", "yes":
+		return 2
+	case "background":
+		return 3
+	case "none":
+		return 1
+	default:
+		return 1
+	}
+}
+
+func layerNumberMap(layers []LayerDefinition) map[kicadfiles.BoardLayer]int {
+	numbers := make(map[kicadfiles.BoardLayer]int, len(layers))
+	for _, layer := range layers {
+		numbers[layer.Name] = layer.Number
+	}
+	return numbers
+}
+
+func layerNumber(layer kicadfiles.BoardLayer, layers map[kicadfiles.BoardLayer]int) int {
+	if number, ok := layers[layer]; ok {
+		return number
+	}
+	if strings.HasPrefix(string(layer), "In") && strings.HasSuffix(string(layer), ".Cu") {
+		index, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(string(layer), "In"), ".Cu"))
+		if err == nil {
+			return index*2 + 2
+		}
+	}
+	return int(^uint(0) >> 1)
+}
+
+func viaTopLayer(via Via) kicadfiles.BoardLayer {
+	if len(via.Layers) == 0 {
+		return ""
+	}
+	return via.Layers[0]
 }
 
 func netCodeSet(nets []Net) map[int]struct{} {

@@ -188,11 +188,25 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 			errs = append(errs, designError("pcb.footprints", "missing footprint for schematic reference "+ref))
 			continue
 		}
-		if symbol.Path != footprint.Path {
+		if symbol.Path != footprint.Path && !isKiCadPCBPath(footprint.Path) {
 			errs = append(errs, designError("pcb.footprints."+ref+".path", "must match schematic symbol path"))
 		}
 	}
 	return errs
+}
+
+func isKiCadPCBPath(value string) bool {
+	value = strings.TrimSpace(value)
+	if !strings.HasPrefix(value, "/") {
+		return false
+	}
+	segments := strings.Split(strings.TrimPrefix(value, "/"), "/")
+	for _, segment := range segments {
+		if !kicadfiles.UUID(segment).Valid() {
+			return false
+		}
+	}
+	return true
 }
 
 func validateSchematicReferences(schematicFile *schematic.SchematicFile) kicadfiles.ValidationErrors {

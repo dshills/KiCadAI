@@ -12,73 +12,73 @@
   )
   (layers
     (0 "F.Cu" signal)
-    (31 "B.Cu" signal)
-    (32 "B.Adhes" user "B.Adhesive")
-    (33 "F.Adhes" user "F.Adhesive")
-    (34 "B.Paste" user)
-    (35 "F.Paste" user)
-    (36 "B.SilkS" user "B.Silkscreen")
-    (37 "F.SilkS" user "F.Silkscreen")
-    (38 "B.Mask" user)
-    (39 "F.Mask" user)
-    (40 "Dwgs.User" user "User.Drawings")
-    (41 "Cmts.User" user "User.Comments")
-    (42 "Eco1.User" user "User.Eco1")
-    (43 "Eco2.User" user "User.Eco2")
-    (44 "Edge.Cuts" user)
-    (45 "Margin" user)
-    (46 "B.CrtYd" user "B.Courtyard")
-    (47 "F.CrtYd" user "F.Courtyard")
-    (48 "B.Fab" user)
-    (49 "F.Fab" user)
-    (50 "User.1" user)
-    (51 "User.2" user)
-    (52 "User.3" user)
-    (53 "User.4" user)
-    (54 "User.5" user)
-    (55 "User.6" user)
-    (56 "User.7" user)
-    (57 "User.8" user)
-    (58 "User.9" user)
-    (59 "User.10" user)
-    (60 "User.11" user)
+    (2 "B.Cu" signal)
+    (9 "F.Adhes" user "F.Adhesive")
+    (11 "B.Adhes" user "B.Adhesive")
+    (13 "F.Paste" user)
+    (15 "B.Paste" user)
+    (5 "F.SilkS" user "F.Silkscreen")
+    (7 "B.SilkS" user "B.Silkscreen")
+    (1 "F.Mask" user)
+    (3 "B.Mask" user)
+    (17 "Dwgs.User" user "User.Drawings")
+    (19 "Cmts.User" user "User.Comments")
+    (21 "Eco1.User" user "User.Eco1")
+    (23 "Eco2.User" user "User.Eco2")
+    (25 "Edge.Cuts" user)
+    (27 "Margin" user)
+    (31 "F.CrtYd" user "F.Courtyard")
+    (29 "B.CrtYd" user "B.Courtyard")
+    (35 "F.Fab" user)
+    (33 "B.Fab" user)
+    (39 "User.1" user)
+    (41 "User.2" user)
+    (43 "User.3" user)
+    (45 "User.4" user)
+    (47 "User.5" user)
+    (49 "User.6" user)
+    (51 "User.7" user)
+    (53 "User.8" user)
+    (55 "User.9" user)
+    (57 "User.10" user)
+    (59 "User.11" user)
     (61 "User.12" user)
-    (62 "User.13" user)
-    (63 "User.14" user)
-    (64 "User.15" user)
-    (65 "User.16" user)
-    (66 "User.17" user)
-    (67 "User.18" user)
-    (68 "User.19" user)
-    (69 "User.20" user)
-    (70 "User.21" user)
-    (71 "User.22" user)
-    (72 "User.23" user)
-    (73 "User.24" user)
-    (74 "User.25" user)
-    (75 "User.26" user)
-    (76 "User.27" user)
-    (77 "User.28" user)
-    (78 "User.29" user)
-    (79 "User.30" user)
-    (80 "User.31" user)
-    (81 "User.32" user)
-    (82 "User.33" user)
-    (83 "User.34" user)
-    (84 "User.35" user)
-    (85 "User.36" user)
-    (86 "User.37" user)
-    (87 "User.38" user)
-    (88 "User.39" user)
-    (89 "User.40" user)
-    (90 "User.41" user)
-    (91 "User.42" user)
-    (92 "User.43" user)
-    (93 "User.44" user)
-    (94 "User.45" user)
+    (63 "User.13" user)
+    (65 "User.14" user)
+    (67 "User.15" user)
+    (69 "User.16" user)
+    (71 "User.17" user)
+    (73 "User.18" user)
+    (75 "User.19" user)
+    (77 "User.20" user)
+    (79 "User.21" user)
+    (81 "User.22" user)
+    (83 "User.23" user)
+    (85 "User.24" user)
+    (87 "User.25" user)
+    (89 "User.26" user)
+    (91 "User.27" user)
+    (93 "User.28" user)
+    (95 "User.29" user)
+    (97 "User.30" user)
+    (99 "User.31" user)
+    (101 "User.32" user)
+    (103 "User.33" user)
+    (105 "User.34" user)
+    (107 "User.35" user)
+    (109 "User.36" user)
+    (111 "User.37" user)
+    (113 "User.38" user)
+    (115 "User.39" user)
+    (117 "User.40" user)
+    (119 "User.41" user)
+    (121 "User.42" user)
+    (123 "User.43" user)
+    (125 "User.44" user)
+    (127 "User.45" user)
   )
   (setup
-    (pad_to_mask_clearance 0.0)
+    (pad_to_mask_clearance 0)
     (allow_soldermask_bridges_in_footprints no)
     (tenting
       (front yes)
@@ -132,102 +132,14 @@
     )
   )
   (footprint
-    "LED_SMD:LED_0805_2012Metric"
-    (layer "F.Cu")
-    (uuid "599eb214-bd5f-597c-a76a-a687d31a24ae")
-    (at 45.0 20.0)
-    (property
-      "Reference"
-      "D1"
-      (at 0.0 -1.5)
-      (unlocked yes)
-      (layer "F.SilkS")
-      (uuid "bd04d146-0b8f-5f24-9c16-ad1de12798b5")
-      (effects
-        (font
-          (size 1.27 1.27)
-          (thickness 0.15)
-        )
-      )
-    )
-    (property
-      "Value"
-      "LED"
-      (at 0.0 1.5)
-      (unlocked yes)
-      (layer "F.SilkS")
-      (uuid "4377b0c0-30a3-5b7f-926b-a1a92e3e01dd")
-      (effects
-        (font
-          (size 1.27 1.27)
-          (thickness 0.15)
-        )
-      )
-    )
-    (property
-      "Datasheet"
-      ""
-      (at 0.0 0.0)
-      (unlocked yes)
-      (layer "F.Fab")
-      (hide yes)
-      (uuid "a8a03353-875b-5ff1-9f17-09b130fe7f75")
-      (effects
-        (font
-          (size 1.27 1.27)
-        )
-      )
-    )
-    (property
-      "Description"
-      ""
-      (at 0.0 0.0)
-      (unlocked yes)
-      (layer "F.Fab")
-      (hide yes)
-      (uuid "43d186fc-2b5c-5091-ac2c-5964269e7ec3")
-      (effects
-        (font
-          (size 1.27 1.27)
-        )
-      )
-    )
-    (path "root.component.d1")
-    (attr smd)
-    (duplicate_pad_numbers_are_jumpers no)
-    (pad
-      "1"
-      smd
-      roundrect
-      (at -1.1 0.0)
-      (size 1.0 1.45)
-      (layers "F.Cu" "F.Mask" "F.Paste")
-      (roundrect_rratio 0.25)
-      (net "LED_OUT")
-      (uuid "f2c1ec8e-8b9e-58a3-b2c2-0064cd35bbac")
-    )
-    (pad
-      "2"
-      smd
-      roundrect
-      (at 1.1 0.0)
-      (size 1.0 1.45)
-      (layers "F.Cu" "F.Mask" "F.Paste")
-      (roundrect_rratio 0.25)
-      (net "GND")
-      (uuid "d2b69caf-d338-5b74-82b3-5d44bab048cb")
-    )
-    (embedded_fonts no)
-  )
-  (footprint
     "Resistor_SMD:R_0805_2012Metric"
     (layer "F.Cu")
     (uuid "4528e193-512e-5ff1-9931-31a0f49503df")
-    (at 25.0 20.0)
+    (at 25 20)
     (property
       "Reference"
       "R1"
-      (at 0.0 -1.5)
+      (at 0 -1.5 0)
       (unlocked yes)
       (layer "F.SilkS")
       (uuid "08d9ed4a-1e24-5ee5-a251-87e87c5b03c6")
@@ -241,7 +153,7 @@
     (property
       "Value"
       "1k"
-      (at 0.0 1.5)
+      (at 0 1.5 0)
       (unlocked yes)
       (layer "F.SilkS")
       (uuid "f2c1da65-f7e4-585a-9c33-65efdfa8a5e7")
@@ -255,7 +167,7 @@
     (property
       "Datasheet"
       ""
-      (at 0.0 0.0)
+      (at 0 0 0)
       (unlocked yes)
       (layer "F.Fab")
       (hide yes)
@@ -269,7 +181,7 @@
     (property
       "Description"
       ""
-      (at 0.0 0.0)
+      (at 0 0 0)
       (unlocked yes)
       (layer "F.Fab")
       (hide yes)
@@ -280,15 +192,15 @@
         )
       )
     )
-    (path "root.component.r1")
+    (path "/e36d2512-8a05-55b6-b261-d35baf73953b")
     (attr smd)
     (duplicate_pad_numbers_are_jumpers no)
     (pad
       "1"
       smd
       roundrect
-      (at -1.1 0.0)
-      (size 1.0 1.45)
+      (at -1.1 0)
+      (size 1 1.45)
       (layers "F.Cu" "F.Mask" "F.Paste")
       (roundrect_rratio 0.25)
       (net "VCC")
@@ -298,8 +210,8 @@
       "2"
       smd
       roundrect
-      (at 1.1 0.0)
-      (size 1.0 1.45)
+      (at 1.1 0)
+      (size 1 1.45)
       (layers "F.Cu" "F.Mask" "F.Paste")
       (roundrect_rratio 0.25)
       (net "LED_OUT")
@@ -307,9 +219,97 @@
     )
     (embedded_fonts no)
   )
+  (footprint
+    "LED_SMD:LED_0805_2012Metric"
+    (layer "F.Cu")
+    (uuid "599eb214-bd5f-597c-a76a-a687d31a24ae")
+    (at 45 20)
+    (property
+      "Reference"
+      "D1"
+      (at 0 -1.5 0)
+      (unlocked yes)
+      (layer "F.SilkS")
+      (uuid "bd04d146-0b8f-5f24-9c16-ad1de12798b5")
+      (effects
+        (font
+          (size 1.27 1.27)
+          (thickness 0.15)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LED"
+      (at 0 1.5 0)
+      (unlocked yes)
+      (layer "F.SilkS")
+      (uuid "4377b0c0-30a3-5b7f-926b-a1a92e3e01dd")
+      (effects
+        (font
+          (size 1.27 1.27)
+          (thickness 0.15)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0 0 0)
+      (unlocked yes)
+      (layer "F.Fab")
+      (hide yes)
+      (uuid "a8a03353-875b-5ff1-9f17-09b130fe7f75")
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0 0 0)
+      (unlocked yes)
+      (layer "F.Fab")
+      (hide yes)
+      (uuid "43d186fc-2b5c-5091-ac2c-5964269e7ec3")
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (path "/192eb761-6c98-5461-aa97-04d81b0144dc")
+    (attr smd)
+    (duplicate_pad_numbers_are_jumpers no)
+    (pad
+      "1"
+      smd
+      roundrect
+      (at -1.1 0)
+      (size 1 1.45)
+      (layers "F.Cu" "F.Mask" "F.Paste")
+      (roundrect_rratio 0.25)
+      (net "LED_OUT")
+      (uuid "f2c1ec8e-8b9e-58a3-b2c2-0064cd35bbac")
+    )
+    (pad
+      "2"
+      smd
+      roundrect
+      (at 1.1 0)
+      (size 1 1.45)
+      (layers "F.Cu" "F.Mask" "F.Paste")
+      (roundrect_rratio 0.25)
+      (net "GND")
+      (uuid "d2b69caf-d338-5b74-82b3-5d44bab048cb")
+    )
+    (embedded_fonts no)
+  )
   (gr_line
-    (start 10.0 10.0)
-    (end 60.0 10.0)
+    (start 10 10)
+    (end 60 10)
     (stroke
       (width 0.1)
       (type solid)
@@ -318,8 +318,18 @@
     (uuid "748033ea-a2b7-5759-9b37-1842431a36f5")
   )
   (gr_line
-    (start 60.0 10.0)
-    (end 60.0 30.0)
+    (start 10 30)
+    (end 10 10)
+    (stroke
+      (width 0.1)
+      (type solid)
+    )
+    (layer "Edge.Cuts")
+    (uuid "4e576abf-0077-5860-a181-3295b4115b17")
+  )
+  (gr_line
+    (start 60 10)
+    (end 60 30)
     (stroke
       (width 0.1)
       (type solid)
@@ -328,8 +338,8 @@
     (uuid "c49669dc-12bb-5684-b1ec-359bc21f7a69")
   )
   (gr_line
-    (start 60.0 30.0)
-    (end 10.0 30.0)
+    (start 60 30)
+    (end 10 30)
     (stroke
       (width 0.1)
       (type solid)
@@ -337,50 +347,40 @@
     (layer "Edge.Cuts")
     (uuid "885876e8-c2bc-5308-80b8-61b2410b16b0")
   )
-  (gr_line
-    (start 10.0 30.0)
-    (end 10.0 10.0)
-    (stroke
-      (width 0.1)
-      (type solid)
-    )
-    (layer "Edge.Cuts")
-    (uuid "4e576abf-0077-5860-a181-3295b4115b17")
-  )
   (segment
-    (start 20.0 20.0)
-    (end 23.9 20.0)
+    (start 20 20)
+    (end 23.9 20)
     (width 0.25)
     (layer "F.Cu")
     (net "VCC")
     (uuid "a5dcc765-258e-507d-9d30-aeaf62048d9a")
   )
-  (segment
-    (start 26.1 20.0)
-    (end 43.9 20.0)
-    (width 0.25)
-    (layer "F.Cu")
-    (net "LED_OUT")
-    (uuid "0927e047-cb70-53ac-9456-0d3ff7ffa835")
-  )
-  (segment
-    (start 46.1 20.0)
-    (end 50.0 20.0)
-    (width 0.25)
-    (layer "F.Cu")
-    (net "GND")
-    (uuid "142a9e91-812e-5155-bc7d-3e9bea5af4ac")
-  )
   (via
-    (at 20.0 20.0)
+    (at 20 20)
     (size 0.8)
     (drill 0.4)
     (layers "F.Cu" "B.Cu")
     (net "VCC")
     (uuid "5dd61c37-2bd8-5b2a-a952-308e04bb0121")
   )
+  (segment
+    (start 26.1 20)
+    (end 43.9 20)
+    (width 0.25)
+    (layer "F.Cu")
+    (net "LED_OUT")
+    (uuid "0927e047-cb70-53ac-9456-0d3ff7ffa835")
+  )
+  (segment
+    (start 46.1 20)
+    (end 50 20)
+    (width 0.25)
+    (layer "F.Cu")
+    (net "GND")
+    (uuid "142a9e91-812e-5155-bc7d-3e9bea5af4ac")
+  )
   (via
-    (at 50.0 20.0)
+    (at 50 20)
     (size 0.8)
     (drill 0.4)
     (layers "F.Cu" "B.Cu")

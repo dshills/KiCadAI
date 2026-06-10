@@ -106,6 +106,15 @@ func TestValidateRejectsFootprintSymbolPathMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsKiCadHierarchicalPCBFootprintPath(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB.Footprints[0].Path = "/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222"
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
 func TestValidateRejectsProjectSchematicNameMismatch(t *testing.T) {
 	design := validLEDDesign(t)
 	design.Project.Name = "other"

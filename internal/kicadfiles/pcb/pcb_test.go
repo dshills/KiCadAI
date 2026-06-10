@@ -25,13 +25,13 @@ func TestWriteMinimalPCB(t *testing.T) {
 		"(thickness 1.6)",
 		"(legacy_teardrops no)",
 		"(0 \"F.Cu\" signal)",
-		"(31 \"B.Cu\" signal)",
-		"(37 \"F.SilkS\" user \"F.Silkscreen\")",
-		"(36 \"B.SilkS\" user \"B.Silkscreen\")",
-		"(44 \"Edge.Cuts\" user)",
-		"(94 \"User.45\" user)",
+		"(2 \"B.Cu\" signal)",
+		"(5 \"F.SilkS\" user \"F.Silkscreen\")",
+		"(7 \"B.SilkS\" user \"B.Silkscreen\")",
+		"(25 \"Edge.Cuts\" user)",
+		"(127 \"User.45\" user)",
 		"(allow_soldermask_bridges_in_footprints no)",
-		"(pad_to_mask_clearance 0.0)",
+		"(pad_to_mask_clearance 0)",
 		"(tenting",
 		"(front yes)",
 		"(back yes)",
@@ -713,7 +713,7 @@ func TestValidateRejectsInvalidTrack(t *testing.T) {
 
 func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
 	board := minimalPCB()
-	board.Layers = append(board.Layers, LayerDefinition{Number: 1, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
+	board.Layers = append(board.Layers, LayerDefinition{Number: 4, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
 	board.Nets = []Net{{Code: 1, Name: "A"}}
 	board.Tracks = []Track{{
 		UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
@@ -734,6 +734,28 @@ func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
 
 	if err := Validate(board); err != nil {
 		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestLayerNumberFallbackMatchesKiCad10InternalCopperIDs(t *testing.T) {
+	layers := layerNumberMap(DefaultTwoLayerStack())
+
+	tests := []struct {
+		layer kicadfiles.BoardLayer
+		want  int
+	}{
+		{layer: kicadfiles.LayerFCu, want: 0},
+		{layer: kicadfiles.LayerBCu, want: 2},
+		{layer: kicadfiles.BoardLayer("In1.Cu"), want: 4},
+		{layer: kicadfiles.BoardLayer("In30.Cu"), want: 62},
+	}
+
+	for _, test := range tests {
+		t.Run(string(test.layer), func(t *testing.T) {
+			if got := layerNumber(test.layer, layers); got != test.want {
+				t.Fatalf("layerNumber(%q) = %d, want %d", test.layer, got, test.want)
+			}
+		})
 	}
 }
 
@@ -788,7 +810,7 @@ func TestWriteRendersTrackArcAndViaTenting(t *testing.T) {
 	output := buf.String()
 	for _, want := range []string{
 		"(arc",
-		"(mid 2.0 2.0)",
+		"(mid 2 2)",
 		"(tenting",
 		"(front yes)",
 		"(back yes)",
@@ -796,6 +818,56 @@ func TestWriteRendersTrackArcAndViaTenting(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
+	}
+}
+
+func TestWriteSortsRoutedItemsLikeKiCad(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{
+		{Code: 1, Name: "GND"},
+		{Code: 2, Name: "VCC"},
+	}
+	board.Tracks = []Track{
+		{
+			UUID:    kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+			Start:   point(1, 1),
+			End:     point(2, 1),
+			Width:   kicadfiles.MM(0.25),
+			Layer:   kicadfiles.LayerFCu,
+			NetCode: 2,
+		},
+		{
+			UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+			Start:   point(1, 2),
+			End:     point(2, 2),
+			Width:   kicadfiles.MM(0.25),
+			Layer:   kicadfiles.LayerFCu,
+			NetCode: 1,
+		},
+	}
+	board.Vias = []Via{{
+		UUID:     kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		Position: point(2, 2),
+		Size:     kicadfiles.MM(0.8),
+		Drill:    kicadfiles.MM(0.4),
+		NetCode:  1,
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+
+	output := buf.String()
+	gndSegment := strings.Index(output, "(net \"GND\")")
+	via := strings.Index(output, "(via")
+	vccSegment := strings.Index(output, "(net \"VCC\")")
+	if gndSegment < 0 || via < 0 || vccSegment < 0 {
+		t.Fatalf("expected routed items missing:\n%s", output)
+	}
+	if !(gndSegment < via && via < vccSegment) {
+		t.Fatalf("routed items not in KiCad order:\n%s", output)
 	}
 }
 
