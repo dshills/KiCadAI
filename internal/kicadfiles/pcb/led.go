@@ -20,13 +20,12 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 		return PCBFile{}, err
 	}
 
-	nets := []Net{
-		{Code: 1, Name: "VCC"},
-		{Code: 2, Name: "LED_OUT"},
-		{Code: 3, Name: "GND"},
-	}
-	resistor := twoPadFootprint(generator, "r1", "Resistor_SMD:R_0805_2012Metric", "R1", "1k", kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)}, 1, 2)
-	led := twoPadFootprint(generator, "d1", "LED_SMD:LED_0805_2012Metric", "D1", "LED", kicadfiles.Point{X: kicadfiles.MM(45), Y: kicadfiles.MM(20)}, 2, 3)
+	nets := NewNetRegistry()
+	vcc := nets.EnsureNet("VCC").Code
+	ledOut := nets.EnsureNet("LED_OUT").Code
+	gnd := nets.EnsureNet("GND").Code
+	resistor := twoPadFootprint(generator, "r1", "Resistor_SMD:R_0805_2012Metric", "R1", "1k", kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)}, vcc, ledOut)
+	led := twoPadFootprint(generator, "d1", "LED_SMD:LED_0805_2012Metric", "D1", "LED", kicadfiles.Point{X: kicadfiles.MM(45), Y: kicadfiles.MM(20)}, ledOut, gnd)
 
 	return PCBFile{
 		Version:          kicadfiles.KiCadPCBFormatV20260206,
@@ -36,17 +35,17 @@ func LEDIndicatorPCB(input LEDIndicatorInput) (PCBFile, error) {
 		Paper:            kicadfiles.Paper{Name: "A4"},
 		Layers:           DefaultTwoLayerStack(),
 		Setup:            DefaultSetup(),
-		Nets:             nets,
+		Nets:             nets.Nets(),
 		Footprints:       []Footprint{led, resistor},
 		Drawings:         rectangleOutline(generator, kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}, kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(30)}),
 		Tracks: []Track{
-			track(generator, "vcc-r1", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(23.9), Y: kicadfiles.MM(20)}, 1),
-			track(generator, "r1-d1", kicadfiles.Point{X: kicadfiles.MM(26.1), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(43.9), Y: kicadfiles.MM(20)}, 2),
-			track(generator, "d1-gnd", kicadfiles.Point{X: kicadfiles.MM(46.1), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}, 3),
+			track(generator, "vcc-r1", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(23.9), Y: kicadfiles.MM(20)}, vcc),
+			track(generator, "r1-d1", kicadfiles.Point{X: kicadfiles.MM(26.1), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(43.9), Y: kicadfiles.MM(20)}, ledOut),
+			track(generator, "d1-gnd", kicadfiles.Point{X: kicadfiles.MM(46.1), Y: kicadfiles.MM(20)}, kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}, gnd),
 		},
 		Vias: []Via{
-			via(generator, "vcc", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, 1),
-			via(generator, "gnd", kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}, 3),
+			via(generator, "vcc", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}, vcc),
+			via(generator, "gnd", kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}, gnd),
 		},
 		TitleBlock:           kicadfiles.TitleBlock{Title: "LED Indicator"},
 		RequireClosedOutline: true,

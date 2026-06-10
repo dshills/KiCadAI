@@ -232,6 +232,62 @@ func TestWriteSortsNetsByCode(t *testing.T) {
 	}
 }
 
+func TestNetRegistryAssignsDeterministicCodes(t *testing.T) {
+	registry := NewNetRegistry("GND", "VCC")
+
+	if got := registry.EnsureNet("GND"); got.Code != 1 || got.Name != "GND" {
+		t.Fatalf("EnsureNet(GND) = %#v", got)
+	}
+	if got := registry.EnsureNet("LED_OUT"); got.Code != 3 || got.Name != "LED_OUT" {
+		t.Fatalf("EnsureNet(LED_OUT) = %#v", got)
+	}
+	if code, ok := registry.NetCode("VCC"); !ok || code != 2 {
+		t.Fatalf("NetCode(VCC) = %d, %v", code, ok)
+	}
+
+	want := []Net{{Code: 0, Name: ""}, {Code: 1, Name: "GND"}, {Code: 2, Name: "VCC"}, {Code: 3, Name: "LED_OUT"}}
+	if got := registry.Nets(); !equalNets(got, want) {
+		t.Fatalf("Nets = %#v, want %#v", got, want)
+	}
+}
+
+func TestNormalizeNetsAddsNetZero(t *testing.T) {
+	got := NormalizeNets([]Net{{Code: 2, Name: "B"}, {Code: 1, Name: "A"}})
+	want := []Net{{Code: 0, Name: ""}, {Code: 1, Name: "A"}, {Code: 2, Name: "B"}}
+	if !equalNets(got, want) {
+		t.Fatalf("NormalizeNets = %#v, want %#v", got, want)
+	}
+
+}
+
+func TestWriteNormalizesNetZeroBeforeValidation(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	board.Footprints = []Footprint{minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "(net 0 \"\")") {
+		t.Fatalf("normalized net 0 missing:\n%s", buf.String())
+	}
+}
+
+func TestWriteRejectsNamedNetZeroBeforeNormalization(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 0, Name: "GND"}}
+
+	var buf bytes.Buffer
+	err := Write(&buf, board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "nets[0].name") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestLEDIndicatorPCBWritesDeterministicBoard(t *testing.T) {
 	input := LEDIndicatorInput{
 		DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
@@ -664,6 +720,18 @@ func advancedGeometryPCB() PCBFile {
 
 func point(x, y float64) kicadfiles.Point {
 	return kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+}
+
+func equalNets(a, b []Net) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func minimalFootprint(uuid, reference string) Footprint {

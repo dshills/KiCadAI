@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/sexpr"
@@ -126,6 +127,12 @@ const (
 type Net struct {
 	Code int
 	Name string
+}
+
+type NetRegistry struct {
+	mu     sync.Mutex
+	nets   []Net
+	byName map[string]int
 }
 
 type Footprint struct {
@@ -304,6 +311,74 @@ func DefaultPlotParams() PCBPlotParams {
 	}
 }
 
+func NewNetRegistry(names ...string) *NetRegistry {
+	registry := &NetRegistry{
+		nets:   []Net{{Code: 0, Name: ""}},
+		byName: map[string]int{"": 0},
+	}
+	for _, name := range names {
+		registry.EnsureNet(name)
+	}
+	return registry
+}
+
+func (registry *NetRegistry) EnsureNet(name string) Net {
+	registry.mustBeUsable()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.ensureInitializedLocked()
+	name = strings.TrimSpace(name)
+	if code, ok := registry.byName[name]; ok {
+		return Net{Code: code, Name: name}
+	}
+	code := len(registry.nets)
+	net := Net{Code: code, Name: name}
+	registry.nets = append(registry.nets, net)
+	registry.byName[name] = code
+	return net
+}
+
+func (registry *NetRegistry) NetCode(name string) (int, bool) {
+	registry.mustBeUsable()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.ensureInitializedLocked()
+	code, ok := registry.byName[strings.TrimSpace(name)]
+	return code, ok
+}
+
+func (registry *NetRegistry) Nets() []Net {
+	registry.mustBeUsable()
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	registry.ensureInitializedLocked()
+	return slices.Clone(registry.nets)
+}
+
+func (registry *NetRegistry) mustBeUsable() {
+	if registry == nil {
+		panic("nil PCB net registry")
+	}
+}
+
+func (registry *NetRegistry) ensureInitializedLocked() {
+	if registry.byName != nil {
+		return
+	}
+	registry.nets = []Net{{Code: 0, Name: ""}}
+	registry.byName = map[string]int{"": 0}
+}
+
+func NormalizeNets(nets []Net) []Net {
+	ordered := sortedNets(slices.Clone(nets))
+	if len(ordered) > 0 && ordered[0].Code == 0 {
+		return ordered
+	}
+	normalized := make([]Net, 0, len(ordered)+1)
+	normalized = append(normalized, Net{Code: 0, Name: ""})
+	return append(normalized, ordered...)
+}
+
 func Validate(board PCBFile) error {
 	var errs kicadfiles.ValidationErrors
 	if board.Version == "" {
@@ -403,6 +478,10 @@ func Validate(board PCBFile) error {
 }
 
 func Write(w io.Writer, board PCBFile) error {
+	if err := validateNetZeroForNormalization(board.Nets); err != nil {
+		return err
+	}
+	board.Nets = NormalizeNets(board.Nets)
 	if err := Validate(board); err != nil {
 		return err
 	}
@@ -411,6 +490,15 @@ func Write(w io.Writer, board PCBFile) error {
 		return err
 	}
 	return sexpr.Render(w, node)
+}
+
+func validateNetZeroForNormalization(nets []Net) error {
+	for i, net := range nets {
+		if net.Code == 0 && net.Name != "" {
+			return fieldError(indexed("nets", i, "name"), "must be empty for net 0")
+		}
+	}
+	return nil
 }
 
 func render(board PCBFile) (sexpr.List, error) {
