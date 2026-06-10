@@ -1,6 +1,7 @@
 package schematic
 
 import (
+	"fmt"
 	"io"
 	"path"
 	"strconv"
@@ -113,13 +114,20 @@ type LEDIndicatorInput struct {
 
 func Validate(schematic SchematicFile) error {
 	var errs kicadfiles.ValidationErrors
-	if schematic.Version == "" {
+	var versionNumber int64
+	versionText := string(schematic.Version)
+	if versionText == "" {
 		errs = append(errs, fieldError("version", "required"))
-	} else if _, err := strconv.ParseInt(string(schematic.Version), 10, 64); err != nil {
+	} else if parsed, err := strconv.ParseInt(versionText, 10, 64); err != nil {
 		errs = append(errs, fieldError("version", "must be numeric"))
+	} else {
+		versionNumber = parsed
 	}
 	if strings.TrimSpace(schematic.Generator) == "" {
 		errs = append(errs, fieldError("generator", "required"))
+	}
+	if versionNumber >= kicadfiles.KiCadSchematicFormatWithGeneratorVersion && strings.TrimSpace(schematic.GeneratorVersion) == "" {
+		errs = append(errs, fieldError("generator_version", fmt.Sprintf("required for schematic versions %d and newer", kicadfiles.KiCadSchematicFormatWithGeneratorVersion)))
 	}
 	if !schematic.UUID.Valid() {
 		errs = append(errs, fieldError("uuid", "valid UUID required"))

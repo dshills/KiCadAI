@@ -16,10 +16,19 @@ import (
 type KiCadFormatVersion string
 
 const (
-	KiCadFormatV20230121    KiCadFormatVersion = "20230121"
+	KiCadFormatV20230121 KiCadFormatVersion = "20230121"
+
 	KiCadPCBFormatV20260206 KiCadFormatVersion = "20260206"
-	KiCadFormatV20260306    KiCadFormatVersion = "20260306"
+
+	KiCadSchematicFormatV20260306 KiCadFormatVersion = "20260306"
+	KiCadSchematicFormatV20260512 KiCadFormatVersion = "20260512"
+
+	// KiCadFormatV20260306 is retained for callers created before schematic
+	// and PCB format constants were split by file type.
+	KiCadFormatV20260306 KiCadFormatVersion = KiCadSchematicFormatV20260306
 )
+
+const KiCadSchematicFormatWithGeneratorVersion int64 = 20231120
 
 type UUID string
 type IU int64

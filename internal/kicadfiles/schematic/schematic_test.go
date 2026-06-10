@@ -81,6 +81,19 @@ func TestValidateRejectsMissingGenerator(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsMissingGeneratorVersionForModernSchematic(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.GeneratorVersion = " "
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "schematic.generator_version") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestWriteValidatesBeforeRendering(t *testing.T) {
 	var buf bytes.Buffer
 	err := Write(&buf, SchematicFile{})
@@ -267,7 +280,7 @@ func TestValidateRejectsDuplicateSheetName(t *testing.T) {
 
 func minimalSchematic() SchematicFile {
 	return SchematicFile{
-		Version:          kicadfiles.KiCadFormatV20260306,
+		Version:          kicadfiles.KiCadSchematicFormatV20260306,
 		Generator:        "eeschema",
 		GeneratorVersion: "10.0",
 		UUID:             kicadfiles.UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8"),
