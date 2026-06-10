@@ -31,6 +31,7 @@ type Options struct {
 	KeepArtifacts bool
 	ArtifactDir   string
 	Timeout       time.Duration
+	Allowlist     []AllowlistEntry
 }
 
 type FileType string
@@ -63,6 +64,7 @@ type Difference struct {
 	Section  string
 	ObjectID string
 	Message  string
+	Diff     string
 }
 
 func EnabledFromEnv() bool {
@@ -182,6 +184,7 @@ func CompareFiles(originalPath, roundTrippedPath string, opts Options) (Result, 
 		result.Differences = append(result.Differences, Difference{
 			Category: "normalized-diff",
 			Message:  firstDiffMessage(normalizedDiff),
+			Diff:     normalizedDiff,
 		})
 	}
 

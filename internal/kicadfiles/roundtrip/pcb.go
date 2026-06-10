@@ -101,6 +101,13 @@ func RoundTripPCB(ctx context.Context, cli KiCadCLI, inputPath string, opts Opti
 			}
 		}
 	}
+	if len(opts.Allowlist) > 0 {
+		filtered, _, err := FilterAllowedDifferences(comparison, opts.Allowlist)
+		if err != nil {
+			return comparison, err
+		}
+		comparison = filtered
+	}
 	return comparison, nil
 }
 
