@@ -51,6 +51,14 @@ func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
 	if input.Seed == "" {
 		input.Seed = input.Name
 	}
+	resistorLibrary := input.LibraryResistor
+	if resistorLibrary == "" {
+		resistorLibrary = "Device:R"
+	}
+	ledLibrary := input.LibraryLED
+	if ledLibrary == "" {
+		ledLibrary = "Device:LED"
+	}
 	projectFile := project.ProjectFile{
 		Name:          input.Name,
 		DesignID:      input.DesignID,
@@ -71,8 +79,8 @@ func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
 		Seed:            input.Seed,
 		LibraryVCC:      input.LibraryVCC,
 		LibraryGND:      input.LibraryGND,
-		LibraryResistor: input.LibraryResistor,
-		LibraryLED:      input.LibraryLED,
+		LibraryResistor: resistorLibrary,
+		LibraryLED:      ledLibrary,
 	})
 	if err != nil {
 		return Design{}, err
@@ -93,6 +101,12 @@ func LEDIndicatorDesign(input LEDIndicatorInput) (Design, error) {
 			return Design{}, err
 		}
 		design.PCB = &pcbFile
+		if err := ApplyLibraryMapping(&design, LibraryMapping{SymbolFootprints: []SymbolFootprintAssignment{
+			{SymbolLibraryID: resistorLibrary, ReferencePrefix: "R", FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric"},
+			{SymbolLibraryID: ledLibrary, ReferencePrefix: "D", FootprintLibraryID: "LED_SMD:LED_0805_2012Metric"},
+		}}); err != nil {
+			return Design{}, err
+		}
 	}
 	if err := Validate(design); err != nil {
 		return Design{}, err
@@ -129,6 +143,7 @@ func Validate(design Design) error {
 		}
 		errs = append(errs, validateFootprintLibraryReferences(design)...)
 		errs = append(errs, validateFootprintReferences(design)...)
+		errs = append(errs, validateSchematicFootprintAssignments(design)...)
 		errs = append(errs, validateExpectedNets(design)...)
 	}
 	errs = append(errs, validateUniqueUUIDs(design)...)
@@ -168,31 +183,111 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 	if design.Schematic == nil || design.PCB == nil {
 		return errs
 	}
-	symbolsByRef := schematicSymbolsByReference(design.Schematic)
-	footprintsByRef := map[string]*pcb.Footprint{}
+	symbolsByRef := map[string]*schematic.SchematicSymbol{}
+	symbolFieldsByRef := map[string]string{}
+	addSymbols := func(prefix string, file *schematic.SchematicFile) {
+		if file == nil {
+			return
+		}
+		for i := range file.Symbols {
+			symbol := &file.Symbols[i]
+			if !symbolRequiresPCBFootprint(symbol) {
+				continue
+			}
+			key := referenceKey(symbol.Reference)
+			if _, exists := symbolsByRef[key]; exists {
+				errs = append(errs, designError(prefix+"["+strconv.Itoa(i)+"].reference", "duplicate schematic reference "+strings.TrimSpace(symbol.Reference)))
+				continue
+			}
+			symbolsByRef[key] = symbol
+			symbolFieldsByRef[key] = prefix + "[" + strconv.Itoa(i) + "].reference"
+		}
+	}
+	addSymbols("schematic.symbols", design.Schematic)
+	for fileIndex, sheetFile := range design.SheetFiles {
+		addSymbols("sheet_files["+strconv.Itoa(fileIndex)+"].symbols", sheetFile)
+	}
+	footprintsByRef := map[string][]int{}
+	firstFootprintIndexByRef := map[string]int{}
 	for i := range design.PCB.Footprints {
 		footprint := &design.PCB.Footprints[i]
-		if _, ok := footprintsByRef[footprint.Reference]; ok {
-			errs = append(errs, designError("pcb.footprints["+strconv.Itoa(i)+"].reference", "duplicate"))
+		key := referenceKey(footprint.Reference)
+		if len(footprintsByRef[key]) > 0 {
+			errs = append(errs, designError("pcb.footprints["+strconv.Itoa(i)+"].reference", "duplicate of pcb.footprints["+strconv.Itoa(firstFootprintIndexByRef[key])+"].reference"))
+		} else {
+			firstFootprintIndexByRef[key] = i
 		}
-		footprintsByRef[footprint.Reference] = footprint
+		footprintsByRef[key] = append(footprintsByRef[key], i)
 	}
 	for i, footprint := range design.PCB.Footprints {
-		if _, ok := symbolsByRef[footprint.Reference]; !ok {
+		if _, ok := symbolsByRef[referenceKey(footprint.Reference)]; !ok {
 			errs = append(errs, designError("pcb.footprints["+strconv.Itoa(i)+"].reference", "missing schematic symbol"))
 		}
 	}
-	for ref, symbol := range symbolsByRef {
-		footprint, ok := footprintsByRef[ref]
+	for key, symbol := range symbolsByRef {
+		footprintIndexes, ok := footprintsByRef[key]
 		if !ok {
-			errs = append(errs, designError("pcb.footprints", "missing footprint for schematic reference "+ref))
+			errs = append(errs, designError(symbolFieldsByRef[key], "missing PCB footprint for schematic reference "+symbol.Reference))
 			continue
 		}
-		if symbol.Path != footprint.Path && !isKiCadPCBPath(footprint.Path) {
-			errs = append(errs, designError("pcb.footprints."+ref+".path", "must match schematic symbol path"))
+		for _, footprintIndex := range footprintIndexes {
+			footprint := &design.PCB.Footprints[footprintIndex]
+			if symbol.Path != footprint.Path && !isKiCadPCBPath(footprint.Path) {
+				errs = append(errs, designError("pcb.footprints["+strconv.Itoa(footprintIndex)+"].path", "must match schematic symbol path for "+symbol.Reference))
+			}
 		}
 	}
 	return errs
+}
+
+func validateSchematicFootprintAssignments(design Design) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if design.Schematic == nil || design.PCB == nil {
+		return errs
+	}
+	footprintsByRef := pcbFootprintsByReference(design.PCB)
+	checkFile := func(prefix string, file *schematic.SchematicFile) {
+		if file == nil {
+			return
+		}
+		for i := range file.Symbols {
+			symbol := &file.Symbols[i]
+			if !symbolRequiresPCBFootprint(symbol) {
+				continue
+			}
+			assigned, assignedOK := schematicFootprintProperty(symbol)
+			assigned = strings.TrimSpace(assigned)
+			footprints, footprintsOK := footprintsByRef[referenceKey(symbol.Reference)]
+			if !footprintsOK {
+				continue
+			}
+			if !assignedOK || assigned == "" {
+				errs = append(errs, designError(prefix+"["+strconv.Itoa(i)+"].properties.Footprint", "required for PCB footprint "+strings.TrimSpace(footprints[0].LibraryID)))
+				continue
+			}
+			for _, footprint := range footprints {
+				footprintLibraryID := strings.TrimSpace(footprint.LibraryID)
+				if !sameLibraryID(footprintLibraryID, assigned) {
+					errs = append(errs, designError(prefix+"["+strconv.Itoa(i)+"].properties.Footprint", "symbol "+strings.TrimSpace(symbol.Reference)+" must match PCB footprint library "+footprintLibraryID))
+				}
+			}
+		}
+	}
+	checkFile("schematic.symbols", design.Schematic)
+	for fileIndex, sheetFile := range design.SheetFiles {
+		checkFile("sheet_files["+strconv.Itoa(fileIndex)+"].symbols", sheetFile)
+	}
+	return errs
+}
+
+func symbolRequiresPCBFootprint(symbol *schematic.SchematicSymbol) bool {
+	if symbol == nil {
+		return false
+	}
+	if strings.HasPrefix(strings.TrimSpace(symbol.Reference), "#") {
+		return false
+	}
+	return symbol.OnBoard == nil || *symbol.OnBoard
 }
 
 func isKiCadPCBPath(value string) bool {
@@ -321,7 +416,7 @@ func schematicSymbolsByReference(schematicFile *schematic.SchematicFile) map[str
 		if strings.HasPrefix(symbol.Reference, "#") {
 			continue
 		}
-		symbolsByRef[symbol.Reference] = symbol
+		symbolsByRef[referenceKey(symbol.Reference)] = symbol
 	}
 	return symbolsByRef
 }

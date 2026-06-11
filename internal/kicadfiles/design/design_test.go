@@ -1,11 +1,13 @@
 package design
 
 import (
+	"reflect"
 	"strings"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/library"
+	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 )
 
@@ -216,6 +218,7 @@ func TestValidateRejectsUnresolvedNonInlineFootprintLibrary(t *testing.T) {
 func TestValidateAllowsFootprintLibraryTableReference(t *testing.T) {
 	design := validLEDDesign(t)
 	design.PCB.Footprints[0].LibraryID = "local_footprints:R_0603"
+	design.Schematic.Symbols[2].Properties = []schematic.Property{{Name: "Footprint", Value: "local_footprints:R_0603"}}
 	design.PCB.Footprints[0].Pads = nil
 	design.PCB.Footprints[0].Graphics = nil
 	design.FootprintTables = []library.TableEntry{{
@@ -226,6 +229,334 @@ func TestValidateAllowsFootprintLibraryTableReference(t *testing.T) {
 
 	if err := Validate(design); err != nil {
 		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestApplyLibraryMappingAssignsSymbolFootprintsAndTables(t *testing.T) {
+	design := validLEDDesign(t)
+	if err := ApplyLibraryMapping(&design, LibraryMapping{
+		SymbolFootprints: []SymbolFootprintAssignment{
+			{SymbolLibraryID: "Device:R", ReferencePrefix: "R", FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric"},
+			{SymbolLibraryID: "Device:LED", ReferencePrefix: "D", FootprintLibraryID: "LED_SMD:LED_0805_2012Metric"},
+		},
+		SymbolTables:            []library.TableEntry{{Name: "local_symbols", Type: "KiCad", URI: "${KIPRJMOD}/lib/local_symbols.kicad_sym"}},
+		FootprintTables:         []library.TableEntry{{Name: "local_footprints", Type: "KiCad", URI: "${KIPRJMOD}/footprints.pretty"}},
+		KnownSymbolLibraries:    []string{"Device"},
+		KnownFootprintLibraries: []string{"Resistor_SMD", "LED_SMD"},
+	}); err != nil {
+		t.Fatalf("ApplyLibraryMapping returned error: %v", err)
+	}
+
+	assertSymbolFootprint(t, design, "R1", "Resistor_SMD:R_0805_2012Metric")
+	assertSymbolFootprint(t, design, "D1", "LED_SMD:LED_0805_2012Metric")
+	if len(design.SymbolTables) != 1 || design.SymbolTables[0].Name != "local_symbols" {
+		t.Fatalf("symbol tables = %+v", design.SymbolTables)
+	}
+	if len(design.FootprintTables) != 1 || design.FootprintTables[0].Name != "local_footprints" {
+		t.Fatalf("footprint tables = %+v", design.FootprintTables)
+	}
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestApplyLibraryMappingRejectsConflictingSymbolFootprint(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Properties = []schematic.Property{{Name: "Footprint", Value: "Wrong:Part"}}
+
+	err := ApplyLibraryMapping(&design, LibraryMapping{SymbolFootprints: []SymbolFootprintAssignment{{
+		SymbolLibraryID:    "Device:R",
+		ReferencePrefix:    "R",
+		FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric",
+	}}})
+	if err == nil {
+		t.Fatal("expected conflict")
+	}
+	if !strings.Contains(err.Error(), "conflicts with mapped footprint") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestApplyLibraryMappingUpdatesFootprintPropertyAndField(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Properties = []schematic.Property{{Name: "Footprint"}}
+	design.Schematic.Symbols[1].Fields = []schematic.Field{{Name: "Footprint"}}
+
+	err := ApplyLibraryMapping(&design, LibraryMapping{SymbolFootprints: []SymbolFootprintAssignment{{
+		SymbolLibraryID:    "Device:R",
+		ReferencePrefix:    "R",
+		FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric",
+	}}})
+	if err != nil {
+		t.Fatalf("ApplyLibraryMapping returned error: %v", err)
+	}
+	if got := design.Schematic.Symbols[1].Properties[0].Value; got != "Resistor_SMD:R_0805_2012Metric" {
+		t.Fatalf("property footprint = %q", got)
+	}
+	if got := design.Schematic.Symbols[1].Fields[0].Value; got != "Resistor_SMD:R_0805_2012Metric" {
+		t.Fatalf("field footprint = %q", got)
+	}
+}
+
+func TestCloneSchematicFileAccountsForEveryField(t *testing.T) {
+	accounted := map[string]struct{}{
+		"Filename":         {},
+		"Version":          {},
+		"Generator":        {},
+		"GeneratorVersion": {},
+		"UUID":             {},
+		"Paper":            {},
+		"TitleBlock":       {},
+		"LibSymbols":       {},
+		"Symbols":          {},
+		"Wires":            {},
+		"NoConnects":       {},
+		"Labels":           {},
+		"Junctions":        {},
+		"Buses":            {},
+		"Polylines":        {},
+		"BusEntries":       {},
+		"Texts":            {},
+		"Sheets":           {},
+		"RawItems":         {},
+		"Instances":        {},
+		"SheetInstances":   {},
+	}
+	schematicType := reflect.TypeOf(schematic.SchematicFile{})
+	for i := 0; i < schematicType.NumField(); i++ {
+		fieldName := schematicType.Field(i).Name
+		if _, ok := accounted[fieldName]; !ok {
+			t.Fatalf("cloneSchematicFile needs an explicit clone policy for SchematicFile.%s", fieldName)
+		}
+		delete(accounted, fieldName)
+	}
+	for fieldName := range accounted {
+		t.Fatalf("cloneSchematicFile accounts for removed SchematicFile.%s", fieldName)
+	}
+}
+
+func TestClonePCBFootprintAccountsForEveryField(t *testing.T) {
+	accounted := map[string]struct{}{
+		"UUID":                          {},
+		"Path":                          {},
+		"LibraryID":                     {},
+		"Reference":                     {},
+		"Value":                         {},
+		"Description":                   {},
+		"Tags":                          {},
+		"SheetName":                     {},
+		"SheetFile":                     {},
+		"Attributes":                    {},
+		"Position":                      {},
+		"Rotation":                      {},
+		"Layer":                         {},
+		"Locked":                        {},
+		"Properties":                    {},
+		"MetadataProperties":            {},
+		"Units":                         {},
+		"NetTiePadGroups":               {},
+		"Texts":                         {},
+		"Pads":                          {},
+		"Graphics":                      {},
+		"Models":                        {},
+		"EmbeddedFonts":                 {},
+		"DuplicatePadNumbersAreJumpers": {},
+	}
+	footprintType := reflect.TypeOf(pcb.Footprint{})
+	for i := 0; i < footprintType.NumField(); i++ {
+		fieldName := footprintType.Field(i).Name
+		if _, ok := accounted[fieldName]; !ok {
+			t.Fatalf("clonePCBFootprint needs an explicit clone policy for Footprint.%s", fieldName)
+		}
+		delete(accounted, fieldName)
+	}
+	for fieldName := range accounted {
+		t.Fatalf("clonePCBFootprint accounts for removed Footprint.%s", fieldName)
+	}
+}
+
+func TestApplyLibraryMappingLeavesDesignUnchangedOnPCBConflict(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Properties = nil
+	design.PCB.Footprints[1].LibraryID = "Other:R_0805"
+
+	err := ApplyLibraryMapping(&design, LibraryMapping{
+		SymbolFootprints: []SymbolFootprintAssignment{{
+			SymbolLibraryID:    "Device:R",
+			ReferencePrefix:    "R",
+			FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric",
+		}},
+		FootprintTables: []library.TableEntry{{Name: "local_footprints", Type: "KiCad", URI: "${KIPRJMOD}/footprints.pretty"}},
+	})
+	if err == nil {
+		t.Fatal("expected PCB conflict")
+	}
+	if _, ok := schematicFootprintProperty(&design.Schematic.Symbols[1]); ok {
+		t.Fatalf("symbol footprint was mutated after failed mapping: %+v", design.Schematic.Symbols[1])
+	}
+	if len(design.FootprintTables) != 0 {
+		t.Fatalf("footprint tables mutated after failed mapping: %+v", design.FootprintTables)
+	}
+}
+
+func TestApplyLibraryMappingRejectsInconsistentReferenceMapping(t *testing.T) {
+	design := validLEDDesign(t)
+	secondUnit := design.Schematic.Symbols[1]
+	secondUnit.UUID = kicadfiles.UUID("99999999-9999-4999-8999-999999999999")
+	secondUnit.LibraryID = "Device:R_Pack"
+	secondUnit.Properties = nil
+	design.Schematic.Symbols = append(design.Schematic.Symbols, secondUnit)
+
+	err := ApplyLibraryMapping(&design, LibraryMapping{SymbolFootprints: []SymbolFootprintAssignment{
+		{SymbolLibraryID: "Device:R", ReferencePrefix: "R", FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric"},
+		{SymbolLibraryID: "Device:R_Pack", ReferencePrefix: "R", FootprintLibraryID: "Resistor_SMD:R_Array"},
+	}})
+	if err == nil {
+		t.Fatal("expected inconsistent mapping")
+	}
+	if !strings.Contains(err.Error(), "maps to both") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestApplyLibraryMappingReferencePrefixRequiresNumericBoundary(t *testing.T) {
+	design := validLEDDesign(t)
+	varistor := design.Schematic.Symbols[1]
+	varistor.Reference = "RV1"
+	varistor.LibraryID = "Device:Varistor"
+	varistor.Properties = nil
+	design.Schematic.Symbols = append(design.Schematic.Symbols, varistor)
+
+	err := ApplyLibraryMapping(&design, LibraryMapping{SymbolFootprints: []SymbolFootprintAssignment{{
+		ReferencePrefix:    "R",
+		FootprintLibraryID: "Resistor_SMD:R_0805_2012Metric",
+	}}})
+	if err != nil {
+		t.Fatalf("ApplyLibraryMapping returned error: %v", err)
+	}
+	if _, ok := schematicFootprintProperty(&design.Schematic.Symbols[len(design.Schematic.Symbols)-1]); ok {
+		t.Fatalf("RV reference was incorrectly matched by R prefix: %+v", design.Schematic.Symbols[len(design.Schematic.Symbols)-1])
+	}
+}
+
+func TestValidateRejectsSchematicPCBFootprintMismatch(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Properties = []schematic.Property{{Name: "Footprint", Value: "Wrong:Part"}}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected mismatch")
+	}
+	if !strings.Contains(err.Error(), "properties.Footprint") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateMatchesSchematicPCBFootprintsCaseInsensitively(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Reference = "r1"
+	design.Schematic.Symbols[1].Properties = []schematic.Property{{Name: "Footprint", Value: "resistor_smd:r_0805_2012metric"}}
+
+	err := Validate(design)
+	if err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRequiresSchematicFootprintForPCBBackedSymbol(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Properties = nil
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected missing schematic footprint assignment")
+	}
+	if !strings.Contains(err.Error(), "properties.Footprint") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAllowsOffBoardSymbolWithoutPCBFootprint(t *testing.T) {
+	design := validLEDDesign(t)
+	onBoard := false
+	design.Schematic.Symbols[1].OnBoard = &onBoard
+	design.PCB.Footprints = append(design.PCB.Footprints[:1], design.PCB.Footprints[2:]...)
+
+	err := Validate(design)
+	if err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateAcceptsPCBFootprintForChildSheetSymbol(t *testing.T) {
+	design := validLEDDesign(t)
+	childSymbol := design.Schematic.Symbols[1]
+	childSymbol.Path = design.PCB.Footprints[1].Path
+	design.Schematic.Symbols = append(design.Schematic.Symbols[:1], design.Schematic.Symbols[2:]...)
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{childSymbol}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	err := Validate(design)
+	if err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateSchematicReferenceAcrossSheets(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{design.Schematic.Symbols[1]}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected duplicate schematic reference")
+	}
+	if !strings.Contains(err.Error(), "duplicate schematic reference R1") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateChecksEveryDuplicatePCBFootprintAssignment(t *testing.T) {
+	design := validLEDDesign(t)
+	design.Schematic.Symbols[1].Properties = []schematic.Property{{Name: "Footprint", Value: "Resistor_SMD:R_0805_2012Metric"}}
+	duplicate := design.PCB.Footprints[1]
+	duplicate.LibraryID = "Wrong:Part"
+	design.PCB.Footprints = append(design.PCB.Footprints, duplicate)
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected duplicate footprint mismatch")
+	}
+	if !strings.Contains(err.Error(), "must match PCB footprint library Wrong:Part") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestApplyLibraryMappingRejectsInvalidAssignment(t *testing.T) {
+	design := validLEDDesign(t)
+	err := ApplyLibraryMapping(&design, LibraryMapping{SymbolFootprints: []SymbolFootprintAssignment{{
+		ReferencePrefix:    "R",
+		FootprintLibraryID: "missing_colon",
+	}}})
+	if err == nil {
+		t.Fatal("expected invalid assignment")
+	}
+	if !strings.Contains(err.Error(), "footprint_library_id") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -351,4 +682,23 @@ func validLEDDesign(t *testing.T) Design {
 		t.Fatalf("LEDIndicatorDesign returned error: %v", err)
 	}
 	return design
+}
+
+func assertSymbolFootprint(t *testing.T, design Design, reference, want string) {
+	t.Helper()
+	for i := range design.Schematic.Symbols {
+		symbol := &design.Schematic.Symbols[i]
+		if symbol.Reference != reference {
+			continue
+		}
+		got, ok := schematicFootprintProperty(symbol)
+		if !ok {
+			t.Fatalf("symbol %s missing Footprint property", reference)
+		}
+		if got != want {
+			t.Fatalf("symbol %s footprint = %q, want %q", reference, got, want)
+		}
+		return
+	}
+	t.Fatalf("symbol %s not found", reference)
 }
