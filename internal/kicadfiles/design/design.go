@@ -471,66 +471,100 @@ func validateUniqueUUIDs(design Design) kicadfiles.ValidationErrors {
 	}
 	add(design.Project.DesignID, uuidLocation{field: "project.design_id"})
 	if design.Schematic != nil {
-		add(design.Schematic.UUID, uuidLocation{field: "schematic.uuid"})
-		for i, symbol := range design.Schematic.Symbols {
-			add(symbol.UUID, uuidLocation{collection: "schematic.symbols", index: i, field: "uuid"})
-		}
-		for i, wire := range design.Schematic.Wires {
-			add(wire.UUID, uuidLocation{collection: "schematic.wires", index: i, field: "uuid"})
-		}
-		for i, label := range design.Schematic.Labels {
-			add(label.UUID, uuidLocation{collection: "schematic.labels", index: i, field: "uuid"})
-		}
-		for i, junction := range design.Schematic.Junctions {
-			add(junction.UUID, uuidLocation{collection: "schematic.junctions", index: i, field: "uuid"})
-		}
-		for i, sheet := range design.Schematic.Sheets {
-			add(sheet.UUID, uuidLocation{collection: "schematic.sheets", index: i, field: "uuid"})
-		}
+		addSchematicUUIDs(design.Schematic, "schematic", add)
 	}
 	for fileIndex, sheetFile := range design.SheetFiles {
 		if sheetFile == nil {
 			errs = append(errs, designError("sheet_files["+strconv.Itoa(fileIndex)+"]", "nil"))
 			continue
 		}
-		add(sheetFile.UUID, uuidLocation{collection: "sheet_files", index: fileIndex, field: "uuid"})
-		for i, symbol := range sheetFile.Symbols {
-			add(symbol.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].symbols", index: i, field: "uuid"})
-		}
-		for i, wire := range sheetFile.Wires {
-			add(wire.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].wires", index: i, field: "uuid"})
-		}
-		for i, label := range sheetFile.Labels {
-			add(label.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].labels", index: i, field: "uuid"})
-		}
-		for i, junction := range sheetFile.Junctions {
-			add(junction.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].junctions", index: i, field: "uuid"})
-		}
-		for i, sheet := range sheetFile.Sheets {
-			add(sheet.UUID, uuidLocation{collection: "sheet_files[" + strconv.Itoa(fileIndex) + "].sheets", index: i, field: "uuid"})
-		}
+		addSchematicUUIDs(sheetFile, "sheet_files["+strconv.Itoa(fileIndex)+"]", add)
 	}
 	if design.PCB != nil {
-		for i, footprint := range design.PCB.Footprints {
-			add(footprint.UUID, uuidLocation{collection: "pcb.footprints", index: i, field: "uuid"})
-		}
-		for i, drawing := range design.PCB.Drawings {
-			add(drawing.UUID, uuidLocation{collection: "pcb.drawings", index: i, field: "uuid"})
-		}
-		for i, track := range design.PCB.Tracks {
-			add(track.UUID, uuidLocation{collection: "pcb.tracks", index: i, field: "uuid"})
-		}
-		for i, via := range design.PCB.Vias {
-			add(via.UUID, uuidLocation{collection: "pcb.vias", index: i, field: "uuid"})
-		}
-		for i, zone := range design.PCB.Zones {
-			add(zone.UUID, uuidLocation{collection: "pcb.zones", index: i, field: "uuid"})
-		}
-		for i, dimension := range design.PCB.Dimensions {
-			add(dimension.UUID, uuidLocation{collection: "pcb.dimensions", index: i, field: "uuid"})
-		}
+		addPCBUUIDs(design.PCB, add)
 	}
 	return errs
+}
+
+type uuidAddFunc func(id kicadfiles.UUID, location uuidLocation)
+
+func addSchematicUUIDs(schematicFile *schematic.SchematicFile, prefix string, add uuidAddFunc) {
+	add(schematicFile.UUID, uuidLocation{field: prefix + ".uuid"})
+	for i, symbol := range schematicFile.Symbols {
+		add(symbol.UUID, uuidLocation{collection: prefix + ".symbols", index: i, field: "uuid"})
+		pinCollection := prefix + ".symbols[" + strconv.Itoa(i) + "].pins"
+		for pinIndex, pin := range symbol.Pins {
+			add(pin.UUID, uuidLocation{collection: pinCollection, index: pinIndex, field: "uuid"})
+		}
+	}
+	for i, wire := range schematicFile.Wires {
+		add(wire.UUID, uuidLocation{collection: prefix + ".wires", index: i, field: "uuid"})
+	}
+	for i, noConnect := range schematicFile.NoConnects {
+		add(noConnect.UUID, uuidLocation{collection: prefix + ".no_connects", index: i, field: "uuid"})
+	}
+	for i, label := range schematicFile.Labels {
+		add(label.UUID, uuidLocation{collection: prefix + ".labels", index: i, field: "uuid"})
+	}
+	for i, junction := range schematicFile.Junctions {
+		add(junction.UUID, uuidLocation{collection: prefix + ".junctions", index: i, field: "uuid"})
+	}
+	for i, bus := range schematicFile.Buses {
+		add(bus.UUID, uuidLocation{collection: prefix + ".buses", index: i, field: "uuid"})
+	}
+	for i, polyline := range schematicFile.Polylines {
+		add(polyline.UUID, uuidLocation{collection: prefix + ".polylines", index: i, field: "uuid"})
+	}
+	for i, entry := range schematicFile.BusEntries {
+		add(entry.UUID, uuidLocation{collection: prefix + ".bus_entries", index: i, field: "uuid"})
+	}
+	for i, text := range schematicFile.Texts {
+		add(text.UUID, uuidLocation{collection: prefix + ".texts", index: i, field: "uuid"})
+	}
+	for i, sheet := range schematicFile.Sheets {
+		add(sheet.UUID, uuidLocation{collection: prefix + ".sheets", index: i, field: "uuid"})
+		pinCollection := prefix + ".sheets[" + strconv.Itoa(i) + "].pins"
+		for pinIndex, pin := range sheet.Pins {
+			add(pin.UUID, uuidLocation{collection: pinCollection, index: pinIndex, field: "uuid"})
+		}
+	}
+	for i, raw := range schematicFile.RawItems {
+		add(raw.UUID, uuidLocation{collection: prefix + ".raw_items", index: i, field: "uuid"})
+	}
+}
+
+func addPCBUUIDs(board *pcb.PCBFile, add uuidAddFunc) {
+	for i, footprint := range board.Footprints {
+		add(footprint.UUID, uuidLocation{collection: "pcb.footprints", index: i, field: "uuid"})
+		footprintCollection := "pcb.footprints[" + strconv.Itoa(i) + "]"
+		for propertyIndex, property := range footprint.Properties {
+			add(property.UUID, uuidLocation{collection: footprintCollection + ".properties", index: propertyIndex, field: "uuid"})
+		}
+		for textIndex, text := range footprint.Texts {
+			add(text.UUID, uuidLocation{collection: footprintCollection + ".texts", index: textIndex, field: "uuid"})
+		}
+		for padIndex, pad := range footprint.Pads {
+			add(pad.UUID, uuidLocation{collection: footprintCollection + ".pads", index: padIndex, field: "uuid"})
+		}
+		for graphicIndex, graphic := range footprint.Graphics {
+			add(graphic.UUID, uuidLocation{collection: footprintCollection + ".graphics", index: graphicIndex, field: "uuid"})
+		}
+	}
+	for i, drawing := range board.Drawings {
+		add(drawing.UUID, uuidLocation{collection: "pcb.drawings", index: i, field: "uuid"})
+	}
+	for i, track := range board.Tracks {
+		add(track.UUID, uuidLocation{collection: "pcb.tracks", index: i, field: "uuid"})
+	}
+	for i, via := range board.Vias {
+		add(via.UUID, uuidLocation{collection: "pcb.vias", index: i, field: "uuid"})
+	}
+	for i, zone := range board.Zones {
+		add(zone.UUID, uuidLocation{collection: "pcb.zones", index: i, field: "uuid"})
+	}
+	for i, dimension := range board.Dimensions {
+		add(dimension.UUID, uuidLocation{collection: "pcb.dimensions", index: i, field: "uuid"})
+	}
 }
 
 func validateSheetFiles(design Design) kicadfiles.ValidationErrors {

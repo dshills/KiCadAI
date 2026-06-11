@@ -9,6 +9,7 @@ import (
 	"kicadai/internal/kicadfiles/library"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/kicadfiles/sexpr"
 )
 
 func TestLEDIndicatorDesignValidates(t *testing.T) {
@@ -722,6 +723,114 @@ func TestValidateRejectsDuplicateUUIDInsideChildSheet(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateSymbolPinUUID(t *testing.T) {
+	design := validLEDDesign(t)
+	duplicate := kicadfiles.UUID("12345678-1234-5678-9234-123456789ad0")
+	design.Schematic.Symbols[1].Pins = []schematic.SymbolPin{
+		{Number: "1", UUID: duplicate},
+		{Number: "2", UUID: duplicate},
+	}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "schematic.symbols[1].pins[1].uuid") || !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateSheetPinUUID(t *testing.T) {
+	design := validLEDDesign(t)
+	duplicate := kicadfiles.UUID("12345678-1234-5678-9234-123456789ad0")
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Power",
+		Filename: "power.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		Pins: []schematic.SheetPin{
+			{UUID: duplicate, Text: "VIN", Kind: schematic.SheetPinInput},
+			{UUID: duplicate, Text: "VOUT", Kind: schematic.SheetPinOutput},
+		},
+	}}
+	child := minimalChildSheet("power.kicad_sch")
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "schematic.sheets[0].pins[1].uuid") || !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateRawSchematicItemUUID(t *testing.T) {
+	design := validLEDDesign(t)
+	duplicate := kicadfiles.UUID("33333333-3333-4333-8333-333333333333")
+	design.Schematic.RawItems = []schematic.RawSchematicItem{
+		{
+			UUID: duplicate,
+			Body: sexpr.Raw(`(rule_area (name "Keepout A") (uuid "33333333-3333-4333-8333-333333333333"))`),
+		},
+		{
+			UUID: duplicate,
+			Body: sexpr.Raw(`(rule_area (name "Keepout B") (uuid "33333333-3333-4333-8333-333333333333"))`),
+		},
+	}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "schematic.raw_items[1].uuid") || !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateNoConnectUUID(t *testing.T) {
+	design := validLEDDesign(t)
+	duplicate := kicadfiles.UUID("12345678-1234-5678-9234-123456789ad0")
+	design.Schematic.NoConnects = []schematic.NoConnect{
+		{UUID: duplicate, Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}},
+		{UUID: duplicate, Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}},
+	}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "schematic.no_connects[1].uuid") || !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicatePCBPadUUID(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB.Footprints[0].Pads[1].UUID = design.PCB.Footprints[0].Pads[0].UUID
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pcb.footprints[0].pads[1].uuid") || !strings.Contains(err.Error(), "duplicate UUID") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateFootprintPropertyUUID(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB.Footprints[0].Properties[1].UUID = design.PCB.Footprints[0].Properties[0].UUID
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "pcb.footprints[0].properties[1].uuid") || !strings.Contains(err.Error(), "duplicate UUID") {
 		t.Fatalf("error = %v", err)
 	}
 }
