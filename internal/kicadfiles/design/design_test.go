@@ -186,6 +186,97 @@ func TestValidateAllowsKnownExternalSymbolLibrary(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsUnresolvedChildSheetSymbolLibrary(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ac1"),
+		LibraryID: "Missing:R",
+		Reference: "R99",
+		Value:     "1k",
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected unresolved child symbol library")
+	}
+	if !strings.Contains(err.Error(), "sheet_files[0].symbols[0].library_id") || !strings.Contains(err.Error(), "unresolved library Missing") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAllowsChildSheetEmbeddedSymbolLibrary(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.LibSymbols = []schematic.EmbeddedSymbol{{LibraryID: "Local:R"}}
+	child.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ac1"),
+		LibraryID: "Local:R",
+		Reference: "R99",
+		Value:     "1k",
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateAllowsChildSheetKnownAndTableSymbolLibraries(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{
+		{
+			UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ac1"),
+			LibraryID: "Device:R",
+			Reference: "R99",
+			Value:     "1k",
+		},
+		{
+			UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ac2"),
+			LibraryID: "local_symbols:Thing",
+			Reference: "U99",
+			Value:     "Thing",
+		},
+	}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+	design.KnownSymbolLibraries = []string{"Device"}
+	design.SymbolTables = []library.TableEntry{{
+		Name: "local_symbols",
+		Type: "KiCad",
+		URI:  "${KIPRJMOD}/local_symbols.kicad_sym",
+	}}
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
 func TestValidateTrimsLibraryIDNickname(t *testing.T) {
 	design := validLEDDesign(t)
 	design.Schematic.LibSymbols = nil
@@ -502,6 +593,7 @@ func TestValidateAcceptsPCBFootprintForChildSheetSymbol(t *testing.T) {
 	child := minimalChildSheet("child.kicad_sch")
 	child.Symbols = []schematic.SchematicSymbol{childSymbol}
 	design.SheetFiles = []*schematic.SchematicFile{&child}
+	design.KnownSymbolLibraries = []string{"Device"}
 
 	err := Validate(design)
 	if err != nil {

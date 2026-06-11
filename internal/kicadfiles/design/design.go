@@ -321,33 +321,50 @@ func validateSchematicReferences(schematicFile *schematic.SchematicFile) kicadfi
 
 func validateSymbolLibraryReferences(design Design) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
-	if design.Schematic == nil {
-		return errs
-	}
-	embedded := map[string]struct{}{}
-	for _, symbol := range design.Schematic.LibSymbols {
-		embedded[symbol.LibraryID] = struct{}{}
-	}
 	tables := tableNicknames(design.SymbolTables)
 	known := nameSet(design.KnownSymbolLibraries)
-	for i, symbol := range design.Schematic.Symbols {
-		if _, ok := embedded[symbol.LibraryID]; ok {
-			continue
+	for _, file := range designSchematicFiles(design) {
+		embedded := map[string]struct{}{}
+		for _, symbol := range file.schematic.LibSymbols {
+			embedded[symbol.LibraryID] = struct{}{}
 		}
-		nickname, err := libraryNickname(symbol.LibraryID)
-		if err != nil {
-			errs = append(errs, designError("schematic.symbols["+strconv.Itoa(i)+"].library_id", err.Error()))
-			continue
+		for i, symbol := range file.schematic.Symbols {
+			if _, ok := embedded[symbol.LibraryID]; ok {
+				continue
+			}
+			nickname, err := libraryNickname(symbol.LibraryID)
+			if err != nil {
+				errs = append(errs, designError(file.prefix+".symbols["+strconv.Itoa(i)+"].library_id", err.Error()))
+				continue
+			}
+			if _, ok := tables[nickname]; ok {
+				continue
+			}
+			if _, ok := known[nickname]; ok {
+				continue
+			}
+			errs = append(errs, designError(file.prefix+".symbols["+strconv.Itoa(i)+"].library_id", "unresolved library "+nickname))
 		}
-		if _, ok := tables[nickname]; ok {
-			continue
-		}
-		if _, ok := known[nickname]; ok {
-			continue
-		}
-		errs = append(errs, designError("schematic.symbols["+strconv.Itoa(i)+"].library_id", "unresolved library "+nickname))
 	}
 	return errs
+}
+
+type designSchematicFile struct {
+	prefix    string
+	schematic *schematic.SchematicFile
+}
+
+func designSchematicFiles(design Design) []designSchematicFile {
+	files := make([]designSchematicFile, 0, 1+len(design.SheetFiles))
+	if design.Schematic != nil {
+		files = append(files, designSchematicFile{prefix: "schematic", schematic: design.Schematic})
+	}
+	for i, file := range design.SheetFiles {
+		if file != nil {
+			files = append(files, designSchematicFile{prefix: "sheet_files[" + strconv.Itoa(i) + "]", schematic: file})
+		}
+	}
+	return files
 }
 
 func validateFootprintLibraryReferences(design Design) kicadfiles.ValidationErrors {
