@@ -376,7 +376,15 @@ func TestWriteRendersFootprintPropertiesAndModel(t *testing.T) {
 	footprint.Tags = "resistor"
 	footprint.SheetName = "/"
 	footprint.SheetFile = "test.kicad_sch"
+	footprint.Locked = true
 	footprint.Attributes = []string{"smd"}
+	footprint.MetadataProperties = []FootprintMetadataProperty{
+		{Name: "ki_fp_filters", Value: "R_*"},
+	}
+	footprint.Units = []FootprintUnit{
+		{Name: "A", Pins: []string{"1", "2"}},
+	}
+	footprint.NetTiePadGroups = []string{"1,2"}
 	footprint.Properties = []FootprintProperty{
 		{
 			UUID:     kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
@@ -408,16 +416,23 @@ func TestWriteRendersFootprintPropertiesAndModel(t *testing.T) {
 	}
 	output := buf.String()
 	for _, want := range []string{
+		"(locked yes)",
 		"(descr \"Chip resistor\")",
 		"(tags \"resistor\")",
 		"(property",
 		"\"Reference\"",
 		"\"R1\"",
+		"(property \"ki_fp_filters\" \"R_*\")",
 		"(unlocked yes)",
 		"(effects",
 		"(sheetname \"/\")",
 		"(sheetfile \"test.kicad_sch\")",
+		"(units",
+		"(unit",
+		"(name \"A\")",
+		"(pins \"1\" \"2\")",
 		"(attr smd)",
+		"(net_tie_pad_groups \"1,2\")",
 		"(embedded_fonts no)",
 		"(model",
 		"\"${KICAD6_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0603_1608Metric.wrl\"",
@@ -429,6 +444,116 @@ func TestWriteRendersFootprintPropertiesAndModel(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
+	}
+}
+
+func TestValidateRejectsInvalidFootprintMetadata(t *testing.T) {
+	tests := []struct {
+		name      string
+		footprint Footprint
+		want      string
+	}{
+		{
+			name: "duplicate property name",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.Texts = nil
+				footprint.Properties = []FootprintProperty{
+					{UUID: kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), Name: "Reference", Value: "R1", Layer: kicadfiles.LayerFSilkS},
+					{UUID: kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"), Name: "Value", Value: "value", Layer: kicadfiles.LayerFFab},
+				}
+				footprint.MetadataProperties = []FootprintMetadataProperty{{Name: "Value", Value: "duplicate"}}
+				return footprint
+			}(),
+			want: "metadata_properties[0].name",
+		},
+		{
+			name: "duplicate property name after trimming",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.Texts = nil
+				footprint.Properties = []FootprintProperty{
+					{UUID: kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), Name: "Reference", Value: "R1", Layer: kicadfiles.LayerFSilkS},
+					{UUID: kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"), Name: "Value", Value: "value", Layer: kicadfiles.LayerFFab},
+				}
+				footprint.MetadataProperties = []FootprintMetadataProperty{{Name: " Value ", Value: "duplicate"}}
+				return footprint
+			}(),
+			want: "metadata_properties[0].name",
+		},
+		{
+			name: "duplicate attribute",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.Attributes = []string{"smd", "smd"}
+				return footprint
+			}(),
+			want: "attributes[1]",
+		},
+		{
+			name: "empty unit pin",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.Units = []FootprintUnit{{Name: "A", Pins: []string{" "}}}
+				return footprint
+			}(),
+			want: "units[0].pins[0]",
+		},
+		{
+			name: "duplicate unit name",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.Units = []FootprintUnit{
+					{Name: "A", Pins: []string{"1"}},
+					{Name: "A", Pins: []string{"2"}},
+				}
+				return footprint
+			}(),
+			want: "units[1].name",
+		},
+		{
+			name: "duplicate unit pin",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.Units = []FootprintUnit{{Name: "A", Pins: []string{"1", "1"}}}
+				return footprint
+			}(),
+			want: "units[0].pins[1]",
+		},
+		{
+			name: "empty net tie group",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.NetTiePadGroups = []string{" "}
+				return footprint
+			}(),
+			want: "net_tie_pad_groups[0]",
+		},
+		{
+			name: "duplicate net tie group",
+			footprint: func() Footprint {
+				footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+				footprint.NetTiePadGroups = []string{"1,2", "1,2"}
+				return footprint
+			}(),
+			want: "net_tie_pad_groups[1]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board := minimalPCB()
+			board.Nets = []Net{{Code: 1, Name: "A"}}
+			board.Footprints = []Footprint{tt.footprint}
+
+			err := Validate(board)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v", err)
+			}
+		})
 	}
 }
 

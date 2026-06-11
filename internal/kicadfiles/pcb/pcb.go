@@ -148,25 +148,29 @@ type NetRegistry struct {
 }
 
 type Footprint struct {
-	UUID          kicadfiles.UUID
-	Path          string
-	LibraryID     string
-	Reference     string
-	Value         string
-	Description   string
-	Tags          string
-	SheetName     string
-	SheetFile     string
-	Attributes    []string
-	Position      kicadfiles.Point
-	Rotation      kicadfiles.Angle
-	Layer         kicadfiles.BoardLayer
-	Properties    []FootprintProperty
-	Texts         []FootprintText
-	Pads          []Pad
-	Graphics      []FootprintGraphic
-	Models        []Model3D
-	EmbeddedFonts *bool
+	UUID               kicadfiles.UUID
+	Path               string
+	LibraryID          string
+	Reference          string
+	Value              string
+	Description        string
+	Tags               string
+	SheetName          string
+	SheetFile          string
+	Attributes         []string
+	Position           kicadfiles.Point
+	Rotation           kicadfiles.Angle
+	Layer              kicadfiles.BoardLayer
+	Locked             bool
+	Properties         []FootprintProperty
+	MetadataProperties []FootprintMetadataProperty
+	Units              []FootprintUnit
+	NetTiePadGroups    []string
+	Texts              []FootprintText
+	Pads               []Pad
+	Graphics           []FootprintGraphic
+	Models             []Model3D
+	EmbeddedFonts      *bool
 	// KiCad 10 writes this flag explicitly on saved footprints.
 	DuplicatePadNumbersAreJumpers *bool
 }
@@ -190,6 +194,16 @@ type FootprintProperty struct {
 	Hide     bool
 	Unlocked bool
 	Effects  TextEffects
+}
+
+type FootprintMetadataProperty struct {
+	Name  string
+	Value string
+}
+
+type FootprintUnit struct {
+	Name string
+	Pins []string
 }
 
 type TextEffects struct {
@@ -827,10 +841,15 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	nodes := []sexpr.Node{
 		sexpr.A("footprint"),
 		sexpr.S(footprint.LibraryID),
+	}
+	if footprint.Locked {
+		nodes = append(nodes, sexpr.L(sexpr.A("locked"), sexpr.A("yes")))
+	}
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(footprint.Layer))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(footprint.UUID))),
 		renderAt(footprint.Position, footprint.Rotation),
-	}
+	)
 	if strings.TrimSpace(footprint.Description) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("descr"), sexpr.S(footprint.Description)))
 	}
@@ -839,6 +858,9 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	}
 	for _, property := range footprint.Properties {
 		nodes = append(nodes, renderFootprintProperty(property))
+	}
+	for _, property := range footprint.MetadataProperties {
+		nodes = append(nodes, renderFootprintMetadataProperty(property))
 	}
 	if strings.TrimSpace(footprint.Path) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("path"), sexpr.S(footprint.Path)))
@@ -849,12 +871,22 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	if strings.TrimSpace(footprint.SheetFile) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("sheetfile"), sexpr.S(footprint.SheetFile)))
 	}
+	if len(footprint.Units) > 0 {
+		nodes = append(nodes, renderFootprintUnits(footprint.Units))
+	}
 	if len(footprint.Attributes) > 0 {
 		attrNodes := []sexpr.Node{sexpr.A("attr")}
 		for _, attr := range footprint.Attributes {
 			attrNodes = append(attrNodes, sexpr.A(attr))
 		}
 		nodes = append(nodes, sexpr.L(attrNodes...))
+	}
+	if len(footprint.NetTiePadGroups) > 0 {
+		groupNodes := []sexpr.Node{sexpr.A("net_tie_pad_groups")}
+		for _, group := range footprint.NetTiePadGroups {
+			groupNodes = append(groupNodes, sexpr.S(group))
+		}
+		nodes = append(nodes, sexpr.L(groupNodes...))
 	}
 	if footprint.DuplicatePadNumbersAreJumpers != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("duplicate_pad_numbers_are_jumpers"), yesNo(*footprint.DuplicatePadNumbersAreJumpers)))
@@ -873,6 +905,27 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	}
 	for _, model := range footprint.Models {
 		nodes = append(nodes, renderModel3D(model))
+	}
+	return sexpr.L(nodes...)
+}
+
+func renderFootprintMetadataProperty(property FootprintMetadataProperty) sexpr.List {
+	return sexpr.L(sexpr.A("property"), sexpr.S(property.Name), sexpr.S(property.Value))
+}
+
+func renderFootprintUnits(units []FootprintUnit) sexpr.List {
+	nodes := []sexpr.Node{sexpr.A("units")}
+	for _, unit := range units {
+		unitNodes := []sexpr.Node{
+			sexpr.A("unit"),
+			sexpr.L(sexpr.A("name"), sexpr.S(unit.Name)),
+		}
+		pinNodes := []sexpr.Node{sexpr.A("pins")}
+		for _, pin := range unit.Pins {
+			pinNodes = append(pinNodes, sexpr.S(pin))
+		}
+		unitNodes = append(unitNodes, sexpr.L(pinNodes...))
+		nodes = append(nodes, sexpr.L(unitNodes...))
 	}
 	return sexpr.L(nodes...)
 }
@@ -1620,8 +1673,14 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 	valueProperty := ""
 	hasReferenceProperty := false
 	hasValueProperty := false
+	propertyNames := map[string]struct{}{}
 	for propertyIndex, property := range footprint.Properties {
 		errs = append(errs, validateFootprintProperty(prefix("properties"), propertyIndex, property)...)
+		propertyName := strings.TrimSpace(property.Name)
+		if _, exists := propertyNames[propertyName]; exists {
+			errs = append(errs, fieldError(indexed(prefix("properties"), propertyIndex, "name"), "duplicate"))
+		}
+		propertyNames[propertyName] = struct{}{}
 		switch property.Name {
 		case "Reference":
 			referenceProperty = property.Value
@@ -1630,6 +1689,51 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 			valueProperty = property.Value
 			hasValueProperty = true
 		}
+	}
+	for propertyIndex, property := range footprint.MetadataProperties {
+		errs = append(errs, validateFootprintMetadataProperty(prefix("metadata_properties"), propertyIndex, property)...)
+		propertyName := strings.TrimSpace(property.Name)
+		if _, exists := propertyNames[propertyName]; exists {
+			errs = append(errs, fieldError(indexed(prefix("metadata_properties"), propertyIndex, "name"), "duplicate"))
+		}
+		propertyNames[propertyName] = struct{}{}
+	}
+	attributes := map[string]struct{}{}
+	for attrIndex, attr := range footprint.Attributes {
+		trimmedAttr := strings.TrimSpace(attr)
+		if trimmedAttr == "" {
+			errs = append(errs, fieldError(indexedValue(prefix("attributes"), attrIndex), "required"))
+		}
+		if attr != trimmedAttr {
+			errs = append(errs, fieldError(indexedValue(prefix("attributes"), attrIndex), "trimmed value required"))
+		}
+		if _, exists := attributes[trimmedAttr]; exists {
+			errs = append(errs, fieldError(indexedValue(prefix("attributes"), attrIndex), "duplicate"))
+		}
+		attributes[trimmedAttr] = struct{}{}
+	}
+	unitNames := map[string]struct{}{}
+	for unitIndex, unit := range footprint.Units {
+		errs = append(errs, validateFootprintUnit(prefix("units"), unitIndex, unit)...)
+		unitName := strings.TrimSpace(unit.Name)
+		if _, exists := unitNames[unitName]; exists {
+			errs = append(errs, fieldError(indexed(prefix("units"), unitIndex, "name"), "duplicate"))
+		}
+		unitNames[unitName] = struct{}{}
+	}
+	netTiePadGroups := map[string]struct{}{}
+	for groupIndex, group := range footprint.NetTiePadGroups {
+		trimmedGroup := strings.TrimSpace(group)
+		if trimmedGroup == "" {
+			errs = append(errs, fieldError(indexedValue(prefix("net_tie_pad_groups"), groupIndex), "required"))
+		}
+		if group != trimmedGroup {
+			errs = append(errs, fieldError(indexedValue(prefix("net_tie_pad_groups"), groupIndex), "trimmed value required"))
+		}
+		if _, exists := netTiePadGroups[trimmedGroup]; exists {
+			errs = append(errs, fieldError(indexedValue(prefix("net_tie_pad_groups"), groupIndex), "duplicate"))
+		}
+		netTiePadGroups[trimmedGroup] = struct{}{}
 	}
 	textKinds := map[string]string{}
 	for textIndex, text := range footprint.Texts {
@@ -1678,13 +1782,58 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 	return errs
 }
 
+func validateFootprintMetadataProperty(collection string, index int, property FootprintMetadataProperty) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	trimmedName := strings.TrimSpace(property.Name)
+	if trimmedName == "" {
+		errs = append(errs, fieldError(indexed(collection, index, "name"), "required"))
+	}
+	if property.Name != trimmedName {
+		errs = append(errs, fieldError(indexed(collection, index, "name"), "trimmed value required"))
+	}
+	return errs
+}
+
+func validateFootprintUnit(collection string, index int, unit FootprintUnit) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	trimmedName := strings.TrimSpace(unit.Name)
+	if trimmedName == "" {
+		errs = append(errs, fieldError(indexed(collection, index, "name"), "required"))
+	}
+	if unit.Name != trimmedName {
+		errs = append(errs, fieldError(indexed(collection, index, "name"), "trimmed value required"))
+	}
+	if len(unit.Pins) == 0 {
+		errs = append(errs, fieldError(indexed(collection, index, "pins"), "required"))
+	}
+	pins := map[string]struct{}{}
+	for pinIndex, pin := range unit.Pins {
+		trimmedPin := strings.TrimSpace(pin)
+		if trimmedPin == "" {
+			errs = append(errs, fieldError(indexedValue(indexed(collection, index, "pins"), pinIndex), "required"))
+		}
+		if pin != trimmedPin {
+			errs = append(errs, fieldError(indexedValue(indexed(collection, index, "pins"), pinIndex), "trimmed value required"))
+		}
+		if _, exists := pins[trimmedPin]; exists {
+			errs = append(errs, fieldError(indexedValue(indexed(collection, index, "pins"), pinIndex), "duplicate"))
+		}
+		pins[trimmedPin] = struct{}{}
+	}
+	return errs
+}
+
 func validateFootprintProperty(collection string, index int, property FootprintProperty) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	if !property.UUID.Valid() {
 		errs = append(errs, fieldError(indexed(collection, index, "uuid"), "valid UUID required"))
 	}
-	if strings.TrimSpace(property.Name) == "" {
+	trimmedName := strings.TrimSpace(property.Name)
+	if trimmedName == "" {
 		errs = append(errs, fieldError(indexed(collection, index, "name"), "required"))
+	}
+	if property.Name != trimmedName {
+		errs = append(errs, fieldError(indexed(collection, index, "name"), "trimmed value required"))
 	}
 	if !kicadfiles.IsValidBoardLayer(property.Layer) {
 		errs = append(errs, fieldError(indexed(collection, index, "layer"), "invalid"))
