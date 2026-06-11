@@ -2,11 +2,19 @@
 
 Date: 2026-06-11
 
-Source corpus: `$KICAD_DEMO_CORPUS`
+Source corpus: `$KICADAI_KICAD_DEMO_CORPUS`
 
-Workspace default: set `$KICAD_DEMO_CORPUS` to the local KiCad demo directory.
+Workspace default: set `$KICADAI_KICAD_DEMO_CORPUS` to the local KiCad demo directory and set `$KICADAI_RUN_KICAD_DEMO_CORPUS=1`.
 
-Scan command: external KiCad demo corpus traversal using the in-repo PCB corpus scanner from `internal/kicadfiles/pcb`.
+Scan command:
+
+```sh
+KICADAI_RUN_KICAD_DEMO_CORPUS=1 \
+KICADAI_KICAD_DEMO_CORPUS="/path/to/kicad-demos" \
+go test ./internal/kicadfiles/pcb -run TestScanCorpusExternalKiCadDemos -count=1 -v
+```
+
+Latest scan result: passed during PCB Object Correctness Phase 10.
 
 The source demo files are not copied into this repository. This document records the object coverage findings needed to drive the PCB object correctness implementation plan.
 
@@ -29,60 +37,74 @@ The source demo files are not copied into this repository. This document records
 | Footprint text objects | 5,252 |
 | Core preservation-only scanner hits | 5,157 |
 
+## Phase 10 Coverage Summary
+
+| Area | Before Object Correctness | After Phase 10 |
+| --- | --- | --- |
+| Footprint metadata | Properties, descriptions, sheet provenance, units, net-tie groups, lock state, and KiCad-saved flags were gaps | Modeled and validated for generated footprints |
+| Pads | SMD/through-hole shapes existed but layer, drill, net, pin metadata, roundrect, and duplicate-layer checks were incomplete | Validated for generated SMD and through-hole pads with net-name/code consistency |
+| Footprint graphics | Common graphics existed; curves were missing | `fp_line`, `fp_rect`, `fp_circle`, `fp_arc`, `fp_poly`, `fp_curve`, and text are covered by tests |
+| Board graphics/outlines | Basic graphics existed; outline closure was strict and single-loop oriented | Closed line outlines support multiple loops and 0.0001 mm endpoint tolerance |
+| Routes/vias | Route objects rendered but route-local net names and via layer spans were weakly checked | Segments, route arcs, and vias validate copper layers, geometry, net consistency, and via spans |
+| Zones | Basic zones rendered; keepouts and richer fill settings were not explicit | Copper zones, filled polygons, keepouts, thermal settings, island removal, and layer declarations are validated |
+| Dimensions | Treated as preservation-only in the first matrix | Common KiCad dimension types are modeled and rendered with nested `gr_text` |
+| Groups/images/tables/targets | Unmodeled | Explicit preservation-only families with raw-node validation |
+| Generated fixture | No single fixture exercised all core corrected PCB objects | `examples/08_pcb_object_correctness/pcb_object_correctness.kicad_pcb` is generated and sync-tested |
+
 ## Top-Level Board Objects
 
 | Object | Count | Implementation status | Plan phase |
 | --- | ---: | --- | --- |
-| `segment` | 64,951 | Modeled, needs route correctness validation | Phase 6 |
-| `via` | 10,159 | Modeled, needs via shape/layer/net validation | Phase 6 |
+| `segment` | 64,951 | Modeled with route correctness validation | Phase 6 |
+| `via` | 10,159 | Modeled with via shape/layer/net validation | Phase 6 |
 | `net` | 5,157 | Modeled | Existing |
-| `footprint` | 4,154 | Modeled, needs metadata/property hardening | Phase 2 |
-| `arc` | 4,552 | Modeled, needs route arc validation | Phase 6 |
-| `gr_line` | 1,169 | Modeled, needs board graphic fixture coverage | Phase 5 |
-| `gr_text` | 1,093 | Modeled, needs board text fixture coverage | Phase 5 |
-| `zone` | 498 | Modeled, needs fill/thermal/island settings | Phase 7 |
-| `gr_circle` | 346 | Modeled, needs board graphic fixture coverage | Phase 5 |
-| `gr_arc` | 183 | Modeled, needs board graphic fixture coverage | Phase 5 |
-| `gr_poly` | 134 | Modeled, needs board graphic fixture coverage | Phase 5 |
+| `footprint` | 4,154 | Modeled with metadata/property hardening | Phase 2 |
+| `arc` | 4,552 | Modeled with route arc validation | Phase 6 |
+| `gr_line` | 1,169 | Modeled with board graphic fixture coverage | Phase 5 |
+| `gr_text` | 1,093 | Modeled with board text fixture coverage | Phase 5 |
+| `zone` | 498 | Modeled with fill/thermal/island/keepout settings | Phase 7 |
+| `gr_circle` | 346 | Modeled with board graphic fixture coverage | Phase 5 |
+| `gr_arc` | 183 | Modeled with board graphic fixture coverage | Phase 5 |
+| `gr_poly` | 134 | Modeled with board graphic fixture coverage | Phase 5 |
 | `dimension` | 37 | Modeled for common KiCad dimension types; richer format/style nodes deferred | Phase 8 |
 | `property` | 37 | Modeled for board metadata where applicable | Phase 2 |
-| `group` | 20 | Preservation-only until modeled | Phase 8 |
+| `group` | 20 | Preservation-only until membership references are modeled | Phase 8 |
 | `embedded_fonts` | 18 | Preservation-only | Phase 8 |
-| `gr_rect` | 15 | Modeled, needs board graphic fixture coverage | Phase 5 |
+| `gr_rect` | 15 | Modeled with board graphic fixture coverage | Phase 5 |
 | `title_block` | 10 | Modeled | Existing |
 
 ## Footprint Child Objects
 
 | Object | Count | Implementation status | Plan phase |
 | --- | ---: | --- | --- |
-| `property` | 94,889 | Modeled, needs exact KiCad save shape validation | Phase 2 |
-| `fp_line` | 382,657 | Modeled, needs footprint graphic fixture coverage | Phase 4 |
-| `pad` | 24,487 | Modeled, needs exhaustive pad correctness | Phase 3 |
-| `fp_text` | 5,252 | Modeled, needs hidden/justify/effects validation | Phase 4 |
+| `property` | 94,889 | Modeled with KiCad-saved property shape validation | Phase 2 |
+| `fp_line` | 382,657 | Modeled with footprint graphic fixture coverage | Phase 4 |
+| `pad` | 24,487 | Modeled with generated SMD/through-hole correctness validation | Phase 3 |
+| `fp_text` | 5,252 | Modeled with effects validation | Phase 4 |
 | `layer` | 4,547 | Modeled | Phase 2 |
-| `attr` | 4,529 | Modeled, needs full flag coverage | Phase 2 |
+| `attr` | 4,529 | Modeled for generated footprint attributes | Phase 2 |
 | `embedded_fonts` | 4,459 | Preservation-only | Phase 8 |
 | `uuid` | 4,273 | Modeled | Existing |
-| `sheetfile` | 4,044 | Needs footprint provenance support | Phase 2 |
-| `sheetname` | 4,021 | Needs footprint provenance support | Phase 2 |
-| `path` | 4,021 | Needs footprint path support | Phase 2 |
-| `model` | 3,818 | Modeled, needs transform validation | Phase 2 |
-| `descr` | 3,762 | Needs footprint description support | Phase 2 |
-| `fp_arc` | 2,951 | Modeled, needs fixture coverage | Phase 4 |
-| `fp_circle` | 2,470 | Modeled, needs fixture coverage | Phase 4 |
-| `fp_rect` | 2,337 | Modeled, needs fixture coverage | Phase 4 |
-| `tags` | 2,159 | Needs footprint tag support | Phase 2 |
-| `fp_poly` | 1,503 | Modeled, needs fixture coverage | Phase 4 |
-| `duplicate_pad_numbers_are_jumpers` | 341 | Needs support | Phase 2 |
+| `sheetfile` | 4,044 | Modeled for footprint provenance | Phase 2 |
+| `sheetname` | 4,021 | Modeled for footprint provenance | Phase 2 |
+| `path` | 4,021 | Modeled for footprint path identity | Phase 2 |
+| `model` | 3,818 | Modeled with transform validation | Phase 2 |
+| `descr` | 3,762 | Modeled for generated footprints | Phase 2 |
+| `fp_arc` | 2,951 | Modeled with fixture coverage | Phase 4 |
+| `fp_circle` | 2,470 | Modeled with fixture coverage | Phase 4 |
+| `fp_rect` | 2,337 | Modeled with fixture coverage | Phase 4 |
+| `tags` | 2,159 | Modeled for generated footprints | Phase 2 |
+| `fp_poly` | 1,503 | Modeled with fixture coverage | Phase 4 |
+| `duplicate_pad_numbers_are_jumpers` | 341 | Modeled | Phase 2 |
 | `embedded_files` | 216 | Preservation-only | Phase 8 |
 | `component_classes` | 96 | Preservation-only until modeled | Phase 8 |
-| `locked` | 72 | Needs support | Phase 2 |
-| `units` | 63 | Needs footprint unit metadata support | Phase 2 |
-| `net_tie_pad_groups` | 19 | Needs support | Phase 2 |
-| `fp_curve` | 18 | Needs modeling and fixture coverage | Phase 4 |
+| `locked` | 72 | Modeled | Phase 2 |
+| `units` | 63 | Modeled for footprint unit metadata | Phase 2 |
+| `net_tie_pad_groups` | 19 | Modeled | Phase 2 |
+| `fp_curve` | 18 | Modeled with validation coverage | Phase 4 |
 | `dimension` | 14 | Modeled for common KiCad dimension types; richer format/style nodes deferred | Phase 8 |
-| `group` | 9 | Preservation-only until modeled | Phase 8 |
-| `zone` | 9 | Needs footprint-local zone coverage | Phase 7 |
+| `group` | 9 | Preservation-only until membership references are modeled | Phase 8 |
+| `zone` | 9 | Board zones modeled; footprint-local zones belong to the future import preservation project | Future import preservation |
 
 ## Pad Classifier Coverage
 
@@ -103,17 +125,17 @@ baseline.
 | Pad shape | `oval` | 1,431 | Phase 3 |
 | Pad shape | `custom` | 152 | Phase 3 |
 
-Pad gaps from corpus tokens:
+Pad status from corpus tokens:
 
-| Token | Count | Gap |
+| Token | Count | Status |
 | --- | ---: | --- |
-| `pintype` | 18,490 | Add pin type preservation/emission where KiCad writes it |
-| `pinfunction` | 15,392 | Add pin function preservation/emission where KiCad writes it |
-| `remove_unused_layers` | 9,580 | Add pad layer cleanup flag support |
-| `roundrect_rratio` | 7,360 | Validate roundrect ratio emission against KiCad |
-| `keep_end_layers` | 4,836 | Add pad layer option support |
-| `zone_layer_connections` | 4,836 | Add pad/zone connection option support |
-| `thermal_bridge_angle` | 254 | Add thermal angle support |
+| `pintype` | 18,490 | Modeled for generated pads |
+| `pinfunction` | 15,392 | Modeled for generated pads |
+| `remove_unused_layers` | 9,580 | Modeled for generated pads |
+| `roundrect_rratio` | 7,360 | Modeled and validated for roundrect pads |
+| `keep_end_layers` | 4,836 | Future import preservation project: pad layer option support |
+| `zone_layer_connections` | 4,836 | Future import preservation project: pad/zone connection option support |
+| `thermal_bridge_angle` | 254 | Modeled for generated pads |
 
 ## Zone Coverage
 
@@ -132,22 +154,22 @@ Pad gaps from corpus tokens:
 | `In8.Cu` | 2 |
 | `In10.Cu` | 1 |
 
-Zone gaps from corpus tokens:
+Zone status from corpus tokens:
 
 These counts are raw token hits across zone-adjacent settings and nested
 objects, not one-to-one zone object counts. They are gap signals for fields the
 writer must own or preserve.
 
-| Token | Count | Gap |
+| Token | Count | Status |
 | --- | ---: | --- |
-| `connect_pads` | 774 | Validate clearance and zone pad connection emission |
-| `min_thickness` | 774 | Add/validate minimum zone thickness |
-| `filled_areas_thickness` | 754 | Add fill thickness setting |
-| `priority` | 700 | Add priority ordering support |
-| `thermal_gap` | 777 | Add thermal gap support |
-| `thermal_bridge_width` | 777 | Add thermal bridge width support |
-| `island_removal_mode` | 484 | Add island removal mode support |
-| `island_area_min` | 470 | Add island area threshold support |
+| `connect_pads` | 774 | Modeled and validated |
+| `min_thickness` | 774 | Modeled and validated |
+| `filled_areas_thickness` | 754 | Modeled |
+| `priority` | 700 | Modeled and validated |
+| `thermal_gap` | 777 | Modeled and validated |
+| `thermal_bridge_width` | 777 | Modeled and validated |
+| `island_removal_mode` | 484 | Modeled and validated |
+| `island_area_min` | 470 | Modeled and validated |
 
 ## Preservation-Only Objects
 
@@ -160,18 +182,36 @@ writer must own or preserve.
 | `embedded_files` | 223 | Preserve on parse/write; do not synthesize |
 | `component_classes` | 96 | Preserve on parse/write; model later if needed |
 
+## Remaining Priorities
+
+1. Connectivity/DRC project:
+   - Add geometry-aware endpoint connectivity checks across pads, tracks,
+     arcs, and vias.
+   - Add opt-in KiCad DRC execution for generated fixtures.
+   - Record allowed DRC baselines explicitly when a fixture intentionally
+     exercises a violation.
+2. Symbol/Footprint Library Mapping project:
+   - Map schematic symbols to generated or library footprints deterministically.
+   - Generate project-local footprint libraries when embedded geometry should
+     be reusable outside a single board file.
+   - Validate pin-to-pad mapping before PCB generation.
+3. Import preservation project:
+   - Parse and re-emit group membership, embedded files, component classes,
+     richer dimension format/style nodes, and low-frequency pad/zone options.
+   - Keep unsupported imported nodes attached to their original owning object.
+
 ## Parser Classification Notes
 
 The corpus scanner intentionally over-reports nested tokens as unsupported when they are not top-level KiCad objects. High-frequency examples include `type`, `thickness`, `hide`, `unlocked`, `justify`, `offset`, `rotate`, `scale`, `front`, `back`, `center`, and setup-specific tokens such as `capping`, `covering`, `filling`, and `plugging`.
 
 These are still useful as gap signals, but implementation should map them to the owning object model rather than treating each as an independent board object.
 
-## Phase 1 Acceptance Criteria
+## Phase 10 Acceptance Criteria
 
-This report is the Phase 1 output. Phase 1 is complete when this report and the
-implementation plan are reviewed and committed.
+This report now includes the Phase 10 coverage update. Phase 10 is complete
+when this report is reviewed and committed.
 
-- The measured object inventory is committed.
-- Every high-frequency object class is mapped to a planned implementation or preservation phase.
-- Pad, footprint, route, board-graphic, zone, group, and dimension gaps are explicitly identified.
-- Later phases can use this matrix as the test fixture checklist.
+- The measured object inventory is still committed.
+- Each Object Correctness object family has an after-state.
+- Remaining object gaps are explicitly scoped to future projects.
+- The external KiCad demo corpus scan passes locally.
