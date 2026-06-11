@@ -152,6 +152,75 @@ func TestBuilderCustomPadsInheritSchematicNets(t *testing.T) {
 	assertPadNet(t, design.PCB.Footprints, "R1", "2", "LED_OUT")
 }
 
+func TestBuilderRejectsCustomPadWithoutSymbolPin(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+
+	_, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{
+			{Name: "1"},
+			{Name: "9"},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected unknown pad error")
+	}
+	if !strings.Contains(err.Error(), "does not match a symbol pin") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuilderAllowsDuplicateCustomPadsForOneSymbolPin(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint R1 returned error: %v", err)
+	}
+	if err := builder.AssignFootprint("R2", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint R2 returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{
+			{Name: "1"},
+			{Name: " 1 "},
+			{Name: "2"},
+		},
+	}); err != nil {
+		t.Fatalf("PlaceFootprint R1 returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("R2", PlaceFootprintOptions{}); err != nil {
+		t.Fatalf("PlaceFootprint R2 returned error: %v", err)
+	}
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "1"}, Endpoint{Reference: "R2", Pin: "1"}, "LATE_NET"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	assertPadsNet(t, design.PCB.Footprints, "R1", "1", "LATE_NET", 2)
+}
+
+func TestBuilderRejectsMissingCustomPadForSymbolPin(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+
+	_, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{{Name: "1"}},
+	})
+	if err == nil {
+		t.Fatal("expected missing pad error")
+	}
+	if !strings.Contains(err.Error(), "missing pad for symbol pin 2") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestBuilderPlaceFootprintUsesSideAwareDefaultsAndAttributes(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "J1", "Connector:Conn_01x02_Pin", "Conn", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
@@ -534,6 +603,30 @@ func assertPadNet(t *testing.T, footprints []pcb.Footprint, reference, padName, 
 			}
 		}
 		t.Fatalf("footprint %s missing pad %s", reference, padName)
+	}
+	t.Fatalf("missing footprint %s", reference)
+}
+
+func assertPadsNet(t *testing.T, footprints []pcb.Footprint, reference, padName, netName string, wantCount int) {
+	t.Helper()
+	for _, footprint := range footprints {
+		if footprint.Reference != reference {
+			continue
+		}
+		count := 0
+		for _, pad := range footprint.Pads {
+			if pad.Name != padName {
+				continue
+			}
+			count++
+			if pad.NetName != netName {
+				t.Fatalf("%s pad %s net = %q, want %q", reference, padName, pad.NetName, netName)
+			}
+		}
+		if count != wantCount {
+			t.Fatalf("%s pad %s count = %d, want %d", reference, padName, count, wantCount)
+		}
+		return
 	}
 	t.Fatalf("missing footprint %s", reference)
 }

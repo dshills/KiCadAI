@@ -3,6 +3,7 @@ package designapi
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -23,7 +24,7 @@ type Builder struct {
 	symbols    map[string]*symbolState
 	symbolKeys map[string]string
 	footprints map[string]int
-	pads       map[string]map[string]int
+	pads       map[string]map[string][]int
 }
 
 type Options struct {
@@ -137,7 +138,7 @@ func New(options Options) (*Builder, error) {
 		symbols:    map[string]*symbolState{},
 		symbolKeys: map[string]string{},
 		footprints: map[string]int{},
-		pads:       map[string]map[string]int{},
+		pads:       map[string]map[string][]int{},
 	}
 	builder.design = kicaddesign.Design{
 		Name: name,
@@ -347,6 +348,9 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 	if len(padSpecs) == 0 {
 		padSpecs = builder.defaultPadSpecs(state, options.Layer, defaultPadType)
 	}
+	if err := builder.validatePadSpecs(reference, state, padSpecs); err != nil {
+		return FootprintHandle{}, err
+	}
 	footprint := pcb.Footprint{
 		UUID:       builder.generator.New("root.pcb.footprint", reference),
 		Path:       symbol.Path,
@@ -359,11 +363,16 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 		Attributes: attributes,
 		Properties: builder.footprintProperties(reference, symbol.Reference, symbol.Value),
 	}
+	padOccurrences := map[string]int{}
 	for _, padSpec := range padSpecs {
-		if strings.TrimSpace(padSpec.Net) == "" {
-			padSpec.Net = state.pinNets[strings.TrimSpace(padSpec.Name)]
+		spec := padSpec
+		padName := strings.TrimSpace(spec.Name)
+		padOccurrence := padOccurrences[padName]
+		padOccurrences[padName]++
+		if strings.TrimSpace(spec.Net) == "" {
+			spec.Net = state.pinNets[padName]
 		}
-		pad, err := builder.padFromSpec(reference, padSpec, defaultPadType, options.Layer)
+		pad, err := builder.padFromSpec(reference, padOccurrence, spec, defaultPadType, options.Layer)
 		if err != nil {
 			return FootprintHandle{}, err
 		}
@@ -375,9 +384,9 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 		builder.design.PCB.Footprints = append(builder.design.PCB.Footprints, footprint)
 		builder.footprints[reference] = len(builder.design.PCB.Footprints) - 1
 	}
-	builder.pads[reference] = map[string]int{}
+	builder.pads[reference] = map[string][]int{}
 	for i, pad := range footprint.Pads {
-		builder.pads[reference][pad.Name] = i
+		builder.pads[reference][pad.Name] = append(builder.pads[reference][pad.Name], i)
 	}
 	builder.syncPCBNets()
 	return FootprintHandle{Reference: reference}, nil
@@ -530,12 +539,14 @@ func (builder *Builder) assignPinNet(endpoint Endpoint, netName string) {
 		pin := strings.TrimSpace(endpoint.Pin)
 		netName = builder.canonicalNet(netName)
 		state.pinNets[pin] = netName
-		if footprint := builder.footprint(endpoint.Reference); footprint != nil {
+		if footprint := builder.footprint(reference); footprint != nil {
 			pads, padsOK := builder.pads[reference]
-			if padIndex, ok := pads[pin]; padsOK && ok {
+			if padIndexes, ok := pads[pin]; padsOK && ok {
 				net := builder.nets.EnsureNet(netName)
-				footprint.Pads[padIndex].NetCode = net.Code
-				footprint.Pads[padIndex].NetName = net.Name
+				for _, padIndex := range padIndexes {
+					footprint.Pads[padIndex].NetCode = net.Code
+					footprint.Pads[padIndex].NetName = net.Name
+				}
 			}
 		}
 	}
@@ -567,7 +578,27 @@ func (builder *Builder) defaultPadSpecs(state *symbolState, layer kicadfiles.Boa
 	return specs
 }
 
-func (builder *Builder) padFromSpec(reference string, spec PadSpec, defaultType string, footprintLayer kicadfiles.BoardLayer) (pcb.Pad, error) {
+func (builder *Builder) validatePadSpecs(reference string, state *symbolState, padSpecs []PadSpec) error {
+	seen := make(map[string]struct{}, len(padSpecs))
+	for _, padSpec := range padSpecs {
+		name := strings.TrimSpace(padSpec.Name)
+		if name == "" {
+			return fmt.Errorf("pad name required")
+		}
+		seen[name] = struct{}{}
+		if _, ok := state.pins[name]; !ok {
+			return fmt.Errorf("pad %s on %s does not match a symbol pin", name, reference)
+		}
+	}
+	for _, pin := range state.pinOrder {
+		if _, ok := seen[pin]; !ok {
+			return fmt.Errorf("footprint %s missing pad for symbol pin %s", reference, pin)
+		}
+	}
+	return nil
+}
+
+func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSpec, defaultType string, footprintLayer kicadfiles.BoardLayer) (pcb.Pad, error) {
 	name := strings.TrimSpace(spec.Name)
 	if name == "" {
 		return pcb.Pad{}, fmt.Errorf("pad name required")
@@ -600,7 +631,7 @@ func (builder *Builder) padFromSpec(reference string, spec PadSpec, defaultType 
 		net = builder.nets.EnsureNet(builder.canonicalNet(spec.Net))
 	}
 	return pcb.Pad{
-		UUID:     builder.generator.New("root.pcb.footprint.pad", reference, name),
+		UUID:     builder.generator.New("root.pcb.footprint.pad", reference, name, strconv.Itoa(occurrence)),
 		Name:     name,
 		Type:     padType,
 		NetCode:  net.Code,
