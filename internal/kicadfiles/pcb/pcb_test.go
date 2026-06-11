@@ -780,6 +780,59 @@ func TestValidateRejectsInvalidRoundRectRatio(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsInvalidSMDPadLayers(t *testing.T) {
+	tests := []struct {
+		name   string
+		layers []kicadfiles.BoardLayer
+		want   string
+	}{
+		{
+			name:   "duplicate layer",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFCu},
+			want:   "layers[1]",
+		},
+		{
+			name:   "wildcard copper",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask},
+			want:   "layers",
+		},
+		{
+			name:   "front and back copper",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu, kicadfiles.LayerFMask, kicadfiles.LayerBMask},
+			want:   "layers",
+		},
+		{
+			name:   "internal copper",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.BoardLayer("In1.Cu"), kicadfiles.LayerFMask},
+			want:   "layers",
+		},
+		{
+			name:   "front copper with back paste",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerBPaste},
+			want:   "layers",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board := minimalPCB()
+			board.Nets = []Net{{Code: 1, Name: "A"}}
+			footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+			footprint.Pads[0].Type = "smd"
+			footprint.Pads[0].Layers = tt.layers
+			board.Footprints = []Footprint{footprint}
+
+			err := Validate(board)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateRejectsDrilledPadWithoutThroughHoleLayers(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

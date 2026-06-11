@@ -1885,16 +1885,24 @@ func validatePad(collection string, index int, pad Pad, netCodes map[int]struct{
 	if len(pad.Layers) == 0 {
 		errs = append(errs, fieldError(indexed(collection, index, "layers"), "required"))
 	}
+	padLayers := map[kicadfiles.BoardLayer]struct{}{}
 	for layerIndex, layer := range pad.Layers {
 		if !kicadfiles.IsValidBoardLayer(layer) {
 			errs = append(errs, fieldError(indexedValue(indexed(collection, index, "layers"), layerIndex), "invalid"))
 		}
+		if _, exists := padLayers[layer]; exists {
+			errs = append(errs, fieldError(indexedValue(indexed(collection, index, "layers"), layerIndex), "duplicate"))
+		}
+		padLayers[layer] = struct{}{}
 	}
 	if (padType == "thru_hole" || padType == "np_thru_hole") && pad.Drill <= 0 {
 		errs = append(errs, fieldError(indexed(collection, index, "drill"), "required for through-hole pads"))
 	}
 	if padType == "smd" && pad.Drill > 0 {
 		errs = append(errs, fieldError(indexed(collection, index, "drill"), "not allowed for SMD pads"))
+	}
+	if padType == "smd" && !validSMDPadLayers(pad.Layers) {
+		errs = append(errs, fieldError(indexed(collection, index, "layers"), "SMD pads require a single copper side with matching mask/paste side"))
 	}
 	if pad.Drill > 0 && !validDrilledPadLayers(pad.Layers) {
 		errs = append(errs, fieldError(indexed(collection, index, "layers"), "drilled pads require through copper and mask layers"))
@@ -2284,6 +2292,24 @@ func validDrilledPadLayers(layers []kicadfiles.BoardLayer) bool {
 		return true
 	}
 	return countDistinctCopperLayers(layers) >= 2 && hasAnyMaskLayer(layers)
+}
+
+func validSMDPadLayers(layers []kicadfiles.BoardLayer) bool {
+	if hasPadLayerSet(layers, kicadfiles.LayerAllCu) || hasPadLayerSet(layers, kicadfiles.LayerAllMask) {
+		return false
+	}
+	hasFrontCopper := hasPadLayerSet(layers, kicadfiles.LayerFCu)
+	hasBackCopper := hasPadLayerSet(layers, kicadfiles.LayerBCu)
+	if hasFrontCopper == hasBackCopper {
+		return false
+	}
+	if countDistinctCopperLayers(layers) != 1 {
+		return false
+	}
+	if hasFrontCopper {
+		return !hasPadLayerSet(layers, kicadfiles.LayerBMask) && !hasPadLayerSet(layers, kicadfiles.LayerBPaste)
+	}
+	return !hasPadLayerSet(layers, kicadfiles.LayerFMask) && !hasPadLayerSet(layers, kicadfiles.LayerFPaste)
 }
 
 func hasAnyMaskLayer(layers []kicadfiles.BoardLayer) bool {
