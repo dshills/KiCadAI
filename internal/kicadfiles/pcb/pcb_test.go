@@ -1433,21 +1433,165 @@ func TestValidateRejectsInvalidFootprintCurve(t *testing.T) {
 }
 
 func TestValidateRejectsInvalidZone(t *testing.T) {
+	tests := []struct {
+		name string
+		zone Zone
+		want string
+	}{
+		{
+			name: "too few polygon points",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0)}},
+			},
+			want: "zones[0].polygons[0].points",
+		},
+		{
+			name: "non copper layer",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFSilkS},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+			},
+			want: "zones[0].layers[0]",
+		},
+		{
+			name: "duplicate layer",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFCu},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+			},
+			want: "zones[0].layers[1]",
+		},
+		{
+			name: "filled polygon undeclared layer",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+				FilledPolygons: []ZoneFilledPolygon{{
+					Layer:  kicadfiles.LayerBCu,
+					Points: []kicadfiles.Point{point(0, 0), point(1, 0), point(1, 1)},
+				}},
+			},
+			want: "zones[0].filled_polygons[0].layer",
+		},
+		{
+			name: "negative fill setting",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+				Fill:     ZoneFillSettings{ThermalGap: -1},
+			},
+			want: "zones[0].fill.thermal_gap",
+		},
+		{
+			name: "invalid island removal mode",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+				Fill:     ZoneFillSettings{IslandRemovalMode: 3},
+			},
+			want: "zones[0].fill.island_removal_mode",
+		},
+		{
+			name: "keepout net code",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				NetCode:  1,
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFSilkS},
+				Keepout:  &ZoneKeepout{},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+			},
+			want: "zones[0].net_code",
+		},
+		{
+			name: "keepout invalid permission",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFSilkS},
+				Keepout:  &ZoneKeepout{Tracks: "blocked"},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+			},
+			want: "zones[0].keepout.tracks",
+		},
+		{
+			name: "keepout filled polygon",
+			zone: Zone{
+				UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+				Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFSilkS},
+				Keepout:  &ZoneKeepout{},
+				Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0), point(1, 1)}},
+				FilledPolygons: []ZoneFilledPolygon{{
+					Layer:  kicadfiles.LayerFCu,
+					Points: []kicadfiles.Point{point(0, 0), point(1, 0), point(1, 1)},
+				}},
+			},
+			want: "zones[0].filled_polygons",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board := minimalPCB()
+			board.Nets = []Net{{Code: 1, Name: "GND"}}
+			board.Zones = []Zone{tt.zone}
+
+			err := Validate(board)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
+func TestWriteRendersZoneKeepout(t *testing.T) {
 	board := minimalPCB()
-	board.Nets = []Net{{Code: 1, Name: "GND"}}
 	board.Zones = []Zone{{
-		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
-		NetCode:  1,
-		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
-		Polygons: [][]kicadfiles.Point{{point(0, 0), point(1, 0)}},
+		UUID:   kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFSilkS},
+		Keepout: &ZoneKeepout{
+			Tracks:     "not_allowed",
+			Vias:       "allowed",
+			Pads:       "allowed",
+			CopperPour: "not_allowed",
+			Footprints: "allowed",
+		},
+		Polygons: [][]kicadfiles.Point{{
+			point(0, 0), point(10, 0), point(10, 10), point(0, 10),
+		}},
 	}}
 
-	err := Validate(board)
-	if err == nil {
-		t.Fatal("expected error")
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
 	}
-	if !strings.Contains(err.Error(), "zones[0].polygons[0].points") {
-		t.Fatalf("error = %v", err)
+	output := buf.String()
+	for _, want := range []string{
+		"(net 0)",
+		"(net_name \"\")",
+		"(layers \"F.SilkS\")",
+		"(keepout",
+		"(tracks not_allowed)",
+		"(vias allowed)",
+		"(copperpour not_allowed)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
 	}
 }
 

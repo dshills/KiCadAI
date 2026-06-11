@@ -135,6 +135,10 @@ const (
 	defaultTextSizeMM         = 1.0
 	defaultTextThicknessMM    = 0.15
 	outlineClosureToleranceIU = kicadfiles.IU(100)
+
+	zoneIslandRemovalAlways = 0
+	zoneIslandRemovalNever  = 1
+	zoneIslandRemovalArea   = 2
 )
 
 type Net struct {
@@ -366,7 +370,16 @@ type Zone struct {
 	MinThickness         kicadfiles.IU
 	FilledAreasThickness bool
 	Fill                 ZoneFillSettings
+	Keepout              *ZoneKeepout
 	Attributes           []ZoneAttribute
+}
+
+type ZoneKeepout struct {
+	Tracks     string
+	Vias       string
+	Pads       string
+	CopperPour string
+	Footprints string
 }
 
 type ZoneFillSettings struct {
@@ -1249,8 +1262,11 @@ func renderZone(zone Zone, netNames map[int]string) sexpr.List {
 		sexpr.L(sexpr.A("connect_pads"), sexpr.A(zoneConnectMode(zone)), sexpr.L(sexpr.A("clearance"), fixed(zone.Clearance))),
 		sexpr.L(sexpr.A("min_thickness"), fixed(defaultIU(zone.MinThickness, kicadfiles.MM(0.25)))),
 		sexpr.L(sexpr.A("filled_areas_thickness"), yesNo(zone.FilledAreasThickness)),
-		renderZoneFill(zone.Fill),
 	)
+	if zone.Keepout != nil {
+		nodes = append(nodes, renderZoneKeepout(*zone.Keepout))
+	}
+	nodes = append(nodes, renderZoneFill(zone.Fill))
 	for _, polygon := range zone.Polygons {
 		nodes = append(nodes, sexpr.L(sexpr.A("polygon"), renderPoints(polygon)))
 	}
@@ -1258,6 +1274,17 @@ func renderZone(zone Zone, netNames map[int]string) sexpr.List {
 		nodes = append(nodes, sexpr.L(sexpr.A("filled_polygon"), sexpr.L(sexpr.A("layer"), sexpr.S(string(polygon.Layer))), renderPoints(polygon.Points)))
 	}
 	return sexpr.L(nodes...)
+}
+
+func renderZoneKeepout(keepout ZoneKeepout) sexpr.List {
+	return sexpr.L(
+		sexpr.A("keepout"),
+		sexpr.L(sexpr.A("tracks"), sexpr.A(defaultString(keepout.Tracks, "allowed"))),
+		sexpr.L(sexpr.A("vias"), sexpr.A(defaultString(keepout.Vias, "allowed"))),
+		sexpr.L(sexpr.A("pads"), sexpr.A(defaultString(keepout.Pads, "allowed"))),
+		sexpr.L(sexpr.A("copperpour"), sexpr.A(defaultString(keepout.CopperPour, "allowed"))),
+		sexpr.L(sexpr.A("footprints"), sexpr.A(defaultString(keepout.Footprints, "allowed"))),
+	)
 }
 
 func renderZoneAttribute(attr ZoneAttribute) sexpr.List {
@@ -2206,13 +2233,31 @@ func validateZone(index int, zone Zone, netCodes map[int]struct{}, netNames map[
 	if expected, ok := netNames[zone.NetCode]; ok && strings.TrimSpace(zone.NetName) != "" && zone.NetName != expected {
 		errs = append(errs, fieldError(prefix("net_name"), "must match net code"))
 	}
+	if zone.Keepout != nil {
+		if zone.NetCode != 0 {
+			errs = append(errs, fieldError(prefix("net_code"), "must be 0 for keepout zones"))
+		}
+		if strings.TrimSpace(zone.NetName) != "" {
+			errs = append(errs, fieldError(prefix("net_name"), "must be empty for keepout zones"))
+		}
+		errs = append(errs, validateZoneKeepout(prefix, *zone.Keepout)...)
+	}
 	if len(zone.Layers) == 0 {
 		errs = append(errs, fieldError(prefix("layers"), "required"))
 	}
+	zoneLayers := make(map[kicadfiles.BoardLayer]struct{}, len(zone.Layers))
 	for layerIndex, layer := range zone.Layers {
-		if !kicadfiles.IsValidBoardLayer(layer) {
-			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "invalid"))
+		if zone.Keepout != nil {
+			if !kicadfiles.IsValidBoardLayer(layer) {
+				errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "invalid"))
+			}
+		} else if !isCopperLayer(layer) {
+			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "must be copper"))
 		}
+		if _, ok := zoneLayers[layer]; ok {
+			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "duplicate"))
+		}
+		zoneLayers[layer] = struct{}{}
 	}
 	if len(zone.Polygons) == 0 {
 		errs = append(errs, fieldError(prefix("polygons"), "required"))
@@ -2222,9 +2267,15 @@ func validateZone(index int, zone Zone, netCodes map[int]struct{}, netNames map[
 			errs = append(errs, fieldError(indexed(prefix("polygons"), polygonIndex, "points"), "at least three distinct points required"))
 		}
 	}
+	if zone.Keepout != nil && len(zone.FilledPolygons) > 0 {
+		errs = append(errs, fieldError(prefix("filled_polygons"), "not allowed for keepout zones"))
+	}
 	for polygonIndex, polygon := range zone.FilledPolygons {
-		if !kicadfiles.IsValidBoardLayer(polygon.Layer) {
-			errs = append(errs, fieldError(indexed(prefix("filled_polygons"), polygonIndex, "layer"), "invalid"))
+		if !isCopperLayer(polygon.Layer) {
+			errs = append(errs, fieldError(indexed(prefix("filled_polygons"), polygonIndex, "layer"), "must be copper"))
+		}
+		if _, ok := zoneLayers[polygon.Layer]; !ok {
+			errs = append(errs, fieldError(indexed(prefix("filled_polygons"), polygonIndex, "layer"), "must be declared in zone layers"))
 		}
 		if countDistinctPoints(polygon.Points) < 3 {
 			errs = append(errs, fieldError(indexed(prefix("filled_polygons"), polygonIndex, "points"), "at least three distinct points required"))
@@ -2239,7 +2290,57 @@ func validateZone(index int, zone Zone, netCodes map[int]struct{}, netNames map[
 	if zone.MinThickness < 0 {
 		errs = append(errs, fieldError(prefix("min_thickness"), "must be non-negative"))
 	}
+	if zone.Clearance < 0 {
+		errs = append(errs, fieldError(prefix("clearance"), "must be non-negative"))
+	}
+	if zone.HatchPitch < 0 {
+		errs = append(errs, fieldError(prefix("hatch_pitch"), "must be non-negative"))
+	}
+	if zone.Fill.ThermalGap < 0 {
+		errs = append(errs, fieldError(prefix("fill.thermal_gap"), "must be non-negative"))
+	}
+	if zone.Fill.ThermalBridgeWidth < 0 {
+		errs = append(errs, fieldError(prefix("fill.thermal_bridge_width"), "must be non-negative"))
+	}
+	if zone.Fill.IslandRemovalMode < zoneIslandRemovalAlways || zone.Fill.IslandRemovalMode > zoneIslandRemovalArea {
+		errs = append(errs, fieldError(prefix("fill.island_removal_mode"), "must be 0, 1, or 2"))
+	}
+	if zone.Fill.IslandAreaMin < 0 {
+		errs = append(errs, fieldError(prefix("fill.island_area_min"), "must be non-negative"))
+	}
 	return errs
+}
+
+func validateZoneKeepout(prefix func(string) string, keepout ZoneKeepout) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	for _, permission := range []struct {
+		field string
+		value string
+	}{
+		{field: "tracks", value: keepout.Tracks},
+		{field: "vias", value: keepout.Vias},
+		{field: "pads", value: keepout.Pads},
+		{field: "copperpour", value: keepout.CopperPour},
+		{field: "footprints", value: keepout.Footprints},
+	} {
+		if strings.TrimSpace(permission.value) != permission.value {
+			errs = append(errs, fieldError(prefix("keepout."+permission.field), "trimmed value required"))
+			continue
+		}
+		if !isValidKeepoutPermission(defaultString(permission.value, "allowed")) {
+			errs = append(errs, fieldError(prefix("keepout."+permission.field), "invalid"))
+		}
+	}
+	return errs
+}
+
+func isValidKeepoutPermission(value string) bool {
+	switch value {
+	case "allowed", "not_allowed":
+		return true
+	default:
+		return false
+	}
 }
 
 func isValidZoneConnectMode(value string) bool {
