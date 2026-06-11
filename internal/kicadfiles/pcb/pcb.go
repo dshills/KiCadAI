@@ -271,6 +271,7 @@ type Drawing struct {
 	Circle     *CircleDrawing
 	Arc        *ArcDrawing
 	Poly       *PolylineDrawing
+	Curve      *PolylineDrawing
 	Text       *TextDrawing
 }
 
@@ -1119,6 +1120,11 @@ func renderGraphic(prefix string, drawing Drawing) sexpr.List {
 		)
 	case drawing.Poly != nil:
 		nodes = append(nodes, renderPoints(drawing.Poly.Points), renderStroke(drawing.Poly.Width, drawing.StrokeType), sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))))
+	case drawing.Curve != nil:
+		nodes = append(nodes, renderPoints(drawing.Curve.Points), renderStroke(drawing.Curve.Width, drawing.StrokeType))
+		if strings.TrimSpace(drawing.Fill) != "" {
+			nodes = append(nodes, sexpr.L(sexpr.A("fill"), sexpr.A(fillMode(drawing.Fill))))
+		}
 	case drawing.Text != nil:
 		nodes = append(nodes,
 			sexpr.S(drawing.Text.Text),
@@ -1981,6 +1987,16 @@ func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors
 		if countDistinctPoints(drawing.Poly.Points) < 2 {
 			errs = append(errs, fieldError(prefix+".poly.points", "at least two distinct points required"))
 		}
+	case drawing.Curve != nil:
+		if drawing.Curve.Width < 0 {
+			errs = append(errs, fieldError(prefix+".curve.width", "must be non-negative"))
+		}
+		if len(drawing.Curve.Points) != 4 {
+			errs = append(errs, fieldError(prefix+".curve.points", "exactly four points required"))
+		}
+		if countDistinctPoints(drawing.Curve.Points) < 2 {
+			errs = append(errs, fieldError(prefix+".curve.points", "at least two distinct points required"))
+		}
 	case drawing.Text != nil:
 		if strings.TrimSpace(drawing.Text.Text) == "" {
 			errs = append(errs, fieldError(prefix+".text", "required"))
@@ -2191,6 +2207,9 @@ func countShapes(drawing Drawing) int {
 	if drawing.Poly != nil {
 		count++
 	}
+	if drawing.Curve != nil {
+		count++
+	}
 	if drawing.Text != nil {
 		count++
 	}
@@ -2209,6 +2228,8 @@ func drawingKind(drawing Drawing) string {
 		return "arc"
 	case drawing.Poly != nil:
 		return "poly"
+	case drawing.Curve != nil:
+		return "curve"
 	case drawing.Text != nil:
 		return "text"
 	default:

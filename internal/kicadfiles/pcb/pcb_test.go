@@ -1195,6 +1195,7 @@ func TestWriteAdvancedGeometry(t *testing.T) {
 		"(fp_circle",
 		"(fp_arc",
 		"(fp_poly",
+		"(fp_curve",
 		"(gr_line",
 		"(gr_circle",
 		"(gr_arc",
@@ -1232,6 +1233,47 @@ func TestValidateRejectsGraphicWithMultipleShapes(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "exactly one shape") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidFootprintCurve(t *testing.T) {
+	tests := []struct {
+		name  string
+		curve PolylineDrawing
+		want  string
+	}{
+		{
+			name:  "wrong point count",
+			curve: PolylineDrawing{Points: []kicadfiles.Point{point(0, 0), point(1, 1), point(2, 0)}, Width: kicadfiles.MM(0.1)},
+			want:  "curve.points",
+		},
+		{
+			name:  "degenerate points",
+			curve: PolylineDrawing{Points: []kicadfiles.Point{point(0, 0), point(0, 0), point(0, 0), point(0, 0)}, Width: kicadfiles.MM(0.1)},
+			want:  "curve.points",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board := minimalPCB()
+			board.Nets = []Net{{Code: 1, Name: "A"}}
+			footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "U1")
+			footprint.Graphics = []FootprintGraphic{{
+				UUID:  kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+				Layer: kicadfiles.LayerFSilkS,
+				Curve: &tt.curve,
+			}}
+			board.Footprints = []Footprint{footprint}
+
+			err := Validate(board)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v", err)
+			}
+		})
 	}
 }
 
@@ -1351,6 +1393,7 @@ func advancedGeometryPCB() PCBFile {
 		{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Layer: kicadfiles.LayerFSilkS, Circle: &CircleDrawing{Center: point(0, 0), End: point(1, 0), Width: kicadfiles.MM(0.1)}},
 		{UUID: kicadfiles.UUID("44444444-4444-4444-8444-444444444444"), Layer: kicadfiles.LayerFSilkS, Arc: &ArcDrawing{Start: point(0, 0), Mid: point(1, 1), End: point(2, 0), Width: kicadfiles.MM(0.1)}},
 		{UUID: kicadfiles.UUID("55555555-5555-4555-8555-555555555555"), Layer: kicadfiles.LayerFSilkS, Poly: &PolylineDrawing{Points: []kicadfiles.Point{point(0, 0), point(1, 0), point(1, 1)}, Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("12121212-1212-4212-8212-121212121212"), Layer: kicadfiles.LayerFSilkS, Curve: &PolylineDrawing{Points: []kicadfiles.Point{point(0, 0), point(0.5, 1), point(1.5, 1), point(2, 0)}, Width: kicadfiles.MM(0.1)}},
 	}
 	board.Footprints = []Footprint{footprint}
 	board.Drawings = []Drawing{
