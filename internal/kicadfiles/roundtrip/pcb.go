@@ -56,7 +56,6 @@ func RoundTripPCB(ctx context.Context, cli KiCadCLI, inputPath string, opts Opti
 	}
 
 	compareOpts := opts
-	compareOpts.KeepArtifacts = true
 	compareOpts.ArtifactDir = workspace.Root
 	comparison, err := CompareFiles(inputPath, copyPath, compareOpts)
 	if err != nil {

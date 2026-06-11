@@ -38,6 +38,44 @@ func TestRoundTripPCBCopiesBeforeUpgrade(t *testing.T) {
 	}
 }
 
+func TestRoundTripPCBDoesNotReportArtifactsWhenNotKept(t *testing.T) {
+	dir := t.TempDir()
+	board := filepath.Join(dir, "board.kicad_pcb")
+	writeTestFile(t, board, "(kicad_pcb)\n")
+	cli := KiCadCLI{Path: fakeKiCadUpgradeCLI(t, filepath.Join(dir, "cli.log"), 0)}
+
+	result, err := RoundTripPCB(context.Background(), cli, board, Options{ArtifactDir: filepath.Join(dir, "artifacts")})
+	if err != nil {
+		t.Fatalf("RoundTripPCB returned error: %v", err)
+	}
+	if result.RawDiffPath != "" || result.NormalizedDiffPath != "" || result.SummaryPath != "" {
+		t.Fatalf("artifact paths should be empty when not kept: %#v", result)
+	}
+	if _, err := os.Stat(result.RoundTrippedPath); !os.IsNotExist(err) {
+		t.Fatalf("round-tripped workspace file should be cleaned up, stat err = %v", err)
+	}
+}
+
+func TestRoundTripPCBReportsArtifactsWhenKept(t *testing.T) {
+	dir := t.TempDir()
+	board := filepath.Join(dir, "board.kicad_pcb")
+	writeTestFile(t, board, "(kicad_pcb)\n")
+	cli := KiCadCLI{Path: fakeKiCadUpgradeCLI(t, filepath.Join(dir, "cli.log"), 0)}
+
+	result, err := RoundTripPCB(context.Background(), cli, board, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(dir, "artifacts")})
+	if err != nil {
+		t.Fatalf("RoundTripPCB returned error: %v", err)
+	}
+	if result.RawDiffPath == "" || result.NormalizedDiffPath == "" || result.SummaryPath == "" {
+		t.Fatalf("artifact paths not set when kept: %#v", result)
+	}
+	for _, path := range []string{result.RawDiffPath, result.NormalizedDiffPath, result.SummaryPath, result.RoundTrippedPath} {
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected retained artifact %s: %v", path, err)
+		}
+	}
+}
+
 func TestRoundTripPCBReportsKiCadFailure(t *testing.T) {
 	dir := t.TempDir()
 	board := filepath.Join(dir, "board.kicad_pcb")
