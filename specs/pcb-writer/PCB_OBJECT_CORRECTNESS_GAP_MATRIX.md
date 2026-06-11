@@ -44,7 +44,7 @@ The source demo files are not copied into this repository. This document records
 | `gr_circle` | 346 | Modeled, needs board graphic fixture coverage | Phase 5 |
 | `gr_arc` | 183 | Modeled, needs board graphic fixture coverage | Phase 5 |
 | `gr_poly` | 134 | Modeled, needs board graphic fixture coverage | Phase 5 |
-| `dimension` | 37 | Preservation-only until modeled | Phase 8 |
+| `dimension` | 37 | Modeled for common KiCad dimension types; richer format/style nodes deferred | Phase 8 |
 | `property` | 37 | Modeled for board metadata where applicable | Phase 2 |
 | `group` | 20 | Preservation-only until modeled | Phase 8 |
 | `embedded_fonts` | 18 | Preservation-only | Phase 8 |
@@ -80,7 +80,7 @@ The source demo files are not copied into this repository. This document records
 | `units` | 63 | Needs footprint unit metadata support | Phase 2 |
 | `net_tie_pad_groups` | 19 | Needs support | Phase 2 |
 | `fp_curve` | 18 | Needs modeling and fixture coverage | Phase 4 |
-| `dimension` | 14 | Preservation-only until modeled | Phase 8 |
+| `dimension` | 14 | Modeled for common KiCad dimension types; richer format/style nodes deferred | Phase 8 |
 | `group` | 9 | Preservation-only until modeled | Phase 8 |
 | `zone` | 9 | Needs footprint-local zone coverage | Phase 7 |
 
@@ -155,8 +155,8 @@ writer must own or preserve.
 | --- | ---: | --- |
 | `embedded_fonts` | 4,528 | Preserve on parse/write once preservation infrastructure exists; do not synthesize yet |
 | `teardrops` | 549 | Preserve on parse/write; generated authoring can defer |
-| `dimension` | 51 | Preserve on parse/write; model later if needed |
-| `group` | 29 | Preserve on parse/write; model later if needed |
+| `dimension` | 51 | Modeled for generated boards; preserve richer imported format/style details when parser work lands |
+| `group` | 29 | Preserve on parse/write; do not synthesize until membership references are modeled |
 | `embedded_files` | 223 | Preserve on parse/write; do not synthesize |
 | `component_classes` | 96 | Preserve on parse/write; model later if needed |
 

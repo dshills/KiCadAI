@@ -238,9 +238,9 @@ func objectSupport(token string) corpusObjectSupport {
 	case "kicad_pcb", "version", "generator", "generator_version", "general", "paper", "title_block", "layers", "setup", "pcbplotparams",
 		"uuid", "property", "net", "footprint", "fp_text", "fp_line", "fp_rect", "fp_circle", "fp_arc", "fp_poly", "pad", "model",
 		"gr_line", "gr_rect", "gr_circle", "gr_arc", "gr_poly", "gr_text", "segment", "arc", "via", "zone", "polygon", "filled_polygon", "pts", "xy", "layer",
-		"start", "end", "width", "at", "size", "drill", "effects", "font", "stroke", "fill", "locked", "placed", "descr", "tags", "attr":
+		"dimension", "start", "end", "width", "at", "size", "drill", "effects", "font", "stroke", "fill", "locked", "placed", "descr", "tags", "attr":
 		return corpusObjectSupported
-	case "embedded_fonts", "teardrops", "group", "dimension", "image", "table", "target":
+	case "embedded_fonts", "teardrops", "group", "image", "table", "target", "embedded_files", "component_classes":
 		return corpusObjectPreservationOnly
 	default:
 		return corpusObjectUnsupported

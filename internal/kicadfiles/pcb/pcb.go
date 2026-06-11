@@ -36,7 +36,8 @@ type PCBFile struct {
 }
 
 type PreservedNode struct {
-	Raw string
+	Family string
+	Raw    string
 }
 
 type PCBGeneral struct {
@@ -409,6 +410,7 @@ type Dimension struct {
 	Text     string
 	Position kicadfiles.Point
 	Rotation kicadfiles.Angle
+	Effects  TextEffects
 }
 
 func DefaultTwoLayerStack() []LayerDefinition {
@@ -653,6 +655,15 @@ func Validate(board PCBFile) error {
 			errs = append(errs, fieldError(indexed("preserved", i, "raw"), "required"))
 		} else if !sexpr.ValidRaw(raw) {
 			errs = append(errs, fieldError(indexed("preserved", i, "raw"), "invalid s-expression syntax"))
+		} else if strings.TrimSpace(preserved.Family) != "" {
+			family := strings.TrimSpace(preserved.Family)
+			if family != preserved.Family {
+				errs = append(errs, fieldError(indexed("preserved", i, "family"), "trimmed value required"))
+			} else if !isPreservationOnlyObject(family) {
+				errs = append(errs, fieldError(indexed("preserved", i, "family"), "unknown preservation-only object family"))
+			} else if rawRootToken(raw) != family {
+				errs = append(errs, fieldError(indexed("preserved", i, "family"), "must match preserved raw node"))
+			}
 		}
 	}
 	return errs.Err()
@@ -680,6 +691,28 @@ func validateNetZeroForNormalization(nets []Net) error {
 		}
 	}
 	return nil
+}
+
+func rawRootToken(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if len(raw) < 2 || raw[0] != '(' {
+		return ""
+	}
+	rest := strings.TrimLeft(raw[1:], " \t\r\n")
+	end := strings.IndexAny(rest, " \t\r\n()")
+	if end == -1 {
+		return ""
+	}
+	return rest[:end]
+}
+
+func isPreservationOnlyObject(token string) bool {
+	switch token {
+	case "embedded_fonts", "teardrops", "group", "image", "table", "target", "embedded_files", "component_classes":
+		return true
+	default:
+		return false
+	}
 }
 
 func render(board PCBFile) (sexpr.List, error) {
@@ -1329,7 +1362,14 @@ func renderDimension(dimension Dimension) sexpr.List {
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(dimension.UUID))),
 		renderPoints(dimension.Points),
 		sexpr.L(sexpr.A("height"), fixed(dimension.Height)),
-		sexpr.L(sexpr.A("gr_text"), sexpr.S(dimension.Text), renderAt(dimension.Position, dimension.Rotation)),
+		sexpr.L(
+			sexpr.A("gr_text"),
+			sexpr.S(dimension.Text),
+			renderAt(dimension.Position, dimension.Rotation),
+			sexpr.L(sexpr.A("layer"), sexpr.S(string(dimension.Layer))),
+			sexpr.L(sexpr.A("uuid"), sexpr.S(string(dimension.UUID))),
+			renderEffects(dimension.Effects),
+		),
 	)
 }
 
@@ -2358,8 +2398,10 @@ func validateDimension(index int, dimension Dimension) kicadfiles.ValidationErro
 	if !dimension.UUID.Valid() {
 		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
 	}
-	if strings.TrimSpace(dimension.Type) == "" {
-		errs = append(errs, fieldError(prefix("type"), "required"))
+	if strings.TrimSpace(dimension.Type) != dimension.Type {
+		errs = append(errs, fieldError(prefix("type"), "trimmed value required"))
+	} else if !isValidDimensionType(dimension.Type) {
+		errs = append(errs, fieldError(prefix("type"), "invalid"))
 	}
 	if !kicadfiles.IsValidBoardLayer(dimension.Layer) {
 		errs = append(errs, fieldError(prefix("layer"), "invalid"))
@@ -2367,13 +2409,22 @@ func validateDimension(index int, dimension Dimension) kicadfiles.ValidationErro
 	if countDistinctPoints(dimension.Points) < 2 {
 		errs = append(errs, fieldError(prefix("points"), "at least two distinct points required"))
 	}
-	if dimension.Height <= 0 {
-		errs = append(errs, fieldError(prefix("height"), "must be positive"))
+	if dimension.Height == 0 {
+		errs = append(errs, fieldError(prefix("height"), "must be non-zero"))
 	}
 	if strings.TrimSpace(dimension.Text) == "" {
 		errs = append(errs, fieldError(prefix("text"), "required"))
 	}
 	return errs
+}
+
+func isValidDimensionType(value string) bool {
+	switch value {
+	case "aligned", "orthogonal", "radial", "leader":
+		return true
+	default:
+		return false
+	}
 }
 
 func countShapes(drawing Drawing) int {

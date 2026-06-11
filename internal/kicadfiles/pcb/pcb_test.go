@@ -217,7 +217,7 @@ func TestWriteRendersTitleBlock(t *testing.T) {
 
 func TestWriteRendersPreservedNodes(t *testing.T) {
 	board := minimalPCB()
-	board.Preserved = []PreservedNode{{Raw: `(embedded_fonts no)`}}
+	board.Preserved = []PreservedNode{{Family: "embedded_fonts", Raw: `(embedded_fonts no)`}}
 
 	var buf bytes.Buffer
 	if err := Write(&buf, board); err != nil {
@@ -225,6 +225,19 @@ func TestWriteRendersPreservedNodes(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "(embedded_fonts no)") {
 		t.Fatalf("preserved node missing:\n%s", buf.String())
+	}
+}
+
+func TestValidateRejectsMismatchedPreservedNodeFamily(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{{Family: "group", Raw: `(target (at 1 2))`}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "preserved[0].family") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
@@ -1668,6 +1681,40 @@ func TestValidateRejectsInvalidDimension(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "dimensions[0].type") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestWriteRendersKiCadStyleDimensionText(t *testing.T) {
+	board := minimalPCB()
+	board.Dimensions = []Dimension{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Type:     "aligned",
+		Layer:    kicadfiles.LayerDwgs,
+		Points:   []kicadfiles.Point{point(0, 0), point(10, 0)},
+		Height:   -kicadfiles.MM(2),
+		Text:     "10.0000 mm",
+		Position: point(5, -2),
+		Effects:  TextEffects{FontSize: point(1.5, 1.5), FontThickness: kicadfiles.MM(0.3)},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(dimension",
+		"(height -2)",
+		"(gr_text",
+		"\"10.0000 mm\"",
+		"(layer \"Dwgs.User\")",
+		"(uuid \"11111111-1111-4111-8111-111111111111\")",
+		"(size 1.5 1.5)",
+		"(thickness 0.3)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
 	}
 }
 
