@@ -1111,6 +1111,25 @@ func TestValidateAcceptsClosedRectOutline(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsTolerantMultiLoopLineOutline(t *testing.T) {
+	board := minimalPCB()
+	board.RequireClosedOutline = true
+	board.Drawings = []Drawing{
+		{UUID: kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(0, 0), End: point(10, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: kicadfiles.Point{X: kicadfiles.MM(10) + 50, Y: 0}, End: point(10, 10), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(10, 10), End: point(0, 10), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(0, 10), End: point(0, 0), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(2, 2), End: point(4, 2), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("ffffffff-ffff-4fff-8fff-ffffffffffff"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(4, 2), End: point(4, 4), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(4, 4), End: point(2, 4), Width: kicadfiles.MM(0.1)}},
+		{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Layer: kicadfiles.LayerEdge, Line: &LineDrawing{Start: point(2, 4), End: point(2, 2), Width: kicadfiles.MM(0.1)}},
+	}
+
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
 func TestValidateRejectsDanglingLineWithRectOutline(t *testing.T) {
 	board := minimalPCB()
 	board.RequireClosedOutline = true

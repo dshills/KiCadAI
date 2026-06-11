@@ -132,8 +132,9 @@ const (
 	kicad10LayerFFab     = 35
 	kicad10LayerUserBase = 39
 
-	defaultTextSizeMM      = 1.0
-	defaultTextThicknessMM = 0.15
+	defaultTextSizeMM         = 1.0
+	defaultTextThicknessMM    = 0.15
+	outlineClosureToleranceIU = kicadfiles.IU(100)
 )
 
 type Net struct {
@@ -2008,6 +2009,7 @@ func validateGraphic(prefix string, drawing Drawing) kicadfiles.ValidationErrors
 func validateClosedOutline(drawings []Drawing) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	degrees := map[kicadfiles.Point]int{}
+	outlinePoints := map[outlineCell][]kicadfiles.Point{}
 	hasClosedShape := false
 	for _, drawing := range drawings {
 		if drawing.Layer == kicadfiles.LayerEdge && (drawing.Rect != nil || drawing.Circle != nil || drawing.Poly != nil) {
@@ -2017,8 +2019,10 @@ func validateClosedOutline(drawings []Drawing) kicadfiles.ValidationErrors {
 		if drawing.Layer != kicadfiles.LayerEdge || drawing.Line == nil {
 			continue
 		}
-		degrees[drawing.Line.Start]++
-		degrees[drawing.Line.End]++
+		start := canonicalOutlinePoint(drawing.Line.Start, outlinePoints)
+		end := canonicalOutlinePoint(drawing.Line.End, outlinePoints)
+		degrees[start]++
+		degrees[end]++
 	}
 	if len(degrees) == 0 {
 		if hasClosedShape {
@@ -2032,6 +2036,56 @@ func validateClosedOutline(drawings []Drawing) kicadfiles.ValidationErrors {
 		}
 	}
 	return errs
+}
+
+type outlineCell struct {
+	x int64
+	y int64
+}
+
+func canonicalOutlinePoint(point kicadfiles.Point, grid map[outlineCell][]kicadfiles.Point) kicadfiles.Point {
+	cell := pointOutlineCell(point)
+	for dx := int64(-1); dx <= 1; dx++ {
+		for dy := int64(-1); dy <= 1; dy++ {
+			for _, existing := range grid[outlineCell{x: cell.x + dx, y: cell.y + dy}] {
+				xDelta := absIU(point.X - existing.X)
+				if xDelta > outlineClosureToleranceIU {
+					continue
+				}
+				yDelta := absIU(point.Y - existing.Y)
+				if yDelta > outlineClosureToleranceIU {
+					continue
+				}
+				if xDelta*xDelta+yDelta*yDelta <= outlineClosureToleranceIU*outlineClosureToleranceIU {
+					return existing
+				}
+			}
+		}
+	}
+	grid[cell] = append(grid[cell], point)
+	return point
+}
+
+func pointOutlineCell(point kicadfiles.Point) outlineCell {
+	return outlineCell{
+		x: floorDivIU(point.X, outlineClosureToleranceIU),
+		y: floorDivIU(point.Y, outlineClosureToleranceIU),
+	}
+}
+
+func floorDivIU(value, divisor kicadfiles.IU) int64 {
+	quotient := int64(value / divisor)
+	if value < 0 && value%divisor != 0 {
+		quotient--
+	}
+	return quotient
+}
+
+func absIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func validateTrack(index int, track Track, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
