@@ -18,6 +18,7 @@ import (
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
+	"kicadai/internal/reports"
 	"kicadai/internal/schematic"
 	"kicadai/internal/workflows"
 )
@@ -665,4 +666,8 @@ func writeJSON(stdout io.Writer, value any) error {
 	encoder.SetEscapeHTML(false)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(value)
+}
+
+func writeReportJSON(stdout io.Writer, result reports.Result) error {
+	return reports.WriteJSON(stdout, result)
 }

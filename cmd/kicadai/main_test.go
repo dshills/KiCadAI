@@ -13,6 +13,7 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
+	"kicadai/internal/reports"
 	"kicadai/internal/workflows"
 )
 
@@ -102,6 +103,31 @@ func TestRunUnknownCommandReturnsUsage(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), `unknown command "bogus"`) || !strings.Contains(err.Error(), "Usage:") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestWriteReportJSON(t *testing.T) {
+	var stdout bytes.Buffer
+
+	err := writeReportJSON(&stdout, reports.ErrorResult("inspect-project", reports.Issue{
+		Code:     reports.CodeMissingFile,
+		Severity: reports.SeverityError,
+		Path:     "project",
+		Message:  "project path does not exist",
+	}))
+	if err != nil {
+		t.Fatalf("writeReportJSON returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "inspect-project"`,
+		`"code": "MISSING_FILE"`,
+		`"path": "project"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
 	}
 }
 
