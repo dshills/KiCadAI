@@ -620,13 +620,13 @@ func Validate(board PCBFile) error {
 		errs = append(errs, validateClosedOutline(board.Drawings)...)
 	}
 	for i, track := range board.Tracks {
-		errs = append(errs, validateTrack(i, track, validNetCodes)...)
+		errs = append(errs, validateTrack(i, track, validNetCodes, validNetNames)...)
 	}
 	for i, arc := range board.TrackArcs {
-		errs = append(errs, validateTrackArc(i, arc, validNetCodes)...)
+		errs = append(errs, validateTrackArc(i, arc, validNetCodes, validNetNames)...)
 	}
 	for i, via := range board.Vias {
-		errs = append(errs, validateVia(i, via, validNetCodes)...)
+		errs = append(errs, validateVia(i, via, validNetCodes, validNetNames)...)
 	}
 	for i, zone := range board.Zones {
 		errs = append(errs, validateZone(i, zone, validNetCodes, validNetNames)...)
@@ -2088,7 +2088,7 @@ func absIU(value kicadfiles.IU) kicadfiles.IU {
 	return value
 }
 
-func validateTrack(index int, track Track, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+func validateTrack(index int, track Track, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	prefix := func(field string) string { return indexed("tracks", index, field) }
 	if !track.UUID.Valid() {
@@ -2103,13 +2103,11 @@ func validateTrack(index int, track Track, netCodes map[int]struct{}) kicadfiles
 	if !isCopperLayer(track.Layer) {
 		errs = append(errs, fieldError(prefix("layer"), "must be copper"))
 	}
-	if _, ok := netCodes[track.NetCode]; !ok {
-		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
-	}
+	errs = append(errs, validateRoutedNet(prefix, track.NetCode, track.NetName, netCodes, netNames)...)
 	return errs
 }
 
-func validateTrackArc(index int, arc TrackArc, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+func validateTrackArc(index int, arc TrackArc, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	prefix := func(field string) string { return indexed("track_arcs", index, field) }
 	if !arc.UUID.Valid() {
@@ -2127,9 +2125,7 @@ func validateTrackArc(index int, arc TrackArc, netCodes map[int]struct{}) kicadf
 	if !isCopperLayer(arc.Layer) {
 		errs = append(errs, fieldError(prefix("layer"), "must be copper"))
 	}
-	if _, ok := netCodes[arc.NetCode]; !ok {
-		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
-	}
+	errs = append(errs, validateRoutedNet(prefix, arc.NetCode, arc.NetName, netCodes, netNames)...)
 	return errs
 }
 
@@ -2139,7 +2135,7 @@ func collinear(a, b, c kicadfiles.Point) bool {
 	return left.Cmp(right) == 0
 }
 
-func validateVia(index int, via Via, netCodes map[int]struct{}) kicadfiles.ValidationErrors {
+func validateVia(index int, via Via, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	prefix := func(field string) string { return indexed("vias", index, field) }
 	if !via.UUID.Valid() {
@@ -2154,11 +2150,46 @@ func validateVia(index int, via Via, netCodes map[int]struct{}) kicadfiles.Valid
 	if via.Drill >= via.Size {
 		errs = append(errs, fieldError(prefix("drill"), "must be less than size"))
 	}
-	if _, ok := netCodes[via.NetCode]; !ok {
-		errs = append(errs, fieldError(prefix("net_code"), "unknown"))
+	errs = append(errs, validateRoutedNet(prefix, via.NetCode, via.NetName, netCodes, netNames)...)
+	copperLayerCount := 0
+	for layerIndex, layer := range via.Layers {
+		duplicateLayer := false
+		for previousIndex := 0; previousIndex < layerIndex; previousIndex++ {
+			if via.Layers[previousIndex] == layer {
+				errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "duplicate"))
+				duplicateLayer = true
+				break
+			}
+		}
+		if !isCopperLayer(layer) {
+			errs = append(errs, fieldError(indexedValue(prefix("layers"), layerIndex), "must be copper"))
+		} else if !duplicateLayer {
+			copperLayerCount++
+		}
 	}
-	if countDistinctCopperLayers(via.Layers) < 2 {
+	if copperLayerCount < 2 {
 		errs = append(errs, fieldError(prefix("layers"), "at least two copper layers required"))
+	}
+	return errs
+}
+
+func validateRoutedNet(prefix func(string) string, code int, name string, netCodes map[int]struct{}, netNames map[int]string) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	if _, ok := netCodes[code]; !ok {
+		return append(errs, fieldError(prefix("net_code"), "unknown"))
+	}
+	return validateExplicitNetName(prefix("net_name"), code, name, netNames)
+}
+
+func validateExplicitNetName(field string, code int, name string, netNames map[int]string) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	trimmed := strings.TrimSpace(name)
+	if name != trimmed {
+		errs = append(errs, fieldError(field, "trimmed value required"))
+		return errs
+	}
+	if name != "" && name != netNames[code] {
+		errs = append(errs, fieldError(field, "must match net code"))
 	}
 	return errs
 }

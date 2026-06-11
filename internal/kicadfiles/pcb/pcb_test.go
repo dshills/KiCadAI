@@ -889,6 +889,100 @@ func TestValidateRejectsInvalidTrack(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsRouteNetNameMismatch(t *testing.T) {
+	tests := []struct {
+		name  string
+		board PCBFile
+		want  string
+	}{
+		{
+			name: "track",
+			board: func() PCBFile {
+				board := minimalPCB()
+				board.Nets = []Net{{Code: 1, Name: "A"}}
+				board.Tracks = []Track{{
+					UUID:    kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+					Start:   point(1, 1),
+					End:     point(2, 1),
+					Width:   kicadfiles.MM(0.25),
+					Layer:   kicadfiles.LayerFCu,
+					NetCode: 1,
+					NetName: "B",
+				}}
+				return board
+			}(),
+			want: "tracks[0].net_name",
+		},
+		{
+			name: "track whitespace",
+			board: func() PCBFile {
+				board := minimalPCB()
+				board.Nets = []Net{{Code: 1, Name: "A"}}
+				board.Tracks = []Track{{
+					UUID:    kicadfiles.UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd"),
+					Start:   point(1, 1),
+					End:     point(2, 1),
+					Width:   kicadfiles.MM(0.25),
+					Layer:   kicadfiles.LayerFCu,
+					NetCode: 1,
+					NetName: " ",
+				}}
+				return board
+			}(),
+			want: "tracks[0].net_name",
+		},
+		{
+			name: "track arc",
+			board: func() PCBFile {
+				board := minimalPCB()
+				board.Nets = []Net{{Code: 1, Name: "A"}}
+				board.TrackArcs = []TrackArc{{
+					UUID:    kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+					Start:   point(1, 1),
+					Mid:     point(2, 2),
+					End:     point(3, 1),
+					Width:   kicadfiles.MM(0.25),
+					Layer:   kicadfiles.LayerFCu,
+					NetCode: 1,
+					NetName: "B",
+				}}
+				return board
+			}(),
+			want: "track_arcs[0].net_name",
+		},
+		{
+			name: "via",
+			board: func() PCBFile {
+				board := minimalPCB()
+				board.Nets = []Net{{Code: 1, Name: "A"}}
+				board.Vias = []Via{{
+					UUID:     kicadfiles.UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc"),
+					Position: point(2, 2),
+					Size:     kicadfiles.MM(0.8),
+					Drill:    kicadfiles.MM(0.4),
+					NetCode:  1,
+					NetName:  "B",
+					Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+				}}
+				return board
+			}(),
+			want: "vias[0].net_name",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := Validate(tt.board)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v", err)
+			}
+		})
+	}
+}
+
 func TestValidateAcceptsInternalCopperLayers(t *testing.T) {
 	board := minimalPCB()
 	board.Layers = append(board.Layers, LayerDefinition{Number: 4, Name: kicadfiles.BoardLayer("In1.Cu"), Kind: "signal"})
@@ -955,6 +1049,48 @@ func TestValidateRejectsInvalidVia(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "vias[0].drill") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsInvalidViaLayers(t *testing.T) {
+	tests := []struct {
+		name   string
+		layers []kicadfiles.BoardLayer
+		want   string
+	}{
+		{
+			name:   "non copper",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFSilkS},
+			want:   "vias[0].layers[1]",
+		},
+		{
+			name:   "duplicate",
+			layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFCu},
+			want:   "vias[0].layers[1]",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			board := minimalPCB()
+			board.Nets = []Net{{Code: 1, Name: "A"}}
+			board.Vias = []Via{{
+				UUID:     kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+				Position: point(1, 1),
+				Size:     kicadfiles.MM(0.8),
+				Drill:    kicadfiles.MM(0.4),
+				NetCode:  1,
+				Layers:   tt.layers,
+			}}
+
+			err := Validate(board)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("error = %v", err)
+			}
+		})
 	}
 }
 
