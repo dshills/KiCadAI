@@ -231,6 +231,34 @@ func TestWriteRendersPreservedNodes(t *testing.T) {
 	}
 }
 
+func TestWriteRendersUnknownPreservedNodesWithPlacementHint(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{
+		{
+			Family: "future_child",
+			Raw:    `(future_child (mode "after-future"))`,
+			After:  "future_constraint",
+		},
+		{
+			Family: "future_constraint",
+			Raw:    `(future_constraint (mode "keep"))`,
+			After:  "setup",
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, board); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	assertInOrder(t, buf.String(),
+		"(setup",
+		"(future_constraint",
+		"\"keep\"",
+		"(future_child",
+		"\"after-future\"",
+	)
+}
+
 func TestValidateRejectsMismatchedPreservedNodeFamily(t *testing.T) {
 	board := minimalPCB()
 	board.Preserved = []PreservedNode{{Family: "group", Raw: `(target (at 1 2))`}}
@@ -240,6 +268,57 @@ func TestValidateRejectsMismatchedPreservedNodeFamily(t *testing.T) {
 		t.Fatal("expected error")
 	}
 	if !strings.Contains(err.Error(), "preserved[0].family") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsUnknownPreservedPlacementAnchor(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{{Family: "future_constraint", Raw: `(future_constraint)`, After: "missing_anchor"}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "preserved[0].after") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsPreservedModeledSingleInstanceNode(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{{Family: "setup", Raw: `(setup)`}}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "must not duplicate modeled PCB node setup") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAllowsPreservedNetPlacementAnchor(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{{Family: "future_constraint", Raw: `(future_constraint)`, After: "net"}}
+
+	if err := Validate(board); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
+func TestValidateRejectsCyclicPreservedPlacementAnchors(t *testing.T) {
+	board := minimalPCB()
+	board.Preserved = []PreservedNode{
+		{Family: "future_a", Raw: `(future_a)`, After: "future_b"},
+		{Family: "future_b", Raw: `(future_b)`, After: "future_a"},
+	}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "cyclic preserved node anchor") {
 		t.Fatalf("error = %v", err)
 	}
 }
@@ -1892,6 +1971,18 @@ func repoPathForPCBTest(t *testing.T, parts ...string) string {
 
 func normalizeLineEndings(value []byte) []byte {
 	return bytes.ReplaceAll(value, []byte("\r\n"), []byte("\n"))
+}
+
+func assertInOrder(t *testing.T, output string, needles ...string) {
+	t.Helper()
+	remainder := output
+	for _, needle := range needles {
+		index := strings.Index(remainder, needle)
+		if index == -1 {
+			t.Fatalf("output missing %s:\n%s", needle, output)
+		}
+		remainder = remainder[index+len(needle):]
+	}
 }
 
 func minimalPCB() PCBFile {

@@ -247,6 +247,9 @@ const (
 
 type RawSchematicItem struct {
 	UUID kicadfiles.UUID
+	// Order optionally pins this raw item into the KiCad top-level item order.
+	// Zero keeps the writer's normal KiCad type/UUID ordering.
+	Order int
 	// Kind is the KiCad schematic item node name, such as "bitmap" or
 	// "rule_area". When omitted, the writer infers it from Body. Body must be
 	// a comment-free S-expression fragment whose UUID matches UUID.
@@ -311,9 +314,10 @@ const (
 const schematicHeaderNodeCapacity = 8
 
 type renderItem struct {
-	kind schematicItemKind
-	uuid kicadfiles.UUID
-	node sexpr.Node
+	kind  schematicItemKind
+	order int
+	uuid  kicadfiles.UUID
+	node  sexpr.Node
 }
 
 type LEDIndicatorInput struct {
@@ -665,35 +669,35 @@ func renderItems(schematic SchematicFile) ([]renderItem, error) {
 		len(schematic.Sheets) + len(schematic.RawItems)
 	items := make([]renderItem, 0, itemCount)
 	for _, junction := range schematic.Junctions {
-		items = append(items, renderItem{kind: schematicItemJunction, uuid: junction.UUID, node: renderJunction(junction)})
+		items = append(items, newRenderItem(schematicItemJunction, junction.UUID, renderJunction(junction)))
 	}
 	for _, noConnect := range schematic.NoConnects {
-		items = append(items, renderItem{kind: schematicItemNoConnect, uuid: noConnect.UUID, node: renderNoConnect(noConnect)})
+		items = append(items, newRenderItem(schematicItemNoConnect, noConnect.UUID, renderNoConnect(noConnect)))
 	}
 	for _, entry := range schematic.BusEntries {
-		items = append(items, renderItem{kind: schematicItemWireToBusEntry, uuid: entry.UUID, node: renderBusEntry(entry)})
+		items = append(items, newRenderItem(schematicItemWireToBusEntry, entry.UUID, renderBusEntry(entry)))
 	}
 	for _, wire := range schematic.Wires {
-		items = append(items, renderItem{kind: schematicItemLine, uuid: wire.UUID, node: renderWire(wire)})
+		items = append(items, newRenderItem(schematicItemLine, wire.UUID, renderWire(wire)))
 	}
 	// KiCad saves wires, buses, and graphical polylines as SCH_LINE_T items.
 	for _, bus := range schematic.Buses {
-		items = append(items, renderItem{kind: schematicItemLine, uuid: bus.UUID, node: renderBus(bus)})
+		items = append(items, newRenderItem(schematicItemLine, bus.UUID, renderBus(bus)))
 	}
 	for _, polyline := range schematic.Polylines {
-		items = append(items, renderItem{kind: schematicItemLine, uuid: polyline.UUID, node: renderPolyline(polyline)})
+		items = append(items, newRenderItem(schematicItemLine, polyline.UUID, renderPolyline(polyline)))
 	}
 	for _, text := range schematic.Texts {
-		items = append(items, renderItem{kind: schematicItemText, uuid: text.UUID, node: renderText(text)})
+		items = append(items, newRenderItem(schematicItemText, text.UUID, renderText(text)))
 	}
 	for _, label := range schematic.Labels {
-		items = append(items, renderItem{kind: labelItemKind(label.Kind), uuid: label.UUID, node: renderLabel(label)})
+		items = append(items, newRenderItem(labelItemKind(label.Kind), label.UUID, renderLabel(label)))
 	}
 	for _, symbol := range schematic.Symbols {
-		items = append(items, renderItem{kind: schematicItemSymbol, uuid: symbol.UUID, node: renderSymbol(symbol)})
+		items = append(items, newRenderItem(schematicItemSymbol, symbol.UUID, renderSymbol(symbol)))
 	}
 	for _, sheet := range schematic.Sheets {
-		items = append(items, renderItem{kind: schematicItemSheet, uuid: sheet.UUID, node: renderSheet(sheet)})
+		items = append(items, newRenderItem(schematicItemSheet, sheet.UUID, renderSheet(sheet)))
 	}
 	for i, raw := range schematic.RawItems {
 		effectiveKind := raw.effectiveKind()
@@ -701,17 +705,28 @@ func renderItems(schematic SchematicFile) ([]renderItem, error) {
 		if !ok {
 			return nil, fieldError(indexed("raw_items", i, "kind"), "unsupported schematic item kind "+string(effectiveKind))
 		}
-		items = append(items, renderItem{kind: kind, uuid: raw.UUID, node: sexpr.R(string(raw.Body))})
+		items = append(items, newRawRenderItem(kind, raw.Order, raw.UUID, sexpr.R(string(raw.Body))))
 	}
 	// Keep the sort stable so invalid duplicate UUID input still renders
 	// reproducibly before validation grows strict global UUID checks.
 	slices.SortStableFunc(items, func(a, b renderItem) int {
-		if a.kind != b.kind {
-			return cmp.Compare(a.kind, b.kind)
+		if a.order != b.order {
+			return cmp.Compare(a.order, b.order)
 		}
 		return cmp.Compare(a.uuid, b.uuid)
 	})
 	return items, nil
+}
+
+func newRenderItem(kind schematicItemKind, uuid kicadfiles.UUID, node sexpr.Node) renderItem {
+	return renderItem{kind: kind, order: int(kind) * 1000, uuid: uuid, node: node}
+}
+
+func newRawRenderItem(kind schematicItemKind, order int, uuid kicadfiles.UUID, node sexpr.Node) renderItem {
+	if order <= 0 {
+		order = int(kind) * 1000
+	}
+	return renderItem{kind: kind, order: order, uuid: uuid, node: node}
 }
 
 func labelItemKind(kind LabelKind) schematicItemKind {
@@ -1119,6 +1134,9 @@ func validateRawSchematicItem(index int, raw RawSchematicItem) (kicadfiles.Valid
 	prefix := func(field string) string { return indexed("raw_items", index, field) }
 	if !raw.UUID.Valid() {
 		errs = append(errs, fieldError(prefix("uuid"), "valid UUID required"))
+	}
+	if raw.Order < 0 {
+		errs = append(errs, fieldError(prefix("order"), "must be non-negative"))
 	}
 	body := strings.TrimSpace(string(raw.Body))
 	if !sexpr.ValidRaw(body) {

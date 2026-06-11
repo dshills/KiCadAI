@@ -19,14 +19,16 @@ var (
 )
 
 type ProjectFile struct {
-	Name          string
-	DesignID      kicadfiles.UUID
-	FormatVersion kicadfiles.KiCadFormatVersion
-	Generator     string
-	PageSettings  PageSettings
-	NetClasses    []NetClass
-	Sheets        []Sheet
-	TextVariables map[string]string
+	Name              string
+	DesignID          kicadfiles.UUID
+	FormatVersion     kicadfiles.KiCadFormatVersion
+	Generator         string
+	PageSettings      PageSettings
+	NetClasses        []NetClass
+	Sheets            []Sheet
+	TextVariables     map[string]string
+	Preserved         map[string]json.RawMessage
+	PreservedSections map[string]map[string]json.RawMessage
 }
 
 type PageSettings struct {
@@ -121,6 +123,7 @@ func Validate(project ProjectFile) error {
 			errs = append(errs, fieldError("text_variables."+key, "invalid key"))
 		}
 	}
+	errs = append(errs, validatePreservedProjectJSON(project)...)
 	return errs.Err()
 }
 
@@ -134,20 +137,100 @@ func Write(w io.Writer, project ProjectFile) error {
 	return encoder.Encode(document)
 }
 
-type document struct {
-	Board                  map[string]any    `json:"board"`
-	Boards                 []string          `json:"boards"`
-	ComponentClassSettings map[string]any    `json:"component_class_settings"`
-	Cvpcb                  map[string]any    `json:"cvpcb"`
-	ERC                    map[string]any    `json:"erc"`
-	Libraries              map[string]any    `json:"libraries"`
-	Meta                   meta              `json:"meta"`
-	NetSettings            netSettings       `json:"net_settings"`
-	PCBNew                 map[string]any    `json:"pcbnew"`
-	Schematic              map[string]any    `json:"schematic"`
-	Sheets                 []sheet           `json:"sheets"`
-	TextVariables          map[string]string `json:"text_variables"`
-	TimeDomainParameters   map[string]any    `json:"time_domain_parameters"`
+func validatePreservedProjectJSON(project ProjectFile) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	for key, raw := range project.Preserved {
+		trimmed := strings.TrimSpace(key)
+		if trimmed == "" {
+			errs = append(errs, fieldError("preserved", "top-level key required"))
+			continue
+		}
+		if trimmed != key {
+			errs = append(errs, fieldError("preserved."+key, "trimmed key required"))
+		}
+		if _, modeled := modeledProjectKeys()[key]; modeled {
+			errs = append(errs, fieldError("preserved."+key, "must not replace modeled project key"))
+		}
+		if err := validateRawJSON(raw); err != nil {
+			errs = append(errs, fieldError("preserved."+key, err.Error()))
+		}
+	}
+	for sectionName, section := range project.PreservedSections {
+		if _, ok := preservableProjectSections()[sectionName]; !ok {
+			errs = append(errs, fieldError("preserved_sections."+sectionName, "unknown preservable section"))
+			continue
+		}
+		for key, raw := range section {
+			trimmed := strings.TrimSpace(key)
+			if trimmed == "" {
+				errs = append(errs, fieldError("preserved_sections."+sectionName, "section key required"))
+				continue
+			}
+			if trimmed != key {
+				errs = append(errs, fieldError("preserved_sections."+sectionName+"."+key, "trimmed key required"))
+			}
+			if _, modeled := modeledProjectSectionKeys(sectionName)[key]; modeled {
+				errs = append(errs, fieldError("preserved_sections."+sectionName+"."+key, "must not replace modeled section key"))
+			}
+			if err := validateRawJSON(raw); err != nil {
+				errs = append(errs, fieldError("preserved_sections."+sectionName+"."+key, err.Error()))
+			}
+		}
+	}
+	return errs
+}
+
+func validateRawJSON(raw json.RawMessage) error {
+	if len(raw) == 0 {
+		return fmt.Errorf("raw JSON required")
+	}
+	if !json.Valid(raw) {
+		return fmt.Errorf("invalid raw JSON")
+	}
+	return nil
+}
+
+func modeledProjectKeys() map[string]struct{} {
+	return map[string]struct{}{
+		"board":                    {},
+		"boards":                   {},
+		"component_class_settings": {},
+		"cvpcb":                    {},
+		"erc":                      {},
+		"libraries":                {},
+		"meta":                     {},
+		"net_settings":             {},
+		"pcbnew":                   {},
+		"schematic":                {},
+		"sheets":                   {},
+		"text_variables":           {},
+		"time_domain_parameters":   {},
+	}
+}
+
+func preservableProjectSections() map[string]struct{} {
+	return map[string]struct{}{
+		"board":                    {},
+		"component_class_settings": {},
+		"cvpcb":                    {},
+		"erc":                      {},
+		"libraries":                {},
+		"net_settings":             {},
+		"pcbnew":                   {},
+		"schematic":                {},
+		"time_domain_parameters":   {},
+	}
+}
+
+func modeledProjectSectionKeys(section string) map[string]struct{} {
+	switch section {
+	case "board":
+		return map[string]struct{}{"design_settings": {}}
+	case "net_settings":
+		return map[string]struct{}{"classes": {}}
+	default:
+		return map[string]struct{}{}
+	}
 }
 
 type meta struct {
@@ -174,7 +257,7 @@ type netClass struct {
 
 type sheet []string
 
-func newDocument(project ProjectFile) document {
+func newDocument(project ProjectFile) map[string]any {
 	classes := make([]netClass, 0, len(project.NetClasses))
 	for _, class := range project.NetClasses {
 		classes = append(classes, netClass{
@@ -186,21 +269,33 @@ func newDocument(project ProjectFile) document {
 		})
 	}
 
-	return document{
-		Board:                  map[string]any{"design_settings": map[string]any{}},
-		Boards:                 []string{},
-		ComponentClassSettings: map[string]any{},
-		Cvpcb:                  map[string]any{},
-		ERC:                    map[string]any{},
-		Libraries:              map[string]any{},
-		Meta:                   meta{Version: 1},
-		NetSettings:            netSettings{Classes: classes},
-		PCBNew:                 map[string]any{},
-		Schematic:              map[string]any{},
-		Sheets:                 renderSheets(project.Sheets),
-		TextVariables:          textVariables(project.TextVariables),
-		TimeDomainParameters:   map[string]any{},
+	document := map[string]any{}
+	for key, raw := range project.Preserved {
+		document[key] = raw
 	}
+	document["board"] = map[string]any{"design_settings": map[string]any{}}
+	document["boards"] = []string{}
+	document["component_class_settings"] = map[string]any{}
+	document["cvpcb"] = map[string]any{}
+	document["erc"] = map[string]any{}
+	document["libraries"] = map[string]any{}
+	document["meta"] = meta{Version: 1}
+	document["net_settings"] = map[string]any{"classes": classes}
+	document["pcbnew"] = map[string]any{}
+	document["schematic"] = map[string]any{}
+	document["sheets"] = renderSheets(project.Sheets)
+	document["text_variables"] = textVariables(project.TextVariables)
+	document["time_domain_parameters"] = map[string]any{}
+	for sectionName, section := range project.PreservedSections {
+		target, ok := document[sectionName].(map[string]any)
+		if !ok {
+			continue
+		}
+		for key, raw := range section {
+			target[key] = raw
+		}
+	}
+	return document
 }
 
 func renderSheets(projectSheets []Sheet) []sheet {

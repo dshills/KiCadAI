@@ -2,6 +2,7 @@ package project
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -106,6 +107,64 @@ func TestWriteProjectWithSheets(t *testing.T) {
 	} {
 		if !strings.Contains(buf.String(), want) {
 			t.Fatalf("output missing %s:\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestWriteProjectPreservesUnknownJSON(t *testing.T) {
+	project := minimalProject()
+	project.Preserved = map[string]json.RawMessage{
+		"future_root": json.RawMessage(`{"enabled":true,"values":[1,2]}`),
+	}
+	project.PreservedSections = map[string]map[string]json.RawMessage{
+		"schematic": {
+			"future_setting": json.RawMessage(`{"mode":"keep"}`),
+		},
+		"board": {
+			"future_board_setting": json.RawMessage(`[{"name":"constraint"}]`),
+		},
+	}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, project); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	for _, want := range []string{
+		"\"future_root\": {",
+		"\"enabled\": true",
+		"\"future_setting\": {",
+		"\"mode\": \"keep\"",
+		"\"future_board_setting\": [",
+		"\"design_settings\": {}",
+	} {
+		if !strings.Contains(buf.String(), want) {
+			t.Fatalf("output missing %s:\n%s", want, buf.String())
+		}
+	}
+}
+
+func TestValidateRejectsPreservedProjectCollisionsAndInvalidJSON(t *testing.T) {
+	project := minimalProject()
+	project.Preserved = map[string]json.RawMessage{
+		"meta":   json.RawMessage(`{"version":2}`),
+		"future": json.RawMessage(`{"unterminated"`),
+	}
+	project.PreservedSections = map[string]map[string]json.RawMessage{
+		"net_settings": {
+			"classes": json.RawMessage(`[]`),
+		},
+		"missing": {
+			"value": json.RawMessage(`true`),
+		},
+	}
+
+	err := Validate(project)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	for _, want := range []string{"preserved.meta", "preserved.future", "preserved_sections.net_settings.classes", "preserved_sections.missing"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error missing %s: %v", want, err)
 		}
 	}
 }

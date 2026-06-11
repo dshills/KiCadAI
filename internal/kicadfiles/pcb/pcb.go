@@ -38,6 +38,7 @@ type PCBFile struct {
 type PreservedNode struct {
 	Family string
 	Raw    string
+	After  string
 }
 
 type PCBGeneral struct {
@@ -649,23 +650,51 @@ func Validate(board PCBFile) error {
 	for i, dimension := range board.Dimensions {
 		errs = append(errs, validateDimension(i, dimension)...)
 	}
+	preservedFamilies := map[string]struct{}{}
+	for _, preserved := range board.Preserved {
+		raw := strings.TrimSpace(preserved.Raw)
+		if !sexpr.ValidRaw(raw) {
+			continue
+		}
+		if family := strings.TrimSpace(preserved.Family); family != "" {
+			preservedFamilies[family] = struct{}{}
+			continue
+		}
+		if family := rawRootToken(raw); family != "" {
+			preservedFamilies[family] = struct{}{}
+		}
+	}
 	for i, preserved := range board.Preserved {
 		raw := strings.TrimSpace(preserved.Raw)
 		if raw == "" {
 			errs = append(errs, fieldError(indexed("preserved", i, "raw"), "required"))
 		} else if !sexpr.ValidRaw(raw) {
 			errs = append(errs, fieldError(indexed("preserved", i, "raw"), "invalid s-expression syntax"))
-		} else if strings.TrimSpace(preserved.Family) != "" {
-			family := strings.TrimSpace(preserved.Family)
-			if family != preserved.Family {
+		} else {
+			family := rawRootToken(raw)
+			explicitFamily := strings.TrimSpace(preserved.Family)
+			if explicitFamily != "" {
+				family = explicitFamily
+			}
+			if isModeledSingleInstancePCBNode(family, board) {
+				errs = append(errs, fieldError(indexed("preserved", i, "family"), "must not duplicate modeled PCB node "+family))
+			}
+			if explicitFamily != "" && explicitFamily != preserved.Family {
 				errs = append(errs, fieldError(indexed("preserved", i, "family"), "trimmed value required"))
-			} else if !isPreservationOnlyObject(family) {
-				errs = append(errs, fieldError(indexed("preserved", i, "family"), "unknown preservation-only object family"))
-			} else if rawRootToken(raw) != family {
+			} else if explicitFamily != "" && rawRootToken(raw) != explicitFamily {
 				errs = append(errs, fieldError(indexed("preserved", i, "family"), "must match preserved raw node"))
 			}
 		}
+		if after := strings.TrimSpace(preserved.After); after != preserved.After {
+			errs = append(errs, fieldError(indexed("preserved", i, "after"), "trimmed value required"))
+		} else if after != "" && !knownPCBTopLevelNode(after) {
+			if _, ok := preservedFamilies[after]; ok {
+				continue
+			}
+			errs = append(errs, fieldError(indexed("preserved", i, "after"), "unknown PCB top-level anchor"))
+		}
 	}
+	errs = append(errs, validatePreservedNodeAnchorGraph(board.Preserved)...)
 	return errs.Err()
 }
 
@@ -706,10 +735,21 @@ func rawRootToken(raw string) string {
 	return rest[:end]
 }
 
-func isPreservationOnlyObject(token string) bool {
+func knownPCBTopLevelNode(token string) bool {
 	switch token {
-	case "embedded_fonts", "teardrops", "group", "image", "table", "target", "embedded_files", "component_classes":
+	case "version", "generator", "generator_version", "general", "paper", "title_block", "layers", "setup", "net", "net_class", "footprint", "gr_line", "gr_rect", "gr_circle", "gr_arc", "gr_poly", "gr_curve", "gr_text", "segment", "arc", "via", "zone", "dimension", "embedded_fonts", "teardrops", "group", "image", "table", "target", "embedded_files", "component_classes":
 		return true
+	default:
+		return false
+	}
+}
+
+func isModeledSingleInstancePCBNode(token string, board PCBFile) bool {
+	switch token {
+	case "version", "generator", "generator_version", "general", "paper", "title_block", "layers", "setup":
+		return true
+	case "embedded_fonts":
+		return board.EmbeddedFonts != nil
 	default:
 		return false
 	}
@@ -754,10 +794,101 @@ func render(board PCBFile) (sexpr.List, error) {
 	if board.EmbeddedFonts != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("embedded_fonts"), yesNo(*board.EmbeddedFonts)))
 	}
-	for _, preserved := range board.Preserved {
-		nodes = append(nodes, sexpr.R(preserved.Raw))
-	}
+	nodes = insertPreservedNodes(nodes, board.Preserved)
 	return sexpr.L(nodes...), nil
+}
+
+func insertPreservedNodes(nodes []sexpr.Node, preserved []PreservedNode) []sexpr.Node {
+	childrenByAnchor := map[string][]int{}
+	roots := make([]int, 0, len(preserved))
+	for i, preservedNode := range preserved {
+		after := strings.TrimSpace(preservedNode.After)
+		if after == "" {
+			roots = append(roots, i)
+			continue
+		}
+		childrenByAnchor[after] = append(childrenByAnchor[after], i)
+	}
+	out := make([]sexpr.Node, 0, len(nodes)+len(preserved))
+	emitted := make([]bool, len(preserved))
+	var appendPreserved func(index int)
+	appendPreserved = func(index int) {
+		if emitted[index] {
+			return
+		}
+		emitted[index] = true
+		raw := preserved[index].Raw
+		out = append(out, sexpr.R(raw))
+		if token := rawRootToken(raw); token != "" {
+			for _, childIndex := range childrenByAnchor[token] {
+				appendPreserved(childIndex)
+			}
+		}
+	}
+	appendChildren := func(anchor string) {
+		for _, index := range childrenByAnchor[anchor] {
+			appendPreserved(index)
+		}
+	}
+	for _, node := range nodes {
+		out = append(out, node)
+		if token := nodeRootToken(node); token != "" {
+			appendChildren(token)
+		}
+	}
+	for _, index := range roots {
+		appendPreserved(index)
+	}
+	for i := range preserved {
+		if !emitted[i] {
+			appendPreserved(i)
+		}
+	}
+	return out
+}
+
+func validatePreservedNodeAnchorGraph(preserved []PreservedNode) kicadfiles.ValidationErrors {
+	var errs kicadfiles.ValidationErrors
+	indexByToken := map[string]int{}
+	for i, preservedNode := range preserved {
+		if token := rawRootToken(preservedNode.Raw); token != "" {
+			if _, exists := indexByToken[token]; !exists {
+				indexByToken[token] = i
+			}
+		}
+	}
+	for i := range preserved {
+		seen := map[int]struct{}{}
+		for current := i; ; {
+			after := strings.TrimSpace(preserved[current].After)
+			if after == "" {
+				break
+			}
+			next, ok := indexByToken[after]
+			if !ok {
+				break
+			}
+			if _, ok := seen[next]; ok {
+				errs = append(errs, fieldError(indexed("preserved", i, "after"), "cyclic preserved node anchor"))
+				break
+			}
+			seen[next] = struct{}{}
+			current = next
+		}
+	}
+	return errs
+}
+
+func nodeRootToken(node sexpr.Node) string {
+	list, ok := node.(sexpr.List)
+	if !ok || len(list) == 0 {
+		return ""
+	}
+	atom, ok := list[0].(sexpr.Atom)
+	if !ok {
+		return ""
+	}
+	return string(atom)
 }
 
 func renderGeneral(general PCBGeneral) sexpr.List {

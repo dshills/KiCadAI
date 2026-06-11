@@ -335,6 +335,31 @@ func TestWritePreservesUnknownRawSchematicItems(t *testing.T) {
 	)
 }
 
+func TestWritePreservesRawSchematicItemsWithExplicitOrder(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:      kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		LibraryID: "Device:R",
+		Reference: "R1",
+		Value:     "1k",
+	}}
+	schematic.RawItems = []RawSchematicItem{{
+		UUID:  kicadfiles.UUID("77777777-7777-4777-8777-777777777777"),
+		Order: int(schematicItemSymbol)*1000 - 1,
+		Body:  sexpr.Raw(`(future_widget (uuid "77777777-7777-4777-8777-777777777777") (value "before symbol"))`),
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	assertInOrder(t, buf.String(),
+		"(future_widget",
+		"\"before symbol\"",
+		"(symbol",
+	)
+}
+
 func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
 	showName := true
 	doNotAutoplace := true
@@ -523,6 +548,23 @@ func TestValidateRejectsRawItemKindMismatch(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "raw_items[0].kind") {
 		t.Fatalf("error missing raw item kind mismatch: %v", err)
+	}
+}
+
+func TestValidateRejectsNegativeRawItemOrder(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.RawItems = []RawSchematicItem{{
+		UUID:  kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Order: -1,
+		Body:  sexpr.Raw(`(rule_area (name "Preserved") (uuid "33333333-3333-4333-8333-333333333333"))`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].order") {
+		t.Fatalf("error missing raw item order validation: %v", err)
 	}
 }
 
