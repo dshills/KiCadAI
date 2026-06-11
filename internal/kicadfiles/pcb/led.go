@@ -129,12 +129,16 @@ func outlineLine(generator kicadfiles.IDGenerator, key string, start, end kicadf
 }
 
 func track(generator kicadfiles.IDGenerator, key string, start, end kicadfiles.Point, netCode int) Track {
+	return trackOnLayer(generator, key, start, end, kicadfiles.LayerFCu, netCode)
+}
+
+func trackOnLayer(generator kicadfiles.IDGenerator, key string, start, end kicadfiles.Point, layer kicadfiles.BoardLayer, netCode int) Track {
 	return Track{
 		UUID:    generator.New("root.pcb.track." + key),
 		Start:   start,
 		End:     end,
 		Width:   kicadfiles.MM(0.25),
-		Layer:   kicadfiles.LayerFCu,
+		Layer:   layer,
 		NetCode: netCode,
 	}
 }
