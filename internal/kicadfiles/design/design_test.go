@@ -623,6 +623,113 @@ func TestValidateRejectsDuplicateSchematicReferenceAcrossSheets(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsDuplicateSchematicReferenceAcrossSheetsWithoutPCB(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.KnownSymbolLibraries = []string{"Device"}
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ad0"),
+		LibraryID: "Device:R",
+		Reference: " r1 ",
+		Value:     "1k",
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected duplicate schematic reference")
+	}
+	if !strings.Contains(err.Error(), "sheet_files[0].symbols[0].reference") ||
+		!strings.Contains(err.Error(), "duplicate schematic reference r1") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateRejectsDuplicateSchematicReferenceAcrossChildSheets(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.KnownSymbolLibraries = []string{"Device"}
+	design.Schematic.Sheets = []schematic.Sheet{
+		{
+			UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+			Name:     "Input",
+			Filename: "input.kicad_sch",
+			Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+		{
+			UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abe"),
+			Name:     "Output",
+			Filename: "output.kicad_sch",
+			Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		},
+	}
+	childA := minimalChildSheet("input.kicad_sch")
+	childA.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ad0"),
+		LibraryID: "Device:R",
+		Reference: "U10",
+		Value:     "1k",
+	}}
+	childB := minimalChildSheet("output.kicad_sch")
+	childB.UUID = kicadfiles.UUID("12345678-1234-5678-9234-123456789ad1")
+	childB.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ad2"),
+		LibraryID: "Device:C",
+		Reference: "u10",
+		Value:     "100n",
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&childA, &childB}
+
+	err := Validate(design)
+	if err == nil {
+		t.Fatal("expected duplicate schematic reference")
+	}
+	if !strings.Contains(err.Error(), "sheet_files[1].symbols[0].reference") ||
+		!strings.Contains(err.Error(), "duplicate schematic reference u10") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestValidateAllowsDuplicatePowerSymbolReferencesAcrossSheets(t *testing.T) {
+	design := validLEDDesign(t)
+	design.PCB = nil
+	design.ExpectedNets = nil
+	design.KnownSymbolLibraries = []string{"power"}
+	design.Schematic.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ad0"),
+		LibraryID: "power:GND",
+		Reference: "#PWR0101",
+		Value:     "GND",
+	}}
+	design.Schematic.Sheets = []schematic.Sheet{{
+		UUID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abd"),
+		Name:     "Child",
+		Filename: "child.kicad_sch",
+		Size:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+	}}
+	child := minimalChildSheet("child.kicad_sch")
+	child.Symbols = []schematic.SchematicSymbol{{
+		UUID:      kicadfiles.UUID("12345678-1234-5678-9234-123456789ad1"),
+		LibraryID: "power:GND",
+		Reference: "#PWR0101",
+		Value:     "GND",
+	}}
+	design.SheetFiles = []*schematic.SchematicFile{&child}
+
+	if err := Validate(design); err != nil {
+		t.Fatalf("Validate returned error: %v", err)
+	}
+}
+
 func TestValidateChecksEveryDuplicatePCBFootprintAssignment(t *testing.T) {
 	design := validLEDDesign(t)
 	design.Schematic.Symbols[1].Properties = []schematic.Property{{Name: "Footprint", Value: "Resistor_SMD:R_0805_2012Metric"}}

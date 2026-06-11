@@ -133,9 +133,9 @@ func Validate(design Design) error {
 		if err := schematic.Validate(*design.Schematic); err != nil {
 			errs = append(errs, nestedErrors(err)...)
 		}
-		errs = append(errs, validateSchematicReferences(design.Schematic)...)
-		errs = append(errs, validateSymbolLibraryReferences(design)...)
 		errs = append(errs, validateSheetFiles(design)...)
+		errs = append(errs, validateDesignSchematicReferences(design)...)
+		errs = append(errs, validateSymbolLibraryReferences(design)...)
 	}
 	if design.PCB != nil {
 		if err := pcb.Validate(*design.PCB); err != nil {
@@ -304,17 +304,26 @@ func isKiCadPCBPath(value string) bool {
 	return true
 }
 
-func validateSchematicReferences(schematicFile *schematic.SchematicFile) kicadfiles.ValidationErrors {
+func validateDesignSchematicReferences(design Design) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
-	seen := map[string]struct{}{}
-	for i, symbol := range schematicFile.Symbols {
-		if strings.HasPrefix(symbol.Reference, "#") {
+	seen := map[string]string{}
+	for _, file := range designSchematicFiles(design) {
+		if file.schematic == nil {
 			continue
 		}
-		if _, ok := seen[symbol.Reference]; ok {
-			errs = append(errs, designError("schematic.symbols["+strconv.Itoa(i)+"].reference", "duplicate"))
+		for i, symbol := range file.schematic.Symbols {
+			reference := strings.TrimSpace(symbol.Reference)
+			if strings.HasPrefix(reference, "#") {
+				continue
+			}
+			key := referenceKey(reference)
+			location := file.prefix + ".symbols[" + strconv.Itoa(i) + "].reference"
+			if prior, ok := seen[key]; ok {
+				errs = append(errs, designError(location, "duplicate schematic reference "+reference+" also used by "+prior))
+				continue
+			}
+			seen[key] = location
 		}
-		seen[symbol.Reference] = struct{}{}
 	}
 	return errs
 }
