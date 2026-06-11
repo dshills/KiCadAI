@@ -1274,13 +1274,17 @@ func renderZone(zone Zone, netNames map[int]string) sexpr.List {
 	if strings.TrimSpace(zone.NetName) != "" {
 		netName = zone.NetName
 	}
-	nodes := []sexpr.Node{
-		sexpr.A("zone"),
-		sexpr.L(sexpr.A("net"), sexpr.I(int64(zone.NetCode))),
-		sexpr.L(sexpr.A("net_name"), sexpr.S(netName)),
+	nodes := []sexpr.Node{sexpr.A("zone")}
+	if zone.Keepout == nil {
+		nodes = append(nodes,
+			sexpr.L(sexpr.A("net"), sexpr.I(int64(zone.NetCode))),
+			sexpr.L(sexpr.A("net_name"), sexpr.S(netName)),
+		)
+	}
+	nodes = append(nodes,
 		renderLayerList("layers", zone.Layers),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(zone.UUID))),
-	}
+	)
 	if strings.TrimSpace(zone.Name) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("name"), sexpr.S(zone.Name)))
 	}
@@ -1344,14 +1348,19 @@ func zoneConnectMode(zone Zone) string {
 }
 
 func renderZoneFill(fill ZoneFillSettings) sexpr.List {
-	return sexpr.L(
-		sexpr.A("fill"),
-		yesNo(fill.Enabled),
+	nodes := []sexpr.Node{sexpr.A("fill")}
+	if fill.Enabled {
+		nodes = append(nodes, sexpr.A("yes"))
+	}
+	// KiCad 10.0.3 rejects "(fill no ...)" for unfilled generated zones; omit
+	// the flag unless the zone is already filled.
+	nodes = append(nodes,
 		sexpr.L(sexpr.A("thermal_gap"), fixed(fill.ThermalGap)),
 		sexpr.L(sexpr.A("thermal_bridge_width"), fixed(fill.ThermalBridgeWidth)),
 		sexpr.L(sexpr.A("island_removal_mode"), sexpr.I(int64(fill.IslandRemovalMode))),
 		sexpr.L(sexpr.A("island_area_min"), sexpr.F(fill.IslandAreaMin)),
 	)
+	return sexpr.L(nodes...)
 }
 
 func renderDimension(dimension Dimension) sexpr.List {

@@ -1440,7 +1440,7 @@ func TestWriteAdvancedGeometry(t *testing.T) {
 		"(gr_arc",
 		"(gr_poly",
 		"(zone",
-		"(net_name \"GND\")",
+		"(net \"GND\")",
 		"(polygon",
 		"(dimension",
 		"(type aligned)",
@@ -1665,8 +1665,6 @@ func TestWriteRendersZoneKeepout(t *testing.T) {
 	}
 	output := buf.String()
 	for _, want := range []string{
-		"(net 0)",
-		"(net_name \"\")",
 		"(layers \"F.SilkS\")",
 		"(keepout",
 		"(tracks not_allowed)",

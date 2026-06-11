@@ -621,7 +621,6 @@
     (min_thickness 0.25)
     (filled_areas_thickness no)
     (fill
-      no
       (thermal_gap 0.5)
       (thermal_bridge_width 0.5)
       (island_removal_mode 1)
