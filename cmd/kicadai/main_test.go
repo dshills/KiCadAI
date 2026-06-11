@@ -158,6 +158,150 @@ func TestRunHelpIncludesGenerateCommands(t *testing.T) {
 	}
 }
 
+func TestRunHelpIncludesStructuredCommandFamilies(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"help"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	for _, want := range []string{"inspect", "evaluate", "transaction", "roundtrip", "export", "generate"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("help missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunStructuredCommandRequiresJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"inspect", "project", "demo"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "inspect requires --json") {
+		t.Fatalf("error = %v", err)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("expected no stdout, got %s", stdout.String())
+	}
+}
+
+func TestRunStructuredCommandRequiresSubcommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "inspect"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "inspect"`,
+		`"code": "INVALID_ARGUMENT"`,
+		`"message": "inspect subcommand required"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunStructuredCommandRejectsUnknownSubcommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "evaluate", "gerbers", "demo"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	if !strings.Contains(output, `"code": "INVALID_ARGUMENT"`) ||
+		!strings.Contains(output, `"unsupported evaluate subcommand gerbers"`) {
+		t.Fatalf("unexpected output:\n%s", output)
+	}
+}
+
+func TestRunStructuredCommandRejectsMissingTarget(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "roundtrip", "pcb"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	if !strings.Contains(output, `"code": "INVALID_ARGUMENT"`) ||
+		!strings.Contains(output, `"roundtrip pcb requires 1 argument(s)"`) {
+		t.Fatalf("unexpected output:\n%s", output)
+	}
+}
+
+func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "inspect", "project", "demo"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "inspect"`,
+		`"code": "UNSUPPORTED_OPERATION"`,
+		`"severity": "blocked"`,
+		`"inspect command family is not implemented yet"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunGenerateStructuredCommandAllowsNoTarget(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "generate", "example"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"code": "UNSUPPORTED_OPERATION"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunTransactionPlanRequiresProjectAndTransaction(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "transaction", "plan", "demo"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"code": "INVALID_ARGUMENT"`) ||
+		!strings.Contains(stdout.String(), `"transaction plan requires 2 argument(s)"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunStructuredCommandRejectsExtraArguments(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "inspect", "project", "demo", "extra"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"code": "INVALID_ARGUMENT"`) ||
+		!strings.Contains(stdout.String(), `"inspect project received 1 unexpected argument(s)"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func TestRunGenerateLEDDemoJSON(t *testing.T) {
 	root := filepath.Join(t.TempDir(), "demo-output")
 	var stdout bytes.Buffer

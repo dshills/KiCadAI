@@ -35,8 +35,14 @@ Commands:
   draw-led-demo Execute the LED indicator schematic plan when supported
   generate-led-demo Generate a direct-file LED indicator KiCad project
   generate-project  Generate a direct-file LED indicator KiCad project
+  generate      Generate projects from structured requests
+  inspect       Inspect KiCad projects and files
+  evaluate      Evaluate KiCad projects and files
+  export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
+  roundtrip     Run KiCad CLI round-trip checks
+  transaction   Validate, plan, or apply structured edit transactions
   version       Print KiCad version information
   help          Print this help text
 
@@ -99,6 +105,7 @@ type cliOptions struct {
 	withPCB       bool
 	overwrite     bool
 	jsonOutput    bool
+	commandArgs   []string
 }
 
 type apiClient interface {
@@ -149,6 +156,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return a.runDrawLEDDemo(opts, stdout)
 	case "generate-led-demo", "generate-project":
 		return a.runGenerateLEDDemo(opts, stdout)
+	case "evaluate", "export", "generate", "inspect", "roundtrip", "transaction":
+		return runStructuredCommandSkeleton(opts, command, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
@@ -198,7 +207,113 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 		return opts, "help", nil
 	}
 
+	opts.commandArgs = flags.Args()[1:]
 	return opts, flags.Arg(0), nil
+}
+
+func runStructuredCommandSkeleton(opts cliOptions, command string, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("%s requires --json in this implementation phase", command)
+	}
+	if issue, ok := validateStructuredCommandArgs(command, opts.commandArgs); !ok {
+		return writeReportFailure(stdout, command, issue)
+	}
+	return writeReportFailure(stdout, command, reports.Issue{
+		Code:     reports.CodeUnsupportedOperation,
+		Severity: reports.SeverityBlocked,
+		Path:     command,
+		Message:  command + " command family is not implemented yet",
+	})
+}
+
+func writeReportFailure(stdout io.Writer, command string, issue reports.Issue) error {
+	if err := writeReportJSON(stdout, reports.ErrorResult(command, issue)); err != nil {
+		return err
+	}
+	return errors.New(issue.Message)
+}
+
+func validateStructuredCommandArgs(command string, args []string) (reports.Issue, bool) {
+	if len(args) == 0 {
+		return reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     command,
+			Message:  command + " subcommand required",
+		}, false
+	}
+	subcommand := args[0]
+	requiredParams, ok := requiredStructuredParams(command, subcommand)
+	if !ok {
+		if !structuredCommandKnown(command) {
+			return reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     command,
+				Message:  "unsupported structured command " + command,
+			}, false
+		}
+		return reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     command + "." + subcommand,
+			Message:  "unsupported " + command + " subcommand " + subcommand,
+		}, false
+	}
+	if len(args)-1 < requiredParams {
+		return reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     command + "." + subcommand,
+			Message:  fmt.Sprintf("%s %s requires %d argument(s)", command, subcommand, requiredParams),
+		}, false
+	}
+	if len(args)-1 > requiredParams {
+		return reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     command + "." + subcommand,
+			Message:  fmt.Sprintf("%s %s received %d unexpected argument(s)", command, subcommand, len(args)-1-requiredParams),
+		}, false
+	}
+	return reports.Issue{}, true
+}
+
+func structuredCommandKnown(command string) bool {
+	switch command {
+	case "evaluate", "export", "generate", "inspect", "roundtrip", "transaction":
+		return true
+	default:
+		return false
+	}
+}
+
+func requiredStructuredParams(command, subcommand string) (int, bool) {
+	switch command {
+	case "evaluate", "inspect", "roundtrip":
+		switch subcommand {
+		case "project", "schematic", "pcb":
+			return 1, true
+		}
+	case "export":
+		switch subcommand {
+		case "preview", "bom", "fabrication":
+			return 1, true
+		}
+	case "generate":
+		switch subcommand {
+		case "project", "breakout", "example":
+			return 0, true
+		}
+	case "transaction":
+		switch subcommand {
+		case "validate":
+			return 1, true
+		case "plan", "apply":
+			return 2, true
+		}
+	}
+	return 0, false
 }
 
 func runConfig(opts cliOptions, stdout io.Writer) error {
