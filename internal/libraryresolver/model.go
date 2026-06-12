@@ -25,9 +25,33 @@ type LibraryRoots struct {
 type LibraryIndex struct {
 	GeneratedAt time.Time                  `json:"generated_at"`
 	Roots       LibraryRoots               `json:"roots"`
+	Inventory   LibraryInventory           `json:"inventory"`
 	Symbols     map[string]SymbolRecord    `json:"symbols"`
 	Footprints  map[string]FootprintRecord `json:"footprints"`
 	Diagnostics []reports.Issue            `json:"diagnostics"`
+}
+
+type LibraryInventory struct {
+	SymbolFiles           []LibraryFile   `json:"symbol_files"`
+	FootprintFiles        []LibraryFile   `json:"footprint_files"`
+	SymbolLibraryCount    int             `json:"symbol_library_count"`
+	FootprintLibraryCount int             `json:"footprint_library_count"`
+	Diagnostics           []reports.Issue `json:"diagnostics"`
+}
+
+type LibraryFileKind string
+
+const (
+	LibraryFileSymbol    LibraryFileKind = "symbol"
+	LibraryFileFootprint LibraryFileKind = "footprint"
+)
+
+type LibraryFile struct {
+	Kind            LibraryFileKind `json:"kind"`
+	Path            string          `json:"path"`
+	LibraryNickname string          `json:"library_nickname"`
+	Name            string          `json:"name,omitempty"`
+	IDPrefix        string          `json:"id_prefix"`
 }
 
 type SymbolRecord struct {
