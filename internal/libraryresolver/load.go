@@ -3,6 +3,7 @@ package libraryresolver
 import (
 	"cmp"
 	"context"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -16,12 +17,35 @@ func Load(ctx context.Context, roots LibraryRoots, opts LoadOptions) (LibraryInd
 		return LibraryIndex{Roots: roots}, []reports.Issue{issue}
 	}
 	var issues []reports.Issue
-	issues = append(issues, ValidateCachePath(opts.CachePath)...)
+	cachePath := strings.TrimSpace(opts.CachePath)
+	cachePathIssues := ValidateCachePath(cachePath)
+	issues = append(issues, cachePathIssues...)
+	if cachePath != "" {
+		cachePath = filepath.Clean(cachePath)
+	}
 	inventory := DiscoverContext(ctx, roots)
 	issues = append(issues, inventory.Diagnostics...)
 	if issue, ok := contextIssue(ctx); ok {
 		issues = append(issues, issue)
 		return LibraryIndex{Roots: roots, Inventory: inventory, Diagnostics: issues}, issues
+	}
+	cacheEnabled := cachePath != "" && len(cachePathIssues) == 0
+	var cacheFiles []libraryCacheFileMeta
+	if cacheEnabled {
+		var metadataIssues []reports.Issue
+		cacheFiles, metadataIssues = cacheMetadata(inventory)
+		if len(metadataIssues) != 0 {
+			issues = append(issues, metadataIssues...)
+			cacheEnabled = false
+		}
+	}
+	if cacheEnabled && !opts.Refresh {
+		if cached, cacheIssues, ok := loadCache(cachePath, roots, inventory, cacheFiles); ok {
+			cached.Diagnostics = mergeIssues(issues, cached.Diagnostics)
+			return cached, cached.Diagnostics
+		} else {
+			issues = append(issues, cacheIssues...)
+		}
 	}
 	var symbols map[string]SymbolRecord
 	var symbolIssues []reports.Issue
@@ -50,6 +74,13 @@ func Load(ctx context.Context, roots LibraryRoots, opts LoadOptions) (LibraryInd
 		Symbols:     symbols,
 		Footprints:  footprints,
 		Diagnostics: issues,
+	}
+	if cacheEnabled {
+		cacheIssues := writeCache(cachePath, index, cacheFiles)
+		if len(cacheIssues) != 0 {
+			issues = append(issues, cacheIssues...)
+			index.Diagnostics = issues
+		}
 	}
 	return index, issues
 }
@@ -183,6 +214,32 @@ func contextIssue(ctx context.Context) (reports.Issue, bool) {
 		Path:     "library.load",
 		Message:  ctx.Err().Error(),
 	}, true
+}
+
+func mergeIssues(first []reports.Issue, second []reports.Issue) []reports.Issue {
+	merged := make([]reports.Issue, 0, len(first)+len(second))
+	seen := map[string]struct{}{}
+	for _, issue := range first {
+		key := issueKey(issue)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, issue)
+	}
+	for _, issue := range second {
+		key := issueKey(issue)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		merged = append(merged, issue)
+	}
+	return merged
+}
+
+func issueKey(issue reports.Issue) string {
+	return string(issue.Code) + "\x00" + string(issue.Severity) + "\x00" + issue.Path + "\x00" + issue.Message + "\x00" + issue.Suggestion
 }
 
 func buildSymbolSearchText(record SymbolRecord) string {

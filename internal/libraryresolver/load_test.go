@@ -2,8 +2,14 @@ package libraryresolver
 
 import (
 	"context"
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
+
+	"kicadai/internal/reports"
 )
 
 func TestLoadMixedFixtureTree(t *testing.T) {
@@ -99,6 +105,93 @@ func TestLoadDeterministicRepeatedOutput(t *testing.T) {
 	}
 }
 
+func TestLoadCacheWriteReadRoundTrip(t *testing.T) {
+	roots := mixedLibraryFixture(t)
+	cachePath := filepath.Join(t.TempDir(), "library-index.json")
+	first, firstIssues := Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	if len(firstIssues) != 2 {
+		t.Fatalf("first issues = %#v", firstIssues)
+	}
+	if _, err := os.Stat(cachePath); err != nil {
+		t.Fatalf("cache file not written: %v", err)
+	}
+	second, secondIssues := Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	if len(secondIssues) != len(firstIssues) {
+		t.Fatalf("second issues = %#v", secondIssues)
+	}
+	first.GeneratedAt = second.GeneratedAt
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("cached load differs\nfirst=%#v\nsecond=%#v", first, second)
+	}
+}
+
+func TestLoadCacheInvalidatedByChangedFileModtime(t *testing.T) {
+	roots := mixedLibraryFixture(t)
+	cachePath := filepath.Join(t.TempDir(), "library-index.json")
+	Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	symbolPath := filepath.Join(roots.SymbolsRoot, "Device.kicad_sym")
+	newTime := time.Now().Add(2 * time.Hour)
+	if err := os.Chtimes(symbolPath, newTime, newTime); err != nil {
+		t.Fatalf("touch symbol file: %v", err)
+	}
+	_, issues := Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	if !hasLoadIssue(issues, "cache file metadata changed") {
+		t.Fatalf("expected cache invalidation issue: %#v", issues)
+	}
+}
+
+func TestLoadCacheInvalidatedBySchemaVersion(t *testing.T) {
+	roots := mixedLibraryFixture(t)
+	cachePath := filepath.Join(t.TempDir(), "library-index.json")
+	Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("read cache: %v", err)
+	}
+	data = []byte(strings.Replace(string(data), `"schema_version":1`, `"schema_version":999`, 1))
+	if err := os.WriteFile(cachePath, data, 0o644); err != nil {
+		t.Fatalf("write cache: %v", err)
+	}
+	_, issues := Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	if !hasLoadIssue(issues, "cache schema version changed") {
+		t.Fatalf("expected schema invalidation issue: %#v", issues)
+	}
+}
+
+func TestLoadCacheRefreshSkipsCorruptCache(t *testing.T) {
+	roots := mixedLibraryFixture(t)
+	cachePath := filepath.Join(t.TempDir(), "library-index.json")
+	if err := os.WriteFile(cachePath, []byte(`not-json`), 0o644); err != nil {
+		t.Fatalf("write corrupt cache: %v", err)
+	}
+	_, issues := Load(context.Background(), roots, LoadOptions{CachePath: cachePath, Refresh: true})
+	if hasLoadIssue(issues, "read cache") {
+		t.Fatalf("refresh should not read corrupt cache: %#v", issues)
+	}
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatalf("read refreshed cache: %v", err)
+	}
+	if !strings.Contains(string(data), `"schema_version":1`) {
+		t.Fatalf("cache was not refreshed:\n%s", data)
+	}
+}
+
+func TestLoadCorruptCacheFallsBackToRebuild(t *testing.T) {
+	roots := mixedLibraryFixture(t)
+	cachePath := filepath.Join(t.TempDir(), "library-index.json")
+	if err := os.WriteFile(cachePath, []byte(`not-json`), 0o644); err != nil {
+		t.Fatalf("write corrupt cache: %v", err)
+	}
+	index, issues := Load(context.Background(), roots, LoadOptions{CachePath: cachePath})
+	if Summary(index).SymbolCount != 1 || Summary(index).FootprintCount != 1 {
+		t.Fatalf("index did not rebuild: %#v", Summary(index))
+	}
+	if !hasLoadIssue(issues, "read cache") {
+		t.Fatalf("expected corrupt cache diagnostic: %#v", issues)
+	}
+}
+
 func mixedLibraryFixture(t *testing.T) LibraryRoots {
 	t.Helper()
 	root := t.TempDir()
@@ -107,4 +200,13 @@ func mixedLibraryFixture(t *testing.T) LibraryRoots {
 	mustWrite(t, symbols+"/Device.kicad_sym", resistorSymbolLibrary())
 	mustWrite(t, footprints+"/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod", resistor0805Footprint())
 	return LibraryRoots{SymbolsRoot: symbols, FootprintsRoot: footprints}
+}
+
+func hasLoadIssue(issues []reports.Issue, contains string) bool {
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, contains) {
+			return true
+		}
+	}
+	return false
 }

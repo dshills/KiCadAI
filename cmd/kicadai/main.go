@@ -263,7 +263,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.symbolsRoot, "symbols-root", "", "KiCad symbol library root")
 	flags.StringVar(&opts.footprintsRoot, "footprints-root", "", "KiCad footprint library root")
 	flags.StringVar(&opts.templatesRoot, "templates-root", "", "KiCad template library root")
-	flags.StringVar(&opts.libraryCache, "library-cache", "", "library resolver cache file path")
+	flags.StringVar(&opts.libraryCache, "library-cache", os.Getenv(libraryresolver.EnvLibraryCache), "library resolver cache file path")
 	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
 
 	if err := flags.Parse(args); err != nil {
