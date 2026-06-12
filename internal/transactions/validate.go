@@ -125,6 +125,7 @@ func validateOperation(op Operation) []reports.Issue {
 					issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s.pads[%d].name", path, padIndex), "pad name is required"))
 				}
 				issues = append(issues, validatePoint(fmt.Sprintf("%s.pads[%d]", path, padIndex), Point{XMM: pad.XMM, YMM: pad.YMM})...)
+				issues = append(issues, validatePadGeometry(fmt.Sprintf("%s.pads[%d]", path, padIndex), pad)...)
 			}
 			return issues
 		})
@@ -185,6 +186,25 @@ func validatePolygon(path string, points []Point) []reports.Issue {
 		issues = append(issues, validatePoint(fmt.Sprintf("%s[%d]", path, i), point)...)
 		if i > 0 && samePoint(points[i-1], point) {
 			issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s[%d]", path, i), "polygon contains a zero-length segment"))
+		}
+	}
+	return issues
+}
+
+func validatePadGeometry(path string, pad PadSpec) []reports.Issue {
+	var issues []reports.Issue
+	for _, field := range []struct {
+		name  string
+		value float64
+	}{
+		{name: "width_mm", value: pad.WidthMM},
+		{name: "height_mm", value: pad.HeightMM},
+		{name: "drill_mm", value: pad.DrillMM},
+	} {
+		if !finite(field.value) {
+			issues = append(issues, issue(reports.CodeInvalidArgument, path+"."+field.name, field.name+" must be finite"))
+		} else if field.value < 0 {
+			issues = append(issues, issue(reports.CodeInvalidArgument, path+"."+field.name, field.name+" must be non-negative"))
 		}
 	}
 	return issues

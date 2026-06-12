@@ -54,6 +54,7 @@ func PlanTransaction(target string, tx Transaction) Plan {
 			existing = &loaded
 		}
 	}
+	addedRefs := map[string]struct{}{}
 	for i, op := range tx.Operations {
 		op.Index = i
 		planned := PlannedOperation{Index: i, Op: op.Op, Supported: supportedPlanOperation(op.Op)}
@@ -62,7 +63,7 @@ func PlanTransaction(target string, tx Transaction) Plan {
 		}
 		plan.Issues = append(plan.Issues, populatePlanFields(&planned, op, target, projectName)...)
 		if existing != nil {
-			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, op)...)
+			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, op, addedRefs)...)
 		}
 		if !planned.Supported {
 			plan.Issues = append(plan.Issues, reports.Issue{
@@ -73,6 +74,12 @@ func PlanTransaction(target string, tx Transaction) Plan {
 			})
 		}
 		plan.Operations = append(plan.Operations, planned)
+		if existingProject && op.Op == OpAddSymbol {
+			var payload AddSymbolOperation
+			if decodeRaw(op, &payload) == nil && strings.TrimSpace(payload.Ref) != "" {
+				addedRefs[strings.TrimSpace(payload.Ref)] = struct{}{}
+			}
+		}
 	}
 	return plan
 }
@@ -214,7 +221,7 @@ func existingProjectTarget(target string) bool {
 	return false
 }
 
-func existingProjectIssues(design kicaddesign.Design, op Operation) []reports.Issue {
+func existingProjectIssues(design kicaddesign.Design, op Operation, addedRefs map[string]struct{}) []reports.Issue {
 	var issues []reports.Issue
 	if touchesDesign(op.Op) && hasUnsupportedImportedContent(design) {
 		issues = append(issues, reports.Issue{
@@ -235,18 +242,18 @@ func existingProjectIssues(design kicaddesign.Design, op Operation) []reports.Is
 	case OpAssignFootprint:
 		var payload AssignFootprintOperation
 		if decodeRaw(op, &payload) == nil {
-			issues = append(issues, refIssues(design, op.Index, payload.Ref)...)
+			issues = append(issues, refIssues(design, op.Index, payload.Ref, addedRefs)...)
 		}
 	case OpPlaceFootprint:
 		var payload PlaceFootprintOperation
 		if decodeRaw(op, &payload) == nil {
-			issues = append(issues, refIssues(design, op.Index, payload.Ref)...)
+			issues = append(issues, refIssues(design, op.Index, payload.Ref, addedRefs)...)
 		}
 	case OpConnect:
 		var payload ConnectOperation
 		if decodeRaw(op, &payload) == nil {
-			issues = append(issues, refIssues(design, op.Index, payload.From.Ref)...)
-			issues = append(issues, refIssues(design, op.Index, payload.To.Ref)...)
+			issues = append(issues, refIssues(design, op.Index, payload.From.Ref, addedRefs)...)
+			issues = append(issues, refIssues(design, op.Index, payload.To.Ref, addedRefs)...)
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodePinmapUnverified,
 				Severity: reports.SeverityBlocked,
@@ -278,9 +285,12 @@ func hasUnsupportedImportedContent(design kicaddesign.Design) bool {
 	return false
 }
 
-func refIssues(design kicaddesign.Design, index int, ref string) []reports.Issue {
+func refIssues(design kicaddesign.Design, index int, ref string, addedRefs map[string]struct{}) []reports.Issue {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
+		return nil
+	}
+	if _, ok := addedRefs[ref]; ok {
 		return nil
 	}
 	if design.Schematic == nil {

@@ -71,11 +71,15 @@ type PinSpec struct {
 }
 
 type PadSpec struct {
-	Name string  `json:"name"`
-	Type string  `json:"type,omitempty"`
-	XMM  float64 `json:"x_mm,omitempty"`
-	YMM  float64 `json:"y_mm,omitempty"`
-	Net  *string `json:"net,omitempty"`
+	Name     string  `json:"name"`
+	Type     string  `json:"type,omitempty"`
+	Shape    string  `json:"shape,omitempty"`
+	XMM      float64 `json:"x_mm,omitempty"`
+	YMM      float64 `json:"y_mm,omitempty"`
+	WidthMM  float64 `json:"width_mm,omitempty"`
+	HeightMM float64 `json:"height_mm,omitempty"`
+	DrillMM  float64 `json:"drill_mm,omitempty"`
+	Net      *string `json:"net,omitempty"`
 }
 
 type CreateProjectOperation struct {
@@ -113,12 +117,14 @@ type AssignFootprintOperation struct {
 }
 
 type PlaceFootprintOperation struct {
-	Op       OperationKind `json:"op"`
-	Ref      string        `json:"ref"`
-	At       Point         `json:"at"`
-	Rotation float64       `json:"rotation_deg,omitempty"`
-	Layer    string        `json:"layer,omitempty"`
-	Pads     []PadSpec     `json:"pads,omitempty"`
+	Op          OperationKind `json:"op"`
+	Ref         string        `json:"ref"`
+	FootprintID string        `json:"footprint_id,omitempty"`
+	Value       string        `json:"value,omitempty"`
+	At          Point         `json:"at"`
+	Rotation    float64       `json:"rotation_deg,omitempty"`
+	Layer       string        `json:"layer,omitempty"`
+	Pads        []PadSpec     `json:"pads,omitempty"`
 }
 
 type RouteOperation struct {
