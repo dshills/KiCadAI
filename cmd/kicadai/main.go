@@ -427,6 +427,10 @@ func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return writeLibraryResult(stdout, libraryresolver.ValidateAssignment(libraryIndex, opts.commandArgs[1], opts.commandArgs[2]), issues)
 	case "pinmap-candidate":
 		return writeLibraryResult(stdout, libraryresolver.GeneratePinmapCandidate(libraryIndex, opts.commandArgs[1], opts.commandArgs[2]), issues)
+	case "klc-symbol":
+		return writeLibraryKLCResult(stdout, libraryresolver.ValidateSymbolKLC(libraryIndex, opts.commandArgs[1]), issues)
+	case "klc-footprint":
+		return writeLibraryKLCResult(stdout, libraryresolver.ValidateFootprintKLC(libraryIndex, opts.commandArgs[1]), issues)
 	}
 	return writeLibraryFailure(stdout, reports.Issue{
 		Code:     reports.CodeInvalidArgument,
@@ -440,11 +444,17 @@ func writeLibraryFailure(stdout io.Writer, issue reports.Issue) error {
 	return writeReportFailure(stdout, "library", issue)
 }
 
+func writeLibraryKLCResult(stdout io.Writer, report libraryresolver.KLCReport, issues []reports.Issue) error {
+	reportIssues := report.Issues
+	report.Issues = nil
+	return writeLibraryResult(stdout, report, append(issues, reportIssues...))
+}
+
 func requiredLibraryParams(subcommand string) (int, bool) {
 	switch subcommand {
 	case "index":
 		return 0, true
-	case "symbol", "footprint", "search-symbols", "search-footprints", "compatible-footprints":
+	case "symbol", "footprint", "search-symbols", "search-footprints", "compatible-footprints", "klc-symbol", "klc-footprint":
 		return 1, true
 	case "validate-assignment", "pinmap-candidate":
 		return 2, true

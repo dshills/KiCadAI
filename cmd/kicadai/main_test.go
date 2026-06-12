@@ -180,6 +180,8 @@ func TestRunLibraryCompatibilityJSON(t *testing.T) {
 		{name: "compatible-footprints", args: []string{"library", "compatible-footprints", "Device:R"}, want: `"status": "compatible"`},
 		{name: "validate-assignment", args: []string{"library", "validate-assignment", "Device:R", "Resistor_SMD:R_0805_2012Metric"}, want: `"status": "compatible"`},
 		{name: "pinmap-candidate", args: []string{"library", "pinmap-candidate", "Device:R", "Resistor_SMD:R_0805_2012Metric"}, want: `"pinmap_candidate"`},
+		{name: "klc-symbol", args: []string{"library", "klc-symbol", "Device:R"}, want: `"kind": "symbol"`},
+		{name: "klc-footprint", args: []string{"library", "klc-footprint", "Resistor_SMD:R_0805_2012Metric"}, want: `"kind": "footprint"`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			var stdout bytes.Buffer
