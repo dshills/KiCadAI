@@ -652,6 +652,33 @@ func TestRunTransactionPlanBlocksExistingProject(t *testing.T) {
 	}
 }
 
+func TestRunTransactionApplyJSON(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1","x_mm":-2.54},{"number":"2","x_mm":2.54}]},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"},
+	  {"op":"place_footprint","ref":"R1","at":{"x_mm":20,"y_mm":20}},
+	  {"op":"write_project"}
+	]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "transaction", "apply", output, path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"ok": true`) || !strings.Contains(stdout.String(), `"kicad_project"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(output, "demo.kicad_pcb")); err != nil {
+		t.Fatalf("PCB not written: %v", err)
+	}
+}
+
 func TestRunStructuredCommandRejectsExtraArguments(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

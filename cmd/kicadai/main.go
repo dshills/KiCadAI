@@ -604,16 +604,42 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		}
 		return nil
 	case "apply":
-		issue := reports.Issue{
-			Code:     reports.CodeUnsupportedOperation,
-			Severity: reports.SeverityBlocked,
-			Path:     "transaction." + subcommand,
-			Message:  "transaction " + subcommand + " is not implemented yet",
+		if len(opts.commandArgs) < 3 {
+			issue := reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "transaction.apply",
+				Message:  "transaction apply requires output directory and transaction path",
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
 		}
-		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+		outputDir := opts.commandArgs[1]
+		path := opts.commandArgs[2]
+		tx, err := transactions.LoadFile(path)
+		if err != nil {
+			issue := reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     filepath.ToSlash(path),
+				Message:  err.Error(),
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
+		applyResult := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: opts.overwrite, Seed: opts.seed})
+		result := reports.ResultWithIssues("transaction", applyResult, applyResult.Issues, applyResult.Artifacts)
+		if err := writeReportJSON(stdout, result); err != nil {
 			return err
 		}
-		return errors.New(issue.Message)
+		if !result.OK {
+			return errors.New("transaction apply failed")
+		}
+		return nil
 	default:
 		issue := reports.Issue{
 			Code:     reports.CodeInvalidArgument,
