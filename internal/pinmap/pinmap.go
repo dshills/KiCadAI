@@ -1,0 +1,180 @@
+package pinmap
+
+import (
+	"fmt"
+	"strings"
+
+	kicaddesign "kicadai/internal/kicadfiles/design"
+	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/reports"
+)
+
+type Entry struct {
+	Symbol    string `json:"symbol"`
+	Footprint string `json:"footprint"`
+	Pins      []Pin  `json:"pins"`
+	Source    string `json:"source"`
+	Notes     string `json:"notes,omitempty"`
+}
+
+type Pin struct {
+	SymbolPin    string `json:"symbol_pin"`
+	Function     string `json:"function,omitempty"`
+	FootprintPad string `json:"footprint_pad"`
+}
+
+type Report struct {
+	Target                 string          `json:"target"`
+	FabricationReady       bool            `json:"fabrication_ready"`
+	FabricationReadyReason string          `json:"fabrication_ready_reason,omitempty"`
+	Mappings               []Mapping       `json:"mappings"`
+	Issues                 []reports.Issue `json:"issues"`
+}
+
+type Mapping struct {
+	Ref       string `json:"ref"`
+	Symbol    string `json:"symbol"`
+	Footprint string `json:"footprint"`
+	Status    string `json:"status"`
+	Source    string `json:"source,omitempty"`
+	Notes     string `json:"notes,omitempty"`
+	PinCount  int    `json:"pin_count"`
+	MapCount  int    `json:"map_count"`
+}
+
+var builtinEntries = []Entry{
+	{Symbol: "Device:R", Footprint: "Resistor_SMD:R_0805_2012Metric", Source: "human_verified", Notes: "Generic two-terminal resistor mapping.", Pins: []Pin{{SymbolPin: "1", Function: "A", FootprintPad: "1"}, {SymbolPin: "2", Function: "B", FootprintPad: "2"}}},
+	{Symbol: "Device:C", Footprint: "Capacitor_SMD:C_0805_2012Metric", Source: "human_verified", Notes: "Generic two-terminal capacitor mapping.", Pins: []Pin{{SymbolPin: "1", Function: "A", FootprintPad: "1"}, {SymbolPin: "2", Function: "B", FootprintPad: "2"}}},
+	{Symbol: "Device:LED", Footprint: "LED_SMD:LED_0805_2012Metric", Source: "human_verified", Notes: "Verify polarity marker against selected LED footprint before fabrication.", Pins: []Pin{{SymbolPin: "1", Function: "K", FootprintPad: "1"}, {SymbolPin: "2", Function: "A", FootprintPad: "2"}}},
+	{Symbol: "Connector:Conn_01x01", Footprint: "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical", Source: "human_verified", Notes: "Single-pin connector maps pin 1 to pad 1.", Pins: []Pin{{SymbolPin: "1", FootprintPad: "1"}}},
+	{Symbol: "Connector:Conn_01x02", Footprint: "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", Source: "human_verified", Notes: "Two-pin header maps pins directly by number.", Pins: []Pin{{SymbolPin: "1", FootprintPad: "1"}, {SymbolPin: "2", FootprintPad: "2"}}},
+	{Symbol: "Device:Q_NPN_BEC", Footprint: "Package_TO_SOT_THT:TO-92_Inline", Source: "human_verified", Notes: "Verify against selected transistor datasheet.", Pins: []Pin{{SymbolPin: "1", Function: "E", FootprintPad: "1"}, {SymbolPin: "2", Function: "B", FootprintPad: "2"}, {SymbolPin: "3", Function: "C", FootprintPad: "3"}}},
+}
+
+var builtinIndex = entryIndex(builtinEntries)
+
+func Builtins() []Entry {
+	entries := make([]Entry, len(builtinEntries))
+	for i, entry := range builtinEntries {
+		entries[i] = entry
+		entries[i].Pins = append([]Pin(nil), entry.Pins...)
+	}
+	return entries
+}
+
+func ValidateProject(path string) (Report, error) {
+	design, err := kicaddesign.ReadProjectDirectory(path)
+	if err != nil {
+		return Report{}, err
+	}
+	report := Report{Target: path, Mappings: []Mapping{}, Issues: []reports.Issue{}}
+	if design.Schematic == nil {
+		report.Issues = append(report.Issues, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: "pinmap.project", Message: "project has no root schematic"})
+		finalize(&report)
+		return report, nil
+	}
+	if len(design.Schematic.Sheets) > 0 {
+		report.Issues = append(report.Issues, reports.Issue{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityBlocked,
+			Path:       "pinmap.hierarchy",
+			Message:    "hierarchical pinmap validation is not implemented; child sheets may contain unverified mappings",
+			Suggestion: "run pinmap validation on child sheets explicitly until hierarchy flattening is implemented",
+		})
+	}
+	for _, symbol := range design.Schematic.Symbols {
+		footprint := symbolFootprint(symbol)
+		if strings.TrimSpace(footprint) == "" {
+			continue
+		}
+		key := mappingKey(symbol.LibraryID, footprint)
+		entry, ok := builtinIndex[key]
+		mapping := Mapping{Ref: symbol.Reference, Symbol: symbol.LibraryID, Footprint: footprint, PinCount: len(symbol.Pins)}
+		if !ok {
+			mapping.Status = "unverified"
+			report.Issues = append(report.Issues, reports.Issue{
+				Code:       reports.CodePinmapUnverified,
+				Severity:   reports.SeverityBlocked,
+				Path:       "pinmap." + symbol.Reference,
+				Message:    fmt.Sprintf("pinmap is not verified for %s -> %s", symbol.LibraryID, footprint),
+				Refs:       []string{symbol.Reference},
+				Suggestion: "add a human-verified pinmap entry before fabrication export",
+			})
+			report.Mappings = append(report.Mappings, mapping)
+			continue
+		}
+		mapping.Status = "verified"
+		mapping.Source = entry.Source
+		mapping.Notes = entry.Notes
+		mapping.MapCount = len(entry.Pins)
+		if len(symbol.Pins) != len(entry.Pins) {
+			mapping.Status = "mismatch"
+			report.Issues = append(report.Issues, reports.Issue{
+				Code:     reports.CodePinmapUnverified,
+				Severity: reports.SeverityBlocked,
+				Path:     "pinmap." + symbol.Reference,
+				Message:  fmt.Sprintf("pinmap pin count mismatch for %s -> %s: symbol has %d pins, mapping has %d", symbol.LibraryID, footprint, len(symbol.Pins), len(entry.Pins)),
+				Refs:     []string{symbol.Reference},
+			})
+		}
+		for _, pinIssue := range pinIdentifierIssues(symbol, entry) {
+			mapping.Status = "mismatch"
+			report.Issues = append(report.Issues, pinIssue)
+		}
+		report.Mappings = append(report.Mappings, mapping)
+	}
+	finalize(&report)
+	return report, nil
+}
+
+func entryIndex(entries []Entry) map[string]Entry {
+	index := make(map[string]Entry, len(entries))
+	for _, entry := range entries {
+		index[mappingKey(entry.Symbol, entry.Footprint)] = entry
+	}
+	return index
+}
+
+func mappingKey(symbol string, footprint string) string {
+	return strings.TrimSpace(symbol) + "\x00" + strings.TrimSpace(footprint)
+}
+
+func symbolFootprint(symbol schematic.SchematicSymbol) string {
+	for _, property := range symbol.Properties {
+		if strings.EqualFold(strings.TrimSpace(property.Name), "Footprint") {
+			return strings.TrimSpace(property.Value)
+		}
+	}
+	return ""
+}
+
+func pinIdentifierIssues(symbol schematic.SchematicSymbol, entry Entry) []reports.Issue {
+	expected := make(map[string]struct{}, len(entry.Pins))
+	for _, pin := range entry.Pins {
+		expected[strings.TrimSpace(pin.SymbolPin)] = struct{}{}
+	}
+	var issues []reports.Issue
+	for _, pin := range symbol.Pins {
+		number := strings.TrimSpace(pin.Number)
+		if _, ok := expected[number]; ok {
+			continue
+		}
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodePinmapUnverified,
+			Severity: reports.SeverityBlocked,
+			Path:     "pinmap." + symbol.Reference,
+			Message:  fmt.Sprintf("pin %s is not present in verified pinmap for %s -> %s", number, symbol.LibraryID, entry.Footprint),
+			Refs:     []string{symbol.Reference},
+		})
+	}
+	return issues
+}
+
+func finalize(report *Report) {
+	if reports.HasBlockingIssue(report.Issues) {
+		report.FabricationReady = false
+		report.FabricationReadyReason = "pinmap verification has blocking issues"
+		return
+	}
+	report.FabricationReady = true
+}

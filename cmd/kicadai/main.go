@@ -24,6 +24,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/roundtrip"
+	"kicadai/internal/pinmap"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematic"
 	"kicadai/internal/transactions"
@@ -45,6 +46,7 @@ Commands:
   generate      Generate projects from structured requests
   inspect       Inspect KiCad projects and files
   evaluate      Evaluate KiCad projects and files
+  pinmap        List or validate symbol-footprint pinmaps
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -186,6 +188,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runEvaluate(opts, stdout)
 	case "roundtrip":
 		return runRoundTrip(opts, stdout)
+	case "pinmap":
+		return runPinmap(opts, stdout)
 	case "transaction":
 		return runTransaction(opts, stdout)
 	case "export":
@@ -445,6 +449,55 @@ func runEvaluate(opts cliOptions, stdout io.Writer) error {
 		return errors.New("evaluate reported blocking issues")
 	}
 	return nil
+}
+
+func runPinmap(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("pinmap requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("pinmap", opts.commandArgs); !ok {
+		if err := writeReportJSON(stdout, reports.ErrorResult("pinmap", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	switch opts.commandArgs[0] {
+	case "list":
+		return writeReportJSON(stdout, reports.OKResult("pinmap", pinmap.Builtins(), nil))
+	case "validate":
+		target := opts.commandArgs[1]
+		report, err := pinmap.ValidateProject(target)
+		if err != nil {
+			issue := reports.Issue{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityError,
+				Path:     "pinmap.validate",
+				Message:  err.Error(),
+			}
+			if errors.Is(err, os.ErrNotExist) {
+				issue.Code = reports.CodeMissingFile
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("pinmap", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
+		result := reports.ResultWithIssues("pinmap", report, report.Issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if !result.OK {
+			return errors.New("pinmap validation failed")
+		}
+		return nil
+	default:
+		return writeReportFailure(stdout, "pinmap", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "pinmap." + opts.commandArgs[0],
+			Message:  "unsupported pinmap subcommand " + opts.commandArgs[0],
+		})
+	}
 }
 
 type roundTripReport struct {
@@ -952,7 +1005,7 @@ func validateStructuredCommandArgs(command string, args []string) (reports.Issue
 
 func structuredCommandKnown(command string) bool {
 	switch command {
-	case "evaluate", "export", "generate", "inspect", "roundtrip", "transaction":
+	case "evaluate", "export", "generate", "inspect", "pinmap", "roundtrip", "transaction":
 		return true
 	default:
 		return false
@@ -975,6 +1028,13 @@ func requiredStructuredParams(command, subcommand string) (int, bool) {
 		switch subcommand {
 		case "project", "breakout", "example":
 			return 0, true
+		}
+	case "pinmap":
+		switch subcommand {
+		case "list":
+			return 0, true
+		case "validate":
+			return 1, true
 		}
 	case "transaction":
 		switch subcommand {

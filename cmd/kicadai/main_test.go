@@ -167,7 +167,7 @@ func TestRunHelpIncludesStructuredCommandFamilies(t *testing.T) {
 	if err := run([]string{"help"}, &stdout, &stderr); err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
-	for _, want := range []string{"inspect", "evaluate", "transaction", "roundtrip", "export", "generate"} {
+	for _, want := range []string{"inspect", "evaluate", "pinmap", "transaction", "roundtrip", "export", "generate"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("help missing %q:\n%s", want, stdout.String())
 		}
@@ -337,6 +337,67 @@ func TestRunInspectProjectJSON(t *testing.T) {
 		`"name": "demo"`,
 		`"symbol_count": 1`,
 		`"footprint_count": 1`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunPinmapListJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "pinmap", "list"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "pinmap"`,
+		`"source": "human_verified"`,
+		`"symbol": "Device:R"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunPinmapValidateReportsBlockingIssues(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_sch"), []byte(`(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (generator_version "10.0")
+  (uuid "11111111-1111-5111-8111-111111111111")
+  (paper A4)
+  (symbol
+    (lib_id "Device:U")
+    (property "Reference" "U1")
+    (property "Footprint" "Package_SO:SOIC-8")
+    (uuid "33333333-3333-5333-8333-333333333333"))
+)`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "pinmap", "validate", root}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "pinmap"`,
+		`"code": "PINMAP_UNVERIFIED"`,
+		`"fabrication_ready": false`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
