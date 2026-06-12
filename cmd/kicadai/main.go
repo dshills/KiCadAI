@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"reflect"
 	"runtime"
@@ -24,6 +25,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/roundtrip"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/pinmap"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematic"
@@ -45,6 +47,7 @@ Commands:
   generate-project  Generate a direct-file LED indicator KiCad project
   generate      Generate projects from structured requests
   inspect       Inspect KiCad projects and files
+  library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
   pinmap        List or validate symbol-footprint pinmaps
   export        Export review and fabrication artifacts
@@ -82,6 +85,12 @@ Global flags:
   --artifact-dir string Directory for retained round-trip artifacts
   --timeout duration    Round-trip KiCad CLI timeout, for example 10s or 2m
   --allowlist string    Round-trip allowlist JSON path
+  --klc-root string        KiCad Library Convention repository root
+  --symbols-root string    KiCad symbol library root
+  --footprints-root string KiCad footprint library root
+  --templates-root string  KiCad template library root
+  --library-cache string   Library resolver cache file path
+  --refresh-library-cache  Rebuild library resolver cache
 `
 
 const (
@@ -100,33 +109,39 @@ var usage = fmt.Sprintf(
 )
 
 type cliOptions struct {
-	socket        string
-	apiCredential string
-	clientName    string
-	timeoutMS     int
-	documentType  string
-	documentID    string
-	originX       int64
-	originY       int64
-	prefix        string
-	output        string
-	requestPath   string
-	name          string
-	seed          string
-	libVCC        string
-	libGND        string
-	libResistor   string
-	libLED        string
-	execute       bool
-	withPCB       bool
-	overwrite     bool
-	jsonOutput    bool
-	kicadCLI      string
-	keepArtifacts bool
-	artifactDir   string
-	roundTimeout  string
-	allowlistPath string
-	commandArgs   []string
+	socket              string
+	apiCredential       string
+	clientName          string
+	timeoutMS           int
+	documentType        string
+	documentID          string
+	originX             int64
+	originY             int64
+	prefix              string
+	output              string
+	requestPath         string
+	name                string
+	seed                string
+	libVCC              string
+	libGND              string
+	libResistor         string
+	libLED              string
+	execute             bool
+	withPCB             bool
+	overwrite           bool
+	jsonOutput          bool
+	kicadCLI            string
+	keepArtifacts       bool
+	artifactDir         string
+	roundTimeout        string
+	allowlistPath       string
+	klcRoot             string
+	symbolsRoot         string
+	footprintsRoot      string
+	templatesRoot       string
+	libraryCache        string
+	refreshLibraryCache bool
+	commandArgs         []string
 }
 
 type apiClient interface {
@@ -167,6 +182,10 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	if err != nil {
 		return err
 	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer func() {
+		stop()
+	}()
 
 	switch command {
 	case "", "help":
@@ -186,6 +205,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runInspect(opts, stdout)
 	case "evaluate":
 		return runEvaluate(opts, stdout)
+	case "library":
+		return runLibrary(ctx, opts, stdout)
 	case "roundtrip":
 		return runRoundTrip(opts, stdout)
 	case "pinmap":
@@ -238,6 +259,12 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.artifactDir, "artifact-dir", "", "round-trip artifact directory")
 	flags.StringVar(&opts.roundTimeout, "timeout", "", "round-trip timeout")
 	flags.StringVar(&opts.allowlistPath, "allowlist", "", "round-trip allowlist JSON path")
+	flags.StringVar(&opts.klcRoot, "klc-root", "", "KiCad Library Convention repository root")
+	flags.StringVar(&opts.symbolsRoot, "symbols-root", "", "KiCad symbol library root")
+	flags.StringVar(&opts.footprintsRoot, "footprints-root", "", "KiCad footprint library root")
+	flags.StringVar(&opts.templatesRoot, "templates-root", "", "KiCad template library root")
+	flags.StringVar(&opts.libraryCache, "library-cache", "", "library resolver cache file path")
+	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
 
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -329,6 +356,135 @@ func runGenerateBreakout(opts cliOptions, stdout io.Writer) error {
 		return errors.New("generate breakout failed")
 	}
 	return nil
+}
+
+type libraryIndexData struct {
+	Summary   libraryresolver.LoadSummary      `json:"summary"`
+	Inventory libraryresolver.LibraryInventory `json:"inventory"`
+}
+
+func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("library requires --json in this implementation phase")
+	}
+	if len(opts.commandArgs) == 0 {
+		return writeLibraryFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "library",
+			Message:  "library requires a subcommand",
+		})
+	}
+	subcommand := opts.commandArgs[0]
+	requiredArgs, ok := requiredLibraryParams(subcommand)
+	if !ok {
+		return writeLibraryFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "library." + subcommand,
+			Message:  "unsupported library subcommand " + subcommand,
+		})
+	}
+	if got := len(opts.commandArgs) - 1; got != requiredArgs {
+		return writeLibraryFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "library." + subcommand,
+			Message:  fmt.Sprintf("library %s requires %d argument(s)", subcommand, requiredArgs),
+		})
+	}
+	libraryIndex, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+		CachePath: opts.libraryCache,
+		Refresh:   opts.refreshLibraryCache,
+	})
+	switch subcommand {
+	case "index":
+		data := libraryIndexData{Summary: libraryresolver.Summary(libraryIndex), Inventory: libraryIndex.Inventory}
+		return writeLibraryResult(stdout, data, issues)
+	case "symbol":
+		id := opts.commandArgs[1]
+		record, ok := libraryresolver.ResolveSymbol(libraryIndex, id)
+		if !ok {
+			issues = append(issues, missingLibraryRecordIssue("library.symbol", id))
+			return writeLibraryResult(stdout, nil, issues)
+		}
+		return writeLibraryResult(stdout, record, issues)
+	case "footprint":
+		id := opts.commandArgs[1]
+		record, ok := libraryresolver.ResolveFootprint(libraryIndex, id)
+		if !ok {
+			issues = append(issues, missingLibraryRecordIssue("library.footprint", id))
+			return writeLibraryResult(stdout, nil, issues)
+		}
+		return writeLibraryResult(stdout, record, issues)
+	case "search-symbols":
+		return writeLibraryResult(stdout, libraryresolver.FindSymbols(libraryIndex, libraryresolver.Query{Text: opts.commandArgs[1]}), issues)
+	case "search-footprints":
+		return writeLibraryResult(stdout, libraryresolver.FindFootprints(libraryIndex, libraryresolver.Query{Text: opts.commandArgs[1]}), issues)
+	}
+	return writeLibraryFailure(stdout, reports.Issue{
+		Code:     reports.CodeInvalidArgument,
+		Severity: reports.SeverityError,
+		Path:     "library." + subcommand,
+		Message:  "unsupported library subcommand " + subcommand,
+	})
+}
+
+func writeLibraryFailure(stdout io.Writer, issue reports.Issue) error {
+	return writeReportFailure(stdout, "library", issue)
+}
+
+func requiredLibraryParams(subcommand string) (int, bool) {
+	switch subcommand {
+	case "index":
+		return 0, true
+	case "symbol", "footprint", "search-symbols", "search-footprints":
+		return 1, true
+	default:
+		return 0, false
+	}
+}
+
+func writeLibraryResult(stdout io.Writer, data any, issues []reports.Issue) error {
+	result := reports.ResultWithIssues("library", data, issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("library command failed")
+	}
+	return nil
+}
+
+func missingLibraryRecordIssue(path string, id string) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeMissingFile,
+		Severity: reports.SeverityError,
+		Path:     path,
+		Message:  "library record not found: " + id,
+	}
+}
+
+func libraryRootsFromOptions(opts cliOptions) libraryresolver.LibraryRoots {
+	roots := libraryresolver.LibraryRoots{
+		KLCRoot:        os.Getenv(libraryresolver.EnvKLCRoot),
+		SymbolsRoot:    os.Getenv(libraryresolver.EnvSymbolsRoot),
+		FootprintsRoot: os.Getenv(libraryresolver.EnvFootprintsRoot),
+		TemplatesRoot:  os.Getenv(libraryresolver.EnvTemplatesRoot),
+	}
+	if strings.TrimSpace(opts.klcRoot) != "" {
+		roots.KLCRoot = opts.klcRoot
+	}
+	if strings.TrimSpace(opts.symbolsRoot) != "" {
+		roots.SymbolsRoot = opts.symbolsRoot
+	}
+	if strings.TrimSpace(opts.footprintsRoot) != "" {
+		roots.FootprintsRoot = opts.footprintsRoot
+	}
+	if strings.TrimSpace(opts.templatesRoot) != "" {
+		roots.TemplatesRoot = opts.templatesRoot
+	}
+	return roots
 }
 
 func runInspect(opts cliOptions, stdout io.Writer) error {

@@ -108,6 +108,93 @@ func TestRunUnknownCommandReturnsUsage(t *testing.T) {
 	}
 }
 
+func TestRunLibraryRequiresJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"library", "index"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "library requires --json") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestRunLibraryIndexJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	symbols, footprints := writeCLILibraryFixture(t)
+	err := run([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints, "library", "index"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{`"symbol_count": 1`, `"footprint_count": 1`, `"symbol_file_count": 1`, `"footprint_file_count": 1`} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunLibrarySymbolAndFootprintJSON(t *testing.T) {
+	symbols, footprints := writeCLILibraryFixture(t)
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "symbol", args: []string{"library", "symbol", "Device:R"}, want: `"library_id": "Device:R"`},
+		{name: "footprint", args: []string{"library", "footprint", "Resistor_SMD:R_0805_2012Metric"}, want: `"footprint_id": "Resistor_SMD:R_0805_2012Metric"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			args := append([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints}, tc.args...)
+			err := run(args, &stdout, &stderr)
+			if err != nil {
+				t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("output missing %q:\n%s", tc.want, stdout.String())
+			}
+		})
+	}
+}
+
+func TestRunLibrarySearchJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	symbols, footprints := writeCLILibraryFixture(t)
+	err := run([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints, "library", "search-symbols", "resistor"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"library_id": "Device:R"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunLibraryUnsupportedSubcommandJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "library", "bogus"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"unsupported library subcommand bogus"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunLibraryMissingIDJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	symbols, footprints := writeCLILibraryFixture(t)
+	err := run([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints, "library", "symbol", "Device:Missing"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"code": "MISSING_FILE"`) || !strings.Contains(stdout.String(), `library record not found: Device:Missing`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func TestWriteReportJSON(t *testing.T) {
 	var stdout bytes.Buffer
 
@@ -130,6 +217,49 @@ func TestWriteReportJSON(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
+	}
+}
+
+func writeCLILibraryFixture(t *testing.T) (string, string) {
+	t.Helper()
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	footprints := filepath.Join(root, "footprints")
+	writeTestFile(t, filepath.Join(symbols, "Device.kicad_sym"), `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "R"
+    (property "Reference" "R" (at 0 0 0))
+    (property "Value" "R" (at 0 -2.54 0))
+    (ki_keywords "resistor R")
+    (ki_description "Resistor")
+    (symbol "R_1_1"
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))
+    )
+  )
+)`)
+	writeTestFile(t, filepath.Join(footprints, "Resistor_SMD.pretty", "R_0805_2012Metric.kicad_mod"), `
+(footprint "R_0805_2012Metric"
+  (version 20240108)
+  (generator "kicadai-test")
+  (descr "Resistor SMD 0805")
+  (tags "resistor 0805")
+  (attr smd)
+  (pad "1" smd roundrect (at -0.95 0) (size 1.0 1.2) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25))
+  (pad "2" smd roundrect (at 0.95 0) (size 1.0 1.2) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25))
+)`)
+	return symbols, footprints
+}
+
+func writeTestFile(t *testing.T, path string, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 
