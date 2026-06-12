@@ -282,6 +282,9 @@ func validateParameterValue(parameter BlockParameter, value any) []reports.Issue
 		if !isStringList(value) {
 			return []reports.Issue{blockIssue(path, fmt.Sprintf("parameter %s must be a string list", parameter.Name))}
 		}
+		if parameter.Required && stringListLen(value) == 0 {
+			return []reports.Issue{blockIssue(path, fmt.Sprintf("parameter %s must not be empty", parameter.Name))}
+		}
 	default:
 		return []reports.Issue{blockIssue(path, "unsupported parameter type "+string(parameter.Type))}
 	}
@@ -454,6 +457,17 @@ func isStringList(value any) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+func stringListLen(value any) int {
+	switch typed := value.(type) {
+	case []string:
+		return len(typed)
+	case []any:
+		return len(typed)
+	default:
+		return 0
 	}
 }
 

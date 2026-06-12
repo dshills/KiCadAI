@@ -118,6 +118,14 @@ func TestValidateParametersAcceptsStandardNumericTypes(t *testing.T) {
 	}
 }
 
+func TestValidateParametersRejectsEmptyRequiredStringList(t *testing.T) {
+	definition := BlockDefinition{Parameters: []BlockParameter{{Name: "pin_names", Type: ParameterStringList, Required: true}}}
+	issues := ValidateParameters(definition, map[string]any{"pin_names": []string{}})
+	if len(issues) != 1 || !strings.Contains(issues[0].Message, "pin_names must not be empty") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestVerificationLevelStableString(t *testing.T) {
 	if string(VerificationRoundTripVerified) != "roundtrip_verified" {
 		t.Fatalf("verification level changed: %q", VerificationRoundTripVerified)
