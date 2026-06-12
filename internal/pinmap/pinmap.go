@@ -6,6 +6,7 @@ import (
 
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -31,15 +32,22 @@ type Report struct {
 	Issues                 []reports.Issue `json:"issues"`
 }
 
+type ValidateOptions struct {
+	LibraryIndex  *libraryresolver.LibraryIndex `json:"-"`
+	LibraryIssues []reports.Issue               `json:"-"`
+}
+
 type Mapping struct {
-	Ref       string `json:"ref"`
-	Symbol    string `json:"symbol"`
-	Footprint string `json:"footprint"`
-	Status    string `json:"status"`
-	Source    string `json:"source,omitempty"`
-	Notes     string `json:"notes,omitempty"`
-	PinCount  int    `json:"pin_count"`
-	MapCount  int    `json:"map_count"`
+	Ref              string                                  `json:"ref"`
+	Symbol           string                                  `json:"symbol"`
+	Footprint        string                                  `json:"footprint"`
+	Status           string                                  `json:"status"`
+	Source           string                                  `json:"source,omitempty"`
+	Notes            string                                  `json:"notes,omitempty"`
+	PinCount         int                                     `json:"pin_count"`
+	MapCount         int                                     `json:"map_count"`
+	CandidatePinmap  []libraryresolver.PinmapCandidate       `json:"candidate_pinmap,omitempty"`
+	ResolverEvidence []libraryresolver.CompatibilityEvidence `json:"resolver_evidence,omitempty"`
 }
 
 var builtinEntries = []Entry{
@@ -63,11 +71,16 @@ func Builtins() []Entry {
 }
 
 func ValidateProject(path string) (Report, error) {
+	return ValidateProjectWithOptions(path, ValidateOptions{})
+}
+
+func ValidateProjectWithOptions(path string, opts ValidateOptions) (Report, error) {
 	design, err := kicaddesign.ReadProjectDirectory(path)
 	if err != nil {
 		return Report{}, err
 	}
 	report := Report{Target: path, Mappings: []Mapping{}, Issues: []reports.Issue{}}
+	report.Issues = append(report.Issues, opts.LibraryIssues...)
 	if design.Schematic == nil {
 		report.Issues = append(report.Issues, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: "pinmap.project", Message: "project has no root schematic"})
 		finalize(&report)
@@ -90,16 +103,22 @@ func ValidateProject(path string) (Report, error) {
 		key := mappingKey(symbol.LibraryID, footprint)
 		entry, ok := builtinIndex[key]
 		mapping := Mapping{Ref: symbol.Reference, Symbol: symbol.LibraryID, Footprint: footprint, PinCount: len(symbol.Pins)}
+		resolverOK := true
+		if opts.LibraryIndex != nil {
+			resolverOK = resolverRecordsExist(opts.LibraryIndex, symbol.LibraryID, footprint, &report, symbol.Reference)
+			if !resolverOK && !ok {
+				mapping.Status = "missing"
+				report.Mappings = append(report.Mappings, mapping)
+				continue
+			}
+		}
 		if !ok {
-			mapping.Status = "unverified"
-			report.Issues = append(report.Issues, reports.Issue{
-				Code:       reports.CodePinmapUnverified,
-				Severity:   reports.SeverityBlocked,
-				Path:       "pinmap." + symbol.Reference,
-				Message:    fmt.Sprintf("pinmap is not verified for %s -> %s", symbol.LibraryID, footprint),
-				Refs:       []string{symbol.Reference},
-				Suggestion: "add a human-verified pinmap entry before fabrication export",
-			})
+			if opts.LibraryIndex != nil {
+				addResolverCandidate(opts.LibraryIndex, &report, &mapping, symbol.Reference)
+			} else {
+				addUnverifiedIssue(&report, symbol.Reference, symbol.LibraryID, footprint, "pinmap is not verified")
+				mapping.Status = "unverified"
+			}
 			report.Mappings = append(report.Mappings, mapping)
 			continue
 		}
@@ -107,6 +126,14 @@ func ValidateProject(path string) (Report, error) {
 		mapping.Source = entry.Source
 		mapping.Notes = entry.Notes
 		mapping.MapCount = len(entry.Pins)
+		if opts.LibraryIndex != nil && resolverOK {
+			compatibility := libraryresolver.ValidateAssignment(*opts.LibraryIndex, symbol.LibraryID, footprint)
+			mapping.ResolverEvidence = compatibility.Evidence
+			for _, padIssue := range footprintPadIssues(opts.LibraryIndex, symbol.Reference, entry) {
+				mapping.Status = "mismatch"
+				report.Issues = append(report.Issues, padIssue)
+			}
+		}
 		if len(symbol.Pins) != len(entry.Pins) {
 			mapping.Status = "mismatch"
 			report.Issues = append(report.Issues, reports.Issue{
@@ -125,6 +152,69 @@ func ValidateProject(path string) (Report, error) {
 	}
 	finalize(&report)
 	return report, nil
+}
+
+func resolverRecordsExist(index *libraryresolver.LibraryIndex, symbolID string, footprintID string, report *Report, ref string) bool {
+	ok := true
+	if _, found := libraryresolver.ResolveSymbol(*index, symbolID); !found {
+		ok = false
+		report.Issues = append(report.Issues, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: "pinmap." + ref, Message: "symbol library record not found: " + symbolID, Refs: []string{ref}})
+	}
+	if _, found := libraryresolver.ResolveFootprint(*index, footprintID); !found {
+		ok = false
+		report.Issues = append(report.Issues, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: "pinmap." + ref, Message: "footprint library record not found: " + footprintID, Refs: []string{ref}})
+	}
+	return ok
+}
+
+func addResolverCandidate(index *libraryresolver.LibraryIndex, report *Report, mapping *Mapping, ref string) {
+	candidate := libraryresolver.GeneratePinmapCandidate(*index, mapping.Symbol, mapping.Footprint)
+	mapping.ResolverEvidence = candidate.Evidence
+	mapping.CandidatePinmap = candidate.PinmapCandidate
+	mapping.MapCount = len(candidate.PinmapCandidate)
+	if candidate.Status == libraryresolver.CompatibilityCandidate && len(candidate.PinmapCandidate) > 0 {
+		mapping.Status = "candidate"
+		addUnverifiedIssue(report, ref, mapping.Symbol, mapping.Footprint, "pinmap candidate is inferred but not verified")
+		return
+	}
+	mapping.Status = "mismatch"
+	report.Issues = append(report.Issues, candidate.Issues...)
+}
+
+func addUnverifiedIssue(report *Report, ref string, symbolID string, footprintID string, prefix string) {
+	report.Issues = append(report.Issues, reports.Issue{
+		Code:       reports.CodePinmapUnverified,
+		Severity:   reports.SeverityBlocked,
+		Path:       "pinmap." + ref,
+		Message:    fmt.Sprintf("%s for %s -> %s", prefix, symbolID, footprintID),
+		Refs:       []string{ref},
+		Suggestion: "add a human-verified pinmap entry before fabrication export",
+	})
+}
+
+func footprintPadIssues(index *libraryresolver.LibraryIndex, ref string, entry Entry) []reports.Issue {
+	footprint, ok := libraryresolver.ResolveFootprint(*index, entry.Footprint)
+	if !ok {
+		return nil
+	}
+	pads := map[string]struct{}{}
+	for _, pad := range footprint.Pads {
+		pads[strings.TrimSpace(pad.Name)] = struct{}{}
+	}
+	var issues []reports.Issue
+	for _, pin := range entry.Pins {
+		if _, ok := pads[strings.TrimSpace(pin.FootprintPad)]; ok {
+			continue
+		}
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodePinmapUnverified,
+			Severity: reports.SeverityBlocked,
+			Path:     "pinmap." + ref,
+			Message:  fmt.Sprintf("footprint pad %s is not present in verified pinmap for %s -> %s", pin.FootprintPad, entry.Symbol, entry.Footprint),
+			Refs:     []string{ref},
+		})
+	}
+	return issues
 }
 
 func entryIndex(entries []Entry) map[string]Entry {

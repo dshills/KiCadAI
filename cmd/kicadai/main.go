@@ -630,7 +630,16 @@ func runPinmap(opts cliOptions, stdout io.Writer) error {
 		return writeReportJSON(stdout, reports.OKResult("pinmap", pinmap.Builtins(), nil))
 	case "validate":
 		target := opts.commandArgs[1]
-		report, err := pinmap.ValidateProject(target)
+		validateOptions := pinmap.ValidateOptions{}
+		if pinmapShouldUseLibraryResolver(opts) {
+			index, issues := libraryresolver.Load(context.Background(), libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+				CachePath: opts.libraryCache,
+				Refresh:   opts.refreshLibraryCache,
+			})
+			validateOptions.LibraryIndex = &index
+			validateOptions.LibraryIssues = issues
+		}
+		report, err := pinmap.ValidateProjectWithOptions(target, validateOptions)
 		if err != nil {
 			issue := reports.Issue{
 				Code:     reports.CodeValidationFailed,
@@ -662,6 +671,11 @@ func runPinmap(opts cliOptions, stdout io.Writer) error {
 			Message:  "unsupported pinmap subcommand " + opts.commandArgs[0],
 		})
 	}
+}
+
+func pinmapShouldUseLibraryResolver(opts cliOptions) bool {
+	roots := libraryRootsFromOptions(opts)
+	return strings.TrimSpace(roots.SymbolsRoot) != "" || strings.TrimSpace(roots.FootprintsRoot) != "" || strings.TrimSpace(opts.libraryCache) != ""
 }
 
 type roundTripReport struct {
