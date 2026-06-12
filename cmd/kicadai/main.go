@@ -895,11 +895,11 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		planOptions := transactions.PlanOptions{RequireLibraryValidation: true}
 		if transactionShouldUseLibraryResolver(opts) {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
-			defer stop()
 			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
 				CachePath: opts.libraryCache,
 				Refresh:   opts.refreshLibraryCache,
 			})
+			stop()
 			planOptions.LibraryIndex = &index
 			planOptions.LibraryIssues = issues
 		}
@@ -940,7 +940,18 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 			}
 			return errors.New(issue.Message)
 		}
-		applyResult := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: opts.overwrite, Seed: opts.seed})
+		applyOptions := transactions.ApplyOptions{OutputDir: outputDir, Overwrite: opts.overwrite, Seed: opts.seed}
+		if transactionShouldUseLibraryResolver(opts) {
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+				CachePath: opts.libraryCache,
+				Refresh:   opts.refreshLibraryCache,
+			})
+			stop()
+			applyOptions.LibraryIndex = &index
+			applyOptions.LibraryIssues = issues
+		}
+		applyResult := transactions.Apply(tx, applyOptions)
 		result := reports.ResultWithIssues("transaction", applyResult, applyResult.Issues, applyResult.Artifacts)
 		if err := writeReportJSON(stdout, result); err != nil {
 			return err

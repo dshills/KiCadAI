@@ -1,0 +1,179 @@
+package transactions
+
+import (
+	"sort"
+	"strconv"
+	"strings"
+
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/designapi"
+	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/libraryresolver"
+)
+
+func footprintRecordPadSpecs(record libraryresolver.FootprintRecord, placementLayer kicadfiles.BoardLayer) []designapi.PadSpec {
+	pads := make([]designapi.PadSpec, 0, len(record.Pads))
+	for _, pad := range record.Pads {
+		pads = append(pads, designapi.PadSpec{
+			Name:   pad.Name,
+			Type:   pad.Type,
+			Shape:  pad.Shape,
+			Offset: pad.Position,
+			Size:   pad.Size,
+			Drill:  pad.Drill,
+			Layers: placementLayers(pad.Layers, placementLayer),
+		})
+	}
+	return pads
+}
+
+func upsertImportedFootprintWithLibrary(board *pcb.PCBFile, generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, index *libraryresolver.LibraryIndex) {
+	if index == nil || len(payload.Pads) > 0 {
+		upsertImportedFootprint(board, generator, payload)
+		return
+	}
+	record, ok := libraryresolver.ResolveFootprint(*index, payload.FootprintID)
+	if !ok || len(record.Pads) == 0 {
+		upsertImportedFootprint(board, generator, payload)
+		return
+	}
+	for i := range board.Footprints {
+		if board.Footprints[i].Reference == payload.Ref {
+			updateImportedFootprint(&board.Footprints[i], generator, payload)
+			if len(board.Footprints[i].Pads) == 0 {
+				board.Footprints[i].Pads = importedPadsFromRecord(generator, payload.Ref, record, board.Footprints[i].Layer)
+			}
+			return
+		}
+	}
+	board.Footprints = append(board.Footprints, importedFootprintFromRecord(generator, payload, record))
+}
+
+func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, record libraryresolver.FootprintRecord) pcb.Footprint {
+	value := firstNonEmpty(payload.Value, payload.Ref)
+	layer := boardLayer(payload.Layer)
+	if layer == "" {
+		layer = kicadfiles.LayerFCu
+	}
+	footprint := pcb.Footprint{
+		UUID:               generator.New("imported.pcb.footprint", payload.Ref),
+		LibraryID:          strings.TrimSpace(payload.FootprintID),
+		Reference:          payload.Ref,
+		Value:              value,
+		Description:        record.Description,
+		Tags:               strings.Join(record.Tags, " "),
+		Attributes:         append([]string(nil), record.Attributes...),
+		Position:           point(payload.At.XMM, payload.At.YMM),
+		Rotation:           kicadfiles.Angle(payload.Rotation),
+		Layer:              layer,
+		MetadataProperties: importedMetadataProperties(record.Properties),
+		Properties: []pcb.FootprintProperty{
+			{Name: "Reference", Value: payload.Ref, Position: kicadfiles.Point{Y: kicadfiles.MM(-1.5)}, Layer: placementLayerFor(kicadfiles.LayerFSilkS, layer), UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Reference")},
+			{Name: "Value", Value: value, Position: kicadfiles.Point{Y: kicadfiles.MM(1.5)}, Layer: placementLayerFor(kicadfiles.LayerFSilkS, layer), UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Value")},
+		},
+		Texts:  importedFootprintTexts(generator, payload.Ref, record.Texts, layer),
+		Pads:   importedPadsFromRecord(generator, payload.Ref, record, layer),
+		Models: importedModels(record.Models),
+	}
+	return footprint
+}
+
+func importedPadsFromRecord(generator kicadfiles.IDGenerator, ref string, record libraryresolver.FootprintRecord, layer kicadfiles.BoardLayer) []pcb.Pad {
+	pads := make([]pcb.Pad, 0, len(record.Pads))
+	for i, pad := range record.Pads {
+		pads = append(pads, pcb.Pad{
+			UUID:        generator.New("imported.pcb.footprint.pad", ref, pad.Name, strconv.Itoa(i)),
+			Name:        pad.Name,
+			Type:        pad.Type,
+			Shape:       pad.Shape,
+			Position:    pad.Position,
+			Rotation:    kicadfiles.Angle(pad.Rotation),
+			Size:        pad.Size,
+			Drill:       pad.Drill,
+			Layers:      placementLayers(pad.Layers, layer),
+			PinFunction: pad.PinFunction,
+			PinType:     pad.PinType,
+		})
+	}
+	return pads
+}
+
+func importedMetadataProperties(properties map[string]string) []pcb.FootprintMetadataProperty {
+	if len(properties) == 0 {
+		return nil
+	}
+	keys := sortedMapKeys(properties)
+	metadata := make([]pcb.FootprintMetadataProperty, 0, len(keys))
+	for _, key := range keys {
+		metadata = append(metadata, pcb.FootprintMetadataProperty{Name: key, Value: properties[key]})
+	}
+	return metadata
+}
+
+func importedFootprintTexts(generator kicadfiles.IDGenerator, ref string, texts []libraryresolver.FootprintText, placementLayer kicadfiles.BoardLayer) []pcb.FootprintText {
+	result := make([]pcb.FootprintText, 0, len(texts))
+	for i, text := range texts {
+		result = append(result, pcb.FootprintText{
+			UUID:     generator.New("imported.pcb.footprint.text", ref, text.Kind, strconv.Itoa(i)),
+			Kind:     text.Kind,
+			Text:     text.Text,
+			Position: text.Position,
+			Layer:    placementLayerFor(kicadfiles.BoardLayer(text.Layer), placementLayer),
+		})
+	}
+	return result
+}
+
+func sortedMapKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func importedModels(paths []string) []pcb.Model3D {
+	models := make([]pcb.Model3D, 0, len(paths))
+	for _, path := range paths {
+		if strings.TrimSpace(path) != "" {
+			models = append(models, pcb.Model3D{Path: strings.TrimSpace(path)})
+		}
+	}
+	return models
+}
+
+func placementLayers(layers []kicadfiles.BoardLayer, placementLayer kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	if len(layers) == 0 {
+		return nil
+	}
+	mapped := make([]kicadfiles.BoardLayer, 0, len(layers))
+	for _, layer := range layers {
+		mapped = append(mapped, placementLayerFor(layer, placementLayer))
+	}
+	return mapped
+}
+
+func placementLayerFor(layer kicadfiles.BoardLayer, placementLayer kicadfiles.BoardLayer) kicadfiles.BoardLayer {
+	if placementLayer != kicadfiles.LayerBCu {
+		return layer
+	}
+	switch layer {
+	case kicadfiles.LayerFCu:
+		return kicadfiles.LayerBCu
+	case kicadfiles.LayerFMask:
+		return kicadfiles.LayerBMask
+	case kicadfiles.LayerFPaste:
+		return kicadfiles.LayerBPaste
+	case kicadfiles.LayerFAdhes:
+		return kicadfiles.LayerBAdhes
+	case kicadfiles.LayerFSilkS:
+		return kicadfiles.LayerBSilkS
+	case kicadfiles.LayerFFab:
+		return kicadfiles.LayerBFab
+	case kicadfiles.LayerFCrtYd:
+		return kicadfiles.LayerBCrtYd
+	default:
+		return layer
+	}
+}

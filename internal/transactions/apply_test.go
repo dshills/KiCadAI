@@ -10,6 +10,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -33,6 +34,68 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}
+	}
+}
+
+func TestApplyUsesResolverFootprintPadsForGeneratedPlacement(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	index := applyResolverFixture()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"J1","library_id":"Connector:Conn_01x02","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"},{"number":"2"}]},
+	  {"op":"assign_footprint","ref":"J1","footprint_id":"Connector_Test:TH_1x02"},
+	  {"op":"place_footprint","ref":"J1","footprint_id":"Connector_Test:TH_1x02","at":{"x_mm":20,"y_mm":20}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	data, err := os.ReadFile(filepath.Join(output, "demo.kicad_pcb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, want := range []string{`thru_hole`, `(drill 0.8)`, `"*.Cu"`, `"*.Mask"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("generated PCB missing %q:\n%s", want, text)
+		}
+	}
+}
+
+func TestUpsertImportedFootprintUsesResolverRecord(t *testing.T) {
+	index := applyResolverFixture()
+	generator, err := kicadfiles.NewDeterministicIDGenerator("11111111-1111-5111-8111-111111111111", "resolver")
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := &pcb.PCBFile{}
+	upsertImportedFootprintWithLibrary(board, generator, PlaceFootprintOperation{
+		Ref:         "J1",
+		FootprintID: "Connector_Test:TH_1x02",
+		At:          Point{XMM: 5, YMM: 5},
+	}, &index)
+	if len(board.Footprints) != 1 || len(board.Footprints[0].Pads) != 2 {
+		t.Fatalf("unexpected footprint: %#v", board.Footprints)
+	}
+	if board.Footprints[0].Pads[0].PinFunction != "A" || board.Footprints[0].Pads[0].Drill != kicadfiles.MM(0.8) {
+		t.Fatalf("resolver pad metadata missing: %#v", board.Footprints[0].Pads[0])
+	}
+}
+
+func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
+	index := applyResolverFixture()
+	record := index.Footprints["Resistor_Test:R_0603"]
+	specs := footprintRecordPadSpecs(record, kicadfiles.LayerBCu)
+	if len(specs) != 2 || !containsBoardLayer(specs[0].Layers, kicadfiles.LayerBCu) || !containsBoardLayer(specs[0].Layers, kicadfiles.LayerBMask) {
+		t.Fatalf("bottom layers not remapped: %#v", specs)
+	}
+	footprint := importedFootprintFromRecord(mustGenerator(t), PlaceFootprintOperation{Ref: "R1", FootprintID: record.FootprintID, Layer: string(kicadfiles.LayerBCu)}, record)
+	if len(footprint.Properties) < 2 || footprint.Properties[0].Layer != kicadfiles.LayerBSilkS {
+		t.Fatalf("property layers not remapped: %#v", footprint.Properties)
+	}
+	if len(footprint.Texts) == 0 || footprint.Texts[0].Layer != kicadfiles.LayerBSilkS {
+		t.Fatalf("text layers not remapped: %#v", footprint.Texts)
 	}
 }
 
@@ -455,6 +518,56 @@ func TestUpsertImportedFootprintUsesPlacementSidePadLayers(t *testing.T) {
 	if fmt.Sprint(board.Footprints[0].Pads[0].Layers) != fmt.Sprint(want) {
 		t.Fatalf("layers = %#v, want %#v", board.Footprints[0].Pads[0].Layers, want)
 	}
+}
+
+func applyResolverFixture() libraryresolver.LibraryIndex {
+	return libraryresolver.LibraryIndex{
+		Footprints: map[string]libraryresolver.FootprintRecord{
+			"Connector_Test:TH_1x02": {
+				FootprintID:     "Connector_Test:TH_1x02",
+				LibraryNickname: "Connector_Test",
+				Name:            "TH_1x02",
+				Description:     "test through-hole connector",
+				Attributes:      []string{"through_hole"},
+				Properties:      map[string]string{"ki_description": "test through-hole connector"},
+				Pads: []libraryresolver.FootprintPad{
+					{Name: "1", Type: "thru_hole", Shape: "circle", Position: kicadfiles.Point{}, Size: kicadfiles.Point{X: kicadfiles.MM(1.6), Y: kicadfiles.MM(1.6)}, Drill: kicadfiles.MM(0.8), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}, PinFunction: "A", PinType: "passive"},
+					{Name: "2", Type: "thru_hole", Shape: "circle", Position: kicadfiles.Point{Y: kicadfiles.MM(2.54)}, Size: kicadfiles.Point{X: kicadfiles.MM(1.6), Y: kicadfiles.MM(1.6)}, Drill: kicadfiles.MM(0.8), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}, PinFunction: "B", PinType: "passive"},
+				},
+				Texts:  []libraryresolver.FootprintText{{Kind: "user", Text: "TEST", Layer: string(kicadfiles.LayerFSilkS)}},
+				Models: []string{"${KICAD9_3DMODEL_DIR}/Connector_Test.3dshapes/TH_1x02.wrl"},
+			},
+			"Resistor_Test:R_0603": {
+				FootprintID:     "Resistor_Test:R_0603",
+				LibraryNickname: "Resistor_Test",
+				Name:            "R_0603",
+				Attributes:      []string{"smd"},
+				Pads: []libraryresolver.FootprintPad{
+					{Name: "1", Type: "smd", Shape: "roundrect", Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
+					{Name: "2", Type: "smd", Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(1.6)}, Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
+				},
+				Texts: []libraryresolver.FootprintText{{Kind: "user", Text: "R", Layer: string(kicadfiles.LayerFSilkS)}},
+			},
+		},
+	}
+}
+
+func mustGenerator(t *testing.T) kicadfiles.IDGenerator {
+	t.Helper()
+	generator, err := kicadfiles.NewDeterministicIDGenerator("11111111-1111-5111-8111-111111111111", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return generator
+}
+
+func containsBoardLayer(layers []kicadfiles.BoardLayer, want kicadfiles.BoardLayer) bool {
+	for _, layer := range layers {
+		if layer == want {
+			return true
+		}
+	}
+	return false
 }
 
 func writeImportedApplyProject(t *testing.T, schematicContents string, pcbContents string) string {

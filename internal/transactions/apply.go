@@ -15,6 +15,7 @@ import (
 	"kicadai/internal/kicadfiles/designapi"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
@@ -22,9 +23,11 @@ import (
 const applyLockFileName = ".kicadai.apply.lock"
 
 type ApplyOptions struct {
-	OutputDir string
-	Overwrite bool
-	Seed      string
+	OutputDir     string
+	Overwrite     bool
+	Seed          string
+	LibraryIndex  *libraryresolver.LibraryIndex
+	LibraryIssues []reports.Issue
 }
 
 type ApplyResult struct {
@@ -36,6 +39,7 @@ type ApplyResult struct {
 func Apply(tx Transaction, opts ApplyOptions) ApplyResult {
 	plan := PlanTransaction(opts.OutputDir, tx)
 	result := ApplyResult{Plan: plan, Artifacts: []reports.Artifact{}, Issues: append([]reports.Issue{}, plan.Issues...)}
+	result.Issues = append(result.Issues, opts.LibraryIssues...)
 	if reports.HasBlockingIssue(result.Issues) {
 		return result
 	}
@@ -171,7 +175,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("place_footprint requires footprint_id for imported apply")))
 				return result
 			}
-			upsertImportedFootprint(design.PCB, generator, payload)
+			upsertImportedFootprintWithLibrary(design.PCB, generator, payload, opts.LibraryIndex)
 			pcbDirty = true
 		case OpRoute:
 			if design.PCB == nil {
@@ -348,6 +352,11 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 				net = *pad.Net
 			}
 			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Shape: pad.Shape, Offset: point(pad.XMM, pad.YMM), Size: padSize(pad), Drill: kicadfiles.MM(pad.DrillMM), Net: net})
+		}
+		if len(pads) == 0 && opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
+			if record, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, payload.FootprintID); ok {
+				pads = footprintRecordPadSpecs(record, boardLayer(payload.Layer))
+			}
 		}
 		_, err := builder.PlaceFootprint(payload.Ref, designapi.PlaceFootprintOptions{
 			Position: point(payload.At.XMM, payload.At.YMM),
