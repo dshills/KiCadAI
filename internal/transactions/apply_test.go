@@ -63,6 +63,71 @@ func TestApplyUsesResolverFootprintPadsForGeneratedPlacement(t *testing.T) {
 	}
 }
 
+func TestApplyUsesResolverSymbolPinsForGeneratedSchematic(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	index := applyResolverFixture()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_Test:R_0603"},
+	  {"op":"place_footprint","ref":"R1","footprint_id":"Resistor_Test:R_0603","at":{"x_mm":20,"y_mm":20}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "demo.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(file.Symbols) != 1 || len(file.Symbols[0].Pins) != 2 {
+		t.Fatalf("resolver pins not instantiated: %#v", file.Symbols)
+	}
+}
+
+func TestApplyBlocksResolverMultiUnitSymbol(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	index := applyResolverFixture()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"U1","library_id":"Amplifier:DUAL","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index})
+	if len(result.Issues) == 0 || result.Issues[0].Path != "operations[1]" {
+		t.Fatalf("expected multi-unit issue: %#v", result.Issues)
+	}
+}
+
+func TestApplyBlocksResolverDuplicatePinSymbol(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	index := applyResolverFixture()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"U1","library_id":"Device:STACKED","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index})
+	if len(result.Issues) == 0 || !strings.Contains(result.Issues[0].Message, "duplicate pin number") {
+		t.Fatalf("expected duplicate pin issue: %#v", result.Issues)
+	}
+}
+
+func TestApplyBlocksMissingResolverSymbolWhenPinsOmitted(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	index := applyResolverFixture()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"X1","library_id":"Device:Missing","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index})
+	if len(result.Issues) == 0 || !strings.Contains(result.Issues[0].Message, "symbol library record not found") {
+		t.Fatalf("expected missing symbol issue: %#v", result.Issues)
+	}
+}
+
 func TestUpsertImportedFootprintUsesResolverRecord(t *testing.T) {
 	index := applyResolverFixture()
 	generator, err := kicadfiles.NewDeterministicIDGenerator("11111111-1111-5111-8111-111111111111", "resolver")
@@ -522,6 +587,41 @@ func TestUpsertImportedFootprintUsesPlacementSidePadLayers(t *testing.T) {
 
 func applyResolverFixture() libraryresolver.LibraryIndex {
 	return libraryresolver.LibraryIndex{
+		Symbols: map[string]libraryresolver.SymbolRecord{
+			"Device:R": {
+				LibraryID: "Device:R",
+				Name:      "R",
+				Pins: []libraryresolver.SymbolPin{
+					{Number: "1", Electrical: "passive", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
+					{Number: "2", Electrical: "passive", Position: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+				},
+			},
+			"Connector:Conn_01x02": {
+				LibraryID: "Connector:Conn_01x02",
+				Name:      "Conn_01x02",
+				Pins: []libraryresolver.SymbolPin{
+					{Number: "1", Electrical: "passive", Position: kicadfiles.Point{Y: kicadfiles.MM(-1.27)}},
+					{Number: "2", Electrical: "passive", Position: kicadfiles.Point{Y: kicadfiles.MM(1.27)}},
+				},
+			},
+			"Amplifier:DUAL": {
+				LibraryID: "Amplifier:DUAL",
+				Name:      "DUAL",
+				Units:     []libraryresolver.SymbolUnit{{Unit: 1}, {Unit: 2}},
+				Pins: []libraryresolver.SymbolPin{
+					{Number: "1", Electrical: "input"},
+					{Number: "2", Electrical: "output"},
+				},
+			},
+			"Device:STACKED": {
+				LibraryID: "Device:STACKED",
+				Name:      "STACKED",
+				Pins: []libraryresolver.SymbolPin{
+					{Number: "1", Electrical: "passive"},
+					{Number: "1", Electrical: "passive"},
+				},
+			},
+		},
 		Footprints: map[string]libraryresolver.FootprintRecord{
 			"Connector_Test:TH_1x02": {
 				FootprintID:     "Connector_Test:TH_1x02",

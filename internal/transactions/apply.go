@@ -144,9 +144,16 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				return result
 			}
 			opIndex := fmt.Sprintf("%d", i)
+			pins, err := resolveSymbolPins(payload.Pins, opts.LibraryIndex, payload.LibraryID)
+			if err != nil {
+				result.Issues = append(result.Issues, applyIssue(i, err))
+				return result
+			}
+			payload.Pins = pins
 			symbol := schematic.NewSymbol(generator.New("imported.schematic.symbol", payload.Ref, opIndex), payload.LibraryID, payload.Ref, firstNonEmpty(payload.Value, payload.Ref), point(payload.At.XMM, payload.At.YMM))
 			for _, pin := range payload.Pins {
 				symbol.Pins = append(symbol.Pins, schematic.SymbolPin{Number: pin.Number, UUID: generator.New("imported.schematic.symbol.pin", payload.Ref, opIndex, pin.Number)})
+				symbol.PinAnchors = append(symbol.PinAnchors, addPoints(symbol.Position, point(pin.XMM, pin.YMM)))
 			}
 			design.Schematic.Symbols = append(design.Schematic.Symbols, symbol)
 			schematicDirty = true
@@ -316,11 +323,16 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := decodeRaw(op, &payload); err != nil {
 			return nil, err
 		}
+		resolverPins, err := resolveSymbolPins(payload.Pins, opts.LibraryIndex, payload.LibraryID)
+		if err != nil {
+			return nil, err
+		}
+		payload.Pins = resolverPins
 		pins := make([]designapi.PinSpec, 0, len(payload.Pins))
 		for _, pin := range payload.Pins {
 			pins = append(pins, designapi.PinSpec{Number: pin.Number, Offset: point(pin.XMM, pin.YMM)})
 		}
-		_, err := builder.AddSymbol(designapi.SymbolOptions{
+		_, err = builder.AddSymbol(designapi.SymbolOptions{
 			Reference: payload.Ref,
 			Value:     payload.Value,
 			LibraryID: payload.LibraryID,
@@ -862,6 +874,10 @@ func endpoint(value Endpoint) designapi.Endpoint {
 
 func point(xMM, yMM float64) kicadfiles.Point {
 	return kicadfiles.Point{X: kicadfiles.MM(xMM), Y: kicadfiles.MM(yMM)}
+}
+
+func addPoints(a kicadfiles.Point, b kicadfiles.Point) kicadfiles.Point {
+	return kicadfiles.Point{X: a.X + b.X, Y: a.Y + b.Y}
 }
 
 func pointSeed(point kicadfiles.Point) string {
