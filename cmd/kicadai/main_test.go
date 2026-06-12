@@ -7,6 +7,8 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"runtime"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -243,17 +245,17 @@ func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := run([]string{"--json", "roundtrip", "project", "demo"}, &stdout, &stderr)
+	err := run([]string{"--json", "export", "preview", "demo"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	output := stdout.String()
 	for _, want := range []string{
 		`"ok": false`,
-		`"command": "roundtrip"`,
+		`"command": "export"`,
 		`"code": "UNSUPPORTED_OPERATION"`,
 		`"severity": "blocked"`,
-		`"roundtrip command family is not implemented yet"`,
+		`"export command family is not implemented yet"`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
@@ -370,6 +372,138 @@ func TestRunEvaluateProjectWithBlockingIssuesReturnsError(t *testing.T) {
 	}
 }
 
+func TestRunRoundTripSkipsWhenKiCadCLIUnavailable(t *testing.T) {
+	t.Setenv("KICADAI_KICAD_CLI", filepath.Join(t.TempDir(), "missing-kicad-cli"))
+	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
+	if err := os.WriteFile(path, []byte(`(kicad_sch (version 20260306))`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "roundtrip", "schematic", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("skip should not fail command: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "roundtrip"`,
+		`"code": "SKIPPED_EXTERNAL_TOOL"`,
+		`"skipped": true`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunRoundTripSchematicWithFakeCLI(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	if err := os.WriteFile(path, []byte(`(kicad_sch (version 20260306))`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli := fakeRoundTripCLI(t, filepath.Join(dir, "cli.log"), 0)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "--keep-artifacts", "--artifact-dir", filepath.Join(dir, "artifacts"), "roundtrip", "schematic", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"file_type": "schematic"`,
+		`"equal": true`,
+		`"roundtrip_report"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunRoundTripReportsKiCadFailure(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "board.kicad_pcb")
+	if err := os.WriteFile(path, []byte(`(kicad_pcb)`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli := fakeRoundTripCLI(t, filepath.Join(dir, "cli.log"), 3)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "roundtrip", "pcb", path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"code": "KICAD_CLI_FAILED"`,
+		`"file_type": "pcb"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunRoundTripRejectsNonExecutableKiCadCLI(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("windows does not use Unix execute bits")
+	}
+	dir := t.TempDir()
+	path := filepath.Join(dir, "board.kicad_pcb")
+	if err := os.WriteFile(path, []byte(`(kicad_pcb)`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli := filepath.Join(dir, "not-executable")
+	if err := os.WriteFile(cli, []byte("#!/bin/sh\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "roundtrip", "pcb", path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"code": "KICAD_CLI_FAILED"`) || !strings.Contains(stdout.String(), "not executable") {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunRoundTripProjectDiscoversRootFiles(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, contents := range map[string]string{
+		"demo.kicad_pro": "{}",
+		"demo.kicad_sch": `(kicad_sch (version 20260306))`,
+		"demo.kicad_pcb": `(kicad_pcb)`,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cli := fakeRoundTripCLI(t, filepath.Join(dir, "cli.log"), 0)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "roundtrip", "project", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	output := stdout.String()
+	if strings.Count(output, `"equal": true`) != 2 {
+		t.Fatalf("expected two successful checks:\n%s", output)
+	}
+}
+
 func TestRunGenerateStructuredCommandAllowsNoTarget(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -381,6 +515,32 @@ func TestRunGenerateStructuredCommandAllowsNoTarget(t *testing.T) {
 	if !strings.Contains(stdout.String(), `"code": "UNSUPPORTED_OPERATION"`) {
 		t.Fatalf("unexpected output:\n%s", stdout.String())
 	}
+}
+
+func fakeRoundTripCLI(t *testing.T, logPath string, upgradeExit int) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kicad-cli")
+	var body string
+	if runtime.GOOS == "windows" {
+		path += ".bat"
+		body = "@echo off\r\n" +
+			"if \"%1\"==\"--version\" echo 10.0.0& exit /b 0\r\n" +
+			"echo %* > \"" + logPath + "\"\r\n" +
+			"if not \"" + strconv.Itoa(upgradeExit) + "\"==\"0\" echo failed 1>&2\r\n" +
+			"exit /b " + strconv.Itoa(upgradeExit) + "\r\n"
+	} else {
+		body = "#!/bin/sh\n" +
+			"if [ \"$1\" = \"--version\" ]; then echo 10.0.0; exit 0; fi\n" +
+			"printf '%s\\n' \"$*\" >> '" + logPath + "'\n"
+		if upgradeExit != 0 {
+			body += "printf '%s\\n' failed >&2\n"
+		}
+		body += "exit " + strconv.Itoa(upgradeExit) + "\n"
+	}
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatalf("write fake KiCad CLI: %v", err)
+	}
+	return path
 }
 
 func TestRunTransactionPlanRequiresProjectAndTransaction(t *testing.T) {

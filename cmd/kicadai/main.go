@@ -10,6 +10,8 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
 	"time"
 
 	"golang.org/x/text/unicode/norm"
@@ -20,6 +22,7 @@ import (
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
+	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematic"
 	"kicadai/internal/workflows"
@@ -69,6 +72,11 @@ Global flags:
   --with-pcb            Include PCB output for generation commands
   --overwrite           Allow generation commands to replace an existing project directory
   --json                Print command output as JSON when supported
+  --kicad-cli string    KiCad CLI executable path for round-trip checks
+  --keep-artifacts      Keep round-trip artifact workspaces
+  --artifact-dir string Directory for retained round-trip artifacts
+  --timeout duration    Round-trip KiCad CLI timeout, for example 10s or 2m
+  --allowlist string    Round-trip allowlist JSON path
 `
 
 const (
@@ -107,6 +115,11 @@ type cliOptions struct {
 	withPCB       bool
 	overwrite     bool
 	jsonOutput    bool
+	kicadCLI      string
+	keepArtifacts bool
+	artifactDir   string
+	roundTimeout  string
+	allowlistPath string
 	commandArgs   []string
 }
 
@@ -167,7 +180,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runInspect(opts, stdout)
 	case "evaluate":
 		return runEvaluate(opts, stdout)
-	case "export", "generate", "roundtrip", "transaction":
+	case "roundtrip":
+		return runRoundTrip(opts, stdout)
+	case "export", "generate", "transaction":
 		return runStructuredCommandSkeleton(opts, command, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
@@ -205,6 +220,11 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.withPCB, "with-pcb", false, "include PCB output")
 	flags.BoolVar(&opts.overwrite, "overwrite", false, "overwrite existing project directory")
 	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
+	flags.StringVar(&opts.kicadCLI, "kicad-cli", "", "KiCad CLI executable path")
+	flags.BoolVar(&opts.keepArtifacts, "keep-artifacts", false, "keep round-trip artifact workspaces")
+	flags.StringVar(&opts.artifactDir, "artifact-dir", "", "round-trip artifact directory")
+	flags.StringVar(&opts.roundTimeout, "timeout", "", "round-trip timeout")
+	flags.StringVar(&opts.allowlistPath, "allowlist", "", "round-trip allowlist JSON path")
 
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -355,6 +375,320 @@ func runEvaluate(opts cliOptions, stdout io.Writer) error {
 		return errors.New("evaluate reported blocking issues")
 	}
 	return nil
+}
+
+type roundTripReport struct {
+	Target string           `json:"target"`
+	Checks []roundTripCheck `json:"checks"`
+}
+
+type roundTripCheck struct {
+	FileType           roundtrip.FileType     `json:"file_type"`
+	Path               string                 `json:"path"`
+	KiCadCLIPath       string                 `json:"kicad_cli_path,omitempty"`
+	KiCadVersion       string                 `json:"kicad_version,omitempty"`
+	Equal              bool                   `json:"equal"`
+	Differences        []roundtrip.Difference `json:"differences,omitempty"`
+	Artifacts          []reports.Artifact     `json:"artifacts"`
+	Skipped            bool                   `json:"skipped,omitempty"`
+	SkipReason         string                 `json:"skip_reason,omitempty"`
+	RoundTrippedPath   string                 `json:"round_tripped_path,omitempty"`
+	RawDiffPath        string                 `json:"raw_diff_path,omitempty"`
+	NormalizedDiffPath string                 `json:"normalized_diff_path,omitempty"`
+	SummaryPath        string                 `json:"summary_path,omitempty"`
+}
+
+func runRoundTrip(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("roundtrip requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("roundtrip", opts.commandArgs); !ok {
+		if err := writeReportJSON(stdout, reports.ErrorResult("roundtrip", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	if len(opts.commandArgs) != 2 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "roundtrip",
+			Message:  "roundtrip requires exactly a subcommand and target path",
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("roundtrip", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	kind := opts.commandArgs[0]
+	target := opts.commandArgs[1]
+	rtOpts, err := roundTripOptions(opts)
+	if err != nil {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "roundtrip.options",
+			Message:  err.Error(),
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("roundtrip", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	cli, skippedIssue, err := roundTripCLI(opts)
+	if err != nil {
+		issue := reports.Issue{
+			Code:     reports.CodeKiCadCLIFailed,
+			Severity: reports.SeverityError,
+			Path:     "roundtrip.kicad_cli",
+			Message:  err.Error(),
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("roundtrip", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	if skippedIssue != nil {
+		report := roundTripReport{Target: filepath.ToSlash(target), Checks: []roundTripCheck{{
+			FileType:   roundtrip.FileType(kind),
+			Path:       filepath.ToSlash(target),
+			Artifacts:  []reports.Artifact{},
+			Skipped:    true,
+			SkipReason: skippedIssue.Message,
+		}}}
+		result := reports.ResultWithIssues("roundtrip", report, []reports.Issue{*skippedIssue}, nil)
+		return writeReportJSON(stdout, result)
+	}
+	ctx := context.Background()
+	if rtOpts.Timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, rtOpts.Timeout)
+		defer cancel()
+	}
+	report := roundTripReport{Target: filepath.ToSlash(target), Checks: []roundTripCheck{}}
+	var issues []reports.Issue
+	var artifacts []reports.Artifact
+	switch kind {
+	case "schematic":
+		check, checkIssues, checkArtifacts := runRoundTripFile(ctx, cli, target, roundtrip.FileTypeSchematic, rtOpts)
+		report.Checks = append(report.Checks, check)
+		issues = append(issues, checkIssues...)
+		artifacts = append(artifacts, checkArtifacts...)
+	case "pcb":
+		check, checkIssues, checkArtifacts := runRoundTripFile(ctx, cli, target, roundtrip.FileTypePCB, rtOpts)
+		report.Checks = append(report.Checks, check)
+		issues = append(issues, checkIssues...)
+		artifacts = append(artifacts, checkArtifacts...)
+	case "project":
+		targets, discoverIssues := roundTripProjectTargets(target)
+		issues = append(issues, discoverIssues...)
+		for _, file := range targets {
+			if err := ctx.Err(); err != nil {
+				issues = append(issues, reports.Issue{
+					Code:     reports.CodeKiCadCLIFailed,
+					Severity: reports.SeverityError,
+					Path:     "roundtrip.timeout",
+					Message:  err.Error(),
+				})
+				break
+			}
+			check, checkIssues, checkArtifacts := runRoundTripFile(ctx, cli, file.path, file.fileType, rtOpts)
+			report.Checks = append(report.Checks, check)
+			issues = append(issues, checkIssues...)
+			artifacts = append(artifacts, checkArtifacts...)
+		}
+	default:
+		return writeReportFailure(stdout, "roundtrip", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "roundtrip." + kind,
+			Message:  "unsupported roundtrip subcommand " + kind,
+		})
+	}
+	result := reports.ResultWithIssues("roundtrip", report, issues, artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("roundtrip reported blocking issues")
+	}
+	return nil
+}
+
+func roundTripOptions(opts cliOptions) (roundtrip.Options, error) {
+	rtOpts := roundtrip.Options{
+		KeepArtifacts: opts.keepArtifacts,
+		ArtifactDir:   opts.artifactDir,
+	}
+	if strings.TrimSpace(opts.roundTimeout) != "" {
+		timeout, err := time.ParseDuration(opts.roundTimeout)
+		if err != nil || timeout < 0 {
+			return roundtrip.Options{}, fmt.Errorf("invalid timeout %q", opts.roundTimeout)
+		}
+		rtOpts.Timeout = timeout
+	}
+	if strings.TrimSpace(opts.allowlistPath) != "" {
+		data, err := os.ReadFile(opts.allowlistPath)
+		if err != nil {
+			return roundtrip.Options{}, fmt.Errorf("read allowlist: %w", err)
+		}
+		if err := json.Unmarshal(data, &rtOpts.Allowlist); err != nil {
+			return roundtrip.Options{}, fmt.Errorf("decode allowlist: %w", err)
+		}
+		if err := roundtrip.ValidateAllowlist(rtOpts.Allowlist); err != nil {
+			return roundtrip.Options{}, err
+		}
+	}
+	return rtOpts, nil
+}
+
+func roundTripCLI(opts cliOptions) (roundtrip.KiCadCLI, *reports.Issue, error) {
+	if strings.TrimSpace(opts.kicadCLI) != "" {
+		info, err := os.Stat(opts.kicadCLI)
+		if err != nil {
+			return roundtrip.KiCadCLI{}, nil, err
+		}
+		if !info.Mode().IsRegular() {
+			return roundtrip.KiCadCLI{}, nil, fmt.Errorf("%s is not a regular file", opts.kicadCLI)
+		}
+		if runtime.GOOS != "windows" && info.Mode()&0o111 == 0 {
+			return roundtrip.KiCadCLI{}, nil, fmt.Errorf("%s is not executable", opts.kicadCLI)
+		}
+		return roundtrip.KiCadCLI{Path: opts.kicadCLI}, nil, nil
+	}
+	cli, err := roundtrip.DiscoverCLI()
+	if err != nil {
+		issue := reports.Issue{
+			Code:     reports.CodeSkippedExternalTool,
+			Severity: reports.SeverityWarning,
+			Path:     "roundtrip.kicad_cli",
+			Message:  err.Error(),
+		}
+		return roundtrip.KiCadCLI{}, &issue, nil
+	}
+	return cli, nil, nil
+}
+
+type roundTripTarget struct {
+	fileType roundtrip.FileType
+	path     string
+}
+
+func roundTripProjectTargets(path string) ([]roundTripTarget, []reports.Issue) {
+	summary, err := inspect.Project(path)
+	if err != nil {
+		return nil, []reports.Issue{evaluate.IssueFromError(err, "roundtrip.project")}
+	}
+	targets := []roundTripTarget{}
+	for _, file := range summary.Files {
+		if !file.Exists {
+			continue
+		}
+		switch file.Kind {
+		case "schematic":
+			targets = append(targets, roundTripTarget{fileType: roundtrip.FileTypeSchematic, path: file.Path})
+		case "pcb":
+			targets = append(targets, roundTripTarget{fileType: roundtrip.FileTypePCB, path: file.Path})
+		}
+	}
+	issues := append([]reports.Issue{}, summary.Issues...)
+	if len(targets) == 0 {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeMissingFile,
+			Severity: reports.SeverityError,
+			Path:     "roundtrip.project",
+			Message:  "project has no schematic or PCB files to round-trip",
+		})
+	}
+	if len(targets) > 0 {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityWarning,
+			Path:       "roundtrip.project.hierarchy",
+			Message:    "hierarchical schematic discovery is not implemented; only root schematic and PCB are checked",
+			Suggestion: "run roundtrip schematic on child sheets explicitly until readers support hierarchy discovery",
+		})
+	}
+	return targets, issues
+}
+
+func runRoundTripFile(ctx context.Context, cli roundtrip.KiCadCLI, path string, fileType roundtrip.FileType, opts roundtrip.Options) (roundTripCheck, []reports.Issue, []reports.Artifact) {
+	var (
+		result roundtrip.Result
+		err    error
+	)
+	switch fileType {
+	case roundtrip.FileTypeSchematic:
+		result, err = roundtrip.RoundTripSchematic(ctx, cli, path, opts)
+	case roundtrip.FileTypePCB:
+		result, err = roundtrip.RoundTripPCB(ctx, cli, path, opts)
+	default:
+		err = fmt.Errorf("unsupported roundtrip file type %s", fileType)
+	}
+	issues := []reports.Issue{}
+	if err != nil {
+		check := roundTripCheck{
+			FileType:     fileType,
+			Path:         filepath.ToSlash(path),
+			KiCadCLIPath: result.KiCadCLIPath,
+			KiCadVersion: result.KiCadVersion,
+			Equal:        false,
+			Artifacts:    roundTripArtifacts(result),
+		}
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeKiCadCLIFailed,
+			Severity: reports.SeverityError,
+			Path:     filepath.ToSlash(path),
+			Message:  err.Error(),
+		})
+		return check, issues, check.Artifacts
+	}
+	check := roundTripCheckFromResult(result, fileType, path)
+	if !result.Equal {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeRoundTripDiff,
+			Severity: reports.SeverityError,
+			Path:     filepath.ToSlash(path),
+			Message:  "round-trip output differs from original",
+		})
+	}
+	return check, issues, check.Artifacts
+}
+
+func roundTripCheckFromResult(result roundtrip.Result, fileType roundtrip.FileType, path string) roundTripCheck {
+	check := roundTripCheck{
+		FileType:           fileType,
+		Path:               filepath.ToSlash(path),
+		KiCadCLIPath:       result.KiCadCLIPath,
+		KiCadVersion:       result.KiCadVersion,
+		Equal:              result.Equal,
+		Differences:        result.Differences,
+		Artifacts:          roundTripArtifacts(result),
+		RoundTrippedPath:   filepath.ToSlash(result.RoundTrippedPath),
+		RawDiffPath:        filepath.ToSlash(result.RawDiffPath),
+		NormalizedDiffPath: filepath.ToSlash(result.NormalizedDiffPath),
+		SummaryPath:        filepath.ToSlash(result.SummaryPath),
+	}
+	return check
+}
+
+func roundTripArtifacts(result roundtrip.Result) []reports.Artifact {
+	artifacts := []reports.Artifact{}
+	add := func(path, description string) {
+		if strings.TrimSpace(path) == "" {
+			return
+		}
+		artifacts = append(artifacts, reports.Artifact{
+			Kind:        reports.ArtifactRoundTripReport,
+			Path:        filepath.ToSlash(path),
+			Description: description,
+		})
+	}
+	add(result.RoundTrippedPath, "round-tripped KiCad file copy")
+	add(result.RawDiffPath, "raw round-trip diff")
+	add(result.NormalizedDiffPath, "normalized round-trip diff")
+	add(result.SummaryPath, "round-trip summary")
+	return artifacts
 }
 
 func writeReportFailure(stdout io.Writer, command string, issue reports.Issue) error {

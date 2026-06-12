@@ -29,14 +29,14 @@ func RoundTripPCB(ctx context.Context, cli KiCadCLI, inputPath string, opts Opti
 	if timeout <= 0 {
 		timeout = defaultTimeout
 	}
-	versionCtx, cancelVersion := context.WithTimeout(ctx, timeout)
+	versionCtx, cancelVersion := contextWithOptionalTimeout(ctx, timeout)
 	version, versionErr := cli.Version(versionCtx)
 	cancelVersion()
 	if versionErr != nil {
 		version = ""
 	}
 
-	runCtx, cancelRun := context.WithTimeout(ctx, timeout)
+	runCtx, cancelRun := contextWithOptionalTimeout(ctx, timeout)
 	stdout, stderr, exitCode, err := runKiCad(runCtx, filepath.Dir(copyPath), cli.Path, "pcb", "upgrade", "--force", copyPath)
 	cancelRun()
 

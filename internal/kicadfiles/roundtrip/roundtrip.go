@@ -124,6 +124,13 @@ func (cli KiCadCLI) Version(ctx context.Context) (string, error) {
 	return version, nil
 }
 
+func contextWithOptionalTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+	if timeout <= 0 {
+		return context.WithCancel(ctx)
+	}
+	return context.WithTimeout(ctx, timeout)
+}
+
 func validateExecutable(path string) error {
 	info, err := os.Stat(path)
 	if err != nil {
