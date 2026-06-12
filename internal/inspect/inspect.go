@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
 
@@ -41,6 +42,8 @@ func Project(path string) (ProjectSummary, error) {
 		Name:   name,
 		Issues: []reports.Issue{},
 	}
+	_, manifestStatus, _ := manifest.Read(root)
+	summary.Manifest = manifestStatus
 	schematicPath := filepath.Join(root, name+".kicad_sch")
 	pcbPath := filepath.Join(root, name+".kicad_pcb")
 	schematicExists := false

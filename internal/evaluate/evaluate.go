@@ -47,6 +47,24 @@ func Project(path string) (Report, error) {
 	}
 	report := newReport(summary.Root)
 	report.InspectionSummaryPresent = true
+	if summary.Manifest.Present {
+		status := CheckPassed
+		issues := []reports.Issue{}
+		if summary.Manifest.Stale {
+			status = CheckBlocked
+			message := "generated-project manifest is stale"
+			if len(summary.Manifest.Issues) > 0 {
+				message = message + ": " + strings.Join(summary.Manifest.Issues, "; ")
+			}
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodePreservationConflict,
+				Severity: reports.SeverityBlocked,
+				Path:     "manifest",
+				Message:  message,
+			})
+		}
+		report.addCheck(CheckResult{Name: "generated_manifest", Status: status, Required: false, Issues: issues})
+	}
 	check := CheckResult{Name: "project_structure", Status: CheckPassed, Required: true}
 	for _, issue := range summary.Issues {
 		if issue.Code == reports.CodeMissingFile {

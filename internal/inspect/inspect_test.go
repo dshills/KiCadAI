@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
 
@@ -71,6 +72,28 @@ func TestProjectDiscoversProjectFileName(t *testing.T) {
 	}
 	if summary.Schematic == nil || summary.PCB == nil {
 		t.Fatalf("expected discovered schematic and PCB, got %#v", summary)
+	}
+}
+
+func TestProjectReportsManifestStatus(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectPath := filepath.Join(root, "demo.kicad_pro")
+	writeFile(t, projectPath, "{}")
+	writeFile(t, filepath.Join(root, "demo.kicad_sch"), `(kicad_sch)`)
+	writeFile(t, filepath.Join(root, "demo.kicad_pcb"), `(kicad_pcb)`)
+	if _, err := manifest.Write(root, manifest.Manifest{ProjectName: "demo", Artifacts: []reports.Artifact{{Kind: reports.ArtifactKiCadProject, Path: projectPath}}}); err != nil {
+		t.Fatal(err)
+	}
+
+	summary, err := Project(root)
+	if err != nil {
+		t.Fatalf("Project returned error: %v", err)
+	}
+	if !summary.Manifest.Present || summary.Manifest.Stale {
+		t.Fatalf("unexpected manifest status: %#v", summary.Manifest)
 	}
 }
 

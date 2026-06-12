@@ -19,10 +19,10 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
-	if len(result.Artifacts) != 3 {
+	if len(result.Artifacts) != 4 {
 		t.Fatalf("expected artifacts, got %#v", result.Artifacts)
 	}
-	for _, name := range []string{"demo.kicad_pro", "demo.kicad_sch", "demo.kicad_pcb"} {
+	for _, name := range []string{"demo.kicad_pro", "demo.kicad_sch", "demo.kicad_pcb", ".kicadai/manifest.json"} {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}

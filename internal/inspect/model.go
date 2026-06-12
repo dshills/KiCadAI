@@ -1,6 +1,9 @@
 package inspect
 
-import "kicadai/internal/reports"
+import (
+	"kicadai/internal/manifest"
+	"kicadai/internal/reports"
+)
 
 type FileSummary struct {
 	Kind   string `json:"kind"`
@@ -21,6 +24,7 @@ type ProjectSummary struct {
 	PCB              *PCBSummary       `json:"pcb,omitempty"`
 	Unsupported      []UnsupportedNode `json:"unsupported,omitempty"`
 	PreservationOnly []UnsupportedNode `json:"preservation_only,omitempty"`
+	Manifest         manifest.Status   `json:"manifest"`
 	Issues           []reports.Issue   `json:"issues"`
 }
 

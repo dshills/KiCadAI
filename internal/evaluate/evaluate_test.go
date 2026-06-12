@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
 
@@ -54,6 +55,35 @@ func TestProjectPreservesNonMissingInspectionIssues(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("expected missing board outline issue to be preserved, got %#v", report.Issues)
+	}
+}
+
+func TestProjectReportsStaleManifest(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectPath := filepath.Join(root, "demo.kicad_pro")
+	writeFile(t, projectPath, "{}")
+	writeFile(t, filepath.Join(root, "demo.kicad_sch"), `(kicad_sch)`)
+	writeFile(t, filepath.Join(root, "demo.kicad_pcb"), `(kicad_pcb (gr_rect (layer "Edge.Cuts")))`)
+	if _, err := manifest.Write(root, manifest.Manifest{ProjectName: "demo", Artifacts: []reports.Artifact{{Kind: reports.ArtifactKiCadProject, Path: projectPath}}}); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, projectPath, `{"changed":true}`)
+
+	report, err := Project(root)
+	if err != nil {
+		t.Fatalf("Project returned error: %v", err)
+	}
+	found := false
+	for _, issue := range report.Issues {
+		if issue.Code == reports.CodePreservationConflict && issue.Path == "manifest" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected stale manifest issue: %#v", report.Issues)
 	}
 }
 

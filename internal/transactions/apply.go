@@ -10,6 +10,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/designapi"
+	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
 
@@ -56,7 +57,32 @@ func Apply(tx Transaction, opts ApplyOptions) ApplyResult {
 		}
 		result.Artifacts = append(result.Artifacts, artifacts...)
 	}
+	if len(result.Artifacts) > 0 {
+		manifestArtifact, err := writeManifestForApply(opts.OutputDir, tx, result.Artifacts)
+		if err != nil {
+			result.Issues = append(result.Issues, applyIssue(len(tx.Operations)-1, err))
+			return result
+		}
+		result.Artifacts = append(result.Artifacts, manifestArtifact)
+	}
 	return result
+}
+
+func writeManifestForApply(outputDir string, tx Transaction, artifacts []reports.Artifact) (reports.Artifact, error) {
+	projectName := projectNameFromTransaction(tx)
+	if projectName == "" {
+		projectName = "generated_design"
+	}
+	ops := make([]manifest.OperationSummary, 0, len(tx.Operations))
+	for i, op := range tx.Operations {
+		ops = append(ops, manifest.OperationSummary{Index: i, Op: string(op.Op)})
+	}
+	return manifest.Write(outputDir, manifest.Manifest{
+		ProjectName:      projectName,
+		GeneratorVersion: reports.Version,
+		Operations:       ops,
+		Artifacts:        artifacts,
+	})
 }
 
 func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Builder, error) {
