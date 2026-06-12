@@ -605,6 +605,53 @@ func TestRunTransactionValidateReportsIssues(t *testing.T) {
 	}
 }
 
+func TestRunTransactionPlanJSON(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "out")
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"create_project","name":"demo"},{"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}},{"op":"write_project"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "transaction", "plan", dir, path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"op": "add_symbol"`,
+		`"refs": [`,
+		`demo.kicad_sch`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunTransactionPlanBlocksExistingProject(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "demo.kicad_pro"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"create_project","name":"demo"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "transaction", "plan", dir, path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"path": "transaction.target"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func TestRunStructuredCommandRejectsExtraArguments(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

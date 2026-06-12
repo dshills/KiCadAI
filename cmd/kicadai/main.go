@@ -566,7 +566,44 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 			return errors.New("transaction validation failed")
 		}
 		return nil
-	case "plan", "apply":
+	case "plan":
+		if len(opts.commandArgs) < 3 {
+			issue := reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "transaction.plan",
+				Message:  "transaction plan requires target and transaction path",
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
+		target := opts.commandArgs[1]
+		path := opts.commandArgs[2]
+		tx, err := transactions.LoadFile(path)
+		if err != nil {
+			issue := reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     filepath.ToSlash(path),
+				Message:  err.Error(),
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
+		plan := transactions.PlanTransaction(target, tx)
+		result := reports.ResultWithIssues("transaction", plan, plan.Issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if !result.OK {
+			return errors.New("transaction plan failed")
+		}
+		return nil
+	case "apply":
 		issue := reports.Issue{
 			Code:     reports.CodeUnsupportedOperation,
 			Severity: reports.SeverityBlocked,
