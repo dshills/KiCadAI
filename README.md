@@ -1,72 +1,100 @@
 # KiCadAI
 
-KiCadAI is an early Go client for KiCad's IPC API. The first implementation establishes the Go project skeleton, CLI entrypoint, shared configuration rules, protobuf envelope client, and connection probes that later phases will use for document discovery and schematic automation.
+KiCadAI is a Go toolkit for AI-assisted KiCad design work. It currently combines
+three related capabilities:
 
-## Current Status
+- a Go client for probing KiCad's live IPC API;
+- direct KiCad project, schematic, and PCB file writers;
+- CLI tools for generation, inspection, evaluation, round-trip validation,
+  transactions, and pinmap readiness checks.
 
-Implementation phases are complete through direct KiCad file generation. The current functional surface is:
+The practical near-term goal is to let agents build and review KiCad-native
+projects from structured intent while keeping the lower-level writer strict,
+deterministic, and testable.
 
-- Go module and package layout.
-- CLI entrypoint at `cmd/kicadai`.
-- Shared connection configuration package.
-- Baseline tests and Make targets.
-- Vendored KiCad API protobuf definitions pinned to an upstream commit.
-- Generated Go protobuf bindings under `internal/kiapi/gen`.
-- IPC transport abstraction with fake and Mangos-backed request/reply implementations.
-- Low-level KiCad protobuf envelope client with token capture and API status errors.
-- CLI `ping` and `version` probes.
-- Open document discovery and CLI `documents` listing.
-- Optional live KiCad integration test harness.
-- Capability detection for schematic read versus missing schematic write commands.
-- Schematic domain request types and validation for planned symbol, wire, and label operations.
-- Deterministic LED demo planning and `plan-led-demo` CLI output.
-- LED demo execution boundary and `draw-led-demo --execute`, currently blocked by missing live IPC schematic write capability.
-- Direct KiCad file writers for `.kicad_pro`, `.kicad_sch`, and `.kicad_pcb`.
-- Safe project directory generation and `generate-led-demo` / `generate-project` CLI commands.
-- AI-ready workflow registry with safe named operations and structured validation issues.
-- Developer setup, troubleshooting, integration-test, and protobuf regeneration docs.
+## Status
 
-Actual schematic mutation remains gated until KiCad exposes compatible schematic write commands in the generated API surface.
+The direct-file workflow is the main functional path today. It can generate
+KiCad project directories, write root schematics and PCBs, inspect existing
+projects, evaluate common correctness issues, apply a conservative subset of
+transactions to imported projects, and validate symbol-to-footprint pinmaps.
 
-## Roadmap
-
-Phase 15 records follow-up work in the [Phase 15 Roadmap](specs/initial/FUTURE.md). Those items are outside the current implementation scope.
-
-## AI Workflow Boundary
-
-Future AI-generated design logic should call named workflow operations in `internal/workflows`, not generated protobuf packages or transport clients directly. The safe registry currently exposes:
-
-- `create_led_indicator` implemented as a deterministic LED schematic plan.
-- `place_decoupling_capacitor` reserved for a future workflow.
-- `create_connector_block` reserved for a future workflow.
-
-Use `workflows.PlanOperation` with a structured `{operation, payload}` request envelope and inspect `OperationResult.Issues` before attempting execution. Go callers can use `workflows.NewCreateLEDIndicatorRequest` to build the initial implemented payload.
+The live KiCad IPC client is useful for connection probes, version checks,
+document discovery, and capability reporting. Live schematic/PCB mutation
+through the IPC API is still limited by the write commands exposed by the
+currently generated KiCad API surface, so actual design generation is done by
+writing KiCad files directly.
 
 ## Requirements
 
 - Go 1.22 or newer.
-- A KiCad build exposing the vendored IPC API shape; the current generated bindings target KiCad 9+ API definitions.
-- A running KiCad instance with the IPC API enabled for live probes.
+- KiCad 9 or newer is the target for current file output and IPC protobufs.
+- `kicad-cli` is optional, but recommended for round-trip checks and external
+  KiCad validation.
+- `protoc` is only needed when regenerating vendored protobuf bindings.
 
-The default Unix IPC endpoint is `ipc:///tmp/kicad/api.sock`. Windows named pipes are not implemented yet, so Windows users must pass an explicit endpoint once support is added.
+The repository vendors KiCad API protobuf definitions under
+`third_party/kicad/api/proto` and commits generated Go bindings under
+`internal/kiapi/gen`.
 
-## KiCad API Setup
+## Quick Start
 
-Enable KiCad's API in KiCad, then open a project and the editor you want to inspect. For schematic automation work, open the schematic editor before running `documents`, `capabilities`, or LED demo commands.
+Run tests:
 
-Start with the resolved config:
+```sh
+make test
+```
+
+Run the CLI from source:
+
+```sh
+go run ./cmd/kicadai --help
+```
+
+Build a local binary:
+
+```sh
+go build -o bin/kicadai ./cmd/kicadai
+```
+
+Generate a simple LED project without contacting KiCad:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --output /tmp/led_indicator \
+  --name led_indicator \
+  --seed demo \
+  --with-pcb \
+  generate-led-demo
+```
+
+Open `/tmp/led_indicator/led_indicator.kicad_pro` in KiCad.
+
+## KiCad IPC Setup
+
+Live IPC commands require KiCad to be running with the API enabled. Open the
+project/editor you want to inspect, then run:
 
 ```sh
 go run ./cmd/kicadai --json config
+go run ./cmd/kicadai --json ping
+go run ./cmd/kicadai --json version
+go run ./cmd/kicadai --json documents
+go run ./cmd/kicadai --json capabilities
 ```
 
-Pass connection settings with flags:
+Connection flags:
 
 ```sh
-go run ./cmd/kicadai --socket ipc:///tmp/kicad/api.sock --token "$KICAD_API_TOKEN" --json ping
+go run ./cmd/kicadai \
+  --socket ipc:///tmp/kicad/api.sock \
+  --token "$KICAD_API_TOKEN" \
+  --timeout-ms 5000 \
+  --json ping
 ```
 
-Or with environment variables:
+Environment variables:
 
 ```sh
 export KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock
@@ -75,27 +103,281 @@ export KICAD_CLIENT_NAME=kicadai-dev
 export KICAD_TIMEOUT_MS=5000
 ```
 
-The client captures KiCad's returned token in memory when no token is configured. It does not persist tokens to disk; set `KICAD_API_TOKEN` yourself if a later process needs to reuse a token. Tokens are redacted from `config` output.
+Configuration precedence is flag first, environment second, platform default
+last. Tokens are redacted from CLI output. If no token is configured, the client
+captures KiCad's returned token in memory for that process only.
 
-## Commands
+## CLI Overview
+
+All structured project-analysis and generation commands currently require
+`--json`.
 
 ```sh
-go run ./cmd/kicadai --help
 go run ./cmd/kicadai --json config
 go run ./cmd/kicadai --json ping
 go run ./cmd/kicadai --json version
 go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
-go run ./cmd/kicadai --output led_indicator --name led_indicator --seed demo --with-pcb --json generate-led-demo
-go run ./cmd/kicadai --document / --json plan-led-demo
-go run ./cmd/kicadai --document / --execute --json draw-led-demo
+go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json pinmap list
+go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 ```
 
-`generate-led-demo` and `generate-project` write KiCad files directly and do not dial KiCad. If `--name` is omitted, it is derived from the `--output` directory basename; otherwise the output directory basename must match `--name`. Omit `--with-pcb` to generate only project and schematic files. Use `--overwrite` to replace an existing generated project directory through the safe directory-swap writer.
+### Live IPC Commands
 
-`plan-led-demo` is deterministic and does not mutate KiCad. `draw-led-demo --execute` currently performs capability preflight and returns a structured failure when schematic write commands are unavailable in the generated API.
+- `config`: print resolved connection configuration.
+- `ping`: check whether KiCad responds.
+- `version`: print KiCad version information.
+- `documents`: list open KiCad documents.
+- `capabilities`: report detected API command support.
+- `plan-led-demo`: print a deterministic LED schematic action plan.
+- `draw-led-demo --execute`: attempts live schematic automation after
+  capability preflight, but currently returns a structured blocked result when
+  schematic write commands are not available.
 
-More details are in [KiCad Direct File Writers](docs/kicad-file-writers.md).
+### Direct Generation Commands
+
+- `generate-led-demo` and `generate-project`: generate a deterministic LED
+  indicator project, with optional PCB output.
+- `generate breakout`: generate a connector breakout project from a structured
+  JSON request.
+
+LED generation:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --output ./out/led_indicator \
+  --name led_indicator \
+  --with-pcb \
+  --overwrite \
+  generate-project
+```
+
+Breakout generation request:
+
+```json
+{
+  "kind": "breakout",
+  "name": "sensor_breakout",
+  "board": { "width_mm": 40, "height_mm": 25 },
+  "connectors": [
+    { "ref": "J1", "pins": ["VCC", "GND", "SDA", "SCL"] },
+    { "ref": "J2", "pins": ["VCC", "GND", "SDA", "SCL"] }
+  ],
+  "ground_zone": true
+}
+```
+
+Run it:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --request ./request.json \
+  --output ./out/sensor_breakout \
+  --overwrite \
+  generate breakout
+```
+
+Generated projects are written through safe directory handling. `--overwrite`
+is required to replace an existing output directory.
+
+### Inspection
+
+Inspect KiCad projects and files:
+
+```sh
+go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json inspect schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+go run ./cmd/kicadai --json inspect pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+```
+
+Inspection reports summarize discovered files, symbol counts, footprint counts,
+and reader issues.
+
+### Evaluation
+
+Evaluate projects and files for generated-output readiness:
+
+```sh
+go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+go run ./cmd/kicadai --json evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+```
+
+Current evaluation includes checks for missing files, duplicate references,
+missing footprints, missing board outlines, disconnected pads, invalid net
+assignments, and preservation conflicts. Reports include a
+`fabrication_ready` field when applicable.
+
+### Transactions
+
+Transactions are structured edit plans. They can be validated, planned against a
+target, or applied.
+
+```sh
+go run ./cmd/kicadai --json transaction validate ./tx.json
+go run ./cmd/kicadai --json transaction plan ./out/project ./tx.json
+go run ./cmd/kicadai --json --overwrite transaction apply ./out/project ./tx.json
+```
+
+Supported operation kinds:
+
+- `create_project`
+- `set_board_outline`
+- `add_symbol`
+- `connect`
+- `assign_footprint`
+- `place_footprint`
+- `route`
+- `add_zone`
+- `write_project`
+
+`remove_symbol` is modeled but intentionally unsafe for imported apply and is
+blocked by planning.
+
+Minimal generated-project transaction:
+
+```json
+{
+  "name": "demo",
+  "operations": [
+    { "op": "create_project", "name": "demo" },
+    { "op": "set_board_outline", "board": { "width_mm": 30, "height_mm": 20 } },
+    {
+      "op": "add_symbol",
+      "ref": "R1",
+      "value": "10k",
+      "library_id": "Device:R",
+      "at": { "x_mm": 25, "y_mm": 25 },
+      "pins": [
+        { "number": "1", "x_mm": -2.54, "y_mm": 0 },
+        { "number": "2", "x_mm": 2.54, "y_mm": 0 }
+      ]
+    },
+    { "op": "assign_footprint", "ref": "R1", "footprint_id": "Resistor_SMD:R_0805_2012Metric" },
+    {
+      "op": "place_footprint",
+      "ref": "R1",
+      "at": { "x_mm": 15, "y_mm": 10 },
+      "pads": [
+        { "name": "1", "type": "smd", "width_mm": 1.2, "height_mm": 1.4, "net": "NET_A" },
+        { "name": "2", "type": "smd", "width_mm": 1.2, "height_mm": 1.4, "net": "NET_B" }
+      ]
+    },
+    { "op": "write_project" }
+  ]
+}
+```
+
+Imported-project apply is deliberately conservative. It supports adding symbols,
+assigning footprints, placing or moving footprints, adding simple routes and
+zones, and writing the project. It blocks unsupported raw content, unsafe
+removals, arbitrary hierarchy refactors, and operations that could damage
+unknown KiCad constructs. Imported writes use a project lock, atomic file
+replacement, permission preservation, and fsync before rename.
+
+### Pinmaps
+
+Pinmap validation checks whether schematic symbol-to-footprint assignments have
+human-verified pin mappings before fabrication readiness is claimed.
+
+List built-in pinmaps:
+
+```sh
+go run ./cmd/kicadai --json pinmap list
+```
+
+Validate a project:
+
+```sh
+go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
+```
+
+Current built-in mappings include common resistors, capacitors, LEDs, simple
+headers, and `Device:Q_NPN_BEC` to a TO-92 inline footprint. Missing mappings,
+pin-count mismatches, pin-name mismatches, and unflattened hierarchical sheets
+block pinmap fabrication readiness.
+
+### Round-Trip Validation
+
+Round-trip commands use `kicad-cli` to save or normalize files and compare the
+result:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
+  roundtrip schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+
+go run ./cmd/kicadai --json roundtrip pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+go run ./cmd/kicadai --json roundtrip project ./examples/07_generated_pcb
+```
+
+Useful flags:
+
+- `--keep-artifacts`
+- `--artifact-dir ./examples/roundtrip_artifacts`
+- `--timeout 30s`
+- `--allowlist ./allowlist.json`
+
+If `kicad-cli` is not found, round-trip checks return a structured skipped
+result rather than failing the deterministic unit suite.
+
+### Export Skeleton
+
+The `export` command family exists as a structured CLI placeholder for future
+review, BOM, and fabrication-package outputs:
+
+```sh
+go run ./cmd/kicadai --json export preview ./project
+go run ./cmd/kicadai --json export bom ./project
+go run ./cmd/kicadai --json export fabrication ./project
+```
+
+These subcommands currently return `UNSUPPORTED_OPERATION`.
+
+## Examples
+
+Checked-in examples live under `examples/`:
+
+| Example | Focus |
+|---|---|
+| `01_led_indicator` | Single resistor and LED from VCC to GND. |
+| `02_button_pullup` | Pull-up resistor, push button, and output label. |
+| `03_rc_filter` | Passive RC low-pass filter with input/output labels. |
+| `04_555_timer` | Medium-complexity 555 oscillator schematic. |
+| `05_sensor_node` | Hierarchical project with power, MCU, and sensor sheets. |
+| `06_class_ab_headphone_amp` | Op-amp gain stage with diode-biased class AB headphone output. |
+| `07_generated_pcb` | Generated schematic and PCB fixture. |
+| `08_pcb_object_correctness` | PCB object correctness fixture. |
+
+Open each KiCad project by opening the `.kicad_pro` file in its directory.
+
+## Go Packages
+
+Key packages:
+
+- `cmd/kicadai`: CLI entrypoint.
+- `internal/kiapi`: live KiCad IPC client and transport boundary.
+- `internal/kicadfiles/project`: `.kicad_pro` reader/writer.
+- `internal/kicadfiles/schematic`: `.kicad_sch` reader/writer and validation.
+- `internal/kicadfiles/pcb`: `.kicad_pcb` reader/writer and validation.
+- `internal/kicadfiles/design`: project-directory read/write orchestration.
+- `internal/kicadfiles/designapi`: higher-level Go builder API.
+- `internal/transactions`: structured transaction validation, planning, and apply.
+- `internal/generate`: higher-level project generators.
+- `internal/inspect`: inspection reports.
+- `internal/evaluate`: readiness and correctness evaluation.
+- `internal/kicadfiles/roundtrip`: KiCad CLI round-trip validation.
+- `internal/pinmap`: symbol-footprint-pinmap registry and validation.
+- `internal/workflows`: AI-facing named workflow registry.
+
+Generated protobuf packages under `internal/kiapi/gen/**` should not be used as
+the AI workflow boundary. Prefer `internal/workflows`, `internal/transactions`,
+or `internal/kicadfiles/designapi`.
 
 ## Testing
 
@@ -105,20 +387,30 @@ Normal tests do not require KiCad:
 make test
 ```
 
-`make test` wraps `go test ./...` with workspace-local Go cache paths.
+Equivalent direct command:
 
-Coverage reports exclude generated KiCad protobuf bindings from the actionable total:
+```sh
+GOCACHE=/tmp/kicadai-gocache go test ./...
+```
+
+Coverage:
 
 ```sh
 make coverage
 make coverage-check
 ```
 
-`make coverage` prints both the raw total and the hand-written total excluding `internal/kiapi/gen/**`. `make coverage-check` fails when the generated-excluded total drops below `COVERAGE_THRESHOLD`, which defaults to `75.0`.
+`make coverage` prints both raw coverage and coverage excluding generated
+protobuf code under `internal/kiapi/gen/**`. `make coverage-check` fails if the
+generated-excluded total drops below `COVERAGE_THRESHOLD`, defaulting to `75.0`.
 
-Normal coverage does not enable the `integration` build tag and does not require a running KiCad instance.
+Live integration tests are opt-in:
 
-Direct generated-file validation with KiCad CLI is opt-in:
+```sh
+KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock go test -tags=integration ./...
+```
+
+Generated-file validation through KiCad CLI is also opt-in:
 
 ```sh
 KICAD_VALIDATE_GENERATED_FILES=1 \
@@ -126,97 +418,79 @@ KICAD_CLI=/path/to/kicad-cli \
 go test -tags=integration ./internal/kicadfiles/design
 ```
 
-This generates an LED project, exports a schematic netlist, and runs PCB DRC with violation exit codes enabled.
-
-Generated protobuf output can be checked with:
+Round-trip fixture validation:
 
 ```sh
-make proto
-make proto-check
+KICADAI_RUN_KICAD_CLI=1 \
+KICADAI_KEEP_ROUNDTRIP_ARTIFACTS=1 \
+KICADAI_ROUNDTRIP_ARTIFACT_DIR="$(pwd)/examples/roundtrip_artifacts" \
+go test ./internal/kicadfiles/roundtrip
 ```
 
-## Live KiCad Integration Tests
+Set `KICADAI_KICAD_CLI` if `kicad-cli` is not on `PATH`.
 
-To run live tests, start KiCad with the API enabled, set the socket endpoint, and use the `integration` build tag:
+## Protobuf Maintenance
 
-```sh
-KICAD_API_SOCKET=ipc:///tmp/kicad/api.sock go test -tags=integration ./...
-```
-
-Live tests are skipped unless `KICAD_API_SOCKET` is set. They are intentionally excluded from `make test`, `make coverage`, and `make coverage-check`; use them to verify real KiCad transport/API behavior after the deterministic unit suite is green.
-
-Live-test configuration:
-
-```text
-KICAD_API_SOCKET   required socket endpoint
-KICAD_API_TOKEN    optional token when the KiCad instance requires one
-KICAD_TIMEOUT_MS   optional request timeout override
-```
-
-## Troubleshooting
-
-- `cannot dial` or connection timeout: KiCad is not running, the API is disabled, or `KICAD_API_SOCKET` points at the wrong endpoint. Verify with `go run ./cmd/kicadai --json config`, then pass `--socket` explicitly.
-- `AS_NOT_READY`: KiCad has started but is not ready to service API requests. Wait a moment, make sure the project/editor has finished loading, then retry.
-- `AS_TOKEN_MISMATCH`: The configured token does not match the KiCad instance. For repeated CLI commands, get the token for the running KiCad instance and set `KICAD_API_TOKEN`; in-memory capture only helps within a single long-lived Go client process.
-- Multiple KiCad instances: each instance may use a different socket and token. Use explicit `KICAD_API_SOCKET` and avoid relying on defaults while more than one instance is open.
-- Wrong endpoint or no open editor: `documents` should show the expected schematic or PCB document. Open the schematic editor and rerun `go run ./cmd/kicadai --json documents`.
-- Schematic commands unavailable: `capabilities` may report schematic read support while `schematic.write` and symbol placement remain missing. In that state, `plan-led-demo` works and `draw-led-demo --execute` returns a structured preflight failure instead of mutating KiCad.
-- `AS_UNIMPLEMENTED` or `AS_UNHANDLED`: the running KiCad version does not implement the requested command. Check `version` and `capabilities`, then keep the workflow in planning mode.
-- `AS_BUSY` or timeout: KiCad is doing another operation. Retry after the editor is idle or increase `KICAD_TIMEOUT_MS`.
-
-## Vendored KiCad API Protos
-
-KiCad's IPC API protobuf definitions are vendored under `third_party/kicad/api/proto` so Go code generation will be reproducible. The pinned upstream commit is recorded in `third_party/kicad/VERSION`.
-
-To refresh the vendored proto files intentionally:
+Refresh vendored KiCad protobuf definitions intentionally:
 
 ```sh
 make refresh-kicad-proto
 ```
 
-Set `KICAD_REF=<commit-or-tag>` to refresh from a different KiCad ref.
+Set `KICAD_REF=<commit-or-tag>` to refresh from a specific KiCad ref.
 
-After refreshing, run:
+Install `protoc` and the Go generator before regenerating bindings:
 
 ```sh
+brew install protobuf
+GOBIN="$PWD/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
 make proto
 make proto-check
 make test
 ```
 
-## Protobuf Generation
+## Current Limitations
 
-Generated Go bindings are committed under `internal/kiapi/gen`. The generator uses explicit `protoc` mappings because KiCad's upstream proto files do not declare Go package options.
+- Live KiCad IPC write support is not the primary mutation path yet.
+- Direct readers/writers model a growing but incomplete subset of KiCad
+  schematic and PCB syntax.
+- Imported-project mutation blocks unsupported raw content to avoid damaging
+  user-authored KiCad features.
+- Hierarchical pinmap validation is intentionally blocked until hierarchy
+  flattening is implemented.
+- Footprint geometry is still generated from transaction payloads and defaults;
+  there is not yet a full footprint-library expander.
+- Export/BOM/fabrication packaging commands are placeholders.
+- Windows named-pipe IPC support is not implemented.
 
-Install the `protoc` compiler first. On macOS:
+## Troubleshooting
 
-```sh
-brew install protobuf
-```
+- `cannot dial` or timeout: KiCad is not running, the API is disabled, or
+  `KICAD_API_SOCKET` points at the wrong endpoint.
+- `AS_NOT_READY`: KiCad has started but is not ready. Wait for the editor to
+  finish loading and retry.
+- `AS_TOKEN_MISMATCH`: set the correct `KICAD_API_TOKEN` for the running KiCad
+  instance.
+- `AS_UNIMPLEMENTED` or `AS_UNHANDLED`: the running KiCad version does not
+  implement the requested API command. Use direct-file generation for mutation.
+- `draw-led-demo --execute` blocked by capabilities: expected when schematic
+  write commands are unavailable in the generated API.
+- `transaction apply` blocked by preservation conflict: the imported file
+  contains KiCad constructs the writer does not model safely yet.
+- `pinmap validate` blocked by hierarchy: validate child sheets directly or wait
+  for hierarchy flattening support.
+- Round-trip skipped: install `kicad-cli` or pass `--kicad-cli`.
 
-Install the pinned generator plugin into the workspace-local `bin` directory:
+## Design Direction
 
-```sh
-GOBIN="$PWD/bin" go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.36.11
-```
+The project is moving toward an AI design loop:
 
-Then regenerate:
+1. Convert intent into structured transactions or higher-level generator
+   requests.
+2. Write KiCad-native project files deterministically.
+3. Inspect and evaluate the result.
+4. Run pinmap, round-trip, and KiCad CLI checks.
+5. Produce review and fabrication-readiness reports.
 
-```sh
-make proto
-```
-
-## KiCad Configuration
-
-The CLI uses these environment variables:
-
-```text
-KICAD_API_SOCKET
-KICAD_API_TOKEN
-KICAD_CLIENT_NAME
-KICAD_TIMEOUT_MS
-```
-
-Tokens are redacted from CLI output.
-
-Connection precedence is flag first, environment second, platform default last. Any socket string without a scheme receives the `ipc://` prefix. Use absolute socket paths for reliable behavior from any working directory; if you must use a relative socket, prefer an explicit form such as `./api.sock`, which normalizes to `ipc://./api.sock`.
+The CLI is the current integration surface. MCP or other agent protocols can be
+layered on later once the core tools are complete and reliable.
