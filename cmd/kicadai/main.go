@@ -421,6 +421,10 @@ func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return writeLibraryResult(stdout, libraryresolver.FindSymbols(libraryIndex, libraryresolver.Query{Text: opts.commandArgs[1]}), issues)
 	case "search-footprints":
 		return writeLibraryResult(stdout, libraryresolver.FindFootprints(libraryIndex, libraryresolver.Query{Text: opts.commandArgs[1]}), issues)
+	case "compatible-footprints":
+		return writeLibraryResult(stdout, libraryresolver.CompatibleFootprints(libraryIndex, opts.commandArgs[1], libraryresolver.MatchOptions{}), issues)
+	case "validate-assignment":
+		return writeLibraryResult(stdout, libraryresolver.ValidateAssignment(libraryIndex, opts.commandArgs[1], opts.commandArgs[2]), issues)
 	}
 	return writeLibraryFailure(stdout, reports.Issue{
 		Code:     reports.CodeInvalidArgument,
@@ -438,8 +442,10 @@ func requiredLibraryParams(subcommand string) (int, bool) {
 	switch subcommand {
 	case "index":
 		return 0, true
-	case "symbol", "footprint", "search-symbols", "search-footprints":
+	case "symbol", "footprint", "search-symbols", "search-footprints", "compatible-footprints":
 		return 1, true
+	case "validate-assignment":
+		return 2, true
 	default:
 		return 0, false
 	}

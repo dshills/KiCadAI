@@ -170,6 +170,31 @@ func TestRunLibrarySearchJSON(t *testing.T) {
 	}
 }
 
+func TestRunLibraryCompatibilityJSON(t *testing.T) {
+	symbols, footprints := writeCLILibraryFixture(t)
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "compatible-footprints", args: []string{"library", "compatible-footprints", "Device:R"}, want: `"status": "compatible"`},
+		{name: "validate-assignment", args: []string{"library", "validate-assignment", "Device:R", "Resistor_SMD:R_0805_2012Metric"}, want: `"status": "compatible"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			args := append([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints}, tc.args...)
+			err := run(args, &stdout, &stderr)
+			if err != nil {
+				t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("output missing %q:\n%s", tc.want, stdout.String())
+			}
+		})
+	}
+}
+
 func TestRunLibraryUnsupportedSubcommandJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -234,6 +259,7 @@ func writeCLILibraryFixture(t *testing.T) (string, string) {
     (property "Value" "R" (at 0 -2.54 0))
     (ki_keywords "resistor R")
     (ki_description "Resistor")
+    (ki_fp_filters "R_*" "Resistor_*")
     (symbol "R_1_1"
       (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
       (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))
