@@ -98,11 +98,11 @@ func TestPCBEvaluationReportsCorpusHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PCB returned error: %v", err)
 	}
-	if len(report.Checks) != 2 {
+	if len(report.Checks) != 1 {
 		t.Fatalf("checks = %#v", report.Checks)
 	}
-	if report.Checks[0].Name != "pcb_corpus_scan" || report.Checks[0].Status != CheckPassed {
-		t.Fatalf("unexpected corpus check: %#v", report.Checks[0])
+	if report.Checks[0].Name != "pcb_validation" || report.Checks[0].Status != CheckPassed {
+		t.Fatalf("unexpected PCB check: %#v", report.Checks[0])
 	}
 	if !report.FabricationReady {
 		t.Fatalf("PCB should be fabrication ready when required checks pass: %#v", report)
@@ -125,7 +125,7 @@ func TestPCBEvaluationReportsMissingOutline(t *testing.T) {
 	}
 }
 
-func TestSchematicEvaluationSkipsReaderGap(t *testing.T) {
+func TestSchematicEvaluationUsesReader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
 	writeFile(t, path, `(kicad_sch (version 20260306) (generator "kicadai"))`)
 
@@ -133,11 +133,47 @@ func TestSchematicEvaluationSkipsReaderGap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Schematic returned error: %v", err)
 	}
-	if len(report.Checks) != 2 {
+	if len(report.Checks) != 1 {
 		t.Fatalf("checks = %#v", report.Checks)
 	}
-	if report.Checks[1].Status != CheckSkipped || report.Checks[1].Issues[0].Code != reports.CodeUnsupportedOperation {
-		t.Fatalf("unexpected reader gap check: %#v", report.Checks[1])
+	if report.Checks[0].Name != "schematic_validation" || report.Checks[0].Status != CheckPassed {
+		t.Fatalf("unexpected schematic check: %#v", report.Checks[0])
+	}
+}
+
+func TestSchematicEvaluationReportsDuplicateReference(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "duplicate.kicad_sch")
+	writeFile(t, path, `(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (symbol (lib_id "Device:R") (property "Reference" "R1") (uuid "11111111-1111-5111-8111-111111111111"))
+  (symbol (lib_id "Device:R") (property "Reference" "R1") (uuid "22222222-2222-5222-8222-222222222222"))
+)`)
+	report, err := Schematic(path)
+	if err != nil {
+		t.Fatalf("Schematic returned error: %v", err)
+	}
+	if len(report.Issues) == 0 || report.Issues[0].Code != reports.CodeDuplicateReference {
+		t.Fatalf("expected duplicate reference issue, got %#v", report.Issues)
+	}
+}
+
+func TestPCBEvaluationReportsDisconnectedPad(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "disconnected.kicad_pcb")
+	writeFile(t, path, `(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user))
+  (setup)
+  (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))
+  (footprint "Test:One" (property "Reference" "J1") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "SIG")))
+)`)
+	report, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	if len(report.Issues) == 0 || report.Issues[0].Code != reports.CodeDisconnectedPad {
+		t.Fatalf("expected disconnected pad issue, got %#v", report.Issues)
 	}
 }
 

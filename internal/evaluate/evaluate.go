@@ -8,6 +8,8 @@ import (
 	"strings"
 
 	"kicadai/internal/inspect"
+	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	schematicfiles "kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 )
 
@@ -115,46 +117,110 @@ func PCB(path string) (Report, error) {
 }
 
 func checksForSchematicSummary(summary inspect.SchematicSummary) []CheckResult {
-	return []CheckResult{
-		{Name: "schematic_parse", Status: statusForIssues(summary.Issues), Required: true, Issues: summary.Issues},
-		schematicReaderGapCheck(summary.Path),
+	issues := append([]reports.Issue{}, summary.Issues...)
+	file, err := schematicfiles.ReadFile(summary.Path)
+	if err != nil {
+		issues = append(issues, IssueFromError(err, summary.Path))
+	} else {
+		issues = append(issues, schematicSemanticIssues(file)...)
 	}
+	for _, unsupported := range summary.Unsupported {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeUnsupportedOperation,
+			Severity: reports.SeverityWarning,
+			Path:     "schematic." + unsupported.Kind,
+			Message:  fmt.Sprintf("unsupported schematic node %q appears %d time(s)", unsupported.Kind, unsupported.Count),
+		})
+	}
+	return []CheckResult{{Name: "schematic_validation", Status: statusForIssues(issues), Required: true, Issues: issues}}
 }
 
 func checksForPCBSummary(summary inspect.PCBSummary) []CheckResult {
-	scanIssues := append([]reports.Issue{}, summary.Issues...)
-	for index := range scanIssues {
-		if scanIssues[index].Code == reports.CodeMissingBoardOutline {
-			scanIssues[index].Severity = reports.SeverityError
+	issues := append([]reports.Issue{}, summary.Issues...)
+	for index := range issues {
+		if issues[index].Code == reports.CodeMissingBoardOutline {
+			issues[index].Severity = reports.SeverityError
 		}
 	}
 	for _, unsupported := range summary.Unsupported {
-		scanIssues = append(scanIssues, reports.Issue{
+		issues = append(issues, reports.Issue{
 			Code:     reports.CodeUnsupportedOperation,
 			Severity: reports.SeverityWarning,
 			Path:     "pcb." + unsupported.Kind,
 			Message:  fmt.Sprintf("unsupported PCB node %q appears %d time(s)", unsupported.Kind, unsupported.Count),
 		})
 	}
-	return []CheckResult{
-		{
-			Name:     "pcb_corpus_scan",
-			Status:   statusForIssues(scanIssues),
-			Required: true,
-			Issues:   scanIssues,
-		},
-		{
-			Name:   "pcb_reader_gap",
-			Status: CheckSkipped,
-			Issues: []reports.Issue{{
-				Code:       reports.CodeUnsupportedOperation,
-				Severity:   reports.SeverityWarning,
-				Path:       "pcb.reader",
-				Message:    "full structured PCB reader is not implemented; evaluation is limited to corpus scan checks",
-				Suggestion: "use generated design validation or KiCad CLI round-trip checks for stronger validation",
-			}},
-		},
+	board, err := pcbfiles.ReadFile(summary.Path)
+	if err != nil {
+		issues = append(issues, IssueFromError(err, summary.Path))
+	} else {
+		issues = append(issues, pcbSemanticIssues(board)...)
 	}
+	return []CheckResult{{Name: "pcb_validation", Status: statusForIssues(issues), Required: true, Issues: issues}}
+}
+
+func schematicSemanticIssues(file schematicfiles.SchematicFile) []reports.Issue {
+	seen := map[string]struct{}{}
+	var issues []reports.Issue
+	for _, symbol := range file.Symbols {
+		ref := strings.TrimSpace(symbol.Reference)
+		if ref == "" {
+			continue
+		}
+		if _, ok := seen[ref]; ok {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeDuplicateReference,
+				Severity: reports.SeverityError,
+				Path:     "schematic.symbols." + ref,
+				Message:  "duplicate schematic reference " + ref,
+				Refs:     []string{ref},
+			})
+		}
+		seen[ref] = struct{}{}
+	}
+	return issues
+}
+
+func pcbSemanticIssues(board pcbfiles.PCBFile) []reports.Issue {
+	connectedNets := map[string]struct{}{}
+	for _, track := range board.Tracks {
+		if track.NetName != "" {
+			connectedNets[track.NetName] = struct{}{}
+		}
+	}
+	for _, arc := range board.TrackArcs {
+		if arc.NetName != "" {
+			connectedNets[arc.NetName] = struct{}{}
+		}
+	}
+	for _, zone := range board.Zones {
+		if zone.NetName != "" {
+			connectedNets[zone.NetName] = struct{}{}
+		}
+	}
+	var issues []reports.Issue
+	for _, footprint := range board.Footprints {
+		for _, pad := range footprint.Pads {
+			if pad.NetName == "" {
+				continue
+			}
+			if _, ok := connectedNets[pad.NetName]; !ok {
+				ref := footprint.Reference
+				if ref == "" {
+					ref = footprint.LibraryID
+				}
+				issues = append(issues, reports.Issue{
+					Code:     reports.CodeDisconnectedPad,
+					Severity: reports.SeverityError,
+					Path:     "pcb.footprints." + ref + ".pads." + pad.Name,
+					Message:  "pad is assigned to net " + pad.NetName + " but no parsed track, arc, or zone uses that net",
+					Refs:     []string{ref},
+					Nets:     []string{pad.NetName},
+				})
+			}
+		}
+	}
+	return issues
 }
 
 func IssueFromError(err error, path string) reports.Issue {
@@ -193,20 +259,6 @@ func codeForError(err error) reports.Code {
 		return coded.Code
 	}
 	return reports.CodeValidationFailed
-}
-
-func schematicReaderGapCheck(path string) CheckResult {
-	return CheckResult{
-		Name:   "schematic_reader_gap",
-		Status: CheckSkipped,
-		Issues: []reports.Issue{{
-			Code:       reports.CodeUnsupportedOperation,
-			Severity:   reports.SeverityWarning,
-			Path:       filepath.ToSlash(path),
-			Message:    "full structured schematic reader is not implemented; semantic schematic evaluation is skipped",
-			Suggestion: "use generated design validation for modeled schematics until the reader gap is closed",
-		}},
-	}
 }
 
 func newReport(target string) Report {

@@ -280,9 +280,8 @@ func TestRunEvaluatePCBJSON(t *testing.T) {
 		`"ok": true`,
 		`"command": "evaluate"`,
 		`"target": "` + path + `"`,
-		`"name": "pcb_corpus_scan"`,
+		`"name": "pcb_validation"`,
 		`"status": "passed"`,
-		`"status": "skipped"`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
