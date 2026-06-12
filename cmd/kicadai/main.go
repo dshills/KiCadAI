@@ -892,7 +892,18 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 			}
 			return errors.New(issue.Message)
 		}
-		plan := transactions.PlanTransaction(target, tx)
+		planOptions := transactions.PlanOptions{RequireLibraryValidation: true}
+		if transactionShouldUseLibraryResolver(opts) {
+			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+			defer stop()
+			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+				CachePath: opts.libraryCache,
+				Refresh:   opts.refreshLibraryCache,
+			})
+			planOptions.LibraryIndex = &index
+			planOptions.LibraryIssues = issues
+		}
+		plan := transactions.PlanTransactionWithOptions(target, tx, planOptions)
 		result := reports.ResultWithIssues("transaction", plan, plan.Issues, nil)
 		if err := writeReportJSON(stdout, result); err != nil {
 			return err
@@ -950,6 +961,10 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		}
 		return errors.New(issue.Message)
 	}
+}
+
+func transactionShouldUseLibraryResolver(opts cliOptions) bool {
+	return pinmapShouldUseLibraryResolver(opts)
 }
 
 func roundTripOptions(opts cliOptions) (roundtrip.Options, error) {

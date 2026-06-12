@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	kicaddesign "kicadai/internal/kicadfiles/design"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -28,13 +29,33 @@ type PlannedOperation struct {
 	Capability string             `json:"capability,omitempty"`
 }
 
+type PlanOptions struct {
+	LibraryIndex             *libraryresolver.LibraryIndex `json:"-"`
+	LibraryIssues            []reports.Issue               `json:"-"`
+	RequireLibraryValidation bool                          `json:"-"`
+}
+
 func PlanTransaction(target string, tx Transaction) Plan {
+	return PlanTransactionWithOptions(target, tx, PlanOptions{})
+}
+
+func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions) Plan {
 	if strings.TrimSpace(target) == "" {
 		target = "."
 	}
 	plan := Plan{Target: filepath.ToSlash(target), Operations: []PlannedOperation{}, Issues: []reports.Issue{}}
 	validation := Validate(tx)
 	plan.Issues = append(plan.Issues, validation.Issues...)
+	plan.Issues = append(plan.Issues, opts.LibraryIssues...)
+	if opts.RequireLibraryValidation && opts.LibraryIndex == nil {
+		plan.Issues = append(plan.Issues, reports.Issue{
+			Code:       reports.CodeUnknownSymbolLibrary,
+			Severity:   reports.SeverityWarning,
+			Path:       "transaction.library",
+			Message:    "library resolver roots are not configured; transaction library validation was skipped",
+			Suggestion: "pass --symbols-root and --footprints-root to validate library IDs",
+		})
+	}
 	projectName := projectNameFromTransaction(tx)
 	if projectName == "" {
 		projectName = "generated_design"
@@ -65,6 +86,10 @@ func PlanTransaction(target string, tx Transaction) Plan {
 		if existing != nil {
 			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, op, addedRefs)...)
 		}
+		if opts.LibraryIndex != nil {
+			plan.Issues = append(plan.Issues, transactionLibraryIssues(*opts.LibraryIndex, op)...)
+			enrichPlannedOperationWithLibrary(*opts.LibraryIndex, &planned, op)
+		}
 		if !planned.Supported {
 			plan.Issues = append(plan.Issues, reports.Issue{
 				Code:     reports.CodeUnsupportedOperation,
@@ -82,6 +107,81 @@ func PlanTransaction(target string, tx Transaction) Plan {
 		}
 	}
 	return plan
+}
+
+func transactionLibraryIssues(index libraryresolver.LibraryIndex, op Operation) []reports.Issue {
+	switch op.Op {
+	case OpAddSymbol:
+		var payload AddSymbolOperation
+		if decodeRaw(op, &payload) != nil {
+			return nil
+		}
+		if _, ok := libraryresolver.ResolveSymbol(index, payload.LibraryID); !ok {
+			return []reports.Issue{missingTransactionLibraryIssue(op.Index, "library_id", "symbol library record not found: "+payload.LibraryID)}
+		}
+	case OpAssignFootprint:
+		var payload AssignFootprintOperation
+		if decodeRaw(op, &payload) != nil {
+			return nil
+		}
+		if _, ok := libraryresolver.ResolveFootprint(index, payload.FootprintID); !ok {
+			return []reports.Issue{missingTransactionLibraryIssue(op.Index, "footprint_id", "footprint library record not found: "+payload.FootprintID)}
+		}
+	case OpPlaceFootprint:
+		var payload PlaceFootprintOperation
+		if decodeRaw(op, &payload) != nil || strings.TrimSpace(payload.FootprintID) == "" {
+			return nil
+		}
+		if _, ok := libraryresolver.ResolveFootprint(index, payload.FootprintID); !ok {
+			return []reports.Issue{missingTransactionLibraryIssue(op.Index, "footprint_id", "footprint library record not found: "+payload.FootprintID)}
+		}
+	case OpConnect:
+		var payload ConnectOperation
+		if decodeRaw(op, &payload) != nil {
+			return nil
+		}
+		return []reports.Issue{{
+			Code:       reports.CodePinmapUnverified,
+			Severity:   reports.SeverityWarning,
+			Path:       "operations[" + strconv.Itoa(op.Index) + "]",
+			Message:    "connect operations require verified pinmaps before fabrication export",
+			Refs:       []string{payload.From.Ref, payload.To.Ref},
+			Suggestion: "run pinmap validate with resolver roots after assigning footprints",
+		}}
+	}
+	return nil
+}
+
+func missingTransactionLibraryIssue(index int, field string, message string) reports.Issue {
+	return reports.Issue{
+		Code:       reports.CodeMissingFile,
+		Severity:   reports.SeverityError,
+		Path:       "operations[" + strconv.Itoa(index) + "]." + field,
+		Message:    message,
+		Suggestion: "run library search commands or configure KiCad library roots",
+	}
+}
+
+func enrichPlannedOperationWithLibrary(index libraryresolver.LibraryIndex, planned *PlannedOperation, op Operation) {
+	switch op.Op {
+	case OpAddSymbol:
+		var payload AddSymbolOperation
+		if decodeRaw(op, &payload) != nil {
+			return
+		}
+		candidates := libraryresolver.CompatibleFootprints(index, payload.LibraryID, libraryresolver.MatchOptions{Limit: 1})
+		if len(candidates) > 0 {
+			planned.Capability = "compatible footprint candidate: " + candidates[0].FootprintID
+		}
+	case OpPlaceFootprint:
+		var payload PlaceFootprintOperation
+		if decodeRaw(op, &payload) != nil || strings.TrimSpace(payload.FootprintID) == "" {
+			return
+		}
+		if footprint, ok := libraryresolver.ResolveFootprint(index, payload.FootprintID); ok {
+			planned.Capability = "resolver footprint geometry available: " + footprint.FootprintID
+		}
+	}
 }
 
 func supportedExistingPlanOperation(kind OperationKind) bool {

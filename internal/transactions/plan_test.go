@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -126,6 +127,83 @@ func TestPlanOperationIndexesPreserved(t *testing.T) {
 	plan := PlanTransaction(t.TempDir(), tx)
 	if plan.Operations[1].Index != 1 || plan.Issues[0].Path != "operations[1].op" {
 		t.Fatalf("indexes not preserved: %#v", plan)
+	}
+}
+
+func TestPlanWithResolverReportsBadSymbolID(t *testing.T) {
+	tx := mustParse(t, `{"operations":[{"op":"add_symbol","ref":"R1","library_id":"Device:Missing","at":{"x_mm":0,"y_mm":0}}]}`)
+	index := transactionResolverFixture()
+	plan := PlanTransactionWithOptions(t.TempDir(), tx, PlanOptions{LibraryIndex: &index})
+	if len(plan.Issues) == 0 || plan.Issues[0].Code != reports.CodeMissingFile || plan.Issues[0].Path != "operations[0].library_id" {
+		t.Fatalf("expected bad symbol issue: %#v", plan.Issues)
+	}
+}
+
+func TestPlanWithResolverReportsBadFootprintID(t *testing.T) {
+	tx := mustParse(t, `{"operations":[
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Missing:Nope"},
+	  {"op":"place_footprint","ref":"R1","footprint_id":"Missing:Nope","at":{"x_mm":0,"y_mm":0}}
+	]}`)
+	index := transactionResolverFixture()
+	plan := PlanTransactionWithOptions(t.TempDir(), tx, PlanOptions{LibraryIndex: &index})
+	if len(plan.Issues) != 2 || plan.Issues[0].Path != "operations[0].footprint_id" || plan.Issues[1].Path != "operations[1].footprint_id" {
+		t.Fatalf("expected bad footprint issues: %#v", plan.Issues)
+	}
+}
+
+func TestPlanWithResolverAcceptsValidLibraries(t *testing.T) {
+	tx := mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"},
+	  {"op":"place_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric","at":{"x_mm":0,"y_mm":0}}
+	]}`)
+	index := transactionResolverFixture()
+	plan := PlanTransactionWithOptions(t.TempDir(), tx, PlanOptions{LibraryIndex: &index})
+	if len(plan.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", plan.Issues)
+	}
+	if plan.Operations[0].Capability == "" || plan.Operations[2].Capability == "" {
+		t.Fatalf("expected resolver suggestions/capabilities: %#v", plan.Operations)
+	}
+}
+
+func TestPlanWithRequiredResolverWithoutIndexWarns(t *testing.T) {
+	tx := mustParse(t, `{"operations":[{"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}}]}`)
+	plan := PlanTransactionWithOptions(t.TempDir(), tx, PlanOptions{RequireLibraryValidation: true})
+	if len(plan.Issues) != 1 || plan.Issues[0].Severity != reports.SeverityWarning {
+		t.Fatalf("expected missing resolver warning: %#v", plan.Issues)
+	}
+}
+
+func transactionResolverFixture() libraryresolver.LibraryIndex {
+	return libraryresolver.LibraryIndex{
+		Symbols: map[string]libraryresolver.SymbolRecord{
+			"Device:R": {
+				LibraryID:       "Device:R",
+				LibraryNickname: "Device",
+				Name:            "R",
+				Description:     "Resistor",
+				Keywords:        []string{"resistor"},
+				FootprintFilter: []string{"R_*", "Resistor_*"},
+				Pins: []libraryresolver.SymbolPin{
+					{Number: "1", Electrical: "passive"},
+					{Number: "2", Electrical: "passive"},
+				},
+			},
+		},
+		Footprints: map[string]libraryresolver.FootprintRecord{
+			"Resistor_SMD:R_0805_2012Metric": {
+				FootprintID:     "Resistor_SMD:R_0805_2012Metric",
+				LibraryNickname: "Resistor_SMD",
+				Name:            "R_0805_2012Metric",
+				Description:     "resistor",
+				Tags:            []string{"resistor"},
+				Pads: []libraryresolver.FootprintPad{
+					{Name: "1"},
+					{Name: "2"},
+				},
+			},
+		},
 	}
 }
 
