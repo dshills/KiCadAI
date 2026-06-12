@@ -393,6 +393,21 @@ func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 			Message:  fmt.Sprintf("library %s requires %d argument(s)", subcommand, requiredArgs),
 		})
 	}
+	if subcommand == "templates" || subcommand == "template" {
+		if subcommand == "templates" {
+			records, issues := libraryresolver.DiscoverTemplates(ctx, libraryRootsFromOptions(opts))
+			return writeLibraryResult(stdout, records, issues)
+		}
+		name := opts.commandArgs[1]
+		record, issues, ok := libraryresolver.DiscoverTemplate(ctx, libraryRootsFromOptions(opts), name)
+		if !ok {
+			if !hasBlockingIssue(issues) {
+				issues = append(issues, missingLibraryRecordIssue("library.template", name))
+			}
+			return writeLibraryResult(stdout, nil, issues)
+		}
+		return writeLibraryResult(stdout, record, issues)
+	}
 	libraryIndex, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
 		CachePath: opts.libraryCache,
 		Refresh:   opts.refreshLibraryCache,
@@ -452,9 +467,9 @@ func writeLibraryKLCResult(stdout io.Writer, report libraryresolver.KLCReport, i
 
 func requiredLibraryParams(subcommand string) (int, bool) {
 	switch subcommand {
-	case "index":
+	case "index", "templates":
 		return 0, true
-	case "symbol", "footprint", "search-symbols", "search-footprints", "compatible-footprints", "klc-symbol", "klc-footprint":
+	case "symbol", "footprint", "search-symbols", "search-footprints", "compatible-footprints", "klc-symbol", "klc-footprint", "template":
 		return 1, true
 	case "validate-assignment", "pinmap-candidate":
 		return 2, true
@@ -481,6 +496,15 @@ func missingLibraryRecordIssue(path string, id string) reports.Issue {
 		Path:     path,
 		Message:  "library record not found: " + id,
 	}
+}
+
+func hasBlockingIssue(issues []reports.Issue) bool {
+	for _, issue := range issues {
+		if issue.Blocking() {
+			return true
+		}
+	}
+	return false
 }
 
 func libraryRootsFromOptions(opts cliOptions) libraryresolver.LibraryRoots {

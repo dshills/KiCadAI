@@ -135,6 +135,17 @@ type FootprintText struct {
 	Layer    string           `json:"layer,omitempty"`
 }
 
+type TemplateRecord struct {
+	Name           string   `json:"name"`
+	Path           string   `json:"path"`
+	ProjectFiles   []string `json:"project_files,omitempty"`
+	MetadataFiles  []string `json:"metadata_files,omitempty"`
+	LibraryTables  []string `json:"library_tables,omitempty"`
+	SchematicFiles []string `json:"schematic_files,omitempty"`
+	BoardFiles     []string `json:"board_files,omitempty"`
+	OtherFiles     []string `json:"other_files,omitempty"`
+}
+
 type GraphicsSummary struct {
 	LineCount     int  `json:"line_count,omitempty"`
 	ArcCount      int  `json:"arc_count,omitempty"`

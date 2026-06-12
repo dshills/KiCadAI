@@ -198,6 +198,31 @@ func TestRunLibraryCompatibilityJSON(t *testing.T) {
 	}
 }
 
+func TestRunLibraryTemplatesJSON(t *testing.T) {
+	templates := writeCLITemplateFixture(t)
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "templates", args: []string{"library", "templates"}, want: `"name": "Demo"`},
+		{name: "template", args: []string{"library", "template", "Demo"}, want: `"project_files": [`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			args := append([]string{"--json", "--templates-root", templates}, tc.args...)
+			err := run(args, &stdout, &stderr)
+			if err != nil {
+				t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("output missing %q:\n%s", tc.want, stdout.String())
+			}
+		})
+	}
+}
+
 func TestRunLibraryUnsupportedSubcommandJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -280,6 +305,18 @@ func writeCLILibraryFixture(t *testing.T) (string, string) {
   (pad "2" smd roundrect (at 0.95 0) (size 1.0 1.2) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25))
 )`)
 	return symbols, footprints
+}
+
+func writeCLITemplateFixture(t *testing.T) string {
+	t.Helper()
+	root := t.TempDir()
+	project := filepath.Join(root, "Projects", "Demo")
+	writeTestFile(t, filepath.Join(project, "Demo.kicad_pro"), `{}`)
+	writeTestFile(t, filepath.Join(project, "Demo.kicad_sch"), `(kicad_sch)`)
+	writeTestFile(t, filepath.Join(project, "Demo.kicad_pcb"), `(kicad_pcb)`)
+	writeTestFile(t, filepath.Join(project, "fp-lib-table"), ``)
+	writeTestFile(t, filepath.Join(project, "meta", "info.html"), `<p>demo</p>`)
+	return root
 }
 
 func writeTestFile(t *testing.T, path string, contents string) {
