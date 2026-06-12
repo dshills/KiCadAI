@@ -46,6 +46,7 @@ type EmbeddedSymbol struct {
 }
 
 type SchematicSymbol struct {
+	Raw              string
 	UUID             kicadfiles.UUID
 	Path             string
 	LibraryID        string

@@ -171,3 +171,60 @@ func TestRenderGoldenSchematicFragment(t *testing.T) {
 		t.Fatalf("Format =\n%s\nwant =\n%s", got, want)
 	}
 }
+
+func TestParseNestedListWithStringsAndComments(t *testing.T) {
+	node, err := Parse([]byte(`; comment
+(kicad_sch (version 20260306) (generator "eeschema") (paper A4) (uuid "abc"))`))
+	if err != nil {
+		t.Fatalf("Parse returned error: %v", err)
+	}
+	if node.Head() != "kicad_sch" {
+		t.Fatalf("head = %q", node.Head())
+	}
+	version, ok := node.Child("version")
+	if !ok || version.ListValue(1) != "20260306" {
+		t.Fatalf("version = %#v", version)
+	}
+	generator, ok := node.Child("generator")
+	if !ok || generator.ListValue(1) != "eeschema" {
+		t.Fatalf("generator = %#v", generator)
+	}
+	if !strings.Contains(node.Raw, "(paper A4)") {
+		t.Fatalf("raw not preserved: %q", node.Raw)
+	}
+}
+
+func TestParseReportsUsefulMalformedError(t *testing.T) {
+	_, err := Parse([]byte(`(kicad_pcb (version 1)`))
+	if err == nil || !strings.Contains(err.Error(), "offset") {
+		t.Fatalf("expected offset error, got %v", err)
+	}
+}
+
+func TestParseRejectsExcessiveNesting(t *testing.T) {
+	input := strings.Repeat("(", maxParseDepth+2) + strings.Repeat(")", maxParseDepth+2)
+	_, err := Parse([]byte(input))
+	if err == nil || !strings.Contains(err.Error(), "maximum list nesting") {
+		t.Fatalf("expected nesting error, got %v", err)
+	}
+}
+
+func TestParsedNodeConvertsEmptyListToListNode(t *testing.T) {
+	node, err := Parse([]byte(`()`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := node.Node().(List); !ok {
+		t.Fatalf("Node() = %T, want List", node.Node())
+	}
+}
+
+func TestParseAtomHandlesUTF8(t *testing.T) {
+	node, err := Parse([]byte(`(root café)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.ListValue(1) != "café" {
+		t.Fatalf("atom = %q", node.ListValue(1))
+	}
+}

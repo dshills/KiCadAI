@@ -155,6 +155,7 @@ type NetRegistry struct {
 }
 
 type Footprint struct {
+	Raw                string
 	UUID               kicadfiles.UUID
 	Path               string
 	LibraryID          string
@@ -234,6 +235,7 @@ type XYZ struct {
 }
 
 type Pad struct {
+	Raw                string
 	UUID               kicadfiles.UUID
 	Name               string
 	Type               string
@@ -355,6 +357,7 @@ type Via struct {
 }
 
 type Zone struct {
+	Raw            string
 	UUID           kicadfiles.UUID
 	NetCode        int
 	NetName        string

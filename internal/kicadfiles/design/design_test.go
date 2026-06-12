@@ -429,6 +429,7 @@ func TestCloneSchematicFileAccountsForEveryField(t *testing.T) {
 
 func TestClonePCBFootprintAccountsForEveryField(t *testing.T) {
 	accounted := map[string]struct{}{
+		"Raw":                           {},
 		"UUID":                          {},
 		"Path":                          {},
 		"LibraryID":                     {},
