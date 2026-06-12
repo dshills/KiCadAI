@@ -363,7 +363,7 @@ func TestRunHelpIncludesStructuredCommandFamilies(t *testing.T) {
 	if err := run([]string{"help"}, &stdout, &stderr); err != nil {
 		t.Fatalf("run returned error: %v", err)
 	}
-	for _, want := range []string{"inspect", "evaluate", "pinmap", "transaction", "roundtrip", "export", "generate"} {
+	for _, want := range []string{"inspect", "evaluate", "pinmap", "transaction", "roundtrip", "export", "generate", "block"} {
 		if !strings.Contains(stdout.String(), want) {
 			t.Fatalf("help missing %q:\n%s", want, stdout.String())
 		}
@@ -383,6 +383,68 @@ func TestRunStructuredCommandRequiresJSON(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("expected no stdout, got %s", stdout.String())
+	}
+}
+
+func TestRunBlockRequiresJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"block", "list"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "block requires --json") {
+		t.Fatalf("err = %v stdout=%s", err, stdout.String())
+	}
+}
+
+func TestRunBlockListShowValidate(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--json", "block", "list"}, &stdout, &stderr); err != nil {
+		t.Fatalf("list err = %v stdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"id": "connector_breakout"`) || !strings.Contains(stdout.String(), `"id": "led_indicator"`) {
+		t.Fatalf("unexpected list output: %s", stdout.String())
+	}
+
+	stdout.Reset()
+	if err := run([]string{"--json", "block", "show", "led_indicator"}, &stdout, &stderr); err != nil {
+		t.Fatalf("show err = %v stdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"name": "LED Indicator"`) || !strings.Contains(stdout.String(), `"required_libraries"`) {
+		t.Fatalf("unexpected show output: %s", stdout.String())
+	}
+
+	request := filepath.Join(t.TempDir(), "request.json")
+	if err := os.WriteFile(request, []byte(`{"block_id":"led_indicator","instance_id":"status","params":{"active_high":true}}`), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	stdout.Reset()
+	if err := run([]string{"--json", "--request", request, "block", "validate", "led_indicator"}, &stdout, &stderr); err != nil {
+		t.Fatalf("validate err = %v stdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"ok": true`) || !strings.Contains(stdout.String(), `"block_id": "led_indicator"`) {
+		t.Fatalf("unexpected validate output: %s", stdout.String())
+	}
+}
+
+func TestRunBlockReportsStructuredFailures(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "block", "show", "missing_block"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(stdout.String(), `"code": "MISSING_FILE"`) {
+		t.Fatalf("missing err = %v stdout=%s", err, stdout.String())
+	}
+
+	stdout.Reset()
+	request := filepath.Join(t.TempDir(), "request.json")
+	if err := os.WriteFile(request, []byte(`{"block_id":"led_indicator","params":{"active_high":"yes"}}`), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	err = run([]string{"--json", "--request", request, "block", "validate", "led_indicator"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(stdout.String(), `"code": "VALIDATION_FAILED"`) || !strings.Contains(stdout.String(), "active_high must be a bool") {
+		t.Fatalf("invalid err = %v stdout=%s", err, stdout.String())
 	}
 }
 

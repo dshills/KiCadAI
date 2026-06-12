@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"golang.org/x/text/unicode/norm"
+	"kicadai/internal/blocks"
 	"kicadai/internal/config"
 	"kicadai/internal/evaluate"
 	breakoutgen "kicadai/internal/generate"
@@ -46,6 +47,7 @@ Commands:
   generate-led-demo Generate a direct-file LED indicator KiCad project
   generate-project  Generate a direct-file LED indicator KiCad project
   generate      Generate projects from structured requests
+  block         List, inspect, and validate built-in circuit blocks
   inspect       Inspect KiCad projects and files
   library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
@@ -217,6 +219,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runStructuredCommandSkeleton(opts, command, stdout)
 	case "generate":
 		return runGenerate(opts, stdout)
+	case "block":
+		return runBlock(opts, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
@@ -356,6 +360,125 @@ func runGenerateBreakout(opts cliOptions, stdout io.Writer) error {
 		return errors.New("generate breakout failed")
 	}
 	return nil
+}
+
+func runBlock(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("block requires --json in this implementation phase")
+	}
+	if len(opts.commandArgs) == 0 {
+		return writeBlockFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "block",
+			Message:  "block requires a subcommand",
+		})
+	}
+	registry := blocks.NewBuiltinRegistry()
+	subcommand := opts.commandArgs[0]
+	switch subcommand {
+	case "list":
+		if len(opts.commandArgs) != 1 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("list", 0))
+		}
+		return writeBlockResult(stdout, registry.ListBlocks(), nil)
+	case "show":
+		if len(opts.commandArgs) != 2 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("show", 1))
+		}
+		id := opts.commandArgs[1]
+		definition, ok := registry.GetBlock(id)
+		if !ok {
+			return writeBlockResult(stdout, nil, []reports.Issue{missingBlockIssue(id)})
+		}
+		return writeBlockResult(stdout, definition, nil)
+	case "validate":
+		if len(opts.commandArgs) != 2 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("validate", 1))
+		}
+		id := opts.commandArgs[1]
+		request, err := blockRequestFromOptions(opts, id)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "request",
+				Message:  err.Error(),
+			})
+		}
+		issues := registry.ValidateRequest(request)
+		return writeBlockResult(stdout, request, issues)
+	default:
+		return writeBlockFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "block." + subcommand,
+			Message:  "unsupported block subcommand " + subcommand,
+		})
+	}
+}
+
+func blockRequestFromOptions(opts cliOptions, id string) (blocks.BlockRequest, error) {
+	if strings.TrimSpace(opts.requestPath) == "" {
+		return blocks.BlockRequest{BlockID: id}, nil
+	}
+	data, err := os.ReadFile(opts.requestPath)
+	if err != nil {
+		return blocks.BlockRequest{}, err
+	}
+	var request blocks.BlockRequest
+	if err := json.Unmarshal(data, &request); err != nil {
+		return blocks.BlockRequest{}, err
+	}
+	if request.BlockID == "" {
+		request.BlockID = id
+	}
+	if request.BlockID != id {
+		return blocks.BlockRequest{}, fmt.Errorf("request block_id %q does not match command block ID %q", request.BlockID, id)
+	}
+	return request, nil
+}
+
+func writeBlockResult(stdout io.Writer, data any, issues []reports.Issue) error {
+	result := reports.ResultWithIssues("block", data, issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("block command failed")
+	}
+	return nil
+}
+
+func writeBlockFailure(stdout io.Writer, issue reports.Issue) error {
+	if err := writeReportJSON(stdout, reports.ErrorResult("block", issue)); err != nil {
+		return err
+	}
+	return errors.New(issue.Message)
+}
+
+func missingBlockIssue(id string) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeMissingFile,
+		Severity: reports.SeverityError,
+		Path:     "block_id",
+		Message:  "block not found: " + id,
+	}
+}
+
+func invalidBlockArgCountIssue(subcommand string, required int) reports.Issue {
+	message := fmt.Sprintf("block %s requires %d argument(s)", subcommand, required)
+	if required == 0 {
+		message = "block " + subcommand + " does not accept arguments"
+	} else if required == 1 {
+		message = "block " + subcommand + " requires 1 argument"
+	}
+	return reports.Issue{
+		Code:     reports.CodeInvalidArgument,
+		Severity: reports.SeverityError,
+		Path:     "block." + subcommand,
+		Message:  message,
+	}
 }
 
 type libraryIndexData struct {
