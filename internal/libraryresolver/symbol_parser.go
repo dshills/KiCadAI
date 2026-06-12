@@ -248,12 +248,3 @@ func hasChildOrAtom(node sexpr.ParsedNode, value string) bool {
 	}
 	return false
 }
-
-func parseIssue(path string, message string) reports.Issue {
-	return reports.Issue{
-		Code:     reports.CodeValidationFailed,
-		Severity: reports.SeverityWarning,
-		Path:     filepath.ToSlash(path),
-		Message:  message,
-	}
-}

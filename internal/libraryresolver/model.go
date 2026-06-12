@@ -109,6 +109,7 @@ type FootprintPad struct {
 	Type        string                  `json:"type,omitempty"`
 	Shape       string                  `json:"shape,omitempty"`
 	Position    kicadfiles.Point        `json:"position"`
+	Rotation    float64                 `json:"rotation,omitempty"`
 	Size        kicadfiles.Point        `json:"size"`
 	Drill       kicadfiles.IU           `json:"drill,omitempty"`
 	Layers      []kicadfiles.BoardLayer `json:"layers,omitempty"`
