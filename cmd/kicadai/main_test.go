@@ -243,17 +243,52 @@ func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := run([]string{"--json", "inspect", "project", "demo"}, &stdout, &stderr)
+	err := run([]string{"--json", "evaluate", "project", "demo"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error")
 	}
 	output := stdout.String()
 	for _, want := range []string{
 		`"ok": false`,
-		`"command": "inspect"`,
+		`"command": "evaluate"`,
 		`"code": "UNSUPPORTED_OPERATION"`,
 		`"severity": "blocked"`,
-		`"inspect command family is not implemented yet"`,
+		`"evaluate command family is not implemented yet"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunInspectProjectJSON(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_sch"), []byte(`(kicad_sch (version 20260306) (symbol))`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pcb"), []byte(`(kicad_pcb (gr_rect (layer "Edge.Cuts")) (footprint "Test:One" (pad "1" smd rect (layers "F.Cu"))))`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "inspect", "project", root}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "inspect"`,
+		`"name": "demo"`,
+		`"symbol_count": 1`,
+		`"footprint_count": 1`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)

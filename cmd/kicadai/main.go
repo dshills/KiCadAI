@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/config"
+	"kicadai/internal/inspect"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
@@ -156,7 +157,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return a.runDrawLEDDemo(opts, stdout)
 	case "generate-led-demo", "generate-project":
 		return a.runGenerateLEDDemo(opts, stdout)
-	case "evaluate", "export", "generate", "inspect", "roundtrip", "transaction":
+	case "inspect":
+		return runInspect(opts, stdout)
+	case "evaluate", "export", "generate", "roundtrip", "transaction":
 		return runStructuredCommandSkeleton(opts, command, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
@@ -224,6 +227,57 @@ func runStructuredCommandSkeleton(opts cliOptions, command string, stdout io.Wri
 		Path:     command,
 		Message:  command + " command family is not implemented yet",
 	})
+}
+
+func runInspect(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("inspect requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("inspect", opts.commandArgs); !ok {
+		return writeReportFailure(stdout, "inspect", issue)
+	}
+	if len(opts.commandArgs) < 2 {
+		return writeReportFailure(stdout, "inspect", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "inspect",
+			Message:  "inspect requires a subcommand and target path",
+		})
+	}
+	kind := opts.commandArgs[0]
+	target := opts.commandArgs[1]
+	var (
+		data any
+		err  error
+	)
+	switch kind {
+	case "project":
+		data, err = inspect.Project(target)
+	case "schematic":
+		data, err = inspect.Schematic(target)
+	case "pcb":
+		data, err = inspect.PCB(target)
+	default:
+		return writeReportFailure(stdout, "inspect", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "inspect." + kind,
+			Message:  "unsupported inspect subcommand " + kind,
+		})
+	}
+	if err != nil {
+		issue := reports.Issue{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "inspect." + kind,
+			Message:  err.Error(),
+		}
+		if errors.Is(err, os.ErrNotExist) {
+			issue.Code = reports.CodeMissingFile
+		}
+		return writeReportFailure(stdout, "inspect", issue)
+	}
+	return writeReportJSON(stdout, reports.OKResult("inspect", data, nil))
 }
 
 func writeReportFailure(stdout io.Writer, command string, issue reports.Issue) error {
