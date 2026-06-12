@@ -59,17 +59,18 @@ func compareSymbolFootprint(symbol SymbolRecord, footprint FootprintRecord) Comp
 
 func compareSymbolFootprintWithPins(symbol SymbolRecord, electricalPins []SymbolPin, symbolPackageSearch string, footprint FootprintRecord) CompatibilityResult {
 	result := CompatibilityResult{SymbolID: symbol.LibraryID, FootprintID: footprint.FootprintID, Status: CompatibilityNeedsVerification}
-	if len(footprint.Pads) == 0 && len(electricalPins) > 0 {
+	mappedPins := uniquePinmapPins(electricalPins)
+	if len(footprint.Pads) == 0 && len(mappedPins) > 0 {
 		result.Status = CompatibilityIncompatible
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "library.compatibility", Message: "footprint has no pads for electrical symbol pins"})
 		return result
 	}
-	if len(footprint.Pads) < len(electricalPins) {
+	if uniquePadDesignatorCount(footprint.Pads) < len(mappedPins) {
 		result.Status = CompatibilityIncompatible
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "library.compatibility", Message: "footprint has fewer pads than symbol electrical pins"})
 		return result
 	}
-	missingPins := missingPadNames(electricalPins, footprint.Pads)
+	missingPins := missingPadNames(mappedPins, footprint.Pads)
 	if len(missingPins) > 0 {
 		result.Status = CompatibilityIncompatible
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "library.compatibility", Message: "footprint is missing pads for symbol pins: " + strings.Join(missingPins, ", ")})
@@ -85,7 +86,7 @@ func compareSymbolFootprintWithPins(symbol SymbolRecord, electricalPins []Symbol
 		result.Score += 0.2
 		result.Evidence = append(result.Evidence, CompatibilityEvidence{Kind: "package_family", Message: "symbol and footprint names share a package family hint", Score: 0.2})
 	}
-	if trustedPassiveMatch(electricalPins, footprint.Pads) && result.Score >= 0.7 {
+	if trustedPassiveMatch(mappedPins, footprint.Pads) && result.Score >= 0.7 {
 		result.Status = CompatibilityCompatible
 		return result
 	}

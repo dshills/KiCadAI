@@ -72,10 +72,14 @@ func compatibilityFixture(t *testing.T) LibraryIndex {
 	symbols := filepath.Join(root, "symbols")
 	footprints := filepath.Join(root, "footprints")
 	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), compatibilitySymbolLibrary())
+	mustWrite(t, filepath.Join(symbols, "Connector.kicad_sym"), connectorSymbolLibrary())
 	mustWrite(t, filepath.Join(footprints, "Resistor_SMD.pretty", "R_0805_2012Metric.kicad_mod"), resistor0805Footprint())
 	mustWrite(t, filepath.Join(footprints, "Package_SO.pretty", "SOIC-8.kicad_mod"), soic8Footprint())
 	mustWrite(t, filepath.Join(footprints, "Package_TO_SOT_THT.pretty", "TO-92.kicad_mod"), to92Footprint())
 	mustWrite(t, filepath.Join(footprints, "Bad.pretty", "MissingPin.kicad_mod"), missingPinFootprint())
+	mustWrite(t, filepath.Join(footprints, "Connector_PinHeader_2.54mm.pretty", "PinHeader_1x02_P2.54mm_Vertical.kicad_mod"), pinHeader1x02Footprint())
+	mustWrite(t, filepath.Join(footprints, "Duplicate.pretty", "DupPads.kicad_mod"), duplicatePadsFootprint())
+	mustWrite(t, filepath.Join(footprints, "Function.pretty", "FuncPads.kicad_mod"), functionPadsFootprint())
 	index, issues := Load(context.Background(), LibraryRoots{SymbolsRoot: symbols, FootprintsRoot: footprints}, LoadOptions{})
 	for _, issue := range issues {
 		if issue.Blocking() {
@@ -124,6 +128,46 @@ func compatibilitySymbolLibrary() string {
       (pin power_in line (at 0 5.08 270) (length 2.54) hide (name "VCC") (number "8"))
     )
   )
+  (symbol "STACKED"
+    (property "Reference" "U" (at 0 0 0))
+    (property "Value" "STACKED" (at 0 -2.54 0))
+    (ki_keywords "stacked pins")
+    (ki_description "Symbol with stacked duplicate pin numbers")
+    (symbol "STACKED_1_1"
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "A") (number "1"))
+      (pin passive line (at -5.08 2.54 0) (length 2.54) (name "A_ALT") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "B") (number "2"))
+    )
+  )
+  (symbol "FUNC"
+    (property "Reference" "U" (at 0 0 0))
+    (property "Value" "FUNC" (at 0 -2.54 0))
+    (ki_keywords "function pin hints")
+    (ki_description "Symbol with nonnumeric pin designators")
+    (symbol "FUNC_1_1"
+      (pin input line (at -5.08 0 0) (length 2.54) (name "IN") (number "A"))
+      (pin output line (at 5.08 0 180) (length 2.54) (name "OUT") (number "Y"))
+    )
+  )
+)`
+}
+
+func connectorSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Conn_01x02"
+    (property "Reference" "J" (at 0 0 0))
+    (property "Value" "Conn_01x02" (at 0 -2.54 0))
+    (ki_keywords "connector")
+    (ki_description "Generic connector, single row, 01x02")
+    (ki_fp_filters "PinHeader_1x02*")
+    (symbol "Conn_01x02_1_1"
+      (pin passive line (at -5.08 2.54 0) (length 2.54) (name "Pin_1") (number "1"))
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "Pin_2") (number "2"))
+    )
+  )
 )`
 }
 
@@ -157,5 +201,32 @@ func missingPinFootprint() string {
 (footprint "MissingPin"
   (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))
   (pad "3" smd rect (at 1 0) (size 1 1) (layers "F.Cu"))
+)`
+}
+
+func pinHeader1x02Footprint() string {
+	return `
+(footprint "PinHeader_1x02_P2.54mm_Vertical"
+  (descr "Through hole straight pin header, 1x02")
+  (tags "connector pin header")
+  (pad "1" thru_hole rect (at 0 0) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
+  (pad "2" thru_hole oval (at 0 2.54) (size 1.7 1.7) (drill 1) (layers "*.Cu" "*.Mask"))
+)`
+}
+
+func duplicatePadsFootprint() string {
+	return `
+(footprint "DupPads"
+  (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu"))
+  (pad "1" smd rect (at 0 1) (size 1 1) (layers "F.Cu"))
+  (pad "2" smd rect (at 1 0) (size 1 1) (layers "F.Cu"))
+)`
+}
+
+func functionPadsFootprint() string {
+	return `
+(footprint "FuncPads"
+  (pad "P1" smd rect (at 0 0) (size 1 1) (layers "F.Cu") (pinfunction "IN"))
+  (pad "P2" smd rect (at 1 0) (size 1 1) (layers "F.Cu") (pinfunction "OUT"))
 )`
 }
