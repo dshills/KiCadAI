@@ -3,6 +3,8 @@ package inspect
 import (
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"testing"
 
 	"kicadai/internal/manifest"
@@ -97,13 +99,12 @@ func TestProjectReportsManifestStatus(t *testing.T) {
 	}
 }
 
-func TestPCBSummaryUsesCorpusScanner(t *testing.T) {
+func TestPCBSummaryUsesReader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "board.kicad_pcb")
 	writeFile(t, path, `(kicad_pcb
   (net 0 "")
   (footprint "Test:One"
-    (pad "1" smd roundrect (layers "F.Cu" "F.Mask"))
-    (teardrops)
+    (pad "1" smd roundrect (at 0 0) (layers "F.Cu" "F.Mask"))
   )
   (segment (start 0 0) (end 1 0) (layer "F.Cu"))
   (via (at 1 0))
@@ -121,15 +122,12 @@ func TestPCBSummaryUsesCorpusScanner(t *testing.T) {
 	if len(summary.Unsupported) != 1 || summary.Unsupported[0].Kind != "future_widget" {
 		t.Fatalf("unexpected unsupported nodes: %#v", summary.Unsupported)
 	}
-	if len(summary.PreservationOnly) != 1 || summary.PreservationOnly[0].Kind != "teardrops" {
-		t.Fatalf("unexpected preservation nodes: %#v", summary.PreservationOnly)
-	}
 	if len(summary.Issues) != 1 || summary.Issues[0].Code != reports.CodeMissingBoardOutline {
 		t.Fatalf("expected missing board outline warning, got %#v", summary.Issues)
 	}
 }
 
-func TestSchematicSummaryIsShallow(t *testing.T) {
+func TestSchematicSummaryUsesReader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
 	writeFile(t, path, `(kicad_sch
   (version 20260306)
@@ -153,8 +151,8 @@ func TestSchematicSummaryIsShallow(t *testing.T) {
 	if summary.SymbolCount != 1 || summary.WireCount != 1 || summary.LabelCount != 2 || summary.JunctionCount != 1 || summary.NoConnectCount != 1 || summary.SheetCount != 1 {
 		t.Fatalf("unexpected schematic counts: %#v", summary)
 	}
-	if summary.InspectionDepth != "shallow" || len(summary.Issues) != 1 || summary.Issues[0].Severity != reports.SeverityWarning {
-		t.Fatalf("expected shallow warning, got %#v", summary)
+	if summary.InspectionDepth != "structured" || len(summary.Issues) != 0 {
+		t.Fatalf("expected structured summary, got %#v", summary)
 	}
 }
 
@@ -213,6 +211,78 @@ func TestSchematicMetadataSkipsCommentsBeforeScalar(t *testing.T) {
 	}
 	if summary.FormatVersion != "20260306" || summary.Generator != "kicadai" {
 		t.Fatalf("metadata = version %q generator %q", summary.FormatVersion, summary.Generator)
+	}
+}
+
+func TestSchematicSummaryReportsUnsupportedAndTruncates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "many.kicad_sch")
+	var builder strings.Builder
+	builder.WriteString(`(kicad_sch (version 20260306) (generator "kicadai")`)
+	for i := 0; i < inspectSampleLimit+1; i++ {
+		builder.WriteString(` (symbol (lib_id "Device:R") (property "Reference" "R`)
+		builder.WriteString(strconv.Itoa(i))
+		builder.WriteString(`"))`)
+	}
+	builder.WriteString(` (rule_area (uuid "22222222-2222-5222-8222-222222222222"))`)
+	builder.WriteString(`)`)
+	writeFile(t, path, builder.String())
+
+	summary, err := Schematic(path)
+	if err != nil {
+		t.Fatalf("Schematic returned error: %v", err)
+	}
+	if !summary.Truncated || len(summary.Symbols) != inspectSampleLimit {
+		t.Fatalf("expected truncated symbols, got %#v", summary)
+	}
+	if len(summary.Unsupported) != 1 || summary.Unsupported[0].Kind != "rule_area" {
+		t.Fatalf("expected unsupported rule_area, got %#v", summary.Unsupported)
+	}
+}
+
+func TestPCBSummaryUsesReaderSamplesAndTruncates(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "many.kicad_pcb")
+	var builder strings.Builder
+	builder.WriteString(`(kicad_pcb (version 20260206) (generator "pcbnew") (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user)) (setup)`)
+	for i := 0; i < inspectSampleLimit+1; i++ {
+		builder.WriteString(` (footprint "Test:One" (property "Reference" "J`)
+		builder.WriteString(strconv.Itoa(i))
+		builder.WriteString(`") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "NET`)
+		builder.WriteString(strconv.Itoa(i))
+		builder.WriteString(`")))`)
+	}
+	builder.WriteString(` (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))`)
+	builder.WriteString(`)`)
+	writeFile(t, path, builder.String())
+
+	summary, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	if !summary.Truncated || len(summary.Footprints) != inspectSampleLimit || len(summary.Nets) != inspectSampleLimit {
+		t.Fatalf("expected truncated PCB samples, got %#v", summary)
+	}
+	if !summary.HasBoardOutline {
+		t.Fatalf("expected board outline: %#v", summary)
+	}
+}
+
+func TestPCBSummarySamplesZoneNets(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "zone.kicad_pcb")
+	writeFile(t, path, strings.Join([]string{
+		`(kicad_pcb`,
+		`  (version 20260206)`,
+		`  (generator "pcbnew")`,
+		`  (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user))`,
+		`  (setup)`,
+		`  (zone (net_name "GND") (uuid "22222222-2222-5222-8222-222222222222"))`,
+		`)`,
+	}, "\n"))
+	summary, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	if len(summary.Nets) != 1 || summary.Nets[0] != "GND" {
+		t.Fatalf("expected zone net sample, got %#v", summary.Nets)
 	}
 }
 

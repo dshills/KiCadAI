@@ -38,6 +38,8 @@ type SchematicSummary struct {
 	JunctionCount    int               `json:"junction_count"`
 	NoConnectCount   int               `json:"no_connect_count"`
 	SheetCount       int               `json:"sheet_count"`
+	Symbols          []string          `json:"symbols,omitempty"`
+	Truncated        bool              `json:"truncated,omitempty"`
 	ObjectCounts     map[string]int    `json:"object_counts,omitempty"`
 	InspectionDepth  string            `json:"inspection_depth"`
 	Unsupported      []UnsupportedNode `json:"unsupported,omitempty"`
@@ -57,6 +59,9 @@ type PCBSummary struct {
 	DrawingCount     int               `json:"drawing_count"`
 	DimensionCount   int               `json:"dimension_count"`
 	HasBoardOutline  bool              `json:"has_board_outline"`
+	Nets             []string          `json:"nets,omitempty"`
+	Footprints       []string          `json:"footprints,omitempty"`
+	Truncated        bool              `json:"truncated,omitempty"`
 	ObjectCounts     map[string]int    `json:"object_counts,omitempty"`
 	LayerUsage       map[string]int    `json:"layer_usage,omitempty"`
 	Unsupported      []UnsupportedNode `json:"unsupported,omitempty"`

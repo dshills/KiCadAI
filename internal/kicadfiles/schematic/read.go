@@ -64,8 +64,10 @@ func Read(data []byte) (SchematicFile, error) {
 			file.Labels = append(file.Labels, readLabel(child, LabelHierarchical))
 		case "junction":
 			file.Junctions = append(file.Junctions, Junction{UUID: readUUID(child), Position: readAtPoint(child)})
+		case "no_connect":
+			file.NoConnects = append(file.NoConnects, NoConnect{UUID: readUUID(child), Position: readAtPoint(child)})
 		case "sheet":
-			file.RawItems = append(file.RawItems, rawItem(child, i))
+			file.Sheets = append(file.Sheets, readSheet(child))
 		case "lib_symbols":
 			file.LibSymbols = readLibSymbols(child)
 		case "version", "generator", "generator_version", "uuid", "paper", "title_block", "sheet_instances":
@@ -76,6 +78,24 @@ func Read(data []byte) (SchematicFile, error) {
 		}
 	}
 	return file, nil
+}
+
+func readSheet(node sexpr.ParsedNode) Sheet {
+	sheet := Sheet{UUID: readUUID(node), Position: readAtPoint(node)}
+	for _, property := range node.ChildrenByHead("property") {
+		if len(property.Children) < 3 {
+			continue
+		}
+		prop := Property{Name: property.ListValue(1), Value: property.ListValue(2), Position: readAtPoint(property)}
+		sheet.Properties = append(sheet.Properties, prop)
+		switch prop.Name {
+		case "Sheetname":
+			sheet.Name = prop.Value
+		case "Sheetfile":
+			sheet.Filename = prop.Value
+		}
+	}
+	return sheet
 }
 
 func readLibSymbols(node sexpr.ParsedNode) []EmbeddedSymbol {

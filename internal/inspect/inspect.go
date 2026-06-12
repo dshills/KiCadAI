@@ -9,10 +9,13 @@ import (
 	"sort"
 	"strings"
 
-	"kicadai/internal/kicadfiles/pcb"
+	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	schematicfiles "kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
+
+const inspectSampleLimit = 20
 
 func Project(path string) (ProjectSummary, error) {
 	if strings.TrimSpace(path) == "" {
@@ -98,26 +101,55 @@ func PCB(path string) (PCBSummary, error) {
 	if strings.TrimSpace(path) == "" {
 		return PCBSummary{}, fmt.Errorf("pcb path required")
 	}
-	report, err := pcb.ScanCorpus(path)
+	board, err := pcbfiles.ReadFile(path)
 	if err != nil {
 		return PCBSummary{}, err
 	}
+	layerUsage := map[string]int{}
+	unsupported := pcbUnsupported(board.Preserved)
+	preservationOnly := []UnsupportedNode{}
+	objectCounts := map[string]int{
+		"footprint": len(board.Footprints),
+		"segment":   len(board.Tracks) + len(board.TrackArcs),
+		"via":       len(board.Vias),
+		"zone":      len(board.Zones),
+		"drawing":   len(board.Drawings),
+		"dimension": len(board.Dimensions),
+	}
+	padCount := 0
+	for _, footprint := range board.Footprints {
+		padCount += len(footprint.Pads)
+	}
+	outline := false
+	for _, drawing := range board.Drawings {
+		if drawing.Layer != "" {
+			layerUsage[string(drawing.Layer)]++
+		}
+		if drawing.Layer == "Edge.Cuts" {
+			outline = true
+		}
+	}
+	nets, netsTruncated := boundedStrings(boardNetNames(board), inspectSampleLimit)
+	footprints, footprintsTruncated := boundedStrings(boardFootprintRefs(board), inspectSampleLimit)
 	summary := PCBSummary{
 		Path:             path,
-		FilesScanned:     report.Files,
-		NetCount:         report.TopLevelObjects["net"],
-		FootprintCount:   report.TopLevelObjects["footprint"],
-		PadCount:         report.FootprintChildTypes["pad"],
-		TrackCount:       report.TopLevelObjects["segment"] + report.TopLevelObjects["arc"],
-		ViaCount:         report.TopLevelObjects["via"],
-		ZoneCount:        report.TopLevelObjects["zone"],
-		DrawingCount:     report.TopLevelObjects["gr_line"] + report.TopLevelObjects["gr_rect"] + report.TopLevelObjects["gr_circle"] + report.TopLevelObjects["gr_arc"] + report.TopLevelObjects["gr_poly"] + report.TopLevelObjects["gr_text"],
-		DimensionCount:   report.SupportedObjects["dimension"],
-		HasBoardOutline:  report.LayerUsage["Edge.Cuts"] > 0,
-		ObjectCounts:     copyCounts(report.ObjectCount),
-		LayerUsage:       copyCounts(report.LayerUsage),
-		Unsupported:      unsupportedNodes(report.UnsupportedObjects),
-		PreservationOnly: unsupportedNodes(report.PreservationOnly),
+		FilesScanned:     1,
+		NetCount:         len(board.Nets),
+		FootprintCount:   len(board.Footprints),
+		PadCount:         padCount,
+		TrackCount:       len(board.Tracks) + len(board.TrackArcs),
+		ViaCount:         len(board.Vias),
+		ZoneCount:        len(board.Zones),
+		DrawingCount:     len(board.Drawings),
+		DimensionCount:   len(board.Dimensions),
+		HasBoardOutline:  outline,
+		Nets:             nets,
+		Footprints:       footprints,
+		Truncated:        netsTruncated || footprintsTruncated,
+		ObjectCounts:     objectCounts,
+		LayerUsage:       layerUsage,
+		Unsupported:      unsupported,
+		PreservationOnly: preservationOnly,
 		Issues:           []reports.Issue{},
 	}
 	if !summary.HasBoardOutline {
@@ -135,33 +167,38 @@ func Schematic(path string) (SchematicSummary, error) {
 	if strings.TrimSpace(path) == "" {
 		return SchematicSummary{}, fmt.Errorf("schematic path required")
 	}
-	file, err := os.Open(path)
+	file, err := schematicfiles.ReadFile(path)
 	if err != nil {
 		return SchematicSummary{}, err
 	}
-	defer file.Close()
-	scan, err := scanSchematic(file)
-	if err != nil {
-		return SchematicSummary{}, err
+	symbols, truncated := boundedStrings(schematicSymbolRefs(file), inspectSampleLimit)
+	objectCounts := map[string]int{
+		"symbol":       len(file.Symbols),
+		"wire":         len(file.Wires),
+		"label":        len(file.Labels),
+		"junction":     len(file.Junctions),
+		"no_connect":   len(file.NoConnects),
+		"sheet":        len(file.Sheets),
+		"raw_item":     len(file.RawItems),
+		"lib_symbols":  len(file.LibSymbols),
+		"sheet_symbol": len(file.SheetInstances),
 	}
 	summary := SchematicSummary{
 		Path:            path,
-		FormatVersion:   scan.Metadata["version"],
-		Generator:       scan.Metadata["generator"],
-		SymbolCount:     scan.Counts["symbol"],
-		WireCount:       scan.Counts["wire"],
-		LabelCount:      scan.Counts["label"] + scan.Counts["global_label"] + scan.Counts["hierarchical_label"],
-		JunctionCount:   scan.Counts["junction"],
-		NoConnectCount:  scan.Counts["no_connect"],
-		SheetCount:      scan.Counts["sheet"],
-		ObjectCounts:    scan.Counts,
-		InspectionDepth: "shallow",
-		Issues: []reports.Issue{{
-			Code:     reports.CodeUnsupportedOperation,
-			Severity: reports.SeverityWarning,
-			Path:     "schematic",
-			Message:  "full structured schematic reader is not implemented; summary uses shallow object counts",
-		}},
+		FormatVersion:   string(file.Version),
+		Generator:       file.Generator,
+		SymbolCount:     len(file.Symbols),
+		WireCount:       len(file.Wires),
+		LabelCount:      len(file.Labels),
+		JunctionCount:   len(file.Junctions),
+		NoConnectCount:  len(file.NoConnects),
+		SheetCount:      len(file.Sheets),
+		Symbols:         symbols,
+		Truncated:       truncated,
+		ObjectCounts:    objectCounts,
+		InspectionDepth: "structured",
+		Unsupported:     schematicUnsupported(file.RawItems),
+		Issues:          []reports.Issue{},
 	}
 	return summary, nil
 }
@@ -198,6 +235,106 @@ func copyCounts(source map[string]int) map[string]int {
 		}
 	}
 	return result
+}
+
+func boundedStrings(values []string, limit int) ([]string, bool) {
+	if len(values) == 0 {
+		return nil, false
+	}
+	values = append([]string(nil), values...)
+	sort.Strings(values)
+	if len(values) <= limit {
+		return values, false
+	}
+	return append([]string(nil), values[:limit]...), true
+}
+
+func boardNetNames(board pcbfiles.PCBFile) []string {
+	seen := map[string]struct{}{}
+	for _, net := range board.Nets {
+		if net.Name != "" {
+			seen[net.Name] = struct{}{}
+		}
+	}
+	for _, track := range board.Tracks {
+		if track.NetName != "" {
+			seen[track.NetName] = struct{}{}
+		}
+	}
+	for _, arc := range board.TrackArcs {
+		if arc.NetName != "" {
+			seen[arc.NetName] = struct{}{}
+		}
+	}
+	for _, zone := range board.Zones {
+		if zone.NetName != "" {
+			seen[zone.NetName] = struct{}{}
+		}
+	}
+	for _, footprint := range board.Footprints {
+		for _, pad := range footprint.Pads {
+			if pad.NetName != "" {
+				seen[pad.NetName] = struct{}{}
+			}
+		}
+	}
+	values := make([]string, 0, len(seen))
+	for value := range seen {
+		values = append(values, value)
+	}
+	return values
+}
+
+func boardFootprintRefs(board pcbfiles.PCBFile) []string {
+	values := make([]string, 0, len(board.Footprints))
+	for _, footprint := range board.Footprints {
+		label := footprint.Reference
+		if label == "" {
+			label = footprint.LibraryID
+		}
+		if label != "" {
+			values = append(values, label)
+		}
+	}
+	return values
+}
+
+func schematicSymbolRefs(file schematicfiles.SchematicFile) []string {
+	values := make([]string, 0, len(file.Symbols))
+	for _, symbol := range file.Symbols {
+		label := symbol.Reference
+		if label == "" {
+			label = symbol.LibraryID
+		}
+		if label != "" {
+			values = append(values, label)
+		}
+	}
+	return values
+}
+
+func schematicUnsupported(items []schematicfiles.RawSchematicItem) []UnsupportedNode {
+	counts := map[string]int{}
+	for _, item := range items {
+		kind := string(item.Kind)
+		if kind == "" {
+			kind = "raw_item"
+		}
+		counts[kind]++
+	}
+	return unsupportedNodes(counts)
+}
+
+func pcbUnsupported(items []pcbfiles.PreservedNode) []UnsupportedNode {
+	counts := map[string]int{}
+	for _, item := range items {
+		kind := item.Family
+		if kind == "" {
+			kind = "unknown"
+		}
+		counts[kind]++
+	}
+	return unsupportedNodes(counts)
 }
 
 func unsupportedNodes(counts map[string]int) []UnsupportedNode {
