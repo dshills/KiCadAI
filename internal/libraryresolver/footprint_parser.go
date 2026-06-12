@@ -1,6 +1,7 @@
 package libraryresolver
 
 import (
+	"context"
 	"math"
 	"os"
 	"path/filepath"
@@ -18,9 +19,16 @@ const maxFootprintLibraryBytes int64 = 64 << 20
 const maxFootprintNestedNumericDepth = 500
 
 func IndexFootprints(inventory LibraryInventory) (map[string]FootprintRecord, []reports.Issue) {
+	return IndexFootprintsContext(context.Background(), inventory)
+}
+
+func IndexFootprintsContext(ctx context.Context, inventory LibraryInventory) (map[string]FootprintRecord, []reports.Issue) {
 	records := make(map[string]FootprintRecord, len(inventory.FootprintFiles))
 	var issues []reports.Issue
-	results := parseFootprintFiles(inventory.FootprintFiles)
+	if issue, ok := contextIssue(ctx); ok {
+		return records, []reports.Issue{issue}
+	}
+	results := parseFootprintFiles(ctx, inventory.FootprintFiles)
 	for _, result := range results {
 		issues = append(issues, result.issues...)
 		if !result.ok {
@@ -37,6 +45,9 @@ func IndexFootprints(inventory LibraryInventory) (map[string]FootprintRecord, []
 		}
 		records[result.record.FootprintID] = result.record
 	}
+	if issue, ok := contextIssue(ctx); ok {
+		issues = append(issues, issue)
+	}
 	return records, issues
 }
 
@@ -46,10 +57,13 @@ type footprintParseResult struct {
 	ok     bool
 }
 
-func parseFootprintFiles(files []LibraryFile) []footprintParseResult {
+func parseFootprintFiles(ctx context.Context, files []LibraryFile) []footprintParseResult {
 	results := make([]footprintParseResult, len(files))
 	if len(files) == 0 {
 		return results
+	}
+	if ctx == nil {
+		ctx = context.Background()
 	}
 	workerCount := runtime.GOMAXPROCS(0)
 	if workerCount > len(files) {
@@ -62,13 +76,22 @@ func parseFootprintFiles(files []LibraryFile) []footprintParseResult {
 		go func() {
 			defer waitGroup.Done()
 			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
 				record, issues, ok := parseFootprintFile(files[index])
 				results[index] = footprintParseResult{record: record, issues: issues, ok: ok}
 			}
 		}()
 	}
 	for index := range files {
-		jobs <- index
+		select {
+		case jobs <- index:
+		case <-ctx.Done():
+			close(jobs)
+			waitGroup.Wait()
+			return results
+		}
 	}
 	close(jobs)
 	waitGroup.Wait()
@@ -194,6 +217,7 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 	sort.Strings(record.Attributes)
 	sort.Strings(record.Models)
 	record.BoundingBox = bounds.box()
+	record.SearchText = buildFootprintSearchText(record)
 	return record, issues
 }
 

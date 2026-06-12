@@ -31,6 +31,14 @@ type LibraryIndex struct {
 	Diagnostics []reports.Issue            `json:"diagnostics"`
 }
 
+type LoadSummary struct {
+	SymbolFileCount    int `json:"symbol_file_count"`
+	FootprintFileCount int `json:"footprint_file_count"`
+	SymbolCount        int `json:"symbol_count"`
+	FootprintCount     int `json:"footprint_count"`
+	DiagnosticCount    int `json:"diagnostic_count"`
+}
+
 type LibraryInventory struct {
 	SymbolFiles           []LibraryFile   `json:"symbol_files"`
 	FootprintFiles        []LibraryFile   `json:"footprint_files"`
@@ -67,6 +75,7 @@ type SymbolRecord struct {
 	Units           []SymbolUnit      `json:"units,omitempty"`
 	Pins            []SymbolPin       `json:"pins,omitempty"`
 	Raw             string            `json:"raw,omitempty"`
+	SearchText      string            `json:"-"`
 }
 
 type SymbolUnit struct {
@@ -102,6 +111,7 @@ type FootprintRecord struct {
 	Models          []string          `json:"models,omitempty"`
 	BoundingBox     BoundingBox       `json:"bounding_box"`
 	Raw             string            `json:"raw,omitempty"`
+	SearchText      string            `json:"-"`
 }
 
 type FootprintPad struct {

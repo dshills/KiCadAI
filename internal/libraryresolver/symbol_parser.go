@@ -1,11 +1,14 @@
 package libraryresolver
 
 import (
+	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/sexpr"
@@ -15,12 +18,19 @@ import (
 const maxSymbolLibraryBytes int64 = 64 << 20
 
 func IndexSymbols(inventory LibraryInventory) (map[string]SymbolRecord, []reports.Issue) {
-	records := map[string]SymbolRecord{}
+	return IndexSymbolsContext(context.Background(), inventory)
+}
+
+func IndexSymbolsContext(ctx context.Context, inventory LibraryInventory) (map[string]SymbolRecord, []reports.Issue) {
+	records := make(map[string]SymbolRecord, len(inventory.SymbolFiles)*20)
 	var issues []reports.Issue
-	for _, file := range inventory.SymbolFiles {
-		fileRecords, fileIssues := parseSymbolFile(file)
-		issues = append(issues, fileIssues...)
-		for _, record := range fileRecords {
+	if issue, ok := contextIssue(ctx); ok {
+		return records, []reports.Issue{issue}
+	}
+	results := parseSymbolFiles(ctx, inventory.SymbolFiles)
+	for _, result := range results {
+		issues = append(issues, result.issues...)
+		for _, record := range result.records {
 			if _, exists := records[record.LibraryID]; exists {
 				issues = append(issues, reports.Issue{
 					Code:     reports.CodeValidationFailed,
@@ -33,7 +43,56 @@ func IndexSymbols(inventory LibraryInventory) (map[string]SymbolRecord, []report
 			records[record.LibraryID] = record
 		}
 	}
+	if issue, ok := contextIssue(ctx); ok {
+		issues = append(issues, issue)
+	}
 	return records, issues
+}
+
+type symbolParseResult struct {
+	records []SymbolRecord
+	issues  []reports.Issue
+}
+
+func parseSymbolFiles(ctx context.Context, files []LibraryFile) []symbolParseResult {
+	results := make([]symbolParseResult, len(files))
+	if len(files) == 0 {
+		return results
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	workerCount := runtime.GOMAXPROCS(0)
+	if workerCount > len(files) {
+		workerCount = len(files)
+	}
+	jobs := make(chan int)
+	var waitGroup sync.WaitGroup
+	waitGroup.Add(workerCount)
+	for range workerCount {
+		go func() {
+			defer waitGroup.Done()
+			for index := range jobs {
+				if ctx.Err() != nil {
+					return
+				}
+				records, issues := parseSymbolFile(files[index])
+				results[index] = symbolParseResult{records: records, issues: issues}
+			}
+		}()
+	}
+	for index := range files {
+		select {
+		case jobs <- index:
+		case <-ctx.Done():
+			close(jobs)
+			waitGroup.Wait()
+			return results
+		}
+	}
+	close(jobs)
+	waitGroup.Wait()
+	return results
 }
 
 func ResolveSymbol(index LibraryIndex, libraryID string) (SymbolRecord, bool) {
@@ -105,6 +164,7 @@ func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) Sym
 	record.FootprintFilter = symbolTextValues(node, "ki_fp_filters")
 	record.Pins = collectSymbolPins(node, name, 1, 1)
 	record.Units = collectSymbolUnits(record.Pins)
+	record.SearchText = buildSymbolSearchText(record)
 	return record
 }
 

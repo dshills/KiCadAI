@@ -2,6 +2,7 @@ package libraryresolver
 
 import (
 	"cmp"
+	"context"
 	"io/fs"
 	slashpath "path"
 	"path/filepath"
@@ -13,6 +14,10 @@ import (
 )
 
 func Discover(roots LibraryRoots) LibraryInventory {
+	return DiscoverContext(context.Background(), roots)
+}
+
+func DiscoverContext(ctx context.Context, roots LibraryRoots) LibraryInventory {
 	var inventory LibraryInventory
 	inventory.Diagnostics = append(inventory.Diagnostics, ValidateRoots(roots)...)
 	var symbolFiles []LibraryFile
@@ -24,14 +29,14 @@ func Discover(roots LibraryRoots) LibraryInventory {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			symbolFiles, symbolIssues = discoverSymbols(roots.SymbolsRoot)
+			symbolFiles, symbolIssues = discoverSymbols(ctx, roots.SymbolsRoot)
 		}()
 	}
 	if strings.TrimSpace(roots.FootprintsRoot) != "" {
 		waitGroup.Add(1)
 		go func() {
 			defer waitGroup.Done()
-			footprintFiles, footprintIssues = discoverFootprints(roots.FootprintsRoot)
+			footprintFiles, footprintIssues = discoverFootprints(ctx, roots.FootprintsRoot)
 		}()
 	}
 	waitGroup.Wait()
@@ -49,19 +54,22 @@ func Discover(roots LibraryRoots) LibraryInventory {
 	return inventory
 }
 
-func discoverSymbols(root string) ([]LibraryFile, []reports.Issue) {
-	return discoverFiles(root, LibraryFileSymbol, ".kicad_sym", symbolLibraryNickname)
+func discoverSymbols(ctx context.Context, root string) ([]LibraryFile, []reports.Issue) {
+	return discoverFiles(ctx, root, LibraryFileSymbol, ".kicad_sym", symbolLibraryNickname)
 }
 
-func discoverFootprints(root string) ([]LibraryFile, []reports.Issue) {
-	return discoverFiles(root, LibraryFileFootprint, ".kicad_mod", footprintLibraryNickname)
+func discoverFootprints(ctx context.Context, root string) ([]LibraryFile, []reports.Issue) {
+	return discoverFiles(ctx, root, LibraryFileFootprint, ".kicad_mod", footprintLibraryNickname)
 }
 
-func discoverFiles(root string, kind LibraryFileKind, ext string, nicknameFn func(string, string, string) string) ([]LibraryFile, []reports.Issue) {
+func discoverFiles(ctx context.Context, root string, kind LibraryFileKind, ext string, nicknameFn func(string, string, string) string) ([]LibraryFile, []reports.Issue) {
 	var files []LibraryFile
 	var issues []reports.Issue
 	rootBase := cleanBase(root)
-	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+	walkErr := filepath.WalkDir(root, func(path string, entry fs.DirEntry, err error) error {
+		if ctx != nil && ctx.Err() != nil {
+			return ctx.Err()
+		}
 		if err != nil {
 			issues = append(issues, discoveryIssue(path, err))
 			return nil
@@ -81,8 +89,8 @@ func discoverFiles(root string, kind LibraryFileKind, ext string, nicknameFn fun
 		files = append(files, LibraryFile{Kind: kind, Path: filepath.ToSlash(path), LibraryNickname: nickname, Name: name, IDPrefix: nickname + ":"})
 		return nil
 	})
-	if err != nil {
-		issues = append(issues, discoveryIssue(root, err))
+	if walkErr != nil {
+		issues = append(issues, discoveryIssue(root, walkErr))
 	}
 	return files, issues
 }
