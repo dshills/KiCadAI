@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/reports"
 )
 
@@ -38,30 +39,51 @@ func PlanTransaction(target string, tx Transaction) Plan {
 	if projectName == "" {
 		projectName = "generated_design"
 	}
-	if existingProjectTarget(target) {
-		plan.Issues = append(plan.Issues, reports.Issue{
-			Code:       reports.CodeUnsupportedOperation,
-			Severity:   reports.SeverityBlocked,
-			Path:       "transaction.target",
-			Message:    "planning mutations against existing projects is blocked until readers are implemented",
-			Suggestion: "use an empty output directory for generated-project planning",
-		})
+	existingProject := existingProjectTarget(target)
+	var existing *kicaddesign.Design
+	if existingProject {
+		loaded, err := kicaddesign.ReadProjectDirectory(target)
+		if err != nil {
+			plan.Issues = append(plan.Issues, reports.Issue{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityBlocked,
+				Path:     "transaction.target",
+				Message:  err.Error(),
+			})
+		} else {
+			existing = &loaded
+		}
 	}
 	for i, op := range tx.Operations {
 		op.Index = i
 		planned := PlannedOperation{Index: i, Op: op.Op, Supported: supportedPlanOperation(op.Op)}
+		if existingProject {
+			planned.Supported = supportedExistingPlanOperation(op.Op)
+		}
 		plan.Issues = append(plan.Issues, populatePlanFields(&planned, op, target, projectName)...)
+		if existing != nil {
+			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, op)...)
+		}
 		if !planned.Supported {
 			plan.Issues = append(plan.Issues, reports.Issue{
 				Code:     reports.CodeUnsupportedOperation,
 				Severity: reports.SeverityBlocked,
 				Path:     "operations[" + strconv.Itoa(i) + "].op",
-				Message:  "operation " + string(op.Op) + " is not supported by generated-project planning",
+				Message:  "operation " + string(op.Op) + " is not supported by this planning mode",
 			})
 		}
 		plan.Operations = append(plan.Operations, planned)
 	}
 	return plan
+}
+
+func supportedExistingPlanOperation(kind OperationKind) bool {
+	switch kind {
+	case OpAddSymbol, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpWriteProject:
+		return true
+	default:
+		return false
+	}
 }
 
 func supportedPlanOperation(kind OperationKind) bool {
@@ -190,6 +212,108 @@ func existingProjectTarget(target string) bool {
 		}
 	}
 	return false
+}
+
+func existingProjectIssues(design kicaddesign.Design, op Operation) []reports.Issue {
+	var issues []reports.Issue
+	if touchesDesign(op.Op) && hasUnsupportedImportedContent(design) {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodePreservationConflict,
+			Severity: reports.SeverityBlocked,
+			Path:     "operations[" + strconv.Itoa(op.Index) + "]",
+			Message:  "existing project contains preserved unsupported content; mutation planning is blocked until preservation-aware apply is implemented",
+		})
+	}
+	switch op.Op {
+	case OpRemoveSymbol:
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeUnsafeRemove,
+			Severity: reports.SeverityBlocked,
+			Path:     "operations[" + strconv.Itoa(op.Index) + "]",
+			Message:  "removing symbols from imported projects is unsafe until dependency analysis is implemented",
+		})
+	case OpAssignFootprint:
+		var payload AssignFootprintOperation
+		if decodeRaw(op, &payload) == nil {
+			issues = append(issues, refIssues(design, op.Index, payload.Ref)...)
+		}
+	case OpPlaceFootprint:
+		var payload PlaceFootprintOperation
+		if decodeRaw(op, &payload) == nil {
+			issues = append(issues, refIssues(design, op.Index, payload.Ref)...)
+		}
+	case OpConnect:
+		var payload ConnectOperation
+		if decodeRaw(op, &payload) == nil {
+			issues = append(issues, refIssues(design, op.Index, payload.From.Ref)...)
+			issues = append(issues, refIssues(design, op.Index, payload.To.Ref)...)
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodePinmapUnverified,
+				Severity: reports.SeverityBlocked,
+				Path:     "operations[" + strconv.Itoa(op.Index) + "]",
+				Message:  "connecting imported symbols requires verified pin maps",
+				Refs:     []string{payload.From.Ref, payload.To.Ref},
+			})
+		}
+	}
+	return issues
+}
+
+func touchesDesign(kind OperationKind) bool {
+	switch kind {
+	case OpAddSymbol, OpAssignFootprint, OpPlaceFootprint, OpConnect, OpRoute, OpAddZone, OpRemoveSymbol:
+		return true
+	default:
+		return false
+	}
+}
+
+func hasUnsupportedImportedContent(design kicaddesign.Design) bool {
+	if design.Schematic != nil && len(design.Schematic.RawItems) > 0 {
+		return true
+	}
+	if design.PCB != nil && len(design.PCB.Preserved) > 0 {
+		return true
+	}
+	return false
+}
+
+func refIssues(design kicaddesign.Design, index int, ref string) []reports.Issue {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil
+	}
+	if design.Schematic == nil {
+		return []reports.Issue{{
+			Code:     reports.CodeMissingFile,
+			Severity: reports.SeverityBlocked,
+			Path:     "operations[" + strconv.Itoa(index) + "].ref",
+			Message:  "cannot resolve reference " + ref + " because the imported project has no root schematic",
+			Refs:     []string{ref},
+		}}
+	}
+	count := 0
+	for _, symbol := range design.Schematic.Symbols {
+		if symbol.Reference == ref {
+			count++
+		}
+	}
+	if count == 1 {
+		return nil
+	}
+	code := reports.CodeInvalidArgument
+	message := "reference " + ref + " does not exist in imported schematic"
+	if count > 1 {
+		code = reports.CodeAmbiguousReference
+		message = "reference " + ref + " is ambiguous in imported schematic"
+	}
+	return []reports.Issue{{
+		Code:     code,
+		Severity: reports.SeverityBlocked,
+		Path:     "operations[" + strconv.Itoa(index) + "].ref",
+		Message:  message,
+		Refs:     []string{ref},
+	}}
 }
 
 func decodeRaw(op Operation, target any) error {

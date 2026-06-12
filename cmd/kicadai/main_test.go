@@ -680,7 +680,7 @@ func TestRunTransactionPlanBlocksExistingProject(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(stdout.String(), `"path": "transaction.target"`) {
+	if !strings.Contains(stdout.String(), `"path": "operations[0].op"`) {
 		t.Fatalf("unexpected output:\n%s", stdout.String())
 	}
 }
