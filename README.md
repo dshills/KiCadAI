@@ -301,6 +301,29 @@ headers, and `Device:Q_NPN_BEC` to a TO-92 inline footprint. Missing mappings,
 pin-count mismatches, pin-name mismatches, and unflattened hierarchical sheets
 block pinmap fabrication readiness.
 
+### Library Resolver
+
+The `library` command indexes local KiCad symbol, footprint, and template
+repositories so generators and transactions can use real library IDs.
+
+```sh
+export KICADAI_KLC_ROOT=/path/to/klc
+export KICADAI_SYMBOLS_ROOT=/path/to/kicad-symbols
+export KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints
+export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
+
+go run ./cmd/kicadai --json library symbol Device:R
+go run ./cmd/kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
+go run ./cmd/kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
+go run ./cmd/kicadai --json library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
+go run ./cmd/kicadai --json library templates
+```
+
+Use `--library-cache .kicadai/library-index.json` for faster repeated loads and
+`--refresh-library-cache` to rebuild it. See
+[docs/library-resolver.md](docs/library-resolver.md) for setup, command
+examples, cache behavior, compatibility statuses, and opt-in integration tests.
+
 ### Round-Trip Validation
 
 Round-trip commands use `kicad-cli` to save or normalize files and compare the
