@@ -17,6 +17,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/config"
 	"kicadai/internal/evaluate"
+	breakoutgen "kicadai/internal/generate"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
@@ -63,6 +64,7 @@ Global flags:
   --origin-y int64      Plan origin Y in KiCad internal units (1 mm = 1,000,000 IU)
   --prefix string        Reference/value prefix for plan commands
   --output string        Output project directory for generation commands
+  --request string       Structured request JSON path for generator commands
   --name string          Project/design name for generation commands
   --seed string          Deterministic seed for generation commands
   --lib-vcc string      VCC symbol library ID for LED demo (default: %[1]s)
@@ -106,6 +108,7 @@ type cliOptions struct {
 	originY       int64
 	prefix        string
 	output        string
+	requestPath   string
 	name          string
 	seed          string
 	libVCC        string
@@ -185,8 +188,10 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runRoundTrip(opts, stdout)
 	case "transaction":
 		return runTransaction(opts, stdout)
-	case "export", "generate":
+	case "export":
 		return runStructuredCommandSkeleton(opts, command, stdout)
+	case "generate":
+		return runGenerate(opts, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
@@ -213,6 +218,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Int64Var(&opts.originY, "origin-y", 0, "plan origin Y")
 	flags.StringVar(&opts.prefix, "prefix", workflows.DefaultLEDDemoPrefix, "plan prefix")
 	flags.StringVar(&opts.output, "output", "", "output project directory")
+	flags.StringVar(&opts.requestPath, "request", "", "structured request JSON path")
 	flags.StringVar(&opts.name, "name", "", "project/design name")
 	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
 	flags.StringVar(&opts.libVCC, "lib-vcc", defaultLibraryIDVCC, "VCC symbol library ID")
@@ -258,6 +264,67 @@ func runStructuredCommandSkeleton(opts cliOptions, command string, stdout io.Wri
 		Path:     command,
 		Message:  command + " command family is not implemented yet",
 	})
+}
+
+func runGenerate(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("generate requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("generate", opts.commandArgs); !ok {
+		return writeReportFailure(stdout, "generate", issue)
+	}
+	switch opts.commandArgs[0] {
+	case "breakout":
+		return runGenerateBreakout(opts, stdout)
+	default:
+		return writeReportFailure(stdout, "generate", reports.Issue{
+			Code:     reports.CodeUnsupportedOperation,
+			Severity: reports.SeverityBlocked,
+			Path:     "generate." + opts.commandArgs[0],
+			Message:  "generate " + opts.commandArgs[0] + " is not implemented yet",
+		})
+	}
+}
+
+func runGenerateBreakout(opts cliOptions, stdout io.Writer) error {
+	if strings.TrimSpace(opts.requestPath) == "" {
+		return writeReportFailure(stdout, "generate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "request",
+			Message:  "generate breakout requires --request",
+		})
+	}
+	if strings.TrimSpace(opts.output) == "" {
+		return writeReportFailure(stdout, "generate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "output",
+			Message:  "generate breakout requires --output",
+		})
+	}
+	req, err := breakoutgen.LoadBreakoutRequest(opts.requestPath)
+	if err != nil {
+		return writeReportFailure(stdout, "generate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "request",
+			Message:  err.Error(),
+		})
+	}
+	data := breakoutgen.GenerateBreakout(req, breakoutgen.BreakoutOptions{
+		OutputDir: opts.output,
+		Overwrite: opts.overwrite,
+		Seed:      opts.seed,
+	})
+	result := reports.ResultWithIssues("generate", data, data.Issues, data.Artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("generate breakout failed")
+	}
+	return nil
 }
 
 func runInspect(opts cliOptions, stdout io.Writer) error {

@@ -124,7 +124,20 @@ func writeOutputDir(op Operation, fallback string) string {
 func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions) ([]reports.Artifact, error) {
 	switch op.Op {
 	case OpSetBoardOutline:
-		return nil, fmt.Errorf("set_board_outline apply is not implemented yet")
+		var payload SetBoardOutlineOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return nil, err
+		}
+		if payload.Board != nil {
+			_, err := builder.SetRectangularBoardOutline(kicadfiles.MM(payload.Board.WidthMM), kicadfiles.MM(payload.Board.HeightMM))
+			return nil, err
+		}
+		points := make([]kicadfiles.Point, 0, len(payload.Points))
+		for _, p := range payload.Points {
+			points = append(points, point(p.XMM, p.YMM))
+		}
+		_, err := builder.SetBoardOutline(points)
+		return nil, err
 	case OpAddSymbol:
 		var payload AddSymbolOperation
 		if err := decodeRaw(op, &payload); err != nil {
@@ -165,7 +178,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			if pad.Net != nil {
 				net = *pad.Net
 			}
-			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Net: net})
+			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Offset: point(pad.XMM, pad.YMM), Net: net})
 		}
 		_, err := builder.PlaceFootprint(payload.Ref, designapi.PlaceFootprintOptions{
 			Position: point(payload.At.XMM, payload.At.YMM),

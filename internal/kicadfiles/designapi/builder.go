@@ -51,6 +51,10 @@ type ZoneHandle struct {
 	Name string
 }
 
+type BoardOutlineHandle struct {
+	SegmentCount int
+}
+
 type SymbolOptions struct {
 	Reference string
 	Value     string
@@ -474,6 +478,57 @@ func (builder *Builder) AddZone(netName string, polygon []kicadfiles.Point, opti
 	})
 	builder.syncPCBNets()
 	return ZoneHandle{Name: name}, nil
+}
+
+func (builder *Builder) SetBoardOutline(points []kicadfiles.Point) (BoardOutlineHandle, error) {
+	if builder == nil {
+		return BoardOutlineHandle{}, fmt.Errorf("builder required")
+	}
+	if countDistinctPoints(points) < 3 {
+		return BoardOutlineHandle{}, fmt.Errorf("board outline requires at least three distinct points")
+	}
+	outline := append([]kicadfiles.Point(nil), points...)
+	if outline[0] == outline[len(outline)-1] {
+		outline = outline[:len(outline)-1]
+	}
+	if len(outline) < 3 {
+		return BoardOutlineHandle{}, fmt.Errorf("board outline requires at least three distinct points")
+	}
+	drawings := make([]pcb.Drawing, 0, len(outline))
+	for i := range outline {
+		start := outline[i]
+		end := outline[(i+1)%len(outline)]
+		if start == end {
+			return BoardOutlineHandle{}, fmt.Errorf("board outline segment %d has identical endpoints", i)
+		}
+		drawings = append(drawings, pcb.Drawing{
+			UUID:  builder.generator.New("root.pcb.outline", fmt.Sprintf("%d", i), formatPoint(start), formatPoint(end)),
+			Layer: kicadfiles.LayerEdge,
+			Kind:  "line",
+			Line:  &pcb.LineDrawing{Start: start, End: end, Width: kicadfiles.MM(0.1)},
+		})
+	}
+	var preserved []pcb.Drawing
+	for _, drawing := range builder.design.PCB.Drawings {
+		if drawing.Layer != kicadfiles.LayerEdge {
+			preserved = append(preserved, drawing)
+		}
+	}
+	builder.design.PCB.Drawings = append(preserved, drawings...)
+	builder.design.PCB.RequireClosedOutline = true
+	return BoardOutlineHandle{SegmentCount: len(drawings)}, nil
+}
+
+func (builder *Builder) SetRectangularBoardOutline(width, height kicadfiles.IU) (BoardOutlineHandle, error) {
+	if width <= 0 || height <= 0 {
+		return BoardOutlineHandle{}, fmt.Errorf("board width and height must be positive")
+	}
+	return builder.SetBoardOutline([]kicadfiles.Point{
+		{X: 0, Y: 0},
+		{X: width, Y: 0},
+		{X: width, Y: height},
+		{X: 0, Y: height},
+	})
 }
 
 func (builder *Builder) Design() kicaddesign.Design {

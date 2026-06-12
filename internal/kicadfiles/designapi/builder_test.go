@@ -404,6 +404,29 @@ func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	}
 }
 
+func TestBuilderSetRectangularBoardOutline(t *testing.T) {
+	builder := newTestBuilder(t)
+	handle, err := builder.SetRectangularBoardOutline(kicadfiles.MM(50), kicadfiles.MM(30))
+	if err != nil {
+		t.Fatalf("SetRectangularBoardOutline returned error: %v", err)
+	}
+	if handle.SegmentCount != 4 {
+		t.Fatalf("segments = %d, want 4", handle.SegmentCount)
+	}
+	design := builder.Design()
+	if !design.PCB.RequireClosedOutline {
+		t.Fatal("expected closed outline validation to be required")
+	}
+	if len(design.PCB.Drawings) != 4 {
+		t.Fatalf("drawings = %d, want 4", len(design.PCB.Drawings))
+	}
+	for _, drawing := range design.PCB.Drawings {
+		if drawing.Layer != kicadfiles.LayerEdge || drawing.Line == nil {
+			t.Fatalf("unexpected outline drawing: %#v", drawing)
+		}
+	}
+}
+
 func TestBuilderWriteProject(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})

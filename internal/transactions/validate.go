@@ -124,6 +124,7 @@ func validateOperation(op Operation) []reports.Issue {
 				if strings.TrimSpace(pad.Name) == "" {
 					issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s.pads[%d].name", path, padIndex), "pad name is required"))
 				}
+				issues = append(issues, validatePoint(fmt.Sprintf("%s.pads[%d]", path, padIndex), Point{XMM: pad.XMM, YMM: pad.YMM})...)
 			}
 			return issues
 		})

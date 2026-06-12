@@ -3,6 +3,7 @@ package transactions
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -26,6 +27,26 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}
+	}
+}
+
+func TestApplySetsBoardOutline(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"set_board_outline","board":{"width_mm":50,"height_mm":30}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	pcbData, err := os.ReadFile(filepath.Join(output, "demo.kicad_pcb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Count(string(pcbData), `(layer "Edge.Cuts")`); got != 4 {
+		t.Fatalf("Edge.Cuts drawing count = %d, want 4\n%s", got, pcbData)
 	}
 }
 

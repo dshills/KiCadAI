@@ -517,6 +517,40 @@ func TestRunGenerateStructuredCommandAllowsNoTarget(t *testing.T) {
 	}
 }
 
+func TestRunGenerateBreakoutJSON(t *testing.T) {
+	dir := t.TempDir()
+	request := filepath.Join(dir, "request.json")
+	output := filepath.Join(dir, "out")
+	body := `{
+	  "kind":"breakout_board",
+	  "name":"sensor_breakout",
+	  "board":{"width_mm":50,"height_mm":30},
+	  "connectors":[
+	    {"ref":"J1","pins":["VCC","GND","SCL","SDA"]},
+	    {"ref":"J2","pins":["VCC","GND","SCL","SDA"]}
+	  ]
+	}`
+	if err := os.WriteFile(request, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--request", request, "--output", output, "generate", "breakout"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	text := stdout.String()
+	for _, want := range []string{`"ok": true`, `"command": "generate"`, `"kind": "pcb"`, `sensor_breakout.kicad_pcb`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected output to contain %q:\n%s", want, text)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(output, "sensor_breakout.kicad_pcb")); err != nil {
+		t.Fatalf("expected generated PCB: %v", err)
+	}
+}
+
 func fakeRoundTripCLI(t *testing.T, logPath string, upgradeExit int) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "kicad-cli")

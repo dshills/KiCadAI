@@ -73,6 +73,8 @@ type PinSpec struct {
 type PadSpec struct {
 	Name string  `json:"name"`
 	Type string  `json:"type,omitempty"`
+	XMM  float64 `json:"x_mm,omitempty"`
+	YMM  float64 `json:"y_mm,omitempty"`
 	Net  *string `json:"net,omitempty"`
 }
 
