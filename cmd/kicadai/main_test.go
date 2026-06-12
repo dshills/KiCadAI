@@ -557,6 +557,54 @@ func TestRunTransactionPlanRequiresProjectAndTransaction(t *testing.T) {
 	}
 }
 
+func TestRunTransactionValidateJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"create_project","name":"demo"},{"op":"write_project"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "transaction", "validate", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "transaction"`,
+		`"operation_count": 2`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunTransactionValidateReportsIssues(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"route","net_name":"","points":[{"x_mm":0,"y_mm":0}]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "transaction", "validate", path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"code": "INVALID_ARGUMENT"`,
+		`"path": "operations[0].net_name"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestRunStructuredCommandRejectsExtraArguments(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

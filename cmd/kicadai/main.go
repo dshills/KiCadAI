@@ -25,6 +25,7 @@ import (
 	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematic"
+	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
 )
 
@@ -182,7 +183,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runEvaluate(opts, stdout)
 	case "roundtrip":
 		return runRoundTrip(opts, stdout)
-	case "export", "generate", "transaction":
+	case "transaction":
+		return runTransaction(opts, stdout)
+	case "export", "generate":
 		return runStructuredCommandSkeleton(opts, command, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
@@ -513,6 +516,79 @@ func runRoundTrip(opts cliOptions, stdout io.Writer) error {
 		return errors.New("roundtrip reported blocking issues")
 	}
 	return nil
+}
+
+func runTransaction(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("transaction requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("transaction", opts.commandArgs); !ok {
+		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	if len(opts.commandArgs) < 2 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "transaction",
+			Message:  "transaction requires a subcommand and target path",
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	subcommand := opts.commandArgs[0]
+	switch subcommand {
+	case "validate":
+		path := opts.commandArgs[1]
+		tx, err := transactions.LoadFile(path)
+		if err != nil {
+			issue := reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     filepath.ToSlash(path),
+				Message:  err.Error(),
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
+		validation := transactions.Validate(tx)
+		result := reports.ResultWithIssues("transaction", validation, validation.Issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if !result.OK {
+			return errors.New("transaction validation failed")
+		}
+		return nil
+	case "plan", "apply":
+		issue := reports.Issue{
+			Code:     reports.CodeUnsupportedOperation,
+			Severity: reports.SeverityBlocked,
+			Path:     "transaction." + subcommand,
+			Message:  "transaction " + subcommand + " is not implemented yet",
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	default:
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "transaction." + subcommand,
+			Message:  "unsupported transaction subcommand " + subcommand,
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
 }
 
 func roundTripOptions(opts cliOptions) (roundtrip.Options, error) {
