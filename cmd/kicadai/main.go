@@ -14,6 +14,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/config"
+	"kicadai/internal/evaluate"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
@@ -120,6 +121,11 @@ type app struct {
 	newClient func(context.Context, config.Config) (apiClient, error)
 }
 
+type structuredReportError interface {
+	error
+	ReportResult(command string) reports.Result
+}
+
 func newApp() app {
 	return app{newClient: func(ctx context.Context, cfg config.Config) (apiClient, error) {
 		return kiapi.NewClient(ctx, cfg, nil)
@@ -159,7 +165,9 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return a.runGenerateLEDDemo(opts, stdout)
 	case "inspect":
 		return runInspect(opts, stdout)
-	case "evaluate", "export", "generate", "roundtrip", "transaction":
+	case "evaluate":
+		return runEvaluate(opts, stdout)
+	case "export", "generate", "roundtrip", "transaction":
 		return runStructuredCommandSkeleton(opts, command, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
@@ -278,6 +286,75 @@ func runInspect(opts cliOptions, stdout io.Writer) error {
 		return writeReportFailure(stdout, "inspect", issue)
 	}
 	return writeReportJSON(stdout, reports.OKResult("inspect", data, nil))
+}
+
+func runEvaluate(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("evaluate requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("evaluate", opts.commandArgs); !ok {
+		if err := writeReportJSON(stdout, reports.ErrorResult("evaluate", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	if len(opts.commandArgs) != 2 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "evaluate",
+			Message:  "evaluate requires exactly a subcommand and target path",
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("evaluate", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	kind := opts.commandArgs[0]
+	target := opts.commandArgs[1]
+	var (
+		data evaluate.Report
+		err  error
+	)
+	switch kind {
+	case "project":
+		data, err = evaluate.Project(target)
+	case "schematic":
+		data, err = evaluate.Schematic(target)
+	case "pcb":
+		data, err = evaluate.PCB(target)
+	default:
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "evaluate." + kind,
+			Message:  "unsupported evaluate subcommand " + kind,
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("evaluate", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	if err != nil {
+		issue := evaluate.IssueFromError(err, "evaluate."+kind)
+		result := reports.ErrorResult("evaluate", issue)
+		var structuredErr structuredReportError
+		if errors.As(err, &structuredErr) {
+			result = structuredErr.ReportResult("evaluate")
+		}
+		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
+			return writeErr
+		}
+		return errors.New(issue.Message)
+	}
+	result := reports.ResultWithIssues("evaluate", data, data.Issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("evaluate reported blocking issues")
+	}
+	return nil
 }
 
 func writeReportFailure(stdout io.Writer, command string, issue reports.Issue) error {

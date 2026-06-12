@@ -243,7 +243,56 @@ func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := run([]string{"--json", "evaluate", "project", "demo"}, &stdout, &stderr)
+	err := run([]string{"--json", "roundtrip", "project", "demo"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "roundtrip"`,
+		`"code": "UNSUPPORTED_OPERATION"`,
+		`"severity": "blocked"`,
+		`"roundtrip command family is not implemented yet"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunEvaluatePCBJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "board.kicad_pcb")
+	if err := os.WriteFile(path, []byte(`(kicad_pcb (gr_rect (layer "Edge.Cuts")) (footprint "Test:One" (pad "1" smd rect (layers "F.Cu"))))`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "evaluate", "pcb", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "evaluate"`,
+		`"target": "` + path + `"`,
+		`"name": "pcb_corpus_scan"`,
+		`"status": "passed"`,
+		`"status": "skipped"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunEvaluateMissingTargetJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "evaluate", "pcb", filepath.Join(t.TempDir(), "missing.kicad_pcb")}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -251,9 +300,7 @@ func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
 	for _, want := range []string{
 		`"ok": false`,
 		`"command": "evaluate"`,
-		`"code": "UNSUPPORTED_OPERATION"`,
-		`"severity": "blocked"`,
-		`"evaluate command family is not implemented yet"`,
+		`"code": "MISSING_FILE"`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
@@ -289,6 +336,33 @@ func TestRunInspectProjectJSON(t *testing.T) {
 		`"name": "demo"`,
 		`"symbol_count": 1`,
 		`"footprint_count": 1`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunEvaluateProjectWithBlockingIssuesReturnsError(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "evaluate", "project", root}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "evaluate"`,
+		`"code": "MISSING_FILE"`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
