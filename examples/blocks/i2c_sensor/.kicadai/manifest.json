@@ -91,15 +91,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/i2c_sensor/i2c_sensor.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/i2c_sensor/i2c_sensor.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "i2c_sensor.kicad_pcb": "1a40861f8dff0aefe51ec1757c615b8b986089c701b40021442adb1af38788c5",
     "i2c_sensor.kicad_pro": "6065401b767e93643ef1a134166847b08c793b850eedf21a5b36be963f66e00c",
-    "i2c_sensor.kicad_sch": "44a7e14dda20a416013fba8a905cf20305fd6b4bb76771650d473646d089be07"
+    "i2c_sensor.kicad_sch": "c4b274a7b6599f6ce2a21e06b01eed9d1275c5c15cb86372891fadd3d3ec4066"
   }
 }

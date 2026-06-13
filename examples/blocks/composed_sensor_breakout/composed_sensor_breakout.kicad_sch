@@ -8,7 +8,7 @@
   (wire
     (pts
       (xy 107.46 10.0)
-      (xy 102.54 0.0)
+      (xy 102.54 0)
     )
     (stroke
       (width 0)
@@ -117,7 +117,7 @@
   )
   (wire
     (pts
-      (xy 0.0 -22.86)
+      (xy 0 -22.86)
       (xy 17.54 12.0)
     )
     (stroke
@@ -216,7 +216,7 @@
   )
   (symbol
     (lib_id "Connector_Generic:Conn_01x04")
-    (at 270.0 0.0 0)
+    (at 270.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -228,7 +228,7 @@
     (property
       "Reference"
       "Jbed8001"
-      (at 270.0 0.0 0)
+      (at 270.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -240,7 +240,7 @@
     (property
       "Value"
       "Conn_01x04"
-      (at 270.0 0.0 0)
+      (at 270.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -252,8 +252,32 @@
     (property
       "Footprint"
       "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
-      (at 270.0 0.0 0)
+      (at 270.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 270.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 270.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -281,7 +305,7 @@
   )
   (symbol
     (lib_id "Regulator_Linear:AMS1117-3.3")
-    (at 100.0 0.0 0)
+    (at 100.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -293,7 +317,7 @@
     (property
       "Reference"
       "Ude41001"
-      (at 100.0 0.0 0)
+      (at 100.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -305,7 +329,7 @@
     (property
       "Value"
       "LDO 3.3V"
-      (at 100.0 0.0 0)
+      (at 100.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -317,8 +341,32 @@
     (property
       "Footprint"
       "Package_TO_SOT_SMD:SOT-223-3_TabPin2"
-      (at 100.0 0.0 0)
+      (at 100.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 100.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 100.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -388,6 +436,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 35.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 35.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "0090fac1-b25f-513d-a11f-1c88fb3d289a")
@@ -437,6 +509,30 @@
       "Capacitor_SMD:C_0805_2012Metric"
       (at 110.0 10.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 110.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 110.0 10.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -502,6 +598,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 15.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 15.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "fa6e4c5c-6751-5abf-9fed-d54e3b2a0f71")
@@ -551,6 +671,30 @@
       "Capacitor_SMD:C_0805_2012Metric"
       (at 45.0 -12.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 45.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 45.0 -12.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -616,6 +760,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 215.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 215.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "05aa44df-d7ff-51da-b0fe-1c486ab6e0fe")
@@ -673,6 +841,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 90.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 90.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "a7e03f5d-64ff-54b3-a6c0-128883223590")
@@ -684,7 +876,7 @@
   )
   (symbol
     (lib_id "Sensor:Generic_I2C")
-    (at 190.0 0.0 0)
+    (at 190.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -696,7 +888,7 @@
     (property
       "Reference"
       "U17b0001"
-      (at 190.0 0.0 0)
+      (at 190.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -708,7 +900,7 @@
     (property
       "Value"
       "I2C Sensor 0x48"
-      (at 190.0 0.0 0)
+      (at 190.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -720,8 +912,32 @@
     (property
       "Footprint"
       "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
-      (at 190.0 0.0 0)
+      (at 190.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 190.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 190.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -799,6 +1015,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 180.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 180.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "ed53c7d5-69ca-5786-877a-c1ad3b880e10")
@@ -848,6 +1088,30 @@
       "Fuse:Fuse_1206_3216Metric"
       (at 15.0 -12.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 15.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 15.0 -12.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -913,6 +1177,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 25.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 25.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "7e589b2e-2960-5cd7-ba91-15c1ba2bdf0c")
@@ -924,7 +1212,7 @@
   )
   (symbol
     (lib_id "Connector:USB_C_Receptacle_USB2.0_16P")
-    (at 0.0 0.0 0)
+    (at 0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -936,7 +1224,7 @@
     (property
       "Reference"
       "J59e8001"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -948,7 +1236,7 @@
     (property
       "Value"
       "USB-C Power"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -960,8 +1248,32 @@
     (property
       "Footprint"
       "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -1079,6 +1391,30 @@
       "Resistor_SMD:R_0805_2012Metric"
       (at 205.0 -10.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 205.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 205.0 -10.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects

@@ -47,15 +47,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/led_indicator/led_indicator.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/led_indicator/led_indicator.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "led_indicator.kicad_pcb": "6dc84ed0fa591f522df32548ec30e48dc0496f88605c0724b393bc07b0ee94e8",
     "led_indicator.kicad_pro": "8f1d75a3876071a65e77b3c2a4119980870455f1ad4282eb0fd856fe4e2d16ea",
-    "led_indicator.kicad_sch": "08a21f0835b49fa9d67002d47d3bfcdd2dab374bc6e10adc33ac0e5dc9887665"
+    "led_indicator.kicad_sch": "3785fd735fb204e139ad11f8c8e32b4a96c0d1d9366776f6a19dc4540eba27be"
   }
 }

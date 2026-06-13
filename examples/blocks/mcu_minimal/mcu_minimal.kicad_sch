@@ -8,7 +8,7 @@
   (wire
     (pts
       (xy 57.54 2.54)
-      (xy 0.0 -38.1)
+      (xy 0 -38.1)
     )
     (stroke
       (width 0)
@@ -29,7 +29,7 @@
   )
   (wire
     (pts
-      (xy 52.46 0.0)
+      (xy 52.46 0)
       (xy 15.24 17.78)
     )
     (stroke
@@ -40,7 +40,7 @@
   )
   (wire
     (pts
-      (xy -52.54 0.0)
+      (xy -52.54 0)
       (xy -15.24 30.48)
     )
     (stroke
@@ -63,7 +63,7 @@
   (wire
     (pts
       (xy -52.54 -12.0)
-      (xy 0.0 38.1)
+      (xy 0 38.1)
     )
     (stroke
       (width 0)
@@ -73,8 +73,8 @@
   )
   (wire
     (pts
-      (xy -47.46 0.0)
-      (xy 0.0 -38.1)
+      (xy -47.46 0)
+      (xy 0 -38.1)
     )
     (stroke
       (width 0)
@@ -85,7 +85,7 @@
   (wire
     (pts
       (xy -72.54 12.0)
-      (xy 0.0 38.1)
+      (xy 0 38.1)
     )
     (stroke
       (width 0)
@@ -107,7 +107,7 @@
   (wire
     (pts
       (xy 57.54 -2.54)
-      (xy 0.0 38.1)
+      (xy 0 38.1)
     )
     (stroke
       (width 0)
@@ -128,7 +128,7 @@
   )
   (wire
     (pts
-      (xy 57.54 0.0)
+      (xy 57.54 0)
       (xy 15.24 22.86)
     )
     (stroke
@@ -151,7 +151,7 @@
   (wire
     (pts
       (xy -67.46 12.0)
-      (xy 0.0 -38.1)
+      (xy 0 -38.1)
     )
     (stroke
       (width 0)
@@ -183,7 +183,7 @@
   )
   (symbol
     (lib_id "Connector_Generic:Conn_02x03_Odd_Even")
-    (at 55.0 0.0 0)
+    (at 55.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -195,7 +195,7 @@
     (property
       "Reference"
       "J3cb6001"
-      (at 55.0 0.0 0)
+      (at 55.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -207,7 +207,7 @@
     (property
       "Value"
       "AVR ISP"
-      (at 55.0 0.0 0)
+      (at 55.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -219,8 +219,32 @@
     (property
       "Footprint"
       "Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical"
-      (at 55.0 0.0 0)
+      (at 55.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 55.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 55.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -302,6 +326,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at -64.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at -64.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "ca719359-2f22-5192-bfb4-2b4fda297512")
@@ -359,6 +407,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at -50.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at -50.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "6698dd9d-0d13-556f-acd5-2576a62024f0")
@@ -370,7 +442,7 @@
   )
   (symbol
     (lib_id "Device:C")
-    (at -50.0 0.0 0)
+    (at -50.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -382,7 +454,7 @@
     (property
       "Reference"
       "C3cb6004"
-      (at -50.0 0.0 0)
+      (at -50.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -394,7 +466,7 @@
     (property
       "Value"
       "100nF"
-      (at -50.0 0.0 0)
+      (at -50.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -406,8 +478,32 @@
     (property
       "Footprint"
       "Capacitor_SMD:C_0805_2012Metric"
-      (at -50.0 0.0 0)
+      (at -50.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at -50.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at -50.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -473,6 +569,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at -70.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at -70.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "b9e5b153-bf2b-54f5-8a1d-320cf72b4a99")
@@ -484,7 +604,7 @@
   )
   (symbol
     (lib_id "MCU_Microchip_ATmega:ATmega328P-A")
-    (at 0.0 0.0 0)
+    (at 0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -496,7 +616,7 @@
     (property
       "Reference"
       "U3cb6001"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -508,7 +628,7 @@
     (property
       "Value"
       "ATmega328P-A"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -520,8 +640,32 @@
     (property
       "Footprint"
       "Package_QFP:TQFP-32_7x7mm_P0.8mm"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -699,6 +843,30 @@
       "Capacitor_SMD:C_0805_2012Metric"
       (at -58.0 12.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at -58.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at -58.0 12.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects

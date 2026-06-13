@@ -19,7 +19,7 @@
   (wire
     (pts
       (xy 12.46 -15.0)
-      (xy 17.54 0.0)
+      (xy 17.54 0)
     )
     (stroke
       (width 0)
@@ -29,8 +29,8 @@
   )
   (wire
     (pts
-      (xy 17.54 0.0)
-      (xy 32.46 0.0)
+      (xy 17.54 0)
+      (xy 32.46 0)
     )
     (stroke
       (width 0)
@@ -130,6 +130,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 30.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 30.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "90ce2ef7-59ad-5103-8980-3aea485eb004")
@@ -141,7 +165,7 @@
   )
   (symbol
     (lib_id "Amplifier_Operational:LMV321")
-    (at 15.0 0.0 0)
+    (at 15.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -153,7 +177,7 @@
     (property
       "Reference"
       "U1cd3001"
-      (at 15.0 0.0 0)
+      (at 15.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -165,7 +189,7 @@
     (property
       "Value"
       "LMV321"
-      (at 15.0 0.0 0)
+      (at 15.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -177,8 +201,32 @@
     (property
       "Footprint"
       "Package_TO_SOT_SMD:SOT-23-5"
-      (at 15.0 0.0 0)
+      (at 15.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 15.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 15.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -256,6 +304,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 15.0 -15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 15.0 -15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "a5429530-41d1-5d13-806a-c4305de46d78")
@@ -267,7 +339,7 @@
   )
   (symbol
     (lib_id "Device:R")
-    (at 35.0 0.0 0)
+    (at 35.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -279,7 +351,7 @@
     (property
       "Reference"
       "R1cd3003"
-      (at 35.0 0.0 0)
+      (at 35.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -291,7 +363,7 @@
     (property
       "Value"
       "100"
-      (at 35.0 0.0 0)
+      (at 35.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -303,8 +375,32 @@
     (property
       "Footprint"
       "Resistor_SMD:R_0805_2012Metric"
-      (at 35.0 0.0 0)
+      (at 35.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 35.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 35.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -324,7 +420,7 @@
   )
   (symbol
     (lib_id "Device:R")
-    (at 0.0 15.0 0)
+    (at 0 15.0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -336,7 +432,7 @@
     (property
       "Reference"
       "R1cd3001"
-      (at 0.0 15.0 0)
+      (at 0 15.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -348,7 +444,7 @@
     (property
       "Value"
       "10000"
-      (at 0.0 15.0 0)
+      (at 0 15.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -360,8 +456,32 @@
     (property
       "Footprint"
       "Resistor_SMD:R_0805_2012Metric"
-      (at 0.0 15.0 0)
+      (at 0 15.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0 15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0 15.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects

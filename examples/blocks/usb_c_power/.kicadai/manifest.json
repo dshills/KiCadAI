@@ -187,15 +187,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/usb_c_power/usb_c_power.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/usb_c_power/usb_c_power.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "usb_c_power.kicad_pcb": "794b985f792451b14eb853a81edab7a2914ab33428157e5c9be48971844dd847",
     "usb_c_power.kicad_pro": "6dfd62a6b1d18187191271ab5c84a2dbfec23abe86428d6af39f21c26d844cab",
-    "usb_c_power.kicad_sch": "63a582068fe796444c29979dbdb588ffd38b8001b86ead0a3acddfb4e77d7d06"
+    "usb_c_power.kicad_sch": "cd1c58414c9f27732dc9d3f6ac0f0b41abb3e68ea3b2ed1674bd153e31efa519"
   }
 }

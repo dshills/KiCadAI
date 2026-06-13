@@ -99,15 +99,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/voltage_regulator/voltage_regulator.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/voltage_regulator/voltage_regulator.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "voltage_regulator.kicad_pcb": "dbd811a8185a0da1002380f5b1c4e31b38dfa59d6a0029c0bd85a1047e089a41",
     "voltage_regulator.kicad_pro": "3c3e4c4f6e4943a61c19cfcd369681536cf8b2217a58b3694f8fc9e3bf6023eb",
-    "voltage_regulator.kicad_sch": "5d179cac3859b625ffe9d2a1f383d739dc8cbe846196a791ff53d4af3688e64b"
+    "voltage_regulator.kicad_sch": "5a38c1233ec2c709e33791f77f79ea75312cf7b0b2cef1ff4dc4e7471cdaeb60"
   }
 }

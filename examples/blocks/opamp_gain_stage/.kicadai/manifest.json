@@ -107,15 +107,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/opamp_gain_stage/opamp_gain_stage.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/opamp_gain_stage/opamp_gain_stage.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "opamp_gain_stage.kicad_pcb": "6890998c1a155f7c40a7becea3b69d56de3a35b67e2c2313720f6f6071bf7ba8",
     "opamp_gain_stage.kicad_pro": "deb119c2755e5ddd29057631b357922d5a7ba3329c2cc15cfe43cb5d03bbf587",
-    "opamp_gain_stage.kicad_sch": "5c88ea5ffaeaa6255ce87499ea143e869a51b211cdb8691a3d73d40cb349eb11"
+    "opamp_gain_stage.kicad_sch": "46aa30b0b2000b2fb706fc64b4b4463d1224b1fcbb0e741319374fd0c88a282a"
   }
 }

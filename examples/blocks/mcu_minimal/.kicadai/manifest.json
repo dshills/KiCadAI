@@ -167,15 +167,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/mcu_minimal/mcu_minimal.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/mcu_minimal/mcu_minimal.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "mcu_minimal.kicad_pcb": "94fdcd2d1a6774efd90517122aaf9899d77cf9103b0e47296cfd26adae7e6e8f",
     "mcu_minimal.kicad_pro": "17d3902a895f47610debc38317fe6d20b8b1bd3047325570167d6a6ec046244c",
-    "mcu_minimal.kicad_sch": "01b33231678e7c84123fcdbbee3d944f5b4e2e8178b9e8ca7496128de9e7b065"
+    "mcu_minimal.kicad_sch": "d06acf3a7e8b889f4562318cc82f8defb47fe21d173fe384f679a980047c077b"
   }
 }

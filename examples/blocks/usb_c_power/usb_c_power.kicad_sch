@@ -7,14 +7,14 @@
   (lib_symbols)
   (wire
     (pts
-      (xy 17.54 -12.0)
-      (xy 52.46 -12.0)
+      (xy 47.54 -12.0)
+      (xy 17.54 12.0)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "03756fac-f352-5e20-ab1f-ac66cb4fac21")
+    (uuid "0d032184-4b13-5672-b8b1-2477ef6c6949")
   )
   (wire
     (pts
@@ -29,58 +29,14 @@
   )
   (wire
     (pts
-      (xy 15.24 15.24)
-      (xy 12.46 -12.0)
+      (xy 42.46 -12.0)
+      (xy 17.54 -12.0)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "10f07cfd-43cd-54f1-8919-7bf96f34e2db")
-  )
-  (wire
-    (pts
-      (xy 0.0 -22.86)
-      (xy 17.54 12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "1151c38e-2349-55a8-8e30-629683aae3bb")
-  )
-  (wire
-    (pts
-      (xy 15.24 15.24)
-      (xy 12.46 -12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "15b57391-87a9-596f-9b6f-4ac6ad6e8ecc")
-  )
-  (wire
-    (pts
-      (xy 15.24 15.24)
-      (xy 12.46 -12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "1d27cd6c-5f14-5649-ad3c-4f7131aa4e6c")
-  )
-  (wire
-    (pts
-      (xy 57.54 -12.0)
-      (xy 65.16 -12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "2774ea31-3a24-527d-91de-8a26b764a3b7")
+    (uuid "2c9da9ca-9967-5d28-8342-28faaec6723c")
   )
   (wire
     (pts
@@ -95,25 +51,14 @@
   )
   (wire
     (pts
-      (xy 42.46 -12.0)
       (xy 17.54 -12.0)
+      (xy 52.46 -12.0)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "2f0905ae-2724-51fb-a7ab-97fd25cac1ac")
-  )
-  (wire
-    (pts
-      (xy 70.24 -12.0)
-      (xy 17.54 12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "3bbbe0ae-b5be-5f2d-9068-903aa5040a50")
+    (uuid "331fd8e3-7d63-5ba1-b03d-1612df122b98")
   )
   (wire
     (pts
@@ -128,39 +73,6 @@
   )
   (wire
     (pts
-      (xy 47.54 -12.0)
-      (xy 17.54 12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "90b71da3-a6dd-5b1e-966f-24c31ab8d6ea")
-  )
-  (wire
-    (pts
-      (xy 37.54 -12.0)
-      (xy 17.54 12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "a88b6512-30fb-5d42-a496-90631202257a")
-  )
-  (wire
-    (pts
-      (xy 0.0 -22.86)
-      (xy 17.54 12.0)
-    )
-    (stroke
-      (width 0)
-      (type default)
-    )
-    (uuid "c664acd4-cb88-5360-b995-4969181f2215")
-  )
-  (wire
-    (pts
       (xy 32.46 -12.0)
       (xy 17.54 -12.0)
     )
@@ -168,7 +80,7 @@
       (width 0)
       (type default)
     )
-    (uuid "d416dd05-ecd5-5547-b51f-6d55e0ef7e67")
+    (uuid "81613622-7ed2-507d-bfb7-89d6011ad119")
   )
   (wire
     (pts
@@ -179,29 +91,51 @@
       (width 0)
       (type default)
     )
-    (uuid "dc3f22fc-7569-521c-8430-f12adeefc8eb")
+    (uuid "9f0e168a-5267-5f23-8df3-eb200712ccae")
   )
   (wire
     (pts
-      (xy 0.0 -22.86)
+      (xy 57.54 -12.0)
+      (xy 65.16 -12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "a08bd10b-6517-521c-9bac-c63d1417387d")
+  )
+  (wire
+    (pts
+      (xy 70.24 -12.0)
       (xy 17.54 12.0)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "dced83b4-7755-5662-b5ff-083fdcc9b125")
+    (uuid "bbc2e29b-183c-5e22-9a9e-a628e0d8e628")
   )
   (wire
     (pts
-      (xy 0.0 -22.86)
+      (xy 0 -22.86)
       (xy 17.54 12.0)
     )
     (stroke
       (width 0)
       (type default)
     )
-    (uuid "efc984b7-d615-5a25-8931-8d2748a6bfb4")
+    (uuid "c664acd4-cb88-5360-b995-4969181f2215")
+  )
+  (wire
+    (pts
+      (xy 37.54 -12.0)
+      (xy 17.54 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d268dcbc-46ff-57b1-b4c2-f45184456cf5")
   )
   (symbol
     (lib_id "Device:D_TVS")
@@ -243,6 +177,30 @@
       "Diode_SMD:D_SOD-323"
       (at 35.0 -12.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 35.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 35.0 -12.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -308,6 +266,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 45.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 45.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "599c7055-5e4a-55b5-9315-4e2efec22477")
@@ -357,6 +339,30 @@
       "LED_SMD:LED_0805_2012Metric"
       (at 67.7 -12.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 67.7 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 67.7 -12.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -422,6 +428,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 15.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 15.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "ecd13066-cd4a-5a09-a610-64fb1177633c")
@@ -479,6 +509,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 55.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 55.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "29ce407c-9b7a-527d-b302-f8b57586f97f")
@@ -490,7 +544,7 @@
   )
   (symbol
     (lib_id "Connector:USB_C_Receptacle_USB2.0_16P")
-    (at 0.0 0.0 0)
+    (at 0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -502,7 +556,7 @@
     (property
       "Reference"
       "J59e8001"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -514,7 +568,7 @@
     (property
       "Value"
       "USB-C Power"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -526,8 +580,32 @@
     (property
       "Footprint"
       "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
-      (at 0.0 0.0 0)
+      (at 0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -653,6 +731,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 15.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 15.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "77269b46-15d5-57c9-977c-9c1d2f3b7da9")
@@ -702,6 +804,30 @@
       "Resistor_SMD:R_0805_2012Metric"
       (at 25.0 12.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 25.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 25.0 12.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects

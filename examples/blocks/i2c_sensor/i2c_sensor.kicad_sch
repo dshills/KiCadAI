@@ -119,6 +119,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 25.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 25.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "a1ba6f08-a958-5922-8f0d-68fbef107420")
@@ -176,6 +200,30 @@
         )
       )
     )
+    (property
+      "Datasheet"
+      ""
+      (at 35.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 35.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
     (pin
       "1"
       (uuid "8b3e13e5-93e8-571a-b4c8-d36b950709e6")
@@ -187,7 +235,7 @@
   )
   (symbol
     (lib_id "Device:C")
-    (at 0.0 10.0 0)
+    (at 0 10.0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -199,7 +247,7 @@
     (property
       "Reference"
       "C17b0001"
-      (at 0.0 10.0 0)
+      (at 0 10.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -211,7 +259,7 @@
     (property
       "Value"
       "100nF"
-      (at 0.0 10.0 0)
+      (at 0 10.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -223,8 +271,32 @@
     (property
       "Footprint"
       "Capacitor_SMD:C_0805_2012Metric"
-      (at 0.0 10.0 0)
+      (at 0 10.0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 0 10.0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -244,7 +316,7 @@
   )
   (symbol
     (lib_id "Sensor:Generic_I2C")
-    (at 10.0 0.0 0)
+    (at 10.0 0 0)
     (unit 1)
     (body_style 1)
     (exclude_from_sim no)
@@ -256,7 +328,7 @@
     (property
       "Reference"
       "U17b0001"
-      (at 10.0 0.0 0)
+      (at 10.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -268,7 +340,7 @@
     (property
       "Value"
       "I2C Sensor 0x48"
-      (at 10.0 0.0 0)
+      (at 10.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects
@@ -280,8 +352,32 @@
     (property
       "Footprint"
       "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
-      (at 10.0 0.0 0)
+      (at 10.0 0 0)
       (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Datasheet"
+      ""
+      (at 10.0 0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Description"
+      ""
+      (at 10.0 0 0)
       (show_name no)
       (do_not_autoplace no)
       (effects

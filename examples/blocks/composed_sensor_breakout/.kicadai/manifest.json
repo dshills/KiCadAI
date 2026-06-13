@@ -287,15 +287,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/composed_sensor_breakout/composed_sensor_breakout.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/composed_sensor_breakout/composed_sensor_breakout.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "composed_sensor_breakout.kicad_pcb": "418ef1794a995fe6fc15d2ef61cd96158056cc581e6a6dac6f24c5650fb6d1ab",
     "composed_sensor_breakout.kicad_pro": "0c489c1930869c9763db6cac2cdce5ea090cb516e78477cad944735032b585cf",
-    "composed_sensor_breakout.kicad_sch": "83ceb2d67b42ec67d1b539ebc1fea7645bb4b497157bcce3da26256570330a6d"
+    "composed_sensor_breakout.kicad_sch": "988bf777623f3820b6e569151dc9344136456f217ce4b3273fe5c30aecaa62be"
   }
 }

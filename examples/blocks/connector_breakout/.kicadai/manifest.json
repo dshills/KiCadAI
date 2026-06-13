@@ -31,15 +31,10 @@
     {
       "kind": "schematic",
       "path": "examples/blocks/connector_breakout/connector_breakout.kicad_sch"
-    },
-    {
-      "kind": "pcb",
-      "path": "examples/blocks/connector_breakout/connector_breakout.kicad_pcb"
     }
   ],
   "file_hashes": {
-    "connector_breakout.kicad_pcb": "7eb7b7defe9500871230a5274b2c7940e76d7b6fb9eba170a1a5198a55395eb1",
     "connector_breakout.kicad_pro": "73f562fcac4e24c817aa0b1f474848e89889cf58ef1409b758a580bc902c0858",
-    "connector_breakout.kicad_sch": "06ac7e1283d6b72cbfc74707d061908d093d030cf0aea7d773e8b009ba7946e9"
+    "connector_breakout.kicad_sch": "dc843acda763602748c6572554982352b104dedc28fbcb85ee19b93e6cc52a59"
   }
 }
