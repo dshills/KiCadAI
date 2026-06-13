@@ -24,6 +24,7 @@ import (
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/checks"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/libraryresolver"
@@ -48,6 +49,7 @@ Commands:
   generate-project  Generate a direct-file LED indicator KiCad project
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
+  check         Run KiCad CLI ERC/DRC checks
   inspect       Inspect KiCad projects and files
   library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
@@ -82,11 +84,11 @@ Global flags:
   --with-pcb            Include PCB output for generation commands
   --overwrite           Allow generation commands to replace an existing project directory
   --json                Print command output as JSON when supported
-  --kicad-cli string    KiCad CLI executable path for round-trip checks
-  --keep-artifacts      Keep round-trip artifact workspaces
-  --artifact-dir string Directory for retained round-trip artifacts
-  --timeout duration    Round-trip KiCad CLI timeout, for example 10s or 2m
-  --allowlist string    Round-trip allowlist JSON path
+  --kicad-cli string    KiCad CLI executable path for KiCad-backed checks
+  --keep-artifacts      Keep KiCad-backed artifact workspaces
+  --artifact-dir string Directory for retained KiCad-backed artifacts
+  --timeout duration    KiCad CLI timeout, for example 10s or 2m
+  --allowlist string    Round-trip or ERC/DRC allowlist JSON path
   --klc-root string        KiCad Library Convention repository root
   --symbols-root string    KiCad symbol library root
   --footprints-root string KiCad footprint library root
@@ -209,6 +211,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runEvaluate(opts, stdout)
 	case "library":
 		return runLibrary(ctx, opts, stdout)
+	case "check":
+		return runCheckCommand(ctx, opts, stdout)
 	case "roundtrip":
 		return runRoundTrip(opts, stdout)
 	case "pinmap":
@@ -979,6 +983,238 @@ func pinmapShouldUseLibraryResolver(opts cliOptions) bool {
 	return strings.TrimSpace(roots.SymbolsRoot) != "" || strings.TrimSpace(roots.FootprintsRoot) != "" || strings.TrimSpace(opts.libraryCache) != ""
 }
 
+type checkCommandReport struct {
+	Target string               `json:"target"`
+	Checks []checks.CheckResult `json:"checks"`
+}
+
+func runCheckCommand(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("check requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("check", opts.commandArgs); !ok {
+		return writeReportFailure(stdout, "check", issue)
+	}
+	if len(opts.commandArgs) < 2 {
+		return writeReportFailure(stdout, "check", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "check",
+			Message:  "check requires a subcommand and target path",
+		})
+	}
+	kind := opts.commandArgs[0]
+	target := opts.commandArgs[1]
+	checkOpts, err := checkOptions(opts)
+	if err != nil {
+		return writeReportFailure(stdout, "check", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "check.options",
+			Message:  err.Error(),
+		})
+	}
+	cli, skippedIssue, err := checkCLI(opts)
+	if err != nil {
+		return writeReportFailure(stdout, "check", reports.Issue{
+			Code:     reports.CodeKiCadCLIFailed,
+			Severity: reports.SeverityError,
+			Path:     "check.kicad_cli",
+			Message:  err.Error(),
+		})
+	}
+	if skippedIssue != nil {
+		report := checkCommandReport{Target: filepath.ToSlash(target), Checks: []checks.CheckResult{{
+			TargetPath: filepath.ToSlash(target),
+			Status:     checks.CheckStatusSkipped,
+		}}}
+		result := reports.ResultWithIssues("check", report, []reports.Issue{*skippedIssue}, nil)
+		return writeReportJSON(stdout, result)
+	}
+
+	report := checkCommandReport{Target: filepath.ToSlash(target), Checks: []checks.CheckResult{}}
+	var issues []reports.Issue
+	var artifacts []reports.Artifact
+	switch kind {
+	case "erc":
+		check, checkIssues, resultArtifacts := runCheckERC(ctx, cli, target, checkOpts)
+		report.Checks = append(report.Checks, check)
+		issues = append(issues, checkIssues...)
+		artifacts = append(artifacts, resultArtifacts...)
+	case "drc":
+		check, checkIssues, resultArtifacts := runCheckDRC(ctx, cli, target, checkOpts)
+		report.Checks = append(report.Checks, check)
+		issues = append(issues, checkIssues...)
+		artifacts = append(artifacts, resultArtifacts...)
+	case "project":
+		erc, ercIssues, ercArtifacts := runCheckERC(ctx, cli, target, checkOpts)
+		report.Checks = append(report.Checks, erc)
+		issues = append(issues, ercIssues...)
+		artifacts = append(artifacts, ercArtifacts...)
+		if err := ctx.Err(); err != nil {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeKiCadCLIFailed,
+				Severity: reports.SeverityError,
+				Path:     "check.project",
+				Message:  err.Error(),
+			})
+			break
+		}
+		drc, drcIssues, drcArtifacts := runCheckDRC(ctx, cli, target, checkOpts)
+		report.Checks = append(report.Checks, drc)
+		issues = append(issues, drcIssues...)
+		artifacts = append(artifacts, drcArtifacts...)
+	default:
+		return writeReportFailure(stdout, "check", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "check." + kind,
+			Message:  "unsupported check subcommand " + kind,
+		})
+	}
+	result := reports.ResultWithIssues("check", report, issues, artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("check reported blocking issues")
+	}
+	return nil
+}
+
+func checkOptions(opts cliOptions) (checks.Options, error) {
+	checkOpts := checks.DefaultOptions()
+	checkOpts.KiCadCLI = opts.kicadCLI
+	checkOpts.KeepArtifacts = opts.keepArtifacts
+	checkOpts.ArtifactDir = opts.artifactDir
+	if strings.TrimSpace(opts.roundTimeout) != "" {
+		timeout, err := time.ParseDuration(opts.roundTimeout)
+		if err != nil || timeout < 0 {
+			return checks.Options{}, fmt.Errorf("invalid timeout %q", opts.roundTimeout)
+		}
+		checkOpts.Timeout = timeout
+	}
+	if strings.TrimSpace(opts.allowlistPath) != "" {
+		data, err := os.ReadFile(opts.allowlistPath)
+		if err != nil {
+			return checks.Options{}, fmt.Errorf("read allowlist: %w", err)
+		}
+		if err := json.Unmarshal(data, &checkOpts.Allowlist); err != nil {
+			return checks.Options{}, fmt.Errorf("decode allowlist: %w", err)
+		}
+	}
+	return checkOpts, nil
+}
+
+func checkCLI(opts cliOptions) (checks.KiCadCLI, *reports.Issue, error) {
+	cli, err := checks.DiscoverCLI(opts.kicadCLI)
+	if err != nil {
+		if strings.TrimSpace(opts.kicadCLI) != "" {
+			return checks.KiCadCLI{}, nil, err
+		}
+		issue := reports.Issue{
+			Code:     reports.CodeSkippedExternalTool,
+			Severity: reports.SeverityWarning,
+			Path:     "check.kicad_cli",
+			Message:  err.Error(),
+		}
+		return checks.KiCadCLI{}, &issue, nil
+	}
+	return cli, nil, nil
+}
+
+func runCheckERC(ctx context.Context, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, []reports.Issue, []reports.Artifact) {
+	result, err := checks.RunERC(ctx, cli, target, opts)
+	return checkResultWithIssues(result, err)
+}
+
+func runCheckDRC(ctx context.Context, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, []reports.Issue, []reports.Artifact) {
+	result, err := checks.RunDRC(ctx, cli, target, opts)
+	return checkResultWithIssues(result, err)
+}
+
+func checkResultWithIssues(result checks.CheckResult, err error) (checks.CheckResult, []reports.Issue, []reports.Artifact) {
+	issues := []reports.Issue{}
+	for _, finding := range result.Findings {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   checkSeverity(finding.Severity),
+			Path:       filepath.ToSlash(finding.File),
+			Message:    finding.Message,
+			Refs:       finding.References,
+			Nets:       checkFindingNets(finding),
+			Suggestion: "repair category: " + string(finding.RepairCategory),
+		})
+	}
+	for _, parserIssue := range result.ParserIssues {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     result.ReportPath,
+			Message:  parserIssue.Message,
+		})
+	}
+	if err != nil {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeKiCadCLIFailed,
+			Severity: reports.SeverityError,
+			Path:     result.TargetPath,
+			Message:  err.Error(),
+		})
+	}
+	return result, issues, checkArtifacts(result)
+}
+
+func checkFindingNets(finding checks.CheckFinding) []string {
+	seen := map[string]struct{}{}
+	nets := make([]string, 0, len(finding.Nets)+1)
+	add := func(net string) {
+		net = strings.TrimSpace(net)
+		if net == "" {
+			return
+		}
+		key := net
+		if _, ok := seen[key]; ok {
+			return
+		}
+		seen[key] = struct{}{}
+		nets = append(nets, net)
+	}
+	for _, net := range finding.Nets {
+		add(net)
+	}
+	if strings.TrimSpace(finding.Net) != "" {
+		add(finding.Net)
+	}
+	return nets
+}
+
+func checkSeverity(severity string) reports.Severity {
+	switch strings.ToLower(strings.TrimSpace(severity)) {
+	case "warning", "warn", "exclusion", "excluded":
+		return reports.SeverityWarning
+	case "info", "notice":
+		return reports.SeverityInfo
+	default:
+		return reports.SeverityError
+	}
+}
+
+func checkArtifacts(result checks.CheckResult) []reports.Artifact {
+	if strings.TrimSpace(result.ReportPath) == "" {
+		return nil
+	}
+	kind := reports.ArtifactERCReport
+	if result.Kind == checks.CheckKindDRC {
+		kind = reports.ArtifactDRCReport
+	}
+	return []reports.Artifact{{
+		Kind:        kind,
+		Path:        filepath.ToSlash(result.ReportPath),
+		Description: string(result.Kind) + " JSON report",
+	}}
+}
+
 type roundTripReport struct {
 	Target string           `json:"target"`
 	Checks []roundTripCheck `json:"checks"`
@@ -1510,7 +1746,7 @@ func validateStructuredCommandArgs(command string, args []string) (reports.Issue
 
 func structuredCommandKnown(command string) bool {
 	switch command {
-	case "evaluate", "export", "generate", "inspect", "pinmap", "roundtrip", "transaction":
+	case "check", "evaluate", "export", "generate", "inspect", "pinmap", "roundtrip", "transaction":
 		return true
 	default:
 		return false
@@ -1519,6 +1755,11 @@ func structuredCommandKnown(command string) bool {
 
 func requiredStructuredParams(command, subcommand string) (int, bool) {
 	switch command {
+	case "check":
+		switch subcommand {
+		case "erc", "drc", "project":
+			return 1, true
+		}
 	case "evaluate", "inspect", "roundtrip":
 		switch subcommand {
 		case "project", "schematic", "pcb":

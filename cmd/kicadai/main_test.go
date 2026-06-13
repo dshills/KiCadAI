@@ -726,6 +726,89 @@ func TestRunRoundTripSkipsWhenKiCadCLIUnavailable(t *testing.T) {
 	}
 }
 
+func TestRunCheckSkipsWhenKiCadCLIUnavailable(t *testing.T) {
+	t.Setenv("KICADAI_KICAD_CLI", filepath.Join(t.TempDir(), "missing-kicad-cli"))
+	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
+	if err := os.WriteFile(path, []byte(`(kicad_sch)`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "check", "erc", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("skip should not fail command: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "check"`,
+		`"code": "SKIPPED_EXTERNAL_TOOL"`,
+		`"status": "skipped"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunCheckERCWithFakeCLIReportsFindings(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	if err := os.WriteFile(path, []byte(`(kicad_sch)`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	cli := fakeCheckCLI(t, 1, `{"coordinate_units":"mm","sheets":[{"path":"/","violations":[{"description":"Input Power pin not driven by any Output Power pins","severity":"error","type":"power_pin_not_driven","items":[{"description":"Symbol #PWR01 Pin 1","pos":{"x":1,"y":2},"uuid":"11111111-1111-4111-8111-111111111111"}]}]}]}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "--keep-artifacts", "--artifact-dir", filepath.Join(dir, "artifacts"), "check", "erc", path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected validation failure")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": false`,
+		`"command": "check"`,
+		`"kind": "erc"`,
+		`"status": "fail"`,
+		`"power_pin_not_driven"`,
+		`"erc_report"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunCheckProjectWithFakeCLIReportsBothChecks(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for name, contents := range map[string]string{
+		"demo.kicad_pro": "{}",
+		"demo.kicad_sch": `(kicad_sch)`,
+		"demo.kicad_pcb": `(kicad_pcb)`,
+	} {
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(contents), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cli := fakeCheckCLI(t, 0, `{"coordinate_units":"mm","violations":[],"sheets":[]}`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "check", "project", dir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	output := stdout.String()
+	if strings.Count(output, `"status": "pass"`) != 2 {
+		t.Fatalf("expected two passing checks:\n%s", output)
+	}
+}
+
 func TestRunRoundTripSchematicWithFakeCLI(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demo.kicad_sch")
@@ -1016,6 +1099,31 @@ func fakeRoundTripCLI(t *testing.T, logPath string, upgradeExit int) string {
 	}
 	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
 		t.Fatalf("write fake KiCad CLI: %v", err)
+	}
+	return path
+}
+
+func fakeCheckCLI(t *testing.T, exitCode int, reportJSON string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kicad-cli")
+	if runtime.GOOS == "windows" {
+		path += ".bat"
+		t.Skip("fake check CLI helper is implemented for POSIX shells")
+	}
+	body := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"--version\" ]; then echo 10.0.0; exit 0; fi\n" +
+		"out=''\n" +
+		"prev=''\n" +
+		"for arg in \"$@\"; do\n" +
+		"  if [ \"$prev\" = \"--output\" ]; then out=\"$arg\"; fi\n" +
+		"  prev=\"$arg\"\n" +
+		"done\n" +
+		"if [ -n \"$out\" ]; then cat > \"$out\" <<'EOF'\n" +
+		reportJSON + "\nEOF\n" +
+		"fi\n" +
+		"exit " + strconv.Itoa(exitCode) + "\n"
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatalf("write fake check CLI: %v", err)
 	}
 	return path
 }
