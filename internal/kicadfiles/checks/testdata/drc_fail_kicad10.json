@@ -1,0 +1,26 @@
+{
+  "$schema": "https://schemas.kicad.org/drc.v1.json",
+  "coordinate_units": "mm",
+  "kicad_version": "10.0.3",
+  "violations": [
+    {
+      "description": "Clearance violation between tracks",
+      "severity": "error",
+      "type": "clearance",
+      "layer": "F.Cu",
+      "net": "GND",
+      "items": [
+        {
+          "description": "Track on F.Cu",
+          "pos": {
+            "x": 10.125001,
+            "y": 12.5
+          },
+          "uuid": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+          "net": "GND",
+          "layer": "F.Cu"
+        }
+      ]
+    }
+  ]
+}

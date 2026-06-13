@@ -1,6 +1,8 @@
 package checks
 
 import (
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -54,6 +56,33 @@ func TestParseMalformedReport(t *testing.T) {
 	}
 	if len(issues) != 1 || !strings.Contains(issues[0].Message, "unexpected end") {
 		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestParseCheckedInReportSamples(t *testing.T) {
+	tests := []struct {
+		path string
+		kind CheckKind
+		want int
+	}{
+		{path: "erc_fail_kicad10.json", kind: CheckKindERC, want: 4},
+		{path: "drc_fail_kicad10.json", kind: CheckKindDRC, want: 1},
+		{path: "pass_kicad10.json", kind: CheckKindDRC, want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.path, func(t *testing.T) {
+			data, err := os.ReadFile(filepath.Join("testdata", tt.path))
+			if err != nil {
+				t.Fatalf("read sample: %v", err)
+			}
+			findings, issues, _ := ParseReport(tt.kind, data)
+			if len(issues) != 0 {
+				t.Fatalf("issues = %#v", issues)
+			}
+			if len(findings) != tt.want {
+				t.Fatalf("findings = %d, want %d", len(findings), tt.want)
+			}
+		})
 	}
 }
 
