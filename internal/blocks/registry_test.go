@@ -93,7 +93,7 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 		if len(definition.Parameters) == 0 || len(definition.Ports) == 0 {
 			t.Fatalf("%s missing parameters or ports: %#v", definition.ID, definition)
 		}
-		if definition.ID == "i2c_sensor" || definition.ID == "led_indicator" || definition.ID == "opamp_gain_stage" || definition.ID == "voltage_regulator" {
+		if definition.ID == "i2c_sensor" || definition.ID == "led_indicator" || definition.ID == "opamp_gain_stage" || definition.ID == "usb_c_power" || definition.ID == "voltage_regulator" {
 			if definition.Verification.Level != VerificationStructural {
 				t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
 			}

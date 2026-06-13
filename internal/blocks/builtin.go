@@ -5,6 +5,7 @@ const (
 	defaultConnectorFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 	defaultI2CSensorSymbol    = "Sensor:Generic_I2C"
 	defaultOpAmpSymbol        = "Amplifier_Operational:LMV321"
+	defaultUSBCSymbol         = "Connector:USB_C_Receptacle_USB2.0_16P"
 )
 
 func BuiltinDefinitions() []BlockDefinition {
@@ -124,10 +125,14 @@ func usbCPowerDefinition() BlockDefinition {
 		Version:     "0.1.0",
 		Category:    "power",
 		Parameters: []BlockParameter{
+			{Name: "connector_footprint", Type: ParameterFootprintID, Default: "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", Description: "USB-C receptacle footprint ID."},
 			{Name: "current_limit", Type: ParameterCurrent, Default: "500mA", Description: "Expected maximum VBUS current."},
 			{Name: "include_fuse", Type: ParameterBool, Default: true, Description: "Include a resettable fuse on VBUS."},
 			{Name: "include_tvs", Type: ParameterBool, Default: true, Description: "Include VBUS ESD/TVS protection."},
+			{Name: "include_bulk_capacitor", Type: ParameterBool, Default: true, Description: "Include a VBUS bulk capacitor."},
+			{Name: "include_power_led", Type: ParameterBool, Default: false, Description: "Include a VBUS power indicator."},
 			{Name: "shield_policy", Type: ParameterEnum, Default: "chassis", Allowed: []any{"chassis", "gnd", "floating"}, Description: "Connector shield handling."},
+			{Name: "data_mode", Type: ParameterEnum, Default: "power_only", Allowed: []any{"power_only"}, Description: "USB data handling mode. Only power_only is currently supported."},
 		},
 		Ports: []BlockPort{
 			{Name: "VBUS_OUT", Direction: PortPower, Voltage: "5V", Description: "Protected 5 V output."},
@@ -135,10 +140,17 @@ func usbCPowerDefinition() BlockDefinition {
 			{Name: "SHIELD", Direction: PortPassive, Description: "Connector shield node."},
 		},
 		RequiredLibraries: []LibraryRequirement{
-			{Kind: "symbol", ID: "Connector:USB_C_Receptacle_USB2.0", Required: true, Description: "USB-C sink connector."},
+			{Kind: "symbol", ID: defaultUSBCSymbol, Required: true, Description: "USB-C sink connector."},
 			{Kind: "symbol", ID: "Device:R", Required: true, Description: "CC pull-down resistors."},
+			{Kind: "symbol", ID: "Device:Fuse", Required: false, Description: "Optional VBUS fuse."},
+			{Kind: "symbol", ID: "Device:D_TVS", Required: false, Description: "Optional VBUS TVS diode."},
+			{Kind: "symbol", ID: "Device:C", Required: false, Description: "Optional VBUS bulk capacitor."},
+			{Kind: "footprint", ID: "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", Required: false, Description: "Default USB-C receptacle footprint when connector_footprint is not overridden."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; USB-C sink validation is implemented in later phases."),
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Implements USB-C sink power-only wiring with CC pull-downs; USB2 data and no-connect marker emission remain explicit gaps."},
+		},
 	}
 }
 

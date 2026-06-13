@@ -1,0 +1,263 @@
+package blocks
+
+import (
+	"math"
+	"strconv"
+
+	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
+)
+
+const usbPowerLEDResistorValue = "1.5k"
+
+type usbCPinRoleMap struct {
+	VBUS   []string
+	GND    []string
+	CC1    string
+	CC2    string
+	Shield string
+}
+
+var usbCPowerPins = usbCPinRoleMap{
+	VBUS: []string{"A4", "A9", "B4", "B9"},
+	GND:  []string{"A1", "A12", "B1", "B12"},
+	CC1:  "A5",
+	CC2:  "B5",
+	// KiCad 10 Connector:USB_C_Receptacle_USB2.0_16P names the shield pin SH.
+	Shield: "SH",
+}
+
+func instantiateUSBCPower(definition BlockDefinition, request BlockRequest, params map[string]any, issues []reports.Issue) BlockOutput {
+	if hasBlockingIssues(issues) {
+		return dryRunBlockOutput(definition, request, nil, issues)
+	}
+	currentLimit, currentOK := parseUnit(params["current_limit"], "A", currentMultipliers())
+	if !currentOK {
+		issues = append(issues, blockIssue("params.current_limit", "current_limit must be a current literal"))
+	}
+	if currentOK && currentLimit <= 0 {
+		issues = append(issues, blockIssue("params.current_limit", "current_limit must be positive"))
+	}
+	connectorFootprint := stringParam(params, "connector_footprint")
+	if connectorFootprint == "" {
+		issues = append(issues, blockIssue("params.connector_footprint", "connector_footprint is required"))
+	}
+	if stringParam(params, "data_mode") != "power_only" {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityBlocked,
+			Path:       "params.data_mode",
+			Message:    "usb_c_power currently supports power_only mode; USB2 data routing is not implemented",
+			Suggestion: "use data_mode power_only until USB data pin-role support is added",
+		})
+	}
+	if hasBlockingIssues(issues) {
+		return dryRunBlockOutput(definition, request, nil, issues)
+	}
+	issues = append(issues, reports.Issue{
+		Code:       reports.CodeUnsupportedOperation,
+		Severity:   reports.SeverityWarning,
+		Path:       "params.data_mode",
+		Message:    "power_only mode does not emit D+/D- no-connect markers because transactions do not support no-connect operations yet",
+		Suggestion: "review generated schematic in KiCad and add no-connect markers manually if required",
+	})
+
+	allocator := NewInstanceReferenceAllocator(request.InstanceID)
+	connectorRef := allocator.Next("J")
+	connector := BlockComponent{
+		Role:        "usb_c_receptacle",
+		RefPrefix:   "J",
+		Value:       "USB-C Power",
+		SymbolID:    defaultUSBCSymbol,
+		FootprintID: connectorFootprint,
+		Pins:        usbCSymbolPins(usbCPowerPins),
+	}
+	var operations []transactions.Operation
+	var issuesOut []reports.Issue
+	issuesOut = append(issuesOut, issues...)
+	connectorOps, connectorIssues := ComponentOperations(connector, connectorRef, transactions.Point{XMM: 0, YMM: 0})
+	issuesOut = append(issuesOut, connectorIssues...)
+	operations = append(operations, connectorOps...)
+
+	vbusConnectorNet := InstanceNetName(request.InstanceID, "vbus_connector")
+	vbusOutNet := InstanceNetName(request.InstanceID, "vbus_out")
+	gndNet := InstanceNetName(request.InstanceID, "gnd")
+	cc1Net := InstanceNetName(request.InstanceID, "cc1")
+	cc2Net := InstanceNetName(request.InstanceID, "cc2")
+	includeFuse := boolParam(params, "include_fuse", true)
+
+	refs := []string{connectorRef}
+	nets := []string{vbusOutNet, gndNet, cc1Net, cc2Net}
+	if includeFuse {
+		nets = append(nets, vbusConnectorNet)
+	}
+	gndRef := ""
+	gndPin := ""
+	for _, cc := range []struct {
+		role string
+		pin  string
+		net  string
+		xmm  float64
+	}{
+		{role: "cc1_rd", pin: usbCPowerPins.CC1, net: cc1Net, xmm: 15},
+		{role: "cc2_rd", pin: usbCPowerPins.CC2, net: cc2Net, xmm: 25},
+	} {
+		ref := allocator.Next("R")
+		rd := BlockComponent{Role: cc.role, RefPrefix: "R", Value: "5.1k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()}
+		rdOps, rdIssues := ComponentOperations(rd, ref, transactions.Point{XMM: cc.xmm, YMM: 12})
+		issuesOut = append(issuesOut, rdIssues...)
+		operations = append(operations, rdOps...)
+		appendConnectOperation(&operations, &issuesOut, connectorRef, cc.pin, ref, "1", cc.net)
+		appendConnectOperation(&operations, &issuesOut, ref, "2", request.InstanceID, "GND", gndNet)
+		if gndRef == "" {
+			gndRef = ref
+			gndPin = "2"
+		}
+		refs = append(refs, ref)
+	}
+	for _, pin := range usbCPowerPins.GND {
+		appendConnectOperation(&operations, &issuesOut, connectorRef, pin, gndRef, gndPin, gndNet)
+	}
+
+	protectedRef := connectorRef
+	protectedPin := usbCPowerPins.VBUS[0]
+	if includeFuse {
+		fuseRef := allocator.Next("F")
+		fuse := BlockComponent{Role: "vbus_fuse", RefPrefix: "F", Value: currentLimitLabel(currentLimit, currentOK), SymbolID: "Device:Fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Pins: twoTerminalHorizontalPins()}
+		fuseOps, fuseIssues := ComponentOperations(fuse, fuseRef, transactions.Point{XMM: 15, YMM: -12})
+		issuesOut = append(issuesOut, fuseIssues...)
+		operations = append(operations, fuseOps...)
+		for _, pin := range usbCPowerPins.VBUS {
+			appendConnectOperation(&operations, &issuesOut, connectorRef, pin, fuseRef, "1", vbusConnectorNet)
+		}
+		appendConnectOperation(&operations, &issuesOut, fuseRef, "2", request.InstanceID, "VBUS_OUT", vbusOutNet)
+		protectedRef = fuseRef
+		protectedPin = "2"
+		refs = append(refs, fuseRef)
+	} else {
+		for _, pin := range usbCPowerPins.VBUS {
+			appendConnectOperation(&operations, &issuesOut, connectorRef, pin, request.InstanceID, "VBUS_OUT", vbusOutNet)
+		}
+	}
+	if boolParam(params, "include_tvs", true) {
+		tvsRef := allocator.Next("D")
+		tvs := BlockComponent{Role: "vbus_tvs", RefPrefix: "D", Value: "VBUS TVS", SymbolID: "Device:D_TVS", FootprintID: "Diode_SMD:D_SOD-323", Pins: twoTerminalHorizontalPins()}
+		tvsOps, tvsIssues := ComponentOperations(tvs, tvsRef, transactions.Point{XMM: 35, YMM: -12})
+		issuesOut = append(issuesOut, tvsIssues...)
+		operations = append(operations, tvsOps...)
+		appendConnectOperation(&operations, &issuesOut, tvsRef, "1", protectedRef, protectedPin, vbusOutNet)
+		appendConnectOperation(&operations, &issuesOut, tvsRef, "2", gndRef, gndPin, gndNet)
+		refs = append(refs, tvsRef)
+	}
+	if boolParam(params, "include_bulk_capacitor", true) {
+		capRef := allocator.Next("C")
+		cap := BlockComponent{Role: "bulk_capacitor", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()}
+		capOps, capIssues := ComponentOperations(cap, capRef, transactions.Point{XMM: 45, YMM: -12})
+		issuesOut = append(issuesOut, capIssues...)
+		operations = append(operations, capOps...)
+		appendConnectOperation(&operations, &issuesOut, capRef, "1", protectedRef, protectedPin, vbusOutNet)
+		appendConnectOperation(&operations, &issuesOut, capRef, "2", gndRef, gndPin, gndNet)
+		refs = append(refs, capRef)
+	}
+	if boolParam(params, "include_power_led", false) {
+		ledOutput, ledIssues := instantiateUSBPowerLED(definition, request, allocator, protectedRef, protectedPin, vbusOutNet, gndRef, gndPin, gndNet)
+		issuesOut = append(issuesOut, ledIssues...)
+		operations = append(operations, ledOutput.Operations...)
+		refs = append(refs, ledOutput.Instance.Refs...)
+		nets = append(nets, ledOutput.Instance.Nets...)
+	}
+	switch stringParam(params, "shield_policy") {
+	case "gnd":
+		appendConnectOperation(&operations, &issuesOut, connectorRef, usbCPowerPins.Shield, gndRef, gndPin, gndNet)
+	case "chassis":
+		appendConnectOperation(&operations, &issuesOut, connectorRef, usbCPowerPins.Shield, request.InstanceID, "SHIELD", InstanceNetName(request.InstanceID, "shield"))
+		nets = append(nets, InstanceNetName(request.InstanceID, "shield"))
+	case "floating":
+		issuesOut = append(issuesOut, reports.Issue{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityWarning,
+			Path:       "params.shield_policy",
+			Message:    "floating shield policy leaves the shield pin unwired because transactions do not support no-connect operations yet",
+			Suggestion: "review generated schematic in KiCad and add a no-connect marker to the shield pin if required",
+		})
+	}
+
+	output := dryRunBlockOutput(definition, request, operations, issuesOut)
+	output.Instance.Params = params
+	output.Instance.Refs = refs
+	output.Instance.Nets = nets
+	return output
+}
+
+func usbCSymbolPins(roles usbCPinRoleMap) []transactions.PinSpec {
+	positions := map[string]transactions.Point{
+		"A1":  {XMM: 0, YMM: -22.86},
+		"A4":  {XMM: 15.24, YMM: 15.24},
+		"A5":  {XMM: 15.24, YMM: 10.16},
+		"A6":  {XMM: 15.24, YMM: -2.54},
+		"A7":  {XMM: 15.24, YMM: 2.54},
+		"A8":  {XMM: 15.24, YMM: -12.7},
+		"A9":  {XMM: 15.24, YMM: 15.24},
+		"A12": {XMM: 0, YMM: -22.86},
+		"B1":  {XMM: 0, YMM: -22.86},
+		"B4":  {XMM: 15.24, YMM: 15.24},
+		"B5":  {XMM: 15.24, YMM: 7.62},
+		"B6":  {XMM: 15.24, YMM: -5.08},
+		"B7":  {XMM: 15.24, YMM: 0},
+		"B8":  {XMM: 15.24, YMM: -15.24},
+		"B9":  {XMM: 15.24, YMM: 15.24},
+		"B12": {XMM: 0, YMM: -22.86},
+		"SH":  {XMM: -7.62, YMM: -22.86},
+	}
+	pinOrder := []string{"A1", "A4", roles.CC1, "A6", "A7", "A8", "A9", "A12", "B1", "B4", roles.CC2, "B6", "B7", "B8", "B9", "B12", roles.Shield}
+	pins := make([]transactions.PinSpec, 0, len(pinOrder))
+	for _, pin := range pinOrder {
+		position, ok := positions[pin]
+		if !ok {
+			continue
+		}
+		pins = append(pins, transactions.PinSpec{Number: pin, XMM: position.XMM, YMM: position.YMM})
+	}
+	return pins
+}
+
+func currentLimitLabel(currentLimit float64, ok bool) string {
+	if !ok || currentLimit <= 0 {
+		return "Fuse"
+	}
+	return formatCurrent(currentLimit)
+}
+
+func formatCurrent(amps float64) string {
+	if amps < 1 {
+		return formatScalar(amps*1000) + "mA"
+	}
+	return formatScalar(amps) + "A"
+}
+
+func formatScalar(value float64) string {
+	if math.Abs(value-math.Round(value)) < 1e-9 {
+		return strconv.FormatFloat(value, 'f', 0, 64)
+	}
+	return strconv.FormatFloat(value, 'f', 2, 64)
+}
+
+func instantiateUSBPowerLED(definition BlockDefinition, request BlockRequest, allocator *ReferenceAllocator, vbusRef string, vbusPin string, vbusNet string, gndRef string, gndPin string, gndNet string) (BlockOutput, []reports.Issue) {
+	resistorRef := allocator.Next("R")
+	ledRef := allocator.Next("D")
+	resistor := BlockComponent{Role: "power_led_resistor", RefPrefix: "R", Value: usbPowerLEDResistorValue, SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()}
+	led := BlockComponent{Role: "power_led", RefPrefix: "D", Value: "POWER LED", SymbolID: "Device:LED", FootprintID: "LED_SMD:LED_0805_2012Metric", Pins: twoTerminalHorizontalPins()}
+	var operations []transactions.Operation
+	var issues []reports.Issue
+	resistorOps, resistorIssues := ComponentOperations(resistor, resistorRef, transactions.Point{XMM: 55, YMM: -12})
+	issues = append(issues, resistorIssues...)
+	operations = append(operations, resistorOps...)
+	ledOps, ledIssues := ComponentOperations(led, ledRef, transactions.Point{XMM: 67.7, YMM: -12})
+	issues = append(issues, ledIssues...)
+	operations = append(operations, ledOps...)
+	seriesNet := InstanceNetName(request.InstanceID, "power_led_series")
+	appendConnectOperation(&operations, &issues, vbusRef, vbusPin, resistorRef, "1", vbusNet)
+	appendConnectOperation(&operations, &issues, resistorRef, "2", ledRef, "1", seriesNet)
+	appendConnectOperation(&operations, &issues, ledRef, "2", gndRef, gndPin, gndNet)
+	return BlockOutput{Definition: Summary(definition), Instance: BlockInstance{BlockID: definition.ID, InstanceID: request.InstanceID, Refs: []string{resistorRef, ledRef}, Nets: []string{seriesNet}}, Operations: operations, Issues: issues}, issues
+}
