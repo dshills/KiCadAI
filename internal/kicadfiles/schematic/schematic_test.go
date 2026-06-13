@@ -3,6 +3,7 @@ package schematic
 import (
 	"bytes"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 
@@ -454,6 +455,42 @@ func TestNewSymbolUsesWriterDerivedProperties(t *testing.T) {
 	}
 	if properties[1].Name != "Value" || properties[1].Value != "1k" {
 		t.Fatalf("derived value property = %#v", properties[1])
+	}
+}
+
+func TestWriterDerivedSymbolPropertiesBaselineMissingRoundTripDefaults(t *testing.T) {
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{},
+	)
+
+	properties := symbolProperties(symbol)
+	names := make([]string, 0, len(properties))
+	for _, property := range properties {
+		names = append(names, property.Name)
+	}
+	for _, want := range []string{"Reference", "Value"} {
+		if !slices.Contains(names, want) {
+			t.Errorf("derived properties missing %q: %#v", want, names)
+		}
+	}
+	for _, missing := range []string{"Footprint", "Datasheet", "Description"} {
+		if slices.Contains(names, missing) {
+			t.Errorf("baseline expected %q to be missing before round-trip compatibility fix: %#v", missing, names)
+		}
+	}
+}
+
+func TestRenderAtBaselineUsesNonCanonicalZero(t *testing.T) {
+	output, err := sexpr.Format(renderAt(kicadfiles.Point{}, 0))
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	if strings.TrimSpace(output) != "(at 0.0 0.0 0)" {
+		t.Fatalf("baseline expected schematic zero at-node to render as 0.0 before canonicalization:\n%s", output)
 	}
 }
 
