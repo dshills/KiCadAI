@@ -220,7 +220,7 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "generate":
 		return runGenerate(opts, stdout)
 	case "block":
-		return runBlock(opts, stdout)
+		return runBlock(ctx, opts, stdout)
 	case "plan-led-demo":
 		return a.runPlanLEDDemo(opts, stdout)
 	case "ping":
@@ -362,7 +362,7 @@ func runGenerateBreakout(opts cliOptions, stdout io.Writer) error {
 	return nil
 }
 
-func runBlock(opts cliOptions, stdout io.Writer) error {
+func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("block requires --json in this implementation phase")
 	}
@@ -422,8 +422,60 @@ func runBlock(opts cliOptions, stdout io.Writer) error {
 				Message:  err.Error(),
 			})
 		}
-		output, issues := registry.Instantiate(context.Background(), request)
-		return writeBlockResult(stdout, output, issues)
+		output, issues := registry.Instantiate(ctx, request)
+		if opts.output == "" || reports.HasBlockingIssue(issues) {
+			return writeBlockResult(stdout, output, issues)
+		}
+		projectName := blockProjectName(opts, request.InstanceID)
+		tx, err := blocks.ProjectTransactionForBlockOutput(projectName, output, opts.overwrite)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "block.instantiate",
+				Message:  err.Error(),
+			})
+		}
+		applyResult := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite, Seed: opts.seed})
+		return writeBlockApplyResult(stdout, blockProjectGenerationResult{
+			Output:      output,
+			Transaction: tx,
+			ApplyResult: applyResult,
+		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
+	case "compose":
+		if len(opts.commandArgs) != 1 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("compose", 0))
+		}
+		request, err := compositionRequestFromOptions(opts)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "request",
+				Message:  err.Error(),
+			})
+		}
+		output := blocks.ComposeBlocks(ctx, registry, request)
+		issues := output.Issues
+		if opts.output == "" || reports.HasBlockingIssue(issues) {
+			return writeBlockResult(stdout, output, issues)
+		}
+		projectName := blockProjectName(opts, output.ProjectName)
+		tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, output, opts.overwrite)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "block.compose",
+				Message:  err.Error(),
+			})
+		}
+		applyResult := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite, Seed: opts.seed})
+		return writeBlockApplyResult(stdout, compositionProjectGenerationResult{
+			Output:      output,
+			Transaction: tx,
+			ApplyResult: applyResult,
+		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
 	default:
 		return writeBlockFailure(stdout, reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -436,7 +488,11 @@ func runBlock(opts cliOptions, stdout io.Writer) error {
 
 func blockRequestFromOptions(opts cliOptions, id string) (blocks.BlockRequest, error) {
 	if strings.TrimSpace(opts.requestPath) == "" {
-		return blocks.BlockRequest{BlockID: id}, nil
+		request := blocks.BlockRequest{BlockID: id}
+		if strings.TrimSpace(opts.output) != "" {
+			request.InstanceID = blockProjectName(opts, id)
+		}
+		return request, nil
 	}
 	data, err := os.ReadFile(opts.requestPath)
 	if err != nil {
@@ -452,7 +508,56 @@ func blockRequestFromOptions(opts cliOptions, id string) (blocks.BlockRequest, e
 	if request.BlockID != id {
 		return blocks.BlockRequest{}, fmt.Errorf("request block_id %q does not match command block ID %q", request.BlockID, id)
 	}
+	if request.InstanceID == "" && strings.TrimSpace(opts.output) != "" {
+		request.InstanceID = blockProjectName(opts, id)
+	}
 	return request, nil
+}
+
+func compositionRequestFromOptions(opts cliOptions) (blocks.CompositionRequest, error) {
+	if strings.TrimSpace(opts.requestPath) == "" {
+		return blocks.CompositionRequest{}, fmt.Errorf("block compose requires --request")
+	}
+	data, err := os.ReadFile(opts.requestPath)
+	if err != nil {
+		return blocks.CompositionRequest{}, err
+	}
+	var request blocks.CompositionRequest
+	if err := json.Unmarshal(data, &request); err != nil {
+		return blocks.CompositionRequest{}, err
+	}
+	if len(request.Instances) == 0 {
+		return blocks.CompositionRequest{}, fmt.Errorf("composition request must contain at least one instance")
+	}
+	return request, nil
+}
+
+func blockProjectName(opts cliOptions, fallback string) string {
+	if strings.TrimSpace(opts.name) != "" {
+		return opts.name
+	}
+	if strings.TrimSpace(fallback) != "" {
+		return fallback
+	}
+	if strings.TrimSpace(opts.output) != "" {
+		base := filepath.Base(filepath.Clean(opts.output))
+		if base != "." && base != ".." && strings.TrimSpace(base) != "" {
+			return base
+		}
+	}
+	return blocks.DefaultGeneratedProjectName
+}
+
+type blockProjectGenerationResult struct {
+	Output      blocks.BlockOutput       `json:"output"`
+	Transaction transactions.Transaction `json:"transaction"`
+	ApplyResult transactions.ApplyResult `json:"apply_result"`
+}
+
+type compositionProjectGenerationResult struct {
+	Output      blocks.CompositionOutput `json:"output"`
+	Transaction transactions.Transaction `json:"transaction"`
+	ApplyResult transactions.ApplyResult `json:"apply_result"`
 }
 
 func writeBlockResult(stdout io.Writer, data any, issues []reports.Issue) error {
@@ -464,6 +569,29 @@ func writeBlockResult(stdout io.Writer, data any, issues []reports.Issue) error 
 		return errors.New("block command failed")
 	}
 	return nil
+}
+
+func writeBlockApplyResult(stdout io.Writer, data any, issues []reports.Issue, artifacts []reports.Artifact) error {
+	result := reports.ResultWithIssues("block", data, issues, artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("block command failed")
+	}
+	return nil
+}
+
+func combinedBlockIssues(groups ...[]reports.Issue) []reports.Issue {
+	total := 0
+	for _, group := range groups {
+		total += len(group)
+	}
+	combined := make([]reports.Issue, 0, total)
+	for _, group := range groups {
+		combined = append(combined, group...)
+	}
+	return combined
 }
 
 func writeBlockFailure(stdout io.Writer, issue reports.Issue) error {

@@ -95,6 +95,7 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 		Value:     component.Value,
 		LibraryID: component.SymbolID,
 		At:        at,
+		Pins:      append([]transactions.PinSpec(nil), component.Pins...),
 	})
 	if err != nil {
 		return nil, []reports.Issue{blockIssue("component."+component.Role, err.Error())}

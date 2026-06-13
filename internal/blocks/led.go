@@ -70,6 +70,7 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 		Value:       formatOhms(resistorOhms),
 		SymbolID:    "Device:R",
 		FootprintID: resistorFootprint,
+		Pins:        twoTerminalHorizontalPins(),
 	}
 	led := BlockComponent{
 		Role:        "led",
@@ -77,6 +78,7 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 		Value:       strings.ToUpper(stringParam(params, "color")) + " LED",
 		SymbolID:    "Device:LED",
 		FootprintID: ledFootprint,
+		Pins:        twoTerminalHorizontalPins(),
 	}
 	var operations []transactions.Operation
 	resistorOps, componentIssues := ComponentOperations(resistor, resistorRef, transactions.Point{XMM: 0, YMM: 0})
@@ -114,6 +116,15 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 		output.Instance.Nets = []string{vccNet, seriesNet, inputNet}
 	}
 	return output
+}
+
+func twoTerminalHorizontalPins() []transactions.PinSpec {
+	// These are schematic symbol anchors only. Footprint pad geometry is
+	// resolved separately by the PCB/library writer.
+	return []transactions.PinSpec{
+		{Number: "1", XMM: -2.54, YMM: 0},
+		{Number: "2", XMM: 2.54, YMM: 0},
+	}
 }
 
 func appendConnectOperation(operations *[]transactions.Operation, issues *[]reports.Issue, fromRef string, fromPin string, toRef string, toPin string, netName string) {

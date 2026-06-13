@@ -105,15 +105,16 @@ type LibraryRequirement struct {
 }
 
 type BlockComponent struct {
-	Role           string            `json:"role"`
-	RefPrefix      string            `json:"ref_prefix"`
-	Value          string            `json:"value,omitempty"`
-	SymbolID       string            `json:"symbol_id"`
-	FootprintID    string            `json:"footprint_id,omitempty"`
-	Properties     map[string]string `json:"properties,omitempty"`
-	PinmapRequired bool              `json:"pinmap_required,omitempty"`
-	PlacementGroup string            `json:"placement_group,omitempty"`
-	Alternatives   []string          `json:"alternatives,omitempty"`
+	Role           string                 `json:"role"`
+	RefPrefix      string                 `json:"ref_prefix"`
+	Value          string                 `json:"value,omitempty"`
+	SymbolID       string                 `json:"symbol_id"`
+	FootprintID    string                 `json:"footprint_id,omitempty"`
+	Pins           []transactions.PinSpec `json:"pins,omitempty"`
+	Properties     map[string]string      `json:"properties,omitempty"`
+	PinmapRequired bool                   `json:"pinmap_required,omitempty"`
+	PlacementGroup string                 `json:"placement_group,omitempty"`
+	Alternatives   []string               `json:"alternatives,omitempty"`
 }
 
 type BlockNet struct {

@@ -879,6 +879,121 @@ func TestRunGenerateBreakoutJSON(t *testing.T) {
 	}
 }
 
+func TestRunBlockInstantiateWritesProject(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "status_led")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--output", output, "--name", "status_led", "block", "instantiate", "led_indicator"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	text := stdout.String()
+	for _, want := range []string{`"ok": true`, `"command": "block"`, `"apply_result"`, `"kicad_project"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected output to contain %q:\n%s", want, text)
+		}
+	}
+	for _, name := range []string{"status_led.kicad_pro", "status_led.kicad_sch", "status_led.kicad_pcb"} {
+		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
+			t.Fatalf("expected generated %s: %v", name, err)
+		}
+	}
+}
+
+func TestRunBlockComposeWritesProject(t *testing.T) {
+	dir := t.TempDir()
+	request := filepath.Join(dir, "request.json")
+	output := filepath.Join(dir, "composed")
+	body := `{
+	  "project_name": "composed",
+	  "instances": [
+	    {"id": "header", "block_id": "connector_breakout", "params": {"pin_names": ["SIG", "GND"]}},
+	    {"id": "status", "block_id": "led_indicator"}
+	  ],
+	  "connections": [
+	    {"from": {"instance_id": "header", "port": "SIG"}, "to": {"instance_id": "status", "port": "IN"}, "net_alias": "LED_EN"}
+	  ]
+	}`
+	if err := os.WriteFile(request, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--request", request, "--output", output, "block", "compose"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	text := stdout.String()
+	for _, want := range []string{`"ok": true`, `"command": "block"`, `"project_name": "composed"`, `"kind": "schematic"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected output to contain %q:\n%s", want, text)
+		}
+	}
+	for _, name := range []string{"composed.kicad_pro", "composed.kicad_sch", "composed.kicad_pcb"} {
+		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
+			t.Fatalf("expected generated %s: %v", name, err)
+		}
+	}
+}
+
+func TestRunBlockComposeRequiresRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "block", "compose"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"block compose requires --request"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunBlockComposeRejectsEmptyRequest(t *testing.T) {
+	request := filepath.Join(t.TempDir(), "request.json")
+	if err := os.WriteFile(request, []byte(`{"project_name":"empty"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--request", request, "block", "compose"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"composition request must contain at least one instance"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunBlockRequiresSubcommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "block"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"block requires a subcommand"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func TestRunBlockMissingBlockReturnsError(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "block", "show", "missing_block"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"block not found: missing_block"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func fakeRoundTripCLI(t *testing.T, logPath string, upgradeExit int) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "kicad-cli")

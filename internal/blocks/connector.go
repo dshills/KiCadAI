@@ -61,6 +61,7 @@ func instantiateConnectorBreakout(definition BlockDefinition, request BlockReque
 		Value:       fmt.Sprintf("Conn_01x%02d", len(pinNames)),
 		SymbolID:    connectorSymbol,
 		FootprintID: connectorFootprint,
+		Pins:        connectorSymbolPins(len(pinNames)),
 	}
 	operations, componentIssues := ComponentOperations(component, connectorRef, transactions.Point{XMM: 0, YMM: 0})
 	issues = append(issues, componentIssues...)
@@ -78,6 +79,16 @@ func instantiateConnectorBreakout(definition BlockDefinition, request BlockReque
 	output.Instance.Refs = []string{connectorRef}
 	output.Instance.Nets = nets
 	return output
+}
+
+func connectorSymbolPins(pinCount int) []transactions.PinSpec {
+	pins := make([]transactions.PinSpec, 0, pinCount)
+	for pin := 1; pin <= pinCount; pin++ {
+		// These are schematic symbol anchors only. Footprint pad geometry is
+		// resolved separately by the PCB/library writer.
+		pins = append(pins, transactions.PinSpec{Number: fmt.Sprint(pin), XMM: 0, YMM: float64(pin-1) * 2.54})
+	}
+	return pins
 }
 
 func stringListParam(params map[string]any, name string) []string {
