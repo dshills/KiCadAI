@@ -6,6 +6,8 @@ intended to be a safer AI-facing design primitive than raw file writes.
 
 The current implementation generates structural KiCad project and schematic
 outputs. It does not yet claim fabrication-ready PCB output.
+The current readiness review and gap matrix are tracked in
+[circuit-block-readiness.md](circuit-block-readiness.md).
 
 ## Available Blocks
 

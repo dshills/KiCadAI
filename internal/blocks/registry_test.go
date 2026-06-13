@@ -100,6 +100,9 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 		} else if definition.Verification.Level != VerificationExperimental {
 			t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
 		}
+		if definition.Verification.Level.AllowsFabricationReadinessClaim() {
+			t.Errorf("%s unexpectedly allows fabrication readiness claims at level %q", definition.ID, definition.Verification.Level)
+		}
 		if issues := NewRegistry(nil).ValidateDefinition(definition); len(issues) != 0 {
 			t.Fatalf("%s validation issues = %#v", definition.ID, issues)
 		}

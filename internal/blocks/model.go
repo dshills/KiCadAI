@@ -23,6 +23,17 @@ const (
 	VerificationReferenceVerified VerificationLevel = "reference_verified"
 )
 
+// AllowsFabricationReadinessClaim reports whether this verification level has
+// enough evidence to permit a fabrication-readiness claim.
+func (level VerificationLevel) AllowsFabricationReadinessClaim() bool {
+	switch level {
+	case VerificationRoundTripVerified, VerificationERCDRCVerified, VerificationReferenceVerified:
+		return true
+	default:
+		return false
+	}
+}
+
 type BlockParameterType string
 
 const (

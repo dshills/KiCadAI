@@ -132,6 +132,30 @@ func TestVerificationLevelStableString(t *testing.T) {
 	}
 }
 
+func TestVerificationLevelFabricationReadinessEligibility(t *testing.T) {
+	eligible := []VerificationLevel{
+		VerificationRoundTripVerified,
+		VerificationERCDRCVerified,
+		VerificationReferenceVerified,
+	}
+	for _, level := range eligible {
+		if !level.AllowsFabricationReadinessClaim() {
+			t.Errorf("%s should allow fabrication readiness claims", level)
+		}
+	}
+	ineligible := []VerificationLevel{
+		VerificationExperimental,
+		VerificationStructural,
+		VerificationLevel(""),
+		VerificationLevel("unknown"),
+	}
+	for _, level := range ineligible {
+		if level.AllowsFabricationReadinessClaim() {
+			t.Errorf("%s should not allow fabrication readiness claims", level)
+		}
+	}
+}
+
 func minimalDefinition() BlockDefinition {
 	return BlockDefinition{
 		ID:          "led_indicator",

@@ -355,7 +355,8 @@ system. The generated block examples are structural schematic/project outputs;
 they are not yet fabrication-ready PCB designs. See
 [docs/circuit-block-library.md](docs/circuit-block-library.md) for request
 formats, verification levels, resolver requirements, examples, AI usage, and
-known limitations.
+known limitations. The current release-readiness gap matrix is in
+[docs/circuit-block-readiness.md](docs/circuit-block-readiness.md).
 
 ### Round-Trip Validation
 
