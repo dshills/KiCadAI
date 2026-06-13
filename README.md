@@ -5,8 +5,8 @@ three related capabilities:
 
 - a Go client for probing KiCad's live IPC API;
 - direct KiCad project, schematic, and PCB file writers;
-- CLI tools for generation, inspection, evaluation, round-trip validation,
-  transactions, and pinmap readiness checks.
+- CLI tools for generation, inspection, evaluation, ERC/DRC feedback,
+  round-trip validation, transactions, and pinmap readiness checks.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -17,7 +17,8 @@ deterministic, and testable.
 The direct-file workflow is the main functional path today. It can generate
 KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
-transactions to imported projects, and validate symbol-to-footprint pinmaps.
+transactions to imported projects, validate symbol-to-footprint pinmaps, and run
+KiCad-backed ERC/DRC checks through `kicad-cli`.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -30,7 +31,7 @@ writing KiCad files directly.
 - Go 1.22 or newer.
 - KiCad 9 or newer is the target for current file output and IPC protobufs.
 - `kicad-cli` is optional, but recommended for round-trip checks and external
-  KiCad validation.
+  KiCad ERC/DRC validation.
 - `protoc` is only needed when regenerating vendored protobuf bindings.
 
 The repository vendors KiCad API protobuf definitions under
@@ -120,6 +121,8 @@ go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
 go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
 go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
+go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 go run ./cmd/kicadai --json pinmap list
 go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 ```
@@ -410,6 +413,20 @@ schematic or PCB files are present. Run `check project` when you need actual
 KiCad ERC/DRC evidence. A design can be parseable and structurally evaluated
 without being ERC/DRC clean or fabrication-ready.
 
+Check output includes:
+
+- stable finding IDs;
+- KiCad rule/code, severity, references, nets, layers, locations, and raw report
+  snippets when available;
+- repair categories such as `connectivity`, `power`, `clearance`, `outline`,
+  `footprint`, and `net_assignment`;
+- an AI-friendly summary prompt grouped by category, reference, net, and layer.
+
+Current caveat: real ERC smoke testing works with local KiCad 10.0.3. The DRC
+runner and parser are implemented and covered with deterministic tests, but the
+current local KiCad CLI exits before writing DRC JSON for the generated PCB
+fixtures, so a stable real DRC fixture remains a follow-up.
+
 ### Export Skeleton
 
 The `export` command family exists as a structured CLI placeholder for future
@@ -437,6 +454,7 @@ Checked-in examples live under `examples/`:
 | `06_class_ab_headphone_amp` | Op-amp gain stage with diode-biased class AB headphone output. |
 | `07_generated_pcb` | Generated schematic and PCB fixture. |
 | `08_pcb_object_correctness` | PCB object correctness fixture. |
+| `checks` | ERC/DRC fixture projects and report samples for KiCad-backed validation. |
 | `blocks` | Circuit block library request files and generated schematic/project examples. |
 
 Open each KiCad project by opening the `.kicad_pro` file in its directory.
@@ -456,6 +474,7 @@ Key packages:
 - `internal/generate`: higher-level project generators.
 - `internal/inspect`: inspection reports.
 - `internal/evaluate`: readiness and correctness evaluation.
+- `internal/kicadfiles/checks`: KiCad CLI ERC/DRC execution, report parsing, and AI-facing findings.
 - `internal/kicadfiles/roundtrip`: KiCad CLI round-trip validation.
 - `internal/pinmap`: symbol-footprint-pinmap registry and validation.
 - `internal/workflows`: AI-facing named workflow registry.
@@ -475,7 +494,14 @@ make test
 Equivalent direct command:
 
 ```sh
-GOCACHE=/tmp/kicadai-gocache go test ./...
+go test ./...
+```
+
+If your environment blocks the default Go build cache location, use a writable
+temporary cache:
+
+```sh
+GOCACHE="$(mktemp -d)" go test ./...
 ```
 
 Coverage:
@@ -514,6 +540,23 @@ go test ./internal/kicadfiles/roundtrip
 
 Set `KICADAI_KICAD_CLI` if `kicad-cli` is not on `PATH`.
 
+ERC/DRC parser and fake-runner tests:
+
+```sh
+go test ./internal/kicadfiles/checks
+```
+
+Real ERC/DRC CLI smoke checks:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
+  --keep-artifacts \
+  --artifact-dir ./examples/check_artifacts \
+  check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
+```
+
 ## Protobuf Maintenance
 
 Refresh vendored KiCad protobuf definitions intentionally:
@@ -546,6 +589,8 @@ make test
 - Footprint geometry is still generated from transaction payloads and defaults;
   there is not yet a full footprint-library expander.
 - Export/BOM/fabrication packaging commands are placeholders.
+- Real DRC execution still needs a stable known-good/known-bad fixture on the
+  local KiCad CLI; parser and command paths are implemented.
 - Windows named-pipe IPC support is not implemented.
 
 ## Troubleshooting
@@ -565,6 +610,11 @@ make test
 - `pinmap validate` blocked by hierarchy: validate child sheets directly or wait
   for hierarchy flattening support.
 - Round-trip skipped: install `kicad-cli` or pass `--kicad-cli`.
+- ERC/DRC check skipped: install `kicad-cli`, set `KICADAI_KICAD_CLI`, or pass
+  `--kicad-cli`.
+- ERC/DRC check returns findings: this is a design validation failure, not a
+  tool failure. The JSON `data.checks[].summary.prompt` field is intended for
+  compact AI repair context.
 
 ## Design Direction
 
