@@ -4,6 +4,8 @@ const (
 	defaultConnectorSymbol    = "Connector_Generic:Conn_01x02"
 	defaultConnectorFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 	defaultI2CSensorSymbol    = "Sensor:Generic_I2C"
+	defaultMCUSymbol          = "MCU_Microchip_ATmega:ATmega328P-A"
+	defaultMCUFootprint       = "Package_QFP:TQFP-32_7x7mm_P0.8mm"
 	defaultOpAmpSymbol        = "Amplifier_Operational:LMV321"
 	defaultUSBCSymbol         = "Connector:USB_C_Receptacle_USB2.0_16P"
 )
@@ -102,18 +104,45 @@ func mcuMinimalDefinition() BlockDefinition {
 		Version:     "0.1.0",
 		Category:    "digital",
 		Parameters: []BlockParameter{
-			{Name: "mcu_symbol", Type: ParameterSymbolID, Required: true, Description: "KiCad symbol ID for the MCU."},
-			{Name: "mcu_footprint", Type: ParameterFootprintID, Required: true, Description: "KiCad footprint ID for the MCU package."},
+			{Name: "mcu_symbol", Type: ParameterSymbolID, Default: defaultMCUSymbol, Description: "KiCad symbol ID for a supported MCU pin-role template. Only the default ATmega328P-A template is currently supported."},
+			{Name: "mcu_footprint", Type: ParameterFootprintID, Default: defaultMCUFootprint, Description: "KiCad footprint ID compatible with the selected MCU pin-role template."},
 			{Name: "supply_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "MCU supply rail."},
-			{Name: "programming_header", Type: ParameterEnum, Default: "swd", Allowed: []any{"none", "swd", "isp", "uart"}, Description: "Programming/debug header mode."},
+			{Name: "clock_mode", Type: ParameterEnum, Default: "internal", Allowed: []any{"internal"}, Description: "Clock source mode. Only internal clock wiring is currently supported."},
+			{Name: "reset_mode", Type: ParameterEnum, Default: "pullup", Allowed: []any{"pullup", "pullup_switch", "external"}, Description: "Reset-pin support circuit."},
+			{Name: "programming_header", Type: ParameterEnum, Default: "isp", Allowed: []any{"none", "isp", "uart"}, Description: "Programming/debug header mode."},
+			{Name: "decoupling_count", Type: ParameterNumber, Default: 3, Description: "Number of local supply decoupling capacitors."},
+			{Name: "decoupling_value", Type: ParameterCapacitance, Default: "100nF", Description: "Local decoupling capacitor value."},
+			{Name: "capacitor_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Decoupling capacitor footprint ID."},
+			{Name: "reset_pullup_value", Type: ParameterResistance, Default: "10k", Description: "Reset pull-up resistor value."},
+			{Name: "reset_resistor_footprint", Type: ParameterFootprintID, Default: "Resistor_SMD:R_0805_2012Metric", Description: "Reset pull-up resistor footprint ID."},
 		},
 		Ports: []BlockPort{
 			{Name: "VCC", Direction: PortPower, Voltage: "supply_voltage", Description: "MCU supply input."},
 			{Name: "GND", Direction: PortPower, Description: "Ground return."},
 			{Name: "RESET", Direction: PortInput, Description: "Reset signal."},
-			{Name: "GPIO", Direction: PortBidirectional, Description: "Application GPIO export group."},
+			{Name: "AREF", Direction: PortPassive, Description: "Analog reference node with local decoupling."},
+			{Name: "GPIO", Direction: PortBidirectional, Description: "General-purpose PB0 application pin."},
+			{Name: "MOSI", Direction: PortBidirectional, Description: "SPI programming data from programmer."},
+			{Name: "MISO", Direction: PortBidirectional, Description: "SPI programming data to programmer."},
+			{Name: "SCK", Direction: PortInput, Description: "SPI programming clock."},
+			{Name: "UART_TX", Direction: PortOutput, Description: "UART transmit pin when UART header is enabled."},
+			{Name: "UART_RX", Direction: PortInput, Description: "UART receive pin when UART header is enabled."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; MCU pin-role metadata remains a known gap."),
+		RequiredLibraries: []LibraryRequirement{
+			{Kind: "symbol", ID: defaultMCUSymbol, Required: true, Description: "Supported MCU symbol template."},
+			{Kind: "symbol", ID: "Device:C", Required: true, Description: "Decoupling capacitors."},
+			{Kind: "symbol", ID: "Device:R", Required: true, Description: "Reset pull-up resistor."},
+			{Kind: "symbol", ID: "Connector_Generic:Conn_02x03_Odd_Even", Required: false, Description: "Optional AVR ISP header."},
+			{Kind: "symbol", ID: "Connector_Generic:Conn_01x04", Required: false, Description: "Optional UART header."},
+			{Kind: "symbol", ID: "Switch:SW_Push", Required: false, Description: "Optional reset switch."},
+			{Kind: "footprint", ID: defaultMCUFootprint, Required: true, Description: "Default MCU footprint."},
+			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: false, Description: "Default decoupling capacitor footprint."},
+			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: false, Description: "Default reset pull-up resistor footprint."},
+		},
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Uses an explicit ATmega328P-A pin-role map; arbitrary MCU symbols remain blocked until resolver semantic metadata is available."},
+		},
 	}
 }
 
