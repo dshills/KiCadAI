@@ -324,6 +324,39 @@ Use `--library-cache .kicadai/library-index.json` for faster repeated loads and
 [docs/library-resolver.md](docs/library-resolver.md) for setup, command
 examples, cache behavior, compatibility statuses, and opt-in integration tests.
 
+### Circuit Block Library
+
+The `block` command exposes reusable circuit primitives for AI-assisted
+schematic generation. Blocks declare parameters, ports, required libraries, and
+verification levels.
+
+```sh
+go run ./cmd/kicadai --json block list
+go run ./cmd/kicadai --json block show led_indicator
+go run ./cmd/kicadai \
+  --json \
+  --request examples/blocks/requests/led_indicator.json \
+  --output ./out/led_indicator \
+  --name led_indicator \
+  --overwrite \
+  block instantiate led_indicator
+go run ./cmd/kicadai \
+  --json \
+  --request examples/blocks/requests/composed_sensor_breakout.json \
+  --output ./out/composed_sensor_breakout \
+  --name composed_sensor_breakout \
+  --overwrite \
+  block compose
+```
+
+Current built-in blocks include LED indicator, connector breakout, voltage
+regulator, I2C sensor, op-amp gain stage, USB-C power input, and MCU minimal
+system. The generated block examples are structural schematic/project outputs;
+they are not yet fabrication-ready PCB designs. See
+[docs/circuit-block-library.md](docs/circuit-block-library.md) for request
+formats, verification levels, resolver requirements, examples, AI usage, and
+known limitations.
+
 ### Round-Trip Validation
 
 Round-trip commands use `kicad-cli` to save or normalize files and compare the
@@ -376,6 +409,7 @@ Checked-in examples live under `examples/`:
 | `06_class_ab_headphone_amp` | Op-amp gain stage with diode-biased class AB headphone output. |
 | `07_generated_pcb` | Generated schematic and PCB fixture. |
 | `08_pcb_object_correctness` | PCB object correctness fixture. |
+| `blocks` | Circuit block library request files and generated schematic/project examples. |
 
 Open each KiCad project by opening the `.kicad_pro` file in its directory.
 
