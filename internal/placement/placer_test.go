@@ -97,6 +97,35 @@ func TestPlaceSamplesAcrossBoardWhenCandidateCapIsSmall(t *testing.T) {
 	}
 }
 
+func TestPlaceCanUseBottomLayerForSideAny(t *testing.T) {
+	req := twoComponentRequest()
+	req.Rules.AllowBackLayer = true
+	req.Components[0].Side = SideTop
+	req.Components[1].Side = SideAny
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Components[1].Fixed = true
+	req.Components[1].Position = &Placement{XMM: 5, YMM: 5, Layer: "B.Cu"}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+}
+
+func TestCandidateLayersRespectSideConstraints(t *testing.T) {
+	rules := Rules{AllowBackLayer: true}
+	if got := candidateLayers(Component{Side: SideTop}, rules); len(got) != 1 || got[0] != "F.Cu" {
+		t.Fatalf("top candidate layers = %#v, want F.Cu", got)
+	}
+	if got := candidateLayers(Component{Side: SideBottom}, rules); len(got) != 1 || got[0] != "B.Cu" {
+		t.Fatalf("bottom candidate layers = %#v, want B.Cu", got)
+	}
+	if got := candidateLayers(Component{Side: SideAny}, rules); len(got) != 2 {
+		t.Fatalf("any candidate layers = %#v, want top and bottom", got)
+	}
+}
+
 func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	req := minimalRequest()
 	req = NormalizeRequest(req)

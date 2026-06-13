@@ -119,15 +119,13 @@ func candidatePlacements(component Component, request Request) []PlacementResult
 	if component.Rotation.FixedDeg != nil {
 		rotations = []float64{*component.Rotation.FixedDeg}
 	}
-	layer := defaultPlacementLayer
-	if component.Side == SideBottom {
-		layer = "B.Cu"
-	}
+	layers := candidateLayers(component, request.Rules)
 	maxCandidates := request.Rules.MaxCandidatesPerPart
-	candidates := make([]PlacementResult, 0, min(maxCandidates, 64))
+	candidates := make([]PlacementResult, 0, maxCandidates)
 	xCount := max(1, int(math.Floor((usable.Max.XMM-usable.Min.XMM)/grid))+1)
 	yCount := max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)
-	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(max(1, len(rotations)))))))
+	variantsPerPoint := max(1, len(rotations)*len(layers))
+	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
 	xIndices := sampledIndices(xCount, axisSamples)
 	yIndices := sampledIndices(yCount, axisSamples)
 	for _, yIndex := range yIndices {
@@ -135,12 +133,14 @@ func candidatePlacements(component Component, request Request) []PlacementResult
 		for _, xIndex := range xIndices {
 			x := usable.Min.XMM + float64(xIndex)*grid
 			for _, rotation := range rotations {
-				candidate := Placement{XMM: roundToGrid(x, grid), YMM: roundToGrid(y, grid), RotationDeg: rotation, Layer: layer}
-				candidateResult, ok := NewPlacementResult(component, candidate, request.Rules)
-				if !ok || !usable.Contains(candidateResult.Bounds) {
-					continue
+				for _, layer := range layers {
+					candidate := Placement{XMM: roundToGrid(x, grid), YMM: roundToGrid(y, grid), RotationDeg: rotation, Layer: layer}
+					candidateResult, ok := NewPlacementResult(component, candidate, request.Rules)
+					if !ok || !usable.Contains(candidateResult.Bounds) {
+						continue
+					}
+					candidates = append(candidates, candidateResult)
 				}
-				candidates = append(candidates, candidateResult)
 			}
 		}
 	}
@@ -151,6 +151,20 @@ func candidatePlacements(component Component, request Request) []PlacementResult
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+func candidateLayers(component Component, rules Rules) []string {
+	switch component.Side {
+	case SideBottom:
+		return []string{"B.Cu"}
+	case SideAny:
+		if rules.AllowBackLayer {
+			return []string{defaultPlacementLayer, "B.Cu"}
+		}
+		return []string{defaultPlacementLayer}
+	default:
+		return []string{defaultPlacementLayer}
+	}
 }
 
 func sampledIndices(count int, target int) []int {
@@ -191,6 +205,15 @@ func placementScore(component Component, placement Placement, request Request) f
 		score += placement.YMM * 10
 	case EdgeBottom:
 		score += (request.Board.HeightMM - placement.YMM) * 10
+	case EdgeAny:
+		left := placement.XMM
+		right := request.Board.WidthMM - placement.XMM
+		top := placement.YMM
+		bottom := request.Board.HeightMM - placement.YMM
+		score += min(min(left, right), min(top, bottom)) * 10
+	}
+	if request.Rules.PreferTopLayer && strings.EqualFold(placement.Layer, "B.Cu") {
+		score += request.Board.WidthMM + request.Board.HeightMM
 	}
 	return score
 }
