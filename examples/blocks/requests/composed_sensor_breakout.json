@@ -1,0 +1,49 @@
+{
+  "project_name": "composed_sensor_breakout",
+  "instances": [
+    {
+      "id": "usb",
+      "block_id": "usb_c_power",
+      "params": {
+        "current_limit": "500mA"
+      }
+    },
+    {
+      "id": "reg3v3",
+      "block_id": "voltage_regulator",
+      "params": {
+        "input_voltage": "5V",
+        "input_voltage_min": "4.5V",
+        "input_voltage_max": "5.5V",
+        "output_voltage": "3.3V",
+        "output_current": "250mA"
+      }
+    },
+    {
+      "id": "sensor",
+      "block_id": "i2c_sensor",
+      "params": {
+        "i2c_address": "0x48",
+        "include_interrupt": true
+      }
+    },
+    {
+      "id": "io",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_count": 4,
+        "pin_names": ["VCC", "SDA", "SCL", "GND"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": {"instance_id": "usb", "port": "VBUS_OUT"}, "to": {"instance_id": "reg3v3", "port": "VIN"}},
+    {"from": {"instance_id": "usb", "port": "GND"}, "to": {"instance_id": "reg3v3", "port": "GND"}},
+    {"from": {"instance_id": "reg3v3", "port": "VOUT"}, "to": {"instance_id": "sensor", "port": "VCC"}},
+    {"from": {"instance_id": "reg3v3", "port": "GND"}, "to": {"instance_id": "sensor", "port": "GND"}},
+    {"from": {"instance_id": "sensor", "port": "VCC"}, "to": {"instance_id": "io", "port": "VCC"}},
+    {"from": {"instance_id": "sensor", "port": "GND"}, "to": {"instance_id": "io", "port": "GND"}},
+    {"from": {"instance_id": "sensor", "port": "SDA"}, "to": {"instance_id": "io", "port": "SDA"}},
+    {"from": {"instance_id": "sensor", "port": "SCL"}, "to": {"instance_id": "io", "port": "SCL"}}
+  ]
+}

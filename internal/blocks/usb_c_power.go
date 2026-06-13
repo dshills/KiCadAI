@@ -112,6 +112,8 @@ func instantiateUSBCPower(definition BlockDefinition, request BlockRequest, para
 		if gndRef == "" {
 			gndRef = ref
 			gndPin = "2"
+		} else {
+			appendConnectOperation(&operations, &issuesOut, ref, "2", gndRef, gndPin, gndNet)
 		}
 		refs = append(refs, ref)
 	}

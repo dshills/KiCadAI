@@ -1,0 +1,139 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "e068fabc-a3b6-5938-b535-9e11306bab33")
+  (paper "A4")
+  (lib_symbols)
+  (wire
+    (pts
+      (xy 2.54 0.0)
+      (xy 10.16 0.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "2854388c-1373-5a3c-b766-12c3b7bfde12")
+  )
+  (symbol
+    (lib_id "Device:LED")
+    (at 12.7 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "45c0c70d-7679-59a6-8ccf-1fd9610956e1")
+    (property
+      "Reference"
+      "D651c001"
+      (at 12.7 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "GREEN LED"
+      (at 12.7 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "LED_SMD:LED_0805_2012Metric"
+      (at 12.7 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "52e0614d-ebcd-5b5a-a144-7b9078b958bf")
+    )
+    (pin
+      "2"
+      (uuid "366f4287-cd6f-54ba-bd69-44e369b35f91")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 0.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "b1406db5-bf95-5998-a71f-34cd8aac65fe")
+    (property
+      "Reference"
+      "R651c001"
+      (at 0.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "260"
+      (at 0.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 0.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "c6aa7f56-7396-5df7-8a61-5b188e1964af")
+    )
+    (pin
+      "2"
+      (uuid "5e765f00-ad86-5fd4-96d4-4a290f6d7f56")
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

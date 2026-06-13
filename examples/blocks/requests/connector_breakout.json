@@ -1,0 +1,8 @@
+{
+  "block_id": "connector_breakout",
+  "instance_id": "io",
+  "params": {
+    "pin_count": 4,
+    "pin_names": ["VCC", "SDA", "SCL", "GND"]
+  }
+}

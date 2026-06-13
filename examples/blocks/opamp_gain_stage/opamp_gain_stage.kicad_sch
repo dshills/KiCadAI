@@ -1,0 +1,388 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "0f8e4278-80a5-5d43-acfb-5f31cf64d175")
+  (paper "A4")
+  (lib_symbols)
+  (wire
+    (pts
+      (xy 17.54 -15.0)
+      (xy 12.46 -1.27)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "0945bd73-a186-593a-8548-2d1265d14804")
+  )
+  (wire
+    (pts
+      (xy 12.46 -15.0)
+      (xy 17.54 0.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "23106962-9c9c-55a8-ba7c-d9288ac03985")
+  )
+  (wire
+    (pts
+      (xy 17.54 0.0)
+      (xy 32.46 0.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "3f3832ef-27da-501a-9748-c17dba5fdf88")
+  )
+  (wire
+    (pts
+      (xy 2.54 15.0)
+      (xy 15.0 2.54)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "42910229-0b9a-5363-96b2-c45621a17146")
+  )
+  (wire
+    (pts
+      (xy 27.46 -10.0)
+      (xy 15.0 -2.54)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "43333411-7dac-53fe-b2c9-1f5408ecde21")
+  )
+  (wire
+    (pts
+      (xy -2.54 15.0)
+      (xy 12.46 -1.27)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "eb04d6ff-d0ba-5452-8fec-169a977937ac")
+  )
+  (wire
+    (pts
+      (xy 32.54 -10.0)
+      (xy 15.0 2.54)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "fbf4330f-8a2d-5fc7-8533-3447bb2716fe")
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 30.0 -10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "455e55c1-a996-5f06-bebf-96e187f0e81a")
+    (property
+      "Reference"
+      "C1cd3001"
+      (at 30.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "100nF"
+      (at 30.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Capacitor_SMD:C_0805_2012Metric"
+      (at 30.0 -10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "90ce2ef7-59ad-5103-8980-3aea485eb004")
+    )
+    (pin
+      "2"
+      (uuid "6597e548-a8d7-57a3-961d-c9dd2a787eb2")
+    )
+  )
+  (symbol
+    (lib_id "Amplifier_Operational:LMV321")
+    (at 15.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "af7395bd-3278-5f77-9cfa-9d1426c9cb37")
+    (property
+      "Reference"
+      "U1cd3001"
+      (at 15.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LMV321"
+      (at 15.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_TO_SOT_SMD:SOT-23-5"
+      (at 15.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "d44490a3-ca0e-58a6-a962-7623b4ce3939")
+    )
+    (pin
+      "4"
+      (uuid "900cd2c9-8a62-54c4-9af7-684a131120ca")
+    )
+    (pin
+      "3"
+      (uuid "0a796223-9234-5c77-80b6-f878278a9ec8")
+    )
+    (pin
+      "2"
+      (uuid "7d35085d-80e8-5282-8a19-350ecdc9a5d0")
+    )
+    (pin
+      "5"
+      (uuid "d05a4b17-f7c5-52a8-94a7-93407600fe7d")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 15.0 -15.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "d6680d0d-0c4f-5999-bb17-8b4c7891b61f")
+    (property
+      "Reference"
+      "R1cd3002"
+      (at 15.0 -15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10000"
+      (at 15.0 -15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 15.0 -15.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "a5429530-41d1-5d13-806a-c4305de46d78")
+    )
+    (pin
+      "2"
+      (uuid "7b036d92-f141-5c57-a59c-e71e83bc0009")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 35.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "fb9d97fb-cc99-5715-a9d6-22da8729dcdf")
+    (property
+      "Reference"
+      "R1cd3003"
+      (at 35.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "100"
+      (at 35.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 35.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "ecd7c1c7-90a4-5774-ab70-d520a9975d8d")
+    )
+    (pin
+      "2"
+      (uuid "c214c34e-ed28-5915-a4d9-cf153ae8054f")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 0.0 15.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "fd5d9615-0926-523b-a440-087d661296a0")
+    (property
+      "Reference"
+      "R1cd3001"
+      (at 0.0 15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10000"
+      (at 0.0 15.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 0.0 15.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "6ff6b62c-e4f9-5005-9625-03e5e69f0b41")
+    )
+    (pin
+      "2"
+      (uuid "a75035a6-7a60-584b-9b95-7be37472893d")
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

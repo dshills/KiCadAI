@@ -1,0 +1,320 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "409bf078-321e-5e5e-bc5d-81df47f1d587")
+  (paper "A4")
+  (lib_symbols)
+  (wire
+    (pts
+      (xy 32.46 -10.0)
+      (xy 7.46 -3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "3e2a6b3d-3c5c-5615-b597-73c1c931639a")
+  )
+  (wire
+    (pts
+      (xy -2.54 10.0)
+      (xy 7.46 -3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "5ae99008-dab2-5513-861c-2a27ae040257")
+  )
+  (wire
+    (pts
+      (xy 37.54 -10.0)
+      (xy 7.46 1.27)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "73081b46-4c88-5e5f-afd2-5b521b1599f6")
+  )
+  (wire
+    (pts
+      (xy 2.54 10.0)
+      (xy 7.46 3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "8d049461-4551-5abf-9bb1-53fe82a2955a")
+  )
+  (wire
+    (pts
+      (xy 22.46 -10.0)
+      (xy 7.46 -3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "9050e43d-32a7-5e40-acab-7f0fd0baa033")
+  )
+  (wire
+    (pts
+      (xy 27.54 -10.0)
+      (xy 7.46 -1.27)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c1ea287b-95b4-59fd-963b-8f7c6ea2ca3d")
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 25.0 -10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "3431e3b7-8859-55d8-8e05-5003b1f855fb")
+    (property
+      "Reference"
+      "R17b0001"
+      (at 25.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "4.7k"
+      (at 25.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 25.0 -10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "a1ba6f08-a958-5922-8f0d-68fbef107420")
+    )
+    (pin
+      "2"
+      (uuid "98903d4e-ad08-55bb-b9f4-8ed3772a21ca")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 35.0 -10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "b5b6c1b7-e87e-54b2-90db-6e4094c3ae13")
+    (property
+      "Reference"
+      "R17b0002"
+      (at 35.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "4.7k"
+      (at 35.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 35.0 -10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "8b3e13e5-93e8-571a-b4c8-d36b950709e6")
+    )
+    (pin
+      "2"
+      (uuid "d9b1918c-22be-55c0-bc79-32df9239ce17")
+    )
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 0.0 10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "c4a8901a-3dbd-5be7-a035-e8cdd66d2cce")
+    (property
+      "Reference"
+      "C17b0001"
+      (at 0.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "100nF"
+      (at 0.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Capacitor_SMD:C_0805_2012Metric"
+      (at 0.0 10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "153f377c-537d-5b52-b522-6604555380d8")
+    )
+    (pin
+      "2"
+      (uuid "f4c29e45-f59e-5e40-9093-f179e8cd17ed")
+    )
+  )
+  (symbol
+    (lib_id "Sensor:Generic_I2C")
+    (at 10.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "e8e074c6-255f-5284-bdde-cee8a965876f")
+    (property
+      "Reference"
+      "U17b0001"
+      (at 10.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "I2C Sensor 0x48"
+      (at 10.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      (at 10.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "d7b00680-2f66-5d7d-ad31-ce8e4401e01c")
+    )
+    (pin
+      "2"
+      (uuid "de107d9a-7db9-5c9d-a29c-dd74cd3a3238")
+    )
+    (pin
+      "3"
+      (uuid "3679e22f-1985-5c96-9496-a5e58d94362d")
+    )
+    (pin
+      "4"
+      (uuid "140f9e17-24cd-589b-8959-f091c1df6aee")
+    )
+    (pin
+      "5"
+      (uuid "4c162003-5102-5834-a1da-49e4f762c130")
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

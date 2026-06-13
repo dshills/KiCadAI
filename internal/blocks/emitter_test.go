@@ -94,3 +94,30 @@ func TestDryRunBlockOutputCarriesPortsAndOperations(t *testing.T) {
 		t.Fatalf("output = %#v", output)
 	}
 }
+
+func TestResolvePortVoltagesUsesStringAndNumericParams(t *testing.T) {
+	ports := []BlockPort{
+		{Name: "VIN", Voltage: "input_voltage"},
+		{Name: "VOUT", Voltage: "output_voltage"},
+		{Name: "FIXED", Voltage: "5V"},
+		{Name: "BOOL", Voltage: "invalid_bool"},
+	}
+	resolved := resolvePortVoltages(ports, map[string]any{
+		"input_voltage":  "12V",
+		"output_voltage": 3.3,
+		"invalid_bool":   true,
+	})
+
+	if resolved[0].Voltage != "12V" {
+		t.Fatalf("VIN voltage = %q, want 12V", resolved[0].Voltage)
+	}
+	if resolved[1].Voltage != "3.3" {
+		t.Fatalf("VOUT voltage = %q, want 3.3", resolved[1].Voltage)
+	}
+	if resolved[2].Voltage != "5V" {
+		t.Fatalf("FIXED voltage = %q, want 5V", resolved[2].Voltage)
+	}
+	if resolved[3].Voltage != "invalid_bool" {
+		t.Fatalf("BOOL voltage = %q, want invalid_bool", resolved[3].Voltage)
+	}
+}

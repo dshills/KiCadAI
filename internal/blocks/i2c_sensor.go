@@ -139,7 +139,7 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 
 	output := dryRunBlockOutput(definition, request, operations, issuesOut)
 	output.Instance.Params = instanceParams
-	output.Instance.Ports = i2cSensorPorts(definition.Ports, boolParam(params, "include_interrupt", false))
+	output.Instance.Ports = resolvePortVoltages(i2cSensorPorts(definition.Ports, boolParam(params, "include_interrupt", false)), instanceParams)
 	output.Instance.Refs = refs
 	output.Instance.Nets = nets
 	return output

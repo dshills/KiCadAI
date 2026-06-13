@@ -1,0 +1,9 @@
+{
+  "block_id": "i2c_sensor",
+  "instance_id": "sensor",
+  "params": {
+    "i2c_address": "0x48",
+    "include_interrupt": true,
+    "supply_voltage": "3.3V"
+  }
+}

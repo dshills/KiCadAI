@@ -1,0 +1,181 @@
+{
+  "project_name": "mcu_minimal",
+  "generator_version": "0.1.0",
+  "operations": [
+    {
+      "index": 0,
+      "op": "create_project"
+    },
+    {
+      "index": 1,
+      "op": "add_symbol"
+    },
+    {
+      "index": 2,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 3,
+      "op": "place_footprint"
+    },
+    {
+      "index": 4,
+      "op": "add_symbol"
+    },
+    {
+      "index": 5,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 6,
+      "op": "place_footprint"
+    },
+    {
+      "index": 7,
+      "op": "connect"
+    },
+    {
+      "index": 8,
+      "op": "connect"
+    },
+    {
+      "index": 9,
+      "op": "add_symbol"
+    },
+    {
+      "index": 10,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 11,
+      "op": "place_footprint"
+    },
+    {
+      "index": 12,
+      "op": "connect"
+    },
+    {
+      "index": 13,
+      "op": "connect"
+    },
+    {
+      "index": 14,
+      "op": "add_symbol"
+    },
+    {
+      "index": 15,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 16,
+      "op": "place_footprint"
+    },
+    {
+      "index": 17,
+      "op": "connect"
+    },
+    {
+      "index": 18,
+      "op": "connect"
+    },
+    {
+      "index": 19,
+      "op": "add_symbol"
+    },
+    {
+      "index": 20,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 21,
+      "op": "place_footprint"
+    },
+    {
+      "index": 22,
+      "op": "connect"
+    },
+    {
+      "index": 23,
+      "op": "connect"
+    },
+    {
+      "index": 24,
+      "op": "add_symbol"
+    },
+    {
+      "index": 25,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 26,
+      "op": "place_footprint"
+    },
+    {
+      "index": 27,
+      "op": "connect"
+    },
+    {
+      "index": 28,
+      "op": "connect"
+    },
+    {
+      "index": 29,
+      "op": "add_symbol"
+    },
+    {
+      "index": 30,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 31,
+      "op": "place_footprint"
+    },
+    {
+      "index": 32,
+      "op": "connect"
+    },
+    {
+      "index": 33,
+      "op": "connect"
+    },
+    {
+      "index": 34,
+      "op": "connect"
+    },
+    {
+      "index": 35,
+      "op": "connect"
+    },
+    {
+      "index": 36,
+      "op": "connect"
+    },
+    {
+      "index": 37,
+      "op": "connect"
+    },
+    {
+      "index": 38,
+      "op": "write_project"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "kicad_project",
+      "path": "examples/blocks/mcu_minimal/mcu_minimal.kicad_pro"
+    },
+    {
+      "kind": "schematic",
+      "path": "examples/blocks/mcu_minimal/mcu_minimal.kicad_sch"
+    },
+    {
+      "kind": "pcb",
+      "path": "examples/blocks/mcu_minimal/mcu_minimal.kicad_pcb"
+    }
+  ],
+  "file_hashes": {
+    "mcu_minimal.kicad_pcb": "94fdcd2d1a6774efd90517122aaf9899d77cf9103b0e47296cfd26adae7e6e8f",
+    "mcu_minimal.kicad_pro": "17d3902a895f47610debc38317fe6d20b8b1bd3047325570167d6a6ec046244c",
+    "mcu_minimal.kicad_sch": "01b33231678e7c84123fcdbbee3d944f5b4e2e8178b9e8ca7496128de9e7b065"
+  }
+}

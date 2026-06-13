@@ -1,0 +1,113 @@
+{
+  "project_name": "voltage_regulator",
+  "generator_version": "0.1.0",
+  "operations": [
+    {
+      "index": 0,
+      "op": "create_project"
+    },
+    {
+      "index": 1,
+      "op": "add_symbol"
+    },
+    {
+      "index": 2,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 3,
+      "op": "place_footprint"
+    },
+    {
+      "index": 4,
+      "op": "add_symbol"
+    },
+    {
+      "index": 5,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 6,
+      "op": "place_footprint"
+    },
+    {
+      "index": 7,
+      "op": "add_symbol"
+    },
+    {
+      "index": 8,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 9,
+      "op": "place_footprint"
+    },
+    {
+      "index": 10,
+      "op": "connect"
+    },
+    {
+      "index": 11,
+      "op": "connect"
+    },
+    {
+      "index": 12,
+      "op": "connect"
+    },
+    {
+      "index": 13,
+      "op": "connect"
+    },
+    {
+      "index": 14,
+      "op": "add_symbol"
+    },
+    {
+      "index": 15,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 16,
+      "op": "place_footprint"
+    },
+    {
+      "index": 17,
+      "op": "add_symbol"
+    },
+    {
+      "index": 18,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 19,
+      "op": "place_footprint"
+    },
+    {
+      "index": 20,
+      "op": "connect"
+    },
+    {
+      "index": 21,
+      "op": "write_project"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "kicad_project",
+      "path": "examples/blocks/voltage_regulator/voltage_regulator.kicad_pro"
+    },
+    {
+      "kind": "schematic",
+      "path": "examples/blocks/voltage_regulator/voltage_regulator.kicad_sch"
+    },
+    {
+      "kind": "pcb",
+      "path": "examples/blocks/voltage_regulator/voltage_regulator.kicad_pcb"
+    }
+  ],
+  "file_hashes": {
+    "voltage_regulator.kicad_pcb": "dbd811a8185a0da1002380f5b1c4e31b38dfa59d6a0029c0bd85a1047e089a41",
+    "voltage_regulator.kicad_pro": "3c3e4c4f6e4943a61c19cfcd369681536cf8b2217a58b3694f8fc9e3bf6023eb",
+    "voltage_regulator.kicad_sch": "5d179cac3859b625ffe9d2a1f383d739dc8cbe846196a791ff53d4af3688e64b"
+  }
+}

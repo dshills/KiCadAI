@@ -8,6 +8,8 @@ import (
 	"kicadai/internal/transactions"
 )
 
+const compositionInstanceSpacingMM = 90.0
+
 type CompositionRequest struct {
 	ProjectName string                  `json:"project_name,omitempty"`
 	Instances   []CompositionInstance   `json:"instances"`
@@ -46,7 +48,7 @@ func ComposeBlocks(ctx context.Context, registry Registry, request CompositionRe
 	}
 	seenInstances := map[string]struct{}{}
 	portsByInstance := map[string]map[string]BlockPort{}
-	for _, instance := range request.Instances {
+	for instanceIndex, instance := range request.Instances {
 		if contextIssue := compositionContextIssue(ctx); contextIssue != nil {
 			output.Issues = append(output.Issues, *contextIssue)
 			return output
@@ -70,8 +72,13 @@ func ComposeBlocks(ctx context.Context, registry Registry, request CompositionRe
 		if len(portIssues) != 0 {
 			continue
 		}
+		offsetOperations, offsetIssues := offsetCompositionOperations(blockOutput.Operations, float64(instanceIndex)*compositionInstanceSpacingMM, 0)
+		output.Issues = append(output.Issues, offsetIssues...)
+		if len(offsetIssues) != 0 {
+			continue
+		}
 		output.Instances = append(output.Instances, blockOutput.Instance)
-		output.Operations = append(output.Operations, blockOutput.Operations...)
+		output.Operations = append(output.Operations, offsetOperations...)
 		portsByInstance[instance.ID] = instancePorts
 	}
 	netGroups := newPortDisjointSet()
@@ -148,6 +155,83 @@ func ComposeBlocks(ctx context.Context, registry Registry, request CompositionRe
 	}
 	output.Issues = append(output.Issues, validateI2CAddressCollisions(output.Instances, netGroups)...)
 	return output
+}
+
+func offsetCompositionOperations(operations []transactions.Operation, xOffsetMM float64, yOffsetMM float64) ([]transactions.Operation, []reports.Issue) {
+	if xOffsetMM == 0 && yOffsetMM == 0 {
+		return append([]transactions.Operation(nil), operations...), nil
+	}
+	offset := append([]transactions.Operation(nil), operations...)
+	var issues []reports.Issue
+	for index, operation := range offset {
+		switch operation.Op {
+		case transactions.OpAddSymbol:
+			var payload transactions.AddSymbolOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode add_symbol for composition offset: "+err.Error()))
+				continue
+			}
+			payload.At.XMM += xOffsetMM
+			payload.At.YMM += yOffsetMM
+			updated, err := wrapOperation(transactions.OpAddSymbol, payload)
+			if err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode add_symbol for composition offset: "+err.Error()))
+				continue
+			}
+			offset[index] = updated
+		case transactions.OpPlaceFootprint:
+			var payload transactions.PlaceFootprintOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode place_footprint for composition offset: "+err.Error()))
+				continue
+			}
+			payload.At.XMM += xOffsetMM
+			payload.At.YMM += yOffsetMM
+			updated, err := wrapOperation(transactions.OpPlaceFootprint, payload)
+			if err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode place_footprint for composition offset: "+err.Error()))
+				continue
+			}
+			offset[index] = updated
+		case transactions.OpRoute:
+			var payload transactions.RouteOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode route for composition offset: "+err.Error()))
+				continue
+			}
+			offsetPoints(payload.Points, xOffsetMM, yOffsetMM)
+			updated, err := wrapOperation(transactions.OpRoute, payload)
+			if err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode route for composition offset: "+err.Error()))
+				continue
+			}
+			offset[index] = updated
+		case transactions.OpAddZone:
+			var payload transactions.AddZoneOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode add_zone for composition offset: "+err.Error()))
+				continue
+			}
+			offsetPoints(payload.Polygon, xOffsetMM, yOffsetMM)
+			updated, err := wrapOperation(transactions.OpAddZone, payload)
+			if err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode add_zone for composition offset: "+err.Error()))
+				continue
+			}
+			offset[index] = updated
+		case transactions.OpConnect:
+			// Connect operations are logical ref/pin endpoints. The schematic
+			// writer derives wire geometry from the already-offset symbol anchors.
+		}
+	}
+	return offset, issues
+}
+
+func offsetPoints(points []transactions.Point, xOffsetMM float64, yOffsetMM float64) {
+	for i := range points {
+		points[i].XMM += xOffsetMM
+		points[i].YMM += yOffsetMM
+	}
 }
 
 func compositionContextIssue(ctx context.Context) *reports.Issue {

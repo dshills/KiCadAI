@@ -1,0 +1,9 @@
+{
+  "block_id": "led_indicator",
+  "instance_id": "status",
+  "params": {
+    "color": "green",
+    "led_current": "5mA",
+    "supply_voltage": "3.3V"
+  }
+}

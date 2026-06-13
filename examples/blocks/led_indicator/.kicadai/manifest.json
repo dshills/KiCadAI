@@ -1,0 +1,61 @@
+{
+  "project_name": "led_indicator",
+  "generator_version": "0.1.0",
+  "operations": [
+    {
+      "index": 0,
+      "op": "create_project"
+    },
+    {
+      "index": 1,
+      "op": "add_symbol"
+    },
+    {
+      "index": 2,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 3,
+      "op": "place_footprint"
+    },
+    {
+      "index": 4,
+      "op": "add_symbol"
+    },
+    {
+      "index": 5,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 6,
+      "op": "place_footprint"
+    },
+    {
+      "index": 7,
+      "op": "connect"
+    },
+    {
+      "index": 8,
+      "op": "write_project"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "kicad_project",
+      "path": "examples/blocks/led_indicator/led_indicator.kicad_pro"
+    },
+    {
+      "kind": "schematic",
+      "path": "examples/blocks/led_indicator/led_indicator.kicad_sch"
+    },
+    {
+      "kind": "pcb",
+      "path": "examples/blocks/led_indicator/led_indicator.kicad_pcb"
+    }
+  ],
+  "file_hashes": {
+    "led_indicator.kicad_pcb": "6dc84ed0fa591f522df32548ec30e48dc0496f88605c0724b393bc07b0ee94e8",
+    "led_indicator.kicad_pro": "8f1d75a3876071a65e77b3c2a4119980870455f1ad4282eb0fd856fe4e2d16ea",
+    "led_indicator.kicad_sch": "08a21f0835b49fa9d67002d47d3bfcdd2dab374bc6e10adc33ac0e5dc9887665"
+  }
+}

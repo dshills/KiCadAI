@@ -1,0 +1,79 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "9009dacf-1072-50dd-b821-3de6a31d7e78")
+  (paper "A4")
+  (lib_symbols)
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x04")
+    (at 0.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "34342232-2a69-5f74-900a-0da07e8b9826")
+    (property
+      "Reference"
+      "Jbed8001"
+      (at 0.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "Conn_01x04"
+      (at 0.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
+      (at 0.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "aa527e6c-22c8-5f39-bb44-74a4476d270b")
+    )
+    (pin
+      "2"
+      (uuid "91e07083-75f0-5e11-b233-bc3561b53c63")
+    )
+    (pin
+      "3"
+      (uuid "839176d2-f627-5d0d-9607-3fcf5408736d")
+    )
+    (pin
+      "4"
+      (uuid "d606bc78-4d78-58e8-bb42-a30b2b23a4c5")
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

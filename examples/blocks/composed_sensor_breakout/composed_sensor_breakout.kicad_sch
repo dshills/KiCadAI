@@ -1,0 +1,1105 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "07f8090d-ff6a-5e8c-89ff-6f2d36d026a6")
+  (paper "A4")
+  (lib_symbols)
+  (wire
+    (pts
+      (xy 107.46 10.0)
+      (xy 102.54 0.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "09ea3692-e579-5f7e-bda2-e7b875316284")
+  )
+  (wire
+    (pts
+      (xy 217.54 -10.0)
+      (xy 187.46 1.27)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "0c2a00e7-1c1b-5a4a-a9cb-de9778db64c1")
+  )
+  (wire
+    (pts
+      (xy 207.54 -10.0)
+      (xy 187.46 -1.27)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "1649baa2-2e7b-5654-b947-5a70c7cb459c")
+  )
+  (wire
+    (pts
+      (xy 87.46 10.0)
+      (xy 97.46 -2.54)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "16c8bc43-8d40-59ec-bf36-207270bf3ac6")
+  )
+  (wire
+    (pts
+      (xy 212.46 -10.0)
+      (xy 187.46 -3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "4403f52c-e796-5ab5-94c3-c658f41d0c6e")
+  )
+  (wire
+    (pts
+      (xy 15.24 7.62)
+      (xy 22.46 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "4df120ac-1492-501c-8ce8-30927034e38c")
+  )
+  (wire
+    (pts
+      (xy 42.46 -12.0)
+      (xy 17.54 -12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "6233c139-229d-5fb7-8a52-9a5ed2a439db")
+  )
+  (wire
+    (pts
+      (xy 177.46 10.0)
+      (xy 187.46 -3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "6d7ab053-4966-5d75-8056-d6b5b994865d")
+  )
+  (wire
+    (pts
+      (xy 202.46 -10.0)
+      (xy 187.46 -3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "871b91b0-b67d-5775-867b-f65460ea7b33")
+  )
+  (wire
+    (pts
+      (xy 37.54 -12.0)
+      (xy 17.54 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "97cfe55a-42f0-5f7f-be95-731e279f8a5c")
+  )
+  (wire
+    (pts
+      (xy 0.0 -22.86)
+      (xy 17.54 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "a4ea8d38-8b4e-5751-9057-bf993f1091a1")
+  )
+  (wire
+    (pts
+      (xy 32.46 -12.0)
+      (xy 17.54 -12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "b0d54459-c779-500e-b10d-77a00c4d3ec3")
+  )
+  (wire
+    (pts
+      (xy 27.54 12.0)
+      (xy 17.54 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c1ef9a78-d32a-558b-8b94-621b31cb9092")
+  )
+  (wire
+    (pts
+      (xy 92.54 10.0)
+      (xy 112.54 10.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "c9556289-fae8-5b4b-9f46-6ec2b9188753")
+  )
+  (wire
+    (pts
+      (xy 15.24 15.24)
+      (xy 12.46 -12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "cdb87f7f-ef0b-554f-bc60-f7910c2b12d6")
+  )
+  (wire
+    (pts
+      (xy 47.54 -12.0)
+      (xy 17.54 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d5f41461-86ae-5dad-a6c8-69b09f00b4ed")
+  )
+  (wire
+    (pts
+      (xy 97.46 2.54)
+      (xy 92.54 10.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d6114c51-38f6-5a32-9e66-f0045318f3ad")
+  )
+  (wire
+    (pts
+      (xy 182.54 10.0)
+      (xy 187.46 3.81)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "d907c389-a78d-592c-8ac2-3dc45ca7ab86")
+  )
+  (wire
+    (pts
+      (xy 15.24 10.16)
+      (xy 12.46 12.0)
+    )
+    (stroke
+      (width 0)
+      (type default)
+    )
+    (uuid "e28b3a56-e81a-58f7-bd14-0eae32908b6a")
+  )
+  (symbol
+    (lib_id "Connector_Generic:Conn_01x04")
+    (at 270.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "1553aa63-ca47-58bf-949d-228134d6cd68")
+    (property
+      "Reference"
+      "Jbed8001"
+      (at 270.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "Conn_01x04"
+      (at 270.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
+      (at 270.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "4165634c-84e0-5e7c-974f-1b8d35623ca1")
+    )
+    (pin
+      "2"
+      (uuid "2a3e31b7-bd91-5926-87b1-64129b9910f5")
+    )
+    (pin
+      "3"
+      (uuid "3c0458b1-eefa-5576-b688-85f5ba1db9d3")
+    )
+    (pin
+      "4"
+      (uuid "418177b3-defe-5f89-8646-096fcdaab7f1")
+    )
+  )
+  (symbol
+    (lib_id "Regulator_Linear:AMS1117-3.3")
+    (at 100.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "18cea050-be51-58f4-9278-f735d9c005b1")
+    (property
+      "Reference"
+      "Ude41001"
+      (at 100.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "LDO 3.3V"
+      (at 100.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_TO_SOT_SMD:SOT-223-3_TabPin2"
+      (at 100.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "5c1f8c38-35d0-5c12-9f45-07a8e0d415fa")
+    )
+    (pin
+      "2"
+      (uuid "b0aee2cc-9c2e-5c19-b9de-755269c746eb")
+    )
+    (pin
+      "3"
+      (uuid "59c2884a-61f0-5316-a40e-928d00be9438")
+    )
+  )
+  (symbol
+    (lib_id "Device:D_TVS")
+    (at 35.0 -12.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "373bcf82-7a42-5381-bcb0-2230fdccd7ac")
+    (property
+      "Reference"
+      "D59e8001"
+      (at 35.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "VBUS TVS"
+      (at 35.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Diode_SMD:D_SOD-323"
+      (at 35.0 -12.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "0090fac1-b25f-513d-a11f-1c88fb3d289a")
+    )
+    (pin
+      "2"
+      (uuid "4e44b0e0-bcc0-5cb7-823e-36146d8a2e46")
+    )
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 110.0 10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "3871b862-1eca-5544-8c00-bf008cfcf4c4")
+    (property
+      "Reference"
+      "Cde41002"
+      (at 110.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10uF"
+      (at 110.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Capacitor_SMD:C_0805_2012Metric"
+      (at 110.0 10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "4d66f0b6-cace-51c3-a42a-3c6008c645f9")
+    )
+    (pin
+      "2"
+      (uuid "2b2496b4-41d0-529f-a951-468d692fd3a6")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 15.0 12.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "3fc0ce1f-f866-58b4-bd07-232fb60bad8a")
+    (property
+      "Reference"
+      "R59e8001"
+      (at 15.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "5.1k"
+      (at 15.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 15.0 12.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "fa6e4c5c-6751-5abf-9fed-d54e3b2a0f71")
+    )
+    (pin
+      "2"
+      (uuid "daf485c6-bba0-5932-81aa-f67cc1db4352")
+    )
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 45.0 -12.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "42eee66c-5a67-5239-9860-1ea9446d9c86")
+    (property
+      "Reference"
+      "C59e8001"
+      (at 45.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10uF"
+      (at 45.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Capacitor_SMD:C_0805_2012Metric"
+      (at 45.0 -12.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "c78a6bac-10a4-5a8c-bf34-bd33a5a8d4bb")
+    )
+    (pin
+      "2"
+      (uuid "f494aaa1-c565-5ab7-80cc-2790052c73cb")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 215.0 -10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "5f40fb04-3318-5592-95ee-a03bdda62f88")
+    (property
+      "Reference"
+      "R17b0002"
+      (at 215.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "4.7k"
+      (at 215.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 215.0 -10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "05aa44df-d7ff-51da-b0fe-1c486ab6e0fe")
+    )
+    (pin
+      "2"
+      (uuid "f9f1e860-59cd-55e3-8380-24d7d7873148")
+    )
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 90.0 10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "6312af79-5950-5d44-9baa-c00c108927fb")
+    (property
+      "Reference"
+      "Cde41001"
+      (at 90.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "10uF"
+      (at 90.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Capacitor_SMD:C_0805_2012Metric"
+      (at 90.0 10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "a7e03f5d-64ff-54b3-a6c0-128883223590")
+    )
+    (pin
+      "2"
+      (uuid "70eeae11-c8c5-59b4-bb87-2b91c314f631")
+    )
+  )
+  (symbol
+    (lib_id "Sensor:Generic_I2C")
+    (at 190.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "65b5a4eb-27b0-5cf0-887f-7063fc61958d")
+    (property
+      "Reference"
+      "U17b0001"
+      (at 190.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "I2C Sensor 0x48"
+      (at 190.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      (at 190.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "0832e94a-ec1c-5268-995c-b02772afef00")
+    )
+    (pin
+      "2"
+      (uuid "b0c43b57-a0ab-5765-87cb-be5f28e85bec")
+    )
+    (pin
+      "3"
+      (uuid "a0984cd6-bead-5d33-88a0-4443c499f142")
+    )
+    (pin
+      "4"
+      (uuid "f226d7ae-d563-5f7d-b9b4-a93c6579ee41")
+    )
+    (pin
+      "5"
+      (uuid "bf741bac-046e-5367-bc40-cd9145b0de3e")
+    )
+  )
+  (symbol
+    (lib_id "Device:C")
+    (at 180.0 10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "7dd1d7f6-87f6-542c-ad2c-18a57b604c50")
+    (property
+      "Reference"
+      "C17b0001"
+      (at 180.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "100nF"
+      (at 180.0 10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Capacitor_SMD:C_0805_2012Metric"
+      (at 180.0 10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "ed53c7d5-69ca-5786-877a-c1ad3b880e10")
+    )
+    (pin
+      "2"
+      (uuid "6021d5f7-1308-5d9e-bf13-08f0de820bbf")
+    )
+  )
+  (symbol
+    (lib_id "Device:Fuse")
+    (at 15.0 -12.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "955fba63-dff7-5b69-9ab8-79bf77803548")
+    (property
+      "Reference"
+      "F59e8001"
+      (at 15.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "500mA"
+      (at 15.0 -12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Fuse:Fuse_1206_3216Metric"
+      (at 15.0 -12.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "6719d3dc-3ceb-5840-b73e-693003810855")
+    )
+    (pin
+      "2"
+      (uuid "f222f20b-e6e3-5ac2-99f6-6f93a65b8b6d")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 25.0 12.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "c5a3fd22-cd96-5114-827e-22b685da87e3")
+    (property
+      "Reference"
+      "R59e8002"
+      (at 25.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "5.1k"
+      (at 25.0 12.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 25.0 12.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "7e589b2e-2960-5cd7-ba91-15c1ba2bdf0c")
+    )
+    (pin
+      "2"
+      (uuid "2c6a485e-1a3c-5c3b-8cd9-518ec6352f93")
+    )
+  )
+  (symbol
+    (lib_id "Connector:USB_C_Receptacle_USB2.0_16P")
+    (at 0.0 0.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "cf1f860b-2596-5ba2-9f33-a5d2c00a1af1")
+    (property
+      "Reference"
+      "J59e8001"
+      (at 0.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "USB-C Power"
+      (at 0.0 0.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
+      (at 0.0 0.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "A1"
+      (uuid "c9a49b74-6dbc-52b5-a6b9-42b35d810daa")
+    )
+    (pin
+      "A4"
+      (uuid "c489cd94-9a4e-5d24-a0e9-0e2f2e02fc1c")
+    )
+    (pin
+      "A5"
+      (uuid "ef36bfc5-ae50-5adf-8e4c-6dfafbe823d4")
+    )
+    (pin
+      "A6"
+      (uuid "0a64ca5a-f745-5683-89b0-dbeb9efaa65d")
+    )
+    (pin
+      "A7"
+      (uuid "c0eb96bb-dbad-541a-aa3b-b86608c9d90a")
+    )
+    (pin
+      "A8"
+      (uuid "21cb3995-32fc-53a3-847f-99fa2a84bd16")
+    )
+    (pin
+      "A9"
+      (uuid "b105533f-5a74-5a22-b610-5d053a3205ba")
+    )
+    (pin
+      "A12"
+      (uuid "ec9e8545-1612-5e9c-896b-385bec55883c")
+    )
+    (pin
+      "B1"
+      (uuid "55731e30-3823-5446-8ed5-aadd14aa40d2")
+    )
+    (pin
+      "B4"
+      (uuid "d63a8db5-451a-56de-aeae-9864276753fa")
+    )
+    (pin
+      "B5"
+      (uuid "512d3499-ea8b-5242-9983-8bfffe0b8975")
+    )
+    (pin
+      "B6"
+      (uuid "7874da1a-4b27-57bd-8da5-2ae270b7d363")
+    )
+    (pin
+      "B7"
+      (uuid "21dcf640-c8d8-5ef2-b5e4-2a02ca68d742")
+    )
+    (pin
+      "B8"
+      (uuid "879c328b-b1f9-5bb6-a36b-40cb2e55421e")
+    )
+    (pin
+      "B9"
+      (uuid "947a6b19-2955-5e8a-924e-06aaf9e6e0e1")
+    )
+    (pin
+      "B12"
+      (uuid "5f04e8f7-1d31-5de9-8a63-292f3221d117")
+    )
+    (pin
+      "SH"
+      (uuid "57445d14-fa5e-5e4e-871b-12c2f98df890")
+    )
+  )
+  (symbol
+    (lib_id "Device:R")
+    (at 205.0 -10.0 0)
+    (unit 1)
+    (body_style 1)
+    (exclude_from_sim no)
+    (in_bom yes)
+    (on_board yes)
+    (in_pos_files yes)
+    (dnp no)
+    (uuid "d21239e6-6f5c-5bfd-b229-7ba2110c3004")
+    (property
+      "Reference"
+      "R17b0001"
+      (at 205.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Value"
+      "4.7k"
+      (at 205.0 -10.0 0)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (property
+      "Footprint"
+      "Resistor_SMD:R_0805_2012Metric"
+      (at 205.0 -10.0 0)
+      (hide yes)
+      (show_name no)
+      (do_not_autoplace no)
+      (effects
+        (font
+          (size 1.27 1.27)
+        )
+      )
+    )
+    (pin
+      "1"
+      (uuid "1e598d18-f3cc-5d01-9bed-9c778d653f78")
+    )
+    (pin
+      "2"
+      (uuid "b9bf612e-10b3-552a-8c1f-6a592bd79ac3")
+    )
+  )
+  (sheet_instances
+    (path
+      "/"
+      (page "1")
+    )
+  )
+)

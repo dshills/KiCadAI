@@ -293,7 +293,7 @@ func instantiateMCUMinimal(definition BlockDefinition, request BlockRequest, par
 
 	output := dryRunBlockOutput(definition, request, operations, issuesOut)
 	output.Instance.Params = cloneAnyParams(params)
-	output.Instance.Ports = mcuPorts(definition.Ports, programmingMode)
+	output.Instance.Ports = resolvePortVoltages(mcuPorts(definition.Ports, programmingMode), output.Instance.Params)
 	output.Instance.Refs = refs
 	output.Instance.Nets = nets
 	return output

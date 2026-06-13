@@ -1,0 +1,9 @@
+{
+  "block_id": "usb_c_power",
+  "instance_id": "usb",
+  "params": {
+    "current_limit": "500mA",
+    "include_power_led": true,
+    "shield_policy": "chassis"
+  }
+}

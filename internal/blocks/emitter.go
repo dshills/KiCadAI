@@ -150,10 +150,39 @@ func dryRunBlockOutput(definition BlockDefinition, request BlockRequest, operati
 			BlockID:    definition.ID,
 			InstanceID: request.InstanceID,
 			Params:     params,
-			Ports:      append([]BlockPort(nil), definition.Ports...),
+			Ports:      resolvePortVoltages(definition.Ports, params),
 		},
 		Operations: operations,
 		Issues:     issues,
+	}
+}
+
+func resolvePortVoltages(ports []BlockPort, params map[string]any) []BlockPort {
+	resolved := append([]BlockPort(nil), ports...)
+	for i := range resolved {
+		if isVoltageLiteral(resolved[i].Voltage) {
+			continue
+		}
+		raw, exists := params[resolved[i].Voltage]
+		if !exists {
+			continue
+		}
+		value := portVoltageValue(raw)
+		if value != "" {
+			resolved[i].Voltage = value
+		}
+	}
+	return resolved
+}
+
+func portVoltageValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case float64, float32, int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprint(typed)
+	default:
+		return ""
 	}
 }
 

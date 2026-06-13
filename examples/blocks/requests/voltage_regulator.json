@@ -1,0 +1,12 @@
+{
+  "block_id": "voltage_regulator",
+  "instance_id": "reg3v3",
+  "params": {
+    "input_voltage": "5V",
+    "input_voltage_min": "4.5V",
+    "input_voltage_max": "5.5V",
+    "output_voltage": "3.3V",
+    "output_current": "250mA",
+    "include_power_led": true
+  }
+}

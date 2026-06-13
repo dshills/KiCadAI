@@ -1,0 +1,9 @@
+{
+  "block_id": "mcu_minimal",
+  "instance_id": "mcu",
+  "params": {
+    "supply_voltage": "3.3V",
+    "programming_header": "isp",
+    "decoupling_count": 3
+  }
+}

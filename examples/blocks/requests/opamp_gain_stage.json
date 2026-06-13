@@ -1,0 +1,10 @@
+{
+  "block_id": "opamp_gain_stage",
+  "instance_id": "amp",
+  "params": {
+    "topology": "non_inverting",
+    "gain": 2,
+    "input_coupling": "dc",
+    "include_output_resistor": true
+  }
+}

@@ -560,7 +560,7 @@ func TestBuilderTreatsNetNamesAsCaseSensitive(t *testing.T) {
 	}
 }
 
-func TestBuilderRepeatedConnectionsUseUniqueWireUUIDs(t *testing.T) {
+func TestBuilderRepeatedConnectionsDoNotDuplicateWires(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
 	addTwoPinSymbol(t, builder, "R2", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)})
@@ -569,16 +569,19 @@ func TestBuilderRepeatedConnectionsUseUniqueWireUUIDs(t *testing.T) {
 	if err := builder.Connect(endpointA, endpointB, "SIG"); err != nil {
 		t.Fatalf("first Connect returned error: %v", err)
 	}
-	if err := builder.Connect(endpointA, endpointB, "SIG"); err != nil {
+	if err := builder.Connect(endpointB, endpointA, "SIG"); err != nil {
 		t.Fatalf("second Connect returned error: %v", err)
 	}
 
 	design := builder.Design()
-	if len(design.Schematic.Wires) != 2 {
-		t.Fatalf("wires = %d, want 2", len(design.Schematic.Wires))
+	if len(design.Schematic.Wires) != 1 {
+		t.Fatalf("wires = %d, want 1", len(design.Schematic.Wires))
 	}
-	if design.Schematic.Wires[0].UUID == design.Schematic.Wires[1].UUID {
-		t.Fatalf("duplicate wire UUID %s", design.Schematic.Wires[0].UUID)
+	if net := builder.assignedPinNet(endpointA); net != "SIG" {
+		t.Fatalf("R1 pin 1 net = %q, want SIG", net)
+	}
+	if net := builder.assignedPinNet(endpointB); net != "SIG" {
+		t.Fatalf("R2 pin 1 net = %q, want SIG", net)
 	}
 }
 

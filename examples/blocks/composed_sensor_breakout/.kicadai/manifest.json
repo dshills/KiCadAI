@@ -1,0 +1,301 @@
+{
+  "project_name": "composed_sensor_breakout",
+  "generator_version": "0.1.0",
+  "operations": [
+    {
+      "index": 0,
+      "op": "create_project"
+    },
+    {
+      "index": 1,
+      "op": "add_symbol"
+    },
+    {
+      "index": 2,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 3,
+      "op": "place_footprint"
+    },
+    {
+      "index": 4,
+      "op": "add_symbol"
+    },
+    {
+      "index": 5,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 6,
+      "op": "place_footprint"
+    },
+    {
+      "index": 7,
+      "op": "connect"
+    },
+    {
+      "index": 8,
+      "op": "add_symbol"
+    },
+    {
+      "index": 9,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 10,
+      "op": "place_footprint"
+    },
+    {
+      "index": 11,
+      "op": "connect"
+    },
+    {
+      "index": 12,
+      "op": "connect"
+    },
+    {
+      "index": 13,
+      "op": "connect"
+    },
+    {
+      "index": 14,
+      "op": "connect"
+    },
+    {
+      "index": 15,
+      "op": "connect"
+    },
+    {
+      "index": 16,
+      "op": "connect"
+    },
+    {
+      "index": 17,
+      "op": "add_symbol"
+    },
+    {
+      "index": 18,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 19,
+      "op": "place_footprint"
+    },
+    {
+      "index": 20,
+      "op": "connect"
+    },
+    {
+      "index": 21,
+      "op": "connect"
+    },
+    {
+      "index": 22,
+      "op": "connect"
+    },
+    {
+      "index": 23,
+      "op": "connect"
+    },
+    {
+      "index": 24,
+      "op": "add_symbol"
+    },
+    {
+      "index": 25,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 26,
+      "op": "place_footprint"
+    },
+    {
+      "index": 27,
+      "op": "connect"
+    },
+    {
+      "index": 28,
+      "op": "connect"
+    },
+    {
+      "index": 29,
+      "op": "add_symbol"
+    },
+    {
+      "index": 30,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 31,
+      "op": "place_footprint"
+    },
+    {
+      "index": 32,
+      "op": "connect"
+    },
+    {
+      "index": 33,
+      "op": "connect"
+    },
+    {
+      "index": 34,
+      "op": "add_symbol"
+    },
+    {
+      "index": 35,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 36,
+      "op": "place_footprint"
+    },
+    {
+      "index": 37,
+      "op": "add_symbol"
+    },
+    {
+      "index": 38,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 39,
+      "op": "place_footprint"
+    },
+    {
+      "index": 40,
+      "op": "add_symbol"
+    },
+    {
+      "index": 41,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 42,
+      "op": "place_footprint"
+    },
+    {
+      "index": 43,
+      "op": "connect"
+    },
+    {
+      "index": 44,
+      "op": "connect"
+    },
+    {
+      "index": 45,
+      "op": "connect"
+    },
+    {
+      "index": 46,
+      "op": "connect"
+    },
+    {
+      "index": 47,
+      "op": "add_symbol"
+    },
+    {
+      "index": 48,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 49,
+      "op": "place_footprint"
+    },
+    {
+      "index": 50,
+      "op": "add_symbol"
+    },
+    {
+      "index": 51,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 52,
+      "op": "place_footprint"
+    },
+    {
+      "index": 53,
+      "op": "connect"
+    },
+    {
+      "index": 54,
+      "op": "connect"
+    },
+    {
+      "index": 55,
+      "op": "add_symbol"
+    },
+    {
+      "index": 56,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 57,
+      "op": "place_footprint"
+    },
+    {
+      "index": 58,
+      "op": "connect"
+    },
+    {
+      "index": 59,
+      "op": "connect"
+    },
+    {
+      "index": 60,
+      "op": "add_symbol"
+    },
+    {
+      "index": 61,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 62,
+      "op": "place_footprint"
+    },
+    {
+      "index": 63,
+      "op": "connect"
+    },
+    {
+      "index": 64,
+      "op": "connect"
+    },
+    {
+      "index": 65,
+      "op": "add_symbol"
+    },
+    {
+      "index": 66,
+      "op": "assign_footprint"
+    },
+    {
+      "index": 67,
+      "op": "place_footprint"
+    },
+    {
+      "index": 68,
+      "op": "write_project"
+    }
+  ],
+  "artifacts": [
+    {
+      "kind": "kicad_project",
+      "path": "examples/blocks/composed_sensor_breakout/composed_sensor_breakout.kicad_pro"
+    },
+    {
+      "kind": "schematic",
+      "path": "examples/blocks/composed_sensor_breakout/composed_sensor_breakout.kicad_sch"
+    },
+    {
+      "kind": "pcb",
+      "path": "examples/blocks/composed_sensor_breakout/composed_sensor_breakout.kicad_pcb"
+    }
+  ],
+  "file_hashes": {
+    "composed_sensor_breakout.kicad_pcb": "418ef1794a995fe6fc15d2ef61cd96158056cc581e6a6dac6f24c5650fb6d1ab",
+    "composed_sensor_breakout.kicad_pro": "0c489c1930869c9763db6cac2cdce5ea090cb516e78477cad944735032b585cf",
+    "composed_sensor_breakout.kicad_sch": "83ceb2d67b42ec67d1b539ebc1fea7645bb4b497157bcce3da26256570330a6d"
+  }
+}

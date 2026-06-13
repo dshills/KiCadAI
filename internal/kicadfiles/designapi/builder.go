@@ -282,14 +282,42 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	builder.assignPinNet(from, netName)
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
+	builder.addSchematicWire(netName, from, to, start, end)
+	builder.syncPCBNets()
+	return nil
+}
+
+func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, start, end kicadfiles.Point) {
+	if builder == nil || hasSchematicWire(builder.design.Schematic.Wires, start, end) {
+		return
+	}
 	wireOffset := len(builder.design.Schematic.Wires)
 	builder.design.Schematic.Wires = append(builder.design.Schematic.Wires, schematic.NewWire(
 		builder.generator.New("root.schematic.wire", netName, fmt.Sprintf("%d", wireOffset), from.Reference, from.Pin, to.Reference, to.Pin),
 		start,
 		end,
 	))
-	builder.syncPCBNets()
-	return nil
+}
+
+func hasSchematicWire(wires []schematic.Wire, start, end kicadfiles.Point) bool {
+	for _, wire := range wires {
+		if len(wire.Points) != 2 {
+			continue
+		}
+		if samePoint(wire.Points[0], start) && samePoint(wire.Points[1], end) {
+			return true
+		}
+		if samePoint(wire.Points[0], end) && samePoint(wire.Points[1], start) {
+			return true
+		}
+	}
+	return false
+}
+
+func samePoint(first, second kicadfiles.Point) bool {
+	// KiCad file coordinates are normalized to integer internal units before
+	// they reach the design builder, so exact comparison is intentional here.
+	return first.X == second.X && first.Y == second.Y
 }
 
 func (builder *Builder) mergeNet(oldName, newName string) {
