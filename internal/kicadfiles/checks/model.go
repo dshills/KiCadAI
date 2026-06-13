@@ -114,6 +114,7 @@ type CheckResult struct {
 	Allowed         []CheckFinding   `json:"allowed,omitempty"`
 	ParserIssues    []ParserIssue    `json:"parser_issues,omitempty"`
 	ContextWarnings []ContextWarning `json:"context_warnings,omitempty"`
+	Summary         CheckSummary     `json:"summary"`
 }
 
 type CheckFinding struct {
@@ -162,6 +163,17 @@ type ContextWarning struct {
 	Path    string `json:"path,omitempty"`
 }
 
+type CheckSummary struct {
+	TotalFindings int                    `json:"total_findings"`
+	BySeverity    map[string]int         `json:"by_severity,omitempty"`
+	ByCategory    map[RepairCategory]int `json:"by_category,omitempty"`
+	ByFile        map[string]int         `json:"by_file,omitempty"`
+	ByReference   map[string]int         `json:"by_reference,omitempty"`
+	ByNet         map[string]int         `json:"by_net,omitempty"`
+	ByLayer       map[string]int         `json:"by_layer,omitempty"`
+	Prompt        string                 `json:"prompt,omitempty"`
+}
+
 func ClassifyStatus(toolError bool, skipped bool, findings []CheckFinding, parserIssues []ParserIssue) CheckStatus {
 	switch {
 	case skipped:
@@ -173,6 +185,32 @@ func ClassifyStatus(toolError bool, skipped bool, findings []CheckFinding, parse
 	default:
 		return CheckStatusPass
 	}
+}
+
+func SummarizeFindings(findings []CheckFinding) CheckSummary {
+	summary := CheckSummary{
+		TotalFindings: len(findings),
+		BySeverity:    map[string]int{},
+		ByCategory:    map[RepairCategory]int{},
+		ByFile:        map[string]int{},
+		ByReference:   map[string]int{},
+		ByNet:         map[string]int{},
+		ByLayer:       map[string]int{},
+	}
+	for _, finding := range findings {
+		incrementString(summary.BySeverity, severityRankLabel(finding.Severity))
+		incrementCategory(summary.ByCategory, finding.RepairCategory)
+		incrementString(summary.ByFile, finding.File)
+		for _, ref := range uniqueStrings(finding.References) {
+			incrementString(summary.ByReference, ref)
+		}
+		for _, net := range uniqueStrings(append([]string{finding.Net}, finding.Nets...)) {
+			incrementString(summary.ByNet, net)
+		}
+		incrementString(summary.ByLayer, finding.Layer)
+	}
+	summary.Prompt = summaryPrompt(summary)
+	return summary
 }
 
 func NormalizeFindings(kind CheckKind, findings []CheckFinding) []CheckFinding {
@@ -273,6 +311,77 @@ func severityRank(value string) string {
 	default:
 		return "3"
 	}
+}
+
+func severityRankLabel(value string) string {
+	switch severityRank(value) {
+	case "0":
+		return "error"
+	case "1":
+		return "warning"
+	case "2":
+		return "exclusion"
+	default:
+		return "info"
+	}
+}
+
+func incrementString(values map[string]int, key string) {
+	key = strings.TrimSpace(key)
+	if key != "" {
+		values[key]++
+	}
+}
+
+func incrementCategory(values map[RepairCategory]int, key RepairCategory) {
+	if key != "" {
+		values[key]++
+	}
+}
+
+func summaryPrompt(summary CheckSummary) string {
+	if summary.TotalFindings == 0 {
+		return "No ERC/DRC findings."
+	}
+	parts := []string{fmt.Sprintf("%d ERC/DRC finding(s)", summary.TotalFindings)}
+	if len(summary.ByCategory) > 0 {
+		parts = append(parts, "categories: "+joinRepairCounts(summary.ByCategory))
+	}
+	if len(summary.ByReference) > 0 {
+		parts = append(parts, "refs: "+joinStringCounts(summary.ByReference))
+	}
+	if len(summary.ByNet) > 0 {
+		parts = append(parts, "nets: "+joinStringCounts(summary.ByNet))
+	}
+	return strings.Join(parts, "; ")
+}
+
+func joinStringCounts(values map[string]int) string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, values[key]))
+	}
+	return strings.Join(parts, ", ")
+}
+
+func joinRepairCounts(values map[RepairCategory]int) string {
+	keys := make([]RepairCategory, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	slices.SortFunc(keys, func(a, b RepairCategory) int {
+		return strings.Compare(string(a), string(b))
+	})
+	parts := make([]string, 0, len(keys))
+	for _, key := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%d", key, values[key]))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func normalizeLocation(loc *CheckLocation) string {

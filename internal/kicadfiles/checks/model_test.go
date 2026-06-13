@@ -76,3 +76,21 @@ func TestClassifyRepairCategory(t *testing.T) {
 		})
 	}
 }
+
+func TestSummarizeFindingsIsDeterministic(t *testing.T) {
+	findings := NormalizeFindings(CheckKindDRC, []CheckFinding{
+		{Severity: "error", Code: "clearance", Message: "Clearance violation", References: []string{"U1", "U1"}, Net: "GND", Nets: []string{"GND"}, Layer: "F.Cu"},
+		{Severity: "warning", Code: "board_outline", Message: "Board outline warning", References: []string{"J1"}, Nets: []string{"VCC"}, Layer: "Edge.Cuts"},
+	})
+	summary := SummarizeFindings(findings)
+	if summary.TotalFindings != 2 {
+		t.Fatalf("total = %d, want 2", summary.TotalFindings)
+	}
+	if summary.ByCategory[RepairClearance] != 1 || summary.ByLayer["F.Cu"] != 1 || summary.ByNet["GND"] != 1 {
+		t.Fatalf("unexpected summary: %#v", summary)
+	}
+	want := "2 ERC/DRC finding(s); categories: clearance=1, outline=1; refs: J1=1, U1=1; nets: GND=1, VCC=1"
+	if summary.Prompt != want {
+		t.Fatalf("prompt = %q, want %q", summary.Prompt, want)
+	}
+}

@@ -85,6 +85,7 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 		Allowed:         allowed,
 		ParserIssues:    parserIssues,
 		ContextWarnings: prepared.Warnings,
+		Summary:         SummarizeFindings(remaining),
 	}
 	if toolError {
 		return check, fmt.Errorf("%s check failed with exit code %d", kind, result.ExitCode)
