@@ -146,6 +146,7 @@ func ComposeBlocks(ctx context.Context, registry Registry, request CompositionRe
 			output.Operations = append(output.Operations, operation)
 		}
 	}
+	output.Issues = append(output.Issues, validateI2CAddressCollisions(output.Instances, netGroups)...)
 	return output
 }
 
@@ -248,4 +249,40 @@ func compatiblePortDirections(a PortDirection, b PortDirection) bool {
 		return true
 	}
 	return (a == PortInput && b == PortOutput) || (a == PortOutput && b == PortInput)
+}
+
+func validateI2CAddressCollisions(instances []BlockInstance, netGroups portDisjointSet) []reports.Issue {
+	type addressedInstance struct {
+		instance BlockInstance
+		address  string
+	}
+	var sensors []addressedInstance
+	for _, instance := range instances {
+		address := i2cAddressKey(instance.Params["i2c_address"])
+		if address != "" && hasI2CBusPorts(instance) {
+			sensors = append(sensors, addressedInstance{instance: instance, address: address})
+		}
+	}
+	var issues []reports.Issue
+	for left := 0; left < len(sensors); left++ {
+		for right := left + 1; right < len(sensors); right++ {
+			if sensors[left].address != sensors[right].address {
+				continue
+			}
+			if sameI2CBus(sensors[left].instance, sensors[right].instance, netGroups) {
+				issues = append(issues, i2cAddressCollisionIssue(sensors[left].instance, sensors[right].instance, sensors[left].address))
+			}
+		}
+	}
+	return issues
+}
+
+func hasI2CBusPorts(instance BlockInstance) bool {
+	hasSDA := false
+	hasSCL := false
+	for _, port := range instance.Ports {
+		hasSDA = hasSDA || port.Name == "SDA"
+		hasSCL = hasSCL || port.Name == "SCL"
+	}
+	return hasSDA && hasSCL
 }

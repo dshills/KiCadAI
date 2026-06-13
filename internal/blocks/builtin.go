@@ -3,6 +3,7 @@ package blocks
 const (
 	defaultConnectorSymbol    = "Connector_Generic:Conn_01x02"
 	defaultConnectorFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+	defaultI2CSensorSymbol    = "Sensor:Generic_I2C"
 )
 
 func BuiltinDefinitions() []BlockDefinition {
@@ -149,10 +150,16 @@ func i2cSensorDefinition() BlockDefinition {
 		Category:    "sensor",
 		Parameters: []BlockParameter{
 			{Name: "supply_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "Sensor supply rail."},
-			{Name: "sensor_symbol", Type: ParameterSymbolID, Required: true, Description: "KiCad symbol ID for the sensor."},
-			{Name: "sensor_footprint", Type: ParameterFootprintID, Required: true, Description: "KiCad footprint ID for the sensor package."},
+			{Name: "sensor_symbol", Type: ParameterSymbolID, Default: defaultI2CSensorSymbol, Description: "KiCad symbol ID for the supported generic I2C sensor template."},
+			{Name: "sensor_footprint", Type: ParameterFootprintID, Default: "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", Description: "KiCad footprint ID for the sensor package."},
 			{Name: "i2c_address", Type: ParameterString, Required: true, Description: "7-bit I2C address such as 0x48."},
+			{Name: "pullup_value", Type: ParameterResistance, Default: "4.7k", Description: "I2C pull-up resistor value."},
+			{Name: "pullup_footprint", Type: ParameterFootprintID, Default: "Resistor_SMD:R_0805_2012Metric", Description: "Pull-up resistor footprint ID."},
 			{Name: "include_pullups", Type: ParameterBool, Default: true, Description: "Include SDA/SCL pull-up resistors."},
+			{Name: "include_interrupt", Type: ParameterBool, Default: false, Description: "Export and wire an interrupt port."},
+			{Name: "include_decoupling", Type: ParameterBool, Default: true, Description: "Include a local supply decoupling capacitor."},
+			{Name: "decoupling_value", Type: ParameterCapacitance, Default: "100nF", Description: "Local decoupling capacitor value."},
+			{Name: "decoupling_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Decoupling capacitor footprint ID."},
 		},
 		Ports: []BlockPort{
 			{Name: "VCC", Direction: PortPower, Voltage: "supply_voltage", Description: "Sensor supply input."},
@@ -161,7 +168,18 @@ func i2cSensorDefinition() BlockDefinition {
 			{Name: "SCL", Direction: PortInput, Description: "I2C clock."},
 			{Name: "INT", Direction: PortOutput, Description: "Optional interrupt output."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; sensor-specific pin roles are supplied by later phases."),
+		RequiredLibraries: []LibraryRequirement{
+			{Kind: "symbol", ID: defaultI2CSensorSymbol, Required: true, Description: "Generic I2C sensor template."},
+			{Kind: "symbol", ID: "Device:R", Required: true, Description: "Optional pull-up resistors."},
+			{Kind: "symbol", ID: "Device:C", Required: true, Description: "Optional decoupling capacitor."},
+			{Kind: "footprint", ID: "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", Required: true, Description: "Default sensor footprint."},
+			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: false, Description: "Default pull-up resistor footprint."},
+			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: false, Description: "Default decoupling capacitor footprint."},
+		},
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Uses an explicit generic I2C sensor pin-role template; real part-specific symbols require future pin-role metadata."},
+		},
 	}
 }
 
