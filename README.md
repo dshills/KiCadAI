@@ -125,6 +125,7 @@ go run ./cmd/kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_
 go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 go run ./cmd/kicadai --json pinmap list
 go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
+go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
 ```
 
 ### Live IPC Commands
@@ -186,6 +187,27 @@ go run ./cmd/kicadai \
 
 Generated projects are written through safe directory handling. `--overwrite`
 is required to replace an existing output directory.
+
+### Placement
+
+The placement engine accepts a structured board placement request and returns
+placed components, geometry issues, metrics, and `place_footprint` transaction
+operations for successful placements.
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --request ./examples/placement/simple_request.json \
+  place request
+```
+
+Current placement support includes fixed components, top/bottom side
+constraints, edge preferences, keepouts, component spacing, group anchors,
+group spread checks, HPWL metrics, footprint-derived bounds helpers, and
+transaction operation output. Requests can use explicit component bounds or
+hydrate bounds from the library resolver in Go before calling
+`placement.Place`. The usable board area uses the larger of
+`Board.MarginMM` and `Rules.BoardEdgeClearanceMM`.
 
 ### Inspection
 

@@ -1,0 +1,72 @@
+{
+  "Board": {
+    "WidthMM": 40,
+    "HeightMM": 25,
+    "MarginMM": 1
+  },
+  "Components": [
+    {
+      "Ref": "R1",
+      "Value": "10k",
+      "FootprintID": "Resistor_SMD:R_0805_2012Metric",
+      "Bounds": {
+        "WidthMM": 2,
+        "HeightMM": 1.25,
+        "Source": "explicit"
+      },
+      "Pads": [
+        { "Name": "1", "XMM": -0.8, "YMM": 0, "WidthMM": 0.6, "HeightMM": 1 },
+        { "Name": "2", "XMM": 0.8, "YMM": 0, "WidthMM": 0.6, "HeightMM": 1 }
+      ]
+    },
+    {
+      "Ref": "C1",
+      "Value": "100n",
+      "FootprintID": "Capacitor_SMD:C_0805_2012Metric",
+      "Bounds": {
+        "WidthMM": 2,
+        "HeightMM": 1.25,
+        "Source": "explicit"
+      },
+      "Pads": [
+        { "Name": "1", "XMM": -0.8, "YMM": 0, "WidthMM": 0.6, "HeightMM": 1 },
+        { "Name": "2", "XMM": 0.8, "YMM": 0, "WidthMM": 0.6, "HeightMM": 1 }
+      ],
+      "GroupID": "decoupling"
+    }
+  ],
+  "Nets": [
+    {
+      "Name": "VCC",
+      "Role": "power",
+      "Endpoints": [
+        { "Ref": "R1", "Pin": "1" },
+        { "Ref": "C1", "Pin": "1" }
+      ]
+    },
+    {
+      "Name": "GND",
+      "Role": "ground",
+      "Endpoints": [
+        { "Ref": "R1", "Pin": "2" },
+        { "Ref": "C1", "Pin": "2" }
+      ]
+    }
+  ],
+  "Groups": [
+    {
+      "ID": "decoupling",
+      "Components": ["C1"],
+      "Anchor": {
+        "At": { "x_mm": 20, "y_mm": 12 }
+      },
+      "MaxSpreadMM": 8
+    }
+  ],
+  "Rules": {
+    "GridMM": 0.5,
+    "ComponentSpacingMM": 0.5,
+    "BoardEdgeClearanceMM": 1,
+    "MaxCandidatesPerPart": 5000
+  }
+}
