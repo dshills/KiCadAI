@@ -6,6 +6,9 @@ intended to be a safer AI-facing design primitive than raw file writes.
 
 The current implementation generates structural KiCad project and schematic
 outputs. It does not yet claim fabrication-ready PCB output.
+The checked-in `led_indicator` and `connector_breakout` schematic examples pass
+the focused KiCad CLI round-trip fixture test, but block verification levels
+remain conservative until broader parameter, ERC/DRC, and PCB evidence exists.
 The current readiness review and gap matrix are tracked in
 [circuit-block-readiness.md](circuit-block-readiness.md).
 
