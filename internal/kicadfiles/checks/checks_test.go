@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-func TestRunERCWithRunnerParsesViolationReportExitOne(t *testing.T) {
+func TestRunERCWithRunnerParsesViolationReportNonZeroExit(t *testing.T) {
 	dir := t.TempDir()
 	schematic := filepath.Join(dir, "demo.kicad_sch")
 	writeCheckTestFile(t, schematic, "(kicad_sch)")
@@ -21,7 +21,7 @@ func TestRunERCWithRunnerParsesViolationReportExitOne(t *testing.T) {
 			if err := os.WriteFile(report, []byte(sampleERCReport), 0o644); err != nil {
 				t.Fatalf("write report: %v", err)
 			}
-			return CommandResult{Args: args, ExitCode: 1, Duration: time.Millisecond, Err: fmt.Errorf("violations")}
+			return CommandResult{Args: args, ExitCode: 5, Duration: time.Millisecond, Err: fmt.Errorf("violations")}
 		},
 	}
 	result, err := RunERCWithRunner(context.Background(), runner, KiCadCLI{Path: "/bin/kicad-cli"}, schematic, Options{KeepArtifacts: true, ArtifactDir: t.TempDir()})

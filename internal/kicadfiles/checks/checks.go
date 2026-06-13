@@ -63,7 +63,7 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 		units = opts.Units
 	}
 	remaining, allowed := FilterAllowedFindings(findings, opts.Allowlist)
-	toolError := commandIsToolError(result, reportPath, parserIssues)
+	toolError := commandIsToolError(result, parserIssues, findings)
 	status := ClassifyStatus(toolError, false, remaining, parserIssues)
 	check := CheckResult{
 		Kind:            kind,
@@ -123,14 +123,12 @@ func parseReportIfPresent(kind CheckKind, reportPath string) ([]CheckFinding, []
 	return findings, issues, units
 }
 
-func commandIsToolError(result CommandResult, reportPath string, parserIssues []ParserIssue) bool {
+func commandIsToolError(result CommandResult, parserIssues []ParserIssue, findings []CheckFinding) bool {
 	if result.Err == nil {
 		return len(parserIssues) > 0
 	}
-	if result.ExitCode == 1 && len(parserIssues) == 0 {
-		if info, err := os.Stat(reportPath); err == nil && info.Size() > 0 {
-			return false
-		}
+	if result.ExitCode > 0 && len(parserIssues) == 0 && len(findings) > 0 {
+		return false
 	}
 	return true
 }
