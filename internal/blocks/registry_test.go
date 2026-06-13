@@ -43,7 +43,7 @@ func TestBuiltinRegistryGetBlockReturnsDefinition(t *testing.T) {
 	if !ok {
 		t.Fatalf("led_indicator not found")
 	}
-	if definition.Name != "LED Indicator" || definition.Verification.Level != VerificationExperimental {
+	if definition.Name != "LED Indicator" || definition.Verification.Level != VerificationStructural {
 		t.Fatalf("definition = %#v", definition)
 	}
 }
@@ -93,7 +93,11 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 		if len(definition.Parameters) == 0 || len(definition.Ports) == 0 {
 			t.Fatalf("%s missing parameters or ports: %#v", definition.ID, definition)
 		}
-		if definition.Verification.Level != VerificationExperimental {
+		if definition.ID == "led_indicator" {
+			if definition.Verification.Level != VerificationStructural {
+				t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
+			}
+		} else if definition.Verification.Level != VerificationExperimental {
 			t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
 		}
 		if issues := NewRegistry(nil).ValidateDefinition(definition); len(issues) != 0 {

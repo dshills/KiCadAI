@@ -21,9 +21,13 @@ func ledIndicatorDefinition() BlockDefinition {
 		Category:    "indicator",
 		Parameters: []BlockParameter{
 			{Name: "supply_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "Rail voltage feeding the indicator."},
+			{Name: "led_forward_voltage", Type: ParameterVoltage, Default: "2.0V", Description: "Expected LED forward voltage."},
 			{Name: "led_current", Type: ParameterCurrent, Default: "5mA", Description: "Target LED current."},
+			{Name: "resistor_value", Type: ParameterResistance, Description: "Optional explicit current-limiting resistor value."},
 			{Name: "color", Type: ParameterEnum, Default: "green", Allowed: []any{"red", "green", "blue", "amber", "white"}, Description: "LED color intent."},
 			{Name: "active_high", Type: ParameterBool, Default: true, Description: "When true, IN sources current through the LED."},
+			{Name: "resistor_footprint", Type: ParameterFootprintID, Default: "Resistor_SMD:R_0805_2012Metric", Description: "Resistor footprint ID."},
+			{Name: "led_footprint", Type: ParameterFootprintID, Default: "LED_SMD:LED_0805_2012Metric", Description: "LED footprint ID."},
 		},
 		Ports: []BlockPort{
 			{Name: "IN", Direction: PortInput, Description: "Control signal."},
@@ -33,8 +37,13 @@ func ledIndicatorDefinition() BlockDefinition {
 		RequiredLibraries: []LibraryRequirement{
 			{Kind: "symbol", ID: "Device:R", Required: true, Description: "Current-limiting resistor."},
 			{Kind: "symbol", ID: "Device:LED", Required: true, Description: "Indicator LED."},
+			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: true, Description: "Default resistor footprint."},
+			{Kind: "footprint", ID: "LED_SMD:LED_0805_2012Metric", Required: true, Description: "Default LED footprint."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; generation is implemented in later phases."),
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Emits deterministic schematic transactions; resolver-backed pinmap validation is implemented in later phases."},
+		},
 	}
 }
 

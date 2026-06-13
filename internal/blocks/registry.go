@@ -24,10 +24,13 @@ type Registry interface {
 }
 
 type BuiltinRegistry struct {
-	definitions map[string]BlockDefinition
-	summaries   []BlockSummary
-	issues      []reports.Issue
+	definitions   map[string]BlockDefinition
+	instantiators map[string]BlockInstantiator
+	summaries     []BlockSummary
+	issues        []reports.Issue
 }
+
+type BlockInstantiator func(definition BlockDefinition, request BlockRequest, params map[string]any, issues []reports.Issue) BlockOutput
 
 func NewBuiltinRegistry() BuiltinRegistry {
 	registry, issues := NewBuiltinRegistryChecked()
@@ -39,11 +42,14 @@ func NewBuiltinRegistry() BuiltinRegistry {
 
 func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 	registry := NewRegistry(BuiltinDefinitions())
+	registry.instantiators = map[string]BlockInstantiator{
+		"led_indicator": instantiateLEDIndicator,
+	}
 	return registry, registry.Issues()
 }
 
 func NewRegistry(definitions []BlockDefinition) BuiltinRegistry {
-	registry := BuiltinRegistry{definitions: map[string]BlockDefinition{}}
+	registry := BuiltinRegistry{definitions: map[string]BlockDefinition{}, instantiators: map[string]BlockInstantiator{}}
 	for _, definition := range definitions {
 		if issues := registry.ValidateDefinition(definition); len(issues) != 0 {
 			registry.issues = append(registry.issues, issues...)
@@ -212,6 +218,10 @@ func (registry BuiltinRegistry) Instantiate(ctx context.Context, request BlockRe
 			Message:    "instance ID is required",
 			Suggestion: "Provide a unique instance_id for every block instance.",
 		})
+	}
+	if instantiator, ok := registry.instantiators[definition.ID]; ok {
+		output := instantiator(definition, request, params, issues)
+		return output, output.Issues
 	}
 	output := BlockOutput{
 		Definition: Summary(definition),

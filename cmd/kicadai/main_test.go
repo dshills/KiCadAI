@@ -426,6 +426,16 @@ func TestRunBlockListShowValidate(t *testing.T) {
 	if !strings.Contains(stdout.String(), `"ok": true`) || !strings.Contains(stdout.String(), `"block_id": "led_indicator"`) {
 		t.Fatalf("unexpected validate output: %s", stdout.String())
 	}
+
+	stdout.Reset()
+	if err := run([]string{"--json", "--request", request, "block", "instantiate", "led_indicator"}, &stdout, &stderr); err != nil {
+		t.Fatalf("instantiate err = %v stdout=%s", err, stdout.String())
+	}
+	for _, want := range []string{`"operations": [`, `"op": "add_symbol"`, `"op": "connect"`, `"refs": [`} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("instantiate output missing %q: %s", want, stdout.String())
+		}
+	}
 }
 
 func TestRunBlockReportsStructuredFailures(t *testing.T) {

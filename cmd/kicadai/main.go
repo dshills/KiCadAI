@@ -408,6 +408,22 @@ func runBlock(opts cliOptions, stdout io.Writer) error {
 		}
 		issues := registry.ValidateRequest(request)
 		return writeBlockResult(stdout, request, issues)
+	case "instantiate":
+		if len(opts.commandArgs) != 2 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("instantiate", 1))
+		}
+		id := opts.commandArgs[1]
+		request, err := blockRequestFromOptions(opts, id)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "request",
+				Message:  err.Error(),
+			})
+		}
+		output, issues := registry.Instantiate(context.Background(), request)
+		return writeBlockResult(stdout, output, issues)
 	default:
 		return writeBlockFailure(stdout, reports.Issue{
 			Code:     reports.CodeInvalidArgument,
