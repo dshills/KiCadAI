@@ -4,6 +4,7 @@ const (
 	defaultConnectorSymbol    = "Connector_Generic:Conn_01x02"
 	defaultConnectorFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
 	defaultI2CSensorSymbol    = "Sensor:Generic_I2C"
+	defaultOpAmpSymbol        = "Amplifier_Operational:LMV321"
 )
 
 func BuiltinDefinitions() []BlockDefinition {
@@ -193,8 +194,12 @@ func opampGainStageDefinition() BlockDefinition {
 		Parameters: []BlockParameter{
 			{Name: "topology", Type: ParameterEnum, Default: "non_inverting", Allowed: []any{"non_inverting", "inverting"}, Description: "Amplifier topology."},
 			{Name: "gain", Type: ParameterNumber, Default: 2.0, Description: "Target voltage gain."},
-			{Name: "opamp_symbol", Type: ParameterSymbolID, Default: "Amplifier_Operational:LMV321", Description: "KiCad symbol ID for the op-amp."},
+			{Name: "opamp_symbol", Type: ParameterSymbolID, Default: defaultOpAmpSymbol, Description: "KiCad symbol ID for the supported op-amp template."},
+			{Name: "opamp_footprint", Type: ParameterFootprintID, Default: "Package_TO_SOT_SMD:SOT-23-5", Description: "Op-amp footprint ID."},
 			{Name: "single_supply", Type: ParameterBool, Default: true, Description: "Use a single-supply bias network."},
+			{Name: "input_coupling", Type: ParameterEnum, Default: "dc", Allowed: []any{"dc", "ac"}, Description: "Input coupling mode."},
+			{Name: "feedback_footprint", Type: ParameterFootprintID, Default: "Resistor_SMD:R_0805_2012Metric", Description: "Feedback resistor footprint ID."},
+			{Name: "include_output_resistor", Type: ParameterBool, Default: false, Description: "Add a small series resistor at the output."},
 		},
 		Ports: []BlockPort{
 			{Name: "IN", Direction: PortInput, Description: "Signal input."},
@@ -204,9 +209,14 @@ func opampGainStageDefinition() BlockDefinition {
 		},
 		RequiredLibraries: []LibraryRequirement{
 			{Kind: "symbol", ID: "Device:R", Required: true, Description: "Feedback resistors."},
-			{Kind: "symbol", ID: "Amplifier_Operational:LMV321", Required: false, Description: "Default op-amp candidate."},
+			{Kind: "symbol", ID: "Device:C", Required: true, Description: "Decoupling and coupling capacitors."},
+			{Kind: "symbol", ID: defaultOpAmpSymbol, Required: true, Description: "Default op-amp candidate."},
+			{Kind: "footprint", ID: "Package_TO_SOT_SMD:SOT-23-5", Required: true, Description: "Default op-amp footprint."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; resistor synthesis is implemented in later phases."),
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Implements a non-inverting LMV321 template with explicit pin roles; other op-amp symbols require future pin-role metadata."},
+		},
 	}
 }
 

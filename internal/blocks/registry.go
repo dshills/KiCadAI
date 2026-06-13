@@ -47,6 +47,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 		"connector_breakout": instantiateConnectorBreakout,
 		"i2c_sensor":         instantiateI2CSensor,
 		"led_indicator":      instantiateLEDIndicator,
+		"opamp_gain_stage":   instantiateOpAmpGainStage,
 		"voltage_regulator":  instantiateVoltageRegulator,
 	}
 	return registry, registry.Issues()
