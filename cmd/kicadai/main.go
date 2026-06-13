@@ -29,6 +29,7 @@ import (
 	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/pinmap"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematic"
 	"kicadai/internal/transactions"
@@ -54,6 +55,7 @@ Commands:
   library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
   pinmap        List or validate symbol-footprint pinmaps
+  place         Run PCB placement planning
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -217,6 +219,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runRoundTrip(opts, stdout)
 	case "pinmap":
 		return runPinmap(opts, stdout)
+	case "place":
+		return runPlace(opts, stdout)
 	case "transaction":
 		return runTransaction(opts, stdout)
 	case "export":
@@ -981,6 +985,59 @@ func runPinmap(opts cliOptions, stdout io.Writer) error {
 func pinmapShouldUseLibraryResolver(opts cliOptions) bool {
 	roots := libraryRootsFromOptions(opts)
 	return strings.TrimSpace(roots.SymbolsRoot) != "" || strings.TrimSpace(roots.FootprintsRoot) != "" || strings.TrimSpace(opts.libraryCache) != ""
+}
+
+func runPlace(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("place requires --json in this implementation phase")
+	}
+	if len(opts.commandArgs) == 0 {
+		return writeReportFailure(stdout, "place", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "place",
+			Message:  "place requires a subcommand",
+		})
+	}
+	switch opts.commandArgs[0] {
+	case "request":
+		if opts.requestPath == "" {
+			return writeReportFailure(stdout, "place", reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "place.request",
+				Message:  "place request requires --request",
+			})
+		}
+		file, err := os.Open(opts.requestPath)
+		if err != nil {
+			return writeReportFailure(stdout, "place", reports.Issue{
+				Code:     reports.CodeMissingFile,
+				Severity: reports.SeverityError,
+				Path:     opts.requestPath,
+				Message:  err.Error(),
+			})
+		}
+		defer file.Close()
+		var request placement.Request
+		if err := json.NewDecoder(file).Decode(&request); err != nil {
+			return writeReportFailure(stdout, "place", reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     opts.requestPath,
+				Message:  err.Error(),
+			})
+		}
+		result := placement.Place(request)
+		return writeReportJSON(stdout, reports.ResultWithIssues("place", result, result.Issues, nil))
+	default:
+		return writeReportFailure(stdout, "place", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "place." + opts.commandArgs[0],
+			Message:  "unsupported place subcommand " + opts.commandArgs[0],
+		})
+	}
 }
 
 type checkCommandReport struct {

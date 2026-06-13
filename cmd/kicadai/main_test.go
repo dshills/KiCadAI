@@ -95,6 +95,47 @@ func TestRunConfigTextRedactsToken(t *testing.T) {
 	}
 }
 
+func TestRunPlaceRequestJSON(t *testing.T) {
+	dir := t.TempDir()
+	request := filepath.Join(dir, "placement.json")
+	if err := os.WriteFile(request, []byte(`{
+	  "Board": {"WidthMM": 40, "HeightMM": 25, "MarginMM": 1},
+	  "Components": [{
+	    "Ref": "R1",
+	    "FootprintID": "Resistor_SMD:R_0805_2012Metric",
+	    "Bounds": {"WidthMM": 2, "HeightMM": 1.25, "Source": "explicit"},
+	    "Pads": [{"Name": "1"}, {"Name": "2"}]
+	  }],
+	  "Nets": [{"Name": "N1", "Endpoints": [{"Ref": "R1", "Pin": "1"}]}]
+	}`), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--json", "--request", request, "place", "request"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s", err, stdout.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{`"command": "place"`, `"status": "placed"`, `"op": "place_footprint"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected output to contain %q, got %s", want, output)
+		}
+	}
+}
+
+func TestRunPlaceRequestRequiresRequestPath(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--json", "place", "request"}, &stdout, &stderr); err == nil || !strings.Contains(err.Error(), "place request requires --request") {
+		t.Fatalf("err = %v", err)
+	}
+	if !strings.Contains(stdout.String(), "place request requires --request") {
+		t.Fatalf("expected missing request issue, got %s", stdout.String())
+	}
+}
+
 func TestRunUnknownCommandReturnsUsage(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
