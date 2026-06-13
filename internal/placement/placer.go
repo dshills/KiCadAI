@@ -9,6 +9,8 @@ import (
 	"kicadai/internal/reports"
 )
 
+const groupAnchorScoreWeight = 5.0
+
 func Place(request Request) Result {
 	request = NormalizeRequest(request)
 	result := Result{
@@ -63,6 +65,11 @@ func Place(request Request) Result {
 		}
 	}
 	if len(geometryIssues) > 0 && result.Status == StatusPlaced {
+		result.Status = StatusPartial
+	}
+	groupIssues := ValidateGroups(request, successfulPlacements)
+	result.Issues = append(result.Issues, groupIssues...)
+	if len(groupIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}
 	result.Metrics.HPWLMM = hpwl(request.Nets, result.Placements)
@@ -144,8 +151,9 @@ func candidatePlacements(component Component, request Request) []PlacementResult
 			}
 		}
 	}
+	anchor, hasAnchor := groupAnchorPoint(component, request)
 	sort.SliceStable(candidates, func(i int, j int) bool {
-		return placementScore(component, candidates[i].Position, request) < placementScore(component, candidates[j].Position, request)
+		return placementScore(component, candidates[i].Position, request, anchor, hasAnchor) < placementScore(component, candidates[j].Position, request, anchor, hasAnchor)
 	})
 	if len(candidates) > maxCandidates {
 		candidates = candidates[:maxCandidates]
@@ -194,7 +202,7 @@ func sampledIndices(count int, target int) []int {
 	return indices
 }
 
-func placementScore(component Component, placement Placement, request Request) float64 {
+func placementScore(component Component, placement Placement, request Request, anchor Point, hasAnchor bool) float64 {
 	score := placement.XMM + placement.YMM
 	switch component.Edge {
 	case EdgeLeft:
@@ -215,7 +223,25 @@ func placementScore(component Component, placement Placement, request Request) f
 	if request.Rules.PreferTopLayer && strings.EqualFold(placement.Layer, "B.Cu") {
 		score += request.Board.WidthMM + request.Board.HeightMM
 	}
+	if hasAnchor {
+		score += math.Hypot(placement.XMM-anchor.XMM, placement.YMM-anchor.YMM) * groupAnchorScoreWeight
+	}
 	return score
+}
+
+func groupAnchorPoint(component Component, request Request) (Point, bool) {
+	if component.GroupID == "" {
+		return Point{}, false
+	}
+	for _, group := range request.Groups {
+		if !strings.EqualFold(group.ID, component.GroupID) {
+			continue
+		}
+		if group.Anchor.At != nil {
+			return *group.Anchor.At, true
+		}
+	}
+	return Point{}, false
 }
 
 func roundToGrid(value float64, grid float64) float64 {
