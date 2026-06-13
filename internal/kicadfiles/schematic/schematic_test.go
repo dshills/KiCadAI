@@ -484,13 +484,23 @@ func TestWriterDerivedSymbolPropertiesBaselineMissingRoundTripDefaults(t *testin
 	}
 }
 
-func TestRenderAtBaselineUsesNonCanonicalZero(t *testing.T) {
+func TestRenderAtCanonicalizesZero(t *testing.T) {
 	output, err := sexpr.Format(renderAt(kicadfiles.Point{}, 0))
 	if err != nil {
 		t.Fatalf("Format returned error: %v", err)
 	}
-	if strings.TrimSpace(output) != "(at 0.0 0.0 0)" {
-		t.Fatalf("baseline expected schematic zero at-node to render as 0.0 before canonicalization:\n%s", output)
+	if strings.TrimSpace(output) != "(at 0 0 0)" {
+		t.Fatalf("expected schematic zero at-node to render canonically:\n%s", output)
+	}
+}
+
+func TestSchematicFixedPreservesNonZeroPrecision(t *testing.T) {
+	output, err := sexpr.Format(sexpr.L(sexpr.A("xy"), schematicFixed(kicadfiles.IU(1_234_567)), schematicFixed(kicadfiles.MM(-0.5))))
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	if strings.TrimSpace(output) != "(xy 1.234567 -0.5)" {
+		t.Fatalf("formatted non-zero points = %q", strings.TrimSpace(output))
 	}
 }
 

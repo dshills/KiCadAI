@@ -112,6 +112,8 @@ const (
 	SymbolMirrorY    SymbolMirror = "y"
 )
 
+var schematicZero = sexpr.X("0")
+
 type SymbolPassthrough string
 
 const (
@@ -1578,8 +1580,8 @@ func renderLineLike(token string, points []kicadfiles.Point, uuid kicadfiles.UUI
 func renderBusEntry(entry BusEntry) sexpr.List {
 	return sexpr.L(
 		sexpr.A("bus_entry"),
-		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(entry.Position.X)), sexpr.X(kicadfiles.ToMMString(entry.Position.Y))),
-		sexpr.L(sexpr.A("size"), sexpr.X(kicadfiles.ToMMString(entry.Size.X)), sexpr.X(kicadfiles.ToMMString(entry.Size.Y))),
+		sexpr.L(sexpr.A("at"), schematicFixed(entry.Position.X), schematicFixed(entry.Position.Y)),
+		sexpr.L(sexpr.A("size"), schematicFixed(entry.Size.X), schematicFixed(entry.Size.Y)),
 		renderStroke(0, "default"),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(entry.UUID))),
 	)
@@ -1631,17 +1633,14 @@ func labelToken(kind LabelKind) string {
 }
 
 func renderJunction(junction Junction) sexpr.List {
-	diameter := sexpr.Node(sexpr.I(0))
-	if junction.Diameter != 0 {
-		diameter = sexpr.X(kicadfiles.ToMMString(junction.Diameter))
-	}
+	diameter := schematicFixed(junction.Diameter)
 	color := junction.Color
 	if (color.R != 0 || color.G != 0 || color.B != 0) && color.A == 0 {
 		color.A = 255
 	}
 	return sexpr.L(
 		sexpr.A("junction"),
-		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(junction.Position.X)), sexpr.X(kicadfiles.ToMMString(junction.Position.Y))),
+		sexpr.L(sexpr.A("at"), schematicFixed(junction.Position.X), schematicFixed(junction.Position.Y)),
 		sexpr.L(sexpr.A("diameter"), diameter),
 		sexpr.L(sexpr.A("color"), sexpr.I(int64(color.R)), sexpr.I(int64(color.G)), sexpr.I(int64(color.B)), sexpr.I(int64(color.A))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(junction.UUID))),
@@ -1651,7 +1650,7 @@ func renderJunction(junction Junction) sexpr.List {
 func renderNoConnect(noConnect NoConnect) sexpr.List {
 	return sexpr.L(
 		sexpr.A("no_connect"),
-		sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(noConnect.Position.X)), sexpr.X(kicadfiles.ToMMString(noConnect.Position.Y))),
+		sexpr.L(sexpr.A("at"), schematicFixed(noConnect.Position.X), schematicFixed(noConnect.Position.Y)),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(noConnect.UUID))),
 	)
 }
@@ -1660,7 +1659,7 @@ func renderSheet(sheet Sheet) sexpr.List {
 	nodes := []sexpr.Node{
 		sexpr.A("sheet"),
 		renderAt(sheet.Position, 0),
-		sexpr.L(sexpr.A("size"), sexpr.X(kicadfiles.ToMMString(sheet.Size.X)), sexpr.X(kicadfiles.ToMMString(sheet.Size.Y))),
+		sexpr.L(sexpr.A("size"), schematicFixed(sheet.Size.X), schematicFixed(sheet.Size.Y)),
 		sexpr.L(sexpr.A("exclude_from_sim"), yesNo(sheet.ExcludeFromSim)),
 		sexpr.L(sexpr.A("in_bom"), yesNo(defaultBool(sheet.InBOM, true))),
 		sexpr.L(sexpr.A("on_board"), yesNo(defaultBool(sheet.OnBoard, true))),
@@ -1770,10 +1769,7 @@ func renderSheetInstancePath(instance SheetInstance) sexpr.List {
 }
 
 func renderStroke(width float64, strokeType string) sexpr.List {
-	var widthNode sexpr.Node = sexpr.I(0)
-	if width != 0 {
-		widthNode = sexpr.X(kicadfiles.ToMMString(kicadfiles.MM(width)))
-	}
+	widthNode := schematicFixed(kicadfiles.MM(width))
 	return sexpr.L(
 		sexpr.A("stroke"),
 		sexpr.L(sexpr.A("width"), widthNode),
@@ -1813,13 +1809,20 @@ func yesNo(value bool) sexpr.Atom {
 func renderPoints(points []kicadfiles.Point) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("pts")}
 	for _, point := range points {
-		nodes = append(nodes, sexpr.L(sexpr.A("xy"), sexpr.X(kicadfiles.ToMMString(point.X)), sexpr.X(kicadfiles.ToMMString(point.Y))))
+		nodes = append(nodes, sexpr.L(sexpr.A("xy"), schematicFixed(point.X), schematicFixed(point.Y)))
 	}
 	return sexpr.L(nodes...)
 }
 
 func renderAt(point kicadfiles.Point, rotation kicadfiles.Angle) sexpr.List {
-	return sexpr.L(sexpr.A("at"), sexpr.X(kicadfiles.ToMMString(point.X)), sexpr.X(kicadfiles.ToMMString(point.Y)), sexpr.F(float64(rotation)))
+	return sexpr.L(sexpr.A("at"), schematicFixed(point.X), schematicFixed(point.Y), sexpr.F(float64(rotation)))
+}
+
+func schematicFixed(value kicadfiles.IU) sexpr.Fixed {
+	if value == 0 {
+		return schematicZero
+	}
+	return sexpr.X(kicadfiles.ToMMString(value))
 }
 
 func indexed(collection string, index int, field string) string {
