@@ -97,6 +97,22 @@ func TestPlaceSamplesAcrossBoardWhenCandidateCapIsSmall(t *testing.T) {
 	}
 }
 
+func TestPlaceScoresBottomEdgeWithoutCancelingY(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 30
+	req.Board.HeightMM = 100
+	req.Components[0].Edge = EdgeBottom
+	req.Rules.MaxCandidatesPerPart = 10
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	if result.Placements[0].Position.YMM < 80 {
+		t.Fatalf("bottom-edge placement Y = %.2f, want sampled near bottom edge", result.Placements[0].Position.YMM)
+	}
+}
+
 func TestPlaceCanUseBottomLayerForSideAny(t *testing.T) {
 	req := twoComponentRequest()
 	req.Rules.AllowBackLayer = true
@@ -131,7 +147,8 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	req = NormalizeRequest(req)
 	req.Components[0].Rotation.AllowedDeg = []float64{45, 0}
 
-	result, ok := placeComponent(req.Components[0], req, newOccupancy(req))
+	padsByRef := componentPadMaps(req.Components)
+	result, ok := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets))
 	if !ok {
 		t.Fatal("placeComponent failed after invalid candidate rotation")
 	}
@@ -143,5 +160,53 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 func TestRoundToGridHandlesNegativeCoordinates(t *testing.T) {
 	if got := roundToGrid(-1.1, 0.5); got != -1 {
 		t.Fatalf("roundToGrid(-1.1, 0.5) = %v, want -1", got)
+	}
+}
+
+func TestPlaceScoresConnectedComponentNearPlacedNetPeer(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 50, HeightMM: 25, MarginMM: 1},
+		Components: []Component{
+			{
+				Ref:         "U1",
+				FootprintID: "Package_SO:SOIC-8",
+				Bounds:      Bounds{WidthMM: 5, HeightMM: 4, Source: BoundsExplicit},
+				Fixed:       true,
+				Position:    &Placement{XMM: 35, YMM: 12, Layer: "F.Cu"},
+			},
+			{
+				Ref:         "C1",
+				FootprintID: "Capacitor_SMD:C_0805_2012Metric",
+				Bounds:      Bounds{WidthMM: 2, HeightMM: 1.25, Source: BoundsExplicit},
+			},
+		},
+		Nets: []Net{{Name: "VCC", Weight: 5, Endpoints: []Endpoint{{Ref: "U1", Pin: "8"}, {Ref: "C1", Pin: "1"}}}},
+	}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	var capPlacement PlacementResult
+	for _, placement := range result.Placements {
+		if placement.Ref == "C1" {
+			capPlacement = placement
+		}
+	}
+	if capPlacement.Ref == "" {
+		t.Fatalf("missing C1 placement: %#v", result.Placements)
+	}
+	if capPlacement.Position.XMM < 25 {
+		t.Fatalf("C1 X = %.2f, want placement near fixed U1", capPlacement.Position.XMM)
+	}
+}
+
+func TestSeedTieBreakIsStable(t *testing.T) {
+	placement := Placement{XMM: 1, YMM: 2, RotationDeg: 90, Layer: "F.Cu"}
+	base := seedTieBreakBase("abc", "R1")
+	first := seedTieBreak(base, placement)
+	second := seedTieBreak(base, placement)
+	if first != second {
+		t.Fatalf("seed tie break changed: %f vs %f", first, second)
 	}
 }
