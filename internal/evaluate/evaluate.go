@@ -78,9 +78,11 @@ func Project(path string) (Report, error) {
 	report.addCheck(check)
 	if summary.Schematic != nil {
 		report.mergeChecks(checksForSchematicSummary(*summary.Schematic)...)
+		report.addCheck(externalKiCadCheck("erc_validation", summary.Schematic.Path))
 	}
 	if summary.PCB != nil {
 		report.mergeChecks(checksForPCBSummary(*summary.PCB)...)
+		report.addCheck(externalKiCadCheck("drc_validation", summary.PCB.Path))
 	}
 	report.finish()
 	return report, nil
@@ -157,6 +159,21 @@ func checksForPCBSummary(summary inspect.PCBSummary) []CheckResult {
 		issues = append(issues, pcbSemanticIssues(board)...)
 	}
 	return []CheckResult{{Name: "pcb_validation", Status: statusForIssues(issues), Required: true, Issues: issues}}
+}
+
+func externalKiCadCheck(name string, path string) CheckResult {
+	return CheckResult{
+		Name:     name,
+		Status:   CheckSkipped,
+		Required: false,
+		Issues: []reports.Issue{{
+			Code:       reports.CodeSkippedExternalTool,
+			Severity:   reports.SeverityInfo,
+			Path:       filepath.ToSlash(path),
+			Message:    name + " is available through the `check` command and is not run by default during structural evaluation",
+			Suggestion: fmt.Sprintf("run `kicadai --json check project %q` for KiCad ERC/DRC evidence", filepath.ToSlash(filepath.Dir(path))),
+		}},
+	}
 }
 
 func schematicSemanticIssues(file schematicfiles.SchematicFile) []reports.Issue {

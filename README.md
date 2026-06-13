@@ -383,6 +383,33 @@ Useful flags:
 If `kicad-cli` is not found, round-trip checks return a structured skipped
 result rather than failing the deterministic unit suite.
 
+### ERC/DRC Checks
+
+KiCad-backed ERC/DRC checks run through `kicad-cli`, preserve the raw JSON
+report, and return structured findings for AI repair loops:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
+  check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
+
+go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+go run ./cmd/kicadai --json check project ./examples/checks/drc_pass
+```
+
+Useful flags:
+
+- `--keep-artifacts`
+- `--artifact-dir ./examples/check_artifacts`
+- `--timeout 30s`
+- `--allowlist ./check_allowlist.json`
+
+`evaluate` reports now include skipped ERC/DRC evidence placeholders when
+schematic or PCB files are present. Run `check project` when you need actual
+KiCad ERC/DRC evidence. A design can be parseable and structurally evaluated
+without being ERC/DRC clean or fabrication-ready.
+
 ### Export Skeleton
 
 The `export` command family exists as a structured CLI placeholder for future
