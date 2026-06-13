@@ -3,6 +3,7 @@ package blocks
 import (
 	"encoding/json"
 	"fmt"
+	"hash/crc32"
 	"regexp"
 	"strings"
 	"sync"
@@ -25,12 +26,18 @@ type ReferenceAllocator struct {
 }
 
 type referenceAllocatorState struct {
-	mu   sync.Mutex
-	next map[string]int
+	token string
+	mu    sync.Mutex
+	next  map[string]int
 }
 
 func NewReferenceAllocator() *ReferenceAllocator {
 	return &ReferenceAllocator{state: &referenceAllocatorState{next: map[string]int{}}}
+}
+
+func NewInstanceReferenceAllocator(instanceID string) *ReferenceAllocator {
+	token := fmt.Sprintf("%04x", uint16(crc32.ChecksumIEEE([]byte(instanceID))))
+	return &ReferenceAllocator{state: &referenceAllocatorState{token: token, next: map[string]int{}}}
 }
 
 func (allocator *ReferenceAllocator) Next(prefix string) string {
@@ -47,6 +54,9 @@ func (allocator *ReferenceAllocator) Next(prefix string) string {
 		allocator.state.next = map[string]int{}
 	}
 	allocator.state.next[prefix]++
+	if allocator.state.token != "" {
+		return fmt.Sprintf("%s%s%03d", prefix, allocator.state.token, allocator.state.next[prefix])
+	}
 	return fmt.Sprintf("%s%d", prefix, allocator.state.next[prefix])
 }
 

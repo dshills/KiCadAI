@@ -43,7 +43,8 @@ func NewBuiltinRegistry() BuiltinRegistry {
 func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 	registry := NewRegistry(BuiltinDefinitions())
 	registry.instantiators = map[string]BlockInstantiator{
-		"led_indicator": instantiateLEDIndicator,
+		"connector_breakout": instantiateConnectorBreakout,
+		"led_indicator":      instantiateLEDIndicator,
 	}
 	return registry, registry.Issues()
 }

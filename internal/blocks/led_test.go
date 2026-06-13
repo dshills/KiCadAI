@@ -33,7 +33,7 @@ func TestLEDIndicatorInstantiatesDeterministicOperations(t *testing.T) {
 	if len(output.Operations) != 9 {
 		t.Fatalf("operations = %#v", output.Operations)
 	}
-	if got := output.Instance.Refs; len(got) != 2 || got[0] != "R1" || got[1] != "D1" {
+	if got := output.Instance.Refs; len(got) != 2 || !strings.HasPrefix(got[0], "R") || !strings.HasPrefix(got[1], "D") {
 		t.Fatalf("refs = %#v", got)
 	}
 	if got := output.Instance.Nets; len(got) != 3 || got[0] != "status_in" || got[1] != "status_led_series" || got[2] != "status_gnd" {

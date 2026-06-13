@@ -15,6 +15,17 @@ func TestReferenceAllocatorIsDeterministicAndPrefixScoped(t *testing.T) {
 	}
 }
 
+func TestInstanceReferenceAllocatorAvoidsInstanceCollisions(t *testing.T) {
+	first := NewInstanceReferenceAllocator("power").Next("J")
+	second := NewInstanceReferenceAllocator("i2c").Next("J")
+	if first == second {
+		t.Fatalf("instance refs collided: %s", first)
+	}
+	if again := NewInstanceReferenceAllocator("power").Next("J"); again != first {
+		t.Fatalf("instance refs are not deterministic: %s != %s", again, first)
+	}
+}
+
 func TestInstanceNetNameIsDeterministic(t *testing.T) {
 	if got := InstanceNetName("led 1", "signal-out"); got != "led_1_signal_out" {
 		t.Fatalf("net = %q", got)

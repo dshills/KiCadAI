@@ -1,5 +1,10 @@
 package blocks
 
+const (
+	defaultConnectorSymbol    = "Connector_Generic:Conn_01x02"
+	defaultConnectorFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
+)
+
 func BuiltinDefinitions() []BlockDefinition {
 	return []BlockDefinition{
 		ledIndicatorDefinition(),
@@ -183,16 +188,18 @@ func connectorBreakoutDefinition() BlockDefinition {
 		Category:    "interconnect",
 		Parameters: []BlockParameter{
 			{Name: "pin_names", Type: ParameterStringList, Required: true, Description: "Ordered connector pin names."},
-			{Name: "connector_symbol", Type: ParameterSymbolID, Default: "Connector_Generic:Conn_01x02", Description: "KiCad connector symbol ID."},
-			{Name: "connector_footprint", Type: ParameterFootprintID, Default: "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", Description: "KiCad connector footprint ID."},
+			{Name: "pin_count", Type: ParameterNumber, Description: "Expected connector pin count; inferred from pin_names when omitted."},
+			{Name: "connector_symbol", Type: ParameterSymbolID, Default: defaultConnectorSymbol, Description: "KiCad connector symbol ID."},
+			{Name: "connector_footprint", Type: ParameterFootprintID, Default: defaultConnectorFootprint, Description: "KiCad connector footprint ID."},
 			{Name: "include_labels", Type: ParameterBool, Default: true, Description: "Add schematic labels for exported pins."},
+			{Name: "include_mounting_holes", Type: ParameterBool, Default: false, Description: "Reserve mounting-hole support for later PCB generation."},
 		},
 		Ports: []BlockPort{
 			{Name: "PINS", Direction: PortPassive, Description: "Dynamic exported pin group; concrete ports are generated from pin_names in later phases."},
 		},
 		RequiredLibraries: []LibraryRequirement{
-			{Kind: "symbol", ID: "Connector_Generic:Conn_01x02", Required: false, Description: "Default two-pin connector."},
-			{Kind: "footprint", ID: "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical", Required: false, Description: "Default two-pin header."},
+			{Kind: "symbol", ID: defaultConnectorSymbol, Required: false, Description: "Default two-pin connector."},
+			{Kind: "footprint", ID: defaultConnectorFootprint, Required: false, Description: "Default two-pin header."},
 		},
 		Verification: experimentalVerification("Initial metadata placeholder; dynamic port expansion is implemented in later phases."),
 	}

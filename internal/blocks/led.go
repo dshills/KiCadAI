@@ -61,7 +61,7 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 		return dryRunBlockOutput(definition, request, nil, issues)
 	}
 
-	allocator := NewReferenceAllocator()
+	allocator := NewInstanceReferenceAllocator(request.InstanceID)
 	resistorRef := allocator.Next("R")
 	ledRef := allocator.Next("D")
 	resistor := BlockComponent{
