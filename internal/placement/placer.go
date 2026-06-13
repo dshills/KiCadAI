@@ -72,6 +72,12 @@ func Place(request Request) Result {
 	if len(groupIssues) > 0 && result.Status == StatusPlaced {
 		result.Status = StatusPartial
 	}
+	operations, operationIssues := PlacementOperations(request, successfulPlacements)
+	result.Operations = operations
+	result.Issues = append(result.Issues, operationIssues...)
+	if len(operationIssues) > 0 && result.Status == StatusPlaced {
+		result.Status = StatusPartial
+	}
 	result.Metrics.HPWLMM = hpwl(request.Nets, result.Placements)
 	return result
 }
