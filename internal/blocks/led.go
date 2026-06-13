@@ -148,7 +148,12 @@ func boolParam(params map[string]any, name string, fallback bool) bool {
 	return value
 }
 
-func parseUnit(value any, suffix string, multipliers map[string]float64) (float64, bool) {
+type unitMultiplier struct {
+	unit       string
+	multiplier float64
+}
+
+func parseUnit(value any, suffix string, multipliers []unitMultiplier) (float64, bool) {
 	text, ok := value.(string)
 	if !ok {
 		return 0, false
@@ -158,17 +163,17 @@ func parseUnit(value any, suffix string, multipliers map[string]float64) (float6
 		return 0, false
 	}
 	text = normalizeUnitLiteral(text, suffix, multipliers)
-	for _, unit := range sortedUnitKeys(multipliers) {
-		multiplier := multipliers[unit]
+	for _, multiplier := range sortedUnitMultipliers(multipliers) {
+		unit := multiplier.unit
 		if strings.HasSuffix(text, unit+suffix) {
 			number := strings.TrimSuffix(text, unit+suffix)
 			parsed, err := strconv.ParseFloat(number, 64)
-			return parsed * multiplier, err == nil
+			return parsed * multiplier.multiplier, err == nil
 		}
 		if strings.HasSuffix(text, unit) {
 			number := strings.TrimSuffix(text, unit)
 			parsed, err := strconv.ParseFloat(number, 64)
-			return parsed * multiplier, err == nil
+			return parsed * multiplier.multiplier, err == nil
 		}
 	}
 	if strings.HasSuffix(text, suffix) {
@@ -180,27 +185,24 @@ func parseUnit(value any, suffix string, multipliers map[string]float64) (float6
 	return parsed, err == nil
 }
 
-func sortedUnitKeys(multipliers map[string]float64) []string {
-	keys := make([]string, 0, len(multipliers))
-	for key := range multipliers {
-		keys = append(keys, key)
-	}
-	slices.SortFunc(keys, func(a string, b string) int {
-		if len(a) != len(b) {
-			return len(b) - len(a)
+func sortedUnitMultipliers(multipliers []unitMultiplier) []unitMultiplier {
+	sorted := append([]unitMultiplier(nil), multipliers...)
+	slices.SortFunc(sorted, func(a unitMultiplier, b unitMultiplier) int {
+		if len(a.unit) != len(b.unit) {
+			return len(b.unit) - len(a.unit)
 		}
-		if a < b {
+		if a.unit < b.unit {
 			return -1
 		}
-		if a > b {
+		if a.unit > b.unit {
 			return 1
 		}
 		return 0
 	})
-	return keys
+	return sorted
 }
 
-func normalizeUnitLiteral(text string, suffix string, multipliers map[string]float64) string {
+func normalizeUnitLiteral(text string, suffix string, multipliers []unitMultiplier) string {
 	text = strings.ReplaceAll(text, " ", "")
 	aliases := map[string]string{
 		"ohms": "Ω",
@@ -217,7 +219,7 @@ func normalizeUnitLiteral(text string, suffix string, multipliers map[string]flo
 	return text
 }
 
-func normalizeResistanceNotation(text string, multipliers map[string]float64) string {
+func normalizeResistanceNotation(text string, multipliers []unitMultiplier) string {
 	core := strings.TrimSuffix(text, "Ω")
 	hasOhmSuffix := core != text
 	if strings.HasSuffix(core, "R") {
@@ -228,7 +230,8 @@ func normalizeResistanceNotation(text string, multipliers map[string]float64) st
 			return core[:i] + "." + core[i+1:] + "Ω"
 		}
 	}
-	for _, unit := range sortedUnitKeys(multipliers) {
+	for _, multiplier := range sortedUnitMultipliers(multipliers) {
+		unit := multiplier.unit
 		for i := 1; i < len(core)-1; i++ {
 			next := i + len(unit)
 			if next >= len(core) || core[i:next] != unit {
@@ -249,16 +252,16 @@ func isASCIIDigit(value byte) bool {
 	return value >= '0' && value <= '9'
 }
 
-func voltageMultipliers() map[string]float64 {
-	return map[string]float64{"m": 1e-3, "u": 1e-6, "µ": 1e-6, "μ": 1e-6, "n": 1e-9, "k": 1e3, "K": 1e3}
+func voltageMultipliers() []unitMultiplier {
+	return []unitMultiplier{{"m", 1e-3}, {"u", 1e-6}, {"µ", 1e-6}, {"μ", 1e-6}, {"n", 1e-9}, {"k", 1e3}, {"K", 1e3}}
 }
 
-func currentMultipliers() map[string]float64 {
-	return map[string]float64{"m": 1e-3, "u": 1e-6, "µ": 1e-6, "μ": 1e-6, "n": 1e-9, "k": 1e3, "K": 1e3}
+func currentMultipliers() []unitMultiplier {
+	return []unitMultiplier{{"m", 1e-3}, {"u", 1e-6}, {"µ", 1e-6}, {"μ", 1e-6}, {"n", 1e-9}, {"k", 1e3}, {"K", 1e3}}
 }
 
-func resistanceMultipliers() map[string]float64 {
-	return map[string]float64{"m": 1e-3, "u": 1e-6, "µ": 1e-6, "μ": 1e-6, "n": 1e-9, "k": 1e3, "K": 1e3, "M": 1e6}
+func resistanceMultipliers() []unitMultiplier {
+	return []unitMultiplier{{"m", 1e-3}, {"u", 1e-6}, {"µ", 1e-6}, {"μ", 1e-6}, {"n", 1e-9}, {"k", 1e3}, {"K", 1e3}, {"M", 1e6}}
 }
 
 func formatOhms(ohms float64) string {

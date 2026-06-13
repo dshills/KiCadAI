@@ -133,3 +133,22 @@ func TestParseResistanceUnits(t *testing.T) {
 		}
 	}
 }
+
+func TestParseBaseUnits(t *testing.T) {
+	cases := []struct {
+		value       string
+		suffix      string
+		multipliers []unitMultiplier
+		want        float64
+	}{
+		{value: "5V", suffix: "V", multipliers: voltageMultipliers(), want: 5},
+		{value: "250mA", suffix: "A", multipliers: currentMultipliers(), want: 0.25},
+		{value: "10uF", suffix: "F", multipliers: capacitanceMultipliers(), want: 0.00001},
+	}
+	for _, tc := range cases {
+		got, ok := parseUnit(tc.value, tc.suffix, tc.multipliers)
+		if !ok || math.Abs(got-tc.want) > 1e-12 {
+			t.Fatalf("parseUnit(%q) = %v, %v; want %v, true", tc.value, got, ok, tc.want)
+		}
+	}
+}

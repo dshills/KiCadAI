@@ -8,6 +8,7 @@ import (
 	"slices"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 var voltageLiteralPattern = regexp.MustCompile(`^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?\s*(?:[munpkgMUNPKGTFf]|\x{00B5}|\x{03BC})?[Vv]$`)
@@ -45,6 +46,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 	registry.instantiators = map[string]BlockInstantiator{
 		"connector_breakout": instantiateConnectorBreakout,
 		"led_indicator":      instantiateLEDIndicator,
+		"voltage_regulator":  instantiateVoltageRegulator,
 	}
 	return registry, registry.Issues()
 }
@@ -165,6 +167,7 @@ func cloneBlockDefinition(definition BlockDefinition) BlockDefinition {
 	definition.RequiredLibraries = append([]LibraryRequirement(nil), definition.RequiredLibraries...)
 	definition.Components = append([]BlockComponent(nil), definition.Components...)
 	for i := range definition.Components {
+		definition.Components[i].Pins = append([]transactions.PinSpec(nil), definition.Components[i].Pins...)
 		definition.Components[i].Properties = cloneStringMap(definition.Components[i].Properties)
 		definition.Components[i].Alternatives = append([]string(nil), definition.Components[i].Alternatives...)
 	}

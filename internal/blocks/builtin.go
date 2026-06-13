@@ -60,9 +60,17 @@ func voltageRegulatorDefinition() BlockDefinition {
 		Version:     "0.1.0",
 		Category:    "power",
 		Parameters: []BlockParameter{
+			{Name: "input_voltage_min", Type: ParameterVoltage, Default: "4.5V", Description: "Minimum expected input rail."},
+			{Name: "input_voltage_max", Type: ParameterVoltage, Default: "12V", Description: "Maximum expected input rail."},
 			{Name: "input_voltage", Type: ParameterVoltage, Default: "5V", Description: "Nominal input rail."},
 			{Name: "output_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "Regulated output rail."},
 			{Name: "output_current", Type: ParameterCurrent, Default: "250mA", Description: "Expected output current."},
+			{Name: "regulator_symbol", Type: ParameterSymbolID, Default: defaultRegulatorSymbol, Description: "KiCad symbol ID for the supported fixed three-pin regulator template."},
+			{Name: "regulator_footprint", Type: ParameterFootprintID, Default: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Description: "KiCad footprint ID for the regulator."},
+			{Name: "input_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Input bypass capacitor value."},
+			{Name: "output_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Output bypass capacitor value."},
+			{Name: "capacitor_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Default capacitor footprint ID."},
+			{Name: "enable_mode", Type: ParameterEnum, Default: "none", Allowed: []any{"none", "tied_input", "export"}, Description: "Enable-pin handling when a regulator pin-role map is available."},
 			{Name: "include_power_led", Type: ParameterBool, Default: false, Description: "Include a downstream power indicator."},
 		},
 		Ports: []BlockPort{
@@ -71,10 +79,15 @@ func voltageRegulatorDefinition() BlockDefinition {
 			{Name: "GND", Direction: PortPower, Description: "Ground return."},
 		},
 		RequiredLibraries: []LibraryRequirement{
-			{Kind: "symbol", ID: "Regulator_Linear:AMS1117-3.3", Required: true, Description: "Default regulator candidate."},
+			{Kind: "symbol", ID: defaultRegulatorSymbol, Required: true, Description: "Default regulator candidate."},
 			{Kind: "symbol", ID: "Device:C", Required: true, Description: "Input and output capacitors."},
+			{Kind: "footprint", ID: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Required: true, Description: "Default regulator footprint."},
+			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: true, Description: "Default capacitor footprint."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; regulator topology checks are implemented in later phases."),
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Emits deterministic fixed-linear-regulator transactions; part-specific thermal and stability requirements remain warnings until resolver metadata improves."},
+		},
 	}
 }
 
