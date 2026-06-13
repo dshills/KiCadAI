@@ -430,6 +430,39 @@ func TestWriteRendersKiCadStyleSymbolDetails(t *testing.T) {
 	}
 }
 
+func TestWriteRendersRequiredSymbolPropertiesBeforeExtras(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:      kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		LibraryID: "Device:R",
+		Reference: "R1",
+		Value:     "1k",
+		Properties: []Property{
+			{Name: "Tolerance", Value: "1%"},
+			{Name: "Description", Value: "Precision resistor"},
+			{Name: "Footprint", Value: "Resistor_SMD:R_0603"},
+		},
+		Fields: []Field{
+			{Name: "Datasheet", Value: "https://example.test/r.pdf", Visible: true},
+			{Name: "Manufacturer", Value: "ExampleCo", Visible: true},
+		},
+	}}
+
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	assertInOrder(t, buf.String(),
+		"\"Reference\"",
+		"\"Value\"",
+		"\"Footprint\"",
+		"\"Datasheet\"",
+		"\"Description\"",
+		"\"Tolerance\"",
+		"\"Manufacturer\"",
+	)
+}
+
 func TestNewSymbolUsesWriterDerivedProperties(t *testing.T) {
 	symbol := NewSymbol(
 		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
