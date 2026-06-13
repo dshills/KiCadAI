@@ -1424,54 +1424,88 @@ func renderSymbolPassthrough(passthrough SymbolPassthrough) sexpr.Node {
 	return sexpr.L(sexpr.A("passthrough"), sexpr.A(string(passthrough)))
 }
 
+const (
+	requiredReferenceIndex = iota
+	requiredValueIndex
+	requiredFootprintIndex
+	requiredDatasheetIndex
+	requiredDescriptionIndex
+)
+
 func symbolProperties(symbol SchematicSymbol) []Property {
-	if len(symbol.Properties) > 0 {
-		reference := Property{Name: "Reference", Value: symbol.Reference, Position: symbol.Position, Rotation: symbol.Rotation}
-		value := Property{Name: "Value", Value: symbol.Value, Position: symbol.Position, Rotation: symbol.Rotation}
-		properties := make([]Property, 0, len(symbol.Properties)+len(symbol.Fields)+2)
-		extras := make([]Property, 0, len(symbol.Properties)+len(symbol.Fields))
-		seen := map[string]struct{}{}
-		for _, property := range symbol.Properties {
-			name := strings.TrimSpace(property.Name)
-			seen[strings.ToLower(name)] = struct{}{}
-			switch {
-			case strings.EqualFold(name, "Reference"):
-				property.Name = "Reference"
-				reference = property
-			case strings.EqualFold(name, "Value"):
-				property.Name = "Value"
-				value = property
-			default:
-				extras = append(extras, property)
-			}
+	required := make([]Property, requiredDescriptionIndex+1)
+	required[requiredReferenceIndex] = defaultSymbolProperty(symbol, "Reference", symbol.Reference, false)
+	required[requiredValueIndex] = defaultSymbolProperty(symbol, "Value", symbol.Value, false)
+	required[requiredFootprintIndex] = defaultSymbolProperty(symbol, "Footprint", "", true)
+	required[requiredDatasheetIndex] = defaultSymbolProperty(symbol, "Datasheet", "", false)
+	required[requiredDescriptionIndex] = defaultSymbolProperty(symbol, "Description", "", false)
+	extras := make([]Property, 0, len(symbol.Properties)+len(symbol.Fields))
+	propertiesSeen := make(map[string]struct{}, len(symbol.Properties)+len(symbol.Fields))
+	extraIndex := make(map[string]int, len(symbol.Properties)+len(symbol.Fields))
+	addExtra := func(key string, property Property) {
+		if index, duplicate := extraIndex[key]; duplicate {
+			extras[index] = property
+			return
 		}
-		for _, field := range symbol.Fields {
-			name := strings.TrimSpace(field.Name)
-			if strings.EqualFold(name, "Reference") || strings.EqualFold(name, "Value") {
-				continue
-			}
-			if _, ok := seen[strings.ToLower(name)]; ok {
-				continue
-			}
-			extras = append(extras, propertyFromField(field))
-		}
-		properties = append(properties, reference, value)
-		properties = append(properties, extras...)
-		return properties
+		extraIndex[key] = len(extras)
+		extras = append(extras, property)
 	}
-	properties := make([]Property, 0, len(symbol.Fields)+2)
-	properties = append(properties,
-		Property{Name: "Reference", Value: symbol.Reference, Position: symbol.Position, Rotation: symbol.Rotation},
-		Property{Name: "Value", Value: symbol.Value, Position: symbol.Position, Rotation: symbol.Rotation},
-	)
-	for _, field := range symbol.Fields {
-		name := strings.TrimSpace(field.Name)
-		if name == "Reference" || name == "Value" {
+	// Properties are the richer KiCad-native representation. Legacy Fields only
+	// fill names that are absent from Properties.
+	for _, property := range symbol.Properties {
+		name := strings.TrimSpace(property.Name)
+		key := strings.ToLower(name)
+		propertiesSeen[key] = struct{}{}
+		if index, ok := requiredSymbolPropertyIndex(key); ok {
+			property.Name = required[index].Name
+			required[index] = property
 			continue
 		}
-		properties = append(properties, propertyFromField(field))
+		addExtra(key, property)
 	}
+	for _, field := range symbol.Fields {
+		name := strings.TrimSpace(field.Name)
+		key := strings.ToLower(name)
+		if _, ok := propertiesSeen[key]; ok {
+			continue
+		}
+		if index, ok := requiredSymbolPropertyIndex(key); ok {
+			if index == requiredReferenceIndex || index == requiredValueIndex {
+				continue
+			}
+			property := propertyFromField(field)
+			property.Name = required[index].Name
+			required[index] = property
+			continue
+		}
+		property := propertyFromField(field)
+		addExtra(key, property)
+	}
+	properties := make([]Property, 0, len(required)+len(extras))
+	properties = append(properties, required...)
+	properties = append(properties, extras...)
 	return properties
+}
+
+func requiredSymbolPropertyIndex(name string) (int, bool) {
+	switch name {
+	case "reference":
+		return requiredReferenceIndex, true
+	case "value":
+		return requiredValueIndex, true
+	case "footprint":
+		return requiredFootprintIndex, true
+	case "datasheet":
+		return requiredDatasheetIndex, true
+	case "description":
+		return requiredDescriptionIndex, true
+	default:
+		return 0, false
+	}
+}
+
+func defaultSymbolProperty(symbol SchematicSymbol, name string, value string, hidden bool) Property {
+	return Property{Name: name, Value: value, Hidden: hidden, Position: symbol.Position, Rotation: symbol.Rotation}
 }
 
 func propertyFromField(field Field) Property {

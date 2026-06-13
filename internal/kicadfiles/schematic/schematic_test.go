@@ -447,8 +447,8 @@ func TestNewSymbolUsesWriterDerivedProperties(t *testing.T) {
 	}
 
 	properties := symbolProperties(symbol)
-	if len(properties) != 2 {
-		t.Fatalf("derived properties length = %d, want 2", len(properties))
+	if len(properties) != 5 {
+		t.Fatalf("derived properties length = %d, want 5", len(properties))
 	}
 	if properties[0].Name != "Reference" || properties[0].Value != "R1" {
 		t.Fatalf("derived reference property = %#v", properties[0])
@@ -456,9 +456,15 @@ func TestNewSymbolUsesWriterDerivedProperties(t *testing.T) {
 	if properties[1].Name != "Value" || properties[1].Value != "1k" {
 		t.Fatalf("derived value property = %#v", properties[1])
 	}
+	for index, want := range []string{"Footprint", "Datasheet", "Description"} {
+		property := properties[index+2]
+		if property.Name != want || property.Value != "" {
+			t.Fatalf("derived %s property = %#v", want, property)
+		}
+	}
 }
 
-func TestWriterDerivedSymbolPropertiesBaselineMissingRoundTripDefaults(t *testing.T) {
+func TestWriterDerivedSymbolPropertiesIncludeRoundTripDefaults(t *testing.T) {
 	symbol := NewSymbol(
 		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
 		"Device:R",
@@ -477,10 +483,102 @@ func TestWriterDerivedSymbolPropertiesBaselineMissingRoundTripDefaults(t *testin
 			t.Errorf("derived properties missing %q: %#v", want, names)
 		}
 	}
-	for _, missing := range []string{"Footprint", "Datasheet", "Description"} {
-		if slices.Contains(names, missing) {
-			t.Errorf("baseline expected %q to be missing before round-trip compatibility fix: %#v", missing, names)
+	for _, want := range []string{"Footprint", "Datasheet", "Description"} {
+		if !slices.Contains(names, want) {
+			t.Errorf("derived properties missing round-trip default %q: %#v", want, names)
 		}
+	}
+}
+
+func TestWriterDerivedSymbolPropertiesPreserveExplicitDefaults(t *testing.T) {
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{},
+	)
+	symbol.Properties = []Property{
+		{Name: "Datasheet", Value: "https://example.test/r.pdf", Hidden: true},
+		{Name: "Description", Value: "Precision resistor"},
+	}
+
+	properties := symbolProperties(symbol)
+	if properties[3].Name != "Datasheet" || properties[3].Value != "https://example.test/r.pdf" || !properties[3].Hidden {
+		t.Fatalf("Datasheet property not preserved: %#v", properties[3])
+	}
+	if properties[4].Name != "Description" || properties[4].Value != "Precision resistor" {
+		t.Fatalf("Description property not preserved: %#v", properties[4])
+	}
+}
+
+func TestWriterDerivedSymbolPropertiesUseLastExplicitDuplicate(t *testing.T) {
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{},
+	)
+	symbol.Properties = []Property{
+		{Name: "Description", Value: "old"},
+		{Name: "Description", Value: "new"},
+		{Name: "Tolerance", Value: "1%"},
+		{Name: "Tolerance", Value: "5%"},
+	}
+
+	properties := symbolProperties(symbol)
+	if properties[4].Name != "Description" || properties[4].Value != "new" {
+		t.Fatalf("Description property = %#v, want last duplicate", properties[4])
+	}
+	if len(properties) != 6 || properties[5].Name != "Tolerance" || properties[5].Value != "5%" {
+		t.Fatalf("extra properties = %#v, want last duplicate Tolerance only", properties)
+	}
+}
+
+func TestWriterDerivedSymbolPropertiesUseLastLegacyFieldDuplicate(t *testing.T) {
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{},
+	)
+	symbol.Fields = []Field{
+		{Name: "Description", Value: "old"},
+		{Name: "Description", Value: "new"},
+		{Name: "Tolerance", Value: "1%"},
+		{Name: "Tolerance", Value: "5%"},
+	}
+
+	properties := symbolProperties(symbol)
+	if properties[4].Name != "Description" || properties[4].Value != "new" {
+		t.Fatalf("Description property = %#v, want last legacy duplicate", properties[4])
+	}
+	if len(properties) != 6 || properties[5].Name != "Tolerance" || properties[5].Value != "5%" {
+		t.Fatalf("extra properties = %#v, want last legacy duplicate Tolerance only", properties)
+	}
+}
+
+func TestWriterDerivedSymbolPropertiesKeepStructReferenceAndValue(t *testing.T) {
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{},
+	)
+	symbol.Fields = []Field{
+		{Name: "Reference", Value: "R_BAD"},
+		{Name: "Value", Value: "bad"},
+	}
+
+	properties := symbolProperties(symbol)
+	if properties[0].Name != "Reference" || properties[0].Value != "R1" {
+		t.Fatalf("Reference property = %#v, want struct-derived reference", properties[0])
+	}
+	if properties[1].Name != "Value" || properties[1].Value != "1k" {
+		t.Fatalf("Value property = %#v, want struct-derived value", properties[1])
 	}
 }
 
