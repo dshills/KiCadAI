@@ -75,14 +75,23 @@ func ValidateGeometry(request Request, placements []PlacementResult) []reports.I
 		}
 		candidate.Bounds = bounds
 		if !usable.Contains(bounds) {
-			issues = append(issues, issue(path+".bounds", "placement is outside usable board area"))
+			issues = append(issues, geometryIssue(reports.CodePlacementOutsideBoard, path+".bounds", "placement is outside usable board area"))
 		}
 		if conflict, ok := occupancy.FirstConflict(candidate); ok {
-			issues = append(issues, issue(path+".bounds", "placement conflicts with "+conflict))
+			issues = append(issues, geometryIssue(reports.CodePlacementCollision, path+".bounds", "placement conflicts with "+conflict))
 		}
 		occupancy.Add(candidate)
 	}
 	return issues
+}
+
+func geometryIssue(code reports.Code, path string, message string) reports.Issue {
+	return reports.Issue{
+		Code:     code,
+		Severity: reports.SeverityError,
+		Path:     path,
+		Message:  message,
+	}
 }
 
 func NewPlacementResult(component Component, placement Placement, rules Rules) (PlacementResult, bool) {

@@ -33,6 +33,8 @@ const (
 	CodeUnsupportedImportedObject Code = "UNSUPPORTED_IMPORTED_OBJECT"
 	CodeUnsafeRemove              Code = "UNSAFE_REMOVE"
 	CodePinmapUnverified          Code = "PINMAP_UNVERIFIED"
+	CodePlacementCollision        Code = "PLACEMENT_COLLISION"
+	CodePlacementOutsideBoard     Code = "PLACEMENT_OUTSIDE_BOARD"
 )
 
 type Issue struct {

@@ -1,0 +1,118 @@
+package placement
+
+import "testing"
+
+func TestPlacePlacesSimpleRequest(t *testing.T) {
+	req := twoComponentRequest()
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v summary=%s", result.Status, result.Issues, placementSummary(result))
+	}
+	if result.Metrics.PlacedCount != 2 || len(result.Placements) != 2 {
+		t.Fatalf("placed count = %d len=%d, want 2", result.Metrics.PlacedCount, len(result.Placements))
+	}
+	if len(ValidateGeometry(req, result.Placements)) != 0 {
+		t.Fatalf("result placements failed geometry validation: %#v", ValidateGeometry(req, result.Placements))
+	}
+}
+
+func TestPlacePreservesFixedComponent(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 10, YMM: 10, RotationDeg: 90, Layer: "F.Cu"}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	if result.Metrics.FixedCount != 1 {
+		t.Fatalf("fixed count = %d, want 1", result.Metrics.FixedCount)
+	}
+	got := result.Placements[0].Position
+	if got.XMM != 10 || got.YMM != 10 || got.RotationDeg != 90 {
+		t.Fatalf("fixed position = %#v, want original", got)
+	}
+}
+
+func TestPlaceReportsPartialWhenNoLegalCandidate(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 2
+	req.Board.HeightMM = 2
+	req.Board.MarginMM = 0
+	req.Rules.BoardEdgeClearanceMM = 0.1
+
+	result := Place(req)
+	if result.Status != StatusBlocked && result.Status != StatusPartial {
+		t.Fatalf("status = %s, want blocked or partial", result.Status)
+	}
+	if result.Metrics.UnplacedCount != 1 {
+		t.Fatalf("unplaced count = %d, want 1", result.Metrics.UnplacedCount)
+	}
+	assertIssueContains(t, result.Issues, "no legal placement found")
+	for _, issue := range result.Issues {
+		if issue.Message == "placement is outside usable board area" {
+			t.Fatalf("unplaced placeholder should not be geometry-validated: %#v", result.Issues)
+		}
+	}
+}
+
+func TestPlaceIsDeterministic(t *testing.T) {
+	req := twoComponentRequest()
+
+	first := Place(req)
+	second := Place(req)
+	if len(first.Placements) != len(second.Placements) {
+		t.Fatalf("placement lengths differ: %d vs %d", len(first.Placements), len(second.Placements))
+	}
+	for i := range first.Placements {
+		if first.Placements[i] != second.Placements[i] {
+			t.Fatalf("placement[%d] differs:\nfirst=%#v\nsecond=%#v", i, first.Placements[i], second.Placements[i])
+		}
+	}
+}
+
+func TestPlaceComputesHPWL(t *testing.T) {
+	req := twoComponentRequest()
+
+	result := Place(req)
+	if result.Metrics.HPWLMM <= 0 {
+		t.Fatalf("HPWLMM = %f, want positive", result.Metrics.HPWLMM)
+	}
+}
+
+func TestPlaceSamplesAcrossBoardWhenCandidateCapIsSmall(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 100
+	req.Board.HeightMM = 20
+	req.Components[0].Edge = EdgeRight
+	req.Rules.MaxCandidatesPerPart = 10
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	if result.Placements[0].Position.XMM < 80 {
+		t.Fatalf("right-edge placement X = %.2f, want sampled near right edge", result.Placements[0].Position.XMM)
+	}
+}
+
+func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
+	req := minimalRequest()
+	req = NormalizeRequest(req)
+	req.Components[0].Rotation.AllowedDeg = []float64{45, 0}
+
+	result, ok := placeComponent(req.Components[0], req, newOccupancy(req))
+	if !ok {
+		t.Fatal("placeComponent failed after invalid candidate rotation")
+	}
+	if result.Position.RotationDeg != 0 {
+		t.Fatalf("rotation = %.1f, want valid fallback rotation", result.Position.RotationDeg)
+	}
+}
+
+func TestRoundToGridHandlesNegativeCoordinates(t *testing.T) {
+	if got := roundToGrid(-1.1, 0.5); got != -1 {
+		t.Fatalf("roundToGrid(-1.1, 0.5) = %v, want -1", got)
+	}
+}
