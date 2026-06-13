@@ -71,6 +71,40 @@ func TestKiCadRoundTripCheckedInGeneratedSchematic(t *testing.T) {
 	}
 }
 
+func TestKiCadRoundTripCheckedInBlockSchematics(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	baseOpts := OptionsFromEnv()
+	tests := []struct {
+		name string
+		path string
+	}{
+		{
+			name: "led indicator",
+			path: repoPath(t, "examples", "blocks", "led_indicator", "led_indicator.kicad_sch"),
+		},
+		{
+			name: "connector breakout",
+			path: repoPath(t, "examples", "blocks", "connector_breakout", "connector_breakout.kicad_sch"),
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), defaultTimeout)
+			defer cancel()
+			opts := baseOpts
+
+			result, err := RoundTripSchematic(ctx, cli, tt.path, opts)
+			if err != nil {
+				t.Fatalf("RoundTripSchematic(%s) returned error: %v\nresult=%#v", tt.path, err, result)
+			}
+			if !result.Equal {
+				t.Fatalf("round trip changed block schematic %s: %s", tt.path, firstResultDifference(result))
+			}
+		})
+	}
+}
+
 func TestKiCadRoundTripGeneratedLEDSchematic(t *testing.T) {
 	cli := requireKiCadCLI(t)
 	sch, err := schematic.LEDIndicatorSchematic(schematic.LEDIndicatorInput{

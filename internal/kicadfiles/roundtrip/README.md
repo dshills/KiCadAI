@@ -18,6 +18,9 @@ Run KiCad-backed round-trip tests explicitly:
 KICADAI_RUN_KICAD_CLI=1 go test ./internal/kicadfiles/roundtrip
 ```
 
+The opt-in suite includes checked-in generated examples and the block schematic
+fixtures for `led_indicator` and `connector_breakout`.
+
 Use a specific KiCad CLI binary:
 
 ```sh
