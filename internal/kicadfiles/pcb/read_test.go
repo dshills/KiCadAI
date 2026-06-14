@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/sexpr"
 )
 
 func TestReadPCBWrittenByWriter(t *testing.T) {
@@ -88,5 +91,137 @@ func TestReadPCBRejectsMissingCoordinates(t *testing.T) {
 	_, err := Read([]byte(input))
 	if err == nil || !strings.Contains(err.Error(), "requires x and y") {
 		t.Fatalf("expected missing coordinate error, got %v", err)
+	}
+}
+
+func TestReadWritePCBPreservesViaGeometryAndNet(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_pcb`,
+		`  (version 20260206)`,
+		`  (generator "pcbnew")`,
+		`  (generator_version "10.0.0")`,
+		`  (paper "A4")`,
+		`  (layers (0 "F.Cu" signal) (2 "B.Cu" signal))`,
+		`  (setup)`,
+		`  (net 0 "")`,
+		`  (net 1 "GND")`,
+		`  (via (at 10 10) (size 0.8) (drill 0.4) (layers "F.Cu" "B.Cu") (net "GND") (uuid "22222222-2222-5222-8222-222222222222"))`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Vias) != 1 || read.Vias[0].Size != kicadfiles.MM(0.8) || read.Vias[0].Drill != kicadfiles.MM(0.4) || read.Vias[0].NetCode != 1 {
+		t.Fatalf("unexpected via: %#v", read.Vias)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	for _, want := range []string{`(size 0.8)`, `(drill 0.4)`, `"F.Cu"`, `"B.Cu"`, `(net "GND")`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+}
+
+func TestReadWritePCBPreservesNonLineDrawings(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_pcb`,
+		`  (version 20260206)`,
+		`  (generator "pcbnew")`,
+		`  (generator_version "10.0.0")`,
+		`  (paper "A4")`,
+		`  (layers (0 "F.Cu" signal) (2 "B.Cu" signal) (17 "Dwgs.User" user))`,
+		`  (setup)`,
+		`  (gr_rect (start 0 0) (end 10 10) (stroke (width 0.1) (type solid)) (fill none) (layer "Dwgs.User") (uuid "22222222-2222-5222-8222-222222222222"))`,
+		`  (gr_circle (center 20 20) (end 21 20) (stroke (width 0.1) (type solid)) (fill none) (layer "Dwgs.User") (uuid "33333333-3333-5333-8333-333333333333"))`,
+		`  (gr_arc (start 30 30) (mid 31 31) (end 32 30) (stroke (width 0.1) (type solid)) (fill none) (layer "Dwgs.User") (uuid "44444444-4444-5444-8444-444444444444"))`,
+		`  (gr_poly (pts (xy 40 40) (xy 42 40) (xy 42 42)) (stroke (width 0.1) (type solid)) (fill none) (layer "Dwgs.User") (uuid "55555555-5555-5555-8555-555555555555"))`,
+		`  (gr_text "note" (at 50 50 0) (layer "Dwgs.User") (uuid "66666666-6666-5666-8666-666666666666") (effects (font (size 1 1))))`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Drawings) != 5 || read.Drawings[0].Rect == nil || read.Drawings[1].Circle == nil || read.Drawings[2].Arc == nil || read.Drawings[3].Poly == nil || read.Drawings[4].Text == nil {
+		t.Fatalf("unexpected drawings: %#v", read.Drawings)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	for _, want := range []string{"(gr_rect", "(gr_circle", "(gr_arc", "(gr_poly", "(gr_text"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+}
+
+func TestReadWritePCBPreservesZoneNetAndPolygon(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_pcb`,
+		`  (version 20260206)`,
+		`  (generator "pcbnew")`,
+		`  (generator_version "10.0.0")`,
+		`  (paper "A4")`,
+		`  (layers (0 "F.Cu" signal) (2 "B.Cu" signal))`,
+		`  (setup)`,
+		`  (net 0 "")`,
+		`  (net 1 "GND")`,
+		`  (zone`,
+		`    (net 1)`,
+		`    (net_name "GND")`,
+		`    (layers "F.Cu")`,
+		`    (uuid "22222222-2222-5222-8222-222222222222")`,
+		`    (hatch edge 0.5)`,
+		`    (connect_pads yes (clearance 0.2))`,
+		`    (min_thickness 0.25)`,
+		`    (fill (thermal_gap 0.5) (thermal_bridge_width 0.5) (island_removal_mode 0) (island_area_min 0))`,
+		`    (polygon (pts (xy 0 0) (xy 10 0) (xy 10 10) (xy 0 0)))`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Zones) != 1 || read.Zones[0].NetCode != 1 || read.Zones[0].NetName != "GND" || len(read.Zones[0].Polygons) != 1 {
+		t.Fatalf("unexpected zones: %#v", read.Zones)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	for _, want := range []string{`(net 1)`, `(net_name "GND")`, `(layers "F.Cu")`, "(polygon"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+}
+
+func TestReadPCBNetRefHandlesNumericOnlyNet(t *testing.T) {
+	node, err := sexpr.Parse([]byte(`(net 1)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	code, name := readPCBNetRef(node)
+	if code != 1 || name != "" {
+		t.Fatalf("net ref = (%d, %q), want (1, \"\")", code, name)
+	}
+}
+
+func TestReadPadDrillHandlesOvalDrill(t *testing.T) {
+	node, err := sexpr.Parse([]byte(`(drill oval 0.5 0.8)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := readPadDrill(node); got != kicadfiles.MM(0.8) {
+		t.Fatalf("drill = %s, want %s", kicadfiles.ToMMString(got), kicadfiles.ToMMString(kicadfiles.MM(0.8)))
 	}
 }

@@ -73,6 +73,7 @@ func Read(data []byte) (PCBFile, error) {
 			}
 		}
 	}
+	resolvePCBNetReferences(&board)
 	return board, nil
 }
 
@@ -110,8 +111,29 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 func readPad(node sexpr.ParsedNode) Pad {
 	pad := Pad{Raw: strings.TrimSpace(node.Raw), Name: node.ListValue(1), Type: node.ListValue(2), Shape: node.ListValue(3), UUID: readPCBUUID(node)}
 	pad.Position = readPCBAtPoint(node)
+	if at, ok := node.Child("at"); ok {
+		if rotation, ok := at.FloatValue(3); ok {
+			pad.Rotation = kicadfiles.Angle(rotation)
+		}
+	}
+	if size, ok := node.Child("size"); ok {
+		x, xOK := size.FloatValue(1)
+		y, yOK := size.FloatValue(2)
+		if xOK && yOK {
+			pad.Size = kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+		}
+	}
+	if drill, ok := node.Child("drill"); ok {
+		pad.Drill = readPadDrill(drill)
+	}
+	if layers, ok := node.Child("layers"); ok {
+		pad.Layers = readPCBLayerList(layers)
+	}
+	if ratio, ok := node.Child("roundrect_rratio"); ok {
+		pad.RoundRectRRatio, _ = ratio.FloatValue(1)
+	}
 	if net, ok := node.Child("net"); ok {
-		pad.NetName = net.ListValue(1)
+		pad.NetCode, pad.NetName = readPCBNetRef(net)
 	}
 	return pad
 }
@@ -128,15 +150,29 @@ func readTrack(node sexpr.ParsedNode) Track {
 		track.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
 	}
 	if net, ok := node.Child("net"); ok {
-		track.NetName = net.ListValue(1)
+		track.NetCode, track.NetName = readPCBNetRef(net)
 	}
 	return track
 }
 
 func readVia(node sexpr.ParsedNode) Via {
 	via := Via{UUID: readPCBUUID(node), Position: readPCBAtPoint(node)}
+	if size, ok := node.Child("size"); ok {
+		value, _ := size.FloatValue(1)
+		via.Size = kicadfiles.MM(value)
+	}
+	if drill, ok := node.Child("drill"); ok {
+		value, _ := drill.FloatValue(1)
+		via.Drill = kicadfiles.MM(value)
+	}
+	if layers, ok := node.Child("layers"); ok {
+		via.Layers = readPCBLayerList(layers)
+	}
+	if tenting, ok := node.Child("tenting"); ok {
+		via.TentingFront, via.TentingBack = readSidePair(tenting)
+	}
 	if net, ok := node.Child("net"); ok {
-		via.NetName = net.ListValue(1)
+		via.NetCode, via.NetName = readPCBNetRef(net)
 	}
 	return via
 }
@@ -146,19 +182,82 @@ func readDrawing(node sexpr.ParsedNode) Drawing {
 	if layer, ok := node.Child("layer"); ok {
 		drawing.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
 	}
-	if drawing.Kind == "line" {
-		drawing.Line = &LineDrawing{Start: readNamedPCBPoint(node, "start"), End: readNamedPCBPoint(node, "end")}
+	if fill, ok := node.Child("fill"); ok {
+		drawing.Fill = fill.ListValue(1)
+	}
+	if net, ok := node.Child("net"); ok {
+		drawing.NetCode, drawing.NetName = readPCBNetRef(net)
+	}
+	width, strokeType := readStroke(node)
+	drawing.StrokeType = strokeType
+	switch drawing.Kind {
+	case "line":
+		drawing.Line = &LineDrawing{Start: readNamedPCBPoint(node, "start"), End: readNamedPCBPoint(node, "end"), Width: width}
+	case "rect":
+		drawing.Rect = &RectDrawing{Start: readNamedPCBPoint(node, "start"), End: readNamedPCBPoint(node, "end"), Width: width}
+	case "circle":
+		drawing.Circle = &CircleDrawing{Center: readNamedPCBPoint(node, "center"), End: readNamedPCBPoint(node, "end"), Width: width}
+	case "arc":
+		drawing.Arc = &ArcDrawing{Start: readNamedPCBPoint(node, "start"), Mid: readNamedPCBPoint(node, "mid"), End: readNamedPCBPoint(node, "end"), Width: width}
+	case "poly":
+		drawing.Poly = &PolylineDrawing{Points: readPoints(node), Width: width}
+	case "text":
+		drawing.Text = &TextDrawing{Text: node.ListValue(1), Position: readPCBAtPoint(node)}
+		if at, ok := node.Child("at"); ok {
+			if rotation, ok := at.FloatValue(3); ok {
+				drawing.Text.Rotation = kicadfiles.Angle(rotation)
+			}
+		}
 	}
 	return drawing
 }
 
 func readZone(node sexpr.ParsedNode) Zone {
 	zone := Zone{Raw: strings.TrimSpace(node.Raw), UUID: readPCBUUID(node)}
-	if net, ok := node.Child("net_name"); ok {
+	if net, ok := node.Child("net"); ok {
+		zone.NetCode, zone.NetName = readPCBNetRef(net)
+	}
+	if net, ok := node.Child("net_name"); ok && strings.TrimSpace(zone.NetName) == "" {
 		zone.NetName = net.ListValue(1)
 	}
 	if name, ok := node.Child("name"); ok {
 		zone.Name = name.ListValue(1)
+	}
+	if layers, ok := node.Child("layers"); ok {
+		zone.Layers = readPCBLayerList(layers)
+	}
+	if priority, ok := node.Child("priority"); ok {
+		value, _ := priority.FloatValue(1)
+		zone.Priority = int(value)
+	}
+	if hatch, ok := node.Child("hatch"); ok {
+		zone.HatchStyle = hatch.ListValue(1)
+		value, _ := hatch.FloatValue(2)
+		zone.HatchPitch = kicadfiles.MM(value)
+	}
+	if connect, ok := node.Child("connect_pads"); ok {
+		zone.ConnectPadsMode = connect.ListValue(1)
+		if clearance, ok := connect.Child("clearance"); ok {
+			value, _ := clearance.FloatValue(1)
+			zone.Clearance = kicadfiles.MM(value)
+		}
+	}
+	if minThickness, ok := node.Child("min_thickness"); ok {
+		value, _ := minThickness.FloatValue(1)
+		zone.MinThickness = kicadfiles.MM(value)
+	}
+	if fill, ok := node.Child("fill"); ok {
+		zone.Fill = readZoneFill(fill)
+	}
+	for _, polygon := range node.ChildrenByHead("polygon") {
+		zone.Polygons = append(zone.Polygons, readPoints(polygon))
+	}
+	for _, polygon := range node.ChildrenByHead("filled_polygon") {
+		filled := ZoneFilledPolygon{Points: readPoints(polygon)}
+		if layer, ok := polygon.Child("layer"); ok {
+			filled.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
+		}
+		zone.FilledPolygons = append(zone.FilledPolygons, filled)
 	}
 	return zone
 }
@@ -182,6 +281,149 @@ func readNamedPCBPoint(node sexpr.ParsedNode, name string) kicadfiles.Point {
 	x, _ := child.FloatValue(1)
 	y, _ := child.FloatValue(2)
 	return kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+}
+
+func readPoints(node sexpr.ParsedNode) []kicadfiles.Point {
+	pts, ok := node.Child("pts")
+	if !ok {
+		return nil
+	}
+	xys := pts.ChildrenByHead("xy")
+	points := make([]kicadfiles.Point, 0, len(xys))
+	for _, xy := range xys {
+		x, _ := xy.FloatValue(1)
+		y, _ := xy.FloatValue(2)
+		points = append(points, kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)})
+	}
+	return points
+}
+
+func readPCBLayerList(node sexpr.ParsedNode) []kicadfiles.BoardLayer {
+	layers := make([]kicadfiles.BoardLayer, 0, max(0, len(node.Children)-1))
+	for _, child := range node.Children[1:] {
+		layers = append(layers, kicadfiles.BoardLayer(child.Value()))
+	}
+	return layers
+}
+
+func readPadDrill(node sexpr.ParsedNode) kicadfiles.IU {
+	if value, ok := node.FloatValue(1); ok {
+		return kicadfiles.MM(value)
+	}
+	if node.ListValue(1) == "oval" {
+		x, xOK := node.FloatValue(2)
+		y, yOK := node.FloatValue(3)
+		switch {
+		case xOK && yOK && y > x:
+			return kicadfiles.MM(y)
+		case xOK:
+			return kicadfiles.MM(x)
+		case yOK:
+			return kicadfiles.MM(y)
+		}
+	}
+	return 0
+}
+
+func readPCBNetRef(node sexpr.ParsedNode) (int, string) {
+	if len(node.Children) < 2 {
+		return 0, ""
+	}
+	if code, ok := node.FloatValue(1); ok {
+		if len(node.Children) > 2 {
+			return int(code), node.ListValue(2)
+		}
+		return int(code), ""
+	}
+	return 0, node.ListValue(1)
+}
+
+func readStroke(node sexpr.ParsedNode) (kicadfiles.IU, string) {
+	stroke, ok := node.Child("stroke")
+	if !ok {
+		return 0, ""
+	}
+	var width kicadfiles.IU
+	if widthNode, ok := stroke.Child("width"); ok {
+		value, _ := widthNode.FloatValue(1)
+		width = kicadfiles.MM(value)
+	}
+	strokeType := ""
+	if typeNode, ok := stroke.Child("type"); ok {
+		strokeType = typeNode.ListValue(1)
+	}
+	return width, strokeType
+}
+
+func readSidePair(node sexpr.ParsedNode) (bool, bool) {
+	var front, back bool
+	if frontNode, ok := node.Child("front"); ok {
+		front = frontNode.ListValue(1) == "yes"
+	}
+	if backNode, ok := node.Child("back"); ok {
+		back = backNode.ListValue(1) == "yes"
+	}
+	return front, back
+}
+
+func readZoneFill(node sexpr.ParsedNode) ZoneFillSettings {
+	fill := ZoneFillSettings{Enabled: node.ListValue(1) == "yes"}
+	if thermalGap, ok := node.Child("thermal_gap"); ok {
+		value, _ := thermalGap.FloatValue(1)
+		fill.ThermalGap = kicadfiles.MM(value)
+	}
+	if bridge, ok := node.Child("thermal_bridge_width"); ok {
+		value, _ := bridge.FloatValue(1)
+		fill.ThermalBridgeWidth = kicadfiles.MM(value)
+	}
+	if islandMode, ok := node.Child("island_removal_mode"); ok {
+		value, _ := islandMode.FloatValue(1)
+		fill.IslandRemovalMode = int(value)
+	}
+	if islandArea, ok := node.Child("island_area_min"); ok {
+		fill.IslandAreaMin, _ = islandArea.FloatValue(1)
+	}
+	return fill
+}
+
+func resolvePCBNetReferences(board *PCBFile) {
+	namesByCode := make(map[int]string, len(board.Nets))
+	codesByName := make(map[string]int, len(board.Nets))
+	for _, net := range board.Nets {
+		namesByCode[net.Code] = net.Name
+		codesByName[net.Name] = net.Code
+	}
+	resolve := func(code *int, name *string) {
+		trimmedName := strings.TrimSpace(*name)
+		if *code == 0 && trimmedName != "" {
+			if resolved, ok := codesByName[*name]; ok {
+				*code = resolved
+			}
+		}
+		if trimmedName == "" {
+			if resolved, ok := namesByCode[*code]; ok {
+				*name = resolved
+			}
+		}
+	}
+	for footprintIndex := range board.Footprints {
+		for padIndex := range board.Footprints[footprintIndex].Pads {
+			pad := &board.Footprints[footprintIndex].Pads[padIndex]
+			resolve(&pad.NetCode, &pad.NetName)
+		}
+	}
+	for i := range board.Tracks {
+		resolve(&board.Tracks[i].NetCode, &board.Tracks[i].NetName)
+	}
+	for i := range board.Vias {
+		resolve(&board.Vias[i].NetCode, &board.Vias[i].NetName)
+	}
+	for i := range board.Zones {
+		resolve(&board.Zones[i].NetCode, &board.Zones[i].NetName)
+	}
+	for i := range board.Drawings {
+		resolve(&board.Drawings[i].NetCode, &board.Drawings[i].NetName)
+	}
 }
 
 func validatePCBNumberNodes(node sexpr.ParsedNode) error {
