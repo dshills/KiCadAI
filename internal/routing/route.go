@@ -85,6 +85,13 @@ func RouteRequest(request Request) Result {
 	} else {
 		result.Status = StatusRouted
 	}
+	validation := ValidateResult(request, result)
+	if len(validation.Issues) != 0 {
+		result.Issues = append(result.Issues, validation.Issues...)
+		if result.Status == StatusRouted {
+			result.Status = StatusBlocked
+		}
+	}
 	return result
 }
 
