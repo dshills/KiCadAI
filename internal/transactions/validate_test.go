@@ -106,6 +106,13 @@ func TestValidateRejectsZeroLengthPolygonSegment(t *testing.T) {
 	}
 }
 
+func TestValidateAcceptsViaOnlyRoute(t *testing.T) {
+	result := Validate(mustParse(t, `{"operations":[{"op":"route","net_name":"SIG","vias":[{"at":{"x_mm":1,"y_mm":2},"diameter_mm":0.6,"drill_mm":0.3,"layers":["F.Cu","B.Cu"]}]}]}`))
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+}
+
 func TestValidateRejectsMalformedWriteProject(t *testing.T) {
 	_, err := Parse([]byte(`{"operations":[{"op":"write_project","output_dir":42}]}`))
 	if err != nil {

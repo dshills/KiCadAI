@@ -208,6 +208,20 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 					NetName: payload.NetName,
 				})
 			}
+			for _, via := range payload.Vias {
+				layers := make([]kicadfiles.BoardLayer, 0, len(via.Layers))
+				for _, layer := range via.Layers {
+					layers = append(layers, boardLayer(layer))
+				}
+				design.PCB.Vias = append(design.PCB.Vias, pcb.Via{
+					UUID:     generator.New("imported.pcb.via", payload.NetName, pointSeed(point(via.At.XMM, via.At.YMM)), strings.Join(via.Layers, ",")),
+					Position: point(via.At.XMM, via.At.YMM),
+					Size:     kicadfiles.MM(via.DiameterMM),
+					Drill:    kicadfiles.MM(via.DrillMM),
+					Layers:   layers,
+					NetName:  payload.NetName,
+				})
+			}
 			pcbDirty = true
 		case OpAddZone:
 			if design.PCB == nil {

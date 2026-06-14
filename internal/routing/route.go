@@ -92,6 +92,14 @@ func RouteRequest(request Request) Result {
 			result.Status = StatusBlocked
 		}
 	}
+	operations, operationIssues := OperationsFromResultWithIssues(result)
+	result.Operations = operations
+	if len(operationIssues) != 0 {
+		result.Issues = append(result.Issues, operationIssues...)
+		if result.Status == StatusRouted {
+			result.Status = StatusBlocked
+		}
+	}
 	return result
 }
 

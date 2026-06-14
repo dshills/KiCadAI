@@ -134,13 +134,26 @@ func validateOperation(op Operation) []reports.Issue {
 		return validateDecoded(op, &payload, func() []reports.Issue {
 			var issues []reports.Issue
 			issues = append(issues, requireNonEmpty(path+".net_name", "net name", payload.NetName)...)
-			if len(payload.Points) < 2 {
+			if len(payload.Points) < 2 && len(payload.Vias) == 0 {
 				issues = append(issues, issue(reports.CodeInvalidArgument, path+".points", "route requires at least two points"))
 			}
 			for pointIndex, point := range payload.Points {
 				issues = append(issues, validatePoint(fmt.Sprintf("%s.points[%d]", path, pointIndex), point)...)
 				if pointIndex > 0 && samePoint(payload.Points[pointIndex-1], point) {
 					issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s.points[%d]", path, pointIndex), "route contains a zero-length segment"))
+				}
+			}
+			for viaIndex, via := range payload.Vias {
+				prefix := fmt.Sprintf("%s.vias[%d]", path, viaIndex)
+				issues = append(issues, validatePoint(prefix+".at", via.At)...)
+				if via.DiameterMM <= 0 {
+					issues = append(issues, issue(reports.CodeInvalidArgument, prefix+".diameter_mm", "via diameter must be positive"))
+				}
+				if via.DrillMM <= 0 || via.DrillMM >= via.DiameterMM {
+					issues = append(issues, issue(reports.CodeInvalidArgument, prefix+".drill_mm", "via drill must be positive and smaller than diameter"))
+				}
+				if len(via.Layers) < 2 {
+					issues = append(issues, issue(reports.CodeInvalidArgument, prefix+".layers", "via requires at least two layers"))
 				}
 			}
 			return issues

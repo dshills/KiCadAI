@@ -128,11 +128,19 @@ type PlaceFootprintOperation struct {
 }
 
 type RouteOperation struct {
-	Op      OperationKind `json:"op"`
-	NetName string        `json:"net_name"`
-	Layer   string        `json:"layer,omitempty"`
-	WidthMM float64       `json:"width_mm,omitempty"`
-	Points  []Point       `json:"points"`
+	Op      OperationKind  `json:"op"`
+	NetName string         `json:"net_name"`
+	Layer   string         `json:"layer,omitempty"`
+	WidthMM float64        `json:"width_mm,omitempty"`
+	Points  []Point        `json:"points"`
+	Vias    []RouteViaSpec `json:"vias,omitempty"`
+}
+
+type RouteViaSpec struct {
+	At         Point    `json:"at"`
+	DiameterMM float64  `json:"diameter_mm"`
+	DrillMM    float64  `json:"drill_mm"`
+	Layers     []string `json:"layers,omitempty"`
 }
 
 type AddZoneOperation struct {
