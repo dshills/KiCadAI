@@ -136,11 +136,9 @@ func (t *MangosTransport) Request(ctx context.Context, payload []byte) ([]byte, 
 		return nil, &ConnectionError{Endpoint: endpoint, Op: "send", Cause: err}
 	}
 
-	if err := ctx.Err(); err != nil {
-		t.closeSocketAfterInterruptedRequest(socket)
-		return nil, err
-	}
-
+	// Once a REQ payload has been transmitted, the socket must receive the
+	// matching REP or be closed by the receive path. Returning ctx.Err here
+	// would leave the REQ/REP state machine desynchronized.
 	recvDeadline, err := effectiveDeadline(ctx, t.timeout.RecvTimeout)
 	if err != nil {
 		t.closeSocketAfterInterruptedRequest(socket)

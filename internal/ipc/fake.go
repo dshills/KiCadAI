@@ -16,6 +16,7 @@ type FakeTransport struct {
 	recvError  error
 	closeError error
 	closed     bool
+	afterSend  func()
 }
 
 func (t *FakeTransport) QueueResponse(response []byte) {
@@ -147,8 +148,34 @@ func (t *FakeTransport) Request(ctx context.Context, payload []byte) ([]byte, er
 	if err := t.Send(ctx, payload); err != nil {
 		return nil, err
 	}
+	if t.afterSend != nil {
+		t.afterSend()
+	}
 
-	return t.Recv(ctx)
+	return t.recvAfterSend()
+}
+
+func (t *FakeTransport) recvAfterSend() ([]byte, error) {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+
+	if t.closed {
+		return nil, ErrClosed
+	}
+	if t.dialedEndpoint == "" {
+		return nil, ErrNotConnected
+	}
+	if t.recvError != nil {
+		return nil, t.recvError
+	}
+	if len(t.responses) == 0 {
+		return nil, ErrNoResponses
+	}
+
+	response := append([]byte(nil), t.responses[0]...)
+	t.responses[0] = nil
+	t.responses = t.responses[1:]
+	return response, nil
 }
 
 func (t *FakeTransport) Close() error {

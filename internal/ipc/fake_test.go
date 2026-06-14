@@ -165,6 +165,28 @@ func TestFakeTransportRequestPropagatesSendAndRecvErrors(t *testing.T) {
 	})
 }
 
+func TestFakeTransportRequestReceivesAfterPostSendCancellation(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	transport := &FakeTransport{
+		afterSend: cancel,
+	}
+	transport.QueueResponse([]byte("response"))
+	if err := transport.Dial(ctx, testIPCEndpoint(t)); err != nil {
+		t.Fatalf("Dial returned error: %v", err)
+	}
+
+	response, err := transport.Request(ctx, []byte("request"))
+	if err != nil {
+		t.Fatalf("Request returned error: %v", err)
+	}
+	if string(response) != "response" {
+		t.Fatalf("response = %q", response)
+	}
+	if len(transport.SentMessages()) != 1 {
+		t.Fatalf("sent messages = %d, want 1", len(transport.SentMessages()))
+	}
+}
+
 func TestFakeTransportStateErrors(t *testing.T) {
 	transport := &FakeTransport{}
 	ctx := testContext(t)
@@ -214,6 +236,9 @@ func TestFakeTransportHonorsCanceledContext(t *testing.T) {
 	}
 	if err := transport.Send(ctx, []byte("request")); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Send error = %v, want %v", err, context.Canceled)
+	}
+	if _, err := transport.Request(ctx, []byte("request")); !errors.Is(err, context.Canceled) {
+		t.Fatalf("Request error = %v, want %v", err, context.Canceled)
 	}
 	if _, err := transport.Recv(ctx); !errors.Is(err, context.Canceled) {
 		t.Fatalf("Recv error = %v, want %v", err, context.Canceled)
