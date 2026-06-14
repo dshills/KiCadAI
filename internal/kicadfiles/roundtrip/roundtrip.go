@@ -356,7 +356,7 @@ func unifiedDiff(aName, bName, a, b string) string {
 	out.WriteString(bName)
 	out.WriteString("\n")
 	oldCount, newCount := diffOutputCounts(ops)
-	out.WriteString(fmt.Sprintf("@@ -%d,%d +%d,%d @@\n", startLine, oldCount, startLine, newCount))
+	fmt.Fprintf(&out, "@@ -%d,%d +%d,%d @@\n", startLine, oldCount, startLine, newCount)
 	for _, op := range ops {
 		out.WriteString(op.prefix)
 		out.WriteString(op.line)

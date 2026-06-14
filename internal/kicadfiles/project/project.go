@@ -317,14 +317,6 @@ func mmNumber(value kicadfiles.IU) float64 {
 	return float64(value) / 1_000_000
 }
 
-func formatVersionNumber(version kicadfiles.KiCadFormatVersion) int {
-	value, err := strconv.Atoi(string(version))
-	if err != nil {
-		return 0
-	}
-	return value
-}
-
 func fieldError(field, message string) kicadfiles.ValidationError {
 	return kicadfiles.ValidationError{Section: "project", Field: field, Message: message}
 }

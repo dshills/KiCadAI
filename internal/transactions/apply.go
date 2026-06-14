@@ -307,15 +307,6 @@ func deterministicDesignUUID(name string, seed string) kicadfiles.UUID {
 	return kicadfiles.UUID(fmt.Sprintf("%x-%x-%x-%x-%x", bytes[0:4], bytes[4:6], bytes[6:8], bytes[8:10], bytes[10:16]))
 }
 
-func writeOutputDir(op Operation, fallback string) string {
-	output := fallback
-	var payload WriteProjectOperation
-	if decodeRaw(op, &payload) == nil && strings.TrimSpace(payload.OutputDir) != "" {
-		output = payload.OutputDir
-	}
-	return output
-}
-
 func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions) ([]reports.Artifact, error) {
 	switch op.Op {
 	case OpSetBoardOutline:
@@ -1000,7 +991,7 @@ func acquireProjectApplyLock(root string) (func(), error) {
 			return nil, err
 		}
 	}
-	if _, err := file.WriteString(fmt.Sprintf("pid=%d\n", os.Getpid())); err != nil {
+	if _, err := fmt.Fprintf(file, "pid=%d\n", os.Getpid()); err != nil {
 		_ = file.Close()
 		_ = os.Remove(lockPath)
 		return nil, err

@@ -334,18 +334,21 @@ func validateMCUTemplate(path string, template mcuTemplate) []reports.Issue {
 	if len(roleMap.GND) == 0 {
 		issues = append(issues, blockIssue(path, "MCU role map must define at least one GND pin"))
 	}
-	for name, pin := range map[string]string{
-		"RESET":  roleMap.RESET,
-		"AREF":   roleMap.AREF,
-		"MOSI":   roleMap.MOSI,
-		"MISO":   roleMap.MISO,
-		"SCK":    roleMap.SCK,
-		"GPIO":   roleMap.GPIO,
-		"UARTTX": roleMap.UARTTX,
-		"UARTRX": roleMap.UARTRX,
+	for _, role := range []struct {
+		name string
+		pin  string
+	}{
+		{name: "RESET", pin: roleMap.RESET},
+		{name: "AREF", pin: roleMap.AREF},
+		{name: "MOSI", pin: roleMap.MOSI},
+		{name: "MISO", pin: roleMap.MISO},
+		{name: "SCK", pin: roleMap.SCK},
+		{name: "GPIO", pin: roleMap.GPIO},
+		{name: "UARTTX", pin: roleMap.UARTTX},
+		{name: "UARTRX", pin: roleMap.UARTRX},
 	} {
-		if pin == "" {
-			issues = append(issues, blockIssue(path, "MCU role map must define "+name+" pin"))
+		if role.pin == "" {
+			issues = append(issues, blockIssue(path, "MCU role map must define "+role.name+" pin"))
 		}
 	}
 	return issues

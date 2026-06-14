@@ -435,18 +435,6 @@ func nameSet(values []string) map[string]struct{} {
 	return names
 }
 
-func schematicSymbolsByReference(schematicFile *schematic.SchematicFile) map[string]*schematic.SchematicSymbol {
-	symbolsByRef := map[string]*schematic.SchematicSymbol{}
-	for i := range schematicFile.Symbols {
-		symbol := &schematicFile.Symbols[i]
-		if strings.HasPrefix(symbol.Reference, "#") {
-			continue
-		}
-		symbolsByRef[referenceKey(symbol.Reference)] = symbol
-	}
-	return symbolsByRef
-}
-
 func validateExpectedNets(design Design) kicadfiles.ValidationErrors {
 	var errs kicadfiles.ValidationErrors
 	if design.PCB == nil {

@@ -10,7 +10,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"reflect"
 	"runtime"
 	"strings"
 	"time"
@@ -1980,7 +1979,7 @@ func runConfig(opts cliOptions, stdout io.Writer) error {
 	fmt.Fprintf(stdout, "socket_path: %s\n", resolved.SocketPath)
 	fmt.Fprintf(stdout, "client_name: %s\n", resolved.ClientName)
 	fmt.Fprintf(stdout, "timeout_ms: %d\n", resolved.TimeoutMS)
-	fmt.Fprintf(stdout, "%s: %s\n", credentialLabel(), configField(resolved.Redacted(), credentialFieldName()))
+	fmt.Fprintf(stdout, "token: %s\n", resolved.Redacted().Token)
 	return nil
 }
 
@@ -2367,38 +2366,11 @@ func resolveConfig(opts cliOptions) (config.Config, error) {
 		SocketPath:  opts.socket,
 		ClientName:  opts.clientName,
 		TimeoutMS:   opts.timeoutMS,
+		Token:       opts.apiCredential,
 		Environment: os.Environ(),
-	}
-	if err := setConfigField(&explicit, credentialFieldName(), opts.apiCredential); err != nil {
-		return config.Config{}, err
 	}
 
 	return config.Resolve(explicit)
-}
-
-func setConfigField(value any, fieldName string, fieldValue string) error {
-	field := reflect.ValueOf(value).Elem().FieldByName(fieldName)
-	if !field.IsValid() || !field.CanSet() || field.Kind() != reflect.String {
-		return fmt.Errorf("configuration field %q is unavailable", fieldName)
-	}
-	field.SetString(fieldValue)
-	return nil
-}
-
-func configField(value any, fieldName string) string {
-	field := reflect.Indirect(reflect.ValueOf(value)).FieldByName(fieldName)
-	if field.IsValid() && field.Kind() == reflect.String {
-		return field.String()
-	}
-	return ""
-}
-
-func credentialFieldName() string {
-	return string([]rune{84, 111, 107, 101, 110})
-}
-
-func credentialLabel() string {
-	return string([]rune{116, 111, 107, 101, 110})
 }
 
 func writeProbeFailure(opts cliOptions, stdout io.Writer, resolved config.Config, err error) error {

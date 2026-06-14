@@ -249,10 +249,6 @@ func normalizePlacementLayer(placement Placement) Placement {
 	return placement
 }
 
-func samePlacementLayer(a string, b string) bool {
-	return strings.EqualFold(normalizeLayer(a), normalizeLayer(b))
-}
-
 func normalizeLayer(layer string) string {
 	layer = strings.TrimSpace(layer)
 	if layer == "" {

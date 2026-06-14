@@ -2,7 +2,6 @@ package blocks
 
 import (
 	"fmt"
-	"math"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -187,7 +186,7 @@ func instantiateRegulatorPowerLED(definition BlockDefinition, request BlockReque
 	resistorRef := allocator.Next("R")
 	ledRef := allocator.Next("D")
 	resistorOhms := (outputVoltage - powerLEDForwardVolts) / powerLEDCurrentAmps
-	resistorPower := math.Pow(powerLEDCurrentAmps, 2) * resistorOhms
+	resistorPower := powerLEDCurrentAmps * powerLEDCurrentAmps * resistorOhms
 	if resistorPower > 0.125 {
 		issues = append(issues, regulatorWarning("params.output_voltage", "default power LED resistor dissipation exceeds 0.125 W"))
 	}

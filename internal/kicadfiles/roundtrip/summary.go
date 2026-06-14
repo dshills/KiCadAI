@@ -69,7 +69,7 @@ func (s Summary) String() string {
 	sort.Strings(keys)
 	var out strings.Builder
 	for _, key := range keys {
-		out.WriteString(fmt.Sprintf("%s=%d\n", key, s.Sections[key]))
+		fmt.Fprintf(&out, "%s=%d\n", key, s.Sections[key])
 	}
 	return out.String()
 }

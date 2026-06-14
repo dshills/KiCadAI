@@ -4,11 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/sexpr"
@@ -55,44 +53,10 @@ type symbolParseResult struct {
 }
 
 func parseSymbolFiles(ctx context.Context, files []LibraryFile) []symbolParseResult {
-	results := make([]symbolParseResult, len(files))
-	if len(files) == 0 {
-		return results
-	}
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	workerCount := runtime.GOMAXPROCS(0)
-	if workerCount > len(files) {
-		workerCount = len(files)
-	}
-	jobs := make(chan int)
-	var waitGroup sync.WaitGroup
-	waitGroup.Add(workerCount)
-	for range workerCount {
-		go func() {
-			defer waitGroup.Done()
-			for index := range jobs {
-				if ctx.Err() != nil {
-					return
-				}
-				records, issues := parseSymbolFile(files[index])
-				results[index] = symbolParseResult{records: records, issues: issues}
-			}
-		}()
-	}
-	for index := range files {
-		select {
-		case jobs <- index:
-		case <-ctx.Done():
-			close(jobs)
-			waitGroup.Wait()
-			return results
-		}
-	}
-	close(jobs)
-	waitGroup.Wait()
-	return results
+	return parallelMap(ctx, len(files), func(index int) symbolParseResult {
+		records, issues := parseSymbolFile(files[index])
+		return symbolParseResult{records: records, issues: issues}
+	})
 }
 
 func ResolveSymbol(index LibraryIndex, libraryID string) (SymbolRecord, bool) {
