@@ -1,5 +1,9 @@
-.PHONY: test coverage coverage-check run-help refresh-kicad-proto proto proto-check
+.DEFAULT_GOAL := help
 
+.PHONY: help build install test lint coverage coverage-check run-help refresh-kicad-proto proto proto-check
+
+BIN_DIR := $(CURDIR)/bin
+BIN := $(BIN_DIR)/kicadai
 GOCACHE_DIR := $(CURDIR)/.gocache
 GOMODCACHE_DIR := $(CURDIR)/.gomodcache
 PATH_WITH_TOOLS := $(CURDIR)/bin:$(PATH)
@@ -10,8 +14,36 @@ COVER_NOGEN_TOTAL := $(COVER_DIR)/kicadai.nogen.total
 GEN_COVER_EXCLUDE := (^|\/)internal\/kiapi\/gen\/
 COVERAGE_THRESHOLD ?= 75.0
 
+help:
+	@printf "KiCadAI targets:\n"
+	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
+	@printf "  make install         Install CLI binary to ./bin using go install\n"
+	@printf "  make test            Run Go tests\n"
+	@printf "  make lint            Run gofmt check and go vet\n"
+	@printf "  make coverage        Generate coverage profiles\n"
+	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
+	@printf "  make run-help        Run kicadai --help from source\n"
+	@printf "  make proto           Regenerate vendored KiCad protobuf bindings\n"
+	@printf "  make proto-check     Regenerate protobuf bindings and check for diffs\n"
+
+build:
+	mkdir -p "$(BIN_DIR)"
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN)" ./cmd/kicadai
+
+install:
+	mkdir -p "$(BIN_DIR)"
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" GOBIN="$(BIN_DIR)" go install ./cmd/kicadai
+
 test:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test ./...
+
+lint:
+	@unformatted="$$(gofmt -l $$(git ls-files '*.go'))"; \
+	if [ -n "$$unformatted" ]; then \
+		printf "gofmt required:\n%s\n" "$$unformatted" >&2; \
+		exit 1; \
+	fi
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go vet ./...
 
 coverage:
 	mkdir -p "$(COVER_DIR)"
