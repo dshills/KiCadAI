@@ -17,8 +17,9 @@ deterministic, and testable.
 The direct-file workflow is the main functional path today. It can generate
 KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
-transactions to imported projects, validate symbol-to-footprint pinmaps, and run
-KiCad-backed ERC/DRC checks through `kicad-cli`.
+transactions to imported projects, place components, route small PCB nets,
+validate symbol-to-footprint pinmaps, and run KiCad-backed ERC/DRC checks
+through `kicad-cli`.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -126,6 +127,7 @@ go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_
 go run ./cmd/kicadai --json pinmap list
 go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
+go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json route request
 ```
 
 ### Live IPC Commands
@@ -207,7 +209,74 @@ group spread checks, HPWL metrics, footprint-derived bounds helpers, and
 transaction operation output. Requests can use explicit component bounds or
 hydrate bounds from the library resolver in Go before calling
 `placement.Place`. The usable board area uses the larger of
-`Board.MarginMM` and `Rules.BoardEdgeClearanceMM`.
+the JSON `board.margin_mm` and `rules.board_edge_clearance_mm` values
+(`Board.MarginMM` and `Rules.BoardEdgeClearanceMM` in Go).
+
+### Routing
+
+The routing engine is a deterministic grid router for small placed boards. It
+accepts a structured `routing.Request`, routes intentional nets, validates
+connectivity and clearance in-process, and returns route segments, vias,
+metrics, issues, AI-facing repair diagnostics, and route-shaped operations.
+
+Run routing from JSON:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --request ./examples/routing/simple_request.json \
+  --mode single_layer \
+  --grid 1 \
+  --trace-width 0.1 \
+  --clearance 0.2 \
+  route request
+```
+
+For `route request`, CLI flags override the matching values from the JSON
+request. Omit the flags when you want to run the fixture exactly as written.
+
+Useful route flags:
+
+- `--mode single_layer|two_layer|validate_only`
+- `--grid <mm>`
+- `--trace-width <mm>`
+- `--clearance <mm>`
+- `--allow-partial`
+
+Routing JSON uses `rules.edge_clearance_mm` for board-edge clearance. Placement
+JSON uses `rules.board_edge_clearance_mm`; the two request schemas are related
+but intentionally separate. There is not currently a route CLI override for
+edge clearance, so set this value in the JSON request.
+
+The Go API entry points are:
+
+- `routing.RouteRequest(request)` for raw route planning.
+- `routing.ValidateResult(request, result)` for in-process route checks.
+- `routing.DiagnosticsForResult(result)` for repair categories/actions.
+- `routingadapters.RequestFromPlacement(...)` to route placement output.
+- `designapi.Builder.RouteBoard(...)` to apply routed tracks/vias to a design.
+
+Current routing support includes deterministic net ordering, single-layer
+Manhattan routing, two-layer routing with vias, keepout and existing-copper
+obstacles, route simplification, connectivity validation, clearance validation,
+operation emission, KiCad check feedback mapping, golden routed examples, and
+bounded stress tests.
+
+Current routing limitations:
+
+- The router is intended for simple boards and early AI workflow validation, not
+  dense BGA or production autorouting.
+- Routes are orthogonal grid paths; there is no diagonal, curved, length-tuned,
+  differential-pair, or impedance-aware routing yet.
+- Placement quality strongly affects routing success.
+- Copper zones are treated as obstacles or unsupported policy inputs; zone-fill
+  aware routing is not implemented.
+- Pad summaries from placement do not yet preserve full footprint pad shape and
+  through-hole metadata, so footprint-library expansion is planned for a future
+  release.
+- KiCad DRC execution is integrated through the checks package, but tests still
+  rely primarily on deterministic parser/fake-runner paths unless a local
+  stable KiCad fixture is available.
 
 ### Inspection
 
@@ -604,6 +673,8 @@ make test
 - Live KiCad IPC write support is not the primary mutation path yet.
 - Direct readers/writers model a growing but incomplete subset of KiCad
   schematic and PCB syntax.
+- The routing engine handles small deterministic grid-routing cases, not full
+  production autorouting.
 - Imported-project mutation blocks unsupported raw content to avoid damaging
   user-authored KiCad features.
 - Hierarchical pinmap validation is intentionally blocked until hierarchy
@@ -637,6 +708,10 @@ make test
 - ERC/DRC check returns findings: this is a design validation failure, not a
   tool failure. The JSON `data.checks[].summary.prompt` field is intended for
   compact AI repair context.
+- `route request` returns blocked or partial: inspect `data.issues` and, from
+  Go, `routing.DiagnosticsForResult`. Common fixes are moving components,
+  reducing clearance/trace width, enabling a second layer or vias, and verifying
+  pad layers/geometry.
 
 ## Design Direction
 

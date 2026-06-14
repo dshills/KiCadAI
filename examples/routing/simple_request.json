@@ -1,0 +1,58 @@
+{
+  "board": {
+    "width_mm": 30,
+    "height_mm": 20,
+    "layers": [
+      { "name": "F.Cu", "kind": "copper", "routable": true }
+    ]
+  },
+  "components": [
+    {
+      "ref": "J1",
+      "position": { "x_mm": 5, "y_mm": 10, "layer": "F.Cu" },
+      "pads": [
+        {
+          "name": "1",
+          "net": "SIG",
+          "position": { "x_mm": 0, "y_mm": 0 },
+          "shape": "circle",
+          "type": "smd",
+          "size": { "width_mm": 1, "height_mm": 1 },
+          "layers": ["F.Cu"]
+        }
+      ]
+    },
+    {
+      "ref": "J2",
+      "position": { "x_mm": 20, "y_mm": 10, "layer": "F.Cu" },
+      "pads": [
+        {
+          "name": "1",
+          "net": "SIG",
+          "position": { "x_mm": 0, "y_mm": 0 },
+          "shape": "circle",
+          "type": "smd",
+          "size": { "width_mm": 1, "height_mm": 1 },
+          "layers": ["F.Cu"]
+        }
+      ]
+    }
+  ],
+  "nets": [
+    {
+      "name": "SIG",
+      "endpoints": [
+        { "ref": "J1", "pin": "1" },
+        { "ref": "J2", "pin": "1" }
+      ]
+    }
+  ],
+  "rules": {
+    "grid_mm": 1,
+    "trace_width_mm": 0.1,
+    "clearance_mm": 0.2,
+    "edge_clearance_mm": 0.3
+  },
+  "strategy": { "mode": "single_layer" },
+  "seed": "readme-routing-example"
+}
