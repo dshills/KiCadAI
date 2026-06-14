@@ -1,12 +1,12 @@
 package routing
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
 
 	"kicadai/internal/reports"
-	"kicadai/internal/transactions"
 )
 
 type Status string
@@ -207,11 +207,58 @@ type Strategy struct {
 }
 
 type Result struct {
-	Status     Status                   `json:"status"`
-	Routes     []Route                  `json:"routes,omitempty"`
-	Operations []transactions.Operation `json:"operations,omitempty"`
-	Issues     []reports.Issue          `json:"issues,omitempty"`
-	Metrics    Metrics                  `json:"metrics"`
+	Status     Status          `json:"status"`
+	Routes     []Route         `json:"routes,omitempty"`
+	Operations []Operation     `json:"operations,omitempty"`
+	Issues     []reports.Issue `json:"issues,omitempty"`
+	Metrics    Metrics         `json:"metrics"`
+}
+
+type Operation struct {
+	Op    string          `json:"op"`
+	Raw   json.RawMessage `json:"-"`
+	Index int             `json:"-"`
+}
+
+func (operation *Operation) UnmarshalJSON(data []byte) error {
+	var head struct {
+		Op string `json:"op"`
+	}
+	if err := json.Unmarshal(data, &head); err != nil {
+		return err
+	}
+	operation.Op = head.Op
+	operation.Raw = append([]byte(nil), data...)
+	return nil
+}
+
+func (operation Operation) MarshalJSON() ([]byte, error) {
+	if len(operation.Raw) > 0 {
+		return operation.Raw, nil
+	}
+	type alias Operation
+	return json.Marshal(alias(operation))
+}
+
+type OperationPoint struct {
+	XMM float64 `json:"x_mm"`
+	YMM float64 `json:"y_mm"`
+}
+
+type RouteOperation struct {
+	Op      string              `json:"op"`
+	NetName string              `json:"net_name"`
+	Layer   string              `json:"layer,omitempty"`
+	WidthMM float64             `json:"width_mm,omitempty"`
+	Points  []OperationPoint    `json:"points"`
+	Vias    []RouteViaOperation `json:"vias,omitempty"`
+}
+
+type RouteViaOperation struct {
+	At         OperationPoint `json:"at"`
+	DiameterMM float64        `json:"diameter_mm"`
+	DrillMM    float64        `json:"drill_mm"`
+	Layers     []string       `json:"layers,omitempty"`
 }
 
 type Route struct {

@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"math"
 	"testing"
-
-	"kicadai/internal/transactions"
 )
 
 func TestOperationsFromResultEmitsSegmentsAndViasInOrder(t *testing.T) {
@@ -23,14 +21,14 @@ func TestOperationsFromResultEmitsSegmentsAndViasInOrder(t *testing.T) {
 	if len(operations) != 2 {
 		t.Fatalf("operations = %#v, want segment and via op", operations)
 	}
-	var segment transactions.RouteOperation
+	var segment RouteOperation
 	if err := json.Unmarshal(operations[0].Raw, &segment); err != nil {
 		t.Fatal(err)
 	}
 	if segment.NetName != "SIG" || segment.Layer != "F.CU" || len(segment.Points) != 2 {
 		t.Fatalf("segment op = %#v", segment)
 	}
-	var via transactions.RouteOperation
+	var via RouteOperation
 	if err := json.Unmarshal(operations[1].Raw, &via); err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +67,7 @@ func TestOperationsFromResultGroupsContiguousSegments(t *testing.T) {
 	if len(operations) != 1 {
 		t.Fatalf("operations = %#v, want grouped operation", operations)
 	}
-	var payload transactions.RouteOperation
+	var payload RouteOperation
 	if err := json.Unmarshal(operations[0].Raw, &payload); err != nil {
 		t.Fatal(err)
 	}

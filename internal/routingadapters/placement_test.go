@@ -1,9 +1,10 @@
-package routing
+package routingadapters
 
 import (
 	"testing"
 
 	"kicadai/internal/placement"
+	"kicadai/internal/routing"
 )
 
 func TestRequestFromPlacementBuildsRoutingRequest(t *testing.T) {
@@ -56,7 +57,7 @@ func TestRequestFromPlacementConvertsKeepouts(t *testing.T) {
 	if len(issues) != 0 {
 		t.Fatalf("issues = %#v", issues)
 	}
-	if len(request.Obstacles) != 1 || request.Obstacles[0].Kind != ObstacleKeepout {
+	if len(request.Obstacles) != 1 || request.Obstacles[0].Kind != routing.ObstacleKeepout {
 		t.Fatalf("obstacles = %#v", request.Obstacles)
 	}
 }

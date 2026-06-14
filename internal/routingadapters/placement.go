@@ -1,13 +1,15 @@
-package routing
+package routingadapters
 
 import (
 	"fmt"
+	"strings"
 
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
+	"kicadai/internal/routing"
 )
 
-func RequestFromPlacement(placementRequest placement.Request, placementResult placement.Result) (Request, []reports.Issue) {
+func RequestFromPlacement(placementRequest placement.Request, placementResult placement.Result) (routing.Request, []reports.Issue) {
 	issues := []reports.Issue{}
 	placements := map[string]placement.PlacementResult{}
 	for _, placed := range placementResult.Placements {
@@ -15,19 +17,19 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 			placements[normalizeKey(placed.Ref)] = placed
 		}
 	}
-	request := Request{
-		Board: Board{
-			Origin:   Point{XMM: placementRequest.Board.Origin.XMM, YMM: placementRequest.Board.Origin.YMM},
+	request := routing.Request{
+		Board: routing.Board{
+			Origin:   routing.Point{XMM: placementRequest.Board.Origin.XMM, YMM: placementRequest.Board.Origin.YMM},
 			WidthMM:  placementRequest.Board.WidthMM,
 			HeightMM: placementRequest.Board.HeightMM,
 			MarginMM: placementRequest.Board.MarginMM,
-			Layers: []Layer{
-				{Name: "F.Cu", Kind: LayerCopper, Routable: true},
-				{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+			Layers: []routing.Layer{
+				{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true},
+				{Name: "B.Cu", Kind: routing.LayerCopper, Routable: true},
 			},
 		},
-		Rules:    DefaultRules(),
-		Strategy: Strategy{Mode: ModeTwoLayer, TreatZonesAs: ZoneObstacle, AllowPartial: true},
+		Rules:    routing.DefaultRules(),
+		Strategy: routing.Strategy{Mode: routing.ModeTwoLayer, TreatZonesAs: routing.ZoneObstacle, AllowPartial: true},
 		Seed:     placementRequest.Seed,
 	}
 	if !placementRequest.Rules.AllowBackLayer {
@@ -61,16 +63,16 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 			})
 			continue
 		}
-		request.Components = append(request.Components, Component{
+		request.Components = append(request.Components, routing.Component{
 			Ref:       component.Ref,
 			Footprint: firstNonEmpty(placed.FootprintID, component.FootprintID),
-			Position:  Placement{XMM: position.XMM, YMM: position.YMM, RotationDeg: position.RotationDeg, Layer: firstNonEmpty(position.Layer, "F.Cu")},
+			Position:  routing.Placement{XMM: position.XMM, YMM: position.YMM, RotationDeg: position.RotationDeg, Layer: firstNonEmpty(position.Layer, "F.Cu")},
 			Pads:      routingPadsFromPlacement(component, firstNonEmpty(position.Layer, "F.Cu")),
 			Fixed:     component.Fixed || placed.Fixed,
 		})
 	}
 	for _, net := range placementRequest.Nets {
-		request.Nets = append(request.Nets, Net{
+		request.Nets = append(request.Nets, routing.Net{
 			Name:      net.Name,
 			Endpoints: routingEndpointsFromPlacement(net.Endpoints),
 			Role:      routingNetRole(net.Role),
@@ -83,14 +85,14 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 			layers = []string{"F.Cu", "B.Cu"}
 		}
 		for _, layer := range layers {
-			rect := Rect{
-				Min: Point{XMM: keepout.Bounds.Min.XMM, YMM: keepout.Bounds.Min.YMM},
-				Max: Point{XMM: keepout.Bounds.Max.XMM, YMM: keepout.Bounds.Max.YMM},
+			rect := routing.Rect{
+				Min: routing.Point{XMM: keepout.Bounds.Min.XMM, YMM: keepout.Bounds.Min.YMM},
+				Max: routing.Point{XMM: keepout.Bounds.Max.XMM, YMM: keepout.Bounds.Max.YMM},
 			}
-			request.Obstacles = append(request.Obstacles, Obstacle{
-				Kind:     ObstacleKeepout,
+			request.Obstacles = append(request.Obstacles, routing.Obstacle{
+				Kind:     routing.ObstacleKeepout,
 				Layer:    layer,
-				Geometry: Shape{Rect: &rect},
+				Geometry: routing.Shape{Rect: &rect},
 				Source:   fmt.Sprintf("keepout:%s", keepout.ID),
 			})
 		}
@@ -98,43 +100,51 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 	return request, issues
 }
 
-func routingPadsFromPlacement(component placement.Component, layer string) []Pad {
-	pads := make([]Pad, 0, len(component.Pads))
+func routingPadsFromPlacement(component placement.Component, layer string) []routing.Pad {
+	pads := make([]routing.Pad, 0, len(component.Pads))
 	layer = firstNonEmpty(layer, "F.Cu")
 	for _, pad := range component.Pads {
-		pads = append(pads, Pad{
+		pads = append(pads, routing.Pad{
 			Ref:      component.Ref,
 			Name:     pad.Name,
 			Net:      pad.Net,
-			Position: Point{XMM: pad.XMM, YMM: pad.YMM},
-			Shape:    PadRect,
-			Type:     PadSMD,
-			Size:     Size{WidthMM: positiveOrDefault(pad.WidthMM, 1), HeightMM: positiveOrDefault(pad.HeightMM, 1)},
+			Position: routing.Point{XMM: pad.XMM, YMM: pad.YMM},
+			Shape:    routing.PadRect,
+			Type:     routing.PadSMD,
+			Size:     routing.Size{WidthMM: positiveOrDefault(pad.WidthMM, 1), HeightMM: positiveOrDefault(pad.HeightMM, 1)},
 			Layers:   []string{layer},
 		})
 	}
 	return pads
 }
 
-func routingEndpointsFromPlacement(endpoints []placement.Endpoint) []Endpoint {
-	routed := make([]Endpoint, 0, len(endpoints))
+func routingEndpointsFromPlacement(endpoints []placement.Endpoint) []routing.Endpoint {
+	routed := make([]routing.Endpoint, 0, len(endpoints))
 	for _, endpoint := range endpoints {
-		routed = append(routed, Endpoint{Ref: endpoint.Ref, Pin: endpoint.Pin})
+		routed = append(routed, routing.Endpoint{Ref: endpoint.Ref, Pin: endpoint.Pin})
 	}
 	return routed
 }
 
-func routingNetRole(role placement.NetRole) NetRole {
+func routingNetRole(role placement.NetRole) routing.NetRole {
 	switch role {
 	case placement.NetPower:
-		return NetPower
+		return routing.NetPower
 	case placement.NetGround:
-		return NetGround
+		return routing.NetGround
 	case placement.NetSignal:
-		return NetSignal
+		return routing.NetSignal
 	default:
-		return NetUnknown
+		return routing.NetUnknown
 	}
+}
+
+func normalizeKey(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
+
+func boolPtr(value bool) *bool {
+	return &value
 }
 
 func firstNonEmpty(values ...string) string {

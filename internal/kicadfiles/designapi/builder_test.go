@@ -9,6 +9,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/routing"
 )
 
 func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
@@ -456,6 +457,47 @@ func TestBuilderWriteProject(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(result.ProjectDir, name)); err != nil {
 			t.Fatalf("expected written file %s: %v", name, err)
 		}
+	}
+}
+
+func TestBuilderRouteBoardAddsPCBTracks(t *testing.T) {
+	builder := newTestBuilder(t)
+	result, err := builder.RouteBoard(designAPIRoutingRequest(), RouteBoardOptions{})
+	if err != nil {
+		t.Fatalf("RouteBoard returned error: %v", err)
+	}
+	if result.Status != routing.StatusRouted {
+		t.Fatalf("status = %s issues = %#v", result.Status, result.Issues)
+	}
+	if len(builder.Design().PCB.Tracks) == 0 {
+		t.Fatalf("tracks = %#v, want routed tracks", builder.Design().PCB.Tracks)
+	}
+}
+
+func TestBuilderRouteBoardDryRunDoesNotMutatePCB(t *testing.T) {
+	builder := newTestBuilder(t)
+	result, err := builder.RouteBoard(designAPIRoutingRequest(), RouteBoardOptions{DryRun: true})
+	if err != nil {
+		t.Fatalf("RouteBoard returned error: %v", err)
+	}
+	if result.Status != routing.StatusRouted {
+		t.Fatalf("status = %s issues = %#v", result.Status, result.Issues)
+	}
+	if len(builder.Design().PCB.Tracks) != 0 {
+		t.Fatalf("tracks = %#v, want dry-run to leave PCB untouched", builder.Design().PCB.Tracks)
+	}
+}
+
+func designAPIRoutingRequest() routing.Request {
+	return routing.Request{
+		Board: routing.Board{WidthMM: 30, HeightMM: 20, Layers: []routing.Layer{{Name: "F.Cu", Kind: routing.LayerCopper, Routable: true}}},
+		Components: []routing.Component{
+			{Ref: "J1", Position: routing.Placement{XMM: 5, YMM: 10, Layer: "F.Cu"}, Pads: []routing.Pad{{Name: "1", Net: "SIG", Shape: routing.PadCircle, Type: routing.PadSMD, Size: routing.Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"}}}},
+			{Ref: "J2", Position: routing.Placement{XMM: 20, YMM: 10, Layer: "F.Cu"}, Pads: []routing.Pad{{Name: "1", Net: "SIG", Shape: routing.PadCircle, Type: routing.PadSMD, Size: routing.Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"}}}},
+		},
+		Nets:     []routing.Net{{Name: "SIG", Endpoints: []routing.Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}}}},
+		Rules:    routing.Rules{GridMM: 1, TraceWidthMM: 0.1, ClearanceMM: 0.01, EdgeClearanceMM: 0.01},
+		Strategy: routing.Strategy{Mode: routing.ModeSingleLayer},
 	}
 }
 

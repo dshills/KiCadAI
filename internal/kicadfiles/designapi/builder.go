@@ -13,6 +13,7 @@ import (
 	"kicadai/internal/kicadfiles/project"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/kicadfiles/sexpr"
+	"kicadai/internal/routing"
 )
 
 type Builder struct {
@@ -95,6 +96,10 @@ type PadSpec struct {
 type RouteOptions struct {
 	Layer kicadfiles.BoardLayer
 	Width kicadfiles.IU
+}
+
+type RouteBoardOptions struct {
+	DryRun bool
 }
 
 type ZoneOptions struct {
@@ -462,6 +467,72 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 	}
 	builder.syncPCBNets()
 	return RouteHandle{NetName: net.Name, Count: added}, nil
+}
+
+func (builder *Builder) RouteBoard(request routing.Request, options RouteBoardOptions) (routing.Result, error) {
+	if builder == nil {
+		return routing.Result{}, fmt.Errorf("builder required")
+	}
+	if builder.design.PCB == nil {
+		return routing.Result{}, fmt.Errorf("PCB required")
+	}
+	result := routing.RouteRequest(request)
+	if options.DryRun {
+		return result, nil
+	}
+	for _, route := range result.Routes {
+		if len(route.Segments) == 0 && len(route.Vias) == 0 {
+			continue
+		}
+		net := builder.nets.EnsureNet(route.Net)
+		for index, segment := range route.Segments {
+			start := pointFromRoutingPoint(segment.Start)
+			end := pointFromRoutingPoint(segment.End)
+			layer := boardLayerFromRouting(segment.Layer)
+			builder.design.PCB.Tracks = append(builder.design.PCB.Tracks, pcb.Track{
+				UUID:    builder.generator.New("root.pcb.route_board", route.Net, string(layer), fmt.Sprintf("%d", index), formatPoint(start), formatPoint(end)),
+				Start:   start,
+				End:     end,
+				Width:   kicadfiles.MM(segment.WidthMM),
+				Layer:   layer,
+				NetCode: net.Code,
+				NetName: net.Name,
+			})
+		}
+		for _, via := range route.Vias {
+			position := pointFromRoutingPoint(via.At)
+			layers := make([]kicadfiles.BoardLayer, 0, len(via.Layers))
+			for _, layer := range via.Layers {
+				layers = append(layers, boardLayerFromRouting(layer))
+			}
+			builder.design.PCB.Vias = append(builder.design.PCB.Vias, pcb.Via{
+				UUID:     builder.generator.New("root.pcb.route_board.via", route.Net, formatPoint(position), formatLayers(layers)),
+				Position: position,
+				Size:     kicadfiles.MM(via.DiameterMM),
+				Drill:    kicadfiles.MM(via.DrillMM),
+				NetCode:  net.Code,
+				NetName:  net.Name,
+				Layers:   layers,
+			})
+		}
+	}
+	builder.syncPCBNets()
+	return result, nil
+}
+
+func pointFromRoutingPoint(point routing.Point) kicadfiles.Point {
+	return kicadfiles.Point{X: kicadfiles.MM(point.XMM), Y: kicadfiles.MM(point.YMM)}
+}
+
+func boardLayerFromRouting(layer string) kicadfiles.BoardLayer {
+	switch strings.ToUpper(strings.TrimSpace(layer)) {
+	case "F.CU":
+		return kicadfiles.LayerFCu
+	case "B.CU":
+		return kicadfiles.LayerBCu
+	default:
+		return kicadfiles.BoardLayer(strings.TrimSpace(layer))
+	}
 }
 
 func (builder *Builder) AddZone(netName string, polygon []kicadfiles.Point, options ZoneOptions) (ZoneHandle, error) {
