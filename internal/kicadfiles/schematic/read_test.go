@@ -41,6 +41,7 @@ func TestReadSchematicPreservesUnsupportedRawNode(t *testing.T) {
 		`(kicad_sch`,
 		`  (version 20260306)`,
 		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
 		`  (uuid "11111111-1111-5111-8111-111111111111")`,
 		`  (paper A4)`,
 		`  (rule_area (name "Keep") (uuid "22222222-2222-5222-8222-222222222222"))`,
@@ -64,6 +65,7 @@ func TestReadSchematicReadsEmbeddedLibSymbols(t *testing.T) {
 		`(kicad_sch`,
 		`  (version 20260306)`,
 		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
 		`  (uuid "11111111-1111-5111-8111-111111111111")`,
 		`  (paper A4)`,
 		`  (lib_symbols (symbol "Device:R" (property "Reference" "R")))`,
@@ -75,5 +77,34 @@ func TestReadSchematicReadsEmbeddedLibSymbols(t *testing.T) {
 	}
 	if len(read.LibSymbols) != 1 || read.LibSymbols[0].LibraryID != "Device:R" || len(read.LibSymbols[0].Body) == 0 {
 		t.Fatalf("unexpected lib symbols: %#v", read.LibSymbols)
+	}
+}
+
+func TestReadWriteSchematicPreservesEmbeddedLibSymbolNumerics(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (lib_symbols`,
+		`    (symbol "Device:R"`,
+		`      (pin passive line (at 0 1.27 0) (length 2.54) (name "~") (number "1"))`,
+		`    )`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "(at 0 1.27 0)") || !strings.Contains(output, "(length 2.54)") {
+		t.Fatalf("embedded symbol numerics not preserved:\n%s", output)
 	}
 }

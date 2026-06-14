@@ -93,7 +93,22 @@ func (node ParsedNode) Node() Node {
 	if node.Quoted {
 		return String(node.String)
 	}
+	if canStartNumeric(node.Atom) && numericPattern.MatchString(node.Atom) {
+		return Number(node.Atom)
+	}
 	return Atom(node.Atom)
+}
+
+func canStartNumeric(value string) bool {
+	if value == "" {
+		return false
+	}
+	switch value[0] {
+	case '+', '-', '.', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return true
+	default:
+		return false
+	}
 }
 
 type sexprParser struct {
@@ -159,6 +174,8 @@ func (parser *sexprParser) parseString() (ParsedNode, error) {
 			switch esc {
 			case 'n':
 				builder.WriteByte('\n')
+			case 'r':
+				builder.WriteByte('\r')
 			case 't':
 				builder.WriteByte('\t')
 			case '"', '\\':

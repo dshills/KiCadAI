@@ -12,10 +12,11 @@ import (
 )
 
 var (
-	ErrInvalidAtom  = errors.New("invalid atom")
-	ErrInvalidFixed = errors.New("invalid fixed numeric literal")
-	ErrInvalidFloat = errors.New("invalid float")
-	ErrInvalidNode  = errors.New("invalid node")
+	ErrInvalidAtom   = errors.New("invalid atom")
+	ErrInvalidFixed  = errors.New("invalid fixed numeric literal")
+	ErrInvalidFloat  = errors.New("invalid float")
+	ErrInvalidNumber = errors.New("invalid numeric literal")
+	ErrInvalidNode   = errors.New("invalid node")
 )
 
 var (
@@ -34,6 +35,7 @@ type String string
 type Int int64
 type Float float64
 type Fixed string
+type Number string
 type Raw string
 type List []Node
 type Omit struct{}
@@ -116,6 +118,8 @@ func (r renderer) writeNode(node Node, indent int) error {
 		return err
 	case Fixed:
 		return r.writeFixed(string(value))
+	case Number:
+		return r.writeNumber(string(value))
 	case Raw:
 		raw := strings.TrimSpace(string(value))
 		if !ValidRaw(raw) {
@@ -254,6 +258,14 @@ func (r renderer) writeFixed(value string) error {
 	return err
 }
 
+func (r renderer) writeNumber(value string) error {
+	if !numericPattern.MatchString(value) {
+		return fmt.Errorf("%w: %q", ErrInvalidNumber, value)
+	}
+	_, err := io.WriteString(r.w, value)
+	return err
+}
+
 func ValidAtom(value string) bool {
 	return atomPattern.MatchString(value) && !numericPattern.MatchString(value)
 }
@@ -321,7 +333,7 @@ func listIsFlat(list List) bool {
 
 func isScalar(node Node) bool {
 	switch node.(type) {
-	case Atom, String, Int, Float, Fixed:
+	case Atom, String, Int, Float, Fixed, Number:
 		return true
 	default:
 		return false

@@ -194,6 +194,78 @@ func TestParseNestedListWithStringsAndComments(t *testing.T) {
 	}
 }
 
+func TestParsedNodeNodePreservesFixedNumericAtoms(t *testing.T) {
+	node, err := Parse([]byte(`(at 0 1.27 -5.08)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Format(node.Node())
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	want := "(at 0 1.27 -5.08)\n"
+	if got != want {
+		t.Fatalf("Format = %q, want %q", got, want)
+	}
+}
+
+func TestParsedNodeNodePreservesExponentNumericAtoms(t *testing.T) {
+	node, err := Parse([]byte(`(values 1e-3 -2.50E+4)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Format(node.Node())
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	want := "(values 1e-3 -2.50E+4)\n"
+	if got != want {
+		t.Fatalf("Format = %q, want %q", got, want)
+	}
+}
+
+func TestParsedNodeNodeRendersEmbeddedNumericList(t *testing.T) {
+	node, err := Parse([]byte(`(symbol "Device:R" (pin (at 0 1.27 0) (length 2.54)))`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := Format(node.Node())
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	if !strings.Contains(got, "(at 0 1.27 0)") || !strings.Contains(got, "(length 2.54)") {
+		t.Fatalf("Format = %q", got)
+	}
+}
+
+func TestParseStringHandlesCarriageReturnEscape(t *testing.T) {
+	node, err := Parse([]byte(`"line\rreturn"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.String != "line\rreturn" {
+		t.Fatalf("String = %q", node.String)
+	}
+	got, err := Format(node.Node())
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	want := "\"line\\rreturn\"\n"
+	if got != want {
+		t.Fatalf("Format = %q, want %q", got, want)
+	}
+}
+
+func TestParseStringPreservesUnknownEscapedCharacter(t *testing.T) {
+	node, err := Parse([]byte(`"unknown\qescape"`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if node.String != "unknownqescape" {
+		t.Fatalf("String = %q", node.String)
+	}
+}
+
 func TestParseReportsUsefulMalformedError(t *testing.T) {
 	_, err := Parse([]byte(`(kicad_pcb (version 1)`))
 	if err == nil || !strings.Contains(err.Error(), "offset") {
