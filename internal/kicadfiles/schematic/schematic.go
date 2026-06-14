@@ -252,7 +252,7 @@ type RawSchematicItem struct {
 	UUID kicadfiles.UUID
 	// Order optionally pins this raw item into the KiCad top-level item order.
 	// Zero keeps the writer's normal KiCad type/UUID ordering.
-	Order int
+	Order int64
 	// Kind is the KiCad schematic item node name, such as "bitmap" or
 	// "rule_area". When omitted, the writer infers it from Body. Body must be
 	// a comment-free S-expression fragment whose UUID matches UUID.
@@ -314,11 +314,14 @@ const (
 	schematicItemUnknownRaw        schematicItemKind = 10000
 )
 
-const schematicHeaderNodeCapacity = 8
+const (
+	schematicHeaderNodeCapacity = 8
+	schematicItemOrderStride    = 1_000_000
+)
 
 type renderItem struct {
 	kind  schematicItemKind
-	order int
+	order int64
 	uuid  kicadfiles.UUID
 	node  sexpr.Node
 }
@@ -722,12 +725,12 @@ func renderItems(schematic SchematicFile) ([]renderItem, error) {
 }
 
 func newRenderItem(kind schematicItemKind, uuid kicadfiles.UUID, node sexpr.Node) renderItem {
-	return renderItem{kind: kind, order: int(kind) * 1000, uuid: uuid, node: node}
+	return renderItem{kind: kind, order: int64(kind) * schematicItemOrderStride, uuid: uuid, node: node}
 }
 
-func newRawRenderItem(kind schematicItemKind, order int, uuid kicadfiles.UUID, node sexpr.Node) renderItem {
+func newRawRenderItem(kind schematicItemKind, order int64, uuid kicadfiles.UUID, node sexpr.Node) renderItem {
 	if order <= 0 {
-		order = int(kind) * 1000
+		order = int64(kind) * schematicItemOrderStride
 	}
 	return renderItem{kind: kind, order: order, uuid: uuid, node: node}
 }

@@ -70,7 +70,9 @@ func Read(data []byte) (SchematicFile, error) {
 			file.Sheets = append(file.Sheets, readSheet(child))
 		case "lib_symbols":
 			file.LibSymbols = readLibSymbols(child)
-		case "version", "generator", "generator_version", "uuid", "paper", "title_block", "sheet_instances":
+		case "sheet_instances":
+			file.SheetInstances = readRootSheetInstances(child)
+		case "version", "generator", "generator_version", "uuid", "paper", "title_block":
 		default:
 			if child.Head() != "" {
 				file.RawItems = append(file.RawItems, rawItem(child, i))
@@ -82,6 +84,13 @@ func Read(data []byte) (SchematicFile, error) {
 
 func readSheet(node sexpr.ParsedNode) Sheet {
 	sheet := Sheet{UUID: readUUID(node), Position: readAtPoint(node)}
+	if size, ok := node.Child("size"); ok {
+		x, xOK := size.FloatValue(1)
+		y, yOK := size.FloatValue(2)
+		if xOK && yOK {
+			sheet.Size = kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+		}
+	}
 	for _, property := range node.ChildrenByHead("property") {
 		if len(property.Children) < 3 {
 			continue
@@ -95,7 +104,70 @@ func readSheet(node sexpr.ParsedNode) Sheet {
 			sheet.Filename = prop.Value
 		}
 	}
+	for _, pin := range node.ChildrenByHead("pin") {
+		if sheetPin, ok := readSheetPin(pin); ok {
+			sheet.Pins = append(sheet.Pins, sheetPin)
+		}
+	}
+	if instances, ok := node.Child("instances"); ok {
+		sheet.Instances = readNestedSheetInstances(instances)
+	}
 	return sheet
+}
+
+func readSheetPin(node sexpr.ParsedNode) (SheetPin, bool) {
+	text := node.ListValue(1)
+	kind := SheetPinKind(node.ListValue(2))
+	if text == "" || kind == "" {
+		return SheetPin{}, false
+	}
+	pin := SheetPin{
+		Text: text,
+		Kind: kind,
+		UUID: readUUID(node),
+	}
+	if at, ok := node.Child("at"); ok {
+		x, xOK := at.FloatValue(1)
+		y, yOK := at.FloatValue(2)
+		if xOK && yOK {
+			pin.Position = kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+		}
+		if rotation, ok := at.FloatValue(3); ok {
+			pin.Rotation = kicadfiles.Angle(rotation)
+		}
+	}
+	return pin, true
+}
+
+func readRootSheetInstances(node sexpr.ParsedNode) []SheetInstance {
+	var instances []SheetInstance
+	for _, pathNode := range node.ChildrenByHead("path") {
+		instances = append(instances, readSheetInstancePath("", pathNode))
+	}
+	return instances
+}
+
+func readNestedSheetInstances(node sexpr.ParsedNode) []SheetInstance {
+	var instances []SheetInstance
+	for _, project := range node.ChildrenByHead("project") {
+		projectName := project.ListValue(1)
+		for _, pathNode := range project.ChildrenByHead("path") {
+			instances = append(instances, readSheetInstancePath(projectName, pathNode))
+		}
+	}
+	return instances
+}
+
+func readSheetInstancePath(project string, node sexpr.ParsedNode) SheetInstance {
+	path := node.ListValue(1)
+	if path == "" {
+		return SheetInstance{Project: project}
+	}
+	instance := SheetInstance{Project: project, Path: path}
+	if page, ok := node.Child("page"); ok {
+		instance.Page = page.ListValue(1)
+	}
+	return instance
 }
 
 func readLibSymbols(node sexpr.ParsedNode) []EmbeddedSymbol {
@@ -138,7 +210,13 @@ func readLabel(node sexpr.ParsedNode, kind LabelKind) Label {
 }
 
 func rawItem(node sexpr.ParsedNode, order int) RawSchematicItem {
-	return RawSchematicItem{UUID: readUUID(node), Order: order, Kind: RawSchematicItemKind(node.Head()), Body: sexpr.Raw(strings.TrimSpace(node.Raw))}
+	kindName := RawSchematicItemKind(node.Head())
+	kind, ok := rawSchematicItemKind(kindName)
+	sortOrder := int64(order)
+	if ok {
+		sortOrder = int64(kind)*schematicItemOrderStride + int64(order)
+	}
+	return RawSchematicItem{UUID: readUUID(node), Order: sortOrder, Kind: kindName, Body: sexpr.Raw(strings.TrimSpace(node.Raw))}
 }
 
 func readUUID(node sexpr.ParsedNode) kicadfiles.UUID {

@@ -346,7 +346,7 @@ func TestWritePreservesRawSchematicItemsWithExplicitOrder(t *testing.T) {
 	}}
 	schematic.RawItems = []RawSchematicItem{{
 		UUID:  kicadfiles.UUID("77777777-7777-4777-8777-777777777777"),
-		Order: int(schematicItemSymbol)*1000 - 1,
+		Order: int64(schematicItemSymbol)*schematicItemOrderStride - 1,
 		Body:  sexpr.Raw(`(future_widget (uuid "77777777-7777-4777-8777-777777777777") (value "before symbol"))`),
 	}}
 
