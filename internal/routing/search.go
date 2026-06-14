@@ -9,16 +9,18 @@ import (
 )
 
 type GridPath struct {
-	Net         string      `json:"net"`
-	Layer       string      `json:"layer"`
-	Coordinates []GridCoord `json:"coordinates"`
-	Points      []Point     `json:"points"`
-	SearchNodes int         `json:"search_nodes"`
+	Net         string         `json:"net"`
+	Layer       string         `json:"layer"`
+	LayerNames  map[int]string `json:"layer_names,omitempty"`
+	Coordinates []GridCoord    `json:"coordinates"`
+	Points      []Point        `json:"points"`
+	SearchNodes int            `json:"search_nodes"`
 }
 
 type astarState struct {
 	Coord GridCoord
 	Dir   int
+	Vias  int
 }
 
 type astarNode struct {
@@ -76,6 +78,61 @@ func routeSingleLayerPath(request Request, access PadAccess, occupancy Occupancy
 	return GridPath{
 		Net:         netName,
 		Layer:       normalizedLayer,
+		LayerNames:  map[int]string{layerIndex: normalizedLayer},
+		Coordinates: path,
+		Points:      points,
+		SearchNodes: searchNodes,
+	}, nil
+}
+
+func routeTwoLayerPath(request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
+	layers := normalizedSearchLayers(request.Board.Layers)
+	rules := normalizedSearchRules(request.Rules)
+	if rules.AllowVias != nil && !*rules.AllowVias {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "vias are not allowed")}
+	}
+	layerIndexes, err := LayerIndexes(layers)
+	if err != nil {
+		return GridPath{}, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityBlocked,
+			Path:     "board.layers",
+			Message:  err.Error(),
+			Nets:     []string{netName},
+		}}
+	}
+	routable := routableLayerNames(layers)
+	if rules.AllowBackLayer != nil && !*rules.AllowBackLayer {
+		routable = []string{normalizeLayer(rules.PreferLayer)}
+	}
+	layerNames := map[int]string{}
+	layerIDs := []int{}
+	for _, layerName := range routable {
+		index, ok := layerIndexes[normalizeLayer(layerName)]
+		if !ok || occupancy.Layers[index] == nil {
+			continue
+		}
+		layerIDs = append(layerIDs, index)
+		layerNames[index] = normalizeLayer(layerName)
+	}
+	sort.Ints(layerIDs)
+	starts := accessCoordsOnLayers(access, occupancy.Grid, pair.From, layerIndexes, layerNames)
+	targets := accessCoordsOnLayers(access, occupancy.Grid, pair.To, layerIndexes, layerNames)
+	if len(layerIDs) == 0 || len(starts) == 0 || len(targets) == 0 {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no two-layer routing access")}
+	}
+	path, searchNodes, found := astarSearchMultiLayer(occupancy, starts, targets, rules, layerIDs, true)
+	if !found {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "no legal two-layer path found")}
+	}
+	points := make([]Point, 0, len(path))
+	for _, coord := range path {
+		points = append(points, occupancy.Grid.ToPoint(coord))
+	}
+	return GridPath{
+		Net:         netName,
+		Layer:       layerNames[path[0].Layer],
+		LayerNames:  layerNames,
 		Coordinates: path,
 		Points:      points,
 		SearchNodes: searchNodes,
@@ -83,6 +140,10 @@ func routeSingleLayerPath(request Request, access PadAccess, occupancy Occupancy
 }
 
 func astarSearch(occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool) {
+	return astarSearchMultiLayer(occupancy, starts, targets, rules, []int{layerIndex}, false)
+}
+
+func astarSearchMultiLayer(occupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool) ([]GridCoord, int, bool) {
 	targetSet := make(map[GridCoord]struct{}, len(targets))
 	allowedBlocked := make(map[GridCoord]struct{}, len(starts)+len(targets))
 	for _, target := range targets {
@@ -94,8 +155,11 @@ func astarSearch(occupancy Occupancy, layerIndex int, starts []GridCoord, target
 	}
 	gridStepMM := normalizedGridStepMM(occupancy.Grid.GridMM)
 	turnPenaltyMM := gridStepMM * 0.15
+	viaCostMM := rules.ViaDiameterMM + gridStepMM
+	if viaCostMM <= 0 || math.IsNaN(viaCostMM) || math.IsInf(viaCostMM, 0) {
+		viaCostMM = DefaultRules().ViaDiameterMM + gridStepMM
+	}
 	heuristic := newTargetHeuristic(targets, gridStepMM)
-	sortGridCoords(starts)
 	open := astarQueue{}
 	heap.Init(&open)
 	cameFrom := map[astarState]astarState{}
@@ -130,7 +194,7 @@ func astarSearch(occupancy Occupancy, layerIndex int, starts []GridCoord, target
 		if _, ok := targetSet[current.Coord]; ok {
 			return reconstructGridPath(current, cameFrom), searchNodes, true
 		}
-		for _, neighbor := range orthogonalNeighbors(current, layerIndex) {
+		for _, neighbor := range orthogonalNeighbors(current) {
 			if !routableCell(occupancy, neighbor.Coord, allowedBlocked) {
 				continue
 			}
@@ -147,6 +211,34 @@ func astarSearch(occupancy Occupancy, layerIndex int, starts []GridCoord, target
 				Sequence: sequence,
 			})
 			sequence++
+		}
+		if allowVias && current.Vias < rules.MaxViasPerNet {
+			for _, layerIndex := range layerIndexes {
+				if layerIndex == current.Coord.Layer {
+					continue
+				}
+				neighbor := astarState{
+					Coord: GridCoord{X: current.Coord.X, Y: current.Coord.Y, Layer: layerIndex},
+					Dir:   routeDirNone,
+					Vias:  current.Vias + 1,
+				}
+				if !routableCell(occupancy, neighbor.Coord, allowedBlocked) {
+					continue
+				}
+				tentative := currentNode.G + viaCostMM
+				if existing, ok := bestCost[neighbor]; ok && !distanceLess(tentative, existing) {
+					continue
+				}
+				bestCost[neighbor] = tentative
+				cameFrom[neighbor] = current
+				heap.Push(&open, &astarNode{
+					State:    neighbor,
+					G:        tentative,
+					F:        tentative + heuristic.estimate(neighbor.Coord),
+					Sequence: sequence,
+				})
+				sequence++
+			}
 		}
 	}
 	return nil, searchNodes, false
@@ -174,6 +266,32 @@ func accessCoordsOnLayer(access PadAccess, grid Grid, endpoint Endpoint, layerNa
 	return coords
 }
 
+func accessCoordsOnLayers(access PadAccess, grid Grid, endpoint Endpoint, layerIndexes map[string]int, layerNames map[int]string) []GridCoord {
+	points, ok := AccessPointsForEndpoint(access, endpoint)
+	if !ok {
+		return nil
+	}
+	coords := []GridCoord{}
+	seen := map[GridCoord]struct{}{}
+	for _, point := range points {
+		layerIndex, ok := layerIndexes[normalizeLayer(point.Layer)]
+		if !ok {
+			continue
+		}
+		if _, allowed := layerNames[layerIndex]; !allowed {
+			continue
+		}
+		coord := grid.ToGrid(point.Point, layerIndex)
+		if _, exists := seen[coord]; exists {
+			continue
+		}
+		seen[coord] = struct{}{}
+		coords = append(coords, coord)
+	}
+	sortGridCoords(coords)
+	return coords
+}
+
 func sortGridCoords(coords []GridCoord) {
 	sort.Slice(coords, func(i int, j int) bool {
 		if coords[i].Layer != coords[j].Layer {
@@ -186,14 +304,15 @@ func sortGridCoords(coords []GridCoord) {
 	})
 }
 
-func orthogonalNeighbors(state astarState, layerIndex int) [4]astarState {
+func orthogonalNeighbors(state astarState) [4]astarState {
 	x := state.Coord.X
 	y := state.Coord.Y
+	layerIndex := state.Coord.Layer
 	return [4]astarState{
-		{Coord: GridCoord{X: x + 1, Y: y, Layer: layerIndex}, Dir: routeDirEast},
-		{Coord: GridCoord{X: x - 1, Y: y, Layer: layerIndex}, Dir: routeDirWest},
-		{Coord: GridCoord{X: x, Y: y + 1, Layer: layerIndex}, Dir: routeDirSouth},
-		{Coord: GridCoord{X: x, Y: y - 1, Layer: layerIndex}, Dir: routeDirNorth},
+		{Coord: GridCoord{X: x + 1, Y: y, Layer: layerIndex}, Dir: routeDirEast, Vias: state.Vias},
+		{Coord: GridCoord{X: x - 1, Y: y, Layer: layerIndex}, Dir: routeDirWest, Vias: state.Vias},
+		{Coord: GridCoord{X: x, Y: y + 1, Layer: layerIndex}, Dir: routeDirSouth, Vias: state.Vias},
+		{Coord: GridCoord{X: x, Y: y - 1, Layer: layerIndex}, Dir: routeDirNorth, Vias: state.Vias},
 	}
 }
 
@@ -314,6 +433,15 @@ func normalizedSearchRules(rules Rules) Rules {
 	defaults := DefaultRules()
 	if rules.MaxSearchNodes == 0 {
 		rules.MaxSearchNodes = defaults.MaxSearchNodes
+	}
+	if rules.MaxViasPerNet == 0 {
+		rules.MaxViasPerNet = defaults.MaxViasPerNet
+	}
+	if rules.ViaDiameterMM == 0 {
+		rules.ViaDiameterMM = defaults.ViaDiameterMM
+	}
+	if rules.ViaDrillMM == 0 {
+		rules.ViaDrillMM = defaults.ViaDrillMM
 	}
 	return rules
 }
