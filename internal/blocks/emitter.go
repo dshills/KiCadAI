@@ -36,7 +36,7 @@ func NewReferenceAllocator() *ReferenceAllocator {
 }
 
 func NewInstanceReferenceAllocator(instanceID string) *ReferenceAllocator {
-	token := fmt.Sprintf("%04x", uint16(crc32.ChecksumIEEE([]byte(instanceID))))
+	token := fmt.Sprintf("%08x", crc32.ChecksumIEEE([]byte(instanceID)))
 	return &ReferenceAllocator{state: &referenceAllocatorState{token: token, next: map[string]int{}}}
 }
 

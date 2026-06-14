@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -88,6 +89,27 @@ func TestProjectTransactionReportsMalformedConnect(t *testing.T) {
 	}, false)
 	if err == nil {
 		t.Fatal("expected malformed connect error")
+	}
+}
+
+func TestProjectTransactionRejectsDuplicateBlockRefs(t *testing.T) {
+	_, err := ProjectTransactionForBlockOutput("bad", BlockOutput{
+		Instance: BlockInstance{InstanceID: "status", Refs: []string{"R1", "R1"}},
+	}, false)
+	if err == nil || !strings.Contains(err.Error(), "duplicate generated reference R1") {
+		t.Fatalf("expected duplicate ref error, got %v", err)
+	}
+}
+
+func TestProjectTransactionRejectsDuplicateCompositionRefs(t *testing.T) {
+	_, err := ProjectTransactionForCompositionOutput("bad", CompositionOutput{
+		Instances: []BlockInstance{
+			{InstanceID: "left", Refs: []string{"R1"}},
+			{InstanceID: "right", Refs: []string{"R1"}},
+		},
+	}, false)
+	if err == nil || !strings.Contains(err.Error(), "left and right") {
+		t.Fatalf("expected duplicate composition ref error, got %v", err)
 	}
 }
 

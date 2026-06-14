@@ -26,6 +26,17 @@ func TestInstanceReferenceAllocatorAvoidsInstanceCollisions(t *testing.T) {
 	}
 }
 
+func TestInstanceReferenceAllocatorAvoidsOldTruncatedCRCCollision(t *testing.T) {
+	first := NewInstanceReferenceAllocator("inst4").Next("J")
+	second := NewInstanceReferenceAllocator("inst1670").Next("J")
+	if first == second {
+		t.Fatalf("refs collided under widened token: %s", first)
+	}
+	if !strings.HasPrefix(first, "Jb5a9fc5f") || !strings.HasPrefix(second, "J2e44fc5f") {
+		t.Fatalf("unexpected widened refs: %s %s", first, second)
+	}
+}
+
 func TestInstanceNetNameIsDeterministic(t *testing.T) {
 	if got := InstanceNetName("led 1", "signal-out"); got != "led_1_signal_out" {
 		t.Fatalf("net = %q", got)

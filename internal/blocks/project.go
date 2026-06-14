@@ -9,17 +9,32 @@ import (
 const DefaultGeneratedProjectName = "generated_blocks"
 
 func ProjectTransactionForBlockOutput(projectName string, output BlockOutput, overwrite bool) (transactions.Transaction, error) {
-	refs := map[string]struct{}{}
+	refs := make(map[string]struct{}, len(output.Instance.Refs))
 	for _, ref := range output.Instance.Refs {
+		if _, exists := refs[ref]; exists {
+			return transactions.Transaction{}, fmt.Errorf("duplicate generated reference %s in instance %s", ref, output.Instance.InstanceID)
+		}
 		refs[ref] = struct{}{}
 	}
 	return projectTransaction(projectName, output.Operations, refs, overwrite)
 }
 
 func ProjectTransactionForCompositionOutput(projectName string, output CompositionOutput, overwrite bool) (transactions.Transaction, error) {
-	refs := map[string]struct{}{}
+	refCount := 0
+	for _, instance := range output.Instances {
+		refCount += len(instance.Refs)
+	}
+	refs := make(map[string]struct{}, refCount)
+	owners := make(map[string]string, refCount)
 	for _, instance := range output.Instances {
 		for _, ref := range instance.Refs {
+			if owner, exists := owners[ref]; exists {
+				if owner == instance.InstanceID {
+					return transactions.Transaction{}, fmt.Errorf("duplicate generated reference %s within instance %s", ref, owner)
+				}
+				return transactions.Transaction{}, fmt.Errorf("duplicate generated reference %s in instances %s and %s", ref, owner, instance.InstanceID)
+			}
+			owners[ref] = instance.InstanceID
 			refs[ref] = struct{}{}
 		}
 	}
