@@ -25,6 +25,32 @@ Two of these round-trip failures are **Critical** (they make `Write` return an e
 
 ---
 
+## Resolution tracking
+
+| Finding | Status | Fix Commit | Regression Test |
+|---|---|---|---|
+| C1 | fixed | `a2417d0` | S-expression numeric/lib-symbol round-trip tests |
+| C2 | fixed | `964e2af` | schematic sheet read/write tests |
+| H1 | fixed | `3484530` | PCB reader geometry preservation tests |
+| H2 | fixed | `a2417d0` | string escape round-trip tests |
+| H3 | fixed | `7b4eaa3` | imported project atomic write failure test |
+| H4 | fixed | `0a2a09d` | IPC post-send cancellation tests |
+| H5 | fixed | `0f61ddb` | block reference collision tests |
+| M1 | fixed | `288892c` | fixed placement collision tests |
+| M2 | fixed | `288892c` | physical board-edge placement tests |
+| M3 | fixed | `288892c` | empty breakout connector ground-zone test |
+| M4 | fixed | `288892c` | footprint stale-pad removal test |
+| M5 | fixed | `964e2af` | raw schematic item ordering tests |
+| M6 | fixed | `3484530` | zone net name/code preservation tests |
+| M7 | fixed | `3484530` | PCB connectivity false-positive regression tests |
+| M8 | fixed | `5491737` | CLI/config tests and `make lint` |
+| M9 | fixed | `5491737` | library resolver tests |
+| M10 | planned | `041e24e` | schematic/package refactor follow-up plan |
+| Low cleanup subset | fixed | `5491737` | `make lint` |
+| Large package/CLI/block refactors | planned | `041e24e` | follow-up plans under `specs/refactor-followups/` |
+
+---
+
 ## Critical
 
 ### C1 — Embedded `lib_symbols` cache cannot round-trip; `Write` fails after `Read`
