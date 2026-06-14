@@ -1,0 +1,359 @@
+package routing
+
+import (
+	"container/heap"
+	"math"
+	"sort"
+
+	"kicadai/internal/reports"
+)
+
+type GridPath struct {
+	Net         string      `json:"net"`
+	Layer       string      `json:"layer"`
+	Coordinates []GridCoord `json:"coordinates"`
+	Points      []Point     `json:"points"`
+	SearchNodes int         `json:"search_nodes"`
+}
+
+type astarState struct {
+	Coord GridCoord
+	Dir   int
+}
+
+type astarNode struct {
+	State    astarState
+	G        float64
+	F        float64
+	Sequence int
+}
+
+type astarQueue []*astarNode
+
+const (
+	routeDirNone = iota
+	routeDirEast
+	routeDirWest
+	routeDirSouth
+	routeDirNorth
+)
+
+func routeSingleLayerPath(request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair, layerName string) (GridPath, []reports.Issue) {
+	layers := normalizedSearchLayers(request.Board.Layers)
+	rules := normalizedSearchRules(request.Rules)
+	layerIndexes, err := LayerIndexes(layers)
+	if err != nil {
+		return GridPath{}, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityBlocked,
+			Path:     "board.layers",
+			Message:  err.Error(),
+			Nets:     []string{netName},
+		}}
+	}
+	normalizedLayer := normalizeLayer(layerName)
+	layerIndex, ok := layerIndexes[normalizedLayer]
+	if !ok {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "routing layer is not available")}
+	}
+	layerGrid := occupancy.Layers[layerIndex]
+	if layerGrid == nil {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "routing layer has no occupancy grid")}
+	}
+	starts := accessCoordsOnLayer(access, occupancy.Grid, pair.From, normalizedLayer, layerIndex)
+	targets := accessCoordsOnLayer(access, occupancy.Grid, pair.To, normalizedLayer, layerIndex)
+	if len(starts) == 0 || len(targets) == 0 {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no access points on routing layer")}
+	}
+	path, searchNodes, found := astarSearch(occupancy, layerIndex, starts, targets, rules)
+	if !found {
+		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "no legal single-layer path found")}
+	}
+	points := make([]Point, 0, len(path))
+	for _, coord := range path {
+		points = append(points, occupancy.Grid.ToPoint(coord))
+	}
+	return GridPath{
+		Net:         netName,
+		Layer:       normalizedLayer,
+		Coordinates: path,
+		Points:      points,
+		SearchNodes: searchNodes,
+	}, nil
+}
+
+func astarSearch(occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool) {
+	targetSet := make(map[GridCoord]struct{}, len(targets))
+	allowedBlocked := make(map[GridCoord]struct{}, len(starts)+len(targets))
+	for _, target := range targets {
+		targetSet[target] = struct{}{}
+		allowedBlocked[target] = struct{}{}
+	}
+	for _, start := range starts {
+		allowedBlocked[start] = struct{}{}
+	}
+	gridStepMM := normalizedGridStepMM(occupancy.Grid.GridMM)
+	turnPenaltyMM := gridStepMM * 0.15
+	heuristic := newTargetHeuristic(targets, gridStepMM)
+	sortGridCoords(starts)
+	open := astarQueue{}
+	heap.Init(&open)
+	cameFrom := map[astarState]astarState{}
+	bestCost := map[astarState]float64{}
+	sequence := 0
+	for _, start := range starts {
+		if !routableCell(occupancy, start, allowedBlocked) {
+			continue
+		}
+		state := astarState{Coord: start, Dir: routeDirNone}
+		bestCost[state] = 0
+		heap.Push(&open, &astarNode{
+			State:    state,
+			G:        0,
+			F:        heuristic.estimate(start),
+			Sequence: sequence,
+		})
+		sequence++
+	}
+	searchNodes := 0
+	maxNodes := rules.MaxSearchNodes
+	for open.Len() > 0 {
+		if searchNodes >= maxNodes {
+			return nil, searchNodes, false
+		}
+		currentNode := heap.Pop(&open).(*astarNode)
+		current := currentNode.State
+		if known, ok := bestCost[current]; ok && currentNode.G > known+distanceEpsilon {
+			continue
+		}
+		searchNodes++
+		if _, ok := targetSet[current.Coord]; ok {
+			return reconstructGridPath(current, cameFrom), searchNodes, true
+		}
+		for _, neighbor := range orthogonalNeighbors(current, layerIndex) {
+			if !routableCell(occupancy, neighbor.Coord, allowedBlocked) {
+				continue
+			}
+			tentative := currentNode.G + movementCost(current.Dir, neighbor.Dir, gridStepMM, turnPenaltyMM)
+			if existing, ok := bestCost[neighbor]; ok && !distanceLess(tentative, existing) {
+				continue
+			}
+			bestCost[neighbor] = tentative
+			cameFrom[neighbor] = current
+			heap.Push(&open, &astarNode{
+				State:    neighbor,
+				G:        tentative,
+				F:        tentative + heuristic.estimate(neighbor.Coord),
+				Sequence: sequence,
+			})
+			sequence++
+		}
+	}
+	return nil, searchNodes, false
+}
+
+func accessCoordsOnLayer(access PadAccess, grid Grid, endpoint Endpoint, layerName string, layerIndex int) []GridCoord {
+	points, ok := AccessPointsForEndpoint(access, endpoint)
+	if !ok {
+		return nil
+	}
+	coords := []GridCoord{}
+	seen := map[GridCoord]struct{}{}
+	for _, point := range points {
+		if normalizeLayer(point.Layer) != layerName {
+			continue
+		}
+		coord := grid.ToGrid(point.Point, layerIndex)
+		if _, exists := seen[coord]; exists {
+			continue
+		}
+		seen[coord] = struct{}{}
+		coords = append(coords, coord)
+	}
+	sortGridCoords(coords)
+	return coords
+}
+
+func sortGridCoords(coords []GridCoord) {
+	sort.Slice(coords, func(i int, j int) bool {
+		if coords[i].Layer != coords[j].Layer {
+			return coords[i].Layer < coords[j].Layer
+		}
+		if coords[i].X != coords[j].X {
+			return coords[i].X < coords[j].X
+		}
+		return coords[i].Y < coords[j].Y
+	})
+}
+
+func orthogonalNeighbors(state astarState, layerIndex int) [4]astarState {
+	x := state.Coord.X
+	y := state.Coord.Y
+	return [4]astarState{
+		{Coord: GridCoord{X: x + 1, Y: y, Layer: layerIndex}, Dir: routeDirEast},
+		{Coord: GridCoord{X: x - 1, Y: y, Layer: layerIndex}, Dir: routeDirWest},
+		{Coord: GridCoord{X: x, Y: y + 1, Layer: layerIndex}, Dir: routeDirSouth},
+		{Coord: GridCoord{X: x, Y: y - 1, Layer: layerIndex}, Dir: routeDirNorth},
+	}
+}
+
+func routableCell(occupancy Occupancy, coord GridCoord, allowedBlocked map[GridCoord]struct{}) bool {
+	layer := occupancy.Layers[coord.Layer]
+	if layer == nil {
+		return false
+	}
+	point := gridPoint{X: coord.X, Y: coord.Y}
+	if _, ok := layer.index(point); !ok {
+		return false
+	}
+	if _, ok := allowedBlocked[coord]; ok {
+		return true
+	}
+	return !occupancy.BlockedCell(coord)
+}
+
+func movementCost(fromDir int, toDir int, gridMM float64, turnPenaltyMM float64) float64 {
+	cost := gridMM
+	if fromDir != routeDirNone && fromDir != toDir {
+		cost += turnPenaltyMM
+	}
+	return cost
+}
+
+type targetHeuristic struct {
+	MinX   int
+	MaxX   int
+	MinY   int
+	MaxY   int
+	GridMM float64
+}
+
+func newTargetHeuristic(targets []GridCoord, gridMM float64) targetHeuristic {
+	if len(targets) == 0 {
+		return targetHeuristic{GridMM: normalizedGridStepMM(gridMM)}
+	}
+	heuristic := targetHeuristic{
+		MinX:   targets[0].X,
+		MaxX:   targets[0].X,
+		MinY:   targets[0].Y,
+		MaxY:   targets[0].Y,
+		GridMM: gridMM,
+	}
+	for _, target := range targets[1:] {
+		heuristic.MinX = min(heuristic.MinX, target.X)
+		heuristic.MaxX = max(heuristic.MaxX, target.X)
+		heuristic.MinY = min(heuristic.MinY, target.Y)
+		heuristic.MaxY = max(heuristic.MaxY, target.Y)
+	}
+	heuristic.GridMM = normalizedGridStepMM(heuristic.GridMM)
+	return heuristic
+}
+
+func normalizedGridStepMM(gridMM float64) float64 {
+	if gridMM <= 0 || math.IsNaN(gridMM) || math.IsInf(gridMM, 0) {
+		return DefaultRules().GridMM
+	}
+	return gridMM
+}
+
+func (heuristic targetHeuristic) estimate(coord GridCoord) float64 {
+	dx := 0
+	if coord.X < heuristic.MinX {
+		dx = heuristic.MinX - coord.X
+	} else if coord.X > heuristic.MaxX {
+		dx = coord.X - heuristic.MaxX
+	}
+	dy := 0
+	if coord.Y < heuristic.MinY {
+		dy = heuristic.MinY - coord.Y
+	} else if coord.Y > heuristic.MaxY {
+		dy = coord.Y - heuristic.MaxY
+	}
+	return float64(dx+dy) * heuristic.GridMM
+}
+
+func reconstructGridPath(current astarState, cameFrom map[astarState]astarState) []GridCoord {
+	path := []GridCoord{current.Coord}
+	for {
+		previous, ok := cameFrom[current]
+		if !ok {
+			break
+		}
+		current = previous
+		path = append(path, current.Coord)
+	}
+	for i, j := 0, len(path)-1; i < j; i, j = i+1, j-1 {
+		path[i], path[j] = path[j], path[i]
+	}
+	return path
+}
+
+func routeFailureIssue(netName string, pair EndpointPair, message string) reports.Issue {
+	return reports.Issue{
+		Code:       reports.CodeValidationFailed,
+		Severity:   reports.SeverityBlocked,
+		Path:       "nets." + netName,
+		Message:    message,
+		Refs:       []string{pair.From.Ref, pair.To.Ref},
+		Nets:       []string{netName},
+		Suggestion: "move components, reduce clearance, or allow another routing layer",
+	}
+}
+
+func normalizedSearchLayers(layers []Layer) []Layer {
+	if len(layers) != 0 {
+		return layers
+	}
+	return []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+}
+
+func normalizedSearchRules(rules Rules) Rules {
+	defaults := DefaultRules()
+	if rules.MaxSearchNodes == 0 {
+		rules.MaxSearchNodes = defaults.MaxSearchNodes
+	}
+	return rules
+}
+
+func (queue astarQueue) Len() int {
+	return len(queue)
+}
+
+func (queue astarQueue) Less(i int, j int) bool {
+	if !distanceEqual(queue[i].F, queue[j].F) {
+		return queue[i].F < queue[j].F
+	}
+	if !distanceEqual(queue[i].G, queue[j].G) {
+		return queue[i].G > queue[j].G
+	}
+	if queue[i].State.Coord.X != queue[j].State.Coord.X {
+		return queue[i].State.Coord.X < queue[j].State.Coord.X
+	}
+	if queue[i].State.Coord.Y != queue[j].State.Coord.Y {
+		return queue[i].State.Coord.Y < queue[j].State.Coord.Y
+	}
+	if queue[i].State.Dir != queue[j].State.Dir {
+		return queue[i].State.Dir < queue[j].State.Dir
+	}
+	return queue[i].Sequence < queue[j].Sequence
+}
+
+func (queue astarQueue) Swap(i int, j int) {
+	queue[i], queue[j] = queue[j], queue[i]
+}
+
+func (queue *astarQueue) Push(value any) {
+	node := value.(*astarNode)
+	*queue = append(*queue, node)
+}
+
+func (queue *astarQueue) Pop() any {
+	old := *queue
+	last := old[len(old)-1]
+	old[len(old)-1] = nil
+	*queue = old[:len(old)-1]
+	return last
+}
