@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/libraryresolver"
@@ -34,6 +35,57 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}
+	}
+}
+
+func TestWriteImportedProjectDoesNotPartiallyReplaceOnRenderFailure(t *testing.T) {
+	root := t.TempDir()
+	base := "demo"
+	schematicPath := filepath.Join(root, base+".kicad_sch")
+	pcbPath := filepath.Join(root, base+".kicad_pcb")
+	oldSchematic := []byte("old schematic")
+	oldPCB := []byte("old pcb")
+	if err := os.WriteFile(schematicPath, oldSchematic, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(pcbPath, oldPCB, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	design := kicaddesign.Design{
+		Schematic: &schematic.SchematicFile{
+			Version:          kicadfiles.KiCadSchematicFormatV20260306,
+			Generator:        "eeschema",
+			GeneratorVersion: "10.0",
+			UUID:             kicadfiles.UUID("11111111-1111-5111-8111-111111111111"),
+			Paper:            kicadfiles.Paper{Name: "A4"},
+		},
+		PCB: &pcb.PCBFile{
+			Version:          kicadfiles.KiCadPCBFormatV20260206,
+			Generator:        "pcbnew",
+			GeneratorVersion: "10.0",
+			General:          pcb.DefaultGeneral(),
+			Paper:            kicadfiles.Paper{Name: "A4"},
+			Layers:           pcb.DefaultTwoLayerStack(),
+			Setup:            pcb.DefaultSetup(),
+			Nets:             []pcb.Net{{Code: 0, Name: ""}, {Code: 1, Name: "A"}},
+			Vias: []pcb.Via{{
+				UUID:    kicadfiles.UUID("22222222-2222-5222-8222-222222222222"),
+				NetCode: 1,
+				NetName: "A",
+				Layers:  []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+			}},
+		},
+	}
+
+	if _, err := writeImportedProject(root, base, design, true, true); err == nil {
+		t.Fatal("expected PCB render failure")
+	}
+	if got, err := os.ReadFile(schematicPath); err != nil || string(got) != string(oldSchematic) {
+		t.Fatalf("schematic changed: %q err=%v", got, err)
+	}
+	if got, err := os.ReadFile(pcbPath); err != nil || string(got) != string(oldPCB) {
+		t.Fatalf("pcb changed: %q err=%v", got, err)
 	}
 }
 
