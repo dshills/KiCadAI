@@ -56,8 +56,10 @@ func BuildPadAccess(request Request) PadAccess {
 				continue
 			}
 			pad.Ref = component.Ref
-			access.Pads[key] = pad
-			points, issues := accessPointsForPad(component.Ref, pad, routableLayers)
+			absolutePad := pad
+			absolutePad.Position = absolutePadPoint(component, pad.Position)
+			access.Pads[key] = absolutePad
+			points, issues := accessPointsForPad(component.Ref, absolutePad, routableLayers)
 			access.AccessPoints[key] = points
 			access.Issues = append(access.Issues, issues...)
 		}

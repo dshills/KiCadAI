@@ -21,7 +21,8 @@ type Rect struct {
 }
 
 type Shape struct {
-	Rect *Rect `json:"rect,omitempty"`
+	Rect    *Rect   `json:"rect,omitempty"`
+	Polygon []Point `json:"polygon,omitempty"`
 }
 
 type GridCoord struct {

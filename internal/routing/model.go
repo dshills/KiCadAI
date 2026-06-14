@@ -478,15 +478,20 @@ func Validate(request *Request) []reports.Issue {
 				issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".layer", "layer is not in board layer table"))
 			}
 		}
-		if shape.Rect == nil {
-			issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".geometry", "shape rectangle is required"))
+		if shape.Rect == nil && len(shape.Polygon) == 0 {
+			issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".geometry", "shape rectangle or polygon is required"))
 			return
 		}
-		if shape.Rect.Min.XMM > shape.Rect.Max.XMM || shape.Rect.Min.YMM > shape.Rect.Max.YMM {
-			issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".geometry.rect", "rectangle min must be less than or equal to max"))
+		if shape.Rect != nil {
+			if shape.Rect.Min.XMM > shape.Rect.Max.XMM || shape.Rect.Min.YMM > shape.Rect.Max.YMM {
+				issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".geometry.rect", "rectangle min must be less than or equal to max"))
+			}
+			validatePoint(prefix+".geometry.rect.min", shape.Rect.Min)
+			validatePoint(prefix+".geometry.rect.max", shape.Rect.Max)
 		}
-		validatePoint(prefix+".geometry.rect.min", shape.Rect.Min)
-		validatePoint(prefix+".geometry.rect.max", shape.Rect.Max)
+		for pointIndex, point := range shape.Polygon {
+			validatePoint(fmt.Sprintf("%s.geometry.polygon[%d]", prefix, pointIndex), point)
+		}
 	}
 	for index, obstacle := range request.Obstacles {
 		validateLayeredShapes(fmt.Sprintf("obstacles[%d]", index), obstacle.Layer, obstacle.Geometry)
