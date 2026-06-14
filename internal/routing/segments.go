@@ -9,7 +9,50 @@ func BuildSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Metrics) 
 	if widthMM <= 0 || math.IsNaN(widthMM) || math.IsInf(widthMM, 0) {
 		widthMM = roundMM(DefaultRules().TraceWidthMM)
 	}
-	points := simplifyPathPoints(path.Points)
+	if len(path.Coordinates) == len(path.Points) && len(path.Coordinates) > 0 && len(path.LayerNames) != 0 {
+		return buildLayeredSegmentsFromPath(path, widthMM)
+	}
+	return buildSegmentsForPoints(path.Net, path.Layer, path.Points, widthMM, path.SearchNodes)
+}
+
+func buildLayeredSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Metrics) {
+	segments := []Segment{}
+	totalLength := 0.0
+	runStart := 0
+	for index := 1; index <= len(path.Coordinates); index++ {
+		if index < len(path.Coordinates) && path.Coordinates[index].Layer == path.Coordinates[index-1].Layer {
+			continue
+		}
+		layer := layerNameForPath(path, path.Coordinates[runStart].Layer)
+		runSegments, metrics := buildSegmentsForPoints(path.Net, layer, path.Points[runStart:index], widthMM, 0)
+		segments = append(segments, runSegments...)
+		totalLength += metrics.TotalLengthMM
+		if index < len(path.Coordinates) && pointDistanceSquared(path.Points[index-1], path.Points[index]) > distanceEpsilonSquared {
+			transitionLayer := layerNameForPath(path, path.Coordinates[index-1].Layer)
+			transitionSegments, metrics := buildSegmentsForPoints(path.Net, transitionLayer, path.Points[index-1:index+1], widthMM, 0)
+			segments = append(segments, transitionSegments...)
+			totalLength += metrics.TotalLengthMM
+		}
+		runStart = index
+	}
+	return segments, Metrics{
+		SegmentCount:  len(segments),
+		TotalLengthMM: roundMM(totalLength),
+		SearchNodes:   path.SearchNodes,
+	}
+}
+
+func layerNameForPath(path GridPath, layerIndex int) string {
+	if path.LayerNames != nil {
+		if layer, ok := path.LayerNames[layerIndex]; ok && layer != "" {
+			return layer
+		}
+	}
+	return path.Layer
+}
+
+func buildSegmentsForPoints(netName string, layer string, points []Point, widthMM float64, searchNodes int) ([]Segment, Metrics) {
+	points = simplifyPathPoints(points)
 	segments := make([]Segment, 0, max(0, len(points)-1))
 	totalLength := 0.0
 	for index := 1; index < len(points); index++ {
@@ -21,8 +64,8 @@ func BuildSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Metrics) 
 		}
 		totalLength += length
 		segments = append(segments, Segment{
-			Net:     path.Net,
-			Layer:   path.Layer,
+			Net:     netName,
+			Layer:   layer,
 			Start:   start,
 			End:     end,
 			WidthMM: widthMM,
@@ -31,7 +74,7 @@ func BuildSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Metrics) 
 	return segments, Metrics{
 		SegmentCount:  len(segments),
 		TotalLengthMM: roundMM(totalLength),
-		SearchNodes:   path.SearchNodes,
+		SearchNodes:   searchNodes,
 	}
 }
 
