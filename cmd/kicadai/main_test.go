@@ -1207,6 +1207,53 @@ func TestRunTransactionValidateJSON(t *testing.T) {
 	}
 }
 
+func TestRunRouteRequestJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "route.json")
+	request := `{
+  "board":{"width_mm":30,"height_mm":20,"layers":[{"name":"F.Cu","kind":"copper","routable":true}]},
+  "components":[
+    {"ref":"J1","position":{"x_mm":5,"y_mm":10,"layer":"F.Cu"},"pads":[{"name":"1","net":"SIG","shape":"circle","type":"smd","size":{"width_mm":1,"height_mm":1},"layers":["F.Cu"]}]},
+    {"ref":"J2","position":{"x_mm":20,"y_mm":10,"layer":"F.Cu"},"pads":[{"name":"1","net":"SIG","shape":"circle","type":"smd","size":{"width_mm":1,"height_mm":1},"layers":["F.Cu"]}]}
+  ],
+  "nets":[{"name":"SIG","endpoints":[{"ref":"J1","pin":"1"},{"ref":"J2","pin":"1"}]}],
+  "rules":{"grid_mm":1,"trace_width_mm":0.1,"clearance_mm":0.01,"edge_clearance_mm":0.01},
+  "strategy":{"mode":"single_layer"}
+}`
+	if err := os.WriteFile(path, []byte(request), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", path, "route", "request"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{`"ok": true`, `"command": "route"`, `"status": "routed"`, `"operations"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunRouteRejectsInvalidMode(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "route.json")
+	if err := os.WriteFile(path, []byte(`{"board":{"width_mm":1,"height_mm":1},"rules":{},"strategy":{}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", path, "--mode", "diagonal", "route", "request"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected invalid mode error")
+	}
+	if !strings.Contains(stdout.String(), `unsupported route mode`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func TestRunTransactionValidateReportsIssues(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "tx.json")
 	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"route","net_name":"","points":[{"x_mm":0,"y_mm":0}]}]}`), 0o644); err != nil {

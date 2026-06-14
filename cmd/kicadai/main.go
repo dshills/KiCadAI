@@ -31,6 +31,7 @@ import (
 	"kicadai/internal/pinmap"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
+	"kicadai/internal/routing"
 	"kicadai/internal/schematic"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
@@ -56,6 +57,7 @@ Commands:
   evaluate      Evaluate KiCad projects and files
   pinmap        List or validate symbol-footprint pinmaps
   place         Run PCB placement planning
+  route         Run PCB routing
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -97,6 +99,12 @@ Global flags:
   --templates-root string  KiCad template library root
   --library-cache string   Library resolver cache file path
   --refresh-library-cache  Rebuild library resolver cache
+  --mode string         Routing mode: single_layer, two_layer, validate_only
+  --grid float          Routing grid in millimeters
+  --trace-width float   Routing trace width in millimeters
+  --clearance float     Routing clearance in millimeters
+  --allow-partial       Allow partial routing results
+  --pretty              Pretty-print JSON output
 `
 
 const (
@@ -115,39 +123,46 @@ var usage = fmt.Sprintf(
 )
 
 type cliOptions struct {
-	socket              string
-	apiCredential       string
-	clientName          string
-	timeoutMS           int
-	documentType        string
-	documentID          string
-	originX             int64
-	originY             int64
-	prefix              string
-	output              string
-	requestPath         string
-	name                string
-	seed                string
-	libVCC              string
-	libGND              string
-	libResistor         string
-	libLED              string
-	execute             bool
-	withPCB             bool
-	overwrite           bool
-	jsonOutput          bool
-	kicadCLI            string
-	keepArtifacts       bool
-	artifactDir         string
-	roundTimeout        string
-	allowlistPath       string
-	klcRoot             string
-	symbolsRoot         string
-	footprintsRoot      string
-	templatesRoot       string
-	libraryCache        string
-	refreshLibraryCache bool
-	commandArgs         []string
+	socket               string
+	apiCredential        string
+	clientName           string
+	timeoutMS            int
+	documentType         string
+	documentID           string
+	originX              int64
+	originY              int64
+	prefix               string
+	output               string
+	requestPath          string
+	name                 string
+	seed                 string
+	libVCC               string
+	libGND               string
+	libResistor          string
+	libLED               string
+	execute              bool
+	withPCB              bool
+	overwrite            bool
+	jsonOutput           bool
+	kicadCLI             string
+	keepArtifacts        bool
+	artifactDir          string
+	roundTimeout         string
+	allowlistPath        string
+	klcRoot              string
+	symbolsRoot          string
+	footprintsRoot       string
+	templatesRoot        string
+	libraryCache         string
+	refreshLibraryCache  bool
+	routeMode            string
+	routeGridMM          float64
+	routeTraceWidthMM    float64
+	routeClearanceMM     float64
+	routeAllowPartial    bool
+	routeAllowPartialSet bool
+	prettyOutput         bool
+	commandArgs          []string
 }
 
 type apiClient interface {
@@ -221,6 +236,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runPinmap(opts, stdout)
 	case "place":
 		return runPlace(opts, stdout)
+	case "route":
+		return runRoute(opts, stdout)
 	case "transaction":
 		return runTransaction(opts, stdout)
 	case "export":
@@ -277,6 +294,12 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.templatesRoot, "templates-root", "", "KiCad template library root")
 	flags.StringVar(&opts.libraryCache, "library-cache", os.Getenv(libraryresolver.EnvLibraryCache), "library resolver cache file path")
 	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
+	flags.StringVar(&opts.routeMode, "mode", "", "routing mode")
+	flags.Float64Var(&opts.routeGridMM, "grid", 0, "routing grid in millimeters")
+	flags.Float64Var(&opts.routeTraceWidthMM, "trace-width", 0, "routing trace width in millimeters")
+	flags.Float64Var(&opts.routeClearanceMM, "clearance", 0, "routing clearance in millimeters")
+	flags.BoolVar(&opts.routeAllowPartial, "allow-partial", false, "allow partial routing results")
+	flags.BoolVar(&opts.prettyOutput, "pretty", false, "pretty-print JSON output")
 
 	if err := flags.Parse(args); err != nil {
 		if errors.Is(err, flag.ErrHelp) {
@@ -290,6 +313,11 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 		return opts, "help", nil
 	}
 
+	flags.Visit(func(flag *flag.Flag) {
+		if flag.Name == "allow-partial" {
+			opts.routeAllowPartialSet = true
+		}
+	})
 	opts.commandArgs = flags.Args()[1:]
 	return opts, flags.Arg(0), nil
 }
@@ -1038,6 +1066,95 @@ func runPlace(opts cliOptions, stdout io.Writer) error {
 			Message:  "unsupported place subcommand " + opts.commandArgs[0],
 		})
 	}
+}
+
+func runRoute(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("route requires --json in this implementation phase")
+	}
+	if len(opts.commandArgs) == 0 {
+		return writeReportFailure(stdout, "route", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "route",
+			Message:  "route requires a subcommand",
+		})
+	}
+	switch opts.commandArgs[0] {
+	case "request":
+		if opts.requestPath == "" {
+			return writeReportFailure(stdout, "route", reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "route.request",
+				Message:  "route request requires --request",
+			})
+		}
+		file, err := os.Open(opts.requestPath)
+		if err != nil {
+			return writeReportFailure(stdout, "route", reports.Issue{
+				Code:     reports.CodeMissingFile,
+				Severity: reports.SeverityError,
+				Path:     opts.requestPath,
+				Message:  err.Error(),
+			})
+		}
+		defer file.Close()
+		var request routing.Request
+		if err := json.NewDecoder(file).Decode(&request); err != nil {
+			return writeReportFailure(stdout, "route", reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     opts.requestPath,
+				Message:  err.Error(),
+			})
+		}
+		if err := applyRouteOverrides(&request, opts); err != nil {
+			return writeReportFailure(stdout, "route", reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "route",
+				Message:  err.Error(),
+			})
+		}
+		result := routing.RouteRequest(request)
+		report := reports.ResultWithIssues("route", result, result.Issues, nil)
+		if opts.prettyOutput {
+			return writePrettyReportJSON(stdout, report)
+		}
+		return writeReportJSON(stdout, report)
+	default:
+		return writeReportFailure(stdout, "route", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "route." + opts.commandArgs[0],
+			Message:  "unsupported route subcommand " + opts.commandArgs[0],
+		})
+	}
+}
+
+func applyRouteOverrides(request *routing.Request, opts cliOptions) error {
+	if opts.routeMode != "" {
+		switch routing.RouteMode(opts.routeMode) {
+		case routing.ModeSingleLayer, routing.ModeTwoLayer, routing.ModeValidateOnly:
+		default:
+			return fmt.Errorf("unsupported route mode %q", opts.routeMode)
+		}
+		request.Strategy.Mode = routing.RouteMode(opts.routeMode)
+	}
+	if opts.routeGridMM > 0 {
+		request.Rules.GridMM = opts.routeGridMM
+	}
+	if opts.routeTraceWidthMM > 0 {
+		request.Rules.TraceWidthMM = opts.routeTraceWidthMM
+	}
+	if opts.routeClearanceMM > 0 {
+		request.Rules.ClearanceMM = opts.routeClearanceMM
+	}
+	if opts.routeAllowPartialSet {
+		request.Strategy.AllowPartial = opts.routeAllowPartial
+	}
+	return nil
 }
 
 type checkCommandReport struct {
@@ -2319,4 +2436,8 @@ func writeJSON(stdout io.Writer, value any) error {
 
 func writeReportJSON(stdout io.Writer, result reports.Result) error {
 	return reports.WriteJSON(stdout, result)
+}
+
+func writePrettyReportJSON(stdout io.Writer, result reports.Result) error {
+	return writeJSON(stdout, result)
 }
