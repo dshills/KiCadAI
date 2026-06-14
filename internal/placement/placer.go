@@ -39,7 +39,7 @@ func Place(request Request) Result {
 	netsByRef := netsByComponent(request.Nets)
 	placedByRef := map[string]PlacementResult{}
 	for _, component := range components {
-		placement, ok := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef)
+		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef)
 		if !ok {
 			result.Status = StatusPartial
 			result.Metrics.UnplacedCount++
@@ -50,7 +50,11 @@ func Place(request Request) Result {
 				GroupID:     component.GroupID,
 				Reason:      "no legal placement found",
 			})
-			result.Issues = append(result.Issues, issue("components."+component.Ref, "no legal placement found for component "+component.Ref))
+			if len(placementIssues) > 0 {
+				result.Issues = append(result.Issues, placementIssues...)
+			} else {
+				result.Issues = append(result.Issues, issue("components."+component.Ref, "no legal placement found for component "+component.Ref))
+			}
 			continue
 		}
 		if component.Fixed {
@@ -117,20 +121,39 @@ func slicesForPlacement(components []Component) []Component {
 	return ordered
 }
 
-func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet) (PlacementResult, bool) {
+func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet) (PlacementResult, bool, []reports.Issue) {
 	if component.Fixed {
 		if component.Position == nil {
-			return PlacementResult{}, false
+			return PlacementResult{}, false, nil
 		}
-		return NewPlacementResult(component, *component.Position, request.Rules)
+		placement, ok := NewPlacementResult(component, *component.Position, request.Rules)
+		if !ok {
+			return PlacementResult{}, false, nil
+		}
+		physicalBounds, ok := ComponentPhysicalBounds(component, placement.Position)
+		if !ok {
+			return PlacementResult{}, false, nil
+		}
+		path := "components." + component.Ref + ".position"
+		if !BoardUsableRect(request.Board, request.Rules).Contains(physicalBounds) {
+			return PlacementResult{}, false, []reports.Issue{
+				geometryIssue(reports.CodePlacementOutsideBoard, path, "fixed placement is outside usable board area"),
+			}
+		}
+		if conflict, ok := occupancy.FirstConflict(placement); ok {
+			return PlacementResult{}, false, []reports.Issue{
+				geometryIssue(reports.CodePlacementCollision, path, "fixed placement conflicts with "+conflict),
+			}
+		}
+		return placement, true, nil
 	}
 	for _, placement := range candidatePlacements(component, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef) {
 		if _, conflict := occupancy.FirstConflict(placement); conflict {
 			continue
 		}
-		return placement, true
+		return placement, true, nil
 	}
-	return PlacementResult{}, false
+	return PlacementResult{}, false, nil
 }
 
 func candidatePlacements(component Component, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet) []PlacementResult {
@@ -157,7 +180,11 @@ func candidatePlacements(component Component, request Request, placedByRef map[s
 				for _, layer := range layers {
 					candidate := Placement{XMM: roundToGrid(x, grid), YMM: roundToGrid(y, grid), RotationDeg: rotation, Layer: layer}
 					candidateResult, ok := NewPlacementResult(component, candidate, request.Rules)
-					if !ok || !usable.Contains(candidateResult.Bounds) {
+					if !ok {
+						continue
+					}
+					physicalBounds, ok := ComponentPhysicalBounds(component, candidateResult.Position)
+					if !ok || !usable.Contains(physicalBounds) {
 						continue
 					}
 					candidates = append(candidates, candidateResult)

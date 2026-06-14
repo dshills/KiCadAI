@@ -36,13 +36,20 @@ func BoardUsableRect(board BoardPlacementArea, rules Rules) Rect {
 }
 
 func ComponentPlacementBounds(component Component, placement Placement, rules Rules) (Rect, bool) {
+	return componentPlacementBounds(component, placement, rules.ComponentSpacingMM/2+component.Bounds.CourtyardMM)
+}
+
+func ComponentPhysicalBounds(component Component, placement Placement) (Rect, bool) {
+	return componentPlacementBounds(component, placement, 0)
+}
+
+func componentPlacementBounds(component Component, placement Placement, spacing float64) (Rect, bool) {
 	if component.Bounds.WidthMM <= 0 || component.Bounds.HeightMM <= 0 {
 		return Rect{}, false
 	}
 	if !validRotation(placement.RotationDeg) {
 		return Rect{}, false
 	}
-	spacing := rules.ComponentSpacingMM/2 + component.Bounds.CourtyardMM
 	return rotatedBounds(component.Bounds, placement, spacing), true
 }
 
@@ -64,19 +71,24 @@ func ValidateGeometry(request Request, placements []PlacementResult) []reports.I
 			continue
 		}
 		candidate := *placement
-		bounds := placement.Bounds
-		if bounds.IsZero() {
+		physicalBounds, ok := ComponentPhysicalBounds(component, placement.Position)
+		if !ok {
+			issues = append(issues, issue(path+".bounds", "placement bounds unavailable for component "+component.Ref))
+			continue
+		}
+		if !usable.Contains(physicalBounds) {
+			issues = append(issues, geometryIssue(reports.CodePlacementOutsideBoard, path+".bounds", "placement is outside usable board area"))
+		}
+		collisionBounds := placement.Bounds
+		if collisionBounds.IsZero() {
 			var ok bool
-			bounds, ok = ComponentPlacementBounds(component, placement.Position, request.Rules)
+			collisionBounds, ok = ComponentPlacementBounds(component, placement.Position, request.Rules)
 			if !ok {
 				issues = append(issues, issue(path+".bounds", "placement bounds unavailable for component "+component.Ref))
 				continue
 			}
 		}
-		candidate.Bounds = bounds
-		if !usable.Contains(bounds) {
-			issues = append(issues, geometryIssue(reports.CodePlacementOutsideBoard, path+".bounds", "placement is outside usable board area"))
-		}
+		candidate.Bounds = collisionBounds
 		if conflict, ok := occupancy.FirstConflict(candidate); ok {
 			issues = append(issues, geometryIssue(reports.CodePlacementCollision, path+".bounds", "placement conflicts with "+conflict))
 		}

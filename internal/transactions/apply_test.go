@@ -571,8 +571,8 @@ func TestUpsertImportedFootprintPreservesExistingModeledFields(t *testing.T) {
 	if got.Description != "preserve me" || got.Tags != "existing" || len(got.Models) != 1 || got.LibraryID != "Connector:Existing" {
 		t.Fatalf("existing metadata not preserved: %#v", got)
 	}
-	if len(got.Pads) != 3 || got.Pads[0].NetName != "SIG" || got.Pads[1].NetName != "SIG" || got.Pads[2].NetName != "" {
-		t.Fatalf("pads not updated selectively: %#v", got.Pads)
+	if len(got.Pads) != 1 || got.Pads[0].NetName != "SIG" {
+		t.Fatalf("pads not reconciled to desired set: %#v", got.Pads)
 	}
 	if got.Position != (kicadfiles.Point{X: kicadfiles.MM(5), Y: kicadfiles.MM(6)}) {
 		t.Fatalf("position = %#v", got.Position)
@@ -585,6 +585,38 @@ func TestUpsertImportedFootprintPreservesExistingModeledFields(t *testing.T) {
 	})
 	if board.Footprints[0].Pads[0].NetName != "SIG" {
 		t.Fatalf("omitted pad net cleared existing net: %#v", board.Footprints[0].Pads[0])
+	}
+}
+
+func TestUpsertImportedFootprintRemovesStalePadsAndPreservesUUID(t *testing.T) {
+	generator, err := kicadfiles.NewDeterministicIDGenerator("11111111-1111-5111-8111-111111111111", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := &pcb.PCBFile{Footprints: []pcb.Footprint{{
+		Reference: "J1",
+		Layer:     kicadfiles.LayerFCu,
+		Pads: []pcb.Pad{
+			{UUID: "pad-1", Name: "1", Type: "smd", Shape: "rect", Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}},
+			{UUID: "pad-2", Name: "2", Type: "smd", Shape: "rect", Size: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}},
+		},
+	}}}
+
+	upsertImportedFootprint(board, generator, PlaceFootprintOperation{
+		Ref:  "J1",
+		At:   Point{XMM: 5, YMM: 6},
+		Pads: []PadSpec{{Name: "1", XMM: 1, YMM: 2}},
+	})
+
+	pads := board.Footprints[0].Pads
+	if len(pads) != 1 {
+		t.Fatalf("pads = %#v, want only replacement pad", pads)
+	}
+	if pads[0].UUID != "pad-1" {
+		t.Fatalf("pad UUID = %q, want stable pad-1", pads[0].UUID)
+	}
+	if pads[0].Position != (kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(2)}) {
+		t.Fatalf("pad position = %#v, want updated position", pads[0].Position)
 	}
 }
 
@@ -631,6 +663,37 @@ func TestUpsertImportedFootprintUsesPlacementSidePadLayers(t *testing.T) {
 	if len(board.Footprints) != 1 || len(board.Footprints[0].Pads) != 1 {
 		t.Fatalf("unexpected footprint: %#v", board.Footprints)
 	}
+	want := []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerBMask}
+	if fmt.Sprint(board.Footprints[0].Pads[0].Layers) != fmt.Sprint(want) {
+		t.Fatalf("layers = %#v, want %#v", board.Footprints[0].Pads[0].Layers, want)
+	}
+}
+
+func TestUpsertImportedFootprintUpdatesExistingPadLayersWhenSideChanges(t *testing.T) {
+	generator, err := kicadfiles.NewDeterministicIDGenerator("11111111-1111-5111-8111-111111111111", "test")
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := &pcb.PCBFile{Footprints: []pcb.Footprint{{
+		Reference: "U1",
+		Layer:     kicadfiles.LayerFCu,
+		Pads: []pcb.Pad{{
+			UUID:   "pad-1",
+			Name:   "1",
+			Type:   "smd",
+			Shape:  "rect",
+			Size:   kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(1)},
+			Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask},
+		}},
+	}}}
+
+	upsertImportedFootprint(board, generator, PlaceFootprintOperation{
+		Ref:   "U1",
+		Layer: string(kicadfiles.LayerBCu),
+		At:    Point{XMM: 1, YMM: 2},
+		Pads:  []PadSpec{{Name: "1"}},
+	})
+
 	want := []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerBMask}
 	if fmt.Sprint(board.Footprints[0].Pads[0].Layers) != fmt.Sprint(want) {
 		t.Fatalf("layers = %#v, want %#v", board.Footprints[0].Pads[0].Layers, want)

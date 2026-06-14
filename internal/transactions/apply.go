@@ -574,55 +574,62 @@ func updateImportedFootprint(footprint *pcb.Footprint, generator kicadfiles.IDGe
 			}
 		}
 	}
-	for i, padSpec := range payload.Pads {
-		updateImportedPad(footprint, generator, payload.Ref, padSpec, i)
+	if len(payload.Pads) > 0 {
+		reconcileImportedPads(footprint, generator, payload.Ref, payload.Pads)
 	}
 }
 
-func updateImportedPad(footprint *pcb.Footprint, generator kicadfiles.IDGenerator, ref string, padSpec PadSpec, index int) {
-	net := ""
-	if padSpec.Net != nil {
-		net = *padSpec.Net
+func reconcileImportedPads(footprint *pcb.Footprint, generator kicadfiles.IDGenerator, ref string, specs []PadSpec) {
+	existing := map[string][]pcb.Pad{}
+	for _, pad := range footprint.Pads {
+		existing[pad.Name] = append(existing[pad.Name], pad)
 	}
-	matched := false
-	for i := range footprint.Pads {
-		if footprint.Pads[i].Name != padSpec.Name {
-			continue
+	pads := make([]pcb.Pad, 0, len(specs))
+	for i, spec := range specs {
+		var pad pcb.Pad
+		if matches := existing[spec.Name]; len(matches) > 0 {
+			pad = matches[0]
+			existing[spec.Name] = matches[1:]
+		} else {
+			pad = pcb.Pad{
+				UUID:   generator.New("imported.pcb.footprint.pad", ref, spec.Name, fmt.Sprintf("%d", i)),
+				Type:   "smd",
+				Shape:  "rect",
+				Size:   kicadfiles.Point{X: kicadfiles.MM(1.6), Y: kicadfiles.MM(1.6)},
+				Layers: padLayersFor("smd", footprint.Layer),
+			}
 		}
-		matched = true
-		pad := &footprint.Pads[i]
-		if strings.TrimSpace(padSpec.Type) != "" {
-			pad.Type = strings.TrimSpace(padSpec.Type)
-			pad.Layers = padLayersFor(pad.Type, footprint.Layer)
-		}
-		if strings.TrimSpace(padSpec.Shape) != "" {
-			pad.Shape = strings.TrimSpace(padSpec.Shape)
-		}
-		pad.Position = point(padSpec.XMM, padSpec.YMM)
-		if padSpec.WidthMM > 0 || padSpec.HeightMM > 0 {
-			pad.Size = padSizeOrDefault(padSpec)
-		}
-		if padSpec.DrillMM > 0 {
-			pad.Drill = kicadfiles.MM(padSpec.DrillMM)
-		}
-		if padSpec.Net != nil {
-			pad.NetName = net
-		}
+		applyImportedPadSpec(&pad, footprint.Layer, spec)
+		pads = append(pads, pad)
 	}
-	if matched {
-		return
+	footprint.Pads = pads
+}
+
+func applyImportedPadSpec(pad *pcb.Pad, footprintLayer kicadfiles.BoardLayer, spec PadSpec) {
+	pad.Name = spec.Name
+	if strings.TrimSpace(spec.Type) != "" {
+		pad.Type = strings.TrimSpace(spec.Type)
+	} else if strings.TrimSpace(pad.Type) == "" {
+		pad.Type = "smd"
 	}
-	footprint.Pads = append(footprint.Pads, pcb.Pad{
-		UUID:     generator.New("imported.pcb.footprint.pad", ref, padSpec.Name, fmt.Sprintf("%d", index)),
-		Name:     padSpec.Name,
-		Type:     firstNonEmpty(padSpec.Type, "smd"),
-		Shape:    firstNonEmpty(padSpec.Shape, "rect"),
-		Position: point(padSpec.XMM, padSpec.YMM),
-		Size:     padSizeOrDefault(padSpec),
-		Drill:    kicadfiles.MM(padSpec.DrillMM),
-		Layers:   padLayersFor(firstNonEmpty(padSpec.Type, "smd"), footprint.Layer),
-		NetName:  net,
-	})
+	pad.Layers = padLayersFor(pad.Type, footprintLayer)
+	if strings.TrimSpace(spec.Shape) != "" {
+		pad.Shape = strings.TrimSpace(spec.Shape)
+	} else if strings.TrimSpace(pad.Shape) == "" {
+		pad.Shape = "rect"
+	}
+	pad.Position = point(spec.XMM, spec.YMM)
+	if spec.WidthMM > 0 || spec.HeightMM > 0 {
+		pad.Size = padSizeOrDefault(spec)
+	} else if pad.Size == (kicadfiles.Point{}) {
+		pad.Size = padSizeOrDefault(spec)
+	}
+	if spec.DrillMM > 0 {
+		pad.Drill = kicadfiles.MM(spec.DrillMM)
+	}
+	if spec.Net != nil {
+		pad.NetName = *spec.Net
+	}
 }
 
 func padSize(pad PadSpec) kicadfiles.Point {

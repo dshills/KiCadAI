@@ -127,6 +127,26 @@ func TestValidateBreakoutRejectsLargeConnector(t *testing.T) {
 	}
 }
 
+func TestBreakoutTransactionGroundZoneWithNoConnectorsDoesNotPanic(t *testing.T) {
+	req := BreakoutRequest{
+		Name:       "empty_breakout",
+		Board:      BoardRequest{WidthMM: 50, HeightMM: 30},
+		GroundZone: true,
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("BreakoutTransaction panicked: %v", r)
+		}
+	}()
+	tx, err := BreakoutTransaction(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tx.Operations) == 0 {
+		t.Fatal("expected base transaction operations")
+	}
+}
+
 func validBreakoutRequest() BreakoutRequest {
 	return BreakoutRequest{
 		Kind:  "breakout_board",

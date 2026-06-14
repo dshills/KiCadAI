@@ -71,6 +71,26 @@ func TestComponentPlacementBoundsAppliesSpacingAndCourtyard(t *testing.T) {
 	}
 }
 
+func TestComponentPhysicalBoundsExcludesSpacingAndCourtyard(t *testing.T) {
+	component := Component{
+		Ref:    "C1",
+		Bounds: Bounds{WidthMM: 2, HeightMM: 1, CourtyardMM: 0.2},
+	}
+	rules := Rules{ComponentSpacingMM: 0.3}
+
+	inflated, ok := ComponentPlacementBounds(component, Placement{XMM: 5, YMM: 5}, rules)
+	if !ok {
+		t.Fatal("ComponentPlacementBounds returned false")
+	}
+	physical, ok := ComponentPhysicalBounds(component, Placement{XMM: 5, YMM: 5})
+	if !ok {
+		t.Fatal("ComponentPhysicalBounds returned false")
+	}
+	if !nearlyEqual(inflated.WidthMM(), 2.7) || !nearlyEqual(physical.WidthMM(), 2) {
+		t.Fatalf("bounds widths inflated=%.3f physical=%.3f, want 2.7 and 2", inflated.WidthMM(), physical.WidthMM())
+	}
+}
+
 func TestValidateGeometryRejectsOutsideBoard(t *testing.T) {
 	req := minimalRequest()
 	req.Rules.BoardEdgeClearanceMM = 1
@@ -81,6 +101,25 @@ func TestValidateGeometryRejectsOutsideBoard(t *testing.T) {
 
 	issues := ValidateGeometry(req, []PlacementResult{placement})
 	assertIssueContains(t, issues, "placement is outside usable board area")
+}
+
+func TestValidateGeometryUsesPhysicalBoundsForBoardEdges(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 10
+	req.Board.HeightMM = 5
+	req.Board.MarginMM = 0
+	req.Rules.BoardEdgeClearanceMM = 1
+	req.Rules.ComponentSpacingMM = 4
+	req.Components[0].Bounds = Bounds{WidthMM: 8, HeightMM: 3, AnchorOffset: Point{XMM: 4, YMM: 1.5}, Source: BoundsExplicit}
+	placement, ok := NewPlacementResult(req.Components[0], Placement{XMM: 5, YMM: 2.5}, normalizeRules(req.Rules))
+	if !ok {
+		t.Fatal("NewPlacementResult returned false")
+	}
+
+	issues := ValidateGeometry(req, []PlacementResult{placement})
+	if len(issues) != 0 {
+		t.Fatalf("ValidateGeometry returned issues: %#v", issues)
+	}
 }
 
 func TestValidateGeometryUsesCalculatedBoundsWithoutMutatingInput(t *testing.T) {

@@ -140,7 +140,7 @@ func BreakoutTransaction(req BreakoutRequest) (transactions.Transaction, error) 
 			ops = append(ops, next...)
 		}
 	}
-	if req.GroundZone && hasPin(req.Connectors[0].Pins, "GND") {
+	if req.GroundZone && len(req.Connectors) > 0 && hasPin(req.Connectors[0].Pins, "GND") {
 		gnd := pinNetName(req.Connectors[0].Pins, "GND")
 		op, err := operation(transactions.AddZoneOperation{
 			Op:      transactions.OpAddZone,

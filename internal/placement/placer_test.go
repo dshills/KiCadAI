@@ -35,6 +35,59 @@ func TestPlacePreservesFixedComponent(t *testing.T) {
 	}
 }
 
+func TestPlaceRejectsFixedComponentCollision(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Components[1].Fixed = true
+	req.Components[1].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+
+	result := Place(req)
+	if result.Status != StatusPartial {
+		t.Fatalf("status = %s, want partial; issues=%#v", result.Status, result.Issues)
+	}
+	if result.Metrics.PlacedCount != 1 || result.Metrics.FixedCount != 1 || result.Metrics.UnplacedCount != 1 {
+		t.Fatalf("metrics = %#v, want one placed fixed and one unplaced", result.Metrics)
+	}
+	assertIssueContains(t, result.Issues, "fixed placement conflicts with component R1")
+}
+
+func TestPlaceRejectsFixedComponentKeepoutOverlap(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Keepouts = []Keepout{{
+		ID:     "mounting",
+		Bounds: Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 6, YMM: 6}},
+		Layers: []string{"F.Cu"},
+	}}
+
+	result := Place(req)
+	if result.Status != StatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", result.Status, result.Issues)
+	}
+	if result.Metrics.PlacedCount != 0 || result.Metrics.FixedCount != 0 || result.Metrics.UnplacedCount != 1 {
+		t.Fatalf("metrics = %#v, want blocked fixed component unplaced", result.Metrics)
+	}
+	assertIssueContains(t, result.Issues, "fixed placement conflicts with keepout mounting")
+}
+
+func TestPlaceUsesPhysicalBoundsForBoardEdgeClearance(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 10
+	req.Board.HeightMM = 5
+	req.Board.MarginMM = 0
+	req.Rules.BoardEdgeClearanceMM = 1
+	req.Rules.ComponentSpacingMM = 4
+	req.Rules.MaxCandidatesPerPart = 100
+	req.Components[0].Bounds = Bounds{WidthMM: 8, HeightMM: 3, AnchorOffset: Point{XMM: 4, YMM: 1.5}, Source: BoundsExplicit}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v summary=%s", result.Status, result.Issues, placementSummary(result))
+	}
+}
+
 func TestPlaceReportsPartialWhenNoLegalCandidate(t *testing.T) {
 	req := minimalRequest()
 	req.Board.WidthMM = 2
@@ -148,7 +201,7 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	req.Components[0].Rotation.AllowedDeg = []float64{45, 0}
 
 	padsByRef := componentPadMaps(req.Components)
-	result, ok := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets))
+	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets))
 	if !ok {
 		t.Fatal("placeComponent failed after invalid candidate rotation")
 	}
