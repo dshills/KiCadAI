@@ -1,8 +1,10 @@
 package transactions
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kicadai/internal/libraryresolver"
@@ -23,8 +25,88 @@ func TestPlanSupportedGeneratedProject(t *testing.T) {
 	if !plan.Operations[1].Supported || len(plan.Operations[1].Refs) != 1 || plan.Operations[1].Refs[0] != "R1" {
 		t.Fatalf("unexpected add symbol plan: %#v", plan.Operations[1])
 	}
+	if !strings.HasPrefix(plan.Operations[1].ID, "op-add-symbol-ref-r1-") || !strings.HasPrefix(plan.Operations[2].ID, "op-connect-ref-r1-") {
+		t.Fatalf("unexpected operation ids: %#v", plan.Operations)
+	}
 	if !plan.Operations[3].WillWrite || len(plan.Operations[3].Artifacts) != 3 {
 		t.Fatalf("write artifacts missing: %#v", plan.Operations[3])
+	}
+}
+
+func TestPlanOperationIDsUseNetWhenNoRef(t *testing.T) {
+	tx := mustParse(t, `{"operations":[{"op":"route","net_name":"I2C SDA","points":[{"x_mm":0,"y_mm":0},{"x_mm":1,"y_mm":1}]}]}`)
+	plan := PlanTransaction(t.TempDir(), tx)
+	if len(plan.Operations) != 1 || !strings.HasPrefix(plan.Operations[0].ID, "op-route-net-i2c-sda-") {
+		t.Fatalf("unexpected operation ids: %#v", plan.Operations)
+	}
+}
+
+func TestPlanOperationIDIsJSONVisible(t *testing.T) {
+	tx := mustParse(t, `{"operations":[{"op":"write_project"}]}`)
+	plan := PlanTransaction(t.TempDir(), tx)
+	data, err := json.Marshal(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !json.Valid(data) || !strings.Contains(string(data), `"id":"op-write-project-`) {
+		t.Fatalf("operation id missing from json: %s", string(data))
+	}
+}
+
+func TestPlanOperationIDsAreContentStableAcrossReorder(t *testing.T) {
+	first := mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}},
+	  {"op":"add_symbol","ref":"C1","library_id":"Device:C","at":{"x_mm":1,"y_mm":0}}
+	]}`)
+	second := mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"C1","library_id":"Device:C","at":{"x_mm":1,"y_mm":0}},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}}
+	]}`)
+	firstPlan := PlanTransaction(t.TempDir(), first)
+	secondPlan := PlanTransaction(t.TempDir(), second)
+	if firstPlan.Operations[0].ID != secondPlan.Operations[1].ID || firstPlan.Operations[1].ID != secondPlan.Operations[0].ID {
+		t.Fatalf("operation ids changed across reorder: first=%#v second=%#v", firstPlan.Operations, secondPlan.Operations)
+	}
+}
+
+func TestPlanOperationIDsCanonicalizeJSONFormatting(t *testing.T) {
+	compact := mustParse(t, `{"operations":[{"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}}]}`)
+	spaced := mustParse(t, `{
+	  "operations": [
+	    {
+	      "op": "add_symbol",
+	      "ref": "R1",
+	      "library_id": "Device:R",
+	      "at": {"x_mm": 0, "y_mm": 0}
+	    }
+	  ]
+	}`)
+	compactPlan := PlanTransaction(t.TempDir(), compact)
+	spacedPlan := PlanTransaction(t.TempDir(), spaced)
+	if compactPlan.Operations[0].ID != spacedPlan.Operations[0].ID {
+		t.Fatalf("operation ids differ by JSON formatting: compact=%#v spaced=%#v", compactPlan.Operations, spacedPlan.Operations)
+	}
+}
+
+func TestPlanOperationIDsDisambiguateDuplicateContent(t *testing.T) {
+	tx := mustParse(t, `{"operations":[{"op":"write_project"},{"op":"write_project"}]}`)
+	plan := PlanTransaction(t.TempDir(), tx)
+	if len(plan.Operations) != 2 || plan.Operations[0].ID == plan.Operations[1].ID || !strings.HasSuffix(plan.Operations[1].ID, "-n1") {
+		t.Fatalf("duplicate operation ids not disambiguated: %#v", plan.Operations)
+	}
+}
+
+func TestUniquePlannedOperationIDAvoidsGeneratedSuffixCollision(t *testing.T) {
+	seen := map[string]struct{}{}
+	counts := map[string]int{}
+	if got := uniquePlannedOperationID("op-write-project", seen, counts); got != "op-write-project" {
+		t.Fatalf("first id = %q", got)
+	}
+	if got := uniquePlannedOperationID("op-write-project-n1", seen, counts); got != "op-write-project-n1" {
+		t.Fatalf("natural suffixed id = %q", got)
+	}
+	if got := uniquePlannedOperationID("op-write-project", seen, counts); got != "op-write-project-n2" {
+		t.Fatalf("collision-safe duplicate id = %q", got)
 	}
 }
 

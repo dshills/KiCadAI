@@ -1,11 +1,15 @@
 package transactions
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"unicode"
 
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/libraryresolver"
@@ -19,6 +23,7 @@ type Plan struct {
 }
 
 type PlannedOperation struct {
+	ID         string             `json:"id"`
 	Index      int                `json:"index"`
 	Op         OperationKind      `json:"op"`
 	Refs       []string           `json:"refs,omitempty"`
@@ -76,6 +81,8 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 		}
 	}
 	addedRefs := map[string]struct{}{}
+	operationIDs := map[string]struct{}{}
+	operationIDCounts := map[string]int{}
 	for i, op := range tx.Operations {
 		op.Index = i
 		planned := PlannedOperation{Index: i, Op: op.Op, Supported: supportedPlanOperation(op.Op)}
@@ -83,6 +90,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 			planned.Supported = supportedExistingPlanOperation(op.Op)
 		}
 		plan.Issues = append(plan.Issues, populatePlanFields(&planned, op, target, projectName)...)
+		planned.ID = uniquePlannedOperationID(plannedOperationID(planned, op), operationIDs, operationIDCounts)
 		if existing != nil {
 			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, op, addedRefs)...)
 		}
@@ -107,6 +115,99 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 		}
 	}
 	return plan
+}
+
+func plannedOperationID(planned PlannedOperation, op Operation) string {
+	parts := []string{"op", sanitizeOperationIDPart(string(planned.Op))}
+	if len(planned.Refs) > 0 {
+		parts = append(parts, "ref", sanitizeOperationIDPart(planned.Refs[0]))
+	} else if len(planned.Nets) > 0 {
+		parts = append(parts, "net", sanitizeOperationIDPart(planned.Nets[0]))
+	}
+	parts = append(parts, operationContentHash(op))
+	return strings.Join(nonEmptyIDParts(parts), "-")
+}
+
+func uniquePlannedOperationID(base string, seen map[string]struct{}, counts map[string]int) string {
+	if _, exists := seen[base]; !exists {
+		seen[base] = struct{}{}
+		return base
+	}
+	for count := counts[base] + 1; ; count++ {
+		candidate := base + "-n" + strconv.Itoa(count)
+		if _, exists := seen[candidate]; exists {
+			continue
+		}
+		seen[candidate] = struct{}{}
+		counts[base] = count
+		return candidate
+	}
+}
+
+func operationContentHash(op Operation) string {
+	data := canonicalOperationHashData(op)
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])[:10]
+}
+
+func canonicalOperationHashData(op Operation) []byte {
+	if len(op.Raw) > 0 {
+		if canonical, ok := canonicalJSON(op.Raw); ok {
+			return canonical
+		}
+		return append([]byte(nil), op.Raw...)
+	}
+	data, err := json.Marshal(struct {
+		Op  OperationKind `json:"op"`
+		Ref string        `json:"ref,omitempty"`
+	}{Op: op.Op, Ref: op.Ref})
+	if err == nil {
+		return data
+	}
+	return []byte(op.Op)
+}
+
+func canonicalJSON(data []byte) ([]byte, bool) {
+	var value any
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	if err := decoder.Decode(&value); err != nil {
+		return nil, false
+	}
+	canonical, err := json.Marshal(value)
+	if err != nil {
+		return nil, false
+	}
+	return canonical, true
+}
+
+func sanitizeOperationIDPart(value string) string {
+	var out strings.Builder
+	lastDash := false
+	for _, r := range value {
+		r = unicode.ToLower(r)
+		keep := unicode.IsLetter(r) || unicode.IsDigit(r)
+		if keep {
+			out.WriteRune(r)
+			lastDash = false
+			continue
+		}
+		if !lastDash && out.Len() > 0 {
+			out.WriteByte('-')
+			lastDash = true
+		}
+	}
+	return strings.Trim(out.String(), "-")
+}
+
+func nonEmptyIDParts(parts []string) []string {
+	filtered := make([]string, 0, len(parts))
+	for _, part := range parts {
+		if part != "" {
+			filtered = append(filtered, part)
+		}
+	}
+	return filtered
 }
 
 func transactionLibraryIssues(index libraryresolver.LibraryIndex, op Operation) []reports.Issue {
