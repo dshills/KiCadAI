@@ -117,7 +117,7 @@ func TestRunPlaceRequestJSON(t *testing.T) {
 		t.Fatalf("run returned error: %v\nstdout=%s", err, stdout.String())
 	}
 	output := stdout.String()
-	for _, want := range []string{`"command": "place"`, `"status": "placed"`, `"op": "place_footprint"`} {
+	for _, want := range []string{`"command": "place"`, `"status": "placed"`, `"op": "place_footprint"`, `"quality":`, `"ready": true`} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("expected output to contain %q, got %s", want, output)
 		}

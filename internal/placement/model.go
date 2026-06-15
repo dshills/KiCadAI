@@ -196,6 +196,7 @@ type Result struct {
 	Issues     []reports.Issue          `json:"issues"`
 	Metrics    Metrics                  `json:"metrics"`
 	Operations []transactions.Operation `json:"operations,omitempty"`
+	Quality    *QualityReport           `json:"quality,omitempty"`
 }
 
 type PlacementResult struct {

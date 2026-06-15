@@ -1056,6 +1056,8 @@ func runPlace(opts cliOptions, stdout io.Writer) error {
 			})
 		}
 		result := placement.Place(request)
+		quality := placement.BuildQualityReport(request, result)
+		result.Quality = &quality
 		return writeReportJSON(stdout, reports.ResultWithIssues("place", result, result.Issues, nil))
 	default:
 		return writeReportFailure(stdout, "place", reports.Issue{
