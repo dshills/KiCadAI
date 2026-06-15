@@ -762,6 +762,38 @@ func TestValidateRejectsRawItemUUIDMismatch(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsMalformedRawItemBody(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Body: sexpr.Raw(`(rule_area (uuid "33333333-3333-4333-8333-333333333333")`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].body") {
+		t.Fatalf("error missing raw body validation: %v", err)
+	}
+}
+
+func TestValidateRejectsMultipleTopLevelRawItemBodies(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.RawItems = []RawSchematicItem{{
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Body: sexpr.Raw(`(rule_area (uuid "33333333-3333-4333-8333-333333333333")) (future_widget (uuid "44444444-4444-4444-8444-444444444444"))`),
+	}}
+
+	err := Validate(schematic)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "raw_items[0].body") {
+		t.Fatalf("error missing multiple top-level raw body validation: %v", err)
+	}
+}
+
 func TestValidateRejectsDuplicateRawItemUUID(t *testing.T) {
 	schematic := minimalSchematic()
 	duplicateUUID := kicadfiles.UUID("33333333-3333-4333-8333-333333333333")
@@ -783,6 +815,16 @@ func TestValidateRejectsDuplicateRawItemUUID(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "raw_items[0].uuid") || !strings.Contains(err.Error(), "duplicate") {
 		t.Fatalf("error missing duplicate raw item UUID: %v", err)
+	}
+}
+
+func TestRawSchematicItemUUIDsRequiresUUIDListShape(t *testing.T) {
+	uuids, err := rawSchematicItemUUIDs(`(future_widget (uuid "33333333-3333-4333-8333-333333333333") (property uuid "44444444-4444-4444-8444-444444444444") (uuid "55555555-5555-4555-8555-555555555555" extra))`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(uuids) != 1 || uuids[0] != kicadfiles.UUID("33333333-3333-4333-8333-333333333333") {
+		t.Fatalf("uuids = %#v, want only direct uuid list", uuids)
 	}
 }
 

@@ -1157,7 +1157,12 @@ func validateRawSchematicItem(index int, raw RawSchematicItem) (kicadfiles.Valid
 	if raw.Kind != "" && raw.Kind != bodyKind {
 		errs = append(errs, fieldError(prefix("kind"), "does not match body kind "+string(bodyKind)))
 	}
-	metadata.uuids = rawSchematicItemUUIDs(body)
+	uuids, err := rawSchematicItemUUIDs(body)
+	if err != nil {
+		errs = append(errs, fieldError(prefix("body"), err.Error()))
+		return errs, metadata
+	}
+	metadata.uuids = uuids
 	if raw.UUID.Valid() && !rawSchematicItemUUIDListContains(metadata.uuids, raw.UUID) {
 		errs = append(errs, fieldError(prefix("body"), "must contain matching uuid "+string(raw.UUID)))
 	}
@@ -1262,85 +1267,29 @@ func rawSchematicItemUUIDListContains(uuids []kicadfiles.UUID, uuid kicadfiles.U
 	return false
 }
 
-func rawSchematicItemUUIDs(body string) []kicadfiles.UUID {
+func rawSchematicItemUUIDs(body string) ([]kicadfiles.UUID, error) {
+	root, err := sexpr.Parse([]byte(body))
+	if err != nil {
+		return nil, fmt.Errorf("invalid raw S-expression: %w", err)
+	}
 	var uuids []kicadfiles.UUID
-	inString := false
-	escaped := false
-	for i := 0; i < len(body); i++ {
-		if inString {
-			if escaped {
-				escaped = false
-				continue
-			}
-			switch body[i] {
-			case '\\':
-				escaped = true
-			case '"':
-				inString = false
+	stack := make([]sexpr.ParsedNode, 0, 32)
+	stack = append(stack, root)
+	for len(stack) > 0 {
+		node := stack[len(stack)-1]
+		stack = stack[:len(stack)-1]
+		if node.Head() == "uuid" && len(node.Children) == 2 {
+			candidate := kicadfiles.UUID(node.ListValue(1))
+			if candidate.Valid() {
+				uuids = append(uuids, candidate)
 			}
 			continue
 		}
-		if body[i] == '"' {
-			inString = true
-			continue
-		}
-		if body[i] != '(' || i+5 > len(body) || body[i+1:i+5] != "uuid" {
-			continue
-		}
-		start := i + len("(uuid")
-		if start >= len(body) || !isSExprSpace(body[start]) {
-			continue
-		}
-		pos := skipSExprSpace(body, start)
-		if pos >= len(body) || body[pos] != '"' {
-			continue
-		}
-		pos++
-		valueEnd, ok := rawSchematicStringEnd(body, pos)
-		if !ok {
-			return uuids
-		}
-		candidate := kicadfiles.UUID(body[pos:valueEnd])
-		afterValue := skipSExprSpace(body, valueEnd+1)
-		if afterValue < len(body) && body[afterValue] == ')' && candidate.Valid() {
-			uuids = append(uuids, candidate)
-		}
-		i = afterValue
-	}
-	return uuids
-}
-
-func rawSchematicStringEnd(value string, start int) (int, bool) {
-	escaped := false
-	for i := start; i < len(value); i++ {
-		if escaped {
-			escaped = false
-			continue
-		}
-		switch value[i] {
-		case '\\':
-			escaped = true
-		case '"':
-			return i, true
+		for i := len(node.Children) - 1; i >= 0; i-- {
+			stack = append(stack, node.Children[i])
 		}
 	}
-	return 0, false
-}
-
-func skipSExprSpace(value string, pos int) int {
-	for pos < len(value) && isSExprSpace(value[pos]) {
-		pos++
-	}
-	return pos
-}
-
-func isSExprSpace(value byte) bool {
-	switch value {
-	case ' ', '\t', '\r', '\n':
-		return true
-	default:
-		return false
-	}
+	return uuids, nil
 }
 
 func validColor(color Color) bool {
