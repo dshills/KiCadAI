@@ -547,13 +547,17 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 				Message:  err.Error(),
 			})
 		}
+		feedbackOptions := blockFeedbackOptions()
+		placementApplication := blockPlacementApplicationForBlockOutput(ctx, tx, output, feedbackOptions)
+		tx = placementApplication.Transaction
 		applyResult := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite, Seed: opts.seed})
+		resultIssues := combinedBlockIssues(issues, placementApplication.Issues)
 		return writeBlockApplyResult(stdout, blockProjectGenerationResult{
 			Output:      output,
 			Transaction: tx,
 			ApplyResult: applyResult,
-			Feedback:    placementFeedbackForBlockOutput(ctx, output, blockFeedbackOptions()),
-		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
+			Feedback:    placementApplication.Feedback,
+		}, combinedBlockIssues(resultIssues, applyResult.Issues), applyResult.Artifacts)
 	case "compose":
 		if len(opts.commandArgs) != 1 {
 			return writeBlockFailure(stdout, invalidBlockArgCountIssue("compose", 0))
@@ -582,13 +586,17 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 				Message:  err.Error(),
 			})
 		}
+		feedbackOptions := blockFeedbackOptions()
+		placementApplication := compositionPlacementApplication(ctx, tx, output, feedbackOptions)
+		tx = placementApplication.Transaction
 		applyResult := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite, Seed: opts.seed})
+		resultIssues := combinedBlockIssues(issues, placementApplication.Issues)
 		return writeBlockApplyResult(stdout, compositionProjectGenerationResult{
 			Output:      output,
 			Transaction: tx,
 			ApplyResult: applyResult,
-			Feedback:    placementFeedbackForCompositionOutput(ctx, output, blockFeedbackOptions()),
-		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
+			Feedback:    placementApplication.Feedback,
+		}, combinedBlockIssues(resultIssues, applyResult.Issues), applyResult.Artifacts)
 	default:
 		return writeBlockFailure(stdout, reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -681,22 +689,119 @@ type blockPlacementFeedbackOptions struct {
 	Enabled bool
 }
 
-func placementFeedbackForBlockOutput(ctx context.Context, output blocks.BlockOutput, feedbackOptions blockPlacementFeedbackOptions) *workflows.DesignFeedback {
+type blockPlacementApplication struct {
+	Transaction transactions.Transaction
+	Feedback    *workflows.DesignFeedback
+	Issues      []reports.Issue
+}
+
+func blockPlacementApplicationForBlockOutput(ctx context.Context, tx transactions.Transaction, output blocks.BlockOutput, feedbackOptions blockPlacementFeedbackOptions) blockPlacementApplication {
 	if !feedbackOptions.Enabled {
-		return nil
+		return blockPlacementApplication{Transaction: tx}
 	}
 	request, issues := placement.RequestFromBlockOutput(output, feedbackOptions.Adapter)
 	issues = combinedPlacementFeedbackIssues(feedbackOptions.Issues, issues)
-	return placementFeedbackForRequest(ctx, request, issues)
+	return blockPlacementApplicationForRequest(ctx, tx, request, issues)
 }
 
-func placementFeedbackForCompositionOutput(ctx context.Context, output blocks.CompositionOutput, feedbackOptions blockPlacementFeedbackOptions) *workflows.DesignFeedback {
+func compositionPlacementApplication(ctx context.Context, tx transactions.Transaction, output blocks.CompositionOutput, feedbackOptions blockPlacementFeedbackOptions) blockPlacementApplication {
 	if !feedbackOptions.Enabled {
-		return nil
+		return blockPlacementApplication{Transaction: tx}
 	}
 	request, issues := placement.RequestFromCompositionOutput(output, feedbackOptions.Adapter)
 	issues = combinedPlacementFeedbackIssues(feedbackOptions.Issues, issues)
-	return placementFeedbackForRequest(ctx, request, issues)
+	return blockPlacementApplicationForRequest(ctx, tx, request, issues)
+}
+
+func blockPlacementApplicationForRequest(ctx context.Context, tx transactions.Transaction, request placement.Request, adapterIssues []reports.Issue) blockPlacementApplication {
+	if reports.HasBlockingIssue(adapterIssues) {
+		feedback := placementFeedbackForBlockedRequest(request, adapterIssues)
+		return blockPlacementApplication{Transaction: tx, Feedback: feedback, Issues: cloneIssues(adapterIssues)}
+	}
+	result := placement.PlaceContext(ctx, request)
+	result.Issues = combinedPlacementFeedbackIssues(adapterIssues, result.Issues)
+	if result.Status != placement.StatusPlaced || reports.HasBlockingIssue(result.Issues) {
+		feedback := workflows.EvaluatePlacement(request, result)
+		return blockPlacementApplication{Transaction: tx, Feedback: &feedback, Issues: result.Issues}
+	}
+	operations, operationIssues := placement.PlacementOperations(request, result.Placements)
+	result.Issues = combinedPlacementFeedbackIssues(result.Issues, operationIssues)
+	if len(operations) != 0 && !reports.HasBlockingIssue(operationIssues) {
+		tx = replaceSupersededPlacementOperationsBeforeWriteProject(tx, operations)
+	}
+	feedback := workflows.EvaluatePlacement(request, result)
+	return blockPlacementApplication{Transaction: tx, Feedback: &feedback, Issues: result.Issues}
+}
+
+func replaceSupersededPlacementOperationsBeforeWriteProject(tx transactions.Transaction, operations []transactions.Operation) transactions.Transaction {
+	if len(operations) == 0 {
+		return tx
+	}
+	replacementRefs := placementOperationRefs(operations)
+	if len(replacementRefs) == 0 {
+		return tx
+	}
+	filtered := make([]transactions.Operation, 0, len(tx.Operations))
+	for _, operation := range tx.Operations {
+		if operation.Op == transactions.OpPlaceFootprint {
+			ref, err := placementOperationRef(operation)
+			if err == nil {
+				if _, replace := replacementRefs[normalizedPlacementRef(ref)]; replace {
+					continue
+				}
+			}
+		}
+		filtered = append(filtered, operation)
+	}
+	insertAt := len(filtered)
+	for index := len(filtered) - 1; index >= 0; index-- {
+		if filtered[index].Op == transactions.OpWriteProject {
+			insertAt = index
+			break
+		}
+	}
+	next := make([]transactions.Operation, 0, len(filtered)+len(operations))
+	next = append(next, filtered[:insertAt]...)
+	next = append(next, operations...)
+	next = append(next, filtered[insertAt:]...)
+	tx.Operations = next
+	return tx
+}
+
+func placementOperationRefs(operations []transactions.Operation) map[string]struct{} {
+	refs := make(map[string]struct{}, len(operations))
+	for _, operation := range operations {
+		ref, err := placementOperationRef(operation)
+		if err != nil {
+			continue
+		}
+		key := normalizedPlacementRef(ref)
+		if key != "" {
+			refs[key] = struct{}{}
+		}
+	}
+	return refs
+}
+
+func placementOperationRef(operation transactions.Operation) (string, error) {
+	if operation.Op != transactions.OpPlaceFootprint {
+		return "", fmt.Errorf("operation is not place_footprint")
+	}
+	var payload struct {
+		Ref string `json:"ref"`
+	}
+	if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+		return "", err
+	}
+	ref := strings.TrimSpace(payload.Ref)
+	if ref == "" {
+		return "", fmt.Errorf("placement operation missing ref")
+	}
+	return ref, nil
+}
+
+func normalizedPlacementRef(ref string) string {
+	return strings.ToUpper(strings.TrimSpace(ref))
 }
 
 func combinedPlacementFeedbackIssues(first []reports.Issue, second []reports.Issue) []reports.Issue {
@@ -704,10 +809,10 @@ func combinedPlacementFeedbackIssues(first []reports.Issue, second []reports.Iss
 		return nil
 	}
 	if len(first) == 0 {
-		return slices.Clone(second)
+		return cloneIssues(second)
 	}
 	if len(second) == 0 {
-		return slices.Clone(first)
+		return cloneIssues(first)
 	}
 	combined := make([]reports.Issue, 0, len(first)+len(second))
 	combined = append(combined, first...)
@@ -715,22 +820,18 @@ func combinedPlacementFeedbackIssues(first []reports.Issue, second []reports.Iss
 	return combined
 }
 
-func placementFeedbackForRequest(ctx context.Context, request placement.Request, adapterIssues []reports.Issue) *workflows.DesignFeedback {
-	if reports.HasBlockingIssue(adapterIssues) {
-		result := placement.Result{
-			Status: placement.StatusBlocked,
-			Issues: adapterIssues,
-			Metrics: placement.Metrics{
-				ComponentCount: len(request.Components),
-				UnplacedCount:  len(request.Components),
-			},
-		}
-		feedback := workflows.EvaluatePlacement(request, result)
-		return &feedback
-	}
-	result := placement.PlaceContext(ctx, request)
-	if len(adapterIssues) > 0 {
-		result.Issues = append(result.Issues, adapterIssues...)
+func cloneIssues(issues []reports.Issue) []reports.Issue {
+	return slices.Clone(issues)
+}
+
+func placementFeedbackForBlockedRequest(request placement.Request, issues []reports.Issue) *workflows.DesignFeedback {
+	result := placement.Result{
+		Status: placement.StatusBlocked,
+		Issues: issues,
+		Metrics: placement.Metrics{
+			ComponentCount: len(request.Components),
+			UnplacedCount:  len(request.Components),
+		},
 	}
 	feedback := workflows.EvaluatePlacement(request, result)
 	return &feedback

@@ -16,6 +16,7 @@ import (
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
 )
 
@@ -369,6 +370,15 @@ func writeTestFile(t *testing.T, path string, contents string) {
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func mustJSONOperation(t *testing.T, kind transactions.OperationKind, payload any) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions.Operation{Op: kind, Raw: raw}
 }
 
 func TestRunHelpFlagPrintsUsage(t *testing.T) {
@@ -1102,6 +1112,44 @@ func TestBlockPlacementLibraryIndexSkipsEmptyFootprintIndex(t *testing.T) {
 	}
 	if len(issues) == 0 {
 		t.Fatal("expected load diagnostics")
+	}
+}
+
+func TestReplaceSupersededPlacementOperationsBeforeWriteProject(t *testing.T) {
+	oldPlace := mustJSONOperation(t, transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{
+		Op:          transactions.OpPlaceFootprint,
+		Ref:         "R1",
+		FootprintID: "Resistor_SMD:R_0805_2012Metric",
+		At:          transactions.Point{XMM: 1, YMM: 2},
+	})
+	newPlace := mustJSONOperation(t, transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{
+		Op:          transactions.OpPlaceFootprint,
+		Ref:         "R1",
+		FootprintID: "Resistor_SMD:R_0805_2012Metric",
+		At:          transactions.Point{XMM: 20, YMM: 30},
+	})
+	write := mustJSONOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject})
+	tx := transactions.Transaction{Operations: []transactions.Operation{
+		{Op: transactions.OpCreateProject},
+		oldPlace,
+		{Op: transactions.OpConnect},
+		oldPlace,
+		write,
+	}}
+
+	got := replaceSupersededPlacementOperationsBeforeWriteProject(tx, []transactions.Operation{newPlace})
+	if len(got.Operations) != 4 {
+		t.Fatalf("operation count = %d, want 4: %#v", len(got.Operations), got.Operations)
+	}
+	if got.Operations[1].Op != transactions.OpConnect || got.Operations[2].Op != transactions.OpPlaceFootprint || got.Operations[3].Op != transactions.OpWriteProject {
+		t.Fatalf("operation order = %#v", got.Operations)
+	}
+	var payload transactions.PlaceFootprintOperation
+	if err := json.Unmarshal(got.Operations[2].Raw, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.At.XMM != 20 || payload.At.YMM != 30 {
+		t.Fatalf("replacement placement = %#v", payload.At)
 	}
 }
 
