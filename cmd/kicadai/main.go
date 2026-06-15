@@ -12,6 +12,7 @@ import (
 	"os/signal"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -477,6 +478,15 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	}
 	registry := blocks.NewBuiltinRegistry()
 	subcommand := opts.commandArgs[0]
+	var feedbackOptions blockPlacementFeedbackOptions
+	feedbackOptionsReady := false
+	blockFeedbackOptions := func() blockPlacementFeedbackOptions {
+		if !feedbackOptionsReady {
+			feedbackOptions = blockPlacementFeedbackOptionsFromCLI(ctx, opts)
+			feedbackOptionsReady = true
+		}
+		return feedbackOptions
+	}
 	switch subcommand {
 	case "list":
 		if len(opts.commandArgs) != 1 {
@@ -542,7 +552,7 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 			Output:      output,
 			Transaction: tx,
 			ApplyResult: applyResult,
-			Feedback:    placementFeedbackForBlockOutput(ctx, output, opts),
+			Feedback:    placementFeedbackForBlockOutput(ctx, output, blockFeedbackOptions()),
 		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
 	case "compose":
 		if len(opts.commandArgs) != 1 {
@@ -577,7 +587,7 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 			Output:      output,
 			Transaction: tx,
 			ApplyResult: applyResult,
-			Feedback:    placementFeedbackForCompositionOutput(ctx, output, opts),
+			Feedback:    placementFeedbackForCompositionOutput(ctx, output, blockFeedbackOptions()),
 		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
 	default:
 		return writeBlockFailure(stdout, reports.Issue{
@@ -665,20 +675,44 @@ type compositionProjectGenerationResult struct {
 	Feedback    *workflows.DesignFeedback `json:"feedback,omitempty"`
 }
 
-func placementFeedbackForBlockOutput(ctx context.Context, output blocks.BlockOutput, opts cliOptions) *workflows.DesignFeedback {
-	if opts.skipPlacementFeedback {
+type blockPlacementFeedbackOptions struct {
+	Adapter placement.AdapterOptions
+	Issues  []reports.Issue
+	Enabled bool
+}
+
+func placementFeedbackForBlockOutput(ctx context.Context, output blocks.BlockOutput, feedbackOptions blockPlacementFeedbackOptions) *workflows.DesignFeedback {
+	if !feedbackOptions.Enabled {
 		return nil
 	}
-	request, issues := placement.RequestFromBlockOutput(output, blockPlacementAdapterOptions(opts))
+	request, issues := placement.RequestFromBlockOutput(output, feedbackOptions.Adapter)
+	issues = combinedPlacementFeedbackIssues(feedbackOptions.Issues, issues)
 	return placementFeedbackForRequest(ctx, request, issues)
 }
 
-func placementFeedbackForCompositionOutput(ctx context.Context, output blocks.CompositionOutput, opts cliOptions) *workflows.DesignFeedback {
-	if opts.skipPlacementFeedback {
+func placementFeedbackForCompositionOutput(ctx context.Context, output blocks.CompositionOutput, feedbackOptions blockPlacementFeedbackOptions) *workflows.DesignFeedback {
+	if !feedbackOptions.Enabled {
 		return nil
 	}
-	request, issues := placement.RequestFromCompositionOutput(output, blockPlacementAdapterOptions(opts))
+	request, issues := placement.RequestFromCompositionOutput(output, feedbackOptions.Adapter)
+	issues = combinedPlacementFeedbackIssues(feedbackOptions.Issues, issues)
 	return placementFeedbackForRequest(ctx, request, issues)
+}
+
+func combinedPlacementFeedbackIssues(first []reports.Issue, second []reports.Issue) []reports.Issue {
+	if len(first) == 0 && len(second) == 0 {
+		return nil
+	}
+	if len(first) == 0 {
+		return slices.Clone(second)
+	}
+	if len(second) == 0 {
+		return slices.Clone(first)
+	}
+	combined := make([]reports.Issue, 0, len(first)+len(second))
+	combined = append(combined, first...)
+	combined = append(combined, second...)
+	return combined
 }
 
 func placementFeedbackForRequest(ctx context.Context, request placement.Request, adapterIssues []reports.Issue) *workflows.DesignFeedback {
@@ -702,8 +736,21 @@ func placementFeedbackForRequest(ctx context.Context, request placement.Request,
 	return &feedback
 }
 
+func blockPlacementFeedbackOptionsFromCLI(ctx context.Context, opts cliOptions) blockPlacementFeedbackOptions {
+	adapterOptions := blockPlacementAdapterOptions(opts)
+	if opts.skipPlacementFeedback {
+		return blockPlacementFeedbackOptions{Adapter: adapterOptions}
+	}
+	roots := libraryRootsFromOptions(opts)
+	index, ok, issues := blockPlacementLibraryIndex(ctx, roots, opts)
+	if ok {
+		adapterOptions.LibraryIndex = &index
+	}
+	return blockPlacementFeedbackOptions{Adapter: adapterOptions, Issues: issues, Enabled: true}
+}
+
 func blockPlacementAdapterOptions(opts cliOptions) placement.AdapterOptions {
-	return placement.AdapterOptions{
+	adapterOptions := placement.AdapterOptions{
 		Board: placement.BoardPlacementArea{
 			WidthMM:  opts.placementBoardWidth,
 			HeightMM: opts.placementBoardHeight,
@@ -716,6 +763,28 @@ func blockPlacementAdapterOptions(opts cliOptions) placement.AdapterOptions {
 			Source:   placement.BoundsEstimated,
 		},
 	}
+	return adapterOptions
+}
+
+func blockPlacementLibraryIndex(ctx context.Context, roots libraryresolver.LibraryRoots, opts cliOptions) (libraryresolver.LibraryIndex, bool, []reports.Issue) {
+	if !blockPlacementShouldUseLibraryResolver(roots) {
+		return libraryresolver.LibraryIndex{}, false, nil
+	}
+	loadedIndex, issues := libraryresolver.Load(ctx, roots, libraryresolver.LoadOptions{
+		CachePath: opts.libraryCache,
+		Refresh:   opts.refreshLibraryCache,
+	})
+	if reports.HasBlockingIssue(issues) {
+		return libraryresolver.LibraryIndex{}, false, issues
+	}
+	if len(loadedIndex.Footprints) == 0 {
+		return libraryresolver.LibraryIndex{}, false, issues
+	}
+	return loadedIndex, true, issues
+}
+
+func blockPlacementShouldUseLibraryResolver(roots libraryresolver.LibraryRoots) bool {
+	return strings.TrimSpace(roots.FootprintsRoot) != ""
 }
 
 func writeBlockResult(stdout io.Writer, data any, issues []reports.Issue) error {

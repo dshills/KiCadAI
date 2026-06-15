@@ -342,6 +342,7 @@ func writeCLILibraryFixture(t *testing.T) (string, string) {
   (descr "Resistor SMD 0805")
   (tags "resistor 0805")
   (attr smd)
+  (fp_rect (start -1.2 -0.8) (end 1.2 0.8) (layer "F.CrtYd"))
   (pad "1" smd roundrect (at -0.95 0) (size 1.0 1.2) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25))
   (pad "2" smd roundrect (at 0.95 0) (size 1.0 1.2) (layers "F.Cu" "F.Paste" "F.Mask") (roundrect_rratio 0.25))
 )`)
@@ -1048,6 +1049,59 @@ func TestRunBlockInstantiateCanSkipPlacementFeedback(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(output, "status_led.kicad_pcb")); err != nil {
 		t.Fatalf("expected generated PCB: %v", err)
+	}
+}
+
+func TestRunBlockInstantiatePlacementFeedbackUsesLibraryGeometry(t *testing.T) {
+	_, footprints := writeCLILibraryFixture(t)
+	dir := t.TempDir()
+	output := filepath.Join(dir, "status_led")
+	request := filepath.Join(dir, "request.json")
+	body := `{
+	  "block_id": "led_indicator",
+	  "instance_id": "status_led",
+	  "params": {
+	    "resistor_footprint": "Resistor_SMD:R_0805_2012Metric",
+	    "led_footprint": "Resistor_SMD:R_0805_2012Metric"
+	  }
+	}`
+	if err := os.WriteFile(request, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--json",
+		"--request", request,
+		"--output", output,
+		"--footprints-root", footprints,
+		"block", "instantiate", "led_indicator",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	text := stdout.String()
+	for _, want := range []string{`"ok": true`, `"feedback"`, `"stage": "placement"`} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("expected output to contain %q:\n%s", want, text)
+		}
+	}
+	for _, unwanted := range []string{`"estimated_bounds_refs"`, `"action": "assign_courtyard_footprint"`} {
+		if strings.Contains(text, unwanted) {
+			t.Fatalf("expected resolver-backed feedback to omit %q:\n%s", unwanted, text)
+		}
+	}
+}
+
+func TestBlockPlacementLibraryIndexSkipsEmptyFootprintIndex(t *testing.T) {
+	roots := libraryRootsFromOptions(cliOptions{footprintsRoot: filepath.Join(t.TempDir(), "missing")})
+	_, ok, issues := blockPlacementLibraryIndex(context.Background(), roots, cliOptions{})
+	if ok {
+		t.Fatal("expected empty footprint index to be skipped")
+	}
+	if len(issues) == 0 {
+		t.Fatal("expected load diagnostics")
 	}
 }
 
