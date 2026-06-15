@@ -110,6 +110,7 @@ type FootprintRecord struct {
 	GraphicsSummary GraphicsSummary   `json:"graphics_summary"`
 	Models          []string          `json:"models,omitempty"`
 	BoundingBox     BoundingBox       `json:"bounding_box"`
+	CourtyardBox    BoundingBox       `json:"courtyard_box,omitempty"`
 	Raw             string            `json:"raw,omitempty"`
 	SearchText      string            `json:"-"`
 }

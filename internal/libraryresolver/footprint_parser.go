@@ -122,6 +122,7 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 		}
 	}
 	bounds := newBounds()
+	courtyardBounds := newBounds()
 	for _, child := range node.Children {
 		switch child.Head() {
 		case "pad":
@@ -139,38 +140,75 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 			}
 		case "fp_line":
 			record.GraphicsSummary.LineCount++
-			record.GraphicsSummary.markLayer(graphicLayer(child))
-			bounds.includeNamedPoint(child, "start")
-			bounds.includeNamedPoint(child, "end")
+			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
+			start, startOK := readNamedPointOK(child, "start")
+			end, endOK := readNamedPointOK(child, "end")
+			if startOK {
+				bounds.includePoint(start)
+			}
+			if endOK {
+				bounds.includePoint(end)
+			}
+			if courtyard {
+				if startOK {
+					courtyardBounds.includePoint(start)
+				}
+				if endOK {
+					courtyardBounds.includePoint(end)
+				}
+			}
 		case "fp_rect":
 			record.GraphicsSummary.PolygonCount++
-			record.GraphicsSummary.markLayer(graphicLayer(child))
-			bounds.includeNamedPoint(child, "start")
-			bounds.includeNamedPoint(child, "end")
+			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
+			start, startOK := readNamedPointOK(child, "start")
+			end, endOK := readNamedPointOK(child, "end")
+			if startOK {
+				bounds.includePoint(start)
+			}
+			if endOK {
+				bounds.includePoint(end)
+			}
+			if courtyard {
+				if startOK {
+					courtyardBounds.includePoint(start)
+				}
+				if endOK {
+					courtyardBounds.includePoint(end)
+				}
+			}
 		case "fp_circle":
 			record.GraphicsSummary.CircleCount++
-			record.GraphicsSummary.markLayer(graphicLayer(child))
+			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			center, centerOK := readNamedPointOK(child, "center")
 			end, endOK := readNamedPointOK(child, "end")
 			if centerOK && endOK {
 				bounds.includeCircle(center, end)
+				if courtyard {
+					courtyardBounds.includeCircle(center, end)
+				}
 			}
 		case "fp_arc":
 			record.GraphicsSummary.ArcCount++
-			record.GraphicsSummary.markLayer(graphicLayer(child))
+			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			start, startOK := readNamedPointOK(child, "start")
 			mid, midOK := readNamedPointOK(child, "mid")
 			end, endOK := readNamedPointOK(child, "end")
 			if startOK && midOK && endOK {
 				bounds.includeArc(start, mid, end)
+				if courtyard {
+					courtyardBounds.includeArc(start, mid, end)
+				}
 			}
 		case "fp_poly":
 			record.GraphicsSummary.PolygonCount++
-			record.GraphicsSummary.markLayer(graphicLayer(child))
+			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			points, pointIssues := readPolyPoints(file.Path, child)
 			issues = append(issues, pointIssues...)
 			for _, point := range points {
 				bounds.includePoint(point)
+				if courtyard {
+					courtyardBounds.includePoint(point)
+				}
 			}
 		case "model":
 			if len(child.Children) > 1 {
@@ -181,6 +219,7 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 	sort.Strings(record.Attributes)
 	sort.Strings(record.Models)
 	record.BoundingBox = bounds.box()
+	record.CourtyardBox = courtyardBounds.box()
 	record.SearchText = buildFootprintSearchText(record)
 	return record, issues
 }
@@ -338,10 +377,27 @@ func graphicLayer(node sexpr.ParsedNode) string {
 	return ""
 }
 
-func (summary *GraphicsSummary) markLayer(layer string) {
+func markGraphicLayer(summary *GraphicsSummary, node sexpr.ParsedNode) bool {
+	layer := graphicLayer(node)
+	summary.markLayer(layer)
+	return isCourtyardLayer(layer)
+}
+
+func isCourtyardLayer(layer string) bool {
 	switch layer {
 	case "F.CrtYd", "B.CrtYd":
+		return true
+	default:
+		return false
+	}
+}
+
+func (summary *GraphicsSummary) markLayer(layer string) {
+	if isCourtyardLayer(layer) {
 		summary.HasCourtyard = true
+		return
+	}
+	switch layer {
 	case "F.Fab", "B.Fab":
 		summary.HasFabOutline = true
 	case "F.SilkS", "B.SilkS":

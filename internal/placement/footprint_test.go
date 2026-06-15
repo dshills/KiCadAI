@@ -40,6 +40,51 @@ func TestBoundsFromFootprintUsesBoundingBoxAndPads(t *testing.T) {
 	}
 }
 
+func TestBoundsFromFootprintPrefersCourtyardBox(t *testing.T) {
+	record := libraryresolver.FootprintRecord{
+		FootprintID: "Test:R_0603",
+		BoundingBox: libraryresolver.BoundingBox{
+			Min: kicadfiles.Point{X: kicadfiles.MM(-10), Y: kicadfiles.MM(-10)},
+			Max: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		},
+		CourtyardBox: libraryresolver.BoundingBox{
+			Min: kicadfiles.Point{X: kicadfiles.MM(-1), Y: kicadfiles.MM(-0.5)},
+			Max: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(0.5)},
+		},
+		GraphicsSummary: libraryresolver.GraphicsSummary{HasCourtyard: true},
+	}
+
+	bounds, _, issues := BoundsFromFootprint(record)
+	if len(issues) != 0 {
+		t.Fatalf("BoundsFromFootprint returned issues: %#v", issues)
+	}
+	if !nearlyEqual(bounds.WidthMM, 2) || !nearlyEqual(bounds.HeightMM, 1) {
+		t.Fatalf("bounds size = %.3fx%.3f, want courtyard 2x1", bounds.WidthMM, bounds.HeightMM)
+	}
+	if bounds.Source != BoundsLibraryCourtyard {
+		t.Fatalf("source = %q, want library courtyard", bounds.Source)
+	}
+}
+
+func TestBoundsFromFootprintFallsBackToOverallBoxWhenCourtyardBoxInvalid(t *testing.T) {
+	record := libraryresolver.FootprintRecord{
+		FootprintID: "Test:R_0603",
+		BoundingBox: libraryresolver.BoundingBox{
+			Min: kicadfiles.Point{X: kicadfiles.MM(-1), Y: kicadfiles.MM(-0.5)},
+			Max: kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(0.5)},
+		},
+		GraphicsSummary: libraryresolver.GraphicsSummary{HasCourtyard: true},
+	}
+
+	bounds, _, issues := BoundsFromFootprint(record)
+	if len(issues) != 0 {
+		t.Fatalf("BoundsFromFootprint returned issues: %#v", issues)
+	}
+	if !nearlyEqual(bounds.WidthMM, 2) || bounds.Source != BoundsLibraryCourtyard {
+		t.Fatalf("bounds = %#v, want fallback overall box with courtyard source", bounds)
+	}
+}
+
 func TestBoundsFromFootprintRejectsInvalidBoundingBox(t *testing.T) {
 	record := libraryresolver.FootprintRecord{FootprintID: "Test:Bad"}
 

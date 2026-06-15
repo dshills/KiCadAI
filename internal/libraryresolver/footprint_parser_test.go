@@ -54,6 +54,37 @@ func TestIndexFootprintsParsesSMDFootprint(t *testing.T) {
 	if record.BoundingBox.Min.X >= record.BoundingBox.Max.X || record.BoundingBox.Min.Y >= record.BoundingBox.Max.Y {
 		t.Fatalf("bounding box = %#v", record.BoundingBox)
 	}
+	if record.CourtyardBox.Min.X >= record.CourtyardBox.Max.X || record.CourtyardBox.Min.Y >= record.CourtyardBox.Max.Y {
+		t.Fatalf("courtyard box = %#v", record.CourtyardBox)
+	}
+}
+
+func TestIndexFootprintsKeepsSeparateCourtyardBoundingBox(t *testing.T) {
+	root := t.TempDir()
+	footprints := filepath.Join(root, "footprints")
+	mustWrite(t, filepath.Join(footprints, "Test.pretty", "Courtyard.kicad_mod"), `
+(footprint "Courtyard"
+  (fp_text user "OUTSIDE" (at 20 20 0) (layer "F.SilkS"))
+  (fp_rect (start -1 -0.5) (end 1 0.5) (layer "F.CrtYd"))
+  (pad "1" smd rect (at 0 0) (size 0.5 0.5) (layers "F.Cu" "F.Mask"))
+)`)
+
+	inventory := Discover(LibraryRoots{FootprintsRoot: footprints})
+	records, issues := IndexFootprints(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record := records["Test:Courtyard"]
+	if !record.GraphicsSummary.HasCourtyard {
+		t.Fatalf("summary = %#v", record.GraphicsSummary)
+	}
+	if record.BoundingBox.Max.X != kicadfiles.MM(20) || record.BoundingBox.Max.Y != kicadfiles.MM(20) {
+		t.Fatalf("overall bounding box = %#v, want text to contribute", record.BoundingBox)
+	}
+	if record.CourtyardBox.Min.X != kicadfiles.MM(-1) || record.CourtyardBox.Min.Y != kicadfiles.MM(-0.5) ||
+		record.CourtyardBox.Max.X != kicadfiles.MM(1) || record.CourtyardBox.Max.Y != kicadfiles.MM(0.5) {
+		t.Fatalf("courtyard box = %#v, want courtyard rect only", record.CourtyardBox)
+	}
 }
 
 func TestIndexFootprintsParsesThroughHoleFootprint(t *testing.T) {
@@ -404,6 +435,9 @@ func resistor0805Footprint() string {
   (fp_text reference "REF**" (at 0 -1.8 0) (layer "F.SilkS"))
   (fp_text value "R_0805_2012Metric" (at 0 1.8 0) (layer "F.Fab"))
   (fp_line (start -1.8 -0.9) (end 1.8 -0.9) (layer "F.CrtYd"))
+  (fp_line (start 1.8 -0.9) (end 1.8 0.9) (layer "F.CrtYd"))
+  (fp_line (start 1.8 0.9) (end -1.8 0.9) (layer "F.CrtYd"))
+  (fp_line (start -1.8 0.9) (end -1.8 -0.9) (layer "F.CrtYd"))
   (fp_line (start -1.0 -0.5) (end 1.0 -0.5) (layer "F.Fab"))
   (fp_line (start -1.0 0.5) (end 1.0 0.5) (layer "F.SilkS"))
   (fp_circle (center 0 0) (end 0 0.6) (layer "F.Fab"))

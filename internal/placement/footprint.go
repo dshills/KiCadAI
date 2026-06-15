@@ -15,16 +15,20 @@ func BoundsFromFootprint(record libraryresolver.FootprintRecord) (Bounds, []PadS
 	if strings.TrimSpace(record.FootprintID) == "" {
 		issues = append(issues, issue("footprint.footprint_id", "footprint id required"))
 	}
-	minX := iuToMM(record.BoundingBox.Min.X)
-	minY := iuToMM(record.BoundingBox.Min.Y)
-	maxX := iuToMM(record.BoundingBox.Max.X)
-	maxY := iuToMM(record.BoundingBox.Max.Y)
-	if maxX <= minX || maxY <= minY {
-		issues = append(issues, issue("footprint.bounding_box", "footprint bounding box must be positive"))
-	}
+	box := record.BoundingBox
 	source := BoundsLibraryPads
 	if record.GraphicsSummary.HasCourtyard {
 		source = BoundsLibraryCourtyard
+		if validBoundingBox(record.CourtyardBox) {
+			box = record.CourtyardBox
+		}
+	}
+	minX := iuToMM(box.Min.X)
+	minY := iuToMM(box.Min.Y)
+	maxX := iuToMM(box.Max.X)
+	maxY := iuToMM(box.Max.Y)
+	if maxX <= minX || maxY <= minY {
+		issues = append(issues, issue("footprint.bounding_box", "footprint bounding box must be positive"))
 	}
 	bounds := Bounds{
 		WidthMM:      maxX - minX,
@@ -43,6 +47,10 @@ func BoundsFromFootprint(record libraryresolver.FootprintRecord) (Bounds, []PadS
 		})
 	}
 	return bounds, pads, issues
+}
+
+func validBoundingBox(box libraryresolver.BoundingBox) bool {
+	return box.Max.X > box.Min.X && box.Max.Y > box.Min.Y
 }
 
 func HydrateComponentFootprint(component Component, record libraryresolver.FootprintRecord) (Component, []reports.Issue) {
