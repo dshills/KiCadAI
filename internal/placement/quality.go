@@ -7,22 +7,23 @@ import (
 )
 
 type QualityReport struct {
-	Status                   Status               `json:"status"`
-	Ready                    bool                 `json:"ready"`
-	Metrics                  Metrics              `json:"metrics"`
-	EstimatedBoundsRefs      []string             `json:"estimated_bounds_refs,omitempty"`
-	FixedRefs                []string             `json:"fixed_refs,omitempty"`
-	UnplacedRefs             []string             `json:"unplaced_refs,omitempty"`
-	GroupReports             []GroupQualityReport `json:"group_reports,omitempty"`
-	EdgeConstraintCount      int                  `json:"edge_constraint_count"`
-	EdgeConstraintSatisfied  int                  `json:"edge_constraint_satisfied"`
-	SideConstraintCount      int                  `json:"side_constraint_count"`
-	SideConstraintSatisfied  int                  `json:"side_constraint_satisfied"`
-	KeepoutCount             int                  `json:"keepout_count"`
-	GeometryIssueCount       int                  `json:"geometry_issue_count"`
-	GroupIssueCount          int                  `json:"group_issue_count"`
-	OperationIssueCount      int                  `json:"operation_issue_count"`
-	PlacementQualityWarnings []string             `json:"placement_quality_warnings,omitempty"`
+	Status                   Status                `json:"status"`
+	Ready                    bool                  `json:"ready"`
+	Metrics                  Metrics               `json:"metrics"`
+	EstimatedBoundsRefs      []string              `json:"estimated_bounds_refs,omitempty"`
+	FixedRefs                []string              `json:"fixed_refs,omitempty"`
+	UnplacedRefs             []string              `json:"unplaced_refs,omitempty"`
+	GroupReports             []GroupQualityReport  `json:"group_reports,omitempty"`
+	EdgeConstraintCount      int                   `json:"edge_constraint_count"`
+	EdgeConstraintSatisfied  int                   `json:"edge_constraint_satisfied"`
+	SideConstraintCount      int                   `json:"side_constraint_count"`
+	SideConstraintSatisfied  int                   `json:"side_constraint_satisfied"`
+	KeepoutCount             int                   `json:"keepout_count"`
+	GeometryIssueCount       int                   `json:"geometry_issue_count"`
+	GroupIssueCount          int                   `json:"group_issue_count"`
+	OperationIssueCount      int                   `json:"operation_issue_count"`
+	PlacementQualityWarnings []string              `json:"placement_quality_warnings,omitempty"`
+	Diagnostics              []PlacementDiagnostic `json:"diagnostics,omitempty"`
 }
 
 type GroupQualityReport struct {
@@ -84,6 +85,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	sort.Strings(report.FixedRefs)
 	sort.Strings(report.UnplacedRefs)
 	report.PlacementQualityWarnings = placementQualityWarnings(report)
+	report.Diagnostics = DiagnosticsForQuality(request, result, report)
 	return report
 }
 
