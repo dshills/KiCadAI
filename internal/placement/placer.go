@@ -11,10 +11,11 @@ import (
 )
 
 const (
-	groupAnchorScoreWeight     = 5.0
-	netConnectivityScoreWeight = 3.0
-	seedTieBreakScoreWeight    = 0.0001
-	placementCompareEpsilon    = 1e-9
+	groupAnchorScoreWeight       = 5.0
+	groupKeepTogetherScoreWeight = 8.0
+	netConnectivityScoreWeight   = 3.0
+	seedTieBreakScoreWeight      = 0.0001
+	placementCompareEpsilon      = 1e-9
 )
 
 func Place(request Request) Result {
@@ -37,9 +38,10 @@ func Place(request Request) Result {
 	padsByRef := componentPadMaps(components)
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
+	keepTogetherPeersByRef := keepTogetherPeersByComponent(request)
 	placedByRef := map[string]PlacementResult{}
 	for _, component := range components {
-		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef)
+		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef)
 		if !ok {
 			result.Status = StatusPartial
 			result.Metrics.UnplacedCount++
@@ -59,6 +61,9 @@ func Place(request Request) Result {
 		}
 		if component.Fixed {
 			result.Metrics.FixedCount++
+		}
+		if estimatedBoundsSource(component.Bounds.Source) {
+			result.Metrics.EstimatedBoundsCount++
 		}
 		result.Metrics.PlacedCount++
 		occupancy.Add(placement)
@@ -121,7 +126,7 @@ func slicesForPlacement(components []Component) []Component {
 	return ordered
 }
 
-func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet) (PlacementResult, bool, []reports.Issue) {
+func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string) (PlacementResult, bool, []reports.Issue) {
 	if component.Fixed {
 		if component.Position == nil {
 			return PlacementResult{}, false, nil
@@ -147,7 +152,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 		}
 		return placement, true, nil
 	}
-	for _, placement := range candidatePlacements(component, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef) {
+	for _, placement := range candidatePlacements(component, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef) {
 		if _, conflict := occupancy.FirstConflict(placement); conflict {
 			continue
 		}
@@ -156,7 +161,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 	return PlacementResult{}, false, nil
 }
 
-func candidatePlacements(component Component, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet) []PlacementResult {
+func candidatePlacements(component Component, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string) []PlacementResult {
 	usable := BoardUsableRect(request.Board, request.Rules)
 	grid := request.Rules.GridMM
 	if grid <= 0 {
@@ -194,6 +199,7 @@ func candidatePlacements(component Component, request Request, placedByRef map[s
 	}
 	anchor, hasAnchor := groupAnchorPoint(component, request)
 	componentRef := normalizeRef(component.Ref)
+	groupTarget, hasGroupTarget := groupKeepTogetherTarget(componentRef, keepTogetherPeersByRef, placedByRef)
 	netTargets := netScoreTargets(componentRef, netsByRef[componentRef], placedByRef, rotatedPadsByRef)
 	seedBase := seedTieBreakBase(request.Seed, component.Ref)
 	rotatedPadsByRotation := rotatedPadsByRef[componentRef]
@@ -201,7 +207,7 @@ func candidatePlacements(component Component, request Request, placedByRef map[s
 	for index, candidate := range candidates {
 		scored[index] = scoredPlacementCandidate{
 			CandidateIndex: index,
-			Score:          placementScore(component, candidate.Position, request, anchor, hasAnchor, netTargets, rotatedPadsByRotation, seedBase),
+			Score:          placementScore(component, candidate.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget, netTargets, rotatedPadsByRotation, seedBase),
 		}
 	}
 	sort.Slice(scored, func(i int, j int) bool {
@@ -287,7 +293,7 @@ func sampledIndices(count int, target int) []int {
 	return indices
 }
 
-func placementScore(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, netTargets []netScoreTarget, rotatedPadsByRotation map[int64]map[string]Point, seedBase uint64) float64 {
+func placementScore(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool, netTargets []netScoreTarget, rotatedPadsByRotation map[int64]map[string]Point, seedBase uint64) float64 {
 	score := 0.0
 	switch component.Edge {
 	case EdgeLeft:
@@ -313,9 +319,108 @@ func placementScore(component Component, placement Placement, request Request, a
 	if hasAnchor {
 		score += boardDistance(placement.XMM-anchor.XMM, placement.YMM-anchor.YMM) * groupAnchorScoreWeight
 	}
+	if hasGroupTarget {
+		score += boardDistance(placement.XMM-groupTarget.XMM, placement.YMM-groupTarget.YMM) * groupKeepTogetherScoreWeight
+	}
 	score += netDistanceScore(placement, netTargets, rotatedPadsByRotation[rotationKey(placement.RotationDeg)]) * netConnectivityScoreWeight
 	score += seedTieBreak(seedBase, placement) * seedTieBreakScoreWeight
 	return score
+}
+
+func keepTogetherPeersByComponent(request Request) map[string][]string {
+	peersByRef := map[string][]string{}
+	componentGroups := map[string][]string{}
+	for _, component := range request.Components {
+		groupID := strings.ToUpper(strings.TrimSpace(component.GroupID))
+		if groupID == "" {
+			continue
+		}
+		componentGroups[groupID] = append(componentGroups[groupID], normalizeRef(component.Ref))
+	}
+	for _, group := range request.Groups {
+		if !group.KeepTogether {
+			continue
+		}
+		groupID := strings.ToUpper(strings.TrimSpace(group.ID))
+		seen := map[string]struct{}{}
+		members := make([]string, 0, len(group.Components)+len(componentGroups[groupID]))
+		for _, ref := range componentGroups[groupID] {
+			if ref == "" {
+				continue
+			}
+			seen[ref] = struct{}{}
+			members = append(members, ref)
+		}
+		for _, ref := range group.Components {
+			normalizedRef := normalizeRef(ref)
+			if normalizedRef == "" {
+				continue
+			}
+			if _, ok := seen[normalizedRef]; ok {
+				continue
+			}
+			seen[normalizedRef] = struct{}{}
+			members = append(members, normalizedRef)
+		}
+		for _, member := range members {
+			for _, peer := range members {
+				if peer == member {
+					continue
+				}
+				peersByRef[member] = append(peersByRef[member], peer)
+			}
+		}
+	}
+	for ref, peers := range peersByRef {
+		seen := map[string]struct{}{}
+		unique := peers[:0]
+		for _, peer := range peers {
+			if _, ok := seen[peer]; ok {
+				continue
+			}
+			seen[peer] = struct{}{}
+			unique = append(unique, peer)
+		}
+		peersByRef[ref] = unique
+	}
+	return peersByRef
+}
+
+func groupKeepTogetherTarget(componentRef string, keepTogetherPeersByRef map[string][]string, placedByRef map[string]PlacementResult) (Point, bool) {
+	if len(placedByRef) == 0 {
+		return Point{}, false
+	}
+	peerRefs := keepTogetherPeersByRef[componentRef]
+	if len(peerRefs) == 0 {
+		return Point{}, false
+	}
+	var centroid Point
+	count := 0
+	for _, peerRef := range peerRefs {
+		placement, ok := placedByRef[peerRef]
+		if !ok {
+			continue
+		}
+		center := placement.Bounds.Center()
+		centroid.XMM += center.XMM
+		centroid.YMM += center.YMM
+		count++
+	}
+	if count == 0 {
+		return Point{}, false
+	}
+	centroid.XMM /= float64(count)
+	centroid.YMM /= float64(count)
+	return centroid, true
+}
+
+func estimatedBoundsSource(source BoundsSource) bool {
+	switch source {
+	case BoundsEstimated, BoundsGeneratedPads, BoundsLibraryPads:
+		return true
+	default:
+		return false
+	}
 }
 
 type netScoreTarget struct {

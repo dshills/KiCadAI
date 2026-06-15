@@ -46,6 +46,7 @@ func RequestFromOperations(operations []transactions.Operation, opts AdapterOpti
 		Components: builder.sortedComponents(),
 		Nets:       builder.sortedNets(),
 		Rules:      opts.Rules,
+		Existing:   ExistingPlacementPolicy{PreserveFixed: opts.PreservePlaced},
 	}, builder.issues
 }
 

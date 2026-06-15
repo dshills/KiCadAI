@@ -45,6 +45,9 @@ func TestRequestFromOperationsBuildsPlacementRequest(t *testing.T) {
 	if len(issues) != 0 {
 		t.Fatalf("RequestFromOperations returned issues: %#v", issues)
 	}
+	if !request.Existing.PreserveFixed {
+		t.Fatal("request Existing.PreserveFixed = false, want true")
+	}
 	if len(request.Components) != 1 {
 		t.Fatalf("components = %#v, want one", request.Components)
 	}

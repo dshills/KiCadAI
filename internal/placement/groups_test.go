@@ -22,6 +22,56 @@ func TestGroupAnchorInfluencesPlacement(t *testing.T) {
 	}
 }
 
+func TestKeepTogetherInfluencesPlacementNearPlacedPeer(t *testing.T) {
+	req := twoComponentRequest()
+	req.Board.WidthMM = 80
+	req.Board.HeightMM = 40
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 60, YMM: 20, Layer: "F.Cu"}
+	req.Groups = []Group{{
+		ID:           "analog",
+		Components:   []string{"R1", "R2"},
+		KeepTogether: true,
+	}}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	var moving PlacementResult
+	for _, placement := range result.Placements {
+		if placement.Ref == "R2" {
+			moving = placement
+		}
+	}
+	if moving.Ref == "" {
+		t.Fatalf("missing R2 placement: %#v", result.Placements)
+	}
+	if moving.Position.XMM < 45 {
+		t.Fatalf("R2 X = %.2f, want keep-together placement near fixed R1", moving.Position.XMM)
+	}
+}
+
+func TestKeepTogetherTargetCombinesMultipleGroups(t *testing.T) {
+	req := Request{
+		Components: []Component{{Ref: "U1"}},
+		Groups: []Group{
+			{ID: "analog", Components: []string{"U1", "R1"}, KeepTogether: true},
+			{ID: "power", Components: []string{"U1", "R1", "C1"}, KeepTogether: true},
+		},
+	}
+	target, ok := groupKeepTogetherTarget("U1", keepTogetherPeersByComponent(req), map[string]PlacementResult{
+		"R1": {Ref: "R1", Bounds: Rect{Min: Point{XMM: 10, YMM: 10}, Max: Point{XMM: 10, YMM: 10}}},
+		"C1": {Ref: "C1", Bounds: Rect{Min: Point{XMM: 30, YMM: 20}, Max: Point{XMM: 30, YMM: 20}}},
+	})
+	if !ok {
+		t.Fatal("groupKeepTogetherTarget returned no target")
+	}
+	if target.XMM != 20 || target.YMM != 15 {
+		t.Fatalf("target = %#v, want centroid of both group peers", target)
+	}
+}
+
 func TestValidateGroupsRejectsSpreadViolation(t *testing.T) {
 	req := twoComponentRequest()
 	req.Groups = []Group{{

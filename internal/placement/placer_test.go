@@ -35,6 +35,24 @@ func TestPlacePreservesFixedComponent(t *testing.T) {
 	}
 }
 
+func TestPlacePreservesPositionWhenExistingPolicyPreserveFixed(t *testing.T) {
+	req := minimalRequest()
+	req.Existing.PreserveFixed = true
+	req.Components[0].Position = &Placement{XMM: 10, YMM: 10, RotationDeg: 90, Layer: "F.Cu"}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	if result.Metrics.FixedCount != 1 {
+		t.Fatalf("fixed count = %d, want 1", result.Metrics.FixedCount)
+	}
+	got := result.Placements[0].Position
+	if got.XMM != 10 || got.YMM != 10 || got.RotationDeg != 90 {
+		t.Fatalf("preserved position = %#v, want original", got)
+	}
+}
+
 func TestPlaceRejectsFixedComponentCollision(t *testing.T) {
 	req := twoComponentRequest()
 	req.Components[0].Fixed = true
@@ -134,6 +152,28 @@ func TestPlaceComputesHPWL(t *testing.T) {
 	}
 }
 
+func TestPlaceCountsEstimatedBoundsSources(t *testing.T) {
+	req := Request{
+		Board: BoardPlacementArea{WidthMM: 50, HeightMM: 25, MarginMM: 1},
+		Components: []Component{
+			{Ref: "R1", FootprintID: "Test:R1", Bounds: Bounds{WidthMM: 2, HeightMM: 1, Source: BoundsExplicit}},
+			{Ref: "R2", FootprintID: "Test:R2", Bounds: Bounds{WidthMM: 2, HeightMM: 1, Source: BoundsLibraryCourtyard}},
+			{Ref: "R3", FootprintID: "Test:R3", Bounds: Bounds{WidthMM: 2, HeightMM: 1, Source: BoundsLibraryPads}},
+			{Ref: "R4", FootprintID: "Test:R4", Bounds: Bounds{WidthMM: 2, HeightMM: 1, Source: BoundsGeneratedPads}},
+			{Ref: "R5", FootprintID: "Test:R5", Bounds: Bounds{WidthMM: 2, HeightMM: 1, Source: BoundsEstimated}},
+		},
+		Rules: Rules{MaxCandidatesPerPart: 200},
+	}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v summary=%s", result.Status, result.Issues, placementSummary(result))
+	}
+	if result.Metrics.EstimatedBoundsCount != 3 {
+		t.Fatalf("estimated bounds count = %d, want 3", result.Metrics.EstimatedBoundsCount)
+	}
+}
+
 func TestPlaceSamplesAcrossBoardWhenCandidateCapIsSmall(t *testing.T) {
 	req := minimalRequest()
 	req.Board.WidthMM = 100
@@ -201,7 +241,7 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	req.Components[0].Rotation.AllowedDeg = []float64{45, 0}
 
 	padsByRef := componentPadMaps(req.Components)
-	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets))
+	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets), keepTogetherPeersByComponent(req))
 	if !ok {
 		t.Fatal("placeComponent failed after invalid candidate rotation")
 	}
@@ -261,5 +301,43 @@ func TestSeedTieBreakIsStable(t *testing.T) {
 	second := seedTieBreak(base, placement)
 	if first != second {
 		t.Fatalf("seed tie break changed: %f vs %f", first, second)
+	}
+}
+
+func TestSeedTieBreakInfluencesEquivalentPlacements(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Bounds = Bounds{
+		WidthMM:      1,
+		HeightMM:     1,
+		AnchorOffset: Point{XMM: 0.5, YMM: 0.5},
+		Source:       BoundsExplicit,
+	}
+	req.Rules.MaxCandidatesPerPart = 100
+	req.Components[0].Rotation.AllowedDeg = []float64{0, 90, 180, 270}
+	req.Seed = "seed-0"
+
+	first := Place(req)
+	second := Place(req)
+	if first.Status != StatusPlaced || second.Status != StatusPlaced {
+		t.Fatalf("seeded placements failed: first=%#v second=%#v", first, second)
+	}
+	if first.Placements[0].Position != second.Placements[0].Position {
+		t.Fatalf("same seed produced different placements: %#v vs %#v", first.Placements[0].Position, second.Placements[0].Position)
+	}
+
+	different := false
+	for _, seed := range []string{"seed-1", "seed-2", "seed-3", "seed-4", "seed-5", "seed-6", "seed-7"} {
+		req.Seed = seed
+		result := Place(req)
+		if result.Status != StatusPlaced {
+			t.Fatalf("placement for %s failed: %#v", seed, result)
+		}
+		if result.Placements[0].Position != first.Placements[0].Position {
+			different = true
+			break
+		}
+	}
+	if !different {
+		t.Fatalf("different seeds did not choose a different equivalent placement from %#v", first.Placements[0].Position)
 	}
 }

@@ -254,6 +254,9 @@ func NormalizeRequest(request Request) Request {
 			position := *request.Components[i].Position
 			request.Components[i].Position = &position
 		}
+		if request.Existing.PreserveFixed && request.Components[i].Position != nil {
+			request.Components[i].Fixed = true
+		}
 		request.Components[i].Ref = strings.TrimSpace(request.Components[i].Ref)
 		request.Components[i].FootprintID = strings.TrimSpace(request.Components[i].FootprintID)
 		request.Components[i].GroupID = strings.TrimSpace(request.Components[i].GroupID)
