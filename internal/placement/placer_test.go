@@ -1,6 +1,11 @@
 package placement
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"kicadai/internal/reports"
+)
 
 func TestPlacePlacesSimpleRequest(t *testing.T) {
 	req := twoComponentRequest()
@@ -15,6 +20,23 @@ func TestPlacePlacesSimpleRequest(t *testing.T) {
 	if len(ValidateGeometry(req, result.Placements)) != 0 {
 		t.Fatalf("result placements failed geometry validation: %#v", ValidateGeometry(req, result.Placements))
 	}
+}
+
+func TestPlaceContextHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result := PlaceContext(ctx, twoComponentRequest())
+	if result.Status != StatusBlocked {
+		t.Fatalf("status = %s, want blocked", result.Status)
+	}
+	if result.Metrics.UnplacedCount != 2 {
+		t.Fatalf("unplaced count = %d, want 2", result.Metrics.UnplacedCount)
+	}
+	if len(result.Issues) != 1 || result.Issues[0].Code != reports.CodeOperationCanceled {
+		t.Fatalf("issues = %#v, want operation canceled issue", result.Issues)
+	}
+	assertIssueContains(t, result.Issues, "context canceled")
 }
 
 func TestPlacePreservesFixedComponent(t *testing.T) {

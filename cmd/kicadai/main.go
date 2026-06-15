@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -79,10 +80,10 @@ Global flags:
   --request string       Structured request JSON path for generator commands
   --name string          Project/design name for generation commands
   --seed string          Deterministic seed for generation commands
-  --lib-vcc string      VCC symbol library ID for LED demo (default: %[1]s)
-  --lib-gnd string      GND symbol library ID for LED demo (default: %[2]s)
-  --lib-resistor string Resistor symbol library ID for LED demo (default: %[3]s)
-  --lib-led string      LED symbol library ID for LED demo (default: %[4]s)
+  --lib-vcc string      VCC symbol library ID for LED demo (default: {{defaultLibraryIDVCC}})
+  --lib-gnd string      GND symbol library ID for LED demo (default: {{defaultLibraryIDGND}})
+  --lib-resistor string Resistor symbol library ID for LED demo (default: {{defaultLibraryIDResistor}})
+  --lib-led string      LED symbol library ID for LED demo (default: {{defaultLibraryIDLED}})
   --execute             Required for mutation commands
   --with-pcb            Include PCB output for generation commands
   --overwrite           Allow generation commands to replace an existing project directory
@@ -98,12 +99,18 @@ Global flags:
   --templates-root string  KiCad template library root
   --library-cache string   Library resolver cache file path
   --refresh-library-cache  Rebuild library resolver cache
-  --mode string         Routing mode: single_layer, two_layer, validate_only
-  --grid float          Routing grid in millimeters
-  --trace-width float   Routing trace width in millimeters
-  --clearance float     Routing clearance in millimeters
-  --allow-partial       Allow partial routing results
-  --pretty              Pretty-print JSON output
+  --mode string                      Routing mode: single_layer, two_layer, validate_only
+  --grid float                       Routing grid in millimeters
+  --trace-width float                Routing trace width in millimeters
+  --clearance float                  Routing clearance in millimeters
+  --allow-partial                    Allow partial routing results
+  --placement-board-width float      Placement feedback board width in millimeters (default {{defaultPlacementBoardWidthMM}})
+  --placement-board-height float     Placement feedback board height in millimeters (default {{defaultPlacementBoardHeightMM}})
+  --placement-board-margin float     Placement feedback board margin in millimeters (default {{defaultPlacementBoardMarginMM}})
+  --placement-estimated-width float  Placement feedback estimated component width in millimeters (default {{defaultPlacementEstimatedWidthMM}})
+  --placement-estimated-height float Placement feedback estimated component height in millimeters (default {{defaultPlacementEstimatedHeightMM}})
+  --skip-placement-feedback          Skip placement feedback in block project generation output
+  --pretty                           Pretty-print JSON output
 `
 
 const (
@@ -111,57 +118,73 @@ const (
 	defaultLibraryIDGND      = "power:GND"
 	defaultLibraryIDResistor = "Device:R"
 	defaultLibraryIDLED      = "Device:LED"
+
+	defaultPlacementBoardWidthMM      = 100.0
+	defaultPlacementBoardHeightMM     = 60.0
+	defaultPlacementBoardMarginMM     = 2.0
+	defaultPlacementEstimatedWidthMM  = 2.0
+	defaultPlacementEstimatedHeightMM = 1.25
 )
 
-var usage = fmt.Sprintf(
-	usageTemplate,
-	defaultLibraryIDVCC,
-	defaultLibraryIDGND,
-	defaultLibraryIDResistor,
-	defaultLibraryIDLED,
-)
+var usage = strings.NewReplacer(
+	"{{defaultLibraryIDVCC}}", defaultLibraryIDVCC,
+	"{{defaultLibraryIDGND}}", defaultLibraryIDGND,
+	"{{defaultLibraryIDResistor}}", defaultLibraryIDResistor,
+	"{{defaultLibraryIDLED}}", defaultLibraryIDLED,
+	"{{defaultPlacementBoardWidthMM}}", fmt.Sprintf("%g", defaultPlacementBoardWidthMM),
+	"{{defaultPlacementBoardHeightMM}}", fmt.Sprintf("%g", defaultPlacementBoardHeightMM),
+	"{{defaultPlacementBoardMarginMM}}", fmt.Sprintf("%g", defaultPlacementBoardMarginMM),
+	"{{defaultPlacementEstimatedWidthMM}}", fmt.Sprintf("%g", defaultPlacementEstimatedWidthMM),
+	"{{defaultPlacementEstimatedHeightMM}}", fmt.Sprintf("%g", defaultPlacementEstimatedHeightMM),
+).Replace(usageTemplate)
 
 type cliOptions struct {
-	socket               string
-	apiCredential        string
-	clientName           string
-	timeoutMS            int
-	documentType         string
-	documentID           string
-	originX              int64
-	originY              int64
-	prefix               string
-	output               string
-	requestPath          string
-	name                 string
-	seed                 string
-	libVCC               string
-	libGND               string
-	libResistor          string
-	libLED               string
-	execute              bool
-	withPCB              bool
-	overwrite            bool
-	jsonOutput           bool
-	kicadCLI             string
-	keepArtifacts        bool
-	artifactDir          string
-	roundTimeout         string
-	allowlistPath        string
-	klcRoot              string
-	symbolsRoot          string
-	footprintsRoot       string
-	templatesRoot        string
-	libraryCache         string
-	refreshLibraryCache  bool
-	routeMode            string
-	routeGridMM          float64
-	routeTraceWidthMM    float64
-	routeClearanceMM     float64
-	routeAllowPartial    bool
-	routeAllowPartialSet bool
-	prettyOutput         bool
-	commandArgs          []string
+	socket                string
+	apiCredential         string
+	clientName            string
+	timeoutMS             int
+	documentType          string
+	documentID            string
+	originX               int64
+	originY               int64
+	prefix                string
+	output                string
+	requestPath           string
+	name                  string
+	seed                  string
+	libVCC                string
+	libGND                string
+	libResistor           string
+	libLED                string
+	execute               bool
+	withPCB               bool
+	overwrite             bool
+	jsonOutput            bool
+	kicadCLI              string
+	keepArtifacts         bool
+	artifactDir           string
+	roundTimeout          string
+	allowlistPath         string
+	klcRoot               string
+	symbolsRoot           string
+	footprintsRoot        string
+	templatesRoot         string
+	libraryCache          string
+	refreshLibraryCache   bool
+	routeMode             string
+	routeGridMM           float64
+	routeTraceWidthMM     float64
+	routeClearanceMM      float64
+	routeAllowPartial     bool
+	routeAllowPartialSet  bool
+	placementBoardWidth   float64
+	placementBoardHeight  float64
+	placementBoardMargin  float64
+	placementEstWidth     float64
+	placementEstHeight    float64
+	skipPlacementFeedback bool
+	prettyOutput          bool
+	commandArgs           []string
 }
 
 type apiClient interface {
@@ -298,6 +321,12 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Float64Var(&opts.routeTraceWidthMM, "trace-width", 0, "routing trace width in millimeters")
 	flags.Float64Var(&opts.routeClearanceMM, "clearance", 0, "routing clearance in millimeters")
 	flags.BoolVar(&opts.routeAllowPartial, "allow-partial", false, "allow partial routing results")
+	flags.Float64Var(&opts.placementBoardWidth, "placement-board-width", defaultPlacementBoardWidthMM, "placement feedback board width in millimeters")
+	flags.Float64Var(&opts.placementBoardHeight, "placement-board-height", defaultPlacementBoardHeightMM, "placement feedback board height in millimeters")
+	flags.Float64Var(&opts.placementBoardMargin, "placement-board-margin", defaultPlacementBoardMarginMM, "placement feedback board margin in millimeters")
+	flags.Float64Var(&opts.placementEstWidth, "placement-estimated-width", defaultPlacementEstimatedWidthMM, "placement feedback estimated component width in millimeters")
+	flags.Float64Var(&opts.placementEstHeight, "placement-estimated-height", defaultPlacementEstimatedHeightMM, "placement feedback estimated component height in millimeters")
+	flags.BoolVar(&opts.skipPlacementFeedback, "skip-placement-feedback", false, "skip placement feedback in block project generation output")
 	flags.BoolVar(&opts.prettyOutput, "pretty", false, "pretty-print JSON output")
 
 	if err := flags.Parse(args); err != nil {
@@ -308,6 +337,9 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 		return cliOptions{}, "", err
 	}
 
+	if err := validatePlacementFeedbackOptions(opts); err != nil {
+		return opts, "", err
+	}
 	if flags.NArg() == 0 {
 		return opts, "help", nil
 	}
@@ -319,6 +351,40 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	})
 	opts.commandArgs = flags.Args()[1:]
 	return opts, flags.Arg(0), nil
+}
+
+func validatePlacementFeedbackOptions(opts cliOptions) error {
+	if !positiveFiniteFloat(opts.placementBoardWidth) {
+		return fmt.Errorf("--placement-board-width must be positive")
+	}
+	if !positiveFiniteFloat(opts.placementBoardHeight) {
+		return fmt.Errorf("--placement-board-height must be positive")
+	}
+	if !nonNegativeFiniteFloat(opts.placementBoardMargin) {
+		return fmt.Errorf("--placement-board-margin must be zero or positive")
+	}
+	if opts.placementBoardMargin*2 >= opts.placementBoardWidth || opts.placementBoardMargin*2 >= opts.placementBoardHeight {
+		return fmt.Errorf("--placement-board-margin must leave positive usable board area")
+	}
+	if opts.placementBoardWidth-2*opts.placementBoardMargin < opts.placementEstWidth ||
+		opts.placementBoardHeight-2*opts.placementBoardMargin < opts.placementEstHeight {
+		return fmt.Errorf("placement board dimensions and margin must leave enough usable area for estimated component bounds")
+	}
+	if !positiveFiniteFloat(opts.placementEstWidth) {
+		return fmt.Errorf("--placement-estimated-width must be positive")
+	}
+	if !positiveFiniteFloat(opts.placementEstHeight) {
+		return fmt.Errorf("--placement-estimated-height must be positive")
+	}
+	return nil
+}
+
+func positiveFiniteFloat(value float64) bool {
+	return value > 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func nonNegativeFiniteFloat(value float64) bool {
+	return value >= 0 && !math.IsNaN(value) && !math.IsInf(value, 0)
 }
 
 func runStructuredCommandSkeleton(opts cliOptions, command string, stdout io.Writer) error {
@@ -476,6 +542,7 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 			Output:      output,
 			Transaction: tx,
 			ApplyResult: applyResult,
+			Feedback:    placementFeedbackForBlockOutput(ctx, output, opts),
 		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
 	case "compose":
 		if len(opts.commandArgs) != 1 {
@@ -510,6 +577,7 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 			Output:      output,
 			Transaction: tx,
 			ApplyResult: applyResult,
+			Feedback:    placementFeedbackForCompositionOutput(ctx, output, opts),
 		}, combinedBlockIssues(issues, applyResult.Issues), applyResult.Artifacts)
 	default:
 		return writeBlockFailure(stdout, reports.Issue{
@@ -584,15 +652,70 @@ func blockProjectName(opts cliOptions, fallback string) string {
 }
 
 type blockProjectGenerationResult struct {
-	Output      blocks.BlockOutput       `json:"output"`
-	Transaction transactions.Transaction `json:"transaction"`
-	ApplyResult transactions.ApplyResult `json:"apply_result"`
+	Output      blocks.BlockOutput        `json:"output"`
+	Transaction transactions.Transaction  `json:"transaction"`
+	ApplyResult transactions.ApplyResult  `json:"apply_result"`
+	Feedback    *workflows.DesignFeedback `json:"feedback,omitempty"`
 }
 
 type compositionProjectGenerationResult struct {
-	Output      blocks.CompositionOutput `json:"output"`
-	Transaction transactions.Transaction `json:"transaction"`
-	ApplyResult transactions.ApplyResult `json:"apply_result"`
+	Output      blocks.CompositionOutput  `json:"output"`
+	Transaction transactions.Transaction  `json:"transaction"`
+	ApplyResult transactions.ApplyResult  `json:"apply_result"`
+	Feedback    *workflows.DesignFeedback `json:"feedback,omitempty"`
+}
+
+func placementFeedbackForBlockOutput(ctx context.Context, output blocks.BlockOutput, opts cliOptions) *workflows.DesignFeedback {
+	if opts.skipPlacementFeedback {
+		return nil
+	}
+	request, issues := placement.RequestFromBlockOutput(output, blockPlacementAdapterOptions(opts))
+	return placementFeedbackForRequest(ctx, request, issues)
+}
+
+func placementFeedbackForCompositionOutput(ctx context.Context, output blocks.CompositionOutput, opts cliOptions) *workflows.DesignFeedback {
+	if opts.skipPlacementFeedback {
+		return nil
+	}
+	request, issues := placement.RequestFromCompositionOutput(output, blockPlacementAdapterOptions(opts))
+	return placementFeedbackForRequest(ctx, request, issues)
+}
+
+func placementFeedbackForRequest(ctx context.Context, request placement.Request, adapterIssues []reports.Issue) *workflows.DesignFeedback {
+	if reports.HasBlockingIssue(adapterIssues) {
+		result := placement.Result{
+			Status: placement.StatusBlocked,
+			Issues: adapterIssues,
+			Metrics: placement.Metrics{
+				ComponentCount: len(request.Components),
+				UnplacedCount:  len(request.Components),
+			},
+		}
+		feedback := workflows.EvaluatePlacement(request, result)
+		return &feedback
+	}
+	result := placement.PlaceContext(ctx, request)
+	if len(adapterIssues) > 0 {
+		result.Issues = append(result.Issues, adapterIssues...)
+	}
+	feedback := workflows.EvaluatePlacement(request, result)
+	return &feedback
+}
+
+func blockPlacementAdapterOptions(opts cliOptions) placement.AdapterOptions {
+	return placement.AdapterOptions{
+		Board: placement.BoardPlacementArea{
+			WidthMM:  opts.placementBoardWidth,
+			HeightMM: opts.placementBoardHeight,
+			MarginMM: opts.placementBoardMargin,
+		},
+		Rules: placement.DefaultRules(),
+		DefaultBounds: placement.Bounds{
+			WidthMM:  opts.placementEstWidth,
+			HeightMM: opts.placementEstHeight,
+			Source:   placement.BoundsEstimated,
+		},
+	}
 }
 
 func writeBlockResult(stdout io.Writer, data any, issues []reports.Issue) error {

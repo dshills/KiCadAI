@@ -1013,7 +1013,15 @@ func TestRunBlockInstantiateWritesProject(t *testing.T) {
 		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
 	}
 	text := stdout.String()
-	for _, want := range []string{`"ok": true`, `"command": "block"`, `"apply_result"`, `"kicad_project"`} {
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "block"`,
+		`"apply_result"`,
+		`"kicad_project"`,
+		`"feedback"`,
+		`"stage": "placement"`,
+		`"action": "assign_courtyard_footprint"`,
+	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("expected output to contain %q:\n%s", want, text)
 		}
@@ -1022,6 +1030,50 @@ func TestRunBlockInstantiateWritesProject(t *testing.T) {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected generated %s: %v", name, err)
 		}
+	}
+}
+
+func TestRunBlockInstantiateCanSkipPlacementFeedback(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "status_led")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--skip-placement-feedback", "--output", output, "--name", "status_led", "block", "instantiate", "led_indicator"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	text := stdout.String()
+	if strings.Contains(text, `"feedback"`) {
+		t.Fatalf("expected feedback to be omitted:\n%s", text)
+	}
+	if _, err := os.Stat(filepath.Join(output, "status_led.kicad_pcb")); err != nil {
+		t.Fatalf("expected generated PCB: %v", err)
+	}
+}
+
+func TestRunBlockRejectsInvalidPlacementFeedbackBoard(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--placement-board-width", "4", "--placement-board-margin", "2", "block", "list"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--placement-board-margin must leave positive usable board area") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestRunBlockRejectsNaNPlacementFeedbackBounds(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--placement-estimated-width", "NaN", "block", "list"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "--placement-estimated-width must be positive") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -1050,7 +1102,14 @@ func TestRunBlockComposeWritesProject(t *testing.T) {
 		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
 	}
 	text := stdout.String()
-	for _, want := range []string{`"ok": true`, `"command": "block"`, `"project_name": "composed"`, `"kind": "schematic"`} {
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "block"`,
+		`"project_name": "composed"`,
+		`"kind": "schematic"`,
+		`"feedback"`,
+		`"stage": "placement"`,
+	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("expected output to contain %q:\n%s", want, text)
 		}

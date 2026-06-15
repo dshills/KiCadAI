@@ -17,6 +17,7 @@ const (
 	CodeMissingFile               Code = "MISSING_FILE"
 	CodeUnsupportedOperation      Code = "UNSUPPORTED_OPERATION"
 	CodeSkippedExternalTool       Code = "SKIPPED_EXTERNAL_TOOL"
+	CodeOperationCanceled         Code = "OPERATION_CANCELED"
 	CodeValidationFailed          Code = "VALIDATION_FAILED"
 	CodeMissingFootprint          Code = "MISSING_FOOTPRINT"
 	CodeDuplicateReference        Code = "DUPLICATE_REFERENCE"

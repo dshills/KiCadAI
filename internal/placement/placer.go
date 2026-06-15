@@ -1,6 +1,7 @@
 package placement
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -19,12 +20,23 @@ const (
 )
 
 func Place(request Request) Result {
+	return PlaceContext(context.Background(), request)
+}
+
+func PlaceContext(ctx context.Context, request Request) Result {
 	request = NormalizeRequest(request)
+	totalComponents := len(request.Components)
 	result := Result{
 		Status: StatusPlaced,
 		Metrics: Metrics{
-			ComponentCount: len(request.Components),
+			ComponentCount: totalComponents,
 		},
+	}
+	if issue, ok := placementContextIssue(ctx); ok {
+		result.Status = StatusBlocked
+		result.Issues = []reports.Issue{issue}
+		result.Metrics.UnplacedCount = totalComponents
+		return result
 	}
 	if issues := Validate(request); len(issues) > 0 {
 		result.Status = StatusBlocked
@@ -39,8 +51,18 @@ func Place(request Request) Result {
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
 	keepTogetherPeersByRef := keepTogetherPeersByComponent(request)
-	placedByRef := map[string]PlacementResult{}
-	for _, component := range components {
+	placedByRef := make(map[string]PlacementResult, len(components))
+	for index, component := range components {
+		if issue, ok := placementContextIssue(ctx); ok {
+			if result.Metrics.PlacedCount > 0 {
+				result.Status = StatusPartial
+			} else {
+				result.Status = StatusBlocked
+			}
+			result.Issues = append(result.Issues, issue)
+			result.Metrics.UnplacedCount += totalComponents - index
+			break
+		}
 		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef)
 		if !ok {
 			result.Status = StatusPartial
@@ -100,6 +122,21 @@ func Place(request Request) Result {
 	}
 	result.Metrics.HPWLMM = hpwl(request.Nets, result.Placements)
 	return result
+}
+
+func placementContextIssue(ctx context.Context) (reports.Issue, bool) {
+	if ctx == nil {
+		return reports.Issue{}, false
+	}
+	if err := ctx.Err(); err != nil {
+		return reports.Issue{
+			Code:     reports.CodeOperationCanceled,
+			Severity: reports.SeverityBlocked,
+			Path:     "placement.context",
+			Message:  err.Error(),
+		}, true
+	}
+	return reports.Issue{}, false
 }
 
 func successfulPlacementResults(placements []PlacementResult) []PlacementResult {
