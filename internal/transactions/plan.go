@@ -114,7 +114,42 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 			}
 		}
 	}
+	annotatePlanIssueOperationIDs(&plan)
 	return plan
+}
+
+func annotatePlanIssueOperationIDs(plan *Plan) {
+	if plan == nil || len(plan.Issues) == 0 || len(plan.Operations) == 0 {
+		return
+	}
+	for i := range plan.Issues {
+		if plan.Issues[i].OperationID != "" {
+			continue
+		}
+		index, ok := operationIndexFromIssuePath(plan.Issues[i].Path)
+		if !ok || index >= len(plan.Operations) {
+			continue
+		}
+		if id := plan.Operations[index].ID; id != "" {
+			plan.Issues[i].OperationID = id
+		}
+	}
+}
+
+func operationIndexFromIssuePath(path string) (index int, ok bool) {
+	rest, found := strings.CutPrefix(path, "operations[")
+	if !found {
+		return 0, false
+	}
+	indexText, _, found := strings.Cut(rest, "]")
+	if !found || indexText == "" {
+		return 0, false
+	}
+	index, err := strconv.Atoi(indexText)
+	if err != nil || index < 0 {
+		return 0, false
+	}
+	return index, true
 }
 
 func plannedOperationID(planned PlannedOperation, op Operation) string {

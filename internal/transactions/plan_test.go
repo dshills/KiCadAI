@@ -116,6 +116,23 @@ func TestPlanUnsupportedRemoval(t *testing.T) {
 	if len(plan.Issues) == 0 || plan.Operations[0].Supported {
 		t.Fatalf("unexpected plan: %#v", plan)
 	}
+	if plan.Issues[0].OperationID == "" || plan.Issues[0].OperationID != plan.Operations[0].ID {
+		t.Fatalf("unsupported issue missing operation id: issue=%#v operation=%#v", plan.Issues[0], plan.Operations[0])
+	}
+}
+
+func TestAnnotatePlanIssueOperationIDsUsesSliceIndex(t *testing.T) {
+	plan := Plan{
+		Operations: []PlannedOperation{
+			{ID: "op-first", Index: 10},
+			{ID: "op-second", Index: 10},
+		},
+		Issues: []reports.Issue{{Path: "operations[1].ref"}},
+	}
+	annotatePlanIssueOperationIDs(&plan)
+	if plan.Issues[0].OperationID != "op-second" {
+		t.Fatalf("operation id = %q, want op-second", plan.Issues[0].OperationID)
+	}
 }
 
 func TestPlanExistingProjectBlocked(t *testing.T) {
@@ -218,6 +235,9 @@ func TestPlanWithResolverReportsBadSymbolID(t *testing.T) {
 	plan := PlanTransactionWithOptions(t.TempDir(), tx, PlanOptions{LibraryIndex: &index})
 	if len(plan.Issues) == 0 || plan.Issues[0].Code != reports.CodeMissingFile || plan.Issues[0].Path != "operations[0].library_id" {
 		t.Fatalf("expected bad symbol issue: %#v", plan.Issues)
+	}
+	if plan.Issues[0].OperationID != plan.Operations[0].ID {
+		t.Fatalf("library issue missing operation id: issue=%#v operation=%#v", plan.Issues[0], plan.Operations[0])
 	}
 }
 

@@ -88,14 +88,15 @@ func TestIssueFromError(t *testing.T) {
 func TestWriteJSONShape(t *testing.T) {
 	var buf bytes.Buffer
 	result := ResultWithIssues("evaluate-pcb", map[string]bool{"ready": false}, []Issue{{
-		Code:       CodeDisconnectedPad,
-		Severity:   SeverityError,
-		Path:       `pcb.footprints[J1].pads["1"]`,
-		Message:    "pad is disconnected",
-		UUIDs:      []string{"12345678-1234-5678-9234-123456789abc"},
-		Refs:       []string{"J1"},
-		Nets:       []string{"GND"},
-		Suggestion: "route GND",
+		Code:        CodeDisconnectedPad,
+		Severity:    SeverityError,
+		Path:        `pcb.footprints[J1].pads["1"]`,
+		OperationID: "op-route-net-gnd-1234567890",
+		Message:     "pad is disconnected",
+		UUIDs:       []string{"12345678-1234-5678-9234-123456789abc"},
+		Refs:        []string{"J1"},
+		Nets:        []string{"GND"},
+		Suggestion:  "route GND",
 	}}, []Artifact{{
 		Kind: ArtifactValidationReport,
 		Path: "reports/validation.json",
@@ -110,6 +111,7 @@ func TestWriteJSONShape(t *testing.T) {
 		`"command": "evaluate-pcb"`,
 		`"code": "DISCONNECTED_PAD"`,
 		`"severity": "error"`,
+		`"operation_id": "op-route-net-gnd-1234567890"`,
 		`"uuids": [`,
 		`"kind": "validation_report"`,
 	} {

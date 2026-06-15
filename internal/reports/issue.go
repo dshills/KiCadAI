@@ -47,6 +47,8 @@ type Issue struct {
 	Refs       []string `json:"refs,omitempty"`
 	Nets       []string `json:"nets,omitempty"`
 	Suggestion string   `json:"suggestion,omitempty"`
+	// OperationID links this issue to a planned transaction operation when available.
+	OperationID string `json:"operation_id,omitempty"`
 }
 
 func (issue Issue) Blocking() bool {
