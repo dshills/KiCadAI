@@ -744,11 +744,8 @@ func replaceSupersededPlacementOperationsBeforeWriteProject(tx transactions.Tran
 	filtered := make([]transactions.Operation, 0, len(tx.Operations))
 	for _, operation := range tx.Operations {
 		if operation.Op == transactions.OpPlaceFootprint {
-			ref, err := placementOperationRef(operation)
-			if err == nil {
-				if _, replace := replacementRefs[normalizedPlacementRef(ref)]; replace {
-					continue
-				}
+			if _, replace := replacementRefs[normalizedPlacementRef(operation.Ref)]; replace {
+				continue
 			}
 		}
 		filtered = append(filtered, operation)
@@ -771,33 +768,15 @@ func replaceSupersededPlacementOperationsBeforeWriteProject(tx transactions.Tran
 func placementOperationRefs(operations []transactions.Operation) map[string]struct{} {
 	refs := make(map[string]struct{}, len(operations))
 	for _, operation := range operations {
-		ref, err := placementOperationRef(operation)
-		if err != nil {
+		if operation.Op != transactions.OpPlaceFootprint {
 			continue
 		}
-		key := normalizedPlacementRef(ref)
+		key := normalizedPlacementRef(operation.Ref)
 		if key != "" {
 			refs[key] = struct{}{}
 		}
 	}
 	return refs
-}
-
-func placementOperationRef(operation transactions.Operation) (string, error) {
-	if operation.Op != transactions.OpPlaceFootprint {
-		return "", fmt.Errorf("operation is not place_footprint")
-	}
-	var payload struct {
-		Ref string `json:"ref"`
-	}
-	if err := json.Unmarshal(operation.Raw, &payload); err != nil {
-		return "", err
-	}
-	ref := strings.TrimSpace(payload.Ref)
-	if ref == "" {
-		return "", fmt.Errorf("placement operation missing ref")
-	}
-	return ref, nil
 }
 
 func normalizedPlacementRef(ref string) string {

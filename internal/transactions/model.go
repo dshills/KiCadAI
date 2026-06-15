@@ -27,17 +27,20 @@ type Operation struct {
 	Op    OperationKind   `json:"op"`
 	Index int             `json:"-"`
 	Raw   json.RawMessage `json:"-"`
+	Ref   string          `json:"-"`
 }
 
 func (op *Operation) UnmarshalJSON(data []byte) error {
 	var head struct {
-		Op OperationKind `json:"op"`
+		Op  OperationKind   `json:"op"`
+		Ref json.RawMessage `json:"ref"`
 	}
 	if err := json.Unmarshal(data, &head); err != nil {
 		return err
 	}
 	op.Op = head.Op
 	op.Raw = append([]byte(nil), data...)
+	op.Ref = operationRefFromRawValue(head.Ref)
 	return nil
 }
 
@@ -47,6 +50,27 @@ func (op Operation) MarshalJSON() ([]byte, error) {
 	}
 	type alias Operation
 	return json.Marshal(alias(op))
+}
+
+// NewOperation wraps a complete operation JSON object. The raw payload should
+// include the same "op" field that would be present after unmarshalling a
+// transaction file.
+func NewOperation(kind OperationKind, raw json.RawMessage) Operation {
+	return NewOperationWithRef(kind, raw, "")
+}
+
+// NewOperationWithRef wraps a complete operation JSON object and attaches
+// already-known reference metadata for callers that constructed the payload.
+func NewOperationWithRef(kind OperationKind, raw json.RawMessage, ref string) Operation {
+	return Operation{Op: kind, Raw: append([]byte(nil), raw...), Ref: ref}
+}
+
+func operationRefFromRawValue(raw json.RawMessage) string {
+	var ref string
+	if err := json.Unmarshal(raw, &ref); err != nil {
+		return ""
+	}
+	return ref
 }
 
 type Point struct {

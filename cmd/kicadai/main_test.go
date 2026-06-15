@@ -378,7 +378,20 @@ func mustJSONOperation(t *testing.T, kind transactions.OperationKind, payload an
 	if err != nil {
 		t.Fatal(err)
 	}
-	return transactions.Operation{Op: kind, Raw: raw}
+	return transactions.NewOperationWithRef(kind, raw, testOperationRef(payload))
+}
+
+func testOperationRef(payload any) string {
+	switch value := payload.(type) {
+	case transactions.AddSymbolOperation:
+		return value.Ref
+	case transactions.AssignFootprintOperation:
+		return value.Ref
+	case transactions.PlaceFootprintOperation:
+		return value.Ref
+	default:
+		return ""
+	}
 }
 
 func TestRunHelpFlagPrintsUsage(t *testing.T) {

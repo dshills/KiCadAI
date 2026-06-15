@@ -249,7 +249,20 @@ func operation(payload any) (transactions.Operation, error) {
 	if err != nil {
 		return transactions.Operation{}, err
 	}
-	return transactions.Operation{Op: kind, Raw: data}, nil
+	return transactions.NewOperationWithRef(kind, data, operationRef(payload)), nil
+}
+
+func operationRef(payload any) string {
+	switch value := payload.(type) {
+	case transactions.AddSymbolOperation:
+		return value.Ref
+	case transactions.AssignFootprintOperation:
+		return value.Ref
+	case transactions.PlaceFootprintOperation:
+		return value.Ref
+	default:
+		return ""
+	}
 }
 
 func operationKind(payload any) (transactions.OperationKind, error) {

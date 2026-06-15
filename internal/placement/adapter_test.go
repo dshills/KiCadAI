@@ -155,5 +155,5 @@ func mustOperation(t *testing.T, kind transactions.OperationKind, payload any) t
 	if err != nil {
 		t.Fatalf("marshal operation: %v", err)
 	}
-	return transactions.Operation{Op: kind, Raw: raw}
+	return transactions.NewOperation(kind, raw)
 }
