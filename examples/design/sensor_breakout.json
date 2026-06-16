@@ -1,0 +1,41 @@
+{
+  "version": "0.1.0",
+  "name": "i2c_sensor_breakout",
+  "intent": {
+    "summary": "I2C sensor breakout with a small header interface"
+  },
+  "board": {
+    "width_mm": 55,
+    "height_mm": 35,
+    "layers": 2,
+    "edge_clearance_mm": 1
+  },
+  "blocks": [
+    {
+      "id": "sensor",
+      "block_id": "i2c_sensor",
+      "params": {
+        "i2c_address": "0x48",
+        "include_pullups": true
+      }
+    },
+    {
+      "id": "header",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["VCC", "GND", "SDA", "SCL", "INT"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": "sensor.VCC", "to": "header.VCC", "net_alias": "VCC"},
+    {"from": "sensor.GND", "to": "header.GND", "net_alias": "GND"},
+    {"from": "sensor.SDA", "to": "header.SDA", "net_alias": "SDA"},
+    {"from": "sensor.SCL", "to": "header.SCL", "net_alias": "SCL"},
+    {"from": "sensor.INT", "to": "header.INT", "net_alias": "INT"}
+  ],
+  "validation": {
+    "acceptance": "connectivity",
+    "strict_unrouted": true
+  }
+}

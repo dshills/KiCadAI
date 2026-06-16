@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "name": "led_indicator",
+  "board": {
+    "width_mm": 40,
+    "height_mm": 25,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "status",
+      "block_id": "led_indicator",
+      "params": {
+        "color": "green",
+        "resistor_ohms": 1000
+      }
+    }
+  ],
+  "validation": {
+    "acceptance": "structural",
+    "skip_routing": true
+  }
+}
