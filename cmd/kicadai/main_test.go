@@ -603,6 +603,16 @@ func TestRunBlockListShowValidate(t *testing.T) {
 			t.Fatalf("instantiate output missing %q: %s", want, stdout.String())
 		}
 	}
+
+	stdout.Reset()
+	if err := run([]string{"--json", "--request", request, "block", "realize-pcb", "led_indicator"}, &stdout, &stderr); err != nil {
+		t.Fatalf("realize-pcb err = %v stdout=%s", err, stdout.String())
+	}
+	for _, want := range []string{`"realization": {`, `"local_routes": [`, `"placement_request": {`, `"components": [`} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("realize-pcb output missing %q: %s", want, stdout.String())
+		}
+	}
 }
 
 func TestRunBlockReportsStructuredFailures(t *testing.T) {

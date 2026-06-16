@@ -578,6 +578,46 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 			ApplyResult: applyResult,
 			Feedback:    placementApplication.Feedback,
 		}, combinedBlockIssues(resultIssues, applyResult.Issues), applyResult.Artifacts)
+	case "realize-pcb":
+		if len(opts.commandArgs) != 2 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("realize-pcb", 1))
+		}
+		id := opts.commandArgs[1]
+		definition, ok := registry.GetBlock(id)
+		if !ok {
+			return writeBlockResult(stdout, nil, []reports.Issue{missingBlockIssue(id)})
+		}
+		request, err := blockRequestFromOptions(opts, id)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "request",
+				Message:  err.Error(),
+			})
+		}
+		if request.InstanceID == "" {
+			request.InstanceID = blockProjectName(opts, id)
+		}
+		output, issues := registry.Instantiate(ctx, request)
+		if reports.HasBlockingIssue(issues) {
+			return writeBlockResult(stdout, blockPCBRealizationCLIResult{Output: output}, issues)
+		}
+		realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{})
+		if reports.HasBlockingIssue(realization.Issues) {
+			return writeBlockResult(stdout, blockPCBRealizationCLIResult{
+				Output:      output,
+				Realization: &realization,
+			}, combinedBlockIssues(issues, realization.Issues))
+		}
+		feedbackOptions := blockFeedbackOptions()
+		placementRequest, placementIssues := placement.RequestFromBlockPCBRealization(realization, feedbackOptions.Adapter)
+		resultIssues := combinedBlockIssues(realization.Issues, placementIssues)
+		return writeBlockResult(stdout, blockPCBRealizationCLIResult{
+			Output:           output,
+			Realization:      &realization,
+			PlacementRequest: &placementRequest,
+		}, combinedBlockIssues(issues, resultIssues))
 	case "compose":
 		if len(opts.commandArgs) != 1 {
 			return writeBlockFailure(stdout, invalidBlockArgCountIssue("compose", 0))
@@ -701,6 +741,12 @@ type compositionProjectGenerationResult struct {
 	Transaction transactions.Transaction  `json:"transaction"`
 	ApplyResult transactions.ApplyResult  `json:"apply_result"`
 	Feedback    *workflows.DesignFeedback `json:"feedback,omitempty"`
+}
+
+type blockPCBRealizationCLIResult struct {
+	Output           blocks.BlockOutput                `json:"output"`
+	Realization      *blocks.BlockPCBRealizationResult `json:"realization,omitempty"`
+	PlacementRequest *placement.Request                `json:"placement_request,omitempty"`
 }
 
 type blockPlacementFeedbackOptions struct {
