@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
@@ -48,6 +49,7 @@ type Options struct {
 	KeepArtifacts   bool
 	ArtifactDir     string
 	AllowlistPath   string
+	Allowlist       []checks.AllowlistEntry
 }
 
 type Result struct {
