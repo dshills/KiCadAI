@@ -242,6 +242,9 @@ func TestApplyRequiresCreateProject(t *testing.T) {
 	if len(result.Issues) == 0 || result.Issues[0].Path != "operations[0].op" {
 		t.Fatalf("expected create_project issue: %#v", result.Issues)
 	}
+	if result.Issues[0].OperationID == "" || result.Issues[0].OperationID != result.Plan.Operations[0].ID {
+		t.Fatalf("expected create_project issue operation id: issue=%#v plan=%#v", result.Issues[0], result.Plan.Operations)
+	}
 }
 
 func TestApplyRejectsLateCreateProject(t *testing.T) {
@@ -273,6 +276,9 @@ func TestApplyStopsOnOperationFailure(t *testing.T) {
 	result := Apply(tx, ApplyOptions{OutputDir: t.TempDir()})
 	if len(result.Issues) == 0 || result.Issues[0].Path != "operations[1]" {
 		t.Fatalf("expected operation index issue: %#v", result.Issues)
+	}
+	if result.Issues[0].OperationID == "" || result.Issues[0].OperationID != result.Plan.Operations[1].ID {
+		t.Fatalf("expected failing operation id: issue=%#v plan=%#v", result.Issues[0], result.Plan.Operations)
 	}
 }
 

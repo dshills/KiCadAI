@@ -37,9 +37,11 @@ type ApplyResult struct {
 	Issues    []reports.Issue    `json:"issues"`
 }
 
-func Apply(tx Transaction, opts ApplyOptions) ApplyResult {
+func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 	plan := PlanTransaction(opts.OutputDir, tx)
-	result := ApplyResult{Plan: plan, Artifacts: []reports.Artifact{}, Issues: append([]reports.Issue{}, plan.Issues...)}
+	result = ApplyResult{Plan: plan, Artifacts: []reports.Artifact{}, Issues: append([]reports.Issue{}, plan.Issues...)}
+	// Keep every early return annotated with operation IDs from the plan.
+	defer annotateApplyResultIssueOperationIDs(&result)
 	result.Issues = append(result.Issues, opts.LibraryIssues...)
 	if reports.HasBlockingIssue(result.Issues) {
 		return result
@@ -81,6 +83,10 @@ func Apply(tx Transaction, opts ApplyOptions) ApplyResult {
 		result.Artifacts = append(result.Artifacts, manifestArtifact)
 	}
 	return result
+}
+
+func annotateApplyResultIssueOperationIDs(result *ApplyResult) {
+	AnnotateIssueOperationIDs(result.Issues, result.Plan.Operations)
 }
 
 func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyResult {
