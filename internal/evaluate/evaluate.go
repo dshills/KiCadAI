@@ -1,6 +1,7 @@
 package evaluate
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -40,10 +41,20 @@ func WithCode(err error, code reports.Code) error {
 }
 
 func Project(path string) (Report, error) {
+	return ProjectContext(context.Background(), path)
+}
+
+func ProjectContext(ctx context.Context, path string) (Report, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if err := ctx.Err(); err != nil {
+		return Report{}, err
+	}
 	if strings.TrimSpace(path) == "" {
 		return Report{}, fmt.Errorf("project path required")
 	}
-	summary, err := inspect.Project(path)
+	summary, err := inspectProjectContext(ctx, path)
 	if err != nil {
 		return Report{}, err
 	}
@@ -86,6 +97,29 @@ func Project(path string) (Report, error) {
 	}
 	report.finish()
 	return report, nil
+}
+
+func inspectProjectContext(ctx context.Context, path string) (inspect.ProjectSummary, error) {
+	type result struct {
+		summary inspect.ProjectSummary
+		err     error
+	}
+	done := make(chan result, 1)
+	go func() {
+		defer func() {
+			if recovered := recover(); recovered != nil {
+				done <- result{err: fmt.Errorf("inspect project panic: %v", recovered)}
+			}
+		}()
+		summary, err := inspect.Project(path)
+		done <- result{summary: summary, err: err}
+	}()
+	select {
+	case <-ctx.Done():
+		return inspect.ProjectSummary{}, ctx.Err()
+	case result := <-done:
+		return result.summary, result.err
+	}
 }
 
 func Schematic(path string) (Report, error) {
