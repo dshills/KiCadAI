@@ -290,6 +290,61 @@ func TestRunLibraryMissingIDJSON(t *testing.T) {
 	}
 }
 
+func TestRunValidateBoardJSON(t *testing.T) {
+	projectDir := writeCLIValidationProject(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "validate", "board", projectDir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{
+		`"command": "validate"`,
+		`"status": "pass"`,
+		`"name": "pcb_structural_validation"`,
+		`"name": "unrouted_net_validation"`,
+		`"name": "kicad_drc"`,
+		`"fabrication_ready": true`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunValidateBoardRequireDRCMissingJSON(t *testing.T) {
+	projectDir := writeCLIValidationProject(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--require-drc", "validate", "board", projectDir}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("expected required DRC failure")
+	}
+	for _, want := range []string{
+		`"command": "validate"`,
+		`"ok": false`,
+		`"code": "SKIPPED_EXTERNAL_TOOL"`,
+		`"KiCad DRC was not run because no KiCad CLI path was configured"`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunValidateBoardRejectsContradictoryDRCFlags(t *testing.T) {
+	projectDir := writeCLIValidationProject(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--require-drc", "--allow-missing-drc", "validate", "board", projectDir}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected contradictory DRC flag error")
+	}
+	if !strings.Contains(stdout.String(), "--require-drc and --allow-missing-drc cannot both be set") {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func TestWriteReportJSON(t *testing.T) {
 	var stdout bytes.Buffer
 
@@ -313,6 +368,53 @@ func TestWriteReportJSON(t *testing.T) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
 	}
+}
+
+func writeCLIValidationProject(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	writeTestFile(t, filepath.Join(dir, "validate_demo.kicad_pro"), "{}")
+	writeTestFile(t, filepath.Join(dir, "validate_demo.kicad_pcb"), `(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (generator_version "10.0")
+  (general (thickness 1.6))
+  (paper "A4")
+  (layers
+    (0 "F.Cu" signal)
+    (2 "B.Cu" signal)
+    (13 "F.Paste" user)
+    (1 "F.Mask" user)
+    (25 "Edge.Cuts" user)
+    (31 "F.CrtYd" user)
+    (35 "F.Fab" user)
+    (5 "F.SilkS" user)
+  )
+  (net 0 "")
+  (net 1 "SIGNAL")
+  (footprint "Test:Pad"
+    (layer "F.Cu")
+    (uuid "11111111-1111-1111-1111-111111111111")
+    (property "Reference" "U1" (at 10 8 0) (layer "F.SilkS") (uuid "11111111-1111-1111-1111-111111111112"))
+    (property "Value" "U1" (at 10 12 0) (layer "F.Fab") (uuid "11111111-1111-1111-1111-111111111113"))
+    (at 10 10 0)
+    (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu" "F.Paste" "F.Mask") (net 1 "SIGNAL") (uuid "11111111-1111-1111-1111-111111111114"))
+  )
+  (footprint "Test:Pad"
+    (layer "F.Cu")
+    (uuid "11111111-1111-1111-1111-111111111115")
+    (property "Reference" "U2" (at 20 8 0) (layer "F.SilkS") (uuid "11111111-1111-1111-1111-111111111116"))
+    (property "Value" "U2" (at 20 12 0) (layer "F.Fab") (uuid "11111111-1111-1111-1111-111111111117"))
+    (at 20 10 0)
+    (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu" "F.Paste" "F.Mask") (net 1 "SIGNAL") (uuid "11111111-1111-1111-1111-111111111118"))
+  )
+  (segment (start 10 10) (end 20 10) (width 0.25) (layer "F.Cu") (net 1 "SIGNAL") (uuid "11111111-1111-1111-1111-111111111119"))
+  (gr_line (start 0 0) (end 30 0) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "11111111-1111-1111-1111-111111111120"))
+  (gr_line (start 30 0) (end 30 20) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "11111111-1111-1111-1111-111111111121"))
+  (gr_line (start 30 20) (end 0 20) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "11111111-1111-1111-1111-111111111122"))
+  (gr_line (start 0 20) (end 0 0) (stroke (width 0.1) (type default)) (layer "Edge.Cuts") (uuid "11111111-1111-1111-1111-111111111123"))
+)`)
+	return dir
 }
 
 func writeCLILibraryFixture(t *testing.T) (string, string) {

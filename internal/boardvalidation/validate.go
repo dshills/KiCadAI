@@ -49,27 +49,59 @@ func Validate(ctx context.Context, targetPath string, opts Options) Result {
 		result.Finish()
 		return result
 	}
-	validateBoard(ctx, &result, target, board, opts)
+	normalizeParsedBoard(&board)
+	validateBoard(ctx, &result, target, &board, opts)
 	result.Finish()
 	return result
 }
 
-func ValidateBoard(ctx context.Context, board pcbfiles.PCBFile, target Target, opts Options) Result {
+func ValidateBoard(ctx context.Context, board *pcbfiles.PCBFile, target Target, opts Options) Result {
 	result := NewResult(target.InputPath)
 	result.BoardPath = target.BoardPath
 	result.ProjectPath = target.ProjectPath
-	validateBoard(ctx, &result, target, board, opts)
+	if board == nil {
+		result.AddCheck(Check{
+			Name:     CheckPCBStructuralValidation,
+			Required: true,
+			Status:   StatusError,
+			Issues: []reports.Issue{{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     target.BoardPath,
+				Message:  "board is nil",
+			}},
+		})
+		result.Finish()
+		return result
+	}
+	normalized := cloneBoardForValidation(board)
+	normalizeParsedBoard(&normalized)
+	validateBoard(ctx, &result, target, &normalized, opts)
 	result.Finish()
 	return result
 }
 
-func validateBoard(ctx context.Context, result *Result, target Target, board pcbfiles.PCBFile, opts Options) {
-	structuralIssues := IssuesFromError(pcbfiles.Validate(board), target.BoardPath)
+func cloneBoardForValidation(board *pcbfiles.PCBFile) pcbfiles.PCBFile {
+	clone := *board
+	clone.Footprints = slices.Clone(board.Footprints)
+	for footprintIndex := range clone.Footprints {
+		clone.Footprints[footprintIndex].Properties = slices.Clone(clone.Footprints[footprintIndex].Properties)
+		clone.Footprints[footprintIndex].MetadataProperties = slices.Clone(clone.Footprints[footprintIndex].MetadataProperties)
+		clone.Footprints[footprintIndex].Texts = slices.Clone(clone.Footprints[footprintIndex].Texts)
+		clone.Footprints[footprintIndex].Pads = slices.Clone(clone.Footprints[footprintIndex].Pads)
+		clone.Footprints[footprintIndex].Graphics = slices.Clone(clone.Footprints[footprintIndex].Graphics)
+		clone.Footprints[footprintIndex].Models = slices.Clone(clone.Footprints[footprintIndex].Models)
+	}
+	return clone
+}
+
+func validateBoard(ctx context.Context, result *Result, target Target, board *pcbfiles.PCBFile, opts Options) {
+	structuralIssues := IssuesFromError(pcbfiles.Validate(*board), target.BoardPath)
 	result.AddCheck(Check{Name: CheckPCBStructuralValidation, Required: true, Issues: structuralIssues})
 
 	result.AddCheck(Check{Name: CheckNetToPadValidation, Required: true, Issues: validateNetToPad(board)})
 
-	connectivityIssues := IssuesFromError(pcbfiles.ValidateGeneratedConnectivity(board), target.BoardPath)
+	connectivityIssues := IssuesFromError(pcbfiles.ValidateGeneratedConnectivity(*board), target.BoardPath)
 	for index := range connectivityIssues {
 		if connectivityIssues[index].Code == reports.CodeValidationFailed {
 			connectivityIssues[index].Code = reports.CodeDisconnectedPad
@@ -90,17 +122,51 @@ func validateBoard(ctx context.Context, result *Result, target Target, board pcb
 	result.AddCheck(runDRCCheck(ctx, target, opts))
 }
 
-func validateNetToPad(board pcbfiles.PCBFile) []reports.Issue {
+func normalizeParsedBoard(board *pcbfiles.PCBFile) {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
+		if strings.TrimSpace(footprint.Path) == "" {
+			uuidText := ""
+			if footprint.UUID.Valid() {
+				uuidText = string(footprint.UUID)
+			}
+			footprint.Path = "/" + firstNonEmpty(uuidText, footprint.Reference, fmt.Sprintf("footprint-%d", footprintIndex))
+		}
+		for propertyIndex := range footprint.Properties {
+			property := &footprint.Properties[propertyIndex]
+			if property.Layer == "" {
+				backSide := footprint.Layer == kicadfiles.LayerBCu
+				switch property.Name {
+				case "Reference":
+					if backSide {
+						property.Layer = kicadfiles.LayerBSilkS
+					} else {
+						property.Layer = kicadfiles.LayerFSilkS
+					}
+				default:
+					if backSide {
+						property.Layer = kicadfiles.LayerBFab
+					} else {
+						property.Layer = kicadfiles.LayerFFab
+					}
+				}
+			}
+		}
+	}
+}
+
+func validateNetToPad(board *pcbfiles.PCBFile) []reports.Issue {
 	netNames := map[int]string{}
 	for _, net := range board.Nets {
 		netNames[net.Code] = net.Name
 	}
 	var issues []reports.Issue
-	for footprintIndex, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		seenPads := map[string]int{}
 		for padIndex, pad := range footprint.Pads {
 			path := fmt.Sprintf("footprints.%d.pads.%d", footprintIndex, padIndex)
-			ref := nonEmptyString(footprint.Reference, footprint.LibraryID)
+			ref := firstNonEmpty(footprint.Reference, footprint.LibraryID)
 			if _, ok := netNames[pad.NetCode]; !ok {
 				issues = append(issues, reports.Issue{
 					Code:       reports.CodeInvalidNetAssignment,
@@ -138,7 +204,7 @@ func validateNetToPad(board pcbfiles.PCBFile) []reports.Issue {
 	return issues
 }
 
-func footprintAllowsDuplicatePads(footprint pcbfiles.Footprint) bool {
+func footprintAllowsDuplicatePads(footprint *pcbfiles.Footprint) bool {
 	if footprint.DuplicatePadNumbersAreJumpers != nil && *footprint.DuplicatePadNumbersAreJumpers {
 		return true
 	}
@@ -164,7 +230,7 @@ type pointKey struct {
 	y int64
 }
 
-func buildBoardConnectivity(board pcbfiles.PCBFile) boardConnectivity {
+func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
 	graph := boardConnectivity{
 		netNames:       map[int]string{},
 		netPads:        map[int][]connectivityPad{},
@@ -175,8 +241,9 @@ func buildBoardConnectivity(board pcbfiles.PCBFile) boardConnectivity {
 	for _, net := range board.Nets {
 		graph.netNames[net.Code] = net.Name
 	}
-	for _, footprint := range board.Footprints {
-		ref := nonEmptyString(footprint.Reference, footprint.LibraryID)
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
+		ref := firstNonEmpty(footprint.Reference, footprint.LibraryID)
 		for _, pad := range footprint.Pads {
 			if pad.NetCode == 0 || pad.Type == "np_thru_hole" {
 				continue
@@ -316,7 +383,7 @@ func refsForPads(pads []connectivityPad) []string {
 	return refs
 }
 
-func validateRouteCompletion(board pcbfiles.PCBFile, graph boardConnectivity) []reports.Issue {
+func validateRouteCompletion(board *pcbfiles.PCBFile, graph boardConnectivity) []reports.Issue {
 	var issues []reports.Issue
 	netNames := graph.netNames
 	for index, track := range board.Tracks {
@@ -374,7 +441,7 @@ func validateRouteEndpoint(path string, netCode int, point kicadfiles.Point, gra
 	return []reports.Issue{invalidRouteIssue(path, "route endpoint is not connected to a same-net pad, via, or route endpoint", netIssueNames(netCode, graph.netNames))}
 }
 
-func validateZones(board pcbfiles.PCBFile, opts Options) ([]ZoneStatus, []reports.Issue) {
+func validateZones(board *pcbfiles.PCBFile, opts Options) ([]ZoneStatus, []reports.Issue) {
 	netNames := map[int]string{}
 	for _, net := range board.Nets {
 		netNames[net.Code] = net.Name
@@ -626,7 +693,7 @@ func boardLayersToStrings(layers []kicadfiles.BoardLayer) []string {
 	return out
 }
 
-func absolutePadPosition(footprint pcbfiles.Footprint, pad pcbfiles.Pad) kicadfiles.Point {
+func absolutePadPosition(footprint *pcbfiles.Footprint, pad pcbfiles.Pad) kicadfiles.Point {
 	localX := pad.Position.X
 	localY := pad.Position.Y
 	if footprint.Layer == kicadfiles.LayerBCu {
@@ -641,6 +708,15 @@ func absolutePadPosition(footprint pcbfiles.Footprint, pad pcbfiles.Pad) kicadfi
 		X: footprint.Position.X + kicadfiles.IU(math.Round(x)),
 		Y: footprint.Position.Y + kicadfiles.IU(math.Round(y)),
 	}
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func appendRepairCategory(suggestion string, category string) string {

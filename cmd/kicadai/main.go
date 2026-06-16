@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/blocks"
+	"kicadai/internal/boardvalidation"
 	"kicadai/internal/config"
 	"kicadai/internal/evaluate"
 	breakoutgen "kicadai/internal/generate"
@@ -54,6 +55,7 @@ Commands:
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
   check         Run KiCad CLI ERC/DRC checks
+  validate      Validate generated board electrical correctness
   inspect       Inspect KiCad projects and files
   library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
@@ -95,6 +97,10 @@ Global flags:
   --artifact-dir string Directory for retained KiCad-backed artifacts
   --timeout duration    KiCad CLI timeout, for example 10s or 2m
   --allowlist string    Round-trip or ERC/DRC allowlist JSON path
+  --require-drc         Require KiCad DRC evidence for board validation
+  --allow-missing-drc   Do not fail board validation when KiCad DRC is unavailable
+  --strict-zones        Treat zones without fill evidence as blocking
+  --strict-unrouted     Treat unrouted multi-pad nets as blocking
   --klc-root string        KiCad Library Convention repository root
   --symbols-root string    KiCad symbol library root
   --footprints-root string KiCad footprint library root
@@ -168,6 +174,10 @@ type cliOptions struct {
 	artifactDir           string
 	roundTimeout          string
 	allowlistPath         string
+	requireDRC            bool
+	allowMissingDRC       bool
+	strictZones           bool
+	strictUnrouted        bool
 	klcRoot               string
 	symbolsRoot           string
 	footprintsRoot        string
@@ -256,6 +266,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runLibrary(ctx, opts, stdout)
 	case "check":
 		return runCheckCommand(ctx, opts, stdout)
+	case "validate":
+		return runValidateCommand(ctx, opts, stdout)
 	case "roundtrip":
 		return runRoundTrip(opts, stdout)
 	case "pinmap":
@@ -314,6 +326,10 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.artifactDir, "artifact-dir", "", "round-trip artifact directory")
 	flags.StringVar(&opts.roundTimeout, "timeout", "", "round-trip timeout")
 	flags.StringVar(&opts.allowlistPath, "allowlist", "", "round-trip allowlist JSON path")
+	flags.BoolVar(&opts.requireDRC, "require-drc", false, "require KiCad DRC evidence for board validation")
+	flags.BoolVar(&opts.allowMissingDRC, "allow-missing-drc", false, "do not fail board validation when KiCad DRC is unavailable")
+	flags.BoolVar(&opts.strictZones, "strict-zones", false, "treat zones without fill evidence as blocking")
+	flags.BoolVar(&opts.strictUnrouted, "strict-unrouted", false, "treat unrouted multi-pad nets as blocking")
 	flags.StringVar(&opts.klcRoot, "klc-root", "", "KiCad Library Convention repository root")
 	flags.StringVar(&opts.symbolsRoot, "symbols-root", "", "KiCad symbol library root")
 	flags.StringVar(&opts.footprintsRoot, "footprints-root", "", "KiCad footprint library root")
@@ -1531,6 +1547,77 @@ func runCheckCommand(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		return errors.New("check reported blocking issues")
 	}
 	return nil
+}
+
+func runValidateCommand(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) == 0 {
+		return writeReportFailure(stdout, "validate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "validate",
+			Message:  "validate requires a subcommand",
+		})
+	}
+	if opts.commandArgs[0] != "board" {
+		return writeReportFailure(stdout, "validate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "validate." + opts.commandArgs[0],
+			Message:  "unsupported validate subcommand " + opts.commandArgs[0],
+		})
+	}
+	if len(opts.commandArgs) != 2 {
+		return writeReportFailure(stdout, "validate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "validate.board",
+			Message:  "validate board requires 1 argument",
+		})
+	}
+	validationOpts, err := boardValidationOptions(opts)
+	if err != nil {
+		return writeReportFailure(stdout, "validate", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "validate.options",
+			Message:  err.Error(),
+		})
+	}
+	report := boardvalidation.Validate(ctx, opts.commandArgs[1], validationOpts)
+	result := reports.ResultWithIssues("validate", report, report.Issues, report.Artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("validate reported blocking issues")
+	}
+	return nil
+}
+
+func boardValidationOptions(opts cliOptions) (boardvalidation.Options, error) {
+	if opts.requireDRC && opts.allowMissingDRC {
+		return boardvalidation.Options{}, fmt.Errorf("--require-drc and --allow-missing-drc cannot both be set")
+	}
+	validationOpts := boardvalidation.Options{
+		StrictZones:     opts.strictZones,
+		StrictUnrouted:  opts.strictUnrouted,
+		RequireDRC:      opts.requireDRC,
+		AllowMissingDRC: opts.allowMissingDRC,
+		KiCadCLI:        opts.kicadCLI,
+		KeepArtifacts:   opts.keepArtifacts,
+		ArtifactDir:     opts.artifactDir,
+		AllowlistPath:   opts.allowlistPath,
+	}
+	if strings.TrimSpace(opts.allowlistPath) != "" {
+		data, err := os.ReadFile(opts.allowlistPath)
+		if err != nil {
+			return boardvalidation.Options{}, fmt.Errorf("read allowlist: %w", err)
+		}
+		if err := json.Unmarshal(data, &validationOpts.Allowlist); err != nil {
+			return boardvalidation.Options{}, fmt.Errorf("decode allowlist: %w", err)
+		}
+	}
+	return validationOpts, nil
 }
 
 func checkOptions(opts cliOptions) (checks.Options, error) {

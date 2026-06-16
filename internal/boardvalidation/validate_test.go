@@ -12,7 +12,7 @@ import (
 
 func TestValidateBoardGoodFullyRouted(t *testing.T) {
 	board := twoPadBoard(t)
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusPass {
 		t.Fatalf("Status = %q, want pass; issues=%#v", result.Status, result.Issues)
 	}
@@ -29,7 +29,7 @@ func TestValidateBoardUnknownPadNet(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Footprints[0].Pads[0].NetCode = 99
 	board.Footprints[0].Pads[0].NetName = "MISSING"
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusFail {
 		t.Fatalf("Status = %q, want fail", result.Status)
 	}
@@ -41,7 +41,7 @@ func TestValidateBoardUnknownPadNet(t *testing.T) {
 func TestValidateBoardUnroutedNet(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Tracks = nil
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusFail {
 		t.Fatalf("Status = %q, want fail", result.Status)
 	}
@@ -54,7 +54,7 @@ func TestValidateBoardUnroutedNet(t *testing.T) {
 func TestValidateBoardDanglingRouteEndpoint(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Tracks[0].End = kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusFail {
 		t.Fatalf("Status = %q, want fail", result.Status)
 	}
@@ -69,7 +69,7 @@ func TestValidateBoardRotatedFootprintPadPosition(t *testing.T) {
 	board.Footprints[0].Rotation = 90
 	board.Footprints[0].Pads[0].Position = kicadfiles.Point{X: kicadfiles.MM(2), Y: 0}
 	board.Tracks[0].Start = kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(12)}
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusPass {
 		t.Fatalf("Status = %q, want pass for rotated footprint route; issues=%#v", result.Status, result.Issues)
 	}
@@ -89,11 +89,11 @@ func TestValidateBoardZoneStrictness(t *testing.T) {
 			{X: kicadfiles.MM(35), Y: kicadfiles.MM(25)},
 		}},
 	}}
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
 	if result.Status != StatusPass {
 		t.Fatalf("Status = %q, want pass with default zone warning; issues=%#v", result.Status, result.Issues)
 	}
-	strict := ValidateBoard(context.Background(), board, testTarget(), Options{StrictZones: true})
+	strict := ValidateBoard(context.Background(), &board, testTarget(), Options{StrictZones: true})
 	if strict.Status != StatusFail {
 		t.Fatalf("strict Status = %q, want fail", strict.Status)
 	}
@@ -101,12 +101,21 @@ func TestValidateBoardZoneStrictness(t *testing.T) {
 
 func TestValidateBoardRequiredDRCMissingFails(t *testing.T) {
 	board := twoPadBoard(t)
-	result := ValidateBoard(context.Background(), board, testTarget(), Options{RequireDRC: true})
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{RequireDRC: true})
 	if result.Status != StatusFail {
 		t.Fatalf("Status = %q, want fail", result.Status)
 	}
 	if !hasIssueCode(result.Issues, reports.CodeSkippedExternalTool) {
 		t.Fatalf("missing skipped DRC issue: %#v", result.Issues)
+	}
+}
+
+func TestValidateBoardDoesNotMutateInput(t *testing.T) {
+	board := twoPadBoard(t)
+	board.Footprints[0].Path = ""
+	_ = ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	if board.Footprints[0].Path != "" {
+		t.Fatalf("ValidateBoard mutated footprint path to %q", board.Footprints[0].Path)
 	}
 }
 
