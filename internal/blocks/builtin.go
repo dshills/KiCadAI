@@ -50,6 +50,8 @@ func ledIndicatorDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: true, Description: "Default resistor footprint."},
 			{Kind: "footprint", ID: "LED_SMD:LED_0805_2012Metric", Required: true, Description: "Default LED footprint."},
 		},
+		Components:     ledIndicatorComponents(),
+		PCBRealization: ledIndicatorPCBRealization(),
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Emits deterministic schematic transactions; resolver-backed pinmap validation is implemented in later phases."},
@@ -89,6 +91,8 @@ func voltageRegulatorDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Required: true, Description: "Default regulator footprint."},
 			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: true, Description: "Default capacitor footprint."},
 		},
+		Components:     voltageRegulatorComponents(),
+		PCBRealization: voltageRegulatorPCBRealization(),
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Emits deterministic fixed-linear-regulator transactions; part-specific thermal and stability requirements remain warnings until resolver metadata improves."},
@@ -139,6 +143,8 @@ func mcuMinimalDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: false, Description: "Default decoupling capacitor footprint."},
 			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: false, Description: "Default reset pull-up resistor footprint."},
 		},
+		Components:     mcuMinimalComponents(),
+		PCBRealization: mcuMinimalPCBRealization(),
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Uses an explicit ATmega328P-A pin-role map; arbitrary MCU symbols remain blocked until resolver semantic metadata is available."},
@@ -176,6 +182,8 @@ func usbCPowerDefinition() BlockDefinition {
 			{Kind: "symbol", ID: "Device:C", Required: false, Description: "Optional VBUS bulk capacitor."},
 			{Kind: "footprint", ID: "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", Required: false, Description: "Default USB-C receptacle footprint when connector_footprint is not overridden."},
 		},
+		Components:     usbCPowerComponents(),
+		PCBRealization: usbCPowerPCBRealization(),
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Implements USB-C sink power-only wiring with CC pull-downs; USB2 data and no-connect marker emission remain explicit gaps."},
@@ -218,6 +226,8 @@ func i2cSensorDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: false, Description: "Default pull-up resistor footprint."},
 			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: false, Description: "Default decoupling capacitor footprint."},
 		},
+		Components:     i2cSensorComponents(),
+		PCBRealization: i2cSensorPCBRealization(),
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Uses an explicit generic I2C sensor pin-role template; real part-specific symbols require future pin-role metadata."},
@@ -254,6 +264,8 @@ func opampGainStageDefinition() BlockDefinition {
 			{Kind: "symbol", ID: defaultOpAmpSymbol, Required: true, Description: "Default op-amp candidate."},
 			{Kind: "footprint", ID: "Package_TO_SOT_SMD:SOT-23-5", Required: true, Description: "Default op-amp footprint."},
 		},
+		Components:     opAmpGainStageComponents(),
+		PCBRealization: opAmpGainStagePCBRealization(),
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Implements a non-inverting LMV321 template with explicit pin roles; other op-amp symbols require future pin-role metadata."},
@@ -283,7 +295,9 @@ func connectorBreakoutDefinition() BlockDefinition {
 			{Kind: "symbol", ID: defaultConnectorSymbol, Required: false, Description: "Default two-pin connector."},
 			{Kind: "footprint", ID: defaultConnectorFootprint, Required: false, Description: "Default two-pin header."},
 		},
-		Verification: experimentalVerification("Initial metadata placeholder; dynamic port expansion is implemented in later phases."),
+		Components:     connectorBreakoutComponents(),
+		PCBRealization: connectorBreakoutPCBRealization(),
+		Verification:   experimentalVerification("Initial metadata placeholder; dynamic port expansion is implemented in later phases."),
 	}
 }
 

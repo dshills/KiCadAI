@@ -18,6 +18,7 @@ func TestValidatePCBRealizationAcceptsValidRealization(t *testing.T) {
 func TestValidatePCBRealizationRejectsUnknownRoleAndLayer(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.PCBRealization.Components[0].ComponentRole = "missing"
+	definition.PCBRealization.Components[0].FootprintParam = "missing_footprint"
 	definition.PCBRealization.Components[0].Placement.Layer = "Nope.Cu"
 	definition.PCBRealization.VerificationLevel = "made_up"
 
@@ -27,6 +28,7 @@ func TestValidatePCBRealizationRejectsUnknownRoleAndLayer(t *testing.T) {
 	}
 	assertIssuePath(t, issues, "block.demo.pcb_realization.verification_level")
 	assertIssuePath(t, issues, "block.demo.pcb_realization.components.0.component_role")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.components.0.footprint_param")
 	assertIssuePath(t, issues, "block.demo.pcb_realization.components.0.placement.layer")
 }
 

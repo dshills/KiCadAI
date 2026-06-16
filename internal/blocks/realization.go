@@ -139,11 +139,17 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, blockIssue(path+".verification_level", "unsupported PCB verification level "+string(realization.VerificationLevel)))
 	}
 	roles := componentRoleSet(definition.Components)
+	parameters := parameterNameSet(definition.Parameters)
 	for index, component := range realization.Components {
 		componentPath := fmt.Sprintf("%s.components.%d", path, index)
 		issues = append(issues, validateKnownRole(componentPath+".component_role", component.ComponentRole, roles)...)
 		if strings.TrimSpace(component.FootprintParam) == "" && strings.TrimSpace(component.FootprintID) == "" {
 			issues = append(issues, blockIssue(componentPath+".footprint", "component realization requires footprint_param or footprint_id"))
+		}
+		if component.FootprintParam != "" {
+			if _, ok := parameters[strings.TrimSpace(component.FootprintParam)]; !ok {
+				issues = append(issues, blockIssue(componentPath+".footprint_param", "unknown footprint parameter "+component.FootprintParam))
+			}
 		}
 		issues = append(issues, validateRelativePlacement(componentPath+".placement", component.Placement)...)
 	}
@@ -260,6 +266,17 @@ func componentRoleSet(components []BlockComponent) map[string]struct{} {
 		}
 	}
 	return roles
+}
+
+func parameterNameSet(parameters []BlockParameter) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, parameter := range parameters {
+		name := strings.TrimSpace(parameter.Name)
+		if name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
 }
 
 func validateKnownRole(path string, role string, roles map[string]struct{}) []reports.Issue {
