@@ -97,22 +97,23 @@ type SymbolPin struct {
 }
 
 type FootprintRecord struct {
-	FootprintID     string            `json:"footprint_id"`
-	LibraryNickname string            `json:"library_nickname"`
-	Name            string            `json:"name"`
-	Path            string            `json:"path"`
-	Description     string            `json:"description,omitempty"`
-	Tags            []string          `json:"tags,omitempty"`
-	Attributes      []string          `json:"attributes,omitempty"`
-	Properties      map[string]string `json:"properties,omitempty"`
-	Pads            []FootprintPad    `json:"pads,omitempty"`
-	Texts           []FootprintText   `json:"texts,omitempty"`
-	GraphicsSummary GraphicsSummary   `json:"graphics_summary"`
-	Models          []string          `json:"models,omitempty"`
-	BoundingBox     BoundingBox       `json:"bounding_box"`
-	CourtyardBox    BoundingBox       `json:"courtyard_box,omitempty"`
-	Raw             string            `json:"raw,omitempty"`
-	SearchText      string            `json:"-"`
+	FootprintID     string             `json:"footprint_id"`
+	LibraryNickname string             `json:"library_nickname"`
+	Name            string             `json:"name"`
+	Path            string             `json:"path"`
+	Description     string             `json:"description,omitempty"`
+	Tags            []string           `json:"tags,omitempty"`
+	Attributes      []string           `json:"attributes,omitempty"`
+	Properties      map[string]string  `json:"properties,omitempty"`
+	Pads            []FootprintPad     `json:"pads,omitempty"`
+	Texts           []FootprintText    `json:"texts,omitempty"`
+	Graphics        []FootprintGraphic `json:"graphics,omitempty"`
+	GraphicsSummary GraphicsSummary    `json:"graphics_summary"`
+	Models          []string           `json:"models,omitempty"`
+	BoundingBox     BoundingBox        `json:"bounding_box"`
+	CourtyardBox    BoundingBox        `json:"courtyard_box,omitempty"`
+	Raw             string             `json:"raw,omitempty"`
+	SearchText      string             `json:"-"`
 }
 
 type FootprintPad struct {
@@ -136,6 +137,19 @@ type FootprintText struct {
 	Layer    string           `json:"layer,omitempty"`
 }
 
+type FootprintGraphic struct {
+	Kind       string             `json:"kind"`
+	Layer      string             `json:"layer,omitempty"`
+	StrokeType string             `json:"stroke_type,omitempty"`
+	Fill       string             `json:"fill,omitempty"`
+	Width      kicadfiles.IU      `json:"width,omitempty"`
+	Start      *kicadfiles.Point  `json:"start,omitempty"`
+	End        *kicadfiles.Point  `json:"end,omitempty"`
+	Mid        *kicadfiles.Point  `json:"mid,omitempty"`
+	Center     *kicadfiles.Point  `json:"center,omitempty"`
+	Points     []kicadfiles.Point `json:"points,omitempty"`
+}
+
 type TemplateRecord struct {
 	Name           string   `json:"name"`
 	Path           string   `json:"path"`
@@ -152,6 +166,7 @@ type GraphicsSummary struct {
 	ArcCount      int  `json:"arc_count,omitempty"`
 	CircleCount   int  `json:"circle_count,omitempty"`
 	PolygonCount  int  `json:"polygon_count,omitempty"`
+	CurveCount    int  `json:"curve_count,omitempty"`
 	TextCount     int  `json:"text_count,omitempty"`
 	HasCourtyard  bool `json:"has_courtyard"`
 	HasFabOutline bool `json:"has_fab_outline"`

@@ -198,6 +198,15 @@ func TestUpsertImportedFootprintUsesResolverRecord(t *testing.T) {
 	if board.Footprints[0].Pads[0].PinFunction != "A" || board.Footprints[0].Pads[0].Drill != kicadfiles.MM(0.8) {
 		t.Fatalf("resolver pad metadata missing: %#v", board.Footprints[0].Pads[0])
 	}
+	if len(board.Footprints[0].Graphics) != 2 {
+		t.Fatalf("resolver graphics missing: %#v", board.Footprints[0].Graphics)
+	}
+	if graphic := pcb.Drawing(board.Footprints[0].Graphics[0]); graphic.Line == nil || graphic.Layer != kicadfiles.LayerFSilkS {
+		t.Fatalf("resolver graphic not mapped: %#v", graphic)
+	}
+	if graphic := pcb.Drawing(board.Footprints[0].Graphics[1]); graphic.Curve == nil || graphic.Layer != kicadfiles.LayerFFab {
+		t.Fatalf("resolver curve not mapped: %#v", graphic)
+	}
 }
 
 func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
@@ -213,6 +222,12 @@ func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
 	}
 	if len(footprint.Texts) == 0 || footprint.Texts[0].Layer != kicadfiles.LayerBSilkS {
 		t.Fatalf("text layers not remapped: %#v", footprint.Texts)
+	}
+	if len(footprint.Graphics) == 0 {
+		t.Fatalf("graphics not populated: %#v", footprint.Graphics)
+	}
+	if graphic := pcb.Drawing(footprint.Graphics[0]); graphic.Layer != kicadfiles.LayerBSilkS {
+		t.Fatalf("graphic layers not remapped: %#v", graphic)
 	}
 }
 
@@ -755,7 +770,21 @@ func applyResolverFixture() libraryresolver.LibraryIndex {
 					{Name: "1", Type: "thru_hole", Shape: "circle", Position: kicadfiles.Point{}, Size: kicadfiles.Point{X: kicadfiles.MM(1.6), Y: kicadfiles.MM(1.6)}, Drill: kicadfiles.MM(0.8), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}, PinFunction: "A", PinType: "passive"},
 					{Name: "2", Type: "thru_hole", Shape: "circle", Position: kicadfiles.Point{Y: kicadfiles.MM(2.54)}, Size: kicadfiles.Point{X: kicadfiles.MM(1.6), Y: kicadfiles.MM(1.6)}, Drill: kicadfiles.MM(0.8), Layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}, PinFunction: "B", PinType: "passive"},
 				},
-				Texts:  []libraryresolver.FootprintText{{Kind: "user", Text: "TEST", Layer: string(kicadfiles.LayerFSilkS)}},
+				Texts: []libraryresolver.FootprintText{{Kind: "user", Text: "TEST", Layer: string(kicadfiles.LayerFSilkS)}},
+				Graphics: []libraryresolver.FootprintGraphic{
+					{
+						Kind:  "line",
+						Layer: string(kicadfiles.LayerFSilkS),
+						Width: kicadfiles.MM(0.12),
+						Start: &kicadfiles.Point{},
+						End:   &kicadfiles.Point{X: kicadfiles.MM(1)},
+					},
+					{
+						Kind:   "curve",
+						Layer:  string(kicadfiles.LayerFFab),
+						Points: []kicadfiles.Point{{}, {X: kicadfiles.MM(1)}, {X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}},
+					},
+				},
 				Models: []string{"${KICAD9_3DMODEL_DIR}/Connector_Test.3dshapes/TH_1x02.wrl"},
 			},
 			"Resistor_Test:R_0603": {
@@ -768,6 +797,20 @@ func applyResolverFixture() libraryresolver.LibraryIndex {
 					{Name: "2", Type: "smd", Shape: "roundrect", Position: kicadfiles.Point{X: kicadfiles.MM(1.6)}, Size: kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.9)}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
 				},
 				Texts: []libraryresolver.FootprintText{{Kind: "user", Text: "R", Layer: string(kicadfiles.LayerFSilkS)}},
+				Graphics: []libraryresolver.FootprintGraphic{
+					{
+						Kind:  "line",
+						Layer: string(kicadfiles.LayerFSilkS),
+						Width: kicadfiles.MM(0.12),
+						Start: &kicadfiles.Point{},
+						End:   &kicadfiles.Point{X: kicadfiles.MM(1)},
+					},
+					{
+						Kind:   "curve",
+						Layer:  string(kicadfiles.LayerFFab),
+						Points: []kicadfiles.Point{{}, {X: kicadfiles.MM(1)}, {X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}},
+					},
+				},
 			},
 		},
 	}

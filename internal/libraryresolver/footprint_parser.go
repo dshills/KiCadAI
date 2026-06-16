@@ -139,10 +139,17 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 				bounds.includePoint(point)
 			}
 		case "fp_line":
-			record.GraphicsSummary.LineCount++
 			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			start, startOK := readNamedPointOK(child, "start")
 			end, endOK := readNamedPointOK(child, "end")
+			if startOK && endOK {
+				if appendLibraryFootprintGraphic(&record, "line", child, func(graphic *FootprintGraphic) {
+					graphic.Start = pointPtr(start)
+					graphic.End = pointPtr(end)
+				}) {
+					record.GraphicsSummary.LineCount++
+				}
+			}
 			if startOK {
 				bounds.includePoint(start)
 			}
@@ -158,10 +165,17 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 				}
 			}
 		case "fp_rect":
-			record.GraphicsSummary.PolygonCount++
 			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			start, startOK := readNamedPointOK(child, "start")
 			end, endOK := readNamedPointOK(child, "end")
+			if startOK && endOK {
+				if appendLibraryFootprintGraphic(&record, "rect", child, func(graphic *FootprintGraphic) {
+					graphic.Start = pointPtr(start)
+					graphic.End = pointPtr(end)
+				}) {
+					record.GraphicsSummary.PolygonCount++
+				}
+			}
 			if startOK {
 				bounds.includePoint(start)
 			}
@@ -177,10 +191,17 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 				}
 			}
 		case "fp_circle":
-			record.GraphicsSummary.CircleCount++
 			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			center, centerOK := readNamedPointOK(child, "center")
 			end, endOK := readNamedPointOK(child, "end")
+			if centerOK && endOK {
+				if appendLibraryFootprintGraphic(&record, "circle", child, func(graphic *FootprintGraphic) {
+					graphic.Center = pointPtr(center)
+					graphic.End = pointPtr(end)
+				}) {
+					record.GraphicsSummary.CircleCount++
+				}
+			}
 			if centerOK && endOK {
 				bounds.includeCircle(center, end)
 				if courtyard {
@@ -188,28 +209,47 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 				}
 			}
 		case "fp_arc":
-			record.GraphicsSummary.ArcCount++
 			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
-			start, startOK := readNamedPointOK(child, "start")
-			mid, midOK := readNamedPointOK(child, "mid")
-			end, endOK := readNamedPointOK(child, "end")
-			if startOK && midOK && endOK {
+			start, mid, end, arcOK := readLibraryArcPointsOK(child)
+			if arcOK {
+				if appendLibraryFootprintGraphic(&record, "arc", child, func(graphic *FootprintGraphic) {
+					graphic.Start = pointPtr(start)
+					graphic.Mid = pointPtr(mid)
+					graphic.End = pointPtr(end)
+				}) {
+					record.GraphicsSummary.ArcCount++
+				}
+			}
+			if arcOK {
 				bounds.includeArc(start, mid, end)
 				if courtyard {
 					courtyardBounds.includeArc(start, mid, end)
 				}
 			}
 		case "fp_poly":
-			record.GraphicsSummary.PolygonCount++
 			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
 			points, pointIssues := readPolyPoints(file.Path, child)
 			issues = append(issues, pointIssues...)
-			for _, point := range points {
-				bounds.includePoint(point)
-				if courtyard {
-					courtyardBounds.includePoint(point)
+			if len(points) >= 3 {
+				if appendLibraryFootprintGraphic(&record, "poly", child, func(graphic *FootprintGraphic) {
+					graphic.Points = points
+				}) {
+					record.GraphicsSummary.PolygonCount++
 				}
 			}
+			includeFootprintGraphicPoints(&bounds, &courtyardBounds, points, courtyard)
+		case "fp_curve":
+			courtyard := markGraphicLayer(&record.GraphicsSummary, child)
+			points, pointIssues := readPolyPoints(file.Path, child)
+			issues = append(issues, pointIssues...)
+			if len(points) >= 2 {
+				if appendLibraryFootprintGraphic(&record, "curve", child, func(graphic *FootprintGraphic) {
+					graphic.Points = points
+				}) {
+					record.GraphicsSummary.CurveCount++
+				}
+			}
+			includeFootprintGraphicPoints(&bounds, &courtyardBounds, points, courtyard)
 		case "model":
 			if len(child.Children) > 1 {
 				record.Models = append(record.Models, child.ListValue(1))
@@ -300,6 +340,95 @@ func readLibraryFootprintText(node sexpr.ParsedNode) FootprintText {
 		text.Layer = layer.ListValue(1)
 	}
 	return text
+}
+
+func readLibraryFootprintGraphicBase(kind string, node sexpr.ParsedNode) FootprintGraphic {
+	return FootprintGraphic{
+		Kind:       kind,
+		Layer:      graphicLayer(node),
+		StrokeType: readStrokeType(node),
+		Width:      readStrokeWidth(node),
+		Fill:       readFill(node),
+	}
+}
+
+func appendLibraryFootprintGraphic(record *FootprintRecord, kind string, node sexpr.ParsedNode, configure func(*FootprintGraphic)) bool {
+	graphic := readLibraryFootprintGraphicBase(kind, node)
+	if strings.TrimSpace(graphic.Layer) == "" {
+		return false
+	}
+	configure(&graphic)
+	record.Graphics = append(record.Graphics, graphic)
+	return true
+}
+
+func pointPtr(point kicadfiles.Point) *kicadfiles.Point {
+	return &point
+}
+
+func readLibraryArcPointsOK(node sexpr.ParsedNode) (kicadfiles.Point, kicadfiles.Point, kicadfiles.Point, bool) {
+	start, startOK := readNamedPointOK(node, "start")
+	mid, midOK := readNamedPointOK(node, "mid")
+	end, endOK := readNamedPointOK(node, "end")
+	if startOK && midOK && endOK {
+		return start, mid, end, true
+	}
+	angleNode, angleOK := node.Child("angle")
+	if !angleOK {
+		return kicadfiles.Point{}, kicadfiles.Point{}, kicadfiles.Point{}, false
+	}
+	center, centerOK := readNamedPointOK(node, "start")
+	legacyStart, legacyStartOK := readNamedPointOK(node, "end")
+	if !centerOK || !legacyStartOK {
+		return kicadfiles.Point{}, kicadfiles.Point{}, kicadfiles.Point{}, false
+	}
+	angle, angleValueOK := angleNode.FloatValue(1)
+	if !angleValueOK {
+		return kicadfiles.Point{}, kicadfiles.Point{}, kicadfiles.Point{}, false
+	}
+	// Legacy KiCad arcs store center in start and arc start in end. Convert to
+	// the modern start/mid/end shape used by pcb.FootprintGraphic rendering.
+	legacyMid := rotatePointAround(center, legacyStart, -angle/2)
+	legacyEnd := rotatePointAround(center, legacyStart, -angle)
+	return legacyStart, legacyMid, legacyEnd, true
+}
+
+func rotatePointAround(center kicadfiles.Point, point kicadfiles.Point, degrees float64) kicadfiles.Point {
+	radians := degrees * math.Pi / 180
+	sin, cos := math.Sin(radians), math.Cos(radians)
+	dx := float64(point.X - center.X)
+	dy := float64(point.Y - center.Y)
+	return kicadfiles.Point{
+		X: center.X + kicadfiles.IU(math.Round(dx*cos-dy*sin)),
+		Y: center.Y + kicadfiles.IU(math.Round(dx*sin+dy*cos)),
+	}
+}
+
+func readStrokeWidth(node sexpr.ParsedNode) kicadfiles.IU {
+	if stroke, ok := node.Child("stroke"); ok {
+		if width, ok := stroke.Child("width"); ok && len(width.Children) > 1 {
+			if value, ok := width.FloatValue(1); ok {
+				return kicadfiles.MM(value)
+			}
+		}
+	}
+	return 0
+}
+
+func readStrokeType(node sexpr.ParsedNode) string {
+	if stroke, ok := node.Child("stroke"); ok {
+		if kind, ok := stroke.Child("type"); ok && len(kind.Children) > 1 {
+			return kind.ListValue(1)
+		}
+	}
+	return ""
+}
+
+func readFill(node sexpr.ParsedNode) string {
+	if fill, ok := node.Child("fill"); ok && len(fill.Children) > 1 {
+		return fill.ListValue(1)
+	}
+	return ""
 }
 
 func readNamedPoint(node sexpr.ParsedNode, name string) kicadfiles.Point {
@@ -421,6 +550,15 @@ func readPolyPoints(path string, node sexpr.ParsedNode) ([]kicadfiles.Point, []r
 		points = append(points, point)
 	}
 	return points, issues
+}
+
+func includeFootprintGraphicPoints(bounds *footprintBounds, courtyardBounds *footprintBounds, points []kicadfiles.Point, courtyard bool) {
+	for _, point := range points {
+		bounds.includePoint(point)
+		if courtyard {
+			courtyardBounds.includePoint(point)
+		}
+	}
 }
 
 type footprintBounds struct {

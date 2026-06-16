@@ -48,6 +48,12 @@ func TestIndexFootprintsParsesSMDFootprint(t *testing.T) {
 	if record.GraphicsSummary.CircleCount != 1 {
 		t.Fatalf("circle count = %d", record.GraphicsSummary.CircleCount)
 	}
+	if len(record.Graphics) != 7 {
+		t.Fatalf("graphics = %#v", record.Graphics)
+	}
+	if record.Graphics[0].Kind != "line" || record.Graphics[0].Layer != "F.CrtYd" || record.Graphics[0].Start == nil || record.Graphics[0].End == nil {
+		t.Fatalf("first graphic = %#v", record.Graphics[0])
+	}
 	if len(record.Models) != 1 || record.Models[0] != "${KICAD9_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805.wrl" {
 		t.Fatalf("models = %#v", record.Models)
 	}
@@ -56,6 +62,48 @@ func TestIndexFootprintsParsesSMDFootprint(t *testing.T) {
 	}
 	if record.CourtyardBox.Min.X >= record.CourtyardBox.Max.X || record.CourtyardBox.Min.Y >= record.CourtyardBox.Max.Y {
 		t.Fatalf("courtyard box = %#v", record.CourtyardBox)
+	}
+}
+
+func TestIndexFootprintsParsesRenderableGraphics(t *testing.T) {
+	root := t.TempDir()
+	footprints := filepath.Join(root, "footprints")
+	mustWrite(t, filepath.Join(footprints, "Test.pretty", "Graphics.kicad_mod"), `
+(footprint "Graphics"
+  (fp_line (start 0 0) (end 1 0) (stroke (width 0.12) (type solid)) (layer "F.SilkS"))
+  (fp_rect (start -1 -1) (end 1 1) (stroke (width 0.05) (type dash)) (fill none) (layer "F.CrtYd"))
+  (fp_circle (center 0 0) (end 0 2) (stroke (width 0.1) (type solid)) (fill none) (layer "F.Fab"))
+  (fp_arc (start -1 0) (mid 0 1) (end 1 0) (stroke (width 0.08) (type solid)) (layer "F.Fab"))
+  (fp_poly (pts (xy 0 0) (xy 1 0) (xy 1 1)) (stroke (width 0.03) (type solid)) (fill solid) (layer "F.Fab"))
+  (fp_curve (pts (xy 0 0) (xy 0.5 1) (xy 1 1) (xy 1.5 0)) (stroke (width 0.04) (type solid)) (layer "F.Fab"))
+)`)
+
+	inventory := Discover(LibraryRoots{FootprintsRoot: footprints})
+	records, issues := IndexFootprints(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	graphics := records["Test:Graphics"].Graphics
+	if len(graphics) != 6 {
+		t.Fatalf("graphics = %#v", graphics)
+	}
+	if graphics[0].Kind != "line" || graphics[0].Width != kicadfiles.MM(0.12) || graphics[0].StrokeType != "solid" {
+		t.Fatalf("line graphic = %#v", graphics[0])
+	}
+	if graphics[1].Kind != "rect" || graphics[1].Fill != "none" || graphics[1].Start == nil || graphics[1].End == nil {
+		t.Fatalf("rect graphic = %#v", graphics[1])
+	}
+	if graphics[2].Kind != "circle" || graphics[2].Center == nil || graphics[2].End == nil {
+		t.Fatalf("circle graphic = %#v", graphics[2])
+	}
+	if graphics[3].Kind != "arc" || graphics[3].Mid == nil {
+		t.Fatalf("arc graphic = %#v", graphics[3])
+	}
+	if graphics[4].Kind != "poly" || len(graphics[4].Points) != 3 || graphics[4].Fill != "solid" {
+		t.Fatalf("poly graphic = %#v", graphics[4])
+	}
+	if graphics[5].Kind != "curve" || len(graphics[5].Points) != 4 || graphics[5].Width != kicadfiles.MM(0.04) {
+		t.Fatalf("curve graphic = %#v", graphics[5])
 	}
 }
 
@@ -293,6 +341,31 @@ func TestIndexFootprintsArcBoundingBoxUsesCircumcircle(t *testing.T) {
 	box := bounds.box()
 	if box.Min.X != kicadfiles.MM(-1) || box.Max.X != kicadfiles.MM(1) || box.Min.Y != 0 || box.Max.Y != kicadfiles.MM(1) {
 		t.Fatalf("bounding box = %#v", box)
+	}
+}
+
+func TestIndexFootprintsParsesLegacyArcFormat(t *testing.T) {
+	root := t.TempDir()
+	footprints := filepath.Join(root, "footprints")
+	mustWrite(t, filepath.Join(footprints, "Test.pretty", "LegacyArc.kicad_mod"), `
+(footprint "LegacyArc"
+  (fp_arc (start 0 0) (end 1 0) (angle 90) (stroke (width 0.1) (type solid)) (layer "F.Fab"))
+)`)
+
+	inventory := Discover(LibraryRoots{FootprintsRoot: footprints})
+	records, issues := IndexFootprints(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	graphics := records["Test:LegacyArc"].Graphics
+	if len(graphics) != 1 || graphics[0].Kind != "arc" || graphics[0].Start == nil || graphics[0].Mid == nil || graphics[0].End == nil {
+		t.Fatalf("graphics = %#v", graphics)
+	}
+	if graphics[0].Start.X != kicadfiles.MM(1) || graphics[0].Start.Y != 0 {
+		t.Fatalf("legacy start = %#v", graphics[0].Start)
+	}
+	if graphics[0].End.X != 0 || graphics[0].End.Y != kicadfiles.MM(-1) {
+		t.Fatalf("legacy end = %#v", graphics[0].End)
 	}
 }
 

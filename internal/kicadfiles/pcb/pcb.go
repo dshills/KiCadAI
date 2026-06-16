@@ -40,6 +40,10 @@ const (
 	zoneIslandRemovalArea   = 2
 )
 
+// DefaultFootprintGraphicStrokeWidth is the writer fallback for library
+// footprint graphics that omit an explicit KiCad stroke width.
+const DefaultFootprintGraphicStrokeWidth = kicadfiles.IU(120000)
+
 func DefaultTwoLayerStack() []LayerDefinition {
 	layers := []LayerDefinition{
 		{Number: kicad10LayerFCu, Name: kicadfiles.LayerFCu, Kind: "signal"},

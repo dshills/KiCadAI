@@ -1,6 +1,8 @@
 package transactions
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
 	"sort"
 	"strconv"
 	"strings"
@@ -71,9 +73,10 @@ func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload Place
 			{Name: "Reference", Value: payload.Ref, Position: kicadfiles.Point{Y: kicadfiles.MM(-1.5)}, Layer: placementLayerFor(kicadfiles.LayerFSilkS, layer), UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Reference")},
 			{Name: "Value", Value: value, Position: kicadfiles.Point{Y: kicadfiles.MM(1.5)}, Layer: placementLayerFor(kicadfiles.LayerFSilkS, layer), UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Value")},
 		},
-		Texts:  importedFootprintTexts(generator, payload.Ref, record.Texts, layer),
-		Pads:   importedPadsFromRecord(generator, payload.Ref, record, layer),
-		Models: importedModels(record.Models),
+		Texts:    importedFootprintTexts(generator, payload.Ref, record.Texts, layer),
+		Graphics: importedFootprintGraphics(generator, payload.Ref, record.Graphics, layer),
+		Pads:     importedPadsFromRecord(generator, payload.Ref, record, layer),
+		Models:   importedModels(record.Models),
 	}
 	return footprint
 }
@@ -122,6 +125,107 @@ func importedFootprintTexts(generator kicadfiles.IDGenerator, ref string, texts 
 		})
 	}
 	return result
+}
+
+func importedFootprintGraphics(generator kicadfiles.IDGenerator, ref string, graphics []libraryresolver.FootprintGraphic, placementLayer kicadfiles.BoardLayer) []pcb.FootprintGraphic {
+	result := make([]pcb.FootprintGraphic, 0, len(graphics))
+	seen := map[string]int{}
+	seedScratch := make([]byte, 0, 256)
+	for _, graphic := range graphics {
+		var seed string
+		seed, seedScratch = footprintGraphicSeed(graphic, seedScratch)
+		occurrence := seen[seed]
+		seen[seed]++
+		width := footprintGraphicStrokeWidth(graphic.Width)
+		drawing := pcb.Drawing{
+			UUID:       generator.New("imported.pcb.footprint.graphic", ref, seed, strconv.Itoa(occurrence)),
+			Kind:       graphic.Kind,
+			Layer:      placementLayerFor(kicadfiles.BoardLayer(graphic.Layer), placementLayer),
+			StrokeType: graphic.StrokeType,
+			Fill:       graphic.Fill,
+		}
+		switch graphic.Kind {
+		case "line":
+			if graphic.Start != nil && graphic.End != nil {
+				drawing.Line = &pcb.LineDrawing{Start: *graphic.Start, End: *graphic.End, Width: width}
+			}
+		case "rect":
+			if graphic.Start != nil && graphic.End != nil {
+				drawing.Rect = &pcb.RectDrawing{Start: *graphic.Start, End: *graphic.End, Width: width}
+			}
+		case "circle":
+			if graphic.Center != nil && graphic.End != nil {
+				drawing.Circle = &pcb.CircleDrawing{Center: *graphic.Center, End: *graphic.End, Width: width}
+			}
+		case "arc":
+			if graphic.Start != nil && graphic.Mid != nil && graphic.End != nil {
+				drawing.Arc = &pcb.ArcDrawing{Start: *graphic.Start, Mid: *graphic.Mid, End: *graphic.End, Width: width}
+			}
+		case "poly":
+			if len(graphic.Points) > 0 {
+				drawing.Poly = &pcb.PolylineDrawing{Points: append([]kicadfiles.Point(nil), graphic.Points...), Width: width}
+			}
+		case "curve":
+			if len(graphic.Points) > 0 {
+				drawing.Curve = &pcb.PolylineDrawing{Points: append([]kicadfiles.Point(nil), graphic.Points...), Width: width}
+			}
+		}
+		if footprintGraphicHasShape(drawing) {
+			result = append(result, pcb.FootprintGraphic(drawing))
+		}
+	}
+	return result
+}
+
+func footprintGraphicHasShape(drawing pcb.Drawing) bool {
+	return drawing.Line != nil || drawing.Rect != nil || drawing.Circle != nil || drawing.Arc != nil || drawing.Poly != nil || drawing.Curve != nil
+}
+
+func footprintGraphicStrokeWidth(width kicadfiles.IU) kicadfiles.IU {
+	if width > 0 {
+		return width
+	}
+	return pcb.DefaultFootprintGraphicStrokeWidth
+}
+
+func footprintGraphicSeed(graphic libraryresolver.FootprintGraphic, scratch []byte) (string, []byte) {
+	scratch = scratch[:0]
+	scratch = appendSeedString(scratch, graphic.Kind)
+	scratch = appendSeedString(scratch, graphic.Layer)
+	scratch = appendSeedString(scratch, graphic.StrokeType)
+	scratch = appendSeedString(scratch, graphic.Fill)
+	scratch = strconv.AppendInt(scratch, int64(graphic.Width), 10)
+	scratch = append(scratch, '|')
+	scratch = appendSeedPoint(scratch, graphic.Start)
+	scratch = appendSeedPoint(scratch, graphic.End)
+	scratch = appendSeedPoint(scratch, graphic.Mid)
+	scratch = appendSeedPoint(scratch, graphic.Center)
+	for i, point := range graphic.Points {
+		scratch = strconv.AppendInt(scratch, int64(i), 10)
+		scratch = append(scratch, ':')
+		scratch = strconv.AppendInt(scratch, int64(point.X), 10)
+		scratch = append(scratch, ',')
+		scratch = strconv.AppendInt(scratch, int64(point.Y), 10)
+		scratch = append(scratch, '|')
+	}
+	sum := sha1.Sum(scratch)
+	return hex.EncodeToString(sum[:8]), scratch
+}
+
+func appendSeedString(buffer []byte, value string) []byte {
+	buffer = append(buffer, value...)
+	return append(buffer, '|')
+}
+
+func appendSeedPoint(buffer []byte, point *kicadfiles.Point) []byte {
+	if point == nil {
+		buffer = append(buffer, "nil"...)
+		return append(buffer, '|')
+	}
+	buffer = strconv.AppendInt(buffer, int64(point.X), 10)
+	buffer = append(buffer, ',')
+	buffer = strconv.AppendInt(buffer, int64(point.Y), 10)
+	return append(buffer, '|')
 }
 
 func sortedMapKeys(values map[string]string) []string {
