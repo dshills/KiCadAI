@@ -151,6 +151,8 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 
 - `generate-led-demo` and `generate-project`: generate a deterministic LED
   indicator project, with optional PCB output.
+- `design create`: run the AI design workflow from explicit circuit-block
+  intent through schematic/PCB write, validation, and feedback.
 - `generate breakout`: generate a connector breakout project from a structured
   JSON request.
 - `block realize-pcb <block_id>`: instantiate a circuit block and return its
@@ -197,6 +199,64 @@ go run ./cmd/kicadai \
 
 Generated projects are written through safe directory handling. `--overwrite`
 is required to replace an existing output directory.
+
+### AI Design Workflow
+
+`design create` is the first deterministic AI-facing workflow. It accepts an
+explicit request JSON, selects built-in circuit blocks by ID, generates a
+schematic transaction, realizes PCB fragments, places footprints, optionally
+routes, writes the KiCad project, runs structural/connectivity validation, and
+returns stage-by-stage feedback.
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --request ./examples/design/led_indicator.json \
+  --output ./out/led_indicator \
+  --overwrite \
+  design create
+```
+
+Useful flags:
+
+- `--skip-routing`: skip board routing while still writing realized local PCB
+  fragments.
+- `--route-mode`: routing mode, one of `single_layer`, `two_layer`, or
+  `validate_only`; `--mode` remains as a shorter alias.
+- `--grid`, `--trace-width`, and `--clearance`: route planner controls in
+  millimeters.
+- `--allow-partial`: allow partial route results.
+- `--placement-estimated-width`, `--placement-estimated-height`,
+  `--placement-board-margin`: fallback placement geometry controls.
+- `--strict-unrouted`, `--strict-zones`: make validation stricter.
+- `--require-drc`, `--kicad-cli`, `--keep-artifacts`, `--artifact-dir`: require
+  KiCad-backed DRC evidence.
+
+Examples live in `examples/design/`:
+
+- `led_indicator.json`: structural acceptance, routing skipped.
+- `sensor_breakout.json`: connectivity-oriented request that may produce
+  actionable routing/validation feedback as the workflow matures.
+
+The top-level JSON result uses requested acceptance as the success contract. A
+request for `structural` acceptance can return `ok: true` while still including
+connectivity or KiCad-check issues for higher levels. Those issues are retained
+in `issues[]` and grouped under `data.feedback.repairs[]` so an agent can decide
+whether to revise the request, adjust placement/routing, or ask for external
+tooling.
+
+Current gaps for autonomous one-shot schematic + PCB generation:
+
+- request planning is explicit block composition, not natural-language block
+  selection;
+- placement is deterministic and conservative, not a full board-layout
+  optimizer;
+- routing is suitable for small known-good nets and local fragment routes, not
+  dense production boards;
+- some generated PCB validation failures still expose writer gaps, especially
+  net-code/net-name preservation in generated footprints and tracks;
+- KiCad ERC/DRC requires `kicad-cli` from KiCad 7 or newer and is optional
+  unless requested.
 
 ### Circuit Blocks
 
