@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -87,5 +88,31 @@ func TestBuildWorkflowResultClonesIssues(t *testing.T) {
 	result.Stages[0].Issues[0].Refs[0] = "mutated"
 	if stage.Issues[0].Refs[0] != "R1" {
 		t.Fatalf("stage issue was mutated: %#v", stage.Issues[0])
+	}
+}
+
+func TestFeedbackRepairActionsByIssueCode(t *testing.T) {
+	cases := []struct {
+		name  string
+		stage StageName
+		issue reports.Issue
+		want  string
+	}{
+		{name: "unknown block", stage: StageBlockPlanning, issue: reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Message: "missing"}, want: "select a supported circuit block"},
+		{name: "missing footprint", stage: StagePCBRealization, issue: reports.Issue{Code: reports.CodeMissingFootprint, Severity: reports.SeverityError, Message: "missing"}, want: "assign a KiCad-resolvable footprint"},
+		{name: "placement", stage: StagePlacement, issue: reports.Issue{Code: reports.CodePlacementOutsideBoard, Severity: reports.SeverityError, Message: "outside"}, want: "increase board size"},
+		{name: "connectivity", stage: StageValidation, issue: reports.Issue{Code: reports.CodeInvalidNetAssignment, Severity: reports.SeverityError, Message: "bad net"}, want: "repair net-to-pad assignments"},
+		{name: "external", stage: StageKiCadChecks, issue: reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityBlocked, Message: "missing cli"}, want: "provide kicad-cli"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			feedback := BuildFeedback([]StageResult{{Name: tc.stage, Status: StageStatusBlocked, Issues: []reports.Issue{tc.issue}}})
+			if len(feedback.Repairs) != 1 {
+				t.Fatalf("repairs = %#v", feedback.Repairs)
+			}
+			if !strings.Contains(feedback.Repairs[0].SuggestedAction, tc.want) {
+				t.Fatalf("action = %q, want %q", feedback.Repairs[0].SuggestedAction, tc.want)
+			}
+		})
 	}
 }

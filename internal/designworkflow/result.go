@@ -241,6 +241,30 @@ func RetryScopeForStage(stage StageName, issue reports.Issue) RetryScope {
 }
 
 func defaultRepairAction(stage StageName, issue reports.Issue) string {
+	if issue.Suggestion != "" {
+		return issue.Suggestion
+	}
+	switch issue.Code {
+	case reports.CodeMissingFile:
+		if stage == StageBlockPlanning {
+			return "select a supported circuit block or add the block to the registry"
+		}
+		return "provide the missing file or update the configured path"
+	case reports.CodeInvalidArgument:
+		return "correct the invalid request field and rerun the workflow"
+	case reports.CodeMissingFootprint, reports.CodeUnknownFootprintLibrary:
+		return "assign a KiCad-resolvable footprint or configure the footprint library roots"
+	case reports.CodePlacementOutsideBoard:
+		return "increase board size or relax placement constraints"
+	case reports.CodePlacementCollision:
+		return "adjust component positions, spacing, or placement constraints"
+	case reports.CodeDisconnectedPad, reports.CodeInvalidNetAssignment:
+		return "repair net-to-pad assignments and rerun routing"
+	case reports.CodeKiCadCLIFailed:
+		return "inspect the KiCad ERC/DRC report and repair the reported design rule finding"
+	case reports.CodeSkippedExternalTool:
+		return "provide kicad-cli or lower the requested external validation level"
+	}
 	switch RetryScopeForStage(stage, issue) {
 	case RetryScopeRequest:
 		return "modify the design request and rerun the workflow"
