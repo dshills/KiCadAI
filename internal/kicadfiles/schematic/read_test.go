@@ -60,6 +60,33 @@ func TestReadSchematicPreservesUnsupportedRawNode(t *testing.T) {
 	}
 }
 
+func TestReadSchematicReadsSymbolMirror(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (symbol`,
+		`    (lib_id "Device:R")`,
+		`    (at 20 20 0)`,
+		`    (mirror x)`,
+		`    (uuid "33333333-3333-5333-8333-333333333333")`,
+		`    (property "Reference" "R1")`,
+		`    (property "Value" "1k")`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 || read.Symbols[0].Mirror != SymbolMirrorX {
+		t.Fatalf("symbol mirror not read: %#v", read.Symbols)
+	}
+}
+
 func TestReadSchematicReadsEmbeddedLibSymbols(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,

@@ -34,6 +34,7 @@ import (
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/schematic"
+	"kicadai/internal/schematicpcb"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
 )
@@ -63,7 +64,7 @@ Commands:
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
   roundtrip     Run KiCad CLI round-trip checks
-  transaction   Validate, plan, or apply structured edit transactions
+  transaction   Build, validate, plan, or apply structured edit transactions
   version       Print KiCad version information
   help          Print this help text
 
@@ -1827,7 +1828,21 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 	}
 	subcommand := opts.commandArgs[0]
 	switch subcommand {
+	case "from-schematic":
+		return runTransactionFromSchematic(opts, stdout)
 	case "validate":
+		if len(opts.commandArgs) < 2 {
+			issue := reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "transaction.validate",
+				Message:  "transaction validate requires transaction path",
+			}
+			if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
 		path := opts.commandArgs[1]
 		tx, err := transactions.LoadFile(path)
 		if err != nil {
@@ -1973,6 +1988,57 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		}
 		return errors.New(issue.Message)
 	}
+}
+
+func runTransactionFromSchematic(opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) < 2 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "transaction.from-schematic",
+			Message:  "transaction from-schematic requires project directory",
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	projectDir := opts.commandArgs[1]
+	design, err := kicaddesign.ReadProjectDirectory(projectDir)
+	if err != nil {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     filepath.ToSlash(projectDir),
+			Message:  err.Error(),
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	transferOptions := schematicpcb.Options{}
+	var libraryIssues []reports.Issue
+	if transactionShouldUseLibraryResolver(opts) {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+		defer stop()
+		index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+			CachePath: opts.libraryCache,
+			Refresh:   opts.refreshLibraryCache,
+		})
+		transferOptions.LibraryIndex = &index
+		libraryIssues = issues
+	}
+	data := schematicpcb.FromDesign(design, transferOptions)
+	data.Issues = append(libraryIssues, data.Issues...)
+	result := reports.ResultWithIssues("transaction", data, data.Issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("transaction from-schematic failed")
+	}
+	return nil
 }
 
 type transactionValidationFeedbackPayload struct {
@@ -2258,6 +2324,8 @@ func requiredStructuredParams(command, subcommand string) (int, bool) {
 		}
 	case "transaction":
 		switch subcommand {
+		case "from-schematic":
+			return 1, true
 		case "validate":
 			return 1, true
 		case "plan", "apply":

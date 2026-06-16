@@ -189,6 +189,9 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 	if lib, ok := node.Child("lib_id"); ok {
 		symbol.LibraryID = lib.ListValue(1)
 	}
+	if mirror, ok := node.Child("mirror"); ok {
+		symbol.Mirror = SymbolMirror(mirror.ListValue(1))
+	}
 	for _, prop := range node.ChildrenByHead("property") {
 		property := Property{Name: prop.ListValue(1), Value: prop.ListValue(2), Position: readAtPoint(prop)}
 		symbol.Properties = append(symbol.Properties, property)

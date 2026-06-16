@@ -1409,6 +1409,60 @@ func TestRunTransactionValidateFeedbackJSON(t *testing.T) {
 	}
 }
 
+func TestRunTransactionFromSchematicJSON(t *testing.T) {
+	symbols, footprints := writeCLILibraryFixture(t)
+	root := filepath.Join(t.TempDir(), "demo")
+	writeTestFile(t, filepath.Join(root, "demo.kicad_pro"), `{}`)
+	writeTestFile(t, filepath.Join(root, "demo.kicad_sch"), `
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "11111111-1111-5111-8111-111111111111")
+  (paper A4)
+  (wire (pts (xy 15.08 10) (xy 34.92 10)) (uuid "22222222-2222-5222-8222-222222222222"))
+  (label "NET_A" (at 25 10 0) (uuid "33333333-3333-5333-8333-333333333333"))
+  (symbol
+    (lib_id "Device:R")
+    (at 10 10 0)
+    (property "Reference" "R1" (at 10 10 0))
+    (property "Value" "10k" (at 10 12.54 0))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric" (at 10 15.08 0))
+    (uuid "44444444-4444-5444-8444-444444444444"))
+  (symbol
+    (lib_id "Device:R")
+    (at 40 10 0)
+    (property "Reference" "R2" (at 40 10 0))
+    (property "Value" "10k" (at 40 12.54 0))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric" (at 40 15.08 0))
+    (uuid "55555555-5555-5555-8555-555555555555"))
+)`)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints, "transaction", "from-schematic", root}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout:\n%s\nstderr:\n%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"ok": true`,
+		`"command": "transaction"`,
+		`"symbol_count": 2`,
+		`"placed_count": 2`,
+		`"net_hint_count": 2`,
+		`"op": "place_footprint"`,
+		`"ref": "R1"`,
+		`"ref": "R2"`,
+		`"net": "NET_A"`,
+		`"op": "write_project"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestRunRouteRequestJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "route.json")
 	request := `{
