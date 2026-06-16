@@ -74,6 +74,7 @@ type BlockDefinition struct {
 	Nets              []BlockNet            `json:"nets,omitempty"`
 	SchematicHints    []SchematicHint       `json:"schematic_hints,omitempty"`
 	PCBHints          []PCBHint             `json:"pcb_hints,omitempty"`
+	PCBRealization    *PCBRealization       `json:"pcb_realization,omitempty"`
 	ValidationRules   []BlockValidationRule `json:"validation_rules,omitempty"`
 	Verification      VerificationRecord    `json:"verification"`
 }

@@ -135,6 +135,7 @@ func (registry BuiltinRegistry) ValidateDefinition(definition BlockDefinition) [
 			issues = append(issues, blockIssue("block."+definition.ID+".ports."+port.Name+".voltage", "port voltage parameter "+port.Voltage+" must use voltage type"))
 		}
 	}
+	issues = append(issues, ValidatePCBRealization(definition)...)
 	return issues
 }
 
@@ -182,6 +183,7 @@ func cloneBlockDefinition(definition BlockDefinition) BlockDefinition {
 	}
 	definition.SchematicHints = append([]SchematicHint(nil), definition.SchematicHints...)
 	definition.PCBHints = append([]PCBHint(nil), definition.PCBHints...)
+	definition.PCBRealization = clonePCBRealization(definition.PCBRealization)
 	definition.ValidationRules = append([]BlockValidationRule(nil), definition.ValidationRules...)
 	definition.Verification.Evidence = append([]string(nil), definition.Verification.Evidence...)
 	definition.Verification.Notes = append([]string(nil), definition.Verification.Notes...)
