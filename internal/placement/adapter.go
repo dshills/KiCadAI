@@ -3,6 +3,7 @@ package placement
 import (
 	"encoding/json"
 	"fmt"
+	"regexp"
 	"sort"
 	"strings"
 
@@ -20,10 +21,53 @@ type AdapterOptions struct {
 	PreservePlaced bool
 }
 
+var netNameRoleTokenPattern = regexp.MustCompile(`[a-z0-9]+`)
+
 func RequestFromBlockOutput(output blocks.BlockOutput, opts AdapterOptions) (Request, []reports.Issue) {
 	request, issues := RequestFromOperations(output.Operations, opts)
 	request.Seed = output.Instance.InstanceID
 	return request, combineIssues(output.Issues, issues)
+}
+
+func RequestFromBlockPCBRealization(realization blocks.BlockPCBRealizationResult, opts AdapterOptions) (Request, []reports.Issue) {
+	request := Request{
+		Board:    opts.Board,
+		Rules:    opts.Rules,
+		Existing: ExistingPlacementPolicy{PreserveFixed: opts.PreservePlaced},
+		Seed:     realization.Instance.InstanceID,
+	}
+	for _, component := range realization.Components {
+		placement := Placement{
+			XMM:         component.Placement.XMM,
+			YMM:         component.Placement.YMM,
+			RotationDeg: component.Placement.RotationDeg,
+			Layer:       firstNonEmpty(component.Placement.Layer, "F.Cu"),
+		}
+		fixed := component.Placement.Fixed || opts.PreservePlaced
+		request.Components = append(request.Components, Component{
+			Ref:         component.Ref,
+			Value:       component.Value,
+			FootprintID: component.FootprintID,
+			Role:        component.ComponentRole,
+			Fixed:       fixed,
+			Position:    &placement,
+			Side:        sideFromLayer(placement.Layer),
+			Rotation:    fixedRotation(component.Placement.RotationDeg),
+		})
+	}
+	for _, route := range realization.LocalRoutes {
+		request.Nets = append(request.Nets, Net{
+			Name: route.NetName,
+			Endpoints: []Endpoint{
+				{Ref: route.From.Ref, Pin: route.From.Pin},
+				{Ref: route.To.Ref, Pin: route.To.Pin},
+			},
+			Role:   netRoleFromName(route.NetName),
+			Weight: 10,
+		})
+	}
+	request = NormalizeRequest(request)
+	return request, combineIssues(realization.Issues, Validate(request))
 }
 
 func RequestFromCompositionOutput(output blocks.CompositionOutput, opts AdapterOptions) (Request, []reports.Issue) {
@@ -221,6 +265,33 @@ func padSummaries(pads []transactions.PadSpec) []PadSummary {
 		})
 	}
 	return summaries
+}
+
+func fixedRotation(rotation float64) RotationConstraint {
+	value := rotation
+	return RotationConstraint{FixedDeg: &value}
+}
+
+func sideFromLayer(layer string) SideConstraint {
+	if strings.EqualFold(strings.TrimSpace(layer), "B.Cu") {
+		return SideBottom
+	}
+	return SideTop
+}
+
+func netRoleFromName(name string) NetRole {
+	normalized := strings.ToLower(strings.TrimSpace(name))
+	for _, token := range netNameRoleTokenPattern.FindAllString(normalized, -1) {
+		switch token {
+		case "gnd", "ground":
+			return NetGround
+		case "vcc", "vdd", "vbus", "vin", "vout":
+			return NetPower
+		case "scl", "clk", "clock":
+			return NetClock
+		}
+	}
+	return NetSignal
 }
 
 func sortEndpoints(endpoints []Endpoint) {

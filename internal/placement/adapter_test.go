@@ -8,6 +8,7 @@ import (
 	"kicadai/internal/blocks"
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
 
@@ -146,6 +147,40 @@ func TestRequestFromBlockOutputCreatesPlacementComponents(t *testing.T) {
 	result := Place(request)
 	if result.Metrics.PlacedCount == 0 {
 		t.Fatalf("expected placed block components, result=%#v", result)
+	}
+}
+
+func TestRequestFromBlockPCBRealizationBuildsPlacementRequest(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("led_indicator")
+	if !ok {
+		t.Fatal("missing led block")
+	}
+	output, instantiateIssues := registry.Instantiate(context.Background(), blocks.BlockRequest{BlockID: "led_indicator", InstanceID: "status"})
+	if len(instantiateIssues) != 0 {
+		t.Fatalf("Instantiate returned issues: %#v", instantiateIssues)
+	}
+	realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{OriginXMM: 10, OriginYMM: 5})
+
+	request, issues := RequestFromBlockPCBRealization(realization, AdapterOptions{
+		Board:          BoardPlacementArea{WidthMM: 50, HeightMM: 25, MarginMM: 1},
+		DefaultBounds:  Bounds{WidthMM: 2, HeightMM: 1.25, Source: BoundsEstimated},
+		PreservePlaced: true,
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("RequestFromBlockPCBRealization issues = %#v", issues)
+	}
+	if len(request.Components) != 2 || len(request.Nets) != 1 {
+		t.Fatalf("request = %#v", request)
+	}
+	if request.Components[0].Role == "" || request.Components[0].Position == nil || !request.Components[0].Fixed {
+		t.Fatalf("component metadata not preserved: %#v", request.Components[0])
+	}
+	if request.Nets[0].Role != NetSignal {
+		t.Fatalf("net role = %q, want signal", request.Nets[0].Role)
+	}
+	if role := netRoleFromName("saving_mode"); role != NetSignal {
+		t.Fatalf("saving_mode role = %q, want signal", role)
 	}
 }
 
