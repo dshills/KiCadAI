@@ -153,6 +153,9 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
   indicator project, with optional PCB output.
 - `generate breakout`: generate a connector breakout project from a structured
   JSON request.
+- `block realize-pcb <block_id>`: instantiate a circuit block and return its
+  PCB realization fragment plus the placement request that can feed the
+  placement engine.
 
 LED generation:
 
@@ -194,6 +197,35 @@ go run ./cmd/kicadai \
 
 Generated projects are written through safe directory handling. `--overwrite`
 is required to replace an existing output directory.
+
+### Circuit Blocks
+
+The block library contains reusable schematic templates for LED indicators,
+connector breakouts, voltage regulators, I2C sensors, op-amp gain stages,
+USB-C power input, and a minimal ATmega328P-A system. Blocks can be listed,
+inspected, validated, instantiated, composed, and now realized as PCB
+fragments.
+
+```sh
+go run ./cmd/kicadai --json block list
+go run ./cmd/kicadai --json block show led_indicator
+go run ./cmd/kicadai --json --request ./examples/blocks/requests/led_indicator.json block instantiate led_indicator
+go run ./cmd/kicadai --json --request ./examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
+```
+
+`block realize-pcb` returns:
+
+- the normal block instantiation output with schematic transactions;
+- `realization.components[]` with refs, footprints, role names, and relative
+  PCB placements;
+- `realization.local_routes[]` and route operations for verified local nets;
+- `placement_request`, a ready input for the placement engine.
+
+This is the first PCB-fragment layer for the circuit block library. It does not
+yet claim fabrication readiness for complete boards; global block composition,
+board outline selection, route conflict resolution, zone refill, and KiCad DRC
+evidence are still required before generated block PCBs should be treated as
+manufacturing candidates.
 
 ### Placement
 

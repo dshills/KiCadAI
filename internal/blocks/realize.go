@@ -50,6 +50,11 @@ type RealizedPCBLocalRoute struct {
 	WidthMM float64               `json:"width_mm,omitempty"`
 }
 
+const (
+	degreesToRadians             = math.Pi / 180
+	routeCoordinateSnapEpsilonMM = 1e-9
+)
+
 func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRealizationOptions) BlockPCBRealizationResult {
 	result := BlockPCBRealizationResult{
 		Definition:  Summary(definition),
@@ -382,10 +387,18 @@ func rotatePoint(x float64, y float64, rotationDeg float64) (float64, float64) {
 	if rotationDeg == 0 {
 		return x, y
 	}
-	radians := rotationDeg * math.Pi / 180
-	cosine := math.Cos(radians)
-	sine := math.Sin(radians)
-	return x*cosine - y*sine, x*sine + y*cosine
+	radians := rotationDeg * degreesToRadians
+	sine, cosine := math.Sincos(radians)
+	// KiCad PCB file coordinates are Y-down. This transform preserves KiCad's
+	// positive-angle direction in that coordinate frame.
+	return zeroNear(x*cosine + y*sine), zeroNear(-x*sine + y*cosine)
+}
+
+func zeroNear(value float64) float64 {
+	if math.Abs(value) < routeCoordinateSnapEpsilonMM {
+		return 0
+	}
+	return value
 }
 
 func firstNonEmptyString(values ...string) string {

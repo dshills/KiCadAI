@@ -25,6 +25,25 @@ GOCACHE=/tmp/kicadai-gocache go run ./cmd/kicadai --json --request examples/bloc
 
 Use the same pattern for the other request files.
 
+## PCB Realization
+
+Circuit blocks also expose PCB realization metadata for the first PCB fragment
+workflow. This returns instantiated schematic operations, realized PCB
+components, local routes, and a placement request derived from the block:
+
+```sh
+GOCACHE=/tmp/kicadai-gocache go run ./cmd/kicadai --json --request examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
+```
+
+The current realization output is intended for agent planning and validation.
+It is not yet a complete board writer for block fragments; board outline
+selection, global placement across multiple blocks, route conflict resolution,
+zone fill, and KiCad DRC evidence remain downstream workflow steps.
+
 ## Validation
 
-These examples are structural schematic/project outputs, not fabrication-ready boards. `inspect project` should parse them. Generated PCB files are intentionally omitted in this phase because footprint pad geometry and routing are still known writer gaps.
+These examples are structural schematic/project outputs, not fabrication-ready
+boards. `inspect project` should parse them. PCB realization is available as
+JSON through `block realize-pcb`; generated PCB files are intentionally omitted
+from these block examples until block fragments can be composed, globally
+placed, routed, and DRC-checked as complete boards.
