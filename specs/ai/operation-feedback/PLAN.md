@@ -89,7 +89,8 @@ run a full plan.
        ID    string        `json:"id"`
        Index int           `json:"index"`
        Op    OperationKind `json:"op"`
-       Ref   string        `json:"ref,omitempty"`
+       Refs  []string      `json:"refs,omitempty"`
+       Nets  []string      `json:"nets,omitempty"`
    }
    ```
 

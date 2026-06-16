@@ -11,8 +11,17 @@ import (
 )
 
 type ValidationResult struct {
-	OperationCount int             `json:"operation_count"`
-	Issues         []reports.Issue `json:"issues"`
+	OperationCount int                  `json:"operation_count"`
+	Operations     []ValidatedOperation `json:"operations,omitempty"`
+	Issues         []reports.Issue      `json:"issues"`
+}
+
+type ValidatedOperation struct {
+	ID    string        `json:"id"`
+	Index int           `json:"index"`
+	Op    OperationKind `json:"op"`
+	Refs  []string      `json:"refs,omitempty"`
+	Nets  []string      `json:"nets,omitempty"`
 }
 
 func LoadFile(path string) (Transaction, error) {
@@ -40,11 +49,70 @@ func Validate(tx Transaction) ValidationResult {
 		result.Issues = append(result.Issues, issue(reports.CodeInvalidArgument, "operations", "transaction requires at least one operation"))
 		return result
 	}
+	result.Operations = make([]ValidatedOperation, 0, len(tx.Operations))
+	plannedOperations := make([]PlannedOperation, 0, len(tx.Operations))
+	operationIDs := map[string]struct{}{}
+	operationIDCounts := map[string]int{}
 	for i, op := range tx.Operations {
 		op.Index = i
+		planned := plannedOperationIdentity(op)
+		planned.ID = uniquePlannedOperationID(plannedOperationID(planned, op), operationIDs, operationIDCounts)
+		plannedOperations = append(plannedOperations, planned)
+		result.Operations = append(result.Operations, ValidatedOperation{
+			ID:    planned.ID,
+			Index: planned.Index,
+			Op:    planned.Op,
+			Refs:  append([]string(nil), planned.Refs...),
+			Nets:  append([]string(nil), planned.Nets...),
+		})
 		result.Issues = append(result.Issues, validateOperation(op)...)
 	}
+	AnnotateIssueOperationIDs(result.Issues, plannedOperations)
 	return result
+}
+
+func plannedOperationIdentity(op Operation) PlannedOperation {
+	planned := PlannedOperation{Index: op.Index, Op: op.Op}
+	switch op.Op {
+	case OpAddSymbol:
+		var payload AddSymbolOperation
+		if decodeRaw(op, &payload) == nil {
+			addRef(&planned, payload.Ref)
+		}
+	case OpConnect:
+		var payload ConnectOperation
+		if decodeRaw(op, &payload) == nil {
+			addRef(&planned, payload.From.Ref)
+			addRef(&planned, payload.To.Ref)
+			addNet(&planned, payload.NetName)
+		}
+	case OpAssignFootprint:
+		var payload AssignFootprintOperation
+		if decodeRaw(op, &payload) == nil {
+			addRef(&planned, payload.Ref)
+		}
+	case OpPlaceFootprint:
+		var payload PlaceFootprintOperation
+		if decodeRaw(op, &payload) == nil {
+			addRef(&planned, payload.Ref)
+			for _, pad := range payload.Pads {
+				if pad.Net != nil {
+					addNet(&planned, *pad.Net)
+				}
+			}
+		}
+	case OpRoute:
+		var payload RouteOperation
+		if decodeRaw(op, &payload) == nil {
+			addNet(&planned, payload.NetName)
+		}
+	case OpAddZone:
+		var payload AddZoneOperation
+		if decodeRaw(op, &payload) == nil && payload.NetName != nil {
+			addNet(&planned, *payload.NetName)
+		}
+	}
+	return planned
 }
 
 func validateOperation(op Operation) []reports.Issue {

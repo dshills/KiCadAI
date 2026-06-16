@@ -43,6 +43,9 @@ func TestValidateValidTransaction(t *testing.T) {
 	if len(result.Issues) != 0 || result.OperationCount != 8 {
 		t.Fatalf("unexpected result: %#v", result)
 	}
+	if len(result.Operations) != 8 || !strings.HasPrefix(result.Operations[1].ID, "op-add-symbol-ref-r1-") {
+		t.Fatalf("operation summaries missing ids: %#v", result.Operations)
+	}
 }
 
 func TestValidateRejectsEmptyOperations(t *testing.T) {
@@ -50,12 +53,18 @@ func TestValidateRejectsEmptyOperations(t *testing.T) {
 	if len(result.Issues) != 1 || result.Issues[0].Path != "operations" {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
+	if result.Issues[0].OperationID != "" || len(result.Operations) != 0 {
+		t.Fatalf("empty transaction should not have operation ids: %#v", result)
+	}
 }
 
 func TestValidateRejectsUnknownOperation(t *testing.T) {
 	result := Validate(mustParse(t, `{"operations":[{"op":"bogus"}]}`))
 	if len(result.Issues) != 1 || result.Issues[0].Code != reports.CodeUnsupportedOperation || result.Issues[0].Path != "operations[0].op" {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	if len(result.Operations) != 1 || result.Issues[0].OperationID != result.Operations[0].ID {
+		t.Fatalf("unsupported operation missing id correlation: %#v", result)
 	}
 }
 
@@ -77,12 +86,26 @@ func TestValidateReportsOperationIndex(t *testing.T) {
 	result := Validate(mustParse(t, `{"operations":[{"op":"write_project"},{"op":"route","net_name":"SIG","points":[{"x_mm":0,"y_mm":0},{"x_mm":0,"y_mm":0}]}]}`))
 	found := false
 	for _, issue := range result.Issues {
-		if issue.Path == "operations[1].points[1]" {
+		if issue.Path == "operations[1].points[1]" && issue.OperationID == result.Operations[1].ID {
 			found = true
 		}
 	}
 	if !found {
 		t.Fatalf("operation index issue missing: %#v", result.Issues)
+	}
+}
+
+func TestValidateOperationIDsStableAcrossReorder(t *testing.T) {
+	first := Validate(mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}},
+	  {"op":"route","net_name":"SIG","points":[{"x_mm":0,"y_mm":0},{"x_mm":1,"y_mm":1}]}
+	]}`))
+	second := Validate(mustParse(t, `{"operations":[
+	  {"op":"route","net_name":"SIG","points":[{"x_mm":0,"y_mm":0},{"x_mm":1,"y_mm":1}]},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}}
+	]}`))
+	if first.Operations[0].ID != second.Operations[1].ID || first.Operations[1].ID != second.Operations[0].ID {
+		t.Fatalf("validation operation ids changed across reorder: first=%#v second=%#v", first.Operations, second.Operations)
 	}
 }
 
