@@ -1379,6 +1379,34 @@ func TestRunTransactionValidateJSON(t *testing.T) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
 	}
+	if strings.Contains(output, `"feedback"`) {
+		t.Fatalf("default validate output should not include feedback wrapper:\n%s", output)
+	}
+}
+
+func TestRunTransactionValidateFeedbackJSON(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"route","net_name":"","points":[{"x_mm":0,"y_mm":0}]}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--feedback", "transaction", "validate", path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected validation error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"validation":`,
+		`"feedback":`,
+		`"operation_id": "op-route-`,
+		`"unlinked_count": 0`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
 }
 
 func TestRunRouteRequestJSON(t *testing.T) {
@@ -1471,6 +1499,32 @@ func TestRunTransactionPlanJSON(t *testing.T) {
 		`"op": "add_symbol"`,
 		`"refs": [`,
 		`demo.kicad_sch`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunTransactionPlanFeedbackJSON(t *testing.T) {
+	dir := filepath.Join(t.TempDir(), "out")
+	path := filepath.Join(t.TempDir(), "tx.json")
+	if err := os.WriteFile(path, []byte(`{"operations":[{"op":"create_project","name":"demo"},{"op":"remove_symbol","ref":"R1"}]}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--feedback", "transaction", "plan", dir, path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected plan error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"plan":`,
+		`"feedback":`,
+		`"operation_id": "op-remove-symbol-`,
+		`"blocking_count": 2`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)

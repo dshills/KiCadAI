@@ -111,6 +111,7 @@ Global flags:
   --placement-estimated-width float  Placement feedback estimated component width in millimeters (default {{defaultPlacementEstimatedWidthMM}})
   --placement-estimated-height float Placement feedback estimated component height in millimeters (default {{defaultPlacementEstimatedHeightMM}})
   --skip-placement-feedback          Skip placement feedback in block project generation output
+  --feedback                         Include grouped operation feedback for transaction commands
   --pretty                           Pretty-print JSON output
 `
 
@@ -184,6 +185,7 @@ type cliOptions struct {
 	placementEstWidth     float64
 	placementEstHeight    float64
 	skipPlacementFeedback bool
+	feedbackOutput        bool
 	prettyOutput          bool
 	commandArgs           []string
 }
@@ -328,6 +330,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Float64Var(&opts.placementEstWidth, "placement-estimated-width", defaultPlacementEstimatedWidthMM, "placement feedback estimated component width in millimeters")
 	flags.Float64Var(&opts.placementEstHeight, "placement-estimated-height", defaultPlacementEstimatedHeightMM, "placement feedback estimated component height in millimeters")
 	flags.BoolVar(&opts.skipPlacementFeedback, "skip-placement-feedback", false, "skip placement feedback in block project generation output")
+	flags.BoolVar(&opts.feedbackOutput, "feedback", false, "include grouped operation feedback for transaction commands")
 	flags.BoolVar(&opts.prettyOutput, "pretty", false, "pretty-print JSON output")
 
 	if err := flags.Parse(args); err != nil {
@@ -1840,7 +1843,14 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 			return errors.New(issue.Message)
 		}
 		validation := transactions.Validate(tx)
-		result := reports.ResultWithIssues("transaction", validation, validation.Issues, nil)
+		data := any(validation)
+		if opts.feedbackOutput {
+			data = transactionValidationFeedbackPayload{
+				Validation: validation,
+				Feedback:   transactions.FeedbackFromValidation(validation),
+			}
+		}
+		result := reports.ResultWithIssues("transaction", data, validation.Issues, nil)
 		if err := writeReportJSON(stdout, result); err != nil {
 			return err
 		}
@@ -1888,7 +1898,14 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 			planOptions.LibraryIssues = issues
 		}
 		plan := transactions.PlanTransactionWithOptions(target, tx, planOptions)
-		result := reports.ResultWithIssues("transaction", plan, plan.Issues, nil)
+		data := any(plan)
+		if opts.feedbackOutput {
+			data = transactionPlanFeedbackPayload{
+				Plan:     plan,
+				Feedback: transactions.FeedbackFromPlan(plan),
+			}
+		}
+		result := reports.ResultWithIssues("transaction", data, plan.Issues, nil)
 		if err := writeReportJSON(stdout, result); err != nil {
 			return err
 		}
@@ -1956,6 +1973,16 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 		}
 		return errors.New(issue.Message)
 	}
+}
+
+type transactionValidationFeedbackPayload struct {
+	Validation transactions.ValidationResult `json:"validation"`
+	Feedback   transactions.FeedbackReport   `json:"feedback"`
+}
+
+type transactionPlanFeedbackPayload struct {
+	Plan     transactions.Plan           `json:"plan"`
+	Feedback transactions.FeedbackReport `json:"feedback"`
 }
 
 func transactionShouldUseLibraryResolver(opts cliOptions) bool {
