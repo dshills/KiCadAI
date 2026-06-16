@@ -88,6 +88,16 @@ func TestPlanOperationIDsCanonicalizeJSONFormatting(t *testing.T) {
 	}
 }
 
+func TestPlanOperationIDsCanonicalizeJSONKeyOrder(t *testing.T) {
+	first := mustParse(t, `{"operations":[{"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0}}]}`)
+	second := mustParse(t, `{"operations":[{"at":{"y_mm":0,"x_mm":0},"library_id":"Device:R","ref":"R1","op":"add_symbol"}]}`)
+	firstPlan := PlanTransaction(t.TempDir(), first)
+	secondPlan := PlanTransaction(t.TempDir(), second)
+	if firstPlan.Operations[0].ID != secondPlan.Operations[0].ID {
+		t.Fatalf("operation ids differ by JSON key order: first=%#v second=%#v", firstPlan.Operations, secondPlan.Operations)
+	}
+}
+
 func TestPlanOperationIDsDisambiguateDuplicateContent(t *testing.T) {
 	tx := mustParse(t, `{"operations":[{"op":"write_project"},{"op":"write_project"}]}`)
 	plan := PlanTransaction(t.TempDir(), tx)
