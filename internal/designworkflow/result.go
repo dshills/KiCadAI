@@ -211,6 +211,13 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 	}
 }
 
+func AcceptanceSatisfied(requested AcceptanceLevel, achieved AcceptanceLevel) bool {
+	if requested == "" {
+		requested = AcceptanceDraft
+	}
+	return acceptanceRank(achieved) >= acceptanceRank(requested)
+}
+
 func RetryScopeForStage(stage StageName, issue reports.Issue) RetryScope {
 	switch stage {
 	case StageParseRequest:

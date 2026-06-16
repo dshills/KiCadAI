@@ -20,6 +20,7 @@ import (
 	"kicadai/internal/blocks"
 	"kicadai/internal/boardvalidation"
 	"kicadai/internal/config"
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/evaluate"
 	breakoutgen "kicadai/internal/generate"
 	"kicadai/internal/inspect"
@@ -55,6 +56,7 @@ Commands:
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
   check         Run KiCad CLI ERC/DRC checks
+  design        Create AI design workflow projects
   validate      Validate generated board electrical correctness
   inspect       Inspect KiCad projects and files
   library       Index and query KiCad symbol and footprint libraries
@@ -108,10 +110,12 @@ Global flags:
   --library-cache string   Library resolver cache file path
   --refresh-library-cache  Rebuild library resolver cache
   --mode string                      Routing mode: single_layer, two_layer, validate_only
+  --route-mode string                Alias for --mode
   --grid float                       Routing grid in millimeters
   --trace-width float                Routing trace width in millimeters
   --clearance float                  Routing clearance in millimeters
   --allow-partial                    Allow partial routing results
+  --skip-routing                     Skip design workflow board routing
   --placement-board-width float      Placement feedback board width in millimeters (default {{defaultPlacementBoardWidthMM}})
   --placement-board-height float     Placement feedback board height in millimeters (default {{defaultPlacementBoardHeightMM}})
   --placement-board-margin float     Placement feedback board margin in millimeters (default {{defaultPlacementBoardMarginMM}})
@@ -190,6 +194,7 @@ type cliOptions struct {
 	routeClearanceMM      float64
 	routeAllowPartial     bool
 	routeAllowPartialSet  bool
+	skipRouting           bool
 	placementBoardWidth   float64
 	placementBoardHeight  float64
 	placementBoardMargin  float64
@@ -266,6 +271,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runLibrary(ctx, opts, stdout)
 	case "check":
 		return runCheckCommand(ctx, opts, stdout)
+	case "design":
+		return runDesign(ctx, opts, stdout)
 	case "validate":
 		return runValidateCommand(ctx, opts, stdout)
 	case "roundtrip":
@@ -337,10 +344,12 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.libraryCache, "library-cache", os.Getenv(libraryresolver.EnvLibraryCache), "library resolver cache file path")
 	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
 	flags.StringVar(&opts.routeMode, "mode", "", "routing mode")
+	flags.StringVar(&opts.routeMode, "route-mode", "", "routing mode")
 	flags.Float64Var(&opts.routeGridMM, "grid", 0, "routing grid in millimeters")
 	flags.Float64Var(&opts.routeTraceWidthMM, "trace-width", 0, "routing trace width in millimeters")
 	flags.Float64Var(&opts.routeClearanceMM, "clearance", 0, "routing clearance in millimeters")
 	flags.BoolVar(&opts.routeAllowPartial, "allow-partial", false, "allow partial routing results")
+	flags.BoolVar(&opts.skipRouting, "skip-routing", false, "skip design workflow board routing")
 	flags.Float64Var(&opts.placementBoardWidth, "placement-board-width", defaultPlacementBoardWidthMM, "placement feedback board width in millimeters")
 	flags.Float64Var(&opts.placementBoardHeight, "placement-board-height", defaultPlacementBoardHeightMM, "placement feedback board height in millimeters")
 	flags.Float64Var(&opts.placementBoardMargin, "placement-board-margin", defaultPlacementBoardMarginMM, "placement feedback board margin in millimeters")
@@ -1638,6 +1647,134 @@ func runValidateCommand(ctx context.Context, opts cliOptions, stdout io.Writer) 
 		return errors.New("validate reported blocking issues")
 	}
 	return nil
+}
+
+func runDesign(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) == 0 {
+		return writeDesignFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "design",
+			Message:  "design requires a subcommand",
+		})
+	}
+	if opts.commandArgs[0] != "create" {
+		return writeDesignFailure(stdout, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "design." + opts.commandArgs[0],
+			Message:  "unsupported design subcommand " + opts.commandArgs[0],
+		})
+	}
+	return runDesignCreate(ctx, opts, stdout)
+}
+
+func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("design create requires --json")
+	}
+	if strings.TrimSpace(opts.requestPath) == "" {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "--request is required"})
+	}
+	if strings.TrimSpace(opts.output) == "" {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "--output is required"})
+	}
+	file, err := os.Open(opts.requestPath)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
+	}
+	defer file.Close()
+	request, issues := designworkflow.DecodeRequestStrict(file)
+	if reports.HasBlockingIssue(issues) {
+		result := reports.ResultWithIssues("design", nil, issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		return errors.New("design request reported blocking issues")
+	}
+	checkOpts, err := checkOptions(opts)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "check_options", Message: err.Error()})
+	}
+	createOpts, err := designCreateOptions(opts, checkOpts)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
+	}
+	workflow := designworkflow.Create(ctx, request, createOpts)
+	result := designWorkflowReport(workflow)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("design reported blocking issues")
+	}
+	return nil
+}
+
+func writeDesignFailure(stdout io.Writer, issue reports.Issue) error {
+	if err := writeReportFailure(stdout, "design", issue); err != nil {
+		return err
+	}
+	return errors.New(issue.Message)
+}
+
+func designWorkflowReport(workflow designworkflow.WorkflowResult) reports.Result {
+	issues := designworkflow.WorkflowIssues(workflow)
+	artifacts := designworkflow.WorkflowArtifacts(workflow)
+	if issues == nil {
+		issues = []reports.Issue{}
+	}
+	if artifacts == nil {
+		artifacts = []reports.Artifact{}
+	}
+	return reports.Result{
+		OK:        designworkflow.AcceptanceSatisfied(workflow.Acceptance.Requested, workflow.Acceptance.Achieved),
+		Command:   "design",
+		Version:   reports.Version,
+		Data:      workflow,
+		Issues:    issues,
+		Artifacts: artifacts,
+	}
+}
+
+func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkflow.CreateOptions, error) {
+	routeMode, err := designworkflow.ParseRoutingMode(opts.routeMode)
+	if err != nil {
+		return designworkflow.CreateOptions{}, err
+	}
+	createOpts := designworkflow.CreateOptions{
+		OutputDir:   opts.output,
+		Overwrite:   opts.overwrite,
+		Seed:        opts.seed,
+		SkipRouting: opts.skipRouting,
+		Placement: designworkflow.PlacementOptions{
+			DefaultBounds: placement.Bounds{WidthMM: opts.placementEstWidth, HeightMM: opts.placementEstHeight, Source: placement.BoundsEstimated},
+			Rules:         placement.Rules{BoardEdgeClearanceMM: opts.placementBoardMargin},
+		},
+		Routing: designworkflow.RoutingOptions{
+			Mode:         routeMode,
+			GridMM:       opts.routeGridMM,
+			TraceWidthMM: opts.routeTraceWidthMM,
+			ClearanceMM:  opts.routeClearanceMM,
+		},
+		Validation: designworkflow.ValidationOptions{
+			StrictZones:    opts.strictZones,
+			StrictUnrouted: opts.strictUnrouted,
+			RequireDRC:     opts.requireDRC,
+		},
+		KiCadChecks: designworkflow.KiCadCheckOptions{
+			KiCadCLI:      checkOpts.KiCadCLI,
+			Timeout:       checkOpts.Timeout,
+			RequireDRC:    opts.requireDRC,
+			KeepArtifacts: checkOpts.KeepArtifacts,
+			ArtifactDir:   checkOpts.ArtifactDir,
+			Allowlist:     checkOpts.Allowlist,
+		},
+	}
+	if opts.routeAllowPartialSet {
+		createOpts.Routing.AllowPartial = &opts.routeAllowPartial
+	}
+	return createOpts, nil
 }
 
 func boardValidationOptions(opts cliOptions) (boardvalidation.Options, error) {

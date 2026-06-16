@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
@@ -93,6 +95,87 @@ func TestRunConfigTextRedactsToken(t *testing.T) {
 	}
 	if strings.Contains(output, "secret-token") {
 		t.Fatalf("token leaked in output: %s", output)
+	}
+}
+
+func TestRunDesignCreateMissingRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--output", filepath.Join(t.TempDir(), "out"), "design", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing request to return an error")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || len(result.Issues) != 1 || result.Issues[0].Path != "request" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunDesignCreateSimpleLED(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	root := t.TempDir()
+	requestPath := filepath.Join(root, "request.json")
+	output := filepath.Join(root, "status_board")
+	writeTestFile(t, requestPath, `{
+  "version": "0.1.0",
+  "name": "status_board",
+  "board": {"width_mm": 40, "height_mm": 25, "layers": 2},
+  "blocks": [{"id": "status", "block_id": "led_indicator"}],
+  "validation": {"acceptance": "structural", "skip_routing": true}
+}`)
+
+	err := run([]string{"--json", "--request", requestPath, "--output", output, "design", "create"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if !result.OK {
+		t.Fatalf("result = %#v", result)
+	}
+	if _, statErr := os.Stat(filepath.Join(output, "status_board.kicad_pcb")); statErr != nil {
+		t.Fatalf("missing pcb output: %v", statErr)
+	}
+}
+
+func TestParseDesignAllowPartialSetsExplicitFlag(t *testing.T) {
+	opts, command, err := parse([]string{"--allow-partial", "design", "create"}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command != "design" || !opts.routeAllowPartialSet || !opts.routeAllowPartial {
+		t.Fatalf("opts=%#v command=%q", opts, command)
+	}
+}
+
+func TestDesignCreateOptionsRejectsUnknownRouteMode(t *testing.T) {
+	_, err := designCreateOptions(cliOptions{routeMode: "sideways"}, checks.Options{})
+	if err == nil {
+		t.Fatal("expected invalid route mode error")
+	}
+}
+
+func TestDesignCreateOptionsMapsPlacementFlags(t *testing.T) {
+	opts, err := designCreateOptions(cliOptions{
+		placementEstWidth:    3.5,
+		placementEstHeight:   2.5,
+		placementBoardMargin: 4,
+	}, checks.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Placement.DefaultBounds.WidthMM != 3.5 || opts.Placement.DefaultBounds.HeightMM != 2.5 {
+		t.Fatalf("default bounds = %#v", opts.Placement.DefaultBounds)
+	}
+	if opts.Placement.Rules.BoardEdgeClearanceMM != 4 {
+		t.Fatalf("placement rules = %#v", opts.Placement.Rules)
 	}
 }
 
