@@ -381,17 +381,18 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			}
 			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Shape: pad.Shape, Offset: point(pad.XMM, pad.YMM), Size: padSize(pad), Drill: kicadfiles.MM(pad.DrillMM), Net: net})
 		}
-		if len(pads) == 0 && opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
-			if record, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, payload.FootprintID); ok {
-				pads = footprintRecordPadSpecs(record, boardLayer(payload.Layer))
-			}
-		}
-		_, err := builder.PlaceFootprint(payload.Ref, designapi.PlaceFootprintOptions{
+		placeOptions := designapi.PlaceFootprintOptions{
 			Position: point(payload.At.XMM, payload.At.YMM),
 			Rotation: kicadfiles.Angle(payload.Rotation),
 			Layer:    boardLayer(payload.Layer),
 			Pads:     pads,
-		})
+		}
+		if opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
+			if record, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, payload.FootprintID); ok {
+				enrichPlaceFootprintOptionsWithRecord(&placeOptions, record, boardLayer(payload.Layer))
+			}
+		}
+		_, err := builder.PlaceFootprint(payload.Ref, placeOptions)
 		return nil, err
 	case OpRoute:
 		var payload RouteOperation

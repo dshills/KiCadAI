@@ -153,6 +153,51 @@ func TestBuilderCustomPadsInheritSchematicNets(t *testing.T) {
 	assertPadNet(t, design.PCB.Footprints, "R1", "2", "LED_OUT")
 }
 
+func TestBuilderPlaceFootprintAcceptsLibraryGeometry(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Description:        "library resistor",
+		Tags:               "resistor 0805",
+		Attributes:         []string{"smd"},
+		MetadataProperties: []pcb.FootprintMetadataProperty{{Name: "ki_description", Value: "library resistor"}},
+		Texts: []pcb.FootprintText{
+			{Kind: "user", Text: "LIB", Layer: kicadfiles.LayerFSilkS},
+		},
+		Graphics: []pcb.FootprintGraphic{
+			pcb.FootprintGraphic(pcb.Drawing{
+				Kind:  "line",
+				Layer: kicadfiles.LayerFSilkS,
+				Line:  &pcb.LineDrawing{Start: kicadfiles.Point{}, End: kicadfiles.Point{X: kicadfiles.MM(1)}, Width: kicadfiles.MM(0.12)},
+			}),
+		},
+		Models: []pcb.Model3D{{Path: "${KICAD9_3DMODEL_DIR}/Resistor_SMD.3dshapes/R_0805.wrl"}},
+		Pads: []PadSpec{
+			{Name: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-1)}},
+			{Name: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(1)}},
+		},
+	}); err != nil {
+		t.Fatalf("PlaceFootprint returned error: %v", err)
+	}
+
+	footprint := builder.Design().PCB.Footprints[0]
+	if footprint.Description != "library resistor" || footprint.Tags != "resistor 0805" {
+		t.Fatalf("metadata not preserved: %#v", footprint)
+	}
+	if len(footprint.Texts) != 1 || !footprint.Texts[0].UUID.Valid() {
+		t.Fatalf("texts not preserved with UUIDs: %#v", footprint.Texts)
+	}
+	if len(footprint.Graphics) != 1 || !pcb.Drawing(footprint.Graphics[0]).UUID.Valid() {
+		t.Fatalf("graphics not preserved with UUIDs: %#v", footprint.Graphics)
+	}
+	if len(footprint.Models) != 1 || footprint.Models[0].Path == "" {
+		t.Fatalf("models not preserved: %#v", footprint.Models)
+	}
+}
+
 func TestBuilderRejectsCustomPadWithoutSymbolPin(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})

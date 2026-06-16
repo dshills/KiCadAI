@@ -108,7 +108,20 @@ func TestApplyUsesResolverFootprintPadsForGeneratedPlacement(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{`thru_hole`, `(drill 0.8)`, `"*.Cu"`, `"*.Mask"`} {
+	for _, want := range []string{
+		`thru_hole`,
+		`(drill 0.8)`,
+		`"*.Cu"`,
+		`"*.Mask"`,
+		`(descr "test through-hole connector")`,
+		`(property "ki_description" "test through-hole connector")`,
+		`(fp_text`,
+		`"TEST"`,
+		`(fp_line`,
+		`(fp_curve`,
+		`(model`,
+		`${KICAD9_3DMODEL_DIR}/Connector_Test.3dshapes/TH_1x02.wrl`,
+	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("generated PCB missing %q:\n%s", want, text)
 		}
@@ -782,7 +795,7 @@ func applyResolverFixture() libraryresolver.LibraryIndex {
 					{
 						Kind:   "curve",
 						Layer:  string(kicadfiles.LayerFFab),
-						Points: []kicadfiles.Point{{}, {X: kicadfiles.MM(1)}, {X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}},
+						Points: []kicadfiles.Point{{}, {X: kicadfiles.MM(1)}, {X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}, {Y: kicadfiles.MM(1)}},
 					},
 				},
 				Models: []string{"${KICAD9_3DMODEL_DIR}/Connector_Test.3dshapes/TH_1x02.wrl"},
@@ -808,7 +821,7 @@ func applyResolverFixture() libraryresolver.LibraryIndex {
 					{
 						Kind:   "curve",
 						Layer:  string(kicadfiles.LayerFFab),
-						Points: []kicadfiles.Point{{}, {X: kicadfiles.MM(1)}, {X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}},
+						Points: []kicadfiles.Point{{}, {X: kicadfiles.MM(1)}, {X: kicadfiles.MM(1), Y: kicadfiles.MM(1)}, {Y: kicadfiles.MM(1)}},
 					},
 				},
 			},

@@ -276,9 +276,9 @@ Current routing limitations:
 - Copper zones are treated as obstacles or unsupported policy inputs; zone-fill
   aware routing is not implemented.
 - Placement can hydrate bounds and compact pad summaries from resolver records.
-  Imported-project transaction apply can hydrate pads, pad shapes, through-hole
-  metadata, text, graphics, and models. Routing still consumes compact pad
-  summaries rather than full pad-stack data.
+  New-project and imported-project transaction apply can hydrate pads, pad
+  shapes, through-hole metadata, text, graphics, and models. Routing still
+  consumes compact pad summaries rather than full pad-stack data.
 - KiCad DRC execution is integrated through the checks package, but tests still
   rely primarily on deterministic parser/fake-runner paths unless a local
   stable KiCad fixture is available.
@@ -719,10 +719,9 @@ make test
 - Hierarchical pinmap validation is intentionally blocked until hierarchy
   flattening is implemented.
 - Footprint-library expansion covers resolver-backed pads, text, graphics,
-  attributes, metadata properties, and model references for imported-project
-  transaction apply. It does not yet preserve every advanced KiCad footprint
-  node or pad-stack option, and new-project builder placement still needs the
-  same graphics/model hydration path.
+  attributes, metadata properties, and model references for generated and
+  imported-project transaction apply. It does not yet preserve every advanced
+  KiCad footprint node or pad-stack option.
 - Export/BOM/fabrication packaging commands are placeholders.
 - Real DRC execution still needs a stable known-good/known-bad fixture on the
   local KiCad CLI; parser and command paths are implemented.

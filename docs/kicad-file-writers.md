@@ -140,11 +140,10 @@ The integration test generates an LED project, exports a schematic netlist, and 
 
 - Existing KiCad files are not parsed or edited losslessly.
 - Generated footprints cover the initial LED fixture and core primitives.
-  Imported-project transaction apply can also hydrate footprints from resolver
-  records, including pads, text, courtyard/fab/silkscreen graphics, attributes,
-  metadata properties, and model references. New-project builder hydration,
-  advanced KiCad footprint nodes, and full pad-stack fidelity remain future
-  work.
+  Transaction apply can also hydrate generated and imported-project footprints
+  from resolver records, including pads, text, courtyard/fab/silkscreen
+  graphics, attributes, metadata properties, and model references. Advanced
+  KiCad footprint nodes and full pad-stack fidelity remain future work.
 - Local `.kicad_sym` and `.kicad_mod` library content generation is not complete; table emission and reference validation are implemented.
 - Hierarchical sheet support emits represented files but does not parse arbitrary existing sheet trees or fully manage instance-specific annotation for reused child sheets. For reused child sheets, users should run KiCad's annotation workflow after generation before treating references as final.
 - Autorouting is out of scope.

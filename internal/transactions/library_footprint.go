@@ -29,6 +29,19 @@ func footprintRecordPadSpecs(record libraryresolver.FootprintRecord, placementLa
 	return pads
 }
 
+func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOptions, record libraryresolver.FootprintRecord, placementLayer kicadfiles.BoardLayer) {
+	options.Description = record.Description
+	options.Tags = strings.Join(record.Tags, " ")
+	options.Attributes = append([]string(nil), record.Attributes...)
+	options.MetadataProperties = importedMetadataProperties(record.Properties)
+	options.Texts = footprintTextsFromRecord(record.Texts, placementLayer)
+	options.Graphics = footprintGraphicsFromRecord(record.Graphics, placementLayer)
+	options.Models = importedModels(record.Models)
+	if len(options.Pads) == 0 {
+		options.Pads = footprintRecordPadSpecs(record, placementLayer)
+	}
+}
+
 func upsertImportedFootprintWithLibrary(board *pcb.PCBFile, generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, index *libraryresolver.LibraryIndex) {
 	if index == nil || len(payload.Pads) > 0 {
 		upsertImportedFootprint(board, generator, payload)
@@ -114,10 +127,19 @@ func importedMetadataProperties(properties map[string]string) []pcb.FootprintMet
 }
 
 func importedFootprintTexts(generator kicadfiles.IDGenerator, ref string, texts []libraryresolver.FootprintText, placementLayer kicadfiles.BoardLayer) []pcb.FootprintText {
+	result := footprintTextsFromRecord(texts, placementLayer)
+	for i := range result {
+		if !result[i].UUID.Valid() {
+			result[i].UUID = generator.New("imported.pcb.footprint.text", ref, result[i].Kind, strconv.Itoa(i))
+		}
+	}
+	return result
+}
+
+func footprintTextsFromRecord(texts []libraryresolver.FootprintText, placementLayer kicadfiles.BoardLayer) []pcb.FootprintText {
 	result := make([]pcb.FootprintText, 0, len(texts))
-	for i, text := range texts {
+	for _, text := range texts {
 		result = append(result, pcb.FootprintText{
-			UUID:     generator.New("imported.pcb.footprint.text", ref, text.Kind, strconv.Itoa(i)),
 			Kind:     text.Kind,
 			Text:     text.Text,
 			Position: text.Position,
@@ -132,53 +154,71 @@ func importedFootprintGraphics(generator kicadfiles.IDGenerator, ref string, gra
 	seen := map[string]int{}
 	seedScratch := make([]byte, 0, 256)
 	for _, graphic := range graphics {
+		converted, ok := footprintGraphicFromRecord(graphic, placementLayer)
+		if !ok {
+			continue
+		}
 		var seed string
 		seed, seedScratch = footprintGraphicSeed(graphic, seedScratch)
 		occurrence := seen[seed]
 		seen[seed]++
-		width := footprintGraphicStrokeWidth(graphic.Width)
-		drawing := pcb.Drawing{
-			UUID:       generator.New("imported.pcb.footprint.graphic", ref, seed, strconv.Itoa(occurrence)),
-			Kind:       graphic.Kind,
-			Layer:      placementLayerFor(kicadfiles.BoardLayer(graphic.Layer), placementLayer),
-			StrokeType: graphic.StrokeType,
-			Fill:       graphic.Fill,
+		drawing := pcb.Drawing(converted)
+		if !drawing.UUID.Valid() {
+			drawing.UUID = generator.New("imported.pcb.footprint.graphic", ref, seed, strconv.Itoa(occurrence))
 		}
-		switch graphic.Kind {
-		case "line":
-			if graphic.Start != nil && graphic.End != nil {
-				drawing.Line = &pcb.LineDrawing{Start: *graphic.Start, End: *graphic.End, Width: width}
-			}
-		case "rect":
-			if graphic.Start != nil && graphic.End != nil {
-				drawing.Rect = &pcb.RectDrawing{Start: *graphic.Start, End: *graphic.End, Width: width}
-			}
-		case "circle":
-			if graphic.Center != nil && graphic.End != nil {
-				drawing.Circle = &pcb.CircleDrawing{Center: *graphic.Center, End: *graphic.End, Width: width}
-			}
-		case "arc":
-			if graphic.Start != nil && graphic.Mid != nil && graphic.End != nil {
-				drawing.Arc = &pcb.ArcDrawing{Start: *graphic.Start, Mid: *graphic.Mid, End: *graphic.End, Width: width}
-			}
-		case "poly":
-			if len(graphic.Points) > 0 {
-				drawing.Poly = &pcb.PolylineDrawing{Points: append([]kicadfiles.Point(nil), graphic.Points...), Width: width}
-			}
-		case "curve":
-			if len(graphic.Points) > 0 {
-				drawing.Curve = &pcb.PolylineDrawing{Points: append([]kicadfiles.Point(nil), graphic.Points...), Width: width}
-			}
-		}
-		if footprintGraphicHasShape(drawing) {
-			result = append(result, pcb.FootprintGraphic(drawing))
+		result = append(result, pcb.FootprintGraphic(drawing))
+	}
+	return result
+}
+
+func footprintGraphicsFromRecord(graphics []libraryresolver.FootprintGraphic, placementLayer kicadfiles.BoardLayer) []pcb.FootprintGraphic {
+	result := make([]pcb.FootprintGraphic, 0, len(graphics))
+	for _, graphic := range graphics {
+		if converted, ok := footprintGraphicFromRecord(graphic, placementLayer); ok {
+			result = append(result, converted)
 		}
 	}
 	return result
 }
 
-func footprintGraphicHasShape(drawing pcb.Drawing) bool {
-	return drawing.Line != nil || drawing.Rect != nil || drawing.Circle != nil || drawing.Arc != nil || drawing.Poly != nil || drawing.Curve != nil
+func footprintGraphicFromRecord(graphic libraryresolver.FootprintGraphic, placementLayer kicadfiles.BoardLayer) (pcb.FootprintGraphic, bool) {
+	width := footprintGraphicStrokeWidth(graphic.Width)
+	drawing := pcb.Drawing{
+		Kind:       graphic.Kind,
+		Layer:      placementLayerFor(kicadfiles.BoardLayer(graphic.Layer), placementLayer),
+		StrokeType: graphic.StrokeType,
+		Fill:       graphic.Fill,
+	}
+	switch graphic.Kind {
+	case "line":
+		if graphic.Start != nil && graphic.End != nil {
+			drawing.Line = &pcb.LineDrawing{Start: *graphic.Start, End: *graphic.End, Width: width}
+		}
+	case "rect":
+		if graphic.Start != nil && graphic.End != nil {
+			drawing.Rect = &pcb.RectDrawing{Start: *graphic.Start, End: *graphic.End, Width: width}
+		}
+	case "circle":
+		if graphic.Center != nil && graphic.End != nil {
+			drawing.Circle = &pcb.CircleDrawing{Center: *graphic.Center, End: *graphic.End, Width: width}
+		}
+	case "arc":
+		if graphic.Start != nil && graphic.Mid != nil && graphic.End != nil {
+			drawing.Arc = &pcb.ArcDrawing{Start: *graphic.Start, Mid: *graphic.Mid, End: *graphic.End, Width: width}
+		}
+	case "poly":
+		if len(graphic.Points) > 0 {
+			drawing.Poly = &pcb.PolylineDrawing{Points: append([]kicadfiles.Point(nil), graphic.Points...), Width: width}
+		}
+	case "curve":
+		if len(graphic.Points) > 0 {
+			drawing.Curve = &pcb.PolylineDrawing{Points: append([]kicadfiles.Point(nil), graphic.Points...), Width: width}
+		}
+	}
+	if drawing.Line == nil && drawing.Rect == nil && drawing.Circle == nil && drawing.Arc == nil && drawing.Poly == nil && drawing.Curve == nil {
+		return pcb.FootprintGraphic{}, false
+	}
+	return pcb.FootprintGraphic(drawing), true
 }
 
 func footprintGraphicStrokeWidth(width kicadfiles.IU) kicadfiles.IU {

@@ -75,11 +75,17 @@ type Endpoint struct {
 }
 
 type PlaceFootprintOptions struct {
-	Position   kicadfiles.Point
-	Rotation   kicadfiles.Angle
-	Layer      kicadfiles.BoardLayer
-	Attributes []string
-	Pads       []PadSpec
+	Position           kicadfiles.Point
+	Rotation           kicadfiles.Angle
+	Layer              kicadfiles.BoardLayer
+	Description        string
+	Tags               string
+	Attributes         []string
+	MetadataProperties []pcb.FootprintMetadataProperty
+	Texts              []pcb.FootprintText
+	Graphics           []pcb.FootprintGraphic
+	Models             []pcb.Model3D
+	Pads               []PadSpec
 }
 
 type PadSpec struct {
@@ -389,16 +395,22 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 		return FootprintHandle{}, err
 	}
 	footprint := pcb.Footprint{
-		UUID:       builder.generator.New("root.pcb.footprint", reference),
-		Path:       symbol.Path,
-		LibraryID:  state.footprintID,
-		Reference:  symbol.Reference,
-		Value:      symbol.Value,
-		Position:   options.Position,
-		Rotation:   options.Rotation,
-		Layer:      options.Layer,
-		Attributes: attributes,
-		Properties: builder.footprintProperties(reference, symbol.Reference, symbol.Value),
+		UUID:               builder.generator.New("root.pcb.footprint", reference),
+		Path:               symbol.Path,
+		LibraryID:          state.footprintID,
+		Reference:          symbol.Reference,
+		Value:              symbol.Value,
+		Description:        strings.TrimSpace(options.Description),
+		Tags:               strings.TrimSpace(options.Tags),
+		Position:           options.Position,
+		Rotation:           options.Rotation,
+		Layer:              options.Layer,
+		Attributes:         attributes,
+		MetadataProperties: cloneFootprintMetadataProperties(options.MetadataProperties),
+		Properties:         builder.footprintProperties(reference, symbol.Reference, symbol.Value),
+		Texts:              builder.footprintTextsFromOptions(reference, options.Texts),
+		Graphics:           builder.footprintGraphicsFromOptions(reference, options.Graphics),
+		Models:             cloneModels(options.Models),
 	}
 	padOccurrences := map[string]int{}
 	for _, padSpec := range padSpecs {
@@ -427,6 +439,43 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 	}
 	builder.syncPCBNets()
 	return FootprintHandle{Reference: reference}, nil
+}
+
+func (builder *Builder) footprintTextsFromOptions(reference string, texts []pcb.FootprintText) []pcb.FootprintText {
+	if len(texts) == 0 {
+		return nil
+	}
+	result := make([]pcb.FootprintText, 0, len(texts))
+	for i, text := range texts {
+		item := text
+		if !item.UUID.Valid() {
+			item.UUID = builder.generator.New("root.pcb.footprint.text", reference, item.Kind, strconv.Itoa(i))
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func (builder *Builder) footprintGraphicsFromOptions(reference string, graphics []pcb.FootprintGraphic) []pcb.FootprintGraphic {
+	if len(graphics) == 0 {
+		return nil
+	}
+	result := make([]pcb.FootprintGraphic, 0, len(graphics))
+	for i, graphic := range graphics {
+		drawing := pcb.Drawing(graphic)
+		if !drawing.UUID.Valid() {
+			drawing.UUID = builder.generator.New("root.pcb.footprint.graphic", reference, drawing.Kind, strconv.Itoa(i))
+		}
+		result = append(result, pcb.FootprintGraphic(drawing))
+	}
+	return result
+}
+
+func cloneModels(models []pcb.Model3D) []pcb.Model3D {
+	if len(models) == 0 {
+		return nil
+	}
+	return append([]pcb.Model3D(nil), models...)
 }
 
 func (builder *Builder) Route(netName string, points []kicadfiles.Point, options RouteOptions) (RouteHandle, error) {
