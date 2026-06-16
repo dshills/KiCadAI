@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -117,7 +118,7 @@ func TestRouteSingleLayerPathAllowsBlockedEndpointCells(t *testing.T) {
 		t.Fatalf("plan issues = %#v", issues)
 	}
 
-	path, routeIssues := routeSingleLayerPath(request, access, occupancy, "SIG", plans[0].Pairs[0], "F.Cu")
+	path, routeIssues := routeSingleLayerPath(context.Background(), request, access, occupancy, "SIG", plans[0].Pairs[0], "F.Cu")
 	if len(routeIssues) != 0 {
 		t.Fatalf("route issues = %#v", routeIssues)
 	}
@@ -160,7 +161,7 @@ func routeFirstPair(t *testing.T, request Request) (GridPath, []reports.Issue) {
 	if len(plans) != 1 || len(plans[0].Pairs) != 1 {
 		t.Fatalf("plans = %#v, want one pair", plans)
 	}
-	return routeSingleLayerPath(request, access, occupancy, "SIG", plans[0].Pairs[0], "F.Cu")
+	return routeSingleLayerPath(context.Background(), request, access, occupancy, "SIG", plans[0].Pairs[0], "F.Cu")
 }
 
 func singleLayerSearchRequest() Request {

@@ -1,6 +1,11 @@
 package routing
 
-import "testing"
+import (
+	"context"
+	"testing"
+
+	"kicadai/internal/reports"
+)
 
 func TestRouteRequestRoutesSimpleBoard(t *testing.T) {
 	request := singleLayerSearchRequest()
@@ -14,6 +19,19 @@ func TestRouteRequestRoutesSimpleBoard(t *testing.T) {
 	}
 	if len(result.Routes) != 1 || len(result.Routes[0].Segments) == 0 {
 		t.Fatalf("routes = %#v", result.Routes)
+	}
+}
+
+func TestRouteRequestContextHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	result := RouteRequestContext(ctx, singleLayerSearchRequest())
+	if result.Status != StatusBlocked {
+		t.Fatalf("status = %s, want blocked", result.Status)
+	}
+	if len(result.Issues) != 1 || result.Issues[0].Code != reports.CodeOperationCanceled {
+		t.Fatalf("issues = %#v", result.Issues)
 	}
 }
 

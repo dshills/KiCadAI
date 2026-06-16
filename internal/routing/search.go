@@ -2,6 +2,7 @@ package routing
 
 import (
 	"container/heap"
+	"context"
 	"math"
 	"sort"
 
@@ -40,7 +41,9 @@ const (
 	routeDirNorth
 )
 
-func routeSingleLayerPath(request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair, layerName string) (GridPath, []reports.Issue) {
+const astarContextCheckInterval = 1024
+
+func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair, layerName string) (GridPath, []reports.Issue) {
 	layers := normalizedSearchLayers(request.Board.Layers)
 	rules := normalizedSearchRules(request.Rules)
 	layerIndexes, err := LayerIndexes(layers)
@@ -67,7 +70,10 @@ func routeSingleLayerPath(request Request, access PadAccess, occupancy Occupancy
 	if len(starts) == 0 || len(targets) == 0 {
 		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no access points on routing layer")}
 	}
-	path, searchNodes, found := astarSearch(occupancy, layerIndex, starts, targets, rules)
+	path, searchNodes, found, canceled := astarSearch(ctx, occupancy, layerIndex, starts, targets, rules)
+	if canceled {
+		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
+	}
 	if !found {
 		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "no legal single-layer path found")}
 	}
@@ -85,7 +91,7 @@ func routeSingleLayerPath(request Request, access PadAccess, occupancy Occupancy
 	}, nil
 }
 
-func routeTwoLayerPath(request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
+func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
 	layers := normalizedSearchLayers(request.Board.Layers)
 	rules := normalizedSearchRules(request.Rules)
 	if rules.AllowVias != nil && !*rules.AllowVias {
@@ -121,7 +127,10 @@ func routeTwoLayerPath(request Request, access PadAccess, occupancy Occupancy, n
 	if len(layerIDs) == 0 || len(starts) == 0 || len(targets) == 0 {
 		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no two-layer routing access")}
 	}
-	path, searchNodes, found := astarSearchMultiLayer(occupancy, starts, targets, rules, layerIDs, true)
+	path, searchNodes, found, canceled := astarSearchMultiLayer(ctx, occupancy, starts, targets, rules, layerIDs, true)
+	if canceled {
+		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
+	}
 	if !found {
 		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "no legal two-layer path found")}
 	}
@@ -139,11 +148,11 @@ func routeTwoLayerPath(request Request, access PadAccess, occupancy Occupancy, n
 	}, nil
 }
 
-func astarSearch(occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool) {
-	return astarSearchMultiLayer(occupancy, starts, targets, rules, []int{layerIndex}, false)
+func astarSearch(ctx context.Context, occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool, bool) {
+	return astarSearchMultiLayer(ctx, occupancy, starts, targets, rules, []int{layerIndex}, false)
 }
 
-func astarSearchMultiLayer(occupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool) ([]GridCoord, int, bool) {
+func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool) ([]GridCoord, int, bool, bool) {
 	targetSet := make(map[GridCoord]struct{}, len(targets))
 	allowedBlocked := make(map[GridCoord]struct{}, len(starts)+len(targets))
 	for _, target := range targets {
@@ -182,8 +191,11 @@ func astarSearchMultiLayer(occupancy Occupancy, starts []GridCoord, targets []Gr
 	searchNodes := 0
 	maxNodes := rules.MaxSearchNodes
 	for open.Len() > 0 {
+		if searchNodes%astarContextCheckInterval == 0 && ctx.Err() != nil {
+			return nil, searchNodes, false, true
+		}
 		if searchNodes >= maxNodes {
-			return nil, searchNodes, false
+			return nil, searchNodes, false, false
 		}
 		currentNode := heap.Pop(&open).(*astarNode)
 		current := currentNode.State
@@ -192,7 +204,7 @@ func astarSearchMultiLayer(occupancy Occupancy, starts []GridCoord, targets []Gr
 		}
 		searchNodes++
 		if _, ok := targetSet[current.Coord]; ok {
-			return reconstructGridPath(current, cameFrom), searchNodes, true
+			return reconstructGridPath(current, cameFrom), searchNodes, true, false
 		}
 		for _, neighbor := range orthogonalNeighbors(current) {
 			if !routableCell(occupancy, neighbor.Coord, allowedBlocked) {
@@ -241,7 +253,7 @@ func astarSearchMultiLayer(occupancy Occupancy, starts []GridCoord, targets []Gr
 			}
 		}
 	}
-	return nil, searchNodes, false
+	return nil, searchNodes, false, false
 }
 
 func accessCoordsOnLayer(access PadAccess, grid Grid, endpoint Endpoint, layerName string, layerIndex int) []GridCoord {

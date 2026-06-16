@@ -1,12 +1,25 @@
 package routing
 
 import (
+	"context"
 	"math"
 
 	"kicadai/internal/reports"
 )
 
+const routePairContextCheckInterval = 16
+
 func RouteRequest(request Request) Result {
+	return RouteRequestContext(context.Background(), request)
+}
+
+func RouteRequestContext(ctx context.Context, request Request) Result {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	if result, canceled := routeCanceledResult(ctx); canceled {
+		return result
+	}
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
 	result := Result{Status: StatusBlocked}
@@ -26,6 +39,11 @@ func RouteRequest(request Request) Result {
 	result.Metrics.NetCount = len(plans)
 	failed := false
 	for _, plan := range plans {
+		if err := ctx.Err(); err != nil {
+			result.Status = StatusBlocked
+			result.Issues = append(result.Issues, routeCanceledIssue(err))
+			return result
+		}
 		route := Route{Net: plan.Net.Name, Status: RouteStatusRouted}
 		netFailed := false
 		occupancy, err := BuildOccupancy(request, plan.Net.Name)
@@ -43,11 +61,18 @@ func RouteRequest(request Request) Result {
 			netFailed = true
 			failed = true
 		}
-		for _, pair := range plan.Pairs {
+		for pairIndex, pair := range plan.Pairs {
+			if pairIndex%routePairContextCheckInterval == 0 {
+				if err := ctx.Err(); err != nil {
+					result.Status = StatusBlocked
+					result.Issues = append(result.Issues, routeCanceledIssue(err))
+					return result
+				}
+			}
 			if netFailed {
 				break
 			}
-			path, routeIssues := routePairPath(request, access, occupancy, plan.Net.Name, pair)
+			path, routeIssues := routePairPath(ctx, request, access, occupancy, plan.Net.Name, pair)
 			if len(routeIssues) != 0 {
 				route.Issues = append(route.Issues, routeIssues...)
 				netFailed = true
@@ -103,11 +128,29 @@ func RouteRequest(request Request) Result {
 	return result
 }
 
-func routePairPath(request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
-	if request.Strategy.Mode == ModeSingleLayer {
-		return routeSingleLayerPath(request, access, occupancy, netName, pair, request.Rules.PreferLayer)
+func routeCanceledResult(ctx context.Context) (Result, bool) {
+	if err := ctx.Err(); err != nil {
+		return Result{
+			Status: StatusBlocked,
+			Issues: []reports.Issue{routeCanceledIssue(err)},
+		}, true
 	}
-	return routeTwoLayerPath(request, access, occupancy, netName, pair)
+	return Result{}, false
+}
+
+func routeCanceledIssue(err error) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeOperationCanceled,
+		Severity: reports.SeverityBlocked,
+		Message:  err.Error(),
+	}
+}
+
+func routePairPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
+	if request.Strategy.Mode == ModeSingleLayer {
+		return routeSingleLayerPath(ctx, request, access, occupancy, netName, pair, request.Rules.PreferLayer)
+	}
+	return routeTwoLayerPath(ctx, request, access, occupancy, netName, pair)
 }
 
 func hasBlockingIssue(issues []reports.Issue) bool {

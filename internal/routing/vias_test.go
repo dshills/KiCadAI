@@ -1,6 +1,7 @@
 package routing
 
 import (
+	"context"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -132,7 +133,7 @@ func routeTwoLayerFirstPair(t *testing.T, request Request) (GridPath, []reports.
 	if len(plans) != 1 || len(plans[0].Pairs) != 1 {
 		t.Fatalf("plans = %#v, want one pair", plans)
 	}
-	return routeTwoLayerPath(request, access, occupancy, "SIG", plans[0].Pairs[0])
+	return routeTwoLayerPath(context.Background(), request, access, occupancy, "SIG", plans[0].Pairs[0])
 }
 
 func twoLayerViaRequest() Request {
