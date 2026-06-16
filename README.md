@@ -5,9 +5,9 @@ three related capabilities:
 
 - a Go client for probing KiCad's live IPC API;
 - direct KiCad project, schematic, and PCB file writers;
-- CLI tools for generation, inspection, evaluation, ERC/DRC feedback,
-  round-trip validation, transactions, operation-correlated feedback, and
-  pinmap readiness checks.
+- CLI tools for generation, inspection, evaluation, connectivity-first board
+  validation, ERC/DRC feedback, round-trip validation, transactions,
+  operation-correlated feedback, and pinmap readiness checks.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -19,10 +19,10 @@ The direct-file workflow is the main functional path today. It can generate
 KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
 transactions to imported projects, place components, route small PCB nets,
-validate symbol-to-footprint pinmaps, and run KiCad-backed ERC/DRC checks
-through `kicad-cli`. Transaction validation, planning, and apply results carry
-stable operation IDs where possible so AI agents can connect issues back to the
-source operation they need to repair.
+validate symbol-to-footprint pinmaps, run connectivity-first PCB validation, and
+run KiCad-backed ERC/DRC checks through `kicad-cli`. Transaction validation,
+planning, and apply results carry stable operation IDs where possible so AI
+agents can connect issues back to the source operation they need to repair.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -125,6 +125,7 @@ go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
 go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
 go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json validate board ./examples/07_generated_pcb
 go run ./cmd/kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 go run ./cmd/kicadai --json pinmap list
@@ -259,6 +260,59 @@ The Go API entry points are:
 - `routing.DiagnosticsForResult(result)` for repair categories/actions.
 - `routingadapters.RequestFromPlacement(...)` to route placement output.
 - `designapi.Builder.RouteBoard(...)` to apply routed tracks/vias to a design.
+
+### Connectivity-First Board Validation
+
+`validate board` is the current board-readiness gate for generated PCBs. It
+combines file parsing, structural PCB validation, net-to-pad checks, generated
+connectivity checks, unrouted-net summaries, route endpoint checks, zone
+evidence, and optional KiCad DRC evidence into one JSON result.
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  validate board ./examples/07_generated_pcb
+```
+
+`validate board` accepts either a `.kicad_pcb` file, a `.kicad_pro` file, or a
+project directory. When given a project directory, it chooses the board matching
+the project name and reports an error for ambiguous board files.
+
+Useful flags:
+
+- `--strict-zones`: make zones without fill evidence blocking.
+- `--require-drc`: require KiCad DRC evidence.
+- `--allow-missing-drc`: reserved for future workflows; it is currently mutually
+  exclusive with `--require-drc`, and missing DRC evidence is already
+  non-blocking by default.
+- `--kicad-cli /path/to/kicad-cli`: run KiCad DRC and include parsed findings.
+- `--allowlist ./allowlist.json`: suppress known KiCad DRC findings through the
+  existing check allowlist format.
+- `--keep-artifacts --artifact-dir ./reports`: retain KiCad DRC reports.
+
+The result includes stable check names:
+
+- `pcb_structural_validation`
+- `net_to_pad_validation`
+- `generated_connectivity`
+- `unrouted_net_validation`
+- `route_completion`
+- `zone_validation`
+- `kicad_drc`
+
+Missing DRC evidence is explicit but non-blocking by default. DRC findings are
+blocking when DRC runs and returns unsuppressed findings. Zone fills are not
+refilled in-process; a zone without filled polygons is a warning by default and
+becomes blocking with `--strict-zones`.
+
+Known limitations:
+
+- The validator does not replace KiCad DRC or zone refill.
+- File-backed validation internally normalizes a small set of fields the current
+  PCB reader does not fully hydrate yet, such as footprint paths and property
+  layers. This is read-only and does not modify project files on disk.
+- In-process route completion uses deterministic geometric evidence and is meant
+  to catch generated-board mistakes early, not to certify fabrication outputs.
 
 Current routing support includes deterministic net ordering, single-layer
 Manhattan routing, two-layer routing with vias, keepout and existing-copper
