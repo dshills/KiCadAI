@@ -26,6 +26,9 @@ func TestFeedbackFromPlanGroupsIssuesByOperationID(t *testing.T) {
 	if feedback.Operations[0].Severity != "" || len(feedback.Operations[0].Issues) != 0 {
 		t.Fatalf("empty operation should have no severity: %#v", feedback.Operations[0])
 	}
+	if feedback.Operations[0].Issues == nil {
+		t.Fatalf("empty operation issues should be an empty slice")
+	}
 	if feedback.Operations[1].Severity != reports.SeverityError || len(feedback.Operations[1].Issues) != 2 {
 		t.Fatalf("route feedback not grouped: %#v", feedback.Operations[1])
 	}

@@ -317,6 +317,22 @@ go run ./cmd/kicadai --json transaction plan ./out/project ./tx.json
 go run ./cmd/kicadai --json --overwrite transaction apply ./out/project ./tx.json
 ```
 
+For AI repair loops, add `--feedback` to validation or planning. The command
+keeps the raw issue list and also returns a grouped `feedback` object keyed by
+stable operation IDs.
+
+```sh
+go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
+go run ./cmd/kicadai --json --feedback transaction plan ./out/invalid_feedback ./examples/transactions/invalid_feedback.json
+```
+
+Each transaction operation summary includes an `id`, and operation-scoped
+issues include `operation_id` when KiCadAI can safely link the issue back to a
+source operation. A repair agent should use that ID to find the matching
+operation, edit or replace it, and rerun validation. Some issues intentionally
+remain unlinked when attribution would be ambiguous, such as shared refs,
+shared nets, or generic KiCad CLI findings without trace data.
+
 Supported operation kinds:
 
 - `create_project`

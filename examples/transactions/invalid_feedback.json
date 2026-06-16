@@ -1,0 +1,22 @@
+{
+  "name": "invalid_feedback_demo",
+  "operations": [
+    {
+      "op": "create_project",
+      "name": "invalid_feedback_demo"
+    },
+    {
+      "op": "add_symbol",
+      "ref": "R1",
+      "library_id": "Device:",
+      "at": { "x_mm": 20, "y_mm": 20 }
+    },
+    {
+      "op": "route",
+      "net_name": "",
+      "points": [
+        { "x_mm": 0, "y_mm": 0 }
+      ]
+    }
+  ]
+}

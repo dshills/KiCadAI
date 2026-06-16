@@ -114,8 +114,12 @@ func buildFeedbackReport(target string, operations []feedbackOperation, issues [
 		}
 		issueGroups[issue.OperationID] = append(issueGroups[issue.OperationID], issue)
 	}
+	emptyIssues := []reports.Issue{}
 	for _, operation := range operations {
 		groupIssues := issueGroups[operation.ID]
+		if groupIssues == nil {
+			groupIssues = emptyIssues
+		}
 		report.Operations = append(report.Operations, OperationFeedback{
 			OperationID: operation.ID,
 			Index:       operation.Index,
