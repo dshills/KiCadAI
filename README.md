@@ -6,7 +6,8 @@ three related capabilities:
 - a Go client for probing KiCad's live IPC API;
 - direct KiCad project, schematic, and PCB file writers;
 - CLI tools for generation, inspection, evaluation, ERC/DRC feedback,
-  round-trip validation, transactions, and pinmap readiness checks.
+  round-trip validation, transactions, operation-correlated feedback, and
+  pinmap readiness checks.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -19,7 +20,9 @@ KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
 transactions to imported projects, place components, route small PCB nets,
 validate symbol-to-footprint pinmaps, and run KiCad-backed ERC/DRC checks
-through `kicad-cli`.
+through `kicad-cli`. Transaction validation, planning, and apply results carry
+stable operation IDs where possible so AI agents can connect issues back to the
+source operation they need to repair.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -128,6 +131,7 @@ go run ./cmd/kicadai --json pinmap list
 go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
 go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json route request
+go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
 
 ### Live IPC Commands
@@ -309,7 +313,9 @@ assignments, and preservation conflicts. Reports include a
 ### Transactions
 
 Transactions are structured edit plans. They can be validated, planned against a
-target, or applied.
+target, or applied. Validation and planning include generated operation
+summaries with stable IDs, and apply annotates operation-scoped failures with
+the same IDs where attribution is safe.
 
 ```sh
 go run ./cmd/kicadai --json transaction validate ./tx.json
@@ -332,6 +338,18 @@ source operation. A repair agent should use that ID to find the matching
 operation, edit or replace it, and rerun validation. Some issues intentionally
 remain unlinked when attribution would be ambiguous, such as shared refs,
 shared nets, or generic KiCad CLI findings without trace data.
+
+Feedback summaries include:
+
+- `operations[]`: grouped issues by operation ID, including refs, nets,
+  artifacts, severity, and suggestions;
+- `issues[]`: the original flat issue list;
+- `summary`: operation count, issue count, blocking/error/warning counts, and
+  unlinked issue count.
+
+Transaction inputs do not need to contain operation IDs. KiCadAI derives IDs
+from operation content and disambiguates identical operations. If an operation
+changes, its ID is expected to change.
 
 Supported operation kinds:
 
@@ -563,6 +581,7 @@ Checked-in examples live under `examples/`:
 | `08_pcb_object_correctness` | PCB object correctness fixture. |
 | `checks` | ERC/DRC fixture projects and report samples for KiCad-backed validation. |
 | `blocks` | Circuit block library request files and generated schematic/project examples. |
+| `transactions` | Transaction fixtures, including an invalid feedback example for AI repair loops. |
 
 Open each KiCad project by opening the `.kicad_pro` file in its directory.
 
@@ -577,7 +596,8 @@ Key packages:
 - `internal/kicadfiles/pcb`: `.kicad_pcb` reader/writer and validation.
 - `internal/kicadfiles/design`: project-directory read/write orchestration.
 - `internal/kicadfiles/designapi`: higher-level Go builder API.
-- `internal/transactions`: structured transaction validation, planning, and apply.
+- `internal/transactions`: structured transaction validation, planning, apply,
+  operation IDs, feedback summaries, and operation trace maps.
 - `internal/generate`: higher-level project generators.
 - `internal/inspect`: inspection reports.
 - `internal/evaluate`: readiness and correctness evaluation.
@@ -693,6 +713,8 @@ make test
   production autorouting.
 - Imported-project mutation blocks unsupported raw content to avoid damaging
   user-authored KiCad features.
+- Operation feedback is strongest for transaction-derived issues. Generic KiCad
+  CLI findings remain unlinked unless a unique operation trace exists.
 - Hierarchical pinmap validation is intentionally blocked until hierarchy
   flattening is implemented.
 - Footprint geometry is still generated from transaction payloads and defaults;
@@ -716,6 +738,9 @@ make test
   write commands are unavailable in the generated API.
 - `transaction apply` blocked by preservation conflict: the imported file
   contains KiCad constructs the writer does not model safely yet.
+- `transaction validate --feedback` returns a nonzero exit for invalid example
+  transactions by design. Inspect `data.feedback.operations[]` and
+  `issues[].operation_id` to identify the operation to edit.
 - `pinmap validate` blocked by hierarchy: validate child sheets directly or wait
   for hierarchy flattening support.
 - Round-trip skipped: install `kicad-cli` or pass `--kicad-cli`.
