@@ -86,7 +86,11 @@ func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 }
 
 func annotateApplyResultIssueOperationIDs(result *ApplyResult) {
+	if len(result.Issues) == 0 {
+		return
+	}
 	AnnotateIssueOperationIDs(result.Issues, result.Plan.Operations)
+	NewOperationTraceMapFromPlan(result.Plan).AnnotateIssues(result.Issues)
 }
 
 func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyResult {
