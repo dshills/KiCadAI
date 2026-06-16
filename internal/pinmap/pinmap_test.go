@@ -122,6 +122,15 @@ func TestValidateProjectHierarchyBlocksReadiness(t *testing.T) {
     (property "Sheetfile" "child.kicad_sch")
     (uuid "22222222-2222-5222-8222-222222222222"))
 )`)
+	if err := os.WriteFile(filepath.Join(dir, "child.kicad_sch"), []byte(`(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (generator_version "10.0")
+  (uuid "33333333-3333-5333-8333-333333333333")
+  (paper A4)
+)`), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	report, err := ValidateProject(dir)
 	if err != nil {
 		t.Fatal(err)

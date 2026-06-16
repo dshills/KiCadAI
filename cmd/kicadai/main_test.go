@@ -1436,6 +1436,29 @@ func TestRunTransactionFromSchematicJSON(t *testing.T) {
     (property "Value" "10k" (at 40 12.54 0))
     (property "Footprint" "Resistor_SMD:R_0805_2012Metric" (at 40 15.08 0))
     (uuid "55555555-5555-5555-8555-555555555555"))
+  (sheet
+    (at 60 20)
+    (size 20 20)
+    (property "Sheetname" "Child")
+    (property "Sheetfile" "child.kicad_sch")
+    (uuid "66666666-6666-5666-8666-666666666666"))
+)`)
+	writeTestFile(t, filepath.Join(root, "child.kicad_sch"), `
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (generator_version "10.0")
+  (uuid "77777777-7777-5777-8777-777777777777")
+  (paper A4)
+  (wire (pts (xy 15.08 10) (xy 25 10)) (uuid "88888888-8888-5888-8888-888888888888"))
+  (label "CHILD_NET" (at 25 10 0) (uuid "99999999-9999-5999-8999-999999999999"))
+  (symbol
+    (lib_id "Device:R")
+    (at 10 10 0)
+    (property "Reference" "R3" (at 10 10 0))
+    (property "Value" "4.7k" (at 10 12.54 0))
+    (property "Footprint" "Resistor_SMD:R_0805_2012Metric" (at 10 15.08 0))
+    (uuid "aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa"))
 )`)
 
 	var stdout bytes.Buffer
@@ -1448,13 +1471,15 @@ func TestRunTransactionFromSchematicJSON(t *testing.T) {
 	for _, want := range []string{
 		`"ok": true`,
 		`"command": "transaction"`,
-		`"symbol_count": 2`,
-		`"placed_count": 2`,
-		`"net_hint_count": 2`,
+		`"symbol_count": 3`,
+		`"placed_count": 3`,
+		`"net_hint_count": 3`,
 		`"op": "place_footprint"`,
 		`"ref": "R1"`,
 		`"ref": "R2"`,
+		`"ref": "R3"`,
 		`"net": "NET_A"`,
+		`"net": "Child/CHILD_NET"`,
 		`"op": "write_project"`,
 	} {
 		if !strings.Contains(output, want) {

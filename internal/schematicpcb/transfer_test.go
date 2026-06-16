@@ -107,6 +107,25 @@ func TestFromDesignGroupsMultiUnitSymbolsByReference(t *testing.T) {
 	}
 }
 
+func TestFromDesignReportsMultiUnitLibraryIDConflicts(t *testing.T) {
+	design := transferFixtureDesign()
+	duplicate := design.Schematic.Symbols[1]
+	duplicate.LibraryID = "Connector:Other"
+	design.Schematic.Symbols = append(design.Schematic.Symbols, duplicate)
+	index := transferFixtureLibraryIndex()
+
+	result := FromDesign(design, Options{LibraryIndex: &index})
+	found := false
+	for _, issue := range result.Issues {
+		if issue.Path == "schematic.symbols[2].lib_id" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("library conflict issue not found: %#v", result.Issues)
+	}
+}
+
 func TestFromDesignUsesKiCadSchematicRotationForPinAnchors(t *testing.T) {
 	design := transferFixtureDesign()
 	design.Schematic.Symbols[1].Rotation = 90
@@ -150,16 +169,81 @@ func TestFromDesignUsesKiCadSchematicMirrorForPinAnchors(t *testing.T) {
 	}
 }
 
-func TestFromDesignRejectsHierarchicalSchematics(t *testing.T) {
+func TestFromDesignPlacesLoadedChildSheetSymbols(t *testing.T) {
 	design := transferFixtureDesign()
-	design.Schematic.Sheets = []schematic.Sheet{{Filename: "child.kicad_sch"}}
+	design.Schematic.Sheets = []schematic.Sheet{{Name: "Child", Filename: "child.kicad_sch"}}
+	child := transferFixtureDesign().Schematic
+	child.Filename = "child.kicad_sch"
+	child.Symbols[0].Reference = "J4"
+	child.Symbols[0].Value = "CHILD_OUT"
+	child.Symbols[0].Properties = []schematic.Property{{Name: "Reference", Value: "J4"}, {Name: "Value", Value: "CHILD_OUT"}, {Name: "Footprint", Value: "Connector_Test:TH_1x02"}}
+	child.Symbols[1].Reference = "J3"
+	child.Symbols[1].Value = "CHILD_IN"
+	child.Symbols[1].Properties = []schematic.Property{{Name: "Reference", Value: "J3"}, {Name: "Value", Value: "CHILD_IN"}, {Name: "Footprint", Value: "Connector_Test:TH_1x02"}}
+	child.Labels = []schematic.Label{{Text: "CHILD_A", Position: kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(10)}}}
+	design.SheetFiles = []*schematic.SchematicFile{child}
+	index := transferFixtureLibraryIndex()
+
+	result := FromDesign(design, Options{LibraryIndex: &index})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if result.SymbolCount != 4 || result.AssignedCount != 4 || result.PlacedCount != 4 || result.NetHintCount != 4 {
+		t.Fatalf("result = %#v", result)
+	}
+	var childPlace transactions.PlaceFootprintOperation
+	if err := json.Unmarshal(result.Transaction.Operations[2].Raw, &childPlace); err != nil {
+		t.Fatal(err)
+	}
+	if childPlace.Ref != "J3" || len(childPlace.Pads) != 2 || childPlace.Pads[0].Net == nil || *childPlace.Pads[0].Net != "Child/CHILD_A" {
+		t.Fatalf("child placement = %#v", childPlace)
+	}
+}
+
+func TestFromDesignKeepsGlobalLabelsUnscopedAcrossSheetFiles(t *testing.T) {
+	design := transferFixtureDesign()
+	design.Schematic.Symbols = nil
+	design.Schematic.Wires = nil
+	design.Schematic.Labels = nil
+	child := transferFixtureDesign().Schematic
+	child.Filename = "child.kicad_sch"
+	child.Symbols = child.Symbols[:1]
+	child.Symbols[0].Reference = "J1"
+	child.Symbols[0].Properties = []schematic.Property{{Name: "Reference", Value: "J1"}, {Name: "Value", Value: "IN"}, {Name: "Footprint", Value: "Connector_Test:TH_1x02"}}
+	child.Wires = []schematic.Wire{{Points: []kicadfiles.Point{{X: kicadfiles.MM(40), Y: kicadfiles.MM(10)}, {X: kicadfiles.MM(25), Y: kicadfiles.MM(10)}}}}
+	child.Labels = []schematic.Label{{Kind: schematic.LabelGlobal, Text: "GLOBAL_A", Position: kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(10)}}}
+	design.SheetFiles = []*schematic.SchematicFile{child}
+	index := transferFixtureLibraryIndex()
+
+	result := FromDesign(design, Options{LibraryIndex: &index})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	var place transactions.PlaceFootprintOperation
+	if err := json.Unmarshal(result.Transaction.Operations[0].Raw, &place); err != nil {
+		t.Fatal(err)
+	}
+	if len(place.Pads) != 2 || place.Pads[0].Net == nil || *place.Pads[0].Net != "GLOBAL_A" {
+		t.Fatalf("global net hint = %#v", place.Pads)
+	}
+}
+
+func TestFromDesignRejectsMultiInstantiatedSheetFiles(t *testing.T) {
+	design := transferFixtureDesign()
+	design.Schematic.Sheets = []schematic.Sheet{
+		{Filename: "child.kicad_sch"},
+		{Filename: "./child.kicad_sch"},
+	}
+	child := transferFixtureDesign().Schematic
+	child.Filename = "child.kicad_sch"
+	design.SheetFiles = []*schematic.SchematicFile{child}
 
 	result := FromDesign(design, Options{LibraryIndex: &libraryresolver.LibraryIndex{}})
-	if len(result.Issues) != 1 || result.Issues[0].Path != "schematic.sheets" {
-		t.Fatalf("hierarchy issue not reported: %#v", result.Issues)
+	if len(result.Issues) != 1 || result.Issues[0].Path != "schematic.sheets.child.kicad_sch" {
+		t.Fatalf("multi-instance issue not reported: %#v", result.Issues)
 	}
 	if len(result.Transaction.Operations) != 0 {
-		t.Fatalf("operations should not be emitted for unsupported hierarchy: %#v", result.Transaction.Operations)
+		t.Fatalf("operations should not be emitted for unsupported multi-instance sheets: %#v", result.Transaction.Operations)
 	}
 }
 

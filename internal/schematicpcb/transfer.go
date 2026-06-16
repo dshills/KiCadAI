@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"path/filepath"
 	"sort"
 	"strings"
 
@@ -48,7 +49,18 @@ type component struct {
 	Value       string
 	LibraryID   string
 	FootprintID string
-	Symbols     []schematic.SchematicSymbol
+	Symbols     []componentSymbol
+}
+
+type componentSymbol struct {
+	FileIndex int
+	Symbol    schematic.SchematicSymbol
+}
+
+type schematicFileEntry struct {
+	Path      string
+	NetPrefix string
+	File      schematic.SchematicFile
 }
 
 type pinAnchor struct {
@@ -64,12 +76,12 @@ func FromDesign(design kicaddesign.Design, opts Options) Result {
 		result.Issues = append(result.Issues, issue(reports.CodeMissingFile, reports.SeverityError, "schematic", "root schematic is required"))
 		return result
 	}
-	if len(design.Schematic.Sheets) > 0 {
-		result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, "schematic.sheets", "hierarchical schematic transfer is not implemented yet"))
+	files := schematicFiles(design)
+	if !validateHierarchy(files, &result) {
 		return result
 	}
-	components := schematicComponents(*design.Schematic, &result)
-	result.SymbolCount = len(design.Schematic.Symbols)
+	components := schematicComponents(files, &result)
+	result.SymbolCount = symbolCount(files)
 	result.AssignedCount = len(components)
 	if opts.LibraryIndex == nil {
 		result.RequiresLibraries = true
@@ -77,7 +89,7 @@ func FromDesign(design kicaddesign.Design, opts Options) Result {
 	}
 	netHints := map[string]map[string]string{}
 	if opts.LibraryIndex != nil {
-		netHints = inferPinNetHints(*design.Schematic, components, *opts.LibraryIndex, &result)
+		netHints = inferPinNetHints(files, components, *opts.LibraryIndex, &result)
 	}
 	ops := make([]transactions.Operation, 0, len(components)+1)
 	layout := normalizeLayout(opts)
@@ -120,6 +132,107 @@ func FromDesign(design kicaddesign.Design, opts Options) Result {
 	return result
 }
 
+func schematicFiles(design kicaddesign.Design) []schematicFileEntry {
+	rootPath := strings.TrimSpace(design.Schematic.Filename)
+	if rootPath == "" {
+		rootPath = "schematic"
+	}
+	files := []schematicFileEntry{{Path: rootPath, File: *design.Schematic}}
+	for i, sheetFile := range design.SheetFiles {
+		if sheetFile == nil {
+			continue
+		}
+		path := strings.TrimSpace(sheetFile.Filename)
+		if path == "" {
+			path = fmt.Sprintf("sheet_files[%d]", i)
+		}
+		files = append(files, schematicFileEntry{Path: path, File: *sheetFile})
+	}
+	applySheetNetPrefixes(files)
+	return files
+}
+
+func applySheetNetPrefixes(files []schematicFileEntry) {
+	byPath := map[string]int{}
+	for i, file := range files {
+		byPath[file.Path] = i
+	}
+	visited := map[string]struct{}{}
+	var visit func(parent schematicFileEntry)
+	visit = func(parent schematicFileEntry) {
+		if _, ok := visited[parent.Path]; ok {
+			return
+		}
+		visited[parent.Path] = struct{}{}
+		for _, sheet := range parent.File.Sheets {
+			childPath, err := kicaddesign.ResolveSheetPath(parent.Path, sheet.Filename)
+			if err != nil {
+				continue
+			}
+			childIndex, ok := byPath[childPath]
+			if !ok {
+				continue
+			}
+			prefix := sheetNetName(sheet)
+			if parent.NetPrefix != "" {
+				prefix = parent.NetPrefix + "/" + prefix
+			}
+			files[childIndex].NetPrefix = prefix
+			visit(files[childIndex])
+		}
+	}
+	if len(files) > 0 {
+		visit(files[0])
+	}
+}
+
+func sheetNetName(sheet schematic.Sheet) string {
+	name := strings.TrimSpace(sheet.Name)
+	if name != "" {
+		return name
+	}
+	filename := strings.TrimSpace(sheet.Filename)
+	if filename == "" {
+		return "sheet"
+	}
+	base := filepath.Base(filepath.FromSlash(filename))
+	return strings.TrimSuffix(base, filepath.Ext(base))
+}
+
+func symbolCount(files []schematicFileEntry) int {
+	count := 0
+	for _, file := range files {
+		count += len(file.File.Symbols)
+	}
+	return count
+}
+
+func validateHierarchy(files []schematicFileEntry, result *Result) bool {
+	counts := map[string]int{}
+	for _, file := range files {
+		for _, sheet := range file.File.Sheets {
+			name := strings.TrimSpace(sheet.Filename)
+			if name == "" {
+				continue
+			}
+			key, err := kicaddesign.ResolveSheetPath(file.Path, name)
+			if err != nil {
+				result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, "schematic.sheets."+name, fmt.Sprintf("invalid sheet file path %q: %v", name, err)))
+				continue
+			}
+			counts[key]++
+		}
+	}
+	ok := true
+	for name, count := range counts {
+		if count > 1 {
+			ok = false
+			result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, "schematic.sheets."+name, "multi-instantiated sheet files are not supported yet"))
+		}
+	}
+	return ok
+}
+
 type layoutOptions struct {
 	originX  float64
 	originY  float64
@@ -148,29 +261,37 @@ func normalizeLayout(opts Options) layoutOptions {
 	return layout
 }
 
-func schematicComponents(file schematic.SchematicFile, result *Result) []component {
+func schematicComponents(files []schematicFileEntry, result *Result) []component {
 	byRef := map[string]*component{}
-	for i, symbol := range file.Symbols {
-		ref := strings.TrimSpace(symbol.Reference)
-		if ref == "" || strings.HasPrefix(ref, "#") {
-			continue
-		}
-		footprintID := symbolProperty(symbol, "Footprint")
-		if existing, ok := byRef[ref]; ok {
-			existing.Symbols = append(existing.Symbols, symbol)
-			if symbol.Value != "" && existing.Value != "" && symbol.Value != existing.Value {
-				result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, fmt.Sprintf("symbols[%d].Value", i), "multi-unit schematic reference "+ref+" has conflicting value "+symbol.Value))
-			} else if existing.Value == "" {
-				existing.Value = symbol.Value
+	for fileIndex, file := range files {
+		for i, symbol := range file.File.Symbols {
+			ref := strings.TrimSpace(symbol.Reference)
+			if ref == "" || strings.HasPrefix(ref, "#") {
+				continue
 			}
-			if footprintID != "" && existing.FootprintID != "" && footprintID != existing.FootprintID {
-				result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, fmt.Sprintf("symbols[%d].Footprint", i), "multi-unit schematic reference "+ref+" has conflicting footprint "+footprintID))
-			} else if existing.FootprintID == "" {
-				existing.FootprintID = footprintID
+			footprintID := symbolProperty(symbol, "Footprint")
+			symbolRef := componentSymbol{FileIndex: fileIndex, Symbol: symbol}
+			if existing, ok := byRef[ref]; ok {
+				existing.Symbols = append(existing.Symbols, symbolRef)
+				if symbol.LibraryID != "" && existing.LibraryID != "" && symbol.LibraryID != existing.LibraryID {
+					result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, fmt.Sprintf("%s.symbols[%d].lib_id", file.Path, i), "multi-unit schematic reference "+ref+" has conflicting library id "+symbol.LibraryID))
+				} else if existing.LibraryID == "" {
+					existing.LibraryID = symbol.LibraryID
+				}
+				if symbol.Value != "" && existing.Value != "" && symbol.Value != existing.Value {
+					result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, fmt.Sprintf("%s.symbols[%d].Value", file.Path, i), "multi-unit schematic reference "+ref+" has conflicting value "+symbol.Value))
+				} else if existing.Value == "" {
+					existing.Value = symbol.Value
+				}
+				if footprintID != "" && existing.FootprintID != "" && footprintID != existing.FootprintID {
+					result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityError, fmt.Sprintf("%s.symbols[%d].Footprint", file.Path, i), "multi-unit schematic reference "+ref+" has conflicting footprint "+footprintID))
+				} else if existing.FootprintID == "" {
+					existing.FootprintID = footprintID
+				}
+				continue
 			}
-			continue
+			byRef[ref] = &component{Ref: ref, Value: symbol.Value, LibraryID: symbol.LibraryID, FootprintID: footprintID, Symbols: []componentSymbol{symbolRef}}
 		}
-		byRef[ref] = &component{Ref: ref, Value: symbol.Value, LibraryID: symbol.LibraryID, FootprintID: footprintID, Symbols: []schematic.SchematicSymbol{symbol}}
 	}
 	components := make([]component, 0, len(byRef))
 	for _, component := range byRef {
@@ -180,11 +301,49 @@ func schematicComponents(file schematic.SchematicFile, result *Result) []compone
 		}
 		components = append(components, *component)
 	}
+	// Map collection is intentionally followed by a natural reference sort so
+	// generated placement operations are deterministic.
 	sort.SliceStable(components, func(i, j int) bool { return naturalRefLess(components[i].Ref, components[j].Ref) })
 	return components
 }
 
-func inferPinNetHints(file schematic.SchematicFile, components []component, index libraryresolver.LibraryIndex, result *Result) map[string]map[string]string {
+func inferPinNetHints(files []schematicFileEntry, components []component, index libraryresolver.LibraryIndex, result *Result) map[string]map[string]string {
+	hints := map[string]map[string]string{}
+	byFile := componentsByFile(len(files), components)
+	for fileIndex, file := range files {
+		fileHints := inferFilePinNetHints(fileIndex == 0, file.NetPrefix, file.File, byFile[fileIndex], index, result)
+		for ref, pinHints := range fileHints {
+			if hints[ref] == nil {
+				hints[ref] = map[string]string{}
+			}
+			for pin, net := range pinHints {
+				hints[ref][pin] = net
+			}
+		}
+	}
+	return hints
+}
+
+func componentsByFile(fileCount int, components []component) [][]component {
+	byFile := make([][]component, fileCount)
+	for _, component := range components {
+		groupedSymbols := map[int][]componentSymbol{}
+		for _, symbol := range component.Symbols {
+			groupedSymbols[symbol.FileIndex] = append(groupedSymbols[symbol.FileIndex], symbol)
+		}
+		for fileIndex, symbols := range groupedSymbols {
+			if fileIndex < 0 || fileIndex >= fileCount {
+				continue
+			}
+			fileComponent := component
+			fileComponent.Symbols = symbols
+			byFile[fileIndex] = append(byFile[fileIndex], fileComponent)
+		}
+	}
+	return byFile
+}
+
+func inferFilePinNetHints(isRoot bool, netPrefix string, file schematic.SchematicFile, components []component, index libraryresolver.LibraryIndex, result *Result) map[string]map[string]string {
 	graph := newNetGraph()
 	var terminals []kicadfiles.Point
 	terminalSeen := map[graphPoint]struct{}{}
@@ -205,7 +364,7 @@ func inferPinNetHints(file schematic.SchematicFile, components []component, inde
 	for _, label := range file.Labels {
 		key := pointKey(label.Position)
 		graph.ensure(key)
-		graph.label(key, label.Text)
+		graph.label(key, labelNetName(label, isRoot, netPrefix))
 		addTerminal(label.Position)
 	}
 	anchors := collectPinAnchors(components, index, result)
@@ -245,10 +404,28 @@ func inferPinNetHints(file schematic.SchematicFile, components []component, inde
 	return hints
 }
 
+func labelNetName(label schematic.Label, isRoot bool, netPrefix string) string {
+	text := strings.TrimSpace(label.Text)
+	if text == "" {
+		return ""
+	}
+	if label.Kind == schematic.LabelGlobal {
+		return text
+	}
+	if isRoot {
+		return text
+	}
+	if strings.TrimSpace(netPrefix) == "" {
+		return text
+	}
+	return netPrefix + "/" + text
+}
+
 func collectPinAnchors(components []component, index libraryresolver.LibraryIndex, result *Result) []pinAnchor {
 	var anchors []pinAnchor
 	for _, component := range components {
-		for _, symbol := range component.Symbols {
+		for _, componentSymbol := range component.Symbols {
+			symbol := componentSymbol.Symbol
 			record, ok := libraryresolver.ResolveSymbol(index, symbol.LibraryID)
 			if !ok {
 				result.Issues = append(result.Issues, issue(reports.CodeUnknownSymbolLibrary, reports.SeverityWarning, "symbol."+component.Ref, "symbol record not found for "+symbol.LibraryID))
