@@ -15,11 +15,19 @@ const (
 	EnvLibraryCache   = "KICADAI_LIBRARY_CACHE"
 )
 
+const (
+	LibrarySourceRoot         = "root"
+	LibrarySourceProjectTable = "project_table"
+	LibrarySourceGlobalTable  = "global_table"
+)
+
 type LibraryRoots struct {
-	KLCRoot        string `json:"klc_root,omitempty"`
-	SymbolsRoot    string `json:"symbols_root,omitempty"`
-	FootprintsRoot string `json:"footprints_root,omitempty"`
-	TemplatesRoot  string `json:"templates_root,omitempty"`
+	KLCRoot           string `json:"klc_root,omitempty"`
+	SymbolsRoot       string `json:"symbols_root,omitempty"`
+	FootprintsRoot    string `json:"footprints_root,omitempty"`
+	TemplatesRoot     string `json:"templates_root,omitempty"`
+	ProjectDir        string `json:"project_dir,omitempty"`
+	GlobalSymbolTable string `json:"global_symbol_table,omitempty"`
 }
 
 type LibraryIndex struct {
@@ -80,6 +88,16 @@ type LibraryFile struct {
 	LibraryNickname string          `json:"library_nickname"`
 	Name            string          `json:"name,omitempty"`
 	IDPrefix        string          `json:"id_prefix"`
+	Source          string          `json:"source,omitempty"`
+}
+
+type SymbolLibraryTableEntry struct {
+	Name        string `json:"name"`
+	Type        string `json:"type,omitempty"`
+	URI         string `json:"uri"`
+	Options     string `json:"options,omitempty"`
+	Description string `json:"description,omitempty"`
+	Path        string `json:"path,omitempty"`
 }
 
 type SymbolRecord struct {

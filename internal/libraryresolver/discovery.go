@@ -22,9 +22,24 @@ func DiscoverContext(ctx context.Context, roots LibraryRoots) LibraryInventory {
 	inventory.Diagnostics = append(inventory.Diagnostics, ValidateRoots(roots)...)
 	var symbolFiles []LibraryFile
 	var symbolIssues []reports.Issue
+	var projectSymbolFiles []LibraryFile
+	var projectSymbolIssues []reports.Issue
+	var globalSymbolFiles []LibraryFile
+	var globalSymbolIssues []reports.Issue
 	var footprintFiles []LibraryFile
 	var footprintIssues []reports.Issue
 	var waitGroup sync.WaitGroup
+	envVariables := environmentVariables()
+	waitGroup.Add(1)
+	go func() {
+		defer waitGroup.Done()
+		projectSymbolFiles, projectSymbolIssues = discoverProjectSymbolTable(ctx, roots, envVariables)
+	}()
+	waitGroup.Add(1)
+	go func() {
+		defer waitGroup.Done()
+		globalSymbolFiles, globalSymbolIssues = discoverGlobalSymbolTable(ctx, roots, envVariables)
+	}()
 	if strings.TrimSpace(roots.SymbolsRoot) != "" {
 		waitGroup.Add(1)
 		go func() {
@@ -40,8 +55,12 @@ func DiscoverContext(ctx context.Context, roots LibraryRoots) LibraryInventory {
 		}()
 	}
 	waitGroup.Wait()
+	inventory.SymbolFiles = append(inventory.SymbolFiles, projectSymbolFiles...)
+	inventory.SymbolFiles = append(inventory.SymbolFiles, globalSymbolFiles...)
 	inventory.SymbolFiles = append(inventory.SymbolFiles, symbolFiles...)
 	inventory.FootprintFiles = append(inventory.FootprintFiles, footprintFiles...)
+	inventory.Diagnostics = append(inventory.Diagnostics, projectSymbolIssues...)
+	inventory.Diagnostics = append(inventory.Diagnostics, globalSymbolIssues...)
 	inventory.Diagnostics = append(inventory.Diagnostics, symbolIssues...)
 	inventory.Diagnostics = append(inventory.Diagnostics, footprintIssues...)
 	sortLibraryFiles(inventory.SymbolFiles)
@@ -86,7 +105,7 @@ func discoverFiles(ctx context.Context, root string, kind LibraryFileKind, ext s
 			return nil
 		}
 		name := trimSuffixFold(entry.Name(), ext)
-		files = append(files, LibraryFile{Kind: kind, Path: filepath.ToSlash(path), LibraryNickname: nickname, Name: name, IDPrefix: nickname + ":"})
+		files = append(files, LibraryFile{Kind: kind, Path: filepath.ToSlash(path), LibraryNickname: nickname, Name: name, IDPrefix: nickname + ":", Source: LibrarySourceRoot})
 		return nil
 	})
 	if walkErr != nil {
@@ -137,6 +156,11 @@ func sortLibraryFiles(files []LibraryFile) {
 		if v := cmp.Compare(a.Kind, b.Kind); v != 0 {
 			return v
 		}
+		// Symbol indexing is first-one-wins on duplicate IDs, so source
+		// precedence sorts highest-priority sources first.
+		if v := cmp.Compare(librarySourceRank(a.Source), librarySourceRank(b.Source)); v != 0 {
+			return v
+		}
 		if v := cmp.Compare(a.LibraryNickname, b.LibraryNickname); v != 0 {
 			return v
 		}
@@ -145,6 +169,19 @@ func sortLibraryFiles(files []LibraryFile) {
 		}
 		return cmp.Compare(a.Path, b.Path)
 	})
+}
+
+func librarySourceRank(source string) int {
+	switch source {
+	case LibrarySourceProjectTable:
+		return 0
+	case LibrarySourceGlobalTable:
+		return 1
+	case LibrarySourceRoot, "":
+		return 2
+	default:
+		return 3
+	}
 }
 
 func countLibraryNicknames(files []LibraryFile) int {
@@ -163,6 +200,11 @@ func duplicateNicknameIssues(kind string, files []LibraryFile) []reports.Issue {
 	seen := map[nicknameContainer]struct{}{}
 	containerCounts := map[string]int{}
 	for _, file := range files {
+		// Project/global symbol tables are authoritative and may intentionally
+		// shadow root-discovered libraries with the same nickname.
+		if kind == "symbol" && file.Source != "" && file.Source != LibrarySourceRoot {
+			continue
+		}
 		key := nicknameContainer{nickname: file.LibraryNickname, container: libraryContainer(file)}
 		if _, ok := seen[key]; ok {
 			continue
