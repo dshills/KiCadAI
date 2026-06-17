@@ -1,6 +1,23 @@
+Current Status Update
+
+Completed or substantially implemented foundations:
+
+- Footprint Library Expansion
+- Schematic to PCB Transfer
+- Connectivity-First Board Validation
+- Circuit Block PCB Realization
+- AI Design Workflow CLI
+- Component Intelligence foundation and golden corpus
+
+Active next project:
+
+- Full Symbol Resolver Hardening
+- Spec: `specs/symbol-resolver-hardening/SPEC.md`
+
 Major Gaps
-1. Component Intelligence
-We need a real component database, not just symbol names and footprint strings.
+1. Component Intelligence Expansion
+We have a component intelligence foundation and seed catalog, but still need a
+larger verified component database beyond the built-in examples.
 Needed:
 verified symbol-to-footprint mappings for many components;
 pin function maps, electrical types, package variants, and polarity rules;
@@ -9,9 +26,10 @@ passive defaults: resistor/capacitor packages, voltage ratings, tolerances;
 connector families and pin numbering conventions;
 power components, regulators, op-amps, MCUs, sensors, crystals, USB, RF modules, etc.
 Current state:
-basic pinmap registry exists;
-only a small built-in set is verified;
-hierarchy is blocked for pinmap validation.
+component catalog, selection, confidence gates, CLI, design workflow
+integration, and golden tests exist;
+only a small seed set is verified or rule-inferred;
+active component coverage remains mostly placeholder-level.
 2. Circuit Design Knowledge
 The AI needs domain-specific circuit templates and design rules.
 Examples:

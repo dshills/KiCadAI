@@ -383,6 +383,10 @@ These are the highest-risk missing capabilities for full AI design generation:
 
 ## Recommended Next Priority Order
 
+Active next project:
+
+- `specs/symbol-resolver-hardening/SPEC.md`
+
 ### 1. Full Symbol Resolver Hardening
 
 Bring schematic symbol semantics closer to footprint support.
