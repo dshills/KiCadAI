@@ -64,7 +64,7 @@ func TestValidateManifestReportsUnknownNetPinRole(t *testing.T) {
 
 func TestValidateManifestReportsUnknownPlacementRole(t *testing.T) {
 	manifest := validManifest()
-	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Role: "missing", XMM: 1, YMM: 2}}
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Role: "missing", XMM: floatRef(1), YMM: floatRef(2)}}
 	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
 	if !hasIssue(issues, "expected placement references unknown component role missing") {
 		t.Fatalf("issues = %#v", issues)
@@ -92,8 +92,8 @@ func TestValidateManifestReportsPortUnknownNet(t *testing.T) {
 func TestValidateManifestReportsDuplicatePlacement(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.PCB.Placements = []ExpectedPlacement{
-		{Role: "resistor", XMM: 1, YMM: 2},
-		{Role: "resistor", XMM: 3, YMM: 4},
+		{Role: "resistor", XMM: floatRef(1), YMM: floatRef(2)},
+		{Role: "resistor", XMM: floatRef(3), YMM: floatRef(4)},
 	}
 	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
 	if !hasIssue(issues, "duplicate expected placement for role:resistor") {
@@ -105,8 +105,8 @@ func TestValidateManifestReportsDuplicatePlacementByRefAndRole(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Components[0].Ref = "R1"
 	manifest.Expected.PCB.Placements = []ExpectedPlacement{
-		{Ref: "R1", XMM: 1, YMM: 2},
-		{Role: "resistor", XMM: 3, YMM: 4},
+		{Ref: "R1", XMM: floatRef(1), YMM: floatRef(2)},
+		{Role: "resistor", XMM: floatRef(3), YMM: floatRef(4)},
 	}
 	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
 	if !hasIssue(issues, "duplicate expected placement for ref:R1") {
@@ -291,4 +291,8 @@ func hasIssue(issues []reports.Issue, fragment string) bool {
 		}
 	}
 	return false
+}
+
+func floatRef(value float64) *float64 {
+	return &value
 }

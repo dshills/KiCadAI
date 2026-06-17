@@ -89,12 +89,14 @@ type ExpectedPCB struct {
 }
 
 type ExpectedPlacement struct {
-	Ref         string  `json:"ref,omitempty"`
-	Role        string  `json:"role,omitempty"`
-	XMM         float64 `json:"x_mm"`
-	YMM         float64 `json:"y_mm"`
-	RotationDeg float64 `json:"rotation_deg,omitempty"`
-	ToleranceMM float64 `json:"tolerance_mm,omitempty"`
+	Ref          string   `json:"ref,omitempty"`
+	Role         string   `json:"role,omitempty"`
+	FootprintID  string   `json:"footprint_id,omitempty"`
+	XMM          *float64 `json:"x_mm,omitempty"`
+	YMM          *float64 `json:"y_mm,omitempty"`
+	RotationDeg  *float64 `json:"rotation_deg,omitempty"`
+	ToleranceMM  *float64 `json:"tolerance_mm,omitempty"`
+	ToleranceDeg *float64 `json:"tolerance_deg,omitempty"`
 }
 
 type ExpectedPadNet struct {
@@ -357,8 +359,11 @@ func validateExpectedPCB(path string, pcb ExpectedPCB, componentRefs map[string]
 			}
 			placements[key] = struct{}{}
 		}
-		if placement.ToleranceMM < 0 {
+		if placement.ToleranceMM != nil && *placement.ToleranceMM < 0 {
 			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, placementPath+".tolerance_mm", "expected placement tolerance must be non-negative"))
+		}
+		if placement.ToleranceDeg != nil && *placement.ToleranceDeg < 0 {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, placementPath+".tolerance_deg", "expected placement rotation tolerance must be non-negative"))
 		}
 	}
 	for index, padNet := range pcb.PadNets {

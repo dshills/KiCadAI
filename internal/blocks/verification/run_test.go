@@ -104,6 +104,79 @@ func TestRunCaseBlocksMissingNetPinMembership(t *testing.T) {
 	}
 }
 
+func TestRunCasePCBPlacementAssertionPasses(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{
+		{Role: "resistor", XMM: floatRef(0), YMM: floatRef(0), ToleranceMM: floatRef(0.001)},
+		{Role: "led", XMM: floatRef(12.7), YMM: floatRef(0), ToleranceMM: floatRef(0.001)},
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusPass || !hasStage(result.Stages, "pcb_assertions") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCasePCBPlacementAssertionBlocksWrongLocation(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{
+		{Role: "resistor", XMM: floatRef(99), YMM: floatRef(0), ToleranceMM: floatRef(0.001)},
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "expected placement role resistor") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCasePCBRequiredRouteBlocksWhenMissing(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.RequiredRoutes = []string{"status_led_series"}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "missing required route status_led_series") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestAssertPCBRequiredRouteTrimsExpectedName(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.RequiredRoutes = []string{" GND "}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{"GND": {}},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{},
+	}}
+	if issues := assertPCB(manifest, summary); len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBBlocksWrongPadNet(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.PadNets = []ExpectedPadNet{{Ref: "R1", Pad: "1", Net: "LED_A"}}
+	summary := semanticSummary{
+		PCB: actualPCB{
+			Placements: map[string]actualPlacement{},
+			PadNets:    map[padKey]string{{Ref: "R1", Pad: "1"}: "GND"},
+			Routes:     map[string]struct{}{},
+			ZoneNames:  map[string]struct{}{},
+			ZoneNets:   map[string]struct{}{},
+		},
+	}
+	issues := assertPCB(manifest, summary)
+	if !hasIssue(issues, "expected pad net LED_A, got GND") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestAssertSemanticsMatchesRepeatedComponentRoles(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Components = []ExpectedComponent{
@@ -329,6 +402,169 @@ func TestComparePinNamesSortsNumericPinsNaturally(t *testing.T) {
 	}
 }
 
+func TestAssertPCBPlacementRotationWrapAround(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Role: "led", XMM: floatRef(1), YMM: floatRef(2), RotationDeg: floatRef(0.1), ToleranceDeg: floatRef(0.3)}}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{"D1": {Ref: "D1", Role: "led", XMM: 1, YMM: 2, RotationDeg: 359.9}},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{},
+	}}
+	if issues := assertPCB(manifest, summary); len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementRoleMatchUsesCoordinates(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Role: "decoupling_capacitor", XMM: floatRef(20), YMM: floatRef(0), ToleranceMM: floatRef(0.01)}}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{
+			"C1": {Ref: "C1", Role: "decoupling_capacitor", XMM: 10, YMM: 0},
+			"C2": {Ref: "C2", Role: "decoupling_capacitor", XMM: 20, YMM: 0},
+		},
+		PadNets:   map[padKey]string{},
+		Routes:    map[string]struct{}{},
+		ZoneNames: map[string]struct{}{},
+		ZoneNets:  map[string]struct{}{},
+	}}
+	if issues := assertPCB(manifest, summary); len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementAllowsExplicitZeroTolerance(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Role: "led", XMM: floatRef(1), YMM: floatRef(2), ToleranceMM: floatRef(0)}}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{"D1": {Ref: "D1", Role: "led", XMM: 1.0005, YMM: 2}},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{},
+	}}
+	issues := assertPCB(manifest, summary)
+	if !hasIssue(issues, "expected placement role led") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementDoesNotReuseSameComponent(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{
+		{Role: "led", XMM: floatRef(1), YMM: floatRef(2), ToleranceMM: floatRef(0.01)},
+		{Role: "led", XMM: floatRef(1), YMM: floatRef(2), ToleranceMM: floatRef(0.01)},
+	}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{"D1": {Ref: "D1", Role: "led", XMM: 1, YMM: 2}},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{},
+	}}
+	issues := assertPCB(manifest, summary)
+	if !hasIssue(issues, "missing expected PCB placement") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementChecksRoleForExplicitRef(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Ref: "R1", Role: "led"}}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{"R1": {Ref: "R1", Role: "resistor"}},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{},
+	}}
+	issues := assertPCB(manifest, summary)
+	if !hasIssue(issues, "expected placement role led") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementRoleMatchUsesRotation(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Role: "led", XMM: floatRef(1), YMM: floatRef(2), RotationDeg: floatRef(90), ToleranceMM: floatRef(0.01), ToleranceDeg: floatRef(0.1)}}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{
+			"D1": {Ref: "D1", Role: "led", XMM: 1, YMM: 2, RotationDeg: 0},
+			"D2": {Ref: "D2", Role: "led", XMM: 1, YMM: 2, RotationDeg: 90},
+		},
+		PadNets:   map[padKey]string{},
+		Routes:    map[string]struct{}{},
+		ZoneNames: map[string]struct{}{},
+		ZoneNets:  map[string]struct{}{},
+	}}
+	if issues := assertPCB(manifest, summary); len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementChecksFootprintID(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{{Ref: "D1", Role: "led", FootprintID: "LED_SMD:LED_0805_2012Metric"}}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{"D1": {Ref: "D1", Role: "led", FootprintID: "LED_THT:LED_D5.0mm"}},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{},
+	}}
+	issues := assertPCB(manifest, summary)
+	if !hasIssue(issues, "footprint LED_SMD:LED_0805_2012Metric") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBPlacementMatchesSpecificExpectationsBeforeGeneral(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.Placements = []ExpectedPlacement{
+		{Role: "decoupling_capacitor"},
+		{Role: "decoupling_capacitor", XMM: floatRef(10), YMM: floatRef(0), ToleranceMM: floatRef(0.01)},
+	}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{
+			"C1": {Ref: "C1", Role: "decoupling_capacitor", XMM: 10, YMM: 0},
+			"C2": {Ref: "C2", Role: "decoupling_capacitor", XMM: 20, YMM: 0},
+		},
+		PadNets:   map[padKey]string{},
+		Routes:    map[string]struct{}{},
+		ZoneNames: map[string]struct{}{},
+		ZoneNets:  map[string]struct{}{},
+	}}
+	if issues := assertPCB(manifest, summary); len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssertPCBRequiredZoneMatchesZoneNet(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.PCB.RequiredZones = []string{"GND"}
+	summary := semanticSummary{PCB: actualPCB{
+		Placements: map[string]actualPlacement{},
+		PadNets:    map[padKey]string{},
+		Routes:     map[string]struct{}{},
+		ZoneNames:  map[string]struct{}{},
+		ZoneNets:   map[string]struct{}{"GND": {}},
+	}}
+	if issues := assertPCB(manifest, summary); len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestSummarizeOutputKeepsAnonymousNetsSeparate(t *testing.T) {
 	output := blocks.BlockOutput{
 		Operations: []transactions.Operation{
@@ -372,6 +608,39 @@ func TestSummarizeOutputMergesAnonymousConnectionChains(t *testing.T) {
 	}
 }
 
+func TestSummarizeOutputRejectsEmptyPlacementRef(t *testing.T) {
+	output := blocks.BlockOutput{
+		Operations: []transactions.Operation{
+			rawPlaceFootprint(t, "", "led", "LED_SMD:LED_0805_2012Metric"),
+		},
+	}
+	summary, issues := summarizeOutput(output)
+	if !hasIssue(issues, "requires ref") {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if _, ok := summary.PCB.Placements[""]; ok {
+		t.Fatalf("empty placement ref was recorded: %#v", summary.PCB.Placements)
+	}
+}
+
+func TestSummarizeOutputTrimsPlacementRef(t *testing.T) {
+	output := blocks.BlockOutput{
+		Operations: []transactions.Operation{
+			rawPlaceFootprint(t, " D1 ", "led", "LED_SMD:LED_0805_2012Metric"),
+		},
+	}
+	summary, issues := summarizeOutput(output)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if _, ok := summary.PCB.Placements["D1"]; !ok {
+		t.Fatalf("trimmed placement ref missing: %#v", summary.PCB.Placements)
+	}
+	if _, ok := summary.PCB.Placements[" D1 "]; ok {
+		t.Fatalf("untrimmed placement ref was recorded: %#v", summary.PCB.Placements)
+	}
+}
+
 func rawConnect(t *testing.T, fromRef string, fromPin string, toRef string, toPin string, netName string) transactions.Operation {
 	t.Helper()
 	raw, err := json.Marshal(transactions.ConnectOperation{
@@ -384,6 +653,20 @@ func rawConnect(t *testing.T, fromRef string, fromPin string, toRef string, toPi
 		t.Fatalf("marshal connect: %v", err)
 	}
 	return transactions.NewOperation(transactions.OpConnect, raw)
+}
+
+func rawPlaceFootprint(t *testing.T, ref string, role string, footprintID string) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(transactions.PlaceFootprintOperation{
+		Op:          transactions.OpPlaceFootprint,
+		Ref:         ref,
+		Role:        role,
+		FootprintID: footprintID,
+	})
+	if err != nil {
+		t.Fatalf("marshal place footprint: %v", err)
+	}
+	return transactions.NewOperation(transactions.OpPlaceFootprint, raw)
 }
 
 func hasStage(stages []StageResult, name string) bool {
