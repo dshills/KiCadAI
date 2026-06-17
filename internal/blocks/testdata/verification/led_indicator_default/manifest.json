@@ -1,0 +1,47 @@
+{
+  "id": "led_indicator_default",
+  "block_id": "led_indicator",
+  "description": "Default status LED with a current-limiting resistor.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "status",
+    "params": {
+      "supply_voltage": "3.3V",
+      "led_forward_voltage": "2.0V",
+      "led_current": "5mA",
+      "active_high": true
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["R1", "D1"],
+    "components": [
+      {
+        "role": "resistor",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "led",
+        "ref_prefix": "D",
+        "symbol_id": "Device:LED",
+        "footprint_id": "LED_SMD:LED_0805_2012Metric"
+      }
+    ],
+    "ports": [
+      {"name": "IN", "direction": "input"},
+      {"name": "GND", "direction": "power"}
+    ],
+    "nets": [
+      {
+        "name": "LED_A",
+        "visibility": "local",
+        "pins": [
+          {"role": "resistor", "pin": "2"},
+          {"role": "led", "pin": "1"}
+        ]
+      }
+    ]
+  }
+}
