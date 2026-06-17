@@ -133,14 +133,16 @@ func parseSymbolFile(file LibraryFile) ([]SymbolRecord, []reports.Issue) {
 			issues = append(issues, parseIssue(file.Path, "invalid symbol ID "+strconv.Quote(file.LibraryNickname+":"+name)))
 			continue
 		}
-		record, recordIssues := readLibrarySymbol(file, child, name)
-		issues = append(issues, recordIssues...)
-		records = append(records, record)
+		records = append(records, readLibrarySymbol(file, child, name))
+	}
+	records = resolveInheritedSymbols(records)
+	for _, record := range records {
+		issues = append(issues, record.Diagnostics...)
 	}
 	return records, issues
 }
 
-func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) (SymbolRecord, []reports.Issue) {
+func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) SymbolRecord {
 	record := SymbolRecord{
 		LibraryID:       file.LibraryNickname + ":" + name,
 		LibraryNickname: file.LibraryNickname,
@@ -166,11 +168,97 @@ func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) (Sy
 	}
 	record.FootprintFilter = symbolTextValues(node, "ki_fp_filters")
 	record.Pins = collectSymbolPins(node, name, 1, 1)
+	record.Graphics = collectSymbolGraphics(file.Path, node, name, 1, 1)
 	record.Units = collectSymbolUnits(record.Pins)
 	record.PowerSymbol = isPowerSymbol(record)
 	record.Diagnostics = validateParsedSymbol(record)
 	record.SearchText = buildSymbolSearchText(record)
-	return record, record.Diagnostics
+	return record
+}
+
+func resolveInheritedSymbols(records []SymbolRecord) []SymbolRecord {
+	byName := make(map[string]int, len(records))
+	for index, record := range records {
+		byName[record.Name] = index
+	}
+	resolved := make([]bool, len(records))
+	resolving := make([]bool, len(records))
+	var resolve func(int) SymbolRecord
+	resolve = func(index int) SymbolRecord {
+		if resolved[index] {
+			return records[index]
+		}
+		record := records[index]
+		if strings.TrimSpace(record.Extends) == "" {
+			resolved[index] = true
+			return record
+		}
+		baseIndex, ok := byName[record.Extends]
+		if !ok {
+			issue := symbolIssue(record, reports.SeverityBlocked, "unresolved base symbol "+strconv.Quote(record.Extends))
+			record.Diagnostics = append(record.Diagnostics, issue)
+			records[index] = record
+			resolved[index] = true
+			return record
+		}
+		if resolving[index] {
+			issue := symbolIssue(record, reports.SeverityBlocked, "cyclic symbol inheritance involving "+record.LibraryID)
+			record.Diagnostics = append(record.Diagnostics, issue)
+			records[index] = record
+			resolved[index] = true
+			return record
+		}
+		resolving[index] = true
+		base := resolve(baseIndex)
+		resolving[index] = false
+		record = inheritSymbolRecord(base, record)
+		record.Diagnostics = validateParsedSymbol(record)
+		record.SearchText = buildSymbolSearchText(record)
+		records[index] = record
+		resolved[index] = true
+		return record
+	}
+	for index := range records {
+		resolve(index)
+	}
+	return records
+}
+
+func inheritSymbolRecord(base SymbolRecord, child SymbolRecord) SymbolRecord {
+	inherited := child
+	inherited.Inherited = true
+	inherited.Properties = mergeSymbolProperties(base.Properties, child.Properties)
+	if inherited.Description == "" {
+		inherited.Description = base.Description
+	}
+	if len(inherited.Keywords) == 0 {
+		inherited.Keywords = append([]string(nil), base.Keywords...)
+	}
+	if inherited.Datasheet == "" {
+		inherited.Datasheet = base.Datasheet
+	}
+	if len(inherited.FootprintFilter) == 0 {
+		inherited.FootprintFilter = append([]string(nil), base.FootprintFilter...)
+	}
+	inherited.Pins = append(append([]SymbolPin(nil), base.Pins...), child.Pins...)
+	inherited.Graphics = append(append([]SymbolGraphic(nil), base.Graphics...), child.Graphics...)
+	inherited.Units = collectSymbolUnits(inherited.Pins)
+	inherited.PowerSymbol = isPowerSymbol(inherited)
+	return inherited
+}
+
+func mergeSymbolProperties(base map[string]string, child map[string]string) map[string]string {
+	if len(base) == 0 && len(child) == 0 {
+		return nil
+	}
+	merged := make(map[string]string, len(base)+len(child))
+	for key, value := range base {
+		merged[key] = value
+	}
+	for key, value := range child {
+		merged[key] = value
+	}
+	return merged
 }
 
 func collectSymbolPins(node sexpr.ParsedNode, symbolName string, unit int, bodyStyle int) []SymbolPin {
@@ -180,6 +268,9 @@ func collectSymbolPins(node sexpr.ParsedNode, symbolName string, unit int, bodyS
 		case "pin":
 			pins = append(pins, readLibraryPin(child, unit, bodyStyle))
 		case "symbol":
+			if len(child.Children) < 2 {
+				continue
+			}
 			childName := child.ListValue(1)
 			childUnit, childBodyStyle, ok := parseSymbolUnitBodyStyle(symbolName, childName)
 			if !ok {
@@ -190,6 +281,72 @@ func collectSymbolPins(node sexpr.ParsedNode, symbolName string, unit int, bodyS
 		}
 	}
 	return pins
+}
+
+func collectSymbolGraphics(path string, node sexpr.ParsedNode, symbolName string, unit int, bodyStyle int) []SymbolGraphic {
+	var graphics []SymbolGraphic
+	for _, child := range node.Children {
+		switch child.Head() {
+		case "rectangle", "circle", "arc", "polyline", "text":
+			if graphic, ok := readLibrarySymbolGraphic(path, child, unit, bodyStyle); ok {
+				graphics = append(graphics, graphic)
+			}
+		case "symbol":
+			if len(child.Children) < 2 {
+				continue
+			}
+			childName := child.ListValue(1)
+			childUnit, childBodyStyle, ok := parseSymbolUnitBodyStyle(symbolName, childName)
+			if !ok {
+				childUnit = unit
+				childBodyStyle = bodyStyle
+			}
+			graphics = append(graphics, collectSymbolGraphics(path, child, symbolName, childUnit, childBodyStyle)...)
+		}
+	}
+	return graphics
+}
+
+func readLibrarySymbolGraphic(path string, node sexpr.ParsedNode, unit int, bodyStyle int) (SymbolGraphic, bool) {
+	bounds := newBounds()
+	switch node.Head() {
+	case "rectangle":
+		bounds.includeNamedPoint(node, "start")
+		bounds.includeNamedPoint(node, "end")
+	case "circle":
+		center, centerOK := readNamedPointOK(node, "center")
+		radius, radiusOK := firstNumericMMFromChild(node, "radius")
+		if centerOK && radiusOK {
+			bounds.includePoint(kicadfiles.Point{X: center.X - radius, Y: center.Y - radius})
+			bounds.includePoint(kicadfiles.Point{X: center.X + radius, Y: center.Y + radius})
+		}
+	case "arc":
+		start, mid, end, ok := readLibraryArcPointsOK(node)
+		if ok {
+			bounds.includeArc(start, mid, end)
+		}
+	case "polyline":
+		points, _ := readPolyPoints(path, node)
+		for _, point := range points {
+			bounds.includePoint(point)
+		}
+	case "text":
+		bounds.includeNamedPoint(node, "at")
+	default:
+		return SymbolGraphic{}, false
+	}
+	if !bounds.initialized {
+		return SymbolGraphic{}, false
+	}
+	return SymbolGraphic{Kind: node.Head(), Unit: unit, BodyStyle: bodyStyle, Bounds: bounds.box()}, true
+}
+
+func firstNumericMMFromChild(node sexpr.ParsedNode, name string) (kicadfiles.IU, bool) {
+	child, ok := node.Child(name)
+	if !ok {
+		return 0, false
+	}
+	return firstNumericMM(child, 1)
 }
 
 func readLibraryPin(node sexpr.ParsedNode, unit int, bodyStyle int) SymbolPin {

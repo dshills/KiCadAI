@@ -213,6 +213,69 @@ func TestIndexSymbolsDetectsPowerSymbolAndHiddenPowerPolicy(t *testing.T) {
 	}
 }
 
+func TestIndexSymbolsResolvesInheritedSymbolMetadata(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), inheritedSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record := records["Device:R_Small"]
+	if !record.Inherited || record.Extends != "R_Base" {
+		t.Fatalf("record = %#v", record)
+	}
+	if record.Properties["Reference"] != "R" || record.Properties["Value"] != "R_Small" {
+		t.Fatalf("properties = %#v", record.Properties)
+	}
+	if len(record.Pins) != 2 || record.Pins[0].Number != "1" || record.Pins[1].Number != "2" {
+		t.Fatalf("pins = %#v", record.Pins)
+	}
+	if len(record.Graphics) == 0 {
+		t.Fatalf("graphics = %#v", record.Graphics)
+	}
+}
+
+func TestIndexSymbolsMissingInheritedBaseBlocks(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), missingBaseSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if _, ok := records["Device:Derived"]; !ok {
+		t.Fatalf("records = %#v", records)
+	}
+	if !hasSymbolIssue(issues, "unresolved base symbol") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestIndexSymbolsParsesGraphicsBoundsAndBodyStyle(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), graphicsSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record := records["Device:Graphic"]
+	if len(record.Graphics) != 3 {
+		t.Fatalf("graphics = %#v", record.Graphics)
+	}
+	if record.Graphics[0].BodyStyle != 2 {
+		t.Fatalf("body style = %#v", record.Graphics[0])
+	}
+	box := record.Graphics[0].Bounds
+	if box.Min.X != kicadfiles.MM(-1.27) || box.Max.X != kicadfiles.MM(1.27) {
+		t.Fatalf("bounds = %#v", box)
+	}
+}
+
 func TestIndexSymbolsMalformedFileDiagnostic(t *testing.T) {
 	root := t.TempDir()
 	symbols := filepath.Join(root, "symbols")
@@ -467,6 +530,56 @@ func powerSymbolLibrary() string {
     (property "Value" "VCC" (at 0 -2.54 0))
     (symbol "VCC_1_1"
       (pin power_in line (at 0 0 90) (length 0) hide (name "VCC") (number "1"))
+    )
+  )
+)`
+}
+
+func inheritedSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "R_Base"
+    (property "Reference" "R" (at 0 0 0))
+    (property "Value" "R_Base" (at 0 -2.54 0))
+    (ki_description "Base resistor")
+    (symbol "R_Base_1_1"
+      (rectangle (start -1.27 -1.27) (end 1.27 1.27))
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))
+    )
+  )
+  (symbol "R_Small"
+    (extends "R_Base")
+    (property "Value" "R_Small" (at 0 -2.54 0))
+  )
+)`
+}
+
+func missingBaseSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Derived"
+    (extends "Missing_Base")
+    (property "Reference" "U" (at 0 0 0))
+  )
+)`
+}
+
+func graphicsSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Graphic"
+    (property "Reference" "U" (at 0 0 0))
+    (symbol "Graphic_1_2"
+      (rectangle (start -1.27 -2.54) (end 1.27 2.54))
+      (circle (center 5.08 0) (radius 1.27))
+      (polyline (pts (xy -2.54 -2.54) (xy -1.27 -1.27) (xy -2.54 0)))
     )
   )
 )`
