@@ -1,0 +1,7 @@
+{
+  "query": {
+    "family": "opamp",
+    "package": "sot23_5"
+  },
+  "acceptance": "draft"
+}

@@ -1,0 +1,16 @@
+{
+  "query": {
+    "family": "capacitor",
+    "package": "0805",
+    "value_kind": "capacitance",
+    "value": "10uF",
+    "minimum_confidence": "rule_inferred"
+  },
+  "required_ratings": [
+    {
+      "kind": "voltage",
+      "value": "100V"
+    }
+  ],
+  "acceptance": "structural"
+}

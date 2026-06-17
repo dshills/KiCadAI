@@ -7,7 +7,8 @@ three related capabilities:
 - direct KiCad project, schematic, and PCB file writers;
 - CLI tools for generation, inspection, evaluation, connectivity-first board
   validation, ERC/DRC feedback, round-trip validation, transactions,
-  operation-correlated feedback, and pinmap readiness checks.
+  operation-correlated feedback, component intelligence, and pinmap readiness
+  checks.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -19,10 +20,11 @@ The direct-file workflow is the main functional path today. It can generate
 KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
 transactions to imported projects, place components, route small PCB nets,
-validate symbol-to-footprint pinmaps, run connectivity-first PCB validation, and
-run KiCad-backed ERC/DRC checks through `kicad-cli`. Transaction validation,
-planning, and apply results carry stable operation IDs where possible so AI
-agents can connect issues back to the source operation they need to repair.
+validate symbol-to-footprint pinmaps, select catalog-backed components, run
+connectivity-first PCB validation, and run KiCad-backed ERC/DRC checks through
+`kicad-cli`. Transaction validation, planning, and apply results carry stable
+operation IDs where possible so AI agents can connect issues back to the source
+operation they need to repair.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -129,6 +131,7 @@ go run ./cmd/kicadai --json writer check ./examples/07_generated_pcb
 go run ./cmd/kicadai --json validate board ./examples/07_generated_pcb
 go run ./cmd/kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+go run ./cmd/kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
 go run ./cmd/kicadai --json pinmap list
 go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
@@ -161,6 +164,8 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 - `block realize-pcb <block_id>`: instantiate a circuit block and return its
   PCB realization fragment plus the placement request that can feed the
   placement engine.
+- `component list|show|find|select|validate`: inspect the curated component
+  catalog, choose symbol/footprint bindings, and enforce confidence gates.
 
 LED generation:
 
@@ -202,6 +207,43 @@ go run ./cmd/kicadai \
 
 Generated projects are written through safe directory handling. `--overwrite`
 is required to replace an existing output directory.
+
+### Component Intelligence
+
+Component intelligence provides a deterministic catalog and selection layer for
+AI-facing generation. The default catalog lives in `data/components/` and can be
+overridden with `--catalog-dir`. Records include KiCad symbol IDs, package
+variants, footprint IDs, function pins, pad functions, ratings, values, and
+verification confidence.
+
+Confidence levels are:
+
+- `verified`: explicit evidence is available.
+- `library_derived`: derived from KiCad library metadata.
+- `rule_inferred`: limited safe inference, mainly symmetric passives.
+- `placeholder`: draft-only structural stand-in.
+- `blocked`: known unsafe or incomplete.
+
+Selection is acceptance-gated. Draft requests may use placeholders with
+warnings. Connectivity, ERC/DRC, and fabrication-candidate requests reject
+placeholder active components and require verified evidence except for narrowly
+allowed passive rule-inferred records.
+
+Examples:
+
+```sh
+go run ./cmd/kicadai --json component list
+go run ./cmd/kicadai --json component show resistor.generic.0805
+go run ./cmd/kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
+go run ./cmd/kicadai --json --request ./examples/components/select_resistor.json component select
+go run ./cmd/kicadai --json component validate
+```
+
+`design create` includes a `component_selection` stage after block planning and
+before schematic or PCB writes. Request JSON can include `component_policy` to
+set a catalog directory, minimum confidence, package preferences, per-role
+component overrides, and component-specific acceptance. See
+`docs/component-intelligence.md` and `examples/components/`.
 
 ### AI Design Workflow
 

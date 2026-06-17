@@ -1,0 +1,10 @@
+{
+  "query": {
+    "family": "connector",
+    "package": "pin_header_1x02",
+    "value_kind": "pin_count",
+    "value": "2pins",
+    "minimum_confidence": "rule_inferred"
+  },
+  "acceptance": "structural"
+}

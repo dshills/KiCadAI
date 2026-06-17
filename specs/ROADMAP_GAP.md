@@ -17,10 +17,75 @@ The roadmap is directionally correct, but it now mixes three different states:
 The largest remaining blockers are not the existence of a writer, CLI, placement
 engine, routing engine, or circuit blocks. Those foundations exist. The largest
 remaining blockers are component intelligence, full symbol semantics, validated
-block quality, closed-loop repair, and manufacturing readiness.
+block quality, closed-loop repair, and manufacturing readiness. Writer
+correctness is now also a first-class implemented gate: it provides project,
+schematic, PCB, transfer, pad-net, copper-net, zone-net, and optional KiCad
+round-trip checks, but it should continue to harden as new generated designs are
+added.
 
 The roadmap should be reorganized around the path from "can generate known
 examples" to "can reliably generate useful KiCad projects from intent."
+
+## Update: Writer Correctness Closeout Completed
+
+Since the first version of this gap analysis, the Writer Correctness Closeout
+project has been implemented.
+
+Implemented evidence:
+
+- `writer check` CLI command for project directories, `.kicad_pro`,
+  `.kicad_sch`, and `.kicad_pcb` targets.
+- `internal/writercorrectness` result model and validation orchestration.
+- project structure discovery checks.
+- schematic parse and generated-connectivity checks.
+- schematic-to-PCB transfer checks.
+- PCB net table and footprint pad-net checks.
+- copper and zone net-reference checks.
+- optional KiCad round-trip evidence.
+- golden corpus coverage for expected passing and blocking cases.
+- AI design workflow integration through the `writer_correctness` stage.
+- README documentation for command usage, checks, flags, and limits.
+
+Remaining writer-correctness follow-up work belongs under hardening rather than
+new foundation work:
+
+- expand golden corpus cases as new examples and blocks are added;
+- keep closing PCB reader/writer hydration gaps exposed by real KiCad round
+  trips;
+- add compatibility aliases only if CLI naming becomes a real usability issue;
+- increase KiCad-backed evidence where stable local fixtures exist;
+- ensure every future AI design workflow path is gated by `writer check`.
+
+## Update: Component Intelligence Foundation Implemented
+
+The Component Intelligence Model project has moved from roadmap gap to
+implemented foundation. The project now has a typed component catalog, curated
+seed records, deterministic selection, confidence and acceptance gates,
+resolver/pinmap evidence hooks, CLI commands, circuit-block annotations, and
+`design create` integration through the `component_selection` stage.
+
+Implemented evidence:
+
+- `data/components/` seed catalog for passives, connectors, LEDs, diodes, and
+  current placeholder active blocks.
+- `internal/components` catalog model, loader, validator, selector, and
+  resolver evidence checks.
+- `component list`, `component show`, `component find`, `component select`, and
+  `component validate` CLI commands.
+- circuit block component metadata for selected built-in blocks.
+- component selection gating in the AI design workflow before schematic or PCB
+  writes.
+- component selection examples under `examples/components/`.
+- component intelligence guide under `docs/component-intelligence.md`.
+
+Remaining component-intelligence follow-up work belongs under hardening and
+catalog expansion rather than foundation work:
+
+- expand verified manufacturer-grade records beyond the seed catalog;
+- verify broader active components with symbol-footprint-pinmap evidence;
+- add sourcing, lifecycle, derating, tolerance, and environmental constraints;
+- grow golden corpus tests for selection output and unsafe choices;
+- use exact part choices to drive richer schematic value/property output.
 
 ## High-Priority Findings
 
@@ -34,6 +99,7 @@ Implemented or substantially started:
 - Footprint Library Expansion
 - Schematic-to-PCB Transfer
 - Connectivity-First Board Validation
+- Writer Correctness Closeout
 - Circuit Block PCB Realization
 - AI Design Workflow CLI
 - Placement Engine foundation
@@ -67,11 +133,11 @@ autonomous enough to:
 - repair the design;
 - repeat until the result is acceptable or clearly blocked.
 
-### 3. Component Intelligence Is the Largest Blocker
+### 3. Component Intelligence Expansion Remains a Blocker
 
-The project can compose known blocks and use resolver-backed library data in
-some paths, but it does not yet have the component intelligence needed for
-general autonomous design.
+The project now has a component intelligence foundation and seed catalog, but
+it does not yet have enough verified component breadth for general autonomous
+design.
 
 Remaining needs:
 
@@ -88,8 +154,8 @@ Remaining needs:
 - regulator, op-amp, MCU, sensor, crystal, USB, RF, protection, and power
   component support.
 
-Without this layer, the AI can assemble known examples but cannot safely choose
-parts for arbitrary user requirements.
+Without expanding this layer, the AI can assemble known examples but cannot
+safely choose parts for arbitrary user requirements.
 
 ### 4. Full Symbol Library Handling Still Trails Footprint Handling
 
@@ -265,6 +331,7 @@ These areas exist and should now be improved rather than restarted:
 - Footprint Library Expansion
 - Schematic-to-PCB Transfer
 - Connectivity-First Board Validation
+- Writer Correctness Closeout
 - Circuit Block PCB Realization
 - AI Design Workflow CLI
 - Placement Engine foundation
@@ -279,7 +346,8 @@ Main hardening work:
 - better diagnostics;
 - real KiCad CLI evidence;
 - repair planning;
-- preservation of generated correctness under rewrite.
+- preservation of generated correctness under rewrite;
+- broader writer correctness corpus coverage and KiCad round-trip evidence.
 
 ### Partially Implemented
 
@@ -292,7 +360,7 @@ autonomous use:
 - Footprint resolver completeness
 - Symbol resolver completeness
 - Round-trip preservation
-- Writer-backed design workflow output quality
+- Writer-backed design workflow output quality across larger component families
 
 Main completion work:
 
@@ -301,13 +369,13 @@ Main completion work:
 - expected ERC/DRC fixtures;
 - block-level constraints;
 - generated netlist evidence;
-- full schematic-to-PCB net correctness.
+- full schematic-to-PCB net correctness for nontrivial, multi-block projects.
 
 ### Major Open Gaps
 
 These are the highest-risk missing capabilities for full AI design generation:
 
-- Component intelligence database
+- Component intelligence expansion and verification beyond the seed catalog
 - Full symbol library semantics
 - Natural-language intent-to-design planner
 - Closed-loop autonomous validation repair
@@ -315,51 +383,7 @@ These are the highest-risk missing capabilities for full AI design generation:
 
 ## Recommended Next Priority Order
 
-### 1. Writer Correctness Closeout
-
-Before adding more AI behavior, close the remaining writer correctness issues
-exposed by generated workflow projects.
-
-Focus:
-
-- generated PCB net-code and net-name correctness;
-- footprint pad net assignment;
-- route net assignment;
-- zone net assignment;
-- schematic-to-PCB netlist consistency;
-- KiCad parse/save stability;
-- no avoidable diffs after KiCad round trip.
-
-Acceptance criteria:
-
-- generated design workflow examples parse in KiCad;
-- KiCad save does not materially rewrite generated connectivity;
-- connectivity-first validation passes for generated examples;
-- failures are structured and actionable.
-
-### 2. Component Intelligence Model
-
-Build the canonical data model that lets the system reason about real parts.
-
-Focus:
-
-- component families;
-- package variants;
-- symbol-footprint-pin mappings;
-- electrical constraints;
-- value/rating rules;
-- MPN metadata;
-- sourcing metadata placeholders;
-- confidence levels for verified vs inferred mappings.
-
-Acceptance criteria:
-
-- common resistor, capacitor, LED, diode, transistor, connector, regulator,
-  op-amp, MCU, USB, and sensor cases have typed records;
-- block generation uses component records instead of ad hoc IDs;
-- unsafe or unverified choices block with clear diagnostics.
-
-### 3. Full Symbol Resolver Hardening
+### 1. Full Symbol Resolver Hardening
 
 Bring schematic symbol semantics closer to footprint support.
 
@@ -382,7 +406,7 @@ Acceptance criteria:
 - schematic generation can use real symbol pin geometry for common parts;
 - symbol-to-footprint assignment validation uses real symbol pins.
 
-### 4. Circuit Block Verification Harness
+### 2. Circuit Block Verification Harness
 
 Turn circuit blocks into a verified corpus.
 
@@ -402,7 +426,7 @@ Acceptance criteria:
 - every block has pass/fail validation expectations;
 - block failures identify the component, net, pin, or constraint responsible.
 
-### 5. Closed-Loop Validation Repair
+### 3. Closed-Loop Validation Repair
 
 Add a repair engine that can respond to validation failures.
 
@@ -421,7 +445,7 @@ Acceptance criteria:
 - unrecoverable issues produce clear blocked reports;
 - repair behavior is deterministic and covered by tests.
 
-### 6. Placement Constraint Engine
+### 4. Placement Constraint Engine
 
 Improve placement from deterministic layout to constraint-aware layout.
 
@@ -441,7 +465,7 @@ Acceptance criteria:
 - the placement engine respects constraints or reports violations;
 - validation can detect placement rule failures.
 
-### 7. Routing Quality Engine
+### 5. Routing Quality Engine
 
 Improve routing from basic connectivity to rule-aware board routing.
 
@@ -462,7 +486,28 @@ Acceptance criteria:
 - route validation catches wrong-net and unrouted cases;
 - route repair can fix common local failures.
 
-### 8. Fabrication Export Readiness
+### 6. Writer Correctness Hardening
+
+Keep the new writer correctness gate aligned with the expanding generator.
+
+Focus:
+
+- larger golden corpus;
+- KiCad round-trip fixtures for representative schematics and boards;
+- stricter cross-file netlist evidence;
+- unsupported-object detection;
+- generated workflow examples that exercise blocks, placement, and routing;
+- diagnostics that point to responsible symbols, footprints, pads, tracks, or
+  zones.
+
+Acceptance criteria:
+
+- every generated example has a writer-correctness expectation;
+- every new writer feature ships with a blocking and passing corpus case;
+- KiCad-backed round-trip evidence is available for stable fixtures;
+- writer failures remain structured enough for future repair planning.
+
+### 7. Fabrication Export Readiness
 
 Once generated designs are electrically meaningful, add manufacturing output.
 
