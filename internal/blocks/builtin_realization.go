@@ -1,9 +1,32 @@
 package blocks
 
+import "kicadai/internal/components"
+
 func ledIndicatorComponents() []BlockComponent {
 	return []BlockComponent{
-		{Role: "resistor", RefPrefix: "R", Value: "330", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "led", RefPrefix: "D", Value: "LED", SymbolID: "Device:LED", FootprintID: "LED_SMD:LED_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
+		{
+			Role:              "resistor",
+			RefPrefix:         "R",
+			Value:             "330",
+			SymbolID:          "Device:R",
+			FootprintID:       "Resistor_SMD:R_0805_2012Metric",
+			Pins:              twoTerminalHorizontalPins(),
+			ComponentQuery:    &components.Query{Family: "resistor", Package: "0805", ValueKind: "resistance"},
+			MinimumConfidence: components.ConfidenceRuleInferred,
+			Acceptance:        components.AcceptanceConnectivity,
+		},
+		{
+			Role:              "led",
+			RefPrefix:         "D",
+			Value:             "LED",
+			SymbolID:          "Device:LED",
+			FootprintID:       "LED_SMD:LED_0805_2012Metric",
+			Pins:              twoTerminalHorizontalPins(),
+			ComponentID:       "led.generic.0805",
+			ComponentVariant:  "0805",
+			MinimumConfidence: components.ConfidenceVerified,
+			Acceptance:        components.AcceptanceConnectivity,
+		},
 	}
 }
 
