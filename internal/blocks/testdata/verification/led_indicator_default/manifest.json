@@ -35,7 +35,7 @@
     ],
     "nets": [
       {
-        "name": "LED_A",
+        "name": "status_led_series",
         "visibility": "local",
         "pins": [
           {"role": "resistor", "pin": "2"},
