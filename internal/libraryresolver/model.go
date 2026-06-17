@@ -31,6 +31,26 @@ type LibraryIndex struct {
 	Diagnostics []reports.Issue            `json:"diagnostics"`
 }
 
+type SymbolLibraryIndex struct {
+	GeneratedAt time.Time                      `json:"generated_at"`
+	Roots       []SymbolRoot                   `json:"roots,omitempty"`
+	Libraries   map[string]SymbolLibraryRecord `json:"libraries,omitempty"`
+	Symbols     map[string]SymbolRecord        `json:"symbols"`
+	Diagnostics []reports.Issue                `json:"diagnostics,omitempty"`
+}
+
+type SymbolRoot struct {
+	Path   string `json:"path"`
+	Source string `json:"source,omitempty"`
+}
+
+type SymbolLibraryRecord struct {
+	Nickname string   `json:"nickname"`
+	Path     string   `json:"path"`
+	Source   string   `json:"source,omitempty"`
+	Symbols  []string `json:"symbols,omitempty"`
+}
+
 type LoadSummary struct {
 	SymbolFileCount    int `json:"symbol_file_count"`
 	FootprintFileCount int `json:"footprint_file_count"`
@@ -67,6 +87,7 @@ type SymbolRecord struct {
 	LibraryNickname string            `json:"library_nickname"`
 	Name            string            `json:"name"`
 	Path            string            `json:"path"`
+	Extends         string            `json:"extends,omitempty"`
 	Description     string            `json:"description,omitempty"`
 	Keywords        []string          `json:"keywords,omitempty"`
 	Datasheet       string            `json:"datasheet,omitempty"`
@@ -74,26 +95,41 @@ type SymbolRecord struct {
 	Properties      map[string]string `json:"properties,omitempty"`
 	Units           []SymbolUnit      `json:"units,omitempty"`
 	Pins            []SymbolPin       `json:"pins,omitempty"`
+	Graphics        []SymbolGraphic   `json:"graphics,omitempty"`
+	PowerSymbol     bool              `json:"power_symbol,omitempty"`
+	Inherited       bool              `json:"inherited,omitempty"`
+	Diagnostics     []reports.Issue   `json:"diagnostics,omitempty"`
 	Raw             string            `json:"raw,omitempty"`
 	SearchText      string            `json:"-"`
 }
 
 type SymbolUnit struct {
-	Unit      int `json:"unit"`
-	BodyStyle int `json:"body_style"`
+	Unit             int             `json:"unit"`
+	BodyStyle        int             `json:"body_style"`
+	PinIndexes       []int           `json:"pin_indexes,omitempty"`
+	CommonPinIndexes []int           `json:"common_pin_indexes,omitempty"`
+	Graphics         []SymbolGraphic `json:"graphics,omitempty"`
 }
 
 type SymbolPin struct {
-	Number       string           `json:"number"`
-	Name         string           `json:"name,omitempty"`
-	Electrical   string           `json:"electrical,omitempty"`
-	Unit         int              `json:"unit"`
-	BodyStyle    int              `json:"body_style"`
-	Position     kicadfiles.Point `json:"position"`
-	Orientation  string           `json:"orientation,omitempty"`
-	Length       kicadfiles.IU    `json:"length,omitempty"`
-	Hidden       bool             `json:"hidden"`
-	FunctionHint string           `json:"function_hint,omitempty"`
+	Number         string           `json:"number"`
+	Name           string           `json:"name,omitempty"`
+	Electrical     string           `json:"electrical,omitempty"`
+	ElectricalType string           `json:"electrical_type,omitempty"`
+	Unit           int              `json:"unit"`
+	BodyStyle      int              `json:"body_style"`
+	Position       kicadfiles.Point `json:"position"`
+	Orientation    string           `json:"orientation,omitempty"`
+	Length         kicadfiles.IU    `json:"length,omitempty"`
+	Hidden         bool             `json:"hidden"`
+	FunctionHint   string           `json:"function_hint,omitempty"`
+}
+
+type SymbolGraphic struct {
+	Kind      string      `json:"kind"`
+	Unit      int         `json:"unit"`
+	BodyStyle int         `json:"body_style"`
+	Bounds    BoundingBox `json:"bounds"`
 }
 
 type FootprintRecord struct {

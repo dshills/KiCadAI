@@ -42,6 +42,37 @@ func TestIndexSymbolsParsesSimpleSymbol(t *testing.T) {
 	if record.Pins[0].Number != "1" || record.Pins[0].Electrical != "passive" || record.Pins[0].Length != kicadfiles.MM(2.54) {
 		t.Fatalf("pin 1 = %#v", record.Pins[0])
 	}
+	if record.Pins[0].ElectricalType != "passive" {
+		t.Fatalf("electrical type = %q", record.Pins[0].ElectricalType)
+	}
+	if len(record.Units) != 1 || len(record.Units[0].PinIndexes) != 2 {
+		t.Fatalf("units = %#v", record.Units)
+	}
+}
+
+func TestIndexSymbolsParsesConnectorSymbol(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Connector.kicad_sym"), connectorParserSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record, ok := records["Connector:Conn_01x02"]
+	if !ok {
+		t.Fatalf("missing Connector:Conn_01x02 in %#v", records)
+	}
+	if len(record.Pins) != 2 {
+		t.Fatalf("pins = %#v", record.Pins)
+	}
+	if record.Pins[0].Number != "1" || record.Pins[1].Number != "2" {
+		t.Fatalf("pin order = %#v", record.Pins)
+	}
+	if record.Pins[0].Name != "Pin_1" || record.Pins[1].Name != "Pin_2" {
+		t.Fatalf("pin names = %#v", record.Pins)
+	}
 }
 
 func TestResolveSymbol(t *testing.T) {
@@ -76,6 +107,22 @@ func TestIndexSymbolsParsesMultiUnitAndHiddenPins(t *testing.T) {
 	}
 }
 
+func TestCollectSymbolUnitsAppliesCommonPinsToEveryUnit(t *testing.T) {
+	units := collectSymbolUnits([]SymbolPin{
+		{Number: "1", Unit: 1, BodyStyle: 1},
+		{Number: "2", Unit: 2, BodyStyle: 1},
+		{Number: "3", Unit: 0, BodyStyle: 0},
+	})
+	if len(units) != 2 {
+		t.Fatalf("units = %#v", units)
+	}
+	for _, unit := range units {
+		if len(unit.CommonPinIndexes) != 1 || unit.CommonPinIndexes[0] != 2 {
+			t.Fatalf("common pins not applied to unit %#v", unit)
+		}
+	}
+}
+
 func TestIndexSymbolsMalformedFileDiagnostic(t *testing.T) {
 	root := t.TempDir()
 	symbols := filepath.Join(root, "symbols")
@@ -87,6 +134,21 @@ func TestIndexSymbolsMalformedFileDiagnostic(t *testing.T) {
 		t.Fatalf("records = %#v", records)
 	}
 	if len(issues) != 1 || !strings.Contains(issues[0].Message, "unterminated") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestIndexSymbolsInvalidSymbolIDDiagnostic(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Bad.kicad_sym"), invalidIDSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if len(records) != 0 {
+		t.Fatalf("records = %#v", records)
+	}
+	if len(issues) != 1 || !strings.Contains(issues[0].Message, "invalid symbol ID") {
 		t.Fatalf("issues = %#v", issues)
 	}
 }
@@ -162,7 +224,7 @@ func TestIndexSymbolsGoldenRecordJSON(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{`"library_id": "Device:R"`, `"description": "Resistor"`, `"number": "1"`} {
+	for _, want := range []string{`"library_id": "Device:R"`, `"description": "Resistor"`, `"number": "1"`, `"electrical_type": "passive"`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("golden JSON missing %s:\n%s", want, text)
 		}
@@ -205,6 +267,35 @@ func amplifierSymbolLibrary() string {
       (pin input line (at -5.08 -2.54 0) (length 2.54) (name "-") (number "6"))
       (pin power_in line (at 0 5.08 270) (length 2.54) hide (name "V+") (number "8"))
     )
+  )
+)`
+}
+
+func connectorParserSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Conn_01x02"
+    (property "Reference" "J" (at 0 0 0))
+    (property "Value" "Conn_01x02" (at 0 -2.54 0))
+    (ki_description "Generic connector, single row, 01x02")
+    (ki_keywords "connector")
+    (symbol "Conn_01x02_1_1"
+      (pin passive line (at 0 2.54 270) (length 2.54) (name "Pin_1") (number "1"))
+      (pin passive line (at 0 -2.54 90) (length 2.54) (name "Pin_2") (number "2"))
+    )
+  )
+)`
+}
+
+func invalidIDSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Bad:Name"
+    (property "Reference" "U" (at 0 0 0))
   )
 )`
 }

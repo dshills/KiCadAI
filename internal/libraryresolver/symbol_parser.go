@@ -99,6 +99,10 @@ func parseSymbolFile(file LibraryFile) ([]SymbolRecord, []reports.Issue) {
 			issues = append(issues, parseIssue(file.Path, "symbol without name"))
 			continue
 		}
+		if !validSymbolIDPart(file.LibraryNickname) || !validSymbolIDPart(name) {
+			issues = append(issues, parseIssue(file.Path, "invalid symbol ID "+strconv.Quote(file.LibraryNickname+":"+name)))
+			continue
+		}
 		records = append(records, readLibrarySymbol(file, child, name))
 	}
 	return records, issues
@@ -118,6 +122,9 @@ func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) Sym
 			continue
 		}
 		record.Properties[property.ListValue(1)] = property.ListValue(2)
+	}
+	if extends, ok := node.Child("extends"); ok && len(extends.Children) > 1 {
+		record.Extends = strings.TrimSpace(extends.ListValue(1))
 	}
 	record.Description = firstSymbolText(node, "ki_description")
 	record.Keywords = fields(firstSymbolText(node, "ki_keywords"))
@@ -160,7 +167,8 @@ func readLibraryPin(node sexpr.ParsedNode, unit int, bodyStyle int) SymbolPin {
 		Hidden:    hasChildOrAtom(node, "hide"),
 	}
 	if len(node.Children) > 1 {
-		pin.Electrical = node.ListValue(1)
+		pin.ElectricalType = strings.TrimSpace(node.ListValue(1))
+		pin.Electrical = pin.ElectricalType
 	}
 	if at, ok := node.Child("at"); ok {
 		if x, ok := at.FloatValue(1); ok {
@@ -208,20 +216,36 @@ func parseSymbolUnitBodyStyle(parentName string, childName string) (int, int) {
 }
 
 func collectSymbolUnits(pins []SymbolPin) []SymbolUnit {
-	seen := map[SymbolUnit]struct{}{}
-	for _, pin := range pins {
-		unit := SymbolUnit{Unit: pin.Unit, BodyStyle: pin.BodyStyle}
-		if unit.Unit == 0 {
-			unit.Unit = 1
-		}
-		if unit.BodyStyle == 0 {
-			unit.BodyStyle = 1
-		}
-		seen[unit] = struct{}{}
+	type unitKey struct {
+		unit      int
+		bodyStyle int
 	}
-	units := make([]SymbolUnit, 0, len(seen))
-	for unit := range seen {
-		units = append(units, unit)
+	byUnit := map[unitKey]*SymbolUnit{}
+	var commonPinIndexes []int
+	for index, pin := range pins {
+		if pin.Unit == 0 {
+			commonPinIndexes = append(commonPinIndexes, index)
+			continue
+		}
+		unit := pin.Unit
+		bodyStyle := pin.BodyStyle
+		key := unitKey{unit: unit, bodyStyle: bodyStyle}
+		entry := byUnit[key]
+		if entry == nil {
+			entry = &SymbolUnit{Unit: unit, BodyStyle: bodyStyle}
+			byUnit[key] = entry
+		}
+		entry.PinIndexes = append(entry.PinIndexes, index)
+	}
+	if len(byUnit) == 0 && len(commonPinIndexes) > 0 {
+		byUnit[unitKey{}] = &SymbolUnit{}
+	}
+	for _, unit := range byUnit {
+		unit.CommonPinIndexes = append(unit.CommonPinIndexes, commonPinIndexes...)
+	}
+	units := make([]SymbolUnit, 0, len(byUnit))
+	for _, unit := range byUnit {
+		units = append(units, *unit)
 	}
 	sort.Slice(units, func(i, j int) bool {
 		if units[i].Unit != units[j].Unit {
@@ -230,6 +254,10 @@ func collectSymbolUnits(pins []SymbolPin) []SymbolUnit {
 		return units[i].BodyStyle < units[j].BodyStyle
 	})
 	return units
+}
+
+func validSymbolIDPart(value string) bool {
+	return value != "" && strings.TrimSpace(value) == value && !strings.Contains(value, ":")
 }
 
 func firstSymbolText(node sexpr.ParsedNode, head string) string {
