@@ -2,6 +2,7 @@ package components
 
 import (
 	"fmt"
+	"strings"
 	"sync"
 
 	"kicadai/internal/libraryresolver"
@@ -25,6 +26,8 @@ const (
 	CodeComponentPinmapMissing       reports.Code = "COMPONENT_PINMAP_MISSING"
 	CodeComponentFunctionPinUnmapped reports.Code = "COMPONENT_FUNCTION_PIN_UNMAPPED"
 	CodeComponentPadFunctionUnmapped reports.Code = "COMPONENT_PAD_FUNCTION_UNMAPPED"
+	CodeComponentElectricalMismatch  reports.Code = "COMPONENT_ELECTRICAL_MISMATCH"
+	CodeComponentUnitPolicyMissing   reports.Code = "COMPONENT_UNIT_POLICY_MISSING"
 )
 
 type EvidenceOptions struct {
@@ -76,17 +79,77 @@ func ValidateCatalogEvidence(catalog *Catalog, opts EvidenceOptions) reports.Res
 }
 
 func functionPinIssues(path string, binding SymbolBinding, symbol libraryresolver.SymbolRecord) []reports.Issue {
-	pins := map[string]struct{}{}
+	pins := map[string][]libraryresolver.SymbolPin{}
+	unitSet := map[int]struct{}{}
 	for _, pin := range symbol.Pins {
-		pins[pin.Number] = struct{}{}
+		if pin.Number != "" {
+			pins[pin.Number] = append(pins[pin.Number], pin)
+		}
+		if pin.Unit > 0 {
+			unitSet[pin.Unit] = struct{}{}
+		}
 	}
 	var issues []reports.Issue
+	if binding.Unit == 0 && len(unitSet) > 1 {
+		issues = append(issues, NewIssue(CodeComponentUnitPolicyMissing, reports.SeverityBlocked, path+".unit", "multi-unit component symbol requires an explicit unit policy: "+symbol.LibraryID))
+	}
 	for i, functionPin := range binding.FunctionPins {
-		if _, ok := pins[functionPin.SymbolPin]; !ok {
+		candidates, ok := pins[functionPin.SymbolPin]
+		if !ok {
 			issues = append(issues, NewIssue(CodeComponentFunctionPinUnmapped, reports.SeverityBlocked, fmt.Sprintf("%s.function_pins[%d]", path, i), "function pin does not exist on resolved symbol: "+functionPin.SymbolPin))
+			continue
+		}
+		candidates = matchingUnitPins(candidates, binding.Unit)
+		if len(candidates) == 0 {
+			issues = append(issues, NewIssue(CodeComponentFunctionPinUnmapped, reports.SeverityBlocked, fmt.Sprintf("%s.function_pins[%d]", path, i), "function pin does not exist on requested symbol unit: "+functionPin.SymbolPin))
+			continue
+		}
+		expectedElectrical := strings.ToLower(strings.TrimSpace(functionPin.Electrical))
+		if expectedElectrical != "" {
+			if pin, actualElectrical, ok := firstElectricalMismatch(candidates, expectedElectrical); ok {
+				issues = append(issues, NewIssue(CodeComponentElectricalMismatch, reports.SeverityBlocked, fmt.Sprintf("%s.function_pins[%d].electrical", path, i), "function pin electrical type "+expectedElectrical+" does not match resolved symbol pin "+symbolPinLabel(pin)+": "+actualElectrical))
+			}
 		}
 	}
 	return issues
+}
+
+func matchingUnitPins(pins []libraryresolver.SymbolPin, unit int) []libraryresolver.SymbolPin {
+	if unit == 0 {
+		return pins
+	}
+	matches := make([]libraryresolver.SymbolPin, 0, len(pins))
+	for _, pin := range pins {
+		if pin.Unit == 0 || pin.Unit == unit {
+			matches = append(matches, pin)
+		}
+	}
+	return matches
+}
+
+func firstElectricalMismatch(pins []libraryresolver.SymbolPin, expected string) (libraryresolver.SymbolPin, string, bool) {
+	if len(pins) == 0 {
+		return libraryresolver.SymbolPin{}, "", false
+	}
+	firstActual := ""
+	for _, pin := range pins {
+		actual := strings.ToLower(strings.TrimSpace(pin.ElectricalType))
+		if firstActual == "" {
+			firstActual = actual
+		}
+		if actual == "" || actual == expected {
+			return libraryresolver.SymbolPin{}, "", false
+		}
+	}
+	return pins[0], firstActual, true
+}
+
+func symbolPinLabel(pin libraryresolver.SymbolPin) string {
+	name := strings.TrimSpace(pin.Name)
+	if name == "" {
+		return pin.Number
+	}
+	return pin.Number + " (" + name + ")"
 }
 
 func padFunctionIssues(path string, variant PackageVariant, footprint libraryresolver.FootprintRecord) []reports.Issue {
