@@ -41,11 +41,14 @@ func PlanBlocks(ctx context.Context, registry blocks.Registry, request Request) 
 	}
 	output := blocks.ComposeBlocks(ctx, registry, composition)
 	issues = append(issues, output.Issues...)
+	evidence, evidenceIssues := blockEvidenceForRequest(ctx, registry, normalized)
+	issues = append(issues, evidenceIssues...)
 	stage := NewStageResult(StageBlockPlanning, issues)
 	stage.Summary = map[string]any{
 		"block_count":      len(normalized.Blocks),
 		"connection_count": len(normalized.Connections),
 		"operation_count":  len(output.Operations),
+		"block_evidence":   evidence,
 	}
 	return BlockPlanResult{
 		Request:     normalized,

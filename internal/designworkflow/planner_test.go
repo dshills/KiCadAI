@@ -30,6 +30,42 @@ func TestPlanBlocksComposesExplicitRequest(t *testing.T) {
 	if result.Composition.ProjectName != "status_board" {
 		t.Fatalf("project name = %q", result.Composition.ProjectName)
 	}
+	evidence, ok := result.Stage.Summary["block_evidence"].([]BlockEvidenceSummary)
+	if !ok || len(evidence) != 2 {
+		t.Fatalf("block evidence = %#v", result.Stage.Summary["block_evidence"])
+	}
+	if evidence[1].BlockID != "led_indicator" || evidence[1].EvidenceLevel == "" {
+		t.Fatalf("LED evidence = %#v", evidence[1])
+	}
+}
+
+func TestPlanBlocksWarnsForMissingBlockEvidence(t *testing.T) {
+	registry := testDesignRegistry{definition: testBlockDefinition("custom_block", blocks.VerificationStructural)}
+	request := Request{
+		Version: RequestVersion,
+		Name:    "custom",
+		Board:   BoardSpec{WidthMM: 10, HeightMM: 10, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "custom", BlockID: "custom_block"}},
+	}
+	result := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(result.Stage.Issues) || !containsIssueMessage(result.Stage.Issues, "no built-in verification evidence") {
+		t.Fatalf("stage = %#v", result.Stage)
+	}
+}
+
+func TestPlanBlocksBlocksFabricationClaimWithoutStrongEvidence(t *testing.T) {
+	registry := testDesignRegistry{definition: testBlockDefinition("custom_fab", blocks.VerificationERCDRCVerified)}
+	request := Request{
+		Version:    RequestVersion,
+		Name:       "custom",
+		Board:      BoardSpec{WidthMM: 10, HeightMM: 10, Layers: 2},
+		Blocks:     []BlockInstanceSpec{{ID: "custom", BlockID: "custom_fab"}},
+		Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate},
+	}
+	result := PlanBlocks(context.Background(), registry, request)
+	if !reports.HasBlockingIssue(result.Stage.Issues) || !containsIssueMessage(result.Stage.Issues, "fabrication readiness claim lacks") {
+		t.Fatalf("stage = %#v", result.Stage)
+	}
 }
 
 func TestPlanBlocksReportsUnknownBlock(t *testing.T) {
@@ -87,4 +123,62 @@ func containsIssueMessage(issues []reports.Issue, text string) bool {
 		}
 	}
 	return false
+}
+
+type testDesignRegistry struct {
+	definition blocks.BlockDefinition
+}
+
+func (registry testDesignRegistry) ListBlocks() []blocks.BlockSummary {
+	return []blocks.BlockSummary{testBlockSummary(registry.definition)}
+}
+
+func (registry testDesignRegistry) GetBlock(id string) (blocks.BlockDefinition, bool) {
+	return registry.definition, id == registry.definition.ID
+}
+
+func (registry testDesignRegistry) ValidateDefinition(definition blocks.BlockDefinition) []reports.Issue {
+	return nil
+}
+
+func (registry testDesignRegistry) ValidateRequest(request blocks.BlockRequest) []reports.Issue {
+	if request.BlockID != registry.definition.ID {
+		return []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Message: "missing"}}
+	}
+	return nil
+}
+
+func (registry testDesignRegistry) Instantiate(ctx context.Context, request blocks.BlockRequest) (blocks.BlockOutput, []reports.Issue) {
+	return blocks.BlockOutput{
+		Definition: testBlockSummary(registry.definition),
+		Instance: blocks.BlockInstance{
+			BlockID:    request.BlockID,
+			InstanceID: request.InstanceID,
+			Params:     request.Params,
+		},
+	}, nil
+}
+
+func testBlockSummary(definition blocks.BlockDefinition) blocks.BlockSummary {
+	return blocks.BlockSummary{
+		ID:                definition.ID,
+		Name:              definition.Name,
+		Description:       definition.Description,
+		Version:           definition.Version,
+		Category:          definition.Category,
+		VerificationLevel: definition.Verification.Level,
+	}
+}
+
+func testBlockDefinition(id string, level blocks.VerificationLevel) blocks.BlockDefinition {
+	return blocks.BlockDefinition{
+		ID:          id,
+		Name:        id,
+		Version:     "0.1.0",
+		Category:    "test",
+		Description: "test block",
+		Verification: blocks.VerificationRecord{
+			Level: level,
+		},
+	}
 }
