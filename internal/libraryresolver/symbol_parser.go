@@ -15,6 +15,36 @@ import (
 
 const maxSymbolLibraryBytes int64 = 64 << 20
 
+const (
+	SymbolElectricalInput         = "input"
+	SymbolElectricalOutput        = "output"
+	SymbolElectricalBidirectional = "bidirectional"
+	SymbolElectricalTriState      = "tri_state"
+	SymbolElectricalPassive       = "passive"
+	SymbolElectricalFree          = "free"
+	SymbolElectricalUnspecified   = "unspecified"
+	SymbolElectricalPowerIn       = "power_in"
+	SymbolElectricalPowerOut      = "power_out"
+	SymbolElectricalOpenCollector = "open_collector"
+	SymbolElectricalOpenEmitter   = "open_emitter"
+	SymbolElectricalNoConnect     = "no_connect"
+)
+
+var knownSymbolElectricalTypes = map[string]struct{}{
+	SymbolElectricalInput:         {},
+	SymbolElectricalOutput:        {},
+	SymbolElectricalBidirectional: {},
+	SymbolElectricalTriState:      {},
+	SymbolElectricalPassive:       {},
+	SymbolElectricalFree:          {},
+	SymbolElectricalUnspecified:   {},
+	SymbolElectricalPowerIn:       {},
+	SymbolElectricalPowerOut:      {},
+	SymbolElectricalOpenCollector: {},
+	SymbolElectricalOpenEmitter:   {},
+	SymbolElectricalNoConnect:     {},
+}
+
 func IndexSymbols(inventory LibraryInventory) (map[string]SymbolRecord, []reports.Issue) {
 	return IndexSymbolsContext(context.Background(), inventory)
 }
@@ -103,12 +133,14 @@ func parseSymbolFile(file LibraryFile) ([]SymbolRecord, []reports.Issue) {
 			issues = append(issues, parseIssue(file.Path, "invalid symbol ID "+strconv.Quote(file.LibraryNickname+":"+name)))
 			continue
 		}
-		records = append(records, readLibrarySymbol(file, child, name))
+		record, recordIssues := readLibrarySymbol(file, child, name)
+		issues = append(issues, recordIssues...)
+		records = append(records, record)
 	}
 	return records, issues
 }
 
-func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) SymbolRecord {
+func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) (SymbolRecord, []reports.Issue) {
 	record := SymbolRecord{
 		LibraryID:       file.LibraryNickname + ":" + name,
 		LibraryNickname: file.LibraryNickname,
@@ -135,8 +167,10 @@ func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) Sym
 	record.FootprintFilter = symbolTextValues(node, "ki_fp_filters")
 	record.Pins = collectSymbolPins(node, name, 1, 1)
 	record.Units = collectSymbolUnits(record.Pins)
+	record.PowerSymbol = isPowerSymbol(record)
+	record.Diagnostics = validateParsedSymbol(record)
 	record.SearchText = buildSymbolSearchText(record)
-	return record
+	return record, record.Diagnostics
 }
 
 func collectSymbolPins(node sexpr.ParsedNode, symbolName string, unit int, bodyStyle int) []SymbolPin {
@@ -147,11 +181,9 @@ func collectSymbolPins(node sexpr.ParsedNode, symbolName string, unit int, bodyS
 			pins = append(pins, readLibraryPin(child, unit, bodyStyle))
 		case "symbol":
 			childName := child.ListValue(1)
-			childUnit, childBodyStyle := parseSymbolUnitBodyStyle(symbolName, childName)
-			if childUnit == 0 {
+			childUnit, childBodyStyle, ok := parseSymbolUnitBodyStyle(symbolName, childName)
+			if !ok {
 				childUnit = unit
-			}
-			if childBodyStyle == 0 {
 				childBodyStyle = bodyStyle
 			}
 			pins = append(pins, collectSymbolPins(child, symbolName, childUnit, childBodyStyle)...)
@@ -164,10 +196,11 @@ func readLibraryPin(node sexpr.ParsedNode, unit int, bodyStyle int) SymbolPin {
 	pin := SymbolPin{
 		Unit:      unit,
 		BodyStyle: bodyStyle,
+		Common:    unit == 0,
 		Hidden:    hasChildOrAtom(node, "hide"),
 	}
 	if len(node.Children) > 1 {
-		pin.ElectricalType = strings.TrimSpace(node.ListValue(1))
+		pin.ElectricalType = strings.ToLower(strings.TrimSpace(node.ListValue(1)))
 		pin.Electrical = pin.ElectricalType
 	}
 	if at, ok := node.Child("at"); ok {
@@ -195,24 +228,24 @@ func readLibraryPin(node sexpr.ParsedNode, unit int, bodyStyle int) SymbolPin {
 	return pin
 }
 
-func parseSymbolUnitBodyStyle(parentName string, childName string) (int, int) {
+func parseSymbolUnitBodyStyle(parentName string, childName string) (int, int, bool) {
 	prefix := parentName + "_"
 	if !strings.HasPrefix(childName, prefix) {
-		return 0, 0
+		return 0, 0, false
 	}
 	parts := strings.Split(strings.TrimPrefix(childName, prefix), "_")
 	if len(parts) < 2 {
-		return 0, 0
+		return 0, 0, false
 	}
 	unit, err := strconv.Atoi(parts[len(parts)-2])
 	if err != nil {
-		return 0, 0
+		return 0, 0, false
 	}
 	bodyStyle, err := strconv.Atoi(parts[len(parts)-1])
 	if err != nil {
-		return 0, 0
+		return 0, 0, false
 	}
-	return unit, bodyStyle
+	return unit, bodyStyle, true
 }
 
 func collectSymbolUnits(pins []SymbolPin) []SymbolUnit {
@@ -258,6 +291,79 @@ func collectSymbolUnits(pins []SymbolPin) []SymbolUnit {
 
 func validSymbolIDPart(value string) bool {
 	return value != "" && strings.TrimSpace(value) == value && !strings.Contains(value, ":")
+}
+
+func validateParsedSymbol(record SymbolRecord) []reports.Issue {
+	var issues []reports.Issue
+	type pinKey struct {
+		unit      int
+		bodyStyle int
+		number    string
+	}
+	duplicatePins := map[pinKey]int{}
+	for index, pin := range record.Pins {
+		if _, ok := knownSymbolElectricalTypes[pin.ElectricalType]; pin.ElectricalType != "" && !ok {
+			issues = append(issues, symbolIssue(record, reports.SeverityWarning, "unknown electrical type "+strconv.Quote(pin.ElectricalType)+" on pin "+pin.Number))
+		}
+		if strings.TrimSpace(pin.Number) == "" {
+			continue
+		}
+		key := pinKey{unit: pin.Unit, bodyStyle: pin.BodyStyle, number: pin.Number}
+		if first, exists := duplicatePins[key]; exists {
+			if !allowsStackedSymbolPins(record) {
+				issues = append(issues, symbolIssue(record, reports.SeverityError, "duplicate pin number "+pin.Number+" in unit "+strconv.Itoa(pin.Unit)+" body style "+strconv.Itoa(pin.BodyStyle)+" at pin indexes "+strconv.Itoa(first)+" and "+strconv.Itoa(index)))
+			}
+			continue
+		}
+		duplicatePins[key] = index
+	}
+	issues = append(issues, SymbolConnectivityAcceptanceIssues(record)...)
+	return issues
+}
+
+func allowsStackedSymbolPins(record SymbolRecord) bool {
+	hasStacked := false
+	hasPins := false
+	for _, keyword := range record.Keywords {
+		switch strings.ToLower(strings.TrimSpace(keyword)) {
+		case "stacked":
+			hasStacked = true
+		case "pin", "pins":
+			hasPins = true
+		}
+	}
+	return hasStacked && hasPins
+}
+
+func isPowerSymbol(record SymbolRecord) bool {
+	if strings.EqualFold(record.LibraryNickname, "power") {
+		return true
+	}
+	for key, value := range record.Properties {
+		if strings.EqualFold(key, "Reference") && strings.HasPrefix(strings.TrimSpace(value), "#") {
+			return true
+		}
+	}
+	return false
+}
+
+func SymbolConnectivityAcceptanceIssues(record SymbolRecord) []reports.Issue {
+	var issues []reports.Issue
+	for _, pin := range record.Pins {
+		if pin.Hidden && (pin.ElectricalType == SymbolElectricalPowerIn || pin.ElectricalType == SymbolElectricalPowerOut) {
+			issues = append(issues, symbolIssue(record, reports.SeverityBlocked, "hidden power pin "+pin.Number+" requires explicit connectivity policy"))
+		}
+	}
+	return issues
+}
+
+func symbolIssue(record SymbolRecord, severity reports.Severity, message string) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: severity,
+		Path:     "library.symbol." + record.LibraryID,
+		Message:  message,
+	}
 }
 
 func firstSymbolText(node sexpr.ParsedNode, head string) string {

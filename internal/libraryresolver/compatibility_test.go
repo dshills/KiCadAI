@@ -125,7 +125,7 @@ func compatibilitySymbolLibrary() string {
     (symbol "U_HIDDEN_1_1"
       (pin input line (at -5.08 0 0) (length 2.54) (name "A") (number "1"))
       (pin output line (at 5.08 0 180) (length 2.54) (name "Y") (number "2"))
-      (pin power_in line (at 0 5.08 270) (length 2.54) hide (name "VCC") (number "8"))
+      (pin passive line (at 0 5.08 270) (length 2.54) hide (name "VCC") (number "8"))
     )
   )
   (symbol "STACKED"

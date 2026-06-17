@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/reports"
 )
 
 func TestIndexSymbolsParsesSimpleSymbol(t *testing.T) {
@@ -57,7 +58,7 @@ func TestIndexSymbolsParsesConnectorSymbol(t *testing.T) {
 
 	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
 	records, issues := IndexSymbols(inventory)
-	if len(issues) != 0 {
+	if hasBlockingIssue(issues) {
 		t.Fatalf("issues = %#v", issues)
 	}
 	record, ok := records["Connector:Conn_01x02"]
@@ -92,7 +93,7 @@ func TestIndexSymbolsParsesMultiUnitAndHiddenPins(t *testing.T) {
 
 	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
 	records, issues := IndexSymbols(inventory)
-	if len(issues) != 0 {
+	if hasBlockingIssue(issues) {
 		t.Fatalf("issues = %#v", issues)
 	}
 	record := records["Amplifier:Dual_OpAmp"]
@@ -120,6 +121,95 @@ func TestCollectSymbolUnitsAppliesCommonPinsToEveryUnit(t *testing.T) {
 		if len(unit.CommonPinIndexes) != 1 || unit.CommonPinIndexes[0] != 2 {
 			t.Fatalf("common pins not applied to unit %#v", unit)
 		}
+	}
+}
+
+func TestIndexSymbolsParsesCommonUnitPins(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Logic.kicad_sym"), commonPinSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record := records["Logic:Dual_Buffer"]
+	if len(record.Units) != 2 {
+		t.Fatalf("units = %#v", record.Units)
+	}
+	if !record.Pins[2].Common || record.Pins[2].Unit != 0 {
+		t.Fatalf("common pin = %#v", record.Pins[2])
+	}
+	for _, unit := range record.Units {
+		if len(unit.CommonPinIndexes) != 1 || unit.CommonPinIndexes[0] != 2 {
+			t.Fatalf("common pin indexes = %#v", record.Units)
+		}
+	}
+}
+
+func TestIndexSymbolsReportsUnknownElectricalType(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Bad.kicad_sym"), unknownElectricalSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if _, ok := records["Bad:Odd"]; !ok {
+		t.Fatalf("records = %#v", records)
+	}
+	if !hasSymbolIssue(issues, "unknown electrical type") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestIndexSymbolsReportsDuplicatePinInSameUnit(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Bad.kicad_sym"), duplicatePinSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if _, ok := records["Bad:Dup"]; !ok {
+		t.Fatalf("records = %#v", records)
+	}
+	if !hasSymbolIssue(issues, "duplicate pin number 1") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestIndexSymbolsAllowsDuplicatePinsAcrossSeparateUnits(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Logic.kicad_sym"), duplicateAcrossUnitsSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if _, ok := records["Logic:Dual_Gate"]; !ok {
+		t.Fatalf("records = %#v", records)
+	}
+	if hasSymbolIssue(issues, "duplicate pin number") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestIndexSymbolsDetectsPowerSymbolAndHiddenPowerPolicy(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "power.kicad_sym"), powerSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if !hasSymbolIssue(issues, "hidden power pin") {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record := records["power:VCC"]
+	if !record.PowerSymbol {
+		t.Fatalf("expected power symbol: %#v", record)
+	}
+	acceptanceIssues := SymbolConnectivityAcceptanceIssues(record)
+	if !hasSymbolIssue(acceptanceIssues, "hidden power pin") {
+		t.Fatalf("acceptance issues = %#v", acceptanceIssues)
 	}
 }
 
@@ -265,7 +355,7 @@ func amplifierSymbolLibrary() string {
     )
     (symbol "Dual_OpAmp_2_1"
       (pin input line (at -5.08 -2.54 0) (length 2.54) (name "-") (number "6"))
-      (pin power_in line (at 0 5.08 270) (length 2.54) hide (name "V+") (number "8"))
+      (pin input line (at 0 5.08 270) (length 2.54) hide (name "V+") (number "8"))
     )
   )
 )`
@@ -298,4 +388,104 @@ func invalidIDSymbolLibrary() string {
     (property "Reference" "U" (at 0 0 0))
   )
 )`
+}
+
+func commonPinSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Dual_Buffer"
+    (property "Reference" "U" (at 0 0 0))
+    (property "Value" "Dual_Buffer" (at 0 -2.54 0))
+    (symbol "Dual_Buffer_1_1"
+      (pin input line (at -5.08 0 0) (length 2.54) (name "A") (number "1"))
+    )
+    (symbol "Dual_Buffer_2_1"
+      (pin output line (at 5.08 0 180) (length 2.54) (name "Y") (number "2"))
+    )
+    (symbol "Dual_Buffer_0_1"
+      (pin power_in line (at 0 5.08 270) (length 2.54) (name "VCC") (number "14"))
+    )
+  )
+)`
+}
+
+func unknownElectricalSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Odd"
+    (property "Reference" "U" (at 0 0 0))
+    (symbol "Odd_1_1"
+      (pin strange line (at 0 0 0) (length 2.54) (name "X") (number "1"))
+    )
+  )
+)`
+}
+
+func duplicatePinSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Dup"
+    (property "Reference" "U" (at 0 0 0))
+    (symbol "Dup_1_1"
+      (pin input line (at -5.08 0 0) (length 2.54) (name "A") (number "1"))
+      (pin output line (at 5.08 0 180) (length 2.54) (name "B") (number "1"))
+    )
+  )
+)`
+}
+
+func duplicateAcrossUnitsSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Dual_Gate"
+    (property "Reference" "U" (at 0 0 0))
+    (symbol "Dual_Gate_1_1"
+      (pin input line (at -5.08 0 0) (length 2.54) (name "A") (number "1"))
+    )
+    (symbol "Dual_Gate_2_1"
+      (pin input line (at -5.08 0 0) (length 2.54) (name "A") (number "1"))
+    )
+  )
+)`
+}
+
+func powerSymbolLibrary() string {
+	return `
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "VCC"
+    (property "Reference" "#PWR" (at 0 0 0))
+    (property "Value" "VCC" (at 0 -2.54 0))
+    (symbol "VCC_1_1"
+      (pin power_in line (at 0 0 90) (length 0) hide (name "VCC") (number "1"))
+    )
+  )
+)`
+}
+
+func hasSymbolIssue(issues []reports.Issue, text string) bool {
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasBlockingIssue(issues []reports.Issue) bool {
+	for _, issue := range issues {
+		if issue.Blocking() {
+			return true
+		}
+	}
+	return false
 }

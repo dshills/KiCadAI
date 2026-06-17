@@ -118,6 +118,7 @@ type SymbolPin struct {
 	ElectricalType string           `json:"electrical_type,omitempty"`
 	Unit           int              `json:"unit"`
 	BodyStyle      int              `json:"body_style"`
+	Common         bool             `json:"common,omitempty"`
 	Position       kicadfiles.Point `json:"position"`
 	Orientation    string           `json:"orientation,omitempty"`
 	Length         kicadfiles.IU    `json:"length,omitempty"`
