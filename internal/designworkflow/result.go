@@ -19,6 +19,7 @@ const (
 	StagePlacement      StageName = "placement"
 	StageRouting        StageName = "routing"
 	StageProjectWrite   StageName = "project_write"
+	StageWriterCorrect  StageName = "writer_correctness"
 	StageValidation     StageName = "validation"
 	StageKiCadChecks    StageName = "kicad_checks"
 	StageFeedback       StageName = "feedback"
@@ -196,7 +197,7 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 		return ""
 	case missingAny(completed, StageSchematic):
 		return AcceptanceDraft
-	case hasAnyBlocked(blocked, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageValidation):
+	case hasAnyBlocked(blocked, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageWriterCorrect, StageValidation):
 		return AcceptanceStructural
 	case hasAnyBlocked(blocked, StageKiCadChecks):
 		return AcceptanceConnectivity

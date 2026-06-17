@@ -28,6 +28,9 @@ func TestCreateWritesWorkflowResult(t *testing.T) {
 	if result.Acceptance.Achieved == "" {
 		t.Fatalf("acceptance = %#v feedback = %#v", result.Acceptance, result.Feedback)
 	}
+	if !hasStage(result, StageWriterCorrect) {
+		t.Fatalf("writer correctness stage missing: %#v", result.Stages)
+	}
 }
 
 func TestWorkflowIssueAndArtifactCollectors(t *testing.T) {
@@ -38,6 +41,15 @@ func TestWorkflowIssueAndArtifactCollectors(t *testing.T) {
 	if len(WorkflowIssues(result)) != 1 || len(WorkflowArtifacts(result)) != 1 {
 		t.Fatalf("collectors failed")
 	}
+}
+
+func hasStage(result WorkflowResult, name StageName) bool {
+	for _, stage := range result.Stages {
+		if stage.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func TestCreateShortCircuitsAfterPlanFailure(t *testing.T) {
