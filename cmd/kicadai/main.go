@@ -1057,6 +1057,13 @@ func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		})
 	}
 	subcommand := opts.commandArgs[0]
+	if subcommand == "symbols" {
+		libraryIndex, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+			CachePath: opts.libraryCache,
+			Refresh:   opts.refreshLibraryCache,
+		})
+		return runLibrarySymbols(opts.commandArgs[1:], stdout, libraryIndex, issues)
+	}
 	requiredArgs, ok := requiredLibraryParams(subcommand)
 	if !ok {
 		return writeLibraryFailure(stdout, reports.Issue{
@@ -1134,6 +1141,76 @@ func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		Path:     "library." + subcommand,
 		Message:  "unsupported library subcommand " + subcommand,
 	})
+}
+
+type librarySymbolSummary struct {
+	LibraryID       string `json:"library_id"`
+	LibraryNickname string `json:"library_nickname"`
+	Name            string `json:"name"`
+	Path            string `json:"path,omitempty"`
+	Description     string `json:"description,omitempty"`
+	PinCount        int    `json:"pin_count"`
+	UnitCount       int    `json:"unit_count"`
+	PowerSymbol     bool   `json:"power_symbol,omitempty"`
+}
+
+func runLibrarySymbols(args []string, stdout io.Writer, index libraryresolver.LibraryIndex, issues []reports.Issue) error {
+	if len(args) == 0 {
+		return writeLibraryFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library.symbols", Message: "library symbols requires a subcommand"})
+	}
+	subcommand := args[0]
+	switch subcommand {
+	case "list":
+		if len(args) != 1 {
+			return writeLibraryFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library.symbols.list", Message: "library symbols list requires 0 argument(s)"})
+		}
+		records := libraryresolver.FindSymbols(index, libraryresolver.Query{})
+		summaries := make([]librarySymbolSummary, 0, len(records))
+		for _, record := range records {
+			summaries = append(summaries, librarySymbolSummary{
+				LibraryID:       record.LibraryID,
+				LibraryNickname: record.LibraryNickname,
+				Name:            record.Name,
+				Path:            record.Path,
+				Description:     record.Description,
+				PinCount:        len(record.Pins),
+				UnitCount:       len(record.Units),
+				PowerSymbol:     record.PowerSymbol,
+			})
+		}
+		return writeLibraryResult(stdout, summaries, issues)
+	case "show":
+		if len(args) != 2 {
+			return writeLibraryFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library.symbols.show", Message: "library symbols show requires 1 argument(s)"})
+		}
+		record, ok := libraryresolver.ResolveSymbol(index, args[1])
+		if !ok {
+			issues = append(issues, missingLibraryRecordIssue("library.symbol", args[1]))
+			return writeLibraryResult(stdout, nil, issues)
+		}
+		return writeLibraryResult(stdout, record, issues)
+	case "pins":
+		if len(args) != 2 {
+			return writeLibraryFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library.symbols.pins", Message: "library symbols pins requires 1 argument(s)"})
+		}
+		record, ok := libraryresolver.ResolveSymbol(index, args[1])
+		if !ok {
+			issues = append(issues, missingLibraryRecordIssue("library.symbol", args[1]))
+			return writeLibraryResult(stdout, nil, issues)
+		}
+		return writeLibraryResult(stdout, record.Pins, issues)
+	case "validate":
+		if len(args) != 2 {
+			return writeLibraryFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library.symbols.validate", Message: "library symbols validate requires 1 argument(s)"})
+		}
+		if _, ok := libraryresolver.ResolveSymbol(index, args[1]); !ok {
+			issues = append(issues, missingLibraryRecordIssue("library.symbol", args[1]))
+			return writeLibraryResult(stdout, nil, issues)
+		}
+		return writeLibraryKLCResult(stdout, libraryresolver.ValidateSymbolKLC(index, args[1]), issues)
+	default:
+		return writeLibraryFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "library.symbols." + subcommand, Message: "unsupported library symbols subcommand " + subcommand})
+	}
 }
 
 func writeLibraryFailure(stdout io.Writer, issue reports.Issue) error {

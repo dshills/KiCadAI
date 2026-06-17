@@ -352,6 +352,46 @@ func TestRunLibrarySearchJSON(t *testing.T) {
 	}
 }
 
+func TestRunLibrarySymbolsNestedCommands(t *testing.T) {
+	symbols, footprints := writeCLILibraryFixture(t)
+	for _, tc := range []struct {
+		name string
+		args []string
+		want string
+	}{
+		{name: "list", args: []string{"library", "symbols", "list"}, want: `"pin_count": 2`},
+		{name: "show", args: []string{"library", "symbols", "show", "Device:R"}, want: `"library_id": "Device:R"`},
+		{name: "pins", args: []string{"library", "symbols", "pins", "Device:R"}, want: `"electrical_type": "passive"`},
+		{name: "validate", args: []string{"library", "symbols", "validate", "Device:R"}, want: `"kind": "symbol"`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			args := append([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints}, tc.args...)
+			err := run(args, &stdout, &stderr)
+			if err != nil {
+				t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+			}
+			if !strings.Contains(stdout.String(), tc.want) {
+				t.Fatalf("stdout missing %q:\n%s", tc.want, stdout.String())
+			}
+		})
+	}
+}
+
+func TestRunLibrarySymbolsMissingSymbol(t *testing.T) {
+	symbols, footprints := writeCLILibraryFixture(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--symbols-root", symbols, "--footprints-root", footprints, "library", "symbols", "show", "Device:Missing"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), `"code": "MISSING_FILE"`) {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
 func TestRunLibraryCompatibilityJSON(t *testing.T) {
 	symbols, footprints := writeCLILibraryFixture(t)
 	for _, tc := range []struct {
