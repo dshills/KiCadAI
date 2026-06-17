@@ -92,6 +92,7 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 	addSymbol, err := wrapOperation(transactions.OpAddSymbol, transactions.AddSymbolOperation{
 		Op:        transactions.OpAddSymbol,
 		Ref:       ref,
+		Role:      component.Role,
 		Value:     component.Value,
 		LibraryID: component.SymbolID,
 		At:        at,
@@ -105,6 +106,7 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 		assign, err := wrapOperation(transactions.OpAssignFootprint, transactions.AssignFootprintOperation{
 			Op:          transactions.OpAssignFootprint,
 			Ref:         ref,
+			Role:        component.Role,
 			FootprintID: component.FootprintID,
 		})
 		if err != nil {
@@ -114,6 +116,7 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 		place, err := wrapOperation(transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{
 			Op:          transactions.OpPlaceFootprint,
 			Ref:         ref,
+			Role:        component.Role,
 			FootprintID: component.FootprintID,
 			Value:       component.Value,
 			At:          at,

@@ -16,6 +16,7 @@ type CreateOptions struct {
 	Overwrite     bool
 	Seed          string
 	SkipRouting   bool
+	Components    ComponentSelectionOptions
 	Placement     PlacementOptions
 	Routing       RoutingOptions
 	Validation    ValidationOptions
@@ -30,12 +31,25 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	normalized := NormalizeRequest(request)
 	plan := PlanBlocks(ctx, opts.BlockRegistry, normalized)
 	stages := []StageResult{plan.Stage}
-	schematicStage := schematicStageFromPlan(plan)
-	stages = append(stages, schematicStage)
 	if workflowStageBlocked(plan.Stage) {
-		stages = append(stages, skippedWorkflowStages("block planning did not complete", StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = append(stages, skippedWorkflowStages("block planning did not complete", StageComponentSelection, StageSchematic, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
+	componentSelections := SelectWorkflowComponents(ctx, opts.BlockRegistry, plan, opts.Components)
+	if !workflowStageBlocked(componentSelections.Stage) {
+		selectionApplyIssues := ApplyComponentSelectionsToPlan(&plan, opts.BlockRegistry, componentSelections.Selections)
+		if len(selectionApplyIssues) != 0 {
+			componentSelections.Stage.Issues = append(componentSelections.Stage.Issues, selectionApplyIssues...)
+			componentSelections.Stage.Status = StageStatusForIssues(componentSelections.Stage.Issues)
+		}
+	}
+	stages = append(stages, componentSelections.Stage)
+	if workflowStageBlocked(componentSelections.Stage) {
+		stages = append(stages, skippedWorkflowStages("component selection did not complete", StageSchematic, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+	}
+	schematicStage := schematicStageFromPlan(plan)
+	stages = append(stages, schematicStage)
 	fragments := RealizePCBFragments(ctx, opts.BlockRegistry, plan)
 	stages = append(stages, fragments.Stage)
 	if workflowStageBlocked(fragments.Stage) {

@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/components"
 	"kicadai/internal/reports"
 )
 
@@ -31,6 +32,7 @@ type Request struct {
 	Intent      Intent              `json:"intent,omitempty"`
 	Board       BoardSpec           `json:"board"`
 	Libraries   LibrarySpec         `json:"libraries,omitempty"`
+	Components  ComponentPolicySpec `json:"component_policy,omitempty"`
 	Blocks      []BlockInstanceSpec `json:"blocks"`
 	Connections []ConnectionSpec    `json:"connections,omitempty"`
 	Constraints ConstraintSpec      `json:"constraints,omitempty"`
@@ -53,6 +55,24 @@ type LibrarySpec struct {
 	RequireResolver bool     `json:"require_resolver,omitempty"`
 	SymbolRoots     []string `json:"symbol_roots,omitempty"`
 	FootprintRoots  []string `json:"footprint_roots,omitempty"`
+}
+
+type ComponentPolicySpec struct {
+	CatalogDir         string                           `json:"catalog_dir,omitempty"`
+	MinimumConfidence  components.ConfidenceLevel       `json:"minimum_confidence,omitempty"`
+	Acceptance         components.AcceptanceLevel       `json:"acceptance,omitempty"`
+	Overrides          map[string]ComponentOverrideSpec `json:"overrides,omitempty"`
+	PackagePreferences map[string]string                `json:"package_preferences,omitempty"`
+}
+
+type ComponentOverrideSpec struct {
+	ComponentID       string                      `json:"component_id,omitempty"`
+	VariantID         string                      `json:"variant_id,omitempty"`
+	Package           string                      `json:"package,omitempty"`
+	MinimumConfidence components.ConfidenceLevel  `json:"minimum_confidence,omitempty"`
+	Acceptance        components.AcceptanceLevel  `json:"acceptance,omitempty"`
+	AllowAlternatives bool                        `json:"allow_alternatives,omitempty"`
+	RequiredRatings   []components.RequiredRating `json:"required_ratings,omitempty"`
 }
 
 type BlockInstanceSpec struct {
@@ -112,6 +132,7 @@ func NormalizeRequest(request Request) Request {
 	if request.Validation.Acceptance == "" {
 		request.Validation.Acceptance = AcceptanceStructural
 	}
+	request.Components = normalizeComponentPolicy(request.Components)
 	request.Blocks = append([]BlockInstanceSpec(nil), request.Blocks...)
 	for i := range request.Blocks {
 		request.Blocks[i].ID = strings.TrimSpace(request.Blocks[i].ID)
@@ -159,6 +180,30 @@ func ValidateRequest(request Request) []reports.Issue {
 	}
 	if !validAcceptanceLevel(request.Validation.Acceptance) {
 		issues = append(issues, issue("validation.acceptance", "unsupported acceptance level "+string(request.Validation.Acceptance)))
+	}
+	if request.Components.MinimumConfidence != "" {
+		componentIssue, ok := components.ValidateConfidenceIssue("component_policy.minimum_confidence", request.Components.MinimumConfidence)
+		if ok {
+			issues = append(issues, componentIssue)
+		}
+	}
+	if componentIssue, ok := components.ValidateAcceptanceIssue("component_policy.acceptance", request.Components.Acceptance); ok {
+		issues = append(issues, componentIssue)
+	}
+	for key, override := range request.Components.Overrides {
+		path := "component_policy.overrides." + key
+		if strings.TrimSpace(key) == "" {
+			issues = append(issues, issue(path, "component override key is required"))
+		}
+		if override.MinimumConfidence != "" {
+			componentIssue, ok := components.ValidateConfidenceIssue(path+".minimum_confidence", override.MinimumConfidence)
+			if ok {
+				issues = append(issues, componentIssue)
+			}
+		}
+		if componentIssue, ok := components.ValidateAcceptanceIssue(path+".acceptance", override.Acceptance); ok {
+			issues = append(issues, componentIssue)
+		}
 	}
 	if len(request.Blocks) == 0 {
 		issues = append(issues, issue("blocks", "at least one block is required"))
@@ -258,6 +303,39 @@ func cloneParams(params map[string]any) map[string]any {
 	clone := make(map[string]any, len(params))
 	for key, value := range params {
 		clone[key] = cloneJSONValue(value)
+	}
+	return clone
+}
+
+func normalizeComponentPolicy(policy ComponentPolicySpec) ComponentPolicySpec {
+	policy.CatalogDir = strings.TrimSpace(policy.CatalogDir)
+	policy.Overrides = cloneComponentOverrides(policy.Overrides)
+	policy.PackagePreferences = cloneStringMap(policy.PackagePreferences)
+	return policy
+}
+
+func cloneComponentOverrides(overrides map[string]ComponentOverrideSpec) map[string]ComponentOverrideSpec {
+	if overrides == nil {
+		return nil
+	}
+	clone := make(map[string]ComponentOverrideSpec, len(overrides))
+	for key, override := range overrides {
+		override.ComponentID = strings.TrimSpace(override.ComponentID)
+		override.VariantID = strings.TrimSpace(override.VariantID)
+		override.Package = strings.TrimSpace(override.Package)
+		override.RequiredRatings = append([]components.RequiredRating(nil), override.RequiredRatings...)
+		clone[strings.TrimSpace(key)] = override
+	}
+	return clone
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	if values == nil {
+		return nil
+	}
+	clone := make(map[string]string, len(values))
+	for key, value := range values {
+		clone[strings.TrimSpace(key)] = strings.TrimSpace(value)
 	}
 	return clone
 }

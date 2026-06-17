@@ -121,6 +121,7 @@ type SetBoardOutlineOperation struct {
 type AddSymbolOperation struct {
 	Op        OperationKind `json:"op"`
 	Ref       string        `json:"ref"`
+	Role      string        `json:"role,omitempty"`
 	Value     string        `json:"value,omitempty"`
 	LibraryID string        `json:"library_id"`
 	At        Point         `json:"at"`
@@ -137,12 +138,14 @@ type ConnectOperation struct {
 type AssignFootprintOperation struct {
 	Op          OperationKind `json:"op"`
 	Ref         string        `json:"ref"`
+	Role        string        `json:"role,omitempty"`
 	FootprintID string        `json:"footprint_id"`
 }
 
 type PlaceFootprintOperation struct {
 	Op          OperationKind `json:"op"`
 	Ref         string        `json:"ref"`
+	Role        string        `json:"role,omitempty"`
 	FootprintID string        `json:"footprint_id,omitempty"`
 	Value       string        `json:"value,omitempty"`
 	At          Point         `json:"at"`

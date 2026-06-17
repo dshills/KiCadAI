@@ -1975,6 +1975,9 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 		Overwrite:   opts.overwrite,
 		Seed:        opts.seed,
 		SkipRouting: opts.skipRouting,
+		Components: designworkflow.ComponentSelectionOptions{
+			CatalogDir: opts.catalogDir,
+		},
 		Placement: designworkflow.PlacementOptions{
 			DefaultBounds: placement.Bounds{WidthMM: opts.placementEstWidth, HeightMM: opts.placementEstHeight, Source: placement.BoundsEstimated},
 			Rules:         placement.Rules{BoardEdgeClearanceMM: opts.placementBoardMargin},

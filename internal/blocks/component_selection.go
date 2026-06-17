@@ -25,7 +25,7 @@ func SelectDefinitionComponents(ctx context.Context, definition BlockDefinition,
 			report.Issues = append(report.Issues, reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityBlocked, Path: "block." + definition.ID, Message: err.Error()})
 			return report
 		}
-		request, ok := componentSelectionRequest(component, acceptance)
+		request, ok := SelectionRequestForComponent(component, acceptance)
 		if !ok {
 			report.Issues = append(report.Issues, reports.Issue{
 				Code:     reports.CodeValidationFailed,
@@ -44,7 +44,7 @@ func SelectDefinitionComponents(ctx context.Context, definition BlockDefinition,
 	return report
 }
 
-func componentSelectionRequest(component BlockComponent, acceptance components.AcceptanceLevel) (components.SelectionRequest, bool) {
+func SelectionRequestForComponent(component BlockComponent, acceptance components.AcceptanceLevel) (components.SelectionRequest, bool) {
 	if acceptance == "" {
 		acceptance = component.Acceptance
 	}

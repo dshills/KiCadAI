@@ -121,7 +121,7 @@ func i2cSensorPCBRealization() *PCBRealization {
 
 func opAmpGainStageComponents() []BlockComponent {
 	return []BlockComponent{
-		{Role: "opamp", RefPrefix: "U", Value: "LMV321", SymbolID: defaultOpAmpSymbol, FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: opAmpPins(lmv321Pins)},
+		{Role: "opamp", RefPrefix: "U", Value: "LMV321", SymbolID: defaultOpAmpSymbol, FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: opAmpPins(lmv321Pins), ComponentID: "opamp.generic.single.lmv321", ComponentVariant: "sot23_5", Acceptance: components.AcceptanceConnectivity},
 		{Role: "gain_to_ground", RefPrefix: "R", Value: "10k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
 		{Role: "feedback", RefPrefix: "R", Value: "10k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
 		{Role: "decoupling_capacitor", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()},

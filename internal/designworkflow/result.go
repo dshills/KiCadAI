@@ -10,19 +10,20 @@ import (
 type StageName string
 
 const (
-	StageParseRequest   StageName = "parse_request"
-	StageLibraryContext StageName = "library_context"
-	StageBlockPlanning  StageName = "block_planning"
-	StageSchematic      StageName = "schematic"
-	StagePCBRealization StageName = "pcb_realization"
-	StageSchematicToPCB StageName = "schematic_to_pcb"
-	StagePlacement      StageName = "placement"
-	StageRouting        StageName = "routing"
-	StageProjectWrite   StageName = "project_write"
-	StageWriterCorrect  StageName = "writer_correctness"
-	StageValidation     StageName = "validation"
-	StageKiCadChecks    StageName = "kicad_checks"
-	StageFeedback       StageName = "feedback"
+	StageParseRequest       StageName = "parse_request"
+	StageLibraryContext     StageName = "library_context"
+	StageBlockPlanning      StageName = "block_planning"
+	StageComponentSelection StageName = "component_selection"
+	StageSchematic          StageName = "schematic"
+	StagePCBRealization     StageName = "pcb_realization"
+	StageSchematicToPCB     StageName = "schematic_to_pcb"
+	StagePlacement          StageName = "placement"
+	StageRouting            StageName = "routing"
+	StageProjectWrite       StageName = "project_write"
+	StageWriterCorrect      StageName = "writer_correctness"
+	StageValidation         StageName = "validation"
+	StageKiCadChecks        StageName = "kicad_checks"
+	StageFeedback           StageName = "feedback"
 )
 
 type StageStatus string
@@ -193,7 +194,7 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 	_, completedKiCadChecks := completed[StageKiCadChecks]
 	_, completedValidation := completed[StageValidation]
 	switch {
-	case hasAnyBlocked(blocked, StageParseRequest, StageBlockPlanning, StageSchematic, StageProjectWrite):
+	case hasAnyBlocked(blocked, StageParseRequest, StageBlockPlanning, StageComponentSelection, StageSchematic, StageProjectWrite):
 		return ""
 	case missingAny(completed, StageSchematic):
 		return AcceptanceDraft
@@ -223,7 +224,7 @@ func RetryScopeForStage(stage StageName, issue reports.Issue) RetryScope {
 	switch stage {
 	case StageParseRequest:
 		return RetryScopeRequest
-	case StageBlockPlanning, StagePCBRealization:
+	case StageBlockPlanning, StageComponentSelection, StagePCBRealization:
 		return RetryScopeBlock
 	case StagePlacement:
 		return RetryScopePlacement
