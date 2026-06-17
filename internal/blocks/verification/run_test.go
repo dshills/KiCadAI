@@ -5,10 +5,13 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
 
@@ -81,6 +84,157 @@ func TestRunCaseWriterIssuesIncludeCaseContext(t *testing.T) {
 		}
 	}
 	t.Fatalf("missing contextualized issue path: %#v", result.Issues)
+}
+
+func TestRunCaseERCDRCSkipsWhenKiCadMissingAndOptional(t *testing.T) {
+	t.Setenv(checks.EnvKiCadCLI, filepath.Join(t.TempDir(), "missing-kicad-cli"))
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.ERCDRC.AllowedCodes = []string{"OPTIONAL_EXPECTATION"}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+	})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if !ok || stage.Status != StatusSkipped || result.Status != StatusPass {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseERCDRCBlocksWhenRequiredAndKiCadMissing(t *testing.T) {
+	t.Setenv(checks.EnvKiCadCLI, filepath.Join(t.TempDir(), "missing-kicad-cli"))
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.ERCDRC.Required = true
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+	})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "kicad-cli") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseERCDRCMockedViolationBlocks(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.EvidenceLevel = EvidenceERCDRCVerified
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			return checks.CheckResult{
+				Kind: kind,
+				Findings: []checks.CheckFinding{{
+					Kind:     kind,
+					Severity: "error",
+					Code:     "KICADAI_TEST_FINDING",
+					Message:  "mocked unallowlisted violation",
+				}},
+			}, nil
+		},
+	})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "mocked unallowlisted violation") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseERCDRCMockedPass(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.EvidenceLevel = EvidenceERCDRCVerified
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			return checks.CheckResult{Kind: kind}, nil
+		},
+	})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusPass || !ok || stage.Status != StatusPass || result.EvidenceLevel != EvidenceERCDRCVerified {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseERCDRCExpectedAllowedIssuePasses(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.EvidenceLevel = EvidenceERCDRCVerified
+	manifest.Expected.ERCDRC.AllowedCodes = []string{"KICADAI_ALLOWED"}
+	manifest.Expected.ERCDRC.ExpectedIssues = []string{"KICADAI_ALLOWED"}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, opts checks.Options) (checks.CheckResult, error) {
+			if len(opts.Allowlist) == 0 || opts.Allowlist[0].Code != "KICADAI_ALLOWED" {
+				t.Fatalf("allowlist = %#v", opts.Allowlist)
+			}
+			return checks.CheckResult{
+				Kind: kind,
+				Allowed: []checks.CheckFinding{{
+					Kind:     kind,
+					Severity: "warning",
+					Code:     "KICADAI_ALLOWED",
+					Message:  "mocked allowed violation",
+				}},
+			}, nil
+		},
+	})
+	if result.Status != StatusPass {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestEnsureProjectForExternalChecksReturnsArtifactOnCacheHit(t *testing.T) {
+	manifest := validManifest()
+	output := &blocks.BlockOutput{}
+	outputDir := t.TempDir()
+	projectDir := filepath.Join(outputDir, manifest.ID)
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	if err := writeProjectSentinel(projectDir, manifest, output, RunOptions{}); err != nil {
+		t.Fatalf("write sentinel: %v", err)
+	}
+	gotProjectDir, artifacts, issues := ensureProjectForExternalChecks(manifest, output, RunOptions{OutputDir: outputDir})
+	if gotProjectDir != projectDir || len(issues) != 0 {
+		t.Fatalf("projectDir=%q artifacts=%#v issues=%#v", gotProjectDir, artifacts, issues)
+	}
+	if len(artifacts) != 1 || string(artifacts[0].Kind) != "kicad_project" || artifacts[0].Path != filepath.ToSlash(projectDir) {
+		t.Fatalf("artifacts = %#v", artifacts)
+	}
+}
+
+func TestEnsureProjectForExternalChecksBlocksStaleCacheHit(t *testing.T) {
+	manifest := validManifest()
+	outputDir := t.TempDir()
+	projectDir := filepath.Join(outputDir, manifest.ID)
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	_, _, issues := ensureProjectForExternalChecks(manifest, &blocks.BlockOutput{}, RunOptions{OutputDir: outputDir})
+	if !hasIssue(issues, "stale or incomplete") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestDedupeArtifactsByKindAndPath(t *testing.T) {
+	artifacts := dedupeArtifacts([]reports.Artifact{
+		{Kind: reports.ArtifactKiCadProject, Path: "out/project"},
+		{Kind: reports.ArtifactKiCadProject, Path: "out/project"},
+		{Kind: reports.ArtifactERCReport, Path: "out/project"},
+	})
+	if len(artifacts) != 2 {
+		t.Fatalf("artifacts = %#v", artifacts)
+	}
 }
 
 func TestRunCaseBlocksWrongExpectedSymbol(t *testing.T) {
@@ -667,6 +821,20 @@ func rawPlaceFootprint(t *testing.T, ref string, role string, footprintID string
 		t.Fatalf("marshal place footprint: %v", err)
 	}
 	return transactions.NewOperation(transactions.OpPlaceFootprint, raw)
+}
+
+func fakeExecutable(t *testing.T, name string) string {
+	t.Helper()
+	contents := "#!/bin/sh\nexit 0\n"
+	if runtime.GOOS == "windows" {
+		name += ".bat"
+		contents = "@echo off\r\nexit /b 0\r\n"
+	}
+	path := filepath.Join(t.TempDir(), name)
+	if err := os.WriteFile(path, []byte(contents), 0o755); err != nil {
+		t.Fatalf("write fake executable: %v", err)
+	}
+	return path
 }
 
 func hasStage(stages []StageResult, name string) bool {

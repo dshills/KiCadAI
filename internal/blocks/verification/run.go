@@ -4,12 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"math"
+	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 	"kicadai/internal/writercorrectness"
@@ -27,6 +30,7 @@ const (
 const (
 	defaultPlacementToleranceMM  = 0.001
 	defaultPlacementToleranceDeg = 0.1
+	projectSentinelName          = ".kicadai-block-verification"
 )
 
 type RunOptions struct {
@@ -36,7 +40,15 @@ type RunOptions struct {
 	Overwrite     bool
 	KeepArtifacts bool
 	WriterOptions writercorrectness.Options
+	KiCadCLI      string
+	RequireERC    bool
+	RequireDRC    bool
+	AllowlistPath string
+	CheckOptions  checks.Options
+	CheckRunner   CheckRunner
 }
+
+type CheckRunner func(ctx context.Context, kind checks.CheckKind, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, error)
 
 type RunResult struct {
 	CaseID        string              `json:"case_id"`
@@ -149,6 +161,19 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 		stage, artifacts := runWriterStage(ctx, manifest, &output, opts)
 		result.Artifacts = append(result.Artifacts, artifacts...)
 		result.addStage(stage)
+		if reports.HasBlockingIssue(stage.Issues) {
+			result.finish()
+			return result
+		}
+	}
+	if ercDRCRequested(manifest.Expected, opts) {
+		ercRunOpts := opts
+		if writerRequested(manifest.Expected.Writer) {
+			ercRunOpts.Overwrite = false
+		}
+		stage, artifacts := runERCDRCStage(ctx, manifest, &output, ercRunOpts)
+		result.Artifacts = append(result.Artifacts, artifacts...)
+		result.addStage(stage)
 	}
 	result.finish()
 	return result
@@ -164,6 +189,7 @@ func (result *RunResult) addStage(stage StageResult) {
 
 func (result *RunResult) finish() {
 	SortIssues(result.Issues)
+	result.Artifacts = dedupeArtifacts(result.Artifacts)
 	result.Status = StatusPass
 	for _, stage := range result.Stages {
 		switch stage.Status {
@@ -175,6 +201,23 @@ func (result *RunResult) finish() {
 			}
 		}
 	}
+}
+
+func dedupeArtifacts(artifacts []reports.Artifact) []reports.Artifact {
+	if len(artifacts) < 2 {
+		return artifacts
+	}
+	seen := map[string]struct{}{}
+	deduped := make([]reports.Artifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		key := string(artifact.Kind) + "\x00" + filepath.ToSlash(filepath.Clean(artifact.Path))
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		deduped = append(deduped, artifact)
+	}
+	return deduped
 }
 
 func writerRequested(writer ExpectedWriter) bool {
@@ -207,7 +250,6 @@ func runWriterStage(ctx context.Context, manifest Manifest, output *blocks.Block
 	if reports.HasBlockingIssue(issues) {
 		return StageResult{Name: "writer_correctness", Issues: issues, Summary: "failed to write generated project"}, artifacts
 	}
-
 	writerOptions := opts.WriterOptions
 	writerOptions.AllowUnrouted = writerOptions.AllowUnrouted || manifest.Expected.Writer.AllowUnrouted
 	writerOptions.RequireKiCadRoundTrip = writerOptions.RequireKiCadRoundTrip || manifest.Expected.Writer.RequireRoundTrip
@@ -219,18 +261,413 @@ func runWriterStage(ctx context.Context, manifest Manifest, output *blocks.Block
 	if manifest.Expected.Writer.OK && !writerResult.OK && len(writerIssues) == 0 {
 		issues = append(issues, writerRunIssue(manifest, "ok", fmt.Sprintf("writer correctness did not report OK; checks=%d failures=%d warnings=%d skipped=%d", len(writerResult.Checks), writerResult.OverallSummary.FailCount, writerResult.OverallSummary.WarningCount, writerResult.OverallSummary.SkippedCount)))
 	}
+	if reports.HasBlockingIssue(issues) {
+		summary := fmt.Sprintf("wrote %s and ran %d writer correctness check(s)", projectDir, len(writerResult.Checks))
+		return StageResult{Name: "writer_correctness", Issues: issues, Summary: summary}, artifacts
+	}
+	if err := writeProjectSentinel(projectDir, manifest, output, opts); err != nil {
+		return StageResult{
+			Name:    "writer_correctness",
+			Issues:  []reports.Issue{writerRunIssue(manifest, "sentinel", err.Error())},
+			Summary: "failed to mark generated project",
+		}, artifacts
+	}
 	summary := fmt.Sprintf("wrote %s and ran %d writer correctness check(s)", projectDir, len(writerResult.Checks))
 	return StageResult{Name: "writer_correctness", Issues: issues, Summary: summary}, artifacts
 }
 
 func caseOutputDir(root string, caseID string) string {
-	return filepath.Join(root, pathID(caseID))
+	cleanRoot := filepath.Clean(root)
+	dir := filepath.Join(cleanRoot, pathID(caseID))
+	rel, err := filepath.Rel(cleanRoot, dir)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return filepath.Join(cleanRoot, "unknown_"+stableStringHash(caseID))
+	}
+	return dir
 }
 
 func writerRunIssue(manifest Manifest, path string, message string) reports.Issue {
 	issue := runIssue("verification."+pathID(manifest.ID)+".writer."+pathSegment(path), message)
 	issue.Suggestion = "case " + manifest.ID + " block " + manifest.BlockID
 	return issue
+}
+
+func ercDRCRequested(expected Expected, opts RunOptions) bool {
+	return opts.RequireERC ||
+		opts.RequireDRC ||
+		expected.ERCDRC.Required ||
+		expected.ERCDRC.RequireERC ||
+		expected.ERCDRC.RequireDRC ||
+		len(expected.ERCDRC.AllowedCodes) > 0 ||
+		len(expected.ERCDRC.ExpectedIssues) > 0 ||
+		expected.EvidenceLevel == EvidenceERCDRCVerified ||
+		expected.EvidenceLevel == EvidenceReferenceVerified
+}
+
+func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) (StageResult, []reports.Artifact) {
+	requiredERC, requiredDRC := ercDRCRequirements(manifest.Expected, opts)
+	if strings.TrimSpace(opts.OutputDir) == "" {
+		if requiredERC || requiredDRC {
+			return StageResult{
+				Name:   "erc_drc",
+				Issues: []reports.Issue{ercDRCRunIssue(manifest, "output_dir", "ERC/DRC verification requires an output directory")},
+			}, nil
+		}
+		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because no output directory was provided"}, nil
+	}
+
+	projectDir, artifacts, issues := ensureProjectForExternalChecks(manifest, output, opts)
+	if reports.HasBlockingIssue(issues) {
+		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to prepare generated project for ERC/DRC"}, artifacts
+	}
+
+	activeCheckOpts, allowlistIssues := checkOptions(manifest, opts)
+	issues = append(issues, allowlistIssues...)
+	if reports.HasBlockingIssue(allowlistIssues) {
+		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to configure ERC/DRC allowlist"}, artifacts
+	}
+
+	cli, err := checks.DiscoverCLI(activeCheckOpts.KiCadCLI)
+	if err != nil {
+		if requiredERC || requiredDRC {
+			issues = append(issues, ercDRCRunIssue(manifest, "kicad_cli", err.Error()))
+			return StageResult{Name: "erc_drc", Issues: issues, Summary: "KiCad CLI is required but unavailable"}, artifacts
+		}
+		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because KiCad CLI is unavailable"}, artifacts
+	}
+	activeCheckOpts.KiCadCLI = cli.Path
+
+	runner := opts.CheckRunner
+	if runner == nil {
+		runner = defaultCheckRunner
+	}
+	kinds := ercDRCKinds(manifest.Expected, opts)
+	allFindings := []checks.CheckFinding{}
+	runFailed := false
+	for _, kind := range kinds {
+		checkResult, runErr := runner(ctx, kind, cli, projectDir, activeCheckOpts)
+		artifacts = append(artifacts, checkArtifacts(checkResult)...)
+		issues = append(issues, checkResultIssues(manifest, checkResult, runErr)...)
+		if runErr != nil {
+			runFailed = true
+		}
+		allFindings = append(allFindings, checkResult.Findings...)
+		allFindings = append(allFindings, checkResult.Allowed...)
+	}
+	if !runFailed {
+		issues = append(issues, missingExpectedCheckIssues(manifest, allFindings, manifest.Expected.ERCDRC.ExpectedIssues)...)
+	}
+
+	summary := fmt.Sprintf("ran %d KiCad ERC/DRC check(s) for %s", len(kinds), projectDir)
+	return StageResult{Name: "erc_drc", Issues: issues, Summary: summary}, artifacts
+}
+
+func ercDRCRequirements(expected Expected, opts RunOptions) (bool, bool) {
+	requireERC := opts.RequireERC || expected.ERCDRC.RequireERC
+	requireDRC := opts.RequireDRC || expected.ERCDRC.RequireDRC
+	if expected.EvidenceLevel == EvidenceERCDRCVerified || expected.EvidenceLevel == EvidenceReferenceVerified {
+		requireERC = true
+		requireDRC = true
+	}
+	if expected.ERCDRC.Required && !expected.ERCDRC.RequireERC && !expected.ERCDRC.RequireDRC {
+		requireERC = true
+		requireDRC = true
+	}
+	return requireERC, requireDRC
+}
+
+func ercDRCKinds(expected Expected, opts RunOptions) []checks.CheckKind {
+	requireERC, requireDRC := ercDRCRequirements(expected, opts)
+	if !requireERC && !requireDRC {
+		requireERC = true
+		requireDRC = true
+	}
+	kinds := make([]checks.CheckKind, 0, 2)
+	if requireERC {
+		kinds = append(kinds, checks.CheckKindERC)
+	}
+	if requireDRC {
+		kinds = append(kinds, checks.CheckKindDRC)
+	}
+	return kinds
+}
+
+func ensureProjectForExternalChecks(manifest Manifest, output *blocks.BlockOutput, opts RunOptions) (string, []reports.Artifact, []reports.Issue) {
+	if err := os.MkdirAll(opts.OutputDir, 0o755); err != nil {
+		return "", nil, []reports.Issue{ercDRCRunIssue(manifest, "output_dir", err.Error())}
+	}
+	projectDir := caseOutputDir(opts.OutputDir, manifest.ID)
+	_, err := os.Stat(projectDir)
+	if err == nil && !opts.Overwrite {
+		if projectSentinelMatches(projectDir, manifest, output, opts) {
+			return projectDir, existingProjectArtifacts(projectDir), nil
+		}
+		return projectDir, nil, []reports.Issue{ercDRCRunIssue(manifest, "project", "existing generated project is stale or incomplete; rerun with overwrite")}
+	}
+	if err != nil && !os.IsNotExist(err) {
+		return projectDir, nil, []reports.Issue{ercDRCRunIssue(manifest, "project", err.Error())}
+	}
+	tx, err := blocks.ProjectTransactionForBlockOutputPtr(pathID(manifest.ID), output, opts.Overwrite)
+	if err != nil {
+		return projectDir, nil, []reports.Issue{ercDRCRunIssue(manifest, "transaction", err.Error())}
+	}
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: projectDir, Overwrite: opts.Overwrite})
+	issues := contextualizeIssues(manifest, "erc_drc.apply", apply.Issues)
+	if reports.HasBlockingIssue(issues) {
+		return projectDir, apply.Artifacts, issues
+	}
+	if err := writeProjectSentinel(projectDir, manifest, output, opts); err != nil {
+		issues = append(issues, ercDRCRunIssue(manifest, "sentinel", err.Error()))
+	}
+	return projectDir, apply.Artifacts, issues
+}
+
+func checkOptions(manifest Manifest, opts RunOptions) (checks.Options, []reports.Issue) {
+	checkOpts := opts.CheckOptions
+	checkOpts.Allowlist = append([]checks.AllowlistEntry(nil), opts.CheckOptions.Allowlist...)
+	checkOpts.KeepArtifacts = checkOpts.KeepArtifacts || opts.KeepArtifacts
+	if strings.TrimSpace(opts.KiCadCLI) != "" {
+		checkOpts.KiCadCLI = opts.KiCadCLI
+	}
+	for _, code := range manifest.Expected.ERCDRC.AllowedCodes {
+		code = strings.TrimSpace(code)
+		if code == "" {
+			continue
+		}
+		checkOpts.Allowlist = append(checkOpts.Allowlist, checks.AllowlistEntry{
+			Code:   code,
+			Reason: "allowed by block verification manifest " + manifest.ID,
+		})
+	}
+	if strings.TrimSpace(opts.AllowlistPath) == "" {
+		return checkOpts, nil
+	}
+	data, err := os.ReadFile(opts.AllowlistPath)
+	if err != nil {
+		return checkOpts, []reports.Issue{ercDRCRunIssue(manifest, "allowlist", err.Error())}
+	}
+	var entries []checks.AllowlistEntry
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return checkOpts, []reports.Issue{ercDRCRunIssue(manifest, "allowlist", err.Error())}
+	}
+	checkOpts.Allowlist = append(checkOpts.Allowlist, entries...)
+	return checkOpts, nil
+}
+
+func defaultCheckRunner(ctx context.Context, kind checks.CheckKind, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, error) {
+	if kind == checks.CheckKindDRC {
+		return checks.RunDRC(ctx, cli, target, opts)
+	}
+	return checks.RunERC(ctx, cli, target, opts)
+}
+
+func checkResultIssues(manifest Manifest, result checks.CheckResult, err error) []reports.Issue {
+	var issues []reports.Issue
+	for _, finding := range result.Findings {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   checkSeverity(finding.Severity),
+			Path:       fmt.Sprintf("verification.%s.erc_drc.%s.%s.%s", pathID(manifest.ID), result.Kind, findingPathSegment(finding), findingFingerprint(finding)),
+			Message:    finding.Message,
+			Refs:       finding.References,
+			Nets:       checkFindingNets(finding),
+			Suggestion: "case " + manifest.ID + " block " + manifest.BlockID,
+		})
+	}
+	for _, parserIssue := range result.ParserIssues {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Path:       "verification." + pathID(manifest.ID) + ".erc_drc." + string(result.Kind) + ".parser",
+			Message:    parserIssue.Message,
+			Suggestion: "case " + manifest.ID + " block " + manifest.BlockID,
+		})
+	}
+	if err != nil {
+		issues = append(issues, ercDRCRunIssue(manifest, string(result.Kind), err.Error()))
+	}
+	return issues
+}
+
+func missingExpectedCheckIssues(manifest Manifest, findings []checks.CheckFinding, expected []string) []reports.Issue {
+	if len(expected) == 0 {
+		return nil
+	}
+	var issues []reports.Issue
+	for _, want := range expected {
+		want = strings.TrimSpace(want)
+		if want == "" || checkFindingMatchesExpectation(findings, want) {
+			continue
+		}
+		issues = append(issues, ercDRCRunIssue(manifest, "expected."+pathSegment(want), "missing expected ERC/DRC issue "+want))
+	}
+	return issues
+}
+
+func checkFindingMatchesExpectation(findings []checks.CheckFinding, want string) bool {
+	wantKey := strings.ToLower(strings.TrimSpace(want))
+	for _, finding := range findings {
+		for _, candidate := range []string{finding.Code, finding.Rule, finding.ID} {
+			if strings.ToLower(strings.TrimSpace(candidate)) == wantKey {
+				return true
+			}
+		}
+		message := strings.ToLower(strings.TrimSpace(finding.Message))
+		if strings.Contains(message, wantKey) {
+			return true
+		}
+	}
+	return false
+}
+
+func findingPathSegment(finding checks.CheckFinding) string {
+	if key := firstNonEmpty(finding.Code, finding.Rule, finding.ID); key != "" {
+		return pathSegment(key)
+	}
+	return "finding"
+}
+
+func checkSeverity(severity string) reports.Severity {
+	switch strings.ToLower(strings.TrimSpace(severity)) {
+	case "warning", "warn", "exclusion", "excluded":
+		return reports.SeverityWarning
+	case "info", "notice":
+		return reports.SeverityInfo
+	default:
+		return reports.SeverityError
+	}
+}
+
+func checkFindingNets(finding checks.CheckFinding) []string {
+	seen := map[string]struct{}{}
+	nets := make([]string, 0, len(finding.Nets)+1)
+	add := func(net string) {
+		net = strings.TrimSpace(net)
+		if net == "" {
+			return
+		}
+		if _, ok := seen[net]; ok {
+			return
+		}
+		seen[net] = struct{}{}
+		nets = append(nets, net)
+	}
+	for _, net := range finding.Nets {
+		add(net)
+	}
+	add(finding.Net)
+	return nets
+}
+
+func checkArtifacts(result checks.CheckResult) []reports.Artifact {
+	if strings.TrimSpace(result.ReportPath) == "" {
+		return nil
+	}
+	kind := reports.ArtifactERCReport
+	if result.Kind == checks.CheckKindDRC {
+		kind = reports.ArtifactDRCReport
+	}
+	return []reports.Artifact{{
+		Kind:        kind,
+		Path:        filepath.ToSlash(result.ReportPath),
+		Description: string(result.Kind) + " JSON report",
+	}}
+}
+
+func existingProjectArtifacts(projectDir string) []reports.Artifact {
+	return []reports.Artifact{{
+		Kind:        reports.ArtifactKiCadProject,
+		Path:        filepath.ToSlash(projectDir),
+		Description: "existing generated KiCad project",
+	}}
+}
+
+func findingFingerprint(finding checks.CheckFinding) string {
+	hash := fnv.New64a()
+	hashStrings(hash,
+		string(finding.Kind),
+		finding.Code,
+		finding.Rule,
+		finding.ID,
+		filepath.Base(finding.File),
+		finding.Sheet,
+		finding.Net,
+		finding.Layer,
+	)
+	hashStringSlice(hash, finding.Nets)
+	hashStringSlice(hash, finding.References)
+	return fmt.Sprintf("%016x", hash.Sum64())
+}
+
+func writeProjectSentinel(projectDir string, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) error {
+	return os.WriteFile(filepath.Join(projectDir, projectSentinelName), []byte(projectSignature(manifest, output, opts)), 0o644)
+}
+
+func projectSentinelMatches(projectDir string, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) bool {
+	data, err := os.ReadFile(filepath.Join(projectDir, projectSentinelName))
+	return err == nil && strings.TrimSpace(string(data)) == projectSignature(manifest, output, opts)
+}
+
+func projectSignature(manifest Manifest, output *blocks.BlockOutput, opts RunOptions) string {
+	hash := fnv.New64a()
+	effectiveAllowUnrouted := opts.WriterOptions.AllowUnrouted || manifest.Expected.Writer.AllowUnrouted
+	effectiveRoundTrip := opts.WriterOptions.RequireKiCadRoundTrip || manifest.Expected.Writer.RequireRoundTrip
+	hashStrings(hash,
+		manifest.ID,
+		manifest.BlockID,
+		fmt.Sprintf("expected_writer_required=%t", manifest.Expected.Writer.Required),
+		fmt.Sprintf("expected_writer_ok=%t", manifest.Expected.Writer.OK),
+		fmt.Sprintf("expected_writer_allow_unrouted=%t", manifest.Expected.Writer.AllowUnrouted),
+		fmt.Sprintf("expected_writer_roundtrip=%t", manifest.Expected.Writer.RequireRoundTrip),
+		fmt.Sprintf("effective_writer_allow_unrouted=%t", effectiveAllowUnrouted),
+		fmt.Sprintf("effective_writer_roundtrip=%t", effectiveRoundTrip),
+	)
+	for _, operation := range output.Operations {
+		hashStrings(hash, string(operation.Op))
+		_, _ = hash.Write(operation.Raw)
+		_, _ = hash.Write([]byte{0})
+	}
+	return fmt.Sprintf("%016x", hash.Sum64())
+}
+
+func stableStringHash(value string) string {
+	hash := fnv.New64a()
+	hashStrings(hash, value)
+	return fmt.Sprintf("%016x", hash.Sum64())
+}
+
+type stringHasher interface {
+	Write([]byte) (int, error)
+}
+
+func hashStrings(hash stringHasher, values ...string) {
+	for _, value := range values {
+		_, _ = hash.Write([]byte(value))
+		_, _ = hash.Write([]byte{0})
+	}
+}
+
+func hashStringSlice(hash stringHasher, values []string) {
+	for _, value := range values {
+		_, _ = hash.Write([]byte(value))
+		_, _ = hash.Write([]byte{0})
+	}
+	_, _ = hash.Write([]byte{0})
+}
+
+func ercDRCRunIssue(manifest Manifest, path string, message string) reports.Issue {
+	issue := runIssue("verification."+pathID(manifest.ID)+".erc_drc."+pathSegment(path), message)
+	issue.Suggestion = "case " + manifest.ID + " block " + manifest.BlockID
+	return issue
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func contextualizeIssues(manifest Manifest, stage string, issues []reports.Issue) []reports.Issue {
