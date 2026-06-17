@@ -5,6 +5,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -40,11 +41,19 @@ const (
 )
 
 type Catalog struct {
-	Version     string             `json:"version"`
-	GeneratedAt *time.Time         `json:"generated_at,omitempty"`
-	Records     []ComponentRecord  `json:"records"`
-	Families    []FamilyDefinition `json:"families"`
-	Diagnostics []reports.Issue    `json:"diagnostics,omitempty"`
+	Version      string                         `json:"version"`
+	GeneratedAt  *time.Time                     `json:"generated_at,omitempty"`
+	Records      []ComponentRecord              `json:"records"`
+	Families     []FamilyDefinition             `json:"families"`
+	Diagnostics  []reports.Issue                `json:"diagnostics,omitempty"`
+	mu           sync.RWMutex                   `json:"-"`
+	recordIndex  map[string]int                 `json:"-"`
+	variantIndex map[string]CatalogVariantIndex `json:"-"`
+}
+
+type CatalogVariantIndex struct {
+	Record  int
+	Variant int
 }
 
 type FamilyDefinition struct {
@@ -71,6 +80,7 @@ type ComponentRecord struct {
 	Packages        []PackageVariant   `json:"packages,omitempty"`
 	SelectionRules  []SelectionRule    `json:"selection_rules,omitempty"`
 	Verification    VerificationRecord `json:"verification"`
+	SearchText      string             `json:"-"`
 }
 
 type PackageVariant struct {
@@ -83,6 +93,7 @@ type PackageVariant struct {
 	DimensionsMM *Bounds              `json:"dimensions_mm,omitempty"`
 	Constraints  []PhysicalConstraint `json:"constraints,omitempty"`
 	Verification VerificationRecord   `json:"verification"`
+	SearchText   string               `json:"-"`
 }
 
 type SymbolBinding struct {
@@ -236,6 +247,8 @@ func SortCatalog(catalog *Catalog) {
 	if catalog == nil {
 		return
 	}
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
 	sort.SliceStable(catalog.Families, func(i, j int) bool {
 		return catalog.Families[i].ID < catalog.Families[j].ID
 	})
@@ -246,6 +259,29 @@ func SortCatalog(catalog *Catalog) {
 		sortRecord(&catalog.Records[i])
 	}
 	sortIssues(catalog.Diagnostics)
+	rebuildCatalogIndexesLocked(catalog)
+}
+
+func RebuildCatalogIndexes(catalog *Catalog) {
+	if catalog == nil {
+		return
+	}
+	catalog.mu.Lock()
+	defer catalog.mu.Unlock()
+	rebuildCatalogIndexesLocked(catalog)
+}
+
+func rebuildCatalogIndexesLocked(catalog *Catalog) {
+	catalog.recordIndex = map[string]int{}
+	catalog.variantIndex = map[string]CatalogVariantIndex{}
+	for i, record := range catalog.Records {
+		catalog.Records[i].SearchText = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + strings.Join(record.Tags, " "))
+		catalog.recordIndex[record.ID] = i
+		for j, variant := range record.Packages {
+			catalog.Records[i].Packages[j].SearchText = strings.ToLower(variant.ID + " " + variant.Name + " " + variant.PackageType + " " + variant.FootprintID)
+			catalog.variantIndex[record.ID+"\x00"+variant.ID] = CatalogVariantIndex{Record: i, Variant: j}
+		}
+	}
 }
 
 func NewIssue(code reports.Code, severity reports.Severity, path string, message string) reports.Issue {

@@ -55,12 +55,7 @@ func TestLoadCatalogMergesDeterministically(t *testing.T) {
 }
 
 func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
-	_, sourceFile, _, ok := runtime.Caller(0)
-	if !ok {
-		t.Fatal("locate test source file")
-	}
-	catalogDir := filepath.Join(filepath.Dir(sourceFile), "..", "..", "data", "components")
-	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: catalogDir})
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {
 		t.Fatalf("load checked-in catalog: %v", err)
 	}
@@ -77,6 +72,15 @@ func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
 			t.Fatalf("checked-in catalog missing family record for %s", family.ID)
 		}
 	}
+}
+
+func checkedInCatalogDir(t *testing.T) string {
+	t.Helper()
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate test source file")
+	}
+	return filepath.Join(filepath.Dir(sourceFile), "..", "..", "data", "components")
 }
 
 func TestValidateCatalogDuplicateID(t *testing.T) {
