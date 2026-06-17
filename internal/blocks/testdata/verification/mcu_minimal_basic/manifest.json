@@ -1,0 +1,167 @@
+{
+  "id": "mcu_minimal_basic",
+  "block_id": "mcu_minimal",
+  "description": "Default ATmega328P-A minimal system with ISP header, reset pull-up, and decoupling.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "mcu",
+    "params": {
+      "supply_voltage": "3.3V",
+      "clock_mode": "internal",
+      "reset_mode": "pullup",
+      "programming_header": "isp",
+      "decoupling_count": 3
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": [
+      "Ud1f13cb6001",
+      "Cd1f13cb6001",
+      "Cd1f13cb6002",
+      "Cd1f13cb6003",
+      "Cd1f13cb6004",
+      "Rd1f13cb6001",
+      "Jd1f13cb6001"
+    ],
+    "components": [
+      {
+        "role": "mcu",
+        "ref": "Ud1f13cb6001",
+        "ref_prefix": "U",
+        "symbol_id": "MCU_Microchip_ATmega:ATmega328P-A",
+        "footprint_id": "Package_QFP:TQFP-32_7x7mm_P0.8mm"
+      },
+      {
+        "role": "decoupling_capacitor",
+        "ref": "Cd1f13cb6001",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "decoupling_capacitor",
+        "ref": "Cd1f13cb6002",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "decoupling_capacitor",
+        "ref": "Cd1f13cb6003",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "aref_decoupling_capacitor",
+        "ref": "Cd1f13cb6004",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "reset_pullup",
+        "ref": "Rd1f13cb6001",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "isp_header",
+        "ref": "Jd1f13cb6001",
+        "ref_prefix": "J",
+        "symbol_id": "Connector_Generic:Conn_02x03_Odd_Even",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical"
+      }
+    ],
+    "ports": [
+      {"name": "VCC", "direction": "power", "net": "mcu_vcc"},
+      {"name": "GND", "direction": "power", "net": "mcu_gnd"},
+      {"name": "RESET", "direction": "input", "net": "mcu_reset"},
+      {"name": "AREF", "direction": "passive", "net": "mcu_aref"},
+      {"name": "GPIO", "direction": "bidirectional", "net": "mcu_gpio"},
+      {"name": "MOSI", "direction": "bidirectional", "net": "mcu_mosi"},
+      {"name": "MISO", "direction": "bidirectional", "net": "mcu_miso"},
+      {"name": "SCK", "direction": "input", "net": "mcu_sck"}
+    ],
+    "nets": [
+      {
+        "name": "mcu_vcc",
+        "visibility": "power",
+        "pins": [
+          {"role": "mcu", "pin": "4"},
+          {"role": "mcu", "pin": "6"},
+          {"role": "mcu", "pin": "18"},
+          {"ref": "Cd1f13cb6001", "pin": "1"},
+          {"ref": "Cd1f13cb6002", "pin": "1"},
+          {"ref": "Cd1f13cb6003", "pin": "1"},
+          {"ref": "Rd1f13cb6001", "pin": "1"},
+          {"ref": "Jd1f13cb6001", "pin": "2"}
+        ]
+      },
+      {
+        "name": "mcu_gnd",
+        "visibility": "power",
+        "pins": [
+          {"role": "mcu", "pin": "3"},
+          {"role": "mcu", "pin": "5"},
+          {"role": "mcu", "pin": "21"},
+          {"ref": "Cd1f13cb6001", "pin": "2"},
+          {"ref": "Cd1f13cb6002", "pin": "2"},
+          {"ref": "Cd1f13cb6003", "pin": "2"},
+          {"ref": "Cd1f13cb6004", "pin": "2"},
+          {"ref": "Jd1f13cb6001", "pin": "6"}
+        ]
+      },
+      {
+        "name": "mcu_reset",
+        "visibility": "exported",
+        "pins": [
+          {"role": "mcu", "pin": "29"},
+          {"ref": "Rd1f13cb6001", "pin": "2"},
+          {"ref": "Jd1f13cb6001", "pin": "5"}
+        ]
+      },
+      {
+        "name": "mcu_aref",
+        "visibility": "exported",
+        "pins": [
+          {"role": "mcu", "pin": "20"},
+          {"ref": "Cd1f13cb6004", "pin": "1"}
+        ]
+      },
+      {
+        "name": "mcu_gpio",
+        "visibility": "exported",
+        "pins": [
+          {"role": "mcu", "pin": "12"}
+        ]
+      },
+      {
+        "name": "mcu_mosi",
+        "visibility": "exported",
+        "pins": [
+          {"role": "mcu", "pin": "15"},
+          {"ref": "Jd1f13cb6001", "pin": "4"}
+        ]
+      },
+      {
+        "name": "mcu_miso",
+        "visibility": "exported",
+        "pins": [
+          {"role": "mcu", "pin": "16"},
+          {"ref": "Jd1f13cb6001", "pin": "1"}
+        ]
+      },
+      {
+        "name": "mcu_sck",
+        "visibility": "exported",
+        "pins": [
+          {"role": "mcu", "pin": "17"},
+          {"ref": "Jd1f13cb6001", "pin": "3"}
+        ]
+      }
+    ]
+  }
+}

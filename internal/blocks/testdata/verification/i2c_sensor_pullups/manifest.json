@@ -1,0 +1,87 @@
+{
+  "id": "i2c_sensor_pullups",
+  "block_id": "i2c_sensor",
+  "description": "Generic I2C sensor with decoupling and SDA/SCL pull-ups.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "temp",
+    "params": {
+      "i2c_address": "0x48",
+      "supply_voltage": "3.3V",
+      "include_pullups": true,
+      "include_decoupling": true
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["U1", "C1", "R1", "R2"],
+    "components": [
+      {
+        "role": "sensor",
+        "ref_prefix": "U",
+        "symbol_id": "Sensor:Generic_I2C",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+      },
+      {
+        "role": "decoupling_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "sda_pullup",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "scl_pullup",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      }
+    ],
+    "ports": [
+      {"name": "VCC", "direction": "power", "net": "temp_vcc"},
+      {"name": "GND", "direction": "power", "net": "temp_gnd"},
+      {"name": "SDA", "direction": "bidirectional", "net": "temp_sda"},
+      {"name": "SCL", "direction": "input", "net": "temp_scl"}
+    ],
+    "nets": [
+      {
+        "name": "temp_vcc",
+        "visibility": "power",
+        "pins": [
+          {"role": "sensor", "pin": "1"},
+          {"role": "decoupling_capacitor", "pin": "1"},
+          {"role": "sda_pullup", "pin": "1"},
+          {"role": "scl_pullup", "pin": "1"}
+        ]
+      },
+      {
+        "name": "temp_gnd",
+        "visibility": "power",
+        "pins": [
+          {"role": "sensor", "pin": "2"},
+          {"role": "decoupling_capacitor", "pin": "2"}
+        ]
+      },
+      {
+        "name": "temp_sda",
+        "visibility": "exported",
+        "pins": [
+          {"role": "sensor", "pin": "3"},
+          {"role": "sda_pullup", "pin": "2"}
+        ]
+      },
+      {
+        "name": "temp_scl",
+        "visibility": "exported",
+        "pins": [
+          {"role": "sensor", "pin": "4"},
+          {"role": "scl_pullup", "pin": "2"}
+        ]
+      }
+    ]
+  }
+}

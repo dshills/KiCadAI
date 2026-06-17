@@ -1,0 +1,72 @@
+{
+  "id": "voltage_regulator_3v3",
+  "block_id": "voltage_regulator",
+  "description": "Default AMS1117 3.3 V regulator with input and output capacitors.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "rail3v3",
+    "params": {
+      "input_voltage_min": "4.8V",
+      "input_voltage_max": "12V",
+      "input_voltage": "5V",
+      "output_voltage": "3.3V",
+      "output_current": "250mA"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["U1", "C1", "C2"],
+    "components": [
+      {
+        "role": "regulator",
+        "ref_prefix": "U",
+        "symbol_id": "Regulator_Linear:AMS1117-3.3",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2"
+      },
+      {
+        "role": "input_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "output_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      }
+    ],
+    "ports": [
+      {"name": "VIN", "direction": "power", "net": "rail3v3_vin"},
+      {"name": "VOUT", "direction": "power", "net": "rail3v3_vout"},
+      {"name": "GND", "direction": "power", "net": "rail3v3_gnd"}
+    ],
+    "nets": [
+      {
+        "name": "rail3v3_vin",
+        "visibility": "exported",
+        "pins": [
+          {"role": "regulator", "pin": "3"},
+          {"role": "input_capacitor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "rail3v3_vout",
+        "visibility": "exported",
+        "pins": [
+          {"role": "regulator", "pin": "2"},
+          {"role": "output_capacitor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "rail3v3_gnd",
+        "visibility": "power",
+        "pins": [
+          {"role": "regulator", "pin": "1"},
+          {"role": "input_capacitor", "pin": "2"},
+          {"role": "output_capacitor", "pin": "2"}
+        ]
+      }
+    ]
+  }
+}

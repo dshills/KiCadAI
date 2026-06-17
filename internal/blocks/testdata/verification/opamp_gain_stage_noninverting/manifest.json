@@ -1,0 +1,94 @@
+{
+  "id": "opamp_gain_stage_noninverting",
+  "block_id": "opamp_gain_stage",
+  "description": "Default non-inverting LMV321 gain stage with feedback network.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "amp",
+    "params": {
+      "topology": "non_inverting",
+      "gain": 2,
+      "input_coupling": "dc",
+      "single_supply": true
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["U1", "R1", "R2", "C1"],
+    "components": [
+      {
+        "role": "opamp",
+        "ref_prefix": "U",
+        "symbol_id": "Amplifier_Operational:LMV321",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5"
+      },
+      {
+        "role": "gain_to_ground",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "feedback",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "decoupling_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      }
+    ],
+    "ports": [
+      {"name": "IN", "direction": "input", "net": "amp_in"},
+      {"name": "OUT", "direction": "output", "net": "amp_out"},
+      {"name": "VCC", "direction": "power", "net": "amp_vcc"},
+      {"name": "GND", "direction": "power", "net": "amp_gnd"}
+    ],
+    "nets": [
+      {
+        "name": "amp_in",
+        "visibility": "exported",
+        "pins": [
+          {"role": "opamp", "pin": "3"}
+        ]
+      },
+      {
+        "name": "amp_feedback",
+        "visibility": "local",
+        "pins": [
+          {"role": "gain_to_ground", "pin": "1"},
+          {"role": "feedback", "pin": "2"},
+          {"role": "opamp", "pin": "4"}
+        ]
+      },
+      {
+        "name": "amp_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "opamp", "pin": "1"},
+          {"role": "feedback", "pin": "1"}
+        ]
+      },
+      {
+        "name": "amp_vcc",
+        "visibility": "power",
+        "pins": [
+          {"role": "opamp", "pin": "5"},
+          {"role": "decoupling_capacitor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "amp_gnd",
+        "visibility": "power",
+        "pins": [
+          {"role": "opamp", "pin": "2"},
+          {"role": "gain_to_ground", "pin": "2"},
+          {"role": "decoupling_capacitor", "pin": "2"}
+        ]
+      }
+    ]
+  }
+}

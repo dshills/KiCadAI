@@ -1,0 +1,123 @@
+{
+  "id": "usb_c_power_5v_sink",
+  "block_id": "usb_c_power",
+  "description": "USB-C power-only sink with CC pull-downs, fuse, TVS, and bulk capacitance.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "usb",
+    "params": {
+      "current_limit": "500mA",
+      "include_fuse": true,
+      "include_tvs": true,
+      "include_bulk_capacitor": true,
+      "shield_policy": "chassis",
+      "data_mode": "power_only"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["J1", "R1", "R2", "F1", "D1", "C1"],
+    "components": [
+      {
+        "role": "usb_c_receptacle",
+        "ref_prefix": "J",
+        "symbol_id": "Connector:USB_C_Receptacle_USB2.0_16P",
+        "footprint_id": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
+      },
+      {
+        "role": "cc1_rd",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "cc2_rd",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "vbus_fuse",
+        "ref_prefix": "F",
+        "symbol_id": "Device:Fuse",
+        "footprint_id": "Fuse:Fuse_1206_3216Metric"
+      },
+      {
+        "role": "vbus_tvs",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D_TVS",
+        "footprint_id": "Diode_SMD:D_SOD-323"
+      },
+      {
+        "role": "bulk_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      }
+    ],
+    "ports": [
+      {"name": "VBUS_OUT", "direction": "power", "net": "usb_vbus_out"},
+      {"name": "GND", "direction": "power", "net": "usb_gnd"},
+      {"name": "SHIELD", "direction": "passive", "net": "usb_shield"}
+    ],
+    "nets": [
+      {
+        "name": "usb_cc1",
+        "visibility": "local",
+        "pins": [
+          {"role": "usb_c_receptacle", "pin": "A5"},
+          {"role": "cc1_rd", "pin": "1"}
+        ]
+      },
+      {
+        "name": "usb_cc2",
+        "visibility": "local",
+        "pins": [
+          {"role": "usb_c_receptacle", "pin": "B5"},
+          {"role": "cc2_rd", "pin": "1"}
+        ]
+      },
+      {
+        "name": "usb_vbus_connector",
+        "visibility": "local",
+        "pins": [
+          {"role": "usb_c_receptacle", "pin": "A4"},
+          {"role": "usb_c_receptacle", "pin": "A9"},
+          {"role": "usb_c_receptacle", "pin": "B4"},
+          {"role": "usb_c_receptacle", "pin": "B9"},
+          {"role": "vbus_fuse", "pin": "1"}
+        ]
+      },
+      {
+        "name": "usb_vbus_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "vbus_fuse", "pin": "2"},
+          {"role": "vbus_tvs", "pin": "1"},
+          {"role": "bulk_capacitor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "usb_gnd",
+        "visibility": "power",
+        "pins": [
+          {"role": "usb_c_receptacle", "pin": "A1"},
+          {"role": "usb_c_receptacle", "pin": "A12"},
+          {"role": "usb_c_receptacle", "pin": "B1"},
+          {"role": "usb_c_receptacle", "pin": "B12"},
+          {"role": "cc1_rd", "pin": "2"},
+          {"role": "cc2_rd", "pin": "2"},
+          {"role": "vbus_tvs", "pin": "2"},
+          {"role": "bulk_capacitor", "pin": "2"}
+        ]
+      },
+      {
+        "name": "usb_shield",
+        "visibility": "exported",
+        "pins": [
+          {"role": "usb_c_receptacle", "pin": "SH"}
+        ]
+      }
+    ]
+  }
+}

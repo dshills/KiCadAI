@@ -1,0 +1,61 @@
+{
+  "id": "connector_breakout_4pin",
+  "block_id": "connector_breakout",
+  "description": "Four-pin passive connector breakout with named exported pins.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "header",
+    "params": {
+      "pin_names": ["VIN", "GND", "SDA", "SCL"],
+      "pin_count": 4
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["J1"],
+    "components": [
+      {
+        "role": "connector",
+        "ref_prefix": "J",
+        "symbol_id": "Connector_Generic:Conn_01x04",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical"
+      }
+    ],
+    "ports": [
+      {"name": "VIN", "direction": "passive", "net": "header_VIN"},
+      {"name": "GND", "direction": "passive", "net": "header_GND"},
+      {"name": "SDA", "direction": "passive", "net": "header_SDA"},
+      {"name": "SCL", "direction": "passive", "net": "header_SCL"}
+    ],
+    "nets": [
+      {
+        "name": "header_VIN",
+        "visibility": "exported",
+        "pins": [
+          {"role": "connector", "pin": "1"}
+        ]
+      },
+      {
+        "name": "header_GND",
+        "visibility": "exported",
+        "pins": [
+          {"role": "connector", "pin": "2"}
+        ]
+      },
+      {
+        "name": "header_SDA",
+        "visibility": "exported",
+        "pins": [
+          {"role": "connector", "pin": "3"}
+        ]
+      },
+      {
+        "name": "header_SCL",
+        "visibility": "exported",
+        "pins": [
+          {"role": "connector", "pin": "4"}
+        ]
+      }
+    ]
+  }
+}
