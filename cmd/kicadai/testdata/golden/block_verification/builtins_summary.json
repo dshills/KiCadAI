@@ -1,0 +1,203 @@
+{
+  "ok": true,
+  "command": "block",
+  "data": {
+    "count": 7,
+    "results": [
+      {
+        "case_id": "connector_breakout_4pin",
+        "block_id": "connector_breakout",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "i2c_sensor_pullups",
+        "block_id": "i2c_sensor",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "led_indicator_default",
+        "block_id": "led_indicator",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "mcu_minimal_basic",
+        "block_id": "mcu_minimal",
+        "evidence_level": "schematic_verified",
+        "status": "warning",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "warning"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ],
+        "issues": [
+          {
+            "code": "UNSUPPORTED_OPERATION",
+            "severity": "warning",
+            "path": "params.mcu_symbol",
+            "message": "MCU alternate-function metadata is not resolver-backed; this block uses a fixed ATmega328P-A role map"
+          },
+          {
+            "code": "UNSUPPORTED_OPERATION",
+            "severity": "warning",
+            "path": "params.mcu_symbol",
+            "message": "MCU alternate-function metadata is not resolver-backed; this block uses a fixed ATmega328P-A role map"
+          }
+        ]
+      },
+      {
+        "case_id": "opamp_gain_stage_noninverting",
+        "block_id": "opamp_gain_stage",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "usb_c_power_5v_sink",
+        "block_id": "usb_c_power",
+        "evidence_level": "schematic_verified",
+        "status": "warning",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "warning"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ],
+        "issues": [
+          {
+            "code": "UNSUPPORTED_OPERATION",
+            "severity": "warning",
+            "path": "params.data_mode",
+            "message": "power_only mode does not emit D+/D- no-connect markers because transactions do not support no-connect operations yet"
+          },
+          {
+            "code": "UNSUPPORTED_OPERATION",
+            "severity": "warning",
+            "path": "params.data_mode",
+            "message": "power_only mode does not emit D+/D- no-connect markers because transactions do not support no-connect operations yet"
+          }
+        ]
+      },
+      {
+        "case_id": "voltage_regulator_3v3",
+        "block_id": "voltage_regulator",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      }
+    ]
+  },
+  "issues": [
+    {
+      "code": "UNSUPPORTED_OPERATION",
+      "severity": "warning",
+      "path": "params.mcu_symbol",
+      "message": "MCU alternate-function metadata is not resolver-backed; this block uses a fixed ATmega328P-A role map"
+    },
+    {
+      "code": "UNSUPPORTED_OPERATION",
+      "severity": "warning",
+      "path": "params.mcu_symbol",
+      "message": "MCU alternate-function metadata is not resolver-backed; this block uses a fixed ATmega328P-A role map"
+    },
+    {
+      "code": "UNSUPPORTED_OPERATION",
+      "severity": "warning",
+      "path": "params.data_mode",
+      "message": "power_only mode does not emit D+/D- no-connect markers because transactions do not support no-connect operations yet"
+    },
+    {
+      "code": "UNSUPPORTED_OPERATION",
+      "severity": "warning",
+      "path": "params.data_mode",
+      "message": "power_only mode does not emit D+/D- no-connect markers because transactions do not support no-connect operations yet"
+    }
+  ]
+}

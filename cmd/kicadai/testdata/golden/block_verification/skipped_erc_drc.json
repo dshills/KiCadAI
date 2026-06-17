@@ -1,0 +1,33 @@
+{
+  "ok": true,
+  "command": "block",
+  "data": {
+    "count": 1,
+    "results": [
+      {
+        "case_id": "led_indicator_skipped_erc_drc",
+        "block_id": "led_indicator",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
+          }
+        ]
+      }
+    ]
+  }
+}
