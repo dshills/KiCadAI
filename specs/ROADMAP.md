@@ -207,3 +207,20 @@ Generate and validate Gerbers, drills, BOM, CPL, and a readiness report.
 
 AI Planner
 Only after the above pieces exist should the AI be allowed to go from “I need a board that does X” to full schematic + PCB without human intervention.
+------
+Footprint Library Expansion (DONE)
+Build real footprint geometry from /Users/dshills/Development/external/kicad-footprints instead of relying on transaction payload/default pad summaries. This unlocks accurate pads, holes, courtyard/clearance, layers, and better routing/DRC.
+
+Schematic to PCB Transfer (DONE)
+Add a workflow that takes schematic symbols + assigned footprints + nets and produces an initial PCB transaction automatically. This is the bridge from “schematic writer works” to “AI can generate a whole board.”
+
+Connectivity-First Board Validation (DONE)
+Strengthen validation around net-to-pad correctness, unrouted nets, route completion, zone connectivity, and DRC evidence. The goal is to catch “looks fine but electrically wrong” boards.
+
+Circuit Block PCB Realization (DONE)
+Take the verified circuit blocks we built and make them produce schematic + PCB fragments: placements, footprints, routed local connections, and required constraints.
+
+AI Design Workflow CLI
+Add a higher-level command like:
+kicadai design create --request request.json --output ./out/project
+It should orchestrate block selection, schematic generation, footprint assignment, placement, routing, ERC/DRC, and feedback.
