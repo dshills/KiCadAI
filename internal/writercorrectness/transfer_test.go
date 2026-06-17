@@ -55,5 +55,5 @@ func TestCheckSchematicPCBTransferFailsWithoutFootprints(t *testing.T) {
 	if check.Status != CheckFail {
 		t.Fatalf("status = %q issues = %#v", check.Status, check.Issues)
 	}
-	assertCheckIssueContains(t, []CheckResult{check}, "no PCB-bearing schematic symbols")
+	assertCheckIssueContains(t, []CheckResult{check}, "has no assigned footprint")
 }

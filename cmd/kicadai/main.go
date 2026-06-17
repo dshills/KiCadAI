@@ -39,6 +39,7 @@ import (
 	"kicadai/internal/schematicpcb"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
+	"kicadai/internal/writercorrectness"
 )
 
 const usageTemplate = `kicadai is a Go client for KiCad's IPC API.
@@ -57,6 +58,7 @@ Commands:
   block         List, inspect, and validate built-in circuit blocks
   check         Run KiCad CLI ERC/DRC checks
   design        Create AI design workflow projects
+  writer        Check generated writer correctness
   validate      Validate generated board electrical correctness
   inspect       Inspect KiCad projects and files
   library       Index and query KiCad symbol and footprint libraries
@@ -182,6 +184,9 @@ type cliOptions struct {
 	allowMissingDRC       bool
 	strictZones           bool
 	strictUnrouted        bool
+	requireKiCadRoundTrip bool
+	strictDiffs           bool
+	allowUnrouted         bool
 	klcRoot               string
 	symbolsRoot           string
 	footprintsRoot        string
@@ -275,6 +280,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runDesign(ctx, opts, stdout)
 	case "validate":
 		return runValidateCommand(ctx, opts, stdout)
+	case "writer":
+		return runWriterCommand(ctx, opts, stdout)
 	case "roundtrip":
 		return runRoundTrip(opts, stdout)
 	case "pinmap":
@@ -337,6 +344,9 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.allowMissingDRC, "allow-missing-drc", false, "do not fail board validation when KiCad DRC is unavailable")
 	flags.BoolVar(&opts.strictZones, "strict-zones", false, "treat zones without fill evidence as blocking")
 	flags.BoolVar(&opts.strictUnrouted, "strict-unrouted", false, "treat unrouted multi-pad nets as blocking")
+	flags.BoolVar(&opts.requireKiCadRoundTrip, "require-kicad-roundtrip", false, "require KiCad round-trip evidence for writer checks")
+	flags.BoolVar(&opts.strictDiffs, "strict-diffs", false, "treat benign round-trip differences as writer failures")
+	flags.BoolVar(&opts.allowUnrouted, "allow-unrouted", false, "allow unrouted nets in writer checks")
 	flags.StringVar(&opts.klcRoot, "klc-root", "", "KiCad Library Convention repository root")
 	flags.StringVar(&opts.symbolsRoot, "symbols-root", "", "KiCad symbol library root")
 	flags.StringVar(&opts.footprintsRoot, "footprints-root", "", "KiCad footprint library root")
@@ -1647,6 +1657,62 @@ func runValidateCommand(ctx context.Context, opts cliOptions, stdout io.Writer) 
 		return errors.New("validate reported blocking issues")
 	}
 	return nil
+}
+
+func runWriterCommand(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) == 0 {
+		if err := writeReportFailure(stdout, "writer", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "writer",
+			Message:  "writer requires a subcommand",
+		}); err != nil {
+			return err
+		}
+		return errors.New("writer requires a subcommand")
+	}
+	if opts.commandArgs[0] != "check" {
+		if err := writeReportFailure(stdout, "writer", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "writer." + opts.commandArgs[0],
+			Message:  "unsupported writer subcommand " + opts.commandArgs[0],
+		}); err != nil {
+			return err
+		}
+		return errors.New("unsupported writer subcommand " + opts.commandArgs[0])
+	}
+	if len(opts.commandArgs) != 2 {
+		if err := writeReportFailure(stdout, "writer", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "writer.check",
+			Message:  "writer check requires 1 argument",
+		}); err != nil {
+			return err
+		}
+		return errors.New("writer check requires 1 argument")
+	}
+	result := writercorrectness.Validate(ctx, opts.commandArgs[1], writerCorrectnessOptions(opts))
+	report := result.ReportResult("writer")
+	if err := writeReportJSON(stdout, report); err != nil {
+		return err
+	}
+	if !report.OK {
+		return errors.New("writer check reported blocking issues")
+	}
+	return nil
+}
+
+func writerCorrectnessOptions(opts cliOptions) writercorrectness.Options {
+	return writercorrectness.Options{
+		RequireKiCadRoundTrip: opts.requireKiCadRoundTrip,
+		KiCadCLI:              opts.kicadCLI,
+		KeepArtifacts:         opts.keepArtifacts,
+		ArtifactDir:           opts.artifactDir,
+		StrictDiffs:           opts.strictDiffs,
+		AllowUnrouted:         opts.allowUnrouted,
+	}
 }
 
 func runDesign(ctx context.Context, opts cliOptions, stdout io.Writer) error {

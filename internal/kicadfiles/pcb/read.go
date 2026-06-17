@@ -91,10 +91,16 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 	if layer, ok := node.Child("layer"); ok {
 		fp.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
 	}
+	if path, ok := node.Child("path"); ok {
+		fp.Path = path.ListValue(1)
+	}
 	for _, property := range node.ChildrenByHead("property") {
 		name := property.ListValue(1)
 		value := property.ListValue(2)
 		fp.Properties = append(fp.Properties, FootprintProperty{Name: name, Value: value, Position: readPCBAtPoint(property), UUID: readPCBUUID(property)})
+		if layer, ok := property.Child("layer"); ok {
+			fp.Properties[len(fp.Properties)-1].Layer = kicadfiles.BoardLayer(layer.ListValue(1))
+		}
 		switch name {
 		case "Reference":
 			fp.Reference = value

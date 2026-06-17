@@ -68,7 +68,7 @@ func CheckSchematicToPCBTransfer(target Target) (TransferSnapshot, CheckResult) 
 	}
 	placements, placementIssues := transferPlacements(result.Transaction.Operations)
 	snapshot.Placements = placements
-	issues = append(issues, result.Issues...)
+	issues = append(issues, promoteTransferIssues(result.Issues)...)
 	issues = append(issues, placementIssues...)
 	issues = append(issues, validateTransferResult(snapshot)...)
 	return snapshot, CheckResult{
@@ -152,14 +152,6 @@ func transferConfidence(result schematicpcb.Result) TransferConfidence {
 
 func validateTransferResult(snapshot TransferSnapshot) []reports.Issue {
 	var issues []reports.Issue
-	if snapshot.SymbolCount > 0 && snapshot.AssignedCount == 0 {
-		issues = append(issues, reports.Issue{
-			Code:     reports.CodeMissingFootprint,
-			Severity: reports.SeverityError,
-			Path:     "schematic_to_pcb",
-			Message:  "no PCB-bearing schematic symbols have footprint assignments",
-		})
-	}
 	if snapshot.AssignedCount != snapshot.PlacedCount {
 		issues = append(issues, reports.Issue{
 			Code:     reports.CodeValidationFailed,
@@ -178,4 +170,14 @@ func validateTransferResult(snapshot TransferSnapshot) []reports.Issue {
 		})
 	}
 	return issues
+}
+
+func promoteTransferIssues(issues []reports.Issue) []reports.Issue {
+	promoted := append([]reports.Issue(nil), issues...)
+	for i := range promoted {
+		if promoted[i].Code == reports.CodeMissingFootprint {
+			promoted[i].Severity = reports.SeverityError
+		}
+	}
+	return promoted
 }

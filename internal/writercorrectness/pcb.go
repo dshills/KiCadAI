@@ -98,6 +98,18 @@ func CheckPCBFootprintPads(target Target) (PCBSnapshot, []CheckResult) {
 	}}
 }
 
+func issuesFromPCBValidate(path string, err error) []reports.Issue {
+	if err == nil {
+		return nil
+	}
+	return []reports.Issue{{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityError,
+		Path:     slashPath(path),
+		Message:  err.Error(),
+	}}
+}
+
 func snapshotPCB(path string, board kpcb.PCBFile) PCBSnapshot {
 	snapshot := PCBSnapshot{Path: slashPath(path), NetCount: len(board.Nets), FootprintCount: len(board.Footprints)}
 	snapshot.Nets = make([]PCBNetSnapshot, 0, len(board.Nets))
@@ -209,16 +221,4 @@ func validateFootprintPads(board kpcb.PCBFile, path string) []reports.Issue {
 		}
 	}
 	return issues
-}
-
-func issuesFromPCBValidate(path string, err error) []reports.Issue {
-	if err == nil {
-		return nil
-	}
-	return []reports.Issue{{
-		Code:     reports.CodeValidationFailed,
-		Severity: reports.SeverityError,
-		Path:     slashPath(path),
-		Message:  err.Error(),
-	}}
 }

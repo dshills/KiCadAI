@@ -428,6 +428,68 @@ func TestRunValidateBoardRejectsContradictoryDRCFlags(t *testing.T) {
 	}
 }
 
+func TestRunWriterCheckPCBJSON(t *testing.T) {
+	projectDir := t.TempDir()
+	writeTestFile(t, filepath.Join(projectDir, "writer_demo.kicad_pro"), "{}")
+	writeTestFile(t, filepath.Join(projectDir, "writer_demo.kicad_sch"), `(kicad_sch
+  (version 20260306)
+  (generator "kicadai-test")
+  (uuid "00000000-0000-0000-0000-000000000001")
+  (paper "A4")
+  (symbol (lib_id "power:GND") (at 10 10 0)
+    (property "Reference" "#PWR01" (at 10 10 0))
+    (property "Value" "GND" (at 10 12 0))
+  )
+)`)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "writer", "check", projectDir}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{
+		`"command": "writer"`,
+		`"ok": true`,
+		`"name": "project_structure"`,
+		`"name": "schematic_parse"`,
+		`"name": "schematic_connectivity"`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunWriterCheckMissingTargetJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "writer", "check", filepath.Join(t.TempDir(), "missing.kicad_pcb")}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("expected writer failure")
+	}
+	for _, want := range []string{
+		`"command": "writer"`,
+		`"ok": false`,
+		`writer check reported blocking issues`,
+	} {
+		if !strings.Contains(stdout.String()+err.Error(), want) {
+			t.Fatalf("output missing %q:\nstdout=%s\nerr=%v", want, stdout.String(), err)
+		}
+	}
+}
+
+func TestRunWriterRejectsUnsupportedSubcommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "writer", "scan", "demo"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(stdout.String(), "unsupported writer subcommand scan") {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
 func TestWriteReportJSON(t *testing.T) {
 	var stdout bytes.Buffer
 
