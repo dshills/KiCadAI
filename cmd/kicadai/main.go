@@ -19,6 +19,7 @@ import (
 	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/blocks"
 	"kicadai/internal/boardvalidation"
+	"kicadai/internal/components"
 	"kicadai/internal/config"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/evaluate"
@@ -56,6 +57,7 @@ Commands:
   generate-project  Generate a direct-file LED indicator KiCad project
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
+  component     List, inspect, select, and validate component catalog records
   check         Run KiCad CLI ERC/DRC checks
   design        Create AI design workflow projects
   writer        Check generated writer correctness
@@ -111,6 +113,12 @@ Global flags:
   --templates-root string  KiCad template library root
   --library-cache string   Library resolver cache file path
   --refresh-library-cache  Rebuild library resolver cache
+  --catalog-dir string     Component catalog directory (default: data/components)
+  --family string          Component family filter
+  --package string         Component package filter
+  --value-kind string      Component value kind filter
+  --value string           Component value filter
+  --acceptance string      Component acceptance level
   --mode string                      Routing mode: single_layer, two_layer, validate_only
   --route-mode string                Alias for --mode
   --grid float                       Routing grid in millimeters
@@ -193,6 +201,12 @@ type cliOptions struct {
 	templatesRoot         string
 	libraryCache          string
 	refreshLibraryCache   bool
+	catalogDir            string
+	componentFamily       string
+	componentPackage      string
+	componentValueKind    string
+	componentValue        string
+	componentAcceptance   string
 	routeMode             string
 	routeGridMM           float64
 	routeTraceWidthMM     float64
@@ -274,6 +288,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runEvaluate(opts, stdout)
 	case "library":
 		return runLibrary(ctx, opts, stdout)
+	case "component":
+		return runComponent(ctx, opts, stdout)
 	case "check":
 		return runCheckCommand(ctx, opts, stdout)
 	case "design":
@@ -353,6 +369,12 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.templatesRoot, "templates-root", "", "KiCad template library root")
 	flags.StringVar(&opts.libraryCache, "library-cache", os.Getenv(libraryresolver.EnvLibraryCache), "library resolver cache file path")
 	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
+	flags.StringVar(&opts.catalogDir, "catalog-dir", components.DefaultCatalogDir, "component catalog directory")
+	flags.StringVar(&opts.componentFamily, "family", "", "component family filter")
+	flags.StringVar(&opts.componentPackage, "package", "", "component package filter")
+	flags.StringVar(&opts.componentValueKind, "value-kind", "", "component value kind filter")
+	flags.StringVar(&opts.componentValue, "value", "", "component value filter")
+	flags.StringVar(&opts.componentAcceptance, "acceptance", "", "component acceptance level")
 	flags.StringVar(&opts.routeMode, "mode", "", "routing mode")
 	flags.StringVar(&opts.routeMode, "route-mode", "", "routing mode")
 	flags.Float64Var(&opts.routeGridMM, "grid", 0, "routing grid in millimeters")
@@ -1144,6 +1166,146 @@ func writeLibraryResult(stdout io.Writer, data any, issues []reports.Issue) erro
 	}
 	if !result.OK {
 		return errors.New("library command failed")
+	}
+	return nil
+}
+
+func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("component requires --json in this implementation phase")
+	}
+	if len(opts.commandArgs) == 0 {
+		return writeReportFailure(stdout, "component", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "component",
+			Message:  "component requires a subcommand",
+		})
+	}
+	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: opts.catalogDir})
+	if err != nil {
+		return writeReportFailure(stdout, "component", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "catalog-dir",
+			Message:  err.Error(),
+		})
+	}
+	subcommand := opts.commandArgs[0]
+	switch subcommand {
+	case "list":
+		return writeComponentResult(stdout, map[string]any{
+			"families": catalog.Families,
+			"records":  catalog.Records,
+		}, catalog.Diagnostics)
+	case "show":
+		if len(opts.commandArgs) != 2 {
+			return writeComponentFailure(stdout, "component show requires component id")
+		}
+		record, ok := componentRecordByID(catalog, opts.commandArgs[1])
+		if !ok {
+			return writeReportFailure(stdout, "component", reports.Issue{Code: components.CodeComponentNotFound, Severity: reports.SeverityError, Path: "component.show", Message: "component not found: " + opts.commandArgs[1]})
+		}
+		return writeComponentResult(stdout, record, catalog.Diagnostics)
+	case "find":
+		query := componentQueryFromOptions(opts)
+		query.MinimumConfidence = minimumConfidenceForAcceptance(components.AcceptanceLevel(opts.componentAcceptance))
+		candidates, result := components.Find(ctx, catalog, query)
+		result.Data = map[string]any{"candidates": candidates}
+		return writeComponentReport(stdout, result)
+	case "select":
+		request, err := componentSelectionRequestFromOptions(opts)
+		if err != nil {
+			return writeReportFailure(stdout, "component", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: err.Error()})
+		}
+		selection, result := components.Select(ctx, catalog, request)
+		if result.OK {
+			result.Data = selection
+		}
+		return writeComponentReport(stdout, result)
+	case "validate":
+		result := components.ValidateCatalog(catalog)
+		return writeComponentReport(stdout, result)
+	default:
+		return writeReportFailure(stdout, "component", reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "component." + subcommand,
+			Message:  "unsupported component subcommand " + subcommand,
+		})
+	}
+}
+
+func minimumConfidenceForAcceptance(level components.AcceptanceLevel) components.ConfidenceLevel {
+	switch level {
+	case components.AcceptanceStructural:
+		return components.ConfidenceRuleInferred
+	case components.AcceptanceConnectivity, components.AcceptanceERCDRC, components.AcceptanceFabricationCandidate:
+		return components.ConfidenceVerified
+	default:
+		return ""
+	}
+}
+
+func componentQueryFromOptions(opts cliOptions) components.Query {
+	return components.Query{
+		Family:    opts.componentFamily,
+		Package:   opts.componentPackage,
+		ValueKind: opts.componentValueKind,
+		Value:     opts.componentValue,
+	}
+}
+
+func componentSelectionRequestFromOptions(opts cliOptions) (components.SelectionRequest, error) {
+	if strings.TrimSpace(opts.requestPath) != "" {
+		var request components.SelectionRequest
+		body, err := os.ReadFile(opts.requestPath)
+		if err != nil {
+			return components.SelectionRequest{}, err
+		}
+		if err := json.Unmarshal(body, &request); err != nil {
+			return components.SelectionRequest{}, err
+		}
+		return request, nil
+	}
+	return components.SelectionRequest{
+		Query:      componentQueryFromOptions(opts),
+		Acceptance: components.AcceptanceLevel(opts.componentAcceptance),
+	}, nil
+}
+
+func componentRecordByID(catalog *components.Catalog, id string) (components.ComponentRecord, bool) {
+	if catalog == nil {
+		return components.ComponentRecord{}, false
+	}
+	for _, record := range catalog.Records {
+		if record.ID == id {
+			return record, true
+		}
+	}
+	return components.ComponentRecord{}, false
+}
+
+func writeComponentFailure(stdout io.Writer, message string) error {
+	return writeReportFailure(stdout, "component", reports.Issue{
+		Code:     reports.CodeInvalidArgument,
+		Severity: reports.SeverityError,
+		Path:     "component",
+		Message:  message,
+	})
+}
+
+func writeComponentResult(stdout io.Writer, data any, issues []reports.Issue) error {
+	return writeComponentReport(stdout, reports.ResultWithIssues("component", data, issues, nil))
+}
+
+func writeComponentReport(stdout io.Writer, result reports.Result) error {
+	result.Command = "component"
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("component command failed")
 	}
 	return nil
 }

@@ -115,6 +115,54 @@ func TestRunDesignCreateMissingRequest(t *testing.T) {
 	}
 }
 
+func TestRunComponentListJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "component", "list"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"records"`) || !strings.Contains(stdout.String(), `"resistor.generic.0805"`) {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRunComponentFindJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--family", "connector", "--package", "1x04", "component", "find"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"connector.pinheader.1x04.2_54mm"`) {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRunComponentSelectBlocksUnsafePlaceholder(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--family", "opamp", "--acceptance", "connectivity", "component", "select"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected unsafe placeholder selection to fail")
+	}
+	if !strings.Contains(stdout.String(), string("COMPONENT_UNSAFE_CONFIDENCE")) {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRunComponentValidateJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "component", "validate"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"record_count"`) {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
 func TestRunDesignCreateSimpleLED(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -143,6 +191,15 @@ func TestRunDesignCreateSimpleLED(t *testing.T) {
 	if _, statErr := os.Stat(filepath.Join(output, "status_board.kicad_pcb")); statErr != nil {
 		t.Fatalf("missing pcb output: %v", statErr)
 	}
+}
+
+func testComponentCatalogDir(t *testing.T) string {
+	t.Helper()
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate test source file")
+	}
+	return filepath.Join(filepath.Dir(sourceFile), "..", "..", "data", "components")
 }
 
 func TestParseDesignAllowPartialSetsExplicitFlag(t *testing.T) {
