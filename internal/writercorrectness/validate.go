@@ -46,6 +46,7 @@ func Validate(ctx context.Context, input string, opts Options) Result {
 		for _, check := range copperChecks {
 			result.AddCheck(check)
 		}
+		result.AddCheck(CheckKiCadRoundTripEvidence(ctx, target, opts))
 	}
 
 	result.Finish()
