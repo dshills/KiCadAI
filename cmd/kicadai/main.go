@@ -18,6 +18,7 @@ import (
 
 	"golang.org/x/text/unicode/norm"
 	"kicadai/internal/blocks"
+	"kicadai/internal/blocks/verification"
 	"kicadai/internal/boardvalidation"
 	"kicadai/internal/components"
 	"kicadai/internal/config"
@@ -103,7 +104,11 @@ Global flags:
   --artifact-dir string Directory for retained KiCad-backed artifacts
   --timeout duration    KiCad CLI timeout, for example 10s or 2m
   --allowlist string    Round-trip or ERC/DRC allowlist JSON path
-  --require-drc         Require KiCad DRC evidence for board validation
+  --case string         Block verification manifest path
+  --suite string        Block verification suite directory
+  --builtins            Run built-in block verification manifests
+  --require-erc         Require KiCad ERC evidence for block verification
+  --require-drc         Require KiCad DRC evidence for board validation or block verification
   --allow-missing-drc   Do not fail board validation when KiCad DRC is unavailable
   --strict-zones        Treat zones without fill evidence as blocking
   --strict-unrouted     Treat unrouted multi-pad nets as blocking
@@ -188,6 +193,10 @@ type cliOptions struct {
 	artifactDir           string
 	roundTimeout          string
 	allowlistPath         string
+	blockVerifyCase       string
+	blockVerifySuite      string
+	blockVerifyBuiltins   bool
+	requireERC            bool
 	requireDRC            bool
 	allowMissingDRC       bool
 	strictZones           bool
@@ -356,7 +365,11 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.artifactDir, "artifact-dir", "", "round-trip artifact directory")
 	flags.StringVar(&opts.roundTimeout, "timeout", "", "round-trip timeout")
 	flags.StringVar(&opts.allowlistPath, "allowlist", "", "round-trip allowlist JSON path")
-	flags.BoolVar(&opts.requireDRC, "require-drc", false, "require KiCad DRC evidence for board validation")
+	flags.StringVar(&opts.blockVerifyCase, "case", "", "block verification manifest path")
+	flags.StringVar(&opts.blockVerifySuite, "suite", "", "block verification suite directory")
+	flags.BoolVar(&opts.blockVerifyBuiltins, "builtins", false, "run built-in block verification manifests")
+	flags.BoolVar(&opts.requireERC, "require-erc", false, "require KiCad ERC evidence for block verification")
+	flags.BoolVar(&opts.requireDRC, "require-drc", false, "require KiCad DRC evidence for board validation or block verification")
 	flags.BoolVar(&opts.allowMissingDRC, "allow-missing-drc", false, "do not fail board validation when KiCad DRC is unavailable")
 	flags.BoolVar(&opts.strictZones, "strict-zones", false, "treat zones without fill evidence as blocking")
 	flags.BoolVar(&opts.strictUnrouted, "strict-unrouted", false, "treat unrouted multi-pad nets as blocking")
@@ -580,6 +593,20 @@ func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		}
 		issues := registry.ValidateRequest(request)
 		return writeBlockResult(stdout, request, issues)
+	case "verify":
+		if len(opts.commandArgs) != 1 {
+			return writeBlockFailure(stdout, invalidBlockArgCountIssue("verify", 0))
+		}
+		report, issues, artifacts, err := runBlockVerify(ctx, opts, registry)
+		if err != nil {
+			return writeBlockFailure(stdout, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "block.verify",
+				Message:  err.Error(),
+			})
+		}
+		return writeBlockApplyResult(stdout, report, issues, artifacts)
 	case "instantiate":
 		if len(opts.commandArgs) != 2 {
 			return writeBlockFailure(stdout, invalidBlockArgCountIssue("instantiate", 1))
@@ -754,6 +781,127 @@ func compositionRequestFromOptions(opts cliOptions) (blocks.CompositionRequest, 
 	return request, nil
 }
 
+func runBlockVerify(ctx context.Context, opts cliOptions, registry blocks.Registry) (blockVerificationCLIReport, []reports.Issue, []reports.Artifact, error) {
+	manifests, loadIssues, err := blockVerificationManifests(opts)
+	if err != nil {
+		return blockVerificationCLIReport{}, nil, nil, err
+	}
+	if reports.HasBlockingIssue(loadIssues) {
+		return blockVerificationCLIReport{}, loadIssues, nil, nil
+	}
+	runOptions, err := blockVerificationRunOptions(opts, registry)
+	if err != nil {
+		return blockVerificationCLIReport{}, nil, nil, err
+	}
+	results := make([]verification.RunResult, 0, len(manifests))
+	issues := append([]reports.Issue(nil), loadIssues...)
+	var artifacts []reports.Artifact
+	for _, manifest := range manifests {
+		caseOptions := runOptions
+		if strings.TrimSpace(runOptions.CheckOptions.ArtifactDir) != "" {
+			artifactDir := blockVerificationCaseArtifactDir(runOptions.CheckOptions.ArtifactDir, manifest.ID)
+			caseOptions.CheckOptions.ArtifactDir = artifactDir
+			caseOptions.WriterOptions.ArtifactDir = artifactDir
+		}
+		result := verification.RunCase(ctx, manifest, caseOptions)
+		results = append(results, result)
+		issues = append(issues, result.Issues...)
+		artifacts = append(artifacts, result.Artifacts...)
+	}
+	return blockVerificationCLIReport{Count: len(results), Results: results}, issues, artifacts, nil
+}
+
+func blockVerificationManifests(opts cliOptions) ([]verification.Manifest, []reports.Issue, error) {
+	selected := 0
+	if strings.TrimSpace(opts.blockVerifyCase) != "" {
+		selected++
+	}
+	if strings.TrimSpace(opts.blockVerifySuite) != "" {
+		selected++
+	}
+	if opts.blockVerifyBuiltins {
+		selected++
+	}
+	if selected != 1 {
+		return nil, nil, fmt.Errorf("block verify requires exactly one of --case, --suite, or --builtins")
+	}
+	if strings.TrimSpace(opts.blockVerifyCase) != "" {
+		manifest, issues := verification.LoadManifest(opts.blockVerifyCase)
+		if len(issues) != 0 {
+			return nil, issues, nil
+		}
+		return []verification.Manifest{manifest}, nil, nil
+	}
+	root := strings.TrimSpace(opts.blockVerifySuite)
+	if opts.blockVerifyBuiltins {
+		root = builtInBlockVerificationRoot()
+	}
+	manifests, issues := verification.LoadSuite(root)
+	return manifests, issues, nil
+}
+
+func blockVerificationCaseArtifactDir(root string, caseID string) string {
+	return filepath.Join(root, safeBlockVerificationPathSegment(caseID))
+}
+
+func safeBlockVerificationPathSegment(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown"
+	}
+	var builder strings.Builder
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			builder.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			builder.WriteRune(r)
+		case r >= '0' && r <= '9':
+			builder.WriteRune(r)
+		case r == '_' || r == '-':
+			builder.WriteRune(r)
+		default:
+			builder.WriteRune('_')
+		}
+	}
+	return builder.String()
+}
+
+func builtInBlockVerificationRoot() string {
+	rel := filepath.Join("internal", "blocks", "testdata", "verification")
+	for _, candidate := range []string{rel, filepath.Join("..", "..", rel)} {
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			return candidate
+		}
+	}
+	return rel
+}
+
+func blockVerificationRunOptions(opts cliOptions, registry blocks.Registry) (verification.RunOptions, error) {
+	checkOpts, err := checkOptions(opts)
+	if err != nil {
+		return verification.RunOptions{}, err
+	}
+	return verification.RunOptions{
+		Registry:      registry,
+		OutputDir:     opts.output,
+		Overwrite:     opts.overwrite,
+		KeepArtifacts: opts.keepArtifacts,
+		KiCadCLI:      opts.kicadCLI,
+		RequireERC:    opts.requireERC,
+		RequireDRC:    opts.requireDRC,
+		CheckOptions:  checkOpts,
+		WriterOptions: writercorrectness.Options{
+			KiCadCLI:              opts.kicadCLI,
+			AllowUnrouted:         opts.allowUnrouted,
+			RequireKiCadRoundTrip: opts.requireKiCadRoundTrip,
+			StrictDiffs:           opts.strictDiffs,
+			KeepArtifacts:         opts.keepArtifacts,
+			ArtifactDir:           opts.artifactDir,
+		},
+	}, nil
+}
+
 func blockProjectName(opts cliOptions, fallback string) string {
 	if strings.TrimSpace(opts.name) != "" {
 		return opts.name
@@ -788,6 +936,11 @@ type blockPCBRealizationCLIResult struct {
 	Output           blocks.BlockOutput                `json:"output"`
 	Realization      *blocks.BlockPCBRealizationResult `json:"realization,omitempty"`
 	PlacementRequest *placement.Request                `json:"placement_request,omitempty"`
+}
+
+type blockVerificationCLIReport struct {
+	Count   int                      `json:"count"`
+	Results []verification.RunResult `json:"results"`
 }
 
 type blockPlacementFeedbackOptions struct {

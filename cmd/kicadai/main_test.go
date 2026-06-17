@@ -891,6 +891,39 @@ func TestRunBlockListShowValidate(t *testing.T) {
 	}
 }
 
+func TestRunBlockVerifyBuiltinsAndCase(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--json", "--builtins", "block", "verify"}, &stdout, &stderr); err != nil {
+		t.Fatalf("verify builtins err = %v stdout=%s", err, stdout.String())
+	}
+	for _, want := range []string{`"command": "block"`, `"count": `, `"case_id": "led_indicator_default"`} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("verify builtins output missing %q: %s", want, stdout.String())
+		}
+	}
+
+	stdout.Reset()
+	manifest := filepath.Join(builtInBlockVerificationRoot(), "led_indicator_default", "manifest.json")
+	if err := run([]string{"--json", "--case", manifest, "block", "verify"}, &stdout, &stderr); err != nil {
+		t.Fatalf("verify case err = %v stdout=%s", err, stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"count": 1`) || !strings.Contains(stdout.String(), `"status": "pass"`) {
+		t.Fatalf("unexpected verify case output: %s", stdout.String())
+	}
+}
+
+func TestRunBlockVerifyRequiresSelection(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "block", "verify"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(stdout.String(), "requires exactly one of --case, --suite, or --builtins") {
+		t.Fatalf("err = %v stdout=%s", err, stdout.String())
+	}
+}
+
 func TestRunBlockReportsStructuredFailures(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
