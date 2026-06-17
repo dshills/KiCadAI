@@ -125,6 +125,7 @@ go run ./cmd/kicadai --json documents
 go run ./cmd/kicadai --json capabilities
 go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
 go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
+go run ./cmd/kicadai --json writer check ./examples/07_generated_pcb
 go run ./cmd/kicadai --json validate board ./examples/07_generated_pcb
 go run ./cmd/kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
@@ -153,6 +154,8 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
   indicator project, with optional PCB output.
 - `design create`: run the AI design workflow from explicit circuit-block
   intent through schematic/PCB write, validation, and feedback.
+- `writer check`: verify generated project, schematic, PCB, net, footprint,
+  pad, copper, zone, and optional KiCad round-trip writer correctness.
 - `generate breakout`: generate a connector breakout project from a structured
   JSON request.
 - `block realize-pcb <block_id>`: instantiate a circuit block and return its
@@ -253,8 +256,9 @@ Current gaps for autonomous one-shot schematic + PCB generation:
   optimizer;
 - routing is suitable for small known-good nets and local fragment routes, not
   dense production boards;
-- some generated PCB validation failures still expose writer gaps, especially
-  net-code/net-name preservation in generated footprints and tracks;
+- writer correctness now reports generated-file gaps explicitly; remaining
+  failures mostly reflect missing footprint assignments, resolver-backed
+  pinmaps, and strict PCB reader/writer coverage;
 - KiCad ERC/DRC requires `kicad-cli` from KiCad 7 or newer and is optional
   unless requested.
 
@@ -428,6 +432,57 @@ Current routing limitations:
 - KiCad DRC execution is integrated through the checks package, but tests still
   rely primarily on deterministic parser/fake-runner paths unless a local
   stable KiCad fixture is available.
+
+### Writer Correctness Checks
+
+`writer check` is the generated-file correctness gate. It is stricter than a
+plain parser and more writer-focused than board readiness. It answers whether
+files emitted by KiCadAI preserve project structure, schematic connectivity,
+schematic-to-PCB transfer, footprint pad net assignments, copper net
+references, zone references, and optional KiCad round-trip stability.
+
+```sh
+go run ./cmd/kicadai --json writer check ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+go run ./cmd/kicadai --json writer check --strict-diffs --allow-unrouted ./examples/07_generated_pcb
+```
+
+The command accepts a project directory, `.kicad_pro`, `.kicad_sch`, or
+`.kicad_pcb` target. It returns nonzero when blocking writer issues are present,
+which makes it suitable for CI and AI workflow gating. Project and `.kicad_pro`
+targets can run cross-file checks. Single-file targets run the checks supported
+by that file and skip checks that require a missing sibling schematic or PCB.
+
+Stable checks:
+
+- `project_structure`
+- `schematic_parse`
+- `schematic_connectivity`
+- `schematic_pcb_transfer`
+- `pcb_parse`
+- `pcb_net_table`
+- `footprint_pad_nets`
+- `copper_net_references`
+- `zone_net_references`
+- `kicad_round_trip`
+
+Useful flags:
+
+- `--require-kicad-roundtrip`
+- `--kicad-cli /path/to/kicad-cli`
+- `--strict-diffs`
+- `--allow-unrouted`
+- `--keep-artifacts --artifact-dir ./reports`
+
+Current limits:
+
+- Some older generated examples intentionally fail writer checks because they
+  lack footprint assignments or resolver-backed pinmaps.
+- KiCad round-trip evidence is skipped unless a KiCad CLI path is available, or
+  blocking when `--require-kicad-roundtrip` is set.
+- Check names and flags use their stable CLI/API identifiers, so separators
+  differ between JSON check IDs such as `kicad_round_trip` and flags such as
+  `--require-kicad-roundtrip`.
+- The writer gate is not a fabrication package validator.
 
 ### Inspection
 
@@ -752,6 +807,8 @@ Key packages:
 - `internal/kicadfiles/roundtrip`: KiCad CLI round-trip validation.
 - `internal/pinmap`: symbol-footprint-pinmap registry and validation.
 - `internal/workflows`: AI-facing named workflow registry.
+- `internal/writercorrectness`: generated writer correctness gate used by the
+  CLI and AI design workflow.
 
 Generated protobuf packages under `internal/kiapi/gen/**` should not be used as
 the AI workflow boundary. Prefer `internal/workflows`, `internal/transactions`,
