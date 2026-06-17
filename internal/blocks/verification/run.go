@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
 	"slices"
 	"strings"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
+	"kicadai/internal/writercorrectness"
 )
 
 type Status string
@@ -18,11 +20,16 @@ const (
 	StatusPass    Status = "pass"
 	StatusWarning Status = "warning"
 	StatusBlocked Status = "blocked"
+	StatusSkipped Status = "skipped"
 )
 
 type RunOptions struct {
-	Registry blocks.Registry
-	Strict   bool
+	Registry      blocks.Registry
+	Strict        bool
+	OutputDir     string
+	Overwrite     bool
+	KeepArtifacts bool
+	WriterOptions writercorrectness.Options
 }
 
 type RunResult struct {
@@ -33,6 +40,7 @@ type RunResult struct {
 	Stages        []StageResult       `json:"stages"`
 	Output        *blocks.BlockOutput `json:"output,omitempty"`
 	Issues        []reports.Issue     `json:"issues,omitempty"`
+	Artifacts     []reports.Artifact  `json:"artifacts,omitempty"`
 }
 
 type StageResult struct {
@@ -96,12 +104,23 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 	summary, summaryIssues := summarizeOutput(output)
 	semanticIssues := append(summaryIssues, assertSemantics(manifest, summary, opts)...)
 	result.addStage(StageResult{Name: "semantic_assertions", Issues: semanticIssues, Summary: "checked expected components, ports, nets, and pins"})
+	if reports.HasBlockingIssue(semanticIssues) {
+		result.finish()
+		return result
+	}
+	if writerRequested(manifest.Expected.Writer) {
+		stage, artifacts := runWriterStage(ctx, manifest, &output, opts)
+		result.Artifacts = append(result.Artifacts, artifacts...)
+		result.addStage(stage)
+	}
 	result.finish()
 	return result
 }
 
 func (result *RunResult) addStage(stage StageResult) {
-	stage.Status = statusForIssues(stage.Issues)
+	if stage.Status == "" {
+		stage.Status = statusForIssues(stage.Issues)
+	}
 	result.Stages = append(result.Stages, stage)
 	result.Issues = append(result.Issues, stage.Issues...)
 }
@@ -119,6 +138,82 @@ func (result *RunResult) finish() {
 			}
 		}
 	}
+}
+
+func writerRequested(writer ExpectedWriter) bool {
+	return writer.Required || writer.OK || writer.AllowUnrouted || writer.RequireRoundTrip
+}
+
+func runWriterStage(ctx context.Context, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) (StageResult, []reports.Artifact) {
+	if strings.TrimSpace(opts.OutputDir) == "" {
+		if manifest.Expected.Writer.Required {
+			return StageResult{
+				Name:   "writer_correctness",
+				Issues: []reports.Issue{writerRunIssue(manifest, "output_dir", "writer verification requires an output directory")},
+			}, nil
+		}
+		return StageResult{Name: "writer_correctness", Status: StatusSkipped, Summary: "writer verification skipped because no output directory was provided"}, nil
+	}
+	projectName := pathID(manifest.ID)
+	projectDir := caseOutputDir(opts.OutputDir, manifest.ID)
+	tx, err := blocks.ProjectTransactionForBlockOutputPtr(projectName, output, opts.Overwrite)
+	if err != nil {
+		return StageResult{
+			Name:    "writer_correctness",
+			Issues:  []reports.Issue{writerRunIssue(manifest, "transaction", err.Error())},
+			Summary: "failed to build project transaction",
+		}, nil
+	}
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: projectDir, Overwrite: opts.Overwrite})
+	issues := contextualizeIssues(manifest, "apply", apply.Issues)
+	artifacts := apply.Artifacts
+	if reports.HasBlockingIssue(issues) {
+		return StageResult{Name: "writer_correctness", Issues: issues, Summary: "failed to write generated project"}, artifacts
+	}
+
+	writerOptions := opts.WriterOptions
+	writerOptions.AllowUnrouted = writerOptions.AllowUnrouted || manifest.Expected.Writer.AllowUnrouted
+	writerOptions.RequireKiCadRoundTrip = writerOptions.RequireKiCadRoundTrip || manifest.Expected.Writer.RequireRoundTrip
+	writerOptions.KeepArtifacts = writerOptions.KeepArtifacts || opts.KeepArtifacts
+	writerResult := writercorrectness.Validate(ctx, projectDir, writerOptions)
+	artifacts = append(artifacts, writerResult.Artifacts...)
+	writerIssues := contextualizeIssues(manifest, "writer", writerResult.Issues)
+	issues = append(issues, writerIssues...)
+	if manifest.Expected.Writer.OK && !writerResult.OK && len(writerIssues) == 0 {
+		issues = append(issues, writerRunIssue(manifest, "ok", fmt.Sprintf("writer correctness did not report OK; checks=%d failures=%d warnings=%d skipped=%d", len(writerResult.Checks), writerResult.OverallSummary.FailCount, writerResult.OverallSummary.WarningCount, writerResult.OverallSummary.SkippedCount)))
+	}
+	summary := fmt.Sprintf("wrote %s and ran %d writer correctness check(s)", projectDir, len(writerResult.Checks))
+	return StageResult{Name: "writer_correctness", Issues: issues, Summary: summary}, artifacts
+}
+
+func caseOutputDir(root string, caseID string) string {
+	return filepath.Join(root, pathID(caseID))
+}
+
+func writerRunIssue(manifest Manifest, path string, message string) reports.Issue {
+	issue := runIssue("verification."+pathID(manifest.ID)+".writer."+pathSegment(path), message)
+	issue.Suggestion = "case " + manifest.ID + " block " + manifest.BlockID
+	return issue
+}
+
+func contextualizeIssues(manifest Manifest, stage string, issues []reports.Issue) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	contextualized := make([]reports.Issue, 0, len(issues))
+	prefix := "verification." + pathID(manifest.ID) + "." + pathSegment(stage)
+	for _, issue := range issues {
+		if strings.TrimSpace(issue.Path) == "" {
+			issue.Path = prefix
+		} else {
+			issue.Path = prefix + "." + strings.TrimPrefix(issue.Path, ".")
+		}
+		if issue.Suggestion == "" {
+			issue.Suggestion = "case " + manifest.ID + " block " + manifest.BlockID
+		}
+		contextualized = append(contextualized, issue)
+	}
+	return contextualized
 }
 
 func statusForIssues(issues []reports.Issue) Status {

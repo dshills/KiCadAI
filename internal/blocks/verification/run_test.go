@@ -3,7 +3,9 @@ package verification
 import (
 	"context"
 	"encoding/json"
+	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"kicadai/internal/blocks"
@@ -22,6 +24,63 @@ func TestRunCaseLEDIndicatorPassesSemantics(t *testing.T) {
 	if len(result.Stages) != 3 || result.Stages[2].Name != "semantic_assertions" {
 		t.Fatalf("stages = %#v", result.Stages)
 	}
+}
+
+func TestRunCaseWriterRequiredReportsKnownPadNetGap(t *testing.T) {
+	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "connector_breakout_4pin", "manifest.json"))
+	if len(issues) != 0 {
+		t.Fatalf("load issues = %#v", issues)
+	}
+	manifest.Expected.Writer = ExpectedWriter{Required: true, OK: true, AllowUnrouted: true}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: t.TempDir(),
+		Overwrite: true,
+	})
+	if result.Status != StatusBlocked || !hasStage(result.Stages, "writer_correctness") || len(result.Artifacts) == 0 || !hasIssue(result.Issues, "PCB pad references missing net code") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseWriterSkipsWhenOutputDirMissingAndNotRequired(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.Writer = ExpectedWriter{OK: true}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	stage, ok := findStage(result.Stages, "writer_correctness")
+	if !ok || stage.Status != StatusSkipped || result.Status != StatusPass {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseWriterBlocksWhenOutputDirMissingAndRequired(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.Writer = ExpectedWriter{Required: true}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "writer verification requires an output directory") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseWriterIssuesIncludeCaseContext(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.Writer = ExpectedWriter{Required: true}
+	outputDir := filepath.Join(t.TempDir(), "not-a-directory")
+	if err := os.WriteFile(outputDir, []byte("file blocks project directory creation"), 0o644); err != nil {
+		t.Fatalf("write blocker file: %v", err)
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry(), OutputDir: outputDir})
+	if result.Status != StatusBlocked {
+		t.Fatalf("result = %#v", result)
+	}
+	for _, issue := range result.Issues {
+		if issue.Path != "" && strings.HasPrefix(issue.Path, "verification.led_indicator_default.") {
+			return
+		}
+	}
+	t.Fatalf("missing contextualized issue path: %#v", result.Issues)
 }
 
 func TestRunCaseBlocksWrongExpectedSymbol(t *testing.T) {
@@ -325,4 +384,18 @@ func rawConnect(t *testing.T, fromRef string, fromPin string, toRef string, toPi
 		t.Fatalf("marshal connect: %v", err)
 	}
 	return transactions.NewOperation(transactions.OpConnect, raw)
+}
+
+func hasStage(stages []StageResult, name string) bool {
+	_, ok := findStage(stages, name)
+	return ok
+}
+
+func findStage(stages []StageResult, name string) (StageResult, bool) {
+	for _, stage := range stages {
+		if stage.Name == name {
+			return stage, true
+		}
+	}
+	return StageResult{}, false
 }

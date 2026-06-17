@@ -9,6 +9,13 @@ import (
 const DefaultGeneratedProjectName = "generated_blocks"
 
 func ProjectTransactionForBlockOutput(projectName string, output BlockOutput, overwrite bool) (transactions.Transaction, error) {
+	return ProjectTransactionForBlockOutputPtr(projectName, &output, overwrite)
+}
+
+func ProjectTransactionForBlockOutputPtr(projectName string, output *BlockOutput, overwrite bool) (transactions.Transaction, error) {
+	if output == nil {
+		return transactions.Transaction{}, fmt.Errorf("block output is required")
+	}
 	refs := make(map[string]struct{}, len(output.Instance.Refs))
 	for _, ref := range output.Instance.Refs {
 		if _, exists := refs[ref]; exists {
