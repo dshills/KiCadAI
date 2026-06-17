@@ -1932,7 +1932,22 @@ func runWriterCommand(ctx context.Context, opts cliOptions, stdout io.Writer) er
 		}
 		return errors.New("writer check requires 1 argument")
 	}
-	result := writercorrectness.Validate(ctx, opts.commandArgs[1], writerCorrectnessOptions(opts))
+	wcOpts := writerCorrectnessOptions(opts)
+	var libraryIssues []reports.Issue
+	if pinmapShouldUseLibraryResolver(opts) {
+		wcOpts.LibraryResolutionUsed = true
+		index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+			CachePath: opts.libraryCache,
+			Refresh:   opts.refreshLibraryCache,
+		})
+		libraryIssues = issues
+		if !reports.HasBlockingIssue(issues) {
+			wcOpts.LibraryIndex = index
+			wcOpts.HasLibraryIndex = true
+		}
+	}
+	wcOpts.LibraryIssues = libraryIssues
+	result := writercorrectness.Validate(ctx, opts.commandArgs[1], wcOpts)
 	report := result.ReportResult("writer")
 	if err := writeReportJSON(stdout, report); err != nil {
 		return err

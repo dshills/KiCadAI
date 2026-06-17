@@ -2,6 +2,7 @@ package writercorrectness
 
 import (
 	"context"
+	"fmt"
 
 	"kicadai/internal/reports"
 )
@@ -20,7 +21,7 @@ func Validate(ctx context.Context, input string, opts Options) Result {
 			result.Finish()
 			return result
 		}
-		_, schematicChecks := CheckSchematics(target)
+		_, schematicChecks := CheckSchematicsWithOptions(target, opts)
 		for _, check := range schematicChecks {
 			result.AddCheck(check)
 		}
@@ -48,9 +49,34 @@ func Validate(ctx context.Context, input string, opts Options) Result {
 		}
 		result.AddCheck(CheckKiCadRoundTripEvidence(ctx, target, opts))
 	}
+	if opts.LibraryResolutionUsed {
+		result.AddCheck(CheckResult{
+			Name:     CheckLibraryResolver,
+			Required: true,
+			Issues:   opts.LibraryIssues,
+			Summary:  libraryResolverSummary(opts.LibraryIssues),
+		})
+	}
 
 	result.Finish()
 	return result
+}
+
+func libraryResolverSummary(issues []reports.Issue) string {
+	issueCount := len(issues)
+	if issueCount == 0 {
+		return "resolved library inputs"
+	}
+	if reports.HasBlockingIssue(issues) {
+		if issueCount == 1 {
+			return "failed to resolve library inputs with 1 issue"
+		}
+		return fmt.Sprintf("failed to resolve library inputs with %d issues", issueCount)
+	}
+	if issueCount == 1 {
+		return "resolved library inputs with 1 issue"
+	}
+	return fmt.Sprintf("resolved library inputs with %d issues", issueCount)
 }
 
 func appendCanceled(ctx context.Context, result *Result) bool {

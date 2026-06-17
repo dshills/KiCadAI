@@ -557,6 +557,40 @@ func TestRunWriterCheckPCBJSON(t *testing.T) {
 	}
 }
 
+func TestRunWriterCheckReportsLibraryResolverIssues(t *testing.T) {
+	projectDir := t.TempDir()
+	writeTestFile(t, filepath.Join(projectDir, "writer_demo.kicad_pro"), "{}")
+	writeTestFile(t, filepath.Join(projectDir, "writer_demo.kicad_sch"), `(kicad_sch
+  (version 20260306)
+  (generator "kicadai-test")
+  (uuid "00000000-0000-0000-0000-000000000001")
+  (paper "A4")
+  (symbol (lib_id "Device:R") (at 10 10 0)
+    (property "Reference" "R1" (at 10 10 0))
+    (property "Value" "1k" (at 10 12 0))
+    (property "Footprint" "Resistor_SMD:R_0603" (at 10 14 0) hide)
+  )
+)`)
+	missingSymbols := filepath.Join(t.TempDir(), "missing-symbols")
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--symbols-root", missingSymbols, "writer", "check", projectDir}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected writer check to fail on library resolver issue")
+	}
+	for _, want := range []string{
+		`"command": "writer"`,
+		`"ok": false`,
+		`"name": "library_resolver"`,
+		`missing-symbols`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
 func TestRunWriterCheckMissingTargetJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

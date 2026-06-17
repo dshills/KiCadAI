@@ -4,6 +4,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"kicadai/internal/libraryresolver"
 )
 
 func TestCheckSchematicsSkipsWithoutSchematic(t *testing.T) {
@@ -51,6 +53,80 @@ func TestCheckSchematicsReportsMissingFootprint(t *testing.T) {
 		t.Fatalf("missing footprints = %#v", snapshot.MissingFootprints)
 	}
 	assertCheckIssueContains(t, checks, "no footprint assignment")
+}
+
+func TestCheckSchematicsReportsUnresolvedSymbolWithLibraryIndex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (symbol (lib_id "Device:Missing") (at 10 10 0)
+    (property "Reference" "R1" (at 10 10 0))
+    (property "Value" "1k" (at 10 12 0))
+    (property "Footprint" "Resistor_SMD:R_0603" (at 10 14 0) hide)
+  )
+`))
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{}}
+
+	_, checks := CheckSchematicsWithOptions(Target{SchematicFiles: []string{path}}, Options{LibraryIndex: index, HasLibraryIndex: true})
+	assertCheckIssueContains(t, checks, "symbol library record not found: Device:Missing")
+}
+
+func TestCheckSchematicsAllowsResolvedSymbolWithLibraryIndex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (symbol (lib_id "Device:R") (at 10 10 0)
+    (property "Reference" "R1" (at 10 10 0))
+    (property "Value" "1k" (at 10 12 0))
+    (property "Footprint" "Resistor_SMD:R_0603" (at 10 14 0) hide)
+  )
+`))
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{"Device:R": {LibraryID: "Device:R"}}}
+
+	_, checks := CheckSchematicsWithOptions(Target{SchematicFiles: []string{path}}, Options{LibraryIndex: index, HasLibraryIndex: true})
+	for _, check := range checks {
+		for _, issue := range check.Issues {
+			if strings.Contains(issue.Message, "symbol library record not found") {
+				t.Fatalf("unexpected resolver issue: %#v", checks)
+			}
+		}
+	}
+}
+
+func TestCheckSchematicsReportsUnresolvedPowerSymbolWithLibraryIndex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (symbol (lib_id "power:GND") (at 10 10 0)
+    (property "Reference" "#PWR01" (at 10 10 0))
+    (property "Value" "GND" (at 10 12 0))
+  )
+`))
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{}}
+
+	_, checks := CheckSchematicsWithOptions(Target{SchematicFiles: []string{path}}, Options{LibraryIndex: index, HasLibraryIndex: true})
+	assertCheckIssueContains(t, checks, "symbol library record not found: power:GND")
+}
+
+func TestCheckSchematicsAllowsResolvedPowerSymbolWithLibraryIndex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (symbol (lib_id "power:GND") (at 10 10 0)
+    (property "Reference" "#PWR01" (at 10 10 0))
+    (property "Value" "GND" (at 10 12 0))
+  )
+`))
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{"power:GND": {LibraryID: "power:GND"}}}
+
+	_, checks := CheckSchematicsWithOptions(Target{SchematicFiles: []string{path}}, Options{LibraryIndex: index, HasLibraryIndex: true})
+	for _, check := range checks {
+		for _, issue := range check.Issues {
+			if strings.Contains(issue.Message, "symbol library record not found") {
+				t.Fatalf("unexpected power resolver issue: %#v", checks)
+			}
+		}
+	}
 }
 
 func TestCheckSchematicsIgnoresPowerFootprint(t *testing.T) {

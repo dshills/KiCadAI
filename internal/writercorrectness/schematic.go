@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	kschematic "kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -42,6 +43,10 @@ type SymbolSnapshot struct {
 }
 
 func CheckSchematics(target Target) (SchematicSnapshot, []CheckResult) {
+	return CheckSchematicsWithOptions(target, Options{})
+}
+
+func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot, []CheckResult) {
 	snapshot := SchematicSnapshot{}
 	files := target.SchematicFiles
 	if len(files) == 0 && target.SchematicPath != "" {
@@ -89,6 +94,18 @@ func CheckSchematics(target Target) (SchematicSnapshot, []CheckResult) {
 			if ref == "" {
 				connectivityIssues = append(connectivityIssues, BlockingIssue(reports.CodeValidationFailed, path, "schematic symbol is missing a reference"))
 				continue
+			}
+			libraryID := strings.TrimSpace(symbol.LibraryID)
+			if libraryID == "" {
+				connectivityIssues = append(connectivityIssues, reports.Issue{
+					Code:     reports.CodeValidationFailed,
+					Severity: reports.SeverityError,
+					Path:     slashPath(path) + ".symbols." + ref + ".library_id",
+					Message:  "schematic symbol has no library ID",
+					Refs:     []string{ref},
+				})
+			} else if opts.HasLibraryIndex {
+				connectivityIssues = append(connectivityIssues, resolverSymbolIssues(path, ref, libraryID, opts)...)
 			}
 			if previous, ok := seenRefs[strings.ToUpper(ref)]; ok && !strings.HasPrefix(ref, "#") {
 				connectivityIssues = append(connectivityIssues, reports.Issue{
@@ -193,6 +210,19 @@ func CheckSchematics(target Target) (SchematicSnapshot, []CheckResult) {
 		Issues:   connectivityIssues,
 		Summary:  fmt.Sprintf("%d symbol(s), %d label(s), %d wire(s)", snapshot.SymbolCount, snapshot.LabelCount, snapshot.WireCount),
 	}}
+}
+
+func resolverSymbolIssues(path string, ref string, libraryID string, opts Options) []reports.Issue {
+	if _, ok := libraryresolver.ResolveSymbol(opts.LibraryIndex, libraryID); !ok {
+		return []reports.Issue{{
+			Code:     reports.CodeMissingFile,
+			Severity: reports.SeverityError,
+			Path:     slashPath(path) + ".symbols." + ref + ".library_id",
+			Message:  "symbol library record not found: " + libraryID,
+			Refs:     []string{ref},
+		}}
+	}
+	return nil
 }
 
 type sheetPinExpectation struct {

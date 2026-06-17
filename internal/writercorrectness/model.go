@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -30,20 +31,22 @@ const (
 	CheckGeneratedConnectivity = "generated_connectivity"
 	CheckZoneNetReferences     = "zone_net_references"
 	CheckKiCadRoundTrip        = "kicad_round_trip"
+	CheckLibraryResolver       = "library_resolver"
 )
 
 var checkPriority = map[string]int{
 	CheckProjectStructure:      0,
-	CheckSchematicParse:        1,
-	CheckSchematicConnectivity: 2,
-	CheckSchematicPCBTransfer:  3,
-	CheckPCBParse:              4,
-	CheckPCBNetTable:           5,
-	CheckFootprintPadNets:      6,
-	CheckCopperNetReferences:   7,
-	CheckGeneratedConnectivity: 8,
-	CheckZoneNetReferences:     9,
-	CheckKiCadRoundTrip:        10,
+	CheckLibraryResolver:       1,
+	CheckSchematicParse:        2,
+	CheckSchematicConnectivity: 3,
+	CheckSchematicPCBTransfer:  4,
+	CheckPCBParse:              5,
+	CheckPCBNetTable:           6,
+	CheckFootprintPadNets:      7,
+	CheckCopperNetReferences:   8,
+	CheckGeneratedConnectivity: 9,
+	CheckZoneNetReferences:     10,
+	CheckKiCadRoundTrip:        11,
 }
 
 type Options struct {
@@ -54,6 +57,10 @@ type Options struct {
 	StrictDiffs           bool
 	AllowUnrouted         bool
 	GeometryToleranceIU   int64
+	LibraryIndex          libraryresolver.LibraryIndex
+	HasLibraryIndex       bool
+	LibraryIssues         []reports.Issue
+	LibraryResolutionUsed bool
 }
 
 type Target struct {
