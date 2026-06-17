@@ -1,0 +1,195 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "regulator.linear.ams1117_3v3.sot223",
+      "family": "regulator",
+      "name": "AMS1117-style 3.3 V linear regulator",
+      "generic": true,
+      "tags": ["power", "linear_regulator", "3v3", "sot223"],
+      "values": [{"kind": "output_voltage", "typ": "3.3", "unit": "V"}],
+      "ratings": [
+        {"kind": "input_voltage", "max": "12", "unit": "V"},
+        {"kind": "output_current", "max": "800", "unit": "mA"}
+      ],
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:AMS1117-3.3",
+        "function_pins": [
+          {"function": "GND", "symbol_pin": "1", "required": true},
+          {"function": "VOUT", "symbol_pin": "2", "required": true},
+          {"function": "VIN", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {"confidence": "placeholder", "notes": ["Pinout must be verified against exact regulator variant."]}
+      }],
+      "packages": [{
+        "id": "sot223",
+        "name": "SOT-223-3 TabPin2",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "package_type": "sot223",
+        "pad_functions": [
+          {"function": "GND", "pad": "1"},
+          {"function": "VOUT", "pad": "2"},
+          {"function": "VIN", "pad": "3"}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Thermal and stability constraints are not verified."]}
+    },
+    {
+      "id": "opamp.generic.single.lmv321",
+      "family": "opamp",
+      "name": "Generic single op-amp LMV321-style",
+      "generic": true,
+      "tags": ["analog", "opamp", "single"],
+      "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "Amplifier_Operational:LMV321",
+        "function_pins": [
+          {"function": "IN_PLUS", "symbol_pin": "1", "required": true},
+          {"function": "V_MINUS", "symbol_pin": "2", "required": true},
+          {"function": "IN_MINUS", "symbol_pin": "3", "required": true},
+          {"function": "OUT", "symbol_pin": "4", "required": true},
+          {"function": "V_PLUS", "symbol_pin": "5", "required": true}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "packages": [{
+        "id": "sot23_5",
+        "name": "SOT-23-5",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+        "package_type": "sot23_5",
+        "pad_functions": [
+          {"function": "IN_PLUS", "pad": "1"},
+          {"function": "V_MINUS", "pad": "2"},
+          {"function": "IN_MINUS", "pad": "3"},
+          {"function": "OUT", "pad": "4"},
+          {"function": "V_PLUS", "pad": "5"}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Stability, bandwidth, and output-drive checks are not implemented."]}
+    },
+    {
+      "id": "mcu.placeholder.avr_minimal_tqfp32",
+      "family": "mcu",
+      "name": "AVR-style TQFP-32 minimal-system placeholder",
+      "generic": true,
+      "tags": ["mcu", "avr", "tqfp32"],
+      "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "MCU_Microchip_ATmega:ATmega328P-A",
+        "function_pins": [
+          {"function": "GPIO_1", "symbol_pin": "1"},
+          {"function": "GPIO_2", "symbol_pin": "2"},
+          {"function": "GND", "symbol_pin": "3", "required": true},
+          {"function": "VCC", "symbol_pin": "4", "required": true},
+          {"function": "GND", "symbol_pin": "5", "required": true},
+          {"function": "VCC", "symbol_pin": "6", "required": true},
+          {"function": "GPIO_7", "symbol_pin": "7"},
+          {"function": "GPIO_8", "symbol_pin": "8"},
+          {"function": "GPIO_9", "symbol_pin": "9"},
+          {"function": "GPIO_10", "symbol_pin": "10"},
+          {"function": "GPIO_11", "symbol_pin": "11"},
+          {"function": "GPIO_12", "symbol_pin": "12"},
+          {"function": "GPIO_13", "symbol_pin": "13"},
+          {"function": "GPIO_14", "symbol_pin": "14"},
+          {"function": "MOSI", "symbol_pin": "15"},
+          {"function": "MISO", "symbol_pin": "16"},
+          {"function": "SCK", "symbol_pin": "17"},
+          {"function": "AVCC", "symbol_pin": "18", "required": true},
+          {"function": "GPIO_19", "symbol_pin": "19"},
+          {"function": "AREF", "symbol_pin": "20"},
+          {"function": "AGND", "symbol_pin": "21", "required": true},
+          {"function": "GPIO_22", "symbol_pin": "22"},
+          {"function": "GPIO_23", "symbol_pin": "23"},
+          {"function": "GPIO_24", "symbol_pin": "24"},
+          {"function": "GPIO_25", "symbol_pin": "25"},
+          {"function": "GPIO_26", "symbol_pin": "26"},
+          {"function": "GPIO_27", "symbol_pin": "27"},
+          {"function": "GPIO_28", "symbol_pin": "28"},
+          {"function": "RESET", "symbol_pin": "29", "required": true},
+          {"function": "GPIO_30", "symbol_pin": "30"},
+          {"function": "GPIO_31", "symbol_pin": "31"},
+          {"function": "GPIO_32", "symbol_pin": "32"}
+        ],
+        "verification": {"confidence": "placeholder", "notes": ["Full pin-role map is still block-local."]}
+      }],
+      "packages": [{
+        "id": "tqfp32",
+        "name": "TQFP-32 7x7 mm P0.8",
+        "footprint_id": "Package_QFP:TQFP-32_7x7mm_P0.8mm",
+        "package_type": "tqfp32",
+        "pad_functions": [
+          {"function": "GPIO_1", "pad": "1"},
+          {"function": "GPIO_2", "pad": "2"},
+          {"function": "GND", "pad": "3"},
+          {"function": "VCC", "pad": "4"},
+          {"function": "GND", "pad": "5"},
+          {"function": "VCC", "pad": "6"},
+          {"function": "GPIO_7", "pad": "7"},
+          {"function": "GPIO_8", "pad": "8"},
+          {"function": "GPIO_9", "pad": "9"},
+          {"function": "GPIO_10", "pad": "10"},
+          {"function": "GPIO_11", "pad": "11"},
+          {"function": "GPIO_12", "pad": "12"},
+          {"function": "GPIO_13", "pad": "13"},
+          {"function": "GPIO_14", "pad": "14"},
+          {"function": "MOSI", "pad": "15"},
+          {"function": "MISO", "pad": "16"},
+          {"function": "SCK", "pad": "17"},
+          {"function": "AVCC", "pad": "18"},
+          {"function": "GPIO_19", "pad": "19"},
+          {"function": "AREF", "pad": "20"},
+          {"function": "AGND", "pad": "21"},
+          {"function": "GPIO_22", "pad": "22"},
+          {"function": "GPIO_23", "pad": "23"},
+          {"function": "GPIO_24", "pad": "24"},
+          {"function": "GPIO_25", "pad": "25"},
+          {"function": "GPIO_26", "pad": "26"},
+          {"function": "GPIO_27", "pad": "27"},
+          {"function": "GPIO_28", "pad": "28"},
+          {"function": "RESET", "pad": "29"},
+          {"function": "GPIO_30", "pad": "30"},
+          {"function": "GPIO_31", "pad": "31"},
+          {"function": "GPIO_32", "pad": "32"}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Placeholder matching the existing MCU minimal block template.", "This is not a complete ATmega328P-A component record and must not be used for arbitrary peripheral pin selection."]}
+    },
+    {
+      "id": "sensor.i2c.interface_header.5pin",
+      "family": "sensor",
+      "name": "Structural five-pin I2C sensor interface header",
+      "generic": true,
+      "tags": ["sensor", "i2c", "placeholder"],
+      "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "Sensor:Generic_I2C",
+        "function_pins": [
+          {"function": "VCC", "symbol_pin": "1", "required": true},
+          {"function": "GND", "symbol_pin": "2", "required": true},
+          {"function": "SDA", "symbol_pin": "3", "required": true},
+          {"function": "SCL", "symbol_pin": "4", "required": true},
+          {"function": "INT", "symbol_pin": "5"}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "packages": [{
+        "id": "generic_smd_5pin",
+        "name": "1x05 interface header",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical",
+        "package_type": "pin_header_1x05",
+        "pad_functions": [
+          {"function": "VCC", "pad": "1"},
+          {"function": "GND", "pad": "2"},
+          {"function": "SDA", "pad": "3"},
+          {"function": "SCL", "pad": "4"},
+          {"function": "INT", "pad": "5"}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Structural placeholder for block composition only.", "This record models an I2C sensor interface header, not a physical sensor package; replace with a verified sensor record before connectivity or fabrication readiness."]}
+    }
+  ]
+}

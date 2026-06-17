@@ -1,0 +1,125 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "resistor.generic.0603",
+      "family": "resistor",
+      "name": "Generic 0603 resistor",
+      "description": "Generic two-terminal SMD resistor for draft and connectivity-level passive use.",
+      "generic": true,
+      "tags": ["passive", "smd", "0603"],
+      "values": [{"kind": "resistance", "min": "0", "max": "10M", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "typ": "0.1", "unit": "W"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:R"]}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "Resistor_SMD:R_0603_1608Metric",
+        "package_type": "0603",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule"]}
+      }],
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"], "notes": ["Symmetric passive; value and rating remain design-specific."]}
+    },
+    {
+      "id": "resistor.generic.0805",
+      "family": "resistor",
+      "name": "Generic 0805 resistor",
+      "description": "Generic two-terminal SMD resistor used by existing LED, regulator, MCU, power, and sensor blocks.",
+      "generic": true,
+      "tags": ["passive", "smd", "0805"],
+      "values": [{"kind": "resistance", "min": "0", "max": "10M", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "typ": "0.125", "unit": "W"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:R"]}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "package_type": "0805",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule"]}
+      }],
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"], "notes": ["Symmetric passive; value and rating remain design-specific."]}
+    },
+    {
+      "id": "capacitor.ceramic.0805",
+      "family": "capacitor",
+      "name": "Generic 0805 ceramic capacitor",
+      "description": "Generic nonpolar ceramic capacitor for decoupling and simple filters.",
+      "generic": true,
+      "tags": ["passive", "smd", "0805", "ceramic", "nonpolar"],
+      "values": [{"kind": "capacitance", "min": "1p", "max": "100u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:C"]}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric",
+        "package_type": "0805",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule"]}
+      }],
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"], "notes": ["Nonpolar passive; voltage derating remains design-specific."]}
+    },
+    {
+      "id": "capacitor.electrolytic.radial",
+      "family": "capacitor",
+      "name": "Generic radial electrolytic capacitor",
+      "description": "Generic polarized electrolytic capacitor placeholder for bulk capacitance.",
+      "generic": true,
+      "tags": ["passive", "through_hole", "polarized"],
+      "values": [{"kind": "capacitance", "min": "1u", "max": "1000u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "16", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "Device:CP",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}
+        ],
+        "verification": {"confidence": "placeholder", "notes": ["Polarity must be verified before connectivity readiness."]}
+      }],
+      "packages": [{
+        "id": "radial_5mm",
+        "name": "Radial 5 mm",
+        "footprint_id": "Capacitor_THT:CP_Radial_D5.0mm_P2.50mm",
+        "package_type": "radial",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1"},
+          {"function": "NEGATIVE", "pad": "2"}
+        ],
+        "verification": {"confidence": "placeholder"}
+      }],
+      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Placeholder until polarized pinmap and voltage derating rules are verified."]}
+    }
+  ]
+}

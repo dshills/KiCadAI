@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -53,6 +54,31 @@ func TestLoadCatalogMergesDeterministically(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
+	_, sourceFile, _, ok := runtime.Caller(0)
+	if !ok {
+		t.Fatal("locate test source file")
+	}
+	catalogDir := filepath.Join(filepath.Dir(sourceFile), "..", "..", "data", "components")
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: catalogDir})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	if len(catalog.Records) == 0 {
+		t.Fatal("checked-in catalog has no records")
+	}
+	result := ValidateCatalog(catalog)
+	if !result.OK {
+		t.Fatalf("checked-in catalog validation failed: %+v", result.Issues)
+	}
+	coveredFamilies := catalogFamilyCoverage(catalog)
+	for _, family := range catalog.Families {
+		if !coveredFamilies[family.ID] {
+			t.Fatalf("checked-in catalog missing family record for %s", family.ID)
+		}
+	}
+}
+
 func TestValidateCatalogDuplicateID(t *testing.T) {
 	catalog := validCatalog()
 	catalog.Records = append(catalog.Records, catalog.Records[0])
@@ -61,6 +87,14 @@ func TestValidateCatalogDuplicateID(t *testing.T) {
 		t.Fatal("expected duplicate id to fail")
 	}
 	assertIssueCode(t, result.Issues, CodeDuplicateComponentID)
+}
+
+func catalogFamilyCoverage(catalog *Catalog) map[string]bool {
+	covered := map[string]bool{}
+	for _, record := range catalog.Records {
+		covered[record.Family] = true
+	}
+	return covered
 }
 
 func TestValidateCatalogUnknownFamily(t *testing.T) {
