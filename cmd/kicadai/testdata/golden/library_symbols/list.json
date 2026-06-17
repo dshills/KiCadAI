@@ -1,0 +1,83 @@
+{
+  "ok": true,
+  "command": "library",
+  "version": "0.1.0",
+  "data": [
+    {
+      "library_id": "Amplifier:Dual_OpAmp",
+      "library_nickname": "Amplifier",
+      "name": "Dual_OpAmp",
+      "path": "$SYMBOLS_ROOT/Amplifier.kicad_sym",
+      "description": "Dual operational amplifier",
+      "pin_count": 8,
+      "unit_count": 2
+    },
+    {
+      "library_id": "Connector:Conn_01x02",
+      "library_nickname": "Connector",
+      "name": "Conn_01x02",
+      "path": "$SYMBOLS_ROOT/Connector.kicad_sym",
+      "description": "Generic two-pin connector",
+      "pin_count": 2,
+      "unit_count": 1
+    },
+    {
+      "library_id": "Device:C",
+      "library_nickname": "Device",
+      "name": "C",
+      "path": "$SYMBOLS_ROOT/Device.kicad_sym",
+      "description": "Capacitor",
+      "pin_count": 2,
+      "unit_count": 1
+    },
+    {
+      "library_id": "Device:LED",
+      "library_nickname": "Device",
+      "name": "LED",
+      "path": "$SYMBOLS_ROOT/Device.kicad_sym",
+      "description": "Light emitting diode",
+      "pin_count": 2,
+      "unit_count": 1
+    },
+    {
+      "library_id": "Device:R",
+      "library_nickname": "Device",
+      "name": "R",
+      "path": "$SYMBOLS_ROOT/Device.kicad_sym",
+      "description": "Resistor",
+      "pin_count": 2,
+      "unit_count": 1
+    },
+    {
+      "library_id": "power:GND",
+      "library_nickname": "power",
+      "name": "GND",
+      "path": "$SYMBOLS_ROOT/power.kicad_sym",
+      "description": "Ground",
+      "pin_count": 1,
+      "unit_count": 1,
+      "power_symbol": true
+    }
+  ],
+  "issues": [
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.klc_root",
+      "message": "KLC root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.footprints_root",
+      "message": "footprints root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.templates_root",
+      "message": "templates root is not configured"
+    }
+  ],
+  "artifacts": []
+}

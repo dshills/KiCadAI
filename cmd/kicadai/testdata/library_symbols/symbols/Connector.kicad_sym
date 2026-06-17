@@ -1,0 +1,14 @@
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Conn_01x02"
+    (property "Reference" "J" (at 0 2.54 0))
+    (property "Value" "Conn_01x02" (at 0 -5.08 0))
+    (ki_keywords "connector")
+    (ki_description "Generic two-pin connector")
+    (symbol "Conn_01x02_1_1"
+      (pin passive line (at -2.54 0 0) (length 2.54) (name "Pin_1") (number "1"))
+      (pin passive line (at -2.54 -2.54 0) (length 2.54) (name "Pin_2") (number "2"))
+    )
+  )
+)

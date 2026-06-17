@@ -1,0 +1,11 @@
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "HiddenPower"
+    (property "Reference" "#PWR" (at 0 -2.54 0) hide)
+    (property "Value" "HiddenPower" (at 0 2.54 0))
+    (symbol "HiddenPower_1_1"
+      (pin power_in line (at 0 0 90) (length 0) hide (name "PWR") (number "1"))
+    )
+  )
+)

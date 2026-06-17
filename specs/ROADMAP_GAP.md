@@ -87,6 +87,44 @@ catalog expansion rather than foundation work:
 - grow golden corpus tests for selection output and unsafe choices;
 - use exact part choices to drive richer schematic value/property output.
 
+## Update: Symbol Resolver Hardening Implemented
+
+The Symbol and Footprint Library Resolver roadmap item has also moved from
+foundation gap to implemented foundation for symbol semantics. The project now
+has a hardened symbol parser and resolver path that can parse representative
+KiCad `.kicad_sym` files, model units, common pins, electrical types, power
+symbols, inherited records, rough graphics bounds, project/global symbol
+tables, and expose resolver evidence through stable CLI JSON.
+
+Implemented evidence:
+
+- `internal/libraryresolver` symbol records for units, pins, electrical types,
+  hidden/common flags, power symbols, inherited metadata, and graphics bounds.
+- project-local and global `sym-lib-table` parsing with KiCad path-variable
+  expansion and deterministic precedence.
+- component evidence validation against resolver-backed symbol pins and unit
+  policy.
+- schematic transaction hydration that can use resolver pin geometry for wire
+  anchors.
+- `library symbols list`, `library symbols show`, `library symbols pins`, and
+  `library symbols validate` CLI commands.
+- writer correctness integration through the `library_resolver` check and
+  unresolved-symbol diagnostics when symbol roots are configured.
+- checked-in CLI golden corpus for list/show/pins/blocked validation outputs.
+- optional external KiCad symbol smoke test gated by
+  `KICADAI_RUN_EXTERNAL_SYMBOL_TESTS=1` and `KICAD_SYMBOLS_DIR`.
+
+Remaining symbol-resolver follow-up work belongs under hardening and library
+coverage rather than foundation work:
+
+- model additional KiCad symbol constructs as they appear in real corpus
+  failures;
+- add explicit safe policies for hidden power pins and multi-unit component
+  usage;
+- grow golden fixtures from real KiCad libraries when regressions are found;
+- keep symbol, footprint, and component evidence aligned as the catalog expands;
+- use resolver evidence more deeply in autonomous design repair loops.
+
 ## High-Priority Findings
 
 ### 1. Roadmap Status Is Stale

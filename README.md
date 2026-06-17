@@ -691,6 +691,21 @@ go run ./cmd/kicadai --json library pinmap-candidate Device:R Resistor_SMD:R_080
 go run ./cmd/kicadai --json library templates
 ```
 
+Hardened symbol inspection commands expose resolver evidence without requiring
+agents to read raw `.kicad_sym` files:
+
+```sh
+go run ./cmd/kicadai --json library symbols list
+go run ./cmd/kicadai --json library symbols show Device:R
+go run ./cmd/kicadai --json library symbols pins Device:R
+go run ./cmd/kicadai --json library symbols validate Device:R
+```
+
+These commands report parsed units, common pins, electrical types, power-symbol
+flags, inherited metadata, rough graphics bounds, and resolver diagnostics.
+`writer check` can use the same resolver evidence when symbol roots are
+configured, and reports a `library_resolver` check when resolution is attempted.
+
 Use `--library-cache .kicadai/library-index.json` for faster repeated loads and
 `--refresh-library-cache` to rebuild it. See
 [docs/library-resolver.md](docs/library-resolver.md) for setup, command

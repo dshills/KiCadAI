@@ -1,0 +1,106 @@
+{
+  "ok": true,
+  "command": "library",
+  "version": "0.1.0",
+  "data": {
+    "library_id": "Device:R",
+    "library_nickname": "Device",
+    "name": "R",
+    "path": "$SYMBOLS_ROOT/Device.kicad_sym",
+    "description": "Resistor",
+    "keywords": [
+      "resistor",
+      "R",
+      "passive"
+    ],
+    "footprint_filter": [
+      "R_*",
+      "Resistor_*"
+    ],
+    "properties": {
+      "Reference": "R",
+      "Value": "R"
+    },
+    "units": [
+      {
+        "unit": 1,
+        "body_style": 1,
+        "pin_indexes": [
+          0,
+          1
+        ]
+      }
+    ],
+    "pins": [
+      {
+        "number": "1",
+        "name": "~",
+        "electrical": "passive",
+        "electrical_type": "passive",
+        "unit": 1,
+        "body_style": 1,
+        "position": {
+          "X": -5080000,
+          "Y": 0
+        },
+        "orientation": "0",
+        "length": 2540000,
+        "hidden": false
+      },
+      {
+        "number": "2",
+        "name": "~",
+        "electrical": "passive",
+        "electrical_type": "passive",
+        "unit": 1,
+        "body_style": 1,
+        "position": {
+          "X": 5080000,
+          "Y": 0
+        },
+        "orientation": "180",
+        "length": 2540000,
+        "hidden": false
+      }
+    ],
+    "graphics": [
+      {
+        "kind": "rectangle",
+        "unit": 1,
+        "body_style": 1,
+        "bounds": {
+          "min": {
+            "X": -2540000,
+            "Y": -1270000
+          },
+          "max": {
+            "X": 2540000,
+            "Y": 1270000
+          }
+        }
+      }
+    ],
+    "raw": "(symbol \"R\"\n    (property \"Reference\" \"R\" (at 0 0 0))\n    (property \"Value\" \"R\" (at 0 -2.54 0))\n    (ki_keywords \"resistor R passive\")\n    (ki_description \"Resistor\")\n    (ki_fp_filters \"R_*\" \"Resistor_*\")\n    (symbol \"R_1_1\"\n      (rectangle (start -2.54 -1.27) (end 2.54 1.27) (stroke (width 0.1524) (type default)) (fill (type background)))\n      (pin passive line (at -5.08 0 0) (length 2.54) (name \"~\") (number \"1\"))\n      (pin passive line (at 5.08 0 180) (length 2.54) (name \"~\") (number \"2\"))\n    )\n  )"
+  },
+  "issues": [
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.klc_root",
+      "message": "KLC root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.footprints_root",
+      "message": "footprints root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.templates_root",
+      "message": "templates root is not configured"
+    }
+  ],
+  "artifacts": []
+}

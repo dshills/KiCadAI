@@ -42,6 +42,23 @@ go run ./cmd/kicadai --json library symbol Device:R
 go run ./cmd/kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
 ```
 
+Inspect hardened symbol evidence:
+
+```sh
+go run ./cmd/kicadai --json library symbols list
+go run ./cmd/kicadai --json library symbols show Device:R
+go run ./cmd/kicadai --json library symbols pins Device:R
+go run ./cmd/kicadai --json library symbols validate Device:R
+```
+
+The nested `library symbols` commands return stable JSON for AI agents and
+tests. `list` emits compact symbol summaries. `show` returns the parsed symbol
+record, including properties, units, pins, inherited metadata, power-symbol
+classification, and rough graphics bounds. `pins` returns the deterministic pin
+list with unit, common-pin, hidden-pin, position, orientation, and electrical
+type evidence. `validate` runs symbol KLC checks and surfaces resolver
+diagnostics.
+
 Search:
 
 ```sh
@@ -127,6 +144,23 @@ KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates \
 go test ./internal/libraryresolver
 ```
 
+The symbol CLI golden corpus is checked in under
+`cmd/kicadai/testdata/golden/library_symbols`. Update it only when the JSON
+contract intentionally changes:
+
+```sh
+go test ./cmd/kicadai -run TestRunLibrarySymbolsGolden -update-library-symbol-goldens
+```
+
+Optional external KiCad symbol smoke tests are separate from the default test
+suite and require both environment variables:
+
+```sh
+KICADAI_RUN_EXTERNAL_SYMBOL_TESTS=1 \
+KICAD_SYMBOLS_DIR=/path/to/kicad-symbols \
+go test ./cmd/kicadai -run TestExternalKiCadSymbolsSmoke
+```
+
 ## Known Limitations
 
 - KLC checks are conservative and partial.
@@ -134,6 +168,8 @@ go test ./internal/libraryresolver
   numbers are reported conservatively.
 - Compatibility uses symbol pins, footprint pads, filters, names, and metadata;
   it does not prove electrical correctness.
+- Hidden power pins currently require explicit connectivity policy before they
+  can be treated as safe evidence.
 - Template indexing records project structure but does not instantiate
   templates yet.
 - Cache validation still performs discovery so added or removed files invalidate

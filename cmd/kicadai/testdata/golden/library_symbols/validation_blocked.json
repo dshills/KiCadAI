@@ -1,0 +1,44 @@
+{
+  "ok": false,
+  "command": "library",
+  "version": "0.1.0",
+  "issues": [
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.klc_root",
+      "message": "KLC root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.footprints_root",
+      "message": "footprints root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.templates_root",
+      "message": "templates root is not configured"
+    },
+    {
+      "code": "VALIDATION_FAILED",
+      "severity": "warning",
+      "path": "$BLOCKED_SYMBOLS_ROOT/Broken.kicad_sym",
+      "message": "sexpr parse error at offset $OFFSET: unterminated list"
+    },
+    {
+      "code": "VALIDATION_FAILED",
+      "severity": "blocked",
+      "path": "library.symbol.HiddenPower:HiddenPower",
+      "message": "hidden power pin 1 requires explicit connectivity policy"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "error",
+      "path": "library.symbol",
+      "message": "library record not found: Device:R"
+    }
+  ],
+  "artifacts": []
+}

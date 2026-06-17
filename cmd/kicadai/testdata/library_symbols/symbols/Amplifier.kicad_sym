@@ -1,0 +1,24 @@
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "Dual_OpAmp"
+    (property "Reference" "U" (at 0 5.08 0))
+    (property "Value" "Dual_OpAmp" (at 0 -5.08 0))
+    (ki_keywords "opamp amplifier")
+    (ki_description "Dual operational amplifier")
+    (symbol "Dual_OpAmp_1_1"
+      (pin input line (at -5.08 1.27 0) (length 2.54) (name "+") (number "3"))
+      (pin input line (at -5.08 -1.27 0) (length 2.54) (name "-") (number "2"))
+      (pin output line (at 5.08 0 180) (length 2.54) (name "OUT") (number "1"))
+    )
+    (symbol "Dual_OpAmp_2_1"
+      (pin input line (at -5.08 1.27 0) (length 2.54) (name "+") (number "5"))
+      (pin input line (at -5.08 -1.27 0) (length 2.54) (name "-") (number "6"))
+      (pin output line (at 5.08 0 180) (length 2.54) (name "OUT") (number "7"))
+    )
+    (symbol "Dual_OpAmp_0_1"
+      (pin power_in line (at 0 5.08 270) (length 2.54) (name "V+") (number "8"))
+      (pin power_in line (at 0 -5.08 90) (length 2.54) (name "V-") (number "4"))
+    )
+  )
+)

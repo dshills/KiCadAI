@@ -1,0 +1,34 @@
+(kicad_symbol_lib
+  (version 20220914)
+  (generator "kicadai-test")
+  (symbol "R"
+    (property "Reference" "R" (at 0 0 0))
+    (property "Value" "R" (at 0 -2.54 0))
+    (ki_keywords "resistor R passive")
+    (ki_description "Resistor")
+    (ki_fp_filters "R_*" "Resistor_*")
+    (symbol "R_1_1"
+      (rectangle (start -2.54 -1.27) (end 2.54 1.27) (stroke (width 0.1524) (type default)) (fill (type background)))
+      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))
+    )
+  )
+  (symbol "C"
+    (property "Reference" "C" (at 0 1.27 0))
+    (property "Value" "C" (at 0 -1.27 0))
+    (ki_keywords "capacitor cap passive")
+    (ki_description "Capacitor")
+    (ki_fp_filters "C_*" "Capacitor_*")
+    (symbol "C_1_1"
+      (pin passive line (at -3.81 0 0) (length 2.54) (name "~") (number "1"))
+      (pin passive line (at 3.81 0 180) (length 2.54) (name "~") (number "2"))
+    )
+  )
+  (symbol "LED"
+    (extends "R")
+    (property "Reference" "D" (at 0 0 0))
+    (property "Value" "LED" (at 0 -2.54 0))
+    (ki_keywords "LED diode")
+    (ki_description "Light emitting diode")
+  )
+)

@@ -1,0 +1,150 @@
+{
+  "ok": true,
+  "command": "library",
+  "version": "0.1.0",
+  "data": [
+    {
+      "number": "3",
+      "name": "+",
+      "electrical": "input",
+      "electrical_type": "input",
+      "unit": 1,
+      "body_style": 1,
+      "position": {
+        "X": -5080000,
+        "Y": 1270000
+      },
+      "orientation": "0",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "2",
+      "name": "-",
+      "electrical": "input",
+      "electrical_type": "input",
+      "unit": 1,
+      "body_style": 1,
+      "position": {
+        "X": -5080000,
+        "Y": -1270000
+      },
+      "orientation": "0",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "1",
+      "name": "OUT",
+      "electrical": "output",
+      "electrical_type": "output",
+      "unit": 1,
+      "body_style": 1,
+      "position": {
+        "X": 5080000,
+        "Y": 0
+      },
+      "orientation": "180",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "5",
+      "name": "+",
+      "electrical": "input",
+      "electrical_type": "input",
+      "unit": 2,
+      "body_style": 1,
+      "position": {
+        "X": -5080000,
+        "Y": 1270000
+      },
+      "orientation": "0",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "6",
+      "name": "-",
+      "electrical": "input",
+      "electrical_type": "input",
+      "unit": 2,
+      "body_style": 1,
+      "position": {
+        "X": -5080000,
+        "Y": -1270000
+      },
+      "orientation": "0",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "7",
+      "name": "OUT",
+      "electrical": "output",
+      "electrical_type": "output",
+      "unit": 2,
+      "body_style": 1,
+      "position": {
+        "X": 5080000,
+        "Y": 0
+      },
+      "orientation": "180",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "8",
+      "name": "V+",
+      "electrical": "power_in",
+      "electrical_type": "power_in",
+      "unit": 0,
+      "body_style": 1,
+      "common": true,
+      "position": {
+        "X": 0,
+        "Y": 5080000
+      },
+      "orientation": "270",
+      "length": 2540000,
+      "hidden": false
+    },
+    {
+      "number": "4",
+      "name": "V-",
+      "electrical": "power_in",
+      "electrical_type": "power_in",
+      "unit": 0,
+      "body_style": 1,
+      "common": true,
+      "position": {
+        "X": 0,
+        "Y": -5080000
+      },
+      "orientation": "90",
+      "length": 2540000,
+      "hidden": false
+    }
+  ],
+  "issues": [
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.klc_root",
+      "message": "KLC root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.footprints_root",
+      "message": "footprints root is not configured"
+    },
+    {
+      "code": "MISSING_FILE",
+      "severity": "warning",
+      "path": "roots.templates_root",
+      "message": "templates root is not configured"
+    }
+  ],
+  "artifacts": []
+}
