@@ -333,6 +333,34 @@ board outline selection, route conflict resolution, zone refill, and KiCad DRC
 evidence are still required before generated block PCBs should be treated as
 manufacturing candidates.
 
+Circuit blocks also have a verification harness with checked-in manifests for
+all built-in blocks. It verifies schematic semantics, PCB placement/pad/route
+expectations where declared, writer correctness when requested, and optional
+KiCad ERC/DRC evidence.
+
+```sh
+go run ./cmd/kicadai --json --builtins block verify
+go run ./cmd/kicadai --json --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json block verify
+go run ./cmd/kicadai --json --suite ./internal/blocks/testdata/verification --output ./out/block-verification --overwrite block verify
+```
+
+KiCad-backed checks are skipped unless a manifest or flag requires them. Use
+`--kicad-cli`, `--require-erc`, `--require-drc`, `--keep-artifacts`, and
+`--artifact-dir` when external ERC/DRC evidence is required. Golden report
+snapshots live under `cmd/kicadai/testdata/golden/block_verification` and can
+be refreshed with:
+
+The `./internal/...` paths above are source-tree paths for repository
+development. For general use, prefer `--builtins` or pass your own manifest
+path through `--case` or `--suite`.
+
+```sh
+go test ./cmd/kicadai -run TestRunBlockVerificationGoldens -update-block-verification-goldens
+```
+
+See [docs/circuit-block-verification.md](docs/circuit-block-verification.md)
+for evidence levels, manifest structure, and extension guidance.
+
 ### Placement
 
 The placement engine accepts a structured board placement request and returns

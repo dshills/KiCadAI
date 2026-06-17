@@ -450,23 +450,40 @@ Acceptance criteria:
 
 ### 2. Circuit Block Verification Harness
 
-Turn circuit blocks into a verified corpus.
+Status: implemented foundation.
 
-Focus:
+The project now has a circuit block verification harness and checked-in corpus.
+All built-in blocks have at least one manifest under
+`internal/blocks/testdata/verification`, the CLI can run one case, a suite, or
+the built-in corpus through `block verify`, and design workflow planning can
+cite each block's strongest built-in evidence level.
 
-- schematic fixture per block;
-- PCB fixture per block;
-- expected nets;
-- expected ERC/DRC outcomes;
-- expected local routing;
-- expected constraints;
-- fixture round-trip tests.
+Implemented evidence:
 
-Acceptance criteria:
+- manifest model and validation for evidence levels, components, ports, nets,
+  PCB expectations, writer expectations, and optional ERC/DRC expectations;
+- semantic assertion engine for generated refs, roles, symbols, footprints,
+  ports, nets, and pin memberships;
+- PCB assertion support for placements, footprint IDs, pad nets, required
+  routes, and required zones;
+- writer correctness integration for generated block projects;
+- optional KiCad ERC/DRC hooks with skipped, required, allowed, and expected
+  issue behavior;
+- `kicadai --json block verify --case|--suite|--builtins` CLI;
+- golden report snapshots for built-ins, a passing case, a blocked case, and
+  skipped ERC/DRC evidence;
+- design workflow `block_planning` evidence summaries and fabrication-candidate
+  evidence gating.
 
-- every built-in block has generated schematic and PCB evidence;
-- every block has pass/fail validation expectations;
-- block failures identify the component, net, pin, or constraint responsible.
+Remaining follow-up work:
+
+- embed or package built-in verification manifests for installed binaries
+  instead of relying on source-tree paths or `KICADAI_BLOCK_VERIFICATION_ROOT`;
+- add singleflight-style cache population if design workflow block evidence
+  lookup becomes hot under concurrent service traffic;
+- raise more block manifests from `schematic_verified` to `pcb_verified` and
+  `erc_drc_verified` as local PCB/DRC evidence matures;
+- expand golden report cases as new blocks and evidence levels are added.
 
 ### 3. Closed-Loop Validation Repair
 
