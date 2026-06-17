@@ -1,0 +1,8 @@
+[
+  {
+    "code": "COMPONENT_AMBIGUOUS",
+    "severity": "blocked",
+    "path": "component.select",
+    "message": "multiple components matched with equal score and confidence"
+  }
+]

@@ -1,0 +1,15 @@
+{
+  "version": "0.1.0",
+  "families": [{"id": "resistor", "name": "Resistor"}],
+  "records": [
+    {
+      "id": "resistor.missing_footprint",
+      "family": "resistor",
+      "name": "Missing footprint",
+      "generic": true,
+      "symbols": [{"symbol_id": "Device:R", "verification": {"confidence": "rule_inferred"}}],
+      "packages": [{"id": "0805", "verification": {"confidence": "rule_inferred"}}],
+      "verification": {"confidence": "rule_inferred"}
+    }
+  ]
+}

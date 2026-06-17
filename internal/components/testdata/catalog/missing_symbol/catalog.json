@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "families": [{"id": "resistor", "name": "Resistor"}],
+  "records": [
+    {
+      "id": "resistor.missing_symbol",
+      "family": "resistor",
+      "name": "Missing symbol",
+      "generic": true,
+      "packages": [{"id": "0805", "footprint_id": "Resistor_SMD:R_0805_2012Metric", "verification": {"confidence": "rule_inferred"}}],
+      "verification": {"confidence": "rule_inferred"}
+    }
+  ]
+}

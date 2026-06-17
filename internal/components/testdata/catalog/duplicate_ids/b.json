@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "resistor.duplicate",
+      "family": "resistor",
+      "name": "Duplicate B",
+      "generic": true,
+      "symbols": [{"symbol_id": "Device:R", "verification": {"confidence": "rule_inferred"}}],
+      "packages": [{"id": "0603", "footprint_id": "Resistor_SMD:R_0603_1608Metric", "verification": {"confidence": "rule_inferred"}}],
+      "verification": {"confidence": "rule_inferred"}
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "version": "0.1.0",
+  "families": [
+    {"id": "resistor", "name": "Resistor"}
+  ],
+  "records": [
+    {
+      "id": "resistor.generic.0805",
+      "family": "resistor",
+      "name": "Generic 0805 resistor",
+      "generic": true,
+      "values": [{"kind": "resistance", "min": "0", "max": "10M", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "typ": "0.125", "unit": "W"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "rule_inferred"}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "package_type": "0805",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "rule_inferred"}
+      }],
+      "verification": {"confidence": "rule_inferred"}
+    }
+  ]
+}

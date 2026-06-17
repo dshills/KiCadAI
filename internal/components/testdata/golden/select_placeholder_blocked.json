@@ -1,0 +1,8 @@
+[
+  {
+    "code": "COMPONENT_UNSAFE_CONFIDENCE",
+    "severity": "blocked",
+    "path": "component.opamp.placeholder",
+    "message": "component confidence placeholder is not allowed for connectivity acceptance"
+  }
+]
