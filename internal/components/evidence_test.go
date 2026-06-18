@@ -143,16 +143,17 @@ func TestValidateCatalogEvidenceUnmappedPad(t *testing.T) {
 
 func TestValidateCatalogEvidenceMissingPinmapForVerifiedActive(t *testing.T) {
 	catalog := validCatalog()
+	catalog.Families = append(catalog.Families, FamilyDefinition{ID: "opamp", Name: "Op-Amp"})
 	catalog.Records[0].Family = "opamp"
 	catalog.Records[0].Verification.Confidence = ConfidenceVerified
-	catalog.Records[0].Symbols[0].SymbolID = "Amplifier_Operational:LMV321"
-	catalog.Records[0].Packages[0].FootprintID = "Package_TO_SOT_SMD:SOT-23-5"
+	catalog.Records[0].Symbols[0].SymbolID = "Amplifier_Operational:UNVERIFIED_TEST"
+	catalog.Records[0].Packages[0].FootprintID = "Package_TO_SOT_SMD:UNVERIFIED_TEST"
 	index := libraryresolver.LibraryIndex{
 		Symbols: map[string]libraryresolver.SymbolRecord{
-			"Amplifier_Operational:LMV321": {LibraryID: "Amplifier_Operational:LMV321", Pins: []libraryresolver.SymbolPin{{Number: "1"}, {Number: "2"}}},
+			"Amplifier_Operational:UNVERIFIED_TEST": {LibraryID: "Amplifier_Operational:UNVERIFIED_TEST", Pins: []libraryresolver.SymbolPin{{Number: "1"}, {Number: "2"}}},
 		},
 		Footprints: map[string]libraryresolver.FootprintRecord{
-			"Package_TO_SOT_SMD:SOT-23-5": {FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pads: []libraryresolver.FootprintPad{{Name: "1"}, {Name: "2"}}},
+			"Package_TO_SOT_SMD:UNVERIFIED_TEST": {FootprintID: "Package_TO_SOT_SMD:UNVERIFIED_TEST", Pads: []libraryresolver.FootprintPad{{Name: "1"}, {Name: "2"}}},
 		},
 	}
 	result := ValidateCatalogEvidence(&catalog, EvidenceOptions{LibraryIndex: &index, RequirePinmaps: true})

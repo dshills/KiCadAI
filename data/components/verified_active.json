@@ -1,0 +1,284 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "opamp.ti.lmv321.sot23_5",
+      "family": "opamp",
+      "name": "TI LMV321 single op-amp SOT-23-5",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LMV321IDBVR",
+      "lifecycle": "active",
+      "tags": ["analog", "opamp", "single", "low_voltage", "sot23_5"],
+      "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}],
+      "temperature": {"min": "-40", "max": "125", "unit": "C"},
+      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm"}],
+      "symbols": [{
+        "symbol_id": "Amplifier_Operational:LMV321",
+        "function_pins": [
+          {"function": "IN_PLUS", "symbol_pin": "1", "electrical": "input", "required": true},
+          {"function": "V_MINUS", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "IN_MINUS", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "OUT", "symbol_pin": "4", "electrical": "output", "required": true},
+          {"function": "V_PLUS", "symbol_pin": "5", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Amplifier_Operational:LMV321", "builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot23_5",
+        "name": "SOT-23-5",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+        "package_type": "sot23_5",
+        "mpn": "LMV321IDBVR",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:LMV321|Package_TO_SOT_SMD:SOT-23-5",
+        "pad_functions": [
+          {"function": "IN_PLUS", "pad": "1"},
+          {"function": "V_MINUS", "pad": "2"},
+          {"function": "IN_MINUS", "pad": "3"},
+          {"function": "OUT", "pad": "4"},
+          {"function": "V_PLUS", "pad": "5"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
+    },
+    {
+      "id": "sensor.bosch.bme280.lga8",
+      "family": "sensor",
+      "name": "Bosch BME280 I2C/SPI environmental sensor",
+      "generic": false,
+      "manufacturer": "Bosch Sensortec",
+      "mpn": "BME280",
+      "lifecycle": "active",
+      "tags": ["sensor", "i2c", "spi", "temperature", "humidity", "pressure", "lga8"],
+      "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}],
+      "companions": [
+        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
+        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires pull-ups on SDA and SCL."}
+      ],
+      "symbols": [{
+        "symbol_id": "Sensor:BME280",
+        "function_pins": [
+          {"function": "GND", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "CSB", "symbol_pin": "2", "electrical": "input"},
+          {"function": "SDA", "symbol_pin": "3", "electrical": "bidirectional", "required": true, "aliases": ["SDI"]},
+          {"function": "SCL", "symbol_pin": "4", "electrical": "input", "required": true, "aliases": ["SCK"]},
+          {"function": "SDO", "symbol_pin": "5", "electrical": "bidirectional"},
+          {"function": "VDDIO", "symbol_pin": "6", "electrical": "power_in", "required": true},
+          {"function": "GND", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "VDD", "symbol_pin": "8", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Sensor:BME280", "builtin_pinmap:Sensor:BME280"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "lga8",
+        "name": "Bosch LGA-8 2.5x2.5 mm P0.65",
+        "footprint_id": "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering",
+        "package_type": "lga8",
+        "mpn": "BME280",
+        "lifecycle": "active",
+        "pinmap_id": "Sensor:BME280|Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering",
+        "pad_functions": [
+          {"function": "GND", "pad": "1"},
+          {"function": "CSB", "pad": "2"},
+          {"function": "SDA", "pad": "3", "aliases": ["SDI"]},
+          {"function": "SCL", "pad": "4", "aliases": ["SCK"]},
+          {"function": "SDO", "pad": "5"},
+          {"function": "VDDIO", "pad": "6"},
+          {"function": "GND", "pad": "7"},
+          {"function": "VDD", "pad": "8"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Sensor:BME280"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Sensor:BME280"], "pinmap_checked": true, "notes": ["Record supports I2C mode through SDA/SDI and SCL/SCK aliases."]}
+    },
+    {
+      "id": "mcu.microchip.atmega328p_a.tqfp32",
+      "family": "mcu",
+      "name": "Microchip ATmega328P-A TQFP-32",
+      "generic": false,
+      "manufacturer": "Microchip",
+      "mpn": "ATmega328P-AU",
+      "lifecycle": "active",
+      "tags": ["mcu", "avr", "tqfp32", "minimal_system"],
+      "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}],
+      "companions": [
+        {"id": "mcu.decoupling_vcc", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place decoupling capacitors near VCC/AVCC and GND pins."},
+        {"id": "mcu.reset_pullup", "family": "resistor", "role": "reset_pullup", "required": true, "description": "RESET requires a pull-up unless held by another verified circuit."},
+        {"id": "mcu.programming_header", "family": "connector", "role": "programming_header", "required": true, "description": "Expose SPI programming pins and reset for firmware loading."}
+      ],
+      "symbols": [{
+        "symbol_id": "MCU_Microchip_ATmega:ATmega328P-A",
+        "function_pins": [
+          {"function": "GPIO_1", "symbol_pin": "1"},
+          {"function": "GPIO_2", "symbol_pin": "2"},
+          {"function": "GND", "symbol_pin": "3", "required": true},
+          {"function": "VCC", "symbol_pin": "4", "required": true},
+          {"function": "GND", "symbol_pin": "5", "required": true},
+          {"function": "VCC", "symbol_pin": "6", "required": true},
+          {"function": "GPIO_7", "symbol_pin": "7"},
+          {"function": "GPIO_8", "symbol_pin": "8"},
+          {"function": "GPIO_9", "symbol_pin": "9"},
+          {"function": "GPIO_10", "symbol_pin": "10"},
+          {"function": "GPIO_11", "symbol_pin": "11"},
+          {"function": "GPIO_12", "symbol_pin": "12"},
+          {"function": "GPIO_13", "symbol_pin": "13"},
+          {"function": "GPIO_14", "symbol_pin": "14"},
+          {"function": "MOSI", "symbol_pin": "15"},
+          {"function": "MISO", "symbol_pin": "16"},
+          {"function": "SCK", "symbol_pin": "17"},
+          {"function": "AVCC", "symbol_pin": "18", "required": true},
+          {"function": "GPIO_19", "symbol_pin": "19"},
+          {"function": "AREF", "symbol_pin": "20"},
+          {"function": "AGND", "symbol_pin": "21", "required": true},
+          {"function": "GPIO_22", "symbol_pin": "22"},
+          {"function": "GPIO_23", "symbol_pin": "23"},
+          {"function": "GPIO_24", "symbol_pin": "24"},
+          {"function": "GPIO_25", "symbol_pin": "25"},
+          {"function": "GPIO_26", "symbol_pin": "26"},
+          {"function": "GPIO_27", "symbol_pin": "27"},
+          {"function": "GPIO_28", "symbol_pin": "28"},
+          {"function": "RESET", "symbol_pin": "29", "required": true},
+          {"function": "GPIO_30", "symbol_pin": "30"},
+          {"function": "GPIO_31", "symbol_pin": "31"},
+          {"function": "GPIO_32", "symbol_pin": "32"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:MCU_Microchip_ATmega:ATmega328P-A", "builtin_pinmap:MCU_Microchip_ATmega:ATmega328P-A"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "tqfp32",
+        "name": "TQFP-32 7x7 mm P0.8",
+        "footprint_id": "Package_QFP:TQFP-32_7x7mm_P0.8mm",
+        "package_type": "tqfp32",
+        "mpn": "ATmega328P-AU",
+        "lifecycle": "active",
+        "pinmap_id": "MCU_Microchip_ATmega:ATmega328P-A|Package_QFP:TQFP-32_7x7mm_P0.8mm",
+        "pad_functions": [
+          {"function": "GPIO_1", "pad": "1"}, {"function": "GPIO_2", "pad": "2"}, {"function": "GND", "pad": "3"}, {"function": "VCC", "pad": "4"},
+          {"function": "GND", "pad": "5"}, {"function": "VCC", "pad": "6"}, {"function": "GPIO_7", "pad": "7"}, {"function": "GPIO_8", "pad": "8"},
+          {"function": "GPIO_9", "pad": "9"}, {"function": "GPIO_10", "pad": "10"}, {"function": "GPIO_11", "pad": "11"}, {"function": "GPIO_12", "pad": "12"},
+          {"function": "GPIO_13", "pad": "13"}, {"function": "GPIO_14", "pad": "14"}, {"function": "MOSI", "pad": "15"}, {"function": "MISO", "pad": "16"},
+          {"function": "SCK", "pad": "17"}, {"function": "AVCC", "pad": "18"}, {"function": "GPIO_19", "pad": "19"}, {"function": "AREF", "pad": "20"},
+          {"function": "AGND", "pad": "21"}, {"function": "GPIO_22", "pad": "22"}, {"function": "GPIO_23", "pad": "23"}, {"function": "GPIO_24", "pad": "24"},
+          {"function": "GPIO_25", "pad": "25"}, {"function": "GPIO_26", "pad": "26"}, {"function": "GPIO_27", "pad": "27"}, {"function": "GPIO_28", "pad": "28"},
+          {"function": "RESET", "pad": "29"}, {"function": "GPIO_30", "pad": "30"}, {"function": "GPIO_31", "pad": "31"}, {"function": "GPIO_32", "pad": "32"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:MCU_Microchip_ATmega:ATmega328P-A"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:MCU_Microchip_ATmega:ATmega328P-A"], "pinmap_checked": true, "notes": ["Minimal-system record. Peripheral suitability and clock/fuse choices remain design-specific."]}
+    },
+    {
+      "id": "crystal.generic.5032_2pin",
+      "family": "crystal",
+      "name": "Generic 2-pin SMD crystal 5.0x3.2 mm",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["crystal", "smd", "5032", "2pin"],
+      "values": [{"kind": "frequency", "min": "1", "max": "50", "unit": "MHz"}],
+      "companions": [{"id": "crystal.load_capacitors", "family": "capacitor", "role": "load_capacitor", "required": true, "description": "Crystal load capacitors must be selected from crystal load capacitance and board stray capacitance."}],
+      "placement_hints": [{"kind": "near", "target": "mcu_oscillator_pins", "value": "10", "unit": "mm"}],
+      "symbols": [{
+        "symbol_id": "Device:Crystal",
+        "function_pins": [
+          {"function": "XTAL_1", "symbol_pin": "1", "required": true},
+          {"function": "XTAL_2", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Crystal"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "5032_2pin",
+        "name": "5032 2-pin SMD",
+        "footprint_id": "Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm",
+        "package_type": "5032_2pin",
+        "pinmap_id": "Device:Crystal|Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm",
+        "pad_functions": [
+          {"function": "XTAL_1", "pad": "1"},
+          {"function": "XTAL_2", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Crystal"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Crystal"], "pinmap_checked": true}
+    },
+    {
+      "id": "usb_c.gct.usb4125_power_only_6p",
+      "family": "usb_c",
+      "name": "GCT USB4125 power-only USB-C receptacle",
+      "generic": false,
+      "manufacturer": "GCT",
+      "mpn": "USB4125",
+      "lifecycle": "active",
+      "tags": ["usb_c", "power_only", "receptacle", "6pin"],
+      "ratings": [{"kind": "voltage", "max": "20", "unit": "V"}, {"kind": "current", "max": "3", "unit": "A"}],
+      "companions": [
+        {"id": "usb_c.cc1_rd", "family": "resistor", "role": "cc_pull_down", "required": true, "description": "Power sink mode requires Rd pull-down on CC1."},
+        {"id": "usb_c.cc2_rd", "family": "resistor", "role": "cc_pull_down", "required": true, "description": "Power sink mode requires Rd pull-down on CC2."},
+        {"id": "usb_c.esd", "family": "protection", "role": "esd_protection", "required": false, "description": "Add ESD protection for exposed connector pins when required by product environment."}
+      ],
+      "symbols": [{
+        "symbol_id": "Connector:USB_C_Receptacle_PowerOnly_6P",
+        "function_pins": [
+          {"function": "CC1", "symbol_pin": "A5", "required": true},
+          {"function": "VBUS", "symbol_pin": "A9", "required": true},
+          {"function": "GND", "symbol_pin": "A12", "required": true},
+          {"function": "CC2", "symbol_pin": "B5", "required": true},
+          {"function": "VBUS", "symbol_pin": "B9", "required": true},
+          {"function": "GND", "symbol_pin": "B12", "required": true},
+          {"function": "SHIELD", "symbol_pin": "SH"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Connector:USB_C_Receptacle_PowerOnly_6P", "builtin_pinmap:Connector:USB_C_Receptacle_PowerOnly_6P"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "gct_usb4125_6p",
+        "name": "GCT USB4125 6P top-mount horizontal",
+        "footprint_id": "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal",
+        "package_type": "usb_c_6p",
+        "mpn": "USB4125",
+        "lifecycle": "active",
+        "pinmap_id": "Connector:USB_C_Receptacle_PowerOnly_6P|Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal",
+        "pad_functions": [
+          {"function": "CC1", "pad": "A5"},
+          {"function": "VBUS", "pad": "A9"},
+          {"function": "GND", "pad": "A12"},
+          {"function": "CC2", "pad": "B5"},
+          {"function": "VBUS", "pad": "B9"},
+          {"function": "GND", "pad": "B12"},
+          {"function": "SHIELD", "pad": "SH"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector:USB_C_Receptacle_PowerOnly_6P"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector:USB_C_Receptacle_PowerOnly_6P"], "pinmap_checked": true, "notes": ["Power-only record. Do not use for USB2 or high-speed data routing."]}
+    },
+    {
+      "id": "protection.tvs.usb_5v_unidirectional",
+      "family": "protection",
+      "name": "Generic 5 V unidirectional TVS protection diode",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["protection", "tvs", "usb", "5v"],
+      "ratings": [{"kind": "working_voltage", "max": "5", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "Device:D_TVS",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sod_323",
+        "name": "SOD-323",
+        "footprint_id": "Diode_SMD:D_SOD-323",
+        "package_type": "sod_323",
+        "pinmap_id": "Device:D_TVS|Diode_SMD:D_SOD-323",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:D_TVS"], "pinmap_checked": true, "notes": ["Generic TVS record; exact surge, capacitance, and clamping ratings required before fabrication."]}
+    }
+  ]
+}

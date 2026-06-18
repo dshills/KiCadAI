@@ -3,12 +3,15 @@
   "families": [
     {"id": "capacitor", "name": "Capacitor", "description": "Charge storage and decoupling components."},
     {"id": "connector", "name": "Connector", "description": "Board interconnects and headers."},
+    {"id": "crystal", "name": "Crystal", "description": "Quartz crystals and resonators for timing circuits."},
     {"id": "diode", "name": "Diode", "description": "Signal, rectifier, Schottky, and TVS diode families."},
     {"id": "led", "name": "LED", "description": "Indicator light-emitting diodes."},
     {"id": "mcu", "name": "Microcontroller", "description": "Microcontrollers and minimal support-system selections."},
     {"id": "opamp", "name": "Operational Amplifier", "description": "Op-amp devices for analog gain and buffering."},
+    {"id": "protection", "name": "Protection Device", "description": "ESD, TVS, reverse-polarity, and other protection components."},
     {"id": "regulator", "name": "Voltage Regulator", "description": "Linear and switching voltage regulator devices."},
     {"id": "resistor", "name": "Resistor", "description": "Fixed resistors and pull-up/down components."},
-    {"id": "sensor", "name": "Sensor", "description": "Digital and analog sensors."}
+    {"id": "sensor", "name": "Sensor", "description": "Digital and analog sensors."},
+    {"id": "usb_c", "name": "USB-C Connector", "description": "USB Type-C receptacles and related power-only connector records."}
   ]
 }

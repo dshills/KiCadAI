@@ -2,6 +2,7 @@ package components
 
 import (
 	"context"
+	"path/filepath"
 	"testing"
 )
 
@@ -183,7 +184,10 @@ func TestSelectRejectsPlaceholderForConnectivity(t *testing.T) {
 }
 
 func TestSelectAllowsPlaceholderForDraft(t *testing.T) {
-	catalog := loadCheckedInCatalog(t)
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: filepath.Join("testdata", "catalog", "unsafe_placeholder")})
+	if err != nil {
+		t.Fatalf("load unsafe placeholder fixture: %v", err)
+	}
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query:      Query{Family: "opamp"},
 		Acceptance: AcceptanceDraft,
@@ -196,6 +200,112 @@ func TestSelectAllowsPlaceholderForDraft(t *testing.T) {
 	}
 	if len(selection.Warnings) == 0 {
 		t.Fatal("expected placeholder warning")
+	}
+}
+
+func TestSelectVerifiedOpAmpBySupplyRange(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "supply_voltage",
+			Value: "3.3",
+			Unit:  "V",
+		}},
+	})
+	if !result.OK {
+		t.Fatalf("select opamp failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "opamp.ti.lmv321.sot23_5" {
+		t.Fatalf("unexpected opamp selection: %+v", selection.Candidate)
+	}
+}
+
+func TestSelectRejectsOpAmpOutsideSupplyRange(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "supply_voltage",
+			Value: "6",
+			Unit:  "V",
+		}},
+	})
+	if result.OK {
+		t.Fatal("expected opamp over-voltage request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectVerifiedMCUAndRequiredFunctions(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Text: "microchip", Family: "mcu", Package: "tqfp32"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("select mcu failed: %+v", result.Issues)
+	}
+	for _, fn := range []string{"VCC", "GND", "RESET"} {
+		if !componentHasFunction(selection.Component, fn) {
+			t.Fatalf("selected MCU missing function %s", fn)
+		}
+	}
+}
+
+func TestSelectVerifiedI2CSensor(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "sensor", Package: "lga8"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("select sensor failed: %+v", result.Issues)
+	}
+	for _, fn := range []string{"VDD", "GND", "SDA", "SCL"} {
+		if !componentHasFunction(selection.Component, fn) {
+			t.Fatalf("selected sensor missing function %s", fn)
+		}
+	}
+}
+
+func TestSelectVerifiedCrystal(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "crystal",
+			Package:   "5032",
+			ValueKind: "frequency",
+			Value:     "16",
+		},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("select crystal failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "crystal.generic.5032_2pin" {
+		t.Fatalf("unexpected crystal selection: %+v", selection.Candidate)
+	}
+}
+
+func TestSelectVerifiedUSBCPowerOnlyConnector(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "usb_c", Package: "6p"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "current",
+			Value: "3",
+			Unit:  "A",
+		}},
+	})
+	if !result.OK {
+		t.Fatalf("select usb-c failed: %+v", result.Issues)
+	}
+	if !componentHasFunction(selection.Component, "CC1") || !componentHasFunction(selection.Component, "CC2") {
+		t.Fatalf("selected USB-C record missing CC pins")
 	}
 }
 
@@ -235,6 +345,17 @@ func loadCheckedInCatalog(t *testing.T) *Catalog {
 		t.Fatalf("load checked-in catalog: %v", err)
 	}
 	return catalog
+}
+
+func componentHasFunction(record ComponentRecord, function string) bool {
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if pin.Function == function {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func testSelectableResistor(id string) ComponentRecord {
