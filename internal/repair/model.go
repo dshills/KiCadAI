@@ -10,6 +10,7 @@ type Status string
 
 const (
 	StatusNotNeeded Status = "not_needed"
+	StatusPlanned   Status = "planned"
 	StatusRepaired  Status = "repaired"
 	StatusPartial   Status = "partial"
 	StatusBlocked   Status = "blocked"
@@ -59,7 +60,9 @@ type Options struct {
 	AllowPlacementRetry      bool   `json:"allow_placement_retry,omitempty"`
 	AllowRoutingRetry        bool   `json:"allow_routing_retry,omitempty"`
 	AllowFootprintAssignment bool   `json:"allow_footprint_assignment,omitempty"`
+	AllowPadNetRegeneration  bool   `json:"allow_pad_net_regeneration,omitempty"`
 	AllowOutlineGeneration   bool   `json:"allow_outline_generation,omitempty"`
+	AllowZoneNetRepair       bool   `json:"allow_zone_net_repair,omitempty"`
 	AllowKiCadCLI            bool   `json:"allow_kicad_cli,omitempty"`
 	Acceptance               string `json:"acceptance,omitempty"`
 }
@@ -75,6 +78,7 @@ type Result struct {
 type Summary struct {
 	AttemptCount  int `json:"attempt_count"`
 	AppliedCount  int `json:"applied_count"`
+	PlannedCount  int `json:"planned_count"`
 	SkippedCount  int `json:"skipped_count"`
 	BlockedCount  int `json:"blocked_count"`
 	RepairedCount int `json:"repaired_count"`
