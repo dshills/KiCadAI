@@ -1,0 +1,19 @@
+{
+  "artifact_kinds": [
+    "kicad_project",
+    "schematic",
+    "pcb",
+    "validation_report"
+  ],
+  "issue_count": 0,
+  "operation_kinds": [
+    "create_project",
+    "set_board_outline",
+    "write_project"
+  ],
+  "repair_status": "not_needed",
+  "status": "repaired",
+  "validations": [
+    "transaction"
+  ]
+}
