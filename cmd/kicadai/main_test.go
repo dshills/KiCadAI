@@ -143,7 +143,7 @@ func TestRunComponentFindJSON(t *testing.T) {
 func TestRunComponentSelectBlocksUnsafePlaceholder(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--family", "opamp", "--acceptance", "connectivity", "component", "select"}, &stdout, &stderr)
+	err := run([]string{"--json", "--catalog-dir", testUnsafeComponentCatalogDir(t), "--family", "opamp", "--acceptance", "connectivity", "component", "select"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected unsafe placeholder selection to fail")
 	}
@@ -314,11 +314,25 @@ func mustTestTransaction(t *testing.T, input string) transactions.Transaction {
 
 func testComponentCatalogDir(t *testing.T) string {
 	t.Helper()
+	return filepath.Join(testProjectRoot(t), "data", "components")
+}
+
+func testUnsafeComponentCatalogDir(t *testing.T) string {
+	t.Helper()
+	dir := filepath.Join(testProjectRoot(t), "internal", "components", "testdata", "catalog", "unsafe_placeholder")
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("unsafe component catalog fixture not found: %s", dir)
+	}
+	return dir
+}
+
+func testProjectRoot(t *testing.T) string {
+	t.Helper()
 	_, sourceFile, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("locate test source file")
 	}
-	return filepath.Join(filepath.Dir(sourceFile), "..", "..", "data", "components")
+	return filepath.Clean(filepath.Join(filepath.Dir(sourceFile), "..", ".."))
 }
 
 func TestParseDesignAllowPartialSetsExplicitFlag(t *testing.T) {
