@@ -10,11 +10,15 @@ import (
 )
 
 const (
-	CodeComponentNotFound       reports.Code = "COMPONENT_NOT_FOUND"
-	CodeComponentAmbiguous      reports.Code = "COMPONENT_AMBIGUOUS"
-	CodeComponentUnsafe         reports.Code = "COMPONENT_UNSAFE_CONFIDENCE"
-	CodeComponentRatingTooLow   reports.Code = "COMPONENT_RATING_TOO_LOW"
-	CodeComponentVariantMissing reports.Code = "COMPONENT_VARIANT_MISSING"
+	CodeComponentNotFound         reports.Code = "COMPONENT_NOT_FOUND"
+	CodeComponentAmbiguous        reports.Code = "COMPONENT_AMBIGUOUS"
+	CodeComponentUnsafe           reports.Code = "COMPONENT_UNSAFE_CONFIDENCE"
+	CodeComponentRatingTooLow     reports.Code = "COMPONENT_RATING_TOO_LOW"
+	CodeComponentRatingMissing    reports.Code = "COMPONENT_RATING_MISSING"
+	CodeComponentFunctionMissing  reports.Code = "COMPONENT_FUNCTION_MISSING"
+	CodeComponentVariantMissing   reports.Code = "COMPONENT_VARIANT_MISSING"
+	CodeComponentConcreteRequired reports.Code = "COMPONENT_CONCRETE_REQUIRED"
+	CodeComponentCompanionMissing reports.Code = "COMPONENT_COMPANION_MISSING"
 )
 
 type Query struct {
@@ -32,6 +36,9 @@ type SelectionRequest struct {
 	Acceptance        AcceptanceLevel  `json:"acceptance,omitempty"`
 	AllowAlternatives bool             `json:"allow_alternatives,omitempty"`
 	RequiredRatings   []RequiredRating `json:"required_ratings,omitempty"`
+	RequiredFunctions []string         `json:"required_functions,omitempty"`
+	RequireConcrete   bool             `json:"require_concrete,omitempty"`
+	RequireCompanions bool             `json:"require_companions,omitempty"`
 }
 
 type RequiredRating struct {
@@ -52,10 +59,16 @@ type Candidate struct {
 }
 
 type Selection struct {
+	Candidate Candidate            `json:"candidate"`
+	Component ComponentRecord      `json:"component"`
+	Variant   PackageVariant       `json:"variant"`
+	Warnings  []reports.Issue      `json:"warnings,omitempty"`
+	Rejected  []CandidateRejection `json:"rejected,omitempty"`
+}
+
+type CandidateRejection struct {
 	Candidate Candidate       `json:"candidate"`
-	Component ComponentRecord `json:"component"`
-	Variant   PackageVariant  `json:"variant"`
-	Warnings  []reports.Issue `json:"warnings,omitempty"`
+	Issues    []reports.Issue `json:"issues"`
 }
 
 type ResolvedComponent struct {
@@ -128,23 +141,22 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 	}
 	var issues []reports.Issue
 	filtered := make([]Candidate, 0, len(candidates))
+	rejected := make([]CandidateRejection, 0, len(candidates))
 	for _, candidate := range candidates {
 		record, _, ok := findRecordVariant(catalog, candidate.ComponentID, candidate.VariantID)
 		if !ok {
 			continue
 		}
-		if ratingIssues := requiredRatingIssues(record, request.RequiredRatings); len(ratingIssues) > 0 {
-			issues = append(issues, ratingIssues...)
-			continue
-		}
-		if !candidateAllowedForAcceptance(record, candidate, request.Acceptance) {
-			issues = append(issues, NewIssue(CodeComponentUnsafe, reports.SeverityBlocked, "component."+candidate.ComponentID, fmt.Sprintf("component confidence %s is not allowed for %s acceptance", candidate.Confidence, request.Acceptance)))
+		candidateIssues := selectionCandidateIssues(record, candidate, request)
+		if len(candidateIssues) > 0 {
+			rejected = append(rejected, CandidateRejection{Candidate: candidate, Issues: candidateIssues})
 			continue
 		}
 		filtered = append(filtered, candidate)
 	}
 	sortCandidates(filtered)
 	if len(filtered) == 0 {
+		issues = append(issues, dedupeRejectedIssues(rejected)...)
 		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": candidates}, issues, nil)
 	}
 	if len(filtered) > 1 && !request.AllowAlternatives && filtered[0].Score == filtered[1].Score && filtered[0].Confidence == filtered[1].Confidence {
@@ -152,11 +164,44 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": filtered[:2]}, issues, nil)
 	}
 	record, variant, _ := findRecordVariant(catalog, filtered[0].ComponentID, filtered[0].VariantID)
-	selection := Selection{Candidate: filtered[0], Component: record, Variant: variant}
+	selection := Selection{Candidate: filtered[0], Component: record, Variant: variant, Rejected: rejected}
 	if filtered[0].Confidence == ConfidencePlaceholder {
 		selection.Warnings = append(selection.Warnings, NewIssue(CodeComponentUnsafe, reports.SeverityWarning, "component."+filtered[0].ComponentID, "placeholder component selected for draft output"))
 	}
 	return selection, reports.ResultWithIssues("component select", selection, append(issues, selection.Warnings...), nil)
+}
+
+func dedupeRejectedIssues(rejected []CandidateRejection) []reports.Issue {
+	var issues []reports.Issue
+	seen := map[string]struct{}{}
+	for _, rejection := range rejected {
+		for _, issue := range rejection.Issues {
+			key := string(issue.Code) + "\x00" + issue.Path + "\x00" + issue.Message
+			if _, ok := seen[key]; ok {
+				continue
+			}
+			seen[key] = struct{}{}
+			issues = append(issues, issue)
+		}
+	}
+	sortIssues(issues)
+	return issues
+}
+
+func selectionCandidateIssues(record ComponentRecord, candidate Candidate, request SelectionRequest) []reports.Issue {
+	var issues []reports.Issue
+	issues = append(issues, requiredRatingIssues(record, request.RequiredRatings)...)
+	issues = append(issues, requiredFunctionIssues(record, request.RequiredFunctions)...)
+	if request.RequireConcrete && record.Generic {
+		issues = append(issues, NewIssue(CodeComponentConcreteRequired, reports.SeverityBlocked, "component."+record.ID, "concrete component record is required"))
+	}
+	if request.RequireCompanions && !recordHasRequiredCompanions(record) {
+		issues = append(issues, NewIssue(CodeComponentCompanionMissing, reports.SeverityBlocked, "component."+record.ID+".companions", "component requires explicit companion component metadata"))
+	}
+	if !candidateAllowedForAcceptance(record, candidate, request.Acceptance) {
+		issues = append(issues, NewIssue(CodeComponentUnsafe, reports.SeverityBlocked, "component."+candidate.ComponentID, fmt.Sprintf("component confidence %s is not allowed for %s acceptance", candidate.Confidence, request.Acceptance)))
+	}
+	return issues
 }
 
 func ResolveBinding(ctx context.Context, catalog *Catalog, id string, variantID string) (ResolvedComponent, reports.Result) {
@@ -316,32 +361,66 @@ func recordVariantKey(recordID string, variantID string) string {
 func requiredRatingIssues(record ComponentRecord, ratings []RequiredRating) []reports.Issue {
 	var issues []reports.Issue
 	for _, required := range ratings {
-		if !recordSatisfiesRating(record, required) {
+		ok, found := recordSatisfiesRating(record, required)
+		if !found {
+			issues = append(issues, NewIssue(CodeComponentRatingMissing, reports.SeverityBlocked, "component."+record.ID+".ratings."+required.Kind, "component is missing requested rating "+required.Kind))
+			continue
+		}
+		if !ok {
 			issues = append(issues, NewIssue(CodeComponentRatingTooLow, reports.SeverityBlocked, "component."+record.ID+".ratings."+required.Kind, "component rating does not satisfy requested "+required.Kind))
 		}
 	}
 	return issues
 }
 
-func recordSatisfiesRating(record ComponentRecord, required RequiredRating) bool {
+func requiredFunctionIssues(record ComponentRecord, functions []string) []reports.Issue {
+	var issues []reports.Issue
+	for _, function := range functions {
+		function = strings.TrimSpace(function)
+		if function == "" {
+			continue
+		}
+		if !recordHasFunction(record, function) {
+			issues = append(issues, NewIssue(CodeComponentFunctionMissing, reports.SeverityBlocked, "component."+record.ID+".functions."+function, "component is missing required function "+function))
+		}
+	}
+	return issues
+}
+
+func recordSatisfiesRating(record ComponentRecord, required RequiredRating) (bool, bool) {
 	want, ok := parseValueWithUnit(required.Value, required.Unit)
 	if !ok {
-		return false
+		return false, true
 	}
+	found := false
 	for _, rating := range record.Ratings {
 		if rating.Kind != required.Kind {
 			continue
 		}
-		capability := rating.Max
-		if capability == "" {
-			capability = rating.Typ
+		found = true
+		if rating.Min != "" {
+			minValue, ok := parseValueWithUnit(rating.Min, rating.Unit)
+			if ok && want < minValue {
+				continue
+			}
 		}
-		got, ok := parseValueWithUnit(capability, rating.Unit)
-		if ok && got >= want {
-			return true
+		if rating.Max != "" {
+			maxValue, ok := parseValueWithUnit(rating.Max, rating.Unit)
+			if ok && want > maxValue {
+				continue
+			}
+			if ok {
+				return true, true
+			}
+		}
+		if rating.Typ != "" {
+			typValue, ok := parseValueWithUnit(rating.Typ, rating.Unit)
+			if ok && typValue >= want {
+				return true, true
+			}
 		}
 	}
-	return false
+	return false, found
 }
 
 func parseValueWithUnit(value string, unit string) (float64, bool) {
@@ -381,6 +460,31 @@ func passiveRuleInferred(record ComponentRecord) bool {
 	default:
 		return false
 	}
+}
+
+func recordHasFunction(record ComponentRecord, function string) bool {
+	for _, symbol := range record.Symbols {
+		for _, pin := range symbol.FunctionPins {
+			if pin.Function == function {
+				return true
+			}
+			for _, alias := range pin.Aliases {
+				if alias == function {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+func recordHasRequiredCompanions(record ComponentRecord) bool {
+	for _, companion := range record.Companions {
+		if companion.Required {
+			return true
+		}
+	}
+	return false
 }
 
 func weakerConfidence(a ConfidenceLevel, b ConfidenceLevel) ConfidenceLevel {

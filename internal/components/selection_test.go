@@ -172,7 +172,10 @@ func TestSelectRejectsRegulatorOverCurrent(t *testing.T) {
 }
 
 func TestSelectRejectsPlaceholderForConnectivity(t *testing.T) {
-	catalog := loadCheckedInCatalog(t)
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: filepath.Join("testdata", "catalog", "unsafe_placeholder")})
+	if err != nil {
+		t.Fatalf("load unsafe placeholder fixture: %v", err)
+	}
 	_, result := Select(context.Background(), catalog, SelectionRequest{
 		Query:      Query{Family: "opamp"},
 		Acceptance: AcceptanceConnectivity,
@@ -237,6 +240,91 @@ func TestSelectRejectsOpAmpOutsideSupplyRange(t *testing.T) {
 		t.Fatal("expected opamp over-voltage request to fail")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectRejectsOpAmpBelowMinimumSupplyRange(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "supply_voltage",
+			Value: "1.8",
+			Unit:  "V",
+		}},
+	})
+	if result.OK {
+		t.Fatal("expected opamp under-voltage request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectWithRejectedPlaceholderAlternativeStillSucceeds(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "opamp", Package: "sot23_5"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("expected verified opamp to win despite rejected placeholder: %+v", result.Issues)
+	}
+	if selection.Component.ID != "opamp.ti.lmv321.sot23_5" {
+		t.Fatalf("unexpected selection: %+v", selection.Candidate)
+	}
+	if len(selection.Rejected) == 0 {
+		t.Fatal("expected rejected placeholder diagnostics")
+	}
+}
+
+func TestSelectRequiresFunction(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "usb_c", Package: "6p"},
+		Acceptance:        AcceptanceConnectivity,
+		RequiredFunctions: []string{"CC1", "CC2"},
+	})
+	if !result.OK {
+		t.Fatalf("expected usb-c function selection to pass: %+v", result.Issues)
+	}
+	if selection.Component.ID != "usb_c.gct.usb4125_power_only_6p" {
+		t.Fatalf("unexpected selection: %+v", selection.Candidate)
+	}
+
+	_, result = Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "usb_c", Package: "6p"},
+		Acceptance:        AcceptanceConnectivity,
+		RequiredFunctions: []string{"D_PLUS"},
+	})
+	if result.OK {
+		t.Fatal("expected missing USB data function to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentFunctionMissing)
+}
+
+func TestSelectRequiresConcreteAndCompanions(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "resistor", Package: "0805"},
+		Acceptance:      AcceptanceConnectivity,
+		RequireConcrete: true,
+	})
+	if result.OK {
+		t.Fatal("expected generic resistor to fail concrete requirement")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentConcreteRequired)
+
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+	})
+	if !result.OK {
+		t.Fatalf("expected concrete opamp with companions to pass: %+v", result.Issues)
+	}
+	if selection.Component.ID != "opamp.ti.lmv321.sot23_5" {
+		t.Fatalf("unexpected selection: %+v", selection.Candidate)
+	}
 }
 
 func TestSelectVerifiedMCUAndRequiredFunctions(t *testing.T) {
