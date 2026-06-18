@@ -66,6 +66,37 @@ func TestBuiltInManifestsValidateAndRun(t *testing.T) {
 	}
 }
 
+func TestBuiltInBlocksDeclareConsistentRequiredRoutes(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	for _, summary := range registry.ListBlocks() {
+		t.Run(summary.ID, func(t *testing.T) {
+			definition, ok := registry.GetBlock(summary.ID)
+			if !ok {
+				t.Fatalf("missing block %s", summary.ID)
+			}
+			if definition.PCBRealization == nil {
+				return
+			}
+			defined := make(map[string]struct{}, len(definition.PCBRealization.LocalRoutes))
+			for _, route := range definition.PCBRealization.LocalRoutes {
+				if route.ID == "" {
+					t.Errorf("local route with empty ID: %#v", route)
+					continue
+				}
+				if _, exists := defined[route.ID]; exists {
+					t.Errorf("duplicate local route ID %s", route.ID)
+				}
+				defined[route.ID] = struct{}{}
+			}
+			for _, required := range definition.PCBRealization.Validation.RequiredRoutes {
+				if _, ok := defined[required]; !ok {
+					t.Errorf("required route %s has no local route definition", required)
+				}
+			}
+		})
+	}
+}
+
 func TestDiscoverManifestPathsSorted(t *testing.T) {
 	paths, issues := DiscoverManifestPaths(filepath.Join("..", "testdata", "verification"))
 	if len(issues) != 0 {
