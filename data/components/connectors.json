@@ -6,6 +6,7 @@
       "family": "connector",
       "name": "1x02 2.54 mm pin header",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["connector", "pin_header", "2.54mm", "1x02"],
       "values": [{"kind": "pin_count", "typ": "2", "unit": "pins"}],
       "symbols": [{
@@ -14,26 +15,60 @@
           {"function": "PIN_1", "symbol_pin": "1", "required": true},
           {"function": "PIN_2", "symbol_pin": "2", "required": true}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["numbered_pin_header_rule"]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "vertical",
         "name": "Vertical",
         "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
         "package_type": "pin_header_1x02",
+        "pinmap_id": "Connector_Generic:Conn_01x02|Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
         "pad_functions": [
           {"function": "PIN_1", "pad": "1"},
           {"function": "PIN_2", "pad": "2"}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["numbered_pin_header_rule"]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+    },
+    {
+      "id": "connector.pinheader.1x03.2_54mm",
+      "family": "connector",
+      "name": "1x03 2.54 mm pin header",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["connector", "pin_header", "2.54mm", "1x03"],
+      "values": [{"kind": "pin_count", "typ": "3", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x03",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true},
+          {"function": "PIN_3", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x03"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "Vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+        "package_type": "pin_header_1x03",
+        "pinmap_id": "Connector_Generic:Conn_01x03|Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"},
+          {"function": "PIN_3", "pad": "3"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x03"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x03"], "pinmap_checked": true}
     },
     {
       "id": "connector.pinheader.1x04.2_54mm",
       "family": "connector",
       "name": "1x04 2.54 mm pin header",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["connector", "pin_header", "2.54mm", "1x04"],
       "values": [{"kind": "pin_count", "typ": "4", "unit": "pins"}],
       "symbols": [{
@@ -44,22 +79,59 @@
           {"function": "PIN_3", "symbol_pin": "3", "required": true},
           {"function": "PIN_4", "symbol_pin": "4", "required": true}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["numbered_pin_header_rule"]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x04"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "vertical",
         "name": "Vertical",
         "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
         "package_type": "pin_header_1x04",
+        "pinmap_id": "Connector_Generic:Conn_01x04|Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
         "pad_functions": [
           {"function": "PIN_1", "pad": "1"},
           {"function": "PIN_2", "pad": "2"},
           {"function": "PIN_3", "pad": "3"},
           {"function": "PIN_4", "pad": "4"}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["numbered_pin_header_rule"]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x04"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x04"], "pinmap_checked": true}
+    },
+    {
+      "id": "connector.pinheader.1x05.2_54mm",
+      "family": "connector",
+      "name": "1x05 2.54 mm pin header",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["connector", "pin_header", "2.54mm", "1x05"],
+      "values": [{"kind": "pin_count", "typ": "5", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x05",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true},
+          {"function": "PIN_3", "symbol_pin": "3", "required": true},
+          {"function": "PIN_4", "symbol_pin": "4", "required": true},
+          {"function": "PIN_5", "symbol_pin": "5", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "Vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical",
+        "package_type": "pin_header_1x05",
+        "pinmap_id": "Connector_Generic:Conn_01x05|Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"},
+          {"function": "PIN_3", "pad": "3"},
+          {"function": "PIN_4", "pad": "4"},
+          {"function": "PIN_5", "pad": "5"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
     }
   ]
 }

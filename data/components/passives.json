@@ -16,7 +16,7 @@
           {"function": "A", "symbol_pin": "1", "required": true},
           {"function": "B", "symbol_pin": "2", "required": true}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:R"]}
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:R"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "0603",
@@ -27,9 +27,9 @@
           {"function": "A", "pad": "1"},
           {"function": "B", "pad": "2"}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule"]}
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"], "notes": ["Symmetric passive; value and rating remain design-specific."]}
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:R"], "pinmap_checked": true, "notes": ["Symmetric passive; value and rating remain design-specific."]}
     },
     {
       "id": "resistor.generic.0805",
@@ -46,7 +46,7 @@
           {"function": "A", "symbol_pin": "1", "required": true},
           {"function": "B", "symbol_pin": "2", "required": true}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:R"]}
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:R"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "0805",
@@ -57,9 +57,42 @@
           {"function": "A", "pad": "1"},
           {"function": "B", "pad": "2"}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule"]}
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"], "notes": ["Symmetric passive; value and rating remain design-specific."]}
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:R"], "pinmap_checked": true, "notes": ["Symmetric passive; value and rating remain design-specific."]}
+    },
+    {
+      "id": "capacitor.ceramic.0603",
+      "family": "capacitor",
+      "name": "Generic 0603 ceramic capacitor",
+      "description": "Generic nonpolar ceramic capacitor for decoupling and compact filters.",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["passive", "smd", "0603", "ceramic", "nonpolar"],
+      "values": [{"kind": "capacitance", "min": "1p", "max": "10u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:C"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "Capacitor_SMD:C_0603_1608Metric",
+        "package_type": "0603",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_0603_1608Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Nonpolar passive; voltage derating remains design-specific."]}
     },
     {
       "id": "capacitor.ceramic.0805",
@@ -67,29 +100,32 @@
       "name": "Generic 0805 ceramic capacitor",
       "description": "Generic nonpolar ceramic capacitor for decoupling and simple filters.",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["passive", "smd", "0805", "ceramic", "nonpolar"],
       "values": [{"kind": "capacitance", "min": "1p", "max": "100u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
       "symbols": [{
         "symbol_id": "Device:C",
         "function_pins": [
           {"function": "A", "symbol_pin": "1", "required": true},
           {"function": "B", "symbol_pin": "2", "required": true}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:C"]}
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:C"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "0805",
         "name": "0805 SMD",
         "footprint_id": "Capacitor_SMD:C_0805_2012Metric",
         "package_type": "0805",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_0805_2012Metric",
         "pad_functions": [
           {"function": "A", "pad": "1"},
           {"function": "B", "pad": "2"}
         ],
-        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule"]}
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog"], "notes": ["Nonpolar passive; voltage derating remains design-specific."]}
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Nonpolar passive; voltage derating remains design-specific."]}
     },
     {
       "id": "capacitor.electrolytic.radial",

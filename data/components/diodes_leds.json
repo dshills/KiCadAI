@@ -6,6 +6,7 @@
       "family": "led",
       "name": "Generic 0805 indicator LED",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["led", "indicator", "0805"],
       "values": [
         {"kind": "forward_voltage", "typ": "2", "unit": "V"},
@@ -17,104 +18,111 @@
           {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
           {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
         ],
-        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED"]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "0805",
         "name": "0805 SMD",
         "footprint_id": "LED_SMD:LED_0805_2012Metric",
         "package_type": "0805",
+        "pinmap_id": "Device:LED|LED_SMD:LED_0805_2012Metric",
         "pad_functions": [
           {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
           {"function": "ANODE", "pad": "2", "aliases": ["A"]}
         ],
-        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED"]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:LED"], "notes": ["Generic electrical ratings are placeholders; exact LED must be selected before fabrication."]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:LED"], "pinmap_checked": true, "notes": ["Generic electrical ratings are placeholders; exact LED must be selected before fabrication."]}
     },
     {
       "id": "diode.signal.generic",
       "family": "diode",
       "name": "Generic signal diode",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["diode", "signal"],
       "ratings": [{"kind": "current", "max": "200", "unit": "mA"}],
       "symbols": [{
         "symbol_id": "Device:D",
         "function_pins": [
-          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true},
-          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true}
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "sod_123",
         "name": "SOD-123",
         "footprint_id": "Diode_SMD:D_SOD-123",
         "package_type": "sod_123",
+        "pinmap_id": "Device:D|Diode_SMD:D_SOD-123",
         "pad_functions": [
-          {"function": "CATHODE", "pad": "1"},
-          {"function": "ANODE", "pad": "2"}
+          {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "aliases": ["A"]}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:D"], "pinmap_checked": true, "notes": ["Generic diode ratings are conservative placeholders; exact part required for fabrication."]}
     },
     {
       "id": "diode.schottky.generic",
       "family": "diode",
       "name": "Generic Schottky diode",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["diode", "schottky"],
       "ratings": [{"kind": "current", "max": "1", "unit": "A"}],
       "symbols": [{
         "symbol_id": "Device:D_Schottky",
         "function_pins": [
-          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true},
-          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true}
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_Schottky"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "sma",
         "name": "SMA",
         "footprint_id": "Diode_SMD:D_SMA",
         "package_type": "sma",
+        "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SMA",
         "pad_functions": [
-          {"function": "CATHODE", "pad": "1"},
-          {"function": "ANODE", "pad": "2"}
+          {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "aliases": ["A"]}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_Schottky"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:D_Schottky"], "pinmap_checked": true, "notes": ["Generic Schottky ratings are conservative placeholders; exact part required for fabrication."]}
     },
     {
       "id": "diode.tvs_unidirectional.generic",
       "family": "diode",
       "name": "Generic unidirectional TVS diode",
       "generic": true,
+      "lifecycle": "active",
       "tags": ["diode", "tvs", "protection"],
       "ratings": [{"kind": "working_voltage", "typ": "5", "unit": "V"}],
       "symbols": [{
         "symbol_id": "Device:D_TVS",
         "function_pins": [
-          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true},
-          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true}
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "sod_323",
         "name": "SOD-323",
         "footprint_id": "Diode_SMD:D_SOD-323",
         "package_type": "sod_323",
+        "pinmap_id": "Device:D_TVS|Diode_SMD:D_SOD-323",
         "pad_functions": [
-          {"function": "CATHODE", "pad": "1"},
-          {"function": "ANODE", "pad": "2"}
+          {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "aliases": ["A"]}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:D_TVS"], "pinmap_checked": true, "notes": ["Generic TVS ratings are placeholders; exact clamping and surge ratings required for fabrication."]}
     }
   ]
 }

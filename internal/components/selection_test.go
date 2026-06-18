@@ -44,6 +44,25 @@ func TestSelectRejectsCapacitorBelowVoltageRating(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
 }
 
+func TestSelectGeneric0603CapacitorByPackage(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "capacitor",
+			Package:   "0603",
+			ValueKind: "capacitance",
+			Value:     "100n",
+		},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("select capacitor failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "capacitor.ceramic.0603" {
+		t.Fatalf("selected %s", selection.Component.ID)
+	}
+}
+
 func TestFindConnectorByPinCountAndPackage(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	candidates, result := Find(context.Background(), catalog, Query{
@@ -57,6 +76,54 @@ func TestFindConnectorByPinCountAndPackage(t *testing.T) {
 	}
 	if len(candidates) != 1 || candidates[0].ComponentID != "connector.pinheader.1x04.2_54mm" {
 		t.Fatalf("unexpected candidates: %+v", candidates)
+	}
+}
+
+func TestFindConnectorByThreePinCount(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	candidates, result := Find(context.Background(), catalog, Query{
+		Family:    "connector",
+		Package:   "1x03",
+		ValueKind: "pin_count",
+		Value:     "3",
+	})
+	if !result.OK {
+		t.Fatalf("find connector failed: %+v", result.Issues)
+	}
+	if len(candidates) != 1 || candidates[0].ComponentID != "connector.pinheader.1x03.2_54mm" {
+		t.Fatalf("unexpected candidates: %+v", candidates)
+	}
+}
+
+func TestSelectVerifiedSignalDiodeForConnectivity(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "diode", Package: "sod_123"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("select diode failed: %+v", result.Issues)
+	}
+	if selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("expected verified diode, got %+v", selection.Candidate)
+	}
+	wantPads := map[string]string{"CATHODE": "1", "ANODE": "2"}
+	for _, padFunction := range selection.Variant.PadFunctions {
+		if want, ok := wantPads[padFunction.Function]; ok && padFunction.Pad != want {
+			t.Fatalf("diode %s mapped to pad %s, want %s", padFunction.Function, padFunction.Pad, want)
+		}
+	}
+	for function := range wantPads {
+		found := false
+		for _, padFunction := range selection.Variant.PadFunctions {
+			if padFunction.Function == function {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("diode missing %s pad function: %+v", function, selection.Variant.PadFunctions)
+		}
 	}
 }
 
