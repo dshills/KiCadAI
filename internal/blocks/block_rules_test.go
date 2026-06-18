@@ -132,6 +132,7 @@ func TestI2CSensorDefinitionDeclaresBusRules(t *testing.T) {
 		}
 	}
 	assertRequiredRoutesDefined(t, definition.PCBRealization)
+	assertRouteEndpointsHavePins(t, definition.PCBRealization)
 }
 
 func TestOpAmpGainStageDefinitionDeclaresAnalogRules(t *testing.T) {
@@ -156,6 +157,51 @@ func TestOpAmpGainStageDefinitionDeclaresAnalogRules(t *testing.T) {
 		}
 	}
 	assertRequiredRoutesDefined(t, definition.PCBRealization)
+}
+
+func TestMCUMinimalDefinitionDeclaresSystemRules(t *testing.T) {
+	definition := mcuMinimalDefinition()
+	rules := validationRuleIDs(definition.ValidationRules)
+	for _, id := range []string{
+		"mcu.concrete_part.required",
+		"mcu.pinmap.required",
+		"mcu.power_pins.covered",
+		"mcu.decoupling.required",
+		"mcu.reset.handled",
+		"mcu.programming.path.required",
+		"mcu.peripheral.mapping.supported",
+	} {
+		if !slices.Contains(rules, id) {
+			t.Errorf("MCU validation rules = %#v, missing %s", rules, id)
+		}
+	}
+	constraints := pcbConstraintIDs(definition.PCBRealization)
+	for _, id := range []string{"mcu_decoupling_proximity"} {
+		if !slices.Contains(constraints, id) {
+			t.Errorf("MCU PCB constraints = %#v, missing %s", constraints, id)
+		}
+	}
+	assertRequiredRoutesDefined(t, definition.PCBRealization)
+}
+
+func TestCompanionBlockFamiliesRemainVisibleAsUnsupportedGaps(t *testing.T) {
+	inventory := NewBuiltinRegistry().Inventory()
+	byID := map[string]BlockFamilyInventory{}
+	for _, family := range inventory.Families {
+		byID[family.ID] = family
+	}
+	for _, id := range []string{"crystal_oscillator", "reset_programming_header", "esd_protection", "reverse_polarity_protection"} {
+		family, ok := byID[id]
+		if !ok {
+			t.Fatalf("family %s not found", id)
+		}
+		if family.Readiness != BlockReadinessUnsupported || family.Implemented {
+			t.Errorf("%s inventory = %#v", id, family)
+		}
+		if len(family.Gaps) == 0 {
+			t.Errorf("%s should include unsupported gap diagnostics", id)
+		}
+	}
 }
 
 func validationRuleIDs(rules []BlockValidationRule) []string {
@@ -191,6 +237,18 @@ func assertRequiredRoutesDefined(t *testing.T, realization *PCBRealization) {
 	for _, routeID := range realization.Validation.RequiredRoutes {
 		if _, ok := defined[routeID]; !ok {
 			t.Errorf("required route %s has no local route definition", routeID)
+		}
+	}
+}
+
+func assertRouteEndpointsHavePins(t *testing.T, realization *PCBRealization) {
+	t.Helper()
+	if realization == nil {
+		t.Fatal("PCB realization is required")
+	}
+	for _, route := range realization.LocalRoutes {
+		if route.From.Pin == "" || route.To.Pin == "" {
+			t.Errorf("route %s has empty endpoint pin: %#v", route.ID, route)
 		}
 	}
 }

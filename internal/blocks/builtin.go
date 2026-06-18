@@ -161,6 +161,15 @@ func mcuMinimalDefinition() BlockDefinition {
 		},
 		Components:     mcuMinimalComponents(),
 		PCBRealization: mcuMinimalPCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "mcu.concrete_part.required", Severity: BlockValidationSeverityBlocked, Description: "MCU minimal system requires a concrete MCU with package-specific evidence."},
+			{ID: "mcu.pinmap.required", Severity: BlockValidationSeverityBlocked, Description: "Selected MCU must provide power, ground, reset, programming, and GPIO pinmap evidence."},
+			{ID: "mcu.power_pins.covered", Severity: BlockValidationSeverityBlocked, Description: "All required MCU power and ground pins must be connected."},
+			{ID: "mcu.decoupling.required", Severity: BlockValidationSeverityBlocked, Description: "Required MCU power domains must have local decoupling."},
+			{ID: "mcu.reset.handled", Severity: BlockValidationSeverityBlocked, Description: "Reset net must have a defined pull state or external reset handling."},
+			{ID: "mcu.programming.path.required", Severity: BlockValidationSeverityBlocked, Description: "Programming/debug path must be emitted when requested."},
+			{ID: "mcu.peripheral.mapping.supported", Severity: BlockValidationSeverityBlocked, Description: "Requested peripheral functions must map to supported MCU pins."},
+		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Uses an explicit ATmega328P-A pin-role map; arbitrary MCU symbols remain blocked until resolver semantic metadata is available."},

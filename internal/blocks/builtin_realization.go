@@ -1,6 +1,10 @@
 package blocks
 
-import "kicadai/internal/components"
+import (
+	"fmt"
+
+	"kicadai/internal/components"
+)
 
 func ledIndicatorComponents() []BlockComponent {
 	return []BlockComponent{
@@ -192,12 +196,54 @@ func mcuMinimalPCBRealization() *PCBRealization {
 			{ComponentRole: "reset_pullup", FootprintParam: "reset_resistor_footprint", Placement: RelativePlacement{XMM: -10, YMM: 7, Layer: "F.Cu"}},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "mcu_core", ComponentRoles: []string{"mcu", "decoupling_capacitor", "aref_decoupling_capacitor", "reset_pullup"}, AnchorRole: "mcu", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -14, MaxXMM: 14, MaxYMM: 14}}},
-		Validation:      PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "reset"}},
+		LocalRoutes: []PCBLocalRoute{
+			{ID: "mcu_vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "mcu", Pin: defaultMCUPrimaryVCCPin()}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "mcu_gnd_decoupling", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "mcu", Pin: defaultMCUPrimaryGNDPin()}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "mcu_aref_decoupling", NetTemplate: "aref", From: RouteEndpoint{ComponentRole: "aref_decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "mcu", Pin: defaultMCUAREFPin()}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "mcu_aref_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "aref_decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "mcu", Pin: defaultMCUPrimaryGNDPin()}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "mcu_reset_pullup", NetTemplate: "reset", From: RouteEndpoint{ComponentRole: "reset_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "mcu", Pin: defaultMCUResetPin()}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+		},
+		Constraints: []PCBConstraint{
+			{ID: "mcu_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"mcu", "decoupling_capacitor", "aref_decoupling_capacitor"}, MaxLengthMM: 6, Description: "MCU decoupling capacitors should remain close to the package power pins."},
+		},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "reset", "aref"}, RequiredRoutes: []string{"mcu_vcc_decoupling", "mcu_gnd_decoupling", "mcu_aref_decoupling", "mcu_aref_ground", "mcu_reset_pullup"}},
 		UnsupportedBehaviors: []string{
 			"multiple decoupling capacitor instances share one component role until indexed component realization is implemented",
 			"programming headers and reset switch placement are metadata-only until conditional realizations are implemented",
 		},
 	}
+}
+
+func defaultMCUPrimaryVCCPin() string {
+	template, ok := supportedMCUTemplates[defaultMCUSymbol]
+	if !ok || len(template.Roles.VCC) == 0 {
+		panic(fmt.Sprintf("default MCU template %s missing VCC pins", defaultMCUSymbol))
+	}
+	return template.Roles.VCC[0]
+}
+
+func defaultMCUPrimaryGNDPin() string {
+	template, ok := supportedMCUTemplates[defaultMCUSymbol]
+	if !ok || len(template.Roles.GND) == 0 {
+		panic(fmt.Sprintf("default MCU template %s missing GND pins", defaultMCUSymbol))
+	}
+	return template.Roles.GND[0]
+}
+
+func defaultMCUResetPin() string {
+	template, ok := supportedMCUTemplates[defaultMCUSymbol]
+	if !ok || template.Roles.RESET == "" {
+		panic(fmt.Sprintf("default MCU template %s missing reset pin", defaultMCUSymbol))
+	}
+	return template.Roles.RESET
+}
+
+func defaultMCUAREFPin() string {
+	template, ok := supportedMCUTemplates[defaultMCUSymbol]
+	if !ok || template.Roles.AREF == "" {
+		panic(fmt.Sprintf("default MCU template %s missing AREF pin", defaultMCUSymbol))
+	}
+	return template.Roles.AREF
 }
 
 func usbCPowerComponents() []BlockComponent {
