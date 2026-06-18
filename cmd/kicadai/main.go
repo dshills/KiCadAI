@@ -59,7 +59,7 @@ Commands:
   generate-project  Generate a direct-file LED indicator KiCad project
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
-  component     List, inspect, select, and validate component catalog records
+  component     List, inspect, select, validate, and report component catalog records
   check         Run KiCad CLI ERC/DRC checks
   design        Create AI design workflow projects
   writer        Check generated writer correctness
@@ -1464,6 +1464,9 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 		return writeComponentReport(stdout, result)
 	case "validate":
 		result := components.ValidateCatalog(catalog)
+		return writeComponentReport(stdout, result)
+	case "coverage":
+		_, result := components.ComponentCoverage(catalog, components.CoverageOptions{})
 		return writeComponentReport(stdout, result)
 	default:
 		return writeReportFailure(stdout, "component", reports.Issue{

@@ -5,6 +5,7 @@
 /dist/
 .gocache/
 .gomodcache/
+.cache/
 .coverage/
 *.test
 coverage.out

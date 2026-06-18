@@ -1,0 +1,165 @@
+package components
+
+import (
+	"sort"
+	"strings"
+
+	"kicadai/internal/reports"
+)
+
+const (
+	CodeComponentCoverageMissing     reports.Code = "COMPONENT_COVERAGE_MISSING"
+	CodeComponentCoveragePlaceholder reports.Code = "COMPONENT_COVERAGE_PLACEHOLDER_ONLY"
+)
+
+type CoverageOptions struct {
+	RequiredFamilies []string `json:"required_families,omitempty"`
+}
+
+type CoverageReport struct {
+	RecordCount      int              `json:"record_count"`
+	FamilyCount      int              `json:"family_count"`
+	ConfidenceCounts map[string]int   `json:"confidence_counts"`
+	Families         []FamilyCoverage `json:"families"`
+	Issues           []reports.Issue  `json:"issues,omitempty"`
+}
+
+type FamilyCoverage struct {
+	Family                  string   `json:"family"`
+	Defined                 bool     `json:"defined"`
+	RecordCount             int      `json:"record_count"`
+	VerifiedRecords         int      `json:"verified_records"`
+	LibraryDerivedRecords   int      `json:"library_derived_records"`
+	RuleInferredRecords     int      `json:"rule_inferred_records"`
+	PlaceholderRecords      int      `json:"placeholder_records"`
+	BlockedRecords          int      `json:"blocked_records"`
+	MissingResolverEvidence []string `json:"missing_resolver_evidence,omitempty"`
+	MissingPinmapEvidence   []string `json:"missing_pinmap_evidence,omitempty"`
+	RecordIDs               []string `json:"record_ids,omitempty"`
+}
+
+func ComponentCoverage(catalog *Catalog, opts CoverageOptions) (CoverageReport, reports.Result) {
+	if catalog == nil {
+		issue := NewIssue(reports.CodeInvalidArgument, reports.SeverityBlocked, "catalog", "component catalog is nil")
+		report := CoverageReport{ConfidenceCounts: emptyConfidenceCounts(), Issues: []reports.Issue{issue}}
+		return report, reports.ErrorResult("component coverage", issue)
+	}
+	required := opts.RequiredFamilies
+	if len(required) == 0 {
+		required = defaultRoadmapRequiredFamilies()
+	}
+	report := CoverageReport{
+		RecordCount:      len(catalog.Records),
+		FamilyCount:      len(catalog.Families),
+		ConfidenceCounts: emptyConfidenceCounts(),
+	}
+	defined := map[string]bool{}
+	byFamily := map[string]*FamilyCoverage{}
+	for _, family := range catalog.Families {
+		id := normalizeCoverageFamily(family.ID)
+		if id == "" {
+			continue
+		}
+		defined[id] = true
+		coverage := ensureFamilyCoverage(byFamily, id)
+		coverage.Defined = true
+	}
+	for _, record := range catalog.Records {
+		family := normalizeCoverageFamily(record.Family)
+		if family == "" {
+			family = "unknown"
+		}
+		coverage := ensureFamilyCoverage(byFamily, family)
+		if !coverage.Defined {
+			coverage.Defined = defined[family]
+		}
+		coverage.RecordCount++
+		coverage.RecordIDs = append(coverage.RecordIDs, record.ID)
+		confidence := record.Verification.Confidence
+		report.ConfidenceCounts[string(confidence)]++
+		switch confidence {
+		case ConfidenceVerified:
+			coverage.VerifiedRecords++
+		case ConfidenceLibraryDerived:
+			coverage.LibraryDerivedRecords++
+		case ConfidenceRuleInferred:
+			coverage.RuleInferredRecords++
+		case ConfidencePlaceholder:
+			coverage.PlaceholderRecords++
+		case ConfidenceBlocked:
+			coverage.BlockedRecords++
+		}
+		if !record.Verification.ResolverChecked {
+			coverage.MissingResolverEvidence = append(coverage.MissingResolverEvidence, record.ID)
+		}
+		if !record.Verification.PinMapChecked && record.Verification.Confidence == ConfidenceVerified && !passiveRuleInferred(record) {
+			coverage.MissingPinmapEvidence = append(coverage.MissingPinmapEvidence, record.ID)
+		}
+	}
+	for _, requiredFamily := range required {
+		family := normalizeCoverageFamily(requiredFamily)
+		if family == "" {
+			continue
+		}
+		coverage := ensureFamilyCoverage(byFamily, family)
+		if coverage.RecordCount == 0 {
+			report.Issues = append(report.Issues, NewIssue(CodeComponentCoverageMissing, reports.SeverityWarning, "coverage."+family, "required component family has no records: "+family))
+		} else if coverage.VerifiedRecords == 0 && coverage.RuleInferredRecords == 0 && coverage.LibraryDerivedRecords == 0 {
+			report.Issues = append(report.Issues, NewIssue(CodeComponentCoveragePlaceholder, reports.SeverityWarning, "coverage."+family, "required component family has only placeholder or blocked records: "+family))
+		}
+	}
+	families := make([]FamilyCoverage, 0, len(byFamily))
+	for _, coverage := range byFamily {
+		sort.Strings(coverage.RecordIDs)
+		sort.Strings(coverage.MissingResolverEvidence)
+		sort.Strings(coverage.MissingPinmapEvidence)
+		families = append(families, *coverage)
+	}
+	sort.SliceStable(families, func(i, j int) bool {
+		return families[i].Family < families[j].Family
+	})
+	sortIssues(report.Issues)
+	report.FamilyCount = len(families)
+	report.Families = families
+	return report, reports.ResultWithIssues("component coverage", report, report.Issues, nil)
+}
+
+func ensureFamilyCoverage(byFamily map[string]*FamilyCoverage, family string) *FamilyCoverage {
+	if coverage, ok := byFamily[family]; ok {
+		return coverage
+	}
+	coverage := &FamilyCoverage{Family: family}
+	byFamily[family] = coverage
+	return coverage
+}
+
+func normalizeCoverageFamily(family string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(family)), "-", "_")
+}
+
+func emptyConfidenceCounts() map[string]int {
+	return map[string]int{
+		string(ConfidenceVerified):       0,
+		string(ConfidenceLibraryDerived): 0,
+		string(ConfidenceRuleInferred):   0,
+		string(ConfidencePlaceholder):    0,
+		string(ConfidenceBlocked):        0,
+	}
+}
+
+func defaultRoadmapRequiredFamilies() []string {
+	return []string{
+		"capacitor",
+		"connector",
+		"crystal",
+		"diode",
+		"led",
+		"mcu",
+		"opamp",
+		"protection",
+		"regulator",
+		"resistor",
+		"sensor",
+		"usb_c",
+	}
+}
