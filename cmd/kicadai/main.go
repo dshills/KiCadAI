@@ -35,6 +35,7 @@ import (
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/pinmap"
 	"kicadai/internal/placement"
+	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/schematic"
@@ -69,6 +70,7 @@ Commands:
   pinmap        List or validate symbol-footprint pinmaps
   place         Run PCB placement planning
   route         Run PCB routing
+  repair        Plan or apply validation repair attempts
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -222,6 +224,7 @@ type cliOptions struct {
 	routeClearanceMM      float64
 	routeAllowPartial     bool
 	routeAllowPartialSet  bool
+	maxRepairAttempts     int
 	skipRouting           bool
 	placementBoardWidth   float64
 	placementBoardHeight  float64
@@ -315,6 +318,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runPlace(opts, stdout)
 	case "route":
 		return runRoute(opts, stdout)
+	case "repair":
+		return runRepairCommand(opts, stdout)
 	case "transaction":
 		return runTransaction(opts, stdout)
 	case "export":
@@ -394,6 +399,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Float64Var(&opts.routeTraceWidthMM, "trace-width", 0, "routing trace width in millimeters")
 	flags.Float64Var(&opts.routeClearanceMM, "clearance", 0, "routing clearance in millimeters")
 	flags.BoolVar(&opts.routeAllowPartial, "allow-partial", false, "allow partial routing results")
+	flags.IntVar(&opts.maxRepairAttempts, "max-repair-attempts", 3, "maximum validation repair attempts")
 	flags.BoolVar(&opts.skipRouting, "skip-routing", false, "skip design workflow board routing")
 	flags.Float64Var(&opts.placementBoardWidth, "placement-board-width", defaultPlacementBoardWidthMM, "placement feedback board width in millimeters")
 	flags.Float64Var(&opts.placementBoardHeight, "placement-board-height", defaultPlacementBoardHeightMM, "placement feedback board height in millimeters")
@@ -2982,6 +2988,86 @@ func writeReportFailure(stdout io.Writer, command string, issue reports.Issue) e
 		return err
 	}
 	return errors.New(issue.Message)
+}
+
+func runRepairCommand(opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) == 0 {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "repair requires subcommand: plan or apply"}
+		return writeReportFailure(stdout, "repair", issue)
+	}
+	if opts.requestPath == "" {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair.request", Message: "repair requires --request stage issues JSON"}
+		return writeReportFailure(stdout, "repair", issue)
+	}
+	groups, err := loadRepairStageIssues(opts.requestPath)
+	if err != nil {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: filepath.ToSlash(opts.requestPath), Message: err.Error()}
+		return writeReportFailure(stdout, "repair", issue)
+	}
+	repairOptions := repair.Options{
+		Enabled:                  true,
+		Apply:                    opts.commandArgs[0] == "apply",
+		MaxAttempts:              opts.maxRepairAttempts,
+		MaxAttemptsPerIssue:      1,
+		AllowFootprintAssignment: true,
+		AllowPadNetRegeneration:  true,
+		AllowOutlineGeneration:   true,
+		AllowPlacementRetry:      true,
+		AllowRoutingRetry:        true,
+		AllowZoneNetRepair:       true,
+		AllowKiCadCLI:            opts.kicadCLI != "",
+	}
+	switch opts.commandArgs[0] {
+	case "plan":
+	case "apply":
+		if !opts.execute {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair.apply", Message: "repair apply requires --execute"}
+			return writeReportFailure(stdout, "repair", issue)
+		}
+	default:
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "unsupported repair subcommand " + opts.commandArgs[0]}
+		return writeReportFailure(stdout, "repair", issue)
+	}
+	plan := repair.BuildPlan(groups, repairOptions)
+	result := reports.ResultWithIssues("repair", plan, repairPlanIssues(plan), nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if plan.Status == repair.StatusBlocked {
+		return fmt.Errorf("repair %s blocked", opts.commandArgs[0])
+	}
+	return nil
+}
+
+func loadRepairStageIssues(path string) ([]repair.StageIssues, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var groups []repair.StageIssues
+	if err := json.Unmarshal(data, &groups); err != nil {
+		return nil, err
+	}
+	return groups, nil
+}
+
+func repairPlanIssues(plan repair.Plan) []reports.Issue {
+	issues := []reports.Issue{}
+	for _, attempt := range plan.Attempts {
+		if attempt.Status != repair.StatusBlocked {
+			continue
+		}
+		issue := attempt.Issue
+		issue.Severity = reports.SeverityBlocked
+		if issue.Code == "" {
+			issue.Code = reports.CodeValidationFailed
+		}
+		if issue.Message == "" {
+			issue.Message = attempt.Message
+		}
+		issues = append(issues, issue)
+	}
+	return issues
 }
 
 func validateStructuredCommandArgs(command string, args []string) (reports.Issue, bool) {
