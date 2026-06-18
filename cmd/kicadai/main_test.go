@@ -17,6 +17,7 @@ import (
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
@@ -191,6 +192,124 @@ func TestRunDesignCreateSimpleLED(t *testing.T) {
 	if _, statErr := os.Stat(filepath.Join(output, "status_board.kicad_pcb")); statErr != nil {
 		t.Fatalf("missing pcb output: %v", statErr)
 	}
+}
+
+func TestRunRepairPlanTargetMissingProvenance(t *testing.T) {
+	output := writeRepairCLIProject(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--target", output, "repair", "plan"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing provenance to block")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || !strings.Contains(stdout.String(), "generated KiCadAI provenance") {
+		t.Fatalf("unexpected result: %s", stdout.String())
+	}
+}
+
+func TestRunRepairApplyTargetRequiresExecute(t *testing.T) {
+	output, bundlePath := writeRepairCLIBundle(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--target", output, "--request", bundlePath, "--overwrite", "repair", "apply"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing execute to block")
+	}
+	if !strings.Contains(stdout.String(), "execute=true") {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRunRepairApplyTargetRequiresOverwrite(t *testing.T) {
+	output, bundlePath := writeRepairCLIBundle(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--target", output, "--request", bundlePath, "--execute", "repair", "apply"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing overwrite to block")
+	}
+	if !strings.Contains(stdout.String(), "overwrite=true") {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRunRepairApplyTargetSuccess(t *testing.T) {
+	output, bundlePath := writeRepairCLIBundle(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--target", output, "--request", bundlePath, "--execute", "--overwrite", "repair", "apply"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"status": "repaired"`) {
+		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRepairOutputDirUsesParentForFileTarget(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "demo.kicad_sch")
+	if err := os.WriteFile(target, []byte("schematic"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if got := repairOutputDir("", target); got != dir {
+		t.Fatalf("output dir = %q, want %q", got, dir)
+	}
+	if got := repairOutputDir(filepath.Join(dir, "override"), target); got != filepath.Join(dir, "override") {
+		t.Fatalf("override output dir = %q", got)
+	}
+}
+
+func writeRepairCLIBundle(t *testing.T) (string, string) {
+	t.Helper()
+	output, tx := writeRepairCLIProjectWithTransaction(t)
+	bundlePath := filepath.Join(t.TempDir(), "repair-bundle.json")
+	bundle := repair.Bundle{
+		Schema:        repair.BundleSchemaV1,
+		ProjectRoot:   output,
+		ProjectName:   "demo",
+		Generated:     true,
+		Transaction:   &tx,
+		RepairOptions: repair.Options{Enabled: true},
+	}
+	if err := repair.SaveBundle(bundlePath, bundle); err != nil {
+		t.Fatal(err)
+	}
+	return output, bundlePath
+}
+
+func writeRepairCLIProject(t *testing.T) string {
+	t.Helper()
+	output, _ := writeRepairCLIProjectWithTransaction(t)
+	return output
+}
+
+func writeRepairCLIProjectWithTransaction(t *testing.T) (string, transactions.Transaction) {
+	t.Helper()
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := mustTestTransaction(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"set_board_outline","board":{"width_mm":40,"height_mm":25}},
+	  {"op":"write_project"}
+	]}`)
+	result := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 0 {
+		t.Fatalf("apply issues: %#v", result.Issues)
+	}
+	return output, tx
+}
+
+func mustTestTransaction(t *testing.T, input string) transactions.Transaction {
+	t.Helper()
+	tx, err := transactions.Parse([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	return tx
 }
 
 func testComponentCatalogDir(t *testing.T) string {

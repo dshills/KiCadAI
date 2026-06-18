@@ -90,6 +90,7 @@ Global flags:
   --origin-y int64      Plan origin Y in KiCad internal units (1 mm = 1,000,000 IU)
   --prefix string        Reference/value prefix for plan commands
   --output string        Output project directory for generation commands
+  --target string        Project, schematic, or PCB target for repair commands
   --request string       Structured request JSON path for generator commands
   --name string          Project/design name for generation commands
   --seed string          Deterministic seed for generation commands
@@ -179,6 +180,7 @@ type cliOptions struct {
 	originY               int64
 	prefix                string
 	output                string
+	target                string
 	requestPath           string
 	name                  string
 	seed                  string
@@ -354,6 +356,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Int64Var(&opts.originY, "origin-y", 0, "plan origin Y")
 	flags.StringVar(&opts.prefix, "prefix", workflows.DefaultLEDDemoPrefix, "plan prefix")
 	flags.StringVar(&opts.output, "output", "", "output project directory")
+	flags.StringVar(&opts.target, "target", "", "repair target project or file")
 	flags.StringVar(&opts.requestPath, "request", "", "structured request JSON path")
 	flags.StringVar(&opts.name, "name", "", "project/design name")
 	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
@@ -2995,6 +2998,9 @@ func runRepairCommand(opts cliOptions, stdout io.Writer) error {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "repair requires subcommand: plan or apply"}
 		return writeReportFailure(stdout, "repair", issue)
 	}
+	if strings.TrimSpace(opts.target) != "" {
+		return runRepairTargetCommand(opts, stdout)
+	}
 	if opts.requestPath == "" {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair.request", Message: "repair requires --request stage issues JSON"}
 		return writeReportFailure(stdout, "repair", issue)
@@ -3037,6 +3043,103 @@ func runRepairCommand(opts cliOptions, stdout io.Writer) error {
 		return fmt.Errorf("repair %s blocked", opts.commandArgs[0])
 	}
 	return nil
+}
+
+func runRepairTargetCommand(opts cliOptions, stdout io.Writer) error {
+	repairOptions := repairOptionsFromCLI(opts, opts.commandArgs[0] == "apply")
+	var bundle *repair.Bundle
+	if strings.TrimSpace(opts.requestPath) != "" {
+		loaded, err := repair.LoadBundle(opts.requestPath)
+		if err != nil {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: filepath.ToSlash(opts.requestPath), Message: err.Error()}
+			return writeReportFailure(stdout, "repair", issue)
+		}
+		bundle = &loaded
+	}
+	switch opts.commandArgs[0] {
+	case "plan":
+		target := repair.HydrateTarget(opts.target, repair.HydrateOptions{Bundle: bundle})
+		if bundle != nil {
+			plan := repair.BuildPlan(bundle.StageIssues, repairOptions)
+			data := struct {
+				Target repair.Target `json:"target"`
+				Plan   repair.Plan   `json:"plan"`
+			}{Target: target, Plan: plan}
+			issues := append([]reports.Issue{}, target.Issues...)
+			issues = append(issues, repairPlanIssues(plan)...)
+			result := reports.ResultWithIssues("repair", data, issues, nil)
+			if err := writeReportJSON(stdout, result); err != nil {
+				return err
+			}
+			if reports.HasBlockingIssue(issues) || plan.Status == repair.StatusBlocked {
+				return fmt.Errorf("repair plan blocked")
+			}
+			return nil
+		}
+		result := reports.ResultWithIssues("repair", target, target.Issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if reports.HasBlockingIssue(target.Issues) {
+			return fmt.Errorf("repair plan blocked")
+		}
+		return nil
+	case "apply":
+		if bundle == nil {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair.request", Message: "repair apply --target requires --request repair bundle JSON"}
+			return writeReportFailure(stdout, "repair", issue)
+		}
+		apply := repair.ApplyPersistedBundle(opts.target, *bundle, repair.PersistedApplyOptions{
+			Execute:   opts.execute,
+			OutputDir: repairOutputDir(opts.output, opts.target),
+			Overwrite: opts.overwrite,
+			Seed:      opts.seed,
+			Repair:    repairOptions,
+			Board:     &transactions.BoardSize{WidthMM: opts.placementBoardWidth, HeightMM: opts.placementBoardHeight},
+		})
+		result := reports.ResultWithIssues("repair", apply, apply.Issues, apply.Artifacts)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if apply.Status == repair.StatusBlocked || reports.HasBlockingIssue(apply.Issues) {
+			return fmt.Errorf("repair apply blocked")
+		}
+		return nil
+	default:
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "unsupported repair subcommand " + opts.commandArgs[0]}
+		return writeReportFailure(stdout, "repair", issue)
+	}
+}
+
+func repairOptionsFromCLI(opts cliOptions, apply bool) repair.Options {
+	return repair.Options{
+		Enabled:                  true,
+		Apply:                    apply,
+		MaxAttempts:              opts.maxRepairAttempts,
+		MaxAttemptsPerIssue:      max(1, opts.maxRepairAttempts),
+		AllowFootprintAssignment: true,
+		AllowPadNetRegeneration:  true,
+		AllowOutlineGeneration:   true,
+		AllowPlacementRetry:      true,
+		AllowRoutingRetry:        true,
+		AllowZoneNetRepair:       true,
+		AllowKiCadCLI:            opts.kicadCLI != "",
+	}
+}
+
+func repairOutputDir(output string, target string) string {
+	if output != "" {
+		return output
+	}
+	if info, err := os.Stat(target); err == nil && !info.IsDir() {
+		return filepath.Dir(target)
+	}
+	switch strings.ToLower(filepath.Ext(target)) {
+	case ".kicad_pro", ".kicad_sch", ".kicad_pcb":
+		return filepath.Dir(target)
+	default:
+		return target
+	}
 }
 
 func loadRepairStageIssues(path string) ([]repair.StageIssues, error) {
