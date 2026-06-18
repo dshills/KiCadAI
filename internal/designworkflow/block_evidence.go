@@ -21,20 +21,34 @@ var blockEvidenceCache = struct {
 }{byKey: map[string]map[string]blockEvidence{}}
 
 type BlockEvidenceSummary struct {
-	InstanceID    string `json:"instance_id"`
-	BlockID       string `json:"block_id"`
-	CaseID        string `json:"case_id,omitempty"`
-	EvidenceLevel string `json:"evidence_level,omitempty"`
-	Status        string `json:"status"`
+	InstanceID        string                `json:"instance_id"`
+	BlockID           string                `json:"block_id"`
+	CaseID            string                `json:"case_id,omitempty"`
+	EvidenceLevel     string                `json:"evidence_level,omitempty"`
+	Status            string                `json:"status"`
+	Readiness         blocks.BlockReadiness `json:"readiness"`
+	VerificationLevel string                `json:"verification_level,omitempty"`
+	ValidationRules   []string              `json:"validation_rules,omitempty"`
+	RequiredRoutes    []string              `json:"required_routes,omitempty"`
+	Gaps              []string              `json:"gaps,omitempty"`
 }
 
 func blockEvidenceForRequest(ctx context.Context, registry blocks.Registry, request Request) ([]BlockEvidenceSummary, []reports.Issue) {
 	index, indexIssues := builtinBlockEvidenceIndex(ctx, registry)
+	inventory := blockInventoryByID(registry)
+	requiredRoutes := blockRequiredRoutesByID(registry)
 	summaries := make([]BlockEvidenceSummary, 0, len(request.Blocks))
 	issues := append([]reports.Issue(nil), indexIssues...)
 	for blockIndex, instance := range request.Blocks {
 		evidence, ok := index[instance.BlockID]
 		summary := BlockEvidenceSummary{InstanceID: instance.ID, BlockID: instance.BlockID}
+		if family, ok := inventory[instance.BlockID]; ok {
+			summary.Readiness = family.Readiness
+			summary.VerificationLevel = string(family.VerificationLevel)
+			summary.ValidationRules = slices.Clone(family.ElectricalRules)
+			summary.RequiredRoutes = slices.Clone(requiredRoutes[instance.BlockID])
+			summary.Gaps = slices.Clone(family.Gaps)
+		}
 		if ok {
 			summary.CaseID = evidence.CaseID
 			summary.EvidenceLevel = string(evidence.EvidenceLevel)
@@ -61,6 +75,37 @@ func blockEvidenceForRequest(ctx context.Context, registry blocks.Registry, requ
 		summaries = append(summaries, summary)
 	}
 	return summaries, issues
+}
+
+type blockInventoryProvider interface {
+	Inventory() blocks.BlockLibraryInventory
+}
+
+func blockInventoryByID(registry blocks.Registry) map[string]blocks.BlockFamilyInventory {
+	builtin, ok := registry.(blockInventoryProvider)
+	if !ok {
+		return nil
+	}
+	inventory := builtin.Inventory()
+	byID := make(map[string]blocks.BlockFamilyInventory, len(inventory.Families))
+	for _, family := range inventory.Families {
+		byID[family.ID] = family
+	}
+	return byID
+}
+
+func blockRequiredRoutesByID(registry blocks.Registry) map[string][]string {
+	byID := make(map[string][]string, len(registry.ListBlocks()))
+	for _, summary := range registry.ListBlocks() {
+		definition, ok := registry.GetBlock(summary.ID)
+		if !ok || definition.PCBRealization == nil {
+			continue
+		}
+		routes := slices.Clone(definition.PCBRealization.Validation.RequiredRoutes)
+		slices.Sort(routes)
+		byID[summary.ID] = routes
+	}
+	return byID
 }
 
 type blockEvidence struct {

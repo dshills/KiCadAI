@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 
@@ -36,6 +37,15 @@ func TestPlanBlocksComposesExplicitRequest(t *testing.T) {
 	}
 	if evidence[1].BlockID != "led_indicator" || evidence[1].EvidenceLevel == "" {
 		t.Fatalf("LED evidence = %#v", evidence[1])
+	}
+	if evidence[1].Readiness != blocks.BlockReadinessPartial {
+		t.Fatalf("LED readiness = %q", evidence[1].Readiness)
+	}
+	if !slices.Contains(evidence[1].ValidationRules, "led.series_route.required") {
+		t.Fatalf("LED validation rules = %#v", evidence[1].ValidationRules)
+	}
+	if !slices.Contains(evidence[1].RequiredRoutes, "series") {
+		t.Fatalf("LED required routes = %#v", evidence[1].RequiredRoutes)
 	}
 }
 
