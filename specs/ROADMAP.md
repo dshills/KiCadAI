@@ -151,34 +151,42 @@ Build a reusable library of verified schematic and PCB design fragments.
 
 ### Current Foundation
 
-Circuit blocks exist, and PCB realization can produce fragments, placements,
-footprints, routed local connections, and constraints for known blocks.
+- Circuit block inventory reports roadmap seed families, implemented status,
+  readiness, validation rules, PCB rules, required roles, exported ports, and
+  explicit unsupported gaps.
+- LED indicator, connector breakout, voltage regulator, MCU minimal, USB-C
+  power, I2C sensor, and op-amp gain-stage blocks declare electrical rules,
+  PCB constraints, and required local-route expectations.
+- PCB realization metadata includes placement groups, keepouts, proximity
+  constraints, route width constraints, edge-facing constraints, and local
+  route definitions for supported block-local nets.
+- MCU minimal realization now includes power decoupling, AREF decoupling,
+  reset pull-up, and local route evidence for its supported ATmega328P-A
+  template.
+- Block verification corpus covers every built-in block and has regression
+  guards that required routes remain defined.
+- `design create` block-planning output exposes block readiness, verification
+  level, rule IDs, required routes, and known gaps for AI-facing explanation.
 
 ### Remaining Work
 
-- Harden and expand blocks for:
-  - LED indicators;
-  - regulators;
-  - MCU minimal systems;
-  - USB-C power;
-  - I2C sensors;
-  - op-amp gain stages;
-  - connector breakouts;
-  - crystals/oscillators;
-  - reset/programming headers;
-  - ESD and reverse-polarity protection.
-- Encode electrical rules: required decoupling, pull-ups, enable pins, boot
-  straps, thermal constraints, analog biasing, and rail compatibility.
-- Encode PCB rules: placement groups, proximity, edge constraints, keepouts,
-  route priorities, zone requirements, and local DRC constraints.
-- Add block verification manifests with ERC/DRC evidence where possible.
+- Add concrete generators for crystal/oscillator, standalone reset/programming,
+  ESD, and reverse-polarity protection blocks.
+- Replace remaining structural/generic active templates with concrete
+  component-catalog-backed parts where fabrication readiness is desired.
+- Add KiCad-backed ERC/DRC evidence to block verification manifests where
+  external KiCad CLI is available.
+- Convert more semantic PCB constraints into downstream placement, routing,
+  DRC, and repair enforcement.
+- Broaden block variants beyond the initial verified/default topologies.
 
 ### Acceptance Gates
 
-- Each block can emit schematic and PCB fragments with validation evidence.
-- Blocks fail closed when required components, footprints, nets, or constraints
-  are missing.
-- Block-level tests cover both generated files and design-rule expectations.
+- Supported seed blocks emit schematic and PCB fragments with declared rule and
+  local-route evidence.
+- Unsupported seed families appear as explicit, tested gaps.
+- Block-level tests cover rule metadata, PCB constraints, required route
+  definitions, verification-corpus coverage, and workflow evidence output.
 
 ## Priority 3: Post-Repair Validation Adapters
 
