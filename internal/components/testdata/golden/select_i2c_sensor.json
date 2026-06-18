@@ -1,0 +1,13 @@
+{
+  "component_id": "sensor.bosch.bme280.lga8",
+  "variant_id": "lga8",
+  "family": "sensor",
+  "name": "Bosch BME280 I2C/SPI environmental sensor",
+  "footprint_id": "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering",
+  "confidence": "verified",
+  "score": 530,
+  "reasons": [
+    "family",
+    "package"
+  ]
+}

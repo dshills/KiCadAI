@@ -1,0 +1,13 @@
+{
+  "component_id": "usb_c.gct.usb4125_power_only_6p",
+  "variant_id": "gct_usb4125_6p",
+  "family": "usb_c",
+  "name": "GCT USB4125 power-only USB-C receptacle",
+  "footprint_id": "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal",
+  "confidence": "verified",
+  "score": 520,
+  "reasons": [
+    "family",
+    "package"
+  ]
+}

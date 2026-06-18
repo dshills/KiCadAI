@@ -1,0 +1,227 @@
+{
+  "record_count": 23,
+  "family_count": 12,
+  "confidence_counts": {
+    "blocked": 0,
+    "library_derived": 0,
+    "placeholder": 4,
+    "rule_inferred": 4,
+    "verified": 15
+  },
+  "families": [
+    {
+      "family": "capacitor",
+      "defined": true,
+      "record_count": 3,
+      "verified_records": 0,
+      "library_derived_records": 0,
+      "rule_inferred_records": 2,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "capacitor.ceramic.0603",
+        "capacitor.ceramic.0805",
+        "capacitor.electrolytic.radial"
+      ],
+      "record_ids": [
+        "capacitor.ceramic.0603",
+        "capacitor.ceramic.0805",
+        "capacitor.electrolytic.radial"
+      ]
+    },
+    {
+      "family": "connector",
+      "defined": true,
+      "record_count": 4,
+      "verified_records": 4,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "connector.pinheader.1x02.2_54mm",
+        "connector.pinheader.1x03.2_54mm",
+        "connector.pinheader.1x04.2_54mm",
+        "connector.pinheader.1x05.2_54mm"
+      ],
+      "record_ids": [
+        "connector.pinheader.1x02.2_54mm",
+        "connector.pinheader.1x03.2_54mm",
+        "connector.pinheader.1x04.2_54mm",
+        "connector.pinheader.1x05.2_54mm"
+      ]
+    },
+    {
+      "family": "crystal",
+      "defined": true,
+      "record_count": 1,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "crystal.generic.5032_2pin"
+      ],
+      "record_ids": [
+        "crystal.generic.5032_2pin"
+      ]
+    },
+    {
+      "family": "diode",
+      "defined": true,
+      "record_count": 3,
+      "verified_records": 3,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "diode.schottky.generic",
+        "diode.signal.generic",
+        "diode.tvs_unidirectional.generic"
+      ],
+      "record_ids": [
+        "diode.schottky.generic",
+        "diode.signal.generic",
+        "diode.tvs_unidirectional.generic"
+      ]
+    },
+    {
+      "family": "led",
+      "defined": true,
+      "record_count": 1,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "led.generic.0805"
+      ],
+      "record_ids": [
+        "led.generic.0805"
+      ]
+    },
+    {
+      "family": "mcu",
+      "defined": true,
+      "record_count": 2,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "mcu.microchip.atmega328p_a.tqfp32",
+        "mcu.placeholder.avr_minimal_tqfp32"
+      ],
+      "record_ids": [
+        "mcu.microchip.atmega328p_a.tqfp32",
+        "mcu.placeholder.avr_minimal_tqfp32"
+      ]
+    },
+    {
+      "family": "opamp",
+      "defined": true,
+      "record_count": 2,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "opamp.generic.single.lmv321",
+        "opamp.ti.lmv321.sot23_5"
+      ],
+      "record_ids": [
+        "opamp.generic.single.lmv321",
+        "opamp.ti.lmv321.sot23_5"
+      ]
+    },
+    {
+      "family": "protection",
+      "defined": true,
+      "record_count": 1,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "protection.tvs.usb_5v_unidirectional"
+      ],
+      "record_ids": [
+        "protection.tvs.usb_5v_unidirectional"
+      ]
+    },
+    {
+      "family": "regulator",
+      "defined": true,
+      "record_count": 1,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "regulator.linear.ams1117_3v3.sot223"
+      ],
+      "record_ids": [
+        "regulator.linear.ams1117_3v3.sot223"
+      ]
+    },
+    {
+      "family": "resistor",
+      "defined": true,
+      "record_count": 2,
+      "verified_records": 0,
+      "library_derived_records": 0,
+      "rule_inferred_records": 2,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "resistor.generic.0603",
+        "resistor.generic.0805"
+      ],
+      "record_ids": [
+        "resistor.generic.0603",
+        "resistor.generic.0805"
+      ]
+    },
+    {
+      "family": "sensor",
+      "defined": true,
+      "record_count": 2,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 1,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "sensor.bosch.bme280.lga8",
+        "sensor.i2c.interface_header.5pin"
+      ],
+      "record_ids": [
+        "sensor.bosch.bme280.lga8",
+        "sensor.i2c.interface_header.5pin"
+      ]
+    },
+    {
+      "family": "usb_c",
+      "defined": true,
+      "record_count": 1,
+      "verified_records": 1,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "usb_c.gct.usb4125_power_only_6p"
+      ],
+      "record_ids": [
+        "usb_c.gct.usb4125_power_only_6p"
+      ]
+    }
+  ]
+}

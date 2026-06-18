@@ -1,0 +1,13 @@
+{
+  "component_id": "opamp.ti.lmv321.sot23_5",
+  "variant_id": "sot23_5",
+  "family": "opamp",
+  "name": "TI LMV321 single op-amp SOT-23-5",
+  "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+  "confidence": "verified",
+  "score": 530,
+  "reasons": [
+    "family",
+    "package"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "component_id": "regulator.linear.ams1117_3v3.sot223",
+  "variant_id": "sot223",
+  "family": "regulator",
+  "name": "AMS1117-3.3 SOT-223 linear regulator",
+  "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+  "confidence": "verified",
+  "score": 535,
+  "reasons": [
+    "family",
+    "package",
+    "value"
+  ]
+}

@@ -67,6 +67,97 @@ func TestGoldenComponentSelectionOutputs(t *testing.T) {
 	assertGoldenJSON(t, "validate_summary.json", validateResult.Data)
 }
 
+func TestGoldenCheckedInCoverageOutput(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	report, result := ComponentCoverage(catalog, CoverageOptions{})
+	if !result.OK {
+		t.Fatalf("coverage failed: %+v", result.Issues)
+	}
+	if len(report.Issues) != 0 {
+		t.Fatalf("coverage has roadmap issues: %+v", report.Issues)
+	}
+	assertGoldenJSON(t, "coverage_checked_in.json", report)
+}
+
+func TestGoldenVerifiedActiveSelections(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	cases := []struct {
+		name    string
+		request SelectionRequest
+	}{
+		{
+			name: "select_regulator.json",
+			request: SelectionRequest{
+				Query:             Query{Family: "regulator", Package: "sot223", ValueKind: "output_voltage", Value: "3.3"},
+				Acceptance:        AcceptanceConnectivity,
+				RequiredRatings:   []RequiredRating{{Kind: "input_voltage", Value: "5", Unit: "V"}},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			},
+		},
+		{
+			name: "select_opamp.json",
+			request: SelectionRequest{
+				Query:             Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+				Acceptance:        AcceptanceConnectivity,
+				RequiredRatings:   []RequiredRating{{Kind: "supply_voltage", Value: "3.3", Unit: "V"}},
+				RequiredFunctions: []string{"IN_PLUS", "IN_MINUS", "OUT"},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			},
+		},
+		{
+			name: "select_mcu.json",
+			request: SelectionRequest{
+				Query:             Query{Text: "microchip", Family: "mcu", Package: "tqfp32"},
+				Acceptance:        AcceptanceConnectivity,
+				RequiredFunctions: []string{"VCC", "GND", "RESET"},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			},
+		},
+		{
+			name: "select_i2c_sensor.json",
+			request: SelectionRequest{
+				Query:             Query{Family: "sensor", Package: "lga8"},
+				Acceptance:        AcceptanceConnectivity,
+				RequiredFunctions: []string{"VDD", "GND", "SDA", "SCL"},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			},
+		},
+		{
+			name: "select_usb_c_power.json",
+			request: SelectionRequest{
+				Query:             Query{Family: "usb_c", Package: "6p"},
+				Acceptance:        AcceptanceConnectivity,
+				RequiredFunctions: []string{"VBUS", "GND", "CC1", "CC2"},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			},
+		},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			selection, result := Select(context.Background(), catalog, tc.request)
+			if !result.OK {
+				t.Fatalf("selection failed: %+v", result.Issues)
+			}
+			if selection.Candidate.ComponentID == "" {
+				t.Fatalf("no candidate selected")
+			}
+			assertGoldenJSON(t, tc.name, selection.Candidate)
+		})
+	}
+}
+
 func TestGoldenUnsafePlaceholderSelection(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: filepath.Join("testdata", "catalog", "unsafe_placeholder")})
 	if err != nil {

@@ -1,0 +1,13 @@
+{
+  "component_id": "mcu.microchip.atmega328p_a.tqfp32",
+  "variant_id": "tqfp32",
+  "family": "mcu",
+  "name": "Microchip ATmega328P-A TQFP-32",
+  "footprint_id": "Package_QFP:TQFP-32_7x7mm_P0.8mm",
+  "confidence": "verified",
+  "score": 530,
+  "reasons": [
+    "family",
+    "package"
+  ]
+}
