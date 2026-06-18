@@ -106,13 +106,14 @@ type PCBKeepout struct {
 }
 
 type PCBConstraint struct {
-	ID          string  `json:"id"`
-	Kind        string  `json:"kind"`
-	NetTemplate string  `json:"net_template,omitempty"`
-	MinWidthMM  float64 `json:"min_width_mm,omitempty"`
-	ClearanceMM float64 `json:"clearance_mm,omitempty"`
-	MaxLengthMM float64 `json:"max_length_mm,omitempty"`
-	Description string  `json:"description,omitempty"`
+	ID          string   `json:"id"`
+	Kind        string   `json:"kind"`
+	NetTemplate string   `json:"net_template,omitempty"`
+	AppliesTo   []string `json:"applies_to,omitempty"`
+	MinWidthMM  float64  `json:"min_width_mm,omitempty"`
+	ClearanceMM float64  `json:"clearance_mm,omitempty"`
+	MaxLengthMM float64  `json:"max_length_mm,omitempty"`
+	Description string   `json:"description,omitempty"`
 }
 
 type PCBValidationExpectations struct {
@@ -235,6 +236,9 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		keepoutIDs[id] = struct{}{}
 		issues = append(issues, validateLayer(keepoutPath+".layer", keepout.Layer, false)...)
 		issues = append(issues, validateBounds(keepoutPath+".bounds", keepout.Bounds)...)
+		for appliesIndex, target := range keepout.AppliesTo {
+			issues = append(issues, validateKnownKeepoutTarget(fmt.Sprintf("%s.applies_to.%d", keepoutPath, appliesIndex), target, roles)...)
+		}
 	}
 	constraintIDs := map[string]struct{}{}
 	for index, constraint := range realization.Constraints {
@@ -249,12 +253,25 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		if strings.TrimSpace(constraint.Kind) == "" {
 			issues = append(issues, blockIssue(constraintPath+".kind", "constraint kind is required"))
 		}
+		for appliesIndex, role := range constraint.AppliesTo {
+			issues = append(issues, validateKnownRole(fmt.Sprintf("%s.applies_to.%d", constraintPath, appliesIndex), role, roles)...)
+		}
 		if constraint.MinWidthMM < 0 || constraint.ClearanceMM < 0 || constraint.MaxLengthMM < 0 ||
 			!finite(constraint.MinWidthMM) || !finite(constraint.ClearanceMM) || !finite(constraint.MaxLengthMM) {
 			issues = append(issues, blockIssue(constraintPath, "constraint dimensions must be finite and non-negative"))
 		}
 	}
 	return issues
+}
+
+func validateKnownKeepoutTarget(path string, target string, roles map[string]struct{}) []reports.Issue {
+	trimmed := strings.TrimSpace(target)
+	switch trimmed {
+	case "copper", "tracks", "vias", "pads", "zones", "footprints":
+		return nil
+	default:
+		return validateKnownRole(path, trimmed, roles)
+	}
 }
 
 func componentRoleSet(components []BlockComponent) map[string]struct{} {
@@ -396,6 +413,9 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 		clone.Keepouts[i].AppliesTo = append([]string(nil), realization.Keepouts[i].AppliesTo...)
 	}
 	clone.Constraints = append([]PCBConstraint(nil), realization.Constraints...)
+	for i := range clone.Constraints {
+		clone.Constraints[i].AppliesTo = append([]string(nil), realization.Constraints[i].AppliesTo...)
+	}
 	clone.Validation.RequiredNets = append([]string(nil), realization.Validation.RequiredNets...)
 	clone.Validation.RequiredRoutes = append([]string(nil), realization.Validation.RequiredRoutes...)
 	clone.Validation.RequiredZones = append([]string(nil), realization.Validation.RequiredZones...)

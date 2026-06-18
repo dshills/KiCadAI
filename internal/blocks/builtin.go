@@ -100,6 +100,15 @@ func voltageRegulatorDefinition() BlockDefinition {
 		},
 		Components:     voltageRegulatorComponents(),
 		PCBRealization: voltageRegulatorPCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "regulator.rail.input_above_output", Severity: BlockValidationSeverityBlocked, Description: "Input voltage must remain above the requested output voltage."},
+			{ID: "regulator.dropout.margin", Severity: BlockValidationSeverityBlocked, Description: "Input minimum must provide dropout margin for the selected regulator."},
+			{ID: "regulator.current.rating", Severity: BlockValidationSeverityBlocked, Description: "Selected regulator must satisfy the requested output current."},
+			{ID: "regulator.input_capacitor.required", Severity: BlockValidationSeverityBlocked, Description: "Input bypass capacitor is required."},
+			{ID: "regulator.output_capacitor.required", Severity: BlockValidationSeverityBlocked, Description: "Output bypass capacitor is required."},
+			{ID: "regulator.enable.handled", Severity: BlockValidationSeverityBlocked, Description: "Enable pins must be tied or exported when the selected regulator requires enable handling."},
+			{ID: "regulator.capacitor.proximity", Severity: BlockValidationSeverityBlocked, Description: "Input and output capacitors must be placed near regulator pins in PCB realization."},
+		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Emits deterministic fixed-linear-regulator transactions; part-specific thermal and stability requirements remain warnings until resolver metadata improves."},
@@ -191,6 +200,14 @@ func usbCPowerDefinition() BlockDefinition {
 		},
 		Components:     usbCPowerComponents(),
 		PCBRealization: usbCPowerPCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "usb_c.power_only.required", Severity: BlockValidationSeverityBlocked, Description: "Only power-only USB-C sink mode is supported."},
+			{ID: "usb_c.cc_pull_downs.required", Severity: BlockValidationSeverityBlocked, Description: "CC1 and CC2 pull-down resistors are required for sink operation."},
+			{ID: "usb_c.connector.pinmap", Severity: BlockValidationSeverityBlocked, Description: "USB-C connector pinmap evidence is required."},
+			{ID: "usb_c.edge_placement.required", Severity: BlockValidationSeverityBlocked, Description: "PCB realization must place the receptacle as an edge-facing connector."},
+			{ID: "usb_c.vbus_route.required", Severity: BlockValidationSeverityBlocked, Description: "VBUS entry route must be present and width-constrained."},
+			{ID: "usb_c.protection.companions", Severity: BlockValidationSeverityBlocked, Description: "Requested fuse, TVS, or bulk capacitor protection companions must be emitted."},
+		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Implements USB-C sink power-only wiring with CC pull-downs; USB2 data and no-connect marker emission remain explicit gaps."},

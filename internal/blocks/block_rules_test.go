@@ -57,10 +57,75 @@ func TestConnectorBreakoutFailsClosedOnDuplicatePins(t *testing.T) {
 	}
 }
 
+func TestVoltageRegulatorDefinitionDeclaresPowerRules(t *testing.T) {
+	definition := voltageRegulatorDefinition()
+	rules := validationRuleIDs(definition.ValidationRules)
+	for _, id := range []string{
+		"regulator.rail.input_above_output",
+		"regulator.dropout.margin",
+		"regulator.current.rating",
+		"regulator.enable.handled",
+		"regulator.input_capacitor.required",
+		"regulator.output_capacitor.required",
+		"regulator.capacitor.proximity",
+	} {
+		if !slices.Contains(rules, id) {
+			t.Errorf("regulator validation rules = %#v, missing %s", rules, id)
+		}
+	}
+	constraints := pcbConstraintIDs(definition.PCBRealization)
+	for _, id := range []string{"regulator_power_width", "regulator_output_width", "regulator_input_capacitor_proximity", "regulator_output_capacitor_proximity"} {
+		if !slices.Contains(constraints, id) {
+			t.Errorf("regulator PCB constraints = %#v, missing %s", constraints, id)
+		}
+	}
+}
+
+func TestUSBCPowerDefinitionDeclaresPowerRules(t *testing.T) {
+	definition := usbCPowerDefinition()
+	rules := validationRuleIDs(definition.ValidationRules)
+	for _, id := range []string{
+		"usb_c.power_only.required",
+		"usb_c.cc_pull_downs.required",
+		"usb_c.connector.pinmap",
+		"usb_c.edge_placement.required",
+		"usb_c.vbus_route.required",
+		"usb_c.protection.companions",
+	} {
+		if !slices.Contains(rules, id) {
+			t.Errorf("USB-C validation rules = %#v, missing %s", rules, id)
+		}
+	}
+	constraints := pcbConstraintIDs(definition.PCBRealization)
+	for _, id := range []string{"usb_c_vbus_width", "usb_c_edge_facing"} {
+		if !slices.Contains(constraints, id) {
+			t.Errorf("USB-C PCB constraints = %#v, missing %s", constraints, id)
+		}
+	}
+	if definition.PCBRealization == nil {
+		t.Fatal("USB-C block should define PCB realization")
+	}
+	if len(definition.PCBRealization.Keepouts) == 0 {
+		t.Fatalf("USB-C block should define edge keepout metadata")
+	}
+}
+
 func validationRuleIDs(rules []BlockValidationRule) []string {
 	ids := make([]string, 0, len(rules))
 	for _, rule := range rules {
 		ids = append(ids, rule.ID)
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+func pcbConstraintIDs(realization *PCBRealization) []string {
+	if realization == nil {
+		return nil
+	}
+	ids := make([]string, 0, len(realization.Constraints))
+	for _, constraint := range realization.Constraints {
+		ids = append(ids, constraint.ID)
 	}
 	slices.Sort(ids)
 	return ids
