@@ -64,23 +64,30 @@ type FamilyDefinition struct {
 }
 
 type ComponentRecord struct {
-	ID              string             `json:"id"`
-	Family          string             `json:"family"`
-	Name            string             `json:"name"`
-	Description     string             `json:"description,omitempty"`
-	Generic         bool               `json:"generic"`
-	Manufacturer    string             `json:"manufacturer,omitempty"`
-	MPN             string             `json:"mpn,omitempty"`
-	Lifecycle       string             `json:"lifecycle,omitempty"`
-	Tags            []string           `json:"tags,omitempty"`
-	Values          []ValueConstraint  `json:"values,omitempty"`
-	Ratings         []RatingConstraint `json:"ratings,omitempty"`
-	ElectricalRoles []ElectricalRole   `json:"electrical_roles,omitempty"`
-	Symbols         []SymbolBinding    `json:"symbols,omitempty"`
-	Packages        []PackageVariant   `json:"packages,omitempty"`
-	SelectionRules  []SelectionRule    `json:"selection_rules,omitempty"`
-	Verification    VerificationRecord `json:"verification"`
-	SearchText      string             `json:"-"`
+	ID              string                 `json:"id"`
+	Family          string                 `json:"family"`
+	Name            string                 `json:"name"`
+	Description     string                 `json:"description,omitempty"`
+	Generic         bool                   `json:"generic"`
+	Manufacturer    string                 `json:"manufacturer,omitempty"`
+	MPN             string                 `json:"mpn,omitempty"`
+	Lifecycle       string                 `json:"lifecycle,omitempty"`
+	Tags            []string               `json:"tags,omitempty"`
+	Values          []ValueConstraint      `json:"values,omitempty"`
+	Ratings         []RatingConstraint     `json:"ratings,omitempty"`
+	Tolerances      []ToleranceConstraint  `json:"tolerances,omitempty"`
+	Temperature     *TemperatureRange      `json:"temperature,omitempty"`
+	ElectricalRoles []ElectricalRole       `json:"electrical_roles,omitempty"`
+	Symbols         []SymbolBinding        `json:"symbols,omitempty"`
+	Packages        []PackageVariant       `json:"packages,omitempty"`
+	Companions      []CompanionRequirement `json:"companions,omitempty"`
+	DeratingRules   []DeratingRule         `json:"derating_rules,omitempty"`
+	PlacementHints  []PlacementHint        `json:"placement_hints,omitempty"`
+	RoutingHints    []RoutingHint          `json:"routing_hints,omitempty"`
+	Properties      []SchematicProperty    `json:"properties,omitempty"`
+	SelectionRules  []SelectionRule        `json:"selection_rules,omitempty"`
+	Verification    VerificationRecord     `json:"verification"`
+	SearchText      string                 `json:"-"`
 }
 
 type PackageVariant struct {
@@ -88,9 +95,12 @@ type PackageVariant struct {
 	Name         string               `json:"name"`
 	FootprintID  string               `json:"footprint_id"`
 	PackageType  string               `json:"package_type,omitempty"`
+	MPN          string               `json:"mpn,omitempty"`
+	Lifecycle    string               `json:"lifecycle,omitempty"`
 	PinMapID     string               `json:"pinmap_id,omitempty"`
 	PadFunctions []PadFunction        `json:"pad_functions,omitempty"`
 	DimensionsMM *Bounds              `json:"dimensions_mm,omitempty"`
+	HeightMM     float64              `json:"height_mm,omitempty"`
 	Constraints  []PhysicalConstraint `json:"constraints,omitempty"`
 	Verification VerificationRecord   `json:"verification"`
 	SearchText   string               `json:"-"`
@@ -135,6 +145,19 @@ type RatingConstraint struct {
 	Unit string `json:"unit,omitempty"`
 }
 
+type ToleranceConstraint struct {
+	Kind string `json:"kind"`
+	Typ  string `json:"typ,omitempty"`
+	Max  string `json:"max,omitempty"`
+	Unit string `json:"unit,omitempty"`
+}
+
+type TemperatureRange struct {
+	Min  string `json:"min,omitempty"`
+	Max  string `json:"max,omitempty"`
+	Unit string `json:"unit,omitempty"`
+}
+
 type ElectricalRole struct {
 	Role        string `json:"role"`
 	Description string `json:"description,omitempty"`
@@ -152,6 +175,42 @@ type PhysicalConstraint struct {
 	Value       string `json:"value,omitempty"`
 	Unit        string `json:"unit,omitempty"`
 	Description string `json:"description,omitempty"`
+}
+
+type CompanionRequirement struct {
+	ID          string   `json:"id"`
+	Family      string   `json:"family,omitempty"`
+	Role        string   `json:"role"`
+	Required    bool     `json:"required"`
+	AppliesTo   []string `json:"applies_to,omitempty"`
+	Description string   `json:"description,omitempty"`
+}
+
+type DeratingRule struct {
+	Kind        string `json:"kind"`
+	Expression  string `json:"expression,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+type PlacementHint struct {
+	Kind        string `json:"kind"`
+	Target      string `json:"target,omitempty"`
+	Value       string `json:"value,omitempty"`
+	Unit        string `json:"unit,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+type RoutingHint struct {
+	Kind        string `json:"kind"`
+	NetRole     string `json:"net_role,omitempty"`
+	Value       string `json:"value,omitempty"`
+	Unit        string `json:"unit,omitempty"`
+	Description string `json:"description,omitempty"`
+}
+
+type SchematicProperty struct {
+	Name  string `json:"name"`
+	Value string `json:"value"`
 }
 
 type Bounds struct {
@@ -312,6 +371,7 @@ func sortRecord(record *ComponentRecord) {
 	sortVerification(&record.Verification)
 	sortValueConstraints(record.Values)
 	sortRatingConstraints(record.Ratings)
+	sortToleranceConstraints(record.Tolerances)
 	sort.SliceStable(record.ElectricalRoles, func(i, j int) bool {
 		if record.ElectricalRoles[i].Role == record.ElectricalRoles[j].Role {
 			return record.ElectricalRoles[i].Description < record.ElectricalRoles[j].Description
@@ -357,6 +417,36 @@ func sortRecord(record *ComponentRecord) {
 			return record.Packages[i].Constraints[a].Kind < record.Packages[i].Constraints[b].Kind
 		})
 	}
+	sort.SliceStable(record.Companions, func(i, j int) bool {
+		if record.Companions[i].ID == record.Companions[j].ID {
+			return record.Companions[i].Role < record.Companions[j].Role
+		}
+		return record.Companions[i].ID < record.Companions[j].ID
+	})
+	for i := range record.Companions {
+		sort.Strings(record.Companions[i].AppliesTo)
+	}
+	sort.SliceStable(record.DeratingRules, func(i, j int) bool {
+		if record.DeratingRules[i].Kind == record.DeratingRules[j].Kind {
+			return record.DeratingRules[i].Expression < record.DeratingRules[j].Expression
+		}
+		return record.DeratingRules[i].Kind < record.DeratingRules[j].Kind
+	})
+	sort.SliceStable(record.PlacementHints, func(i, j int) bool {
+		if record.PlacementHints[i].Kind == record.PlacementHints[j].Kind {
+			return record.PlacementHints[i].Target < record.PlacementHints[j].Target
+		}
+		return record.PlacementHints[i].Kind < record.PlacementHints[j].Kind
+	})
+	sort.SliceStable(record.RoutingHints, func(i, j int) bool {
+		if record.RoutingHints[i].Kind == record.RoutingHints[j].Kind {
+			return record.RoutingHints[i].NetRole < record.RoutingHints[j].NetRole
+		}
+		return record.RoutingHints[i].Kind < record.RoutingHints[j].Kind
+	})
+	sort.SliceStable(record.Properties, func(i, j int) bool {
+		return record.Properties[i].Name < record.Properties[j].Name
+	})
 	sort.SliceStable(record.SelectionRules, func(i, j int) bool {
 		if record.SelectionRules[i].Kind == record.SelectionRules[j].Kind {
 			return record.SelectionRules[i].Expression < record.SelectionRules[j].Expression
@@ -444,6 +534,26 @@ func sortRatingConstraints(ratings []RatingConstraint) {
 	})
 	for i := range keyed {
 		ratings[i] = keyed[i].rating
+	}
+}
+
+func sortToleranceConstraints(tolerances []ToleranceConstraint) {
+	keyed := make([]struct {
+		tolerance ToleranceConstraint
+		key       constraintSortKey
+	}, len(tolerances))
+	for i, tolerance := range tolerances {
+		keyed[i].tolerance = tolerance
+		keyed[i].key = makeConstraintSortKey(tolerance.Max, tolerance.Unit)
+	}
+	sort.SliceStable(keyed, func(i, j int) bool {
+		if keyed[i].tolerance.Kind == keyed[j].tolerance.Kind {
+			return compareConstraintSortKeys(keyed[i].key, keyed[j].key) < 0
+		}
+		return keyed[i].tolerance.Kind < keyed[j].tolerance.Kind
+	})
+	for i := range keyed {
+		tolerances[i] = keyed[i].tolerance
 	}
 }
 

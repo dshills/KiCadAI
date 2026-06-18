@@ -141,6 +141,126 @@ func TestValidateCatalogInvalidConfidence(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeInvalidConfidence)
 }
 
+func TestValidateCatalogExtendedMetadata(t *testing.T) {
+	catalog := validCatalog()
+	record := &catalog.Records[0]
+	record.Lifecycle = "active"
+	record.Tolerances = []ToleranceConstraint{{Kind: "resistance", Max: "1", Unit: "%"}}
+	record.Temperature = &TemperatureRange{Min: "-40", Max: "85", Unit: "C"}
+	record.Companions = []CompanionRequirement{{
+		ID:       "cap.input",
+		Family:   "capacitor",
+		Role:     "input_capacitor",
+		Required: true,
+	}}
+	record.DeratingRules = []DeratingRule{{Kind: "voltage", Expression: "rated_voltage >= 2 * operating_voltage"}}
+	record.PlacementHints = []PlacementHint{{Kind: "near", Target: "power_pin", Value: "2", Unit: "mm"}}
+	record.RoutingHints = []RoutingHint{{Kind: "net_class", NetRole: "power", Value: "0.25", Unit: "mm"}}
+	record.Properties = []SchematicProperty{{Name: "MPN", Value: "GENERIC-0805"}}
+	record.Packages[0].MPN = "GENERIC-0805-PKG"
+	record.Packages[0].Lifecycle = "preferred"
+	record.Packages[0].HeightMM = 0.55
+
+	result := ValidateCatalog(&catalog)
+	if !result.OK {
+		t.Fatalf("expected extended metadata to validate: %+v", result.Issues)
+	}
+}
+
+func TestValidateCatalogInvalidExtendedMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Catalog)
+		code   reports.Code
+	}{
+		{
+			name: "lifecycle",
+			mutate: func(c *Catalog) {
+				c.Records[0].Lifecycle = "shipping"
+			},
+			code: CodeInvalidLifecycle,
+		},
+		{
+			name: "tolerance",
+			mutate: func(c *Catalog) {
+				c.Records[0].Tolerances = []ToleranceConstraint{{Kind: "resistance", Max: "one", Unit: "%"}}
+			},
+			code: CodeInvalidConstraint,
+		},
+		{
+			name: "duplicate companion",
+			mutate: func(c *Catalog) {
+				c.Records[0].Companions = []CompanionRequirement{
+					{ID: "c1", Role: "decoupling", Required: true},
+					{ID: "c1", Role: "decoupling", Required: true},
+				}
+			},
+			code: CodeInvalidMetadata,
+		},
+		{
+			name: "placement unit",
+			mutate: func(c *Catalog) {
+				c.Records[0].PlacementHints = []PlacementHint{{Kind: "near", Value: "2"}}
+			},
+			code: CodeInvalidMetadata,
+		},
+		{
+			name: "negative height",
+			mutate: func(c *Catalog) {
+				c.Records[0].Packages[0].HeightMM = -1
+			},
+			code: CodeInvalidMetadata,
+		},
+		{
+			name: "duplicate property",
+			mutate: func(c *Catalog) {
+				c.Records[0].Properties = []SchematicProperty{{Name: "MPN", Value: "a"}, {Name: "MPN", Value: "b"}}
+			},
+			code: CodeInvalidMetadata,
+		},
+		{
+			name: "untrimmed lifecycle",
+			mutate: func(c *Catalog) {
+				c.Records[0].Lifecycle = "active "
+			},
+			code: CodeInvalidLifecycle,
+		},
+		{
+			name: "untrimmed property",
+			mutate: func(c *Catalog) {
+				c.Records[0].Properties = []SchematicProperty{{Name: " MPN", Value: "a"}}
+			},
+			code: CodeInvalidMetadata,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			tt.mutate(&catalog)
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected validation to fail")
+			}
+			assertIssueCode(t, result.Issues, tt.code)
+		})
+	}
+}
+
+func TestValidateCatalogTemperaturePath(t *testing.T) {
+	catalog := validCatalog()
+	catalog.Records[0].Temperature = &TemperatureRange{Min: "cold", Max: "85", Unit: "C"}
+	result := ValidateCatalog(&catalog)
+	if result.OK {
+		t.Fatal("expected invalid temperature to fail")
+	}
+	for _, issue := range result.Issues {
+		if issue.Path == "records[0].temperature.min" {
+			return
+		}
+	}
+	t.Fatalf("expected temperature min path in %+v", result.Issues)
+}
+
 func validCatalog() Catalog {
 	return Catalog{
 		Version: CatalogVersion,

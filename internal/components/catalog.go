@@ -27,6 +27,8 @@ const (
 	CodeInvalidFunctionPin      reports.Code = "COMPONENT_INVALID_FUNCTION_PIN"
 	CodeInvalidPadFunction      reports.Code = "COMPONENT_INVALID_PAD_FUNCTION"
 	CodeInvalidConstraint       reports.Code = "COMPONENT_INVALID_CONSTRAINT"
+	CodeInvalidLifecycle        reports.Code = "COMPONENT_INVALID_LIFECYCLE"
+	CodeInvalidMetadata         reports.Code = "COMPONENT_INVALID_METADATA"
 	CodeInvalidComponentID      reports.Code = "COMPONENT_INVALID_ID"
 	CodeInvalidComponentFamily  reports.Code = "COMPONENT_INVALID_FAMILY"
 	CodeInvalidComponentPackage reports.Code = "COMPONENT_INVALID_PACKAGE"
@@ -132,6 +134,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		if issue, ok := ValidateConfidenceIssue(path+".verification.confidence", record.Verification.Confidence); ok {
 			issues = append(issues, issue)
 		}
+		issues = append(issues, validateLifecycle(path+".lifecycle", record.Lifecycle)...)
 		if len(record.Symbols) == 0 {
 			issues = append(issues, NewIssue(CodeMissingSymbolBinding, reports.SeverityBlocked, path+".symbols", "component record has no symbol bindings"))
 		}
@@ -142,6 +145,13 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validatePackages(path, record.Packages)...)
 		issues = append(issues, validateConstraints(path+".values", valueConstraintsAsGeneric(record.Values))...)
 		issues = append(issues, validateConstraints(path+".ratings", ratingConstraintsAsGeneric(record.Ratings))...)
+		issues = append(issues, validateConstraints(path+".tolerances", toleranceConstraintsAsGeneric(record.Tolerances))...)
+		issues = append(issues, validateTemperatureRange(path+".temperature", record.Temperature)...)
+		issues = append(issues, validateCompanions(path+".companions", record.Companions)...)
+		issues = append(issues, validateDeratingRules(path+".derating_rules", record.DeratingRules)...)
+		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
+		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
+		issues = append(issues, validateSchematicProperties(path+".properties", record.Properties)...)
 	}
 	sortIssues(issues)
 	return reports.ResultWithIssues("component validate", map[string]any{
@@ -192,6 +202,10 @@ func validatePackages(path string, packages []PackageVariant) []reports.Issue {
 		if strings.TrimSpace(pkg.FootprintID) == "" {
 			issues = append(issues, NewIssue(CodeMissingFootprint, reports.SeverityBlocked, packagePath+".footprint_id", "package variant requires footprint_id"))
 		}
+		issues = append(issues, validateLifecycle(packagePath+".lifecycle", pkg.Lifecycle)...)
+		if pkg.HeightMM < 0 {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, packagePath+".height_mm", "package height must not be negative"))
+		}
 		if issue, ok := ValidateConfidenceIssue(packagePath+".verification.confidence", pkg.Verification.Confidence); ok {
 			issues = append(issues, issue)
 		}
@@ -227,6 +241,172 @@ func ratingConstraintsAsGeneric(ratings []RatingConstraint) []genericConstraint 
 		out[i] = genericConstraint{kind: rating.Kind, min: rating.Min, typ: rating.Typ, max: rating.Max, unit: rating.Unit}
 	}
 	return out
+}
+
+func toleranceConstraintsAsGeneric(tolerances []ToleranceConstraint) []genericConstraint {
+	out := make([]genericConstraint, len(tolerances))
+	for i, tolerance := range tolerances {
+		out[i] = genericConstraint{kind: tolerance.Kind, typ: tolerance.Typ, max: tolerance.Max, unit: tolerance.Unit}
+	}
+	return out
+}
+
+func validateTemperatureRange(path string, temperature *TemperatureRange) []reports.Issue {
+	if temperature == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	if strings.TrimSpace(temperature.Unit) == "" {
+		issues = append(issues, NewIssue(CodeInvalidConstraint, reports.SeverityBlocked, path+".unit", "constraint unit is required"))
+	}
+	for _, value := range []struct {
+		name string
+		text string
+	}{{"min", temperature.Min}, {"max", temperature.Max}} {
+		if strings.TrimSpace(value.text) == "" {
+			continue
+		}
+		compact := strings.TrimSpace(value.text + temperature.Unit)
+		spaced := strings.TrimSpace(value.text + " " + temperature.Unit)
+		if _, ok := parseLeadingEngineeringNumber(compact); !ok {
+			_, ok = parseLeadingEngineeringNumber(spaced)
+			if !ok {
+				issues = append(issues, NewIssue(CodeInvalidConstraint, reports.SeverityBlocked, path+"."+value.name, "constraint value cannot be parsed: "+value.text+" "+temperature.Unit))
+			}
+		}
+	}
+	return issues
+}
+
+func validateLifecycle(path string, lifecycle string) []reports.Issue {
+	trimmed := strings.TrimSpace(lifecycle)
+	if trimmed == "" {
+		return nil
+	}
+	if lifecycle != trimmed {
+		return []reports.Issue{NewIssue(CodeInvalidLifecycle, reports.SeverityBlocked, path, "lifecycle value must not have leading or trailing whitespace: "+lifecycle)}
+	}
+	switch lifecycle {
+	case "active", "preferred", "mature", "nrnd", "obsolete", "unknown":
+		return nil
+	default:
+		return []reports.Issue{NewIssue(CodeInvalidLifecycle, reports.SeverityBlocked, path, "invalid lifecycle value: "+lifecycle)}
+	}
+}
+
+func validateCompanions(path string, companions []CompanionRequirement) []reports.Issue {
+	var issues []reports.Issue
+	type companionKey struct {
+		ID   string
+		Role string
+	}
+	seen := map[companionKey]int{}
+	for i, companion := range companions {
+		companionPath := fmt.Sprintf("%s[%d]", path, i)
+		valid := true
+		if issue, ok := validateTrimmedMetadata(companionPath+".id", companion.ID, "companion requirement id"); ok {
+			issues = append(issues, issue)
+			valid = false
+		} else if companion.ID == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, companionPath+".id", "companion requirement id is required"))
+			valid = false
+		}
+		if issue, ok := validateTrimmedMetadata(companionPath+".role", companion.Role, "companion requirement role"); ok {
+			issues = append(issues, issue)
+			valid = false
+		} else if companion.Role == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, companionPath+".role", "companion requirement role is required"))
+			valid = false
+		}
+		if !valid {
+			continue
+		}
+		key := companionKey{ID: companion.ID, Role: companion.Role}
+		if first, ok := seen[key]; ok {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, companionPath, fmt.Sprintf("duplicate companion requirement duplicates %s[%d]", path, first)))
+		} else {
+			seen[key] = i
+		}
+	}
+	return issues
+}
+
+func validateDeratingRules(path string, rules []DeratingRule) []reports.Issue {
+	var issues []reports.Issue
+	for i, rule := range rules {
+		rulePath := fmt.Sprintf("%s[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(rulePath+".kind", rule.Kind, "derating rule kind"); ok {
+			issues = append(issues, issue)
+		} else if rule.Kind == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rulePath+".kind", "derating rule kind is required"))
+		}
+		if strings.TrimSpace(rule.Expression) == "" && strings.TrimSpace(rule.Description) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rulePath, "derating rule requires expression or description"))
+		}
+	}
+	return issues
+}
+
+func validatePlacementHints(path string, hints []PlacementHint) []reports.Issue {
+	var issues []reports.Issue
+	for i, hint := range hints {
+		hintPath := fmt.Sprintf("%s[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(hintPath+".kind", hint.Kind, "placement hint kind"); ok {
+			issues = append(issues, issue)
+		} else if hint.Kind == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, hintPath+".kind", "placement hint kind is required"))
+		}
+		if strings.TrimSpace(hint.Value) != "" && strings.TrimSpace(hint.Unit) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, hintPath+".unit", "placement hint with value requires unit"))
+		}
+	}
+	return issues
+}
+
+func validateRoutingHints(path string, hints []RoutingHint) []reports.Issue {
+	var issues []reports.Issue
+	for i, hint := range hints {
+		hintPath := fmt.Sprintf("%s[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(hintPath+".kind", hint.Kind, "routing hint kind"); ok {
+			issues = append(issues, issue)
+		} else if hint.Kind == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, hintPath+".kind", "routing hint kind is required"))
+		}
+		if strings.TrimSpace(hint.Value) != "" && strings.TrimSpace(hint.Unit) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, hintPath+".unit", "routing hint with value requires unit"))
+		}
+	}
+	return issues
+}
+
+func validateSchematicProperties(path string, properties []SchematicProperty) []reports.Issue {
+	var issues []reports.Issue
+	seen := map[string]int{}
+	for i, property := range properties {
+		propertyPath := fmt.Sprintf("%s[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(propertyPath+".name", property.Name, "schematic property name"); ok {
+			issues = append(issues, issue)
+			continue
+		}
+		name := property.Name
+		if name == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, propertyPath+".name", "schematic property name is required"))
+			continue
+		}
+		if first, ok := seen[name]; ok {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, propertyPath+".name", fmt.Sprintf("duplicate schematic property duplicates %s[%d]", path, first)))
+		} else {
+			seen[name] = i
+		}
+	}
+	return issues
+}
+
+func validateTrimmedMetadata(path string, value string, label string) (reports.Issue, bool) {
+	if value != strings.TrimSpace(value) {
+		return NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, label+" must not have leading or trailing whitespace"), true
+	}
+	return reports.Issue{}, false
 }
 
 func validateConstraints(path string, constraints []genericConstraint) []reports.Issue {
