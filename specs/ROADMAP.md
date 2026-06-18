@@ -43,8 +43,10 @@ from validation feedback to safe automatic repair.
 - Resolver-backed footprint hydration, footprint graphics, pads, and models.
 - Symbol resolver foundation with project/global symbol table support and
   KiCad symbol metadata.
-- Component intelligence foundation with catalog records, confidence gates,
-  resolver evidence, CLI commands, and design workflow integration.
+- Verified component and part intelligence foundation with catalog coverage
+  reports, richer metadata, confidence gates, rating/function-aware selection,
+  resolver/pinmap evidence checks, golden coverage, and design workflow
+  evidence output.
 - Circuit block library foundation and PCB realization for verified blocks.
 - Placement engine foundation with deterministic placement model support.
 - Routing engine foundation for small generated PCB nets.
@@ -66,9 +68,10 @@ KiCadAI is not yet ready for unconstrained "make me any board" autonomous
 design. The remaining blockers are mostly breadth, quality gates, and closed
 loop confidence:
 
-- component catalog breadth is still small;
-- many active parts need verified symbol, footprint, pinmap, and design-rule
-  evidence;
+- component catalog breadth is still intentionally small beyond the verified
+  seed families;
+- many production-ready active parts still need datasheet-backed electrical,
+  thermal, lifecycle, availability, and design-rule evidence;
 - circuit blocks need deeper electrical validation and layout constraints;
 - placement and routing need stronger rules for real PCB quality;
 - KiCad-backed validation needs to be used more consistently;
@@ -93,28 +96,50 @@ loop confidence:
 
 Make part selection reliable enough for AI-generated designs beyond demos.
 
+### Status
+
+Implemented foundation.
+
 ### Current Foundation
 
-The component catalog, resolver evidence checks, confidence gates, CLI commands,
-and workflow integration exist.
+The component catalog now has verified or policy-allowed coverage for common
+passives, pin headers, LEDs, diodes, a regulator, an op-amp, an MCU, an I2C
+sensor, a crystal, USB-C power-only, and a protection part. It includes:
+
+- catalog coverage reporting through `component coverage`;
+- richer metadata for lifecycle, ratings, tolerances, temperature, companion
+  components, placement hints, routing hints, and schematic properties;
+- verified built-in pinmaps for the seed active and connector records;
+- rating-aware selection with min/max checks;
+- required function checks;
+- concrete-part and companion metadata gates;
+- rejected-candidate diagnostics;
+- stronger evidence validation for required pin-to-pad mappings and polarity;
+- workflow component-selection output with manufacturer, MPN, confidence,
+  pinmap evidence, companions, and rejected alternatives;
+- golden coverage and representative selection snapshots.
 
 ### Remaining Work
 
-- Expand the verified catalog for passives, connectors, regulators, op-amps,
-  MCUs, sensors, crystals, USB-C parts, protection devices, LEDs, diodes, and
-  power components.
-- Add manufacturer part numbers, lifecycle, availability, voltage/current/power
-  ratings, tolerance, temperature, and package constraints.
-- Add explicit polarity, pin function, electrical type, and footprint pad maps.
-- Connect catalog selections to richer schematic properties and PCB rules.
-- Add golden tests for component selection, unsafe choices, and resolver
-  evidence failures.
+- Expand from seed records to larger verified families and real alternatives.
+- Add availability/lifecycle source integration when a trusted local or remote
+  source is chosen.
+- Replace remaining structural placeholders where verified concrete parts are
+  needed.
+- Improve MCU function names from generic GPIO placeholders to datasheet port
+  and peripheral roles.
+- Emit selected component properties into generated schematic symbols when the
+  transaction/writer model supports arbitrary symbol properties.
+- Convert component placement/routing hints into downstream rule enforcement.
+- Add KiCad-library-backed evidence runs for the full checked-in catalog when
+  external library roots are configured.
 
 ### Acceptance Gates
 
-- Common design intents can select concrete parts without placeholder active
-  components.
-- Every selected part has symbol, footprint, and pinmap evidence.
+- Seed common design intents can select concrete or policy-allowed parts without
+  relying on placeholder active components.
+- Selected connectivity-level active seed parts have symbol, footprint, and
+  pinmap evidence.
 - Unsafe or under-evidenced selections block the workflow with actionable
   issues.
 
@@ -361,12 +386,14 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Build post-repair validation adapters and bundle export support.
-2. Expand verified component records for the next target design families.
-3. Harden circuit blocks with electrical and layout constraints.
-4. Improve placement rules for block-aware layouts.
-5. Improve routing rules and DRC-driven route repair.
-6. Add fabrication export/readiness gates.
+1. Harden circuit blocks with electrical and layout constraints using the
+   verified component catalog.
+2. Build post-repair validation adapters and bundle export support.
+3. Improve placement rules for block-aware layouts and component placement
+   hints.
+4. Improve routing rules, net classes, and DRC-driven route repair.
+5. Add fabrication export/readiness gates.
+6. Expand verified component coverage alongside each new block family.
 7. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
