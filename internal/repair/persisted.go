@@ -32,6 +32,7 @@ type PersistedApplyOptions struct {
 	LibraryIndex   *libraryresolver.LibraryIndex
 	LibraryIssues  []reports.Issue
 	InspectProject func(path string) (inspect.ProjectSummary, error)
+	PostValidators []PostApplyValidator
 }
 
 type PersistedApplyResult struct {
@@ -40,8 +41,33 @@ type PersistedApplyResult struct {
 	Repair      Result                   `json:"repair"`
 	Apply       transactions.ApplyResult `json:"apply,omitempty"`
 	Transaction transactions.Transaction `json:"transaction,omitempty"`
+	Validation  []PostApplyValidation    `json:"validation,omitempty"`
 	Issues      []reports.Issue          `json:"issues,omitempty"`
 	Artifacts   []reports.Artifact       `json:"artifacts,omitempty"`
+}
+
+type PostApplyValidation struct {
+	Name      string             `json:"name"`
+	Issues    []reports.Issue    `json:"issues,omitempty"`
+	Artifacts []reports.Artifact `json:"artifacts,omitempty"`
+	Skipped   bool               `json:"skipped,omitempty"`
+}
+
+type PostApplyValidationContext struct {
+	OutputDir   string
+	Target      Target
+	Transaction transactions.Transaction
+	Apply       transactions.ApplyResult
+}
+
+type PostApplyValidator interface {
+	ValidatePostApply(PostApplyValidationContext) PostApplyValidation
+}
+
+type PostApplyValidatorFunc func(PostApplyValidationContext) PostApplyValidation
+
+func (fn PostApplyValidatorFunc) ValidatePostApply(ctx PostApplyValidationContext) PostApplyValidation {
+	return fn(ctx)
 }
 
 var managedKiCadExtensions = map[string]struct{}{
@@ -129,7 +155,61 @@ func ApplyPersistedBundle(targetPath string, bundle Bundle, opts PersistedApplyO
 	applyResult.Artifacts = nil
 	applyResult.Issues = nil
 	result.Apply = applyResult
+	result.Validation = runPostApplyValidators(PostApplyValidationContext{
+		OutputDir:   outputDir,
+		Target:      target,
+		Transaction: tx,
+		Apply:       applyResult,
+	}, opts.PostValidators)
+	for _, validation := range result.Validation {
+		result.Artifacts = appendArtifacts(result.Artifacts, validation.Artifacts)
+		result.Issues = appendIssues(result.Issues, validation.Issues)
+	}
+	result.Status = statusFromPostValidation(bundle.StageIssues, result.Issues)
 	return finalizePersistedResult(result)
+}
+
+func runPostApplyValidators(ctx PostApplyValidationContext, validators []PostApplyValidator) []PostApplyValidation {
+	validations := make([]PostApplyValidation, 0, len(validators)+1)
+	txIssues := transactions.Validate(ctx.Transaction).Issues
+	validations = append(validations, PostApplyValidation{Name: "transaction", Issues: txIssues})
+	for _, validator := range validators {
+		if validator == nil {
+			validations = append(validations, PostApplyValidation{Name: "optional", Skipped: true})
+			continue
+		}
+		validation := validator.ValidatePostApply(ctx)
+		if strings.TrimSpace(validation.Name) == "" {
+			validation.Name = "post_apply"
+		}
+		validations = append(validations, validation)
+	}
+	return validations
+}
+
+func statusFromPostValidation(before []StageIssues, final []reports.Issue) Status {
+	if len(final) == 0 {
+		return StatusRepaired
+	}
+	if reports.HasBlockingIssue(final) {
+		beforeBlocking := blockingIssueCount(flattenIssues(before))
+		finalBlocking := blockingIssueCount(final)
+		if finalBlocking >= beforeBlocking {
+			return StatusBlocked
+		}
+		return StatusPartial
+	}
+	return StatusPartial
+}
+
+func blockingIssueCount(issues []reports.Issue) int {
+	count := 0
+	for _, issue := range issues {
+		if issue.Blocking() {
+			count++
+		}
+	}
+	return count
 }
 
 func appendArtifacts(base []reports.Artifact, artifacts []reports.Artifact) []reports.Artifact {
@@ -523,6 +603,9 @@ func createReplayStage(outputDir string) (string, error) {
 func finalizePersistedResult(result PersistedApplyResult) PersistedApplyResult {
 	if reports.HasBlockingIssue(result.Issues) {
 		result.Status = StatusBlocked
+		return result
+	}
+	if len(result.Validation) > 0 && (result.Status == StatusRepaired || result.Status == StatusPartial || result.Status == StatusBlocked) {
 		return result
 	}
 	switch result.Repair.Status {

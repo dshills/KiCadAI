@@ -211,6 +211,94 @@ func TestApplyPersistedBundleRemovesStaleGeneratedFiles(t *testing.T) {
 	}
 }
 
+func TestApplyPersistedBundlePostValidationWarningIsPartial(t *testing.T) {
+	output, bundle := persistedOutlineFixture(t)
+	result := ApplyPersistedBundle(output, bundle, PersistedApplyOptions{
+		Execute:        true,
+		Overwrite:      true,
+		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		InspectProject: cleanInspection,
+		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(PostApplyValidationContext) PostApplyValidation {
+			return PostApplyValidation{Name: "writer", Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Message: "non-blocking diff"}}}
+		})},
+	})
+	if result.Status != StatusPartial || len(result.Validation) != 2 {
+		t.Fatalf("expected partial validation result, got %#v", result)
+	}
+}
+
+func TestApplyPersistedBundlePostValidationRepeatedBlockingIsBlocked(t *testing.T) {
+	output, bundle := persistedOutlineFixture(t)
+	result := ApplyPersistedBundle(output, bundle, PersistedApplyOptions{
+		Execute:        true,
+		Overwrite:      true,
+		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		InspectProject: cleanInspection,
+		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(PostApplyValidationContext) PostApplyValidation {
+			return PostApplyValidation{Name: "board", Issues: []reports.Issue{{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline"}}}
+		})},
+	})
+	if result.Status != StatusBlocked {
+		t.Fatalf("expected blocked validation result, got %#v", result)
+	}
+}
+
+func TestApplyPersistedBundlePostValidationWorsenedIssueCountBlocks(t *testing.T) {
+	output, bundle := persistedOutlineFixture(t)
+	result := ApplyPersistedBundle(output, bundle, PersistedApplyOptions{
+		Execute:        true,
+		Overwrite:      true,
+		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		InspectProject: cleanInspection,
+		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(PostApplyValidationContext) PostApplyValidation {
+			return PostApplyValidation{Name: "board", Issues: []reports.Issue{
+				{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline"},
+				{Code: reports.CodeDisconnectedPad, Severity: reports.SeverityError, Message: "disconnected"},
+			}}
+		})},
+	})
+	if result.Status != StatusBlocked {
+		t.Fatalf("expected blocked validation result, got %#v", result)
+	}
+}
+
+func TestApplyPersistedBundleSkippedOptionalValidatorDoesNotBlock(t *testing.T) {
+	output, bundle := persistedOutlineFixture(t)
+	result := ApplyPersistedBundle(output, bundle, PersistedApplyOptions{
+		Execute:        true,
+		Overwrite:      true,
+		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		InspectProject: cleanInspection,
+		PostValidators: []PostApplyValidator{nil},
+	})
+	if result.Status != StatusRepaired || len(result.Validation) != 2 || !result.Validation[1].Skipped {
+		t.Fatalf("expected skipped optional validator, got %#v", result)
+	}
+}
+
+func persistedOutlineFixture(t *testing.T) (string, Bundle) {
+	t.Helper()
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := persistedBaseTransaction(t, "demo",
+		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
+	)
+	initial := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output})
+	if len(initial.Issues) != 0 {
+		t.Fatalf("initial apply issues: %#v", initial.Issues)
+	}
+	return output, Bundle{
+		Schema:      BundleSchemaV1,
+		ProjectRoot: output,
+		ProjectName: "demo",
+		Generated:   true,
+		Transaction: &tx,
+		StageIssues: []StageIssues{{Stage: "validation", Issues: []reports.Issue{{
+			Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline",
+		}}}},
+		RepairOptions: Options{Enabled: true, AllowOutlineGeneration: true},
+	}
+}
+
 func persistedBaseTransaction(t *testing.T, name string, ops ...transactions.Operation) transactions.Transaction {
 	t.Helper()
 	create := mustRepairOperation(t, transactions.OpCreateProject, transactions.CreateProjectOperation{Op: transactions.OpCreateProject, Name: name}, "")
