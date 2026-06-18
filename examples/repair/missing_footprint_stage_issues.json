@@ -1,0 +1,14 @@
+[
+  {
+    "stage": "validation",
+    "issues": [
+      {
+        "code": "MISSING_FOOTPRINT",
+        "severity": "error",
+        "path": "symbols.R1",
+        "message": "R1 has no assigned footprint",
+        "refs": ["R1"]
+      }
+    ]
+  }
+]

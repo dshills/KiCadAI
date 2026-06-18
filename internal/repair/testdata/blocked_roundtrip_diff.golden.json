@@ -1,0 +1,32 @@
+{
+  "status": "blocked",
+  "options": {
+    "enabled": true,
+    "max_attempts": 3,
+    "max_attempts_per_issue": 1
+  },
+  "attempts": [
+    {
+      "number": 1,
+      "stage": "roundtrip",
+      "issue": {
+        "code": "ROUNDTRIP_DIFF",
+        "severity": "",
+        "message": "diff"
+      },
+      "category": "roundtrip_diff",
+      "action": "unsupported",
+      "status": "blocked",
+      "dry_run": true,
+      "message": "round-trip diffs require preservation-aware handling"
+    }
+  ],
+  "summary": {
+    "attempt_count": 1,
+    "applied_count": 0,
+    "planned_count": 0,
+    "skipped_count": 0,
+    "blocked_count": 1,
+    "repaired_count": 0
+  }
+}

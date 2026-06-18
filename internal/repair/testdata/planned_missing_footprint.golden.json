@@ -1,0 +1,36 @@
+{
+  "status": "planned",
+  "options": {
+    "enabled": true,
+    "max_attempts": 3,
+    "max_attempts_per_issue": 1,
+    "allow_footprint_assignment": true
+  },
+  "attempts": [
+    {
+      "number": 1,
+      "stage": "validation",
+      "issue": {
+        "code": "MISSING_FOOTPRINT",
+        "severity": "",
+        "message": "missing footprint",
+        "refs": [
+          "R1"
+        ]
+      },
+      "category": "missing_footprint",
+      "action": "assign_footprint",
+      "status": "planned",
+      "dry_run": true,
+      "message": "planned footprint assignment repair"
+    }
+  ],
+  "summary": {
+    "attempt_count": 1,
+    "applied_count": 0,
+    "planned_count": 1,
+    "skipped_count": 0,
+    "blocked_count": 0,
+    "repaired_count": 0
+  }
+}

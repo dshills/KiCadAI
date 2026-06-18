@@ -1,0 +1,16 @@
+{
+  "status": "not_needed",
+  "options": {
+    "enabled": true,
+    "max_attempts": 3,
+    "max_attempts_per_issue": 1
+  },
+  "summary": {
+    "attempt_count": 0,
+    "applied_count": 0,
+    "planned_count": 0,
+    "skipped_count": 0,
+    "blocked_count": 0,
+    "repaired_count": 0
+  }
+}
