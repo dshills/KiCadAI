@@ -125,6 +125,39 @@ coverage rather than foundation work:
 - keep symbol, footprint, and component evidence aligned as the catalog expands;
 - use resolver evidence more deeply in autonomous design repair loops.
 
+## Update: Closed-Loop Validation Repair Foundation Implemented
+
+The Closed-Loop Validation Repair project has moved from open foundation gap to
+implemented foundation.
+
+Implemented evidence:
+
+- `internal/repair` issue classification, policy model, planning model, and
+  stable status/action taxonomy.
+- deterministic repair planner with dry-run default, per-issue attempt limits,
+  explicit skipped/blocked/planned/partial statuses, and report goldens.
+- safe transaction-level executors for verified footprint assignment, generated
+  pad-net hint repair, board outline generation, targeted placement replacement,
+  and targeted net rerouting.
+- bounded runner that requires revalidation before reporting `repaired`.
+- opt-in `validation_repair` stage in the design workflow.
+- `repair plan` / `repair apply --execute` CLI entrypoint for structured stage
+  issue JSON.
+- example repair input under `examples/repair/`.
+- documentation under `docs/validation-repair.md`.
+
+Remaining repair follow-up work belongs under workflow hardening:
+
+- wire project-directory hydration so CLI apply can mutate generated projects
+  directly, not only report plans;
+- connect the runner to `design create` apply mode with real post-write
+  validators;
+- execute KiCad zone refill only when an explicit KiCad CLI policy is enabled;
+- preserve unsupported imported KiCad nodes before allowing repairs on imported
+  projects;
+- grow golden and real-project repair cases as writer/validator coverage
+  expands.
+
 ## High-Priority Findings
 
 ### 1. Roadmap Status Is Stale

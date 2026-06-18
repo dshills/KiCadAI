@@ -6,7 +6,7 @@ three related capabilities:
 - a Go client for probing KiCad's live IPC API;
 - direct KiCad project, schematic, and PCB file writers;
 - CLI tools for generation, inspection, evaluation, connectivity-first board
-  validation, ERC/DRC feedback, round-trip validation, transactions,
+  validation, ERC/DRC feedback, validation repair planning, round-trip validation, transactions,
   operation-correlated feedback, component intelligence, and pinmap readiness
   checks.
 
@@ -25,6 +25,10 @@ connectivity-first PCB validation, and run KiCad-backed ERC/DRC checks through
 `kicad-cli`. Transaction validation, planning, and apply results carry stable
 operation IDs where possible so AI agents can connect issues back to the source
 operation they need to repair.
+Closed-loop validation repair now has a deterministic foundation: issue
+classification, repair planning, safe transaction-level executors, a bounded
+runner that requires revalidation before reporting success, an opt-in
+`validation_repair` workflow stage, and a `repair` CLI for structured plans.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -136,6 +140,7 @@ go run ./cmd/kicadai --json pinmap list
 go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
 go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json route request
+go run ./cmd/kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
 go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
 
@@ -156,7 +161,8 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 - `generate-led-demo` and `generate-project`: generate a deterministic LED
   indicator project, with optional PCB output.
 - `design create`: run the AI design workflow from explicit circuit-block
-  intent through schematic/PCB write, validation, and feedback.
+  intent through schematic/PCB write, validation, optional repair planning, and
+  feedback.
 - `writer check`: verify generated project, schematic, PCB, net, footprint,
   pad, copper, zone, and optional KiCad round-trip writer correctness.
 - `generate breakout`: generate a connector breakout project from a structured
@@ -166,6 +172,10 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
   placement engine.
 - `component list|show|find|select|validate`: inspect the curated component
   catalog, choose symbol/footprint bindings, and enforce confidence gates.
+- `repair plan|apply`: classify stage issues and emit deterministic repair
+  attempts. `repair apply` requires `--execute`; current CLI apply mode reports
+  the apply plan while lower-level executor/runner APIs perform in-memory
+  transaction repair.
 
 LED generation:
 
