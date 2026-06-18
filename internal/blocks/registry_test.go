@@ -96,7 +96,16 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 		if len(definition.Components) == 0 || definition.PCBRealization == nil {
 			t.Fatalf("%s missing component or PCB realization metadata: %#v", definition.ID, definition)
 		}
-		if definition.ID == "i2c_sensor" || definition.ID == "led_indicator" || definition.ID == "mcu_minimal" || definition.ID == "opamp_gain_stage" || definition.ID == "usb_c_power" || definition.ID == "voltage_regulator" {
+		structuralBlocks := map[string]bool{
+			"connector_breakout": true,
+			"i2c_sensor":         true,
+			"led_indicator":      true,
+			"mcu_minimal":        true,
+			"opamp_gain_stage":   true,
+			"usb_c_power":        true,
+			"voltage_regulator":  true,
+		}
+		if structuralBlocks[definition.ID] {
 			if definition.Verification.Level != VerificationStructural {
 				t.Fatalf("%s verification = %q", definition.ID, definition.Verification.Level)
 			}

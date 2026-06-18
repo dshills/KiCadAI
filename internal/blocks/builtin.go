@@ -52,6 +52,13 @@ func ledIndicatorDefinition() BlockDefinition {
 		},
 		Components:     ledIndicatorComponents(),
 		PCBRealization: ledIndicatorPCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "led.current.positive", Severity: BlockValidationSeverityBlocked, Description: "LED current must be a positive current literal."},
+			{ID: "led.forward_voltage.below_supply", Severity: BlockValidationSeverityBlocked, Description: "LED forward voltage must be below the selected supply rail."},
+			{ID: "led.resistor.required", Severity: BlockValidationSeverityBlocked, Description: "A positive current-limiting resistor value must be provided or derived."},
+			{ID: "led.polarity.evidence", Severity: BlockValidationSeverityBlocked, Description: "LED anode/cathode evidence is required for connectivity-level use."},
+			{ID: "led.series_route.required", Severity: BlockValidationSeverityBlocked, Description: "PCB realization must include the local resistor-to-LED route."},
+		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Emits deterministic schematic transactions; resolver-backed pinmap validation is implemented in later phases."},
@@ -297,7 +304,17 @@ func connectorBreakoutDefinition() BlockDefinition {
 		},
 		Components:     connectorBreakoutComponents(),
 		PCBRealization: connectorBreakoutPCBRealization(),
-		Verification:   experimentalVerification("Initial metadata placeholder; dynamic port expansion is implemented in later phases."),
+		ValidationRules: []BlockValidationRule{
+			{ID: "connector.pin_names.required", Severity: BlockValidationSeverityBlocked, Description: "Connector pin names must be non-empty and unique."},
+			{ID: "connector.pin_count.matches_names", Severity: BlockValidationSeverityBlocked, Description: "Connector pin count must match the requested pin-name list."},
+			{ID: "connector.symbol.resolved", Severity: BlockValidationSeverityBlocked, Description: "Connector symbol must be known for the requested pin count."},
+			{ID: "connector.footprint.resolved", Severity: BlockValidationSeverityBlocked, Description: "Connector footprint must be known for the requested pin count."},
+			{ID: "connector.pin_numbering.evidence", Severity: BlockValidationSeverityBlocked, Description: "Connector pin numbering must be explicit before connectivity readiness."},
+		},
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Dynamic connector port expansion is implemented; pin numbering remains structural until resolver evidence is attached."},
+		},
 	}
 }
 

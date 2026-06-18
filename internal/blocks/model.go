@@ -172,6 +172,8 @@ type BlockValidationRule struct {
 	Description string `json:"description"`
 }
 
+const BlockValidationSeverityBlocked = "blocked"
+
 type VerificationRecord struct {
 	Level       VerificationLevel `json:"level"`
 	Date        string            `json:"date,omitempty"`
