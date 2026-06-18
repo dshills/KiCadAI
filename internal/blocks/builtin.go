@@ -252,6 +252,14 @@ func i2cSensorDefinition() BlockDefinition {
 		},
 		Components:     i2cSensorComponents(),
 		PCBRealization: i2cSensorPCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "i2c.address.valid", Severity: BlockValidationSeverityBlocked, Description: "I2C address must be a valid 7-bit address."},
+			{ID: "i2c.rail.compatible", Severity: BlockValidationSeverityBlocked, Description: "Selected sensor must support the requested bus rail."},
+			{ID: "i2c.decoupling.required", Severity: BlockValidationSeverityBlocked, Description: "Sensor supply decoupling is required unless explicitly blocked by request policy."},
+			{ID: "i2c.pullups.owned_or_external", Severity: BlockValidationSeverityBlocked, Description: "SDA and SCL pull-ups must be provided by the block or by shared-bus composition."},
+			{ID: "i2c.pullups.no_duplicate", Severity: BlockValidationSeverityBlocked, Description: "Shared-bus composition must avoid duplicate pull-ups."},
+			{ID: "i2c.sensor.pinmap", Severity: BlockValidationSeverityBlocked, Description: "Sensor VCC, GND, SDA, and SCL pinmap evidence is required."},
+		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Uses an explicit generic I2C sensor pin-role template; real part-specific symbols require future pin-role metadata."},
@@ -290,6 +298,14 @@ func opampGainStageDefinition() BlockDefinition {
 		},
 		Components:     opAmpGainStageComponents(),
 		PCBRealization: opAmpGainStagePCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "opamp.topology.supported", Severity: BlockValidationSeverityBlocked, Description: "Requested op-amp topology must be implemented by the block."},
+			{ID: "opamp.gain.valid", Severity: BlockValidationSeverityBlocked, Description: "Requested gain must be positive and representable by selected resistor values."},
+			{ID: "opamp.supply.compatible", Severity: BlockValidationSeverityBlocked, Description: "Selected op-amp must support the requested supply mode and voltage."},
+			{ID: "opamp.bias.required", Severity: BlockValidationSeverityBlocked, Description: "Single-supply AC-coupled operation requires a bias/reference network."},
+			{ID: "opamp.feedback.proximity", Severity: BlockValidationSeverityBlocked, Description: "Feedback components must be placed close to the op-amp input and output pins."},
+			{ID: "opamp.feedback.route.required", Severity: BlockValidationSeverityBlocked, Description: "PCB realization must include the local feedback route."},
+		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Implements a non-inverting LMV321 template with explicit pin roles; other op-amp symbols require future pin-role metadata."},

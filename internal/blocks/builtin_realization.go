@@ -121,6 +121,10 @@ func i2cSensorPCBRealization() *PCBRealization {
 			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 		},
+		Constraints: []PCBConstraint{
+			{ID: "i2c_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"sensor", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Sensor decoupling capacitor should remain close to the sensor supply pins."},
+			{ID: "i2c_bus_pullup_group", Kind: "shared_bus_pullup", AppliesTo: []string{"sda_pullup", "scl_pullup"}, Description: "SDA and SCL pull-ups must be owned once per bus."},
+		},
 		Validation: PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "sda", "scl"}, RequiredRoutes: []string{"vcc_decoupling", "gnd_decoupling", "sda_pullup", "scl_pullup"}},
 	}
 }
@@ -151,10 +155,17 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "opamp_core", ComponentRoles: []string{"opamp", "feedback", "gain_to_ground", "decoupling_capacitor"}, AnchorRole: "opamp", Bounds: &RelativeBounds{MinXMM: -8, MinYMM: -8, MaxXMM: 8, MaxYMM: 8}}},
 		LocalRoutes: []PCBLocalRoute{
+			{ID: "feedback_output", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.OUT}, To: RouteEndpoint{ComponentRole: "feedback", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "feedback_loop", NetTemplate: "feedback", From: RouteEndpoint{ComponentRole: "feedback", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INN}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "gain_reference", NetTemplate: "feedback", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INN}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "gain_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "supply_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VCC}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"in", "out", "feedback", "vcc", "gnd"}, RequiredRoutes: []string{"feedback_loop", "supply_decoupling"}},
+		Constraints: []PCBConstraint{
+			{ID: "opamp_feedback_proximity", Kind: "proximity", NetTemplate: "feedback", AppliesTo: []string{"opamp", "feedback", "gain_to_ground"}, MaxLengthMM: 6, Description: "Feedback network should remain close to the op-amp inverting input."},
+			{ID: "opamp_supply_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"opamp", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Supply decoupling capacitor should remain close to the op-amp supply pins."},
+		},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"in", "out", "feedback", "vcc", "gnd"}, RequiredRoutes: []string{"feedback_output", "feedback_loop", "gain_reference", "gain_ground", "supply_decoupling"}},
 	}
 }
 
