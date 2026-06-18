@@ -22,6 +22,7 @@ const (
 	StageProjectWrite       StageName = "project_write"
 	StageWriterCorrect      StageName = "writer_correctness"
 	StageValidation         StageName = "validation"
+	StageValidationRepair   StageName = "validation_repair"
 	StageKiCadChecks        StageName = "kicad_checks"
 	StageFeedback           StageName = "feedback"
 )

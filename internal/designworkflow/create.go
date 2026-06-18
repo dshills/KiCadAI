@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/transactions"
@@ -21,6 +22,7 @@ type CreateOptions struct {
 	Routing       RoutingOptions
 	Validation    ValidationOptions
 	KiCadChecks   KiCadCheckOptions
+	Repair        repair.Options
 	BlockRegistry blocks.Registry
 }
 
@@ -90,7 +92,55 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	stages = append(stages, validated.Stage)
 	checked := RunKiCadChecks(ctx, &normalized, &written, opts.KiCadChecks)
 	stages = append(stages, checked.Stage)
+	if opts.Repair.Enabled {
+		stages = append(stages, validationRepairStage([]repair.StageIssues{
+			{Stage: string(StageWriterCorrect), Issues: writerChecked.Stage.Issues},
+			{Stage: string(StageValidation), Issues: validated.Stage.Issues},
+			{Stage: string(StageKiCadChecks), Issues: checked.Stage.Issues},
+		}, opts.Repair))
+	}
 	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+}
+
+func validationRepairStage(groups []repair.StageIssues, opts repair.Options) StageResult {
+	plan := repair.BuildPlan(groups, opts)
+	stage := StageResult{Name: StageValidationRepair, Status: repairStageStatus(plan.Status)}
+	stage.Summary = map[string]any{
+		"status":        plan.Status,
+		"attempt_count": plan.Summary.AttemptCount,
+		"planned_count": plan.Summary.PlannedCount,
+		"blocked_count": plan.Summary.BlockedCount,
+		"skipped_count": plan.Summary.SkippedCount,
+	}
+	for _, attempt := range plan.Attempts {
+		if attempt.Status == repair.StatusBlocked {
+			stage.Issues = append(stage.Issues, reports.Issue{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityBlocked,
+				Path:     "validation_repair",
+				Message:  attempt.Message,
+				Refs:     append([]string(nil), attempt.Issue.Refs...),
+				Nets:     append([]string(nil), attempt.Issue.Nets...),
+			})
+		}
+	}
+	if len(stage.Issues) > 0 {
+		stage.Status = StageStatusForIssues(stage.Issues)
+	}
+	return stage
+}
+
+func repairStageStatus(status repair.Status) StageStatus {
+	switch status {
+	case repair.StatusNotNeeded, repair.StatusRepaired:
+		return StageStatusOK
+	case repair.StatusPartial, repair.StatusPlanned:
+		return StageStatusWarning
+	case repair.StatusSkipped:
+		return StageStatusSkipped
+	default:
+		return StageStatusBlocked
+	}
 }
 
 func workflowStageBlocked(stage StageResult) bool {
