@@ -1,6 +1,10 @@
 package repair
 
-import "kicadai/internal/reports"
+import (
+	"context"
+
+	"kicadai/internal/reports"
+)
 
 type Validator interface {
 	Validate() []reports.Issue
@@ -30,8 +34,21 @@ func NewRunner(options Options, executor *Executor, validate Validator) Runner {
 }
 
 func (runner Runner) Run(groups []StageIssues) Result {
+	return runner.RunContext(context.Background(), groups)
+}
+
+func (runner Runner) RunContext(ctx context.Context, groups []StageIssues) Result {
 	if !runner.Options.Enabled {
 		return Result{Status: StatusSkipped, Summary: Summary{}}
+	}
+	if err := ctx.Err(); err != nil {
+		issues := []reports.Issue{{
+			Code:     reports.CodeOperationCanceled,
+			Severity: reports.SeverityBlocked,
+			Path:     "context",
+			Message:  err.Error(),
+		}}
+		return Result{Status: StatusBlocked, FinalIssues: issues, Summary: Summary{BlockedCount: 1}}
 	}
 	initialIssues := flattenIssues(groups)
 	if len(initialIssues) == 0 {
@@ -53,6 +70,15 @@ func (runner Runner) Run(groups []StageIssues) Result {
 	attempts := []Attempt{}
 	latestIssues := initialIssues
 	for _, planned := range plan.Attempts {
+		if err := ctx.Err(); err != nil {
+			latestIssues = append(latestIssues, reports.Issue{
+				Code:     reports.CodeOperationCanceled,
+				Severity: reports.SeverityBlocked,
+				Path:     "context",
+				Message:  err.Error(),
+			})
+			return Result{Status: StatusBlocked, Attempts: attempts, FinalIssues: latestIssues, Summary: summarizeAttempts(attempts)}
+		}
 		if planned.Status != StatusPlanned {
 			attempts = append(attempts, planned)
 			if planned.Status == StatusBlocked {

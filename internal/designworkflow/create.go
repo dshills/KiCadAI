@@ -93,13 +93,94 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	checked := RunKiCadChecks(ctx, &normalized, &written, opts.KiCadChecks)
 	stages = append(stages, checked.Stage)
 	if opts.Repair.Enabled {
-		stages = append(stages, validationRepairStage([]repair.StageIssues{
+		groups := []repair.StageIssues{
 			{Stage: string(StageWriterCorrect), Issues: writerChecked.Stage.Issues},
 			{Stage: string(StageValidation), Issues: validated.Stage.Issues},
 			{Stage: string(StageKiCadChecks), Issues: checked.Stage.Issues},
-		}, opts.Repair))
+		}
+		if opts.Repair.Apply {
+			stages = append(stages, persistedValidationRepairStage(ctx, &normalized, written, groups, opts))
+		} else {
+			stages = append(stages, validationRepairStage(groups, opts.Repair))
+		}
 	}
 	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+}
+
+func persistedValidationRepairStage(ctx context.Context, request *Request, written ProjectWriteResult, groups []repair.StageIssues, opts CreateOptions) StageResult {
+	if err := ctx.Err(); err != nil {
+		return NewStageResult(StageValidationRepair, []reports.Issue{{
+			Code:     reports.CodeOperationCanceled,
+			Severity: reports.SeverityBlocked,
+			Path:     "context",
+			Message:  err.Error(),
+		}})
+	}
+	tx := written.Transaction
+	bundle := repair.Bundle{
+		Schema:        repair.BundleSchemaV1,
+		ProjectRoot:   opts.OutputDir,
+		ProjectName:   request.Name,
+		Generated:     true,
+		Transaction:   &tx,
+		StageIssues:   groups,
+		RepairOptions: opts.Repair,
+	}
+	result := repair.ApplyPersistedBundleContext(ctx, opts.OutputDir, bundle, repair.PersistedApplyOptions{
+		Execute:   true,
+		OutputDir: opts.OutputDir,
+		Overwrite: opts.Overwrite,
+		Seed:      opts.Seed,
+		Repair:    opts.Repair,
+		Board:     &transactions.BoardSize{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM},
+	})
+	attemptCount, appliedCount := repairAttemptCounts(&result)
+	stage := StageResult{Name: StageValidationRepair, Status: repairStageStatus(result.Status)}
+	stage.Issues = append(stage.Issues, result.Issues...)
+	stage.Artifacts = append(stage.Artifacts, result.Artifacts...)
+	stage.Summary = map[string]any{
+		"status":           result.Status,
+		"attempt_count":    attemptCount,
+		"applied_count":    appliedCount,
+		"validation_count": len(result.Validation),
+		"artifact_count":   len(result.Artifacts),
+	}
+	if len(stage.Issues) > 0 {
+		stage.Status = moreSevereStageStatus(stage.Status, StageStatusForIssues(stage.Issues))
+	}
+	return stage
+}
+
+func repairAttemptCounts(result *repair.PersistedApplyResult) (int, int) {
+	return result.Repair.Summary.AttemptCount, result.Repair.Summary.AppliedCount
+}
+
+func moreSevereStageStatus(a StageStatus, b StageStatus) StageStatus {
+	if stageStatusRank(b) > stageStatusRank(a) {
+		return b
+	}
+	return a
+}
+
+func stageStatusRank(status StageStatus) int {
+	const (
+		rankOK = iota
+		rankSkipped
+		rankWarning
+		rankBlocked
+	)
+	switch status {
+	case StageStatusBlocked:
+		return rankBlocked
+	case StageStatusWarning:
+		return rankWarning
+	case StageStatusSkipped:
+		return rankSkipped
+	case StageStatusOK:
+		return rankOK
+	default:
+		return rankBlocked
+	}
 }
 
 func validationRepairStage(groups []repair.StageIssues, opts repair.Options) StageResult {

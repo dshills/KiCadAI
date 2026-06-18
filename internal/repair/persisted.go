@@ -1,6 +1,7 @@
 package repair
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -81,6 +82,10 @@ var managedKiCadExtensions = map[string]struct{}{
 }
 
 func ApplyPersistedBundle(targetPath string, bundle Bundle, opts PersistedApplyOptions) PersistedApplyResult {
+	return applyPersistedBundle(context.Background(), targetPath, bundle, opts)
+}
+
+func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle, opts PersistedApplyOptions) PersistedApplyResult {
 	inspectProject := opts.InspectProject
 	if inspectProject == nil {
 		inspectProject = inspect.Project
@@ -138,9 +143,19 @@ func ApplyPersistedBundle(targetPath string, bundle Bundle, opts PersistedApplyO
 	validator := ValidatorFunc(func() []reports.Issue {
 		return transactions.Validate(tx).Issues
 	})
-	repairResult := NewRunner(repairOptions, executor, validator).Run(bundle.StageIssues)
+	if err := ctx.Err(); err != nil {
+		result.Issues = appendIssues(result.Issues, []reports.Issue{contextIssue(err)})
+		result.Status = StatusBlocked
+		return finalizePersistedResult(result)
+	}
+	repairResult := NewRunner(repairOptions, executor, validator).RunContext(ctx, bundle.StageIssues)
 	result.Repair = repairResult
 	result.Transaction = tx
+	if err := ctx.Err(); err != nil {
+		result.Issues = appendIssues(result.Issues, []reports.Issue{contextIssue(err)})
+		result.Status = StatusBlocked
+		return finalizePersistedResult(result)
+	}
 	if repairResult.Status != StatusRepaired && repairResult.Status != StatusPartial && repairResult.Status != StatusNotNeeded {
 		result.Issues = append(result.Issues, repairResult.FinalIssues...)
 		return finalizePersistedResult(result)
@@ -149,13 +164,18 @@ func ApplyPersistedBundle(targetPath string, bundle Bundle, opts PersistedApplyO
 		result.Issues = append(result.Issues, validation.Issues...)
 		return finalizePersistedResult(result)
 	}
-	applyResult, artifacts, issues := replayGeneratedTransaction(tx, outputDir, opts)
+	if err := ctx.Err(); err != nil {
+		result.Issues = appendIssues(result.Issues, []reports.Issue{contextIssue(err)})
+		result.Status = StatusBlocked
+		return finalizePersistedResult(result)
+	}
+	applyResult, artifacts, issues := replayGeneratedTransaction(ctx, tx, outputDir, opts)
 	result.Artifacts = appendArtifacts(result.Artifacts, artifacts)
 	result.Issues = appendIssues(result.Issues, issues, applyResult.Issues)
 	applyResult.Artifacts = nil
 	applyResult.Issues = nil
 	result.Apply = applyResult
-	result.Validation = runPostApplyValidators(PostApplyValidationContext{
+	result.Validation = runPostApplyValidators(ctx, PostApplyValidationContext{
 		OutputDir:   outputDir,
 		Target:      target,
 		Transaction: tx,
@@ -169,16 +189,43 @@ func ApplyPersistedBundle(targetPath string, bundle Bundle, opts PersistedApplyO
 	return finalizePersistedResult(result)
 }
 
-func runPostApplyValidators(ctx PostApplyValidationContext, validators []PostApplyValidator) []PostApplyValidation {
+func ApplyPersistedBundleContext(ctx context.Context, targetPath string, bundle Bundle, opts PersistedApplyOptions) PersistedApplyResult {
+	if err := ctx.Err(); err != nil {
+		return contextBlockedPersistedResult(err)
+	}
+	return applyPersistedBundle(ctx, targetPath, bundle, opts)
+}
+
+func contextBlockedPersistedResult(err error) PersistedApplyResult {
+	return PersistedApplyResult{
+		Status: StatusBlocked,
+		Issues: []reports.Issue{contextIssue(err)},
+	}
+}
+
+func contextIssue(err error) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeOperationCanceled,
+		Severity: reports.SeverityBlocked,
+		Path:     "context",
+		Message:  err.Error(),
+	}
+}
+
+func runPostApplyValidators(ctx context.Context, validationCtx PostApplyValidationContext, validators []PostApplyValidator) []PostApplyValidation {
 	validations := make([]PostApplyValidation, 0, len(validators)+1)
-	txIssues := transactions.Validate(ctx.Transaction).Issues
+	txIssues := transactions.Validate(validationCtx.Transaction).Issues
 	validations = append(validations, PostApplyValidation{Name: "transaction", Issues: txIssues})
 	for _, validator := range validators {
+		if err := ctx.Err(); err != nil {
+			validations = append(validations, PostApplyValidation{Name: "context", Issues: []reports.Issue{contextIssue(err)}})
+			break
+		}
 		if validator == nil {
 			validations = append(validations, PostApplyValidation{Name: "optional", Skipped: true})
 			continue
 		}
-		validation := validator.ValidatePostApply(ctx)
+		validation := validator.ValidatePostApply(validationCtx)
 		if strings.TrimSpace(validation.Name) == "" {
 			validation.Name = "post_apply"
 		}
@@ -238,12 +285,18 @@ func appendIssues(base []reports.Issue, groups ...[]reports.Issue) []reports.Iss
 	return out
 }
 
-func replayGeneratedTransaction(tx transactions.Transaction, outputDir string, opts PersistedApplyOptions) (transactions.ApplyResult, []reports.Artifact, []reports.Issue) {
+func replayGeneratedTransaction(ctx context.Context, tx transactions.Transaction, outputDir string, opts PersistedApplyOptions) (transactions.ApplyResult, []reports.Artifact, []reports.Issue) {
+	if err := ctx.Err(); err != nil {
+		return transactions.ApplyResult{}, nil, []reports.Issue{contextIssue(err)}
+	}
 	existing, err := existingProjectDir(outputDir)
 	if err != nil {
 		return transactions.ApplyResult{}, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
 	}
 	if !existing {
+		if err := ctx.Err(); err != nil {
+			return transactions.ApplyResult{}, nil, []reports.Issue{contextIssue(err)}
+		}
 		apply := transactions.Apply(tx, transactions.ApplyOptions{
 			OutputDir:     outputDir,
 			Overwrite:     opts.Overwrite,
@@ -258,6 +311,9 @@ func replayGeneratedTransaction(tx transactions.Transaction, outputDir string, o
 		return transactions.ApplyResult{}, nil, []reports.Issue{persistedIssue(reports.CodeValidationFailed, "output", err.Error())}
 	}
 	defer os.RemoveAll(stage)
+	if err := ctx.Err(); err != nil {
+		return transactions.ApplyResult{}, nil, []reports.Issue{contextIssue(err)}
+	}
 	apply := transactions.Apply(tx, transactions.ApplyOptions{
 		OutputDir:     stage,
 		Overwrite:     true,
@@ -268,6 +324,9 @@ func replayGeneratedTransaction(tx transactions.Transaction, outputDir string, o
 	if reports.HasBlockingIssue(apply.Issues) {
 		apply.Artifacts = nil
 		return apply, nil, nil
+	}
+	if err := ctx.Err(); err != nil {
+		return apply, nil, []reports.Issue{contextIssue(err)}
 	}
 	artifacts, err := replaceGeneratedOutput(stage, outputDir, apply.Artifacts)
 	if err != nil {
