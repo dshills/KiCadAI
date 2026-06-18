@@ -26,16 +26,22 @@ type ComponentSelectionResult struct {
 }
 
 type ComponentSelectionEntry struct {
-	InstanceID  string                     `json:"instance_id"`
-	BlockID     string                     `json:"block_id"`
-	Role        string                     `json:"role"`
-	ComponentID string                     `json:"component_id"`
-	VariantID   string                     `json:"variant_id"`
-	SymbolID    string                     `json:"symbol_id,omitempty"`
-	Value       string                     `json:"value,omitempty"`
-	FootprintID string                     `json:"footprint_id,omitempty"`
-	Confidence  components.ConfidenceLevel `json:"confidence"`
-	Warnings    []reports.Issue            `json:"warnings,omitempty"`
+	InstanceID      string                            `json:"instance_id"`
+	BlockID         string                            `json:"block_id"`
+	Role            string                            `json:"role"`
+	ComponentID     string                            `json:"component_id"`
+	VariantID       string                            `json:"variant_id"`
+	Manufacturer    string                            `json:"manufacturer,omitempty"`
+	MPN             string                            `json:"mpn,omitempty"`
+	SymbolID        string                            `json:"symbol_id,omitempty"`
+	Value           string                            `json:"value,omitempty"`
+	FootprintID     string                            `json:"footprint_id,omitempty"`
+	Confidence      components.ConfidenceLevel        `json:"confidence"`
+	ResolverChecked bool                              `json:"resolver_checked,omitempty"`
+	PinMapChecked   bool                              `json:"pinmap_checked,omitempty"`
+	Companions      []components.CompanionRequirement `json:"companions,omitempty"`
+	Rejected        []components.CandidateRejection   `json:"rejected,omitempty"`
+	Warnings        []reports.Issue                   `json:"warnings,omitempty"`
 }
 
 func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, plan BlockPlanResult, opts ComponentSelectionOptions) ComponentSelectionResult {
@@ -96,15 +102,21 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 			}
 			if result.OK {
 				selections = append(selections, ComponentSelectionEntry{
-					InstanceID:  instance.ID,
-					BlockID:     definition.ID,
-					Role:        blockComponent.Role,
-					ComponentID: selection.Candidate.ComponentID,
-					VariantID:   selection.Candidate.VariantID,
-					SymbolID:    firstSelectedSymbolID(selection),
-					FootprintID: selection.Candidate.FootprintID,
-					Confidence:  selection.Candidate.Confidence,
-					Warnings:    append([]reports.Issue(nil), selection.Warnings...),
+					InstanceID:      instance.ID,
+					BlockID:         definition.ID,
+					Role:            blockComponent.Role,
+					ComponentID:     selection.Candidate.ComponentID,
+					VariantID:       selection.Candidate.VariantID,
+					Manufacturer:    selection.Component.Manufacturer,
+					MPN:             selectedMPN(selection),
+					SymbolID:        firstSelectedSymbolID(selection),
+					FootprintID:     selection.Candidate.FootprintID,
+					Confidence:      selection.Candidate.Confidence,
+					ResolverChecked: selectedResolverChecked(selection),
+					PinMapChecked:   selectedPinMapChecked(selection),
+					Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
+					Rejected:        append([]components.CandidateRejection(nil), selection.Rejected...),
+					Warnings:        append([]reports.Issue(nil), selection.Warnings...),
 				})
 			}
 		}
@@ -400,6 +412,27 @@ func firstSelectedSymbolID(selection components.Selection) string {
 	return selection.Component.Symbols[0].SymbolID
 }
 
+func selectedMPN(selection components.Selection) string {
+	if selection.Variant.ID != "" && selection.Variant.MPN != "" {
+		return selection.Variant.MPN
+	}
+	return selection.Component.MPN
+}
+
+func selectedResolverChecked(selection components.Selection) bool {
+	if selection.Component.Verification.ResolverChecked {
+		return true
+	}
+	return selection.Variant.ID != "" && selection.Variant.Verification.ResolverChecked
+}
+
+func selectedPinMapChecked(selection components.Selection) bool {
+	if selection.Component.Verification.PinMapChecked {
+		return true
+	}
+	return selection.Variant.ID != "" && selection.Variant.Verification.PinMapChecked
+}
+
 func applyComponentPolicy(request *components.SelectionRequest, policy ComponentPolicySpec, blockID string, instanceID string, role string) []reports.Issue {
 	var issues []reports.Issue
 	if request.Query.MinimumConfidence == "" {
@@ -482,13 +515,19 @@ func selectedComponentSummary(selections []ComponentSelectionEntry) []map[string
 	out := make([]map[string]any, 0, len(selections))
 	for _, selection := range selections {
 		out = append(out, map[string]any{
-			"instance_id":  selection.InstanceID,
-			"role":         selection.Role,
-			"component_id": selection.ComponentID,
-			"variant_id":   selection.VariantID,
-			"symbol_id":    selection.SymbolID,
-			"footprint_id": selection.FootprintID,
-			"confidence":   selection.Confidence,
+			"instance_id":      selection.InstanceID,
+			"role":             selection.Role,
+			"component_id":     selection.ComponentID,
+			"variant_id":       selection.VariantID,
+			"manufacturer":     selection.Manufacturer,
+			"mpn":              selection.MPN,
+			"symbol_id":        selection.SymbolID,
+			"footprint_id":     selection.FootprintID,
+			"confidence":       selection.Confidence,
+			"resolver_checked": selection.ResolverChecked,
+			"pinmap_checked":   selection.PinMapChecked,
+			"companion_count":  len(selection.Companions),
+			"rejected_count":   len(selection.Rejected),
 		})
 	}
 	return out

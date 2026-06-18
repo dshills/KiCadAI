@@ -196,4 +196,10 @@ func TestCreateComponentSelectionSummaryCarriesMetadata(t *testing.T) {
 	if selected[0]["component_id"] == "" || selected[0]["footprint_id"] == "" {
 		t.Fatalf("selected component metadata incomplete: %#v", selected)
 	}
+	if _, ok := selected[0]["pinmap_checked"].(bool); !ok {
+		t.Fatalf("selected component evidence missing pinmap flag: %#v", selected[0])
+	}
+	if _, ok := selected[0]["rejected_count"].(int); !ok {
+		t.Fatalf("selected component evidence missing rejected count: %#v", selected[0])
+	}
 }
