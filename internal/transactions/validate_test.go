@@ -28,6 +28,15 @@ func TestOperationPreservesRawJSON(t *testing.T) {
 	}
 }
 
+func TestTransactionCloneIsolatesRawOperations(t *testing.T) {
+	tx := mustParse(t, `{"operations":[{"op":"create_project","name":"demo"}]}`)
+	clone := tx.Clone()
+	clone.Operations[0].Raw[0] = '['
+	if tx.Operations[0].Raw[0] != '{' {
+		t.Fatalf("clone mutated source raw operation: %q", tx.Operations[0].Raw)
+	}
+}
+
 func TestValidateValidTransaction(t *testing.T) {
 	tx := mustParse(t, `{"operations":[
 	  {"op":"create_project","name":"demo"},

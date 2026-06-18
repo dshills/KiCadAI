@@ -31,6 +31,23 @@ type Operation struct {
 	Net   string          `json:"-"`
 }
 
+func (tx Transaction) Clone() Transaction {
+	clone := tx
+	clone.Operations = append([]Operation(nil), tx.Operations...)
+	for index := range clone.Operations {
+		clone.Operations[index] = clone.Operations[index].Clone()
+	}
+	return clone
+}
+
+func (op Operation) Clone() Operation {
+	// Operation currently stores scalar metadata plus the raw operation JSON.
+	// The raw payload is the only mutable backing store that needs copying.
+	clone := op
+	clone.Raw = append(json.RawMessage(nil), op.Raw...)
+	return clone
+}
+
 func (op *Operation) UnmarshalJSON(data []byte) error {
 	var head struct {
 		Op      OperationKind   `json:"op"`
