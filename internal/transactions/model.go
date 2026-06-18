@@ -28,12 +28,14 @@ type Operation struct {
 	Index int             `json:"-"`
 	Raw   json.RawMessage `json:"-"`
 	Ref   string          `json:"-"`
+	Net   string          `json:"-"`
 }
 
 func (op *Operation) UnmarshalJSON(data []byte) error {
 	var head struct {
-		Op  OperationKind   `json:"op"`
-		Ref json.RawMessage `json:"ref"`
+		Op      OperationKind   `json:"op"`
+		Ref     json.RawMessage `json:"ref"`
+		NetName json.RawMessage `json:"net_name"`
 	}
 	if err := json.Unmarshal(data, &head); err != nil {
 		return err
@@ -41,6 +43,7 @@ func (op *Operation) UnmarshalJSON(data []byte) error {
 	op.Op = head.Op
 	op.Raw = append([]byte(nil), data...)
 	op.Ref = operationRefFromRawValue(head.Ref)
+	op.Net = operationStringFromRawValue(head.NetName)
 	return nil
 }
 
@@ -56,7 +59,11 @@ func (op Operation) MarshalJSON() ([]byte, error) {
 // include the same "op" field that would be present after unmarshalling a
 // transaction file.
 func NewOperation(kind OperationKind, raw json.RawMessage) Operation {
-	return NewOperationWithRef(kind, raw, "")
+	operation := NewOperationWithRef(kind, raw, "")
+	metadata := operationMetadataFromRaw(raw)
+	operation.Ref = metadata.Ref
+	operation.Net = metadata.NetName
+	return operation
 }
 
 // NewOperationWithRef wraps a complete operation JSON object and attaches
@@ -66,11 +73,28 @@ func NewOperationWithRef(kind OperationKind, raw json.RawMessage, ref string) Op
 }
 
 func operationRefFromRawValue(raw json.RawMessage) string {
+	return operationStringFromRawValue(raw)
+}
+
+func operationStringFromRawValue(raw json.RawMessage) string {
 	var ref string
 	if err := json.Unmarshal(raw, &ref); err != nil {
 		return ""
 	}
 	return ref
+}
+
+type operationMetadata struct {
+	Ref     string `json:"ref"`
+	NetName string `json:"net_name"`
+}
+
+func operationMetadataFromRaw(data json.RawMessage) operationMetadata {
+	var metadata operationMetadata
+	if len(data) > 0 {
+		_ = json.Unmarshal(data, &metadata)
+	}
+	return metadata
 }
 
 type Point struct {

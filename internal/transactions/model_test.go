@@ -18,8 +18,8 @@ func TestOperationRefMetadataFromUnmarshal(t *testing.T) {
 func TestNewOperationWrapsRawPayload(t *testing.T) {
 	raw := json.RawMessage(`{"op":"assign_footprint","ref":"U1","footprint_id":"Package:QFN"}`)
 	operation := NewOperation(OpAssignFootprint, raw)
-	if operation.Ref != "" {
-		t.Fatalf("operation ref = %q, want empty metadata", operation.Ref)
+	if operation.Ref != "U1" {
+		t.Fatalf("operation ref = %q, want U1", operation.Ref)
 	}
 	var payload map[string]any
 	if err := json.Unmarshal(operation.Raw, &payload); err != nil {

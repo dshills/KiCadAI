@@ -24,6 +24,9 @@ type PadNetHint struct {
 
 type ExecutionContext struct {
 	Transaction      *transactions.Transaction
+	Board            *transactions.BoardSize
+	PlacementOps     []transactions.Operation
+	RouteOps         []transactions.Operation
 	Footprints       map[string]FootprintEvidence
 	PadNets          []PadNetHint
 	AllowUnknownRefs bool
@@ -61,6 +64,12 @@ func (executor *Executor) Execute(attempt Attempt) Attempt {
 		return executor.assignFootprint(attempt)
 	case ActionRegeneratePadNets:
 		return executor.regeneratePadNets(attempt)
+	case ActionGenerateOutline:
+		return executor.generateOutline(attempt)
+	case ActionRetryPlacement:
+		return executor.retryPlacement(attempt)
+	case ActionRerouteNet:
+		return executor.rerouteNet(attempt)
 	default:
 		attempt.Status = StatusBlocked
 		attempt.Message = "repair action is not executable by this executor"
@@ -123,6 +132,59 @@ func (executor *Executor) assignFootprint(attempt Attempt) Attempt {
 	attempt.Status = StatusRepaired
 	attempt.Message = "assigned verified footprint"
 	attempt.Operations = []string{"assign_footprint " + evidence.Ref + " " + evidence.FootprintID}
+	return executor.revalidate(attempt)
+}
+
+func (executor *Executor) generateOutline(attempt Attempt) Attempt {
+	if executor.Context.Transaction == nil {
+		return blockedAttempt(attempt, "transaction is required for outline repair")
+	}
+	if executor.Context.Board == nil || executor.Context.Board.WidthMM <= 0 || executor.Context.Board.HeightMM <= 0 {
+		return blockedAttempt(attempt, "board dimensions are required for outline repair")
+	}
+	payload := transactions.SetBoardOutlineOperation{
+		Op:    transactions.OpSetBoardOutline,
+		Board: executor.Context.Board,
+	}
+	operation, err := repairOperation(transactions.OpSetBoardOutline, payload, "")
+	if err != nil {
+		return blockedAttempt(attempt, "encode set_board_outline repair: "+err.Error())
+	}
+	executor.Context.Transaction.Operations = upsertSingletonOperation(executor.Context.Transaction.Operations, operation, transactions.OpSetBoardOutline)
+	executor.rebuildIndexes()
+	attempt.Status = StatusRepaired
+	attempt.Message = "generated board outline from dimensions"
+	attempt.Operations = []string{string(transactions.OpSetBoardOutline)}
+	return executor.revalidate(attempt)
+}
+
+func (executor *Executor) retryPlacement(attempt Attempt) Attempt {
+	if executor.Context.Transaction == nil {
+		return blockedAttempt(attempt, "transaction is required for placement repair")
+	}
+	if len(executor.Context.PlacementOps) == 0 {
+		return blockedAttempt(attempt, "placement retry did not produce replacement operations")
+	}
+	executor.Context.Transaction.Operations = replaceRefOperations(executor.Context.Transaction.Operations, executor.Context.PlacementOps, transactions.OpPlaceFootprint)
+	executor.rebuildIndexes()
+	attempt.Status = StatusRepaired
+	attempt.Message = "replaced generated placement operations"
+	attempt.Operations = operationNames(executor.Context.PlacementOps)
+	return executor.revalidate(attempt)
+}
+
+func (executor *Executor) rerouteNet(attempt Attempt) Attempt {
+	if executor.Context.Transaction == nil {
+		return blockedAttempt(attempt, "transaction is required for routing repair")
+	}
+	if len(executor.Context.RouteOps) == 0 {
+		return blockedAttempt(attempt, "routing retry did not produce replacement operations")
+	}
+	executor.Context.Transaction.Operations = replaceNetOperations(executor.Context.Transaction.Operations, executor.Context.RouteOps)
+	executor.rebuildIndexes()
+	attempt.Status = StatusRepaired
+	attempt.Message = "replaced generated route operations"
+	attempt.Operations = operationNames(executor.Context.RouteOps)
 	return executor.revalidate(attempt)
 }
 
@@ -324,11 +386,132 @@ func repairOperation(kind transactions.OperationKind, payload any, ref string) (
 	if err != nil {
 		return transactions.Operation{}, err
 	}
-	return transactions.NewOperationWithRef(kind, data, ref), nil
+	operation := transactions.NewOperationWithRef(kind, data, ref)
+	if route, ok := payload.(transactions.RouteOperation); ok {
+		operation.Net = route.NetName
+	}
+	return operation, nil
+}
+
+func insertBeforeWrite(operations []transactions.Operation, operation transactions.Operation) []transactions.Operation {
+	out := make([]transactions.Operation, 0, len(operations)+1)
+	inserted := false
+	for _, existing := range operations {
+		if !inserted && existing.Op == transactions.OpWriteProject {
+			out = append(out, operation)
+			inserted = true
+		}
+		out = append(out, existing)
+	}
+	if !inserted {
+		out = append(out, operation)
+	}
+	return out
+}
+
+func upsertSingletonOperation(operations []transactions.Operation, replacement transactions.Operation, kind transactions.OperationKind) []transactions.Operation {
+	for index, operation := range operations {
+		if operation.Op == kind {
+			out := append([]transactions.Operation(nil), operations...)
+			out[index] = replacement
+			return out
+		}
+	}
+	return insertBeforeWrite(operations, replacement)
+}
+
+func replaceRefOperations(operations []transactions.Operation, replacements []transactions.Operation, kind transactions.OperationKind) []transactions.Operation {
+	targets := map[string]struct{}{}
+	for _, replacement := range replacements {
+		if ref := normalizeRef(operationRef(replacement)); ref != "" {
+			targets[ref] = struct{}{}
+		}
+	}
+	out := make([]transactions.Operation, 0, len(operations)+len(replacements))
+	inserted := false
+	for _, existing := range operations {
+		if existing.Op == kind && refTargeted(existing, targets) {
+			if !inserted {
+				out = append(out, replacements...)
+				inserted = true
+			}
+			continue
+		}
+		if !inserted && existing.Op == transactions.OpWriteProject {
+			out = append(out, replacements...)
+			inserted = true
+		}
+		out = append(out, existing)
+	}
+	if !inserted {
+		out = append(out, replacements...)
+	}
+	return out
+}
+
+func replaceNetOperations(operations []transactions.Operation, replacements []transactions.Operation) []transactions.Operation {
+	targets := map[string]struct{}{}
+	for _, replacement := range replacements {
+		if net := normalizeNet(operationNet(replacement)); net != "" {
+			targets[net] = struct{}{}
+		}
+	}
+	out := make([]transactions.Operation, 0, len(operations)+len(replacements))
+	inserted := false
+	for _, existing := range operations {
+		if existing.Op == transactions.OpRoute && netTargeted(existing, targets) {
+			if !inserted {
+				out = append(out, replacements...)
+				inserted = true
+			}
+			continue
+		}
+		if !inserted && existing.Op == transactions.OpWriteProject {
+			out = append(out, replacements...)
+			inserted = true
+		}
+		out = append(out, existing)
+	}
+	if !inserted {
+		out = append(out, replacements...)
+	}
+	return out
+}
+
+func refTargeted(operation transactions.Operation, targets map[string]struct{}) bool {
+	if len(targets) == 0 {
+		return false
+	}
+	_, ok := targets[normalizeRef(operationRef(operation))]
+	return ok
+}
+
+func netTargeted(operation transactions.Operation, targets map[string]struct{}) bool {
+	if len(targets) == 0 {
+		return false
+	}
+	_, ok := targets[normalizeNet(operationNet(operation))]
+	return ok
+}
+
+func operationNames(operations []transactions.Operation) []string {
+	names := make([]string, 0, len(operations))
+	for _, operation := range operations {
+		names = append(names, string(operation.Op))
+	}
+	return names
 }
 
 func operationRef(operation transactions.Operation) string {
 	return strings.TrimSpace(operation.Ref)
+}
+
+func operationNet(operation transactions.Operation) string {
+	return strings.TrimSpace(operation.Net)
+}
+
+func normalizeNet(net string) string {
+	return strings.ToUpper(strings.TrimSpace(net))
 }
 
 func copyPadHints(hints map[string]string) map[string]string {
