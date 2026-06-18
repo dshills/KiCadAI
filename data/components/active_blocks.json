@@ -4,13 +4,35 @@
     {
       "id": "regulator.linear.ams1117_3v3.sot223",
       "family": "regulator",
-      "name": "AMS1117-style 3.3 V linear regulator",
-      "generic": true,
+      "name": "AMS1117-3.3 SOT-223 linear regulator",
+      "description": "Concrete AMS1117-3.3-compatible SOT-223 regulator record for 5 V to 3.3 V generated power rails.",
+      "generic": false,
+      "manufacturer": "Advanced Monolithic Systems",
+      "mpn": "AMS1117-3.3",
+      "lifecycle": "mature",
       "tags": ["power", "linear_regulator", "3v3", "sot223"],
-      "values": [{"kind": "output_voltage", "typ": "3.3", "unit": "V"}],
+      "values": [
+        {"kind": "output_voltage", "typ": "3.3", "unit": "V"},
+        {"kind": "dropout_voltage", "typ": "1.1", "unit": "V"}
+      ],
       "ratings": [
         {"kind": "input_voltage", "max": "12", "unit": "V"},
         {"kind": "output_current", "max": "800", "unit": "mA"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [
+        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "description": "Input bypass capacitor placed near VIN and GND."},
+        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "description": "Output capacitor, typically 10uF to 22uF with ESR in the datasheet stability range, required for regulator stability and transient response."}
+      ],
+      "derating_rules": [
+        {"kind": "thermal", "description": "Check package dissipation for VIN-VOUT drop and requested load current before fabrication."}
+      ],
+      "placement_hints": [
+        {"kind": "near", "target": "input_capacitor", "value": "3", "unit": "mm"},
+        {"kind": "near", "target": "output_capacitor", "value": "3", "unit": "mm"}
+      ],
+      "routing_hints": [
+        {"kind": "net_class", "net_role": "power", "value": "0.5", "unit": "mm"}
       ],
       "symbols": [{
         "symbol_id": "Regulator_Linear:AMS1117-3.3",
@@ -19,21 +41,24 @@
           {"function": "VOUT", "symbol_pin": "2", "required": true},
           {"function": "VIN", "symbol_pin": "3", "required": true}
         ],
-        "verification": {"confidence": "placeholder", "notes": ["Pinout must be verified against exact regulator variant."]}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Regulator_Linear:AMS1117-3.3"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "sot223",
         "name": "SOT-223-3 TabPin2",
         "footprint_id": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
         "package_type": "sot223",
+        "mpn": "AMS1117-3.3",
+        "lifecycle": "mature",
+        "pinmap_id": "Regulator_Linear:AMS1117-3.3|Package_TO_SOT_SMD:SOT-223-3_TabPin2",
         "pad_functions": [
           {"function": "GND", "pad": "1"},
           {"function": "VOUT", "pad": "2"},
           {"function": "VIN", "pad": "3"}
         ],
-        "verification": {"confidence": "placeholder"}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Regulator_Linear:AMS1117-3.3"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "placeholder", "sources": ["curated_seed_catalog"], "notes": ["Thermal and stability constraints are not verified."]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Regulator_Linear:AMS1117-3.3"], "pinmap_checked": true, "notes": ["Thermal dissipation and exact manufacturer datasheet constraints still require fabrication-stage checks."]}
     },
     {
       "id": "opamp.generic.single.lmv321",

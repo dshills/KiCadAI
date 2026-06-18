@@ -127,6 +127,49 @@ func TestSelectVerifiedSignalDiodeForConnectivity(t *testing.T) {
 	}
 }
 
+func TestSelectVerifiedRegulatorForPowerRequest(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "regulator",
+			Package:   "sot223",
+			ValueKind: "output_voltage",
+			Value:     "3.3",
+		},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "5", Unit: "V"},
+			{Kind: "output_current", Value: "500", Unit: "mA"},
+		},
+	})
+	if !result.OK {
+		t.Fatalf("select regulator failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "regulator.linear.ams1117_3v3.sot223" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected regulator selection: %+v", selection.Candidate)
+	}
+	if len(selection.Component.Companions) < 2 {
+		t.Fatalf("expected regulator companion requirements: %+v", selection.Component.Companions)
+	}
+}
+
+func TestSelectRejectsRegulatorOverCurrent(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "regulator", Package: "sot223"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "output_current",
+			Value: "2",
+			Unit:  "A",
+		}},
+	})
+	if result.OK {
+		t.Fatal("expected regulator over-current request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
 func TestSelectRejectsPlaceholderForConnectivity(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
