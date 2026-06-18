@@ -91,6 +91,7 @@ func TestValidateCatalogEvidenceExplicitUnitMatchesPinUnit(t *testing.T) {
 	catalog.Records[0].Symbols[0].SymbolID = "Amplifier:Dual"
 	catalog.Records[0].Symbols[0].Unit = 2
 	catalog.Records[0].Symbols[0].FunctionPins = []FunctionPin{{Function: "OUT", SymbolPin: "2", Required: true}}
+	catalog.Records[0].Packages[0].PadFunctions = []PadFunction{{Function: "OUT", Pad: "2"}}
 	index := resolverFixtureForResistor()
 	index.Symbols = map[string]libraryresolver.SymbolRecord{
 		"Amplifier:Dual": {
@@ -139,6 +140,29 @@ func TestValidateCatalogEvidenceUnmappedPad(t *testing.T) {
 		t.Fatal("expected unmapped footprint pad to fail")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentPadFunctionUnmapped)
+}
+
+func TestValidateCatalogEvidenceRequiredFunctionMissingPadMapping(t *testing.T) {
+	catalog := validCatalog()
+	catalog.Records[0].Packages[0].PadFunctions = []PadFunction{{Function: "B", Pad: "2"}}
+	index := resolverFixtureForResistor()
+	result := ValidateCatalogEvidence(&catalog, EvidenceOptions{LibraryIndex: &index})
+	if result.OK {
+		t.Fatal("expected missing required function pad mapping to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentPadFunctionUnmapped)
+}
+
+func TestValidateCatalogEvidencePolarityMismatch(t *testing.T) {
+	catalog := validCatalog()
+	catalog.Records[0].Symbols[0].FunctionPins[0].Polarity = "positive"
+	catalog.Records[0].Packages[0].PadFunctions[0].Polarity = "negative"
+	index := resolverFixtureForResistor()
+	result := ValidateCatalogEvidence(&catalog, EvidenceOptions{LibraryIndex: &index})
+	if result.OK {
+		t.Fatal("expected polarity mismatch to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentPolarityMismatch)
 }
 
 func TestValidateCatalogEvidenceMissingPinmapForVerifiedActive(t *testing.T) {

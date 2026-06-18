@@ -126,6 +126,7 @@ type FunctionPin struct {
 type PadFunction struct {
 	Function string   `json:"function"`
 	Pad      string   `json:"pad"`
+	Polarity string   `json:"polarity,omitempty"`
 	Aliases  []string `json:"aliases,omitempty"`
 }
 

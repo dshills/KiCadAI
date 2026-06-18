@@ -27,6 +27,7 @@ const (
 	CodeComponentFunctionPinUnmapped reports.Code = "COMPONENT_FUNCTION_PIN_UNMAPPED"
 	CodeComponentPadFunctionUnmapped reports.Code = "COMPONENT_PAD_FUNCTION_UNMAPPED"
 	CodeComponentElectricalMismatch  reports.Code = "COMPONENT_ELECTRICAL_MISMATCH"
+	CodeComponentPolarityMismatch    reports.Code = "COMPONENT_POLARITY_MISMATCH"
 	CodeComponentUnitPolicyMissing   reports.Code = "COMPONENT_UNIT_POLICY_MISSING"
 )
 
@@ -68,6 +69,7 @@ func ValidateCatalogEvidence(catalog *Catalog, opts EvidenceOptions) reports.Res
 			}
 			issues = append(issues, padFunctionIssues(variantPath, variant, resolvedFootprint)...)
 		}
+		issues = append(issues, symbolFootprintFunctionIssues(recordPath, record)...)
 		if opts.RequirePinmaps && record.Verification.Confidence == ConfidenceVerified && !recordHasAllPinmaps(record) {
 			if !(opts.AllowPassiveRules && passiveRuleInferred(record)) {
 				issues = append(issues, NewIssue(CodeComponentPinmapMissing, reports.SeverityBlocked, recordPath+".verification", "verified component record requires a verified symbol-footprint pinmap"))
@@ -76,6 +78,64 @@ func ValidateCatalogEvidence(catalog *Catalog, opts EvidenceOptions) reports.Res
 	}
 	sortIssues(issues)
 	return reports.ResultWithIssues("component validate evidence", base.Data, issues, nil)
+}
+
+func symbolFootprintFunctionIssues(path string, record ComponentRecord) []reports.Issue {
+	var issues []reports.Issue
+	for symbolIndex, symbol := range record.Symbols {
+		for functionIndex, functionPin := range symbol.FunctionPins {
+			if !functionPin.Required && strings.TrimSpace(functionPin.Polarity) == "" {
+				continue
+			}
+			for variantIndex, variant := range record.Packages {
+				pads := indexPadFunctions(variant.PadFunctions)
+				pad, ok := findIndexedPadFunction(pads, functionPin)
+				if !ok {
+					if functionPin.Required {
+						issues = append(issues, NewIssue(CodeComponentPadFunctionUnmapped, reports.SeverityBlocked, fmt.Sprintf("%s.packages[%d].pad_functions.%s", path, variantIndex, functionPin.Function), fmt.Sprintf("required function %s from symbols[%d].function_pins[%d] has no package pad mapping", functionPin.Function, symbolIndex, functionIndex)))
+					}
+					continue
+				}
+				expectedPolarity := strings.TrimSpace(functionPin.Polarity)
+				actualPolarity := strings.TrimSpace(pad.Polarity)
+				if expectedPolarity != "" && actualPolarity != "" && !strings.EqualFold(expectedPolarity, actualPolarity) {
+					issues = append(issues, NewIssue(CodeComponentPolarityMismatch, reports.SeverityBlocked, fmt.Sprintf("%s.packages[%d].pad_functions.%s", path, variantIndex, functionPin.Function), fmt.Sprintf("function %s polarity mismatch: symbol is %s, pad is %s", functionPin.Function, expectedPolarity, actualPolarity)))
+				}
+			}
+		}
+	}
+	return issues
+}
+
+func indexPadFunctions(pads []PadFunction) map[string]PadFunction {
+	index := make(map[string]PadFunction, len(pads))
+	for _, pad := range pads {
+		if key := normalizedFunctionName(pad.Function); key != "" {
+			index[key] = pad
+		}
+		for _, alias := range pad.Aliases {
+			if key := normalizedFunctionName(alias); key != "" {
+				index[key] = pad
+			}
+		}
+	}
+	return index
+}
+
+func findIndexedPadFunction(pads map[string]PadFunction, functionPin FunctionPin) (PadFunction, bool) {
+	if pad, ok := pads[normalizedFunctionName(functionPin.Function)]; ok {
+		return pad, true
+	}
+	for _, alias := range functionPin.Aliases {
+		if pad, ok := pads[normalizedFunctionName(alias)]; ok {
+			return pad, true
+		}
+	}
+	return PadFunction{}, false
+}
+
+func normalizedFunctionName(name string) string {
+	return strings.ToLower(strings.TrimSpace(name))
 }
 
 func functionPinIssues(path string, binding SymbolBinding, symbol libraryresolver.SymbolRecord) []reports.Issue {

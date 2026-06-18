@@ -273,8 +273,8 @@
         "package_type": "sod_323",
         "pinmap_id": "Device:D_TVS|Diode_SMD:D_SOD-323",
         "pad_functions": [
-          {"function": "CATHODE", "pad": "1", "aliases": ["K"]},
-          {"function": "ANODE", "pad": "2", "aliases": ["A"]}
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A"]}
         ],
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
       }],
