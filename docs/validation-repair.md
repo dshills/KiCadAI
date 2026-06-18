@@ -7,9 +7,14 @@ a design as repaired.
 
 ## Safety Model
 
-Repair is disabled unless explicitly requested. Planning is read-only. Apply
-mode is guarded by the CLI `--execute` flag and the lower-level runner refuses
-to report `repaired` without a validator.
+Repair is disabled unless explicitly requested. Planning is read-only. Persisted
+apply mode is guarded by `--execute`, generated-project provenance, and
+`--overwrite` when replacing an existing project. The runner refuses to report
+`repaired` without validation evidence.
+
+Generated-project provenance means the repair bundle carries the generated
+transaction history and the target project is recognized as KiCadAI-generated
+rather than imported or preservation-only user content.
 
 Current safe repair actions are transaction scoped:
 
@@ -24,7 +29,31 @@ or resolve unsupported imported objects are reported as skipped or blocked.
 
 ## CLI
 
-Plan repairs from captured stage issues:
+Target-based persisted apply is the project mutation path for integrations that
+already produce a repair bundle with generated transaction provenance. CLI-only
+users should use stage-issue planning until a bundle export command is added.
+The repair request is provided to the existing `--request` flag as a bundle
+file; `repair plan` does not create a bundle from stage issues by itself:
+
+```sh
+go run ./cmd/kicadai --json \
+  --target ./out/project \
+  --request ./path/to/generated-repair-bundle.json \
+  repair plan
+
+go run ./cmd/kicadai --json --execute --overwrite \
+  --target ./out/project \
+  --request ./path/to/generated-repair-bundle.json \
+  repair apply
+```
+
+`--overwrite` authorizes replacement of KiCadAI-managed generated files through
+transaction replay. Stale cleanup is manifest-backed and should not delete
+unmanaged user files, but imported or preservation-only projects remain blocked.
+
+Plan repairs from captured stage issues without a project target. This emits a
+plan report; it does not create the repair bundle required by target-based
+persisted apply:
 
 ```sh
 go run ./cmd/kicadai --json \
@@ -32,7 +61,8 @@ go run ./cmd/kicadai --json \
   repair plan
 ```
 
-Apply mode is intentionally gated:
+Legacy stage-issue apply mode is intentionally gated and reports the
+transaction-level repair result without selecting a project target:
 
 ```sh
 go run ./cmd/kicadai --json --execute \
@@ -40,17 +70,16 @@ go run ./cmd/kicadai --json --execute \
   repair apply
 ```
 
-The current CLI emits the repair plan/report contract. File mutation is still
-performed through the lower-level repair executor/runner integration points.
+Imported or preservation-only projects remain blocked until preservation-aware
+mutation is explicit.
 
 ## Workflow Integration
 
 `design create` can opt into a `validation_repair` stage through
-`designworkflow.CreateOptions.Repair`. The stage summarizes planned, skipped,
+`designworkflow.CreateOptions.Repair`. Plan mode summarizes planned, skipped,
 and blocked repair attempts after writer correctness, validation, and KiCad
-checks. Planned repairs are surfaced as pending repair evidence; callers must
-still retain the original validation issue severities when deciding whether a
-design is acceptable.
+checks. Apply mode builds an in-memory repair bundle from the generated
+transaction, replays repaired output, and reports final validation evidence.
 
 ## Status Values
 
@@ -66,11 +95,10 @@ design is acceptable.
 
 ## Current Limits
 
-- The CLI repair command consumes stage-issue JSON and reports plans; it does
-  not yet reopen and mutate a KiCad project directory by itself.
 - KiCad zone refill is classified but not executed without explicit KiCad CLI
   integration.
 - Preservation-aware repairs for unsupported imported KiCad nodes remain
   blocked.
-- Full closed-loop workflow mutation needs more project-state hydration so the
-  executor can be safely wired into `design create` apply mode.
+- Post-write validators currently include transaction validation plus optional
+  adapters; broader writer, board, and KiCad-backed validation adapters should
+  keep expanding with new repair cases.

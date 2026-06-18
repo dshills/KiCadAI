@@ -142,19 +142,20 @@ Implemented evidence:
 - bounded runner that requires revalidation before reporting `repaired`.
 - opt-in `validation_repair` stage in the design workflow.
 - `repair plan` / `repair apply --execute` CLI entrypoint for structured stage
-  issue JSON.
+  issue JSON and target-based generated-project repair bundles.
+- persisted repair apply for generated projects using transaction replay,
+  overwrite gating, manifest-backed stale cleanup, post-apply validation
+  evidence, and repair goldens.
 - example repair input under `examples/repair/`.
 - documentation under `docs/validation-repair.md`.
 
 Remaining repair follow-up work belongs under workflow hardening:
 
-- wire project-directory hydration so CLI apply can mutate generated projects
-  directly, not only report plans;
-- connect the runner to `design create` apply mode with real post-write
-  validators;
 - execute KiCad zone refill only when an explicit KiCad CLI policy is enabled;
 - preserve unsupported imported KiCad nodes before allowing repairs on imported
   projects;
+- expand post-write validator adapters beyond transaction validation and
+  currently injected hooks;
 - grow golden and real-project repair cases as writer/validator coverage
   expands.
 

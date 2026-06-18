@@ -27,8 +27,9 @@ operation IDs where possible so AI agents can connect issues back to the source
 operation they need to repair.
 Closed-loop validation repair now has a deterministic foundation: issue
 classification, repair planning, safe transaction-level executors, a bounded
-runner that requires revalidation before reporting success, an opt-in
-`validation_repair` workflow stage, and a `repair` CLI for structured plans.
+runner that requires revalidation before reporting success, persisted repairs
+for generated projects, an opt-in `validation_repair` workflow stage, and a
+`repair` CLI for structured plans and target-based apply.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -141,6 +142,8 @@ go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
 go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json route request
 go run ./cmd/kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
+# For integrations that already produce a generated repair bundle:
+go run ./cmd/kicadai --json --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
 go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
 
@@ -161,8 +164,8 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 - `generate-led-demo` and `generate-project`: generate a deterministic LED
   indicator project, with optional PCB output.
 - `design create`: run the AI design workflow from explicit circuit-block
-  intent through schematic/PCB write, validation, optional repair planning, and
-  feedback.
+  intent through schematic/PCB write, validation, optional repair planning or
+  apply, and feedback.
 - `writer check`: verify generated project, schematic, PCB, net, footprint,
   pad, copper, zone, and optional KiCad round-trip writer correctness.
 - `generate breakout`: generate a connector breakout project from a structured
@@ -173,9 +176,9 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 - `component list|show|find|select|validate`: inspect the curated component
   catalog, choose symbol/footprint bindings, and enforce confidence gates.
 - `repair plan|apply`: classify stage issues and emit deterministic repair
-  attempts. `repair apply` requires `--execute`; current CLI apply mode reports
-  the apply plan while lower-level executor/runner APIs perform in-memory
-  transaction repair.
+  attempts. With `--target` and a repair bundle, the `repair apply` command
+  with `--execute` and `--overwrite` persists safe transaction-level repairs
+  back through the generated KiCad writer.
 
 LED generation:
 
