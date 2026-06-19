@@ -19,8 +19,9 @@ deterministic, and testable.
 The direct-file workflow is the main functional path today. It can generate
 KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
-transactions to imported projects, place components, route small PCB nets,
-validate symbol-to-footprint pinmaps, select catalog-backed components, run
+transactions to imported projects, place components with block-aware quality
+reports and repair diagnostics, route small PCB nets, validate
+symbol-to-footprint pinmaps, select catalog-backed components, run
 connectivity-first PCB validation, and run KiCad-backed ERC/DRC checks through
 `kicad-cli`. Transaction validation, planning, and apply results carry stable
 operation IDs where possible so AI agents can connect issues back to the source

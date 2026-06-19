@@ -50,7 +50,9 @@ from validation feedback to safe automatic repair.
 - Circuit block library expansion foundation with inventory, readiness gaps,
   electrical rules, PCB constraints, required local routes, verification corpus
   guards, and design workflow evidence output.
-- Placement engine foundation with deterministic placement model support.
+- Placement engine hardening foundation with deterministic model support,
+  block-derived placement intent, proximity/region/mechanical/routing-readiness
+  quality reports, repairable diagnostics, and golden corpus coverage.
 - Routing engine foundation for small generated PCB nets.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
@@ -431,9 +433,9 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Improve placement rules for block-aware layouts and component placement
-   hints.
-2. Improve routing rules, net classes, and DRC-driven route repair.
+1. Improve routing rules, net classes, and DRC-driven route repair.
+2. Add true placement congestion/fanout scoring and iterative placement retry
+   from the new repairable diagnostics.
 3. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
    and generated repair bundles.
 4. Add a dedicated repair bundle export command for non-`design create` flows.
