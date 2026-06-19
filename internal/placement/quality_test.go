@@ -137,6 +137,92 @@ func TestQualityReportScoresEdgeConstraints(t *testing.T) {
 	}
 }
 
+func TestQualityReportScoresMechanicalKeepouts(t *testing.T) {
+	req := minimalRequest()
+	req.Mechanical = []MechanicalConstraint{{
+		ID:     "mounting-hole",
+		Kind:   "mounting_hole",
+		Bounds: Rect{Min: Point{XMM: 20, YMM: 20}, Max: Point{XMM: 25, YMM: 25}},
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if quality.KeepoutCount != 1 {
+		t.Fatalf("KeepoutCount = %d, want 1", quality.KeepoutCount)
+	}
+	var found bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "mechanical" {
+			found = true
+			if dimension.Status != "pass" {
+				t.Fatalf("mechanical dimension = %#v, want pass", dimension)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing mechanical score: %#v", quality.Score)
+	}
+}
+
+func TestQualityReportWarnsForOptionalMechanicalOverlap(t *testing.T) {
+	req := minimalRequest()
+	req.Mechanical = []MechanicalConstraint{{
+		ID:       "service-zone",
+		Kind:     "service_area",
+		Bounds:   Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 8, YMM: 8}},
+		Optional: true,
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if quality.OptionalKeepoutViolations != 1 || quality.GeometryIssueCount != 0 {
+		t.Fatalf("unexpected optional keepout accounting: %#v", quality)
+	}
+	var found bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "mechanical" {
+			found = true
+			if dimension.Status != "warning" || dimension.Score != 0.5 {
+				t.Fatalf("mechanical dimension = %#v, want warning half score", dimension)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing mechanical score: %#v", quality.Score)
+	}
+}
+
+func TestQualityReportMechanicalScoreIgnoresComponentOverlap(t *testing.T) {
+	req := twoComponentRequest()
+	req.Keepouts = []Keepout{{
+		ID:     "mounting",
+		Bounds: Rect{Min: Point{XMM: 20, YMM: 20}, Max: Point{XMM: 25, YMM: 25}},
+	}}
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 5, YMM: 5}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if quality.GeometryIssueCount == 0 || quality.RequiredKeepoutViolations != 0 {
+		t.Fatalf("test setup should have only component geometry issues: %#v", quality)
+	}
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "mechanical" && dimension.Status != "pass" {
+			t.Fatalf("mechanical dimension = %#v, want pass for unrelated overlap", dimension)
+		}
+	}
+}
+
 func TestQualityReportMissingProximityTargetMarshalsJSON(t *testing.T) {
 	req := minimalRequest()
 	req.ProximityRules = []ProximityRule{{

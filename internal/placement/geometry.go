@@ -139,6 +139,9 @@ func (o *occupancy) FirstConflict(candidate PlacementResult) (string, bool) {
 	candidate.Position = normalizePlacementLayer(candidate.Position)
 	candidateLayer := candidate.Position.Layer
 	for _, keepout := range o.keepouts {
+		if keepout.Optional {
+			continue
+		}
 		if keepoutAppliesToLayer(keepout, candidateLayer) && keepout.Bounds.Intersects(candidate.Bounds) {
 			if keepout.ID != "" {
 				return "keepout " + keepout.ID, true

@@ -97,6 +97,16 @@ func TestNormalizeRequestTrimsNestedIdentifiers(t *testing.T) {
 	}
 }
 
+func TestNormalizeRequestHonorsOptionalKeepout(t *testing.T) {
+	req := minimalRequest()
+	req.Keepouts = []Keepout{{ID: "service-zone", Optional: true}}
+
+	got := NormalizeRequest(req)
+	if len(got.Keepouts) != 1 || !got.Keepouts[0].Optional {
+		t.Fatalf("optional keepout normalized as required: %#v", got.Keepouts)
+	}
+}
+
 func TestNormalizeRequestForcesTopWhenBackLayerDisabled(t *testing.T) {
 	req := minimalRequest()
 	req.Rules.AllowBackLayer = false
@@ -154,6 +164,57 @@ func TestValidateRejectsInvalidKeepoutBounds(t *testing.T) {
 
 	issues := Validate(req)
 	assertIssueContains(t, issues, "keepout bounds min must not exceed max")
+}
+
+func TestNormalizeRequestConvertsMechanicalConstraintsToKeepouts(t *testing.T) {
+	req := minimalRequest()
+	req.Mechanical = []MechanicalConstraint{{
+		ID:     " mh1 ",
+		Kind:   "mounting_hole",
+		Bounds: Rect{Min: Point{XMM: 1, YMM: 1}, Max: Point{XMM: 3, YMM: 3}},
+		Layers: []string{"F.Cu"},
+	}}
+
+	got := NormalizeRequest(req)
+	if len(got.Keepouts) != 1 || got.Keepouts[0].ID != "mh1" || got.Keepouts[0].Reason != "mounting_hole" || got.Keepouts[0].Optional {
+		t.Fatalf("mechanical keepout not normalized: %#v", got.Keepouts)
+	}
+	again := NormalizeRequest(got)
+	if len(again.Keepouts) != 1 {
+		t.Fatalf("normalizing mechanical keepouts should be idempotent: %#v", again.Keepouts)
+	}
+}
+
+func TestNormalizeRequestPreservesOptionalMechanicalKeepouts(t *testing.T) {
+	req := minimalRequest()
+	req.Mechanical = []MechanicalConstraint{{
+		ID:       "optional-zone",
+		Kind:     "service_area",
+		Bounds:   Rect{Min: Point{XMM: 1, YMM: 1}, Max: Point{XMM: 3, YMM: 3}},
+		Optional: true,
+	}}
+
+	got := NormalizeRequest(NormalizeRequest(req))
+	if len(got.Keepouts) != 1 || !got.Keepouts[0].Optional {
+		t.Fatalf("optional mechanical keepout not preserved across normalization: %#v", got.Keepouts)
+	}
+}
+
+func TestValidateMechanicalConstraints(t *testing.T) {
+	req := minimalRequest()
+	req.Mechanical = []MechanicalConstraint{{
+		Optional: true,
+		Bounds:   Rect{Min: Point{XMM: 5, YMM: 5}, Max: Point{XMM: 1, YMM: 1}},
+	}}
+
+	issues := Validate(NormalizeRequest(req))
+	assertIssueContains(t, issues, "mechanical constraint kind required")
+	assertIssueContains(t, issues, "mechanical constraint bounds min must not exceed max")
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, "mechanical constraint bounds") && issue.Severity != reports.SeverityError {
+			t.Fatalf("invalid mechanical bounds severity = %q, want error: %#v", issue.Severity, issue)
+		}
+	}
 }
 
 func TestValidateRejectsDuplicateReferences(t *testing.T) {

@@ -174,6 +174,22 @@ func TestValidateGeometryRejectsKeepoutOverlap(t *testing.T) {
 	assertIssueContains(t, issues, "placement conflicts with keepout mounting")
 }
 
+func TestValidateGeometryAllowsOptionalMechanicalOverlap(t *testing.T) {
+	req := minimalRequest()
+	req.Mechanical = []MechanicalConstraint{{
+		ID:       "service-zone",
+		Kind:     "service_area",
+		Bounds:   Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 8, YMM: 8}},
+		Optional: true,
+	}}
+	placement, _ := NewPlacementResult(req.Components[0], Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}, normalizeRules(req.Rules))
+
+	issues := ValidateGeometry(req, []PlacementResult{placement})
+	if len(issues) != 0 {
+		t.Fatalf("ValidateGeometry returned issues for optional mechanical overlap: %#v", issues)
+	}
+}
+
 func TestOccupancyTreatsTouchingEdgesAsNonIntersecting(t *testing.T) {
 	a := Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 1, YMM: 1}}
 	b := Rect{Min: Point{XMM: 1, YMM: 0}, Max: Point{XMM: 2, YMM: 1}}

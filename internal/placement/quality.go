@@ -10,28 +10,31 @@ const (
 	scoreWeightGroupCohesion = 1.0
 	scoreWeightProximity     = 1.0
 	scoreWeightEdge          = 1.0
+	scoreWeightMechanical    = 1.0
 )
 
 type QualityReport struct {
-	Status                   Status                `json:"status"`
-	Ready                    bool                  `json:"ready"`
-	Metrics                  Metrics               `json:"metrics"`
-	EstimatedBoundsRefs      []string              `json:"estimated_bounds_refs,omitempty"`
-	FixedRefs                []string              `json:"fixed_refs,omitempty"`
-	UnplacedRefs             []string              `json:"unplaced_refs,omitempty"`
-	GroupReports             []GroupQualityReport  `json:"group_reports,omitempty"`
-	ProximityReports         []ProximityReport     `json:"proximity_reports,omitempty"`
-	Score                    ScoreReport           `json:"score,omitempty"`
-	EdgeConstraintCount      int                   `json:"edge_constraint_count"`
-	EdgeConstraintSatisfied  int                   `json:"edge_constraint_satisfied"`
-	SideConstraintCount      int                   `json:"side_constraint_count"`
-	SideConstraintSatisfied  int                   `json:"side_constraint_satisfied"`
-	KeepoutCount             int                   `json:"keepout_count"`
-	GeometryIssueCount       int                   `json:"geometry_issue_count"`
-	GroupIssueCount          int                   `json:"group_issue_count"`
-	OperationIssueCount      int                   `json:"operation_issue_count"`
-	PlacementQualityWarnings []string              `json:"placement_quality_warnings,omitempty"`
-	Diagnostics              []PlacementDiagnostic `json:"diagnostics,omitempty"`
+	Status                    Status                `json:"status"`
+	Ready                     bool                  `json:"ready"`
+	Metrics                   Metrics               `json:"metrics"`
+	EstimatedBoundsRefs       []string              `json:"estimated_bounds_refs,omitempty"`
+	FixedRefs                 []string              `json:"fixed_refs,omitempty"`
+	UnplacedRefs              []string              `json:"unplaced_refs,omitempty"`
+	GroupReports              []GroupQualityReport  `json:"group_reports,omitempty"`
+	ProximityReports          []ProximityReport     `json:"proximity_reports,omitempty"`
+	Score                     ScoreReport           `json:"score,omitempty"`
+	EdgeConstraintCount       int                   `json:"edge_constraint_count"`
+	EdgeConstraintSatisfied   int                   `json:"edge_constraint_satisfied"`
+	SideConstraintCount       int                   `json:"side_constraint_count"`
+	SideConstraintSatisfied   int                   `json:"side_constraint_satisfied"`
+	KeepoutCount              int                   `json:"keepout_count"`
+	RequiredKeepoutViolations int                   `json:"required_keepout_violations"`
+	OptionalKeepoutViolations int                   `json:"optional_keepout_violations"`
+	GeometryIssueCount        int                   `json:"geometry_issue_count"`
+	GroupIssueCount           int                   `json:"group_issue_count"`
+	OperationIssueCount       int                   `json:"operation_issue_count"`
+	PlacementQualityWarnings  []string              `json:"placement_quality_warnings,omitempty"`
+	Diagnostics               []PlacementDiagnostic `json:"diagnostics,omitempty"`
 }
 
 type ProximityReport struct {
@@ -64,14 +67,17 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	validation := ValidateResult(&request, &result)
 	placementsByRef := placementResultsByRef(successful)
 	componentRefsByGroup := componentRefsByGroupID(request.Components)
+	requiredKeepoutViolations, optionalKeepoutViolations := keepoutViolationCounts(request.Keepouts, successful)
 	report := QualityReport{
-		Status:              result.Status,
-		Ready:               validation.Ready,
-		Metrics:             result.Metrics,
-		KeepoutCount:        len(request.Keepouts),
-		GeometryIssueCount:  len(validation.GeometryIssues),
-		GroupIssueCount:     len(validation.GroupIssues),
-		OperationIssueCount: len(validation.TransactionResult.Issues),
+		Status:                    result.Status,
+		Ready:                     validation.Ready,
+		Metrics:                   result.Metrics,
+		KeepoutCount:              len(request.Keepouts),
+		RequiredKeepoutViolations: requiredKeepoutViolations,
+		OptionalKeepoutViolations: optionalKeepoutViolations,
+		GeometryIssueCount:        len(validation.GeometryIssues),
+		GroupIssueCount:           len(validation.GroupIssues),
+		OperationIssueCount:       len(validation.TransactionResult.Issues),
 	}
 	for _, component := range request.Components {
 		ref := normalizeRef(component.Ref)
@@ -234,6 +240,18 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		}
 		add(ScoreDimension{Name: "edge_constraints", Score: edgeScore, Weight: scoreWeightEdge, Status: edgeStatus, Message: "edge placement constraint satisfaction"})
 	}
+	if report.KeepoutCount > 0 {
+		mechanicalScore := 1.0
+		mechanicalStatus := "pass"
+		if report.RequiredKeepoutViolations > 0 {
+			mechanicalScore = 0
+			mechanicalStatus = "fail"
+		} else if report.OptionalKeepoutViolations > 0 {
+			mechanicalScore = 0.5
+			mechanicalStatus = "warning"
+		}
+		add(ScoreDimension{Name: "mechanical", Score: mechanicalScore, Weight: scoreWeightMechanical, Status: mechanicalStatus, Message: "mechanical keepout and board-fit satisfaction"})
+	}
 	proximityScore := 1.0
 	proximityStatus := "pass"
 	for _, proximity := range report.ProximityReports {
@@ -258,6 +276,22 @@ func placementResultsByRef(placements []PlacementResult) map[string]PlacementRes
 		byRef[normalizeRef(placement.Ref)] = placement
 	}
 	return byRef
+}
+
+func keepoutViolationCounts(keepouts []Keepout, placements []PlacementResult) (required int, optional int) {
+	for _, keepout := range keepouts {
+		for _, placement := range placements {
+			if keepoutAppliesToLayer(keepout, placement.Position.Layer) && keepout.Bounds.Intersects(placement.Bounds) {
+				if keepout.Optional {
+					optional++
+				} else {
+					required++
+				}
+				break
+			}
+		}
+	}
+	return required, optional
 }
 
 func componentRefsByGroupID(components []Component) map[string][]string {
@@ -404,6 +438,9 @@ func placementQualityWarnings(report QualityReport) []string {
 	}
 	if report.SideConstraintCount > report.SideConstraintSatisfied {
 		warnings = append(warnings, "one or more side constraints were not satisfied")
+	}
+	if report.OptionalKeepoutViolations > 0 {
+		warnings = append(warnings, "one or more optional keepouts were occupied")
 	}
 	for _, group := range report.GroupReports {
 		if group.MaxSpreadMM > 0 && !group.SpreadSatisfied {

@@ -81,6 +81,7 @@ type Request struct {
 	Nets           []Net
 	Groups         []Group
 	Keepouts       []Keepout
+	Mechanical     []MechanicalConstraint
 	ProximityRules []ProximityRule
 	RegionRules    []RegionRule
 	Rules          Rules
@@ -158,10 +159,21 @@ type GroupAnchor struct {
 }
 
 type Keepout struct {
-	ID     string
-	Bounds Rect
-	Layers []string
-	Reason string
+	ID         string
+	Bounds     Rect
+	Layers     []string
+	Reason     string
+	Optional   bool
+	Mechanical bool `json:"Mechanical,omitempty"`
+}
+
+type MechanicalConstraint struct {
+	ID       string   `json:"id"`
+	Kind     string   `json:"kind"`
+	Bounds   Rect     `json:"bounds"`
+	Layers   []string `json:"layers,omitempty"`
+	Optional bool     `json:"optional,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
 }
 
 type Rules struct {
@@ -295,6 +307,7 @@ func NormalizeRequest(request Request) Request {
 	request.Nets = slices.Clone(request.Nets)
 	request.Groups = slices.Clone(request.Groups)
 	request.Keepouts = slices.Clone(request.Keepouts)
+	request.Mechanical = slices.Clone(request.Mechanical)
 	request.ProximityRules = slices.Clone(request.ProximityRules)
 	request.RegionRules = slices.Clone(request.RegionRules)
 	request.Rules = normalizeRules(request.Rules)
@@ -354,9 +367,30 @@ func NormalizeRequest(request Request) Request {
 		}
 		slices.Sort(request.Groups[i].Components)
 	}
+	keepouts := make([]Keepout, 0, len(request.Keepouts)+len(request.Mechanical))
 	for i := range request.Keepouts {
+		if request.Keepouts[i].Mechanical {
+			continue
+		}
 		request.Keepouts[i].Layers = slices.Clone(request.Keepouts[i].Layers)
 		request.Keepouts[i].ID = strings.TrimSpace(request.Keepouts[i].ID)
+		keepouts = append(keepouts, request.Keepouts[i])
+	}
+	request.Keepouts = keepouts
+	request.Keepouts = slices.Grow(request.Keepouts, len(request.Mechanical))
+	for i := range request.Mechanical {
+		request.Mechanical[i].Layers = slices.Clone(request.Mechanical[i].Layers)
+		request.Mechanical[i].ID = stableRuleID(request.Mechanical[i].ID, "mechanical", i)
+		request.Mechanical[i].Kind = strings.TrimSpace(request.Mechanical[i].Kind)
+		request.Mechanical[i].Reason = strings.TrimSpace(request.Mechanical[i].Reason)
+		request.Keepouts = append(request.Keepouts, Keepout{
+			ID:         request.Mechanical[i].ID,
+			Bounds:     request.Mechanical[i].Bounds,
+			Layers:     request.Mechanical[i].Layers,
+			Reason:     firstNonEmpty(request.Mechanical[i].Reason, request.Mechanical[i].Kind),
+			Optional:   request.Mechanical[i].Optional,
+			Mechanical: true,
+		})
 	}
 	for i := range request.ProximityRules {
 		request.ProximityRules[i].ID = stableRuleID(request.ProximityRules[i].ID, "proximity", i)
@@ -526,9 +560,21 @@ func Validate(request Request) []reports.Issue {
 		}
 	}
 	for i, keepout := range request.Keepouts {
+		if keepout.Mechanical {
+			continue
+		}
 		path := fmt.Sprintf("keepouts[%d].bounds", i)
 		if keepout.Bounds.Min.XMM > keepout.Bounds.Max.XMM || keepout.Bounds.Min.YMM > keepout.Bounds.Max.YMM {
 			issues = append(issues, issue(path, "keepout bounds min must not exceed max"))
+		}
+	}
+	for i, mechanical := range request.Mechanical {
+		path := fmt.Sprintf("mechanical[%d]", i)
+		if strings.TrimSpace(mechanical.Kind) == "" {
+			issues = append(issues, issue(path+".kind", "mechanical constraint kind required"))
+		}
+		if mechanical.Bounds.Min.XMM > mechanical.Bounds.Max.XMM || mechanical.Bounds.Min.YMM > mechanical.Bounds.Max.YMM {
+			issues = append(issues, issue(path+".bounds", "mechanical constraint bounds min must not exceed max"))
 		}
 	}
 	issues = append(issues, validateProximityRules(request.ProximityRules, refs)...)
