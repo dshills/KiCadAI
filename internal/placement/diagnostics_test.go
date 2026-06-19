@@ -91,9 +91,95 @@ func TestDiagnosticsForQualityReportsLongWeightedNet(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsForQualityReportsFailedProximityRule(t *testing.T) {
+	req := twoComponentRequest()
+	req.ProximityRules = []ProximityRule{{
+		ID:            "near",
+		AnchorRef:     "R1",
+		TargetRefs:    []string{"R2"},
+		MaxDistanceMM: 1,
+		Required:      true,
+	}}
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 20, YMM: 5}),
+		},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnostic(quality.Diagnostics, PlacementDiagnosticNetProximity)
+	if got == nil || got.Severity != reports.SeverityError || got.Action != PlacementActionReviewNetProximity {
+		t.Fatalf("diagnostic = %#v", got)
+	}
+}
+
+func TestDiagnosticsForQualityReportsRequiredRegionMiss(t *testing.T) {
+	req := minimalRequest()
+	req.RegionRules = []RegionRule{{
+		ID:        "analog",
+		Region:    "analog",
+		Refs:      []string{"R1"},
+		Preferred: Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 3, YMM: 3}},
+		Required:  true,
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 20, YMM: 20})},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnostic(quality.Diagnostics, PlacementDiagnosticConstraint)
+	if got == nil || got.Action != PlacementActionMoveToRegion || got.Severity != reports.SeverityError {
+		t.Fatalf("diagnostic = %#v", got)
+	}
+}
+
+func TestDiagnosticsForQualityReportsRoutingReadinessFailure(t *testing.T) {
+	req := twoComponentRequest()
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnostic(quality.Diagnostics, PlacementDiagnosticRoutingReadiness)
+	if got == nil || got.Action != PlacementActionImproveRoutingReadiness || got.Severity != reports.SeverityError {
+		t.Fatalf("diagnostic = %#v", got)
+	}
+}
+
+func TestDiagnosticsForQualityReportsKeepoutViolation(t *testing.T) {
+	req := minimalRequest()
+	req.Keepouts = []Keepout{{ID: "mount", Bounds: Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 8, YMM: 8}}}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnosticByAction(quality.Diagnostics, PlacementActionMoveOutOfKeepout)
+	if got == nil || got.Action != PlacementActionMoveOutOfKeepout || got.Severity != reports.SeverityError {
+		t.Fatalf("diagnostic = %#v", got)
+	}
+	if len(got.Refs) != 1 || got.Refs[0] != "R1" {
+		t.Fatalf("diagnostic refs = %#v, want R1", got)
+	}
+}
+
 func findPlacementDiagnostic(diagnostics []PlacementDiagnostic, category PlacementDiagnosticCategory) *PlacementDiagnostic {
 	for i := range diagnostics {
 		if diagnostics[i].Category == category {
+			return &diagnostics[i]
+		}
+	}
+	return nil
+}
+
+func findPlacementDiagnosticByAction(diagnostics []PlacementDiagnostic, action PlacementDiagnosticAction) *PlacementDiagnostic {
+	for i := range diagnostics {
+		if diagnostics[i].Action == action {
 			return &diagnostics[i]
 		}
 	}

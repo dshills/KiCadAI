@@ -29,6 +29,9 @@ const (
 	PlacementActionAdjustConstraints        PlacementDiagnosticAction = "adjust_constraints"
 	PlacementActionMoveGroupTogether        PlacementDiagnosticAction = "move_group_together"
 	PlacementActionReviewNetProximity       PlacementDiagnosticAction = "review_net_proximity"
+	PlacementActionMoveOutOfKeepout         PlacementDiagnosticAction = "move_out_of_keepout"
+	PlacementActionMoveToRegion             PlacementDiagnosticAction = "move_to_region"
+	PlacementActionImproveRoutingReadiness  PlacementDiagnosticAction = "improve_routing_readiness"
 	PlacementActionProceedToRouting         PlacementDiagnosticAction = "proceed_to_routing"
 	PlacementActionInspectValidationIssue   PlacementDiagnosticAction = "inspect_validation_issue"
 )
@@ -104,6 +107,10 @@ func DiagnosticsForQuality(request Request, result Result, quality QualityReport
 			Path:       "quality.group_reports." + group.ID,
 		})
 	}
+	diagnostics = append(diagnostics, keepoutReportDiagnostics(quality.KeepoutReports)...)
+	diagnostics = append(diagnostics, proximityReportDiagnostics(quality.ProximityReports)...)
+	diagnostics = append(diagnostics, regionReportDiagnostics(quality.RegionReports)...)
+	diagnostics = append(diagnostics, netReportDiagnostics(quality.NetReports)...)
 	diagnostics = append(diagnostics, netProximityDiagnostics(request, placementsByRef)...)
 	if quality.Ready && len(diagnostics) == 0 {
 		diagnostics = append(diagnostics, PlacementDiagnostic{
@@ -152,6 +159,113 @@ func placementDiagnosticSuggestion(explicit string, category PlacementDiagnostic
 	default:
 		return "Inspect the placement issue and update the placement request before rerunning."
 	}
+}
+
+func keepoutReportDiagnostics(keepoutReports []KeepoutReport) []PlacementDiagnostic {
+	diagnostics := []PlacementDiagnostic{}
+	for _, report := range keepoutReports {
+		severity := reports.SeverityError
+		kind := "required"
+		if report.Optional {
+			severity = reports.SeverityWarning
+			kind = "optional"
+		}
+		diagnostics = append(diagnostics, PlacementDiagnostic{
+			Category:   PlacementDiagnosticConstraint,
+			Action:     PlacementActionMoveOutOfKeepout,
+			Severity:   severity,
+			Message:    keepoutViolationMessage(kind, report),
+			Suggestion: "Move listed refs out of the keepout, relax optional keepouts, or enlarge the board.",
+			Path:       "quality.keepout_reports." + report.ID,
+			Refs:       append([]string(nil), report.Refs...),
+		})
+	}
+	return diagnostics
+}
+
+func keepoutViolationMessage(kind string, report KeepoutReport) string {
+	total := len(report.Refs)
+	label := "violation"
+	if total != 1 {
+		label = "violations"
+	}
+	name := report.ID
+	if strings.TrimSpace(name) == "" {
+		name = "unnamed"
+	}
+	return fmt.Sprintf("%d %s keepout %s detected for %s.", total, kind, label, name)
+}
+
+func proximityReportDiagnostics(proximityReports []ProximityReport) []PlacementDiagnostic {
+	diagnostics := []PlacementDiagnostic{}
+	for _, report := range proximityReports {
+		if report.Satisfied {
+			continue
+		}
+		severity := reports.SeverityWarning
+		if report.Required {
+			severity = reports.SeverityError
+		}
+		refs := append([]string{report.AnchorRef}, report.TargetRefs...)
+		diagnostics = append(diagnostics, PlacementDiagnostic{
+			Category:   PlacementDiagnosticNetProximity,
+			Action:     PlacementActionReviewNetProximity,
+			Severity:   severity,
+			Message:    "Proximity rule " + report.ID + " was not satisfied.",
+			Suggestion: "Move target components closer to the anchor or relax the proximity rule.",
+			Path:       "quality.proximity_reports." + report.ID,
+			Refs:       uniqueSortedStrings(refs),
+		})
+	}
+	return diagnostics
+}
+
+func regionReportDiagnostics(regionReports []RegionReport) []PlacementDiagnostic {
+	diagnostics := []PlacementDiagnostic{}
+	for _, report := range regionReports {
+		if report.Satisfied {
+			continue
+		}
+		severity := reports.SeverityWarning
+		if report.Required {
+			severity = reports.SeverityError
+		}
+		refs := append([]string(nil), report.OutsideRefs...)
+		refs = append(refs, report.MissingRefs...)
+		diagnostics = append(diagnostics, PlacementDiagnostic{
+			Category:   PlacementDiagnosticConstraint,
+			Action:     PlacementActionMoveToRegion,
+			Severity:   severity,
+			Message:    "Region rule " + report.ID + " for " + report.Region + " was not satisfied.",
+			Suggestion: "Move listed refs into the preferred region, provide placements for missing refs, or relax the region rule.",
+			Path:       "quality.region_reports." + report.ID,
+			Refs:       uniqueSortedStrings(refs),
+		})
+	}
+	return diagnostics
+}
+
+func netReportDiagnostics(netReports []NetQualityReport) []PlacementDiagnostic {
+	diagnostics := []PlacementDiagnostic{}
+	for _, report := range netReports {
+		if report.Status == netStatusPass {
+			continue
+		}
+		severity := reports.SeverityWarning
+		if report.Status == netStatusFail {
+			severity = reports.SeverityError
+		}
+		diagnostics = append(diagnostics, PlacementDiagnostic{
+			Category:   PlacementDiagnosticRoutingReadiness,
+			Action:     PlacementActionImproveRoutingReadiness,
+			Severity:   severity,
+			Message:    fmt.Sprintf("Net %s routing readiness status: %s.", report.Name, report.Status),
+			Suggestion: "Place connected components closer, complete missing placements, or adjust net priorities before routing.",
+			Path:       "quality.net_reports." + report.Name,
+			Nets:       []string{report.Name},
+		})
+	}
+	return diagnostics
 }
 
 func netProximityDiagnostics(request Request, placementsByRef map[string]PlacementResult) []PlacementDiagnostic {

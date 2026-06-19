@@ -36,6 +36,7 @@ type QualityReport struct {
 	ProximityReports          []ProximityReport     `json:"proximity_reports,omitempty"`
 	RegionReports             []RegionReport        `json:"region_reports,omitempty"`
 	NetReports                []NetQualityReport    `json:"net_reports,omitempty"`
+	KeepoutReports            []KeepoutReport       `json:"keepout_reports,omitempty"`
 	Score                     ScoreReport           `json:"score,omitempty"`
 	EdgeConstraintCount       int                   `json:"edge_constraint_count"`
 	EdgeConstraintSatisfied   int                   `json:"edge_constraint_satisfied"`
@@ -91,6 +92,13 @@ type NetQualityReport struct {
 	Message             string  `json:"message,omitempty"`
 }
 
+type KeepoutReport struct {
+	ID       string   `json:"id,omitempty"`
+	Reason   string   `json:"reason,omitempty"`
+	Optional bool     `json:"optional,omitempty"`
+	Refs     []string `json:"refs,omitempty"`
+}
+
 type GroupQualityReport struct {
 	ID               string  `json:"id"`
 	PlacedCount      int     `json:"placed_count"`
@@ -108,7 +116,8 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	validation := ValidateResult(&request, &result)
 	placementsByRef := placementResultsByRef(successful)
 	componentRefsByGroup := componentRefsByGroupID(request.Components)
-	requiredKeepoutViolations, optionalKeepoutViolations := keepoutViolationCounts(request.Keepouts, successful)
+	keepoutReports := keepoutViolationReports(request.Keepouts, successful)
+	requiredKeepoutViolations, optionalKeepoutViolations := keepoutViolationCounts(keepoutReports)
 	report := QualityReport{
 		Status:                    result.Status,
 		Ready:                     validation.Ready,
@@ -152,6 +161,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	report.ProximityReports = proximityReports(request, placementsByRef)
 	report.RegionReports = regionReports(request, placementsByRef)
 	report.NetReports = netQualityReports(request, placementsByRef)
+	report.KeepoutReports = keepoutReports
 	report.Score = placementScoreReport(report)
 	sort.Strings(report.EstimatedBoundsRefs)
 	sort.Strings(report.FixedRefs)
@@ -567,17 +577,32 @@ func routingReadinessScore(reports []NetQualityReport) (float64, string) {
 	return score / float64(totalWeight), status
 }
 
-func keepoutViolationCounts(keepouts []Keepout, placements []PlacementResult) (required int, optional int) {
+func keepoutViolationReports(keepouts []Keepout, placements []PlacementResult) []KeepoutReport {
+	reports := []KeepoutReport{}
 	for _, keepout := range keepouts {
+		report := KeepoutReport{ID: keepout.ID, Reason: keepout.Reason, Optional: keepout.Optional}
 		for _, placement := range placements {
 			if keepoutAppliesToLayer(keepout, placement.Position.Layer) && keepout.Bounds.Intersects(placement.Bounds) {
-				if keepout.Optional {
-					optional++
-				} else {
-					required++
-				}
-				break
+				report.Refs = append(report.Refs, placement.Ref)
 			}
+		}
+		if len(report.Refs) > 0 {
+			sort.Strings(report.Refs)
+			reports = append(reports, report)
+		}
+	}
+	slices.SortFunc(reports, func(a, b KeepoutReport) int {
+		return cmp.Compare(a.ID, b.ID)
+	})
+	return reports
+}
+
+func keepoutViolationCounts(reports []KeepoutReport) (required int, optional int) {
+	for _, report := range reports {
+		if report.Optional {
+			optional++
+		} else {
+			required++
 		}
 	}
 	return required, optional
