@@ -273,6 +273,139 @@ func TestValidateAcceptsEquivalentRightAngleRotations(t *testing.T) {
 	}
 }
 
+func TestNormalizeRequestNormalizesIntentRules(t *testing.T) {
+	req := minimalRequest()
+	req.Components = append(req.Components, Component{
+		Ref:         " C1 ",
+		FootprintID: "Capacitor_SMD:C_0805_2012Metric",
+		Bounds:      Bounds{WidthMM: 2, HeightMM: 1.25, Source: BoundsExplicit},
+	})
+	req.ProximityRules = []ProximityRule{{
+		Role:       IntentDecoupling,
+		AnchorRef:  " R1 ",
+		TargetRefs: []string{" C1 ", "c1"},
+		AnchorPins: []string{" 1 ", "1"},
+		TargetPins: []string{" 2 "},
+	}}
+	req.RegionRules = []RegionRule{{
+		Region:   " analog ",
+		Refs:     []string{" C1 ", "R1", "r1"},
+		NetRoles: []NetRole{NetAnalog},
+		Preferred: Rect{
+			Min: Point{XMM: 0, YMM: 0},
+			Max: Point{XMM: 10, YMM: 10},
+		},
+	}}
+
+	got := NormalizeRequest(req)
+	if got.ProximityRules[0].ID != "proximity-001" || got.ProximityRules[0].AnchorRef != "R1" {
+		t.Fatalf("proximity rule not normalized: %#v", got.ProximityRules[0])
+	}
+	if got.ProximityRules[0].Weight != 1 || len(got.ProximityRules[0].TargetRefs) != 1 || got.ProximityRules[0].TargetRefs[0] != "C1" {
+		t.Fatalf("proximity rule targets/weight not normalized: %#v", got.ProximityRules[0])
+	}
+	if got.RegionRules[0].ID != "region-001" || got.RegionRules[0].Region != "analog" {
+		t.Fatalf("region rule not normalized: %#v", got.RegionRules[0])
+	}
+	if len(got.RegionRules[0].Refs) != 2 {
+		t.Fatalf("region refs not deduplicated: %#v", got.RegionRules[0].Refs)
+	}
+}
+
+func TestValidateIntentRules(t *testing.T) {
+	req := minimalRequest()
+	req.Components = append(req.Components, Component{
+		Ref:         "C1",
+		FootprintID: "Capacitor_SMD:C_0805_2012Metric",
+		Bounds:      Bounds{WidthMM: 2, HeightMM: 1.25, Source: BoundsExplicit},
+	})
+	req.ProximityRules = []ProximityRule{{
+		ID:            "decouple",
+		Role:          IntentDecoupling,
+		AnchorRef:     "R1",
+		TargetRefs:    []string{"C1"},
+		MaxDistanceMM: 5,
+		Required:      true,
+	}}
+	req.RegionRules = []RegionRule{{
+		ID:       "analog",
+		Region:   "analog",
+		Refs:     []string{"R1"},
+		NetRoles: []NetRole{NetAnalog},
+		Preferred: Rect{
+			Min: Point{XMM: 0, YMM: 0},
+			Max: Point{XMM: 10, YMM: 10},
+		},
+		Required: true,
+	}}
+
+	issues := Validate(NormalizeRequest(req))
+	if len(issues) != 0 {
+		t.Fatalf("Validate returned intent rule issues: %#v", issues)
+	}
+}
+
+func TestValidateRequiredIntentRuleBlocksUnknownRefs(t *testing.T) {
+	req := minimalRequest()
+	req.ProximityRules = []ProximityRule{{
+		ID:         "bad",
+		Role:       IntentDecoupling,
+		AnchorRef:  "U99",
+		TargetRefs: []string{"C99"},
+		Required:   true,
+	}}
+
+	issues := Validate(NormalizeRequest(req))
+	assertIssueContains(t, issues, "proximity rule anchor references unknown component U99")
+	assertIssueContains(t, issues, "proximity rule target references unknown component C99")
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, "proximity rule") && issue.Severity != reports.SeverityError {
+			t.Fatalf("required proximity issue severity = %q, want error: %#v", issue.Severity, issue)
+		}
+	}
+}
+
+func TestValidateProximityRulePins(t *testing.T) {
+	req := minimalRequest()
+	req.Components = append(req.Components, Component{
+		Ref:         "C1",
+		FootprintID: "Capacitor_SMD:C_0805_2012Metric",
+		Bounds:      Bounds{WidthMM: 2, HeightMM: 1.25, Source: BoundsExplicit},
+		Pads:        []PadSummary{{Name: "1"}, {Name: "2"}},
+	})
+	req.ProximityRules = []ProximityRule{{
+		ID:         "bad-pins",
+		Role:       IntentDecoupling,
+		AnchorRef:  "R1",
+		TargetRefs: []string{"C1"},
+		AnchorPins: []string{"9"},
+		TargetPins: []string{"8"},
+		Required:   true,
+	}}
+
+	issues := Validate(NormalizeRequest(req))
+	assertIssueContains(t, issues, "proximity rule anchor pin 9 not found in component R1")
+	assertIssueContains(t, issues, "proximity rule target pin 8 not found in component C1")
+}
+
+func TestValidateOptionalIntentRuleWarns(t *testing.T) {
+	req := minimalRequest()
+	req.RegionRules = []RegionRule{{
+		ID:       "optional-region",
+		Region:   "analog",
+		Refs:     []string{"C99"},
+		Required: false,
+	}}
+
+	issues := Validate(NormalizeRequest(req))
+	assertIssueContains(t, issues, "region rule references unknown component C99")
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, "region rule") && issue.Severity != reports.SeverityWarning {
+			t.Fatalf("optional region issue severity = %q, want warning: %#v", issue.Severity, issue)
+		}
+	}
+}
+
 func minimalRequest() Request {
 	return Request{
 		Board: BoardPlacementArea{WidthMM: 40, HeightMM: 25, MarginMM: 1},

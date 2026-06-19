@@ -61,15 +61,31 @@ const (
 	NetUnknown      NetRole = "unknown"
 )
 
+type IntentRole string
+
+const (
+	IntentDecoupling  IntentRole = "decoupling"
+	IntentClock       IntentRole = "clock"
+	IntentFeedback    IntentRole = "feedback"
+	IntentPowerPath   IntentRole = "power_path"
+	IntentPullup      IntentRole = "pullup"
+	IntentConnector   IntentRole = "connector"
+	IntentThermal     IntentRole = "thermal"
+	IntentReset       IntentRole = "reset"
+	IntentProgramming IntentRole = "programming"
+)
+
 type Request struct {
-	Board      BoardPlacementArea
-	Components []Component
-	Nets       []Net
-	Groups     []Group
-	Keepouts   []Keepout
-	Rules      Rules
-	Existing   ExistingPlacementPolicy
-	Seed       string
+	Board          BoardPlacementArea
+	Components     []Component
+	Nets           []Net
+	Groups         []Group
+	Keepouts       []Keepout
+	ProximityRules []ProximityRule
+	RegionRules    []RegionRule
+	Rules          Rules
+	Existing       ExistingPlacementPolicy
+	Seed           string
 }
 
 type BoardPlacementArea struct {
@@ -159,6 +175,30 @@ type Rules struct {
 	MaxCandidatesPerPart     int
 }
 
+type ProximityRule struct {
+	ID            string
+	Source        string
+	Role          IntentRole
+	AnchorRef     string
+	TargetRefs    []string
+	AnchorPins    []string
+	TargetPins    []string
+	MaxDistanceMM float64
+	Weight        int
+	Required      bool
+}
+
+type RegionRule struct {
+	ID        string
+	Source    string
+	Region    string
+	Refs      []string
+	NetRoles  []NetRole
+	Preferred Rect
+	Weight    int
+	Required  bool
+}
+
 type ExistingPlacementPolicy struct {
 	PreserveFixed bool
 }
@@ -238,6 +278,8 @@ func NormalizeRequest(request Request) Request {
 	request.Nets = slices.Clone(request.Nets)
 	request.Groups = slices.Clone(request.Groups)
 	request.Keepouts = slices.Clone(request.Keepouts)
+	request.ProximityRules = slices.Clone(request.ProximityRules)
+	request.RegionRules = slices.Clone(request.RegionRules)
 	request.Rules = normalizeRules(request.Rules)
 	for i := range request.Components {
 		request.Components[i].Pads = slices.Clone(request.Components[i].Pads)
@@ -298,6 +340,27 @@ func NormalizeRequest(request Request) Request {
 	for i := range request.Keepouts {
 		request.Keepouts[i].Layers = slices.Clone(request.Keepouts[i].Layers)
 		request.Keepouts[i].ID = strings.TrimSpace(request.Keepouts[i].ID)
+	}
+	for i := range request.ProximityRules {
+		request.ProximityRules[i].ID = stableRuleID(request.ProximityRules[i].ID, "proximity", i)
+		request.ProximityRules[i].Source = strings.TrimSpace(request.ProximityRules[i].Source)
+		request.ProximityRules[i].AnchorRef = strings.TrimSpace(request.ProximityRules[i].AnchorRef)
+		if request.ProximityRules[i].Weight <= 0 {
+			request.ProximityRules[i].Weight = 1
+		}
+		request.ProximityRules[i].TargetRefs = uniqueSortedStrings(request.ProximityRules[i].TargetRefs)
+		request.ProximityRules[i].AnchorPins = uniqueSortedStrings(request.ProximityRules[i].AnchorPins)
+		request.ProximityRules[i].TargetPins = uniqueSortedStrings(request.ProximityRules[i].TargetPins)
+	}
+	for i := range request.RegionRules {
+		request.RegionRules[i].NetRoles = slices.Clone(request.RegionRules[i].NetRoles)
+		request.RegionRules[i].ID = stableRuleID(request.RegionRules[i].ID, "region", i)
+		request.RegionRules[i].Source = strings.TrimSpace(request.RegionRules[i].Source)
+		request.RegionRules[i].Region = strings.TrimSpace(request.RegionRules[i].Region)
+		if request.RegionRules[i].Weight <= 0 {
+			request.RegionRules[i].Weight = 1
+		}
+		request.RegionRules[i].Refs = uniqueSortedStrings(request.RegionRules[i].Refs)
 	}
 	return request
 }
@@ -451,7 +514,151 @@ func Validate(request Request) []reports.Issue {
 			issues = append(issues, issue(path, "keepout bounds min must not exceed max"))
 		}
 	}
+	issues = append(issues, validateProximityRules(request.ProximityRules, refs)...)
+	issues = append(issues, validateRegionRules(request.RegionRules, refs)...)
 	return issues
+}
+
+func validateProximityRules(rules []ProximityRule, refs map[string]Component) []reports.Issue {
+	var issues []reports.Issue
+	ids := map[string]int{}
+	for i, rule := range rules {
+		path := fmt.Sprintf("proximity_rules[%d]", i)
+		id := strings.TrimSpace(rule.ID)
+		if id == "" {
+			issues = append(issues, issue(path+".id", "proximity rule id required"))
+		} else {
+			key := strings.ToUpper(id)
+			if previous, ok := ids[key]; ok {
+				issues = append(issues, issue(path+".id", fmt.Sprintf("duplicate proximity rule ID %s already defined at index %d", id, previous)))
+			}
+			ids[key] = i
+		}
+		if !validIntentRole(rule.Role) {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".role", "invalid intent role "+string(rule.Role)))
+		}
+		anchorRef := strings.TrimSpace(rule.AnchorRef)
+		anchor, hasAnchor := refs[strings.ToUpper(anchorRef)]
+		if anchorRef == "" {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".anchor_ref", "proximity rule anchor ref required"))
+		} else if !hasAnchor {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".anchor_ref", "proximity rule anchor references unknown component "+anchorRef))
+		} else {
+			for _, pin := range rule.AnchorPins {
+				if !componentHasPad(anchor, pin) {
+					issues = append(issues, intentRuleIssue(rule.Required, path+".anchor_pins", "proximity rule anchor pin "+pin+" not found in component "+anchorRef))
+				}
+			}
+		}
+		if len(rule.TargetRefs) == 0 {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".target_refs", "proximity rule target refs required"))
+		}
+		for _, target := range rule.TargetRefs {
+			targetRef := strings.TrimSpace(target)
+			targetComponent, hasTarget := refs[strings.ToUpper(targetRef)]
+			if targetRef == "" {
+				issues = append(issues, intentRuleIssue(rule.Required, path+".target_refs", "proximity rule target ref required"))
+				continue
+			}
+			if !hasTarget {
+				issues = append(issues, intentRuleIssue(rule.Required, path+".target_refs", "proximity rule target references unknown component "+targetRef))
+				continue
+			}
+			for _, pin := range rule.TargetPins {
+				if !componentHasPad(targetComponent, pin) {
+					issues = append(issues, intentRuleIssue(rule.Required, path+".target_pins", "proximity rule target pin "+pin+" not found in component "+targetRef))
+				}
+			}
+		}
+		if rule.MaxDistanceMM < 0 {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".max_distance_mm", "proximity rule max distance must be non-negative"))
+		}
+	}
+	return issues
+}
+
+func validateRegionRules(rules []RegionRule, refs map[string]Component) []reports.Issue {
+	var issues []reports.Issue
+	ids := map[string]int{}
+	for i, rule := range rules {
+		path := fmt.Sprintf("region_rules[%d]", i)
+		id := strings.TrimSpace(rule.ID)
+		if id == "" {
+			issues = append(issues, issue(path+".id", "region rule id required"))
+		} else {
+			key := strings.ToUpper(id)
+			if previous, ok := ids[key]; ok {
+				issues = append(issues, issue(path+".id", fmt.Sprintf("duplicate region rule ID %s already defined at index %d", id, previous)))
+			}
+			ids[key] = i
+		}
+		if strings.TrimSpace(rule.Region) == "" {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".region", "region rule region required"))
+		}
+		for _, ref := range rule.Refs {
+			if strings.TrimSpace(ref) == "" {
+				issues = append(issues, intentRuleIssue(rule.Required, path+".refs", "region rule ref required"))
+				continue
+			}
+			if _, ok := refs[strings.ToUpper(strings.TrimSpace(ref))]; !ok {
+				issues = append(issues, intentRuleIssue(rule.Required, path+".refs", "region rule references unknown component "+strings.TrimSpace(ref)))
+			}
+		}
+		for _, role := range rule.NetRoles {
+			if !validNetRole(role) {
+				issues = append(issues, intentRuleIssue(rule.Required, path+".net_roles", "invalid net role "+string(role)))
+			}
+		}
+		if rule.Preferred.Min.XMM > rule.Preferred.Max.XMM || rule.Preferred.Min.YMM > rule.Preferred.Max.YMM {
+			issues = append(issues, intentRuleIssue(rule.Required, path+".preferred", "region preferred bounds min must not exceed max"))
+		}
+	}
+	return issues
+}
+
+func intentRuleIssue(required bool, path string, message string) reports.Issue {
+	out := issue(path, message)
+	if !required {
+		out.Severity = reports.SeverityWarning
+	}
+	return out
+}
+
+func stableRuleID(id string, prefix string, index int) string {
+	id = strings.TrimSpace(id)
+	if id != "" {
+		return id
+	}
+	return fmt.Sprintf("%s-%03d", prefix, index+1)
+}
+
+func uniqueSortedStrings(values []string) []string {
+	seen := map[string]string{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToUpper(trimmed)
+		if _, ok := seen[key]; !ok {
+			seen[key] = trimmed
+		}
+	}
+	out := make([]string, 0, len(seen))
+	for _, value := range seen {
+		out = append(out, value)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func validIntentRole(role IntentRole) bool {
+	switch role {
+	case "", IntentDecoupling, IntentClock, IntentFeedback, IntentPowerPath, IntentPullup, IntentConnector, IntentThermal, IntentReset, IntentProgramming:
+		return true
+	default:
+		return false
+	}
 }
 
 func validSide(side SideConstraint) bool {
