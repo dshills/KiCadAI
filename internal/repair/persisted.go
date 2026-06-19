@@ -41,6 +41,7 @@ type PersistedApplyResult struct {
 	Status      Status                   `json:"status"`
 	Target      Target                   `json:"target"`
 	Repair      Result                   `json:"repair"`
+	Budget      *BudgetSummary           `json:"budget,omitempty"`
 	Apply       transactions.ApplyResult `json:"apply,omitempty"`
 	Transaction transactions.Transaction `json:"transaction,omitempty"`
 	Validation  []PostApplyValidation    `json:"validation,omitempty"`
@@ -133,6 +134,7 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 	if !repairOptions.Enabled {
 		repairOptions = bundle.RepairOptions
 	}
+	repairOptions = normalizeRepairOptions(repairOptions)
 	repairOptions.Enabled = true
 	repairOptions.Apply = true
 	executor := NewExecutor(ExecutionContext{
@@ -153,6 +155,7 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 	}
 	repairResult := NewRunner(repairOptions, executor, validator).RunContext(ctx, bundle.StageIssues)
 	result.Repair = repairResult
+	result.Budget = repairBudgetSummary(repairOptions, repairResult)
 	result.Transaction = tx
 	if err := ctx.Err(); err != nil {
 		result.Issues = appendIssues(result.Issues, []reports.Issue{contextIssue(err)})
@@ -193,6 +196,43 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 	result.Delta = CompareValidationIssues(flattenIssues(bundle.StageIssues), result.Issues)
 	result.Status = statusFromValidationDelta(result.Delta)
 	return finalizePersistedResult(result)
+}
+
+func normalizeRepairOptions(opts Options) Options {
+	defaults := DefaultOptions()
+	if opts.MaxAttempts <= 0 {
+		opts.MaxAttempts = defaults.MaxAttempts
+	}
+	if opts.MaxAttemptsPerIssue <= 0 {
+		opts.MaxAttemptsPerIssue = defaults.MaxAttemptsPerIssue
+	}
+	return opts
+}
+
+func repairBudgetSummary(opts Options, result Result) *BudgetSummary {
+	opts = normalizeRepairOptions(opts)
+	summary := BudgetSummary{
+		MaxAttempts:         opts.MaxAttempts,
+		MaxAttemptsPerIssue: opts.MaxAttemptsPerIssue,
+		AttemptCount:        result.Summary.AttemptCount,
+		Exhausted:           len(result.FinalIssues) > 0 && (result.Summary.AttemptCount >= opts.MaxAttempts || perIssueBudgetReached(result.Attempts, opts.MaxAttemptsPerIssue)),
+	}
+	return &summary
+}
+
+func perIssueBudgetReached(attempts []Attempt, maxAttemptsPerIssue int) bool {
+	if maxAttemptsPerIssue <= 0 {
+		return false
+	}
+	counts := map[string]int{}
+	for _, attempt := range attempts {
+		key := StableIssueKey(attempt.Issue)
+		counts[key]++
+		if counts[key] >= maxAttemptsPerIssue {
+			return true
+		}
+	}
+	return false
 }
 
 func ApplyPersistedBundleContext(ctx context.Context, targetPath string, bundle Bundle, opts PersistedApplyOptions) PersistedApplyResult {

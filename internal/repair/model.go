@@ -84,6 +84,13 @@ type Summary struct {
 	RepairedCount int `json:"repaired_count"`
 }
 
+type BudgetSummary struct {
+	MaxAttempts         int  `json:"max_attempts"`
+	MaxAttemptsPerIssue int  `json:"max_attempts_per_issue"`
+	AttemptCount        int  `json:"attempt_count"`
+	Exhausted           bool `json:"exhausted"`
+}
+
 type Attempt struct {
 	Number       int             `json:"number"`
 	Stage        string          `json:"stage,omitempty"`

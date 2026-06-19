@@ -283,6 +283,29 @@ func TestApplyPersistedBundleSkippedOptionalValidatorDoesNotBlock(t *testing.T) 
 	}
 }
 
+func TestRepairBudgetSummaryNormalizesDefaultsAndDetectsExhaustion(t *testing.T) {
+	summary := repairBudgetSummary(Options{}, Result{
+		FinalIssues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Message: "still failing"}},
+		Summary:     Summary{AttemptCount: 3},
+	})
+	defaults := DefaultOptions()
+	if summary == nil || summary.MaxAttempts != defaults.MaxAttempts || summary.MaxAttemptsPerIssue != defaults.MaxAttemptsPerIssue || !summary.Exhausted {
+		t.Fatalf("unexpected budget summary: %+v", summary)
+	}
+}
+
+func TestRepairBudgetSummaryDetectsPerIssueExhaustion(t *testing.T) {
+	issue := reports.Issue{Code: reports.CodeMissingFootprint, Severity: reports.SeverityError, Message: "missing footprint"}
+	summary := repairBudgetSummary(Options{MaxAttempts: 10, MaxAttemptsPerIssue: 1}, Result{
+		FinalIssues: []reports.Issue{issue},
+		Attempts:    []Attempt{{Issue: issue}},
+		Summary:     Summary{AttemptCount: 1},
+	})
+	if summary == nil || !summary.Exhausted {
+		t.Fatalf("unexpected budget summary: %+v", summary)
+	}
+}
+
 func persistedOutlineFixture(t *testing.T) (string, Bundle) {
 	t.Helper()
 	output := filepath.Join(t.TempDir(), "demo")
