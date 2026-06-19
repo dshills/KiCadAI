@@ -413,14 +413,38 @@ go run ./cmd/kicadai \
   place request
 ```
 
-Current placement support includes fixed components, top/bottom side
-constraints, edge preferences, keepouts, component spacing, group anchors,
-group spread checks, HPWL metrics, footprint-derived bounds helpers, and
-transaction operation output. Requests can use explicit component bounds or
-hydrate bounds from the library resolver in Go before calling
-`placement.Place`. The usable board area uses the larger of
-the JSON `board.margin_mm` and `rules.board_edge_clearance_mm` values
+Current placement support includes:
+
+- fixed components and top/bottom side constraints;
+- connector edge intent;
+- hard and optional keepouts plus mechanical constraints;
+- component spacing, group anchors, and group spread checks;
+- proximity rules and region preferences;
+- per-net HPWL and routing-readiness reports;
+- footprint-derived bounds helpers;
+- transaction operation output.
+
+Requests can use explicit component bounds or hydrate bounds from the library
+resolver in Go before calling `placement.Place`. The usable board area uses the
+larger of the JSON `board.margin_mm` and `rules.board_edge_clearance_mm` values
 (`Board.MarginMM` and `Rules.BoardEdgeClearanceMM` in Go).
+
+`placement.BuildQualityReport` returns AI-facing evidence for repair loops:
+
+- `group_reports`, `proximity_reports`, `region_reports`, `net_reports`, and
+  `keepout_reports` describe why a placement is good or poor; edge constraint
+  evidence is exposed through edge counters and score dimensions.
+- `score.dimensions` currently covers group cohesion, edge constraints,
+  mechanical keepouts, region satisfaction, routing readiness, and proximity.
+- `diagnostics` maps placement quality issues to repairable actions for
+  missing placements, keepouts, regions, proximity, routing readiness,
+  estimated footprint geometry, grouping, and validation issues.
+
+The placement hardening golden corpus covers representative LED, regulator,
+MCU minimal, USB-C power, I2C sensor, op-amp gain-stage, and connector-breakout
+layouts. Placement is still a deterministic heuristic, not a production-grade
+constraint solver; thermal placement, true congestion analysis, differential
+pairs, and final DRC-grade layout decisions remain future work.
 
 ### Routing
 

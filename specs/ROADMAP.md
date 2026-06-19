@@ -250,19 +250,37 @@ that produces reasonable boards.
 
 ### Current Foundation
 
-Placement planning and model support exist, and design workflows can place
-generated footprints.
+Placement hardening foundation is implemented. The engine now carries explicit
+intent and quality evidence for:
+
+- block-derived placement groups, keepouts, constraints, and local-route
+  proximity hints;
+- proximity scoring with pad-distance evidence and center fallback;
+- group-cohesion scoring;
+- connector edge constraint scoring;
+- hard and optional mechanical keepouts;
+- analog/digital/power/user region preference reports;
+- per-net HPWL and routing-readiness reports;
+- repairable placement diagnostics for missing placements, keepouts, regions,
+  proximity, routing readiness, estimated footprint geometry, grouping, and
+  validation issues;
+- golden placement corpus coverage for LED, regulator, MCU minimal, USB-C
+  power, I2C sensor, op-amp gain-stage, and connector-breakout layouts.
 
 ### Remaining Work
 
-- Group components by circuit block and net role.
-- Place connectors based on edge/orientation constraints.
-- Place decoupling capacitors near power pins.
-- Keep crystals and oscillators near MCUs.
-- Separate analog, digital, high-current, and noisy regions.
-- Model mounting holes, board outlines, keepouts, and mechanical constraints.
-- Add congestion, route-length, thermal, and DRC feedback scores.
-- Support iterative placement repair from validation findings.
+- Add richer candidate scoring from semantic component roles, not only
+  post-placement quality reports.
+- Add true congestion-grid and escape/fanout modeling rather than HPWL-only
+  routing readiness.
+- Add thermal, high-current, creepage/clearance, differential-pair, and
+  controlled-impedance placement rules.
+- Add crystal/oscillator and other timing-sensitive block fixtures once those
+  blocks are implemented.
+- Feed placement diagnostics into an iterative placement retry loop instead of
+  only reporting repair actions.
+- Validate hardened placement outputs against KiCad DRC evidence in larger
+  board-level golden projects.
 
 ### Acceptance Gates
 
