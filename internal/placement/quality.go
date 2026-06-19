@@ -14,6 +14,8 @@ type QualityReport struct {
 	FixedRefs                []string              `json:"fixed_refs,omitempty"`
 	UnplacedRefs             []string              `json:"unplaced_refs,omitempty"`
 	GroupReports             []GroupQualityReport  `json:"group_reports,omitempty"`
+	ProximityReports         []ProximityReport     `json:"proximity_reports,omitempty"`
+	Score                    ScoreReport           `json:"score,omitempty"`
 	EdgeConstraintCount      int                   `json:"edge_constraint_count"`
 	EdgeConstraintSatisfied  int                   `json:"edge_constraint_satisfied"`
 	SideConstraintCount      int                   `json:"side_constraint_count"`
@@ -24,6 +26,19 @@ type QualityReport struct {
 	OperationIssueCount      int                   `json:"operation_issue_count"`
 	PlacementQualityWarnings []string              `json:"placement_quality_warnings,omitempty"`
 	Diagnostics              []PlacementDiagnostic `json:"diagnostics,omitempty"`
+}
+
+type ProximityReport struct {
+	ID            string   `json:"id"`
+	Source        string   `json:"source,omitempty"`
+	Role          string   `json:"role,omitempty"`
+	AnchorRef     string   `json:"anchor_ref"`
+	TargetRefs    []string `json:"target_refs,omitempty"`
+	MaxDistanceMM float64  `json:"max_distance_mm,omitempty"`
+	ActualMM      *float64 `json:"actual_mm,omitempty"`
+	Satisfied     bool     `json:"satisfied"`
+	Required      bool     `json:"required"`
+	Evidence      string   `json:"evidence"`
 }
 
 type GroupQualityReport struct {
@@ -81,12 +96,129 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	for _, group := range request.Groups {
 		report.GroupReports = append(report.GroupReports, groupQualityReport(group, placementsByRef, componentRefsByGroup))
 	}
+	report.ProximityReports = proximityReports(request, placementsByRef)
+	report.Score = placementScoreReport(report)
 	sort.Strings(report.EstimatedBoundsRefs)
 	sort.Strings(report.FixedRefs)
 	sort.Strings(report.UnplacedRefs)
 	report.PlacementQualityWarnings = placementQualityWarnings(report)
 	report.Diagnostics = DiagnosticsForQuality(request, result, report)
 	return report
+}
+
+func proximityReports(request Request, placementsByRef map[string]PlacementResult) []ProximityReport {
+	componentsByRef := componentsByNormalizedRef(request.Components)
+	reports := make([]ProximityReport, 0, len(request.ProximityRules))
+	for _, rule := range request.ProximityRules {
+		anchorRef := normalizeRef(rule.AnchorRef)
+		anchorPlacement, ok := placementsByRef[anchorRef]
+		if !ok {
+			reports = append(reports, ProximityReport{
+				ID:            rule.ID,
+				Source:        rule.Source,
+				Role:          string(rule.Role),
+				AnchorRef:     rule.AnchorRef,
+				TargetRefs:    append([]string(nil), rule.TargetRefs...),
+				MaxDistanceMM: rule.MaxDistanceMM,
+				Required:      rule.Required,
+				Evidence:      "missing_anchor",
+			})
+			continue
+		}
+		anchorComponent := componentsByRef[anchorRef]
+		report := ProximityReport{
+			ID:            rule.ID,
+			Source:        rule.Source,
+			Role:          string(rule.Role),
+			AnchorRef:     rule.AnchorRef,
+			TargetRefs:    append([]string(nil), rule.TargetRefs...),
+			MaxDistanceMM: rule.MaxDistanceMM,
+			Required:      rule.Required,
+			Evidence:      "center",
+		}
+		bestDistance := math.Inf(1)
+		for _, targetRefRaw := range rule.TargetRefs {
+			targetRef := normalizeRef(targetRefRaw)
+			targetPlacement, ok := placementsByRef[targetRef]
+			if !ok {
+				continue
+			}
+			targetComponent := componentsByRef[targetRef]
+			distance, evidence := proximityDistance(anchorComponent, anchorPlacement, rule.AnchorPins, targetComponent, targetPlacement, rule.TargetPins)
+			if distance < bestDistance {
+				bestDistance = distance
+				report.Evidence = evidence
+			}
+		}
+		if math.IsInf(bestDistance, 1) {
+			report.Evidence = "missing_target"
+		} else {
+			report.ActualMM = &bestDistance
+		}
+		report.Satisfied = report.ActualMM != nil && (rule.MaxDistanceMM <= 0 || *report.ActualMM <= rule.MaxDistanceMM)
+		reports = append(reports, report)
+	}
+	sort.SliceStable(reports, func(i, j int) bool {
+		return reports[i].ID < reports[j].ID
+	})
+	return reports
+}
+
+func componentsByNormalizedRef(components []Component) map[string]Component {
+	byRef := make(map[string]Component, len(components))
+	for _, component := range components {
+		byRef[normalizeRef(component.Ref)] = component
+	}
+	return byRef
+}
+
+func proximityDistance(anchor Component, anchorPlacement PlacementResult, anchorPins []string, target Component, targetPlacement PlacementResult, targetPins []string) (float64, string) {
+	anchorPoint, anchorEvidence := proximityPoint(anchor, anchorPlacement, anchorPins)
+	targetPoint, targetEvidence := proximityPoint(target, targetPlacement, targetPins)
+	evidence := "center"
+	if anchorEvidence == "pad" && targetEvidence == "pad" {
+		evidence = "pad"
+	}
+	return boardDistance(anchorPoint.XMM-targetPoint.XMM, anchorPoint.YMM-targetPoint.YMM), evidence
+}
+
+func proximityPoint(component Component, placement PlacementResult, pins []string) (Point, string) {
+	padsByName := map[string]PadSummary{}
+	for _, pad := range component.Pads {
+		padsByName[strings.ToUpper(strings.TrimSpace(pad.Name))] = pad
+	}
+	for _, pin := range pins {
+		pad, ok := padsByName[strings.ToUpper(strings.TrimSpace(pin))]
+		if ok {
+			rotated := rotatePoint(Point{XMM: pad.XMM, YMM: pad.YMM}, placement.Position.RotationDeg)
+			return Point{XMM: placement.Position.XMM + rotated.XMM, YMM: placement.Position.YMM + rotated.YMM}, "pad"
+		}
+	}
+	return placement.Bounds.Center(), "center"
+}
+
+func placementScoreReport(report QualityReport) ScoreReport {
+	score := ScoreReport{}
+	add := func(dimension ScoreDimension) {
+		score.Dimensions = append(score.Dimensions, dimension)
+		score.Total += dimension.Score * dimension.Weight
+	}
+	proximityScore := 1.0
+	proximityStatus := "pass"
+	for _, proximity := range report.ProximityReports {
+		if !proximity.Satisfied {
+			proximityScore = 0
+			if proximity.Required {
+				proximityStatus = "fail"
+				break
+			}
+			proximityStatus = "warning"
+		}
+	}
+	if len(report.ProximityReports) > 0 {
+		add(ScoreDimension{Name: "proximity", Score: proximityScore, Weight: 1, Status: proximityStatus, Message: "electrical proximity rule satisfaction"})
+	}
+	return score
 }
 
 func placementResultsByRef(placements []PlacementResult) map[string]PlacementResult {

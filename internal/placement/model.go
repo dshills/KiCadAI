@@ -260,6 +260,23 @@ type Metrics struct {
 	HPWLMM               float64
 }
 
+type ScoreReport struct {
+	Total      float64          `json:"total"`
+	Dimensions []ScoreDimension `json:"dimensions,omitempty"`
+}
+
+type ScoreDimension struct {
+	Name       string   `json:"name"`
+	Score      float64  `json:"score"`
+	Weight     float64  `json:"weight"`
+	Status     string   `json:"status"`
+	Refs       []string `json:"refs,omitempty"`
+	Groups     []string `json:"groups,omitempty"`
+	Nets       []string `json:"nets,omitempty"`
+	Message    string   `json:"message,omitempty"`
+	Suggestion string   `json:"suggestion,omitempty"`
+}
+
 func DefaultRules() Rules {
 	return Rules{
 		GridMM:                   0.5,
