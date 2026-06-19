@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-18
+Date: 2026-06-19
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -47,7 +47,9 @@ from validation feedback to safe automatic repair.
   reports, richer metadata, confidence gates, rating/function-aware selection,
   resolver/pinmap evidence checks, golden coverage, and design workflow
   evidence output.
-- Circuit block library foundation and PCB realization for verified blocks.
+- Circuit block library expansion foundation with inventory, readiness gaps,
+  electrical rules, PCB constraints, required local routes, verification corpus
+  guards, and design workflow evidence output.
 - Placement engine foundation with deterministic placement model support.
 - Routing engine foundation for small generated PCB nets.
 - Connectivity-first board validation for pad nets, unrouted nets, route
@@ -72,7 +74,9 @@ loop confidence:
   seed families;
 - many production-ready active parts still need datasheet-backed electrical,
   thermal, lifecycle, availability, and design-rule evidence;
-- circuit blocks need deeper electrical validation and layout constraints;
+- circuit block coverage still needs more variants and concrete generators for
+  crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
+  protection families;
 - placement and routing need stronger rules for real PCB quality;
 - KiCad-backed validation needs to be used more consistently;
 - repair can persist generated-project changes, but imported-project mutation
@@ -149,6 +153,10 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
 
 Build a reusable library of verified schematic and PCB design fragments.
 
+### Status
+
+Implemented foundation.
+
 ### Current Foundation
 
 - Circuit block inventory reports roadmap seed families, implemented status,
@@ -201,26 +209,32 @@ Repair can classify issues, mutate safe transaction operations, replay generated
 projects, gate overwrite, clean stale managed files through manifests, and run
 post-apply validation hooks.
 
+Post-repair validation adapters now include writer correctness,
+connectivity-first board validation, optional KiCad ERC/DRC, and optional
+KiCad round-trip evidence. Persisted repair results include validation adapter
+summaries, before/after issue deltas, retry budget evidence, and generated
+repair bundle artifacts from `design create` repair runs.
+
 ### Remaining Work
 
-- Add built-in post-apply adapters for:
-  - writer correctness;
-  - connectivity-first board validation;
-  - KiCad ERC;
-  - KiCad DRC;
-  - optional round-trip checks.
-- Persist repair bundles from `design create` or add a dedicated CLI export
-  command so target-based repair apply is fully CLI-reproducible.
-- Add retry budgets across generate, validate, repair, and revalidate cycles.
+- Expand post-repair adapters to include richer parser-specific evidence once
+  ERC/DRC findings are mapped to repair categories consistently across all
+  flows.
+- Add a dedicated repair bundle export command for non-`design create` flows.
+- Extend retry budgets from persisted repair apply into full generate,
+  validate, repair, and revalidate loops.
 - Implement KiCad zone refill only under explicit KiCad CLI policy.
-- Preserve richer before/after validation evidence and issue deltas.
+- Add golden CLI fixtures for post-repair validation summaries and issue deltas.
 
 ### Acceptance Gates
 
-- `repair apply --target ...` can produce final validation evidence without
-  caller-supplied fake validators.
+- `repair apply --target ...` can produce final validation evidence from
+  built-in adapters.
 - Repairs report `repaired` only when post-write validation is clean.
-- Worsened, repeated, or unresolved blocking issues stay blocked or partial.
+- Repairs report `partial` when only non-blocking issues remain or when
+  blocking issue counts improve but are not eliminated.
+- Repairs report `blocked` when blocking issue counts do not improve or get
+  worse.
 
 ## Priority 4: Placement Engine Hardening
 
@@ -394,15 +408,14 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Harden circuit blocks with electrical and layout constraints using the
-   verified component catalog.
-2. Build post-repair validation adapters and bundle export support.
-3. Improve placement rules for block-aware layouts and component placement
+1. Build post-repair validation adapters and bundle export support.
+2. Improve placement rules for block-aware layouts and component placement
    hints.
-4. Improve routing rules, net classes, and DRC-driven route repair.
-5. Add fabrication export/readiness gates.
-6. Expand verified component coverage alongside each new block family.
-7. Add intent-level planning only after the above gates are reliable.
+3. Improve routing rules, net classes, and DRC-driven route repair.
+4. Add fabrication export/readiness gates.
+5. Expand verified component and block coverage alongside each new block
+   family.
+6. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
 

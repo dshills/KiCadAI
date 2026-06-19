@@ -28,8 +28,11 @@ operation they need to repair.
 Closed-loop validation repair now has a deterministic foundation: issue
 classification, repair planning, safe transaction-level executors, a bounded
 runner that requires revalidation before reporting success, persisted repairs
-for generated projects, an opt-in `validation_repair` workflow stage, and a
-`repair` CLI for structured plans and target-based apply.
+for generated projects, post-repair validation adapters, an opt-in
+`validation_repair` workflow stage, and a `repair` CLI for structured plans and
+target-based apply. Persisted repair results include validation summaries,
+before/after issue deltas, retry budget evidence, and artifacts such as repair
+bundles or KiCad reports when available.
 
 The live KiCad IPC client is useful for connection probes, version checks,
 document discovery, and capability reporting. Live schematic/PCB mutation
@@ -178,7 +181,9 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 - `repair plan|apply`: classify stage issues and emit deterministic repair
   attempts. With `--target` and a repair bundle, the `repair apply` command
   with `--execute` and `--overwrite` persists safe transaction-level repairs
-  back through the generated KiCad writer.
+  back through the generated KiCad writer and can run built-in post-repair
+  validators for writer correctness, board validation, ERC/DRC, and round-trip
+  evidence when the corresponding validation flags are enabled.
 
 LED generation:
 
