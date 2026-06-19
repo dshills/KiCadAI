@@ -61,6 +61,10 @@ from validation feedback to safe automatic repair.
 - Closed-loop validation repair foundation with planning, executors, persisted
   generated-project apply, target-based CLI support, workflow integration, and
   repair goldens.
+- Post-repair validation adapters for writer correctness, board validation,
+  optional KiCad ERC/DRC, optional KiCad round-trip evidence, persisted
+  validation summaries, issue deltas, retry budget evidence, and design
+  workflow repair bundle artifacts.
 - `design create` workflow for structured block-based design requests.
 - README and focused docs for current CLI capabilities.
 
@@ -78,7 +82,8 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
-- KiCad-backed validation needs to be used more consistently;
+- KiCad-backed validation exists in the repair and workflow loops, but needs
+  broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
   remains blocked by preservation safety;
 - fabrication export is still not a complete release gate;
@@ -408,14 +413,16 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Build post-repair validation adapters and bundle export support.
-2. Improve placement rules for block-aware layouts and component placement
+1. Improve placement rules for block-aware layouts and component placement
    hints.
-3. Improve routing rules, net classes, and DRC-driven route repair.
-4. Add fabrication export/readiness gates.
-5. Expand verified component and block coverage alongside each new block
+2. Improve routing rules, net classes, and DRC-driven route repair.
+3. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
+   and generated repair bundles.
+4. Add a dedicated repair bundle export command for non-`design create` flows.
+5. Add fabrication export/readiness gates.
+6. Expand verified component and block coverage alongside each new block
    family.
-6. Add intent-level planning only after the above gates are reliable.
+7. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
 

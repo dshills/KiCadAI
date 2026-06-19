@@ -185,6 +185,19 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
   validators for writer correctness, board validation, ERC/DRC, and round-trip
   evidence when the corresponding validation flags are enabled.
 
+Results for the `repair apply` command include:
+
+- `validation`: the transaction check plus enabled post-repair adapters.
+- `summary`: adapter count, skipped count, issue totals, blocking counts, and
+  artifacts.
+- `delta`: before/after issue summaries with cleared, repeated, and new issues.
+- `budget`: normalized retry limits, attempt count, and exhaustion status.
+
+When `design create` runs the persisted `validation_repair` stage, it writes a
+repair bundle artifact at `.kicadai/repair-bundle.json` under the generated
+project directory. That bundle can be passed back to `repair apply --target`
+for reproducible generated-project repair.
+
 LED generation:
 
 ```sh
@@ -294,6 +307,8 @@ Useful flags:
 - `--strict-unrouted`, `--strict-zones`: make validation stricter.
 - `--require-drc`, `--kicad-cli`, `--keep-artifacts`, `--artifact-dir`: require
   KiCad-backed DRC evidence.
+- `--max-repair-attempts`: bound validation repair attempts when repair is
+  enabled by the workflow or a repair command.
 
 Examples live in `examples/design/`:
 
