@@ -226,6 +226,9 @@ func TestApplyPersistedBundlePostValidationWarningIsPartial(t *testing.T) {
 	if result.Status != StatusPartial || len(result.Validation) != 2 {
 		t.Fatalf("expected partial validation result, got %#v", result)
 	}
+	if result.Summary.IssueCount != 1 || result.Delta.After.WarningCount != 1 {
+		t.Fatalf("expected validation summary and delta, got summary=%#v delta=%#v", result.Summary, result.Delta)
+	}
 }
 
 func TestApplyPersistedBundlePostValidationRepeatedBlockingIsBlocked(t *testing.T) {
@@ -241,6 +244,9 @@ func TestApplyPersistedBundlePostValidationRepeatedBlockingIsBlocked(t *testing.
 	})
 	if result.Status != StatusBlocked {
 		t.Fatalf("expected blocked validation result, got %#v", result)
+	}
+	if result.Delta.After.BlockingCount == 0 || len(result.Delta.Repeated) != 1 {
+		t.Fatalf("expected repeated blocking validation delta, got %#v", result.Delta)
 	}
 }
 

@@ -44,6 +44,8 @@ type PersistedApplyResult struct {
 	Apply       transactions.ApplyResult `json:"apply,omitempty"`
 	Transaction transactions.Transaction `json:"transaction,omitempty"`
 	Validation  []PostApplyValidation    `json:"validation,omitempty"`
+	Summary     ValidationSummary        `json:"summary,omitempty"`
+	Delta       ValidationDelta          `json:"delta,omitempty"`
 	Issues      []reports.Issue          `json:"issues,omitempty"`
 	Artifacts   []reports.Artifact       `json:"artifacts,omitempty"`
 }
@@ -187,7 +189,9 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 		result.Artifacts = appendArtifacts(result.Artifacts, validation.Artifacts)
 		result.Issues = appendIssues(result.Issues, validation.Issues)
 	}
-	result.Status = statusFromPostValidation(bundle.StageIssues, result.Issues)
+	result.Summary = SummarizePostValidation(result.Validation)
+	result.Delta = CompareValidationIssues(flattenIssues(bundle.StageIssues), result.Issues)
+	result.Status = statusFromValidationDelta(result.Delta)
 	return finalizePersistedResult(result)
 }
 
@@ -237,13 +241,15 @@ func runPostApplyValidators(ctx context.Context, validationCtx PostApplyValidati
 }
 
 func statusFromPostValidation(before []StageIssues, final []reports.Issue) Status {
-	if len(final) == 0 {
+	return statusFromValidationDelta(CompareValidationIssues(flattenIssues(before), final))
+}
+
+func statusFromValidationDelta(delta ValidationDelta) Status {
+	if delta.After.IssueCount == 0 {
 		return StatusRepaired
 	}
-	if reports.HasBlockingIssue(final) {
-		beforeBlocking := blockingIssueCount(flattenIssues(before))
-		finalBlocking := blockingIssueCount(final)
-		if finalBlocking >= beforeBlocking {
+	if delta.After.BlockingCount > 0 {
+		if delta.After.BlockingCount >= delta.Before.BlockingCount {
 			return StatusBlocked
 		}
 		return StatusPartial
