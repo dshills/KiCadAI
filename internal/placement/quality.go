@@ -9,6 +9,7 @@ import (
 const (
 	scoreWeightGroupCohesion = 1.0
 	scoreWeightProximity     = 1.0
+	scoreWeightEdge          = 1.0
 )
 
 type QualityReport struct {
@@ -224,6 +225,14 @@ func placementScoreReport(report QualityReport) ScoreReport {
 	}
 	if len(report.GroupReports) > 0 {
 		add(ScoreDimension{Name: "group_cohesion", Score: groupScore, Weight: scoreWeightGroupCohesion, Status: groupStatus, Message: "placement group cohesion"})
+	}
+	if report.EdgeConstraintCount > 0 {
+		edgeScore := float64(report.EdgeConstraintSatisfied) / float64(report.EdgeConstraintCount)
+		edgeStatus := "pass"
+		if report.EdgeConstraintSatisfied < report.EdgeConstraintCount {
+			edgeStatus = "fail"
+		}
+		add(ScoreDimension{Name: "edge_constraints", Score: edgeScore, Weight: scoreWeightEdge, Status: edgeStatus, Message: "edge placement constraint satisfaction"})
 	}
 	proximityScore := 1.0
 	proximityStatus := "pass"

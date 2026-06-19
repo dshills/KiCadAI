@@ -65,6 +65,29 @@ func TestPlaceFragmentsDerivesBlockPlacementIntent(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsDerivesConnectorEdgeIntent(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "usb_power",
+		Board:   BoardSpec{WidthMM: 100, HeightMM: 60, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "usb", BlockID: "usb_c_power"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	for _, component := range result.Request.Components {
+		if component.Role == "usb_c_receptacle" {
+			if component.Edge != placement.EdgeAny {
+				t.Fatalf("usb connector edge = %q, want any edge", component.Edge)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing usb_c_receptacle in placement request: %#v", result.Request.Components)
+}
+
 func TestPlaceFragmentsSkipsAfterRealizationFailure(t *testing.T) {
 	result := PlaceFragments(context.Background(), validRequest(), PCBFragmentResult{
 		Stage: NewStageResult(StagePCBRealization, []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Message: "bad"}}),

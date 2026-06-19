@@ -111,6 +111,32 @@ func TestQualityReportScoresGroupCohesion(t *testing.T) {
 	}
 }
 
+func TestQualityReportScoresEdgeConstraints(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Edge = EdgeRight
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if quality.EdgeConstraintCount != 1 || quality.EdgeConstraintSatisfied != 0 {
+		t.Fatalf("unexpected edge counts: %#v", quality)
+	}
+	var found bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "edge_constraints" {
+			found = true
+			if dimension.Status != "fail" || dimension.Score != 0 {
+				t.Fatalf("edge dimension = %#v, want failing zero score", dimension)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing edge score: %#v", quality.Score)
+	}
+}
+
 func TestQualityReportMissingProximityTargetMarshalsJSON(t *testing.T) {
 	req := minimalRequest()
 	req.ProximityRules = []ProximityRule{{

@@ -59,6 +59,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	netIndexes := map[string]int{}
 	for _, fragment := range fragments.Fragments {
 		groupIDByRole := placementGroupIDByRole(fragment)
+		edgeByRole := placementEdgeByRole(fragment)
 		for _, component := range fragment.Realization.Components {
 			position := placement.Placement{
 				XMM:         component.Placement.XMM,
@@ -77,6 +78,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 				Side:        sideFromLayer(position.Layer),
 				Rotation:    fixedRotation(component.Placement.RotationDeg),
 				GroupID:     groupIDByRole[component.ComponentRole],
+				Edge:        edgeByRole[component.ComponentRole],
 			})
 		}
 		placementRequest.Groups = append(placementRequest.Groups, placementGroupsFromFragment(fragment)...)
@@ -154,6 +156,40 @@ func placementGroupIDByRole(fragment BlockFragment) map[string]string {
 		}
 	}
 	return byRole
+}
+
+func placementEdgeByRole(fragment BlockFragment) map[string]placement.EdgeConstraint {
+	byRole := map[string]placement.EdgeConstraint{}
+	for _, constraint := range fragment.Constraints {
+		kind := strings.TrimSpace(constraint.Kind)
+		if !strings.EqualFold(kind, "edge_facing") {
+			continue
+		}
+		edge := placementEdgeFromConstraint(constraint)
+		for _, role := range constraint.AppliesTo {
+			role = strings.TrimSpace(role)
+			if role != "" {
+				byRole[role] = edge
+			}
+		}
+	}
+	return byRole
+}
+
+func placementEdgeFromConstraint(constraint blocks.PCBConstraint) placement.EdgeConstraint {
+	text := normalizeRoleName(constraint.ID + " " + constraint.Kind + " " + constraint.Description)
+	switch {
+	case containsToken(text, "left"):
+		return placement.EdgeLeft
+	case containsToken(text, "right"):
+		return placement.EdgeRight
+	case containsToken(text, "top"):
+		return placement.EdgeTop
+	case containsToken(text, "bottom"):
+		return placement.EdgeBottom
+	default:
+		return placement.EdgeAny
+	}
 }
 
 func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
