@@ -20,9 +20,12 @@ const (
 	routingReadinessThresholdMultiplier = 0.75
 	routingReadinessWarningCredit       = 0.5
 
-	netStatusPass    = "pass"
-	netStatusWarning = "warning"
-	netStatusFail    = "fail"
+	scoreStatusPass    = "pass"
+	scoreStatusWarning = "warning"
+	scoreStatusFail    = "fail"
+	netStatusPass      = scoreStatusPass
+	netStatusWarning   = scoreStatusWarning
+	netStatusFail      = scoreStatusFail
 )
 
 type QualityReport struct {
