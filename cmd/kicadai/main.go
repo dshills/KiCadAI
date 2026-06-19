@@ -2258,6 +2258,7 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 			ArtifactDir:   checkOpts.ArtifactDir,
 			Allowlist:     checkOpts.Allowlist,
 		},
+		PostRepair: repairPostValidationOptions(opts),
 	}
 	if opts.routeAllowPartialSet {
 		createOpts.Routing.AllowPartial = &opts.routeAllowPartial
@@ -3093,12 +3094,13 @@ func runRepairTargetCommand(opts cliOptions, stdout io.Writer) error {
 			return writeReportFailure(stdout, "repair", issue)
 		}
 		apply := repair.ApplyPersistedBundle(opts.target, *bundle, repair.PersistedApplyOptions{
-			Execute:   opts.execute,
-			OutputDir: repairOutputDir(opts.output, opts.target),
-			Overwrite: opts.overwrite,
-			Seed:      opts.seed,
-			Repair:    repairOptions,
-			Board:     &transactions.BoardSize{WidthMM: opts.placementBoardWidth, HeightMM: opts.placementBoardHeight},
+			Execute:        opts.execute,
+			OutputDir:      repairOutputDir(opts.output, opts.target),
+			Overwrite:      opts.overwrite,
+			Seed:           opts.seed,
+			Repair:         repairOptions,
+			Board:          &transactions.BoardSize{WidthMM: opts.placementBoardWidth, HeightMM: opts.placementBoardHeight},
+			PostValidation: repairPostValidationOptions(opts),
 		})
 		result := reports.ResultWithIssues("repair", apply, apply.Issues, apply.Artifacts)
 		if err := writeReportJSON(stdout, result); err != nil {
@@ -3111,6 +3113,26 @@ func runRepairTargetCommand(opts cliOptions, stdout io.Writer) error {
 	default:
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "unsupported repair subcommand " + opts.commandArgs[0]}
 		return writeReportFailure(stdout, "repair", issue)
+	}
+}
+
+func repairPostValidationOptions(opts cliOptions) repair.PostValidationOptions {
+	coreValidation := opts.strictZones || opts.strictUnrouted || opts.requireDRC || opts.requireERC || opts.requireKiCadRoundTrip
+	return repair.PostValidationOptions{
+		WriterCorrectness:       coreValidation,
+		BoardValidation:         coreValidation,
+		KiCadERC:                opts.requireERC,
+		KiCadDRC:                opts.requireDRC,
+		RoundTrip:               opts.requireKiCadRoundTrip,
+		RequireKiCadERC:         opts.requireERC,
+		RequireKiCadDRC:         opts.requireDRC,
+		RequireRoundTrip:        opts.requireKiCadRoundTrip,
+		StrictZones:             opts.strictZones,
+		StrictUnrouted:          opts.strictUnrouted,
+		AllowMissingKiCadChecks: opts.allowMissingDRC,
+		KeepArtifacts:           opts.keepArtifacts,
+		ArtifactDir:             opts.artifactDir,
+		KiCadCLI:                opts.kicadCLI,
 	}
 }
 

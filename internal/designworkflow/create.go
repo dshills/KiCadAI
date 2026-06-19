@@ -2,7 +2,10 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"kicadai/internal/blocks"
@@ -23,6 +26,7 @@ type CreateOptions struct {
 	Validation    ValidationOptions
 	KiCadChecks   KiCadCheckOptions
 	Repair        repair.Options
+	PostRepair    repair.PostValidationOptions
 	BlockRegistry blocks.Registry
 }
 
@@ -127,28 +131,63 @@ func persistedValidationRepairStage(ctx context.Context, request *Request, writt
 		RepairOptions: opts.Repair,
 	}
 	result := repair.ApplyPersistedBundleContext(ctx, opts.OutputDir, bundle, repair.PersistedApplyOptions{
-		Execute:   true,
-		OutputDir: opts.OutputDir,
-		Overwrite: opts.Overwrite,
-		Seed:      opts.Seed,
-		Repair:    opts.Repair,
-		Board:     &transactions.BoardSize{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM},
+		Execute:        true,
+		OutputDir:      opts.OutputDir,
+		Overwrite:      opts.Overwrite,
+		Seed:           opts.Seed,
+		Repair:         opts.Repair,
+		Board:          &transactions.BoardSize{WidthMM: request.Board.WidthMM, HeightMM: request.Board.HeightMM},
+		PostValidation: opts.PostRepair,
 	})
 	attemptCount, appliedCount := repairAttemptCounts(&result)
 	stage := StageResult{Name: StageValidationRepair, Status: repairStageStatus(result.Status)}
 	stage.Issues = append(stage.Issues, result.Issues...)
 	stage.Artifacts = append(stage.Artifacts, result.Artifacts...)
+	if artifact, err := writeRepairBundleArtifact(opts.OutputDir, &bundle); err == nil {
+		stage.Artifacts = append(stage.Artifacts, artifact)
+	} else {
+		stage.Issues = append(stage.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "repair.bundle", Message: err.Error()})
+	}
 	stage.Summary = map[string]any{
 		"status":           result.Status,
 		"attempt_count":    attemptCount,
 		"applied_count":    appliedCount,
 		"validation_count": len(result.Validation),
 		"artifact_count":   len(result.Artifacts),
+		"validation_delta": result.Delta,
 	}
 	if len(stage.Issues) > 0 {
 		stage.Status = moreSevereStageStatus(stage.Status, StageStatusForIssues(stage.Issues))
 	}
 	return stage
+}
+
+func writeRepairBundleArtifact(outputDir string, bundle *repair.Bundle) (reports.Artifact, error) {
+	if strings.TrimSpace(outputDir) == "" {
+		return reports.Artifact{}, fmt.Errorf("output directory is required")
+	}
+	if bundle == nil {
+		return reports.Artifact{}, fmt.Errorf("repair bundle is required")
+	}
+	dir := filepath.Join(outputDir, ".kicadai")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return reports.Artifact{}, fmt.Errorf("create repair bundle directory: %w", err)
+	}
+	path := filepath.Join(dir, "repair-bundle.json")
+	file, err := os.Create(path)
+	if err != nil {
+		return reports.Artifact{}, fmt.Errorf("create repair bundle: %w", err)
+	}
+	encoder := json.NewEncoder(file)
+	encoder.SetIndent("", "  ")
+	if err := encoder.Encode(bundle); err != nil {
+		_ = file.Close()
+		return reports.Artifact{}, fmt.Errorf("write repair bundle: %w", err)
+	}
+	if err := file.Close(); err != nil {
+		return reports.Artifact{}, fmt.Errorf("close repair bundle: %w", err)
+	}
+	return reports.Artifact{Kind: reports.ArtifactValidationReport, Path: filepath.ToSlash(path), Description: "post-repair validation bundle"}, nil
 }
 
 func repairAttemptCounts(result *repair.PersistedApplyResult) (int, int) {
