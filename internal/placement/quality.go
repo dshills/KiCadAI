@@ -1,7 +1,10 @@
 package placement
 
 import (
+	"cmp"
+	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 )
@@ -12,6 +15,14 @@ const (
 	scoreWeightEdge          = 1.0
 	scoreWeightMechanical    = 1.0
 	scoreWeightRegion        = 1.0
+	scoreWeightRouting       = 1.0
+
+	routingReadinessThresholdMultiplier = 0.75
+	routingReadinessWarningCredit       = 0.5
+
+	netStatusPass    = "pass"
+	netStatusWarning = "warning"
+	netStatusFail    = "fail"
 )
 
 type QualityReport struct {
@@ -24,6 +35,7 @@ type QualityReport struct {
 	GroupReports              []GroupQualityReport  `json:"group_reports,omitempty"`
 	ProximityReports          []ProximityReport     `json:"proximity_reports,omitempty"`
 	RegionReports             []RegionReport        `json:"region_reports,omitempty"`
+	NetReports                []NetQualityReport    `json:"net_reports,omitempty"`
 	Score                     ScoreReport           `json:"score,omitempty"`
 	EdgeConstraintCount       int                   `json:"edge_constraint_count"`
 	EdgeConstraintSatisfied   int                   `json:"edge_constraint_satisfied"`
@@ -65,6 +77,18 @@ type RegionReport struct {
 	MissingRefs    []string `json:"missing_refs,omitempty"`
 	Satisfied      bool     `json:"satisfied"`
 	Required       bool     `json:"required"`
+}
+
+type NetQualityReport struct {
+	Name                string  `json:"name"`
+	Role                string  `json:"role,omitempty"`
+	EndpointCount       int     `json:"endpoint_count"`
+	PlacedEndpointCount int     `json:"placed_endpoint_count"`
+	Weight              int     `json:"weight"`
+	HPWLMM              float64 `json:"hpwl_mm"`
+	WeightedHPWLMM      float64 `json:"weighted_hpwl_mm"`
+	Status              string  `json:"status"`
+	Message             string  `json:"message,omitempty"`
 }
 
 type GroupQualityReport struct {
@@ -127,6 +151,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	}
 	report.ProximityReports = proximityReports(request, placementsByRef)
 	report.RegionReports = regionReports(request, placementsByRef)
+	report.NetReports = netQualityReports(request, placementsByRef)
 	report.Score = placementScoreReport(report)
 	sort.Strings(report.EstimatedBoundsRefs)
 	sort.Strings(report.FixedRefs)
@@ -323,6 +348,74 @@ func netRoleStrings(roles []NetRole) []string {
 	return out
 }
 
+func netQualityReports(request Request, placementsByRef map[string]PlacementResult) []NetQualityReport {
+	reports := make([]NetQualityReport, 0, len(request.Nets))
+	longThreshold := routingReadinessLongThreshold(request.Board)
+	for _, net := range request.Nets {
+		if len(net.Endpoints) < 2 {
+			continue
+		}
+		weight := net.Weight
+		if weight <= 0 {
+			weight = 1
+		}
+		report := NetQualityReport{
+			Name:          net.Name,
+			Role:          string(net.Role),
+			EndpointCount: len(net.Endpoints),
+			Weight:        weight,
+			Status:        netStatusPass,
+		}
+		minX, minY := 0.0, 0.0
+		maxX, maxY := 0.0, 0.0
+		for _, endpoint := range net.Endpoints {
+			ref := normalizeRef(endpoint.Ref)
+			if ref == "" {
+				continue
+			}
+			placement, ok := placementsByRef[ref]
+			if !ok {
+				continue
+			}
+			point := placement.Bounds.Center()
+			if report.PlacedEndpointCount == 0 {
+				minX, maxX = point.XMM, point.XMM
+				minY, maxY = point.YMM, point.YMM
+			} else {
+				minX = min(minX, point.XMM)
+				maxX = max(maxX, point.XMM)
+				minY = min(minY, point.YMM)
+				maxY = max(maxY, point.YMM)
+			}
+			report.PlacedEndpointCount++
+		}
+		if report.PlacedEndpointCount < report.EndpointCount {
+			report.Status = netStatusFail
+			report.Message = "one or more net endpoints are unplaced"
+		}
+		if report.PlacedEndpointCount > 1 {
+			report.HPWLMM = (maxX - minX) + (maxY - minY)
+			report.WeightedHPWLMM = float64(weight) * report.HPWLMM
+			if report.Status == netStatusPass && longThreshold > 0 && report.HPWLMM > longThreshold {
+				report.Status = netStatusWarning
+				report.Message = "net HPWL exceeds routing-readiness threshold"
+			}
+		}
+		reports = append(reports, report)
+	}
+	slices.SortFunc(reports, func(a, b NetQualityReport) int {
+		return cmp.Compare(a.Name, b.Name)
+	})
+	return reports
+}
+
+func routingReadinessLongThreshold(board BoardPlacementArea) float64 {
+	if board.WidthMM <= 0 || board.HeightMM <= 0 {
+		return 0
+	}
+	return max(board.WidthMM, board.HeightMM) * routingReadinessThresholdMultiplier
+}
+
 func componentsByNormalizedRef(components []Component) map[string]Component {
 	byRef := make(map[string]Component, len(components))
 	for _, component := range components {
@@ -416,6 +509,10 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		regionScore := float64(regionSatisfied) / float64(len(report.RegionReports))
 		add(ScoreDimension{Name: "regions", Score: regionScore, Weight: scoreWeightRegion, Status: regionStatus, Message: "placement region preference satisfaction"})
 	}
+	if len(report.NetReports) > 0 {
+		routingScore, routingStatus := routingReadinessScore(report.NetReports)
+		add(ScoreDimension{Name: "routing_readiness", Score: routingScore, Weight: scoreWeightRouting, Status: routingStatus, Message: "placement net HPWL and endpoint readiness"})
+	}
 	proximityScore := 1.0
 	proximityStatus := "pass"
 	for _, proximity := range report.ProximityReports {
@@ -440,6 +537,34 @@ func placementResultsByRef(placements []PlacementResult) map[string]PlacementRes
 		byRef[normalizeRef(placement.Ref)] = placement
 	}
 	return byRef
+}
+
+func routingReadinessScore(reports []NetQualityReport) (float64, string) {
+	if len(reports) == 0 {
+		return 1, netStatusPass
+	}
+	score := 0.0
+	var totalWeight int64
+	status := netStatusPass
+	for _, report := range reports {
+		weight := report.Weight
+		totalWeight += int64(weight)
+		switch report.Status {
+		case netStatusPass:
+			score += float64(weight)
+		case netStatusWarning:
+			score += float64(weight) * routingReadinessWarningCredit
+			if status != netStatusFail {
+				status = netStatusWarning
+			}
+		case netStatusFail:
+			status = netStatusFail
+		}
+	}
+	if totalWeight == 0 {
+		return 1, status
+	}
+	return score / float64(totalWeight), status
 }
 
 func keepoutViolationCounts(keepouts []Keepout, placements []PlacementResult) (required int, optional int) {
@@ -615,10 +740,29 @@ func placementQualityWarnings(report QualityReport) []string {
 			}
 		}
 	}
+	failedNets, warningNets := routingReadinessIssueCounts(report.NetReports)
+	if failedNets > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d nets have failed routing readiness", failedNets))
+	}
+	if warningNets > 0 {
+		warnings = append(warnings, fmt.Sprintf("%d nets have routing-readiness warnings", warningNets))
+	}
 	for _, group := range report.GroupReports {
 		if group.MaxSpreadMM > 0 && !group.SpreadSatisfied {
 			warnings = append(warnings, "group "+group.ID+" exceeds max spread")
 		}
 	}
 	return warnings
+}
+
+func routingReadinessIssueCounts(reports []NetQualityReport) (failed int, warning int) {
+	for _, report := range reports {
+		switch report.Status {
+		case netStatusFail:
+			failed++
+		case netStatusWarning:
+			warning++
+		}
+	}
+	return failed, warning
 }

@@ -235,6 +235,89 @@ func TestQualityReportRegionWithNoRefsIsSatisfiedNoop(t *testing.T) {
 	}
 }
 
+func TestQualityReportIncludesNetHPWL(t *testing.T) {
+	req := twoComponentRequest()
+	req.Nets[0].Role = NetSignal
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 8, YMM: 7}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.NetReports) != 1 {
+		t.Fatalf("net reports = %#v", quality.NetReports)
+	}
+	report := quality.NetReports[0]
+	if report.Name != "N1" || report.Role != string(NetSignal) || report.HPWLMM != 5 || report.Status != "pass" {
+		t.Fatalf("unexpected net report: %#v", report)
+	}
+}
+
+func TestQualityReportWarnsForLongNetHPWL(t *testing.T) {
+	req := twoComponentRequest()
+	req.Nets[0].Weight = 2
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 2, YMM: 2}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 38, YMM: 23}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.NetReports) != 1 || quality.NetReports[0].Status != "warning" || quality.NetReports[0].WeightedHPWLMM <= quality.NetReports[0].HPWLMM {
+		t.Fatalf("unexpected long-net report: %#v", quality.NetReports)
+	}
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "routing_readiness" {
+			if dimension.Status != "warning" || dimension.Score != 0.5 {
+				t.Fatalf("routing dimension = %#v, want warning half score", dimension)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing routing readiness score: %#v", quality.Score)
+}
+
+func TestQualityReportFailsRoutingReadinessForMissingEndpoint(t *testing.T) {
+	req := twoComponentRequest()
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.NetReports) != 1 || quality.NetReports[0].Status != "fail" {
+		t.Fatalf("unexpected missing-endpoint report: %#v", quality.NetReports)
+	}
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "routing_readiness" {
+			if dimension.Status != "fail" || dimension.Score != 0 {
+				t.Fatalf("routing dimension = %#v, want fail zero score", dimension)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing routing readiness score: %#v", quality.Score)
+}
+
+func TestQualityReportCountsMultiplePinsOnSamePlacedComponent(t *testing.T) {
+	req := minimalRequest()
+	req.Nets[0].Endpoints = []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R1", Pin: "2"}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.NetReports) != 1 || quality.NetReports[0].PlacedEndpointCount != 2 || quality.NetReports[0].Status != "pass" {
+		t.Fatalf("unexpected same-component net report: %#v", quality.NetReports)
+	}
+}
+
 func TestQualityReportScoresMechanicalKeepouts(t *testing.T) {
 	req := minimalRequest()
 	req.Mechanical = []MechanicalConstraint{{
