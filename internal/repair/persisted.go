@@ -33,6 +33,7 @@ type PersistedApplyOptions struct {
 	LibraryIndex   *libraryresolver.LibraryIndex
 	LibraryIssues  []reports.Issue
 	InspectProject func(path string) (inspect.ProjectSummary, error)
+	PostValidation PostValidationOptions
 	PostValidators []PostApplyValidator
 }
 
@@ -62,13 +63,13 @@ type PostApplyValidationContext struct {
 }
 
 type PostApplyValidator interface {
-	ValidatePostApply(PostApplyValidationContext) PostApplyValidation
+	ValidatePostApply(context.Context, PostApplyValidationContext) PostApplyValidation
 }
 
-type PostApplyValidatorFunc func(PostApplyValidationContext) PostApplyValidation
+type PostApplyValidatorFunc func(context.Context, PostApplyValidationContext) PostApplyValidation
 
-func (fn PostApplyValidatorFunc) ValidatePostApply(ctx PostApplyValidationContext) PostApplyValidation {
-	return fn(ctx)
+func (fn PostApplyValidatorFunc) ValidatePostApply(ctx context.Context, validationCtx PostApplyValidationContext) PostApplyValidation {
+	return fn(ctx, validationCtx)
 }
 
 var managedKiCadExtensions = map[string]struct{}{
@@ -175,12 +176,13 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 	applyResult.Artifacts = nil
 	applyResult.Issues = nil
 	result.Apply = applyResult
+	postValidators := append(BuiltInPostApplyValidators(opts.PostValidation), opts.PostValidators...)
 	result.Validation = runPostApplyValidators(ctx, PostApplyValidationContext{
 		OutputDir:   outputDir,
 		Target:      target,
 		Transaction: tx,
 		Apply:       applyResult,
-	}, opts.PostValidators)
+	}, postValidators)
 	for _, validation := range result.Validation {
 		result.Artifacts = appendArtifacts(result.Artifacts, validation.Artifacts)
 		result.Issues = appendIssues(result.Issues, validation.Issues)
@@ -225,7 +227,7 @@ func runPostApplyValidators(ctx context.Context, validationCtx PostApplyValidati
 			validations = append(validations, PostApplyValidation{Name: "optional", Skipped: true})
 			continue
 		}
-		validation := validator.ValidatePostApply(validationCtx)
+		validation := validator.ValidatePostApply(ctx, validationCtx)
 		if strings.TrimSpace(validation.Name) == "" {
 			validation.Name = "post_apply"
 		}

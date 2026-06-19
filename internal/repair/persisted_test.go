@@ -1,6 +1,7 @@
 package repair
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -218,7 +219,7 @@ func TestApplyPersistedBundlePostValidationWarningIsPartial(t *testing.T) {
 		Overwrite:      true,
 		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
 		InspectProject: cleanInspection,
-		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(PostApplyValidationContext) PostApplyValidation {
+		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(context.Context, PostApplyValidationContext) PostApplyValidation {
 			return PostApplyValidation{Name: "writer", Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Message: "non-blocking diff"}}}
 		})},
 	})
@@ -234,7 +235,7 @@ func TestApplyPersistedBundlePostValidationRepeatedBlockingIsBlocked(t *testing.
 		Overwrite:      true,
 		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
 		InspectProject: cleanInspection,
-		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(PostApplyValidationContext) PostApplyValidation {
+		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(context.Context, PostApplyValidationContext) PostApplyValidation {
 			return PostApplyValidation{Name: "board", Issues: []reports.Issue{{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline"}}}
 		})},
 	})
@@ -250,7 +251,7 @@ func TestApplyPersistedBundlePostValidationWorsenedIssueCountBlocks(t *testing.T
 		Overwrite:      true,
 		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
 		InspectProject: cleanInspection,
-		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(PostApplyValidationContext) PostApplyValidation {
+		PostValidators: []PostApplyValidator{PostApplyValidatorFunc(func(context.Context, PostApplyValidationContext) PostApplyValidation {
 			return PostApplyValidation{Name: "board", Issues: []reports.Issue{
 				{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline"},
 				{Code: reports.CodeDisconnectedPad, Severity: reports.SeverityError, Message: "disconnected"},
