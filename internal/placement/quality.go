@@ -6,6 +6,11 @@ import (
 	"strings"
 )
 
+const (
+	scoreWeightGroupCohesion = 1.0
+	scoreWeightProximity     = 1.0
+)
+
 type QualityReport struct {
 	Status                   Status                `json:"status"`
 	Ready                    bool                  `json:"ready"`
@@ -203,6 +208,23 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		score.Dimensions = append(score.Dimensions, dimension)
 		score.Total += dimension.Score * dimension.Weight
 	}
+	groupScore := 1.0
+	groupStatus := "pass"
+	for _, group := range report.GroupReports {
+		if group.RequestedCount > 0 && group.PlacedCount < group.RequestedCount {
+			groupScore = 0
+			groupStatus = "fail"
+			break
+		}
+		if group.MaxSpreadMM > 0 && !group.SpreadSatisfied {
+			groupScore = 0
+			groupStatus = "fail"
+			break
+		}
+	}
+	if len(report.GroupReports) > 0 {
+		add(ScoreDimension{Name: "group_cohesion", Score: groupScore, Weight: scoreWeightGroupCohesion, Status: groupStatus, Message: "placement group cohesion"})
+	}
 	proximityScore := 1.0
 	proximityStatus := "pass"
 	for _, proximity := range report.ProximityReports {
@@ -216,7 +238,7 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		}
 	}
 	if len(report.ProximityReports) > 0 {
-		add(ScoreDimension{Name: "proximity", Score: proximityScore, Weight: 1, Status: proximityStatus, Message: "electrical proximity rule satisfaction"})
+		add(ScoreDimension{Name: "proximity", Score: proximityScore, Weight: scoreWeightProximity, Status: proximityStatus, Message: "electrical proximity rule satisfaction"})
 	}
 	return score
 }

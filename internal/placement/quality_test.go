@@ -77,6 +77,40 @@ func TestQualityReportScoresFailedProximity(t *testing.T) {
 	}
 }
 
+func TestQualityReportScoresGroupCohesion(t *testing.T) {
+	req := twoComponentRequest()
+	req.Groups = []Group{{
+		ID:           "analog",
+		Components:   []string{"R1", "R2"},
+		KeepTogether: true,
+		MaxSpreadMM:  2,
+	}}
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 30, YMM: 5}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.GroupReports) != 1 || quality.GroupReports[0].SpreadSatisfied {
+		t.Fatalf("unexpected group reports: %#v", quality.GroupReports)
+	}
+	var found bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "group_cohesion" {
+			found = true
+			if dimension.Status != "fail" {
+				t.Fatalf("group cohesion status = %q, want fail", dimension.Status)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing group cohesion score: %#v", quality.Score)
+	}
+}
+
 func TestQualityReportMissingProximityTargetMarshalsJSON(t *testing.T) {
 	req := minimalRequest()
 	req.ProximityRules = []ProximityRule{{
