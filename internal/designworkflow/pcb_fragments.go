@@ -21,11 +21,14 @@ type PCBFragmentResult struct {
 }
 
 type BlockFragment struct {
-	InstanceID  string                           `json:"instance_id"`
-	BlockID     string                           `json:"block_id"`
-	OriginXMM   float64                          `json:"origin_x_mm"`
-	OriginYMM   float64                          `json:"origin_y_mm"`
-	Realization blocks.BlockPCBRealizationResult `json:"realization"`
+	InstanceID      string                           `json:"instance_id"`
+	BlockID         string                           `json:"block_id"`
+	OriginXMM       float64                          `json:"origin_x_mm"`
+	OriginYMM       float64                          `json:"origin_y_mm"`
+	Realization     blocks.BlockPCBRealizationResult `json:"realization"`
+	PlacementGroups []blocks.PCBPlacementGroup       `json:"placement_groups,omitempty"`
+	Keepouts        []blocks.PCBKeepout              `json:"keepouts,omitempty"`
+	Constraints     []blocks.PCBConstraint           `json:"constraints,omitempty"`
 }
 
 func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan BlockPlanResult) PCBFragmentResult {
@@ -65,13 +68,19 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		originX, originY := fragmentOrigin(index, columns)
 		realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{OriginXMM: originX, OriginYMM: originY})
 		issues = append(issues, prefixIssues(fmt.Sprintf("blocks[%d].pcb_realization", index), realization.Issues)...)
-		fragments = append(fragments, BlockFragment{
+		fragment := BlockFragment{
 			InstanceID:  instance.ID,
 			BlockID:     instance.BlockID,
 			OriginXMM:   originX,
 			OriginYMM:   originY,
 			Realization: realization,
-		})
+		}
+		if definition.PCBRealization != nil {
+			fragment.PlacementGroups = clonePCBPlacementGroups(definition.PCBRealization.PlacementGroups)
+			fragment.Keepouts = clonePCBKeepouts(definition.PCBRealization.Keepouts)
+			fragment.Constraints = clonePCBConstraints(definition.PCBRealization.Constraints)
+		}
+		fragments = append(fragments, fragment)
 	}
 	issues = append(issues, validateFragmentBounds(request, fragments)...)
 	componentCount, routeCount := fragmentCounts(fragments)
@@ -83,6 +92,34 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		"local_routes":    routeCount,
 	}
 	return PCBFragmentResult{Fragments: fragments, Stage: stage}
+}
+
+func clonePCBPlacementGroups(groups []blocks.PCBPlacementGroup) []blocks.PCBPlacementGroup {
+	out := append([]blocks.PCBPlacementGroup(nil), groups...)
+	for i := range out {
+		out[i].ComponentRoles = append([]string(nil), groups[i].ComponentRoles...)
+		if groups[i].Bounds != nil {
+			bounds := *groups[i].Bounds
+			out[i].Bounds = &bounds
+		}
+	}
+	return out
+}
+
+func clonePCBKeepouts(keepouts []blocks.PCBKeepout) []blocks.PCBKeepout {
+	out := append([]blocks.PCBKeepout(nil), keepouts...)
+	for i := range out {
+		out[i].AppliesTo = append([]string(nil), keepouts[i].AppliesTo...)
+	}
+	return out
+}
+
+func clonePCBConstraints(constraints []blocks.PCBConstraint) []blocks.PCBConstraint {
+	out := append([]blocks.PCBConstraint(nil), constraints...)
+	for i := range out {
+		out[i].AppliesTo = append([]string(nil), constraints[i].AppliesTo...)
+	}
+	return out
 }
 
 func fragmentColumnCount(request Request) int {

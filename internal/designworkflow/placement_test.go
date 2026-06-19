@@ -30,6 +30,39 @@ func TestPlaceFragmentsPlacesRealizedLED(t *testing.T) {
 	if !result.Request.Components[0].Fixed {
 		t.Fatalf("expected fixed realized placement: %#v", result.Request.Components[0])
 	}
+	if len(result.Request.Groups) == 0 {
+		t.Fatalf("expected block-derived placement groups")
+	}
+	if len(result.Request.ProximityRules) == 0 {
+		t.Fatalf("expected block-derived proximity rules")
+	}
+}
+
+func TestPlaceFragmentsDerivesBlockPlacementIntent(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "analog_board",
+		Board:   BoardSpec{WidthMM: 100, HeightMM: 60, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "amp", BlockID: "opamp_gain_stage"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if len(result.Request.Groups) == 0 {
+		t.Fatalf("expected placement groups in request")
+	}
+	group := result.Request.Groups[0]
+	if group.ID == "" || len(group.Components) == 0 || !group.KeepTogether || group.MaxSpreadMM <= 0 {
+		t.Fatalf("unexpected group: %#v", group)
+	}
+	if len(result.Request.ProximityRules) == 0 {
+		t.Fatalf("expected proximity rules in request")
+	}
+	if result.Request.ProximityRules[0].Source == "" {
+		t.Fatalf("expected proximity source metadata: %#v", result.Request.ProximityRules[0])
+	}
 }
 
 func TestPlaceFragmentsSkipsAfterRealizationFailure(t *testing.T) {

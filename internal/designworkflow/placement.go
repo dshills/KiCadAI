@@ -2,9 +2,11 @@ package designworkflow
 
 import (
 	"context"
+	"math"
 	"strings"
 	"unicode"
 
+	"kicadai/internal/blocks"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
@@ -54,7 +56,9 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	if defaultBounds.WidthMM <= 0 || defaultBounds.HeightMM <= 0 {
 		defaultBounds = defaultWorkflowBounds
 	}
+	netIndexes := map[string]int{}
 	for _, fragment := range fragments.Fragments {
+		groupIDByRole := placementGroupIDByRole(fragment)
 		for _, component := range fragment.Realization.Components {
 			position := placement.Placement{
 				XMM:         component.Placement.XMM,
@@ -72,18 +76,14 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 				Position:    &position,
 				Side:        sideFromLayer(position.Layer),
 				Rotation:    fixedRotation(component.Placement.RotationDeg),
+				GroupID:     groupIDByRole[component.ComponentRole],
 			})
 		}
+		placementRequest.Groups = append(placementRequest.Groups, placementGroupsFromFragment(fragment)...)
+		placementRequest.Keepouts = append(placementRequest.Keepouts, placementKeepoutsFromFragment(fragment)...)
+		placementRequest.ProximityRules = append(placementRequest.ProximityRules, proximityRulesFromFragment(fragment)...)
 		for _, route := range fragment.Realization.LocalRoutes {
-			placementRequest.Nets = append(placementRequest.Nets, placement.Net{
-				Name: route.NetName,
-				Endpoints: []placement.Endpoint{
-					{Ref: route.From.Ref, Pin: route.From.Pin},
-					{Ref: route.To.Ref, Pin: route.To.Pin},
-				},
-				Role:   netRoleFromName(route.NetName),
-				Weight: 10,
-			})
+			addPlacementRouteNet(&placementRequest, netIndexes, route)
 		}
 	}
 	placementRequest = placement.NormalizeRequest(placementRequest)
@@ -100,6 +100,204 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func addPlacementRouteNet(request *placement.Request, indexes map[string]int, route blocks.RealizedPCBLocalRoute) {
+	name := strings.TrimSpace(route.NetName)
+	if name == "" {
+		return
+	}
+	key := strings.ToUpper(name)
+	endpoints := []placement.Endpoint{
+		{Ref: route.From.Ref, Pin: route.From.Pin},
+		{Ref: route.To.Ref, Pin: route.To.Pin},
+	}
+	if index, ok := indexes[key]; ok {
+		request.Nets[index].Endpoints = appendUniquePlacementEndpoints(request.Nets[index].Endpoints, endpoints...)
+		if request.Nets[index].Weight < 10 {
+			request.Nets[index].Weight = 10
+		}
+		return
+	}
+	indexes[key] = len(request.Nets)
+	request.Nets = append(request.Nets, placement.Net{
+		Name:      name,
+		Endpoints: endpoints,
+		Role:      netRoleFromName(name),
+		Weight:    10,
+	})
+}
+
+func appendUniquePlacementEndpoints(existing []placement.Endpoint, incoming ...placement.Endpoint) []placement.Endpoint {
+	seen := map[string]struct{}{}
+	for _, endpoint := range existing {
+		key := strings.ToUpper(strings.TrimSpace(endpoint.Ref)) + "|" + strings.TrimSpace(endpoint.Pin)
+		seen[key] = struct{}{}
+	}
+	for _, endpoint := range incoming {
+		key := strings.ToUpper(strings.TrimSpace(endpoint.Ref)) + "|" + strings.TrimSpace(endpoint.Pin)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		existing = append(existing, endpoint)
+	}
+	return existing
+}
+
+func placementGroupIDByRole(fragment BlockFragment) map[string]string {
+	byRole := map[string]string{}
+	for _, group := range fragment.PlacementGroups {
+		groupID := blockPlacementGroupID(fragment, group.ID)
+		for _, role := range group.ComponentRoles {
+			byRole[strings.TrimSpace(role)] = groupID
+		}
+	}
+	return byRole
+}
+
+func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
+	groups := make([]placement.Group, 0, len(fragment.PlacementGroups))
+	for _, group := range fragment.PlacementGroups {
+		converted := placement.Group{
+			ID:           blockPlacementGroupID(fragment, group.ID),
+			Role:         group.ID,
+			KeepTogether: true,
+			Priority:     10,
+		}
+		for _, role := range group.ComponentRoles {
+			if ref := fragment.Realization.RoleRefs[strings.TrimSpace(role)]; ref != "" {
+				converted.Components = append(converted.Components, ref)
+			}
+		}
+		if group.AnchorRole != "" {
+			converted.Anchor.Ref = fragment.Realization.RoleRefs[strings.TrimSpace(group.AnchorRole)]
+		}
+		if group.Bounds != nil {
+			converted.MaxSpreadMM = boundsDiagonal(*group.Bounds)
+		}
+		if len(converted.Components) > 0 {
+			groups = append(groups, converted)
+		}
+	}
+	return groups
+}
+
+func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
+	keepouts := make([]placement.Keepout, 0, len(fragment.Keepouts))
+	for _, keepout := range fragment.Keepouts {
+		keepouts = append(keepouts, placement.Keepout{
+			ID:     blockPlacementGroupID(fragment, keepout.ID),
+			Bounds: relativeBoundsToPlacementRect(fragment, keepout.Bounds),
+			Layers: []string{keepout.Layer},
+			Reason: keepout.Description,
+		})
+	}
+	return keepouts
+}
+
+func proximityRulesFromFragment(fragment BlockFragment) []placement.ProximityRule {
+	rules := []placement.ProximityRule{}
+	for _, group := range fragment.PlacementGroups {
+		anchorRef := fragment.Realization.RoleRefs[strings.TrimSpace(group.AnchorRole)]
+		if anchorRef == "" && len(group.ComponentRoles) > 0 {
+			anchorRef = fragment.Realization.RoleRefs[strings.TrimSpace(group.ComponentRoles[0])]
+		}
+		if anchorRef == "" {
+			continue
+		}
+		var targets []string
+		for _, role := range group.ComponentRoles {
+			ref := fragment.Realization.RoleRefs[strings.TrimSpace(role)]
+			if ref != "" && ref != anchorRef {
+				targets = append(targets, ref)
+			}
+		}
+		if len(targets) == 0 {
+			continue
+		}
+		rules = append(rules, placement.ProximityRule{
+			ID:            blockPlacementGroupID(fragment, group.ID) + ".cohesion",
+			Source:        "block:" + fragment.BlockID,
+			Role:          placementRoleFromGroup(group),
+			AnchorRef:     anchorRef,
+			TargetRefs:    targets,
+			MaxDistanceMM: max(2, boundsDiagonalValue(group.Bounds)),
+			Weight:        5,
+			Required:      group.Bounds != nil,
+		})
+	}
+	for _, route := range fragment.Realization.LocalRoutes {
+		role := placementRoleFromNetName(route.NetName)
+		rules = append(rules, placement.ProximityRule{
+			ID:            blockPlacementGroupID(fragment, route.ID) + ".route",
+			Source:        "block:" + fragment.BlockID,
+			Role:          role,
+			AnchorRef:     route.From.Ref,
+			TargetRefs:    []string{route.To.Ref},
+			AnchorPins:    []string{route.From.Pin},
+			TargetPins:    []string{route.To.Pin},
+			MaxDistanceMM: 15,
+			Weight:        3,
+			Required:      false,
+		})
+	}
+	return rules
+}
+
+func blockPlacementGroupID(fragment BlockFragment, id string) string {
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = "placement"
+	}
+	return fragment.InstanceID + "." + id
+}
+
+func relativeBoundsToPlacementRect(fragment BlockFragment, bounds blocks.RelativeBounds) placement.Rect {
+	return placement.Rect{
+		Min: placement.Point{XMM: fragment.OriginXMM + bounds.MinXMM, YMM: fragment.OriginYMM + bounds.MinYMM},
+		Max: placement.Point{XMM: fragment.OriginXMM + bounds.MaxXMM, YMM: fragment.OriginYMM + bounds.MaxYMM},
+	}
+}
+
+func boundsDiagonal(bounds blocks.RelativeBounds) float64 {
+	return math.Hypot(bounds.MaxXMM-bounds.MinXMM, bounds.MaxYMM-bounds.MinYMM)
+}
+
+func boundsDiagonalValue(bounds *blocks.RelativeBounds) float64 {
+	if bounds == nil {
+		return 10
+	}
+	return boundsDiagonal(*bounds)
+}
+
+func placementRoleFromGroup(group blocks.PCBPlacementGroup) placement.IntentRole {
+	name := normalizeRoleName(group.ID + " " + group.Description + " " + strings.Join(group.ComponentRoles, " "))
+	switch {
+	case strings.Contains(name, "decoupling"):
+		return placement.IntentDecoupling
+	case strings.Contains(name, "feedback"):
+		return placement.IntentFeedback
+	case strings.Contains(name, "connector"):
+		return placement.IntentConnector
+	case strings.Contains(name, "regulator"), strings.Contains(name, "power"):
+		return placement.IntentPowerPath
+	case strings.Contains(name, "clock"), strings.Contains(name, "crystal"):
+		return placement.IntentClock
+	default:
+		return ""
+	}
+}
+
+func placementRoleFromNetName(name string) placement.IntentRole {
+	switch netRoleFromName(name) {
+	case placement.NetPower, placement.NetGround:
+		return placement.IntentPowerPath
+	case placement.NetClock:
+		return placement.IntentClock
+	default:
+		return ""
+	}
 }
 
 func mergePlacementRules(rules placement.Rules) placement.Rules {

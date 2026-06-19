@@ -545,7 +545,7 @@ func validateProximityRules(rules []ProximityRule, refs map[string]Component) []
 			issues = append(issues, intentRuleIssue(rule.Required, path+".anchor_ref", "proximity rule anchor references unknown component "+anchorRef))
 		} else {
 			for _, pin := range rule.AnchorPins {
-				if !componentHasPad(anchor, pin) {
+				if len(anchor.Pads) > 0 && !componentHasPad(anchor, pin) {
 					issues = append(issues, intentRuleIssue(rule.Required, path+".anchor_pins", "proximity rule anchor pin "+pin+" not found in component "+anchorRef))
 				}
 			}
@@ -565,7 +565,7 @@ func validateProximityRules(rules []ProximityRule, refs map[string]Component) []
 				continue
 			}
 			for _, pin := range rule.TargetPins {
-				if !componentHasPad(targetComponent, pin) {
+				if len(targetComponent.Pads) > 0 && !componentHasPad(targetComponent, pin) {
 					issues = append(issues, intentRuleIssue(rule.Required, path+".target_pins", "proximity rule target pin "+pin+" not found in component "+targetRef))
 				}
 			}
