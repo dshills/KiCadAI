@@ -11,6 +11,7 @@ const (
 	scoreWeightProximity     = 1.0
 	scoreWeightEdge          = 1.0
 	scoreWeightMechanical    = 1.0
+	scoreWeightRegion        = 1.0
 )
 
 type QualityReport struct {
@@ -22,6 +23,7 @@ type QualityReport struct {
 	UnplacedRefs              []string              `json:"unplaced_refs,omitempty"`
 	GroupReports              []GroupQualityReport  `json:"group_reports,omitempty"`
 	ProximityReports          []ProximityReport     `json:"proximity_reports,omitempty"`
+	RegionReports             []RegionReport        `json:"region_reports,omitempty"`
 	Score                     ScoreReport           `json:"score,omitempty"`
 	EdgeConstraintCount       int                   `json:"edge_constraint_count"`
 	EdgeConstraintSatisfied   int                   `json:"edge_constraint_satisfied"`
@@ -48,6 +50,21 @@ type ProximityReport struct {
 	Satisfied     bool     `json:"satisfied"`
 	Required      bool     `json:"required"`
 	Evidence      string   `json:"evidence"`
+}
+
+type RegionReport struct {
+	ID             string   `json:"id"`
+	Source         string   `json:"source,omitempty"`
+	Region         string   `json:"region"`
+	Refs           []string `json:"refs,omitempty"`
+	NetRoles       []string `json:"net_roles,omitempty"`
+	Preferred      Rect     `json:"preferred,omitempty"`
+	PlacedCount    int      `json:"placed_count"`
+	RequestedCount int      `json:"requested_count"`
+	OutsideRefs    []string `json:"outside_refs,omitempty"`
+	MissingRefs    []string `json:"missing_refs,omitempty"`
+	Satisfied      bool     `json:"satisfied"`
+	Required       bool     `json:"required"`
 }
 
 type GroupQualityReport struct {
@@ -109,6 +126,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 		report.GroupReports = append(report.GroupReports, groupQualityReport(group, placementsByRef, componentRefsByGroup))
 	}
 	report.ProximityReports = proximityReports(request, placementsByRef)
+	report.RegionReports = regionReports(request, placementsByRef)
 	report.Score = placementScoreReport(report)
 	sort.Strings(report.EstimatedBoundsRefs)
 	sort.Strings(report.FixedRefs)
@@ -174,6 +192,135 @@ func proximityReports(request Request, placementsByRef map[string]PlacementResul
 		return reports[i].ID < reports[j].ID
 	})
 	return reports
+}
+
+func regionReports(request Request, placementsByRef map[string]PlacementResult) []RegionReport {
+	if len(request.RegionRules) == 0 {
+		return nil
+	}
+	reports := make([]RegionReport, 0, len(request.RegionRules))
+	refsByRole := map[NetRole][]string{}
+	if regionRulesUseNetRoles(request.RegionRules) {
+		refsByRole = netRefsByRole(request.Nets)
+	}
+	for _, rule := range request.RegionRules {
+		refs := regionRuleRefs(rule, refsByRole)
+		report := RegionReport{
+			ID:             rule.ID,
+			Source:         rule.Source,
+			Region:         rule.Region,
+			Refs:           refs,
+			NetRoles:       netRoleStrings(rule.NetRoles),
+			Preferred:      rule.Preferred,
+			RequestedCount: len(refs),
+			Required:       rule.Required,
+			Satisfied:      true,
+		}
+		if len(refs) == 0 {
+			reports = append(reports, report)
+			continue
+		}
+		for _, ref := range refs {
+			placement, ok := placementsByRef[ref]
+			if !ok {
+				report.MissingRefs = append(report.MissingRefs, ref)
+				report.Satisfied = false
+				continue
+			}
+			report.PlacedCount++
+			if !rule.Preferred.IsZero() && !placementSatisfiesRegion(placement, rule.Preferred) {
+				report.OutsideRefs = append(report.OutsideRefs, ref)
+				report.Satisfied = false
+			}
+		}
+		reports = append(reports, report)
+	}
+	sort.Slice(reports, func(i, j int) bool {
+		return reports[i].ID < reports[j].ID
+	})
+	return reports
+}
+
+func placementSatisfiesRegion(placement PlacementResult, preferred Rect) bool {
+	return preferred.Contains(placement.Bounds)
+}
+
+func regionRuleRefs(rule RegionRule, refsByRole map[NetRole][]string) []string {
+	seen := map[string]struct{}{}
+	refs := make([]string, 0, len(rule.Refs))
+	for _, ref := range rule.Refs {
+		refs = addNormalizedRef(normalizeRef(ref), seen, refs)
+	}
+	for _, role := range rule.NetRoles {
+		for _, ref := range refsByRole[role] {
+			refs = addNormalizedRef(ref, seen, refs)
+		}
+	}
+	sort.Strings(refs)
+	return refs
+}
+
+func addNormalizedRef(normalized string, seen map[string]struct{}, refs []string) []string {
+	if normalized == "" {
+		return refs
+	}
+	if _, ok := seen[normalized]; ok {
+		return refs
+	}
+	seen[normalized] = struct{}{}
+	return append(refs, normalized)
+}
+
+func netRefsByRole(nets []Net) map[NetRole][]string {
+	seenByRole := map[NetRole]map[string]struct{}{}
+	refsByRole := map[NetRole][]string{}
+	for _, net := range nets {
+		if net.Role == "" || net.Role == NetUnknown {
+			continue
+		}
+		for _, endpoint := range net.Endpoints {
+			ref := normalizeRef(endpoint.Ref)
+			if ref == "" {
+				continue
+			}
+			if seenByRole[net.Role] == nil {
+				seenByRole[net.Role] = map[string]struct{}{}
+			}
+			if _, ok := seenByRole[net.Role][ref]; ok {
+				continue
+			}
+			seenByRole[net.Role][ref] = struct{}{}
+			refsByRole[net.Role] = append(refsByRole[net.Role], ref)
+		}
+	}
+	return refsByRole
+}
+
+func regionRulesUseNetRoles(rules []RegionRule) bool {
+	for _, rule := range rules {
+		if len(rule.NetRoles) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func netRoleStrings(roles []NetRole) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(roles))
+	for _, role := range roles {
+		value := string(role)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Strings(out)
+	return out
 }
 
 func componentsByNormalizedRef(components []Component) map[string]Component {
@@ -251,6 +398,23 @@ func placementScoreReport(report QualityReport) ScoreReport {
 			mechanicalStatus = "warning"
 		}
 		add(ScoreDimension{Name: "mechanical", Score: mechanicalScore, Weight: scoreWeightMechanical, Status: mechanicalStatus, Message: "mechanical keepout and board-fit satisfaction"})
+	}
+	regionSatisfied := 0
+	regionStatus := "pass"
+	for _, region := range report.RegionReports {
+		if region.Satisfied {
+			regionSatisfied++
+			continue
+		}
+		if region.Required {
+			regionStatus = "fail"
+		} else if regionStatus != "fail" {
+			regionStatus = "warning"
+		}
+	}
+	if len(report.RegionReports) > 0 {
+		regionScore := float64(regionSatisfied) / float64(len(report.RegionReports))
+		add(ScoreDimension{Name: "regions", Score: regionScore, Weight: scoreWeightRegion, Status: regionStatus, Message: "placement region preference satisfaction"})
 	}
 	proximityScore := 1.0
 	proximityStatus := "pass"
@@ -441,6 +605,15 @@ func placementQualityWarnings(report QualityReport) []string {
 	}
 	if report.OptionalKeepoutViolations > 0 {
 		warnings = append(warnings, "one or more optional keepouts were occupied")
+	}
+	for _, region := range report.RegionReports {
+		if !region.Satisfied {
+			if region.Required {
+				warnings = append(warnings, "region "+region.ID+" required placement was not satisfied")
+			} else {
+				warnings = append(warnings, "region "+region.ID+" placement preference was not satisfied")
+			}
+		}
 	}
 	for _, group := range report.GroupReports {
 		if group.MaxSpreadMM > 0 && !group.SpreadSatisfied {

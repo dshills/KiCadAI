@@ -137,6 +137,104 @@ func TestQualityReportScoresEdgeConstraints(t *testing.T) {
 	}
 }
 
+func TestQualityReportScoresRequiredRegionMiss(t *testing.T) {
+	req := minimalRequest()
+	req.RegionRules = []RegionRule{{
+		ID:        "analog",
+		Region:    "analog",
+		Refs:      []string{"R1"},
+		Preferred: Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 10, YMM: 10}},
+		Required:  true,
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 30, YMM: 20})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.RegionReports) != 1 || quality.RegionReports[0].Satisfied || len(quality.RegionReports[0].OutsideRefs) != 1 {
+		t.Fatalf("unexpected region report: %#v", quality.RegionReports)
+	}
+	var found bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "regions" {
+			found = true
+			if dimension.Status != "fail" || dimension.Score != 0 {
+				t.Fatalf("region dimension = %#v, want failing zero score", dimension)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("missing region score: %#v", quality.Score)
+	}
+}
+
+func TestQualityReportScoresOptionalRegionMissAsWarning(t *testing.T) {
+	req := minimalRequest()
+	req.RegionRules = []RegionRule{{
+		ID:        "analog-soft",
+		Region:    "analog",
+		Refs:      []string{"R1"},
+		Preferred: Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 10, YMM: 10}},
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 30, YMM: 20})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "regions" {
+			if dimension.Status != "warning" {
+				t.Fatalf("region dimension = %#v, want warning", dimension)
+			}
+			return
+		}
+	}
+	t.Fatalf("missing region score: %#v", quality.Score)
+}
+
+func TestQualityReportRegionRefsExpandFromNetRoles(t *testing.T) {
+	req := twoComponentRequest()
+	req.Nets[0].Role = NetAnalog
+	req.RegionRules = []RegionRule{{
+		ID:        "analog-net",
+		Region:    "analog",
+		NetRoles:  []NetRole{NetAnalog},
+		Preferred: Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 10, YMM: 10}},
+	}}
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 6, YMM: 5}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.RegionReports) != 1 || quality.RegionReports[0].RequestedCount != 2 || !quality.RegionReports[0].Satisfied {
+		t.Fatalf("unexpected net-role region report: %#v", quality.RegionReports)
+	}
+}
+
+func TestQualityReportRegionWithNoRefsIsSatisfiedNoop(t *testing.T) {
+	req := minimalRequest()
+	req.RegionRules = []RegionRule{{
+		ID:        "empty",
+		Region:    "analog",
+		Preferred: Rect{Min: Point{XMM: 0, YMM: 0}, Max: Point{XMM: 10, YMM: 10}},
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.RegionReports) != 1 || !quality.RegionReports[0].Satisfied {
+		t.Fatalf("empty region report should be satisfied no-op: %#v", quality.RegionReports)
+	}
+}
+
 func TestQualityReportScoresMechanicalKeepouts(t *testing.T) {
 	req := minimalRequest()
 	req.Mechanical = []MechanicalConstraint{{
