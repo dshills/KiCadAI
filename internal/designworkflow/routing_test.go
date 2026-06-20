@@ -47,6 +47,11 @@ func TestRoutePlacementRoutesSimpleSignalWithPads(t *testing.T) {
 	if countTransactionOps(result.Operations, transactions.OpRoute) == 0 {
 		t.Fatalf("operations = %#v, want transaction route operation", result.Operations)
 	}
+	if result.Stage.Summary["quality_score"] == nil ||
+		result.Stage.Summary["route_reports"] == nil ||
+		result.Stage.Summary["repair_diagnostics"] == nil {
+		t.Fatalf("routing summary missing quality evidence: %#v", result.Stage.Summary)
+	}
 }
 
 func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {

@@ -56,12 +56,18 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	routeOperations := transactionRouteOperations(result.Operations)
 	operations := append(localOperations, routeOperations...)
 	stage := NewStageResult(StageRouting, issues)
+	routeDiagnostics := routing.DiagnosticsForResult(result)
 	stage.Summary = map[string]any{
 		"local_route_operations": len(localOperations),
 		"route_operations":       len(result.Operations),
 		"routed_nets":            result.Metrics.RoutedNetCount,
 		"failed_nets":            result.Metrics.FailedNetCount,
 		"status":                 result.Status,
+		"repair_diagnostics":     len(routeDiagnostics),
+	}
+	if result.Quality != nil {
+		stage.Summary["quality_score"] = result.Quality.Score.Overall
+		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
 }
