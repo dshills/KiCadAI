@@ -254,6 +254,7 @@ type Result struct {
 	Operations []Operation     `json:"operations,omitempty"`
 	Issues     []reports.Issue `json:"issues,omitempty"`
 	Metrics    Metrics         `json:"metrics"`
+	Quality    *QualityReport  `json:"quality,omitempty"`
 }
 
 type Operation struct {
@@ -304,11 +305,13 @@ type RouteViaOperation struct {
 }
 
 type Route struct {
-	Net      string          `json:"net"`
-	Segments []Segment       `json:"segments,omitempty"`
-	Vias     []Via           `json:"vias,omitempty"`
-	Status   RouteStatus     `json:"status"`
-	Issues   []reports.Issue `json:"issues,omitempty"`
+	Net            string          `json:"net"`
+	Segments       []Segment       `json:"segments,omitempty"`
+	Vias           []Via           `json:"vias,omitempty"`
+	Status         RouteStatus     `json:"status"`
+	Issues         []reports.Issue `json:"issues,omitempty"`
+	SearchNodes    int             `json:"search_nodes,omitempty"`
+	SearchLimitHit bool            `json:"search_limit_hit,omitempty"`
 }
 
 type RouteStatus string
@@ -344,6 +347,40 @@ type Metrics struct {
 	TotalLengthMM     float64 `json:"total_length_mm"`
 	SearchNodes       int     `json:"search_nodes"`
 	MaxSearchNodesHit bool    `json:"max_search_nodes_hit"`
+}
+
+type QualityReport struct {
+	Status     Status             `json:"status"`
+	Score      QualityScore       `json:"score"`
+	NetReports []NetQualityReport `json:"net_reports,omitempty"`
+}
+
+type QualityScore struct {
+	Overall    float64                 `json:"overall"`
+	Dimensions []QualityScoreDimension `json:"dimensions,omitempty"`
+}
+
+type QualityScoreDimension struct {
+	Name    string  `json:"name"`
+	Score   float64 `json:"score"`
+	Message string  `json:"message,omitempty"`
+}
+
+type NetQualityReport struct {
+	NetName         string      `json:"net_name"`
+	Role            NetRole     `json:"role,omitempty"`
+	Class           string      `json:"class,omitempty"`
+	EndpointCount   int         `json:"endpoint_count"`
+	RoutedEndpoints int         `json:"routed_endpoint_count"`
+	Status          RouteStatus `json:"status"`
+	SegmentCount    int         `json:"segment_count"`
+	ViaCount        int         `json:"via_count"`
+	LengthMM        float64     `json:"length_mm"`
+	Layers          []string    `json:"layers,omitempty"`
+	SearchNodes     int         `json:"search_nodes"`
+	SearchLimitHit  bool        `json:"search_limit_hit,omitempty"`
+	FailureCategory string      `json:"failure_category,omitempty"`
+	SuggestedRepair string      `json:"suggested_repair,omitempty"`
 }
 
 func DefaultRules() Rules {

@@ -73,6 +73,12 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				break
 			}
 			path, routeIssues := routePairPath(ctx, request, access, occupancy, plan.Net.Name, pair)
+			route.SearchNodes += path.SearchNodes
+			result.Metrics.SearchNodes += path.SearchNodes
+			if path.SearchLimitHit {
+				route.SearchLimitHit = true
+				result.Metrics.MaxSearchNodesHit = true
+			}
 			if len(routeIssues) != 0 {
 				route.Issues = append(route.Issues, routeIssues...)
 				netFailed = true
@@ -83,7 +89,6 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			vias := BuildViasFromPath(path, request.Rules)
 			route.Segments = append(route.Segments, segments...)
 			route.Vias = append(route.Vias, vias...)
-			result.Metrics.SearchNodes += metrics.SearchNodes
 			result.Metrics.SegmentCount += len(segments)
 			result.Metrics.ViaCount += len(vias)
 			result.Metrics.TotalLengthMM = roundMM(result.Metrics.TotalLengthMM + metrics.TotalLengthMM)
@@ -125,6 +130,8 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			result.Status = StatusBlocked
 		}
 	}
+	quality := BuildQualityReport(request, result)
+	result.Quality = &quality
 	return result
 }
 

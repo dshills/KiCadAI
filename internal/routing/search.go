@@ -10,12 +10,13 @@ import (
 )
 
 type GridPath struct {
-	Net         string         `json:"net"`
-	Layer       string         `json:"layer"`
-	LayerNames  map[int]string `json:"layer_names,omitempty"`
-	Coordinates []GridCoord    `json:"coordinates"`
-	Points      []Point        `json:"points"`
-	SearchNodes int            `json:"search_nodes"`
+	Net            string         `json:"net"`
+	Layer          string         `json:"layer"`
+	LayerNames     map[int]string `json:"layer_names,omitempty"`
+	Coordinates    []GridCoord    `json:"coordinates"`
+	Points         []Point        `json:"points"`
+	SearchNodes    int            `json:"search_nodes"`
+	SearchLimitHit bool           `json:"search_limit_hit,omitempty"`
 }
 
 type astarState struct {
@@ -75,19 +76,20 @@ func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
 	}
 	if !found {
-		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "no legal single-layer path found")}
+		return GridPath{Net: netName, SearchNodes: searchNodes, SearchLimitHit: searchNodes >= rules.MaxSearchNodes}, []reports.Issue{routeFailureIssue(netName, pair, "no legal single-layer path found")}
 	}
 	points := make([]Point, 0, len(path))
 	for _, coord := range path {
 		points = append(points, occupancy.Grid.ToPoint(coord))
 	}
 	return GridPath{
-		Net:         netName,
-		Layer:       normalizedLayer,
-		LayerNames:  map[int]string{layerIndex: normalizedLayer},
-		Coordinates: path,
-		Points:      points,
-		SearchNodes: searchNodes,
+		Net:            netName,
+		Layer:          normalizedLayer,
+		LayerNames:     map[int]string{layerIndex: normalizedLayer},
+		Coordinates:    path,
+		Points:         points,
+		SearchNodes:    searchNodes,
+		SearchLimitHit: searchNodes >= rules.MaxSearchNodes,
 	}, nil
 }
 
@@ -132,19 +134,20 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
 	}
 	if !found {
-		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "no legal two-layer path found")}
+		return GridPath{Net: netName, SearchNodes: searchNodes, SearchLimitHit: searchNodes >= rules.MaxSearchNodes}, []reports.Issue{routeFailureIssue(netName, pair, "no legal two-layer path found")}
 	}
 	points := make([]Point, 0, len(path))
 	for _, coord := range path {
 		points = append(points, occupancy.Grid.ToPoint(coord))
 	}
 	return GridPath{
-		Net:         netName,
-		Layer:       layerNames[path[0].Layer],
-		LayerNames:  layerNames,
-		Coordinates: path,
-		Points:      points,
-		SearchNodes: searchNodes,
+		Net:            netName,
+		Layer:          layerNames[path[0].Layer],
+		LayerNames:     layerNames,
+		Coordinates:    path,
+		Points:         points,
+		SearchNodes:    searchNodes,
+		SearchLimitHit: searchNodes >= rules.MaxSearchNodes,
 	}, nil
 }
 
