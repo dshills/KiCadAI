@@ -1087,7 +1087,9 @@ make test
 - Direct readers/writers model a growing but incomplete subset of KiCad
   schematic and PCB syntax.
 - The routing engine handles small deterministic grid-routing cases, not full
-  production autorouting.
+  production autorouting. It now reports route quality, rules, diagnostics, and
+  length/search-pressure evidence, but it is still not a KiCad push-and-shove or
+  dense-board router.
 - Imported-project mutation blocks unsupported raw content to avoid damaging
   user-authored KiCad features.
 - Operation feedback is strongest for transaction-derived issues. Generic KiCad

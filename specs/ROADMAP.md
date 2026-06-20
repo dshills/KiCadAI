@@ -339,6 +339,10 @@ Routing hardening foundation is implemented. The engine now includes:
 ### Acceptance Gates
 
 - Routed boards have no disconnected pads or unrouted required nets.
+- Route quality reports explain routed, failed, skipped, and weak nets with
+  per-net rule, length, layer, via, and search-pressure evidence.
+- Shared PCB rule resolution stays deterministic across routing, workflow
+  summaries, diagnostics, and future writer/DRC integrations.
 - DRC failures become structured, operation-correlated issues.
 - Route repair can replace generated route operations safely.
 
