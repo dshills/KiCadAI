@@ -133,6 +133,45 @@ func TestBuildOccupancyDoesNotBlockSameNetFixedCopper(t *testing.T) {
 	}
 }
 
+func TestBuildOccupancyZonePolicies(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 1
+	zone := ExistingCopper{
+		Kind:  CopperZone,
+		Net:   "GND",
+		Layer: "F.Cu",
+		Geometry: Shape{Rect: &Rect{
+			Min: Point{XMM: 8, YMM: 8},
+			Max: Point{XMM: 9, YMM: 9},
+		}},
+	}
+	request.Existing = []ExistingCopper{zone}
+
+	request.Strategy.TreatZonesAs = ZoneIgnore
+	ignored := mustBuildOccupancy(t, request, "SIG")
+	if ignored.BlockedCell(GridCoord{X: 8, Y: 8, Layer: 0}) {
+		t.Fatal("ignored zone should not block occupancy")
+	}
+
+	request.Strategy.TreatZonesAs = ZoneObstacle
+	blocked := mustBuildOccupancy(t, request, "SIG")
+	if !blocked.BlockedCell(GridCoord{X: 8, Y: 8, Layer: 0}) {
+		t.Fatal("zone obstacle should block occupancy")
+	}
+	if obstacle, ok := blocked.FirstObstacle(GridCoord{X: 8, Y: 8, Layer: 0}); !ok || obstacle.Kind != ObstacleZone {
+		t.Fatalf("zone obstacle = %#v ok=%v", obstacle, ok)
+	}
+
+	request.Strategy.TreatZonesAs = ZoneUnsupported
+	if _, err := BuildOccupancy(request, "SIG"); err == nil {
+		t.Fatal("unsupported zone policy should block")
+	}
+	request.Strategy.TreatZonesAs = ZoneSufficient
+	if _, err := BuildOccupancy(request, "SIG"); err == nil {
+		t.Fatal("zone sufficient policy should require proof evidence")
+	}
+}
+
 func TestBuildOccupancyIsLayerAware(t *testing.T) {
 	request := minimalRequest()
 	request.Rules.GridMM = 1

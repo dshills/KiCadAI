@@ -52,10 +52,24 @@ func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
 		occupancy.addShape(layerIndexes, obstacle.Layer, obstacle.Geometry, obstacle.Clearance+request.Rules.TraceWidthMM/2, obstacle)
 	}
 	for _, copper := range request.Existing {
+		if copper.Kind == CopperZone {
+			switch request.Strategy.TreatZonesAs {
+			case ZoneIgnore:
+				continue
+			case ZoneUnsupported, ZoneSufficient:
+				return Occupancy{}, fmt.Errorf("zone routing policy %q is not implemented by the router", request.Strategy.TreatZonesAs)
+			}
+		}
 		if copper.Net == currentNet {
 			continue
 		}
-		obstacle := Obstacle{Kind: ObstacleExistingCopper, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: request.Rules.ClearanceMM, Source: "existing_copper"}
+		kind := ObstacleExistingCopper
+		source := "existing_copper"
+		if copper.Kind == CopperZone {
+			kind = ObstacleZone
+			source = "zone"
+		}
+		obstacle := Obstacle{Kind: kind, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: request.Rules.ClearanceMM, Source: source}
 		occupancy.addShape(layerIndexes, copper.Layer, copper.Geometry, request.Rules.ClearanceMM+request.Rules.TraceWidthMM/2, obstacle)
 	}
 	for _, component := range request.Components {
