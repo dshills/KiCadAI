@@ -17,6 +17,10 @@ const (
 	RepairBoardBoundary RepairCategory = "board_boundary"
 	RepairExternalCheck RepairCategory = "external_check"
 	RepairInputModel    RepairCategory = "input_model"
+	RepairRoutingRules  RepairCategory = "routing_rules"
+	RepairZonePolicy    RepairCategory = "zone_policy"
+	RepairLengthPolicy  RepairCategory = "length_policy"
+	RepairViaPolicy     RepairCategory = "via_policy"
 	RepairUnknown       RepairCategory = "unknown"
 )
 
@@ -31,6 +35,10 @@ const (
 	ActionAddBoardOutline      RepairAction = "add_board_outline"
 	ActionRepairGeneratedFile  RepairAction = "repair_generated_file"
 	ActionRerunExternalCheck   RepairAction = "rerun_external_check"
+	ActionAdjustRoutingRules   RepairAction = "adjust_routing_rules"
+	ActionResolveZonePolicy    RepairAction = "resolve_zone_policy"
+	ActionRelaxLengthPolicy    RepairAction = "relax_length_policy"
+	ActionAdjustViaPolicy      RepairAction = "adjust_via_policy"
 	ActionInspectManually      RepairAction = "inspect_manually"
 )
 
@@ -84,10 +92,18 @@ func repairCategoryForIssue(issue reports.Issue) RepairCategory {
 	}
 	text := strings.ToLower(string(issue.Code) + " " + issue.Message + " " + issue.Suggestion)
 	switch {
+	case containsAnyText(text, "net class", "trace width", "clearance matrix", "manufacturing minimum"):
+		return RepairRoutingRules
+	case containsAnyText(text, "zone routing policy", "unsupported zone"):
+		return RepairZonePolicy
+	case containsAnyText(text, "route length exceeds"):
+		return RepairLengthPolicy
 	case containsAnyText(text, "clearance", "too close", "intersects obstacle", "keepout"):
 		return RepairClearance
 	case containsAnyText(text, "layer is not available", "routing layer", "back layer") || containsAllText(text, "via", "not allowed"):
 		return RepairLayerAccess
+	case containsAnyText(text, "via budget", "max vias", "too many vias"):
+		return RepairViaPolicy
 	case containsAnyText(text, "pad geometry", "pad layer", "access point", "two-layer routing access"):
 		return RepairPadAccess
 	case containsAnyText(text, "not connected", "unconnected", "no legal", "route does not connect"):
@@ -123,6 +139,14 @@ func repairActionForCategory(category RepairCategory) RepairAction {
 		return ActionRerunExternalCheck
 	case RepairInputModel:
 		return ActionRepairGeneratedFile
+	case RepairRoutingRules:
+		return ActionAdjustRoutingRules
+	case RepairZonePolicy:
+		return ActionResolveZonePolicy
+	case RepairLengthPolicy:
+		return ActionRelaxLengthPolicy
+	case RepairViaPolicy:
+		return ActionAdjustViaPolicy
 	default:
 		return ActionInspectManually
 	}
@@ -146,6 +170,14 @@ func suggestionForRoutingRepair(category RepairCategory) string {
 		return "Fix the KiCad CLI invocation or generated project files, then rerun validation."
 	case RepairInputModel:
 		return "Correct the routing request schema and required design inputs before routing."
+	case RepairRoutingRules:
+		return "Assign or adjust net classes, trace widths, clearances, and manufacturing limits."
+	case RepairZonePolicy:
+		return "Change zone routing policy, provide conservative zone evidence, or route without relying on zones."
+	case RepairLengthPolicy:
+		return "Move components closer, allow a shorter routing layer transition, or relax length constraints."
+	case RepairViaPolicy:
+		return "Allow vias, increase via budget, or change layer policy to avoid required transitions."
 	default:
 		return "Inspect the reported issue and update the design before rerunning routing."
 	}

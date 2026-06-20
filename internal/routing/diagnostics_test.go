@@ -32,6 +32,29 @@ func TestDiagnosticsForResultClassifiesRouteSearchFailure(t *testing.T) {
 	}
 }
 
+func TestDiagnosticForIssueClassifiesRoutingPolicyRepairs(t *testing.T) {
+	cases := []struct {
+		name     string
+		message  string
+		category RepairCategory
+		action   RepairAction
+	}{
+		{name: "rules", message: "power net has no explicit net class", category: RepairRoutingRules, action: ActionAdjustRoutingRules},
+		{name: "zone", message: "zone routing policy unsupported", category: RepairZonePolicy, action: ActionResolveZonePolicy},
+		{name: "length", message: "route length exceeds maximum", category: RepairLengthPolicy, action: ActionRelaxLengthPolicy},
+		{name: "via", message: "max vias exceeded", category: RepairViaPolicy, action: ActionAdjustViaPolicy},
+		{name: "keepout_zone", message: "clearance violation near keepout zone", category: RepairClearance, action: ActionReduceClearance},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			diagnostic := DiagnosticForIssue(reports.Issue{Message: tc.message})
+			if diagnostic.Category != tc.category || diagnostic.Action != tc.action {
+				t.Fatalf("diagnostic = %#v", diagnostic)
+			}
+		})
+	}
+}
+
 func TestDiagnosticForIssueClassifiesLayerAccess(t *testing.T) {
 	diagnostic := DiagnosticForIssue(reports.Issue{
 		Code:     reports.CodeValidationFailed,
