@@ -178,6 +178,18 @@ func TestResolveNetRuleFromSetUsesOverrideWithoutRebuildingRequest(t *testing.T)
 	}
 }
 
+func TestValidateRejectsInvalidDifferentialPairMetadata(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.DifferentialPairs = []pcbrules.CoupledNetGroup{{
+		ID:      "USB",
+		Mode:    pcbrules.DifferentialPairMode,
+		Members: []string{"USB_P"},
+	}}
+	NormalizeRequest(&request)
+	issues := Validate(&request)
+	assertIssuePath(t, issues, "rules.differential_pairs[0].members")
+}
+
 func minimalRequest() Request {
 	return Request{
 		Board: Board{

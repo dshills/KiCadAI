@@ -79,6 +79,18 @@ func TestValidateRejectsDifferentialPairMemberCount(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsDuplicateCoupledMembership(t *testing.T) {
+	issues := Validate(RuleSet{
+		DifferentialPairs: []CoupledNetGroup{
+			{ID: "A", Mode: DifferentialPairMode, Members: []string{"P1", "N1"}},
+			{ID: "B", Mode: DifferentialPairMode, Members: []string{"P1", "N2"}},
+		},
+	})
+	if !hasIssuePath(issues, "differential_pairs[1].members") {
+		t.Fatalf("expected duplicate membership issue, got %#v", issues)
+	}
+}
+
 func TestResolveRejectsNeckdownBelowManufacturingMinimum(t *testing.T) {
 	got, issues := Resolve(RuleSet{
 		TraceWidthMM:       floatPtr(0.25),

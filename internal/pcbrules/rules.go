@@ -293,10 +293,21 @@ func Validate(set RuleSet) []Issue {
 			issues = append(issues, Issue{Path: "clearance_matrix[" + key + "]", Message: "clearance matrix clearance cannot be negative", Blocking: true})
 		}
 	}
+	coupledMembers := map[string]string{}
 	for index, group := range set.DifferentialPairs {
 		path := fmt.Sprintf("differential_pairs[%d]", index)
 		if strings.TrimSpace(group.ID) == "" {
 			issues = append(issues, Issue{Path: path + ".id", Message: "coupled net group id is required", Blocking: true})
+		}
+		for _, member := range group.Members {
+			member = strings.TrimSpace(member)
+			if member == "" {
+				continue
+			}
+			if existing := coupledMembers[member]; existing != "" && existing != group.ID {
+				issues = append(issues, Issue{Path: path + ".members", Message: "net belongs to multiple coupled net groups", Blocking: true})
+			}
+			coupledMembers[member] = group.ID
 		}
 		switch strings.TrimSpace(group.Mode) {
 		case "", DifferentialPairMode:

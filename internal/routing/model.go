@@ -370,6 +370,7 @@ type NetQualityReport struct {
 	NetName         string      `json:"net_name"`
 	Role            NetRole     `json:"role,omitempty"`
 	Class           string      `json:"class,omitempty"`
+	CoupledGroupID  string      `json:"coupled_group_id,omitempty"`
 	EndpointCount   int         `json:"endpoint_count"`
 	RoutedEndpoints int         `json:"routed_endpoint_count"`
 	Status          RouteStatus `json:"status"`

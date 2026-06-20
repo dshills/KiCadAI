@@ -15,6 +15,15 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	for _, route := range result.Routes {
 		routeByNet[route.Net] = route
 	}
+	var coupledGroupByNet map[string]string
+	if len(request.Rules.DifferentialPairs) != 0 {
+		coupledGroupByNet = make(map[string]string, len(request.Rules.DifferentialPairs)*2)
+		for _, group := range request.Rules.DifferentialPairs {
+			for _, member := range group.Members {
+				coupledGroupByNet[member] = group.ID
+			}
+		}
+	}
 	netNames := make([]string, 0, len(netByName))
 	for name := range netByName {
 		netNames = append(netNames, name)
@@ -29,6 +38,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 				NetName:         netName,
 				Role:            net.Role,
 				Class:           net.Class,
+				CoupledGroupID:  coupledGroupByNet[netName],
 				EndpointCount:   len(net.Endpoints),
 				Status:          RouteStatusSkipped,
 				FailureCategory: "skipped",
@@ -40,6 +50,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 			NetName:         netName,
 			Role:            net.Role,
 			Class:           net.Class,
+			CoupledGroupID:  coupledGroupByNet[netName],
 			EndpointCount:   len(net.Endpoints),
 			Status:          route.Status,
 			SegmentCount:    len(route.Segments),

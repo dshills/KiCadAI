@@ -1,9 +1,18 @@
 package routing
 
-import "testing"
+import (
+	"testing"
+
+	"kicadai/internal/pcbrules"
+)
 
 func TestBuildQualityReportForRoutedNet(t *testing.T) {
 	request := singleLayerSearchRequest()
+	request.Rules.DifferentialPairs = []pcbrules.CoupledNetGroup{{
+		ID:      "PAIR1",
+		Mode:    pcbrules.DifferentialPairMode,
+		Members: []string{"SIG", "SIG_N"},
+	}}
 	result := RouteRequest(request)
 	if result.Quality == nil {
 		t.Fatalf("expected quality report")
@@ -17,6 +26,9 @@ func TestBuildQualityReportForRoutedNet(t *testing.T) {
 	net := result.Quality.NetReports[0]
 	if net.Status != RouteStatusRouted {
 		t.Fatalf("net status = %s", net.Status)
+	}
+	if net.CoupledGroupID != "PAIR1" {
+		t.Fatalf("coupled group = %q", net.CoupledGroupID)
 	}
 	if net.EndpointCount != 2 || net.RoutedEndpoints != 2 {
 		t.Fatalf("endpoint counts = %d/%d", net.RoutedEndpoints, net.EndpointCount)
