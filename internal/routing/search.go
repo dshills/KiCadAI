@@ -110,8 +110,11 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 		}}
 	}
 	routable := routableLayerNames(layers)
+	if len(rules.AllowedLayers) != 0 {
+		routable = filterAllowedLayers(routable, rules.AllowedLayers)
+	}
 	if rules.AllowBackLayer != nil && !*rules.AllowBackLayer {
-		routable = []string{normalizeLayer(rules.PreferLayer)}
+		routable = filterAllowedLayers(routable, []string{rules.PreferLayer})
 	}
 	layerNames := map[int]string{}
 	layerIDs := []int{}
@@ -459,6 +462,20 @@ func normalizedSearchRules(rules Rules) Rules {
 		rules.ViaDrillMM = defaults.ViaDrillMM
 	}
 	return rules
+}
+
+func filterAllowedLayers(routable []string, allowed []string) []string {
+	allowedSet := map[string]struct{}{}
+	for _, layer := range allowed {
+		allowedSet[normalizeLayer(layer)] = struct{}{}
+	}
+	filtered := make([]string, 0, len(routable))
+	for _, layer := range routable {
+		if _, ok := allowedSet[normalizeLayer(layer)]; ok {
+			filtered = append(filtered, layer)
+		}
+	}
+	return filtered
 }
 
 func (queue astarQueue) Len() int {

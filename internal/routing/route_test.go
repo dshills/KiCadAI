@@ -84,6 +84,49 @@ func TestRouteRequestPartialWhenAllowed(t *testing.T) {
 	}
 }
 
+func TestRouteRequestAppliesNetClassTraceAndViaRules(t *testing.T) {
+	request := twoLayerViaRequest()
+	request.Rules.NetClasses = map[string]NetClass{
+		"WIDE": {
+			TraceWidthMM:  0.45,
+			ViaDiameterMM: 0.8,
+			ViaDrillMM:    0.35,
+			MaxViasPerNet: 1,
+		},
+	}
+	request.Nets[0].Class = "WIDE"
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted {
+		t.Fatalf("status = %s issues=%#v", result.Status, result.Issues)
+	}
+	if len(result.Routes) != 1 || len(result.Routes[0].Segments) == 0 || len(result.Routes[0].Vias) == 0 {
+		t.Fatalf("expected routed segments and via: %#v", result.Routes)
+	}
+	if result.Routes[0].Segments[0].WidthMM != 0.45 {
+		t.Fatalf("segment width = %v, want net class width", result.Routes[0].Segments[0].WidthMM)
+	}
+	if result.Routes[0].Vias[0].DiameterMM != 0.8 || result.Routes[0].Vias[0].DrillMM != 0.35 {
+		t.Fatalf("via geometry = %#v", result.Routes[0].Vias[0])
+	}
+}
+
+func TestRouteRequestAllowedLayersCanBlockRoute(t *testing.T) {
+	request := twoLayerViaRequest()
+	request.Rules.NetClasses = map[string]NetClass{
+		"TOP_ONLY": {AllowedLayers: []string{"F.Cu"}},
+	}
+	request.Nets[0].Class = "TOP_ONLY"
+
+	result := RouteRequest(request)
+	if result.Status != StatusBlocked {
+		t.Fatalf("status = %s, want blocked", result.Status)
+	}
+	if result.Quality == nil || result.Quality.NetReports[0].Status != RouteStatusFailed {
+		t.Fatalf("expected failed quality report: %#v", result.Quality)
+	}
+}
+
 func TestExistingCopperForSegmentsIncludesTraceWidth(t *testing.T) {
 	existing := existingCopperForSegments([]Segment{{
 		Net:     "SIG",

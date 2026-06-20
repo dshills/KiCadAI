@@ -4,6 +4,7 @@ import (
 	"context"
 	"math"
 
+	"kicadai/internal/pcbrules"
 	"kicadai/internal/reports"
 )
 
@@ -36,6 +37,8 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		result.Issues = issues
 		return result
 	}
+	ruleSet := toPCBRules(request.Rules, request.Strategy)
+	ruleResolver := pcbrules.NewResolver(ruleSet)
 	result.Metrics.NetCount = len(plans)
 	failed := false
 	for _, plan := range plans {
@@ -45,20 +48,45 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			return result
 		}
 		route := Route{Net: plan.Net.Name, Status: RouteStatusRouted}
-		netFailed := false
-		occupancy, err := BuildOccupancy(request, plan.Net.Name)
-		if err != nil {
-			if issue, ok := reports.IssueFromError(err); ok {
-				route.Issues = append(route.Issues, issue)
-			} else {
-				route.Issues = append(route.Issues, reports.Issue{
-					Code:     reports.CodeValidationFailed,
-					Severity: reports.SeverityBlocked,
-					Message:  err.Error(),
-					Nets:     []string{plan.Net.Name},
-				})
+		netRequest := request
+		effectiveRule, ruleIssues := ResolveNetRuleWithResolver(ruleResolver, plan.Net)
+		if len(ruleIssues) != 0 {
+			route.Issues = append(route.Issues, ruleIssues...)
+		}
+		netFailed := hasBlockingIssue(ruleIssues)
+		if netFailed {
+			route.Status = RouteStatusFailed
+		}
+		netRequest.Rules = applyEffectiveRule(request.Rules, effectiveRule)
+		if plan.Net.Class == "" && (plan.Net.Role == NetPower || plan.Net.Role == NetGround || plan.Net.Role == NetHighCurrent) {
+			route.Issues = append(route.Issues, reports.Issue{
+				Code:       reports.CodeValidationFailed,
+				Severity:   reports.SeverityWarning,
+				Path:       "nets." + plan.Net.Name + ".class",
+				Message:    "power or high-current net has no explicit net class",
+				Nets:       []string{plan.Net.Name},
+				Suggestion: "assign a net class with explicit trace, via, and clearance rules",
+			})
+		}
+		var occupancy Occupancy
+		if !netFailed {
+			var err error
+			occupancy, err = BuildOccupancy(netRequest, plan.Net.Name)
+			if err != nil {
+				if issue, ok := reports.IssueFromError(err); ok {
+					route.Issues = append(route.Issues, issue)
+				} else {
+					route.Issues = append(route.Issues, reports.Issue{
+						Code:     reports.CodeValidationFailed,
+						Severity: reports.SeverityBlocked,
+						Message:  err.Error(),
+						Nets:     []string{plan.Net.Name},
+					})
+				}
+				netFailed = true
+				failed = true
 			}
-			netFailed = true
+		} else {
 			failed = true
 		}
 		for pairIndex, pair := range plan.Pairs {
@@ -72,7 +100,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if netFailed {
 				break
 			}
-			path, routeIssues := routePairPath(ctx, request, access, occupancy, plan.Net.Name, pair)
+			path, routeIssues := routePairPath(ctx, netRequest, access, occupancy, plan.Net.Name, pair)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
@@ -85,8 +113,8 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				failed = true
 				break
 			}
-			segments, metrics := BuildSegmentsFromPath(path, request.Rules.TraceWidthMM)
-			vias := BuildViasFromPath(path, request.Rules)
+			segments, metrics := BuildSegmentsFromPath(path, netRequest.Rules.TraceWidthMM)
+			vias := BuildViasFromPath(path, netRequest.Rules)
 			route.Segments = append(route.Segments, segments...)
 			route.Vias = append(route.Vias, vias...)
 			result.Metrics.SegmentCount += len(segments)
@@ -102,6 +130,8 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if !request.Strategy.AllowPartial {
 				result.Status = StatusBlocked
 				result.Issues = append(issues, collectRouteIssues(result.Routes)...)
+				quality := BuildQualityReport(request, result)
+				result.Quality = &quality
 				return result
 			}
 			continue
@@ -158,6 +188,34 @@ func routePairPath(ctx context.Context, request Request, access PadAccess, occup
 		return routeSingleLayerPath(ctx, request, access, occupancy, netName, pair, request.Rules.PreferLayer)
 	}
 	return routeTwoLayerPath(ctx, request, access, occupancy, netName, pair)
+}
+
+func applyEffectiveRule(rules Rules, effective pcbrules.EffectiveRule) Rules {
+	if effective.TraceWidthMM > 0 {
+		rules.TraceWidthMM = effective.TraceWidthMM
+	}
+	if effective.ClearanceMM > 0 {
+		rules.ClearanceMM = effective.ClearanceMM
+	}
+	if effective.ViaDiameterMM > 0 {
+		rules.ViaDiameterMM = effective.ViaDiameterMM
+	}
+	if effective.ViaDrillMM > 0 {
+		rules.ViaDrillMM = effective.ViaDrillMM
+	}
+	if effective.ViaClearanceMM > 0 {
+		rules.ViaClearanceMM = effective.ViaClearanceMM
+	}
+	if effective.MaxViasPerNet > 0 {
+		rules.MaxViasPerNet = effective.MaxViasPerNet
+	}
+	if effective.PreferLayer != "" {
+		rules.PreferLayer = effective.PreferLayer
+	}
+	if len(effective.AllowedLayers) != 0 {
+		rules.AllowedLayers = append([]string(nil), effective.AllowedLayers...)
+	}
+	return rules
 }
 
 func hasBlockingIssue(issues []reports.Issue) bool {
