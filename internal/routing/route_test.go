@@ -127,6 +127,39 @@ func TestRouteRequestAllowedLayersCanBlockRoute(t *testing.T) {
 	}
 }
 
+func TestRouteRequestLengthWarningDoesNotFailRoute(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.NetOverrides = map[string]NetRule{
+		"SIG": {WarningLengthMM: 1},
+	}
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted {
+		t.Fatalf("status = %s issues=%#v", result.Status, result.Issues)
+	}
+	if len(result.Routes[0].Issues) == 0 {
+		t.Fatalf("expected length warning")
+	}
+	if result.Routes[0].Status != RouteStatusRouted {
+		t.Fatalf("route status = %s", result.Routes[0].Status)
+	}
+}
+
+func TestRouteRequestMaxLengthFailsRoute(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.NetOverrides = map[string]NetRule{
+		"SIG": {MaxLengthMM: 1},
+	}
+
+	result := RouteRequest(request)
+	if result.Status != StatusBlocked {
+		t.Fatalf("status = %s, want blocked", result.Status)
+	}
+	if result.Routes[0].Status != RouteStatusFailed {
+		t.Fatalf("route status = %s", result.Routes[0].Status)
+	}
+}
+
 func TestExistingCopperForSegmentsIncludesTraceWidth(t *testing.T) {
 	existing := existingCopperForSegments([]Segment{{
 		Net:     "SIG",

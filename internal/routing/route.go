@@ -123,7 +123,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			request.Existing = append(request.Existing, existingCopperForSegments(segments)...)
 			request.Existing = append(request.Existing, existingCopperForVias(vias)...)
 		}
-		if netFailed || len(route.Issues) != 0 {
+		if netFailed || hasBlockingIssue(route.Issues) {
 			route.Status = RouteStatusFailed
 			result.Metrics.FailedNetCount++
 			result.Routes = append(result.Routes, route)
@@ -134,6 +134,21 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				result.Quality = &quality
 				return result
 			}
+			continue
+		}
+		route.Issues = append(route.Issues, lengthPolicyIssues(plan.Net.Name, effectiveRule, route)...)
+		if hasBlockingIssue(route.Issues) {
+			route.Status = RouteStatusFailed
+			result.Metrics.FailedNetCount++
+			result.Routes = append(result.Routes, route)
+			if !request.Strategy.AllowPartial {
+				result.Status = StatusBlocked
+				result.Issues = append(issues, collectRouteIssues(result.Routes)...)
+				quality := BuildQualityReport(request, result)
+				result.Quality = &quality
+				return result
+			}
+			failed = true
 			continue
 		}
 		result.Metrics.RoutedNetCount++
@@ -216,6 +231,35 @@ func applyEffectiveRule(rules Rules, effective pcbrules.EffectiveRule) Rules {
 		rules.AllowedLayers = append([]string(nil), effective.AllowedLayers...)
 	}
 	return rules
+}
+
+func lengthPolicyIssues(netName string, effective pcbrules.EffectiveRule, route Route) []reports.Issue {
+	length := routeLength(route)
+	if length <= 0 {
+		return nil
+	}
+	issues := []reports.Issue{}
+	if effective.MaxLengthMM > 0 && length > effective.MaxLengthMM {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityBlocked,
+			Path:       "nets." + netName + ".max_length_mm",
+			Message:    "route length exceeds maximum",
+			Nets:       []string{netName},
+			Suggestion: "move components closer, allow a shorter layer transition, or increase max length",
+		})
+	}
+	if effective.WarningLengthMM > 0 && length > effective.WarningLengthMM {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityWarning,
+			Path:       "nets." + netName + ".warning_length_mm",
+			Message:    "route length exceeds warning threshold",
+			Nets:       []string{netName},
+			Suggestion: "review placement or route policy for a shorter path",
+		})
+	}
+	return issues
 }
 
 func hasBlockingIssue(issues []reports.Issue) bool {
