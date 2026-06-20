@@ -42,6 +42,25 @@ func TestRouteTwoLayerPathBackLayerDisabled(t *testing.T) {
 	}
 }
 
+func TestRouteTwoLayerPathBackLayerDisabledAndPreferredLayerDisallowed(t *testing.T) {
+	request := twoLayerViaRequest()
+	disabled := false
+	request.Rules.AllowBackLayer = &disabled
+	request.Rules.PreferLayer = "B.Cu"
+	request.Rules.AllowedLayers = []string{"F.Cu"}
+
+	result := RouteRequest(request)
+	if result.Status != StatusBlocked {
+		t.Fatalf("status = %s, want blocked", result.Status)
+	}
+	if len(result.Routes) == 0 || len(result.Routes[0].Issues) == 0 {
+		t.Fatalf("expected route issue: %#v", result)
+	}
+	if got := result.Routes[0].Issues[0].Message; got != "no valid routing layer is available with back layer disabled" {
+		t.Fatalf("message = %q", got)
+	}
+}
+
 func TestBuildViasFromPathDeduplicatesLayerTransitions(t *testing.T) {
 	path := GridPath{
 		Net:        "SIG",

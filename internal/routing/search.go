@@ -124,6 +124,13 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 	}
 	if rules.AllowBackLayer != nil && !*rules.AllowBackLayer {
 		routable = filterAllowedLayers(routable, []string{rules.PreferLayer})
+		if len(routable) == 0 {
+			return GridPath{}, []reports.Issue{routeFailureIssue(
+				netName,
+				pair,
+				"no valid routing layer is available with back layer disabled",
+			)}
+		}
 	}
 	layerNames := map[int]string{}
 	layerIDs := []int{}
