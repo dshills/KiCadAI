@@ -53,9 +53,11 @@ from validation feedback to safe automatic repair.
 - Placement engine hardening foundation with deterministic model support,
   block-derived placement intent, proximity/region/mechanical/routing-readiness
   quality reports, repairable diagnostics, and golden corpus coverage.
-- Routing engine foundation for small generated PCB nets.
-- Routing engine hardening has a detailed spec and phased implementation plan
-  in `specs/routing-engine-hardening/`.
+- Routing engine hardening foundation with shared `internal/pcbrules`,
+  per-net quality reports, net-class and role-aware routing, obstacle
+  diagnostics, via/layer policy diagnostics, length policy evidence, explicit
+  zone policy behavior, coupled-net intent reporting, workflow integration, and
+  golden corpus coverage.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -300,33 +302,39 @@ Route generated boards in ways that are electrically meaningful and DRC-aware.
 
 ### Current Foundation
 
-Routing request/result models, small-net routing, validation, and transaction
-emission exist. A routing hardening spec and implementation plan now define the
-next work around shared PCB rules, route quality reports, net-class policies,
-clearance matrices, neckdowns, via policy, conservative zone evidence, repair
-diagnostics, workflow integration, and a golden routing corpus.
+Routing hardening foundation is implemented. The engine now includes:
+
+- shared `internal/pcbrules` rule resolution for net classes, role defaults,
+  trace/via/layer policy, clearance matrix metadata, neckdown metadata, length
+  limits, zone policy, and coupled-net intent;
+- per-net route quality reports with status, endpoint counts, segment/via
+  counts, length, layers, search nodes, failure categories, repair suggestions,
+  and coupled group IDs;
+- net class and role-aware routing for trace width, via geometry, via limits,
+  preferred layer, and allowed layer policy;
+- obstacle diagnostics that report nearby blocker kind/source where available;
+- explicit zone handling for ignore, obstacle, unsupported, and conservative
+  zone-sufficient blockers;
+- length warning/failure policy and search-pressure quality scoring;
+- repairable routing diagnostics for rules, zones, length policy, via policy,
+  layer access, clearance, connectivity, and external checks;
+- design workflow routing summaries with quality score, route report counts,
+  and repair diagnostic counts;
+- golden route corpus coverage for straight routes, keepout detours, via
+  routes, length-policy blockers, and zone-policy blockers.
 
 ### Remaining Work
 
-- Implement the shared `internal/pcbrules` model for net classes, trace/via
-  rules, layer policy, clearance matrices, neckdowns, zone policy, and length
-  policy.
-- Add route quality reports with per-net completion, length, via, layer,
-  search-pressure, clearance, and failure evidence.
-- Apply net class and role-aware routing rules during route search and
+- Enforce full class-to-class clearance matrix behavior during occupancy and
   validation.
-- Improve obstacle and clearance diagnostics around pads, same-net and
-  other-net copper, keepouts, zones, and board edges.
-- Harden two-layer routing with explicit via limits, allowed-layer policy,
-  through-hole same-net layer transitions, and unsupported blind/buried via
-  diagnostics.
-- Add length scoring, differential/coupled-net intent validation, and honest
-  unsupported-feature reporting.
-- Integrate repairable routing diagnostics into `design create` and repair
-  planning.
-- Add a golden routing corpus with route-shape/topology summaries.
-- Keep zone-sufficient behavior conservative and opt-in until proof evidence is
-  strong enough to avoid false connectivity.
+- Implement DRC-grade neckdown geometry around constrained pads.
+- Add true same-net through-hole zero-cost layer transitions rather than only
+  conventional generated vias.
+- Add conservative zone-sufficient proof evidence before allowing zones to
+  satisfy route segments.
+- Broaden golden routing cases to more full circuit block boards and KiCad DRC
+  evidence.
+- Add iterative route/placement retry loops with strict convergence limits.
 
 ### Acceptance Gates
 
@@ -449,16 +457,15 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Implement `specs/routing-engine-hardening/PLAN.md` phase by phase.
-2. Add true placement congestion/fanout scoring and iterative placement retry
+1. Add true placement congestion/fanout scoring and iterative placement retry
    from the new repairable diagnostics.
-3. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
+2. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
    and generated repair bundles.
-4. Add a dedicated repair bundle export command for non-`design create` flows.
-5. Add fabrication export/readiness gates.
-6. Expand verified component and block coverage alongside each new block
+3. Add a dedicated repair bundle export command for non-`design create` flows.
+4. Add fabrication export/readiness gates.
+5. Expand verified component and block coverage alongside each new block
    family.
-7. Add intent-level planning only after the above gates are reliable.
+6. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
 
