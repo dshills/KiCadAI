@@ -168,6 +168,23 @@ func TestDiagnosticsForQualityReportsKeepoutViolation(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsForQualityReportsFanoutPressure(t *testing.T) {
+	req := fanoutRequest("U1", 20)
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 1.5, YMM: 1.5})},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnosticByAction(quality.Diagnostics, PlacementActionImproveFanout)
+	if got == nil || got.Category != PlacementDiagnosticFanout || got.Severity != reports.SeverityError {
+		t.Fatalf("fanout diagnostic = %#v", got)
+	}
+	if len(got.Refs) != 1 || got.Refs[0] != "U1" {
+		t.Fatalf("fanout diagnostic refs = %#v", got.Refs)
+	}
+}
+
 func findPlacementDiagnostic(diagnostics []PlacementDiagnostic, category PlacementDiagnosticCategory) *PlacementDiagnostic {
 	for i := range diagnostics {
 		if diagnostics[i].Category == category {

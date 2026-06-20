@@ -2,6 +2,7 @@ package placement
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 )
 
@@ -251,6 +252,82 @@ func TestSampleCongestionPointsHandlesLimitOne(t *testing.T) {
 	sampled := sampleCongestionPoints(points, 1)
 	if len(sampled) != 1 || sampled[0].ref != "R1" {
 		t.Fatalf("sampled = %#v, want first point only", sampled)
+	}
+}
+
+func TestQualityReportFanoutAllowsConnectorNearEdge(t *testing.T) {
+	req := fanoutRequest("J1", 12)
+	req.Components[0].Role = string(IntentConnector)
+	req.Components[0].Edge = EdgeLeft
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 1.5, YMM: 20})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	report := findFanoutReport(quality.FanoutReports, "J1")
+	if report == nil || report.Status != "pass" || report.ConnectedPadCount != 12 {
+		t.Fatalf("connector fanout report = %#v", report)
+	}
+}
+
+func TestQualityReportFanoutFailsDenseComponentWithPoorEscape(t *testing.T) {
+	req := fanoutRequest("U1", 20)
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 1.5, YMM: 1.5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	report := findFanoutReport(quality.FanoutReports, "U1")
+	if report == nil || report.Status != "fail" || report.SuggestedAction == "" {
+		t.Fatalf("dense fanout report = %#v", report)
+	}
+	var foundScore bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "fanout" {
+			foundScore = true
+			if dimension.Status != "fail" || dimension.Score != 0 {
+				t.Fatalf("fanout score = %#v, want failing zero score", dimension)
+			}
+		}
+	}
+	if !foundScore {
+		t.Fatalf("missing fanout score: %#v", quality.Score)
+	}
+}
+
+func TestQualityReportFanoutWarnsForKeepoutPressure(t *testing.T) {
+	req := fanoutRequest("U1", 10)
+	req.Keepouts = []Keepout{{ID: "mount", Bounds: Rect{Min: Point{XMM: 12, YMM: 10}, Max: Point{XMM: 18, YMM: 18}}}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 10, YMM: 12})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	report := findFanoutReport(quality.FanoutReports, "U1")
+	if report == nil || report.Status != "warning" || report.KeepoutPressure == 0 {
+		t.Fatalf("keepout fanout report = %#v", report)
+	}
+}
+
+func TestQualityReportFanoutReportsAreSorted(t *testing.T) {
+	req := fanoutRequest("U2", 8)
+	second := fanoutComponent("U1", 8)
+	req.Components = append(req.Components, second)
+	req.Nets = append(req.Nets, fanoutNets("U1", 8)...)
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 20, YMM: 20}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 30, YMM: 20}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.FanoutReports) != 2 || quality.FanoutReports[0].Ref != "U1" || quality.FanoutReports[1].Ref != "U2" {
+		t.Fatalf("fanout reports not sorted: %#v", quality.FanoutReports)
 	}
 }
 
@@ -509,6 +586,50 @@ func TestQualityReportMissingProximityTargetMarshalsJSON(t *testing.T) {
 	if _, err := json.Marshal(quality); err != nil {
 		t.Fatalf("quality report should marshal without infinities: %v", err)
 	}
+}
+
+func fanoutRequest(ref string, count int) Request {
+	return Request{
+		Board: BoardPlacementArea{WidthMM: 50, HeightMM: 40},
+		Components: []Component{
+			fanoutComponent(ref, count),
+		},
+		Nets: fanoutNets(ref, count),
+		Rules: Rules{
+			ComponentSpacingMM: 2,
+		},
+	}
+}
+
+func fanoutComponent(ref string, count int) Component {
+	pads := make([]PadSummary, 0, count)
+	for index := 1; index <= count; index++ {
+		pads = append(pads, PadSummary{Name: fmt.Sprintf("%d", index)})
+	}
+	return Component{
+		Ref:         ref,
+		FootprintID: "Test:Dense",
+		Bounds:      Bounds{WidthMM: 3, HeightMM: 3, AnchorOffset: Point{XMM: 1.5, YMM: 1.5}, Source: BoundsExplicit},
+		Pads:        pads,
+	}
+}
+
+func fanoutNets(ref string, count int) []Net {
+	nets := make([]Net, 0, count)
+	for index := 1; index <= count; index++ {
+		pin := fmt.Sprintf("%d", index)
+		nets = append(nets, Net{Name: "N" + pin, Endpoints: []Endpoint{{Ref: ref, Pin: pin}}})
+	}
+	return nets
+}
+
+func findFanoutReport(reports []FanoutReport, ref string) *FanoutReport {
+	for index := range reports {
+		if reports[index].Ref == ref {
+			return &reports[index]
+		}
+	}
+	return nil
 }
 
 func mustPlacementResultForTest(t *testing.T, component Component, position Placement) PlacementResult {

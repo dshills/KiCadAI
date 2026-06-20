@@ -17,9 +17,17 @@ const (
 	scoreWeightRegion        = 1.0
 	scoreWeightRouting       = 1.0
 	scoreWeightCongestion    = 1.0
+	scoreWeightFanout        = 1.0
 
 	routingReadinessThresholdMultiplier = 0.75
 	routingReadinessWarningCredit       = 0.5
+	fanoutWarningConnectedPads          = 8
+	fanoutFailConnectedPads             = 16
+	fanoutClearanceRuleMultiplier       = 2.0
+	fanoutWarningPressure               = 1.0
+	fanoutFailPressure                  = 2.0
+	fanoutWarningEscapeDemand           = 1.0
+	fanoutFailEscapeDemand              = 1.5
 	congestionMaxGridCellsPerAxis       = 200
 	congestionMinCellMM                 = 2.5
 	congestionMaxEndpointsPerNet        = 128
@@ -49,6 +57,7 @@ type QualityReport struct {
 	RegionReports             []RegionReport        `json:"region_reports,omitempty"`
 	NetReports                []NetQualityReport    `json:"net_reports,omitempty"`
 	CongestionReports         []CongestionReport    `json:"congestion_reports,omitempty"`
+	FanoutReports             []FanoutReport        `json:"fanout_reports,omitempty"`
 	KeepoutReports            []KeepoutReport       `json:"keepout_reports,omitempty"`
 	Score                     ScoreReport           `json:"score,omitempty"`
 	EdgeConstraintCount       int                   `json:"edge_constraint_count"`
@@ -74,6 +83,21 @@ type CongestionReport struct {
 	Status            string  `json:"status"`
 	Evidence          string  `json:"evidence"`
 	SuggestedAction   string  `json:"suggested_action,omitempty"`
+}
+
+type FanoutReport struct {
+	Ref               string   `json:"ref"`
+	PadCount          int      `json:"pad_count"`
+	ConnectedPadCount int      `json:"connected_pad_count"`
+	LocalNetCount     int      `json:"local_net_count"`
+	AvailableSides    []string `json:"available_sides,omitempty"`
+	EdgePressure      float64  `json:"edge_pressure"`
+	KeepoutPressure   float64  `json:"keepout_pressure"`
+	NeighborPressure  float64  `json:"neighbor_pressure"`
+	EscapeDemand      float64  `json:"escape_demand"`
+	Status            string   `json:"status"`
+	Evidence          string   `json:"evidence"`
+	SuggestedAction   string   `json:"suggested_action,omitempty"`
 }
 
 type ProximityReport struct {
@@ -186,6 +210,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	report.RegionReports = regionReports(request, placementsByRef)
 	report.NetReports = netQualityReports(request, placementsByRef)
 	report.CongestionReports = congestionReports(request, placementsByRef)
+	report.FanoutReports = fanoutReports(request, placementsByRef)
 	report.KeepoutReports = keepoutReports
 	report.Score = placementScoreReport(report)
 	sort.Strings(report.EstimatedBoundsRefs)
@@ -552,6 +577,10 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		congestionScore, congestionStatus := congestionScore(report.CongestionReports)
 		add(ScoreDimension{Name: "congestion", Score: congestionScore, Weight: scoreWeightCongestion, Status: congestionStatus, Message: "coarse placement congestion estimate"})
 	}
+	if len(report.FanoutReports) > 0 {
+		fanoutScore, fanoutStatus := fanoutScore(report.FanoutReports)
+		add(ScoreDimension{Name: "fanout", Score: fanoutScore, Weight: scoreWeightFanout, Status: fanoutStatus, Message: "component escape readiness estimate"})
+	}
 	proximityScore := 1.0
 	proximityStatus := "pass"
 	for _, proximity := range report.ProximityReports {
@@ -568,6 +597,280 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		add(ScoreDimension{Name: "proximity", Score: proximityScore, Weight: scoreWeightProximity, Status: proximityStatus, Message: "electrical proximity rule satisfaction"})
 	}
 	return score
+}
+
+func fanoutReports(request Request, placementsByRef map[string]PlacementResult) []FanoutReport {
+	if len(request.Components) == 0 || request.Board.WidthMM <= 0 || request.Board.HeightMM <= 0 {
+		return nil
+	}
+	connectedPinsByRef, localNetsByRef := fanoutConnectivity(request.Nets)
+	componentsByRef := componentsByNormalizedRef(request.Components)
+	clearance := max(0.5, request.Rules.ComponentSpacingMM*fanoutClearanceRuleMultiplier)
+	neighborPressureByRef := fanoutNeighborPressures(request.Board, placementsByRef, clearance)
+	reports := make([]FanoutReport, 0, len(placementsByRef))
+	for ref, placement := range placementsByRef {
+		component, ok := componentsByRef[ref]
+		if !ok {
+			continue
+		}
+		padCount := len(component.Pads)
+		connectedPadCount := len(connectedPinsByRef[ref])
+		if padCount == 0 {
+			padCount = connectedPadCount
+		}
+		localNetCount := len(localNetsByRef[ref])
+		if connectedPadCount == 0 && localNetCount == 0 {
+			continue
+		}
+		availableSides := fanoutAvailableSides(request.Board, request.Keepouts, placement, clearance)
+		edgePressure := fanoutEdgePressure(request.Board, placement.Bounds, clearance)
+		keepoutPressure := fanoutKeepoutPressure(request.Keepouts, placement, clearance)
+		neighborPressure := neighborPressureByRef[ref]
+		perimeter := max(0.1, 2*(placement.Bounds.WidthMM()+placement.Bounds.HeightMM()))
+		escapeDemand := float64(max(connectedPadCount, localNetCount)) / perimeter
+		status := scoreStatusPass
+		action := ""
+		pressure := edgePressure + keepoutPressure + neighborPressure
+		if connectedPadCount >= fanoutFailConnectedPads && (len(availableSides) <= 1 || pressure >= fanoutFailPressure || escapeDemand >= fanoutFailEscapeDemand && pressure >= fanoutWarningPressure) {
+			status = scoreStatusFail
+			action = "increase escape clearance or move component away from blocked sides"
+		} else if connectedPadCount >= fanoutWarningConnectedPads && (len(availableSides) <= 2 || pressure >= fanoutWarningPressure || escapeDemand >= fanoutWarningEscapeDemand) {
+			status = scoreStatusWarning
+			action = "review component fanout spacing before routing"
+		}
+		if (strings.EqualFold(component.Role, string(IntentConnector)) || component.Edge != EdgeNone) && len(availableSides) >= 1 && status != scoreStatusPass {
+			status = scoreStatusPass
+			action = ""
+		}
+		if status == scoreStatusPass && connectedPadCount < fanoutWarningConnectedPads {
+			continue
+		}
+		reports = append(reports, FanoutReport{
+			Ref:               component.Ref,
+			PadCount:          padCount,
+			ConnectedPadCount: connectedPadCount,
+			LocalNetCount:     localNetCount,
+			AvailableSides:    availableSides,
+			EdgePressure:      roundPlacementMetric(edgePressure),
+			KeepoutPressure:   roundPlacementMetric(keepoutPressure),
+			NeighborPressure:  roundPlacementMetric(neighborPressure),
+			EscapeDemand:      roundPlacementMetric(escapeDemand),
+			Status:            status,
+			Evidence:          "bounds_edge_keepout_neighbor_escape",
+			SuggestedAction:   action,
+		})
+	}
+	slices.SortFunc(reports, func(a, b FanoutReport) int {
+		return cmp.Compare(a.Ref, b.Ref)
+	})
+	return reports
+}
+
+func fanoutConnectivity(nets []Net) (map[string]map[string]struct{}, map[string]map[string]struct{}) {
+	pinsByRef := map[string]map[string]struct{}{}
+	netsByRef := map[string]map[string]struct{}{}
+	for _, net := range nets {
+		for endpointIndex, endpoint := range net.Endpoints {
+			ref := normalizeRef(endpoint.Ref)
+			if ref == "" {
+				continue
+			}
+			if pinsByRef[ref] == nil {
+				pinsByRef[ref] = map[string]struct{}{}
+			}
+			if netsByRef[ref] == nil {
+				netsByRef[ref] = map[string]struct{}{}
+			}
+			pin := strings.TrimSpace(endpoint.Pin)
+			if pin == "" {
+				pin = fmt.Sprintf("%s#%d", net.Name, endpointIndex)
+			}
+			pinsByRef[ref][pin] = struct{}{}
+			netsByRef[ref][net.Name] = struct{}{}
+		}
+	}
+	return pinsByRef, netsByRef
+}
+
+func fanoutAvailableSides(board BoardPlacementArea, keepouts []Keepout, placement PlacementResult, clearance float64) []string {
+	boardMinX := board.Origin.XMM
+	boardMinY := board.Origin.YMM
+	boardMaxX := board.Origin.XMM + board.WidthMM
+	boardMaxY := board.Origin.YMM + board.HeightMM
+	candidates := []struct {
+		name  string
+		space float64
+	}{
+		{name: "left", space: placement.Bounds.Min.XMM - boardMinX},
+		{name: "right", space: boardMaxX - placement.Bounds.Max.XMM},
+		{name: "bottom", space: placement.Bounds.Min.YMM - boardMinY},
+		{name: "top", space: boardMaxY - placement.Bounds.Max.YMM},
+	}
+	available := []string{}
+	for _, candidate := range candidates {
+		if candidate.space < clearance {
+			continue
+		}
+		if fanoutSideBlockedByKeepout(candidate.name, placement.Bounds, keepouts, clearance) {
+			continue
+		}
+		available = append(available, candidate.name)
+	}
+	return available
+}
+
+func fanoutSideBlockedByKeepout(side string, bounds Rect, keepouts []Keepout, clearance float64) bool {
+	probe := expandedRect(bounds, clearance)
+	switch side {
+	case "left":
+		probe.Max.XMM = bounds.Min.XMM
+	case "right":
+		probe.Min.XMM = bounds.Max.XMM
+	case "bottom":
+		probe.Max.YMM = bounds.Min.YMM
+	case "top":
+		probe.Min.YMM = bounds.Max.YMM
+	}
+	for _, keepout := range keepouts {
+		if !keepout.Optional && keepout.Bounds.Intersects(probe) {
+			return true
+		}
+	}
+	return false
+}
+
+func fanoutEdgePressure(board BoardPlacementArea, bounds Rect, clearance float64) float64 {
+	boardMinX := board.Origin.XMM
+	boardMinY := board.Origin.YMM
+	boardMaxX := board.Origin.XMM + board.WidthMM
+	boardMaxY := board.Origin.YMM + board.HeightMM
+	pressure := 0.0
+	for _, distance := range []float64{bounds.Min.XMM - boardMinX, boardMaxX - bounds.Max.XMM, bounds.Min.YMM - boardMinY, boardMaxY - bounds.Max.YMM} {
+		if distance < clearance {
+			pressure++
+		}
+	}
+	return pressure
+}
+
+func fanoutKeepoutPressure(keepouts []Keepout, placement PlacementResult, clearance float64) float64 {
+	pressure := 0.0
+	for _, side := range []string{"left", "right", "bottom", "top"} {
+		if fanoutSideBlockedByKeepout(side, placement.Bounds, keepouts, clearance) {
+			pressure++
+		}
+	}
+	return pressure
+}
+
+func expandedRect(bounds Rect, amount float64) Rect {
+	return Rect{
+		Min: Point{XMM: bounds.Min.XMM - amount, YMM: bounds.Min.YMM - amount},
+		Max: Point{XMM: bounds.Max.XMM + amount, YMM: bounds.Max.YMM + amount},
+	}
+}
+
+func fanoutNeighborPressures(board BoardPlacementArea, placementsByRef map[string]PlacementResult, clearance float64) map[string]float64 {
+	if len(placementsByRef) == 0 || board.WidthMM <= 0 || board.HeightMM <= 0 || clearance <= 0 {
+		return nil
+	}
+	cellSize := max(1, clearance)
+	cols := max(1, int(math.Ceil(board.WidthMM/cellSize)))
+	rows := max(1, int(math.Ceil(board.HeightMM/cellSize)))
+	for cols*rows > congestionMaxGridCellsPerAxis*congestionMaxGridCellsPerAxis {
+		cellSize *= 2
+		cols = max(1, int(math.Ceil(board.WidthMM/cellSize)))
+		rows = max(1, int(math.Ceil(board.HeightMM/cellSize)))
+	}
+	rangesByRef := map[string]fanoutGridRanges{}
+	for ref, placement := range placementsByRef {
+		rangesByRef[ref] = fanoutGridRanges{
+			bounds: computeFanoutGridRange(board, placement.Bounds, cellSize, cols, rows),
+			probe:  computeFanoutGridRange(board, expandedRect(placement.Bounds, clearance), cellSize, cols, rows),
+		}
+	}
+	grid := make([][]string, cols*rows)
+	for ref := range placementsByRef {
+		cellRange := rangesByRef[ref].bounds
+		for row := cellRange.startRow; row <= cellRange.endRow; row++ {
+			for col := cellRange.startCol; col <= cellRange.endCol; col++ {
+				grid[row*cols+col] = append(grid[row*cols+col], ref)
+			}
+		}
+	}
+	pressures := map[string]float64{}
+	seen := map[string]struct{}{}
+	for ref, placement := range placementsByRef {
+		probe := expandedRect(placement.Bounds, clearance)
+		cellRange := rangesByRef[ref].probe
+		clear(seen)
+		for row := cellRange.startRow; row <= cellRange.endRow; row++ {
+			for col := cellRange.startCol; col <= cellRange.endCol; col++ {
+				for _, otherRef := range grid[row*cols+col] {
+					if otherRef == ref {
+						continue
+					}
+					if _, ok := seen[otherRef]; ok {
+						continue
+					}
+					seen[otherRef] = struct{}{}
+					if probe.Intersects(placementsByRef[otherRef].Bounds) {
+						pressures[ref] += fanoutRelativeNeighborPressure(placement.Bounds, placementsByRef[otherRef].Bounds)
+					}
+				}
+			}
+		}
+	}
+	return pressures
+}
+
+type fanoutGridRanges struct {
+	bounds fanoutGridRange
+	probe  fanoutGridRange
+}
+
+type fanoutGridRange struct {
+	startCol int
+	endCol   int
+	startRow int
+	endRow   int
+}
+
+func computeFanoutGridRange(board BoardPlacementArea, bounds Rect, cellSize float64, cols int, rows int) fanoutGridRange {
+	return fanoutGridRange{
+		startCol: clampInt(int(math.Floor((bounds.Min.XMM-board.Origin.XMM)/cellSize)), 0, cols-1),
+		endCol:   clampInt(int(math.Floor((bounds.Max.XMM-board.Origin.XMM)/cellSize)), 0, cols-1),
+		startRow: clampInt(int(math.Floor((bounds.Min.YMM-board.Origin.YMM)/cellSize)), 0, rows-1),
+		endRow:   clampInt(int(math.Floor((bounds.Max.YMM-board.Origin.YMM)/cellSize)), 0, rows-1),
+	}
+}
+
+func fanoutRelativeNeighborPressure(bounds Rect, other Rect) float64 {
+	area := max(1e-6, bounds.WidthMM()*bounds.HeightMM())
+	otherArea := max(0, other.WidthMM()*other.HeightMM())
+	return min(1, otherArea/area)
+}
+
+func fanoutScore(reports []FanoutReport) (float64, string) {
+	if len(reports) == 0 {
+		return 1, scoreStatusPass
+	}
+	worstScore := 1.0
+	status := scoreStatusPass
+	for _, report := range reports {
+		score := 1.0
+		if report.Status == scoreStatusFail {
+			score = 0
+			status = scoreStatusFail
+		} else if report.Status == scoreStatusWarning {
+			score = 0.5
+			if status != scoreStatusFail {
+				status = scoreStatusWarning
+			}
+		}
+		worstScore = min(worstScore, score)
+	}
+	return worstScore, status
 }
 
 type congestionCell struct {

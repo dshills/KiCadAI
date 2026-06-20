@@ -17,6 +17,7 @@ const (
 	PlacementDiagnosticConstraint       PlacementDiagnosticCategory = "constraint"
 	PlacementDiagnosticGrouping         PlacementDiagnosticCategory = "grouping"
 	PlacementDiagnosticNetProximity     PlacementDiagnosticCategory = "net_proximity"
+	PlacementDiagnosticFanout           PlacementDiagnosticCategory = "fanout"
 	PlacementDiagnosticRoutingReadiness PlacementDiagnosticCategory = "routing_readiness"
 	PlacementDiagnosticValidation       PlacementDiagnosticCategory = "validation"
 )
@@ -29,6 +30,7 @@ const (
 	PlacementActionAdjustConstraints        PlacementDiagnosticAction = "adjust_constraints"
 	PlacementActionMoveGroupTogether        PlacementDiagnosticAction = "move_group_together"
 	PlacementActionReviewNetProximity       PlacementDiagnosticAction = "review_net_proximity"
+	PlacementActionImproveFanout            PlacementDiagnosticAction = "improve_fanout"
 	PlacementActionMoveOutOfKeepout         PlacementDiagnosticAction = "move_out_of_keepout"
 	PlacementActionMoveToRegion             PlacementDiagnosticAction = "move_to_region"
 	PlacementActionImproveRoutingReadiness  PlacementDiagnosticAction = "improve_routing_readiness"
@@ -110,6 +112,7 @@ func DiagnosticsForQuality(request Request, result Result, quality QualityReport
 	diagnostics = append(diagnostics, keepoutReportDiagnostics(quality.KeepoutReports)...)
 	diagnostics = append(diagnostics, proximityReportDiagnostics(quality.ProximityReports)...)
 	diagnostics = append(diagnostics, regionReportDiagnostics(quality.RegionReports)...)
+	diagnostics = append(diagnostics, fanoutReportDiagnostics(quality.FanoutReports)...)
 	diagnostics = append(diagnostics, netReportDiagnostics(quality.NetReports)...)
 	diagnostics = append(diagnostics, netProximityDiagnostics(request, placementsByRef)...)
 	if quality.Ready && len(diagnostics) == 0 {
@@ -243,6 +246,36 @@ func regionReportDiagnostics(regionReports []RegionReport) []PlacementDiagnostic
 		})
 	}
 	return diagnostics
+}
+
+func fanoutReportDiagnostics(fanoutReports []FanoutReport) []PlacementDiagnostic {
+	var diagnostics []PlacementDiagnostic
+	for _, report := range fanoutReports {
+		if report.Status == scoreStatusPass {
+			continue
+		}
+		severity := reports.SeverityWarning
+		if report.Status == scoreStatusFail {
+			severity = reports.SeverityError
+		}
+		diagnostics = append(diagnostics, PlacementDiagnostic{
+			Category:   PlacementDiagnosticFanout,
+			Action:     PlacementActionImproveFanout,
+			Severity:   severity,
+			Message:    fmt.Sprintf("Component %s fanout readiness status: %s.", report.Ref, report.Status),
+			Suggestion: fanoutDiagnosticSuggestion(report),
+			Path:       "quality.fanout_reports." + report.Ref,
+			Refs:       []string{report.Ref},
+		})
+	}
+	return diagnostics
+}
+
+func fanoutDiagnosticSuggestion(report FanoutReport) string {
+	if strings.TrimSpace(report.SuggestedAction) != "" {
+		return report.SuggestedAction
+	}
+	return "Increase spacing around the component, move it away from keepouts or edges, or reduce local net density before routing."
 }
 
 func netReportDiagnostics(netReports []NetQualityReport) []PlacementDiagnostic {
