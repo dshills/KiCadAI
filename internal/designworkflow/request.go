@@ -27,16 +27,17 @@ const (
 )
 
 type Request struct {
-	Version     string              `json:"version"`
-	Name        string              `json:"name"`
-	Intent      Intent              `json:"intent,omitempty"`
-	Board       BoardSpec           `json:"board"`
-	Libraries   LibrarySpec         `json:"libraries,omitempty"`
-	Components  ComponentPolicySpec `json:"component_policy,omitempty"`
-	Blocks      []BlockInstanceSpec `json:"blocks"`
-	Connections []ConnectionSpec    `json:"connections,omitempty"`
-	Constraints ConstraintSpec      `json:"constraints,omitempty"`
-	Validation  ValidationSpec      `json:"validation,omitempty"`
+	Version      string                 `json:"version"`
+	Name         string                 `json:"name"`
+	Intent       Intent                 `json:"intent,omitempty"`
+	Board        BoardSpec              `json:"board"`
+	Libraries    LibrarySpec            `json:"libraries,omitempty"`
+	Components   ComponentPolicySpec    `json:"component_policy,omitempty"`
+	Blocks       []BlockInstanceSpec    `json:"blocks"`
+	Connections  []ConnectionSpec       `json:"connections,omitempty"`
+	Constraints  ConstraintSpec         `json:"constraints,omitempty"`
+	Validation   ValidationSpec         `json:"validation,omitempty"`
+	RoutingRetry RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
 }
 
 type Intent struct {
@@ -104,6 +105,17 @@ type ValidationSpec struct {
 	SkipKiCadChecks bool            `json:"skip_kicad_checks,omitempty"`
 }
 
+type RoutingRetryPolicySpec struct {
+	Enabled                 bool                         `json:"enabled,omitempty"`
+	MaxAttempts             int                          `json:"max_attempts,omitempty"`
+	MinRoutingScoreDelta    float64                      `json:"min_routing_score_delta,omitempty"`
+	AllowedHintCategories   []PlacementRetryHintCategory `json:"allowed_hint_categories,omitempty"`
+	PreserveFixed           bool                         `json:"preserve_fixed,omitempty"`
+	StopOnNewBlockers       bool                         `json:"stop_on_new_blockers,omitempty"`
+	StopOnRepeatedSignature bool                         `json:"stop_on_repeated_signature,omitempty"`
+	StopOnNonImprovement    bool                         `json:"stop_on_non_improvement,omitempty"`
+}
+
 var projectNamePattern = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
 func DecodeRequestStrict(reader io.Reader) (Request, []reports.Issue) {
@@ -132,6 +144,7 @@ func NormalizeRequest(request Request) Request {
 	if request.Validation.Acceptance == "" {
 		request.Validation.Acceptance = AcceptanceStructural
 	}
+	request.RoutingRetry = normalizeRoutingRetryPolicy(request.RoutingRetry)
 	request.Components = normalizeComponentPolicy(request.Components)
 	request.Blocks = append([]BlockInstanceSpec(nil), request.Blocks...)
 	for i := range request.Blocks {
@@ -158,6 +171,29 @@ func NormalizeProjectName(name string) string {
 	return name
 }
 
+func normalizeRoutingRetryPolicy(policy RoutingRetryPolicySpec) RoutingRetryPolicySpec {
+	if policy.MaxAttempts == 0 {
+		policy.MaxAttempts = 1
+	}
+	if policy.AllowedHintCategories == nil {
+		policy.AllowedHintCategories = []PlacementRetryHintCategory{
+			PlacementRetryReduceDistance,
+			PlacementRetryIncreaseSpacing,
+			PlacementRetryImproveFanout,
+			PlacementRetryMoveFromEdge,
+		}
+	} else {
+		policy.AllowedHintCategories = append([]PlacementRetryHintCategory(nil), policy.AllowedHintCategories...)
+	}
+	if !policy.Enabled && policy.MaxAttempts > 0 {
+		policy.MaxAttempts = max(1, policy.MaxAttempts)
+	}
+	if policy.Enabled && policy.MaxAttempts == 1 {
+		policy.MaxAttempts = 2
+	}
+	return policy
+}
+
 func ValidateRequest(request Request) []reports.Issue {
 	request = NormalizeRequest(request)
 	var issues []reports.Issue
@@ -181,6 +217,7 @@ func ValidateRequest(request Request) []reports.Issue {
 	if !validAcceptanceLevel(request.Validation.Acceptance) {
 		issues = append(issues, issue("validation.acceptance", "unsupported acceptance level "+string(request.Validation.Acceptance)))
 	}
+	issues = append(issues, validateRoutingRetryPolicy(request.RoutingRetry)...)
 	if request.Components.MinimumConfidence != "" {
 		componentIssue, ok := components.ValidateConfidenceIssue("component_policy.minimum_confidence", request.Components.MinimumConfidence)
 		if ok {
@@ -244,6 +281,31 @@ func ValidateRequest(request Request) []reports.Issue {
 		issues = append(issues, issue("constraints.clearance_mm", "clearance must be non-negative"))
 	}
 	return issues
+}
+
+func validateRoutingRetryPolicy(policy RoutingRetryPolicySpec) []reports.Issue {
+	var issues []reports.Issue
+	if policy.MaxAttempts < 1 {
+		issues = append(issues, issue("routing_retry.max_attempts", "routing retry max attempts must be at least 1"))
+	}
+	if policy.MinRoutingScoreDelta < 0 {
+		issues = append(issues, issue("routing_retry.min_routing_score_delta", "routing retry minimum score delta must be non-negative"))
+	}
+	for index, category := range policy.AllowedHintCategories {
+		if !validPlacementRetryHintCategory(category) {
+			issues = append(issues, issue(fmt.Sprintf("routing_retry.allowed_hint_categories[%d]", index), "unsupported placement retry hint category "+string(category)))
+		}
+	}
+	return issues
+}
+
+func validPlacementRetryHintCategory(category PlacementRetryHintCategory) bool {
+	switch category {
+	case PlacementRetryReduceDistance, PlacementRetryIncreaseSpacing, PlacementRetryImproveFanout, PlacementRetryMoveFromEdge, PlacementRetryRelaxRules, PlacementRetryUnsupported:
+		return true
+	default:
+		return false
+	}
 }
 
 func ToCompositionRequest(request Request) (blocks.CompositionRequest, []reports.Issue) {

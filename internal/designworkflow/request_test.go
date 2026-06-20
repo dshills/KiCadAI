@@ -102,6 +102,58 @@ func TestNormalizeProjectName(t *testing.T) {
 	}
 }
 
+func TestNormalizeRequestDefaultsRoutingRetryDisabled(t *testing.T) {
+	request := NormalizeRequest(validRequest())
+	if request.RoutingRetry.Enabled {
+		t.Fatalf("retry enabled by default: %#v", request.RoutingRetry)
+	}
+	if request.RoutingRetry.MaxAttempts != 1 || len(request.RoutingRetry.AllowedHintCategories) == 0 {
+		t.Fatalf("retry defaults = %#v", request.RoutingRetry)
+	}
+}
+
+func TestNormalizeRequestEnabledRoutingRetryIsBounded(t *testing.T) {
+	request := validRequest()
+	request.RoutingRetry = RoutingRetryPolicySpec{Enabled: true, MaxAttempts: 1}
+
+	normalized := NormalizeRequest(request)
+	if normalized.RoutingRetry.MaxAttempts != 2 {
+		t.Fatalf("max attempts = %d, want total attempts bumped to 2", normalized.RoutingRetry.MaxAttempts)
+	}
+}
+
+func TestValidateRequestRejectsInvalidRoutingRetryPolicy(t *testing.T) {
+	request := validRequest()
+	request.RoutingRetry = RoutingRetryPolicySpec{
+		MaxAttempts:          -1,
+		MinRoutingScoreDelta: -0.1,
+		AllowedHintCategories: []PlacementRetryHintCategory{
+			PlacementRetryHintCategory("teleport"),
+		},
+	}
+
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "routing_retry.max_attempts")
+	assertIssuePath(t, issues, "routing_retry.min_routing_score_delta")
+	assertIssuePath(t, issues, "routing_retry.allowed_hint_categories[0]")
+}
+
+func TestDecodeRequestStrictAcceptsRoutingRetryPolicy(t *testing.T) {
+	request, issues := DecodeRequestStrict(strings.NewReader(`{
+	  "version": "0.1.0",
+	  "name": "demo",
+	  "board": {"width_mm": 10, "height_mm": 10},
+	  "blocks": [{"id": "led", "block_id": "led_indicator"}],
+	  "routing_retry": {"enabled": true, "max_attempts": 3, "allowed_hint_categories": ["increase_spacing"]}
+	}`))
+	if len(issues) != 0 {
+		t.Fatalf("DecodeRequestStrict issues = %#v", issues)
+	}
+	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 3 || request.RoutingRetry.AllowedHintCategories[0] != PlacementRetryIncreaseSpacing {
+		t.Fatalf("routing retry = %#v", request.RoutingRetry)
+	}
+}
+
 func validRequest() Request {
 	return Request{
 		Version: RequestVersion,
