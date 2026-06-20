@@ -63,6 +63,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
 	placed := PlaceFragments(ctx, normalized, fragments, opts.Placement)
+	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
 	if workflowStageBlocked(placed.Stage) {
 		stages = append(stages, skippedWorkflowStages("placement did not complete", StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
@@ -71,6 +72,8 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	routingOpts := opts.Routing
 	routingOpts.Skip = routingOpts.Skip || opts.SkipRouting || normalized.Validation.SkipRouting
 	routed := RoutePlacement(ctx, normalized, fragments, placed, routingOpts)
+	placed, routed, _ = maybeRetryPlacementRouting(ctx, normalized, fragments, placed, routed, routingOpts, normalized.RoutingRetry)
+	stages[placementStageIndex] = placed.Stage
 	stages = append(stages, routed.Stage)
 	if workflowStageBlocked(routed.Stage) {
 		stages = append(stages, skippedWorkflowStages("routing did not complete", StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
