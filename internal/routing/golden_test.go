@@ -10,31 +10,34 @@ import (
 
 func TestGoldenRoutedExamples(t *testing.T) {
 	cases := []struct {
-		name          string
-		request       Request
-		wantStatus    Status
-		wantRoutes    int
-		wantSegments  int
-		wantVias      int
-		wantSignature string
+		name           string
+		request        Request
+		wantStatus     Status
+		wantRoutes     int
+		wantSegments   int
+		wantVias       int
+		wantSignature  string
+		wantOperations bool
 	}{
 		{
-			name:          "straight_single_layer_signal",
-			request:       goldenStraightSingleLayerRequest(),
-			wantStatus:    StatusRouted,
-			wantRoutes:    1,
-			wantSegments:  1,
-			wantVias:      0,
-			wantSignature: "S:SIG:F.CU:5.000,10.000>20.000,10.000",
+			name:           "straight_single_layer_signal",
+			request:        goldenStraightSingleLayerRequest(),
+			wantStatus:     StatusRouted,
+			wantRoutes:     1,
+			wantSegments:   1,
+			wantVias:       0,
+			wantSignature:  "S:SIG:F.CU:5.000,10.000>20.000,10.000",
+			wantOperations: true,
 		},
 		{
-			name:          "single_layer_keepout_detour",
-			request:       goldenSingleLayerDetourRequest(),
-			wantStatus:    StatusRouted,
-			wantRoutes:    1,
-			wantSegments:  3,
-			wantVias:      0,
-			wantSignature: "S:SIG:F.CU:20.000,7.000>20.000,10.000|S:SIG:F.CU:5.000,7.000>20.000,7.000|S:SIG:F.CU:5.000,7.000>5.000,10.000",
+			name:           "single_layer_keepout_detour",
+			request:        goldenSingleLayerDetourRequest(),
+			wantStatus:     StatusRouted,
+			wantRoutes:     1,
+			wantSegments:   3,
+			wantVias:       0,
+			wantSignature:  "S:SIG:F.CU:20.000,7.000>20.000,10.000|S:SIG:F.CU:5.000,7.000>20.000,7.000|S:SIG:F.CU:5.000,7.000>5.000,10.000",
+			wantOperations: true,
 		},
 		{
 			name:       "two_layer_smd_via",
@@ -43,9 +46,25 @@ func TestGoldenRoutedExamples(t *testing.T) {
 			wantRoutes: 1,
 			// The destination pad is only on B.Cu, so the golden path places a
 			// via directly at that endpoint after a single F.Cu segment.
+			wantSegments:   1,
+			wantVias:       1,
+			wantSignature:  "S:SIG:F.CU:5.000,10.000>20.000,10.000|V:SIG:20.000,10.000:B.CU,F.CU",
+			wantOperations: true,
+		},
+		{
+			name:          "max_length_policy_blocked",
+			request:       goldenMaxLengthBlockedRequest(),
+			wantStatus:    StatusBlocked,
+			wantRoutes:    1,
 			wantSegments:  1,
-			wantVias:      1,
-			wantSignature: "S:SIG:F.CU:5.000,10.000>20.000,10.000|V:SIG:20.000,10.000:B.CU,F.CU",
+			wantVias:      0,
+			wantSignature: "S:SIG:F.CU:5.000,10.000>20.000,10.000",
+		},
+		{
+			name:       "zone_unsupported_blocked",
+			request:    goldenZoneUnsupportedRequest(),
+			wantStatus: StatusBlocked,
+			wantRoutes: 1,
 		},
 	}
 	for _, tc := range cases {
@@ -69,11 +88,13 @@ func TestGoldenRoutedExamples(t *testing.T) {
 			if segments != tc.wantSegments || vias != tc.wantVias {
 				t.Fatalf("segments/vias = %d/%d, want %d/%d; routes = %#v", segments, vias, tc.wantSegments, tc.wantVias, result.Routes)
 			}
-			report := ValidateResult(tc.request, result)
-			if len(report.Issues) != 0 {
-				t.Fatalf("validation issues = %#v", report.Issues)
+			if result.Status == StatusRouted || segments != 0 || vias != 0 {
+				report := ValidateResult(tc.request, result)
+				if len(report.Issues) != 0 {
+					t.Fatalf("validation issues = %#v", report.Issues)
+				}
 			}
-			if len(result.Operations) == 0 {
+			if tc.wantOperations && len(result.Operations) == 0 {
 				t.Fatalf("operations missing for routed result: %#v", result)
 			}
 		})
@@ -105,6 +126,27 @@ func goldenSingleLayerDetourRequest() Request {
 func goldenTwoLayerViaRequest() Request {
 	request := twoLayerViaRequest()
 	request.Seed = "golden-two-layer-via"
+	return request
+}
+
+func goldenMaxLengthBlockedRequest() Request {
+	request := goldenStraightSingleLayerRequest()
+	request.Rules.NetOverrides = map[string]NetRule{"SIG": {MaxLengthMM: 1}}
+	return request
+}
+
+func goldenZoneUnsupportedRequest() Request {
+	request := goldenStraightSingleLayerRequest()
+	request.Strategy.TreatZonesAs = ZoneUnsupported
+	request.Existing = append(request.Existing, ExistingCopper{
+		Kind:  CopperZone,
+		Net:   "GND",
+		Layer: "F.Cu",
+		Geometry: Shape{Rect: &Rect{
+			Min: Point{XMM: 8, YMM: 8},
+			Max: Point{XMM: 9, YMM: 9},
+		}},
+	})
 	return request
 }
 
