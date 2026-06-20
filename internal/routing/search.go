@@ -76,7 +76,16 @@ func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
 	}
 	if !found {
-		return GridPath{Net: netName, SearchNodes: searchNodes, SearchLimitHit: searchNodes >= rules.MaxSearchNodes}, []reports.Issue{routeFailureIssue(netName, pair, "no legal single-layer path found")}
+		return GridPath{
+				Net:            netName,
+				SearchNodes:    searchNodes,
+				SearchLimitHit: searchNodes >= rules.MaxSearchNodes,
+			}, []reports.Issue{routeFailureIssueWithObstacle(
+				netName,
+				pair,
+				"no legal single-layer path found",
+				nearestObstacleSummary(occupancy, starts, targets),
+			)}
 	}
 	points := make([]Point, 0, len(path))
 	for _, coord := range path {
@@ -137,7 +146,16 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
 	}
 	if !found {
-		return GridPath{Net: netName, SearchNodes: searchNodes, SearchLimitHit: searchNodes >= rules.MaxSearchNodes}, []reports.Issue{routeFailureIssue(netName, pair, "no legal two-layer path found")}
+		return GridPath{
+				Net:            netName,
+				SearchNodes:    searchNodes,
+				SearchLimitHit: searchNodes >= rules.MaxSearchNodes,
+			}, []reports.Issue{routeFailureIssueWithObstacle(
+				netName,
+				pair,
+				"no legal two-layer path found",
+				nearestObstacleSummary(occupancy, starts, targets),
+			)}
 	}
 	points := make([]Point, 0, len(path))
 	for _, coord := range path {
@@ -426,6 +444,13 @@ func reconstructGridPath(current astarState, cameFrom map[astarState]astarState)
 }
 
 func routeFailureIssue(netName string, pair EndpointPair, message string) reports.Issue {
+	return routeFailureIssueWithObstacle(netName, pair, message, "")
+}
+
+func routeFailureIssueWithObstacle(netName string, pair EndpointPair, message string, obstacleSummary string) reports.Issue {
+	if obstacleSummary != "" {
+		message += ": blocked near " + obstacleSummary
+	}
 	return reports.Issue{
 		Code:       reports.CodeValidationFailed,
 		Severity:   reports.SeverityBlocked,
@@ -435,6 +460,29 @@ func routeFailureIssue(netName string, pair EndpointPair, message string) report
 		Nets:       []string{netName},
 		Suggestion: "move components, reduce clearance, or allow another routing layer",
 	}
+}
+
+func nearestObstacleSummary(occupancy Occupancy, coordSets ...[]GridCoord) string {
+	for _, coords := range coordSets {
+		for _, coord := range coords {
+			if obstacle, ok := occupancy.FirstObstacle(coord); ok {
+				return obstacleSummary(obstacle)
+			}
+			for _, neighbor := range orthogonalNeighbors(astarState{Coord: coord}) {
+				if obstacle, ok := occupancy.FirstObstacle(neighbor.Coord); ok {
+					return obstacleSummary(obstacle)
+				}
+			}
+		}
+	}
+	return ""
+}
+
+func obstacleSummary(obstacle Obstacle) string {
+	if obstacle.Source != "" {
+		return string(obstacle.Kind) + " " + obstacle.Source
+	}
+	return string(obstacle.Kind)
 }
 
 func normalizedSearchLayers(layers []Layer) []Layer {

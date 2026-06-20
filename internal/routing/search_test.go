@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -75,6 +76,27 @@ func TestRouteSingleLayerPathAvoidsObstacle(t *testing.T) {
 		if point.XMM >= 10 && point.XMM <= 15 && point.YMM >= 9 && point.YMM <= 11 {
 			t.Fatalf("path crosses keepout at %#v: %#v", point, path.Points)
 		}
+	}
+}
+
+func TestRouteFailureNamesNearbyObstacle(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Obstacles = []Obstacle{{
+		Kind:   ObstacleKeepout,
+		Layer:  "F.Cu",
+		Source: "fixture_keepout",
+		Geometry: Shape{Rect: &Rect{
+			Min: Point{XMM: 0, YMM: 0},
+			Max: Point{XMM: 30, YMM: 30},
+		}},
+	}}
+
+	result := RouteRequest(request)
+	if result.Status != StatusBlocked || len(result.Routes) == 0 || len(result.Routes[0].Issues) == 0 {
+		t.Fatalf("expected blocked route with issue: %#v", result)
+	}
+	if got := result.Routes[0].Issues[0].Message; !strings.Contains(got, "fixture_keepout") {
+		t.Fatalf("issue message = %q, want obstacle source", got)
 	}
 }
 
