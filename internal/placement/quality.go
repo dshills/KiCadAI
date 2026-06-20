@@ -16,9 +16,18 @@ const (
 	scoreWeightMechanical    = 1.0
 	scoreWeightRegion        = 1.0
 	scoreWeightRouting       = 1.0
+	scoreWeightCongestion    = 1.0
 
 	routingReadinessThresholdMultiplier = 0.75
 	routingReadinessWarningCredit       = 0.5
+	congestionMaxGridCellsPerAxis       = 200
+	congestionMinCellMM                 = 2.5
+	congestionMaxEndpointsPerNet        = 128
+	congestionWarningUtilization        = 1.0
+	congestionFailUtilization           = 2.0
+	// Congestion capacity estimates usable coarse routing tracks per cell pitch length.
+	congestionMinCellCapacity          = 8.0
+	congestionCapacityPerLinearPitchMM = 8.0
 
 	scoreStatusPass    = "pass"
 	scoreStatusWarning = "warning"
@@ -39,6 +48,7 @@ type QualityReport struct {
 	ProximityReports          []ProximityReport     `json:"proximity_reports,omitempty"`
 	RegionReports             []RegionReport        `json:"region_reports,omitempty"`
 	NetReports                []NetQualityReport    `json:"net_reports,omitempty"`
+	CongestionReports         []CongestionReport    `json:"congestion_reports,omitempty"`
 	KeepoutReports            []KeepoutReport       `json:"keepout_reports,omitempty"`
 	Score                     ScoreReport           `json:"score,omitempty"`
 	EdgeConstraintCount       int                   `json:"edge_constraint_count"`
@@ -53,6 +63,17 @@ type QualityReport struct {
 	OperationIssueCount       int                   `json:"operation_issue_count"`
 	PlacementQualityWarnings  []string              `json:"placement_quality_warnings,omitempty"`
 	Diagnostics               []PlacementDiagnostic `json:"diagnostics,omitempty"`
+}
+
+type CongestionReport struct {
+	CellID            string  `json:"cell_id"`
+	Bounds            Rect    `json:"bounds"`
+	WeightedCrossings float64 `json:"weighted_crossings"`
+	EstimatedCapacity float64 `json:"estimated_capacity"`
+	Utilization       float64 `json:"utilization"`
+	Status            string  `json:"status"`
+	Evidence          string  `json:"evidence"`
+	SuggestedAction   string  `json:"suggested_action,omitempty"`
 }
 
 type ProximityReport struct {
@@ -164,6 +185,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	report.ProximityReports = proximityReports(request, placementsByRef)
 	report.RegionReports = regionReports(request, placementsByRef)
 	report.NetReports = netQualityReports(request, placementsByRef)
+	report.CongestionReports = congestionReports(request, placementsByRef)
 	report.KeepoutReports = keepoutReports
 	report.Score = placementScoreReport(report)
 	sort.Strings(report.EstimatedBoundsRefs)
@@ -526,6 +548,10 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		routingScore, routingStatus := routingReadinessScore(report.NetReports)
 		add(ScoreDimension{Name: "routing_readiness", Score: routingScore, Weight: scoreWeightRouting, Status: routingStatus, Message: "placement net HPWL and endpoint readiness"})
 	}
+	if len(report.CongestionReports) > 0 {
+		congestionScore, congestionStatus := congestionScore(report.CongestionReports)
+		add(ScoreDimension{Name: "congestion", Score: congestionScore, Weight: scoreWeightCongestion, Status: congestionStatus, Message: "coarse placement congestion estimate"})
+	}
 	proximityScore := 1.0
 	proximityStatus := "pass"
 	for _, proximity := range report.ProximityReports {
@@ -542,6 +568,299 @@ func placementScoreReport(report QualityReport) ScoreReport {
 		add(ScoreDimension{Name: "proximity", Score: proximityScore, Weight: scoreWeightProximity, Status: proximityStatus, Message: "electrical proximity rule satisfaction"})
 	}
 	return score
+}
+
+type congestionCell struct {
+	bounds            Rect
+	weightedCrossings float64
+}
+
+func congestionReports(request Request, placementsByRef map[string]PlacementResult) []CongestionReport {
+	if request.Board.WidthMM <= 0 || request.Board.HeightMM <= 0 || len(request.Nets) == 0 {
+		return nil
+	}
+	cols := congestionAxisCells(request.Board.WidthMM, len(request.Components))
+	rows := congestionAxisCells(request.Board.HeightMM, len(request.Components))
+	if cols <= 0 || rows <= 0 {
+		return nil
+	}
+	cellWidth := request.Board.WidthMM / float64(cols)
+	cellHeight := request.Board.HeightMM / float64(rows)
+	cells := make([]*congestionCell, rows*cols)
+	for _, net := range request.Nets {
+		points := placedEndpointPoints(net, placementsByRef)
+		if len(points) < 2 {
+			continue
+		}
+		points = sampleCongestionPoints(points, congestionMaxEndpointsPerNet)
+		weight := net.Weight
+		if weight <= 0 {
+			weight = 1
+		}
+		if net.Role == NetPower || net.Role == NetGround || net.Role == NetClock || net.Role == NetDifferential {
+			weight *= 2
+		}
+		for _, edge := range congestionMSTEdges(points) {
+			horizontalFirstMid := Point{XMM: edge.end.point.XMM, YMM: edge.start.point.YMM}
+			verticalFirstMid := Point{XMM: edge.start.point.XMM, YMM: edge.end.point.YMM}
+			splitWeight := float64(weight) / 2
+			addCongestionSegment(cells, request.Board, cols, rows, cellWidth, cellHeight, edge.start, endpointPoint{point: horizontalFirstMid}, splitWeight)
+			addCongestionSegment(cells, request.Board, cols, rows, cellWidth, cellHeight, endpointPoint{point: horizontalFirstMid}, edge.end, splitWeight)
+			addCongestionSegment(cells, request.Board, cols, rows, cellWidth, cellHeight, edge.start, endpointPoint{point: verticalFirstMid}, splitWeight)
+			addCongestionSegment(cells, request.Board, cols, rows, cellWidth, cellHeight, endpointPoint{point: verticalFirstMid}, edge.end, splitWeight)
+		}
+	}
+	reports := make([]CongestionReport, 0, len(cells))
+	for index, cell := range cells {
+		if cell == nil {
+			continue
+		}
+		row := index / cols
+		col := index % cols
+		id := congestionCellID(row, col)
+		capacity := congestionCapacity(cell.bounds)
+		utilization := 0.0
+		if capacity > 0 {
+			utilization = cell.weightedCrossings / capacity
+		}
+		status := scoreStatusPass
+		action := ""
+		if utilization > congestionFailUtilization {
+			status = scoreStatusFail
+			action = "spread components or reduce net crossings through this area"
+		} else if utilization >= congestionWarningUtilization {
+			status = scoreStatusWarning
+			action = "review placement density around this area"
+		}
+		reports = append(reports, CongestionReport{
+			CellID:            id,
+			Bounds:            cell.bounds,
+			WeightedCrossings: roundPlacementMetric(cell.weightedCrossings),
+			EstimatedCapacity: roundPlacementMetric(capacity),
+			Utilization:       roundPlacementMetric(utilization),
+			Status:            status,
+			Evidence:          "centerpoint_horizontal_then_vertical",
+			SuggestedAction:   action,
+		})
+	}
+	slices.SortFunc(reports, func(a, b CongestionReport) int {
+		return cmp.Compare(a.CellID, b.CellID)
+	})
+	return reports
+}
+
+type endpointPoint struct {
+	ref   string
+	point Point
+}
+
+type congestionEdge struct {
+	start endpointPoint
+	end   endpointPoint
+}
+
+func placedEndpointPoints(net Net, placementsByRef map[string]PlacementResult) []endpointPoint {
+	points := []endpointPoint{}
+	for _, endpoint := range net.Endpoints {
+		ref := normalizeRef(endpoint.Ref)
+		placement, ok := placementsByRef[ref]
+		if !ok {
+			continue
+		}
+		points = append(points, endpointPoint{ref: ref, point: placement.Bounds.Center()})
+	}
+	slices.SortFunc(points, func(a, b endpointPoint) int {
+		return cmp.Compare(a.ref, b.ref)
+	})
+	return points
+}
+
+func sampleCongestionPoints(points []endpointPoint, limit int) []endpointPoint {
+	if limit <= 0 || len(points) <= limit {
+		return points
+	}
+	if limit == 1 {
+		return points[:1]
+	}
+	spatial := slices.Clone(points)
+	slices.SortFunc(spatial, func(a, b endpointPoint) int {
+		if a.point.XMM != b.point.XMM {
+			return cmp.Compare(a.point.XMM, b.point.XMM)
+		}
+		if a.point.YMM != b.point.YMM {
+			return cmp.Compare(a.point.YMM, b.point.YMM)
+		}
+		return cmp.Compare(a.ref, b.ref)
+	})
+	sampled := make([]endpointPoint, 0, limit)
+	lastIndex := -1
+	for sampleIndex := 0; sampleIndex < limit; sampleIndex++ {
+		pointIndex := int(math.Round(float64(sampleIndex) * float64(len(spatial)-1) / float64(limit-1)))
+		if pointIndex == lastIndex {
+			continue
+		}
+		sampled = append(sampled, spatial[pointIndex])
+		lastIndex = pointIndex
+	}
+	return sampled
+}
+
+func congestionMSTEdges(points []endpointPoint) []congestionEdge {
+	if len(points) < 2 {
+		return nil
+	}
+	used := make([]bool, len(points))
+	bestDistance := make([]float64, len(points))
+	bestParent := make([]int, len(points))
+	for index := range points {
+		bestDistance[index] = math.Inf(1)
+		bestParent[index] = -1
+	}
+	used[0] = true
+	for index := 1; index < len(points); index++ {
+		bestDistance[index] = manhattanDistance(points[0].point, points[index].point)
+		bestParent[index] = 0
+	}
+	edges := make([]congestionEdge, 0, len(points)-1)
+	for len(edges) < len(points)-1 {
+		bestTo := -1
+		for index, isUsed := range used {
+			if isUsed || bestParent[index] < 0 {
+				continue
+			}
+			if bestTo < 0 || bestDistance[index] < bestDistance[bestTo] || (bestDistance[index] == bestDistance[bestTo] && congestionEdgeLess(points[bestParent[index]], points[index], points[bestParent[bestTo]], points[bestTo])) {
+				bestTo = index
+			}
+		}
+		if bestTo < 0 || bestParent[bestTo] < 0 {
+			break
+		}
+		edges = append(edges, congestionEdge{start: points[bestParent[bestTo]], end: points[bestTo]})
+		used[bestTo] = true
+		for index, isUsed := range used {
+			if isUsed {
+				continue
+			}
+			distance := manhattanDistance(points[bestTo].point, points[index].point)
+			if distance < bestDistance[index] || (distance == bestDistance[index] && congestionEdgeLess(points[bestTo], points[index], points[bestParent[index]], points[index])) {
+				bestDistance[index] = distance
+				bestParent[index] = bestTo
+			}
+		}
+	}
+	return edges
+}
+
+func congestionEdgeLess(from endpointPoint, to endpointPoint, bestFrom endpointPoint, bestTo endpointPoint) bool {
+	if bestFrom.ref == "" && bestTo.ref == "" {
+		return true
+	}
+	if compare := cmp.Compare(from.ref, bestFrom.ref); compare != 0 {
+		return compare < 0
+	}
+	if compare := cmp.Compare(to.ref, bestTo.ref); compare != 0 {
+		return compare < 0
+	}
+	if from.point.XMM != bestFrom.point.XMM {
+		return from.point.XMM < bestFrom.point.XMM
+	}
+	return to.point.XMM < bestTo.point.XMM
+}
+
+func manhattanDistance(a Point, b Point) float64 {
+	return math.Abs(a.XMM-b.XMM) + math.Abs(a.YMM-b.YMM)
+}
+
+func addCongestionSegment(cells []*congestionCell, board BoardPlacementArea, cols int, rows int, cellWidth float64, cellHeight float64, start endpointPoint, end endpointPoint, weight float64) {
+	minX := min(start.point.XMM, end.point.XMM)
+	maxX := max(start.point.XMM, end.point.XMM)
+	minY := min(start.point.YMM, end.point.YMM)
+	maxY := max(start.point.YMM, end.point.YMM)
+	startCol := clampInt(int(math.Floor((minX-board.Origin.XMM)/cellWidth)), 0, cols-1)
+	endCol := clampInt(int(math.Floor((maxX-board.Origin.XMM)/cellWidth)), 0, cols-1)
+	startRow := clampInt(int(math.Floor((minY-board.Origin.YMM)/cellHeight)), 0, rows-1)
+	endRow := clampInt(int(math.Floor((maxY-board.Origin.YMM)/cellHeight)), 0, rows-1)
+	for row := startRow; row <= endRow; row++ {
+		for col := startCol; col <= endCol; col++ {
+			cellMinX := board.Origin.XMM + float64(col)*cellWidth
+			cellMinY := board.Origin.YMM + float64(row)*cellHeight
+			cellMaxX := cellMinX + cellWidth
+			cellMaxY := cellMinY + cellHeight
+			demand := weight * congestionDemandUnits(cellMinX, cellMinY, cellMaxX, cellMaxY, minX, maxX, minY, maxY)
+			if demand <= 0 {
+				continue
+			}
+			id := row*cols + col
+			cell := cells[id]
+			if cell == nil {
+				cell = &congestionCell{
+					bounds: Rect{
+						Min: Point{XMM: cellMinX, YMM: cellMinY},
+						Max: Point{XMM: cellMaxX, YMM: cellMaxY},
+					},
+				}
+				cells[id] = cell
+			}
+			cell.weightedCrossings += demand
+		}
+	}
+}
+
+func congestionDemandUnits(cellMinX float64, cellMinY float64, cellMaxX float64, cellMaxY float64, minX float64, maxX float64, minY float64, maxY float64) float64 {
+	xOverlap := max(0, min(maxX, cellMaxX)-max(minX, cellMinX))
+	yOverlap := max(0, min(maxY, cellMaxY)-max(minY, cellMinY))
+	length := max(xOverlap, yOverlap)
+	if length <= 0 {
+		return 0
+	}
+	return max(0.25, length/congestionMinCellMM)
+}
+
+func congestionAxisCells(lengthMM float64, componentCount int) int {
+	if lengthMM <= 0 {
+		return 0
+	}
+	bySize := int(math.Ceil(lengthMM / congestionMinCellMM))
+	byDensity := int(math.Ceil(math.Sqrt(float64(max(1, componentCount))) * 4))
+	return clampInt(max(1, min(bySize, byDensity)), 1, congestionMaxGridCellsPerAxis)
+}
+
+func congestionCapacity(bounds Rect) float64 {
+	return max(congestionMinCellCapacity, (bounds.WidthMM()+bounds.HeightMM())/congestionMinCellMM*congestionCapacityPerLinearPitchMM)
+}
+
+func congestionScore(reports []CongestionReport) (float64, string) {
+	if len(reports) == 0 {
+		return 1, scoreStatusPass
+	}
+	worstScore := 1.0
+	status := scoreStatusPass
+	for _, report := range reports {
+		score := 1.0
+		if report.Status == scoreStatusFail {
+			score = 0
+			status = scoreStatusFail
+		} else if report.Status == scoreStatusWarning {
+			score = 0.5
+			if status != scoreStatusFail {
+				status = scoreStatusWarning
+			}
+		}
+		worstScore = min(worstScore, score)
+	}
+	return worstScore, status
+}
+
+func congestionCellID(row int, col int) string {
+	return fmt.Sprintf("r%03d_c%03d", row, col)
+}
+
+func clampInt(value int, minValue int, maxValue int) int {
+	return max(minValue, min(value, maxValue))
+}
+
+func roundPlacementMetric(value float64) float64 {
+	return math.Round(value*1000) / 1000
 }
 
 func placementResultsByRef(placements []PlacementResult) map[string]PlacementResult {

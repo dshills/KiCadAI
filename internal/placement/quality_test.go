@@ -169,6 +169,91 @@ func TestQualityReportScoresRequiredRegionMiss(t *testing.T) {
 	}
 }
 
+func TestQualityReportIncludesCongestionReports(t *testing.T) {
+	req := twoComponentRequest()
+	req.Board = BoardPlacementArea{WidthMM: 20, HeightMM: 20}
+	req.Nets = []Net{
+		{Name: "A", Weight: 3, Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}},
+		{Name: "B", Weight: 3, Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}},
+	}
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 15, YMM: 15}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.CongestionReports) == 0 {
+		t.Fatalf("missing congestion reports")
+	}
+	for index := 1; index < len(quality.CongestionReports); index++ {
+		if quality.CongestionReports[index-1].CellID > quality.CongestionReports[index].CellID {
+			t.Fatalf("congestion reports not sorted: %#v", quality.CongestionReports)
+		}
+	}
+	var foundScore bool
+	for _, dimension := range quality.Score.Dimensions {
+		if dimension.Name == "congestion" {
+			foundScore = true
+			if dimension.Score < 0 || dimension.Score > 1 {
+				t.Fatalf("congestion score out of range: %#v", dimension)
+			}
+		}
+	}
+	if !foundScore {
+		t.Fatalf("missing congestion score: %#v", quality.Score)
+	}
+}
+
+func TestCongestionAxisCellsIsCapped(t *testing.T) {
+	if got := congestionAxisCells(10000, 100000); got > congestionMaxGridCellsPerAxis {
+		t.Fatalf("cells = %d, want capped at %d", got, congestionMaxGridCellsPerAxis)
+	}
+}
+
+func TestCongestionReportsRespectBoardOrigin(t *testing.T) {
+	req := twoComponentRequest()
+	req.Board = BoardPlacementArea{
+		Origin:   Point{XMM: 100, YMM: 50},
+		WidthMM:  20,
+		HeightMM: 20,
+	}
+	req.Nets = []Net{
+		{Name: "A", Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}},
+	}
+	result := Result{
+		Status: StatusPlaced,
+		Placements: []PlacementResult{
+			mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 105, YMM: 55}),
+			mustPlacementResultForTest(t, req.Components[1], Placement{XMM: 115, YMM: 65}),
+		},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if len(quality.CongestionReports) == 0 {
+		t.Fatalf("missing congestion reports")
+	}
+	for _, report := range quality.CongestionReports {
+		if report.Bounds.Min.XMM < req.Board.Origin.XMM || report.Bounds.Min.YMM < req.Board.Origin.YMM {
+			t.Fatalf("congestion cell outside board origin: %#v", report)
+		}
+	}
+}
+
+func TestSampleCongestionPointsHandlesLimitOne(t *testing.T) {
+	points := []endpointPoint{
+		{ref: "R1", point: Point{XMM: 0, YMM: 0}},
+		{ref: "R2", point: Point{XMM: 1, YMM: 1}},
+	}
+
+	sampled := sampleCongestionPoints(points, 1)
+	if len(sampled) != 1 || sampled[0].ref != "R1" {
+		t.Fatalf("sampled = %#v, want first point only", sampled)
+	}
+}
+
 func TestQualityReportScoresOptionalRegionMissAsWarning(t *testing.T) {
 	req := minimalRequest()
 	req.RegionRules = []RegionRule{{
