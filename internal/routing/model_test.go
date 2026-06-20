@@ -4,6 +4,7 @@ import (
 	"math"
 	"testing"
 
+	"kicadai/internal/pcbrules"
 	"kicadai/internal/reports"
 )
 
@@ -153,6 +154,28 @@ func TestValidateRejectsInvalidNetClassParameters(t *testing.T) {
 	issues := Validate(&request)
 	assertIssuePath(t, issues, "rules.net_classes[bad].trace_width_mm")
 	assertIssuePath(t, issues, "rules.net_classes[bad].via_drill_mm")
+}
+
+func TestResolveNetRuleFromSetUsesOverrideWithoutRebuildingRequest(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.NetClasses = map[string]NetClass{
+		"POWER": {TraceWidthMM: 0.5},
+	}
+	request.Rules.NetOverrides = map[string]NetRule{
+		"SIG": {ClassName: "POWER", MaxViasPerNet: 1},
+	}
+	NormalizeRequest(&request)
+
+	rule, issues := ResolveNetRuleFromSet(toPCBRules(request.Rules, request.Strategy), request.Nets[0])
+	if len(issues) != 0 {
+		t.Fatalf("ResolveNetRuleFromSet issues = %#v", issues)
+	}
+	if rule.ClassName != "POWER" || rule.TraceWidthMM != 0.5 || rule.MaxViasPerNet != 1 {
+		t.Fatalf("resolved rule = %#v", rule)
+	}
+	if pcbrules.PairKey("B", "A") != "A|B" {
+		t.Fatalf("PairKey normalization changed")
+	}
 }
 
 func minimalRequest() Request {

@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"kicadai/internal/pcbrules"
 	"kicadai/internal/reports"
 )
 
@@ -51,10 +52,14 @@ const (
 type NetRole string
 
 const (
-	NetPower   NetRole = "power"
-	NetGround  NetRole = "ground"
-	NetSignal  NetRole = "signal"
-	NetUnknown NetRole = "unknown"
+	NetPower        NetRole = "power"
+	NetGround       NetRole = "ground"
+	NetSignal       NetRole = "signal"
+	NetClock        NetRole = "clock"
+	NetAnalog       NetRole = "analog"
+	NetHighCurrent  NetRole = "high_current"
+	NetDifferential NetRole = "differential"
+	NetUnknown      NetRole = "unknown"
 )
 
 type CopperKind string
@@ -84,6 +89,7 @@ const (
 	ZoneIgnore      ZoneRoutingPolicy = "ignore"
 	ZoneObstacle    ZoneRoutingPolicy = "obstacle"
 	ZoneUnsupported ZoneRoutingPolicy = "unsupported"
+	ZoneSufficient  ZoneRoutingPolicy = "sufficient"
 )
 
 type Request struct {
@@ -175,26 +181,62 @@ type Obstacle struct {
 }
 
 type Rules struct {
-	GridMM          float64             `json:"grid_mm,omitempty"`
-	TraceWidthMM    float64             `json:"trace_width_mm,omitempty"`
-	ClearanceMM     float64             `json:"clearance_mm,omitempty"`
-	ViaDiameterMM   float64             `json:"via_diameter_mm,omitempty"`
-	ViaDrillMM      float64             `json:"via_drill_mm,omitempty"`
-	ViaClearanceMM  float64             `json:"via_clearance_mm,omitempty"`
-	EdgeClearanceMM float64             `json:"edge_clearance_mm,omitempty"`
-	MaxSearchNodes  int                 `json:"max_search_nodes,omitempty"`
-	MaxViasPerNet   int                 `json:"max_vias_per_net,omitempty"`
-	AllowVias       *bool               `json:"allow_vias,omitempty"`
-	AllowBackLayer  *bool               `json:"allow_back_layer,omitempty"`
-	PreferLayer     string              `json:"prefer_layer,omitempty"`
-	NetClasses      map[string]NetClass `json:"net_classes,omitempty"`
+	GridMM             float64                    `json:"grid_mm,omitempty"`
+	TraceWidthMM       float64                    `json:"trace_width_mm,omitempty"`
+	ClearanceMM        float64                    `json:"clearance_mm,omitempty"`
+	ViaDiameterMM      float64                    `json:"via_diameter_mm,omitempty"`
+	ViaDrillMM         float64                    `json:"via_drill_mm,omitempty"`
+	ViaClearanceMM     float64                    `json:"via_clearance_mm,omitempty"`
+	EdgeClearanceMM    float64                    `json:"edge_clearance_mm,omitempty"`
+	MaxSearchNodes     int                        `json:"max_search_nodes,omitempty"`
+	MaxViasPerNet      int                        `json:"max_vias_per_net,omitempty"`
+	AllowVias          *bool                      `json:"allow_vias,omitempty"`
+	AllowBackLayer     *bool                      `json:"allow_back_layer,omitempty"`
+	PreferLayer        string                     `json:"prefer_layer,omitempty"`
+	NetClasses         map[string]NetClass        `json:"net_classes,omitempty"`
+	NetOverrides       map[string]NetRule         `json:"net_overrides,omitempty"`
+	AllowedLayers      []string                   `json:"allowed_layers,omitempty"`
+	ClearanceMatrix    map[string]float64         `json:"clearance_matrix,omitempty"`
+	WarningLengthMM    float64                    `json:"warning_length_mm,omitempty"`
+	MaxLengthMM        float64                    `json:"max_length_mm,omitempty"`
+	MinTraceWidthMM    float64                    `json:"min_trace_width_mm,omitempty"`
+	MinNeckdownWidthMM float64                    `json:"min_neckdown_width_mm,omitempty"`
+	NeckdownWidthMM    float64                    `json:"neckdown_width_mm,omitempty"`
+	NeckdownLengthMM   float64                    `json:"neckdown_length_mm,omitempty"`
+	DifferentialPairs  []pcbrules.CoupledNetGroup `json:"differential_pairs,omitempty"`
 }
 
 type NetClass struct {
-	TraceWidthMM  float64 `json:"trace_width_mm,omitempty"`
-	ClearanceMM   float64 `json:"clearance_mm,omitempty"`
-	ViaDiameterMM float64 `json:"via_diameter_mm,omitempty"`
-	ViaDrillMM    float64 `json:"via_drill_mm,omitempty"`
+	TraceWidthMM       float64  `json:"trace_width_mm,omitempty"`
+	ClearanceMM        float64  `json:"clearance_mm,omitempty"`
+	ViaDiameterMM      float64  `json:"via_diameter_mm,omitempty"`
+	ViaDrillMM         float64  `json:"via_drill_mm,omitempty"`
+	ViaClearanceMM     float64  `json:"via_clearance_mm,omitempty"`
+	AllowedLayers      []string `json:"allowed_layers,omitempty"`
+	PreferLayer        string   `json:"prefer_layer,omitempty"`
+	MaxViasPerNet      int      `json:"max_vias_per_net,omitempty"`
+	WarningLengthMM    float64  `json:"warning_length_mm,omitempty"`
+	MaxLengthMM        float64  `json:"max_length_mm,omitempty"`
+	NeckdownWidthMM    float64  `json:"neckdown_width_mm,omitempty"`
+	NeckdownLengthMM   float64  `json:"neckdown_length_mm,omitempty"`
+	RequireExplicitUse bool     `json:"require_explicit_use,omitempty"`
+}
+
+type NetRule struct {
+	ClassName        string   `json:"class,omitempty"`
+	Role             NetRole  `json:"role,omitempty"`
+	TraceWidthMM     float64  `json:"trace_width_mm,omitempty"`
+	ClearanceMM      float64  `json:"clearance_mm,omitempty"`
+	ViaDiameterMM    float64  `json:"via_diameter_mm,omitempty"`
+	ViaDrillMM       float64  `json:"via_drill_mm,omitempty"`
+	ViaClearanceMM   float64  `json:"via_clearance_mm,omitempty"`
+	AllowedLayers    []string `json:"allowed_layers,omitempty"`
+	PreferLayer      string   `json:"prefer_layer,omitempty"`
+	MaxViasPerNet    int      `json:"max_vias_per_net,omitempty"`
+	WarningLengthMM  float64  `json:"warning_length_mm,omitempty"`
+	MaxLengthMM      float64  `json:"max_length_mm,omitempty"`
+	NeckdownWidthMM  float64  `json:"neckdown_width_mm,omitempty"`
+	NeckdownLengthMM float64  `json:"neckdown_length_mm,omitempty"`
 }
 
 type Strategy struct {
@@ -382,6 +424,13 @@ func NormalizeRequest(request *Request) {
 		}
 		request.Rules.NetClasses = normalizedClasses
 	}
+	if len(request.Rules.NetOverrides) > 0 {
+		normalizedOverrides := make(map[string]NetRule, len(request.Rules.NetOverrides))
+		for name, rule := range request.Rules.NetOverrides {
+			normalizedOverrides[strings.TrimSpace(name)] = rule
+		}
+		request.Rules.NetOverrides = normalizedOverrides
+	}
 	if request.Strategy.Mode == ModeSingleLayer {
 		request.Rules.AllowVias = boolPtr(false)
 		request.Rules.AllowBackLayer = boolPtr(false)
@@ -423,6 +472,9 @@ func Validate(request *Request) []reports.Issue {
 	if request.Rules.MaxSearchNodes <= 0 {
 		issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, "rules.max_search_nodes", "max search nodes must be positive"))
 	}
+	for _, ruleIssue := range pcbrules.Validate(toPCBRules(request.Rules, request.Strategy)) {
+		issues = append(issues, issue(reports.CodeInvalidArgument, severityFromRuleIssue(ruleIssue), "rules."+ruleIssue.Path, ruleIssue.Message))
+	}
 	if !supportedMode(request.Strategy.Mode) {
 		issues = append(issues, issue(reports.CodeUnsupportedOperation, reports.SeverityBlocked, "strategy.mode", fmt.Sprintf("unsupported routing mode %q", request.Strategy.Mode)))
 	}
@@ -442,6 +494,9 @@ func Validate(request *Request) []reports.Issue {
 		}
 		if netClass.ViaDiameterMM > 0 && netClass.ViaDrillMM > 0 && netClass.ViaDrillMM >= netClass.ViaDiameterMM {
 			issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".via_drill_mm", "net class via drill must be smaller than via diameter"))
+		}
+		if netClass.NeckdownWidthMM > 0 && netClass.TraceWidthMM > 0 && netClass.NeckdownWidthMM > netClass.TraceWidthMM {
+			issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, prefix+".neckdown_width_mm", "net class neckdown width cannot exceed trace width"))
 		}
 	}
 	knownLayers := map[string]Layer{}
@@ -577,11 +632,124 @@ func Validate(request *Request) []reports.Issue {
 	return issues
 }
 
+func ResolveNetRule(request *Request, net Net) (pcbrules.EffectiveRule, []reports.Issue) {
+	if request == nil {
+		return pcbrules.EffectiveRule{}, []reports.Issue{issue(reports.CodeInvalidArgument, reports.SeverityBlocked, "request", "request is required")}
+	}
+	return ResolveNetRuleFromSet(toPCBRules(request.Rules, request.Strategy), net)
+}
+
+func ResolveNetRuleFromSet(ruleSet pcbrules.RuleSet, net Net) (pcbrules.EffectiveRule, []reports.Issue) {
+	return ResolveNetRuleWithResolver(pcbrules.NewResolver(ruleSet), net)
+}
+
+func ResolveNetRuleWithResolver(resolver *pcbrules.Resolver, net Net) (pcbrules.EffectiveRule, []reports.Issue) {
+	if resolver == nil {
+		resolver = pcbrules.NewResolver(pcbrules.RuleSet{})
+	}
+	rule, ruleIssues := resolver.Resolve(pcbrules.NetDescriptor{
+		Name:  strings.TrimSpace(net.Name),
+		Class: strings.TrimSpace(net.Class),
+		Role:  pcbrules.Role(net.Role),
+	})
+	issues := make([]reports.Issue, 0, len(ruleIssues))
+	for _, ruleIssue := range ruleIssues {
+		issues = append(issues, issue(reports.CodeInvalidArgument, severityFromRuleIssue(ruleIssue), "rules."+ruleIssue.Path, ruleIssue.Message))
+	}
+	return rule, issues
+}
+
+func toPCBRules(rules Rules, strategy Strategy) pcbrules.RuleSet {
+	set := pcbrules.RuleSet{
+		GridMM:             sparseFloatValue(rules.GridMM),
+		TraceWidthMM:       sparseFloatValue(rules.TraceWidthMM),
+		ClearanceMM:        sparseFloatValue(rules.ClearanceMM),
+		ViaDiameterMM:      sparseFloatValue(rules.ViaDiameterMM),
+		ViaDrillMM:         sparseFloatValue(rules.ViaDrillMM),
+		ViaClearanceMM:     sparseFloatValue(rules.ViaClearanceMM),
+		EdgeClearanceMM:    sparseFloatValue(rules.EdgeClearanceMM),
+		MaxSearchNodes:     sparseIntValue(rules.MaxSearchNodes),
+		MaxViasPerNet:      sparseIntValue(rules.MaxViasPerNet),
+		AllowVias:          rules.AllowVias,
+		AllowBackLayer:     rules.AllowBackLayer,
+		PreferLayer:        rules.PreferLayer,
+		AllowedLayers:      append([]string(nil), rules.AllowedLayers...),
+		WarningLengthMM:    sparseFloatValue(rules.WarningLengthMM),
+		MaxLengthMM:        sparseFloatValue(rules.MaxLengthMM),
+		MinTraceWidthMM:    sparseFloatValue(rules.MinTraceWidthMM),
+		MinNeckdownWidthMM: sparseFloatValue(rules.MinNeckdownWidthMM),
+		NeckdownWidthMM:    sparseFloatValue(rules.NeckdownWidthMM),
+		NeckdownLengthMM:   sparseFloatValue(rules.NeckdownLengthMM),
+		TreatZonesAs:       pcbrules.ZonePolicy(strategy.TreatZonesAs),
+		ClearanceMatrix:    pcbrules.ClearanceMatrix(rules.ClearanceMatrix),
+		DifferentialPairs:  append([]pcbrules.CoupledNetGroup(nil), rules.DifferentialPairs...),
+		Classes:            make(map[string]pcbrules.Class, len(rules.NetClasses)),
+		NetOverrides:       make(map[string]pcbrules.Rule, len(rules.NetOverrides)),
+	}
+	for name, class := range rules.NetClasses {
+		set.Classes[name] = pcbrules.Class{
+			TraceWidthMM:       sparseFloatValue(class.TraceWidthMM),
+			ClearanceMM:        sparseFloatValue(class.ClearanceMM),
+			ViaDiameterMM:      sparseFloatValue(class.ViaDiameterMM),
+			ViaDrillMM:         sparseFloatValue(class.ViaDrillMM),
+			ViaClearanceMM:     sparseFloatValue(class.ViaClearanceMM),
+			AllowedLayers:      append([]string(nil), class.AllowedLayers...),
+			PreferLayer:        class.PreferLayer,
+			MaxViasPerNet:      sparseIntValue(class.MaxViasPerNet),
+			WarningLengthMM:    sparseFloatValue(class.WarningLengthMM),
+			MaxLengthMM:        sparseFloatValue(class.MaxLengthMM),
+			NeckdownWidthMM:    sparseFloatValue(class.NeckdownWidthMM),
+			NeckdownLengthMM:   sparseFloatValue(class.NeckdownLengthMM),
+			RequireExplicitUse: class.RequireExplicitUse,
+		}
+	}
+	for name, override := range rules.NetOverrides {
+		set.NetOverrides[name] = pcbrules.Rule{
+			ClassName:        override.ClassName,
+			Role:             pcbrules.Role(override.Role),
+			TraceWidthMM:     sparseFloatValue(override.TraceWidthMM),
+			ClearanceMM:      sparseFloatValue(override.ClearanceMM),
+			ViaDiameterMM:    sparseFloatValue(override.ViaDiameterMM),
+			ViaDrillMM:       sparseFloatValue(override.ViaDrillMM),
+			ViaClearanceMM:   sparseFloatValue(override.ViaClearanceMM),
+			AllowedLayers:    append([]string(nil), override.AllowedLayers...),
+			PreferLayer:      override.PreferLayer,
+			MaxViasPerNet:    sparseIntValue(override.MaxViasPerNet),
+			WarningLengthMM:  sparseFloatValue(override.WarningLengthMM),
+			MaxLengthMM:      sparseFloatValue(override.MaxLengthMM),
+			NeckdownWidthMM:  sparseFloatValue(override.NeckdownWidthMM),
+			NeckdownLengthMM: sparseFloatValue(override.NeckdownLengthMM),
+		}
+	}
+	return set
+}
+
+func severityFromRuleIssue(ruleIssue pcbrules.Issue) reports.Severity {
+	if ruleIssue.Blocking {
+		return reports.SeverityBlocked
+	}
+	return reports.SeverityWarning
+}
+
 func supportedMode(mode RouteMode) bool {
 	return mode == ModeSingleLayer || mode == ModeTwoLayer || mode == ModeValidateOnly
 }
 
 func boolPtr(value bool) *bool {
+	return &value
+}
+
+func sparseFloatValue(value float64) *float64 {
+	if value == 0 {
+		return nil
+	}
+	return &value
+}
+
+func sparseIntValue(value int) *int {
+	if value == 0 {
+		return nil
+	}
 	return &value
 }
 
