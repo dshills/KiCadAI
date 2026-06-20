@@ -26,6 +26,11 @@ connectivity-first PCB validation, and run KiCad-backed ERC/DRC checks through
 `kicad-cli`. Transaction validation, planning, and apply results carry stable
 operation IDs where possible so AI agents can connect issues back to the source
 operation they need to repair.
+Routing engine hardening is the next implementation priority and is specified
+in `specs/routing-engine-hardening/`. That plan covers shared PCB rule
+resolution, route quality reports, net-class and role-aware routing, clearance
+matrices, neckdowns, conservative zone evidence, via policy, differential/length
+intent, repair diagnostics, workflow integration, and golden route coverage.
 Closed-loop validation repair now has a deterministic foundation: issue
 classification, repair planning, safe transaction-level executors, a bounded
 runner that requires revalidation before reporting success, persisted repairs
@@ -550,15 +555,26 @@ obstacles, route simplification, connectivity validation, clearance validation,
 operation emission, KiCad check feedback mapping, golden routed examples, and
 bounded stress tests.
 
+The next routing hardening pass is planned, not yet implemented. See
+`specs/routing-engine-hardening/SPEC.md` and
+`specs/routing-engine-hardening/PLAN.md` for the phased work to add shared
+`internal/pcbrules`, per-net route quality reports, net class and role-aware
+routing, class-to-class clearance matrices, pad neckdowns, stronger obstacle
+diagnostics, deterministic scoring, conservative zone-sufficient evidence,
+coupled-net intent validation, repairable route diagnostics, workflow
+integration, and a representative golden routing corpus.
+
 Current routing limitations:
 
 - The router is intended for simple boards and early AI workflow validation, not
   dense BGA or production autorouting.
 - Routes are orthogonal grid paths; there is no diagonal, curved, length-tuned,
   differential-pair, or impedance-aware routing yet.
+- Net-class and role-aware routing rules, clearance matrices, neckdowns, and
+  route quality reports are specified but not implemented yet.
 - Placement quality strongly affects routing success.
 - Copper zones are treated as obstacles or unsupported policy inputs; zone-fill
-  aware routing is not implemented.
+  aware routing and conservative zone-sufficient proof are not implemented.
 - Placement can hydrate bounds and compact pad summaries from resolver records.
   New-project and imported-project transaction apply can hydrate pads, pad
   shapes, through-hole metadata, text, graphics, and models. Routing still
@@ -1071,7 +1087,8 @@ make test
 - Direct readers/writers model a growing but incomplete subset of KiCad
   schematic and PCB syntax.
 - The routing engine handles small deterministic grid-routing cases, not full
-  production autorouting.
+  production autorouting. The next hardening pass is specified in
+  `specs/routing-engine-hardening/` but not implemented yet.
 - Imported-project mutation blocks unsupported raw content to avoid damaging
   user-authored KiCad features.
 - Operation feedback is strongest for transaction-derived issues. Generic KiCad

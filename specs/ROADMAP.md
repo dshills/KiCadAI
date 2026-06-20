@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-19
+Date: 2026-06-20
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -54,6 +54,8 @@ from validation feedback to safe automatic repair.
   block-derived placement intent, proximity/region/mechanical/routing-readiness
   quality reports, repairable diagnostics, and golden corpus coverage.
 - Routing engine foundation for small generated PCB nets.
+- Routing engine hardening has a detailed spec and phased implementation plan
+  in `specs/routing-engine-hardening/`.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -299,18 +301,32 @@ Route generated boards in ways that are electrically meaningful and DRC-aware.
 ### Current Foundation
 
 Routing request/result models, small-net routing, validation, and transaction
-emission exist.
+emission exist. A routing hardening spec and implementation plan now define the
+next work around shared PCB rules, route quality reports, net-class policies,
+clearance matrices, neckdowns, via policy, conservative zone evidence, repair
+diagnostics, workflow integration, and a golden routing corpus.
 
 ### Remaining Work
 
-- Add net classes with trace width, clearance, via, and layer constraints.
-- Add power, signal, analog, and high-current routing policies.
-- Improve obstacle avoidance around footprints, keepouts, zones, and board
-  edges.
-- Support two-layer routing with via policy and return-path awareness.
-- Add differential pair and length-matching foundations.
-- Feed DRC and connectivity findings back into route repair.
-- Improve zone and copper pour handling.
+- Implement the shared `internal/pcbrules` model for net classes, trace/via
+  rules, layer policy, clearance matrices, neckdowns, zone policy, and length
+  policy.
+- Add route quality reports with per-net completion, length, via, layer,
+  search-pressure, clearance, and failure evidence.
+- Apply net class and role-aware routing rules during route search and
+  validation.
+- Improve obstacle and clearance diagnostics around pads, same-net and
+  other-net copper, keepouts, zones, and board edges.
+- Harden two-layer routing with explicit via limits, allowed-layer policy,
+  through-hole same-net layer transitions, and unsupported blind/buried via
+  diagnostics.
+- Add length scoring, differential/coupled-net intent validation, and honest
+  unsupported-feature reporting.
+- Integrate repairable routing diagnostics into `design create` and repair
+  planning.
+- Add a golden routing corpus with route-shape/topology summaries.
+- Keep zone-sufficient behavior conservative and opt-in until proof evidence is
+  strong enough to avoid false connectivity.
 
 ### Acceptance Gates
 
@@ -433,7 +449,7 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Improve routing rules, net classes, and DRC-driven route repair.
+1. Implement `specs/routing-engine-hardening/PLAN.md` phase by phase.
 2. Add true placement congestion/fanout scoring and iterative placement retry
    from the new repairable diagnostics.
 3. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
