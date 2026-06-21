@@ -1,0 +1,12 @@
+{
+  "name": "harness",
+  "request": "request.json",
+  "intent": "Harness-only metadata fixture for full-board retry evidence tests.",
+  "expected_categories": ["increase_spacing"],
+  "expected_stop_reason": "max_attempts",
+  "expected_improvement": "none",
+  "preserve_constraints": ["fixed_refs", "keepouts", "edge_constraints", "net_assignments"],
+  "expected_routing_status": "blocked",
+  "expect_project_write": false,
+  "determinism": "static metadata fixture with no workflow execution"
+}
