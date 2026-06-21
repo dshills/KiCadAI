@@ -174,6 +174,41 @@ func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
 	}
 }
 
+func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
+	requestPath := filepath.Join("..", "..", "internal", "designworkflow", "testdata", "full_board_retry", "generated_led_rejected", "request.json")
+	output := filepath.Join(t.TempDir(), "generated_led_rejected")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "design", "create"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result cliRetrySnapshot
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	routingStage := cliRetryStageByName(t, result.Data.Stages, "routing")
+	if routingStage.Status != "blocked" {
+		t.Fatalf("routing stage status = %q, want blocked", routingStage.Status)
+	}
+	retry, ok := routingStage.Summary["routing_retry"].(map[string]any)
+	if !ok {
+		t.Fatalf("routing retry summary missing: %#v", routingStage.Summary)
+	}
+	if enabled, ok := retry["enabled"].(bool); !ok || !enabled {
+		t.Fatalf("retry enabled = %#v", retry["enabled"])
+	}
+	if attempts, ok := retry["attempts"].(float64); !ok || int(attempts) != 1 {
+		t.Fatalf("retry attempts = %#v", retry["attempts"])
+	}
+	if stop, ok := retry["stop_reason"].(string); !ok || stop != "no_eligible_hints" {
+		t.Fatalf("retry stop = %#v", retry["stop_reason"])
+	}
+	if !cliRetryStageHasIssue(routingStage, "footprint pad summaries") {
+		t.Fatalf("routing stage missing pad-summary issue: %#v", routingStage.Issues)
+	}
+}
+
 type cliRetrySnapshot struct {
 	Data struct {
 		Project struct {
@@ -187,6 +222,9 @@ type cliRetryStageSnapshot struct {
 	Name    string         `json:"name"`
 	Status  string         `json:"status"`
 	Summary map[string]any `json:"summary"`
+	Issues  []struct {
+		Message string `json:"message"`
+	} `json:"issues,omitempty"`
 }
 
 func cliRetryStageByName(t *testing.T, stages []cliRetryStageSnapshot, name string) cliRetryStageSnapshot {
@@ -202,6 +240,15 @@ func cliRetryStageByName(t *testing.T, stages []cliRetryStageSnapshot, name stri
 	}
 	t.Fatalf("missing stage %q; got stages %v", name, names)
 	return cliRetryStageSnapshot{}
+}
+
+func cliRetryStageHasIssue(stage cliRetryStageSnapshot, text string) bool {
+	for _, issue := range stage.Issues {
+		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRunComponentListJSON(t *testing.T) {
