@@ -117,6 +117,65 @@ func hydratePadsFromResolverRecord(index libraryresolver.LibraryIndex, ref strin
 	return result
 }
 
+type padNetAssignment struct {
+	NetName string
+	Pin     string
+}
+
+type padNetAssignmentIndex map[string][]padNetAssignment
+
+func buildPadNetAssignmentIndex(nets []placement.Net) padNetAssignmentIndex {
+	index := padNetAssignmentIndex{}
+	for _, net := range nets {
+		netName := strings.TrimSpace(net.Name)
+		if netName == "" {
+			continue
+		}
+		for _, endpoint := range net.Endpoints {
+			ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+			if ref == "" {
+				continue
+			}
+			index[ref] = append(index[ref], padNetAssignment{NetName: netName, Pin: strings.TrimSpace(endpoint.Pin)})
+		}
+	}
+	return index
+}
+
+func assignPadNetsFromIndex(ref string, pads []placement.PadSummary, assignments padNetAssignmentIndex) ([]placement.PadSummary, []reports.Issue) {
+	ref = strings.TrimSpace(ref)
+	out := append([]placement.PadSummary(nil), pads...)
+	padByName := map[string][]int{}
+	for index, pad := range out {
+		name := strings.TrimSpace(pad.Name)
+		out[index].Name = name
+		if name != "" {
+			padByName[name] = append(padByName[name], index)
+		}
+	}
+	var issues []reports.Issue
+	for _, assignment := range assignments[strings.ToUpper(ref)] {
+		pin := assignment.Pin
+		if pin == "" {
+			issues = append(issues, padHydrationIssue(ref, "", "nets."+assignment.NetName, "net endpoint pin is required for pad assignment"))
+			continue
+		}
+		padIndexes := padByName[pin]
+		if len(padIndexes) == 0 {
+			issues = append(issues, padHydrationIssue(ref, "", "nets."+assignment.NetName+"."+pin, "net endpoint pin has no matching footprint pad"))
+			continue
+		}
+		for _, padIndex := range padIndexes {
+			if out[padIndex].Net != "" && out[padIndex].Net != assignment.NetName {
+				issues = append(issues, padHydrationIssue(ref, "", "pads."+pin+".net", fmt.Sprintf("footprint pad maps to multiple generated nets: %s and %s", out[padIndex].Net, assignment.NetName)))
+				continue
+			}
+			out[padIndex].Net = assignment.NetName
+		}
+	}
+	return out, issues
+}
+
 func padHydrationResultForRef(base padHydrationResult, ref string) padHydrationResult {
 	result := padHydrationResult{
 		Bounds: base.Bounds,

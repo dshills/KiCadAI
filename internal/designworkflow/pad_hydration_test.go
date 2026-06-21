@@ -6,6 +6,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
 
@@ -129,5 +130,68 @@ func TestPadHydrationResolverReusesFootprintDataWithPerRefContext(t *testing.T) 
 	second.Pads[0].Net = "SIG"
 	if first.Pads[0].Net == "SIG" {
 		t.Fatalf("cached pad summaries were not copied per result")
+	}
+}
+
+func TestAssignPadNetsMapsEndpointPinsToPads(t *testing.T) {
+	index := buildPadNetAssignmentIndex([]placement.Net{{
+		Name: "LED_SERIES",
+		Endpoints: []placement.Endpoint{
+			{Ref: "R1", Pin: "2"},
+			{Ref: "D1", Pin: "1"},
+		},
+	}})
+	pads, issues := assignPadNetsFromIndex("D1", []placement.PadSummary{{Name: "1"}, {Name: "2"}}, index)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if pads[0].Net != "LED_SERIES" || pads[1].Net != "" {
+		t.Fatalf("pads = %#v", pads)
+	}
+}
+
+func TestAssignPadNetsMapsSharedPadNames(t *testing.T) {
+	index := buildPadNetAssignmentIndex([]placement.Net{{
+		Name:      "GND",
+		Endpoints: []placement.Endpoint{{Ref: "U1", Pin: "GND"}},
+	}})
+	pads, issues := assignPadNetsFromIndex("U1", []placement.PadSummary{{Name: "GND"}, {Name: "GND"}, {Name: "VCC"}}, index)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if pads[0].Net != "GND" || pads[1].Net != "GND" || pads[2].Net != "" {
+		t.Fatalf("pads = %#v", pads)
+	}
+}
+
+func TestBuildPadNetAssignmentIndexGroupsByRef(t *testing.T) {
+	index := buildPadNetAssignmentIndex([]placement.Net{
+		{Name: "A", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}},
+		{Name: "B", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "2"}}},
+	})
+	if len(index["R1"]) != 2 || len(index["R2"]) != 1 {
+		t.Fatalf("index = %#v", index)
+	}
+}
+
+func TestAssignPadNetsBlocksMissingPadMapping(t *testing.T) {
+	index := buildPadNetAssignmentIndex([]placement.Net{{
+		Name:      "LED_SERIES",
+		Endpoints: []placement.Endpoint{{Ref: "D1", Pin: "2"}},
+	}})
+	_, issues := assignPadNetsFromIndex("D1", []placement.PadSummary{{Name: "1"}}, index)
+	if len(issues) != 1 || !issues[0].Blocking() {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestAssignPadNetsBlocksConflictingNetAssignment(t *testing.T) {
+	index := buildPadNetAssignmentIndex([]placement.Net{
+		{Name: "A", Endpoints: []placement.Endpoint{{Ref: "D1", Pin: "1"}}},
+		{Name: "B", Endpoints: []placement.Endpoint{{Ref: "D1", Pin: "1"}}},
+	})
+	_, issues := assignPadNetsFromIndex("D1", []placement.PadSummary{{Name: "1"}}, index)
+	if len(issues) != 1 || !issues[0].Blocking() {
+		t.Fatalf("issues = %#v", issues)
 	}
 }
