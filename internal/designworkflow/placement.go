@@ -7,6 +7,7 @@ import (
 	"unicode"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
@@ -16,6 +17,7 @@ var defaultWorkflowBounds = placement.Bounds{WidthMM: 2.0, HeightMM: 1.25, Sourc
 type PlacementOptions struct {
 	DefaultBounds placement.Bounds
 	Rules         placement.Rules
+	LibraryIndex  *libraryresolver.LibraryIndex
 }
 
 type PlacementStageResult struct {
@@ -88,6 +90,12 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 			addPlacementRouteNet(&placementRequest, netIndexes, route)
 		}
 	}
+	var padEntries []PadHydrationEntry
+	var padIssues []reports.Issue
+	if opts.LibraryIndex != nil {
+		placementRequest, padEntries, padIssues = hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
+		issues = append(issues, padIssues...)
+	}
 	placementRequest = placement.NormalizeRequest(placementRequest)
 	result := placement.PlaceContext(ctx, placementRequest)
 	issues = append(issues, result.Issues...)
@@ -98,10 +106,45 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		"unplaced_count":  result.Metrics.UnplacedCount,
 		"fixed_count":     result.Metrics.FixedCount,
 	}
+	if len(padEntries) != 0 || len(padIssues) != 0 {
+		stage.Summary["pad_hydration"] = summarizePadHydration(padEntries, padIssues)
+	}
+	stage.Issues = issues
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+func hydratePlacementRequestPads(request placement.Request, index *libraryresolver.LibraryIndex) (placement.Request, []PadHydrationEntry, []reports.Issue) {
+	resolver := padHydrationResolver{}
+	if index != nil {
+		resolver.index = *index
+	}
+	netAssignments := buildPadNetAssignmentIndex(request.Nets)
+	entries := make([]PadHydrationEntry, 0, len(request.Components))
+	var issues []reports.Issue
+	for componentIndex := range request.Components {
+		component := &request.Components[componentIndex]
+		if len(component.Pads) != 0 {
+			pads, netIssues := assignPadNetsFromIndex(component.Ref, component.Pads, netAssignments)
+			component.Pads = pads
+			entries = append(entries, PadHydrationEntry{Ref: component.Ref, FootprintID: component.FootprintID, Source: PadHydrationSourceInput, PadCount: len(component.Pads)})
+			issues = append(issues, netIssues...)
+			continue
+		}
+		hydrated := resolver.Hydrate(component.Ref, component.FootprintID)
+		if len(hydrated.Pads) != 0 {
+			component.Bounds = hydrated.Bounds
+		}
+		pads, netIssues := assignPadNetsFromIndex(component.Ref, hydrated.Pads, netAssignments)
+		component.Pads = pads
+		hydrated.Entry.PadCount = len(pads)
+		entries = append(entries, hydrated.Entry)
+		issues = append(issues, hydrated.Issues...)
+		issues = append(issues, netIssues...)
+	}
+	return request, entries, issues
 }
 
 func addPlacementRouteNet(request *placement.Request, indexes map[string]int, route blocks.RealizedPCBLocalRoute) {

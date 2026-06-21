@@ -13,7 +13,7 @@ import (
 func TestSummarizePadHydrationOrdersMissingRefsAndCountsSources(t *testing.T) {
 	summary := summarizePadHydration([]PadHydrationEntry{
 		{Ref: "D1", FootprintID: "LED:D", Source: PadHydrationSourceResolver, PadCount: 2},
-		{Ref: "R1", FootprintID: "R:R", Source: PadHydrationSourceVerifiedTemplate, PadCount: 2},
+		{Ref: "R1", FootprintID: "R:R", Source: PadHydrationSourceInput, PadCount: 2},
 		{Ref: "J1", FootprintID: "Connector:J", Source: PadHydrationSourceMissing, MissingReason: "not found"},
 	}, []reports.Issue{
 		{Severity: reports.SeverityBlocked, Refs: []string{"U1"}},
@@ -23,7 +23,7 @@ func TestSummarizePadHydrationOrdersMissingRefsAndCountsSources(t *testing.T) {
 	if summary.ComponentCount != 3 || summary.HydratedComponents != 2 || summary.MissingComponents != 1 || summary.PadCount != 4 {
 		t.Fatalf("summary counts = %#v", summary)
 	}
-	wantSources := map[PadHydrationSource]int{PadHydrationSourceResolver: 1, PadHydrationSourceVerifiedTemplate: 1, PadHydrationSourceMissing: 1}
+	wantSources := map[PadHydrationSource]int{PadHydrationSourceResolver: 1, PadHydrationSourceInput: 1, PadHydrationSourceMissing: 1}
 	if !reflect.DeepEqual(summary.SourceCounts, wantSources) {
 		t.Fatalf("source counts = %#v, want %#v", summary.SourceCounts, wantSources)
 	}

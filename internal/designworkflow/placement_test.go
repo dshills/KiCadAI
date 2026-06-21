@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
@@ -65,6 +67,47 @@ func TestPlaceFragmentsCurrentlyLacksGeneratedPadSummaries(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsHydratesGeneratedPadsFromResolver(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "status_board",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(ctx, registry, request)
+	fragments := RealizePCBFragments(ctx, registry, plan)
+	index := libraryresolver.LibraryIndex{Footprints: map[string]libraryresolver.FootprintRecord{
+		"Resistor_SMD:R_0805_2012Metric": placementTestFootprint("Resistor_SMD:R_0805_2012Metric"),
+		"LED_SMD:LED_0805_2012Metric":    placementTestFootprint("LED_SMD:LED_0805_2012Metric"),
+	}}
+
+	result := PlaceFragments(ctx, request, fragments, PlacementOptions{LibraryIndex: &index})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	var sawNet bool
+	for _, component := range result.Request.Components {
+		if len(component.Pads) != 2 {
+			t.Fatalf("%s pads = %#v, want two hydrated pads", component.Ref, component.Pads)
+		}
+		for _, pad := range component.Pads {
+			if pad.Net != "" {
+				sawNet = true
+			}
+		}
+	}
+	if !sawNet {
+		t.Fatalf("expected at least one generated net assignment: %#v", result.Request.Components)
+	}
+	summary, ok := result.Stage.Summary["pad_hydration"].(PadHydrationSummary)
+	if !ok || summary.HydratedComponents != 2 || summary.PadCount != 4 {
+		t.Fatalf("pad hydration summary = %#v", result.Stage.Summary["pad_hydration"])
+	}
+}
+
 func TestPlaceFragmentsDerivesBlockPlacementIntent(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
@@ -89,6 +132,20 @@ func TestPlaceFragmentsDerivesBlockPlacementIntent(t *testing.T) {
 	}
 	if result.Request.ProximityRules[0].Source == "" {
 		t.Fatalf("expected proximity source metadata: %#v", result.Request.ProximityRules[0])
+	}
+}
+
+func placementTestFootprint(id string) libraryresolver.FootprintRecord {
+	return libraryresolver.FootprintRecord{
+		FootprintID: id,
+		BoundingBox: libraryresolver.BoundingBox{
+			Min: kicadfiles.Point{X: -1_000_000, Y: -500_000},
+			Max: kicadfiles.Point{X: 1_000_000, Y: 500_000},
+		},
+		Pads: []libraryresolver.FootprintPad{
+			{Name: "1", Position: kicadfiles.Point{X: -600_000}, Size: kicadfiles.Point{X: 500_000, Y: 600_000}},
+			{Name: "2", Position: kicadfiles.Point{X: 600_000}, Size: kicadfiles.Point{X: 500_000, Y: 600_000}},
+		},
 	}
 }
 

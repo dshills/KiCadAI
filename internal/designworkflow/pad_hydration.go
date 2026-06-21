@@ -16,6 +16,7 @@ type PadHydrationSource string
 const (
 	PadHydrationSourceResolver         PadHydrationSource = "resolver"
 	PadHydrationSourceVerifiedTemplate PadHydrationSource = "verified_template"
+	PadHydrationSourceInput            PadHydrationSource = "input"
 	PadHydrationSourceMissing          PadHydrationSource = "missing"
 )
 
