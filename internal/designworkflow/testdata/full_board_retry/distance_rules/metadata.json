@@ -1,0 +1,12 @@
+{
+  "name": "distance_rules",
+  "request": "request.json",
+  "intent": "Small pad-backed board shaped to support reduce-distance retry evidence.",
+  "expected_categories": ["reduce_distance"],
+  "expected_stop_reason": "max_attempts",
+  "expected_improvement": "proximity_rule_evidence",
+  "preserve_constraints": ["fixed_refs", "keepouts", "edge_constraints", "local_routes", "net_assignments", "net_classes"],
+  "expected_routing_status": "partial",
+  "expect_project_write": false,
+  "determinism": "explicit pad summaries, multi-endpoint signal net, fixed seed, and in-process routing only"
+}

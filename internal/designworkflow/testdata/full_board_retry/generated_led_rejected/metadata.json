@@ -1,0 +1,12 @@
+{
+  "name": "generated_led_rejected",
+  "request": "request.json",
+  "intent": "Generated LED design-create candidate kept as a documented rejection until component pad summaries hydrate through the full workflow.",
+  "expected_categories": [],
+  "expected_stop_reason": "no_eligible_hints",
+  "expected_improvement": "rejected_missing_pad_summaries",
+  "preserve_constraints": [],
+  "expected_routing_status": "blocked",
+  "expect_project_write": false,
+  "determinism": "blocks deterministically before useful retry because generated components lack footprint pad summaries"
+}

@@ -1,0 +1,12 @@
+{
+  "name": "spacing_improves",
+  "request": "request.json",
+  "intent": "Small pad-backed board shaped to support full-board spacing retry evidence.",
+  "expected_categories": ["increase_spacing"],
+  "expected_stop_reason": "routed",
+  "expected_improvement": "routing_status_or_failed_net_count",
+  "preserve_constraints": ["fixed_refs", "keepouts", "edge_constraints", "local_routes", "net_assignments", "net_classes"],
+  "expected_routing_status": "routed",
+  "expect_project_write": false,
+  "determinism": "explicit pad summaries, fixed connector, fixed seed, and in-process routing only"
+}
