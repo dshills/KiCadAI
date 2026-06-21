@@ -32,7 +32,12 @@ Placement/routing feedback now has an opt-in bounded retry foundation:
 placement quality reports include coarse congestion cells and component fanout
 pressure, routing diagnostics map to placement retry hints, retry policies are
 explicit in design requests, and `design create` can rerun placement/routing
-within a capped budget while returning best-attempt evidence.
+within a capped budget while returning best-attempt evidence. Golden tests now
+cover retry behavior across fixtures, categories, stop conditions, unsupported
+skips, CLI summaries, and pad-backed full-board seed fixtures for spacing
+improvement, reduce-distance rule evidence, and safe non-improvement stops. The
+remaining gap is that generated `design create` layouts do not yet route far
+enough for retry to improve them without test-seed footprint pad summaries.
 Routing engine hardening now has an implemented foundation: shared PCB rule
 resolution, route quality reports, net-class and role-aware routing, length
 policy, search-pressure quality scoring, explicit zone policy behavior,
@@ -291,7 +296,12 @@ retry. Common stop reasons include `disabled`, `routed`, `max_attempts`,
 `repeated_placement_state`, `non_improving_retry`, and `context_canceled`.
 Golden tests cover fixture loading, CLI retry summaries, supported category
 adjustments, unsupported skip behavior, path normalization, and convergence
-boundaries.
+boundaries. Full-board retry tests also cover pad-backed seed boards where
+spacing retry improves routing evidence, reduce-distance retry emits stable
+proximity rules, and safe-stop retry preserves the best attempt. Current
+generated `design create` candidates still expose a documented footprint pad
+summary resolution blocker before full-board CLI improvement evidence is
+available.
 
 ### Component Intelligence
 
@@ -496,9 +506,14 @@ larger of the JSON `board.margin_mm` and `rules.board_edge_clearance_mm` values
 
 The placement hardening golden corpus covers representative LED, regulator,
 MCU minimal, USB-C power, I2C sensor, op-amp gain-stage, and connector-breakout
-layouts. Placement is still a deterministic heuristic, not a production-grade
-constraint solver; thermal placement, true congestion analysis, differential
-pairs, and final DRC-grade layout decisions remain future work.
+layouts. Placement-routing retry coverage now also includes deterministic
+goldens for retry summary shape, spacing/fanout/distance adjustments,
+unsupported skip behavior, selected stop conditions, CLI output, and pad-backed
+full-board seed evidence.
+Placement is still a deterministic heuristic, not a production-grade constraint
+solver; thermal placement, true congestion analysis, differential pairs,
+generated-workflow footprint pad summary resolution for full-board retry, and
+final DRC-grade layout decisions remain future work.
 
 ### Routing
 

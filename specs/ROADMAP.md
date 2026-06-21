@@ -62,7 +62,9 @@ from validation feedback to safe automatic repair.
 - Bounded placement-routing retry foundation with routing diagnostic to
   placement hint mapping, explicit retry policy, deterministic adjustment
   builder, best-attempt selection, repeated-state detection, and workflow retry
-  summaries.
+  summaries, plus golden coverage for fixture loading, retry summary shape,
+  supported placement retry categories, unsupported skips, selected stop
+  conditions, CLI output, and pad-backed full-board seed evidence.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -93,9 +95,9 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
-- placement-routing retry exists with golden coverage for summary shape,
-  supported hint categories, unsupported skips, selected stop conditions, and
-  CLI output, but remains conservative and needs broader full-board evidence;
+- placement-routing retry exists with focused and pad-backed full-board seed
+  evidence, but generated `design create` workflows still need footprint pad
+  summary resolution before they can prove real full-board retry improvement;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
@@ -478,8 +480,8 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Add golden full-board fixtures for placement-routing retry summaries,
-   improvement decisions, repeated-state stops, and non-improving retry stops.
+1. Resolve generated workflow footprint pad summaries so `design create`
+   full-board retry fixtures can prove improvement on real generated layouts.
 2. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
    and generated repair bundles.
 3. Add a dedicated repair bundle export command for non-`design create` flows.
