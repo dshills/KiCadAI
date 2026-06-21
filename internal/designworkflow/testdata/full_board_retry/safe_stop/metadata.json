@@ -1,0 +1,12 @@
+{
+  "name": "safe_stop",
+  "request": "request.json",
+  "intent": "Pad-backed board where an eligible retry applies but does not improve routing rank.",
+  "expected_categories": ["increase_spacing"],
+  "expected_stop_reason": "non_improving_retry",
+  "expected_improvement": "safe_stop_best_preserved",
+  "preserve_constraints": ["fixed_refs", "keepouts", "edge_constraints", "local_routes", "net_assignments", "net_classes"],
+  "expected_routing_status": "blocked",
+  "expect_project_write": false,
+  "determinism": "routing retry uses a fixed blocked initial result and skipped retry routing to force non-improvement deterministically"
+}
