@@ -125,6 +125,48 @@ func TestRetryGoldenReduceDistanceFixture(t *testing.T) {
 	}
 }
 
+func TestRetryGoldenUnsupportedZoneSkipsPlacementMutation(t *testing.T) {
+	request := loadRetryFixtureRequest(t, "unsupported_zone")
+	if !request.RoutingRetry.Enabled || len(request.RoutingRetry.AllowedHintCategories) != 1 || request.RoutingRetry.AllowedHintCategories[0] != PlacementRetryUnsupported {
+		t.Fatalf("retry policy = %#v", request.RoutingRetry)
+	}
+	hints := BuildPlacementRetryHints([]routing.RepairDiagnostic{{
+		Category: routing.RepairZonePolicy,
+		Action:   routing.ActionResolveZonePolicy,
+		Severity: reports.SeverityError,
+		Nets:     []string{"GND"},
+	}}, nil)
+	if len(hints) != 1 || hints[0].Category != PlacementRetryUnsupported || hints[0].RetryEligible {
+		t.Fatalf("hints = %#v", hints)
+	}
+	filtered := filterPlacementRetryHints(hints, request.RoutingRetry)
+	if len(filtered) != 0 {
+		t.Fatalf("unsupported hints should not pass retry filter: %#v", filtered)
+	}
+	assertRetryGoldenNoPlacementMutation(t, hints)
+}
+
+func TestRetryGoldenRelaxRulesSkipsPlacementMutation(t *testing.T) {
+	request := loadRetryFixtureRequest(t, "relax_rules")
+	if !request.RoutingRetry.Enabled || len(request.RoutingRetry.AllowedHintCategories) != 1 || request.RoutingRetry.AllowedHintCategories[0] != PlacementRetryRelaxRules {
+		t.Fatalf("retry policy = %#v", request.RoutingRetry)
+	}
+	hints := BuildPlacementRetryHints([]routing.RepairDiagnostic{{
+		Category: routing.RepairRoutingRules,
+		Action:   routing.ActionAdjustRoutingRules,
+		Severity: reports.SeverityError,
+		Nets:     []string{"VIN"},
+	}}, nil)
+	if len(hints) != 1 || hints[0].Category != PlacementRetryRelaxRules || hints[0].RetryEligible {
+		t.Fatalf("hints = %#v", hints)
+	}
+	filtered := filterPlacementRetryHints(hints, request.RoutingRetry)
+	if len(filtered) != 0 {
+		t.Fatalf("rule-only hints should not pass retry filter: %#v", filtered)
+	}
+	assertRetryGoldenNoPlacementMutation(t, hints)
+}
+
 func retryGoldenPlacementRequest() placement.Request {
 	return placement.Request{
 		Board: placement.BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 2},
@@ -154,6 +196,24 @@ func retryGoldenPlacementRequest() placement.Request {
 			GroupSpacingMM:     1,
 		},
 	}
+}
+
+func assertRetryGoldenNoPlacementMutation(t *testing.T, hints []PlacementRetryHint) {
+	t.Helper()
+	req := placement.NormalizeRequest(retryGoldenPlacementRequest())
+	before := placement.CloneRequest(req)
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, hints, 1)
+	if adjustment.Applied {
+		t.Fatalf("ineligible adjustment applied: %#v", adjustment)
+	}
+	assertRetryGoldenEqual(t, "components", before.Components, adjusted.Components)
+	assertRetryGoldenEqual(t, "nets", before.Nets, adjusted.Nets)
+	assertRetryGoldenEqual(t, "keepouts", before.Keepouts, adjusted.Keepouts)
+	assertRetryGoldenEqual(t, "proximity_rules", before.ProximityRules, adjusted.ProximityRules)
+	assertRetryGoldenEqual(t, "board", before.Board, adjusted.Board)
+	assertRetryGoldenEqual(t, "existing", before.Existing, adjusted.Existing)
+	assertRetryGoldenEqual(t, "seed", before.Seed, adjusted.Seed)
+	assertRetryGoldenEqual(t, "rules", before.Rules, adjusted.Rules)
 }
 
 func assertRetryGoldenFixedComponentPreserved(t *testing.T, before, after placement.Request, ref string) {
@@ -218,4 +278,11 @@ func retryGoldenProximityRulesByID(request *placement.Request) map[string]placem
 		rules[rule.ID] = rule
 	}
 	return rules
+}
+
+func assertRetryGoldenEqual(t *testing.T, label string, want, got any) {
+	t.Helper()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("%s changed: want=%#v got=%#v", label, want, got)
+	}
 }
