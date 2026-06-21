@@ -8,7 +8,8 @@ three related capabilities:
 - CLI tools for generation, inspection, evaluation, connectivity-first board
   validation, ERC/DRC feedback, validation repair planning, round-trip validation, transactions,
   operation-correlated feedback, component intelligence, and pinmap readiness
-  checks.
+  checks, plus placement congestion/fanout scoring and bounded
+  placement-routing retry evidence.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -20,12 +21,18 @@ The direct-file workflow is the main functional path today. It can generate
 KiCad project directories, write root schematics and PCBs, inspect existing
 projects, evaluate common correctness issues, apply a conservative subset of
 transactions to imported projects, place components with block-aware quality
-reports and repair diagnostics, route small PCB nets, validate
+reports, congestion/fanout readiness evidence, and repair diagnostics, route
+small PCB nets, validate
 symbol-to-footprint pinmaps, select catalog-backed components, run
 connectivity-first PCB validation, and run KiCad-backed ERC/DRC checks through
 `kicad-cli`. Transaction validation, planning, and apply results carry stable
 operation IDs where possible so AI agents can connect issues back to the source
 operation they need to repair.
+Placement/routing feedback now has an opt-in bounded retry foundation:
+placement quality reports include coarse congestion cells and component fanout
+pressure, routing diagnostics map to placement retry hints, retry policies are
+explicit in design requests, and `design create` can rerun placement/routing
+within a capped budget while returning best-attempt evidence.
 Routing engine hardening now has an implemented foundation: shared PCB rule
 resolution, route quality reports, net-class and role-aware routing, length
 policy, search-pressure quality scoring, explicit zone policy behavior,
@@ -173,8 +180,9 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
 - `generate-led-demo` and `generate-project`: generate a deterministic LED
   indicator project, with optional PCB output.
 - `design create`: run the AI design workflow from explicit circuit-block
-  intent through schematic/PCB write, validation, optional repair planning or
-  apply, and feedback.
+  intent through schematic/PCB write, placement, routing, optional bounded
+  placement-routing retry, validation, optional repair planning or apply, and
+  feedback.
 - `writer check`: verify generated project, schematic, PCB, net, footprint,
   pad, copper, zone, and optional KiCad round-trip writer correctness.
 - `generate breakout`: generate a connector breakout project from a structured
@@ -244,6 +252,25 @@ go run ./cmd/kicadai \
 
 Generated projects are written through safe directory handling. `--overwrite`
 is required to replace an existing output directory.
+
+`design create` requests can opt into bounded placement-routing retry with a
+`routing_retry` object. Retry is disabled by default. When enabled, `max_attempts`
+is the total number of placement/routing attempts, including the initial
+attempt:
+
+```json
+{
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 2,
+    "allowed_hint_categories": ["increase_spacing", "improve_fanout", "reduce_distance"]
+  }
+}
+```
+
+Retry summaries are returned in the routing stage. They include attempt count,
+applied adjustment count, stop reason, hint categories, and compact attempt
+history.
 
 ### Component Intelligence
 

@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-20
+Date: 2026-06-21
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -52,12 +52,17 @@ from validation feedback to safe automatic repair.
   guards, and design workflow evidence output.
 - Placement engine hardening foundation with deterministic model support,
   block-derived placement intent, proximity/region/mechanical/routing-readiness
-  quality reports, repairable diagnostics, and golden corpus coverage.
+  quality reports, coarse congestion reports, component fanout/escape readiness
+  reports, repairable diagnostics, and golden corpus coverage.
 - Routing engine hardening foundation with shared `internal/pcbrules`,
   per-net quality reports, net-class and role-aware routing, obstacle
   diagnostics, via/layer policy diagnostics, length policy evidence, explicit
   zone policy behavior, coupled-net intent reporting, workflow integration, and
   golden corpus coverage.
+- Bounded placement-routing retry foundation with routing diagnostic to
+  placement hint mapping, explicit retry policy, deterministic adjustment
+  builder, best-attempt selection, repeated-state detection, and workflow retry
+  summaries.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -88,6 +93,8 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
+- placement-routing retry exists but remains conservative and needs broader
+  full-board golden evidence;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
@@ -267,24 +274,26 @@ intent and quality evidence for:
 - hard and optional mechanical keepouts;
 - analog/digital/power/user region preference reports;
 - per-net HPWL and routing-readiness reports;
+- coarse congestion reports with deterministic grid utilization evidence;
+- component fanout and escape-readiness reports with edge, keepout, neighbor,
+  and escape-demand pressure;
 - repairable placement diagnostics for missing placements, keepouts, regions,
-  proximity, routing readiness, estimated footprint geometry, grouping, and
-  validation issues;
+  proximity, routing readiness, fanout, estimated footprint geometry, grouping,
+  and validation issues;
 - golden placement corpus coverage for LED, regulator, MCU minimal, USB-C
   power, I2C sensor, op-amp gain-stage, and connector-breakout layouts.
 
 ### Remaining Work
 
-- Add richer candidate scoring from semantic component roles, not only
-  post-placement quality reports.
-- Add true congestion-grid and escape/fanout modeling rather than HPWL-only
-  routing readiness.
+- Add richer candidate scoring from semantic component roles and the new
+  congestion/fanout reports, not only post-placement quality reports.
 - Add thermal, high-current, creepage/clearance, differential-pair, and
   controlled-impedance placement rules.
 - Add crystal/oscillator and other timing-sensitive block fixtures once those
   blocks are implemented.
-- Feed placement diagnostics into an iterative placement retry loop instead of
-  only reporting repair actions.
+- Expand the new placement-routing retry loop with more full-board golden cases,
+  richer convergence criteria, and stronger evidence that retries improve
+  routing without harming hard constraints.
 - Validate hardened placement outputs against KiCad DRC evidence in larger
   board-level golden projects.
 
@@ -320,6 +329,9 @@ Routing hardening foundation is implemented. The engine now includes:
   layer access, clearance, connectivity, and external checks;
 - design workflow routing summaries with quality score, route report counts,
   and repair diagnostic counts;
+- routing diagnostics mapped to placement retry hints for spacing, fanout,
+  distance, edge, unsupported, and rule-only failures;
+- opt-in bounded placement-routing retry summaries in `design create`;
 - golden route corpus coverage for straight routes, keepout detours, via
   routes, length-policy blockers, and zone-policy blockers.
 
@@ -334,7 +346,9 @@ Routing hardening foundation is implemented. The engine now includes:
   satisfy route segments.
 - Broaden golden routing cases to more full circuit block boards and KiCad DRC
   evidence.
-- Add iterative route/placement retry loops with strict convergence limits.
+- Broaden iterative route/placement retry loops with more golden full-board
+  fixtures, richer route-quality ranking, and KiCad DRC-backed improvement
+  evidence.
 
 ### Acceptance Gates
 
@@ -438,7 +452,7 @@ decisions.
 
 `design create` accepts structured requests and orchestrates block planning,
 component selection, schematic/PCB generation, placement, routing, validation,
-and optional repair behavior.
+optional bounded placement-routing retry, and optional repair behavior.
 
 ### Remaining Work
 
@@ -448,7 +462,8 @@ and optional repair behavior.
 - Select blocks and parts from verified catalogs.
 - Calculate values and check ratings.
 - Produce a design rationale and known-limit report.
-- Add iterative generate/validate/repair loops with bounded budgets.
+- Connect bounded placement-routing retry, validation repair, and future
+  fabrication checks into a higher-level generate/validate/repair loop.
 - Store all decisions, assumptions, and validation evidence in artifacts.
 
 ### Acceptance Gates
@@ -461,8 +476,8 @@ and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Add true placement congestion/fanout scoring and iterative placement retry
-   from the new repairable diagnostics.
+1. Add golden full-board fixtures for placement-routing retry summaries,
+   improvement decisions, repeated-state stops, and non-improving retry stops.
 2. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
    and generated repair bundles.
 3. Add a dedicated repair bundle export command for non-`design create` flows.
