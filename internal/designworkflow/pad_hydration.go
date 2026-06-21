@@ -1,9 +1,13 @@
 package designworkflow
 
 import (
+	"fmt"
 	"sort"
 	"strings"
+	"sync"
 
+	"kicadai/internal/libraryresolver"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
 
@@ -31,6 +35,161 @@ type PadHydrationSummary struct {
 	SourceCounts       map[PadHydrationSource]int `json:"source_counts,omitempty"`
 	MissingRefs        []string                   `json:"missing_refs,omitempty"`
 	BlockingIssues     int                        `json:"blocking_issues,omitempty"`
+}
+
+type padHydrationResult struct {
+	Bounds placement.Bounds
+	Pads   []placement.PadSummary
+	Entry  PadHydrationEntry
+	Issues []reports.Issue
+}
+
+type padHydrationResolver struct {
+	index libraryresolver.LibraryIndex
+	cache map[string]padHydrationResult
+	mu    sync.Mutex
+}
+
+func (resolver *padHydrationResolver) Hydrate(ref string, footprintID string) padHydrationResult {
+	ref = strings.TrimSpace(ref)
+	footprintID = strings.TrimSpace(footprintID)
+	resolver.mu.Lock()
+	resolver.ensureCache()
+	base, ok := resolver.cache[footprintID]
+	resolver.mu.Unlock()
+	if ok {
+		return padHydrationResultForRef(base, ref)
+	}
+
+	base = hydratePadsFromResolverRecord(resolver.index, "", footprintID)
+	resolver.mu.Lock()
+	resolver.ensureCache()
+	if cached, ok := resolver.cache[footprintID]; ok {
+		base = cached
+	} else {
+		resolver.cache[footprintID] = base
+	}
+	resolver.mu.Unlock()
+	return padHydrationResultForRef(base, ref)
+}
+
+func (resolver *padHydrationResolver) ensureCache() {
+	if resolver.cache == nil {
+		resolver.cache = map[string]padHydrationResult{}
+	}
+}
+
+func hydratePadsFromResolverRecord(index libraryresolver.LibraryIndex, ref string, footprintID string) padHydrationResult {
+	result := padHydrationResult{Entry: PadHydrationEntry{Ref: ref, FootprintID: footprintID, Source: PadHydrationSourceMissing}}
+	if footprintID == "" {
+		result.Entry.MissingReason = "missing footprint id"
+		result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, "footprint_id", "component has no footprint id for pad hydration"))
+		return result
+	}
+	record, ok := libraryresolver.ResolveFootprint(index, footprintID)
+	if !ok {
+		result.Entry.MissingReason = "footprint not resolved"
+		result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, "footprint_id", "footprint library record not found: "+footprintID))
+		return result
+	}
+	bounds, pads, issues := placement.BoundsFromFootprint(record)
+	result.Bounds = bounds
+	result.Issues = append(result.Issues, contextualizePadHydrationIssues(ref, issues)...)
+	for padIndex, pad := range pads {
+		pad.Name = strings.TrimSpace(pad.Name)
+		if pad.Name == "" {
+			result.Issues = append(result.Issues, padHydrationWarning(ref, footprintID, fmt.Sprintf("pads[%d].name", padIndex), "unnamed footprint pad skipped during routing summary hydration"))
+			continue
+		}
+		if pad.WidthMM <= 0 || pad.HeightMM <= 0 {
+			result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, fmt.Sprintf("pads[%d].size", padIndex), "footprint pad size must be positive"))
+			continue
+		}
+		result.Pads = append(result.Pads, pad)
+	}
+	if len(result.Pads) == 0 {
+		result.Entry.MissingReason = "no routable footprint pads"
+		result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, "pads", "footprint has no routable pads"))
+		return result
+	}
+	result.Entry.Source = PadHydrationSourceResolver
+	result.Entry.PadCount = len(result.Pads)
+	return result
+}
+
+func padHydrationResultForRef(base padHydrationResult, ref string) padHydrationResult {
+	result := padHydrationResult{
+		Bounds: base.Bounds,
+		Pads:   append([]placement.PadSummary(nil), base.Pads...),
+		Entry:  base.Entry,
+		Issues: append([]reports.Issue(nil), base.Issues...),
+	}
+	result.Entry.Ref = ref
+	for index := range result.Issues {
+		result.Issues[index] = contextualizePadHydrationIssue(ref, result.Issues[index])
+	}
+	return result
+}
+
+func padHydrationIssue(ref string, footprintID string, path string, message string) reports.Issue {
+	return newPadHydrationIssue(ref, footprintID, path, message, reports.SeverityBlocked)
+}
+
+func padHydrationWarning(ref string, footprintID string, path string, message string) reports.Issue {
+	return newPadHydrationIssue(ref, footprintID, path, message, reports.SeverityWarning)
+}
+
+func newPadHydrationIssue(ref string, footprintID string, path string, message string, severity reports.Severity) reports.Issue {
+	issuePath := "pad_hydration"
+	if ref != "" {
+		issuePath += "." + ref
+	}
+	if path != "" {
+		issuePath += "." + path
+	}
+	issue := reports.Issue{
+		Code:     reports.CodeInvalidArgument,
+		Severity: severity,
+		Path:     issuePath,
+		Message:  message,
+	}
+	if ref != "" {
+		issue.Refs = []string{ref}
+	}
+	if footprintID != "" {
+		issue.Suggestion = "resolve footprint pad metadata for " + footprintID
+	}
+	return issue
+}
+
+func contextualizePadHydrationIssues(ref string, issues []reports.Issue) []reports.Issue {
+	if ref == "" || len(issues) == 0 {
+		return issues
+	}
+	out := make([]reports.Issue, 0, len(issues))
+	for _, issue := range issues {
+		out = append(out, contextualizePadHydrationIssue(ref, issue))
+	}
+	return out
+}
+
+func contextualizePadHydrationIssue(ref string, issue reports.Issue) reports.Issue {
+	if ref == "" {
+		return issue
+	}
+	if issue.Path != "" {
+		if !strings.HasPrefix(issue.Path, "pad_hydration.") {
+			issue.Path = "pad_hydration." + ref + "." + issue.Path
+		} else if !strings.HasPrefix(issue.Path, "pad_hydration."+ref+".") {
+			issue.Path = "pad_hydration." + ref + strings.TrimPrefix(issue.Path, "pad_hydration")
+		}
+	} else {
+		issue.Path = "pad_hydration." + ref
+	}
+	if len(issue.Refs) == 0 {
+		issue.Refs = []string{ref}
+	}
+	return issue
 }
 
 func summarizePadHydration(entries []PadHydrationEntry, issues []reports.Issue) PadHydrationSummary {
