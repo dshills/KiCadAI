@@ -93,8 +93,9 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
-- placement-routing retry exists but remains conservative and needs broader
-  full-board golden evidence;
+- placement-routing retry exists with golden coverage for summary shape,
+  supported hint categories, unsupported skips, selected stop conditions, and
+  CLI output, but remains conservative and needs broader full-board evidence;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
@@ -291,9 +292,10 @@ intent and quality evidence for:
   controlled-impedance placement rules.
 - Add crystal/oscillator and other timing-sensitive block fixtures once those
   blocks are implemented.
-- Expand the new placement-routing retry loop with more full-board golden cases,
-  richer convergence criteria, and stronger evidence that retries improve
-  routing without harming hard constraints.
+- Expand placement-routing retry beyond the new harness, category, stop, skip,
+  and CLI goldens with more full-board cases, richer convergence criteria, and
+  stronger evidence that retries improve routing without harming hard
+  constraints.
 - Validate hardened placement outputs against KiCad DRC evidence in larger
   board-level golden projects.
 

@@ -272,6 +272,27 @@ Retry summaries are returned in the routing stage. They include attempt count,
 applied adjustment count, stop reason, hint categories, and compact attempt
 history.
 
+Runnable example:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --request ./examples/design_retry/placement_routing_retry.json \
+  --output ./out/placement_routing_retry_demo \
+  --overwrite \
+  design create
+```
+
+Supported placement retry hint categories are `increase_spacing`,
+`improve_fanout`, `reduce_distance`, and `move_from_edge`. Routing-rule and
+unsupported-zone diagnostics are reported but intentionally skipped by placement
+retry. Common stop reasons include `disabled`, `routed`, `max_attempts`,
+`no_eligible_hints`, `no_safe_adjustment`, `placement_blocked`,
+`repeated_placement_state`, `non_improving_retry`, and `context_canceled`.
+Golden tests cover fixture loading, CLI retry summaries, supported category
+adjustments, unsupported skip behavior, path normalization, and convergence
+boundaries.
+
 ### Component Intelligence
 
 Component intelligence provides a deterministic catalog and selection layer for

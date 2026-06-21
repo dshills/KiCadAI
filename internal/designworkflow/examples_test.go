@@ -7,9 +7,16 @@ import (
 )
 
 func TestDesignExamplesParseAndValidate(t *testing.T) {
-	paths, err := filepath.Glob(filepath.Join("..", "..", "examples", "design", "*.json"))
-	if err != nil {
-		t.Fatal(err)
+	var paths []string
+	for _, dir := range []string{"design", "design_retry"} {
+		matches, err := filepath.Glob(filepath.Join("..", "..", "examples", dir, "*.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if len(matches) == 0 {
+			t.Fatalf("no design examples found in examples/%s", dir)
+		}
+		paths = append(paths, matches...)
 	}
 	if len(paths) == 0 {
 		t.Fatal("no design examples found")
