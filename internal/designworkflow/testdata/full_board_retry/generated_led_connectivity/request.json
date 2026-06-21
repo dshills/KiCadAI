@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
-  "name": "generated_led_rejected",
+  "name": "generated_led_connectivity",
   "board": {
     "width_mm": 45,
     "height_mm": 30,

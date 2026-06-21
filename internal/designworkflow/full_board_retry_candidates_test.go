@@ -13,11 +13,17 @@ import (
 )
 
 func TestFullBoardRetryCandidateFixturesDecode(t *testing.T) {
-	for _, name := range []string{"spacing_improves", "distance_rules", "generated_led_rejected"} {
+	for _, name := range fullBoardRetryCandidateFixtures {
 		t.Run(name, func(t *testing.T) {
 			metadata := loadFullBoardRetryMetadata(t, name)
 			if metadata.Request == "" {
 				t.Fatalf("metadata missing request: %#v", metadata)
+			}
+			if metadata.Name != name {
+				t.Fatalf("metadata name = %q, want fixture name %q", metadata.Name, name)
+			}
+			if metadata.ExpectedImprovement == "" {
+				t.Fatalf("metadata missing expected improvement: %#v", metadata)
 			}
 			file, err := os.Open(filepath.Join(fullBoardRetryFixtureRoot, name, metadata.Request))
 			if err != nil {
@@ -50,16 +56,12 @@ func TestFullBoardRetryCandidateBaselinesAreDeterministic(t *testing.T) {
 }
 
 func TestFullBoardRetryCandidateWorkflowReachesRoutingConnectivity(t *testing.T) {
-	for _, name := range []string{"spacing_improves", "distance_rules", "generated_led_rejected"} {
+	for _, name := range fullBoardRetryCandidateFixtures {
 		t.Run(name, func(t *testing.T) {
 			result := runFullBoardRetryFixture(t, name)
 			stage, ok := stageByName(result, StageRouting)
 			if !ok {
 				t.Fatalf("routing stage missing: %#v", result.Stages)
-			}
-			metadata := loadFullBoardRetryMetadata(t, name)
-			if name == "generated_led_rejected" && metadata.ExpectedImprovement != "generated_routing_connectivity" {
-				t.Fatalf("metadata = %#v", metadata)
 			}
 			if stage.Status != StageStatusBlocked {
 				t.Fatalf("candidate workflow stage = %#v, want current generated routing blocker documented", stage)
@@ -68,6 +70,8 @@ func TestFullBoardRetryCandidateWorkflowReachesRoutingConnectivity(t *testing.T)
 		})
 	}
 }
+
+var fullBoardRetryCandidateFixtures = []string{"spacing_improves", "distance_rules", "generated_led_connectivity"}
 
 func runFullBoardRetryFixture(t *testing.T, name string) WorkflowResult {
 	t.Helper()

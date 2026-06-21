@@ -1,5 +1,5 @@
 {
-  "name": "generated_led_rejected",
+  "name": "generated_led_connectivity",
   "request": "request.json",
   "intent": "Generated LED design-create candidate that now hydrates footprint pad summaries and reaches real routing connectivity evidence.",
   "expected_categories": [],
