@@ -355,9 +355,9 @@ Routing hardening foundation is implemented. The engine now includes:
   satisfy route segments.
 - Broaden golden routing cases to more full circuit block boards and KiCad DRC
   evidence.
-- Resolve generated workflow footprint pad summaries, then broaden iterative
-  route/placement retry loops with more generated full-board fixtures, richer
-  route-quality ranking, and KiCad DRC-backed improvement evidence.
+- Broaden iterative route/placement retry loops with more generated full-board
+  fixtures, richer route-quality ranking, and KiCad DRC-backed improvement
+  evidence now that generated pad summaries hydrate.
 
 ### Acceptance Gates
 

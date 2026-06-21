@@ -518,8 +518,8 @@ unsupported skip behavior, selected stop conditions, CLI output, and pad-backed
 full-board seed evidence.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver; thermal placement, true congestion analysis, differential pairs,
-generated-workflow footprint pad summary resolution for full-board retry, and
-final DRC-grade layout decisions remain future work.
+broader generated full-board retry improvement evidence, and final DRC-grade
+layout decisions remain future work.
 
 ### Routing
 
