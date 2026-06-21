@@ -118,6 +118,127 @@ func hydratePadsFromResolverRecord(index libraryresolver.LibraryIndex, ref strin
 	return result
 }
 
+func hydratePadsFromVerifiedTemplate(ref string, footprintID string) padHydrationResult {
+	ref = strings.TrimSpace(ref)
+	footprintID = strings.TrimSpace(footprintID)
+	result := padHydrationResult{Entry: PadHydrationEntry{Ref: ref, FootprintID: footprintID, Source: PadHydrationSourceMissing}}
+	template, ok := verifiedPadTemplate(footprintID)
+	if !ok {
+		result.Entry.MissingReason = "no verified pad template"
+		result.Issues = append(result.Issues, padHydrationIssue(ref, footprintID, "footprint_id", "no verified pad template for footprint: "+footprintID))
+		return result
+	}
+	result.Bounds = template.Bounds
+	result.Pads = append([]placement.PadSummary(nil), template.Pads...)
+	result.Entry.Source = PadHydrationSourceVerifiedTemplate
+	result.Entry.PadCount = len(result.Pads)
+	return result
+}
+
+type verifiedPadTemplateRecord struct {
+	Bounds placement.Bounds
+	Pads   []placement.PadSummary
+}
+
+func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
+	switch strings.TrimSpace(footprintID) {
+	case "Resistor_SMD:R_0603_1608Metric":
+		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
+	case "Resistor_SMD:R_0805_2012Metric",
+		"Capacitor_SMD:C_0805_2012Metric",
+		"LED_SMD:LED_0805_2012Metric",
+		"Diode_SMD:D_SOD-323":
+		return twoPadTemplate(2.0, 1.25, 0.7, 0.8, 1.2), true
+	case "Capacitor_SMD:C_0603_1608Metric":
+		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
+	case "Diode_SMD:D_SOD-123":
+		return twoPadTemplate(3.7, 1.8, 1.2, 1.2, 2.4), true
+	case "Diode_SMD:D_SMA":
+		return twoPadTemplate(6.2, 3.0, 1.5, 1.7, 4.4), true
+	case "Fuse:Fuse_1206_3216Metric":
+		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
+	case "Package_TO_SOT_SMD:SOT-23-5":
+		return verifiedPadTemplateRecord{
+			Bounds: placement.Bounds{WidthMM: 3.7, HeightMM: 3.0, Source: placement.BoundsEstimated},
+			Pads: []placement.PadSummary{
+				{Name: "1", XMM: -1.5, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "2", XMM: -1.5, YMM: 0, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "3", XMM: -1.5, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "5", XMM: 1.5, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "4", XMM: 1.5, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
+			},
+		}, true
+	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
+		return verifiedPadTemplateRecord{
+			Bounds: placement.Bounds{WidthMM: 6.7, HeightMM: 7.0, Source: placement.BoundsEstimated},
+			Pads: []placement.PadSummary{
+				{Name: "1", XMM: -2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
+				{Name: "2", XMM: 0, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
+				{Name: "3", XMM: 2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
+				{Name: "2", XMM: 0, YMM: -2.1, WidthMM: 3.8, HeightMM: 2.4},
+			},
+		}, true
+	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
+		return rowPadTemplate(5.9, 4.9, 1.27, 0.7, 0.9, []string{"1", "2", "3", "4"}, []string{"8", "7", "6", "5"}), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
+		return pinHeaderTemplate(1), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical":
+		return pinHeaderTemplate(2), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical":
+		return pinHeaderTemplate(3), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical":
+		return pinHeaderTemplate(4), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical":
+		return pinHeaderTemplate(5), true
+	default:
+		return verifiedPadTemplateRecord{}, false
+	}
+}
+
+func twoPadTemplate(envelopeWidth, envelopeHeight, padWidth, padHeight, pitch float64) verifiedPadTemplateRecord {
+	return verifiedPadTemplateRecord{
+		Bounds: placement.Bounds{WidthMM: envelopeWidth, HeightMM: envelopeHeight, Source: placement.BoundsEstimated},
+		Pads: []placement.PadSummary{
+			{Name: "1", XMM: -pitch / 2, YMM: 0, WidthMM: padWidth, HeightMM: padHeight},
+			{Name: "2", XMM: pitch / 2, YMM: 0, WidthMM: padWidth, HeightMM: padHeight},
+		},
+	}
+}
+
+func rowPadTemplate(centerSpanWidth, bodyHeight, pitch, padWidth, padHeight float64, leftNames []string, rightNames []string) verifiedPadTemplateRecord {
+	pads := make([]placement.PadSummary, 0, len(leftNames)+len(rightNames))
+	rows := max(len(leftNames), len(rightNames))
+	for index, name := range leftNames {
+		pads = append(pads, placement.PadSummary{Name: name, XMM: -centerSpanWidth / 2, YMM: rowPadY(index, rows, pitch), WidthMM: padWidth, HeightMM: padHeight})
+	}
+	for index, name := range rightNames {
+		pads = append(pads, placement.PadSummary{Name: name, XMM: centerSpanWidth / 2, YMM: rowPadY(index, rows, pitch), WidthMM: padWidth, HeightMM: padHeight})
+	}
+	return verifiedPadTemplateRecord{Bounds: placement.Bounds{WidthMM: centerSpanWidth + padWidth, HeightMM: bodyHeight + padHeight, Source: placement.BoundsEstimated}, Pads: pads}
+}
+
+func rowPadY(index int, count int, pitch float64) float64 {
+	if count <= 1 {
+		return 0
+	}
+	return (float64(index) - float64(count-1)/2) * pitch
+}
+
+func pinHeaderTemplate(count int) verifiedPadTemplateRecord {
+	pads := make([]placement.PadSummary, 0, count)
+	height := max(2.54, float64(count)*2.54)
+	for index := 0; index < count; index++ {
+		pads = append(pads, placement.PadSummary{
+			Name:     fmt.Sprintf("%d", index+1),
+			XMM:      0,
+			YMM:      (float64(index) - float64(count-1)/2) * 2.54,
+			WidthMM:  1.7,
+			HeightMM: 1.7,
+		})
+	}
+	return verifiedPadTemplateRecord{Bounds: placement.Bounds{WidthMM: 2.54, HeightMM: height, Source: placement.BoundsEstimated}, Pads: pads}
+}
+
 type padNetAssignment struct {
 	NetName string
 	Pin     string

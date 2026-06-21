@@ -133,6 +133,91 @@ func TestPadHydrationResolverReusesFootprintDataWithPerRefContext(t *testing.T) 
 	}
 }
 
+func TestVerifiedPadTemplateUsesPackageSpecificRowPinOrder(t *testing.T) {
+	soic, ok := verifiedPadTemplate("Package_SO:SOIC-8_3.9x4.9mm_P1.27mm")
+	if !ok {
+		t.Fatal("missing SOIC-8 template")
+	}
+	if got := padTemplateNames(soic.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4", "8", "7", "6", "5"}) {
+		t.Fatalf("SOIC pad order = %#v", got)
+	}
+	sot, ok := verifiedPadTemplate("Package_TO_SOT_SMD:SOT-23-5")
+	if !ok {
+		t.Fatal("missing SOT-23-5 template")
+	}
+	if got := padTemplateNames(sot.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "5", "4"}) {
+		t.Fatalf("SOT pad order = %#v", got)
+	}
+	if len(sot.Pads) != 5 {
+		t.Fatalf("SOT pad count = %d, want 5", len(sot.Pads))
+	}
+	if sot.Pads[2].Name != "3" || sot.Pads[4].Name != "4" || sot.Pads[2].YMM != sot.Pads[4].YMM {
+		t.Fatalf("SOT pin 4 should align with pin 3: %#v", sot.Pads)
+	}
+	if sot.Bounds.WidthMM < 3.7 {
+		t.Fatalf("SOT bounds too narrow: %#v", sot.Bounds)
+	}
+	if sot.Pads[0].YMM == soic.Pads[0].YMM {
+		t.Fatalf("expected package-specific pitch, sot=%#v soic=%#v", sot.Pads[0], soic.Pads[0])
+	}
+	if soic.Bounds.WidthMM < 6.6 {
+		t.Fatalf("SOIC bounds too narrow: %#v", soic.Bounds)
+	}
+}
+
+func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
+	for _, footprintID := range []string{
+		"Resistor_SMD:R_0603_1608Metric",
+		"Resistor_SMD:R_0805_2012Metric",
+		"Capacitor_SMD:C_0603_1608Metric",
+		"Capacitor_SMD:C_0805_2012Metric",
+		"LED_SMD:LED_0805_2012Metric",
+	} {
+		t.Run(footprintID, func(t *testing.T) {
+			template, ok := verifiedPadTemplate(footprintID)
+			if !ok {
+				t.Fatal("missing template")
+			}
+			if len(template.Pads) != 2 {
+				t.Fatalf("pad count = %d, want 2", len(template.Pads))
+			}
+			gap := template.Pads[1].XMM - template.Pads[1].WidthMM/2 - (template.Pads[0].XMM + template.Pads[0].WidthMM/2)
+			if gap <= 0 {
+				t.Fatalf("pads overlap or touch, gap=%v pads=%#v", gap, template.Pads)
+			}
+		})
+	}
+}
+
+func TestSOT223TemplateMapsDuplicatePinTwoPads(t *testing.T) {
+	template, ok := verifiedPadTemplate("Package_TO_SOT_SMD:SOT-223-3_TabPin2")
+	if !ok {
+		t.Fatal("missing SOT-223 template")
+	}
+	index := buildPadNetAssignmentIndex([]placement.Net{{Name: "VOUT", Endpoints: []placement.Endpoint{{Ref: "U1", Pin: "2"}}}})
+	pads, issues := assignPadNetsFromIndex("U1", template.Pads, index)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	var pinTwoCount int
+	for _, pad := range pads {
+		if pad.Name == "2" && pad.Net == "VOUT" {
+			pinTwoCount++
+		}
+	}
+	if pinTwoCount != 2 {
+		t.Fatalf("pin 2 pads assigned = %d, pads=%#v", pinTwoCount, pads)
+	}
+}
+
+func padTemplateNames(pads []placement.PadSummary) []string {
+	names := make([]string, 0, len(pads))
+	for _, pad := range pads {
+		names = append(names, pad.Name)
+	}
+	return names
+}
+
 func TestAssignPadNetsMapsEndpointPinsToPads(t *testing.T) {
 	index := buildPadNetAssignmentIndex([]placement.Net{{
 		Name: "LED_SERIES",

@@ -11,7 +11,7 @@ import (
 	"kicadai/internal/transactions"
 )
 
-func TestRoutePlacementCarriesLocalRoutesWhenPadSummariesMissing(t *testing.T) {
+func TestRoutePlacementUsesGeneratedPadSummariesForLocalRoutes(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
 		Name:    "status_board",
@@ -28,9 +28,9 @@ func TestRoutePlacementCarriesLocalRoutesWhenPadSummariesMissing(t *testing.T) {
 		t.Fatalf("operations = %#v, want local route operation", result.Operations)
 	}
 	if result.Stage.Status != StageStatusBlocked {
-		t.Fatalf("stage = %#v, want blocked until footprint pad summaries are available", result.Stage)
+		t.Fatalf("stage = %#v, want blocked on real generated route connectivity", result.Stage)
 	}
-	assertIssueCode(t, result.Stage.Issues, reports.CodeInvalidArgument)
+	assertIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
 }
 
 func TestRoutePlacementRoutesSimpleSignalWithPads(t *testing.T) {

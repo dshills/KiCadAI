@@ -90,12 +90,8 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 			addPlacementRouteNet(&placementRequest, netIndexes, route)
 		}
 	}
-	var padEntries []PadHydrationEntry
-	var padIssues []reports.Issue
-	if opts.LibraryIndex != nil {
-		placementRequest, padEntries, padIssues = hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
-		issues = append(issues, padIssues...)
-	}
+	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
+	issues = append(issues, padIssues...)
 	placementRequest = placement.NormalizeRequest(placementRequest)
 	result := placement.PlaceContext(ctx, placementRequest)
 	issues = append(issues, result.Issues...)
@@ -134,6 +130,14 @@ func hydratePlacementRequestPads(request placement.Request, index *libraryresolv
 			continue
 		}
 		hydrated := resolver.Hydrate(component.Ref, component.FootprintID)
+		if len(hydrated.Pads) == 0 {
+			fallback := hydratePadsFromVerifiedTemplate(component.Ref, component.FootprintID)
+			if len(fallback.Pads) != 0 {
+				hydrated = fallback
+			} else {
+				hydrated.Issues = append(hydrated.Issues, fallback.Issues...)
+			}
+		}
 		if len(hydrated.Pads) != 0 {
 			component.Bounds = hydrated.Bounds
 		}

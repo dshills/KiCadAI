@@ -43,7 +43,7 @@ func TestPlaceFragmentsPlacesRealizedLED(t *testing.T) {
 	}
 }
 
-func TestPlaceFragmentsCurrentlyLacksGeneratedPadSummaries(t *testing.T) {
+func TestPlaceFragmentsHydratesGeneratedPadsFromVerifiedTemplates(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
 	request := Request{
@@ -61,9 +61,13 @@ func TestPlaceFragmentsCurrentlyLacksGeneratedPadSummaries(t *testing.T) {
 		t.Fatalf("expected generated components")
 	}
 	for _, component := range result.Request.Components {
-		if len(component.Pads) != 0 {
-			t.Fatalf("unexpected generated pad summaries before hydration: %#v", component)
+		if len(component.Pads) != 2 {
+			t.Fatalf("%s pads = %#v, want verified template pads", component.Ref, component.Pads)
 		}
+	}
+	summary, ok := result.Stage.Summary["pad_hydration"].(PadHydrationSummary)
+	if !ok || summary.SourceCounts[PadHydrationSourceVerifiedTemplate] != 2 {
+		t.Fatalf("pad hydration summary = %#v", result.Stage.Summary["pad_hydration"])
 	}
 }
 
@@ -105,6 +109,19 @@ func TestPlaceFragmentsHydratesGeneratedPadsFromResolver(t *testing.T) {
 	summary, ok := result.Stage.Summary["pad_hydration"].(PadHydrationSummary)
 	if !ok || summary.HydratedComponents != 2 || summary.PadCount != 4 {
 		t.Fatalf("pad hydration summary = %#v", result.Stage.Summary["pad_hydration"])
+	}
+}
+
+func TestHydratePlacementRequestPadsBlocksUnknownFootprint(t *testing.T) {
+	request := placement.Request{
+		Components: []placement.Component{{Ref: "X1", FootprintID: "Unknown:Missing", Bounds: defaultWorkflowBounds}},
+	}
+	_, entries, issues := hydratePlacementRequestPads(request, nil)
+	if len(entries) != 1 || entries[0].Source != PadHydrationSourceMissing {
+		t.Fatalf("entries = %#v", entries)
+	}
+	if len(issues) != 2 || !issues[0].Blocking() || !issues[1].Blocking() {
+		t.Fatalf("issues = %#v", issues)
 	}
 }
 

@@ -4,8 +4,6 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"slices"
-	"strings"
 	"testing"
 	"time"
 
@@ -51,7 +49,7 @@ func TestFullBoardRetryCandidateBaselinesAreDeterministic(t *testing.T) {
 	}
 }
 
-func TestFullBoardRetryCandidateWorkflowBoundaryIsDocumented(t *testing.T) {
+func TestFullBoardRetryCandidateWorkflowReachesRoutingConnectivity(t *testing.T) {
 	for _, name := range []string{"spacing_improves", "distance_rules", "generated_led_rejected"} {
 		t.Run(name, func(t *testing.T) {
 			result := runFullBoardRetryFixture(t, name)
@@ -60,17 +58,13 @@ func TestFullBoardRetryCandidateWorkflowBoundaryIsDocumented(t *testing.T) {
 				t.Fatalf("routing stage missing: %#v", result.Stages)
 			}
 			metadata := loadFullBoardRetryMetadata(t, name)
-			if name == "generated_led_rejected" && metadata.ExpectedImprovement != "rejected_missing_pad_summaries" {
+			if name == "generated_led_rejected" && metadata.ExpectedImprovement != "generated_routing_connectivity" {
 				t.Fatalf("metadata = %#v", metadata)
 			}
 			if stage.Status != StageStatusBlocked {
-				t.Fatalf("candidate workflow stage = %#v, want current generated workflow blocker documented", stage)
+				t.Fatalf("candidate workflow stage = %#v, want current generated routing blocker documented", stage)
 			}
-			if !slices.ContainsFunc(stage.Issues, func(issue reports.Issue) bool {
-				return strings.Contains(issue.Message, "footprint pad summaries")
-			}) {
-				t.Fatalf("expected pad-summary blocker, got %#v", stage.Issues)
-			}
+			assertIssueCode(t, stage.Issues, reports.CodeDisconnectedPad)
 		})
 	}
 }
