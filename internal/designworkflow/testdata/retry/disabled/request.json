@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "name": "retry_disabled",
+  "board": {
+    "width_mm": 50,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "status",
+      "block_id": "led_indicator"
+    }
+  ],
+  "validation": {
+    "acceptance": "structural",
+    "skip_routing": true
+  }
+}
