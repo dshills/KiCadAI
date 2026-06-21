@@ -1,0 +1,24 @@
+{
+  "version": "0.1.0",
+  "name": "retry_increase_spacing",
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "status",
+      "block_id": "led_indicator"
+    }
+  ],
+  "validation": {
+    "acceptance": "structural",
+    "skip_routing": true
+  },
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 2,
+    "allowed_hint_categories": ["increase_spacing"]
+  }
+}
