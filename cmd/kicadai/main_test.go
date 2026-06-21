@@ -116,6 +116,94 @@ func TestRunDesignCreateMissingRequest(t *testing.T) {
 	}
 }
 
+func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
+	tests := []struct {
+		name          string
+		fixture       string
+		wantRetry     bool
+		wantAttempts  int
+		wantStop      string
+		wantStageStat string
+	}{
+		{name: "disabled", fixture: "disabled", wantStageStat: "skipped"},
+		{name: "enabled", fixture: "non_improving", wantRetry: true, wantAttempts: 1, wantStop: "no_eligible_hints", wantStageStat: "blocked"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			requestPath := filepath.Join("..", "..", "internal", "designworkflow", "testdata", "retry", tc.fixture, "request.json")
+			output := filepath.Join(t.TempDir(), tc.fixture)
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			if err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "design", "create"}, &stdout, &stderr); err != nil {
+				t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+			}
+			var result cliRetrySnapshot
+			if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+				t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+			}
+			gotOutputInfo, gotOutputErr := os.Stat(result.Data.Project.OutputDir)
+			wantOutputInfo, wantOutputErr := os.Stat(output)
+			samePath := false
+			if gotOutputErr == nil && wantOutputErr == nil {
+				samePath = os.SameFile(gotOutputInfo, wantOutputInfo)
+			} else {
+				samePath = filepath.Clean(result.Data.Project.OutputDir) == filepath.Clean(output)
+			}
+			if !samePath {
+				t.Fatalf("output_dir = %q, want %q", result.Data.Project.OutputDir, output)
+			}
+			routingStage := cliRetryStageByName(t, result.Data.Stages, "routing")
+			if routingStage.Status != tc.wantStageStat {
+				t.Fatalf("routing stage = %#v", routingStage)
+			}
+			retry, hasRetry := routingStage.Summary["routing_retry"].(map[string]any)
+			if hasRetry != tc.wantRetry {
+				t.Fatalf("routing_retry present = %v, want %v in %#v", hasRetry, tc.wantRetry, routingStage.Summary)
+			}
+			if !tc.wantRetry {
+				return
+			}
+			enabled, enabledOK := retry["enabled"].(bool)
+			attempts, attemptsOK := retry["attempts"].(float64)
+			stopReason, stopOK := retry["stop_reason"].(string)
+			if !enabledOK || !enabled || !attemptsOK || int(attempts) != tc.wantAttempts || !stopOK || stopReason != tc.wantStop {
+				t.Fatalf("retry summary = %#v", retry)
+			}
+		})
+	}
+}
+
+type cliRetrySnapshot struct {
+	Data struct {
+		Project struct {
+			OutputDir string `json:"output_dir"`
+		} `json:"project"`
+		Stages []cliRetryStageSnapshot `json:"stages"`
+	} `json:"data"`
+}
+
+type cliRetryStageSnapshot struct {
+	Name    string         `json:"name"`
+	Status  string         `json:"status"`
+	Summary map[string]any `json:"summary"`
+}
+
+func cliRetryStageByName(t *testing.T, stages []cliRetryStageSnapshot, name string) cliRetryStageSnapshot {
+	t.Helper()
+	for _, stage := range stages {
+		if stage.Name == name {
+			return stage
+		}
+	}
+	var names []string
+	for _, stage := range stages {
+		names = append(names, stage.Name)
+	}
+	t.Fatalf("missing stage %q; got stages %v", name, names)
+	return cliRetryStageSnapshot{}
+}
+
 func TestRunComponentListJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
