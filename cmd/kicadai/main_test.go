@@ -175,8 +175,8 @@ func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
 }
 
 func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
-	requestPath := filepath.Join("..", "..", "internal", "designworkflow", "testdata", "full_board_retry", "generated_led_rejected", "request.json")
-	output := filepath.Join(t.TempDir(), "generated_led_rejected")
+	requestPath := filepath.Join("..", "..", "internal", "designworkflow", "testdata", "full_board_retry", "generated_led_connectivity", "request.json")
+	output := filepath.Join(t.TempDir(), "generated_led_connectivity")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -187,6 +187,8 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
 		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
 	}
+	placementStage := cliRetryStageByName(t, result.Data.Stages, "placement")
+	assertCLIPadHydrationSummary(t, placementStage, 2, 2)
 	routingStage := cliRetryStageByName(t, result.Data.Stages, "routing")
 	if routingStage.Status != "blocked" {
 		t.Fatalf("routing stage status = %q, want blocked", routingStage.Status)
@@ -204,8 +206,40 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if stop, ok := retry["stop_reason"].(string); !ok || stop != "no_eligible_hints" {
 		t.Fatalf("retry stop = %#v", retry["stop_reason"])
 	}
-	if !cliRetryStageHasIssue(routingStage, "footprint pad summaries") {
-		t.Fatalf("routing stage missing pad-summary issue: %#v", routingStage.Issues)
+	if cliRetryStageHasIssue(routingStage, "footprint pad summaries") {
+		t.Fatalf("routing stage still has pad-summary issue: %#v", routingStage.Issues)
+	}
+}
+
+func assertCLIPadHydrationSummary(t *testing.T, stage cliRetryStageSnapshot, wantHydrated float64, wantTemplates float64) {
+	t.Helper()
+	hydrationValue, hasHydration := stage.Summary["pad_hydration"]
+	if !hasHydration {
+		t.Fatalf("pad hydration summary missing: %#v", stage.Summary)
+	}
+	hydration, hydrationOK := hydrationValue.(map[string]any)
+	if !hydrationOK {
+		t.Fatalf("pad hydration summary has type %T: %#v", hydrationValue, hydrationValue)
+	}
+	hydratedValue, hasHydrated := hydration["hydrated_components"]
+	if !hasHydrated {
+		t.Fatalf("hydrated_components missing: %#v", hydration)
+	}
+	hydrated, hydratedOK := hydratedValue.(float64)
+	if !hydratedOK || hydrated != wantHydrated {
+		t.Fatalf("hydrated_components = %#v, want %v", hydratedValue, wantHydrated)
+	}
+	sourceValue, hasSources := hydration["source_counts"]
+	if !hasSources {
+		t.Fatalf("source_counts missing: %#v", hydration)
+	}
+	sources, sourcesOK := sourceValue.(map[string]any)
+	if !sourcesOK {
+		t.Fatalf("source_counts has type %T: %#v", sourceValue, sourceValue)
+	}
+	templateCount, templateOK := sources["verified_template"].(float64)
+	if !templateOK || templateCount != wantTemplates {
+		t.Fatalf("verified_template source count = %#v, want %v", sources["verified_template"], wantTemplates)
 	}
 }
 

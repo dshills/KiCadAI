@@ -36,8 +36,9 @@ within a capped budget while returning best-attempt evidence. Golden tests now
 cover retry behavior across fixtures, categories, stop conditions, unsupported
 skips, CLI summaries, and pad-backed full-board seed fixtures for spacing
 improvement, reduce-distance rule evidence, and safe non-improvement stops. The
-remaining gap is that generated `design create` layouts do not yet route far
-enough for retry to improve them without test-seed footprint pad summaries.
+generated `design create` workflow now hydrates footprint pad summaries through
+resolver-backed records or verified built-in seed templates, so generated boards
+reach real routing/connectivity evidence instead of stopping at missing pads.
 Routing engine hardening now has an implemented foundation: shared PCB rule
 resolution, route quality reports, net-class and role-aware routing, length
 policy, search-pressure quality scoring, explicit zone policy behavior,
@@ -298,16 +299,15 @@ Golden tests cover fixture loading, CLI retry summaries, supported category
 adjustments, unsupported skip behavior, path normalization, and convergence
 boundaries. Full-board retry tests also cover pad-backed seed boards where
 spacing retry improves routing evidence, reduce-distance retry emits stable
-proximity rules, and safe-stop retry preserves the best attempt. Current
-generated `design create` candidates still expose a documented footprint pad
-summary resolution blocker before full-board CLI improvement evidence is
-available.
+proximity rules, and safe-stop retry preserves the best attempt. Generated
+`design create` candidates now expose placement-stage `pad_hydration` evidence
+and reach real routing/connectivity diagnostics.
 
 In practical terms, retry is now proven at three levels: focused category and
 stop-condition unit coverage, pad-backed full-board seed coverage, and CLI
-summary coverage for the current generated-workflow boundary. The next retry
-milestone is resolving generated footprint pad summaries so the same evidence
-can be collected from ordinary `design create` projects.
+summary coverage for generated workflows with hydrated pad evidence. The next
+retry milestone is proving actual improvement on more generated full-board
+cases, not merely reaching routing.
 
 ### Component Intelligence
 

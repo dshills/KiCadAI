@@ -95,9 +95,9 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
-- placement-routing retry exists with focused and pad-backed full-board seed
-  evidence, but generated `design create` workflows still need footprint pad
-  summary resolution before they can prove real full-board retry improvement;
+- placement-routing retry exists with focused, pad-backed seed, and generated
+  workflow evidence; generated workflows now hydrate footprint pad summaries,
+  but still need broader proof of real full-board retry improvement;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
@@ -287,7 +287,8 @@ intent and quality evidence for:
   power, I2C sensor, op-amp gain-stage, and connector-breakout layouts;
 - pad-backed full-board retry seed coverage for spacing improvement,
   reduce-distance proximity-rule evidence, safe non-improvement stops, hard
-  constraint preservation, and selected CLI evidence boundaries.
+  constraint preservation, generated pad hydration, and selected CLI evidence
+  boundaries.
 
 ### Remaining Work
 
@@ -297,9 +298,8 @@ intent and quality evidence for:
   controlled-impedance placement rules.
 - Add crystal/oscillator and other timing-sensitive block fixtures once those
   blocks are implemented.
-- Resolve generated workflow footprint pad summaries so the full-board retry
-  evidence can move from pad-backed seed boards into true `design create`
-  generated projects.
+- Expand generated full-board retry cases now that generated workflow footprint
+  pad summaries hydrate through resolver-backed records or verified templates.
 - Expand placement-routing retry with more generated-board cases, richer
   convergence criteria, and stronger evidence that retries improve routing
   without harming hard constraints.
@@ -485,11 +485,11 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Resolve generated workflow footprint pad summaries so `design create`
-   full-board retry fixtures can prove improvement on real generated layouts.
-2. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
+1. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
    and generated repair bundles.
-3. Add a dedicated repair bundle export command for non-`design create` flows.
+2. Add a dedicated repair bundle export command for non-`design create` flows.
+3. Add generated full-board retry fixtures that prove actual improvement after
+   pad hydration, not only real connectivity diagnostics.
 4. Add fabrication export/readiness gates.
 5. Expand verified component and block coverage alongside each new block
    family.
