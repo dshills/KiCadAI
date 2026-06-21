@@ -303,6 +303,12 @@ generated `design create` candidates still expose a documented footprint pad
 summary resolution blocker before full-board CLI improvement evidence is
 available.
 
+In practical terms, retry is now proven at three levels: focused category and
+stop-condition unit coverage, pad-backed full-board seed coverage, and CLI
+summary coverage for the current generated-workflow boundary. The next retry
+milestone is resolving generated footprint pad summaries so the same evidence
+can be collected from ordinary `design create` projects.
+
 ### Component Intelligence
 
 Component intelligence provides a deterministic catalog and selection layer for

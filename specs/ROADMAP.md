@@ -284,7 +284,10 @@ intent and quality evidence for:
   proximity, routing readiness, fanout, estimated footprint geometry, grouping,
   and validation issues;
 - golden placement corpus coverage for LED, regulator, MCU minimal, USB-C
-  power, I2C sensor, op-amp gain-stage, and connector-breakout layouts.
+  power, I2C sensor, op-amp gain-stage, and connector-breakout layouts;
+- pad-backed full-board retry seed coverage for spacing improvement,
+  reduce-distance proximity-rule evidence, safe non-improvement stops, hard
+  constraint preservation, and selected CLI evidence boundaries.
 
 ### Remaining Work
 
@@ -294,10 +297,12 @@ intent and quality evidence for:
   controlled-impedance placement rules.
 - Add crystal/oscillator and other timing-sensitive block fixtures once those
   blocks are implemented.
-- Expand placement-routing retry beyond the new harness, category, stop, skip,
-  and CLI goldens with more full-board cases, richer convergence criteria, and
-  stronger evidence that retries improve routing without harming hard
-  constraints.
+- Resolve generated workflow footprint pad summaries so the full-board retry
+  evidence can move from pad-backed seed boards into true `design create`
+  generated projects.
+- Expand placement-routing retry with more generated-board cases, richer
+  convergence criteria, and stronger evidence that retries improve routing
+  without harming hard constraints.
 - Validate hardened placement outputs against KiCad DRC evidence in larger
   board-level golden projects.
 
@@ -350,9 +355,9 @@ Routing hardening foundation is implemented. The engine now includes:
   satisfy route segments.
 - Broaden golden routing cases to more full circuit block boards and KiCad DRC
   evidence.
-- Broaden iterative route/placement retry loops with more golden full-board
-  fixtures, richer route-quality ranking, and KiCad DRC-backed improvement
-  evidence.
+- Resolve generated workflow footprint pad summaries, then broaden iterative
+  route/placement retry loops with more generated full-board fixtures, richer
+  route-quality ranking, and KiCad DRC-backed improvement evidence.
 
 ### Acceptance Gates
 
