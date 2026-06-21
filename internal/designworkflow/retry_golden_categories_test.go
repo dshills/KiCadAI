@@ -80,6 +80,51 @@ func TestRetryGoldenImproveFanoutFixture(t *testing.T) {
 	assertRetryGoldenSpacingDelta(t, req, adjusted, 1)
 }
 
+func TestRetryGoldenReduceDistanceFixture(t *testing.T) {
+	request := loadRetryFixtureRequest(t, "reduce_distance")
+	if !request.RoutingRetry.Enabled || len(request.RoutingRetry.AllowedHintCategories) != 1 || request.RoutingRetry.AllowedHintCategories[0] != PlacementRetryReduceDistance {
+		t.Fatalf("retry policy = %#v", request.RoutingRetry)
+	}
+
+	hints := filterPlacementRetryHints(BuildPlacementRetryHints([]routing.RepairDiagnostic{{
+		Category: routing.RepairLengthPolicy,
+		Action:   routing.ActionRelaxLengthPolicy,
+		Severity: reports.SeverityError,
+		Nets:     []string{"SDA"},
+	}}, nil), request.RoutingRetry)
+	if len(hints) != 1 || hints[0].Category != PlacementRetryReduceDistance {
+		t.Fatalf("hints = %#v", hints)
+	}
+
+	req := retryGoldenPlacementRequest()
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, hints, 1)
+	wantRules := []string{
+		"retry_reduce_distance:SDA:U1:J1",
+		"retry_reduce_distance:SDA:U1:R1",
+	}
+	if !adjustment.Applied || !retryGoldenSameStrings(adjustment.ProximityRules, wantRules) {
+		t.Fatalf("adjustment = %#v, want rules %#v", adjustment, wantRules)
+	}
+	rulesByID := retryGoldenProximityRulesByID(&adjusted)
+	if len(rulesByID) != 2 {
+		t.Fatalf("proximity rules = %#v", adjusted.ProximityRules)
+	}
+	for _, wantID := range wantRules {
+		rule, ok := rulesByID[wantID]
+		if !ok {
+			t.Fatalf("missing proximity rule %s in %#v", wantID, adjusted.ProximityRules)
+		}
+		if rule.AnchorRef != "U1" || rule.MaxDistanceMM != placementRetryMaxProximityMM || rule.Source != "routing_retry" {
+			t.Fatalf("rule = %#v, want id %s anchored at U1", rule, wantID)
+		}
+	}
+
+	adjustedAgain, duplicate := BuildPlacementRetryAdjustment(adjusted, hints, 2)
+	if duplicate.Applied || len(duplicate.ProximityRules) != 0 || len(adjustedAgain.ProximityRules) != len(adjusted.ProximityRules) {
+		t.Fatalf("duplicate adjustment = %#v adjusted=%#v", duplicate, adjustedAgain.ProximityRules)
+	}
+}
+
 func retryGoldenPlacementRequest() placement.Request {
 	return placement.Request{
 		Board: placement.BoardPlacementArea{WidthMM: 40, HeightMM: 30, MarginMM: 2},
@@ -157,4 +202,20 @@ func retryGoldenComponentByRef(request *placement.Request, ref string) *placemen
 		}
 	}
 	return nil
+}
+
+func retryGoldenSameStrings(got, want []string) bool {
+	gotSorted := slices.Clone(got)
+	wantSorted := slices.Clone(want)
+	slices.Sort(gotSorted)
+	slices.Sort(wantSorted)
+	return slices.Equal(gotSorted, wantSorted)
+}
+
+func retryGoldenProximityRulesByID(request *placement.Request) map[string]placement.ProximityRule {
+	rules := make(map[string]placement.ProximityRule, len(request.ProximityRules))
+	for _, rule := range request.ProximityRules {
+		rules[rule.ID] = rule
+	}
+	return rules
 }
