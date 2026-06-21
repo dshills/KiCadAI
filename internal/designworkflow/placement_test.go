@@ -3,11 +3,14 @@ package designworkflow
 import (
 	"context"
 	"testing"
+	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
+
+const testTimeout = 10 * time.Second
 
 func TestPlaceFragmentsPlacesRealizedLED(t *testing.T) {
 	request := Request{
@@ -35,6 +38,30 @@ func TestPlaceFragmentsPlacesRealizedLED(t *testing.T) {
 	}
 	if len(result.Request.ProximityRules) == 0 {
 		t.Fatalf("expected block-derived proximity rules")
+	}
+}
+
+func TestPlaceFragmentsCurrentlyLacksGeneratedPadSummaries(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
+	defer cancel()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "status_board",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(ctx, registry, request)
+	fragments := RealizePCBFragments(ctx, registry, plan)
+
+	result := PlaceFragments(ctx, request, fragments, PlacementOptions{})
+	if len(result.Request.Components) == 0 {
+		t.Fatalf("expected generated components")
+	}
+	for _, component := range result.Request.Components {
+		if len(component.Pads) != 0 {
+			t.Fatalf("unexpected generated pad summaries before hydration: %#v", component)
+		}
 	}
 }
 

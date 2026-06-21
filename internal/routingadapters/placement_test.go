@@ -1,11 +1,14 @@
 package routingadapters
 
 import (
+	"math"
 	"testing"
 
 	"kicadai/internal/placement"
 	"kicadai/internal/routing"
 )
+
+const floatTolerance = 1e-6
 
 func TestRequestFromPlacementBuildsRoutingRequest(t *testing.T) {
 	placementRequest := placementAdapterRequest()
@@ -40,6 +43,34 @@ func TestRequestFromPlacementUsesPlacementLayerForPads(t *testing.T) {
 	if request.Components[0].Pads[0].Layers[0] != "B.Cu" {
 		t.Fatalf("pad layers = %#v, want B.Cu", request.Components[0].Pads[0].Layers)
 	}
+}
+
+func TestRequestFromPlacementPreservesLocalPadGeometryAndNet(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	if len(placementRequest.Components) < 2 {
+		t.Fatal("placement adapter fixture missing components")
+	}
+	placementRequest.Components[0].Pads = []placement.PadSummary{{Name: "A", Net: "SIG_A", XMM: -0.65, YMM: 0.25, WidthMM: 0.4, HeightMM: 0.8}}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, RotationDeg: 90, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(request.Components) == 0 || len(request.Components[0].Pads) == 0 {
+		t.Fatalf("missing converted pad: %#v", request.Components)
+	}
+	pad := request.Components[0].Pads[0]
+	if pad.Name != "A" || pad.Net != "SIG_A" {
+		t.Fatalf("pad identity/net = %#v", pad)
+	}
+	assertCloseFloat(t, pad.Position.XMM, -0.65, "pad x")
+	assertCloseFloat(t, pad.Position.YMM, 0.25, "pad y")
+	assertCloseFloat(t, pad.Size.WidthMM, 0.4, "pad width")
+	assertCloseFloat(t, pad.Size.HeightMM, 0.8, "pad height")
 }
 
 func TestRequestFromPlacementConvertsKeepouts(t *testing.T) {
@@ -90,5 +121,12 @@ func placementAdapterRequest() placement.Request {
 			},
 		}},
 		Rules: placement.Rules{AllowBackLayer: true},
+	}
+}
+
+func assertCloseFloat(t testing.TB, got, want float64, label string) {
+	t.Helper()
+	if math.Abs(got-want) >= floatTolerance {
+		t.Fatalf("%s = %v, want %v", label, got, want)
 	}
 }
