@@ -546,7 +546,10 @@ func TestPostRepairTargetApplyRequiresOverwriteForExistingGeneratedTarget(t *tes
 func TestRepairExportBundleCLIDryRun(t *testing.T) {
 	root := t.TempDir()
 	outputDir := filepath.Join(root, "target")
-	_ = writePostRepairCleanBundle(t, root, outputDir)
+	setupBundlePath := writePostRepairCleanBundle(t, root, outputDir)
+	if setupBundlePath == "" {
+		t.Fatal("setup bundle path is empty")
+	}
 	issuesPath := writePostRepairStageIssues(t, root)
 	result := runPostRepairCLI(t,
 		"--json",
@@ -600,5 +603,44 @@ func TestRepairExportBundleCLIMissingRequest(t *testing.T) {
 	)
 	if result.OK || len(result.Issues) == 0 {
 		t.Fatalf("missing request result = %#v", result)
+	}
+}
+
+func TestRepairApplyFromExportedBundleBlocksWithoutTransaction(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	issuesPath := writePostRepairStageIssues(t, root)
+	exported := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if !exported.OK {
+		t.Fatalf("export result = %#v", exported)
+	}
+	exportedBundlePath := filepath.FromSlash(exported.Data.BundlePath)
+	bundle, err := repair.LoadBundle(exportedBundlePath)
+	if err != nil {
+		t.Fatalf("load exported bundle: %v", err)
+	}
+	if bundle.Transaction != nil {
+		t.Fatalf("exported bundle unexpectedly has transaction: %#v", bundle.Transaction)
+	}
+	applied := runPostRepairTargetApplyCLI(t, outputDir, exportedBundlePath)
+	if applied.OK || applied.Data.Status != repair.StatusBlocked {
+		t.Fatalf("apply from transactionless export = %#v", applied)
+	}
+	found := false
+	for _, issue := range applied.Issues {
+		if issue.Code == reports.CodeInvalidArgument && strings.Contains(issue.Path, "transaction") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("missing transaction provenance issue: %#v", applied.Issues)
 	}
 }
