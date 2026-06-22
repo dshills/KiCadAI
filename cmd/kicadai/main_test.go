@@ -188,7 +188,7 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
 	}
 	placementStage := cliRetryStageByName(t, result.Data.Stages, "placement")
-	assertCLIPadHydrationSummary(t, placementStage, 2, 2)
+	assertCLIPadHydrationSummary(t, placementStage, 2, 2, 4)
 	routingStage := cliRetryStageByName(t, result.Data.Stages, "routing")
 	if routingStage.Status != "blocked" {
 		t.Fatalf("routing stage status = %q, want blocked", routingStage.Status)
@@ -200,18 +200,27 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if enabled, ok := retry["enabled"].(bool); !ok || !enabled {
 		t.Fatalf("retry enabled = %#v", retry["enabled"])
 	}
-	if attempts, ok := retry["attempts"].(float64); !ok || int(attempts) != 1 {
+	if attempts, ok := retry["attempts"].(float64); !ok || attempts != 1 {
 		t.Fatalf("retry attempts = %#v", retry["attempts"])
+	}
+	if applied, ok := retry["applied"].(float64); !ok || applied != 0 {
+		t.Fatalf("retry applied = %#v", retry["applied"])
 	}
 	if stop, ok := retry["stop_reason"].(string); !ok || stop != "no_eligible_hints" {
 		t.Fatalf("retry stop = %#v", retry["stop_reason"])
+	}
+	if _, hasHistory := retry["attempt_history"]; hasHistory {
+		t.Fatalf("retry attempt history should be absent for no-eligible-hints boundary: %#v", retry["attempt_history"])
+	}
+	if _, hasCategories := retry["hint_categories"]; hasCategories {
+		t.Fatalf("retry hint categories should be absent for no-eligible-hints boundary: %#v", retry["hint_categories"])
 	}
 	if cliRetryStageHasIssue(routingStage, "footprint pad summaries") {
 		t.Fatalf("routing stage still has pad-summary issue: %#v", routingStage.Issues)
 	}
 }
 
-func assertCLIPadHydrationSummary(t *testing.T, stage cliRetryStageSnapshot, wantHydrated float64, wantTemplates float64) {
+func assertCLIPadHydrationSummary(t *testing.T, stage cliRetryStageSnapshot, wantHydrated float64, wantTemplates float64, wantPads float64) {
 	t.Helper()
 	hydrationValue, hasHydration := stage.Summary["pad_hydration"]
 	if !hasHydration {
@@ -240,6 +249,10 @@ func assertCLIPadHydrationSummary(t *testing.T, stage cliRetryStageSnapshot, wan
 	templateCount, templateOK := sources["verified_template"].(float64)
 	if !templateOK || templateCount != wantTemplates {
 		t.Fatalf("verified_template source count = %#v, want %v", sources["verified_template"], wantTemplates)
+	}
+	padCount, padOK := hydration["pad_count"].(float64)
+	if !padOK || padCount != wantPads {
+		t.Fatalf("pad_count = %#v, want %v", hydration["pad_count"], wantPads)
 	}
 }
 
