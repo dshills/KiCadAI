@@ -410,3 +410,44 @@ func TestPostRepairApplyValidationSummary(t *testing.T) {
 		t.Fatalf("unexpected delta issue counts: before=%v (want 0), after=%v (want >= 1)", beforeIssues, afterIssues)
 	}
 }
+
+func TestPostRepairApplyValidationDeltaStatuses(t *testing.T) {
+	t.Run("clean", func(t *testing.T) {
+		cleanRoot := t.TempDir()
+		cleanOutput := filepath.Join(cleanRoot, "target")
+		cleanBundle := writePostRepairCleanBundle(t, cleanRoot, cleanOutput)
+		clean := runPostRepairTargetApplyCLI(t, cleanOutput, cleanBundle)
+		if !clean.OK {
+			t.Fatalf("clean apply ok=false, want true; issues=%#v result=%#v", clean.Issues, clean)
+		}
+		if clean.Data.Status != repair.StatusRepaired {
+			t.Fatalf("clean apply status = %q, want %q", clean.Data.Status, repair.StatusRepaired)
+		}
+		cleanAfter := postRepairSummaryMap(t, clean.Data.Delta, "after")
+		if got := postRepairSummaryNumber(t, cleanAfter, "issue_count"); got != 0 {
+			t.Fatalf("clean after issue_count = %v, want 0", got)
+		}
+	})
+
+	t.Run("strict", func(t *testing.T) {
+		// The bundle is structurally clean; strict validation intentionally
+		// surfaces non-blocking evidence such as skipped external KiCad checks.
+		partialRoot := t.TempDir()
+		partialOutput := filepath.Join(partialRoot, "target")
+		partialBundle := writePostRepairCleanBundle(t, partialRoot, partialOutput)
+		partial := runPostRepairTargetApplyCLI(t, partialOutput, partialBundle, "--strict-unrouted")
+		if !partial.OK {
+			t.Fatalf("strict apply ok=false, want true; issues=%#v result=%#v", partial.Issues, partial)
+		}
+		if partial.Data.Status != repair.StatusPartial {
+			t.Fatalf("strict apply status = %q, want %q", partial.Data.Status, repair.StatusPartial)
+		}
+		partialAfter := postRepairSummaryMap(t, partial.Data.Delta, "after")
+		if got := postRepairSummaryNumber(t, partialAfter, "blocking_count"); got != 0 {
+			t.Fatalf("strict after blocking_count = %v, want 0", got)
+		}
+		if got := postRepairSummaryNumber(t, partialAfter, "warning_count"); got < 1 {
+			t.Fatalf("strict after warning_count = %v, want >= 1", got)
+		}
+	})
+}
