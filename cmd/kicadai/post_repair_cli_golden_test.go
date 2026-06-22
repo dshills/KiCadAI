@@ -12,6 +12,7 @@ import (
 
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 const postRepairCLIFixtureRoot = "../../internal/designworkflow/testdata/post_repair_cli"
@@ -28,16 +29,18 @@ type postRepairCLIData struct {
 	Project struct {
 		OutputDir string `json:"output_dir"`
 	} `json:"project,omitempty"`
-	Stages     []postRepairCLIStage `json:"stages,omitempty"`
-	Status     repair.Status        `json:"status,omitempty"`
-	Summary    map[string]any       `json:"summary,omitempty"`
-	Delta      map[string]any       `json:"delta,omitempty"`
-	Validation []struct {
-		Name      string             `json:"name"`
-		Skipped   bool               `json:"skipped,omitempty"`
-		Issues    []reports.Issue    `json:"issues,omitempty"`
-		Artifacts []reports.Artifact `json:"artifacts,omitempty"`
-	} `json:"validation,omitempty"`
+	Stages     []postRepairCLIStage      `json:"stages,omitempty"`
+	Status     repair.Status             `json:"status,omitempty"`
+	Summary    map[string]any            `json:"summary,omitempty"`
+	Delta      map[string]any            `json:"delta,omitempty"`
+	Validation []postRepairCLIValidation `json:"validation,omitempty"`
+}
+
+type postRepairCLIValidation struct {
+	Name      string             `json:"name"`
+	Skipped   bool               `json:"skipped,omitempty"`
+	Issues    []reports.Issue    `json:"issues,omitempty"`
+	Artifacts []reports.Artifact `json:"artifacts,omitempty"`
 }
 
 type postRepairCLIStage struct {
@@ -129,6 +132,21 @@ func runPostRepairDesignCreateCLI(t *testing.T, fixtureName string, globalArgs .
 	return runPostRepairCLI(t, args...), outputDir
 }
 
+func runPostRepairTargetApplyCLI(t *testing.T, target string, bundlePath string, globalArgs ...string) postRepairCLIResult {
+	t.Helper()
+	// This CLI uses one global flag set, so all flags must precede "repair apply".
+	args := []string{
+		"--json",
+		"--execute",
+		"--overwrite",
+		"--target", target,
+		"--request", bundlePath,
+	}
+	args = append(args, globalArgs...)
+	args = append(args, "repair", "apply")
+	return runPostRepairCLI(t, args...)
+}
+
 func runPostRepairCLI(t *testing.T, args ...string) postRepairCLIResult {
 	t.Helper()
 	var stdout bytes.Buffer
@@ -208,6 +226,43 @@ func postRepairBundleArtifact(t *testing.T, outputDir string, artifacts []report
 	return reports.Artifact{}
 }
 
+func writePostRepairCleanBundle(t *testing.T, dir string, outputDir string) string {
+	t.Helper()
+	tx := mustPostRepairTransaction(t, `{"operations":[
+	  {"op":"create_project","name":"post_repair_clean_apply"},
+	  {"op":"set_board_outline","board":{"width_mm":30,"height_mm":20}},
+	  {"op":"write_project","overwrite":true}
+	]}`)
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if len(apply.Issues) != 0 {
+		t.Fatalf("materialize clean repair target issues: %#v", apply.Issues)
+	}
+	path := filepath.Join(dir, "clean-repair-bundle.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("create clean repair bundle directory: %v", err)
+	}
+	if err := repair.SaveBundle(path, repair.Bundle{
+		Schema:        repair.BundleSchemaV1,
+		ProjectRoot:   outputDir,
+		ProjectName:   "post_repair_clean_apply",
+		Generated:     true,
+		Transaction:   &tx,
+		RepairOptions: repair.Options{Enabled: true, Apply: true},
+	}); err != nil {
+		t.Fatalf("write clean repair bundle: %v", err)
+	}
+	return path
+}
+
+func mustPostRepairTransaction(t *testing.T, input string) transactions.Transaction {
+	t.Helper()
+	tx, err := transactions.Parse([]byte(input))
+	if err != nil {
+		t.Fatalf("parse transaction fixture: %v", err)
+	}
+	return tx
+}
+
 func postRepairStageExists(stages []postRepairCLIStage, name string) bool {
 	for _, stage := range stages {
 		if stage.Name == name {
@@ -215,6 +270,22 @@ func postRepairStageExists(stages []postRepairCLIStage, name string) bool {
 		}
 	}
 	return false
+}
+
+func postRepairValidationByName(t *testing.T, validations []postRepairCLIValidation, name string) postRepairCLIValidation {
+	t.Helper()
+	for _, validation := range validations {
+		if validation.Name == name {
+			return validation
+		}
+	}
+	names := make([]string, 0, len(validations))
+	for _, validation := range validations {
+		names = append(names, validation.Name)
+	}
+	t.Fatalf("missing validation %q; got validations %q", name, names)
+	// t.Fatalf aborts the test; this zero value satisfies the compiler.
+	return postRepairCLIValidation{}
 }
 
 func normalizePostRepairPath(root string, path string) string {
@@ -308,5 +379,34 @@ func TestPostRepairDesignCreateDisabledOmitsRepairBundle(t *testing.T) {
 		if normalizePostRepairPath(result.Data.Project.OutputDir, artifact.Path) == ".kicadai/repair-bundle.json" {
 			t.Fatalf("repair bundle artifact present without repair enabled: %#v", artifact)
 		}
+	}
+}
+
+func TestPostRepairApplyValidationSummary(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	bundlePath := writePostRepairCleanBundle(t, root, outputDir)
+	applied := runPostRepairTargetApplyCLI(t, outputDir, bundlePath, "--strict-unrouted")
+	if applied.Data.Status == "" {
+		t.Fatalf("repair apply status missing: %#v", applied.Data)
+	}
+	transaction := postRepairValidationByName(t, applied.Data.Validation, "transaction")
+	writer := postRepairValidationByName(t, applied.Data.Validation, "writer_correctness")
+	board := postRepairValidationByName(t, applied.Data.Validation, "board_validation")
+	if transaction.Skipped || writer.Skipped || board.Skipped {
+		t.Fatalf("built-in validators should not be skipped: transaction=%#v writer=%#v board=%#v", transaction, writer, board)
+	}
+	if len(writer.Issues) == 0 {
+		t.Fatalf("writer correctness evidence missing issues: %#v", writer)
+	}
+	if applied.Data.Delta == nil {
+		t.Fatalf("validation delta missing from repair apply: %#v", applied.Data)
+	}
+	before := postRepairSummaryMap(t, applied.Data.Delta, "before")
+	after := postRepairSummaryMap(t, applied.Data.Delta, "after")
+	beforeIssues := postRepairSummaryNumber(t, before, "issue_count")
+	afterIssues := postRepairSummaryNumber(t, after, "issue_count")
+	if beforeIssues != 0 || afterIssues < 1 {
+		t.Fatalf("unexpected delta issue counts: before=%v (want 0), after=%v (want >= 1)", beforeIssues, afterIssues)
 	}
 }
