@@ -229,6 +229,22 @@ func postRepairSummaryNumber(t *testing.T, summary map[string]any, key string) f
 	return number
 }
 
+func postRepairSummaryBool(t *testing.T, summary map[string]any, key string) bool {
+	t.Helper()
+	if summary == nil {
+		t.Fatalf("summary missing; need key %q", key)
+	}
+	value, ok := summary[key]
+	if !ok {
+		t.Fatalf("summary missing %q: %#v", key, summary)
+	}
+	typed, ok := value.(bool)
+	if !ok {
+		t.Fatalf("summary[%q] has type %T: %#v", key, value, value)
+	}
+	return typed
+}
+
 func postRepairBundleArtifact(t *testing.T, outputDir string, artifacts []reports.Artifact) reports.Artifact {
 	t.Helper()
 	for _, artifact := range artifacts {
@@ -395,8 +411,11 @@ func TestPostRepairDesignCreateEmitsGeneratedRepairBundle(t *testing.T) {
 	if bundle.Schema != repair.BundleSchemaV1 || !bundle.Generated || bundle.ProjectName != "post_repair_bundle_basic" {
 		t.Fatalf("bundle metadata = %#v", bundle)
 	}
-	if bundle.Transaction == nil || len(bundle.Transaction.Operations) == 0 {
-		t.Fatalf("bundle transaction missing: %#v", bundle.Transaction)
+	if bundle.Transaction == nil {
+		t.Fatalf("bundle transaction missing")
+	}
+	if len(bundle.Transaction.Operations) == 0 {
+		t.Fatalf("bundle transaction operations missing: %#v", bundle.Transaction)
 	}
 	if len(bundle.StageIssues) == 0 {
 		t.Fatalf("bundle stage issues missing: %#v", bundle.StageIssues)
@@ -575,6 +594,9 @@ func TestRepairExportBundleCLIDryRun(t *testing.T) {
 	if got := postRepairSummaryNumber(t, result.Data.Summary, "blocking_count"); got != 1 {
 		t.Fatalf("blocking_count = %v, want 1", got)
 	}
+	if !postRepairSummaryBool(t, result.Data.Summary, "has_transaction") {
+		t.Fatalf("summary = %#v, want has_transaction=true", result.Data.Summary)
+	}
 	if _, err := os.Stat(filepath.FromSlash(result.Data.BundlePath)); !os.IsNotExist(err) {
 		t.Fatalf("dry-run wrote bundle or unexpected stat error: %v", err)
 	}
@@ -601,6 +623,12 @@ func TestRepairExportBundleCLIExecuteWritesBundle(t *testing.T) {
 	}
 	if !bundle.Generated || bundle.ProjectName != "post_repair_clean_apply" || len(bundle.StageIssues) != 1 {
 		t.Fatalf("bundle = %#v", bundle)
+	}
+	if bundle.Transaction == nil {
+		t.Fatalf("bundle transaction missing")
+	}
+	if len(bundle.Transaction.Operations) == 0 {
+		t.Fatalf("bundle transaction operations missing: %#v", bundle.Transaction)
 	}
 }
 
@@ -734,7 +762,7 @@ func TestRepairExportBundleCLIMalformedRequest(t *testing.T) {
 	}
 }
 
-func TestRepairApplyFromExportedBundleBlocksWithoutTransaction(t *testing.T) {
+func TestRepairApplyFromExportedBundleUsesHydratedTransaction(t *testing.T) {
 	root := t.TempDir()
 	outputDir := filepath.Join(root, "target")
 	_ = writePostRepairCleanBundle(t, root, outputDir)
@@ -754,21 +782,17 @@ func TestRepairApplyFromExportedBundleBlocksWithoutTransaction(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load exported bundle: %v", err)
 	}
-	if bundle.Transaction != nil {
-		t.Fatalf("exported bundle unexpectedly has transaction: %#v", bundle.Transaction)
+	if bundle.Transaction == nil {
+		t.Fatalf("exported bundle missing hydrated transaction")
+	}
+	if len(bundle.Transaction.Operations) == 0 {
+		t.Fatalf("exported bundle hydrated transaction operations missing: %#v", bundle.Transaction)
 	}
 	applied := runPostRepairTargetApplyCLI(t, outputDir, exportedBundlePath)
-	if applied.OK || applied.Data.Status != repair.StatusBlocked {
-		t.Fatalf("apply from transactionless export = %#v", applied)
+	if !applied.OK {
+		t.Fatalf("apply from hydrated export ok=false: %#v", applied)
 	}
-	found := false
-	for _, issue := range applied.Issues {
-		if issue.Code == reports.CodeInvalidArgument && strings.Contains(issue.Path, "transaction") {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Fatalf("missing transaction provenance issue: %#v", applied.Issues)
+	if applied.Data.Status != repair.StatusRepaired {
+		t.Fatalf("apply from hydrated export = %#v, want status %q", applied, repair.StatusRepaired)
 	}
 }

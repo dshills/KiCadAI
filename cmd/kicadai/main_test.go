@@ -17,6 +17,7 @@ import (
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/provenance"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -378,6 +379,9 @@ func TestRunDesignCreateSimpleLED(t *testing.T) {
 
 func TestRunRepairPlanTargetMissingProvenance(t *testing.T) {
 	output := writeRepairCLIProject(t)
+	if err := os.RemoveAll(filepath.Join(output, provenance.RelativePath)); err != nil {
+		t.Fatal(err)
+	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	err := run([]string{"--json", "--target", output, "repair", "plan"}, &stdout, &stderr)
