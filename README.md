@@ -166,6 +166,10 @@ go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json rou
 go run ./cmd/kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
 # For integrations that already produce a generated repair bundle:
 go run ./cmd/kicadai --json --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
+# Generate/apply a repair bundle during design create, then replay that saved
+# bundle later for reproducible target-apply validation:
+go run ./cmd/kicadai --json --request ./examples/design/led_indicator.json --output ./out/led_indicator --overwrite --repair-apply --skip-routing design create
+go run ./cmd/kicadai --json --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
 go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
 
@@ -212,6 +216,20 @@ Results for the `repair apply` command include:
   artifacts.
 - `delta`: before/after issue summaries with cleared, repeated, and new issues.
 - `budget`: normalized retry limits, attempt count, and exhaustion status.
+
+Post-repair statuses are intended for AI callers:
+
+- `repaired`: required validation is clean after apply.
+- `partial`: blocking issues are absent, but non-blocking warnings or skipped
+  optional evidence remain.
+- `blocked`: required validation still has blocking issues, a required external
+  validator is unavailable, or safety policy prevents mutation.
+
+KiCad-backed post-repair evidence is opt-in. `--require-drc` makes missing DRC
+evidence blocking. `--allow-missing-drc` requests optional DRC evidence and
+keeps a missing `kicad-cli` visible as a warning. Default tests use fake or
+missing CLI paths and do not require a local KiCad install. By default, KiCad
+DRC is skipped unless `--require-drc` or `--allow-missing-drc` is provided.
 
 When `design create` runs the persisted `validation_repair` stage, it writes a
 repair bundle artifact at `.kicadai/repair-bundle.json` under the generated
@@ -365,6 +383,10 @@ go run ./cmd/kicadai \
 
 Useful flags:
 
+- `--output`: project output directory for `design create` and generation
+  commands.
+- `--target`: existing generated project directory or file for `repair apply`
+  and other target-oriented commands.
 - `--skip-routing`: skip board routing while still writing realized local PCB
   fragments.
 - `--route-mode`: routing mode, one of `single_layer`, `two_layer`, or
@@ -377,6 +399,12 @@ Useful flags:
 - `--strict-unrouted`, `--strict-zones`: make validation stricter.
 - `--require-drc`, `--kicad-cli`, `--keep-artifacts`, `--artifact-dir`: require
   KiCad-backed DRC evidence.
+- `--allow-missing-drc`: request optional DRC evidence without blocking when
+  `kicad-cli` is unavailable.
+- `--repair`: include the plan-only `validation_repair` stage in
+  `design create`; it does not persist the replay bundle.
+- `--repair-apply`: implies `--repair`, applies generated-project validation
+  repair during `design create`, and writes `.kicadai/repair-bundle.json`.
 - `--max-repair-attempts`: bound validation repair attempts when repair is
   enabled by the workflow or a repair command.
 

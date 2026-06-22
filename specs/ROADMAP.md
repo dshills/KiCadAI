@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-21
+Date: 2026-06-22
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -77,7 +77,9 @@ from validation feedback to safe automatic repair.
 - Post-repair validation adapters for writer correctness, board validation,
   optional KiCad ERC/DRC, optional KiCad round-trip evidence, persisted
   validation summaries, issue deltas, retry budget evidence, and design
-  workflow repair bundle artifacts.
+  workflow repair bundle artifacts, with CLI golden coverage for bundle export,
+  target apply, validation summaries, delta statuses, and optional vs required
+  KiCad DRC policy.
 - `design create` workflow for structured block-based design requests.
 - README and focused docs for current CLI capabilities.
 
@@ -234,7 +236,10 @@ Post-repair validation adapters now include writer correctness,
 connectivity-first board validation, optional KiCad ERC/DRC, and optional
 KiCad round-trip evidence. Persisted repair results include validation adapter
 summaries, before/after issue deltas, retry budget evidence, and generated
-repair bundle artifacts from `design create` repair runs.
+repair bundle artifacts from `design create` repair runs. CLI golden fixtures
+now lock down generated bundle parseability, target apply overwrite policy,
+post-apply validation adapter names, repaired/partial delta status behavior,
+and optional versus required missing KiCad DRC evidence.
 
 ### Remaining Work
 
@@ -245,7 +250,8 @@ repair bundle artifacts from `design create` repair runs.
 - Extend retry budgets from persisted repair apply into full generate,
   validate, repair, and revalidate loops.
 - Implement KiCad zone refill only under explicit KiCad CLI policy.
-- Add golden CLI fixtures for post-repair validation summaries and issue deltas.
+- Broaden CLI fixtures with real KiCad ERC/DRC artifacts under opt-in
+  integration configuration.
 
 ### Acceptance Gates
 
