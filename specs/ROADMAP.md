@@ -313,6 +313,8 @@ intent and quality evidence for:
   blocks are implemented.
 - Expand generated full-board retry cases now that generated workflow footprint
   pad summaries hydrate through resolver-backed records or verified templates.
+  Each fixture should capture baseline evidence, retry attempts, selected best
+  attempt, and before/after routing, connectivity, and validation deltas.
 - Expand placement-routing retry with more generated-board cases, richer
   convergence criteria, and stronger evidence that retries improve routing
   without harming hard constraints.
@@ -499,7 +501,9 @@ optional bounded placement-routing retry, and optional repair behavior.
 ## Near-Term Recommended Sequence
 
 1. Add generated full-board retry fixtures that prove actual improvement after
-   pad hydration, not only real connectivity diagnostics.
+   pad hydration, not only real connectivity diagnostics. The fixtures should
+   cover multiple `design create` requests and assert before/after validation
+   deltas without loosening hard placement or board constraints.
 2. Add fabrication export/readiness gates.
 3. Persist transaction provenance for generated targets outside `design
    create` so `repair export-bundle` can feed mutation-safe apply flows.

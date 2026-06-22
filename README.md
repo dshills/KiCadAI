@@ -358,6 +358,11 @@ summary coverage for generated workflows with hydrated pad evidence. The next
 retry milestone is proving actual improvement on more generated full-board
 cases, not merely reaching routing.
 
+Current roadmap focus: expand generated full-board retry fixtures so
+`design create` examples demonstrate measurable before/after improvement in
+routing, connectivity, and validation evidence after pad hydration. This is the
+next confidence gate before fabrication-readiness work.
+
 ### Component Intelligence
 
 Component intelligence provides a deterministic catalog and selection layer for
@@ -584,6 +589,11 @@ Placement is still a deterministic heuristic, not a production-grade constraint
 solver; thermal placement, true congestion analysis, differential pairs,
 broader generated full-board retry improvement evidence, and final DRC-grade
 layout decisions remain future work.
+
+The next placement/retry work item is a generated-board corpus that records
+baseline, retry attempts, selected best attempt, and final validation deltas for
+multiple `design create` requests. That corpus should prove retry improves
+electrical evidence without loosening hard placement or board constraints.
 
 ### Routing
 
