@@ -112,6 +112,86 @@ func TestExportBundleOverwriteReplacesExistingBundle(t *testing.T) {
 	}
 }
 
+func TestExportBundleBlocksMissingTarget(t *testing.T) {
+	result := ExportBundle(ExportOptions{
+		TargetPath:  filepath.Join(t.TempDir(), "missing"),
+		StageIssues: exportStageIssues(),
+		Execute:     true,
+	})
+	assertIssueCode(t, result.Issues, reports.CodeMissingFile)
+}
+
+func TestExportBundleBlocksTargetWithoutGeneratedManifest(t *testing.T) {
+	root := t.TempDir()
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		StageIssues: exportStageIssues(),
+		Execute:     true,
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root: root,
+			Name: "demo",
+		}),
+	})
+	assertIssueCode(t, result.Issues, reports.CodePreservationConflict)
+}
+
+func TestExportBundleBlocksEmptyStageIssues(t *testing.T) {
+	root := t.TempDir()
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		StageIssues: []StageIssues{{Stage: "writer_correctness"}},
+		Execute:     true,
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root:     root,
+			Name:     "demo",
+			Manifest: manifest.Status{Present: true},
+		}),
+	})
+	assertIssueCode(t, result.Issues, reports.CodeInvalidArgument)
+}
+
+func TestExportBundleBlocksOutputOutsideTargetRoot(t *testing.T) {
+	root := t.TempDir()
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		OutputPath:  filepath.Join(t.TempDir(), "repair-bundle.json"),
+		StageIssues: exportStageIssues(),
+		Execute:     true,
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root:     root,
+			Name:     "demo",
+			Manifest: manifest.Status{Present: true},
+		}),
+	})
+	assertIssueCode(t, result.Issues, reports.CodeInvalidArgument)
+}
+
+func TestExportBundleCreatesSafeNestedParentDirectory(t *testing.T) {
+	root := t.TempDir()
+	path := filepath.Join(root, ".kicadai", "exports", "repair-bundle.json")
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		OutputPath:  path,
+		StageIssues: exportStageIssues(),
+		Execute:     true,
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root:     root,
+			Name:     "demo",
+			Manifest: manifest.Status{Present: true},
+		}),
+	})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("expected bundle at %s: %v", path, err)
+	}
+	if !info.Mode().IsRegular() {
+		t.Fatalf("expected regular bundle file at %s, got mode %s", path, info.Mode())
+	}
+}
+
 func exportStageIssues() []StageIssues {
 	return []StageIssues{{Stage: "writer_correctness", Issues: []reports.Issue{
 		{Code: reports.CodeInvalidNetAssignment, Severity: reports.SeverityError, Path: "pcb.pad", Message: "missing net"},
