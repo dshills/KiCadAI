@@ -77,9 +77,10 @@ from validation feedback to safe automatic repair.
 - Post-repair validation adapters for writer correctness, board validation,
   optional KiCad ERC/DRC, optional KiCad round-trip evidence, persisted
   validation summaries, issue deltas, retry budget evidence, and design
-  workflow repair bundle artifacts, with CLI golden coverage for bundle export,
-  target apply, validation summaries, delta statuses, and optional vs required
-  KiCad DRC policy.
+  workflow repair bundle artifacts, plus a dedicated `repair export-bundle`
+  command for non-`design create` generated targets, with CLI golden coverage
+  for bundle export, target apply, validation summaries, delta statuses, and
+  optional vs required KiCad DRC policy.
 - `design create` workflow for structured block-based design requests.
 - README and focused docs for current CLI capabilities.
 
@@ -236,17 +237,23 @@ Post-repair validation adapters now include writer correctness,
 connectivity-first board validation, optional KiCad ERC/DRC, and optional
 KiCad round-trip evidence. Persisted repair results include validation adapter
 summaries, before/after issue deltas, retry budget evidence, and generated
-repair bundle artifacts from `design create` repair runs. CLI golden fixtures
-now lock down generated bundle parseability, target apply overwrite policy,
-post-apply validation adapter names, repaired/partial delta status behavior,
-and optional versus required missing KiCad DRC evidence.
+repair bundle artifacts from `design create` repair runs. `repair
+export-bundle` now packages stage issue JSON against generated targets for
+non-workflow repair evidence, with dry-run-by-default behavior, inside-target
+output policy, overwrite gates, malformed request handling, generated ownership
+checks, and selected-field CLI goldens. CLI golden fixtures now lock down
+generated bundle parseability, target apply overwrite policy, post-apply
+validation adapter names, repaired/partial delta status behavior, and optional
+versus required missing KiCad DRC evidence.
 
 ### Remaining Work
 
 - Expand post-repair adapters to include richer parser-specific evidence once
   ERC/DRC findings are mapped to repair categories consistently across all
   flows.
-- Add a dedicated repair bundle export command for non-`design create` flows.
+- Persist or discover transaction provenance for generated targets outside
+  `design create` so exported repair bundles can be applied, not only retained
+  as repair evidence.
 - Extend retry budgets from persisted repair apply into full generate,
   validate, repair, and revalidate loops.
 - Implement KiCad zone refill only under explicit KiCad CLI policy.
@@ -491,15 +498,14 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Add golden CLI fixtures for post-repair validation summaries, issue deltas,
-   and generated repair bundles.
-2. Add a dedicated repair bundle export command for non-`design create` flows.
-3. Add generated full-board retry fixtures that prove actual improvement after
+1. Add generated full-board retry fixtures that prove actual improvement after
    pad hydration, not only real connectivity diagnostics.
-4. Add fabrication export/readiness gates.
-5. Expand verified component and block coverage alongside each new block
+2. Add fabrication export/readiness gates.
+3. Persist transaction provenance for generated targets outside `design
+   create` so `repair export-bundle` can feed mutation-safe apply flows.
+4. Expand verified component and block coverage alongside each new block
    family.
-6. Add intent-level planning only after the above gates are reliable.
+5. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
 

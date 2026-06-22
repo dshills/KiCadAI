@@ -164,6 +164,8 @@ go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
 go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
 go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json route request
 go run ./cmd/kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
+go run ./cmd/kicadai --json --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
+go run ./cmd/kicadai --json --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 # For integrations that already produce a generated repair bundle:
 go run ./cmd/kicadai --json --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
 # Generate/apply a repair bundle during design create, then replay that saved
@@ -202,12 +204,16 @@ go run ./cmd/kicadai --json --feedback transaction validate ./examples/transacti
   placement engine.
 - `component list|show|find|select|validate`: inspect the curated component
   catalog, choose symbol/footprint bindings, and enforce confidence gates.
-- `repair plan|apply`: classify stage issues and emit deterministic repair
-  attempts. With `--target` and a repair bundle, the `repair apply` command
-  with `--execute` and `--overwrite` persists safe transaction-level repairs
-  back through the generated KiCad writer and can run built-in post-repair
-  validators for writer correctness, board validation, ERC/DRC, and round-trip
-  evidence when the corresponding validation flags are enabled.
+- `repair plan|export-bundle|apply`: classify stage issues, package generated
+  target repair evidence, and emit deterministic repair attempts.
+  `repair export-bundle` accepts stage issue JSON via `--request` plus
+  `--target`, defaults to a dry run, and writes
+  `.kicadai/repair-bundle.json` only with `--execute`.
+  With `--target` and a repair bundle, `repair apply` with `--execute` and
+  `--overwrite` persists safe transaction-level repairs back through the
+  generated KiCad writer and can run built-in post-repair validators for writer
+  correctness, board validation, ERC/DRC, and round-trip evidence when the
+  corresponding validation flags are enabled.
 
 Results for the `repair apply` command include:
 
@@ -233,8 +239,33 @@ DRC is skipped unless `--require-drc` or `--allow-missing-drc` is provided.
 
 When `design create` runs the persisted `validation_repair` stage, it writes a
 repair bundle artifact at `.kicadai/repair-bundle.json` under the generated
-project directory. That bundle can be passed back to `repair apply --target`
-for reproducible generated-project repair.
+project directory. That bundle can be passed back via `--request` to
+`repair apply --target` for reproducible generated-project repair.
+
+For non-`design create` flows, `repair export-bundle` packages structured
+stage issues against a generated target:
+
+```sh
+go run ./cmd/kicadai \
+  --json \
+  --target ./out/led_indicator \
+  --request ./examples/repair/missing_footprint_stage_issues.json \
+  repair export-bundle
+
+go run ./cmd/kicadai \
+  --json \
+  --execute \
+  --overwrite \
+  --target ./out/led_indicator \
+  --request ./examples/repair/missing_footprint_stage_issues.json \
+  repair export-bundle
+```
+
+Export is generated-target-only and refuses output paths outside the target
+root. Bundles exported from stage issues may report
+`summary.has_transaction=false` when no generated transaction evidence is
+available; those bundles remain useful as evidence, while mutation through
+`repair apply` requires transaction provenance.
 
 LED generation:
 
@@ -384,9 +415,14 @@ go run ./cmd/kicadai \
 Useful flags:
 
 - `--output`: project output directory for `design create` and generation
-  commands.
-- `--target`: existing generated project directory or file for `repair apply`
-  and other target-oriented commands.
+  commands; for `repair export-bundle`, an optional bundle output path inside
+  the target root.
+- `--target`: existing generated project directory or file for
+  target-oriented repair commands.
+- `--execute`: perform filesystem writes for repair export/apply commands that
+  otherwise default to dry-run behavior.
+- `--overwrite`: allow replacing generated output directories or existing
+  repair bundle files.
 - `--skip-routing`: skip board routing while still writing realized local PCB
   fragments.
 - `--route-mode`: routing mode, one of `single_layer`, `two_layer`, or

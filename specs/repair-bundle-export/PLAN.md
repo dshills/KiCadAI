@@ -295,3 +295,20 @@ Document the command and move the roadmap to the next priority.
 Document repair bundle export
 ```
 
+## Implementation Notes
+
+- `repair export-bundle` is implemented as a generated-target-only evidence
+  export path. It defaults to dry-run behavior and writes only when `--execute`
+  is provided.
+- Output paths are constrained to the generated target root. Existing bundle
+  files require `--overwrite`.
+- The internal export service accepts optional transaction evidence and reports
+  `summary.has_transaction=true` when a transaction is present.
+- Current CLI exports from stage issue JSON do not yet discover full generated
+  transaction provenance from target metadata, so CLI-generated bundles can
+  report `summary.has_transaction=false`. Those bundles remain useful for
+  reproducible evidence and diagnostics. Mutation through `repair apply
+  --target` still requires transaction provenance and blocks safely when the
+  transaction is absent.
+- The next follow-up is to persist or hydrate transaction provenance for
+  generated targets outside the `design create --repair-apply` path.
