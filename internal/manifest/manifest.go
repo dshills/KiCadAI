@@ -21,6 +21,14 @@ type Manifest struct {
 	Operations       []OperationSummary `json:"operations"`
 	Artifacts        []reports.Artifact `json:"artifacts"`
 	FileHashes       map[string]string  `json:"file_hashes"`
+	Provenance       *ProvenanceRef     `json:"provenance,omitempty"`
+}
+
+type ProvenanceRef struct {
+	TransactionPath string `json:"transaction_path,omitempty"`
+	Schema          string `json:"schema,omitempty"`
+	OperationCount  int    `json:"operation_count,omitempty"`
+	Hash            string `json:"hash,omitempty"`
 }
 
 type OperationSummary struct {
@@ -46,26 +54,35 @@ func Write(root string, manifest Manifest) (reports.Artifact, error) {
 	if manifest.FileHashes == nil {
 		manifest.FileHashes = map[string]string{}
 	}
+	if manifest.Provenance != nil {
+		if err := hydrateProvenanceRef(absRoot, manifest.Provenance, manifest.FileHashes); err != nil {
+			return reports.Artifact{}, err
+		}
+	}
 	for _, artifact := range manifest.Artifacts {
 		if strings.TrimSpace(artifact.Path) == "" {
 			continue
 		}
-		absArtifact, err := filepath.Abs(artifact.Path)
-		if err != nil {
-			return reports.Artifact{}, err
+		artifactPath := artifact.Path
+		if filepath.IsAbs(artifactPath) {
+			rel, err := filepath.Rel(absRoot, artifactPath)
+			if err != nil {
+				return reports.Artifact{}, fmt.Errorf("artifact is outside manifest root: %s", artifact.Path)
+			}
+			artifactPath = rel
 		}
-		rel, err := filepath.Rel(absRoot, absArtifact)
-		if err != nil || strings.HasPrefix(rel, "..") {
+		rel, absArtifact, err := cleanRelativePath(absRoot, artifactPath)
+		if err != nil {
 			return reports.Artifact{}, fmt.Errorf("artifact is outside manifest root: %s", artifact.Path)
 		}
-		if filepath.ToSlash(rel) == RelativePath {
+		if rel == RelativePath {
 			continue
 		}
 		hash, err := fileHash(absArtifact)
 		if err != nil {
 			return reports.Artifact{}, err
 		}
-		manifest.FileHashes[filepath.ToSlash(rel)] = hash
+		manifest.FileHashes[rel] = hash
 	}
 	path := filepath.Join(root, RelativePath)
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -95,19 +112,110 @@ func Read(root string) (Manifest, Status, error) {
 		return Manifest{}, Status{Present: true, Path: filepath.ToSlash(path), Stale: true, Issues: []string{err.Error()}}, err
 	}
 	status := Status{Present: true, Path: filepath.ToSlash(path)}
+	absRoot, err := filepath.Abs(root)
+	if err != nil {
+		return manifest, Status{Present: true, Path: filepath.ToSlash(path), Stale: true, Issues: []string{err.Error()}}, err
+	}
+	checkProvenanceRef(absRoot, manifest, &status)
 	for rel, want := range manifest.FileHashes {
-		got, err := fileHash(filepath.Join(root, filepath.FromSlash(rel)))
+		if manifest.Provenance != nil && rel == manifest.Provenance.TransactionPath {
+			continue
+		}
+		cleanRel, absPath, err := cleanRelativePath(absRoot, rel)
 		if err != nil {
 			status.Stale = true
 			status.Issues = append(status.Issues, rel+": "+err.Error())
 			continue
 		}
+		got, err := fileHash(absPath)
+		if err != nil {
+			status.Stale = true
+			status.Issues = append(status.Issues, cleanRel+": "+err.Error())
+			continue
+		}
 		if got != want {
 			status.Stale = true
-			status.Issues = append(status.Issues, rel+": hash mismatch")
+			status.Issues = append(status.Issues, cleanRel+": hash mismatch")
 		}
 	}
 	return manifest, status, nil
+}
+
+func hydrateProvenanceRef(absRoot string, ref *ProvenanceRef, hashes map[string]string) error {
+	if ref == nil {
+		return nil
+	}
+	rel := strings.TrimSpace(ref.TransactionPath)
+	if rel == "" {
+		return fmt.Errorf("provenance transaction_path is required")
+	}
+	cleanRel, absPath, err := cleanRelativePath(absRoot, rel)
+	if err != nil {
+		return fmt.Errorf("invalid provenance transaction_path: %w", err)
+	}
+	hash, err := fileHash(absPath)
+	if err != nil {
+		return fmt.Errorf("hash provenance transaction: %w", err)
+	}
+	ref.TransactionPath = cleanRel
+	ref.Hash = hash
+	hashes[cleanRel] = hash
+	return nil
+}
+
+func checkProvenanceRef(absRoot string, manifest Manifest, status *Status) {
+	if manifest.Provenance == nil {
+		return
+	}
+	ref := manifest.Provenance
+	if strings.TrimSpace(ref.TransactionPath) == "" {
+		markStatusStale(status, "provenance.transaction_path: required")
+		return
+	}
+	cleanRel, absPath, err := cleanRelativePath(absRoot, ref.TransactionPath)
+	if err != nil {
+		markStatusStale(status, "provenance.transaction_path: "+err.Error())
+		return
+	}
+	got, err := fileHash(absPath)
+	if err != nil {
+		markStatusStale(status, cleanRel+": "+err.Error())
+		return
+	}
+	if ref.Hash != "" && got != ref.Hash {
+		markStatusStale(status, cleanRel+": provenance hash mismatch")
+	}
+	if want, ok := manifest.FileHashes[cleanRel]; !ok {
+		markStatusStale(status, cleanRel+": missing file hash")
+	} else if got != want {
+		markStatusStale(status, cleanRel+": hash mismatch")
+	}
+}
+
+func cleanRelativePath(absRoot string, rel string) (string, string, error) {
+	if filepath.IsAbs(rel) {
+		return "", "", fmt.Errorf("path must be relative")
+	}
+	cleanRel := filepath.Clean(filepath.FromSlash(rel))
+	if cleanRel == "." {
+		return "", "", fmt.Errorf("path is required")
+	}
+	for _, part := range strings.Split(filepath.ToSlash(cleanRel), "/") {
+		if part == ".." {
+			return "", "", fmt.Errorf("path must not contain parent traversal")
+		}
+	}
+	absPath := filepath.Join(absRoot, cleanRel)
+	relToRoot, err := filepath.Rel(absRoot, absPath)
+	if err != nil || relToRoot == ".." || strings.HasPrefix(relToRoot, ".."+string(filepath.Separator)) {
+		return "", "", fmt.Errorf("path must be inside manifest root")
+	}
+	return filepath.ToSlash(cleanRel), absPath, nil
+}
+
+func markStatusStale(status *Status, issue string) {
+	status.Stale = true
+	status.Issues = append(status.Issues, issue)
 }
 
 func fileHash(path string) (string, error) {
