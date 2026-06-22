@@ -22,6 +22,8 @@ import (
 )
 
 const applyLockFileName = ".kicadai.apply.lock"
+const transactionProvenanceSchema = "kicadai.transaction.provenance.v1"
+const transactionProvenancePath = ".kicadai/transaction.json"
 
 type ApplyOptions struct {
 	OutputDir     string
@@ -35,6 +37,22 @@ type ApplyResult struct {
 	Plan      Plan               `json:"plan"`
 	Artifacts []reports.Artifact `json:"artifacts"`
 	Issues    []reports.Issue    `json:"issues"`
+}
+
+type transactionProvenance struct {
+	Schema             string                      `json:"schema"`
+	ProjectName        string                      `json:"project_name"`
+	GeneratorVersion   string                      `json:"generator_version,omitempty"`
+	CreatedBy          string                      `json:"created_by,omitempty"`
+	Transaction        Transaction                 `json:"transaction"`
+	OperationCount     int                         `json:"operation_count"`
+	OperationSummaries []manifest.OperationSummary `json:"operation_summaries,omitempty"`
+	Source             transactionProvenanceSource `json:"source,omitempty"`
+}
+
+type transactionProvenanceSource struct {
+	Kind string `json:"kind,omitempty"`
+	Seed string `json:"seed,omitempty"`
 }
 
 func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
@@ -75,12 +93,12 @@ func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 		result.Artifacts = append(result.Artifacts, artifacts...)
 	}
 	if len(result.Artifacts) > 0 {
-		manifestArtifact, err := writeManifestForApply(opts.OutputDir, tx, result.Artifacts)
+		metadataArtifacts, err := writeManifestForApply(opts.OutputDir, tx, result.Artifacts)
 		if err != nil {
-			result.Issues = append(result.Issues, applyIssue(len(tx.Operations)-1, err))
+			result.Issues = append(result.Issues, applyIssue(lastOperationIndex(tx), err))
 			return result
 		}
-		result.Artifacts = append(result.Artifacts, manifestArtifact)
+		result.Artifacts = append(result.Artifacts, metadataArtifacts...)
 	}
 	return result
 }
@@ -273,21 +291,108 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 	return result
 }
 
-func writeManifestForApply(outputDir string, tx Transaction, artifacts []reports.Artifact) (reports.Artifact, error) {
+func writeManifestForApply(outputDir string, tx Transaction, artifacts []reports.Artifact) ([]reports.Artifact, error) {
 	projectName := projectNameFromTransaction(tx)
 	if projectName == "" {
 		projectName = "generated_design"
 	}
-	ops := make([]manifest.OperationSummary, 0, len(tx.Operations))
-	for i, op := range tx.Operations {
-		ops = append(ops, manifest.OperationSummary{Index: i, Op: string(op.Op)})
+	ops := operationSummariesForApply(tx)
+	provenanceArtifact, err := writeTransactionProvenanceForApply(outputDir, projectName, tx)
+	if err != nil {
+		return nil, err
 	}
-	return manifest.Write(outputDir, manifest.Manifest{
+	manifestArtifacts := append([]reports.Artifact(nil), artifacts...)
+	manifestArtifacts = append(manifestArtifacts, provenanceArtifact)
+	manifestArtifact, err := manifest.Write(outputDir, manifest.Manifest{
 		ProjectName:      projectName,
 		GeneratorVersion: reports.Version,
 		Operations:       ops,
-		Artifacts:        artifacts,
+		Artifacts:        manifestArtifacts,
+		Provenance: &manifest.ProvenanceRef{
+			TransactionPath: transactionProvenancePath,
+			Schema:          transactionProvenanceSchema,
+			OperationCount:  len(tx.Operations),
+		},
 	})
+	if err != nil {
+		return nil, err
+	}
+	return []reports.Artifact{provenanceArtifact, manifestArtifact}, nil
+}
+
+func lastOperationIndex(tx Transaction) int {
+	if len(tx.Operations) == 0 {
+		return -1
+	}
+	return len(tx.Operations) - 1
+}
+
+func writeTransactionProvenanceForApply(outputDir string, projectName string, tx Transaction) (reports.Artifact, error) {
+	data := transactionProvenance{
+		Schema:             transactionProvenanceSchema,
+		ProjectName:        projectName,
+		GeneratorVersion:   reports.Version,
+		CreatedBy:          "kicadai",
+		Transaction:        tx,
+		OperationCount:     len(tx.Operations),
+		OperationSummaries: operationSummariesForApply(tx),
+		Source:             transactionProvenanceSource{Kind: "transaction_apply"},
+	}
+	raw, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return reports.Artifact{}, err
+	}
+	raw = append(raw, '\n')
+	path := filepath.Join(outputDir, filepath.FromSlash(transactionProvenancePath))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return reports.Artifact{}, err
+	}
+	if err := writeFileAtomic(path, raw, 0o644); err != nil {
+		return reports.Artifact{}, err
+	}
+	return reports.Artifact{Kind: reports.ArtifactValidationReport, Path: transactionProvenancePath, Description: "KiCadAI generated transaction provenance"}, nil
+}
+
+func operationSummariesForApply(tx Transaction) []manifest.OperationSummary {
+	summaries := make([]manifest.OperationSummary, 0, len(tx.Operations))
+	for index, op := range tx.Operations {
+		summaries = append(summaries, manifest.OperationSummary{Index: index, Op: string(op.Op)})
+	}
+	return summaries
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	dir := filepath.Dir(path)
+	base := filepath.Base(path)
+	if runes := []rune(base); len(runes) > 128 {
+		base = string(runes[:128])
+	}
+	tmp, err := os.CreateTemp(dir, "."+base+".tmp-*")
+	if err != nil {
+		return err
+	}
+	tmpPath := tmp.Name()
+	closed := false
+	defer func() {
+		if !closed {
+			_ = tmp.Close()
+		}
+		_ = os.Remove(tmpPath)
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		return err
+	}
+	if err := tmp.Chmod(perm); err != nil {
+		return err
+	}
+	if err := tmp.Sync(); err != nil {
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		return err
+	}
+	closed = true
+	return os.Rename(tmpPath, path)
 }
 
 func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Builder, error) {

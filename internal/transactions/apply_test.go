@@ -1,6 +1,7 @@
 package transactions
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -12,6 +13,7 @@ import (
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
 
@@ -28,13 +30,37 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
-	if len(result.Artifacts) != 4 {
+	if len(result.Artifacts) != 5 {
 		t.Fatalf("expected artifacts, got %#v", result.Artifacts)
 	}
-	for _, name := range []string{"demo.kicad_pro", "demo.kicad_sch", "demo.kicad_pcb", ".kicadai/manifest.json"} {
+	for _, name := range []string{"demo.kicad_pro", "demo.kicad_sch", "demo.kicad_pcb", ".kicadai/manifest.json", ".kicadai/transaction.json"} {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}
+	}
+	generatedManifest, status, err := manifest.Read(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if status.Stale {
+		t.Fatalf("manifest status = %#v, want fresh", status)
+	}
+	if generatedManifest.Provenance == nil || generatedManifest.Provenance.Hash == "" {
+		t.Fatalf("manifest provenance = %#v", generatedManifest.Provenance)
+	}
+	if got := generatedManifest.FileHashes[transactionProvenancePath]; got == "" || got != generatedManifest.Provenance.Hash {
+		t.Fatalf("transaction provenance hash = %q manifest provenance = %#v", got, generatedManifest.Provenance)
+	}
+	provenanceData, err := os.ReadFile(filepath.Join(output, filepath.FromSlash(transactionProvenancePath)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var readProvenance transactionProvenance
+	if err := json.Unmarshal(provenanceData, &readProvenance); err != nil {
+		t.Fatal(err)
+	}
+	if readProvenance.OperationCount != len(tx.Operations) {
+		t.Fatalf("operation count = %d, want %d", readProvenance.OperationCount, len(tx.Operations))
 	}
 }
 
