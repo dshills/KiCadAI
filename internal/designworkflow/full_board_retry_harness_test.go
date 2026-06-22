@@ -443,7 +443,10 @@ func TestFullBoardRetryFixtureMetadataDeclaresEvidenceContract(t *testing.T) {
 			if metadata.Request == "" || metadata.ExpectedRoutingStatus == "" || metadata.ExpectedImprovement == "" || metadata.ExpectedImprovedMetric == "" {
 				t.Fatalf("metadata missing evidence contract fields: %#v", metadata)
 			}
-			if metadata.ExpectedMinAttempts < 1 {
+			if metadata.ExpectedRoutingStatus == "skipped" && metadata.ExpectedMinAttempts != 0 {
+				t.Fatalf("expected_min_attempts = %d, want 0 for skipped routing", metadata.ExpectedMinAttempts)
+			}
+			if metadata.ExpectedRoutingStatus != "skipped" && metadata.ExpectedMinAttempts < 1 {
 				t.Fatalf("expected_min_attempts = %d, want >= 1", metadata.ExpectedMinAttempts)
 			}
 			if metadata.ExpectPadHydration && metadata.ExpectedMinHydratedPads < 1 {

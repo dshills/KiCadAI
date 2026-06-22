@@ -1,0 +1,21 @@
+{
+  "name": "generated_sensor_multiblock",
+  "request": "request.json",
+  "intent": "Generated multi-block I2C sensor and connector fixture that proves pad hydration and inter-block net intent reach placement, while documenting the current fixed-placement boundary before routing retry.",
+  "fixture_class": "generated_multiblock_boundary",
+  "expected_categories": [],
+  "expected_stop_reason": "",
+  "expected_improvement": "generated_multiblock_pad_hydration",
+  "expected_improved_metric": "none_placement_boundary",
+  "preserve_constraints": ["net_assignments"],
+  "preserve_fixed_refs": [],
+  "expected_routing_status": "skipped",
+  "expected_baseline_status": "skipped",
+  "expected_final_status": "skipped",
+  "expected_min_attempts": 0,
+  "expected_min_applied": 0,
+  "expect_pad_hydration": true,
+  "expected_min_hydrated_pads": 14,
+  "expect_project_write": false,
+  "determinism": "generated multi-block request with local fixed placements currently blocks in placement after hydrating pads and preserving inter-block net aliases"
+}
