@@ -1,6 +1,7 @@
 package inspect
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -32,6 +33,14 @@ func TestProjectSummarizesExpectedFiles(t *testing.T) {
 	}
 	if summary.PCB == nil || summary.PCB.FootprintCount != 1 || summary.PCB.PadCount != 1 || !summary.PCB.HasBoardOutline {
 		t.Fatalf("unexpected PCB summary: %#v", summary.PCB)
+	}
+}
+
+func TestProjectContextHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := ProjectContext(ctx, t.TempDir()); err == nil {
+		t.Fatalf("ProjectContext returned nil error for canceled context")
 	}
 }
 
@@ -74,6 +83,52 @@ func TestProjectDiscoversProjectFileName(t *testing.T) {
 	}
 	if summary.Schematic == nil || summary.PCB == nil {
 		t.Fatalf("expected discovered schematic and PCB, got %#v", summary)
+	}
+}
+
+func TestDiscoverProjectFilePrefersDirectoryName(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "other.kicad_pro"), "{}")
+	writeFile(t, filepath.Join(root, "demo.kicad_pro"), "{}")
+
+	path, ok, err := DiscoverProjectFile(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !ok || filepath.Base(path) != "demo.kicad_pro" {
+		t.Fatalf("path=%q ok=%v, want demo.kicad_pro", path, ok)
+	}
+}
+
+func TestDiscoverProjectFileReportsAmbiguousProjects(t *testing.T) {
+	root := t.TempDir()
+	writeFile(t, filepath.Join(root, "alpha.kicad_pro"), "{}")
+	writeFile(t, filepath.Join(root, "beta.kicad_pro"), "{}")
+
+	if _, _, err := DiscoverProjectFile(root); err == nil {
+		t.Fatalf("DiscoverProjectFile returned nil error for ambiguous projects")
+	}
+}
+
+func TestProjectContextWithProjectPathUsesOverride(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "container")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	projectPath := filepath.Join(root, "actual.kicad_pro")
+	writeFile(t, projectPath, "{}")
+	writeFile(t, filepath.Join(root, "actual.kicad_sch"), `(kicad_sch (version 20260306) (generator "kicadai"))`)
+	writeFile(t, filepath.Join(root, "actual.kicad_pcb"), `(kicad_pcb (gr_line (layer "Edge.Cuts")))`)
+
+	summary, err := ProjectContextWithProjectPath(context.Background(), root, projectPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Name != "actual" || summary.Schematic == nil || summary.PCB == nil {
+		t.Fatalf("summary = %#v, want override project name and files", summary)
 	}
 }
 
@@ -127,6 +182,14 @@ func TestPCBSummaryUsesReader(t *testing.T) {
 	}
 }
 
+func TestPCBContextHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := PCBContext(ctx, filepath.Join(t.TempDir(), "board.kicad_pcb")); err == nil {
+		t.Fatalf("PCBContext returned nil error for canceled context")
+	}
+}
+
 func TestSchematicSummaryUsesReader(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
 	writeFile(t, path, `(kicad_sch
@@ -153,6 +216,14 @@ func TestSchematicSummaryUsesReader(t *testing.T) {
 	}
 	if summary.InspectionDepth != "structured" || len(summary.Issues) != 0 {
 		t.Fatalf("expected structured summary, got %#v", summary)
+	}
+}
+
+func TestSchematicContextHonorsCanceledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if _, err := SchematicContext(ctx, filepath.Join(t.TempDir(), "demo.kicad_sch")); err == nil {
+		t.Fatalf("SchematicContext returned nil error for canceled context")
 	}
 }
 

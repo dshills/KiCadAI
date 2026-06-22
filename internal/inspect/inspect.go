@@ -2,6 +2,7 @@ package inspect
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"io"
 	"os"
@@ -18,6 +19,17 @@ import (
 const inspectSampleLimit = 20
 
 func Project(path string) (ProjectSummary, error) {
+	return ProjectContext(context.Background(), path)
+}
+
+func ProjectContext(ctx context.Context, path string) (ProjectSummary, error) {
+	return ProjectContextWithProjectPath(ctx, path, "")
+}
+
+func ProjectContextWithProjectPath(ctx context.Context, path string, projectPathOverride string) (ProjectSummary, error) {
+	if err := ctx.Err(); err != nil {
+		return ProjectSummary{}, err
+	}
 	if strings.TrimSpace(path) == "" {
 		return ProjectSummary{}, fmt.Errorf("project path required")
 	}
@@ -34,11 +46,24 @@ func Project(path string) (ProjectSummary, error) {
 	}
 	name := filepath.Base(root)
 	projectPath := filepath.Join(root, name+".kicad_pro")
-	if discoveredProject, ok, err := discoverProjectFile(root); err != nil {
-		return ProjectSummary{}, err
-	} else if ok {
-		projectPath = discoveredProject
-		name = strings.TrimSuffix(filepath.Base(projectPath), ".kicad_pro")
+	if strings.TrimSpace(projectPathOverride) != "" {
+		overridePath, err := filepath.Abs(projectPathOverride)
+		if err != nil {
+			return ProjectSummary{}, err
+		}
+		rel, err := filepath.Rel(root, overridePath)
+		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			return ProjectSummary{}, fmt.Errorf("project path override must be inside project root")
+		}
+		projectPath = overridePath
+		name = ProjectNameFromPath(projectPath)
+	} else {
+		if discoveredProject, ok, err := DiscoverProjectFile(root); err != nil {
+			return ProjectSummary{}, err
+		} else if ok {
+			projectPath = discoveredProject
+			name = ProjectNameFromPath(projectPath)
+		}
 	}
 	summary := ProjectSummary{
 		Root:   root,
@@ -77,7 +102,10 @@ func Project(path string) (ProjectSummary, error) {
 		summary.Files = append(summary.Files, file)
 	}
 	if schematicExists {
-		schematicSummary, err := Schematic(schematicPath)
+		if err := ctx.Err(); err != nil {
+			return ProjectSummary{}, err
+		}
+		schematicSummary, err := SchematicContext(ctx, schematicPath)
 		if err != nil {
 			summary.Issues = append(summary.Issues, issueFromError(err, "schematic"))
 		} else {
@@ -85,7 +113,10 @@ func Project(path string) (ProjectSummary, error) {
 		}
 	}
 	if pcbExists {
-		pcbSummary, err := PCB(pcbPath)
+		if err := ctx.Err(); err != nil {
+			return ProjectSummary{}, err
+		}
+		pcbSummary, err := PCBContext(ctx, pcbPath)
 		if err != nil {
 			summary.Issues = append(summary.Issues, issueFromError(err, "pcb"))
 		} else {
@@ -97,12 +128,32 @@ func Project(path string) (ProjectSummary, error) {
 	return summary, nil
 }
 
+func ProjectNameFromPath(path string) string {
+	base := filepath.Base(path)
+	ext := filepath.Ext(base)
+	name := base[:len(base)-len(ext)]
+	if name == "" {
+		return base
+	}
+	return name
+}
+
 func PCB(path string) (PCBSummary, error) {
+	return PCBContext(context.Background(), path)
+}
+
+func PCBContext(ctx context.Context, path string) (PCBSummary, error) {
+	if err := ctx.Err(); err != nil {
+		return PCBSummary{}, err
+	}
 	if strings.TrimSpace(path) == "" {
 		return PCBSummary{}, fmt.Errorf("pcb path required")
 	}
 	board, err := pcbfiles.ReadFile(path)
 	if err != nil {
+		return PCBSummary{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return PCBSummary{}, err
 	}
 	layerUsage := map[string]int{}
@@ -164,11 +215,21 @@ func PCB(path string) (PCBSummary, error) {
 }
 
 func Schematic(path string) (SchematicSummary, error) {
+	return SchematicContext(context.Background(), path)
+}
+
+func SchematicContext(ctx context.Context, path string) (SchematicSummary, error) {
+	if err := ctx.Err(); err != nil {
+		return SchematicSummary{}, err
+	}
 	if strings.TrimSpace(path) == "" {
 		return SchematicSummary{}, fmt.Errorf("schematic path required")
 	}
 	file, err := schematicfiles.ReadFile(path)
 	if err != nil {
+		return SchematicSummary{}, err
+	}
+	if err := ctx.Err(); err != nil {
 		return SchematicSummary{}, err
 	}
 	symbols, truncated := boundedStrings(schematicSymbolRefs(file), inspectSampleLimit)
@@ -203,7 +264,7 @@ func Schematic(path string) (SchematicSummary, error) {
 	return summary, nil
 }
 
-func discoverProjectFile(root string) (string, bool, error) {
+func DiscoverProjectFile(root string) (string, bool, error) {
 	entries, err := os.ReadDir(root)
 	if err != nil {
 		return "", false, err
@@ -213,15 +274,32 @@ func discoverProjectFile(root string) (string, bool, error) {
 		if entry.IsDir() {
 			continue
 		}
-		if strings.HasSuffix(entry.Name(), ".kicad_pro") {
+		if strings.EqualFold(filepath.Ext(entry.Name()), ".kicad_pro") {
 			matches = append(matches, filepath.Join(root, entry.Name()))
 		}
 	}
+	sort.Strings(matches)
 	if len(matches) == 0 {
 		return "", false, nil
 	}
-	sort.Strings(matches)
+	if len(matches) > 1 {
+		dirName := filepath.Base(root)
+		for _, match := range matches {
+			if strings.EqualFold(ProjectNameFromPath(match), dirName) {
+				return match, true, nil
+			}
+		}
+		return "", false, fmt.Errorf("multiple .kicad_pro files found: %s", strings.Join(baseNames(matches), ", "))
+	}
 	return matches[0], true, nil
+}
+
+func baseNames(paths []string) []string {
+	names := make([]string, len(paths))
+	for index, path := range paths {
+		names[index] = filepath.Base(path)
+	}
+	return names
 }
 
 func copyCounts(source map[string]int) map[string]int {
