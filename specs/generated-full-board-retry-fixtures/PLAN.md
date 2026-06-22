@@ -247,3 +247,28 @@ fabrication export/readiness gates.
 ```text
 Document generated retry fixture milestone
 ```
+
+## Implementation Notes
+
+- Phase 2 proves measurable before/after retry improvement through the
+  existing pad-backed `spacing_improves` full-board fixture. The deterministic
+  improvement is routing status rank (`blocked` to `partial`), not full routed
+  completion.
+- True generated `design create` movement improvement remains blocked by
+  current block-local placement semantics: realized block components with local
+  routes are emitted as fixed placements. Generated fixtures now document this
+  boundary rather than pretending retry can safely move those components.
+- Phase 3 locks down generated LED hydrated-pad routing/connectivity evidence
+  and no-eligible-hint retry behavior.
+- Phase 4 adds generated multi-block sensor/header boundary evidence. The
+  workflow hydrates pads and carries inter-block net intent into placement, but
+  that specific multi-block fixture blocks on fixed generated component
+  geometry before routing can run. The generated LED boundary fixture remains
+  the generated case that reaches routing/connectivity diagnostics.
+- Phase 5 extends CLI selected-field coverage for generated retry evidence,
+  including pad count, applied count, and absence of attempt history/categories
+  when no retry hint is eligible.
+- The next implementation project should be fabrication export/readiness gates.
+  A later placement project should make generated block-local placement
+  semantics movable under retry while preserving required local-route intent and
+  hard constraints.

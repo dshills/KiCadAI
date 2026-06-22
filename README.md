@@ -350,18 +350,24 @@ boundaries. Full-board retry tests also cover pad-backed seed boards where
 spacing retry improves routing evidence, reduce-distance retry emits stable
 proximity rules, and safe-stop retry preserves the best attempt. Generated
 `design create` candidates now expose placement-stage `pad_hydration` evidence
-and reach real routing/connectivity diagnostics.
+and the generated LED fixture reaches real routing/connectivity diagnostics.
+The expanded retry corpus now also covers generated no-eligible-hint
+boundaries, generated multi-block pad-hydration and net-intent boundaries
+before routing, hard-constraint preservation under retry adjustment, and CLI
+selected-field evidence for generated retry output.
 
 In practical terms, retry is now proven at three levels: focused category and
 stop-condition unit coverage, pad-backed full-board seed coverage, and CLI
-summary coverage for generated workflows with hydrated pad evidence. The next
-retry milestone is proving actual improvement on more generated full-board
-cases, not merely reaching routing.
+summary coverage for generated workflows with hydrated pad evidence.
+Pad-backed full-board fixtures prove before/after improvement and safe stop.
+Generated workflows currently prove hydrated-pad boundaries and real
+connectivity diagnostics; true generated-board movement improvement remains
+blocked because block-local components are currently emitted as fixed CAD
+placements, which prevents retry from moving them.
 
-Current roadmap focus: expand generated full-board retry fixtures so
-`design create` examples demonstrate measurable before/after improvement in
-routing, connectivity, and validation evidence after pad hydration. This is the
-next confidence gate before fabrication-readiness work.
+Current roadmap focus: add fabrication export/readiness gates so generated
+projects can produce deterministic manufacturing artifacts and a clear
+not-fabrication-ready status when evidence is missing.
 
 ### Component Intelligence
 
@@ -584,16 +590,18 @@ MCU minimal, USB-C power, I2C sensor, op-amp gain-stage, and connector-breakout
 layouts. Placement-routing retry coverage now also includes deterministic
 goldens for retry summary shape, spacing/fanout/distance adjustments,
 unsupported skip behavior, selected stop conditions, CLI output, and pad-backed
-full-board seed evidence.
+full-board seed evidence. Generated full-board boundary coverage now includes
+hydrated-pad retry evidence for LED and multi-block sensor/header workflows,
+plus a documented fixed-placement boundary that prevents true generated-board
+retry movement today.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver; thermal placement, true congestion analysis, differential pairs,
-broader generated full-board retry improvement evidence, and final DRC-grade
-layout decisions remain future work.
+true generated-board retry movement improvement, and final DRC-grade layout
+decisions remain future work.
 
-The next placement/retry work item is a generated-board corpus that records
-baseline, retry attempts, selected best attempt, and final validation deltas for
-multiple `design create` requests. That corpus should prove retry improves
-electrical evidence without loosening hard placement or board constraints.
+The next placement/retry work item is to make generated block-local placement
+semantics flexible enough for retry to move eligible components while
+preserving local-route intent and hard constraints.
 
 ### Routing
 

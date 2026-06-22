@@ -64,7 +64,10 @@ from validation feedback to safe automatic repair.
   builder, best-attempt selection, repeated-state detection, and workflow retry
   summaries, plus golden coverage for fixture loading, retry summary shape,
   supported placement retry categories, unsupported skips, selected stop
-  conditions, CLI output, and pad-backed full-board seed evidence.
+  conditions, CLI output, evidence of improvement in pad-backed full-board
+  seeds, generated hydrated-pad and no-eligible-hint boundaries, generated
+  multi-block pad-hydration and net-intent boundaries, and hard-constraint
+  preservation under retry adjustment.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -311,13 +314,12 @@ intent and quality evidence for:
   controlled-impedance placement rules.
 - Add crystal/oscillator and other timing-sensitive block fixtures once those
   blocks are implemented.
-- Expand generated full-board retry cases now that generated workflow footprint
-  pad summaries hydrate through resolver-backed records or verified templates.
-  Each fixture should capture baseline evidence, retry attempts, selected best
-  attempt, and before/after routing, connectivity, and validation deltas.
-- Expand placement-routing retry with more generated-board cases, richer
-  convergence criteria, and stronger evidence that retries improve routing
-  without harming hard constraints.
+- Make generated block-local placement semantics flexible enough for retry to
+  move eligible generated components while preserving local-route intent and
+  hard constraints. Current generated fixtures prove hydrated-pad and boundary
+  evidence, while pad-backed seed fixtures prove before/after improvement.
+- Expand placement-routing retry with richer generated-board convergence
+  criteria once generated components can move safely.
 - Validate hardened placement outputs against KiCad DRC evidence in larger
   board-level golden projects.
 
@@ -500,13 +502,11 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Add generated full-board retry fixtures that prove actual improvement after
-   pad hydration, not only real connectivity diagnostics. The fixtures should
-   cover multiple `design create` requests and assert before/after validation
-   deltas without loosening hard placement or board constraints.
-2. Add fabrication export/readiness gates.
-3. Persist transaction provenance for generated targets outside `design
+1. Add fabrication export/readiness gates.
+2. Persist transaction provenance for generated targets outside `design
    create` so `repair export-bundle` can feed mutation-safe apply flows.
+3. Make generated block-local placement semantics movable under retry without
+   breaking required local-route intent.
 4. Expand verified component and block coverage alongside each new block
    family.
 5. Add intent-level planning only after the above gates are reliable.
