@@ -435,21 +435,25 @@ func writeRepairMarker(outputDir string) (string, error) {
 }
 
 func artifactRel(stage string, artifact reports.Artifact) (string, error) {
-	source := filepath.FromSlash(artifact.Path)
+	source := artifactSourcePath(stage, artifact)
+	return artifactRelFromSource(stage, source, artifact.Path)
+}
+
+func artifactRelFromSource(stage string, source string, artifactPath string) (string, error) {
 	rel, err := filepath.Rel(stage, source)
 	if err != nil {
 		return "", err
 	}
 	relSlash := filepath.ToSlash(rel)
 	if rel == "." || rel == ".." || strings.HasPrefix(relSlash, "../") {
-		return "", fmt.Errorf("artifact is outside repair stage: %s", artifact.Path)
+		return "", fmt.Errorf("artifact is outside repair stage: %s", artifactPath)
 	}
 	return rel, nil
 }
 
 func copyProducedArtifact(stage string, outputDir string, artifact reports.Artifact) (reports.Artifact, error) {
-	source := filepath.FromSlash(artifact.Path)
-	rel, err := artifactRel(stage, artifact)
+	source := artifactSourcePath(stage, artifact)
+	rel, err := artifactRelFromSource(stage, source, artifact.Path)
 	if err != nil {
 		return reports.Artifact{}, err
 	}
@@ -470,6 +474,14 @@ func copyProducedArtifact(stage string, outputDir string, artifact reports.Artif
 	copied := artifact
 	copied.Path = filepath.ToSlash(target)
 	return copied, nil
+}
+
+func artifactSourcePath(stage string, artifact reports.Artifact) string {
+	source := filepath.FromSlash(artifact.Path)
+	if filepath.IsAbs(source) {
+		return source
+	}
+	return filepath.Join(stage, source)
 }
 
 func removeStaleGeneratedFiles(stage string, outputDir string) error {

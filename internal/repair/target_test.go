@@ -28,6 +28,40 @@ func TestHydrateMissingBundleBlocksMutation(t *testing.T) {
 	}
 }
 
+func TestHydrateGeneratedTargetFromTransactionProvenanceIsMutable(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := persistedBaseTransaction(t, "demo",
+		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
+	)
+	if result := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output}); len(result.Issues) != 0 {
+		t.Fatalf("apply issues = %#v", result.Issues)
+	}
+	target := HydrateTarget(output, HydrateOptions{})
+	if !target.Mutable || !target.Generated || target.Transaction == nil {
+		t.Fatalf("target = %#v", target)
+	}
+	if target.Provenance == nil || !target.Provenance.Valid || target.Provenance.OperationCount != len(tx.Operations) {
+		t.Fatalf("provenance = %#v", target.Provenance)
+	}
+}
+
+func TestHydrateGeneratedTargetWithStaleProvenanceBlocks(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := persistedBaseTransaction(t, "demo",
+		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
+	)
+	if result := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output}); len(result.Issues) != 0 {
+		t.Fatalf("apply issues = %#v", result.Issues)
+	}
+	if err := os.WriteFile(filepath.Join(output, ".kicadai", "transaction.json"), []byte(`{"schema":"changed"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	target := HydrateTarget(output, HydrateOptions{})
+	if target.Mutable || !reports.HasBlockingIssue(target.Issues) {
+		t.Fatalf("target = %#v", target)
+	}
+}
+
 func TestHydrateUnsupportedContentBlocksMutation(t *testing.T) {
 	root := t.TempDir()
 	bundle := generatedBundle(t, root)

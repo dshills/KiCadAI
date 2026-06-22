@@ -3,6 +3,7 @@
     "kicad_project",
     "schematic",
     "pcb",
+    "validation_report",
     "validation_report"
   ],
   "issue_count": 0,

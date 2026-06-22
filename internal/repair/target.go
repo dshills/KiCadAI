@@ -6,7 +6,9 @@ import (
 	"strings"
 
 	"kicadai/internal/inspect"
+	"kicadai/internal/provenance"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 type TargetKind string
@@ -20,14 +22,24 @@ const (
 )
 
 type Target struct {
-	Path       string                  `json:"path"`
-	Root       string                  `json:"root,omitempty"`
-	Kind       TargetKind              `json:"kind"`
-	Generated  bool                    `json:"generated"`
-	Mutable    bool                    `json:"mutable"`
-	Bundle     *Bundle                 `json:"bundle,omitempty"`
-	Inspection *inspect.ProjectSummary `json:"inspection,omitempty"`
-	Issues     []reports.Issue         `json:"issues,omitempty"`
+	Path        string                    `json:"path"`
+	Root        string                    `json:"root,omitempty"`
+	Kind        TargetKind                `json:"kind"`
+	Generated   bool                      `json:"generated"`
+	Mutable     bool                      `json:"mutable"`
+	Bundle      *Bundle                   `json:"bundle,omitempty"`
+	Inspection  *inspect.ProjectSummary   `json:"inspection,omitempty"`
+	Provenance  *TargetProvenance         `json:"provenance,omitempty"`
+	Issues      []reports.Issue           `json:"issues,omitempty"`
+	Transaction *transactions.Transaction `json:"-"`
+}
+
+type TargetProvenance struct {
+	Present        bool   `json:"present"`
+	Path           string `json:"path,omitempty"`
+	Schema         string `json:"schema,omitempty"`
+	OperationCount int    `json:"operation_count,omitempty"`
+	Valid          bool   `json:"valid"`
 }
 
 type HydrateOptions struct {
@@ -61,7 +73,10 @@ func HydrateTarget(path string, opts HydrateOptions) Target {
 	}
 	target.Root = filepath.ToSlash(absRoot)
 	target.Bundle = opts.Bundle
-	target.Generated = opts.Bundle != nil && opts.Bundle.Generated
+	if opts.Bundle != nil {
+		target.Generated = opts.Bundle.Generated
+		target.Transaction = opts.Bundle.Transaction
+	}
 	inspector := opts.InspectProject
 	if inspector == nil {
 		inspector = inspect.Project
@@ -71,6 +86,9 @@ func HydrateTarget(path string, opts HydrateOptions) Target {
 	} else {
 		target.Inspection = &summary
 		target.Issues = append(target.Issues, summary.Issues...)
+		if summary.Manifest.Present && !summary.Manifest.Stale {
+			target.Generated = true
+		}
 		if hasUnsupportedContent(summary) {
 			target.Issues = append(target.Issues, reports.Issue{
 				Code:     reports.CodePreservationConflict,
@@ -80,6 +98,9 @@ func HydrateTarget(path string, opts HydrateOptions) Target {
 			})
 		}
 	}
+	if target.Generated && target.Transaction == nil {
+		loadTargetProvenance(absRoot, &target)
+	}
 	if !target.Generated {
 		target.Issues = append(target.Issues, reports.Issue{
 			Code:     reports.CodePreservationConflict,
@@ -88,7 +109,7 @@ func HydrateTarget(path string, opts HydrateOptions) Target {
 			Message:  "repair apply requires generated KiCadAI provenance",
 		})
 	}
-	if opts.Bundle == nil || opts.Bundle.Transaction == nil {
+	if target.Transaction == nil {
 		target.Issues = append(target.Issues, reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityBlocked,
@@ -96,8 +117,34 @@ func HydrateTarget(path string, opts HydrateOptions) Target {
 			Message:  "repair apply requires generated transaction provenance for safe persistence",
 		})
 	}
-	target.Mutable = target.Generated && opts.Bundle != nil && opts.Bundle.Transaction != nil && !reports.HasBlockingIssue(target.Issues)
+	target.Mutable = target.Generated && target.Transaction != nil && !reports.HasBlockingIssue(target.Issues)
 	return target
+}
+
+func loadTargetProvenance(root string, target *Target) {
+	summary := TargetProvenance{Path: filepath.ToSlash(filepath.Join(root, provenance.RelativePath))}
+	loaded, issues, err := provenance.Read(root)
+	if err == nil {
+		summary.Present = true
+		summary.Schema = loaded.Schema
+		summary.OperationCount = loaded.OperationCount
+	}
+	if err == nil && len(issues) == 0 {
+		summary.Valid = true
+		tx := loaded.Transaction
+		target.Transaction = &tx
+	} else {
+		target.Issues = append(target.Issues, issues...)
+		if err != nil {
+			target.Issues = append(target.Issues, reports.Issue{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityBlocked,
+				Path:     "provenance.transaction",
+				Message:  err.Error(),
+			})
+		}
+	}
+	target.Provenance = &summary
 }
 
 func targetKindForPath(path string) TargetKind {
