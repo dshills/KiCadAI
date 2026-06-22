@@ -8,6 +8,7 @@ import (
 	"kicadai/internal/inspect"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestExportBundleDryRunReturnsDefaultPath(t *testing.T) {
@@ -192,9 +193,86 @@ func TestExportBundleCreatesSafeNestedParentDirectory(t *testing.T) {
 	}
 }
 
+func TestExportBundleSummaryReportsMissingTransaction(t *testing.T) {
+	root := t.TempDir()
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		StageIssues: exportStageIssues(),
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root:     root,
+			Name:     "demo",
+			Manifest: manifest.Status{Present: true},
+		}),
+	})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if result.Summary.HasTransaction {
+		t.Fatalf("summary = %#v, want has_transaction=false", result.Summary)
+	}
+}
+
+func TestExportBundleIncludesProvidedTransaction(t *testing.T) {
+	root := t.TempDir()
+	tx := exportTransaction(t)
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		StageIssues: exportStageIssues(),
+		Execute:     true,
+		Transaction: &tx,
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root:     root,
+			Name:     "demo",
+			Manifest: manifest.Status{Present: true},
+		}),
+	})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if !result.Summary.HasTransaction {
+		t.Fatalf("summary = %#v, want has_transaction=true", result.Summary)
+	}
+	bundle, err := LoadBundle(filepath.FromSlash(result.BundlePath))
+	if err != nil {
+		t.Fatalf("LoadBundle returned error: %v", err)
+	}
+	if bundle.Transaction == nil || len(bundle.Transaction.Operations) != 2 {
+		t.Fatalf("bundle transaction = %#v", bundle.Transaction)
+	}
+}
+
+func TestExportBundleBlocksInvalidProvidedTransaction(t *testing.T) {
+	root := t.TempDir()
+	tx := transactions.Transaction{}
+	result := ExportBundle(ExportOptions{
+		TargetPath:  root,
+		StageIssues: exportStageIssues(),
+		Execute:     true,
+		Transaction: &tx,
+		InspectProject: stubInspect(root, inspect.ProjectSummary{
+			Root:     root,
+			Name:     "demo",
+			Manifest: manifest.Status{Present: true},
+		}),
+	})
+	assertIssueCode(t, result.Issues, reports.CodeValidationFailed)
+}
+
 func exportStageIssues() []StageIssues {
 	return []StageIssues{{Stage: "writer_correctness", Issues: []reports.Issue{
 		{Code: reports.CodeInvalidNetAssignment, Severity: reports.SeverityError, Path: "pcb.pad", Message: "missing net"},
 		{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityWarning, Path: "kicad_drc", Message: "missing KiCad CLI"},
 	}}}
+}
+
+func exportTransaction(t *testing.T) transactions.Transaction {
+	t.Helper()
+	tx, err := transactions.Parse([]byte(`{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"write_project","overwrite":true}
+	]}`))
+	if err != nil {
+		t.Fatalf("parse transaction: %v", err)
+	}
+	return tx
 }
