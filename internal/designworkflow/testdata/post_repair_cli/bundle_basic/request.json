@@ -1,0 +1,19 @@
+{
+  "version": "0.1.0",
+  "name": "post_repair_bundle_basic",
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "status",
+      "block_id": "led_indicator"
+    }
+  ],
+  "validation": {
+    "acceptance": "structural"
+  }
+}
+

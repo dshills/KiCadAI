@@ -1,0 +1,243 @@
+package main
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"kicadai/internal/repair"
+	"kicadai/internal/reports"
+)
+
+const postRepairCLIFixtureRoot = "../../internal/designworkflow/testdata/post_repair_cli"
+
+type postRepairCLIResult struct {
+	OK        bool               `json:"ok"`
+	Command   string             `json:"command"`
+	Data      postRepairCLIData  `json:"data"`
+	Issues    []reports.Issue    `json:"issues,omitempty"`
+	Artifacts []reports.Artifact `json:"artifacts,omitempty"`
+}
+
+type postRepairCLIData struct {
+	Project struct {
+		OutputDir string `json:"output_dir"`
+	} `json:"project,omitempty"`
+	Stages     []postRepairCLIStage `json:"stages,omitempty"`
+	Status     repair.Status        `json:"status,omitempty"`
+	Summary    map[string]any       `json:"summary,omitempty"`
+	Delta      map[string]any       `json:"delta,omitempty"`
+	Validation []struct {
+		Name      string             `json:"name"`
+		Skipped   bool               `json:"skipped,omitempty"`
+		Issues    []reports.Issue    `json:"issues,omitempty"`
+		Artifacts []reports.Artifact `json:"artifacts,omitempty"`
+	} `json:"validation,omitempty"`
+}
+
+type postRepairCLIStage struct {
+	Name      string             `json:"name"`
+	Status    string             `json:"status"`
+	Summary   map[string]any     `json:"summary,omitempty"`
+	Issues    []reports.Issue    `json:"issues,omitempty"`
+	Artifacts []reports.Artifact `json:"artifacts,omitempty"`
+}
+
+type postRepairCLIFixture struct {
+	Name    string `json:"name"`
+	Request string `json:"request,omitempty"`
+	Bundle  string `json:"bundle,omitempty"`
+	Intent  string `json:"intent,omitempty"`
+}
+
+func loadPostRepairCLIFixture(t *testing.T, name string) postRepairCLIFixture {
+	t.Helper()
+	if err := validatePostRepairCLIFixtureName(name); err != nil {
+		t.Fatalf("invalid post-repair CLI fixture name %q: %v", name, err)
+	}
+	path := postRepairCLIFixtureFilePath(t, name, "metadata.json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read post-repair CLI fixture metadata %q: %v", path, err)
+	}
+	var fixture postRepairCLIFixture
+	if err := json.Unmarshal(data, &fixture); err != nil {
+		t.Fatalf("decode post-repair CLI fixture metadata %q: %v", path, err)
+	}
+	if fixture.Name != name {
+		t.Fatalf("fixture name = %q, want %q", fixture.Name, name)
+	}
+	return fixture
+}
+
+func postRepairCLIFixtureFilePath(t *testing.T, fixtureName string, fileName string) string {
+	t.Helper()
+	if err := validatePostRepairCLIFixtureName(fixtureName); err != nil {
+		t.Fatalf("invalid post-repair CLI fixture name %q: %v", fixtureName, err)
+	}
+	if strings.TrimSpace(fileName) == "" {
+		t.Fatalf("fixture %q has empty file path", fixtureName)
+	}
+	if filepath.IsAbs(fileName) {
+		t.Fatalf("fixture %q file path must be relative: %q", fixtureName, fileName)
+	}
+	base := filepath.Join(postRepairCLIFixtureRoot, fixtureName)
+	path := filepath.Join(base, filepath.Clean(fileName))
+	rel, err := filepath.Rel(base, path)
+	if err != nil || rel == "." || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		t.Fatalf("fixture %q file path escapes fixture directory: %q", fixtureName, fileName)
+	}
+	return path
+}
+
+func validatePostRepairCLIFixtureName(name string) error {
+	if strings.TrimSpace(name) == "" {
+		return fmt.Errorf("empty fixture name")
+	}
+	// filepath.Base(".") and filepath.Base("..") return the original value,
+	// so reject them explicitly before using the name as a fixture directory.
+	if name == "." || name == ".." {
+		return fmt.Errorf("must not be %q", name)
+	}
+	if name != filepath.Base(name) || strings.ContainsAny(name, `/\`) {
+		return fmt.Errorf("must be a single fixture directory name")
+	}
+	return nil
+}
+
+func runPostRepairDesignCreateCLI(t *testing.T, fixtureName string, globalArgs ...string) (postRepairCLIResult, string) {
+	t.Helper()
+	fixture := loadPostRepairCLIFixture(t, fixtureName)
+	if strings.TrimSpace(fixture.Request) == "" {
+		t.Fatalf("fixture %q missing request", fixtureName)
+	}
+	outputDir := filepath.Join(t.TempDir(), fixtureName)
+	requestPath := postRepairCLIFixtureFilePath(t, fixtureName, fixture.Request)
+	args := []string{
+		"--json",
+		"--request", requestPath,
+		"--output", outputDir,
+		"--overwrite",
+	}
+	args = append(args, globalArgs...)
+	args = append(args, "design", "create")
+	return runPostRepairCLI(t, args...), outputDir
+}
+
+func runPostRepairCLI(t *testing.T, args ...string) postRepairCLIResult {
+	t.Helper()
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run(args, &stdout, &stderr)
+	var result postRepairCLIResult
+	decoder := json.NewDecoder(bytes.NewReader(bytes.TrimSpace(stdout.Bytes())))
+	if decodeErr := decoder.Decode(&result); decodeErr != nil {
+		t.Fatalf("decode CLI JSON: %v\nerr=%v\nstdout=%s\nstderr=%s", decodeErr, err, stdout.String(), stderr.String())
+	}
+	var trailing json.RawMessage
+	if decodeErr := decoder.Decode(&trailing); decodeErr != io.EOF {
+		t.Fatalf("CLI JSON has trailing stdout: %v\nerr=%v\nstdout=%s\nstderr=%s", decodeErr, err, stdout.String(), stderr.String())
+	}
+	if err != nil && len(result.Issues) == 0 {
+		t.Fatalf("CLI returned error without JSON issues: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	return result
+}
+
+func postRepairStageByName(t *testing.T, stages []postRepairCLIStage, name string) postRepairCLIStage {
+	t.Helper()
+	for _, stage := range stages {
+		if stage.Name == name {
+			return stage
+		}
+	}
+	names := make([]string, 0, len(stages))
+	for _, stage := range stages {
+		names = append(names, stage.Name)
+	}
+	t.Fatalf("missing stage %q; got stages %v", name, names)
+	return postRepairCLIStage{}
+}
+
+func postRepairSummaryMap(t *testing.T, summary map[string]any, key string) map[string]any {
+	t.Helper()
+	if summary == nil {
+		t.Fatalf("summary missing; need key %q", key)
+	}
+	value, ok := summary[key]
+	if !ok {
+		t.Fatalf("summary missing %q: %#v", key, summary)
+	}
+	typed, ok := value.(map[string]any)
+	if !ok {
+		t.Fatalf("summary[%s] has type %T: %#v", key, value, value)
+	}
+	return typed
+}
+
+func postRepairSummaryNumber(t *testing.T, summary map[string]any, key string) float64 {
+	t.Helper()
+	if summary == nil {
+		t.Fatalf("summary missing; need key %q", key)
+	}
+	value, ok := summary[key]
+	if !ok {
+		t.Fatalf("summary missing %q: %#v", key, summary)
+	}
+	number, ok := value.(float64)
+	if !ok {
+		t.Fatalf("summary[%s] has type %T: %#v", key, value, value)
+	}
+	return number
+}
+
+func normalizePostRepairPath(root string, path string) string {
+	root = filepath.Clean(root)
+	path = filepath.Clean(path)
+	if rel, err := filepath.Rel(root, path); err == nil && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." {
+		if rel == "." {
+			return "."
+		}
+		return filepath.ToSlash(rel)
+	}
+	if filepath.IsAbs(path) {
+		return "<outside-root>"
+	}
+	return filepath.ToSlash(path)
+}
+
+func assertPostRepairPathInside(t *testing.T, root string, path string) {
+	t.Helper()
+	rel, err := filepath.Rel(filepath.Clean(root), filepath.Clean(path))
+	// The root itself is not an artifact path inside the root.
+	if err != nil || rel == "." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) || rel == ".." {
+		t.Fatalf("path %q is not inside root %q", path, root)
+	}
+}
+
+func TestPostRepairCLIGoldenHarnessFixtureLoader(t *testing.T) {
+	fixture := loadPostRepairCLIFixture(t, "bundle_basic")
+	if fixture.Request != "request.json" {
+		t.Fatalf("fixture = %#v", fixture)
+	}
+}
+
+func TestPostRepairCLIGoldenHarnessNormalizesPaths(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "project")
+	path := filepath.Join(root, ".kicadai", "repair-bundle.json")
+	if got := normalizePostRepairPath(root, root); got != "." {
+		t.Fatalf("normalized root path = %q", got)
+	}
+	if got := normalizePostRepairPath(root, path); got != ".kicadai/repair-bundle.json" {
+		t.Fatalf("normalized path = %q", got)
+	}
+	if got := normalizePostRepairPath(root, filepath.Dir(root)); got != "<outside-root>" {
+		t.Fatalf("normalized outside path = %q", got)
+	}
+	assertPostRepairPathInside(t, root, path)
+}
