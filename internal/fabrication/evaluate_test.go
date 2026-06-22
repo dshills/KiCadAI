@@ -112,8 +112,30 @@ func TestDryRunSuppressesExternalKiCadCLI(t *testing.T) {
 	if got := validationKiCadCLI(EvaluateOptions{KiCadCLI: "/usr/bin/kicad-cli", DryRun: true}); got != "" {
 		t.Fatalf("validationKiCadCLI dry-run = %q, want empty", got)
 	}
+	if got := validationKiCadCLI(EvaluateOptions{KiCadCLI: "/usr/bin/kicad-cli", CLIPolicy: CLIPolicyDisabled}); got != "" {
+		t.Fatalf("validationKiCadCLI disabled = %q, want empty", got)
+	}
 	if got := validationKiCadCLI(EvaluateOptions{KiCadCLI: "/usr/bin/kicad-cli"}); got == "" {
-		t.Fatalf("validationKiCadCLI execute = empty, want configured CLI")
+		t.Fatalf("validationKiCadCLI default with CLI = empty, want configured CLI")
+	}
+	if got := validationKiCadCLI(EvaluateOptions{KiCadCLI: "/usr/bin/kicad-cli", CLIPolicy: CLIPolicyOptional}); got == "" {
+		t.Fatalf("validationKiCadCLI optional = empty, want configured CLI")
+	}
+}
+
+func TestCLIPolicyMissingEvidenceSeverity(t *testing.T) {
+	root := t.TempDir()
+	projectPath := filepath.Join(root, "demo.kicad_pro")
+	if err := os.WriteFile(projectPath, []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	optional := Evaluate(context.Background(), root, EvaluateOptions{CLIPolicy: CLIPolicyOptional})
+	if severityForIssuePath(optional.Issues, "gerber") != reports.SeverityWarning {
+		t.Fatalf("optional issues = %#v, want warning gerber issue", optional.Issues)
+	}
+	required := Evaluate(context.Background(), root, EvaluateOptions{CLIPolicy: CLIPolicyRequired})
+	if severityForIssuePath(required.Issues, "gerber") != reports.SeverityError {
+		t.Fatalf("required issues = %#v, want error gerber issue", required.Issues)
 	}
 }
 
@@ -183,4 +205,13 @@ func hasIssuePath(issues []reports.Issue, path string) bool {
 		}
 	}
 	return false
+}
+
+func severityForIssuePath(issues []reports.Issue, path string) reports.Severity {
+	for _, issue := range issues {
+		if issue.Path == path {
+			return issue.Severity
+		}
+	}
+	return ""
 }

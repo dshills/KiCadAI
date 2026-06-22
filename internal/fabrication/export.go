@@ -12,7 +12,7 @@ import (
 )
 
 func ExportPreview(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute})
+	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy})
 	return exportReadiness(ctx, targetPath, opts, result, nil, nil)
 }
 
@@ -30,7 +30,7 @@ func MarshalResultJSON(result Result) ([]byte, error) {
 }
 
 func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute})
+	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy})
 	reportData, err := BuildReports(ctx, targetPath)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "bom", Message: err.Error()})
@@ -46,7 +46,7 @@ func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
 }
 
 func ExportPackage(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute})
+	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy})
 	reportData, err := BuildReports(ctx, targetPath)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "package", Message: err.Error()})

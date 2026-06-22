@@ -16,8 +16,9 @@ import (
 )
 
 type EvaluateOptions struct {
-	KiCadCLI string
-	DryRun   bool
+	KiCadCLI  string
+	DryRun    bool
+	CLIPolicy CLIPolicy
 }
 
 func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Result {
@@ -72,8 +73,8 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 	evidence["drc"] = validation.DRC
 	resultSummary.DRC = validation.DRC
 	issues = append(issues, validation.Issues...)
-	addERCEvidence(summary, evidence, &resultSummary, &issues)
-	addMissingExternalEvidence(evidence, &resultSummary, &issues)
+	addERCEvidence(summary, opts, evidence, &resultSummary, &issues)
+	addMissingExternalEvidence(opts, evidence, &resultSummary, &issues)
 
 	issues = dedupeIssues(issues)
 	slices.SortFunc(issues, compareIssues)
@@ -309,9 +310,11 @@ func evaluateWriterEvidence(ctx context.Context, root string, opts EvaluateOptio
 }
 
 func evaluateBoardEvidence(ctx context.Context, root string, opts EvaluateOptions) boardEvidenceResult {
+	policy := effectiveCLIPolicy(opts)
 	board := boardvalidation.Validate(ctx, root, boardvalidation.Options{
 		KiCadCLI:        validationKiCadCLI(opts),
-		AllowMissingDRC: true,
+		RequireDRC:      policy == CLIPolicyRequired,
+		AllowMissingDRC: policy != CLIPolicyRequired,
 	})
 	status := EvidencePass
 	switch board.Status {
@@ -343,30 +346,47 @@ func evaluateBoardEvidence(ctx context.Context, root string, opts EvaluateOption
 }
 
 func validationKiCadCLI(opts EvaluateOptions) string {
-	if opts.DryRun {
+	if opts.DryRun || effectiveCLIPolicy(opts) == CLIPolicyDisabled {
 		return ""
 	}
 	return opts.KiCadCLI
 }
 
-func addERCEvidence(summary inspect.ProjectSummary, evidence map[string]EvidenceStatus, resultSummary *Summary, issues *[]reports.Issue) {
+func addERCEvidence(summary inspect.ProjectSummary, opts EvaluateOptions, evidence map[string]EvidenceStatus, resultSummary *Summary, issues *[]reports.Issue) {
+	if existing, ok := evidence["erc"]; ok {
+		resultSummary.ERC = existing
+		if existing != EvidenceMissing || issuePathExists(*issues, "erc") {
+			return
+		}
+	}
 	status := EvidenceMissing
 	message := "KiCad ERC evidence has not been generated"
 	if summary.Schematic != nil {
 		message = "schematic inspection is available, but KiCad ERC evidence has not been generated"
 	}
+	severity := cliMissingSeverity(opts)
 	evidence["erc"] = status
 	resultSummary.ERC = status
 	*issues = append(*issues, reports.Issue{
 		Code:       reports.CodeValidationFailed,
-		Severity:   reports.SeverityWarning,
+		Severity:   severity,
 		Path:       "erc",
 		Message:    message,
 		Suggestion: "export an ERC report through KiCad CLI or GUI and include it in the fabrication package evidence",
 	})
 }
 
-func addMissingExternalEvidence(evidence map[string]EvidenceStatus, resultSummary *Summary, issues *[]reports.Issue) {
+func issuePathExists(issues []reports.Issue, path string) bool {
+	for _, issue := range issues {
+		if issue.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func addMissingExternalEvidence(opts EvaluateOptions, evidence map[string]EvidenceStatus, resultSummary *Summary, issues *[]reports.Issue) {
+	severity := cliMissingSeverity(opts)
 	missing := []struct {
 		key         string
 		path        string
@@ -388,10 +408,46 @@ func addMissingExternalEvidence(evidence map[string]EvidenceStatus, resultSummar
 		item.setSummary(EvidenceMissing)
 		*issues = append(*issues, reports.Issue{
 			Code:     reports.CodeValidationFailed,
-			Severity: reports.SeverityWarning,
+			Severity: severityForMissingEvidence(item.key, severity),
 			Path:     item.path,
 			Message:  item.description,
 		})
+	}
+}
+
+func cliPolicy(policy CLIPolicy) CLIPolicy {
+	switch policy {
+	case "", CLIPolicyDisabled, CLIPolicyOptional, CLIPolicyRequired:
+		return policy
+	default:
+		return CLIPolicyDisabled
+	}
+}
+
+func effectiveCLIPolicy(opts EvaluateOptions) CLIPolicy {
+	policy := cliPolicy(opts.CLIPolicy)
+	if policy != "" {
+		return policy
+	}
+	if strings.TrimSpace(opts.KiCadCLI) != "" {
+		return CLIPolicyOptional
+	}
+	return CLIPolicyDisabled
+}
+
+func cliMissingSeverity(opts EvaluateOptions) reports.Severity {
+	if effectiveCLIPolicy(opts) == CLIPolicyRequired {
+		return reports.SeverityError
+	}
+	return reports.SeverityWarning
+}
+
+func severityForMissingEvidence(key string, cliSeverity reports.Severity) reports.Severity {
+	switch key {
+	case "bom", "cpl", "gerber", "drill":
+		return cliSeverity
+	default:
+		return reports.SeverityWarning
 	}
 }
 

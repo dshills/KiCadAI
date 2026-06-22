@@ -1750,6 +1750,7 @@ func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		Overwrite: opts.overwrite,
 		Output:    opts.output,
 		KiCadCLI:  opts.kicadCLI,
+		CLIPolicy: exportCLIPolicy(opts),
 	}
 	target := opts.commandArgs[1]
 	var data fabrication.Result
@@ -1780,6 +1781,16 @@ func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return errors.New("export reported blocking issues")
 	}
 	return nil
+}
+
+func exportCLIPolicy(opts cliOptions) fabrication.CLIPolicy {
+	if opts.requireDRC {
+		return fabrication.CLIPolicyRequired
+	}
+	if strings.TrimSpace(opts.kicadCLI) != "" {
+		return fabrication.CLIPolicyOptional
+	}
+	return fabrication.CLIPolicyDisabled
 }
 
 func runPinmap(opts cliOptions, stdout io.Writer) error {

@@ -62,6 +62,14 @@ const (
 	GeneratorExternal Generator = "external"
 )
 
+type CLIPolicy string
+
+const (
+	CLIPolicyDisabled CLIPolicy = "disabled"
+	CLIPolicyOptional CLIPolicy = "optional"
+	CLIPolicyRequired CLIPolicy = "required"
+)
+
 type ProjectRef struct {
 	Name string `json:"name"`
 	Root string `json:"root,omitempty"`
@@ -96,11 +104,12 @@ type Summary struct {
 }
 
 type Options struct {
-	Command   string `json:"command,omitempty"`
-	Execute   bool   `json:"execute"`
-	Overwrite bool   `json:"overwrite"`
-	Output    string `json:"output,omitempty"`
-	KiCadCLI  string `json:"kicad_cli,omitempty"`
+	Command   string    `json:"command,omitempty"`
+	Execute   bool      `json:"execute"`
+	Overwrite bool      `json:"overwrite"`
+	Output    string    `json:"output,omitempty"`
+	KiCadCLI  string    `json:"kicad_cli,omitempty"`
+	CLIPolicy CLIPolicy `json:"cli_policy,omitempty"`
 }
 
 type Manifest struct {
