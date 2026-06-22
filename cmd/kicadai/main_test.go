@@ -1320,11 +1320,18 @@ func TestRunStructuredCommandRejectsMissingTarget(t *testing.T) {
 	}
 }
 
-func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
+func TestRunExportPreviewJSON(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := run([]string{"--json", "export", "preview", "demo"}, &stdout, &stderr)
+	err := run([]string{"--json", "export", "preview", root}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -1332,9 +1339,9 @@ func TestRunStructuredCommandReturnsUnsupportedStub(t *testing.T) {
 	for _, want := range []string{
 		`"ok": false`,
 		`"command": "export"`,
-		`"code": "UNSUPPORTED_OPERATION"`,
-		`"severity": "blocked"`,
-		`"export command family is not implemented yet"`,
+		`"status": "blocked"`,
+		`"dry_run": true`,
+		`"kind": "readiness_report"`,
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)

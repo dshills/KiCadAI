@@ -24,6 +24,7 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/evaluate"
+	"kicadai/internal/fabrication"
 	breakoutgen "kicadai/internal/generate"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kiapi"
@@ -329,7 +330,7 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "transaction":
 		return runTransaction(opts, stdout)
 	case "export":
-		return runStructuredCommandSkeleton(opts, command, stdout)
+		return runExport(ctx, opts, stdout)
 	case "generate":
 		return runGenerate(opts, stdout)
 	case "block":
@@ -1717,6 +1718,66 @@ func runEvaluate(opts cliOptions, stdout io.Writer) error {
 	}
 	if !result.OK {
 		return errors.New("evaluate reported blocking issues")
+	}
+	return nil
+}
+
+func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("export requires --json in this implementation phase")
+	}
+	if issue, ok := validateStructuredCommandArgs("export", opts.commandArgs); !ok {
+		if err := writeReportJSON(stdout, reports.ErrorResult("export", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	if len(opts.commandArgs) != 2 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "export",
+			Message:  "export requires exactly a subcommand and target path",
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("export", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	options := fabrication.Options{
+		Command:   "export " + opts.commandArgs[0],
+		Execute:   opts.execute,
+		Overwrite: opts.overwrite,
+		Output:    opts.output,
+		KiCadCLI:  opts.kicadCLI,
+	}
+	target := opts.commandArgs[1]
+	var data fabrication.Result
+	switch opts.commandArgs[0] {
+	case "preview":
+		data = fabrication.ExportPreview(ctx, target, options)
+	case "bom":
+		data = fabrication.ExportBOM(ctx, target, options)
+	case "fabrication":
+		data = fabrication.ExportPackage(ctx, target, options)
+	default:
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "export." + opts.commandArgs[0],
+			Message:  "unsupported export subcommand " + opts.commandArgs[0],
+		}
+		if err := writeReportJSON(stdout, reports.ErrorResult("export", issue)); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	result := reports.ResultWithIssues("export", data, data.Issues, fabrication.ReportArtifacts(data.Artifacts))
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("export reported blocking issues")
 	}
 	return nil
 }
