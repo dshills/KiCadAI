@@ -134,13 +134,25 @@ func runPostRepairDesignCreateCLI(t *testing.T, fixtureName string, globalArgs .
 
 func runPostRepairTargetApplyCLI(t *testing.T, target string, bundlePath string, globalArgs ...string) postRepairCLIResult {
 	t.Helper()
+	return runPostRepairTargetApplyCLIWithOverwrite(t, target, bundlePath, true, globalArgs...)
+}
+
+func runPostRepairTargetApplyNoOverwriteCLI(t *testing.T, target string, bundlePath string, globalArgs ...string) postRepairCLIResult {
+	t.Helper()
+	return runPostRepairTargetApplyCLIWithOverwrite(t, target, bundlePath, false, globalArgs...)
+}
+
+func runPostRepairTargetApplyCLIWithOverwrite(t *testing.T, target string, bundlePath string, overwrite bool, globalArgs ...string) postRepairCLIResult {
+	t.Helper()
 	// This CLI uses one global flag set, so all flags must precede "repair apply".
 	args := []string{
 		"--json",
 		"--execute",
-		"--overwrite",
 		"--target", target,
 		"--request", bundlePath,
+	}
+	if overwrite {
+		args = append(args, "--overwrite")
 	}
 	args = append(args, globalArgs...)
 	args = append(args, "repair", "apply")
@@ -482,4 +494,24 @@ func TestPostRepairApplyKiCadValidationPolicy(t *testing.T) {
 			t.Fatalf("required DRC issues = %#v, want one error", drc.Issues)
 		}
 	})
+}
+
+func TestPostRepairTargetApplyRequiresOverwriteForExistingGeneratedTarget(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	bundlePath := writePostRepairCleanBundle(t, root, outputDir)
+	result := runPostRepairTargetApplyNoOverwriteCLI(t, outputDir, bundlePath)
+	if result.OK || result.Data.Status != repair.StatusBlocked {
+		t.Fatalf("no-overwrite apply result=%#v, want ok=false status=%q", result, repair.StatusBlocked)
+	}
+	found := false
+	for _, issue := range result.Issues {
+		if issue.Code == reports.CodeInvalidArgument && strings.Contains(strings.ToLower(issue.Message), "overwrite") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("missing overwrite blocking issue: %#v", result.Issues)
+	}
 }
