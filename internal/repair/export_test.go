@@ -12,15 +12,10 @@ import (
 )
 
 func TestExportBundleDryRunReturnsDefaultPath(t *testing.T) {
-	root := t.TempDir()
+	root, tx := generatedExportTarget(t)
 	result := ExportBundle(ExportOptions{
 		TargetPath:  root,
 		StageIssues: exportStageIssues(),
-		InspectProject: stubInspect(root, inspect.ProjectSummary{
-			Root:     root,
-			Name:     "demo",
-			Manifest: manifest.Status{Present: true},
-		}),
 	})
 	if len(result.Issues) != 0 {
 		t.Fatalf("issues = %#v", result.Issues)
@@ -34,19 +29,20 @@ func TestExportBundleDryRunReturnsDefaultPath(t *testing.T) {
 	if result.Summary.StageCount != 1 || result.Summary.IssueCount != 2 || result.Summary.BlockingCount != 1 || !result.Summary.Generated {
 		t.Fatalf("summary = %#v", result.Summary)
 	}
+	if !result.Summary.HasTransaction || result.Target.Transaction == nil || result.Target.Provenance == nil || !result.Target.Provenance.Valid {
+		t.Fatalf("transaction provenance not hydrated: summary=%#v target=%#v", result.Summary, result.Target)
+	}
+	if result.Target.Transaction == nil || len(result.Target.Transaction.Operations) != len(tx.Operations) {
+		t.Fatalf("target transaction = %#v", result.Target.Transaction)
+	}
 }
 
 func TestExportBundleExecuteWritesParseableBundle(t *testing.T) {
-	root := t.TempDir()
+	root, tx := generatedExportTarget(t)
 	result := ExportBundle(ExportOptions{
 		TargetPath:  root,
 		StageIssues: exportStageIssues(),
 		Execute:     true,
-		InspectProject: stubInspect(root, inspect.ProjectSummary{
-			Root:     root,
-			Name:     "demo",
-			Manifest: manifest.Status{Present: true},
-		}),
 	})
 	if len(result.Issues) != 0 {
 		t.Fatalf("issues = %#v", result.Issues)
@@ -57,6 +53,9 @@ func TestExportBundleExecuteWritesParseableBundle(t *testing.T) {
 	}
 	if loaded.ProjectRoot != filepath.ToSlash(root) || loaded.ProjectName != "demo" || !loaded.Generated || len(loaded.StageIssues) != 1 {
 		t.Fatalf("bundle = %#v", loaded)
+	}
+	if loaded.Transaction == nil || len(loaded.Transaction.Operations) != len(tx.Operations) {
+		t.Fatalf("bundle transaction = %#v", loaded.Transaction)
 	}
 	if !loaded.RepairOptions.Enabled || !loaded.RepairOptions.Apply {
 		t.Fatalf("repair options = %#v", loaded.RepairOptions)
@@ -76,6 +75,7 @@ func TestExportBundleBlocksExistingBundleWithoutOverwrite(t *testing.T) {
 		TargetPath:  root,
 		StageIssues: exportStageIssues(),
 		Execute:     true,
+		Transaction: exportTransactionPtr(t),
 		InspectProject: stubInspect(root, inspect.ProjectSummary{
 			Root:     root,
 			Name:     "demo",
@@ -99,6 +99,7 @@ func TestExportBundleOverwriteReplacesExistingBundle(t *testing.T) {
 		StageIssues: exportStageIssues(),
 		Execute:     true,
 		Overwrite:   true,
+		Transaction: exportTransactionPtr(t),
 		InspectProject: stubInspect(root, inspect.ProjectSummary{
 			Root:     root,
 			Name:     "demo",
@@ -142,6 +143,7 @@ func TestExportBundleBlocksEmptyStageIssues(t *testing.T) {
 		TargetPath:  root,
 		StageIssues: []StageIssues{{Stage: "writer_correctness"}},
 		Execute:     true,
+		Transaction: exportTransactionPtr(t),
 		InspectProject: stubInspect(root, inspect.ProjectSummary{
 			Root:     root,
 			Name:     "demo",
@@ -158,6 +160,7 @@ func TestExportBundleBlocksOutputOutsideTargetRoot(t *testing.T) {
 		OutputPath:  filepath.Join(t.TempDir(), "repair-bundle.json"),
 		StageIssues: exportStageIssues(),
 		Execute:     true,
+		Transaction: exportTransactionPtr(t),
 		InspectProject: stubInspect(root, inspect.ProjectSummary{
 			Root:     root,
 			Name:     "demo",
@@ -175,6 +178,7 @@ func TestExportBundleCreatesSafeNestedParentDirectory(t *testing.T) {
 		OutputPath:  path,
 		StageIssues: exportStageIssues(),
 		Execute:     true,
+		Transaction: exportTransactionPtr(t),
 		InspectProject: stubInspect(root, inspect.ProjectSummary{
 			Root:     root,
 			Name:     "demo",
@@ -204,11 +208,8 @@ func TestExportBundleSummaryReportsMissingTransaction(t *testing.T) {
 			Manifest: manifest.Status{Present: true},
 		}),
 	})
-	if len(result.Issues) != 0 {
-		t.Fatalf("issues = %#v", result.Issues)
-	}
-	if result.Summary.HasTransaction {
-		t.Fatalf("summary = %#v, want has_transaction=false", result.Summary)
+	if !reports.HasBlockingIssue(result.Issues) || result.Summary.HasTransaction {
+		t.Fatalf("result = %#v", result)
 	}
 }
 
@@ -275,4 +276,21 @@ func exportTransaction(t *testing.T) transactions.Transaction {
 		t.Fatalf("parse transaction: %v", err)
 	}
 	return tx
+}
+
+func exportTransactionPtr(t *testing.T) *transactions.Transaction {
+	t.Helper()
+	tx := exportTransaction(t)
+	return &tx
+}
+
+func generatedExportTarget(t *testing.T) (string, transactions.Transaction) {
+	t.Helper()
+	root := filepath.Join(t.TempDir(), "demo")
+	tx := exportTransaction(t)
+	result := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: root})
+	if len(result.Issues) != 0 {
+		t.Fatalf("apply issues = %#v", result.Issues)
+	}
+	return root, tx
 }

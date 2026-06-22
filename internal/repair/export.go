@@ -46,7 +46,7 @@ func ExportBundle(opts ExportOptions) (result ExportResult) {
 	repairOptions.Apply = true
 	target := hydrateExportTarget(opts.TargetPath, opts)
 	defer func() {
-		result.Summary = exportSummary(opts.StageIssues, result.Issues, target.Generated, opts.Transaction != nil)
+		result.Summary = exportSummary(opts.StageIssues, result.Issues, target.Generated, target.Transaction != nil)
 	}()
 	result.Target = target
 	if len(target.Issues) > 0 {
@@ -96,7 +96,7 @@ func ExportBundle(opts ExportOptions) (result ExportResult) {
 		ProjectRoot:   target.Root,
 		ProjectName:   exportProjectName(target),
 		Generated:     true,
-		Transaction:   opts.Transaction,
+		Transaction:   target.Transaction,
 		StageIssues:   opts.StageIssues,
 		RepairOptions: repairOptions,
 	}
@@ -158,6 +158,19 @@ func hydrateExportTarget(path string, opts ExportOptions) Target {
 			Path:     "target.generated",
 			Message:  "repair export-bundle requires generated KiCadAI provenance",
 		})
+	}
+	if opts.Transaction != nil {
+		target.Transaction = opts.Transaction
+	} else if target.Generated {
+		loadTargetProvenance(absRoot, &target)
+		if target.Transaction == nil {
+			target.Issues = append(target.Issues, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityBlocked,
+				Path:     "target.transaction",
+				Message:  "repair export-bundle requires a generated transaction that is present and loadable",
+			})
+		}
 	}
 	target.Mutable = false
 	return target
