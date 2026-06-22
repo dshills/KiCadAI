@@ -528,12 +528,7 @@ func validateZones(board *pcbfiles.PCBFile, opts Options) ([]ZoneStatus, []repor
 
 func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 	if strings.TrimSpace(opts.KiCadCLI) == "" {
-		severity := reports.SeverityInfo
-		status := StatusSkipped
-		if opts.RequireDRC && !opts.AllowMissingDRC {
-			severity = reports.SeverityError
-			status = StatusFail
-		}
+		status, severity := missingDRCPolicy(opts)
 		return Check{
 			Name:     CheckKiCadDRC,
 			Required: opts.RequireDRC,
@@ -547,9 +542,24 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 			}},
 		}
 	}
-	cli := checks.KiCadCLI{Path: opts.KiCadCLI}
+	cli, cliErr := checks.DiscoverCLI(opts.KiCadCLI)
+	if cliErr != nil {
+		status, severity := missingDRCPolicy(opts)
+		return Check{
+			Name:     CheckKiCadDRC,
+			Required: opts.RequireDRC,
+			Status:   status,
+			Issues: []reports.Issue{{
+				Code:       reports.CodeSkippedExternalTool,
+				Severity:   severity,
+				Path:       "kicad_drc",
+				Message:    cliErr.Error(),
+				Suggestion: "set --kicad-cli or use --allow-missing-drc when DRC evidence is optional",
+			}},
+		}
+	}
 	checkOpts := checks.DefaultOptions()
-	checkOpts.KiCadCLI = opts.KiCadCLI
+	checkOpts.KiCadCLI = cli.Path
 	checkOpts.KeepArtifacts = opts.KeepArtifacts
 	checkOpts.ArtifactDir = opts.ArtifactDir
 	checkOpts.Allowlist = opts.Allowlist
@@ -567,6 +577,13 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 		status = StatusFail
 	}
 	return Check{Name: CheckKiCadDRC, Required: opts.RequireDRC, Status: status, Issues: issues, Artifacts: artifacts, Evidence: drc.ReportPath}
+}
+
+func missingDRCPolicy(opts Options) (Status, reports.Severity) {
+	if opts.RequireDRC && !opts.AllowMissingDRC {
+		return StatusFail, reports.SeverityError
+	}
+	return StatusSkipped, reports.SeverityWarning
 }
 
 func drcIssues(result checks.CheckResult, err error) []reports.Issue {

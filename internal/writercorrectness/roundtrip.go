@@ -70,11 +70,19 @@ func resolveRoundTripCLI(opts Options) (roundtrip.KiCadCLI, *reports.Issue) {
 		}
 		info, err := os.Stat(opts.KiCadCLI)
 		if err != nil {
-			issue := reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityError, Path: "writer.kicad_cli", Message: lookErr.Error()}
+			severity := reports.SeverityWarning
+			if opts.RequireKiCadRoundTrip {
+				severity = reports.SeverityError
+			}
+			issue := reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: severity, Path: "writer.kicad_cli", Message: err.Error()}
 			return roundtrip.KiCadCLI{}, &issue
 		}
 		if info.IsDir() || (runtime.GOOS != "windows" && info.Mode()&0o111 == 0) {
-			issue := reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityError, Path: "writer.kicad_cli", Message: opts.KiCadCLI + " is not executable"}
+			severity := reports.SeverityWarning
+			if opts.RequireKiCadRoundTrip {
+				severity = reports.SeverityError
+			}
+			issue := reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: severity, Path: "writer.kicad_cli", Message: opts.KiCadCLI + " is not executable"}
 			return roundtrip.KiCadCLI{}, &issue
 		}
 		return roundtrip.KiCadCLI{Path: opts.KiCadCLI}, nil

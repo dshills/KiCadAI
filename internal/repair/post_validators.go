@@ -121,7 +121,7 @@ func (validator RoundTripValidator) ValidatePostApply(ctx context.Context, input
 }
 
 func boardValidationOptions(opts PostValidationOptions) boardvalidation.Options {
-	requireDRC := opts.RequireKiCadDRC || opts.KiCadDRC
+	requireDRC := opts.RequireKiCadDRC
 	return boardvalidation.Options{
 		StrictZones:     opts.StrictZones,
 		StrictUnrouted:  opts.StrictUnrouted,
@@ -142,10 +142,9 @@ func (validator WriterCorrectnessValidator) ValidatePostApply(ctx context.Contex
 		return PostApplyValidation{Name: postValidatorWriterCorrectness, Issues: []reports.Issue{persistedIssue(reports.CodeInvalidArgument, "output", "post-apply writer correctness target is required")}}
 	}
 	result := writercorrectness.Validate(ctx, target, writercorrectness.Options{
-		KiCadCLI:              validator.Options.KiCadCLI,
-		KeepArtifacts:         validator.Options.KeepArtifacts,
-		ArtifactDir:           validator.Options.ArtifactDir,
-		RequireKiCadRoundTrip: false,
+		KiCadCLI:      validator.Options.KiCadCLI,
+		KeepArtifacts: validator.Options.KeepArtifacts,
+		ArtifactDir:   validator.Options.ArtifactDir,
 	})
 	return PostApplyValidation{
 		Name:      postValidatorWriterCorrectness,

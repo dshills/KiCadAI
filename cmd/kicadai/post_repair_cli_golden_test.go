@@ -451,3 +451,35 @@ func TestPostRepairApplyValidationDeltaStatuses(t *testing.T) {
 		}
 	})
 }
+
+func TestPostRepairApplyKiCadValidationPolicy(t *testing.T) {
+	t.Run("optional missing DRC", func(t *testing.T) {
+		root := t.TempDir()
+		outputDir := filepath.Join(root, "target")
+		bundlePath := writePostRepairCleanBundle(t, root, outputDir)
+		missingCLI := filepath.Join(root, "missing-kicad-cli")
+		result := runPostRepairTargetApplyCLI(t, outputDir, bundlePath, "--allow-missing-drc", "--kicad-cli", missingCLI)
+		if !result.OK || result.Data.Status != repair.StatusPartial {
+			t.Fatalf("optional missing DRC ok/status = %v/%q, want true/%q; issues=%#v", result.OK, result.Data.Status, repair.StatusPartial, result.Issues)
+		}
+		drc := postRepairValidationByName(t, result.Data.Validation, "kicad_drc")
+		if len(drc.Issues) != 1 || drc.Issues[0].Severity != reports.SeverityWarning {
+			t.Fatalf("optional DRC issues = %#v, want one warning", drc.Issues)
+		}
+	})
+
+	t.Run("required missing DRC", func(t *testing.T) {
+		root := t.TempDir()
+		outputDir := filepath.Join(root, "target")
+		bundlePath := writePostRepairCleanBundle(t, root, outputDir)
+		missingCLI := filepath.Join(root, "missing-kicad-cli")
+		result := runPostRepairTargetApplyCLI(t, outputDir, bundlePath, "--require-drc", "--kicad-cli", missingCLI)
+		if result.OK || result.Data.Status != repair.StatusBlocked {
+			t.Fatalf("required missing DRC ok/status = %v/%q, want false/%q; issues=%#v", result.OK, result.Data.Status, repair.StatusBlocked, result.Issues)
+		}
+		drc := postRepairValidationByName(t, result.Data.Validation, "kicad_drc")
+		if len(drc.Issues) != 1 || drc.Issues[0].Severity != reports.SeverityError {
+			t.Fatalf("required DRC issues = %#v, want one error", drc.Issues)
+		}
+	})
+}

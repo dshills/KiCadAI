@@ -3137,12 +3137,12 @@ func runRepairTargetCommand(opts cliOptions, stdout io.Writer) error {
 }
 
 func repairPostValidationOptions(opts cliOptions) repair.PostValidationOptions {
-	coreValidation := opts.strictZones || opts.strictUnrouted || opts.requireDRC || opts.requireERC || opts.requireKiCadRoundTrip
+	coreValidation := opts.strictZones || opts.strictUnrouted || opts.requireDRC || opts.allowMissingDRC || opts.requireERC || opts.requireKiCadRoundTrip
 	return repair.PostValidationOptions{
 		WriterCorrectness:       coreValidation,
 		BoardValidation:         coreValidation,
 		KiCadERC:                opts.requireERC,
-		KiCadDRC:                opts.requireDRC,
+		KiCadDRC:                opts.requireDRC || opts.allowMissingDRC,
 		RoundTrip:               opts.requireKiCadRoundTrip,
 		RequireKiCadERC:         opts.requireERC,
 		RequireKiCadDRC:         opts.requireDRC,

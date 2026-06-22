@@ -122,7 +122,7 @@ func TestBoardValidationOptionsMapPostValidationOptions(t *testing.T) {
 
 func TestBoardValidationOptionsRequireDRCOverridesMissingKiCadAllowance(t *testing.T) {
 	opts := boardValidationOptions(PostValidationOptions{
-		KiCadDRC:                true,
+		RequireKiCadDRC:         true,
 		AllowMissingKiCadChecks: true,
 	})
 	if !opts.RequireDRC || opts.AllowMissingDRC {
