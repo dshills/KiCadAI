@@ -196,6 +196,27 @@ func postRepairSummaryNumber(t *testing.T, summary map[string]any, key string) f
 	return number
 }
 
+func postRepairBundleArtifact(t *testing.T, outputDir string, artifacts []reports.Artifact) reports.Artifact {
+	t.Helper()
+	for _, artifact := range artifacts {
+		if normalizePostRepairPath(outputDir, artifact.Path) == ".kicadai/repair-bundle.json" {
+			assertPostRepairPathInside(t, outputDir, artifact.Path)
+			return artifact
+		}
+	}
+	t.Fatalf("missing repair bundle artifact under %q: %#v", outputDir, artifacts)
+	return reports.Artifact{}
+}
+
+func postRepairStageExists(stages []postRepairCLIStage, name string) bool {
+	for _, stage := range stages {
+		if stage.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizePostRepairPath(root string, path string) string {
 	root = filepath.Clean(root)
 	path = filepath.Clean(path)
@@ -240,4 +261,52 @@ func TestPostRepairCLIGoldenHarnessNormalizesPaths(t *testing.T) {
 		t.Fatalf("normalized outside path = %q", got)
 	}
 	assertPostRepairPathInside(t, root, path)
+}
+
+func TestPostRepairDesignCreateEmitsGeneratedRepairBundle(t *testing.T) {
+	result, outputDir := runPostRepairDesignCreateCLI(t, "bundle_basic", "--repair-apply", "--skip-routing")
+	stage := postRepairStageByName(t, result.Data.Stages, "validation_repair")
+	validationStage := postRepairStageByName(t, result.Data.Stages, "validation")
+	kiCadStage := postRepairStageByName(t, result.Data.Stages, "kicad_checks")
+	if validationStage.Status != "skipped" || kiCadStage.Status != "skipped" {
+		t.Fatalf("downstream stages should be explicit skips: validation=%#v kicad=%#v", validationStage, kiCadStage)
+	}
+	if stage.Status == "" {
+		t.Fatalf("validation_repair status is empty: %#v", stage)
+	}
+	bundleArtifact := postRepairBundleArtifact(t, outputDir, stage.Artifacts)
+	if bundleArtifact.Kind != reports.ArtifactValidationReport {
+		t.Fatalf("bundle artifact kind = %q", bundleArtifact.Kind)
+	}
+	bundle, err := repair.LoadBundle(bundleArtifact.Path)
+	if err != nil {
+		t.Fatalf("load generated repair bundle: %v", err)
+	}
+	if bundle.Schema != repair.BundleSchemaV1 || !bundle.Generated || bundle.ProjectName != "post_repair_bundle_basic" {
+		t.Fatalf("bundle metadata = %#v", bundle)
+	}
+	if bundle.Transaction == nil || len(bundle.Transaction.Operations) == 0 {
+		t.Fatalf("bundle transaction missing: %#v", bundle.Transaction)
+	}
+	if len(bundle.StageIssues) == 0 {
+		t.Fatalf("bundle stage issues missing: %#v", bundle.StageIssues)
+	}
+	if !bundle.RepairOptions.Enabled || !bundle.RepairOptions.Apply {
+		t.Fatalf("bundle repair options = %#v", bundle.RepairOptions)
+	}
+	if got := normalizePostRepairPath(outputDir, bundle.ProjectRoot); got != "." {
+		t.Fatalf("bundle project root = %q", got)
+	}
+}
+
+func TestPostRepairDesignCreateDisabledOmitsRepairBundle(t *testing.T) {
+	result, _ := runPostRepairDesignCreateCLI(t, "bundle_basic", "--skip-routing")
+	if postRepairStageExists(result.Data.Stages, "validation_repair") {
+		t.Fatalf("validation_repair stage present without repair enabled: %#v", result.Data.Stages)
+	}
+	for _, artifact := range result.Artifacts {
+		if normalizePostRepairPath(result.Data.Project.OutputDir, artifact.Path) == ".kicadai/repair-bundle.json" {
+			t.Fatalf("repair bundle artifact present without repair enabled: %#v", artifact)
+		}
+	}
 }

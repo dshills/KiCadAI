@@ -514,6 +514,16 @@ func TestParseDesignAllowPartialSetsExplicitFlag(t *testing.T) {
 	}
 }
 
+func TestParseDesignRepairApplyImpliesRepair(t *testing.T) {
+	opts, command, err := parse([]string{"--repair-apply", "design", "create"}, io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command != "design" || !opts.repairApply || !opts.repairEnabled {
+		t.Fatalf("opts=%#v command=%q", opts, command)
+	}
+}
+
 func TestDesignCreateOptionsRejectsUnknownRouteMode(t *testing.T) {
 	_, err := designCreateOptions(cliOptions{routeMode: "sideways"}, checks.Options{})
 	if err == nil {

@@ -133,6 +133,8 @@ Global flags:
   --trace-width float                Routing trace width in millimeters
   --clearance float                  Routing clearance in millimeters
   --allow-partial                    Allow partial routing results
+  --repair                           Include validation repair planning in design create
+  --repair-apply                     Apply generated-project validation repairs during design create
   --skip-routing                     Skip design workflow board routing
   --placement-board-width float      Placement feedback board width in millimeters (default {{defaultPlacementBoardWidthMM}})
   --placement-board-height float     Placement feedback board height in millimeters (default {{defaultPlacementBoardHeightMM}})
@@ -226,6 +228,8 @@ type cliOptions struct {
 	routeClearanceMM      float64
 	routeAllowPartial     bool
 	routeAllowPartialSet  bool
+	repairEnabled         bool
+	repairApply           bool
 	maxRepairAttempts     int
 	skipRouting           bool
 	placementBoardWidth   float64
@@ -402,6 +406,8 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.Float64Var(&opts.routeTraceWidthMM, "trace-width", 0, "routing trace width in millimeters")
 	flags.Float64Var(&opts.routeClearanceMM, "clearance", 0, "routing clearance in millimeters")
 	flags.BoolVar(&opts.routeAllowPartial, "allow-partial", false, "allow partial routing results")
+	flags.BoolVar(&opts.repairEnabled, "repair", false, "include validation repair planning in design create")
+	flags.BoolVar(&opts.repairApply, "repair-apply", false, "apply generated-project validation repairs during design create")
 	flags.IntVar(&opts.maxRepairAttempts, "max-repair-attempts", 3, "maximum validation repair attempts")
 	flags.BoolVar(&opts.skipRouting, "skip-routing", false, "skip design workflow board routing")
 	flags.Float64Var(&opts.placementBoardWidth, "placement-board-width", defaultPlacementBoardWidthMM, "placement feedback board width in millimeters")
@@ -433,6 +439,9 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 			opts.routeAllowPartialSet = true
 		}
 	})
+	if opts.repairApply {
+		opts.repairEnabled = true
+	}
 	opts.commandArgs = flags.Args()[1:]
 	return opts, flags.Arg(0), nil
 }
@@ -2258,12 +2267,23 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 			ArtifactDir:   checkOpts.ArtifactDir,
 			Allowlist:     checkOpts.Allowlist,
 		},
+		Repair:     repairOptionsForDesignCreate(opts),
 		PostRepair: repairPostValidationOptions(opts),
 	}
 	if opts.routeAllowPartialSet {
 		createOpts.Routing.AllowPartial = &opts.routeAllowPartial
 	}
 	return createOpts, nil
+}
+
+func repairOptionsForDesignCreate(opts cliOptions) repair.Options {
+	if !opts.repairEnabled && !opts.repairApply {
+		return repair.Options{}
+	}
+	repairOptions := repairOptionsFromCLI(opts, opts.repairApply)
+	repairOptions.Enabled = true
+	repairOptions.Acceptance = opts.componentAcceptance
+	return repairOptions
 }
 
 func boardValidationOptions(opts cliOptions) (boardvalidation.Options, error) {

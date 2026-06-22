@@ -93,6 +93,12 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	stages = append(stages, writerChecked.Stage)
 	if workflowStageBlocked(writerChecked.Stage) {
 		stages = append(stages, skippedWorkflowStages("writer correctness check did not complete", StageValidation, StageKiCadChecks)...)
+		groups := []repair.StageIssues{
+			{Stage: string(StageWriterCorrect), Issues: writerChecked.Stage.Issues},
+		}
+		if repairStageShouldRun(opts.Repair, groups) {
+			stages = append(stages, repairStageForGroups(ctx, &normalized, written, groups, opts))
+		}
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
 	validated := ValidateProject(ctx, &normalized, &written, opts.Validation)
@@ -105,13 +111,30 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 			{Stage: string(StageValidation), Issues: validated.Stage.Issues},
 			{Stage: string(StageKiCadChecks), Issues: checked.Stage.Issues},
 		}
-		if opts.Repair.Apply {
-			stages = append(stages, persistedValidationRepairStage(ctx, &normalized, written, groups, opts))
-		} else {
-			stages = append(stages, validationRepairStage(groups, opts.Repair))
+		if repairStageShouldRun(opts.Repair, groups) {
+			stages = append(stages, repairStageForGroups(ctx, &normalized, written, groups, opts))
 		}
 	}
 	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+}
+
+func repairStageShouldRun(opts repair.Options, groups []repair.StageIssues) bool {
+	return opts.Enabled && (opts.Apply || repairStageIssueCount(groups) > 0)
+}
+
+func repairStageIssueCount(groups []repair.StageIssues) int {
+	count := 0
+	for _, group := range groups {
+		count += len(group.Issues)
+	}
+	return count
+}
+
+func repairStageForGroups(ctx context.Context, request *Request, written ProjectWriteResult, groups []repair.StageIssues, opts CreateOptions) StageResult {
+	if opts.Repair.Apply {
+		return persistedValidationRepairStage(ctx, request, written, groups, opts)
+	}
+	return validationRepairStage(groups, opts.Repair)
 }
 
 func persistedValidationRepairStage(ctx context.Context, request *Request, written ProjectWriteResult, groups []repair.StageIssues, opts CreateOptions) StageResult {
