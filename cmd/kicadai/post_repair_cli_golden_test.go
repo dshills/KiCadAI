@@ -563,6 +563,18 @@ func TestRepairExportBundleCLIDryRun(t *testing.T) {
 	if normalizePostRepairPath(outputDir, result.Data.BundlePath) != ".kicadai/repair-bundle.json" {
 		t.Fatalf("bundle path = %q", result.Data.BundlePath)
 	}
+	if !result.Data.Target.Generated {
+		t.Fatalf("target generated = false: %#v", result.Data.Target)
+	}
+	if got := postRepairSummaryNumber(t, result.Data.Summary, "stage_count"); got != 1 {
+		t.Fatalf("stage_count = %v, want 1", got)
+	}
+	if got := postRepairSummaryNumber(t, result.Data.Summary, "issue_count"); got != 1 {
+		t.Fatalf("issue_count = %v, want 1", got)
+	}
+	if got := postRepairSummaryNumber(t, result.Data.Summary, "blocking_count"); got != 1 {
+		t.Fatalf("blocking_count = %v, want 1", got)
+	}
 	if _, err := os.Stat(filepath.FromSlash(result.Data.BundlePath)); !os.IsNotExist(err) {
 		t.Fatalf("dry-run wrote bundle or unexpected stat error: %v", err)
 	}
@@ -603,6 +615,122 @@ func TestRepairExportBundleCLIMissingRequest(t *testing.T) {
 	)
 	if result.OK || len(result.Issues) == 0 {
 		t.Fatalf("missing request result = %#v", result)
+	}
+}
+
+func TestRepairExportBundleCLIExplicitOutputPath(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	issuesPath := writePostRepairStageIssues(t, root)
+	bundlePath := filepath.Join(outputDir, ".kicadai", "exports", "repair-bundle.json")
+	result := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"--output", bundlePath,
+		"repair", "export-bundle",
+	)
+	if !result.OK {
+		t.Fatalf("explicit output result = %#v", result)
+	}
+	if normalizePostRepairPath(outputDir, result.Data.BundlePath) != ".kicadai/exports/repair-bundle.json" {
+		t.Fatalf("bundle path = %q", result.Data.BundlePath)
+	}
+	if _, err := repair.LoadBundle(bundlePath); err != nil {
+		t.Fatalf("load explicit output bundle: %v", err)
+	}
+}
+
+func TestRepairExportBundleCLIOverwriteGate(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	issuesPath := writePostRepairStageIssues(t, root)
+	first := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if !first.OK {
+		t.Fatalf("first export result = %#v", first)
+	}
+	second := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if second.OK {
+		t.Fatalf("second export unexpectedly succeeded: %#v", second)
+	}
+	third := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--overwrite",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if !third.OK {
+		t.Fatalf("overwrite export result = %#v", third)
+	}
+}
+
+func TestRepairExportBundleCLIBlocksOutsideOutputPath(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	issuesPath := writePostRepairStageIssues(t, root)
+	result := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"--output", filepath.Join(root, "outside.json"),
+		"repair", "export-bundle",
+	)
+	if result.OK || len(result.Issues) == 0 {
+		t.Fatalf("outside output result = %#v", result)
+	}
+}
+
+func TestRepairExportBundleCLIMissingTarget(t *testing.T) {
+	root := t.TempDir()
+	issuesPath := writePostRepairStageIssues(t, root)
+	result := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", filepath.Join(root, "missing"),
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if result.OK || len(result.Issues) == 0 {
+		t.Fatalf("missing target result = %#v", result)
+	}
+}
+
+func TestRepairExportBundleCLIMalformedRequest(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	path := filepath.Join(root, "bad-stage-issues.json")
+	if err := os.WriteFile(path, []byte("{"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", path,
+		"repair", "export-bundle",
+	)
+	if result.OK || len(result.Issues) == 0 {
+		t.Fatalf("malformed request result = %#v", result)
 	}
 }
 
