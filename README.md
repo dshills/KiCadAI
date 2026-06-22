@@ -242,6 +242,13 @@ repair bundle artifact at `.kicadai/repair-bundle.json` under the generated
 project directory. That bundle can be passed back via `--request` to
 `repair apply --target` for reproducible generated-project repair.
 
+New generated projects also include `.kicadai/transaction.json`, and
+`.kicadai/manifest.json` records a hash for that provenance file.
+Target-oriented repair commands use that evidence to reconstruct the original
+transaction when a caller does not provide one. Targets with missing, stale, or
+malformed metadata, plus imported or unsupported targets, remain blocked before
+mutation.
+
 For non-`design create` flows, `repair export-bundle` packages structured
 stage issues against a generated target:
 
@@ -262,10 +269,11 @@ go run ./cmd/kicadai \
 ```
 
 Export is generated-target-only and refuses output paths outside the target
-root. Bundles exported from stage issues may report
-`summary.has_transaction=false` when no generated transaction evidence is
-available; those bundles remain useful as evidence, while mutation through
-`repair apply` requires transaction provenance.
+root. For valid generated targets, export hydrates transaction provenance and
+reports `summary.has_transaction=true`, so the exported bundle can feed
+`repair apply`. Legacy generated projects without `.kicadai/transaction.json`
+must be regenerated or supplied with a repair bundle that already contains the
+transaction.
 
 LED generation:
 
@@ -1285,6 +1293,10 @@ make test
   user-authored KiCad features.
 - Operation feedback is strongest for transaction-derived issues. Generic KiCad
   CLI findings remain unlinked unless a unique operation trace exists.
+- Generated-target repair mutation requires fresh `.kicadai/transaction.json`
+  provenance referenced by `.kicadai/manifest.json`, or an explicit repair
+  bundle transaction. Legacy generated projects without that file are treated as
+  evidence-only until regenerated.
 - Hierarchical pinmap validation is intentionally blocked until hierarchy
   flattening is implemented.
 - Footprint-library expansion covers resolver-backed pads, text, graphics,

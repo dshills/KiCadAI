@@ -249,19 +249,20 @@ repair bundle artifacts from `design create` repair runs. `repair
 export-bundle` now packages stage issue JSON against generated targets for
 non-workflow repair evidence, with dry-run-by-default behavior, inside-target
 output policy, overwrite gates, malformed request handling, generated ownership
-checks, and selected-field CLI goldens. CLI golden fixtures now lock down
-generated bundle parseability, target apply overwrite policy, post-apply
-validation adapter names, repaired/partial delta status behavior, and optional
-versus required missing KiCad DRC evidence.
+checks, hydrated transaction provenance, and selected-field CLI goldens.
+Generated projects now persist `.kicadai/transaction.json`, and generated
+manifests record that provenance hash so target-based repair can fail closed on
+missing, stale, malformed, imported, or unsupported targets. CLI golden
+fixtures now lock down generated bundle parseability, target apply overwrite
+policy, post-apply validation adapter names, repaired/partial delta status
+behavior, target-provenance export/apply replay, and optional versus required
+missing KiCad DRC evidence.
 
 ### Remaining Work
 
 - Expand post-repair adapters to include richer parser-specific evidence once
   ERC/DRC findings are mapped to repair categories consistently across all
   flows.
-- Persist or discover transaction provenance for generated targets outside
-  `design create` so exported repair bundles can be applied, not only retained
-  as repair evidence.
 - Extend retry budgets from persisted repair apply into full generate,
   validate, repair, and revalidate loops.
 - Implement KiCad zone refill only under explicit KiCad CLI policy.
@@ -519,14 +520,12 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Persist transaction provenance for generated targets outside `design
-   create` so `repair export-bundle` can feed mutation-safe apply flows.
-2. Make generated block-local placement semantics movable under retry without
+1. Make generated block-local placement semantics movable under retry without
    breaking required local-route intent.
-3. Generate and validate Gerber/drill evidence for fabrication packages.
-4. Expand verified component and block coverage alongside each new block
+2. Generate and validate Gerber/drill evidence for fabrication packages.
+3. Expand verified component and block coverage alongside each new block
    family.
-5. Add intent-level planning only after the above gates are reliable.
+4. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
 
