@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kicadai/internal/components"
+	"kicadai/internal/inspect"
 	"kicadai/internal/reports"
 )
 
@@ -39,6 +40,38 @@ func TestCreateWritesWorkflowResult(t *testing.T) {
 	}
 	if got := componentStage.Summary["selection_count"]; got != 2 {
 		t.Fatalf("component selection count = %#v, want 2", got)
+	}
+}
+
+func TestCreateStructuralRequestSkipsFabricationReadiness(t *testing.T) {
+	request := Request{
+		Version:    RequestVersion,
+		Name:       "structural_board",
+		Board:      BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks:     []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+		Validation: ValidationSpec{Acceptance: AcceptanceStructural, SkipRouting: true},
+	}
+	result := Create(context.Background(), request, CreateOptions{OutputDir: filepath.Join(t.TempDir(), "structural_board")})
+	if hasStage(result, StageFabricationReady) {
+		t.Fatalf("fabrication readiness stage should not run for structural request: %#v", result.Stages)
+	}
+}
+
+func TestFabricationReadinessStageBlocksMissingPackageEvidence(t *testing.T) {
+	request := Request{Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate}}
+	written := ProjectWriteResult{Inspection: inspect.ProjectSummary{Root: t.TempDir()}}
+	stage := FabricationReadinessStage(context.Background(), &request, &written)
+	if stage.Name != StageFabricationReady {
+		t.Fatalf("stage name = %q", stage.Name)
+	}
+	if stage.Status != StageStatusBlocked {
+		t.Fatalf("stage = %#v, want blocked", stage)
+	}
+	if !hasIssueCode(stage.Issues, reports.CodeValidationFailed) {
+		t.Fatalf("expected readiness issue in %#v", stage.Issues)
+	}
+	if stage.Summary["dry_run"] != true {
+		t.Fatalf("summary = %#v, want dry run", stage.Summary)
 	}
 }
 

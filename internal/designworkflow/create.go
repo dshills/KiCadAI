@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/fabrication"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
@@ -105,17 +106,65 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	stages = append(stages, validated.Stage)
 	checked := RunKiCadChecks(ctx, &normalized, &written, opts.KiCadChecks)
 	stages = append(stages, checked.Stage)
+	fabricationStage := FabricationReadinessStage(ctx, &normalized, &written)
+	if fabricationStage.Name != "" {
+		stages = append(stages, fabricationStage)
+	}
 	if opts.Repair.Enabled {
 		groups := []repair.StageIssues{
 			{Stage: string(StageWriterCorrect), Issues: writerChecked.Stage.Issues},
 			{Stage: string(StageValidation), Issues: validated.Stage.Issues},
 			{Stage: string(StageKiCadChecks), Issues: checked.Stage.Issues},
 		}
+		if fabricationStage.Name != "" {
+			groups = append(groups, repair.StageIssues{Stage: string(StageFabricationReady), Issues: fabricationStage.Issues})
+		}
 		if repairStageShouldRun(opts.Repair, groups) {
 			stages = append(stages, repairStageForGroups(ctx, &normalized, written, groups, opts))
 		}
 	}
 	return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+}
+
+func FabricationReadinessStage(ctx context.Context, request *Request, written *ProjectWriteResult) StageResult {
+	if request == nil || written == nil || request.Validation.Acceptance != AcceptanceFabricationCandidate {
+		return StageResult{}
+	}
+	outputDir := strings.TrimSpace(written.Inspection.Root)
+	if outputDir == "" {
+		return NewStageResult(StageFabricationReady, []reports.Issue{{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "fabrication.output_dir",
+			Message:  "fabrication readiness requires a written project output directory",
+		}})
+	}
+	policy := fabrication.CLIPolicyDisabled
+	if request.Validation.RequireDRC || request.Validation.RequireERC {
+		policy = fabrication.CLIPolicyRequired
+	}
+	result := fabrication.ExportPreview(ctx, outputDir, fabrication.Options{CLIPolicy: policy})
+	issues := append([]reports.Issue(nil), result.Issues...)
+	if result.Status != fabrication.StatusReady {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Path:       "fabrication.status",
+			Message:    "fabrication readiness is " + string(result.Status) + ", not ready",
+			Suggestion: "run export fabrication with required ERC/DRC, BOM, CPL, Gerber, and drill evidence before claiming fabrication readiness",
+		})
+	}
+	stage := NewStageResult(StageFabricationReady, issues)
+	if result.Status == fabrication.StatusBlocked {
+		stage.Status = StageStatusBlocked
+	}
+	stage.Artifacts = fabrication.ReportArtifacts(result.Artifacts)
+	stage.Summary = map[string]any{
+		"status":  result.Status,
+		"score":   result.Score,
+		"dry_run": result.DryRun,
+	}
+	return stage
 }
 
 func repairStageShouldRun(opts repair.Options, groups []repair.StageIssues) bool {

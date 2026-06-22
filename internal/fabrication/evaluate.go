@@ -37,6 +37,7 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 			Summary:   Summary{Project: EvidenceFail},
 			Issues:    []reports.Issue{issue},
 			Artifacts: expectedFabricationArtifacts(),
+			DryRun:    opts.DryRun,
 		}
 	}
 
@@ -55,6 +56,7 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 			Summary:   Summary{Project: EvidenceFail},
 			Issues:    []reports.Issue{issue},
 			Artifacts: expectedFabricationArtifacts(),
+			DryRun:    opts.DryRun,
 		}
 	}
 

@@ -68,8 +68,28 @@ func TestAchievedAcceptanceAllowsFabricationCandidate(t *testing.T) {
 		NewStageResult(StageRouting, nil),
 		NewStageResult(StageValidation, nil),
 		NewStageResult(StageKiCadChecks, nil),
+		NewStageResult(StageFabricationReady, nil),
 	})
 	if result.Acceptance.Achieved != AcceptanceFabricationCandidate || !result.Acceptance.FabricationReady {
+		t.Fatalf("acceptance = %#v", result.Acceptance)
+	}
+}
+
+func TestAchievedAcceptanceBlocksFabricationCandidateWithoutReadiness(t *testing.T) {
+	result := BuildWorkflowResult(ProjectSummary{Name: "demo"}, AcceptanceFabricationCandidate, []StageResult{
+		NewStageResult(StageSchematic, nil),
+		NewStageResult(StagePCBRealization, nil),
+		NewStageResult(StagePlacement, nil),
+		NewStageResult(StageRouting, nil),
+		NewStageResult(StageValidation, nil),
+		NewStageResult(StageKiCadChecks, nil),
+		NewStageResult(StageFabricationReady, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Message:  "missing fabrication evidence",
+		}}),
+	})
+	if result.Acceptance.Achieved != AcceptanceERCDRC || result.Acceptance.FabricationReady {
 		t.Fatalf("acceptance = %#v", result.Acceptance)
 	}
 }

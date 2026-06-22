@@ -24,6 +24,7 @@ const (
 	StageValidation         StageName = "validation"
 	StageValidationRepair   StageName = "validation_repair"
 	StageKiCadChecks        StageName = "kicad_checks"
+	StageFabricationReady   StageName = "fabrication_readiness"
 	StageFeedback           StageName = "feedback"
 )
 
@@ -193,6 +194,7 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 		completed[stage.Name] = struct{}{}
 	}
 	_, completedKiCadChecks := completed[StageKiCadChecks]
+	_, completedFabrication := completed[StageFabricationReady]
 	_, completedValidation := completed[StageValidation]
 	switch {
 	case hasAnyBlocked(blocked, StageParseRequest, StageBlockPlanning, StageComponentSelection, StageSchematic, StageProjectWrite):
@@ -203,7 +205,12 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 		return AcceptanceStructural
 	case hasAnyBlocked(blocked, StageKiCadChecks):
 		return AcceptanceConnectivity
-	case completedKiCadChecks && requestedAtLeast(requested, AcceptanceFabricationCandidate):
+	case hasAnyBlocked(blocked, StageFabricationReady) && requestedAtLeast(requested, AcceptanceFabricationCandidate):
+		if completedKiCadChecks {
+			return AcceptanceERCDRC
+		}
+		return AcceptanceConnectivity
+	case completedKiCadChecks && completedFabrication && requestedAtLeast(requested, AcceptanceFabricationCandidate):
 		return AcceptanceFabricationCandidate
 	case completedKiCadChecks && requestedAtLeast(requested, AcceptanceERCDRC):
 		return AcceptanceERCDRC
@@ -233,7 +240,7 @@ func RetryScopeForStage(stage StageName, issue reports.Issue) RetryScope {
 		return RetryScopeRouting
 	case StageProjectWrite, StageSchematic, StageSchematicToPCB:
 		return RetryScopeWriter
-	case StageLibraryContext, StageKiCadChecks, StageValidation:
+	case StageLibraryContext, StageKiCadChecks, StageFabricationReady, StageValidation:
 		if issue.Code == reports.CodeKiCadCLIFailed || issue.Code == reports.CodeSkippedExternalTool {
 			return RetryScopeExternal
 		}

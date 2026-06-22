@@ -11,9 +11,12 @@ import (
 )
 
 func TestEvaluateMissingTargetBlocks(t *testing.T) {
-	result := Evaluate(context.Background(), filepath.Join(t.TempDir(), "missing"), EvaluateOptions{})
+	result := Evaluate(context.Background(), filepath.Join(t.TempDir(), "missing"), EvaluateOptions{DryRun: true})
 	if result.Status != StatusBlocked || result.Summary.Project != EvidenceFail {
 		t.Fatalf("result = %#v, want blocked missing target", result)
+	}
+	if !result.DryRun {
+		t.Fatalf("DryRun = false, want true")
 	}
 	if len(result.Issues) == 0 || result.Issues[0].Code != reports.CodeInvalidArgument {
 		t.Fatalf("issues = %#v, want invalid target issue", result.Issues)
