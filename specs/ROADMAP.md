@@ -84,6 +84,10 @@ from validation feedback to safe automatic repair.
   command for non-`design create` generated targets, with CLI golden coverage
   for bundle export, target apply, validation summaries, delta statuses, and
   optional vs required KiCad DRC policy.
+- Fabrication export/readiness gate foundation with readiness model, package
+  manifest serialization, project evaluation, deterministic BOM/CPL reports,
+  safe dry-run/execute export service, CLI wiring, KiCad CLI evidence policy,
+  and `design create` fabrication-candidate acceptance integration.
 - `design create` workflow for structured block-based design requests.
 - README and focused docs for current CLI capabilities.
 
@@ -108,7 +112,8 @@ loop confidence:
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
   remains blocked by preservation safety;
-- fabrication export is still not a complete release gate;
+- fabrication export now provides conservative readiness gates, but does not
+  yet generate complete manufacturer-release Gerber/drill packages;
 - natural-language intent planning is not yet a first-class pipeline.
 
 ## Roadmap Principles
@@ -450,20 +455,32 @@ Define "done" as manufacturable, not merely parseable.
 
 ### Current Foundation
 
-Writers, board validation, ERC/DRC hooks, and export command placeholders exist.
+Writers, board validation, ERC/DRC hooks, and fabrication export/readiness gates
+exist. The `export preview`, `export bom`, and `export fabrication` commands
+evaluate project readiness, model `blocked`/`candidate`/`ready` status,
+generate deterministic BOM/CPL reports where evidence exists, enforce safe
+dry-run/execute/overwrite behavior, emit package manifests/readiness reports,
+and expose optional or required KiCad CLI evidence policy. `design create`
+treats `validation.acceptance: fabrication-candidate` as a request to prove
+fabrication readiness; partial readiness status (`candidate` or `blocked`)
+downgrades achieved acceptance and leaves `acceptance.fabrication_ready` false.
 
 ### Remaining Work
 
-- Generate and validate Gerbers, drill files, BOM, CPL/position files, and a
-  fabrication package manifest.
+- Generate and validate Gerbers and drill files, then attach those artifacts to
+  the package manifest.
+- Strengthen BOM and CPL source data with richer component identity,
+  manufacturer, MPN, side, rotation, and placement provenance.
 - Add stackup, net class, solder mask, paste, edge cuts, courtyard, silkscreen,
   and mounting-hole checks.
-- Add fabrication-readiness score and blocking issue taxonomy.
+- Expand fabrication-readiness score and blocking issue taxonomy as new gates
+  become executable.
 - Integrate manufacturer profile constraints when available.
 
 ### Acceptance Gates
 
-- A generated board can produce a complete fabrication package.
+- A generated board can produce a complete fabrication package when Gerber and
+  drill generation are implemented.
 - Missing fab artifacts or failed checks block "ready" status.
 - Output package contents are deterministic and test-covered.
 
@@ -502,11 +519,11 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Add fabrication export/readiness gates.
-2. Persist transaction provenance for generated targets outside `design
+1. Persist transaction provenance for generated targets outside `design
    create` so `repair export-bundle` can feed mutation-safe apply flows.
-3. Make generated block-local placement semantics movable under retry without
+2. Make generated block-local placement semantics movable under retry without
    breaking required local-route intent.
+3. Generate and validate Gerber/drill evidence for fabrication packages.
 4. Expand verified component and block coverage alongside each new block
    family.
 5. Add intent-level planning only after the above gates are reliable.

@@ -9,7 +9,7 @@ three related capabilities:
   validation, ERC/DRC feedback, validation repair planning, round-trip validation, transactions,
   operation-correlated feedback, component intelligence, and pinmap readiness
   checks, plus placement congestion/fanout scoring and bounded
-  placement-routing retry evidence.
+  placement-routing retry evidence, and fabrication readiness previews.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -365,9 +365,9 @@ connectivity diagnostics; true generated-board movement improvement remains
 blocked because block-local components are currently emitted as fixed CAD
 placements, which prevents retry from moving them.
 
-Current roadmap focus: add fabrication export/readiness gates so generated
-projects can produce deterministic manufacturing artifacts and a clear
-not-fabrication-ready status when evidence is missing.
+Current roadmap focus: strengthen generated-project provenance and movable
+placement semantics so repair, retry, and readiness evidence can keep improving
+after a project has been written.
 
 ### Component Intelligence
 
@@ -1078,10 +1078,14 @@ runner and parser are implemented and covered with deterministic tests, but the
 current local KiCad CLI exits before writing DRC JSON for the generated PCB
 fixtures, so a stable real DRC fixture remains a follow-up.
 
-### Export Skeleton
+### Fabrication Export And Readiness
 
-The `export` command family exists as a structured CLI placeholder for future
-review, BOM, and fabrication-package outputs:
+The `export` command family evaluates whether a project has enough evidence to
+claim fabrication readiness and can produce deterministic package metadata,
+BOM, and CPL reports. These commands are intended for machine-to-machine
+workflows today, so they are dry-run by default and require `--json`. If
+`--json` is omitted, the CLI returns the standard structured-command usage
+error instead of a human summary.
 
 ```sh
 go run ./cmd/kicadai --json export preview ./project
@@ -1089,7 +1093,43 @@ go run ./cmd/kicadai --json export bom ./project
 go run ./cmd/kicadai --json export fabrication ./project
 ```
 
-These subcommands currently return `UNSUPPORTED_OPERATION`.
+Use `--execute` to write files and `--overwrite` to replace existing package
+files:
+
+```sh
+go run ./cmd/kicadai --json --execute --overwrite export fabrication ./project
+```
+
+Default package paths are under `<project>/fabrication/`:
+
+- `readiness.json`
+- `package-manifest.json`
+- `bom.csv`
+- `cpl.csv`
+
+Readiness statuses are intentionally conservative:
+
+- `blocked`: required project files, writer/board validation, report data, or
+  configured external evidence is missing or failing.
+- `candidate`: the project has partial evidence, but not enough to claim ready.
+- `ready`: all modeled required evidence passes. This status is possible only
+  when the required evidence already exists; KiCadAI does not yet generate
+  Gerber or drill files itself, so most generated projects remain `blocked` or
+  `candidate` until those artifacts are supplied by another flow.
+
+KiCad CLI evidence is policy-driven. Without `--kicad-cli`, preview and export
+stay deterministic and do not invoke external tools. With `--kicad-cli`, missing
+Gerber, drill, ERC, and DRC evidence is visible as optional evidence; missing
+`ready`-level evidence keeps the status at `candidate` or `blocked`, never
+`ready`. With `--require-drc`, missing or failing external fabrication evidence
+is blocking. `design create` now runs a dry-run fabrication preview only when
+the input request JSON sets `validation.acceptance` to
+`fabrication-candidate`, which is the highest current design acceptance level
+and functions as a request to prove fabrication readiness. That input value is
+an enum value; the output field `acceptance.fabrication_ready` is a JSON field
+name and boolean. In the output workflow result, partial readiness status
+(`candidate` or `blocked`) downgrades the achieved acceptance and leaves
+`acceptance.fabrication_ready` false.
 
 ## Examples
 
@@ -1251,7 +1291,10 @@ make test
   attributes, metadata properties, and model references for generated and
   imported-project transaction apply. It does not yet preserve every advanced
   KiCad footprint node or pad-stack option.
-- Export/BOM/fabrication packaging commands are placeholders.
+- Export/BOM/fabrication packaging commands now produce readiness previews,
+  deterministic BOM/CPL reports where evidence exists, and dry-run package
+  manifests. They are readiness gates, not a complete manufacturer-release
+  package yet.
 - Real DRC execution still needs a stable known-good/known-bad fixture on the
   local KiCad CLI; parser and command paths are implemented.
 - Windows named-pipe IPC support is not implemented.
