@@ -23,26 +23,44 @@ import (
 const fullBoardRetryFixtureRoot = "testdata/full_board_retry"
 
 type fullBoardRetryFixtureMetadata struct {
-	Name                  string   `json:"name"`
-	Request               string   `json:"request"`
-	Intent                string   `json:"intent"`
-	ExpectedCategories    []string `json:"expected_categories"`
-	ExpectedStopReason    string   `json:"expected_stop_reason"`
-	ExpectedImprovement   string   `json:"expected_improvement"`
-	PreserveConstraints   []string `json:"preserve_constraints"`
-	ExpectedRoutingStatus string   `json:"expected_routing_status"`
-	ExpectProjectWrite    bool     `json:"expect_project_write"`
-	Determinism           string   `json:"determinism"`
+	Name                    string   `json:"name"`
+	Request                 string   `json:"request"`
+	Intent                  string   `json:"intent"`
+	FixtureClass            string   `json:"fixture_class"`
+	ExpectedCategories      []string `json:"expected_categories"`
+	ExpectedStopReason      string   `json:"expected_stop_reason"`
+	ExpectedImprovement     string   `json:"expected_improvement"`
+	ExpectedImprovedMetric  string   `json:"expected_improved_metric"`
+	PreserveConstraints     []string `json:"preserve_constraints"`
+	PreserveFixedRefs       []string `json:"preserve_fixed_refs"`
+	ExpectedRoutingStatus   string   `json:"expected_routing_status"`
+	ExpectedBaselineStatus  string   `json:"expected_baseline_status"`
+	ExpectedFinalStatus     string   `json:"expected_final_status"`
+	ExpectedMinAttempts     int      `json:"expected_min_attempts"`
+	ExpectedMinApplied      int      `json:"expected_min_applied"`
+	ExpectPadHydration      bool     `json:"expect_pad_hydration"`
+	ExpectedMinHydratedPads int      `json:"expected_min_hydrated_pads"`
+	ExpectProjectWrite      bool     `json:"expect_project_write"`
+	Determinism             string   `json:"determinism"`
 }
 
 type fullBoardRetryEvidence struct {
-	Fixture       string
-	RoutingStatus routing.Status
-	RoutedNets    int
-	FailedNets    int
-	Retry         placementRoutingRetrySummary
-	HasRetry      bool
-	Artifacts     int
+	Fixture               string
+	RoutingStatus         routing.Status
+	BaselineRoutingStatus routing.Status
+	FinalRoutingStatus    routing.Status
+	RoutedNets            int
+	FailedNets            int
+	BaselineRoutedNets    int
+	BaselineFailedNets    int
+	FinalRoutedNets       int
+	FinalFailedNets       int
+	BlockingIssues        int
+	PadHydration          PadHydrationSummary
+	HasPadHydration       bool
+	Retry                 placementRoutingRetrySummary
+	HasRetry              bool
+	Artifacts             int
 }
 
 func fullBoardRetryMetadataPath(name string) string {
@@ -68,7 +86,7 @@ func loadFullBoardRetryMetadata(t *testing.T, name string) fullBoardRetryFixture
 	if err != nil {
 		t.Fatalf("load full-board retry fixture %q from %s: %v", name, fullBoardRetryMetadataPath(name), err)
 	}
-	if metadata.Name == "" || metadata.Intent == "" || metadata.Determinism == "" {
+	if metadata.Name == "" || metadata.Intent == "" || metadata.Determinism == "" || metadata.FixtureClass == "" {
 		t.Fatalf("full-board retry fixture metadata incomplete: %#v", metadata)
 	}
 	return metadata
@@ -87,14 +105,171 @@ func fullBoardRetryEvidenceFromWorkflow(t *testing.T, fixture string, result Wor
 		RoutedNets: intFromStageSummary(stage.Summary, "routed_nets"),
 		FailedNets: intFromStageSummary(stage.Summary, "failed_nets"),
 	}
-	if raw, ok := stage.Summary["status"].(string); ok {
-		evidence.RoutingStatus = routing.Status(raw)
+	if status, ok := fullBoardRetryRoutingStatusFromAny(stage.Summary["status"]); ok {
+		evidence.RoutingStatus = status
 	}
+	evidence.BaselineRoutingStatus = evidence.RoutingStatus
+	evidence.BaselineRoutedNets = evidence.RoutedNets
+	evidence.BaselineFailedNets = evidence.FailedNets
+	evidence.FinalRoutingStatus = evidence.RoutingStatus
+	evidence.FinalRoutedNets = evidence.RoutedNets
+	evidence.FinalFailedNets = evidence.FailedNets
 	if summary, ok := retrySummaryFromStage(t, stage); ok {
 		evidence.Retry = summary
 		evidence.HasRetry = true
+		evidence.BaselineRoutingStatus, evidence.BaselineRoutedNets, evidence.BaselineFailedNets = fullBoardRetryBaselineFromSummary(summary, evidence.RoutingStatus, evidence.RoutedNets, evidence.FailedNets)
+	}
+	evidence.BlockingIssues = fullBoardRetryBlockingIssueCount(result.Stages)
+	if placementStage, ok := stageByName(result, StagePlacement); ok {
+		if padSummary, ok := fullBoardRetryPadHydrationSummary(placementStage); ok {
+			evidence.PadHydration = padSummary
+			evidence.HasPadHydration = true
+		}
 	}
 	return evidence
+}
+
+func fullBoardRetryBaselineFromSummary(summary placementRoutingRetrySummary, fallbackStatus routing.Status, fallbackRouted, fallbackFailed int) (routing.Status, int, int) {
+	if len(summary.AttemptHistory) == 0 {
+		return fallbackStatus, fallbackRouted, fallbackFailed
+	}
+	first := summary.AttemptHistory[0]
+	status, _ := fullBoardRetryRoutingStatusFromAny(first["baseline_routing_status"])
+	if status == "" {
+		status = fallbackStatus
+	}
+	return status, intFromStageSummary(first, "baseline_routed_nets"), intFromStageSummary(first, "baseline_failed_nets")
+}
+
+func fullBoardRetryRoutingStatusFromAny(value any) (routing.Status, bool) {
+	switch status := value.(type) {
+	case routing.Status:
+		return status, true
+	case string:
+		return routing.Status(status), true
+	default:
+		return "", false
+	}
+}
+
+func fullBoardRetryBlockingIssueCount(stages []StageResult) int {
+	seen := map[string]struct{}{}
+	for _, stage := range stages {
+		for _, issue := range stage.Issues {
+			if issue.Blocking() {
+				key := string(issue.Code) + "\x00" + string(issue.Severity) + "\x00" + issue.Path + "\x00" + issue.Message
+				seen[key] = struct{}{}
+			}
+		}
+	}
+	return len(seen)
+}
+
+func fullBoardRetryPadHydrationSummary(stage StageResult) (PadHydrationSummary, bool) {
+	if stage.Summary == nil {
+		return PadHydrationSummary{}, false
+	}
+	raw, ok := stage.Summary["pad_hydration"]
+	if !ok {
+		return PadHydrationSummary{}, false
+	}
+	switch summary := raw.(type) {
+	case PadHydrationSummary:
+		return summary, true
+	case map[string]any:
+		return fullBoardRetryPadHydrationSummaryFromMap(summary), true
+	default:
+		return PadHydrationSummary{}, false
+	}
+}
+
+func fullBoardRetryPadHydrationSummaryFromMap(raw map[string]any) PadHydrationSummary {
+	summary := PadHydrationSummary{
+		ComponentCount:     intFromStageSummary(raw, "component_count"),
+		HydratedComponents: intFromStageSummary(raw, "hydrated_components"),
+		MissingComponents:  intFromStageSummary(raw, "missing_components"),
+		PadCount:           intFromStageSummary(raw, "pad_count"),
+		BlockingIssues:     intFromStageSummary(raw, "blocking_issues"),
+	}
+	if values, ok := raw["missing_refs"].([]any); ok {
+		for _, value := range values {
+			if ref, ok := value.(string); ok {
+				summary.MissingRefs = append(summary.MissingRefs, ref)
+			}
+		}
+	}
+	if sourceCounts, ok := raw["source_counts"].(map[string]any); ok {
+		summary.SourceCounts = map[PadHydrationSource]int{}
+		for source, count := range sourceCounts {
+			summary.SourceCounts[PadHydrationSource(source)] = intFromAny(count)
+		}
+	}
+	return summary
+}
+
+func intFromAny(value any) int {
+	switch parsed := value.(type) {
+	case nil:
+		return 0
+	case int:
+		return parsed
+	case int8:
+		return int(parsed)
+	case int16:
+		return int(parsed)
+	case int32:
+		return int(parsed)
+	case int64:
+		return intValueToInt(parsed)
+	case uint:
+		return intFromUint64(uint64(parsed))
+	case uint8:
+		return int(parsed)
+	case uint16:
+		return int(parsed)
+	case uint32:
+		return intFromUint64(uint64(parsed))
+	case uint64:
+		return intFromUint64(parsed)
+	case float32:
+		return intFromFloat64(float64(parsed))
+	case float64:
+		return intFromFloat64(parsed)
+	case json.Number:
+		if intValue, err := parsed.Int64(); err == nil {
+			return intValueToInt(intValue)
+		}
+		if floatValue, err := strconv.ParseFloat(string(parsed), 64); err == nil {
+			return intFromFloat64(floatValue)
+		}
+	}
+	panic(fmt.Sprintf("unsupported numeric type %T", value))
+}
+
+func intFromFloat64(value float64) int {
+	rounded := math.Round(value)
+	maxInt := float64(int(^uint(0) >> 1))
+	minInt := -maxInt - 1
+	if rounded > maxInt || rounded < minInt {
+		panic(fmt.Sprintf("float %f overflows int", value))
+	}
+	return int(rounded)
+}
+
+func intValueToInt(value int64) int {
+	converted := int(value)
+	if int64(converted) != value {
+		panic(fmt.Sprintf("int64 %d overflows int", value))
+	}
+	return converted
+}
+
+func intFromUint64(value uint64) int {
+	maxInt := uint64(^uint(0) >> 1)
+	if value > maxInt {
+		panic(fmt.Sprintf("uint64 %d overflows int", value))
+	}
+	return int(value)
 }
 
 func intFromStageSummary(summary map[string]any, key string) int {
@@ -256,6 +431,42 @@ func TestFullBoardRetryHarnessLoadsMetadata(t *testing.T) {
 	if metadata.Name != "harness" || len(metadata.ExpectedCategories) != 1 || metadata.ExpectedCategories[0] != string(PlacementRetryIncreaseSpacing) {
 		t.Fatalf("metadata = %#v", metadata)
 	}
+	if metadata.FixtureClass != "harness" || metadata.ExpectedImprovedMetric != "none" || metadata.ExpectedMinAttempts != 1 {
+		t.Fatalf("extended metadata = %#v", metadata)
+	}
+}
+
+func TestFullBoardRetryFixtureMetadataDeclaresEvidenceContract(t *testing.T) {
+	for _, name := range fullBoardRetryFixtureNames(t) {
+		t.Run(name, func(t *testing.T) {
+			metadata := loadFullBoardRetryMetadata(t, name)
+			if metadata.Request == "" || metadata.ExpectedRoutingStatus == "" || metadata.ExpectedImprovement == "" || metadata.ExpectedImprovedMetric == "" {
+				t.Fatalf("metadata missing evidence contract fields: %#v", metadata)
+			}
+			if metadata.ExpectedMinAttempts < 1 {
+				t.Fatalf("expected_min_attempts = %d, want >= 1", metadata.ExpectedMinAttempts)
+			}
+			if metadata.ExpectPadHydration && metadata.ExpectedMinHydratedPads < 1 {
+				t.Fatalf("pad hydration expectation missing minimum hydrated pads: %#v", metadata)
+			}
+		})
+	}
+}
+
+func fullBoardRetryFixtureNames(t *testing.T) []string {
+	t.Helper()
+	entries, err := os.ReadDir(fullBoardRetryFixtureRoot)
+	if err != nil {
+		t.Fatalf("read full-board retry fixture root: %v", err)
+	}
+	var names []string
+	for _, entry := range entries {
+		if entry.IsDir() {
+			names = append(names, entry.Name())
+		}
+	}
+	slices.Sort(names)
+	return names
 }
 
 func TestFullBoardRetryHarnessMissingFixtureReportsPath(t *testing.T) {
@@ -284,6 +495,53 @@ func TestFullBoardRetryEvidenceExtractorHandlesMissingRetry(t *testing.T) {
 	evidence := fullBoardRetryEvidenceFromWorkflow(t, "no_retry", result)
 	if evidence.HasRetry || evidence.RoutingStatus != routing.StatusBlocked || evidence.RoutedNets != 1 || evidence.FailedNets != 2 {
 		t.Fatalf("evidence = %#v", evidence)
+	}
+}
+
+func TestFullBoardRetryEvidenceExtractorReadsRetryAndPadHydration(t *testing.T) {
+	result := WorkflowResult{Stages: []StageResult{
+		{
+			Name: StagePlacement,
+			Summary: map[string]any{
+				"pad_hydration": PadHydrationSummary{
+					ComponentCount:     2,
+					HydratedComponents: 2,
+					PadCount:           4,
+					SourceCounts:       map[PadHydrationSource]int{PadHydrationSourceVerifiedTemplate: 2},
+				},
+			},
+		},
+		{
+			Name: StageRouting,
+			Summary: map[string]any{
+				"status":      string(routing.StatusRouted),
+				"routed_nets": 2,
+				"failed_nets": 0,
+				"routing_retry": placementRoutingRetrySummary{
+					Enabled:    true,
+					Attempts:   2,
+					Applied:    1,
+					StopReason: "routed",
+					AttemptHistory: []map[string]any{{
+						"attempt":                 2,
+						"baseline_routing_status": string(routing.StatusBlocked),
+						"baseline_routed_nets":    0,
+						"baseline_failed_nets":    2,
+						"routing_status":          string(routing.StatusRouted),
+						"routed_nets":             2,
+						"failed_nets":             0,
+					}},
+				},
+			},
+		},
+	}}
+
+	evidence := fullBoardRetryEvidenceFromWorkflow(t, "with_retry", result)
+	if !evidence.HasRetry || evidence.Retry.Attempts != 2 || evidence.BaselineRoutingStatus != routing.StatusBlocked || evidence.FinalRoutingStatus != routing.StatusRouted {
+		t.Fatalf("retry evidence = %#v", evidence)
+	}
+	if !evidence.HasPadHydration || evidence.PadHydration.HydratedComponents != 2 || evidence.PadHydration.PadCount != 4 {
+		t.Fatalf("pad hydration evidence = %#v", evidence)
 	}
 }
 

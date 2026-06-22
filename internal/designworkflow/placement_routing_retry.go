@@ -76,11 +76,14 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 		ensureStageSummary(&nextRouted.Stage)
 		nextRouted.Stage.Summary["retry_adjustment"] = PlacementRetryAdjustmentSummary(adjustment)
 		summary.AttemptHistory = append(summary.AttemptHistory, map[string]any{
-			"attempt":        attempt,
-			"placement":      nextPlaced.Stage.Summary,
-			"routing_status": nextRouted.Result.Status,
-			"failed_nets":    nextRouted.Result.Metrics.FailedNetCount,
-			"routed_nets":    nextRouted.Result.Metrics.RoutedNetCount,
+			"attempt":                 attempt,
+			"placement":               nextPlaced.Stage.Summary,
+			"baseline_routing_status": currentRouted.Result.Status,
+			"baseline_failed_nets":    currentRouted.Result.Metrics.FailedNetCount,
+			"baseline_routed_nets":    currentRouted.Result.Metrics.RoutedNetCount,
+			"routing_status":          nextRouted.Result.Status,
+			"failed_nets":             nextRouted.Result.Metrics.FailedNetCount,
+			"routed_nets":             nextRouted.Result.Metrics.RoutedNetCount,
 		})
 		if routingAttemptBetter(nextRouted, bestRouted) {
 			bestPlaced = nextPlaced
