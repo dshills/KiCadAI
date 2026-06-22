@@ -14,6 +14,7 @@ const (
 	ArtifactERCReport             ArtifactKind = "erc_report"
 	ArtifactPreview               ArtifactKind = "preview"
 	ArtifactBOM                   ArtifactKind = "bom"
+	ArtifactCPL                   ArtifactKind = "cpl"
 	ArtifactGerber                ArtifactKind = "gerber"
 	ArtifactDrill                 ArtifactKind = "drill"
 	ArtifactFabricationPackage    ArtifactKind = "fabrication_package"
