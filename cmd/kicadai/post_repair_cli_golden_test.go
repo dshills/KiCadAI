@@ -29,6 +29,9 @@ type postRepairCLIData struct {
 	Project struct {
 		OutputDir string `json:"output_dir"`
 	} `json:"project,omitempty"`
+	Target     repair.Target             `json:"target,omitempty"`
+	BundlePath string                    `json:"bundle_path,omitempty"`
+	DryRun     bool                      `json:"dry_run,omitempty"`
 	Stages     []postRepairCLIStage      `json:"stages,omitempty"`
 	Status     repair.Status             `json:"status,omitempty"`
 	Summary    map[string]any            `json:"summary,omitempty"`
@@ -262,6 +265,30 @@ func writePostRepairCleanBundle(t *testing.T, dir string, outputDir string) stri
 		RepairOptions: repair.Options{Enabled: true, Apply: true},
 	}); err != nil {
 		t.Fatalf("write clean repair bundle: %v", err)
+	}
+	return path
+}
+
+func writePostRepairStageIssues(t *testing.T, dir string) string {
+	t.Helper()
+	path := filepath.Join(dir, "stage-issues.json")
+	data := []byte(`[
+	  {
+	    "stage": "writer_correctness",
+	    "issues": [
+	      {
+	        "code": "INVALID_NET_ASSIGNMENT",
+	        "severity": "error",
+	        "path": "pcb.footprints.R1.pads.1",
+	        "message": "PCB pad references missing net code",
+	        "refs": ["R1"],
+	        "nets": ["SIG"]
+	      }
+	    ]
+	  }
+	]`)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write stage issues: %v", err)
 	}
 	return path
 }
@@ -513,5 +540,65 @@ func TestPostRepairTargetApplyRequiresOverwriteForExistingGeneratedTarget(t *tes
 	}
 	if !found {
 		t.Fatalf("missing overwrite blocking issue: %#v", result.Issues)
+	}
+}
+
+func TestRepairExportBundleCLIDryRun(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	issuesPath := writePostRepairStageIssues(t, root)
+	result := runPostRepairCLI(t,
+		"--json",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if !result.OK || !result.Data.DryRun {
+		t.Fatalf("dry-run result = %#v", result)
+	}
+	if normalizePostRepairPath(outputDir, result.Data.BundlePath) != ".kicadai/repair-bundle.json" {
+		t.Fatalf("bundle path = %q", result.Data.BundlePath)
+	}
+	if _, err := os.Stat(filepath.FromSlash(result.Data.BundlePath)); !os.IsNotExist(err) {
+		t.Fatalf("dry-run wrote bundle or unexpected stat error: %v", err)
+	}
+}
+
+func TestRepairExportBundleCLIExecuteWritesBundle(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	issuesPath := writePostRepairStageIssues(t, root)
+	result := runPostRepairCLI(t,
+		"--json",
+		"--execute",
+		"--target", outputDir,
+		"--request", issuesPath,
+		"repair", "export-bundle",
+	)
+	if !result.OK || result.Data.DryRun {
+		t.Fatalf("execute result = %#v", result)
+	}
+	bundle, err := repair.LoadBundle(filepath.FromSlash(result.Data.BundlePath))
+	if err != nil {
+		t.Fatalf("load exported bundle: %v", err)
+	}
+	if !bundle.Generated || bundle.ProjectName != "post_repair_clean_apply" || len(bundle.StageIssues) != 1 {
+		t.Fatalf("bundle = %#v", bundle)
+	}
+}
+
+func TestRepairExportBundleCLIMissingRequest(t *testing.T) {
+	root := t.TempDir()
+	outputDir := filepath.Join(root, "target")
+	_ = writePostRepairCleanBundle(t, root, outputDir)
+	result := runPostRepairCLI(t,
+		"--json",
+		"--target", outputDir,
+		"repair", "export-bundle",
+	)
+	if result.OK || len(result.Issues) == 0 {
+		t.Fatalf("missing request result = %#v", result)
 	}
 }

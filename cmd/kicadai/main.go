@@ -70,7 +70,7 @@ Commands:
   pinmap        List or validate symbol-footprint pinmaps
   place         Run PCB placement planning
   route         Run PCB routing
-  repair        Plan or apply validation repair attempts
+  repair        Plan, export-bundle, or apply validation repair attempts
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -3019,7 +3019,7 @@ func writeReportFailure(stdout io.Writer, command string, issue reports.Issue) e
 
 func runRepairCommand(opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
-		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "repair requires subcommand: plan or apply"}
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair", Message: "repair requires subcommand: plan, export-bundle, or apply"}
 		return writeReportFailure(stdout, "repair", issue)
 	}
 	if strings.TrimSpace(opts.target) != "" {
@@ -3071,6 +3071,33 @@ func runRepairCommand(opts cliOptions, stdout io.Writer) error {
 
 func runRepairTargetCommand(opts cliOptions, stdout io.Writer) error {
 	repairOptions := repairOptionsFromCLI(opts, opts.commandArgs[0] == "apply")
+	if opts.commandArgs[0] == "export-bundle" {
+		if strings.TrimSpace(opts.requestPath) == "" {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "repair.request", Message: "repair export-bundle requires --request stage issues JSON"}
+			return writeReportFailure(stdout, "repair", issue)
+		}
+		groups, err := loadRepairStageIssues(opts.requestPath)
+		if err != nil {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: filepath.ToSlash(opts.requestPath), Message: err.Error()}
+			return writeReportFailure(stdout, "repair", issue)
+		}
+		export := repair.ExportBundle(repair.ExportOptions{
+			TargetPath:  opts.target,
+			OutputPath:  opts.output,
+			StageIssues: groups,
+			Execute:     opts.execute,
+			Overwrite:   opts.overwrite,
+			Repair:      repairOptions,
+		})
+		result := reports.ResultWithIssues("repair", export, export.Issues, export.Artifacts)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if reports.HasBlockingIssue(export.Issues) {
+			return fmt.Errorf("repair export-bundle blocked")
+		}
+		return nil
+	}
 	var bundle *repair.Bundle
 	if strings.TrimSpace(opts.requestPath) != "" {
 		loaded, err := repair.LoadBundle(opts.requestPath)
