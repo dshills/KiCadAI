@@ -1,0 +1,100 @@
+{
+  "id": "reset_programming_header_isp",
+  "block_id": "reset_programming_header",
+  "description": "Default reset pull-up, reset switch, and AVR ISP header.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "prog"
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["R1", "SW1", "J1"],
+    "components": [
+      {
+        "role": "reset_pullup",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "value": "10k"
+      },
+      {
+        "role": "reset_switch",
+        "ref_prefix": "SW",
+        "symbol_id": "Switch:SW_Push",
+        "footprint_id": "Button_Switch_SMD:SW_SPST_SKQG_WithStem",
+        "value": "RESET"
+      },
+      {
+        "role": "isp_header",
+        "ref_prefix": "J",
+        "symbol_id": "Connector_Generic:Conn_02x03_Odd_Even",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical",
+        "value": "AVR ISP"
+      }
+    ],
+    "ports": [
+      {"name": "VCC", "direction": "power"},
+      {"name": "GND", "direction": "power"},
+      {"name": "RESET", "direction": "passive"},
+      {"name": "MOSI", "direction": "passive"},
+      {"name": "MISO", "direction": "passive"},
+      {"name": "SCK", "direction": "passive"}
+    ],
+    "nets": [
+      {
+        "name": "prog_reset",
+        "visibility": "exported",
+        "pins": [
+          {"role": "reset_pullup", "pin": "2"},
+          {"role": "reset_switch", "pin": "1"},
+          {"role": "isp_header", "pin": "5"}
+        ]
+      },
+      {
+        "name": "prog_vcc",
+        "visibility": "exported",
+        "pins": [
+          {"role": "reset_pullup", "pin": "1"},
+          {"role": "isp_header", "pin": "2"}
+        ]
+      },
+      {
+        "name": "prog_gnd",
+        "visibility": "exported",
+        "pins": [
+          {"role": "reset_switch", "pin": "2"},
+          {"role": "isp_header", "pin": "6"}
+        ]
+      },
+      {
+        "name": "prog_miso",
+        "visibility": "exported",
+        "pins": [
+          {"role": "isp_header", "pin": "1"}
+        ]
+      },
+      {
+        "name": "prog_sck",
+        "visibility": "exported",
+        "pins": [
+          {"role": "isp_header", "pin": "3"}
+        ]
+      },
+      {
+        "name": "prog_mosi",
+        "visibility": "exported",
+        "pins": [
+          {"role": "isp_header", "pin": "4"}
+        ]
+      }
+    ],
+    "pcb": {
+      "placements": [
+        {"role": "reset_pullup", "footprint_id": "Resistor_SMD:R_0805_2012Metric"},
+        {"role": "reset_switch", "footprint_id": "Button_Switch_SMD:SW_SPST_SKQG_WithStem"},
+        {"role": "isp_header", "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical"}
+      ],
+      "allow_unrouted": true
+    }
+  }
+}

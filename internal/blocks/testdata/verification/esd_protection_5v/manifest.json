@@ -1,0 +1,44 @@
+{
+  "id": "esd_protection_5v",
+  "block_id": "esd_protection",
+  "description": "Single 5 V TVS shunt from protected signal to ground.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "esd"
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["D1"],
+    "components": [
+      {
+        "role": "tvs",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D_TVS",
+        "footprint_id": "Diode_SMD:D_SOD-323",
+        "value": "5V TVS"
+      }
+    ],
+    "ports": [
+      {"name": "SIGNAL", "direction": "passive"},
+      {"name": "GND", "direction": "power"}
+    ],
+    "nets": [
+      {
+        "name": "esd_signal",
+        "visibility": "exported",
+        "pins": [{"role": "tvs", "pin": "1"}]
+      },
+      {
+        "name": "esd_gnd",
+        "visibility": "exported",
+        "pins": [{"role": "tvs", "pin": "2"}]
+      }
+    ],
+    "pcb": {
+      "placements": [
+        {"role": "tvs", "footprint_id": "Diode_SMD:D_SOD-323"}
+      ],
+      "allow_unrouted": true
+    }
+  }
+}

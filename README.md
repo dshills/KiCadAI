@@ -553,12 +553,12 @@ evidence are still required before generated block PCBs should be treated as
 manufacturing candidates.
 
 Circuit blocks also have a verification harness with checked-in manifests for
-the established built-in blocks. It verifies schematic semantics, PCB
-placement/pad/route expectations where declared, writer correctness when
-requested, and optional KiCad ERC/DRC evidence. The newer crystal oscillator,
-reset/programming, ESD, and reverse-polarity blocks are available through the
-registry and design workflow, but still need dedicated verification manifests
-before they can claim the same evidence level as the older block corpus.
+all built-in blocks. It verifies schematic semantics, PCB placement/pad/route
+expectations where declared, writer correctness when requested, and optional
+KiCad ERC/DRC evidence. The newer crystal oscillator, reset/programming, ESD,
+and reverse-polarity manifests currently provide schematic/structural evidence;
+they still need stronger KiCad-backed layout evidence before fabrication
+readiness claims.
 
 ```sh
 go run ./cmd/kicadai --json --builtins block verify
@@ -1037,9 +1037,9 @@ rule metadata for required companions, decoupling, pull-ups, rail
 compatibility, enable/reset/programming handling, edge constraints, keepouts,
 proximity constraints, route priorities, and required local routes where the
 current realization model supports them. The newer protection and timing blocks
-remain structural/partial: they use verified seed records where available, but
-need block verification manifests, more variants, and stronger KiCad-backed
-layout evidence before fabrication-readiness claims.
+remain structural/partial: they use verified seed records and checked-in
+verification manifests, but need more variants and stronger KiCad-backed layout
+evidence before fabrication-readiness claims.
 
 The generated block examples are structural schematic/project outputs; they are
 not yet fabrication-ready PCB designs. See

@@ -108,8 +108,8 @@ loop confidence:
   thermal, lifecycle, availability, and design-rule evidence;
 - circuit block coverage now includes concrete structural generators for
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
-  protection families, but these newer blocks still need verification
-  manifests, more variants, and stronger KiCad-backed layout proof;
+  protection families, but these newer blocks still need more variants and
+  stronger KiCad-backed layout proof;
 - placement and routing need stronger rules for real PCB quality;
 - placement-routing retry now includes focused pad-backed seeds, generated
   workflow coverage, larger generated fixture families, selected attempt
@@ -221,8 +221,9 @@ Implemented foundation.
 
 ### Remaining Work
 
-- Add dedicated verification manifests for the newer crystal/oscillator,
-  reset/programming, ESD, and reverse-polarity protection generators.
+- Raise the newer crystal/oscillator, reset/programming, ESD, and
+  reverse-polarity protection manifests beyond schematic/structural evidence
+  with stronger PCB and KiCad-backed checks.
 - Add conditional PCB realization support so reset/programming headers and
   optional reset switches can declare mode-specific placements/routes without
   referencing absent roles.

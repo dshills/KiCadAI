@@ -18,10 +18,14 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 	got := manifestIDs(manifests)
 	want := []string{
 		"connector_breakout_4pin",
+		"crystal_oscillator_default",
+		"esd_protection_5v",
 		"i2c_sensor_pullups",
 		"led_indicator_default",
 		"mcu_minimal_basic",
 		"opamp_gain_stage_noninverting",
+		"reset_programming_header_isp",
+		"reverse_polarity_schottky",
 		"usb_c_power_5v_sink",
 		"voltage_regulator_3v3",
 	}

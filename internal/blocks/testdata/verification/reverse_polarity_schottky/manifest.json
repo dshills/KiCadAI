@@ -1,0 +1,50 @@
+{
+  "id": "reverse_polarity_schottky",
+  "block_id": "reverse_polarity_protection",
+  "description": "Series Schottky diode reverse-polarity input protection.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "polarity"
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["D1"],
+    "components": [
+      {
+        "role": "series_diode",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D_Schottky",
+        "footprint_id": "Diode_SMD:D_SMA",
+        "value": "Schottky"
+      }
+    ],
+    "ports": [
+      {"name": "VIN_RAW", "direction": "power"},
+      {"name": "VIN_PROTECTED", "direction": "power"},
+      {"name": "GND", "direction": "power"}
+    ],
+    "nets": [
+      {
+        "name": "polarity_vin_raw",
+        "visibility": "exported",
+        "pins": [{"role": "series_diode", "pin": "2"}]
+      },
+      {
+        "name": "polarity_vin_protected",
+        "visibility": "exported",
+        "pins": [{"role": "series_diode", "pin": "1"}]
+      },
+      {
+        "name": "polarity_gnd",
+        "visibility": "exported",
+        "pins": []
+      }
+    ],
+    "pcb": {
+      "placements": [
+        {"role": "series_diode", "footprint_id": "Diode_SMD:D_SMA"}
+      ],
+      "allow_unrouted": true
+    }
+  }
+}

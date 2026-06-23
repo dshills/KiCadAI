@@ -2,7 +2,7 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 7,
+    "count": 11,
     "results": [
       {
         "case_id": "connector_breakout_4pin",
@@ -20,6 +20,54 @@
           },
           {
             "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "crystal_oscillator_default",
+        "block_id": "crystal_oscillator",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "esd_protection_5v",
+        "block_id": "esd_protection",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_assertions",
             "status": "pass"
           }
         ]
@@ -114,6 +162,54 @@
           },
           {
             "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "reset_programming_header_isp",
+        "block_id": "reset_programming_header",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "reverse_polarity_schottky",
+        "block_id": "reverse_polarity_protection",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_assertions",
             "status": "pass"
           }
         ]

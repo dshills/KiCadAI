@@ -1,0 +1,75 @@
+{
+  "id": "crystal_oscillator_default",
+  "block_id": "crystal_oscillator",
+  "description": "Default 16 MHz crystal oscillator with two load capacitors.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "clk"
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["Y1", "C1", "C2"],
+    "components": [
+      {
+        "role": "crystal",
+        "ref_prefix": "Y",
+        "symbol_id": "Device:Crystal",
+        "footprint_id": "Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm",
+        "value": "16MHz"
+      },
+      {
+        "role": "load_capacitor_1",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0603_1608Metric",
+        "value": "22p"
+      },
+      {
+        "role": "load_capacitor_2",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0603_1608Metric",
+        "value": "22p"
+      }
+    ],
+    "ports": [
+      {"name": "XTAL1", "direction": "passive"},
+      {"name": "XTAL2", "direction": "passive"},
+      {"name": "GND", "direction": "power"}
+    ],
+    "nets": [
+      {
+        "name": "clk_xtal1",
+        "visibility": "exported",
+        "pins": [
+          {"role": "crystal", "pin": "1"},
+          {"role": "load_capacitor_1", "pin": "1"}
+        ]
+      },
+      {
+        "name": "clk_xtal2",
+        "visibility": "exported",
+        "pins": [
+          {"role": "crystal", "pin": "2"},
+          {"role": "load_capacitor_2", "pin": "1"}
+        ]
+      },
+      {
+        "name": "clk_gnd",
+        "visibility": "exported",
+        "pins": [
+          {"role": "load_capacitor_1", "pin": "2"},
+          {"role": "load_capacitor_2", "pin": "2"}
+        ]
+      }
+    ],
+    "pcb": {
+      "placements": [
+        {"role": "crystal", "footprint_id": "Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm"},
+        {"role": "load_capacitor_1", "footprint_id": "Capacitor_SMD:C_0603_1608Metric"},
+        {"role": "load_capacitor_2", "footprint_id": "Capacitor_SMD:C_0603_1608Metric"}
+      ],
+      "allow_unrouted": true
+    }
+  }
+}
