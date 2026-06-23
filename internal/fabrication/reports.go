@@ -19,16 +19,23 @@ import (
 )
 
 type BOMRow struct {
-	References    []string `json:"references"`
-	Quantity      int      `json:"quantity"`
-	Value         string   `json:"value"`
-	SymbolID      string   `json:"symbol_id,omitempty"`
-	FootprintID   string   `json:"footprint_id,omitempty"`
-	ComponentID   string   `json:"component_id,omitempty"`
-	Manufacturer  string   `json:"manufacturer,omitempty"`
-	MPN           string   `json:"mpn,omitempty"`
-	Confidence    string   `json:"confidence"`
-	ReadinessNote string   `json:"readiness_note,omitempty"`
+	References            []string       `json:"references"`
+	Quantity              int            `json:"quantity"`
+	Value                 string         `json:"value"`
+	SymbolID              string         `json:"symbol_id,omitempty"`
+	FootprintID           string         `json:"footprint_id,omitempty"`
+	ComponentID           string         `json:"component_id,omitempty"`
+	Manufacturer          string         `json:"manufacturer,omitempty"`
+	MPN                   string         `json:"mpn,omitempty"`
+	Package               string         `json:"package,omitempty"`
+	ComponentClass        string         `json:"component_class,omitempty"`
+	Lifecycle             string         `json:"lifecycle,omitempty"`
+	Confidence            string         `json:"confidence"`
+	IdentityStatus        IdentityStatus `json:"identity_status,omitempty"`
+	IdentitySource        IdentitySource `json:"identity_source,omitempty"`
+	IdentityIssueCount    int            `json:"identity_issue_count,omitempty"`
+	IdentityBlockingCount int            `json:"identity_blocking_count,omitempty"`
+	ReadinessNote         string         `json:"readiness_note,omitempty"`
 }
 
 type CPLRow struct {
@@ -160,7 +167,17 @@ func readSchematicsRecursivePath(path string, stack map[string]struct{}, cache m
 }
 
 func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.Issue) {
-	groups := map[string]*BOMRow{}
+	type bomGroupKey struct {
+		value          string
+		symbolID       string
+		footprintID    string
+		componentID    string
+		manufacturer   string
+		mpn            string
+		packageName    string
+		componentClass string
+	}
+	groups := map[bomGroupKey]*BOMRow{}
 	var issues []reports.Issue
 	for _, symbol := range schematic.Symbols {
 		if symbol.DoNotPopulate || boolPtrValue(symbol.InBOM, true) == false || boolPtrValue(symbol.OnBoard, true) == false {
@@ -177,45 +194,81 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 		manufacturer := firstNonEmpty(lookup(properties, "Manufacturer"), lookup(fields, "Manufacturer"))
 		mpn := firstNonEmpty(lookup(properties, "MPN"), lookup(properties, "Manufacturer Part Number"), lookup(fields, "MPN"))
 		componentID := firstNonEmpty(lookup(properties, "Component ID"), lookup(fields, "Component ID"))
-		key := strings.Join([]string{value, symbol.LibraryID, footprint, componentID, manufacturer, mpn}, "\x00")
+		packageName := firstNonEmpty(lookup(properties, "Package"), lookup(fields, "Package"))
+		componentClass := firstNonEmpty(lookup(properties, "Component Class"), lookup(fields, "Component Class"))
+		lifecycle := firstNonEmpty(lookup(properties, "Lifecycle"), lookup(fields, "Lifecycle"))
+		confidence := firstNonEmpty(lookup(properties, "Confidence"), lookup(fields, "Confidence"), "partial")
+		identity := NormalizeComponentIdentity(ComponentIdentity{
+			Reference:      ref,
+			ComponentID:    componentID,
+			Value:          value,
+			SymbolID:       symbol.LibraryID,
+			FootprintID:    footprint,
+			Manufacturer:   manufacturer,
+			MPN:            mpn,
+			Package:        packageName,
+			ComponentClass: componentClass,
+			Lifecycle:      lifecycle,
+			Confidence:     confidence,
+		})
+		key := bomGroupKey{
+			value:          identity.Value,
+			symbolID:       identity.SymbolID,
+			footprintID:    identity.FootprintID,
+			componentID:    identity.ComponentID,
+			manufacturer:   identity.Manufacturer,
+			mpn:            identity.MPN,
+			packageName:    identity.Package,
+			componentClass: identity.ComponentClass,
+		}
 		row := groups[key]
 		if row == nil {
+			issueCount, blockingCount := IdentityIssueCounts(identity.Issues)
 			row = &BOMRow{
-				Value:        value,
-				SymbolID:     symbol.LibraryID,
-				FootprintID:  footprint,
-				ComponentID:  componentID,
-				Manufacturer: manufacturer,
-				MPN:          mpn,
-				Confidence:   "partial",
+				Value:                 identity.Value,
+				SymbolID:              identity.SymbolID,
+				FootprintID:           identity.FootprintID,
+				ComponentID:           identity.ComponentID,
+				Manufacturer:          identity.Manufacturer,
+				MPN:                   identity.MPN,
+				Package:               identity.Package,
+				ComponentClass:        identity.ComponentClass,
+				Lifecycle:             identity.Lifecycle,
+				Confidence:            identity.Confidence,
+				IdentityStatus:        identity.Status,
+				IdentitySource:        identity.Source,
+				IdentityIssueCount:    issueCount,
+				IdentityBlockingCount: blockingCount,
 			}
 			groups[key] = row
 		}
 		row.References = append(row.References, ref)
-		if manufacturer == "" || mpn == "" {
-			row.ReadinessNote = appendReadinessNote(row.ReadinessNote, "missing manufacturer or MPN")
-			issues = append(issues, reports.Issue{
+		if identity.Manufacturer == "" || identity.MPN == "" {
+			issue := reports.Issue{
 				Code:       reports.CodeValidationFailed,
 				Severity:   reports.SeverityWarning,
 				Path:       "bom." + ref,
 				Message:    fmt.Sprintf("%s is missing manufacturer or MPN data", ref),
 				Refs:       []string{ref},
 				Suggestion: "add Manufacturer and MPN properties before fabrication release",
-			})
+			}
+			addBOMRowReadinessIssue(row, &issues, "missing manufacturer or MPN", issue)
 		}
-		if footprint == "" {
-			row.ReadinessNote = appendReadinessNote(row.ReadinessNote, "missing footprint")
-			issues = append(issues, reports.Issue{
+		if identity.FootprintID == "" {
+			issue := reports.Issue{
 				Code:       reports.CodeMissingFootprint,
 				Severity:   reports.SeverityError,
 				Path:       "bom." + ref + ".footprint",
 				Message:    fmt.Sprintf("%s has no footprint assignment", ref),
 				Refs:       []string{ref},
 				Suggestion: "assign a KiCad footprint before fabrication release",
-			})
+			}
+			addBOMRowReadinessIssue(row, &issues, "missing footprint", issue)
 		}
-		if manufacturer != "" && mpn != "" && footprint != "" {
-			row.Confidence = "high"
+		if identity.Manufacturer != "" && identity.MPN != "" && identity.FootprintID != "" {
+			if row.Confidence == "" || strings.EqualFold(row.Confidence, "partial") {
+				row.Confidence = "high"
+			}
 		}
 	}
 	rows := make([]BOMRow, 0, len(groups))
@@ -256,20 +309,27 @@ func BuildCPLRows(board pcbfiles.PCBFile) []CPLRow {
 func MarshalBOMCSV(rows []BOMRow) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"References", "Quantity", "Value", "SymbolID", "FootprintID", "ComponentID", "Manufacturer", "MPN", "Confidence", "ReadinessNote"}); err != nil {
+	if err := writer.Write([]string{"References", "Quantity", "Value", "SymbolID", "FootprintID", "ComponentID", "Manufacturer", "MPN", "Package", "ComponentClass", "Lifecycle", "Confidence", "IdentityStatus", "IdentitySource", "IdentityIssueCount", "IdentityBlockingCount", "ReadinessNote"}); err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
 		if err := writer.Write([]string{
 			strings.Join(row.References, " "),
-			fmt.Sprintf("%d", row.Quantity),
+			strconv.Itoa(row.Quantity),
 			row.Value,
 			row.SymbolID,
 			row.FootprintID,
 			row.ComponentID,
 			row.Manufacturer,
 			row.MPN,
+			row.Package,
+			row.ComponentClass,
+			row.Lifecycle,
 			row.Confidence,
+			string(row.IdentityStatus),
+			string(row.IdentitySource),
+			strconv.Itoa(row.IdentityIssueCount),
+			strconv.Itoa(row.IdentityBlockingCount),
 			row.ReadinessNote,
 		}); err != nil {
 			return nil, err
@@ -358,6 +418,31 @@ func appendReadinessNote(existing string, note string) string {
 		return existing
 	}
 	return existing + "; " + note
+}
+
+func addBOMRowReadinessIssue(row *BOMRow, issues *[]reports.Issue, note string, issue reports.Issue) {
+	if row != nil {
+		row.ReadinessNote = appendReadinessNote(row.ReadinessNote, note)
+		addBOMRowIdentityIssue(row, issue)
+	}
+	*issues = append(*issues, issue)
+}
+
+func addBOMRowIdentityIssue(row *BOMRow, issue reports.Issue) {
+	if row == nil {
+		return
+	}
+	row.IdentityIssueCount++
+	if issue.Blocking() {
+		row.IdentityBlockingCount++
+	}
+	if issue.Blocking() {
+		row.IdentityStatus = IdentityFail
+		return
+	}
+	if row.IdentityStatus == "" || row.IdentityStatus == IdentityPass {
+		row.IdentityStatus = IdentityWarning
+	}
 }
 
 func propertyMap(properties []schematicfiles.Property) map[string]string {

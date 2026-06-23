@@ -61,6 +61,37 @@ func TestBuildBOMRowsReportsMissingReadinessData(t *testing.T) {
 	}
 }
 
+func TestBuildBOMRowsHydratesIdentityEvidence(t *testing.T) {
+	rows, issues := BuildBOMRows(schematicfiles.SchematicFile{Symbols: []schematicfiles.SchematicSymbol{{
+		Reference: "U1",
+		Value:     "MCU",
+		LibraryID: "MCU:ATmega328P",
+		Properties: []schematicfiles.Property{
+			{Name: "Footprint", Value: "Package_QFP:TQFP-32"},
+			{Name: "Component ID", Value: "mcu.atmega328p-au"},
+			{Name: "Manufacturer Part Number", Value: "ATMEGA328P-AU"},
+			{Name: "Manufacturer", Value: "Microchip"},
+			{Name: "Package", Value: "TQFP-32"},
+			{Name: "Component Class", Value: "Active"},
+			{Name: "Lifecycle", Value: "active"},
+			{Name: "Confidence", Value: "verified"},
+		},
+	}}})
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %#v", rows)
+	}
+	row := rows[0]
+	if row.ComponentID != "mcu.atmega328p-au" || row.Package != "TQFP-32" || row.ComponentClass != "active" || row.Lifecycle != "active" {
+		t.Fatalf("identity row = %#v", row)
+	}
+	if row.IdentityStatus != IdentityPass || row.IdentitySource != IdentitySourceSchematicProperty {
+		t.Fatalf("identity evidence = %#v", row)
+	}
+}
+
 func TestBuildCPLRowsSortsAndFormatsPlacement(t *testing.T) {
 	rows := BuildCPLRows(pcbfiles.PCBFile{Footprints: []pcbfiles.Footprint{
 		{Reference: "U1", LibraryID: "Package:QFN", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(5)}, Rotation: 90, Layer: kicadfiles.LayerBCu, Locked: true},
@@ -93,6 +124,9 @@ func TestReportCSVSerializationEscapesFields(t *testing.T) {
 	text := string(bom)
 	if !strings.Contains(text, `"10k, 1%"`) || !strings.Contains(text, `"quoted ""note"""`) {
 		t.Fatalf("BOM CSV not escaped correctly:\n%s", text)
+	}
+	if !strings.Contains(text, "Package,ComponentClass,Lifecycle,Confidence,IdentityStatus,IdentitySource,IdentityIssueCount,IdentityBlockingCount") {
+		t.Fatalf("BOM CSV missing identity columns:\n%s", text)
 	}
 	cpl, err := MarshalCPLCSV([]CPLRow{{Reference: "U1", Footprint: "Package:QFN", XMM: "1", YMM: "2", RotationDegrees: "90.000", Layer: "top", PlacementSource: "pcb"}})
 	if err != nil {
