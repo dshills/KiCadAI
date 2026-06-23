@@ -190,7 +190,7 @@ func TestCompanionBlockFamiliesRemainVisibleAsUnsupportedGaps(t *testing.T) {
 	for _, family := range inventory.Families {
 		byID[family.ID] = family
 	}
-	for _, id := range []string{"crystal_oscillator", "reset_programming_header", "esd_protection", "reverse_polarity_protection"} {
+	for _, id := range []string{"reset_programming_header", "esd_protection", "reverse_polarity_protection"} {
 		family, ok := byID[id]
 		if !ok {
 			t.Fatalf("family %s not found", id)

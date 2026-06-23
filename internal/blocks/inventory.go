@@ -55,9 +55,9 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		Name:     "Crystal And Oscillator",
 		Category: "timing",
 		Gaps: []string{
-			"block generator is not implemented",
-			"requires verified crystal or oscillator component metadata",
 			"requires MCU clock-pin composition rules",
+			"oscillator startup margin is not simulated",
+			"high-quality oscillator layout still requires human review",
 		},
 	},
 	{
