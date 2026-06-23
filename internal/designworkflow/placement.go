@@ -62,6 +62,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	for _, fragment := range fragments.Fragments {
 		groupIDByRole := placementGroupIDByRole(fragment)
 		edgeByRole := placementEdgeByRole(fragment)
+		localRouteRefs := placementLocalRouteRefs(fragment)
 		for _, component := range fragment.Realization.Components {
 			position := placement.Placement{
 				XMM:         component.Placement.XMM,
@@ -69,18 +70,22 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 				RotationDeg: component.Placement.RotationDeg,
 				Layer:       firstNonEmpty(component.Placement.Layer, "F.Cu"),
 			}
+			groupID := groupIDByRole[component.ComponentRole]
+			edge := edgeByRole[component.ComponentRole]
+			mobility, fixed := generatedPlacementMobility(request, fragment, component, groupID, edge, localRouteRefs[strings.TrimSpace(component.Ref)])
 			placementRequest.Components = append(placementRequest.Components, placement.Component{
 				Ref:         component.Ref,
 				Value:       component.Value,
 				FootprintID: component.FootprintID,
 				Role:        component.ComponentRole,
 				Bounds:      defaultBounds,
-				Fixed:       true,
+				Fixed:       fixed,
 				Position:    &position,
 				Side:        sideFromLayer(position.Layer),
 				Rotation:    fixedRotation(component.Placement.RotationDeg),
-				GroupID:     groupIDByRole[component.ComponentRole],
-				Edge:        edgeByRole[component.ComponentRole],
+				GroupID:     groupID,
+				Edge:        edge,
+				Mobility:    mobility,
 			})
 		}
 		placementRequest.Groups = append(placementRequest.Groups, placementGroupsFromFragment(fragment)...)
@@ -223,6 +228,81 @@ func placementEdgeByRole(fragment BlockFragment) map[string]placement.EdgeConstr
 		}
 	}
 	return byRole
+}
+
+func placementLocalRouteRefs(fragment BlockFragment) map[string]bool {
+	refs := map[string]bool{}
+	for _, route := range fragment.Realization.LocalRoutes {
+		if ref := strings.TrimSpace(route.From.Ref); ref != "" {
+			refs[ref] = true
+		}
+		if ref := strings.TrimSpace(route.To.Ref); ref != "" {
+			refs[ref] = true
+		}
+	}
+	return refs
+}
+
+func generatedPlacementMobility(request Request, fragment BlockFragment, component blocks.RealizedPCBComponent, groupID string, edge placement.EdgeConstraint, hasLocalRoute bool) (placement.MobilityPolicy, bool) {
+	ownerScope := "block:" + fragment.BlockID + "/" + fragment.InstanceID
+	constraints := []string{"generated", "block:" + fragment.BlockID}
+	hardFixed := component.Placement.Fixed || edge != placement.EdgeNone || request.RoutingRetry.PreserveFixed
+	if !request.RoutingRetry.Enabled {
+		hardFixed = true
+		constraints = append(constraints, "retry_disabled")
+	}
+	if request.RoutingRetry.PreserveFixed {
+		constraints = append(constraints, "preserve_fixed")
+	}
+	if edge != placement.EdgeNone {
+		constraints = append(constraints, "edge")
+	}
+	if component.Placement.Fixed {
+		constraints = append(constraints, "component_fixed")
+	}
+	if hardFixed {
+		return placement.MobilityPolicy{
+			Class:         placement.MobilityFixed,
+			Reason:        generatedMobilityFixedReason(request, component, edge),
+			OwnerScope:    ownerScope,
+			GroupID:       groupID,
+			RouteHandling: placement.RouteHandlingPreserveFixed,
+			Constraints:   constraints,
+		}, true
+	}
+	policy := placement.MobilityPolicy{
+		OwnerScope:  ownerScope,
+		GroupID:     groupID,
+		Transforms:  []string{"translate"},
+		Reason:      "generated block placement is retry-movable",
+		Constraints: constraints,
+	}
+	switch {
+	case groupID != "":
+		policy.Class = placement.MobilityGroupTransform
+		policy.RouteHandling = placement.RouteHandlingTransformWithGroup
+	case hasLocalRoute:
+		policy.Class = placement.MobilityLocalRebuild
+		policy.RouteHandling = placement.RouteHandlingInvalidateRebuild
+	default:
+		policy.Class = placement.MobilitySoftPreferred
+		policy.RouteHandling = placement.RouteHandlingInvalidateRebuild
+	}
+	return policy, false
+}
+
+func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBComponent, edge placement.EdgeConstraint) string {
+	switch {
+	case !request.RoutingRetry.Enabled:
+		return "routing retry is disabled"
+	case request.RoutingRetry.PreserveFixed:
+		return "routing retry preserve_fixed is enabled"
+	case component.Placement.Fixed:
+		return "generated component has fixed placement attribute"
+	case edge != placement.EdgeNone:
+		return "generated component has hard edge constraint"
+	}
+	return "generated component is treated as fixed by safety policy"
 }
 
 func placementEdgeFromConstraint(constraint blocks.PCBConstraint) placement.EdgeConstraint {

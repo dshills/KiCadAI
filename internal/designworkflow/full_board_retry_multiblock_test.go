@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"kicadai/internal/reports"
+	"kicadai/internal/placement"
 	"kicadai/internal/routing"
 )
 
@@ -24,17 +24,21 @@ func TestFullBoardRetryGeneratedMultiBlockBoundaryEvidence(t *testing.T) {
 	if !ok {
 		t.Fatalf("pad hydration summary missing: %#v", placementStage.Summary)
 	}
-	if metadata.FixtureClass != "generated_multiblock_boundary" {
+	if metadata.FixtureClass != "generated_multiblock_mobility_boundary" {
 		t.Fatalf("fixture class = %q", metadata.FixtureClass)
 	}
 	if padSummary.PadCount < metadata.ExpectedMinHydratedPads || padSummary.MissingComponents != 0 {
 		t.Fatalf("pad hydration = %#v metadata=%#v", padSummary, metadata)
 	}
-	if placementStage.Status != StageStatusBlocked {
-		t.Fatalf("placement status = %s, want blocked", placementStage.Status)
+	if placementStage.Status != StageStatusOK {
+		t.Fatalf("placement status = %s, want ok", placementStage.Status)
 	}
-	if !hasIssueCode(placementStage.Issues, reports.CodePlacementOutsideBoard) {
-		t.Fatalf("placement issues did not document fixed placement boundary: %#v", placementStage.Issues)
+	mobility, ok := placementStage.Summary["mobility"].(placement.MobilitySummary)
+	if !ok {
+		t.Fatalf("mobility summary missing: %#v", placementStage.Summary)
+	}
+	if mobility.EligibleCount == 0 || mobility.GroupTransformCount == 0 {
+		t.Fatalf("expected generated multiblock mobility evidence: %#v", mobility)
 	}
 	if got := string(routingStage.Status); got != metadata.ExpectedRoutingStatus {
 		t.Fatalf("routing status = %s, want %s", got, metadata.ExpectedRoutingStatus)

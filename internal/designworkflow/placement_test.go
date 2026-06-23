@@ -35,11 +35,58 @@ func TestPlaceFragmentsPlacesRealizedLED(t *testing.T) {
 	if !result.Request.Components[0].Fixed {
 		t.Fatalf("expected fixed realized placement: %#v", result.Request.Components[0])
 	}
+	if result.Request.Components[0].Mobility.Class != placement.MobilityFixed {
+		t.Fatalf("expected fixed mobility when retry disabled: %#v", result.Request.Components[0].Mobility)
+	}
 	if len(result.Request.Groups) == 0 {
 		t.Fatalf("expected block-derived placement groups")
 	}
 	if len(result.Request.ProximityRules) == 0 {
 		t.Fatalf("expected block-derived proximity rules")
+	}
+}
+
+func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "status_board",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+		RoutingRetry: RoutingRetryPolicySpec{
+			Enabled: true,
+		},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	if len(result.Request.Components) != 2 {
+		t.Fatalf("components = %#v", result.Request.Components)
+	}
+	for _, component := range result.Request.Components {
+		if component.Fixed {
+			t.Fatalf("retry-enabled generated component unexpectedly fixed: %#v", component)
+		}
+		if component.Mobility.Class != placement.MobilityGroupTransform {
+			t.Fatalf("%s mobility = %#v, want group transform", component.Ref, component.Mobility)
+		}
+		if component.Mobility.OwnerScope != "block:led_indicator/status" {
+			t.Fatalf("%s owner scope = %q", component.Ref, component.Mobility.OwnerScope)
+		}
+		if component.Mobility.RouteHandling != placement.RouteHandlingTransformWithGroup {
+			t.Fatalf("%s route handling = %q", component.Ref, component.Mobility.RouteHandling)
+		}
+	}
+	summary, ok := result.Stage.Summary["mobility"].(placement.MobilitySummary)
+	if !ok {
+		t.Fatalf("mobility summary = %#v", result.Stage.Summary["mobility"])
+	}
+	if summary.GroupTransformCount != 2 || summary.EligibleCount != 2 {
+		t.Fatalf("mobility summary = %#v", summary)
 	}
 }
 
@@ -182,6 +229,9 @@ func TestPlaceFragmentsDerivesConnectorEdgeIntent(t *testing.T) {
 		if component.Role == "usb_c_receptacle" {
 			if component.Edge != placement.EdgeAny {
 				t.Fatalf("usb connector edge = %q, want any edge", component.Edge)
+			}
+			if !component.Fixed || component.Mobility.Class != placement.MobilityFixed {
+				t.Fatalf("usb connector should remain fixed: fixed=%v mobility=%#v", component.Fixed, component.Mobility)
 			}
 			return
 		}
