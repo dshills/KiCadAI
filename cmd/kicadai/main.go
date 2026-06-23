@@ -104,6 +104,7 @@ Global flags:
   --overwrite           Allow generation commands to replace an existing project directory
   --json                Print command output as JSON when supported
   --kicad-cli string    KiCad CLI executable path for KiCad-backed checks and fabrication plotting
+  --manufacturer-profile string Local fabrication manufacturer profile ID, for example generic_assembly
   --keep-artifacts      Keep KiCad-backed artifact workspaces
   --artifact-dir string Directory for retained KiCad-backed artifacts
   --timeout duration    KiCad CLI timeout, for example 10s or 2m
@@ -196,6 +197,7 @@ type cliOptions struct {
 	overwrite             bool
 	jsonOutput            bool
 	kicadCLI              string
+	manufacturerProfile   string
 	keepArtifacts         bool
 	artifactDir           string
 	roundTimeout          string
@@ -374,6 +376,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.overwrite, "overwrite", false, "overwrite existing project directory")
 	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
 	flags.StringVar(&opts.kicadCLI, "kicad-cli", "", "KiCad CLI executable path")
+	flags.StringVar(&opts.manufacturerProfile, "manufacturer-profile", "", "local fabrication manufacturer profile ID")
 	flags.BoolVar(&opts.keepArtifacts, "keep-artifacts", false, "keep round-trip artifact workspaces")
 	flags.StringVar(&opts.artifactDir, "artifact-dir", "", "round-trip artifact directory")
 	flags.StringVar(&opts.roundTimeout, "timeout", "", "round-trip timeout")
@@ -1745,12 +1748,13 @@ func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return errors.New(issue.Message)
 	}
 	options := fabrication.Options{
-		Command:   "export " + opts.commandArgs[0],
-		Execute:   opts.execute,
-		Overwrite: opts.overwrite,
-		Output:    opts.output,
-		KiCadCLI:  opts.kicadCLI,
-		CLIPolicy: exportCLIPolicy(opts),
+		Command:             "export " + opts.commandArgs[0],
+		Execute:             opts.execute,
+		Overwrite:           opts.overwrite,
+		Output:              opts.output,
+		KiCadCLI:            opts.kicadCLI,
+		CLIPolicy:           exportCLIPolicy(opts),
+		ManufacturerProfile: opts.manufacturerProfile,
 	}
 	target := opts.commandArgs[1]
 	var data fabrication.Result

@@ -1460,6 +1460,17 @@ func TestRunExportFabricationExecuteMissingKiCadCLIReportsEvidence(t *testing.T)
 	}
 }
 
+func TestParseManufacturerProfileFlag(t *testing.T) {
+	var stderr bytes.Buffer
+	opts, command, err := parse([]string{"--manufacturer-profile", "generic_assembly", "export", "preview", "."}, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command != "export" || opts.manufacturerProfile != "generic_assembly" {
+		t.Fatalf("command=%q manufacturerProfile=%q", command, opts.manufacturerProfile)
+	}
+}
+
 func TestRunEvaluatePCBJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "board.kicad_pcb")
 	if err := os.WriteFile(path, []byte(`(kicad_pcb (gr_rect (layer "Edge.Cuts")) (footprint "Test:One" (pad "1" smd rect (layers "F.Cu"))))`), 0o644); err != nil {
