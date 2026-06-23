@@ -90,7 +90,9 @@ from validation feedback to safe automatic repair.
 - Fabrication export/readiness gate foundation with readiness model, package
   manifest serialization, project evaluation, deterministic BOM/CPL reports,
   safe dry-run/execute export service, CLI wiring, KiCad CLI evidence policy,
-  and `design create` fabrication-candidate acceptance integration.
+  BOM/CPL identity and placement evidence, BOM/CPL consistency validation,
+  built-in generic assembly manufacturer profile checks, and `design create`
+  fabrication-candidate acceptance integration.
 - `design create` workflow for structured block-based design requests.
 - README and focused docs for current CLI capabilities.
 
@@ -117,8 +119,9 @@ loop confidence:
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
   remains blocked by preservation safety;
-- fabrication export now provides conservative readiness gates, but does not
-  yet generate complete manufacturer-release Gerber/drill packages;
+- fabrication export now provides conservative readiness gates with BOM/CPL
+  identity, consistency, and local manufacturer-profile evidence, but does not
+  yet guarantee complete manufacturer acceptance;
 - natural-language intent planning is not yet a first-class pipeline.
 
 ## Roadmap Principles
@@ -460,30 +463,34 @@ Define "done" as manufacturable, not merely parseable.
 Writers, board validation, ERC/DRC hooks, and fabrication export/readiness gates
 exist. The `export preview`, `export bom`, and `export fabrication` commands
 evaluate project readiness, model `blocked`/`candidate`/`ready` status,
-generate deterministic BOM/CPL reports where evidence exists, enforce safe
+generate deterministic BOM/CPL reports where evidence exists, hydrate BOM rows
+with component identity evidence, hydrate CPL rows with BOM linkage, side, and
+rotation evidence, validate BOM/CPL consistency, enforce safe
 dry-run/execute/overwrite behavior, emit package manifests/readiness reports,
-generate and validate KiCad-CLI-backed Gerber/drill artifacts, and expose
-optional or required KiCad CLI evidence policy. `design create` treats
-`validation.acceptance: fabrication-candidate` as a request to prove
-fabrication readiness; partial readiness status (`candidate` or `blocked`)
-downgrades achieved acceptance and leaves `acceptance.fabrication_ready` false.
+generate and validate KiCad-CLI-backed Gerber/drill artifacts, expose optional
+or required KiCad CLI evidence policy, and optionally apply the built-in
+`generic_assembly` manufacturer profile through `--manufacturer-profile`.
+`design create` treats `validation.acceptance: fabrication-candidate` as a
+request to prove fabrication readiness; partial readiness status (`candidate`
+or `blocked`) downgrades achieved acceptance and leaves
+`acceptance.fabrication_ready` false.
 
 ### Remaining Work
 
-- Strengthen BOM and CPL source data with richer component identity,
-  manufacturer, MPN, side, rotation, and placement provenance.
 - Add stackup, net class, solder mask, paste, edge cuts, courtyard, silkscreen,
   and mounting-hole checks.
 - Expand fabrication-readiness score and blocking issue taxonomy as new gates
   become executable.
-- Integrate manufacturer profile constraints when available.
+- Add additional manufacturer profile presets and profile import once specific
+  fabricator rule sources are selected.
 
 ### Acceptance Gates
 
 - A generated board can produce a fabrication package with KiCad-CLI-backed
   Gerber/drill evidence when a local KiCad CLI is configured.
 - Missing fab artifacts or failed checks block "ready" status.
-- Output package contents are deterministic and test-covered.
+- Output package contents, identity evidence, consistency evidence, and local
+  profile evidence are deterministic and test-covered.
 
 ## Priority 9: Intent Planner And AI Orchestration
 
@@ -520,10 +527,10 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Strengthen BOM/CPL, component identity, and manufacturer profile evidence
-   for fabrication packages.
-2. Expand verified component and block coverage alongside each new block
+1. Expand verified component and block coverage alongside each new block
    family.
+2. Add stackup, courtyard, solder mask/paste, silkscreen, and mounting-hole
+   fabrication checks.
 3. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready

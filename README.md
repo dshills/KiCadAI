@@ -1123,6 +1123,19 @@ go run ./cmd/kicadai --json export bom ./project
 go run ./cmd/kicadai --json export fabrication ./project
 ```
 
+Fabrication reports now include explicit assembly evidence:
+
+- BOM rows carry component identity status, source, package, component class,
+  lifecycle, confidence, and issue/blocking counts.
+- CPL rows carry BOM linkage, component identity, normalized side, raw layer,
+  raw rotation, normalized rotation, and placement readiness notes.
+- BOM/CPL consistency checks block mismatched references, duplicate
+  references, missing placements, extra placements, footprint mismatches,
+  missing coordinates, and unknown assembly sides.
+- Optional manufacturer profiles add local assembly policy checks. The built-in
+  `generic_assembly` profile requires exact manufacturer/MPN evidence for
+  assembly-critical rows while allowing generic passives.
+
 Use `--execute` to write files and `--overwrite` to replace existing package
 files. KiCad CLI is required for Gerber and drill generation:
 
@@ -1131,6 +1144,7 @@ go run ./cmd/kicadai \
   --json \
   --execute \
   --overwrite \
+  --manufacturer-profile generic_assembly \
   --kicad-cli /path/to/kicad-cli \
   export fabrication ./project
 ```
@@ -1170,10 +1184,11 @@ name and boolean. In the output workflow result, partial readiness status
 `acceptance.fabrication_ready` false.
 
 This is still not a manufacturer acceptance guarantee. KiCadAI validates the
-presence and non-empty contents of modeled fabrication outputs, but broader DFM
-checks such as manufacturer-specific stackups, annular ring policy, solder
-slivers, impedance, panelization, assembly notes, and procurement readiness
-remain separate gates.
+presence, identity consistency, and local profile compatibility of modeled
+fabrication outputs, but broader DFM checks such as manufacturer-specific
+stackups, annular ring policy, solder slivers, impedance, panelization,
+assembly notes, live part availability, and procurement readiness remain
+separate gates.
 
 ## Examples
 
