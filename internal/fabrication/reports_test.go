@@ -106,6 +106,62 @@ func TestBuildCPLRowsSortsAndFormatsPlacement(t *testing.T) {
 	}
 }
 
+func TestBuildCPLRowsWithBOMHydratesIdentityAndNormalizesPlacement(t *testing.T) {
+	rows, issues := BuildCPLRowsWithBOM(
+		pcbfiles.PCBFile{Footprints: []pcbfiles.Footprint{
+			{Reference: "U1", LibraryID: "Package_QFP:TQFP-32", Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(5)}, Rotation: 450, Layer: kicadfiles.LayerBCu},
+			{Reference: "R1", LibraryID: "Resistor_SMD:R_0603", Position: kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(3)}, Rotation: -90, Layer: kicadfiles.LayerFCu},
+		}},
+		[]BOMRow{
+			{
+				References:   []string{"U1"},
+				Value:        "MCU",
+				SymbolID:     "MCU:ATmega328P",
+				FootprintID:  "Package_QFP:TQFP-32",
+				ComponentID:  "mcu.atmega328p-au",
+				Manufacturer: "Microchip",
+				MPN:          "ATMEGA328P-AU",
+			},
+			{
+				References:  []string{"R1"},
+				Value:       "10k",
+				SymbolID:    "Device:R",
+				FootprintID: "Resistor_SMD:R_0603",
+			},
+		},
+	)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(rows) != 2 {
+		t.Fatalf("rows = %#v", rows)
+	}
+	if rows[0].Reference != "R1" || rows[0].Layer != "top" || rows[0].NormalizedRotationDegrees != "270.000" {
+		t.Fatalf("R1 CPL row = %#v, want top side and normalized -90 rotation", rows[0])
+	}
+	u1 := rows[1]
+	if u1.ComponentID != "mcu.atmega328p-au" || u1.Manufacturer != "Microchip" || u1.MPN != "ATMEGA328P-AU" {
+		t.Fatalf("U1 CPL identity = %#v", u1)
+	}
+	if u1.BOMLinkageStatus != "linked" || u1.IdentityKey != "mcu.atmega328p-au" || u1.Layer != "bottom" || u1.RawRotationDegrees != "450.000" || u1.NormalizedRotationDegrees != "90.000" {
+		t.Fatalf("U1 CPL placement = %#v", u1)
+	}
+}
+
+func TestBuildCPLRowsWithBOMReportsUnknownSide(t *testing.T) {
+	rows, issues := BuildCPLRowsWithBOM(pcbfiles.PCBFile{Footprints: []pcbfiles.Footprint{{
+		Reference: "U1",
+		LibraryID: "Package:QFN",
+		Layer:     kicadfiles.LayerFSilkS,
+	}}}, nil)
+	if len(rows) != 1 || rows[0].Layer != "unknown" || !strings.Contains(rows[0].ReadinessNote, "unknown placement side") {
+		t.Fatalf("rows = %#v, want unknown side readiness note", rows)
+	}
+	if !hasIssueCode(issues, reports.CodeValidationFailed) || !reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v, want blocking unknown side issue", issues)
+	}
+}
+
 func TestReportCSVSerializationEscapesFields(t *testing.T) {
 	bom, err := MarshalBOMCSV([]BOMRow{{
 		References:    []string{"R1"},
@@ -128,11 +184,11 @@ func TestReportCSVSerializationEscapesFields(t *testing.T) {
 	if !strings.Contains(text, "Package,ComponentClass,Lifecycle,Confidence,IdentityStatus,IdentitySource,IdentityIssueCount,IdentityBlockingCount") {
 		t.Fatalf("BOM CSV missing identity columns:\n%s", text)
 	}
-	cpl, err := MarshalCPLCSV([]CPLRow{{Reference: "U1", Footprint: "Package:QFN", XMM: "1", YMM: "2", RotationDegrees: "90.000", Layer: "top", PlacementSource: "pcb"}})
+	cpl, err := MarshalCPLCSV([]CPLRow{{Reference: "U1", Footprint: "Package:QFN", ComponentID: "ic.example", XMM: "1", YMM: "2", RotationDegrees: "90.000", Layer: "top", NormalizedSide: "top", RawLayer: "F.Cu", RawRotationDegrees: "450.000", NormalizedRotationDegrees: "90.000", BOMLinkageStatus: "linked", PlacementSource: "pcb"}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(cpl), "Reference,Footprint") || !strings.Contains(string(cpl), "U1,Package:QFN") {
+	if !strings.Contains(string(cpl), "Reference,Footprint,ComponentID") || !strings.Contains(string(cpl), "U1,Package:QFN,ic.example") || !strings.Contains(string(cpl), "NormalizedRotation,BOMLinkageStatus") {
 		t.Fatalf("CPL CSV unexpected:\n%s", cpl)
 	}
 }

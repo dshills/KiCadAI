@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math"
 	"path/filepath"
 	"slices"
 	"strconv"
@@ -39,14 +40,24 @@ type BOMRow struct {
 }
 
 type CPLRow struct {
-	Reference       string `json:"reference"`
-	Footprint       string `json:"footprint"`
-	XMM             string `json:"x_mm"`
-	YMM             string `json:"y_mm"`
-	RotationDegrees string `json:"rotation_degrees"`
-	Layer           string `json:"layer"`
-	PlacementSource string `json:"placement_source"`
-	Fixed           bool   `json:"fixed"`
+	Reference                 string `json:"reference"`
+	Footprint                 string `json:"footprint"`
+	ComponentID               string `json:"component_id,omitempty"`
+	Manufacturer              string `json:"manufacturer,omitempty"`
+	MPN                       string `json:"mpn,omitempty"`
+	IdentityKey               string `json:"identity_key,omitempty"`
+	XMM                       string `json:"x_mm"`
+	YMM                       string `json:"y_mm"`
+	RotationDegrees           string `json:"rotation_degrees"`
+	Layer                     string `json:"layer"`
+	NormalizedSide            string `json:"normalized_side,omitempty"`
+	RawLayer                  string `json:"raw_layer,omitempty"`
+	RawRotationDegrees        string `json:"raw_rotation_degrees,omitempty"`
+	NormalizedRotationDegrees string `json:"normalized_rotation_degrees,omitempty"`
+	BOMLinkageStatus          string `json:"bom_linkage_status,omitempty"`
+	PlacementSource           string `json:"placement_source"`
+	Fixed                     bool   `json:"fixed"`
+	ReadinessNote             string `json:"readiness_note,omitempty"`
 }
 
 type ReportData struct {
@@ -88,7 +99,9 @@ func BuildReports(ctx context.Context, targetPath string) (ReportData, error) {
 		if err != nil {
 			issues = append(issues, reportDataIssue("pcb", err.Error()))
 		} else {
-			cpl = BuildCPLRows(board)
+			rows, rowIssues := BuildCPLRowsWithBOM(board, bom)
+			cpl = rows
+			issues = append(issues, rowIssues...)
 		}
 	}
 	issues = dedupeIssues(issues)
@@ -282,7 +295,14 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 }
 
 func BuildCPLRows(board pcbfiles.PCBFile) []CPLRow {
+	rows, _ := BuildCPLRowsWithBOM(board, nil)
+	return rows
+}
+
+func BuildCPLRowsWithBOM(board pcbfiles.PCBFile, bom []BOMRow) ([]CPLRow, []reports.Issue) {
+	bomByRef := bomRowsByReference(bom)
 	rows := make([]CPLRow, 0, len(board.Footprints))
+	var issues []reports.Issue
 	for _, footprint := range board.Footprints {
 		ref := strings.TrimSpace(footprint.Reference)
 		if ref == "" || strings.HasPrefix(ref, "#") {
@@ -291,19 +311,42 @@ func BuildCPLRows(board pcbfiles.PCBFile) []CPLRow {
 		if footprintDNP(footprint) {
 			continue
 		}
-		rows = append(rows, CPLRow{
-			Reference:       ref,
-			Footprint:       footprint.LibraryID,
-			XMM:             kicadfiles.ToMMString(footprint.Position.X),
-			YMM:             kicadfiles.ToMMString(footprint.Position.Y),
-			RotationDegrees: fmt.Sprintf("%.3f", footprint.Rotation),
-			Layer:           cplLayer(footprint.Layer),
-			PlacementSource: "pcb",
-			Fixed:           footprint.Locked,
-		})
+		rawRotation := float64(footprint.Rotation)
+		normalizedRotation := normalizeRotationDegrees(rawRotation)
+		side, sideIssue := normalizeCPLSide(footprint.Layer, ref)
+		row := CPLRow{
+			Reference:                 ref,
+			Footprint:                 footprint.LibraryID,
+			XMM:                       kicadfiles.ToMMString(footprint.Position.X),
+			YMM:                       kicadfiles.ToMMString(footprint.Position.Y),
+			RotationDegrees:           formatDegrees(normalizedRotation),
+			Layer:                     side,
+			NormalizedSide:            side,
+			RawLayer:                  string(footprint.Layer),
+			RawRotationDegrees:        formatDegrees(rawRotation),
+			NormalizedRotationDegrees: formatDegrees(normalizedRotation),
+			BOMLinkageStatus:          "unlinked",
+			PlacementSource:           "pcb",
+			Fixed:                     footprint.Locked,
+		}
+		if bomRow, ok := bomByRef[ref]; ok {
+			row.ComponentID = bomRow.ComponentID
+			row.Manufacturer = bomRow.Manufacturer
+			row.MPN = bomRow.MPN
+			row.IdentityKey = bomRowIdentityKey(bomRow)
+			row.BOMLinkageStatus = "linked"
+		} else if len(bom) > 0 {
+			row.BOMLinkageStatus = "missing_bom"
+			row.ReadinessNote = appendReadinessNote(row.ReadinessNote, "missing BOM identity linkage")
+		}
+		if sideIssue != nil {
+			row.ReadinessNote = appendReadinessNote(row.ReadinessNote, "unknown placement side")
+			issues = append(issues, *sideIssue)
+		}
+		rows = append(rows, row)
 	}
 	slices.SortFunc(rows, compareCPLRows)
-	return rows
+	return rows, issues
 }
 
 func MarshalBOMCSV(rows []BOMRow) ([]byte, error) {
@@ -345,11 +388,11 @@ func MarshalBOMCSV(rows []BOMRow) ([]byte, error) {
 func MarshalCPLCSV(rows []CPLRow) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"Reference", "Footprint", "X(mm)", "Y(mm)", "Rotation", "Layer", "PlacementSource", "Fixed"}); err != nil {
+	if err := writer.Write(cplCSVHeader()); err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
-		if err := writer.Write([]string{row.Reference, row.Footprint, row.XMM, row.YMM, row.RotationDegrees, row.Layer, row.PlacementSource, fmt.Sprintf("%t", row.Fixed)}); err != nil {
+		if err := writer.Write(cplCSVRecord(row)); err != nil {
 			return nil, err
 		}
 	}
@@ -358,6 +401,52 @@ func MarshalCPLCSV(rows []CPLRow) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func cplCSVHeader() []string {
+	return []string{
+		"Reference",
+		"Footprint",
+		"ComponentID",
+		"Manufacturer",
+		"MPN",
+		"IdentityKey",
+		"X(mm)",
+		"Y(mm)",
+		"Rotation",
+		"Layer",
+		"NormalizedSide",
+		"RawLayer",
+		"RawRotation",
+		"NormalizedRotation",
+		"BOMLinkageStatus",
+		"PlacementSource",
+		"Fixed",
+		"ReadinessNote",
+	}
+}
+
+func cplCSVRecord(row CPLRow) []string {
+	return []string{
+		row.Reference,
+		row.Footprint,
+		row.ComponentID,
+		row.Manufacturer,
+		row.MPN,
+		row.IdentityKey,
+		row.XMM,
+		row.YMM,
+		row.RotationDegrees,
+		row.Layer,
+		row.NormalizedSide,
+		row.RawLayer,
+		row.RawRotationDegrees,
+		row.NormalizedRotationDegrees,
+		row.BOMLinkageStatus,
+		row.PlacementSource,
+		fmt.Sprintf("%t", row.Fixed),
+		row.ReadinessNote,
+	}
 }
 
 func MarshalReportJSON(data ReportData) ([]byte, error) {
@@ -395,10 +484,73 @@ func compareCPLRows(a, b CPLRow) int {
 }
 
 func cplLayer(layer kicadfiles.BoardLayer) string {
-	if layer == kicadfiles.LayerBCu || strings.HasPrefix(string(layer), "B.") {
-		return "bottom"
+	side, _ := normalizeCPLSide(layer, "")
+	return side
+}
+
+func normalizeCPLSide(layer kicadfiles.BoardLayer, ref string) (string, *reports.Issue) {
+	layerName := strings.TrimSpace(string(layer))
+	switch layer {
+	case kicadfiles.LayerFCu:
+		return "top", nil
+	case kicadfiles.LayerBCu:
+		return "bottom", nil
+	default:
+		path := "cpl"
+		if ref != "" {
+			path = "cpl." + ref + ".layer"
+		}
+		message := fmt.Sprintf("placement layer %q is not an assembly side", layerName)
+		refs := []string{}
+		if ref != "" {
+			message = fmt.Sprintf("%s has unknown placement layer %q", ref, layerName)
+			refs = []string{ref}
+		}
+		return "unknown", &reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Path:       path,
+			Message:    message,
+			Refs:       refs,
+			Suggestion: "place assembled footprints on F.Cu or B.Cu before fabrication release",
+		}
 	}
-	return "top"
+}
+
+func normalizeRotationDegrees(degrees float64) float64 {
+	normalized := math.Mod(math.Mod(degrees, 360)+360, 360)
+	if normalized == 0 {
+		return 0
+	}
+	return normalized
+}
+
+func formatDegrees(degrees float64) string {
+	return fmt.Sprintf("%.3f", degrees)
+}
+
+func bomRowsByReference(rows []BOMRow) map[string]BOMRow {
+	byRef := map[string]BOMRow{}
+	for _, row := range rows {
+		for _, ref := range row.References {
+			ref = strings.TrimSpace(ref)
+			if ref != "" {
+				byRef[ref] = row
+			}
+		}
+	}
+	return byRef
+}
+
+func bomRowIdentityKey(row BOMRow) string {
+	if row.ComponentID != "" {
+		return row.ComponentID
+	}
+	parts := []string{row.Value, row.SymbolID, row.FootprintID, row.Manufacturer, row.MPN}
+	for index := range parts {
+		parts[index] = strings.ReplaceAll(strings.TrimSpace(parts[index]), "|", `\|`)
+	}
+	return strings.Join(parts, "|")
 }
 
 func footprintDNP(footprint pcbfiles.Footprint) bool {
