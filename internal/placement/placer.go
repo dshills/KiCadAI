@@ -72,6 +72,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 				FootprintID: component.FootprintID,
 				Fixed:       component.Fixed,
 				GroupID:     component.GroupID,
+				Mobility:    component.Mobility,
 				Reason:      "no legal placement found",
 			})
 			if len(placementIssues) > 0 {

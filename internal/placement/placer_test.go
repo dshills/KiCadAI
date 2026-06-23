@@ -2,6 +2,7 @@ package placement
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -159,7 +160,7 @@ func TestPlaceIsDeterministic(t *testing.T) {
 		t.Fatalf("placement lengths differ: %d vs %d", len(first.Placements), len(second.Placements))
 	}
 	for i := range first.Placements {
-		if first.Placements[i] != second.Placements[i] {
+		if !reflect.DeepEqual(first.Placements[i], second.Placements[i]) {
 			t.Fatalf("placement[%d] differs:\nfirst=%#v\nsecond=%#v", i, first.Placements[i], second.Placements[i])
 		}
 	}

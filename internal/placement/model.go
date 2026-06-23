@@ -111,6 +111,7 @@ type Component struct {
 	GroupID     string
 	Priority    int
 	Hints       []Hint
+	Mobility    MobilityPolicy
 }
 
 type Bounds struct {
@@ -258,6 +259,7 @@ type PlacementResult struct {
 	Bounds      Rect
 	Fixed       bool
 	GroupID     string
+	Mobility    MobilityPolicy
 	Reason      string
 }
 
@@ -270,6 +272,50 @@ type Metrics struct {
 	OutsideOutlineCount  int
 	EstimatedBoundsCount int
 	HPWLMM               float64
+}
+
+type MobilityClass string
+
+const (
+	MobilityFixed          MobilityClass = "fixed"
+	MobilityGroupTransform MobilityClass = "group_transform"
+	MobilityLocalRebuild   MobilityClass = "local_rebuild"
+	MobilitySoftPreferred  MobilityClass = "soft_preferred"
+	MobilityUnowned        MobilityClass = "unowned"
+)
+
+type RouteHandlingPolicy string
+
+const (
+	RouteHandlingTransformWithGroup RouteHandlingPolicy = "transform_with_group"
+	RouteHandlingInvalidateRebuild  RouteHandlingPolicy = "invalidate_and_rebuild"
+	RouteHandlingPreserveFixed      RouteHandlingPolicy = "preserve_fixed"
+	RouteHandlingUnsupported        RouteHandlingPolicy = "unsupported"
+)
+
+type MobilityPolicy struct {
+	Class         MobilityClass       `json:"class,omitempty"`
+	Reason        string              `json:"reason,omitempty"`
+	OwnerScope    string              `json:"owner_scope,omitempty"`
+	GroupID       string              `json:"group_id,omitempty"`
+	Transforms    []string            `json:"transforms,omitempty"`
+	RouteHandling RouteHandlingPolicy `json:"route_handling,omitempty"`
+	Constraints   []string            `json:"constraints,omitempty"`
+}
+
+type MobilitySummary struct {
+	Total                 int            `json:"total"`
+	ByClass               map[string]int `json:"by_class,omitempty"`
+	EligibleCount         int            `json:"eligible_count"`
+	FixedCount            int            `json:"fixed_count"`
+	UnownedCount          int            `json:"unowned_count"`
+	GroupTransformCount   int            `json:"group_transform_count"`
+	LocalRebuildCount     int            `json:"local_rebuild_count"`
+	SoftPreferredCount    int            `json:"soft_preferred_count"`
+	TransformableRouteCnt int            `json:"transformable_route_count"`
+	RebuildableRouteCnt   int            `json:"rebuildable_route_count"`
+	PreservedRouteCnt     int            `json:"preserved_route_count"`
+	UnsupportedRouteCnt   int            `json:"unsupported_route_count"`
 }
 
 type ScoreReport struct {
@@ -333,6 +379,7 @@ func NormalizeRequest(request Request) Request {
 		request.Components[i].Ref = strings.TrimSpace(request.Components[i].Ref)
 		request.Components[i].FootprintID = strings.TrimSpace(request.Components[i].FootprintID)
 		request.Components[i].GroupID = strings.TrimSpace(request.Components[i].GroupID)
+		request.Components[i].Mobility = normalizeMobilityPolicy(request.Components[i])
 		if request.Components[i].Side == "" {
 			request.Components[i].Side = SideTop
 		}

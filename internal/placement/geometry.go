@@ -118,6 +118,7 @@ func NewPlacementResult(component Component, placement Placement, rules Rules) (
 		Bounds:      bounds,
 		Fixed:       component.Fixed,
 		GroupID:     component.GroupID,
+		Mobility:    normalizeMobilityPolicy(component),
 	}, true
 }
 

@@ -96,11 +96,13 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	result := placement.PlaceContext(ctx, placementRequest)
 	issues = append(issues, result.Issues...)
 	stage := NewStageResult(StagePlacement, issues)
+	mobilitySummary := placement.MobilitySummaryForComponents(placementRequest.Components)
 	stage.Summary = map[string]any{
 		"component_count": result.Metrics.ComponentCount,
 		"placed_count":    result.Metrics.PlacedCount,
 		"unplaced_count":  result.Metrics.UnplacedCount,
 		"fixed_count":     result.Metrics.FixedCount,
+		"mobility":        mobilitySummary,
 	}
 	if len(padEntries) != 0 || len(padIssues) != 0 {
 		stage.Summary["pad_hydration"] = summarizePadHydration(padEntries, padIssues)

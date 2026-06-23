@@ -8,6 +8,8 @@ func CloneRequest(request Request) Request {
 	for index := range out.Components {
 		out.Components[index].Pads = slices.Clone(out.Components[index].Pads)
 		out.Components[index].Hints = slices.Clone(out.Components[index].Hints)
+		out.Components[index].Mobility.Transforms = slices.Clone(out.Components[index].Mobility.Transforms)
+		out.Components[index].Mobility.Constraints = slices.Clone(out.Components[index].Mobility.Constraints)
 		if out.Components[index].Position != nil {
 			position := *out.Components[index].Position
 			out.Components[index].Position = &position
