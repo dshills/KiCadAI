@@ -127,6 +127,7 @@ func TestValidateRequestRejectsInvalidRoutingRetryPolicy(t *testing.T) {
 	request.RoutingRetry = RoutingRetryPolicySpec{
 		MaxAttempts:          -1,
 		MinRoutingScoreDelta: -0.1,
+		DRCPolicy:            RetryDRCPolicy("always"),
 		AllowedHintCategories: []PlacementRetryHintCategory{
 			PlacementRetryHintCategory("teleport"),
 		},
@@ -135,6 +136,7 @@ func TestValidateRequestRejectsInvalidRoutingRetryPolicy(t *testing.T) {
 	issues := ValidateRequest(request)
 	assertIssuePath(t, issues, "routing_retry.max_attempts")
 	assertIssuePath(t, issues, "routing_retry.min_routing_score_delta")
+	assertIssuePath(t, issues, "routing_retry.drc_policy")
 	assertIssuePath(t, issues, "routing_retry.allowed_hint_categories[0]")
 }
 
@@ -144,12 +146,12 @@ func TestDecodeRequestStrictAcceptsRoutingRetryPolicy(t *testing.T) {
 	  "name": "demo",
 	  "board": {"width_mm": 10, "height_mm": 10},
 	  "blocks": [{"id": "led", "block_id": "led_indicator"}],
-	  "routing_retry": {"enabled": true, "max_attempts": 3, "allowed_hint_categories": ["increase_spacing"]}
+	  "routing_retry": {"enabled": true, "max_attempts": 3, "allowed_hint_categories": ["increase_spacing"], "drc_policy": "optional"}
 	}`))
 	if len(issues) != 0 {
 		t.Fatalf("DecodeRequestStrict issues = %#v", issues)
 	}
-	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 3 || request.RoutingRetry.AllowedHintCategories[0] != PlacementRetryIncreaseSpacing {
+	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 3 || request.RoutingRetry.AllowedHintCategories[0] != PlacementRetryIncreaseSpacing || request.RoutingRetry.DRCPolicy != RetryDRCPolicyOptional {
 		t.Fatalf("routing retry = %#v", request.RoutingRetry)
 	}
 }

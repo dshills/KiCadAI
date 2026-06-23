@@ -110,6 +110,7 @@ type RoutingRetryPolicySpec struct {
 	MaxAttempts             int                          `json:"max_attempts,omitempty"`
 	MinRoutingScoreDelta    float64                      `json:"min_routing_score_delta,omitempty"`
 	AllowedHintCategories   []PlacementRetryHintCategory `json:"allowed_hint_categories,omitempty"`
+	DRCPolicy               RetryDRCPolicy               `json:"drc_policy,omitempty"`
 	PreserveFixed           bool                         `json:"preserve_fixed,omitempty"`
 	StopOnNewBlockers       bool                         `json:"stop_on_new_blockers,omitempty"`
 	StopOnRepeatedSignature bool                         `json:"stop_on_repeated_signature,omitempty"`
@@ -290,6 +291,9 @@ func validateRoutingRetryPolicy(policy RoutingRetryPolicySpec) []reports.Issue {
 	}
 	if policy.MinRoutingScoreDelta < 0 {
 		issues = append(issues, issue("routing_retry.min_routing_score_delta", "routing retry minimum score delta must be non-negative"))
+	}
+	if policy.DRCPolicy != "" && normalizeRetryDRCPolicy(policy.DRCPolicy) != policy.DRCPolicy {
+		issues = append(issues, issue("routing_retry.drc_policy", "unsupported routing retry DRC policy "+string(policy.DRCPolicy)))
 	}
 	for index, category := range policy.AllowedHintCategories {
 		if !validPlacementRetryHintCategory(category) {
