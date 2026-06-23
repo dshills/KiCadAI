@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/kicadfiles"
+	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/reports"
 )
 
@@ -72,6 +74,9 @@ func TestExportPackageExecuteWithFakeRunnerWritesPlotDirectories(t *testing.T) {
 	if status := artifactStatus(result.Artifacts, ArtifactDrill); status != ArtifactGenerated {
 		t.Fatalf("drill artifact status = %s, want generated", status)
 	}
+	if result.Summary.Gerber != EvidencePass || result.Summary.Drill != EvidencePass {
+		t.Fatalf("summary gerber/drill = %s/%s, want pass/pass", result.Summary.Gerber, result.Summary.Drill)
+	}
 }
 
 func TestExportPackageUsesCustomOutputPathForPlotArtifacts(t *testing.T) {
@@ -95,9 +100,7 @@ func TestExportPackageUsesCustomOutputPathForPlotArtifacts(t *testing.T) {
 func TestDiscoverPlotPCBPathUsesExistingBoardWhenNameDiffers(t *testing.T) {
 	root := testFabricationProject(t)
 	boardPath := filepath.Join(root, "board.kicad_pcb")
-	if err := os.WriteFile(boardPath, []byte("(kicad_pcb)\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
+	writeTestPCB(t, root, "board.kicad_pcb")
 	got, issue := discoverPlotPCBPath(root, "demo")
 	if issue != nil {
 		t.Fatalf("discoverPlotPCBPath issue: %#v", issue)
@@ -110,9 +113,7 @@ func TestDiscoverPlotPCBPathUsesExistingBoardWhenNameDiffers(t *testing.T) {
 func TestDiscoverPlotPCBPathBlocksAmbiguousBoards(t *testing.T) {
 	root := testFabricationProject(t)
 	for _, name := range []string{"a.kicad_pcb", "b.kicad_pcb"} {
-		if err := os.WriteFile(filepath.Join(root, name), []byte("(kicad_pcb)\n"), 0o644); err != nil {
-			t.Fatal(err)
-		}
+		writeTestPCB(t, root, name)
 	}
 	_, issue := discoverPlotPCBPath(root, "demo")
 	if issue == nil {
@@ -127,8 +128,8 @@ func TestExportPackageExecuteMissingKiCadCLIBlocksPlotArtifacts(t *testing.T) {
 	if !hasIssuePath(result.Issues, "fabrication.kicad_cli") {
 		t.Fatalf("issues = %#v, want missing KiCad CLI issue", result.Issues)
 	}
-	if status := artifactStatus(result.Artifacts, ArtifactGerber); status != ArtifactBlocked {
-		t.Fatalf("gerber artifact status = %s, want blocked", status)
+	if status := artifactStatus(result.Artifacts, ArtifactGerber); status != ArtifactMissing {
+		t.Fatalf("gerber artifact status = %s, want missing", status)
 	}
 }
 
@@ -196,7 +197,41 @@ func testFabricationProject(t *testing.T) string {
 
 func writeTestPCB(t *testing.T, root string, name string) {
 	t.Helper()
-	if err := os.WriteFile(filepath.Join(root, name), []byte("(kicad_pcb)\n"), 0o644); err != nil {
+	file, err := os.Create(filepath.Join(root, name))
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := pcbfiles.PCBFile{
+		Version:          kicadfiles.KiCadPCBFormatV20260206,
+		Generator:        "kicadai-test",
+		GeneratorVersion: "phase3",
+		General:          pcbfiles.DefaultGeneral(),
+		Paper:            kicadfiles.Paper{Name: "A4"},
+		Layers:           pcbfiles.DefaultTwoLayerStack(),
+		Setup:            pcbfiles.DefaultSetup(),
+		Drawings: []pcbfiles.Drawing{{
+			UUID:  kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+			Layer: kicadfiles.LayerEdge,
+			Kind:  "line",
+			Line: &pcbfiles.LineDrawing{
+				Start: kicadfiles.Point{X: kicadfiles.MM(0), Y: kicadfiles.MM(0)},
+				End:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(0)},
+				Width: kicadfiles.MM(0.1),
+			},
+		}},
+		Vias: []pcbfiles.Via{{
+			UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+			Position: kicadfiles.Point{X: kicadfiles.MM(5), Y: kicadfiles.MM(5)},
+			Size:     kicadfiles.MM(0.8),
+			Drill:    kicadfiles.MM(0.4),
+			Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+		}},
+	}
+	if err := pcbfiles.Write(file, board); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -225,18 +260,36 @@ func (writingPlotRunner) RunPlotCommand(ctx context.Context, command PlotCommand
 	if err := ctx.Err(); err != nil {
 		return PlotCommandEvidence{Kind: command.Kind, Argv: command.Argv, OutputDir: command.OutputDir, ExitCode: -1, StderrSnippet: err.Error()}
 	}
-	name := "demo-F_Cu.gbr"
 	if command.Kind == PlotKindDrill {
-		name = "demo.drl"
+		path := filepath.Join(command.OutputDir, "demo.drl")
+		if err := os.WriteFile(path, []byte("plot"), 0o644); err != nil {
+			return PlotCommandEvidence{Kind: command.Kind, Argv: command.Argv, OutputDir: command.OutputDir, ExitCode: -1, StderrSnippet: err.Error()}
+		}
+		return PlotCommandEvidence{
+			Kind:           command.Kind,
+			Argv:           command.Argv,
+			OutputDir:      command.OutputDir,
+			GeneratedPaths: []string{path},
+		}
 	}
-	path := filepath.Join(command.OutputDir, name)
-	if err := os.WriteFile(path, []byte("plot"), 0o644); err != nil {
-		return PlotCommandEvidence{Kind: command.Kind, Argv: command.Argv, OutputDir: command.OutputDir, ExitCode: -1, StderrSnippet: err.Error()}
+	paths := []string{
+		filepath.Join(command.OutputDir, "demo-F_Cu.gbr"),
+		filepath.Join(command.OutputDir, "demo-B_Cu.gbr"),
+		filepath.Join(command.OutputDir, "demo-F_Mask.gbr"),
+		filepath.Join(command.OutputDir, "demo-B_Mask.gbr"),
+		filepath.Join(command.OutputDir, "demo-F_SilkS.gbr"),
+		filepath.Join(command.OutputDir, "demo-B_SilkS.gbr"),
+		filepath.Join(command.OutputDir, "demo-Edge_Cuts.gbr"),
+	}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte("plot"), 0o644); err != nil {
+			return PlotCommandEvidence{Kind: command.Kind, Argv: command.Argv, OutputDir: command.OutputDir, ExitCode: -1, StderrSnippet: err.Error()}
+		}
 	}
 	return PlotCommandEvidence{
 		Kind:           command.Kind,
 		Argv:           command.Argv,
 		OutputDir:      command.OutputDir,
-		GeneratedPaths: []string{path},
+		GeneratedPaths: paths,
 	}
 }

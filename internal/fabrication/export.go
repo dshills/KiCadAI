@@ -107,7 +107,7 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 		if gerberRelErr == nil && drillRelErr == nil && pcbIssue == nil {
 			result.Artifacts = markArtifact(result.Artifacts, ArtifactGerber, filepath.ToSlash(gerberRel), ArtifactExpected)
 			result.Artifacts = markArtifact(result.Artifacts, ArtifactDrill, filepath.ToSlash(drillRel), ArtifactExpected)
-			plot := PlotFabricationOutputs(ctx, PlotRequest{
+			plotRequest := PlotRequest{
 				ProjectRoot: target.Root,
 				ProjectName: target.Name,
 				PCBPath:     pcbPath,
@@ -118,9 +118,16 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 				Overwrite:   opts.Overwrite,
 				KiCadCLI:    opts.KiCadCLI,
 				CLIPolicy:   opts.CLIPolicy,
-			}, opts.PlotRunner)
+			}
+			plot := PlotFabricationOutputs(ctx, plotRequest, opts.PlotRunner)
 			result.Issues = append(result.Issues, plot.Issues...)
 			result.Artifacts = applyPlotArtifacts(result.Artifacts, plot, filepath.ToSlash(gerberRel), filepath.ToSlash(drillRel))
+			validation := ValidateFabricationArtifacts(ctx, plotRequest)
+			result.Summary.Gerber = validation.Gerber
+			result.Summary.Drill = validation.Drill
+			result.Issues = append(result.Issues, validation.Issues...)
+			result.Issues = dedupeIssues(result.Issues)
+			result.Artifacts = applyArtifactValidation(result.Artifacts, validation, filepath.ToSlash(gerberRel), filepath.ToSlash(drillRel))
 		}
 	}
 	for _, write := range append(slices.Clone(metadataWrites), dataWrites...) {
@@ -322,6 +329,29 @@ func applyPlotArtifacts(artifacts []Artifact, plot PlotResult, gerberPath string
 	artifacts = markArtifact(artifacts, ArtifactGerber, gerberPath, gerberStatus)
 	artifacts = markArtifact(artifacts, ArtifactDrill, drillPath, drillStatus)
 	return artifacts
+}
+
+func applyArtifactValidation(artifacts []Artifact, validation FabricationArtifactValidation, gerberPath string, drillPath string) []Artifact {
+	artifacts = markArtifact(artifacts, ArtifactGerber, gerberPath, artifactStatusForEvidence(validation.Gerber))
+	artifacts = markArtifact(artifacts, ArtifactDrill, drillPath, artifactStatusForEvidence(validation.Drill))
+	return artifacts
+}
+
+func artifactStatusForEvidence(status EvidenceStatus) ArtifactStatus {
+	switch status {
+	case EvidencePass:
+		return ArtifactGenerated
+	case EvidenceMissing:
+		return ArtifactMissing
+	case EvidenceSkipped:
+		return ArtifactSkipped
+	case EvidenceWarning:
+		return ArtifactExpected
+	case EvidenceFail:
+		return ArtifactBlocked
+	default:
+		return ArtifactBlocked
+	}
 }
 
 func summaryEvidence(summary Summary) map[string]EvidenceStatus {
