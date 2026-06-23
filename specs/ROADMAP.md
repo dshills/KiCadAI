@@ -106,9 +106,10 @@ loop confidence:
   seed families;
 - many production-ready active parts still need datasheet-backed electrical,
   thermal, lifecycle, availability, and design-rule evidence;
-- circuit block coverage still needs more variants and concrete generators for
+- circuit block coverage now includes concrete structural generators for
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
-  protection families;
+  protection families, but these newer blocks still need verification
+  manifests, more variants, and stronger KiCad-backed layout proof;
 - placement and routing need stronger rules for real PCB quality;
 - placement-routing retry now includes focused pad-backed seeds, generated
   workflow coverage, larger generated fixture families, selected attempt
@@ -203,8 +204,10 @@ Implemented foundation.
   readiness, validation rules, PCB rules, required roles, exported ports, and
   explicit unsupported gaps.
 - LED indicator, connector breakout, voltage regulator, MCU minimal, USB-C
-  power, I2C sensor, and op-amp gain-stage blocks declare electrical rules,
-  PCB constraints, and required local-route expectations.
+  power, I2C sensor, op-amp gain-stage, crystal oscillator,
+  reset/programming header, ESD protection, and reverse-polarity protection
+  blocks declare electrical rules, PCB constraints, and required local-route
+  expectations where supported by the current realization model.
 - PCB realization metadata includes placement groups, keepouts, proximity
   constraints, route width constraints, edge-facing constraints, and local
   route definitions for supported block-local nets.
@@ -218,8 +221,13 @@ Implemented foundation.
 
 ### Remaining Work
 
-- Add concrete generators for crystal/oscillator, standalone reset/programming,
-  ESD, and reverse-polarity protection blocks.
+- Add dedicated verification manifests for the newer crystal/oscillator,
+  reset/programming, ESD, and reverse-polarity protection generators.
+- Add conditional PCB realization support so reset/programming headers and
+  optional reset switches can declare mode-specific placements/routes without
+  referencing absent roles.
+- Add entry-anchor modeling for connector-adjacent ESD and input-protection
+  placement/routing constraints.
 - Replace remaining structural/generic active templates with concrete
   component-catalog-backed parts where fabrication readiness is desired.
 - Add KiCad-backed ERC/DRC evidence to block verification manifests where

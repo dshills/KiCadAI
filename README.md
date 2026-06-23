@@ -520,9 +520,10 @@ Current gaps for autonomous one-shot schematic + PCB generation:
 
 The block library contains reusable schematic templates for LED indicators,
 connector breakouts, voltage regulators, I2C sensors, op-amp gain stages,
-USB-C power input, and a minimal ATmega328P-A system. Blocks can be listed,
-inspected, validated, instantiated, composed, and now realized as PCB
-fragments.
+USB-C power input, a minimal ATmega328P-A system, crystal oscillators,
+reset/programming headers, 5 V ESD shunts, and series-diode reverse-polarity
+input protection. Blocks can be listed, inspected, validated, instantiated,
+composed, and now realized as PCB fragments.
 
 Built-in blocks now declare machine-readable electrical rules, PCB rules, local
 route requirements, placement/proximity constraints, verification evidence, and
@@ -552,9 +553,12 @@ evidence are still required before generated block PCBs should be treated as
 manufacturing candidates.
 
 Circuit blocks also have a verification harness with checked-in manifests for
-all built-in blocks. It verifies schematic semantics, PCB placement/pad/route
-expectations where declared, writer correctness when requested, and optional
-KiCad ERC/DRC evidence.
+the established built-in blocks. It verifies schematic semantics, PCB
+placement/pad/route expectations where declared, writer correctness when
+requested, and optional KiCad ERC/DRC evidence. The newer crystal oscillator,
+reset/programming, ESD, and reverse-polarity blocks are available through the
+registry and design workflow, but still need dedicated verification manifests
+before they can claim the same evidence level as the older block corpus.
 
 ```sh
 go run ./cmd/kicadai --json --builtins block verify
@@ -1026,14 +1030,16 @@ go run ./cmd/kicadai \
 ```
 
 Current built-in blocks include LED indicator, connector breakout, voltage
-regulator, I2C sensor, op-amp gain stage, USB-C power input, and MCU minimal
-system. These blocks now carry electrical and PCB rule metadata for required
-companions, decoupling, pull-ups, rail compatibility, enable/reset/programming
-handling, edge constraints, keepouts, proximity constraints, route priorities,
-and required local routes. Crystal/oscillator, standalone reset/programming,
-ESD, and reverse-polarity protection families are visible in the roadmap
-inventory as unsupported gaps until concrete generators and verified component
-evidence are added.
+regulator, I2C sensor, op-amp gain stage, USB-C power input, MCU minimal
+system, crystal oscillator, reset/programming header, 5 V ESD protection, and
+reverse-polarity input protection. These blocks now carry electrical and PCB
+rule metadata for required companions, decoupling, pull-ups, rail
+compatibility, enable/reset/programming handling, edge constraints, keepouts,
+proximity constraints, route priorities, and required local routes where the
+current realization model supports them. The newer protection and timing blocks
+remain structural/partial: they use verified seed records where available, but
+need block verification manifests, more variants, and stronger KiCad-backed
+layout evidence before fabrication-readiness claims.
 
 The generated block examples are structural schematic/project outputs; they are
 not yet fabrication-ready PCB designs. See
