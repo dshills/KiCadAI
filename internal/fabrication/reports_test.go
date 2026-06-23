@@ -162,6 +162,56 @@ func TestBuildCPLRowsWithBOMReportsUnknownSide(t *testing.T) {
 	}
 }
 
+func TestValidateBOMCPLConsistencyPassesMatchingAssemblySet(t *testing.T) {
+	summary, issues := ValidateBOMCPLConsistency(
+		[]BOMRow{{References: []string{"R1", "R2"}, FootprintID: "Resistor_SMD:R_0603"}},
+		[]CPLRow{
+			{Reference: "R1", Footprint: "Resistor_SMD:R_0603", XMM: "1", YMM: "2", Layer: "top", NormalizedSide: "top"},
+			{Reference: "R2", Footprint: "Resistor_SMD:R_0603", XMM: "3", YMM: "4", Layer: "bottom", NormalizedSide: "bottom"},
+		},
+	)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v, want none", issues)
+	}
+	if summary.CheckedReferences != 2 || summary.MatchedReferences != 2 || summary.BlockingCount != 0 {
+		t.Fatalf("summary = %#v, want two matched references", summary)
+	}
+}
+
+func TestValidateBOMCPLConsistencyBlocksMissingAndExtraReferences(t *testing.T) {
+	summary, issues := ValidateBOMCPLConsistency(
+		[]BOMRow{{References: []string{"R1"}, FootprintID: "Resistor:R_0603"}},
+		[]CPLRow{{Reference: "C1", Footprint: "Capacitor:C_0603", XMM: "1", YMM: "2", Layer: "top", NormalizedSide: "top"}},
+	)
+	if summary.CheckedReferences != 2 || summary.MatchedReferences != 0 || summary.BlockingCount != 2 {
+		t.Fatalf("summary = %#v, want one missing and one extra blocking issue", summary)
+	}
+	if !reports.HasBlockingIssue(issues) || !hasIssuePath(issues, "cpl.R1") || !hasIssuePath(issues, "bom.C1") {
+		t.Fatalf("issues = %#v, want missing CPL and extra CPL issues", issues)
+	}
+}
+
+func TestValidateBOMCPLConsistencyBlocksDuplicatesMismatchAndPlacementEvidence(t *testing.T) {
+	_, issues := ValidateBOMCPLConsistency(
+		[]BOMRow{
+			{References: []string{"U1"}, FootprintID: "Package:QFN"},
+			{References: []string{"U1"}, FootprintID: "Package:QFN"},
+		},
+		[]CPLRow{
+			{Reference: "U1", Footprint: "Package:TQFP", Layer: "unknown", NormalizedSide: "unknown"},
+			{Reference: "U1", Footprint: "Package:TQFP", XMM: "1", YMM: "2", Layer: "top", NormalizedSide: "top"},
+		},
+	)
+	if !hasIssueCode(issues, reports.CodeDuplicateReference) {
+		t.Fatalf("issues = %#v, want duplicate reference issue", issues)
+	}
+	for _, path := range []string{"cpl.U1.footprint", "cpl.U1.position", "cpl.U1.layer"} {
+		if !hasIssuePath(issues, path) {
+			t.Fatalf("issues = %#v, want %s", issues, path)
+		}
+	}
+}
+
 func TestReportCSVSerializationEscapesFields(t *testing.T) {
 	bom, err := MarshalBOMCSV([]BOMRow{{
 		References:    []string{"R1"},

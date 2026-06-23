@@ -61,10 +61,25 @@ type CPLRow struct {
 }
 
 type ReportData struct {
-	BOM    []BOMRow        `json:"bom"`
-	CPL    []CPLRow        `json:"cpl"`
-	Issues []reports.Issue `json:"issues"`
+	BOM         []BOMRow           `json:"bom"`
+	CPL         []CPLRow           `json:"cpl"`
+	Consistency ConsistencySummary `json:"consistency,omitempty"`
+	Issues      []reports.Issue    `json:"issues"`
 }
+
+type ConsistencySummary struct {
+	CheckedReferences int `json:"checked_references"`
+	MatchedReferences int `json:"matched_references"`
+	SkippedReferences int `json:"skipped_references,omitempty"`
+	WarningCount      int `json:"warning_count,omitempty"`
+	BlockingCount     int `json:"blocking_count,omitempty"`
+}
+
+const (
+	cplSideTop     = "top"
+	cplSideBottom  = "bottom"
+	cplSideUnknown = "unknown"
+)
 
 func BuildReports(ctx context.Context, targetPath string) (ReportData, error) {
 	target, err := resolveEvaluationTarget(targetPath)
@@ -104,9 +119,11 @@ func BuildReports(ctx context.Context, targetPath string) (ReportData, error) {
 			issues = append(issues, rowIssues...)
 		}
 	}
+	consistency, consistencyIssues := ValidateBOMCPLConsistency(bom, cpl)
+	issues = append(issues, consistencyIssues...)
 	issues = dedupeIssues(issues)
 	slices.SortFunc(issues, compareIssues)
-	return ReportData{BOM: bom, CPL: cpl, Issues: issues}, nil
+	return ReportData{BOM: bom, CPL: cpl, Consistency: consistency, Issues: issues}, nil
 }
 
 func summaryFilePath(root string, files []inspect.FileSummary, kind string) string {
@@ -349,6 +366,128 @@ func BuildCPLRowsWithBOM(board pcbfiles.PCBFile, bom []BOMRow) ([]CPLRow, []repo
 	return rows, issues
 }
 
+func ValidateBOMCPLConsistency(bom []BOMRow, cpl []CPLRow) (ConsistencySummary, []reports.Issue) {
+	type bomRefEntry struct {
+		row BOMRow
+		ref string
+	}
+	bomRefs := map[string]bomRefEntry{}
+	cplRefs := map[string]CPLRow{}
+	var issues []reports.Issue
+	for _, row := range bom {
+		for _, ref := range row.References {
+			refKey := referenceKey(ref)
+			if refKey == "" {
+				continue
+			}
+			if _, exists := bomRefs[refKey]; exists {
+				issues = append(issues, consistencyIssue(
+					reports.CodeDuplicateReference,
+					reports.SeverityError,
+					"bom."+ref,
+					ref,
+					fmt.Sprintf("%s appears in multiple BOM rows", ref),
+					"ensure each assembled reference appears in exactly one BOM row",
+				))
+				continue
+			}
+			bomRefs[refKey] = bomRefEntry{row: row, ref: strings.TrimSpace(ref)}
+		}
+	}
+	for _, row := range cpl {
+		ref := strings.TrimSpace(row.Reference)
+		refKey := referenceKey(ref)
+		if refKey == "" {
+			continue
+		}
+		if _, exists := cplRefs[refKey]; exists {
+			issues = append(issues, consistencyIssue(
+				reports.CodeDuplicateReference,
+				reports.SeverityError,
+				"cpl."+ref,
+				ref,
+				fmt.Sprintf("%s appears in multiple CPL rows", ref),
+				"ensure each placed reference appears in exactly one CPL row",
+			))
+			continue
+		}
+		cplRefs[refKey] = row
+	}
+	matches := 0
+	for refKey, bomEntry := range bomRefs {
+		cplRow, ok := cplRefs[refKey]
+		bomRow := bomEntry.row
+		ref := bomEntry.ref
+		if !ok {
+			issues = append(issues, consistencyIssue(
+				reports.CodeValidationFailed,
+				reports.SeverityError,
+				"cpl."+ref,
+				ref,
+				fmt.Sprintf("%s is present in the BOM but missing from the CPL", ref),
+				"place the footprint on the PCB or mark it not-on-board/DNP",
+			))
+			continue
+		}
+		matches++
+		if bomRow.FootprintID != "" && cplRow.Footprint != "" && bomRow.FootprintID != cplRow.Footprint {
+			issues = append(issues, consistencyIssue(
+				reports.CodeValidationFailed,
+				reports.SeverityError,
+				"cpl."+ref+".footprint",
+				ref,
+				fmt.Sprintf("%s footprint mismatch: BOM has %q, CPL has %q", ref, bomRow.FootprintID, cplRow.Footprint),
+				"regenerate the PCB from the assigned schematic footprint or update the mismatched footprint",
+			))
+		}
+		if strings.TrimSpace(cplRow.XMM) == "" || strings.TrimSpace(cplRow.YMM) == "" {
+			issues = append(issues, consistencyIssue(
+				reports.CodeValidationFailed,
+				reports.SeverityError,
+				"cpl."+ref+".position",
+				ref,
+				fmt.Sprintf("%s is missing placement coordinates", ref),
+				"place the footprint before fabrication release",
+			))
+		}
+		if cplRow.Layer == cplSideUnknown || cplRow.NormalizedSide == cplSideUnknown {
+			issues = append(issues, consistencyIssue(
+				reports.CodeValidationFailed,
+				reports.SeverityError,
+				"cpl."+ref+".layer",
+				ref,
+				fmt.Sprintf("%s has unknown assembly side", ref),
+				"place assembled footprints on F.Cu or B.Cu",
+			))
+		}
+	}
+	for refKey, cplRow := range cplRefs {
+		if _, ok := bomRefs[refKey]; !ok {
+			ref := strings.TrimSpace(cplRow.Reference)
+			issues = append(issues, consistencyIssue(
+				reports.CodeValidationFailed,
+				reports.SeverityError,
+				"bom."+ref,
+				ref,
+				fmt.Sprintf("%s is present in the CPL but missing from the BOM", ref),
+				"include the reference in the BOM or mark the footprint DNP",
+			))
+		}
+	}
+	summary := ConsistencySummary{
+		CheckedReferences: len(bomRefs) + len(cplRefs) - matches,
+		MatchedReferences: matches,
+	}
+	for _, issue := range issues {
+		if issue.Blocking() {
+			summary.BlockingCount++
+		} else {
+			summary.WarningCount++
+		}
+	}
+	return summary, issues
+}
+
 func MarshalBOMCSV(rows []BOMRow) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
@@ -492,9 +631,9 @@ func normalizeCPLSide(layer kicadfiles.BoardLayer, ref string) (string, *reports
 	layerName := strings.TrimSpace(string(layer))
 	switch layer {
 	case kicadfiles.LayerFCu:
-		return "top", nil
+		return cplSideTop, nil
 	case kicadfiles.LayerBCu:
-		return "bottom", nil
+		return cplSideBottom, nil
 	default:
 		path := "cpl"
 		if ref != "" {
@@ -506,7 +645,7 @@ func normalizeCPLSide(layer kicadfiles.BoardLayer, ref string) (string, *reports
 			message = fmt.Sprintf("%s has unknown placement layer %q", ref, layerName)
 			refs = []string{ref}
 		}
-		return "unknown", &reports.Issue{
+		return cplSideUnknown, &reports.Issue{
 			Code:       reports.CodeValidationFailed,
 			Severity:   reports.SeverityError,
 			Path:       path,
@@ -551,6 +690,21 @@ func bomRowIdentityKey(row BOMRow) string {
 		parts[index] = strings.ReplaceAll(strings.TrimSpace(parts[index]), "|", `\|`)
 	}
 	return strings.Join(parts, "|")
+}
+
+func consistencyIssue(code reports.Code, severity reports.Severity, path string, ref string, message string, suggestion string) reports.Issue {
+	return reports.Issue{
+		Code:       code,
+		Severity:   severity,
+		Path:       path,
+		Message:    message,
+		Refs:       []string{ref},
+		Suggestion: suggestion,
+	}
+}
+
+func referenceKey(ref string) string {
+	return strings.ToUpper(strings.TrimSpace(ref))
 }
 
 func footprintDNP(footprint pcbfiles.Footprint) bool {
