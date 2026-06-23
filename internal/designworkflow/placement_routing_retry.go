@@ -84,6 +84,8 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 			"routing_status":          nextRouted.Result.Status,
 			"failed_nets":             nextRouted.Result.Metrics.FailedNetCount,
 			"routed_nets":             nextRouted.Result.Metrics.RoutedNetCount,
+			"eligible_ref_count":      adjustment.EligibleRefs,
+			"blocked_ref_count":       adjustment.BlockedRefs,
 		})
 		if routingAttemptBetter(nextRouted, bestRouted) {
 			bestPlaced = nextPlaced

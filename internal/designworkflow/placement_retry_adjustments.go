@@ -20,6 +20,8 @@ type PlacementRetryAdjustment struct {
 	SpacingDeltaMM float64  `json:"spacing_delta_mm,omitempty"`
 	ProximityRules []string `json:"proximity_rules,omitempty"`
 	SkippedReasons []string `json:"skipped_reasons,omitempty"`
+	EligibleRefs   int      `json:"eligible_refs,omitempty"`
+	BlockedRefs    int      `json:"blocked_refs,omitempty"`
 }
 
 func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementRetryHint, attempt int) (placement.Request, PlacementRetryAdjustment) {
@@ -31,6 +33,9 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 	adjustment := PlacementRetryAdjustment{Attempt: attempt}
 	refsByNet := placementRetryRefsByNet(adjusted)
 	complexityByRef := placementRetryComponentComplexity(adjusted.Components)
+	movableRefs, blockedRefs := placementRetryMobilityRefs(adjusted.Components)
+	adjustment.EligibleRefs = len(movableRefs)
+	adjustment.BlockedRefs = len(blockedRefs)
 	spacingDelta := min(placementRetryMaxSpacingDeltaMM, float64(attempt)*placementRetryBaseSpacingDeltaMM)
 	orderedHints := slices.Clone(hints)
 	for index := range orderedHints {
@@ -49,23 +54,31 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 	})
 	for _, hint := range orderedHints {
 		if !hint.RetryEligible {
-			adjustment.SkippedReasons = append(adjustment.SkippedReasons, "ineligible:"+string(hint.Category))
+			addPlacementRetrySkippedReason(&adjustment, "ineligible:"+string(hint.Category))
 			continue
 		}
 		switch hint.Category {
 		case PlacementRetryIncreaseSpacing, PlacementRetryImproveFanout, PlacementRetryMoveFromEdge:
+			if len(movableRefs) == 0 {
+				addPlacementRetrySkippedReason(&adjustment, "mobility:no_movable_candidates")
+				continue
+			}
 			if spacingDelta > adjustment.SpacingDeltaMM {
 				adjustment.SpacingDeltaMM = spacingDelta
 			}
 		case PlacementRetryReduceDistance:
-			added := addRetryProximityRules(&adjusted, hint, refsByNet, complexityByRef, existingRuleIDs)
+			if len(movableRefs) == 0 {
+				addPlacementRetrySkippedReason(&adjustment, "mobility:no_movable_candidates")
+				continue
+			}
+			added := addRetryProximityRules(&adjusted, hint, refsByNet, complexityByRef, movableRefs, existingRuleIDs)
 			if len(added) == 0 {
-				adjustment.SkippedReasons = append(adjustment.SkippedReasons, "reduce_distance:no_ref_pair")
+				addPlacementRetrySkippedReason(&adjustment, "reduce_distance:no_ref_pair")
 				continue
 			}
 			adjustment.ProximityRules = append(adjustment.ProximityRules, added...)
 		default:
-			adjustment.SkippedReasons = append(adjustment.SkippedReasons, "unsupported:"+string(hint.Category))
+			addPlacementRetrySkippedReason(&adjustment, "unsupported:"+string(hint.Category))
 		}
 	}
 	if adjustment.SpacingDeltaMM > 0 {
@@ -81,14 +94,17 @@ func BuildPlacementRetryAdjustment(request placement.Request, hints []PlacementR
 	return adjusted, adjustment
 }
 
-func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint, refsByNet map[string][]string, complexityByRef map[string]float64, existingRuleIDs map[string]struct{}) []string {
+func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint, refsByNet map[string][]string, complexityByRef map[string]float64, movableRefs map[string]struct{}, existingRuleIDs map[string]struct{}) []string {
 	var added []string
 	for _, netName := range hint.Nets {
 		refs := refsByNet[netName]
 		if len(refs) < 2 {
 			continue
 		}
-		anchor, targets := placementRetryAnchorAndTargets(refs, complexityByRef)
+		anchor, targets := placementRetryAnchorAndMovableTargets(refs, complexityByRef, movableRefs)
+		if anchor == "" || len(targets) == 0 {
+			continue
+		}
 		for _, target := range targets {
 			ruleID := "retry_reduce_distance:" + netName + ":" + anchor + ":" + target
 			if _, ok := existingRuleIDs[ruleID]; ok {
@@ -107,6 +123,50 @@ func addRetryProximityRules(request *placement.Request, hint PlacementRetryHint,
 		}
 	}
 	return added
+}
+
+func addPlacementRetrySkippedReason(adjustment *PlacementRetryAdjustment, reason string) {
+	if reason == "" {
+		return
+	}
+	if slices.Contains(adjustment.SkippedReasons, reason) {
+		return
+	}
+	adjustment.SkippedReasons = append(adjustment.SkippedReasons, reason)
+}
+
+func placementRetryMobilityRefs(components []placement.Component) (map[string]struct{}, map[string]struct{}) {
+	movable := make(map[string]struct{}, len(components))
+	blocked := make(map[string]struct{}, len(components))
+	for _, component := range components {
+		ref := component.Ref
+		if ref == "" {
+			continue
+		}
+		if placementRetryComponentMovable(component) {
+			movable[ref] = struct{}{}
+			delete(blocked, ref)
+		} else {
+			if _, ok := movable[ref]; !ok {
+				blocked[ref] = struct{}{}
+			}
+		}
+	}
+	return movable, blocked
+}
+
+func placementRetryComponentMovable(component placement.Component) bool {
+	if component.Fixed {
+		return false
+	}
+	switch component.Mobility.Class {
+	case placement.MobilityGroupTransform, placement.MobilityLocalRebuild, placement.MobilitySoftPreferred:
+		return component.Mobility.RouteHandling != placement.RouteHandlingUnsupported
+	case placement.MobilityUnowned, "":
+		return component.Mobility.OwnerScope == ""
+	default:
+		return false
+	}
 }
 
 func placementRetryComponentComplexity(components []placement.Component) map[string]float64 {
@@ -128,6 +188,22 @@ func placementRetryAnchorAndTargets(refs []string, complexityByRef map[string]fl
 	anchor := ordered[0]
 	targets := slices.Clone(ordered[1:])
 	slices.Sort(targets)
+	return anchor, targets
+}
+
+func placementRetryAnchorAndMovableTargets(refs []string, complexityByRef map[string]float64, movableRefs map[string]struct{}) (string, []string) {
+	anchor, orderedTargets := placementRetryAnchorAndTargets(refs, complexityByRef)
+	targets := make([]string, 0, len(orderedTargets))
+	for _, target := range orderedTargets {
+		if _, ok := movableRefs[target]; ok {
+			targets = append(targets, target)
+		}
+	}
+	if _, ok := movableRefs[anchor]; ok && len(targets) == 0 {
+		if len(orderedTargets) > 0 {
+			return orderedTargets[0], []string{anchor}
+		}
+	}
 	return anchor, targets
 }
 

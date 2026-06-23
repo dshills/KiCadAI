@@ -99,14 +99,13 @@ func TestRetryGoldenReduceDistanceFixture(t *testing.T) {
 	req := retryGoldenPlacementRequest()
 	adjusted, adjustment := BuildPlacementRetryAdjustment(req, hints, 1)
 	wantRules := []string{
-		"retry_reduce_distance:SDA:U1:J1",
 		"retry_reduce_distance:SDA:U1:R1",
 	}
 	if !adjustment.Applied || !retryGoldenSameStrings(adjustment.ProximityRules, wantRules) {
 		t.Fatalf("adjustment = %#v, want rules %#v", adjustment, wantRules)
 	}
 	rulesByID := retryGoldenProximityRulesByID(&adjusted)
-	if len(rulesByID) != 2 {
+	if len(rulesByID) != 1 {
 		t.Fatalf("proximity rules = %#v", adjusted.ProximityRules)
 	}
 	for _, wantID := range wantRules {

@@ -37,6 +37,54 @@ func TestBuildPlacementRetryAdjustmentAddsReduceDistanceRule(t *testing.T) {
 	}
 }
 
+func TestBuildPlacementRetryAdjustmentTargetsMovableRefs(t *testing.T) {
+	req := retryPlacementRequest()
+	req.Components[0].Mobility = placement.MobilityPolicy{Class: placement.MobilityLocalRebuild, RouteHandling: placement.RouteHandlingInvalidateRebuild, OwnerScope: "generated"}
+	req.Components[1].Fixed = true
+	req.Components[1].Mobility = placement.MobilityPolicy{Class: placement.MobilityFixed, RouteHandling: placement.RouteHandlingPreserveFixed, OwnerScope: "generated"}
+	req = placement.NormalizeRequest(req)
+
+	adjusted, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
+		Category:      PlacementRetryReduceDistance,
+		RetryEligible: true,
+		Nets:          []string{"N1"},
+	}}, 1)
+
+	if !adjustment.Applied || len(adjustment.ProximityRules) != 1 {
+		t.Fatalf("adjustment = %#v", adjustment)
+	}
+	if adjusted.ProximityRules[0].TargetRefs[0] != "R1" {
+		t.Fatalf("proximity rule should target movable ref R1: %#v", adjusted.ProximityRules[0])
+	}
+	if adjustment.EligibleRefs != 2 {
+		t.Fatalf("eligible refs = %#v", adjustment.EligibleRefs)
+	}
+	if adjustment.BlockedRefs != 1 {
+		t.Fatalf("blocked refs = %#v", adjustment.BlockedRefs)
+	}
+}
+
+func TestBuildPlacementRetryAdjustmentSkipsWithoutMovableRefs(t *testing.T) {
+	req := retryPlacementRequest()
+	for index := range req.Components {
+		req.Components[index].Fixed = true
+		req.Components[index].Position = &placement.Placement{XMM: float64(index + 1), YMM: 1}
+		req.Components[index].Mobility = placement.MobilityPolicy{Class: placement.MobilityFixed, RouteHandling: placement.RouteHandlingPreserveFixed, OwnerScope: "generated"}
+	}
+
+	_, adjustment := BuildPlacementRetryAdjustment(req, []PlacementRetryHint{{
+		Category:      PlacementRetryIncreaseSpacing,
+		RetryEligible: true,
+	}}, 1)
+
+	if adjustment.Applied {
+		t.Fatalf("adjustment applied without movable refs: %#v", adjustment)
+	}
+	if len(adjustment.SkippedReasons) != 1 || adjustment.SkippedReasons[0] != "mobility:no_movable_candidates" {
+		t.Fatalf("skipped reasons = %#v", adjustment.SkippedReasons)
+	}
+}
+
 func TestBuildPlacementRetryAdjustmentPreservesFixedComponents(t *testing.T) {
 	req := retryPlacementRequest()
 	req.Components[0].Fixed = true
