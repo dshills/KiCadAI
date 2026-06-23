@@ -112,12 +112,14 @@ func ensureStageSummary(stage *StageResult) {
 func placeAdjustedRequest(ctx context.Context, request placement.Request) PlacementStageResult {
 	result := placement.PlaceContext(ctx, request)
 	stage := NewStageResult(StagePlacement, result.Issues)
+	mobilitySummary := placement.MobilitySummaryForComponents(request.Components)
 	stage.Summary = map[string]any{
 		"component_count": result.Metrics.ComponentCount,
 		"placed_count":    result.Metrics.PlacedCount,
 		"unplaced_count":  result.Metrics.UnplacedCount,
 		"fixed_count":     result.Metrics.FixedCount,
 		"retry":           true,
+		"mobility":        mobilitySummary,
 	}
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning

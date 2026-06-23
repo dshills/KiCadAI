@@ -30,6 +30,10 @@ func TestRoutePlacementUsesGeneratedPadSummariesForLocalRoutes(t *testing.T) {
 	if result.Stage.Status != StageStatusBlocked {
 		t.Fatalf("stage = %#v, want blocked on real generated route connectivity", result.Stage)
 	}
+	localRoutes, ok := result.Stage.Summary["local_route_mobility"].(LocalRouteMobilitySummary)
+	if !ok || localRoutes.Total == 0 || localRoutes.Preserved == 0 {
+		t.Fatalf("local route mobility summary = %#v", result.Stage.Summary["local_route_mobility"])
+	}
 	assertIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
 }
 

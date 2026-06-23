@@ -37,12 +37,19 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		}})}
 	}
 	localOperations := localRouteOperations(fragments)
+	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
 	if opts.Skip || request.Validation.SkipRouting {
-		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{"reason": "routing skipped"}}
+		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
+			"reason":               "routing skipped",
+			"local_route_mobility": localRouteMobility,
+		}}
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
 	}
 	if placed.Stage.Status == StageStatusBlocked || reports.HasBlockingIssue(placed.Stage.Issues) {
-		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{"reason": "placement did not complete"}}
+		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
+			"reason":               "placement did not complete",
+			"local_route_mobility": localRouteMobility,
+		}}
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
 	}
 
@@ -64,6 +71,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"failed_nets":            result.Metrics.FailedNetCount,
 		"status":                 result.Status,
 		"repair_diagnostics":     len(routeDiagnostics),
+		"local_route_mobility":   localRouteMobility,
 	}
 	if result.Quality != nil {
 		stage.Summary["quality_score"] = result.Quality.Score.Overall
