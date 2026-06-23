@@ -75,9 +75,8 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		Name:     "ESD Protection",
 		Category: "protection",
 		Gaps: []string{
-			"standalone block generator is not implemented",
-			"requires verified TVS component metadata",
 			"requires route-through placement rules",
+			"requires signal-class-specific surge and capacitance selection",
 		},
 	},
 	{
