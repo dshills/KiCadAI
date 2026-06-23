@@ -106,6 +106,7 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 			break
 		}
 		nextPlaced := placeAdjustedRequest(ctx, adjustedRequest)
+		preserveRetryPlacementEvidence(&nextPlaced.Stage, currentPlaced.Stage)
 		if workflowStageBlocked(nextPlaced.Stage) {
 			summary.StopReason = "placement_blocked"
 			break
@@ -127,17 +128,24 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 		attemptSummary.EligibleRefCount = adjustment.EligibleRefs
 		attemptSummary.BlockedRefCount = adjustment.BlockedRefs
 		attemptSummary.RegressionFlags = placementRoutingRegressionFlags(attemptSummary, bestAttempt)
-		if routingAttemptBetter(nextRouted, bestRouted) {
+		improved := placementRoutingAttemptBetter(attemptSummary, bestAttempt, policy)
+		if improved {
 			bestPlaced = nextPlaced
 			bestRouted = nextRouted
-			attemptSummary.SelectedReason = routingAttemptSelectionReason(nextRouted, bestAttempt)
+			attemptSummary.SelectedReason = placementRoutingAttemptSelectionReason(attemptSummary, bestAttempt, policy)
 			bestAttempt = attemptSummary
-		} else if policy.StopOnNonImprovement {
-			summary.AttemptHistory = append(summary.AttemptHistory, attemptSummary)
+		}
+		summary.AttemptHistory = append(summary.AttemptHistory, attemptSummary)
+		if !improved && policy.StopOnNewBlockers && slices.Contains(attemptSummary.RegressionFlags, "drc_regression") {
+			summary.StopReason = "drc_regression"
+			break
+		} else if !improved && policy.StopOnNewBlockers && slices.Contains(attemptSummary.RegressionFlags, "board_validation_regression") {
+			summary.StopReason = "board_validation_regression"
+			break
+		} else if !improved && policy.StopOnNonImprovement {
 			summary.StopReason = "non_improving_retry"
 			break
 		}
-		summary.AttemptHistory = append(summary.AttemptHistory, attemptSummary)
 		currentPlaced = nextPlaced
 		currentRouted = nextRouted
 	}
@@ -176,6 +184,21 @@ func placeAdjustedRequest(ctx context.Context, request placement.Request) Placem
 	return PlacementStageResult{Request: request, Result: result, Stage: stage}
 }
 
+func preserveRetryPlacementEvidence(next *StageResult, current StageResult) {
+	if next == nil || current.Summary == nil {
+		return
+	}
+	ensureStageSummary(next)
+	for _, key := range []string{"pad_hydration"} {
+		if _, exists := next.Summary[key]; exists {
+			continue
+		}
+		if value, ok := current.Summary[key]; ok {
+			next.Summary[key] = value
+		}
+	}
+}
+
 func filterPlacementRetryHints(hints []PlacementRetryHint, policy RoutingRetryPolicySpec) []PlacementRetryHint {
 	allowed := map[PlacementRetryHintCategory]struct{}{}
 	for _, category := range policy.AllowedHintCategories {
@@ -211,16 +234,9 @@ func placementRetryHintCategoryStrings(hints []PlacementRetryHint) []string {
 }
 
 func routingAttemptBetter(candidate RoutingStageResult, current RoutingStageResult) bool {
-	if routingStatusRank(candidate.Result.Status) != routingStatusRank(current.Result.Status) {
-		return routingStatusRank(candidate.Result.Status) > routingStatusRank(current.Result.Status)
-	}
-	if candidate.Result.Metrics.FailedNetCount != current.Result.Metrics.FailedNetCount {
-		return candidate.Result.Metrics.FailedNetCount < current.Result.Metrics.FailedNetCount
-	}
-	if candidate.Result.Metrics.RoutedNetCount != current.Result.Metrics.RoutedNetCount {
-		return candidate.Result.Metrics.RoutedNetCount > current.Result.Metrics.RoutedNetCount
-	}
-	return false
+	candidateSummary := placementRoutingAttemptSummaryForResult(0, nil, nil, candidate, "")
+	currentSummary := placementRoutingAttemptSummaryForResult(0, nil, nil, current, "")
+	return placementRoutingAttemptBetter(candidateSummary, currentSummary, RoutingRetryPolicySpec{})
 }
 
 func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStageResult, placed *PlacementStageResult, routed RoutingStageResult, adjustment string) placementRoutingRetryAttemptSummary {
@@ -238,7 +254,7 @@ func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStage
 		RegressionFlags:         nil,
 		BoardValidationBlocking: 0,
 	}
-	summary.BoardValidationIssueCount, summary.BoardValidationBlocking = summarizeRetryIssues(routed.Stage.Issues)
+	summary.BoardValidationIssueCount, summary.BoardValidationBlocking = boardValidationCountsFromRoutingStage(routed.Stage)
 	if baseline != nil {
 		summary.BaselineRoutingStatus = baseline.Result.Status
 		summary.BaselineRouteScore = routeQualityScore(*baseline)
@@ -314,16 +330,123 @@ func summarizeRetryIssues(issues []reports.Issue) (total int, blocking int) {
 	return total, blocking
 }
 
-func routingAttemptSelectionReason(candidate RoutingStageResult, previousBest placementRoutingRetryAttemptSummary) string {
+func boardValidationCountsFromRoutingStage(stage StageResult) (total int, blocking int) {
+	if stage.Summary != nil {
+		total = intFromRetrySummary(stage.Summary, "board_validation_issue_count")
+		blocking = intFromRetrySummary(stage.Summary, "board_validation_blocking")
+		if total > 0 || blocking > 0 {
+			return total, blocking
+		}
+	}
+	if stage.Name == StageValidation {
+		return summarizeRetryIssues(stage.Issues)
+	}
+	return 0, 0
+}
+
+func placementRoutingAttemptBetter(candidate, current placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) bool {
+	return comparePlacementRoutingAttempts(candidate, current, policy) > 0
+}
+
+func comparePlacementRoutingAttempts(candidate, current placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) int {
+	if policy.DRCPolicy == RetryDRCPolicyRequired {
+		candidateDRCOK := candidate.DRCBlockingCount == 0 && candidate.DRCStatus != retryEvidenceFail
+		currentDRCOK := current.DRCBlockingCount == 0 && current.DRCStatus != retryEvidenceFail
+		if candidateDRCOK != currentDRCOK {
+			if candidateDRCOK {
+				return 1
+			}
+			return -1
+		}
+	}
+	if candidate.BoardValidationBlocking != current.BoardValidationBlocking {
+		return lowerIsBetter(candidate.BoardValidationBlocking, current.BoardValidationBlocking)
+	}
+	if candidate.DRCBlockingCount != current.DRCBlockingCount {
+		return lowerIsBetter(candidate.DRCBlockingCount, current.DRCBlockingCount)
+	}
+	if routingStatusRank(candidate.RoutingStatus) != routingStatusRank(current.RoutingStatus) {
+		return higherIsBetter(routingStatusRank(candidate.RoutingStatus), routingStatusRank(current.RoutingStatus))
+	}
+	if candidate.FailedNets != current.FailedNets {
+		return lowerIsBetter(candidate.FailedNets, current.FailedNets)
+	}
+	if candidate.RoutedNets != current.RoutedNets {
+		return higherIsBetter(candidate.RoutedNets, current.RoutedNets)
+	}
+	if candidate.RouteScore != current.RouteScore {
+		return higherFloatIsBetter(candidate.RouteScore, current.RouteScore)
+	}
+	return lowerIsBetter(candidate.Attempt, current.Attempt)
+}
+
+func placementRoutingAttemptSelectionReason(candidate, previousBest placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) string {
 	switch {
-	case routingStatusRank(candidate.Result.Status) > routingStatusRank(previousBest.RoutingStatus):
+	case policy.DRCPolicy == RetryDRCPolicyRequired && candidate.DRCBlockingCount == 0 && previousBest.DRCBlockingCount > 0:
+		return "required_drc_cleaner"
+	case candidate.BoardValidationBlocking < previousBest.BoardValidationBlocking:
+		return "fewer_board_validation_blockers"
+	case candidate.DRCBlockingCount < previousBest.DRCBlockingCount:
+		return "fewer_drc_blockers"
+	case routingStatusRank(candidate.RoutingStatus) > routingStatusRank(previousBest.RoutingStatus):
 		return "routing_status_improved"
-	case candidate.Result.Metrics.FailedNetCount < previousBest.FailedNets:
+	case candidate.FailedNets < previousBest.FailedNets:
 		return "fewer_failed_nets"
-	case candidate.Result.Metrics.RoutedNetCount > previousBest.RoutedNets:
+	case candidate.RoutedNets > previousBest.RoutedNets:
 		return "more_routed_nets"
+	case candidate.RouteScore > previousBest.RouteScore:
+		return "higher_route_quality"
 	default:
 		return "best_ranked_attempt"
+	}
+}
+
+func lowerIsBetter(candidate, current int) int {
+	switch {
+	case candidate < current:
+		return 1
+	case candidate > current:
+		return -1
+	default:
+		return 0
+	}
+}
+
+func higherIsBetter(candidate, current int) int {
+	switch {
+	case candidate > current:
+		return 1
+	case candidate < current:
+		return -1
+	default:
+		return 0
+	}
+}
+
+func higherFloatIsBetter(candidate, current float64) int {
+	switch {
+	case candidate > current:
+		return 1
+	case candidate < current:
+		return -1
+	default:
+		return 0
+	}
+}
+
+func intFromRetrySummary(summary map[string]any, key string) int {
+	if summary == nil {
+		return 0
+	}
+	switch value := summary[key].(type) {
+	case int:
+		return value
+	case int64:
+		return int(value)
+	case float64:
+		return int(math.Round(value))
+	default:
+		return 0
 	}
 }
 
@@ -359,8 +482,10 @@ func routingStatusRank(status routing.Status) int {
 		return 3
 	case routing.StatusPartial:
 		return 2
-	default:
+	case routing.StatusBlocked:
 		return 1
+	default:
+		return 0
 	}
 }
 

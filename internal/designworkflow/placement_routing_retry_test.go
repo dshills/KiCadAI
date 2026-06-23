@@ -46,6 +46,71 @@ func TestRoutingAttemptBetterPrefersRoutedStatus(t *testing.T) {
 	}
 }
 
+func TestPlacementRoutingAttemptRankingPrefersValidationBlockersOverRoutedNets(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{
+		Attempt:                 1,
+		RoutingStatus:           routing.StatusPartial,
+		RoutedNets:              2,
+		FailedNets:              1,
+		BoardValidationBlocking: 0,
+	}
+	candidate := placementRoutingRetryAttemptSummary{
+		Attempt:                 2,
+		RoutingStatus:           routing.StatusPartial,
+		RoutedNets:              4,
+		FailedNets:              0,
+		BoardValidationBlocking: 1,
+	}
+
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("candidate with validation blocker should not outrank current")
+	}
+}
+
+func TestPlacementRoutingAttemptRankingRequiresCleanDRCWhenRequired(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{
+		Attempt:          1,
+		RoutingStatus:    routing.StatusPartial,
+		RoutedNets:       1,
+		DRCStatus:        retryEvidencePass,
+		DRCBlockingCount: 0,
+	}
+	candidate := placementRoutingRetryAttemptSummary{
+		Attempt:          2,
+		RoutingStatus:    routing.StatusRouted,
+		RoutedNets:       3,
+		DRCStatus:        retryEvidenceFail,
+		DRCBlockingCount: 1,
+	}
+
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{DRCPolicy: RetryDRCPolicyRequired}) {
+		t.Fatalf("candidate with required DRC failure should not outrank clean current")
+	}
+}
+
+func TestPlacementRoutingAttemptRankingUsesScoresAndAttemptTieBreak(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{Attempt: 1, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.5, PlacementScore: 0.5}
+	candidate := placementRoutingRetryAttemptSummary{Attempt: 2, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.7, PlacementScore: 0.5}
+	if !placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("higher route score should rank better")
+	}
+	tiedLater := current
+	tiedLater.Attempt = 3
+	if placementRoutingAttemptBetter(tiedLater, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("later tied attempt should not outrank earlier attempt")
+	}
+}
+
+func TestPlacementRoutingAttemptSelectionReasons(t *testing.T) {
+	previous := placementRoutingRetryAttemptSummary{Attempt: 1, RoutingStatus: routing.StatusPartial, RoutedNets: 1, DRCBlockingCount: 1}
+	candidate := placementRoutingRetryAttemptSummary{Attempt: 2, RoutingStatus: routing.StatusPartial, RoutedNets: 1, DRCBlockingCount: 0}
+
+	reason := placementRoutingAttemptSelectionReason(candidate, previous, RoutingRetryPolicySpec{DRCPolicy: RetryDRCPolicyRequired})
+	if reason != "required_drc_cleaner" {
+		t.Fatalf("selection reason = %q", reason)
+	}
+}
+
 func TestPlacementRoutingRetryAttemptSummaryNormalizesEvidence(t *testing.T) {
 	summary := normalizePlacementRoutingRetryAttempt(placementRoutingRetryAttemptSummary{
 		Attempt:            -1,
@@ -62,7 +127,7 @@ func TestPlacementRoutingRetryAttemptSummaryNormalizesEvidence(t *testing.T) {
 	}
 }
 
-func TestPlacementRoutingRetryAttemptSummaryCountsIssues(t *testing.T) {
+func TestPlacementRoutingRetryAttemptSummaryDoesNotTreatRoutingIssuesAsBoardValidation(t *testing.T) {
 	routed := RoutingStageResult{
 		Result: routing.Result{Status: routing.StatusPartial},
 		Stage: StageResult{Issues: []reports.Issue{
@@ -77,7 +142,7 @@ func TestPlacementRoutingRetryAttemptSummaryCountsIssues(t *testing.T) {
 	if summary.Attempt != 2 || summary.RoutingStatus != routing.StatusPartial || summary.RoutedNets != 1 || summary.FailedNets != 2 {
 		t.Fatalf("route summary = %#v", summary)
 	}
-	if summary.BoardValidationIssueCount != 2 || summary.BoardValidationBlocking != 1 {
+	if summary.BoardValidationIssueCount != 0 || summary.BoardValidationBlocking != 0 {
 		t.Fatalf("issue summary = %#v", summary)
 	}
 }
