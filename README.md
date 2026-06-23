@@ -1095,10 +1095,10 @@ fixtures, so a stable real DRC fixture remains a follow-up.
 
 The `export` command family evaluates whether a project has enough evidence to
 claim fabrication readiness and can produce deterministic package metadata,
-BOM, and CPL reports. These commands are intended for machine-to-machine
-workflows today, so they are dry-run by default and require `--json`. If
-`--json` is omitted, the CLI returns the standard structured-command usage
-error instead of a human summary.
+BOM, CPL, Gerber, and drill reports. These commands are intended for
+machine-to-machine workflows today, so they are dry-run by default and require
+`--json`. If `--json` is omitted, the CLI returns the standard
+structured-command usage error instead of a human summary.
 
 ```sh
 go run ./cmd/kicadai --json export preview ./project
@@ -1107,10 +1107,15 @@ go run ./cmd/kicadai --json export fabrication ./project
 ```
 
 Use `--execute` to write files and `--overwrite` to replace existing package
-files:
+files. KiCad CLI is required for Gerber and drill generation:
 
 ```sh
-go run ./cmd/kicadai --json --execute --overwrite export fabrication ./project
+go run ./cmd/kicadai \
+  --json \
+  --execute \
+  --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  export fabrication ./project
 ```
 
 Default package paths are under `<project>/fabrication/`:
@@ -1119,20 +1124,23 @@ Default package paths are under `<project>/fabrication/`:
 - `package-manifest.json`
 - `bom.csv`
 - `cpl.csv`
+- `gerbers/`
+- `drill/`
 
 Readiness statuses are intentionally conservative:
 
 - `blocked`: required project files, writer/board validation, report data, or
   configured external evidence is missing or failing.
 - `candidate`: the project has partial evidence, but not enough to claim ready.
-- `ready`: all modeled required evidence passes. This status is possible only
-  when the required evidence already exists; KiCadAI does not yet generate
-  Gerber or drill files itself, so most generated projects remain `blocked` or
-  `candidate` until those artifacts are supplied by another flow.
+- `ready`: all modeled required evidence passes. KiCadAI can now generate and
+  validate Gerber/drill evidence through `kicad-cli`, but readiness remains
+  blocked or candidate when any modeled evidence is missing or failing.
 
 KiCad CLI evidence is policy-driven. Without `--kicad-cli`, preview and export
-stay deterministic and do not invoke external tools. With `--kicad-cli`, missing
-Gerber, drill, ERC, and DRC evidence is visible as optional evidence; missing
+stay deterministic and do not invoke external tools. With `--kicad-cli` and
+`--execute`, `export fabrication` invokes KiCad CLI to generate Gerber and drill
+outputs, validates required copper, mask, silkscreen, Edge.Cuts, and drill
+files, and records generated file lists in `package-manifest.json`. Missing
 `ready`-level evidence keeps the status at `candidate` or `blocked`, never
 `ready`. With `--require-drc`, missing or failing external fabrication evidence
 is blocking. `design create` now runs a dry-run fabrication preview only when
@@ -1143,6 +1151,12 @@ an enum value; the output field `acceptance.fabrication_ready` is a JSON field
 name and boolean. In the output workflow result, partial readiness status
 (`candidate` or `blocked`) downgrades the achieved acceptance and leaves
 `acceptance.fabrication_ready` false.
+
+This is still not a manufacturer acceptance guarantee. KiCadAI validates the
+presence and non-empty contents of modeled fabrication outputs, but broader DFM
+checks such as manufacturer-specific stackups, annular ring policy, solder
+slivers, impedance, panelization, assembly notes, and procurement readiness
+remain separate gates.
 
 ## Examples
 

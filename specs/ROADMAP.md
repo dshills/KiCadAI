@@ -460,15 +460,14 @@ exist. The `export preview`, `export bom`, and `export fabrication` commands
 evaluate project readiness, model `blocked`/`candidate`/`ready` status,
 generate deterministic BOM/CPL reports where evidence exists, enforce safe
 dry-run/execute/overwrite behavior, emit package manifests/readiness reports,
-and expose optional or required KiCad CLI evidence policy. `design create`
-treats `validation.acceptance: fabrication-candidate` as a request to prove
+generate and validate KiCad-CLI-backed Gerber/drill artifacts, and expose
+optional or required KiCad CLI evidence policy. `design create` treats
+`validation.acceptance: fabrication-candidate` as a request to prove
 fabrication readiness; partial readiness status (`candidate` or `blocked`)
 downgrades achieved acceptance and leaves `acceptance.fabrication_ready` false.
 
 ### Remaining Work
 
-- Generate and validate Gerbers and drill files, then attach those artifacts to
-  the package manifest.
 - Strengthen BOM and CPL source data with richer component identity,
   manufacturer, MPN, side, rotation, and placement provenance.
 - Add stackup, net class, solder mask, paste, edge cuts, courtyard, silkscreen,
@@ -479,8 +478,8 @@ downgrades achieved acceptance and leaves `acceptance.fabrication_ready` false.
 
 ### Acceptance Gates
 
-- A generated board can produce a complete fabrication package when Gerber and
-  drill generation are implemented.
+- A generated board can produce a fabrication package with KiCad-CLI-backed
+  Gerber/drill evidence when a local KiCad CLI is configured.
 - Missing fab artifacts or failed checks block "ready" status.
 - Output package contents are deterministic and test-covered.
 
@@ -519,9 +518,10 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Generate and validate Gerber/drill evidence for fabrication packages.
-2. Expand placement-routing retry with larger-board convergence and KiCad
+1. Expand placement-routing retry with larger-board convergence and KiCad
    DRC-backed layout evidence.
+2. Strengthen BOM/CPL, component identity, and manufacturer profile evidence
+   for fabrication packages.
 3. Expand verified component and block coverage alongside each new block
    family.
 4. Add intent-level planning only after the above gates are reliable.
