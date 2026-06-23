@@ -84,9 +84,8 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		Name:     "Reverse-Polarity Protection",
 		Category: "protection",
 		Gaps: []string{
-			"standalone block generator is not implemented",
-			"requires verified protection topology metadata",
-			"requires current and thermal rating checks",
+			"requires ideal-diode MOSFET controller metadata",
+			"requires current and thermal rating checks beyond the generic 1A Schottky seed",
 		},
 	},
 }

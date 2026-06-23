@@ -29,29 +29,6 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 	}
 }
 
-func TestBuiltinInventoryReportsUnsupportedRoadmapGaps(t *testing.T) {
-	inventory := NewBuiltinRegistry().Inventory()
-	byID := map[string]BlockFamilyInventory{}
-	for _, family := range inventory.Families {
-		byID[family.ID] = family
-	}
-	for _, id := range []string{"reverse_polarity_protection"} {
-		family, ok := byID[id]
-		if !ok {
-			t.Fatalf("%s missing from inventory", id)
-		}
-		if family.Implemented {
-			t.Fatalf("%s unexpectedly implemented: %#v", id, family)
-		}
-		if family.Readiness != BlockReadinessUnsupported {
-			t.Fatalf("%s readiness = %q", id, family.Readiness)
-		}
-		if len(family.Gaps) == 0 {
-			t.Fatalf("%s missing actionable gaps", id)
-		}
-	}
-}
-
 func TestBuiltinInventorySummarizesImplementedBlockRules(t *testing.T) {
 	inventory := NewBuiltinRegistry().Inventory()
 	var led BlockFamilyInventory

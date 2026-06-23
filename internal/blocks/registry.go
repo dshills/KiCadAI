@@ -44,16 +44,17 @@ func NewBuiltinRegistry() BuiltinRegistry {
 func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 	registry := NewRegistry(BuiltinDefinitions())
 	registry.instantiators = map[string]BlockInstantiator{
-		"connector_breakout":       instantiateConnectorBreakout,
-		"crystal_oscillator":       instantiateCrystalOscillator,
-		"esd_protection":           instantiateESDProtection,
-		"i2c_sensor":               instantiateI2CSensor,
-		"led_indicator":            instantiateLEDIndicator,
-		"mcu_minimal":              instantiateMCUMinimal,
-		"opamp_gain_stage":         instantiateOpAmpGainStage,
-		"reset_programming_header": instantiateResetProgrammingHeader,
-		"usb_c_power":              instantiateUSBCPower,
-		"voltage_regulator":        instantiateVoltageRegulator,
+		"connector_breakout":          instantiateConnectorBreakout,
+		"crystal_oscillator":          instantiateCrystalOscillator,
+		"esd_protection":              instantiateESDProtection,
+		"i2c_sensor":                  instantiateI2CSensor,
+		"led_indicator":               instantiateLEDIndicator,
+		"mcu_minimal":                 instantiateMCUMinimal,
+		"opamp_gain_stage":            instantiateOpAmpGainStage,
+		"reset_programming_header":    instantiateResetProgrammingHeader,
+		"reverse_polarity_protection": instantiateReversePolarityProtection,
+		"usb_c_power":                 instantiateUSBCPower,
+		"voltage_regulator":           instantiateVoltageRegulator,
 	}
 	return registry, registry.Issues()
 }

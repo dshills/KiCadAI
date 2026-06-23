@@ -184,26 +184,6 @@ func TestMCUMinimalDefinitionDeclaresSystemRules(t *testing.T) {
 	assertRequiredRoutesDefined(t, definition.PCBRealization)
 }
 
-func TestCompanionBlockFamiliesRemainVisibleAsUnsupportedGaps(t *testing.T) {
-	inventory := NewBuiltinRegistry().Inventory()
-	byID := map[string]BlockFamilyInventory{}
-	for _, family := range inventory.Families {
-		byID[family.ID] = family
-	}
-	for _, id := range []string{"reverse_polarity_protection"} {
-		family, ok := byID[id]
-		if !ok {
-			t.Fatalf("family %s not found", id)
-		}
-		if family.Readiness != BlockReadinessUnsupported || family.Implemented {
-			t.Errorf("%s inventory = %#v", id, family)
-		}
-		if len(family.Gaps) == 0 {
-			t.Errorf("%s should include unsupported gap diagnostics", id)
-		}
-	}
-}
-
 func validationRuleIDs(rules []BlockValidationRule) []string {
 	ids := make([]string, 0, len(rules))
 	for _, rule := range rules {

@@ -18,6 +18,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		crystalOscillatorDefinition(),
 		resetProgrammingHeaderDefinition(),
 		esdProtectionDefinition(),
+		reversePolarityProtectionDefinition(),
 		usbCPowerDefinition(),
 		i2cSensorDefinition(),
 		opampGainStageDefinition(),
