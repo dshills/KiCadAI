@@ -108,9 +108,11 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
-- placement-routing retry exists with focused, pad-backed seed, generated
-  workflow evidence, and generated mobility policy; it still needs broader
-  proof of larger full-board convergence and DRC-grade layout quality;
+- placement-routing retry now includes focused pad-backed seeds, generated
+  workflow coverage, larger generated fixture families, selected attempt
+  evidence, optional DRC evidence, and generated mobility policy coverage. It
+  still needs broader real KiCad DRC-clean layout proof before it can be
+  treated as production layout quality;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
@@ -518,13 +520,11 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Expand placement-routing retry with larger-board convergence and KiCad
-   DRC-backed layout evidence.
-2. Strengthen BOM/CPL, component identity, and manufacturer profile evidence
+1. Strengthen BOM/CPL, component identity, and manufacturer profile evidence
    for fabrication packages.
-3. Expand verified component and block coverage alongside each new block
+2. Expand verified component and block coverage alongside each new block
    family.
-4. Add intent-level planning only after the above gates are reliable.
+3. Add intent-level planning only after the above gates are reliable.
 
 ## Definition Of Autonomous Ready
 

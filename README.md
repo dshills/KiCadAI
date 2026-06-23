@@ -337,8 +337,20 @@ attempt:
 ```
 
 Retry summaries are returned in the routing stage. They include attempt count,
-applied adjustment count, stop reason, hint categories, and compact attempt
-history.
+applied adjustment count, stop reason, selected attempt, selected reason, hint
+categories, and compact attempt history.
+
+Attempt history includes:
+
+- the baseline attempt plus each retry attempt;
+- routed, failed, and skipped net counts;
+- route and placement scores;
+- board validation counters when available;
+- DRC evidence status and source.
+
+Retry DRC evidence is skipped unless requested by `routing_retry.drc_policy`;
+optional or required real KiCad evidence is wired through the same adapter used
+by local smoke tests.
 
 Runnable example:
 
@@ -353,10 +365,12 @@ go run ./cmd/kicadai \
 
 Supported placement retry hint categories are `increase_spacing`,
 `improve_fanout`, `reduce_distance`, and `move_from_edge`. Routing-rule and
-unsupported-zone diagnostics are reported but intentionally skipped by placement
-retry. Common stop reasons include `disabled`, `routed`, `max_attempts`,
+unsupported-zone diagnostics are reported, but placement retry intentionally
+ignores those zones during its optimization loop. Common stop reasons include
+`disabled`, `routed`, `max_attempts`,
 `no_eligible_hints`, `no_safe_adjustment`, `placement_blocked`,
-`repeated_placement_state`, `non_improving_retry`, and `context_canceled`.
+`repeated_placement_state`, `non_improving_retry`, `drc_regression`,
+`board_validation_regression`, and `context_canceled`.
 Golden tests cover fixture loading, CLI retry summaries, supported category
 adjustments, unsupported skip behavior, path normalization, and convergence
 boundaries. Full-board retry tests also cover pad-backed seed boards where
@@ -368,7 +382,10 @@ The expanded retry corpus now also covers generated no-eligible-hint
 boundaries, generated multi-block pad-hydration and net-intent boundaries
 before routing, hard-constraint preservation under retry adjustment, generated
 mobility ownership, local-route mobility classification, and CLI selected-field
-evidence for generated retry output.
+evidence for generated retry output. Larger generated convergence fixtures now
+declare `multi-block-convergence`, `DRC-regression`, `no-convergence`,
+`fixed-boundary`, and `local-route-boundary` families for continued ranking and
+evidence hardening.
 
 In practical terms, retry is now proven at three levels: focused category and
 stop-condition unit coverage, pad-backed full-board seed coverage, and CLI
@@ -381,10 +398,10 @@ routes used `transformable`, `rebuildable`, `preserved`, or `blocked`
 handling.
 
 Retry remains opt-in and is a layout-improvement/diagnostic mechanism, not a
-fabrication-readiness claim. Current roadmap focus: validate fabrication outputs
-with Gerber/drill evidence so readiness reports can prove that generated
-packages are manufacturer-release candidates rather than only KiCad-parsable
-projects.
+fabrication-readiness claim. Current roadmap focus: strengthen BOM/CPL,
+component identity, and manufacturer profile evidence for fabrication packages
+now that retry convergence evidence and optional DRC evidence hooks are in
+place.
 
 ### Component Intelligence
 
