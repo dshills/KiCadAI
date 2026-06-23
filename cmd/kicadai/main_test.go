@@ -216,6 +216,12 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if stop, ok := retry["stop_reason"].(string); !ok || stop != "no_eligible_hints" {
 		t.Fatalf("retry stop = %#v", retry["stop_reason"])
 	}
+	if selectedAttempt, ok := retry["selected_attempt"].(float64); !ok || selectedAttempt != 1 {
+		t.Fatalf("selected attempt = %#v", retry["selected_attempt"])
+	}
+	if selectedReason, ok := retry["selected_reason"].(string); !ok || selectedReason == "" {
+		t.Fatalf("selected reason = %#v", retry["selected_reason"])
+	}
 	history, hasHistory := retry["attempt_history"].([]any)
 	if !hasHistory || len(history) != 1 {
 		t.Fatalf("retry attempt history = %#v, want baseline attempt only", retry["attempt_history"])
@@ -223,6 +229,12 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	first, ok := history[0].(map[string]any)
 	if !ok || first["attempt"] != float64(1) || first["selected"] != true {
 		t.Fatalf("retry baseline attempt = %#v", history[0])
+	}
+	if status, ok := first["drc_status"].(string); !ok || status != "skipped" {
+		t.Fatalf("baseline DRC status = %#v", first["drc_status"])
+	}
+	if source, ok := first["drc_source"].(string); !ok || source != "skipped" {
+		t.Fatalf("baseline DRC source = %#v", first["drc_source"])
 	}
 	if _, hasCategories := retry["hint_categories"]; hasCategories {
 		t.Fatalf("retry hint categories should be absent for no-eligible-hints boundary: %#v", retry["hint_categories"])
