@@ -82,6 +82,7 @@ type Artifact struct {
 	Required    bool            `json:"required,omitempty"`
 	Generator   Generator       `json:"generator,omitempty"`
 	Description string          `json:"description,omitempty"`
+	Files       []string        `json:"files,omitempty"`
 	Issues      []reports.Issue `json:"issues,omitempty"`
 }
 
@@ -198,6 +199,11 @@ func NormalizeManifest(manifest Manifest) Manifest {
 		if manifest.Artifacts[index].Issues == nil {
 			manifest.Artifacts[index].Issues = []reports.Issue{}
 		}
+		manifest.Artifacts[index].Files = slices.Clone(manifest.Artifacts[index].Files)
+		for fileIndex := range manifest.Artifacts[index].Files {
+			manifest.Artifacts[index].Files[fileIndex] = cleanManifestPath(manifest.Artifacts[index].Files[fileIndex])
+		}
+		slices.Sort(manifest.Artifacts[index].Files)
 		manifest.Artifacts[index].Path = cleanManifestPath(manifest.Artifacts[index].Path)
 		slices.SortFunc(manifest.Artifacts[index].Issues, compareIssues)
 	}
@@ -255,6 +261,12 @@ func ValidateManifest(manifest Manifest) []reports.Issue {
 			issues = append(issues, issue(artifactPath+".status", "artifact status is required"))
 		} else if !validArtifactStatus(artifact.Status) {
 			issues = append(issues, issue(artifactPath+".status", "unsupported artifact status"))
+		}
+		for fileIndex, file := range artifact.Files {
+			cleanedFile := cleanManifestPath(file)
+			if !cleanManifestPathInsidePackage(cleanedFile) {
+				issues = append(issues, issue(fmt.Sprintf("%s.files[%d]", artifactPath, fileIndex), "artifact file path must be relative and inside package root"))
+			}
 		}
 	}
 	for key, status := range manifest.Evidence {

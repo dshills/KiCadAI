@@ -2,6 +2,7 @@ package fabrication
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -76,6 +77,22 @@ func TestExportPackageExecuteWithFakeRunnerWritesPlotDirectories(t *testing.T) {
 	}
 	if result.Summary.Gerber != EvidencePass || result.Summary.Drill != EvidencePass {
 		t.Fatalf("summary gerber/drill = %s/%s, want pass/pass", result.Summary.Gerber, result.Summary.Drill)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "fabrication", "package-manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	gerber := manifestArtifact(manifest.Artifacts, ArtifactGerber)
+	if gerber.Generator != GeneratorKiCad || len(gerber.Files) == 0 {
+		t.Fatalf("gerber manifest artifact = %#v, want kicad-cli files", gerber)
+	}
+	drill := manifestArtifact(manifest.Artifacts, ArtifactDrill)
+	if drill.Generator != GeneratorKiCad || len(drill.Files) == 0 {
+		t.Fatalf("drill manifest artifact = %#v, want kicad-cli files", drill)
 	}
 }
 
@@ -252,6 +269,15 @@ func artifactPath(artifacts []Artifact, kind ArtifactKind) string {
 		}
 	}
 	return ""
+}
+
+func manifestArtifact(artifacts []Artifact, kind ArtifactKind) Artifact {
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind {
+			return artifact
+		}
+	}
+	return Artifact{}
 }
 
 type writingPlotRunner struct{}

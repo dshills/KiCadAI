@@ -310,25 +310,120 @@ func applyPlotArtifacts(artifacts []Artifact, plot PlotResult, gerberPath string
 	}
 	for _, command := range plot.Commands {
 		status := ArtifactExpected
+		generator := Generator("")
 		if command.SkippedReason != "" {
 			if len(plot.Issues) > 0 {
 				status = ArtifactBlocked
+			} else {
+				status = ArtifactSkipped
 			}
 		} else if command.ExitCode != 0 {
+			generator = GeneratorKiCad
 			status = ArtifactBlocked
 		} else if len(command.GeneratedPaths) > 0 {
+			generator = GeneratorKiCad
 			status = ArtifactGenerated
+		} else {
+			generator = GeneratorKiCad
 		}
 		switch command.Kind {
 		case PlotKindGerber:
-			gerberStatus = status
+			gerberStatus = combineArtifactStatus(gerberStatus, status)
+			artifacts = setArtifactEvidence(artifacts, ArtifactGerber, generator, command.GeneratedPaths)
 		case PlotKindDrill:
-			drillStatus = status
+			drillStatus = combineArtifactStatus(drillStatus, status)
+			artifacts = setArtifactEvidence(artifacts, ArtifactDrill, generator, command.GeneratedPaths)
 		}
 	}
+	if len(plot.Issues) > 0 {
+		artifacts = setArtifactIssues(artifacts, ArtifactGerber, plot.Issues)
+		artifacts = setArtifactIssues(artifacts, ArtifactDrill, plot.Issues)
+	}
+	artifacts = finalizeArtifactFiles(artifacts, ArtifactGerber)
+	artifacts = finalizeArtifactFiles(artifacts, ArtifactDrill)
 	artifacts = markArtifact(artifacts, ArtifactGerber, gerberPath, gerberStatus)
 	artifacts = markArtifact(artifacts, ArtifactDrill, drillPath, drillStatus)
 	return artifacts
+}
+
+func setArtifactEvidence(artifacts []Artifact, kind ArtifactKind, generator Generator, files []string) []Artifact {
+	for index := range artifacts {
+		if artifacts[index].Kind != kind {
+			continue
+		}
+		if generator != "" {
+			artifacts[index].Generator = generator
+		}
+		if len(files) > 0 {
+			artifacts[index].Files = append(artifacts[index].Files, files...)
+		}
+	}
+	return artifacts
+}
+
+func finalizeArtifactFiles(artifacts []Artifact, kind ArtifactKind) []Artifact {
+	for index := range artifacts {
+		if artifacts[index].Kind != kind {
+			continue
+		}
+		artifacts[index].Files = dedupeStrings(artifacts[index].Files)
+		slices.Sort(artifacts[index].Files)
+	}
+	return artifacts
+}
+
+func setArtifactIssues(artifacts []Artifact, kind ArtifactKind, issues []reports.Issue) []Artifact {
+	for index := range artifacts {
+		if artifacts[index].Kind != kind {
+			continue
+		}
+		artifacts[index].Issues = dedupeIssues(append(artifacts[index].Issues, issues...))
+		slices.SortFunc(artifacts[index].Issues, compareIssues)
+	}
+	return artifacts
+}
+
+func combineArtifactStatus(current ArtifactStatus, next ArtifactStatus) ArtifactStatus {
+	if current == ArtifactExpected {
+		return next
+	}
+	if next == ArtifactExpected {
+		return current
+	}
+	if artifactStatusRank(next) < artifactStatusRank(current) {
+		return next
+	}
+	return current
+}
+
+func artifactStatusRank(status ArtifactStatus) int {
+	switch status {
+	case ArtifactBlocked:
+		return 0
+	case ArtifactMissing:
+		return 1
+	case ArtifactGenerated:
+		return 2
+	case ArtifactSkipped:
+		return 3
+	case ArtifactExpected:
+		return 4
+	default:
+		return 0
+	}
+}
+
+func dedupeStrings(values []string) []string {
+	seen := map[string]struct{}{}
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func applyArtifactValidation(artifacts []Artifact, validation FabricationArtifactValidation, gerberPath string, drillPath string) []Artifact {
