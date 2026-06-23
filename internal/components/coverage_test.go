@@ -2,10 +2,13 @@ package components
 
 import (
 	"context"
+	"slices"
 	"testing"
 
 	"kicadai/internal/reports"
 )
+
+var verifiedExpansionTargetFamilies = []string{"connector", "crystal", "diode", "protection", "usb_c"}
 
 func TestComponentCoverageCountsCatalog(t *testing.T) {
 	catalog := validCatalog()
@@ -73,4 +76,51 @@ func TestCheckedInCatalogCoverageIsDeterministic(t *testing.T) {
 			t.Fatalf("families not sorted: %+v", report.Families)
 		}
 	}
+}
+
+func TestCheckedInCatalogIncludesVerifiedExpansionFamilies(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	report, result := ComponentCoverage(catalog, CoverageOptions{RequiredFamilies: verifiedExpansionTargetFamilies})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("coverage should not block: %+v", result.Issues)
+	}
+	for _, family := range verifiedExpansionTargetFamilies {
+		coverage, ok := familyCoverageByID(report, family)
+		if !ok {
+			t.Errorf("missing family coverage for %s; found families: %#v", family, familyIDs(report))
+			continue
+		}
+		if coverage.RecordCount == 0 {
+			t.Errorf("family %s has no records", family)
+		}
+	}
+}
+
+func TestDefaultRoadmapRequiredFamiliesIncludeCoverageExpansionTargets(t *testing.T) {
+	required := defaultRoadmapRequiredFamilies()
+	for _, family := range verifiedExpansionTargetFamilies {
+		if !slices.Contains(required, family) {
+			t.Errorf("default required families missing %s: %#v", family, required)
+		}
+	}
+}
+
+func familyCoverageByID(report CoverageReport, family string) (FamilyCoverage, bool) {
+	for _, coverage := range report.Families {
+		if coverage.Family == family {
+			return coverage, true
+		}
+	}
+	return FamilyCoverage{}, false
+}
+
+func familyIDs(report CoverageReport) []string {
+	ids := make([]string, 0, len(report.Families))
+	for _, coverage := range report.Families {
+		ids = append(ids, coverage.Family)
+	}
+	return ids
 }
