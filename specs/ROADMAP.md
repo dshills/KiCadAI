@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-22
+Date: 2026-06-23
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -67,7 +67,10 @@ from validation feedback to safe automatic repair.
   conditions, CLI output, evidence of improvement in pad-backed full-board
   seeds, generated hydrated-pad and no-eligible-hint boundaries, generated
   multi-block pad-hydration and net-intent boundaries, and hard-constraint
-  preservation under retry adjustment.
+  preservation under retry adjustment. Generated placement participants now
+  carry explicit mobility policy, including `fixed`, `group_transform`,
+  `local_rebuild`, `soft_preferred`, and `unowned` classes, and retry evidence
+  reports eligible refs, blocked refs, and `local_route_mobility` handling.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -105,9 +108,9 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families;
 - placement and routing need stronger rules for real PCB quality;
-- placement-routing retry exists with focused, pad-backed seed, and generated
-  workflow evidence; generated workflows now hydrate footprint pad summaries,
-  but still need broader proof of real full-board retry improvement;
+- placement-routing retry exists with focused, pad-backed seed, generated
+  workflow evidence, and generated mobility policy; it still needs broader
+  proof of larger full-board convergence and DRC-grade layout quality;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
 - repair can persist generated-project changes, but imported-project mutation
@@ -308,9 +311,9 @@ intent and quality evidence for:
 - golden placement corpus coverage for LED, regulator, MCU minimal, USB-C
   power, I2C sensor, op-amp gain-stage, and connector-breakout layouts;
 - pad-backed full-board retry seed coverage for spacing improvement,
-  reduce-distance proximity-rule evidence, safe non-improvement stops, hard
-  constraint preservation, generated pad hydration, and selected CLI evidence
-  boundaries.
+  reduce-distance rule evidence, safe non-improvement stops, hard-constraint
+  preservation, generated pad hydration, generated placement
+  mobility, `local_route_mobility`, and selected CLI evidence boundaries.
 
 ### Remaining Work
 
@@ -320,12 +323,8 @@ intent and quality evidence for:
   controlled-impedance placement rules.
 - Add crystal/oscillator and other timing-sensitive block fixtures once those
   blocks are implemented.
-- Make generated block-local placement semantics flexible enough for retry to
-  move eligible generated components while preserving local-route intent and
-  hard constraints. Current generated fixtures prove hydrated-pad and boundary
-  evidence, while pad-backed seed fixtures prove before/after improvement.
-- Expand placement-routing retry with richer generated-board convergence
-  criteria once generated components can move safely.
+- Expand placement-routing retry with richer convergence criteria across
+  larger boards.
 - Validate hardened placement outputs against KiCad DRC evidence in larger
   board-level golden projects.
 
@@ -520,9 +519,9 @@ optional bounded placement-routing retry, and optional repair behavior.
 
 ## Near-Term Recommended Sequence
 
-1. Make generated block-local placement semantics movable under retry without
-   breaking required local-route intent.
-2. Generate and validate Gerber/drill evidence for fabrication packages.
+1. Generate and validate Gerber/drill evidence for fabrication packages.
+2. Expand placement-routing retry with larger-board convergence and KiCad
+   DRC-backed layout evidence.
 3. Expand verified component and block coverage alongside each new block
    family.
 4. Add intent-level planning only after the above gates are reliable.

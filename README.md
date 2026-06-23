@@ -32,13 +32,18 @@ Placement/routing feedback now has an opt-in bounded retry foundation:
 placement quality reports include coarse congestion cells and component fanout
 pressure, routing diagnostics map to placement retry hints, retry policies are
 explicit in design requests, and `design create` can rerun placement/routing
-within a capped budget while returning best-attempt evidence. Golden tests now
-cover retry behavior across fixtures, categories, stop conditions, unsupported
-skips, CLI summaries, and pad-backed full-board seed fixtures for spacing
-improvement, reduce-distance rule evidence, and safe non-improvement stops. The
-generated `design create` workflow now hydrates footprint pad summaries through
-resolver-backed records or verified built-in seed templates, so generated boards
-reach real routing/connectivity evidence instead of stopping at missing pads.
+within a capped budget while returning best-attempt evidence. Generated
+placements carry mobility classes (`fixed`, `group_transform`, `local_rebuild`,
+`soft_preferred`, and `unowned`) plus route-handling policy so retry can move
+eligible generated block-local refs while preserving hard constraints and
+local-route intent. Golden tests now cover retry behavior across fixtures,
+categories, stop conditions, unsupported skips, CLI summaries, pad-backed
+full-board seed fixtures for spacing improvement, reduce-distance rule
+evidence, safe non-improvement stops, generated mobility ownership, and
+local-route mobility evidence. The generated `design create` workflow now
+hydrates footprint pad summaries through resolver-backed records or verified
+built-in seed templates, so generated boards reach real routing/connectivity
+evidence instead of stopping at missing pads.
 Routing engine hardening now has an implemented foundation: shared PCB rule
 resolution, route quality reports, net-class and role-aware routing, length
 policy, search-pressure quality scoring, explicit zone policy behavior,
@@ -361,21 +366,25 @@ proximity rules, and safe-stop retry preserves the best attempt. Generated
 and the generated LED fixture reaches real routing/connectivity diagnostics.
 The expanded retry corpus now also covers generated no-eligible-hint
 boundaries, generated multi-block pad-hydration and net-intent boundaries
-before routing, hard-constraint preservation under retry adjustment, and CLI
-selected-field evidence for generated retry output.
+before routing, hard-constraint preservation under retry adjustment, generated
+mobility ownership, local-route mobility classification, and CLI selected-field
+evidence for generated retry output.
 
 In practical terms, retry is now proven at three levels: focused category and
 stop-condition unit coverage, pad-backed full-board seed coverage, and CLI
 summary coverage for generated workflows with hydrated pad evidence.
 Pad-backed full-board fixtures prove before/after improvement and safe stop.
-Generated workflows currently prove hydrated-pad boundaries and real
-connectivity diagnostics; true generated-board movement improvement remains
-blocked because block-local components are currently emitted as fixed CAD
-placements, which prevents retry from moving them.
+Generated workflows now expose placement-stage `mobility` evidence and
+routing-stage `local_route_mobility` evidence so AI callers can tell which
+generated refs were eligible to move, which remained blocked, and whether local
+routes used `transformable`, `rebuildable`, `preserved`, or `blocked`
+handling.
 
-Current roadmap focus: strengthen generated-project provenance and movable
-placement semantics so repair, retry, and readiness evidence can keep improving
-after a project has been written.
+Retry remains opt-in and is a layout-improvement/diagnostic mechanism, not a
+fabrication-readiness claim. Current roadmap focus: validate fabrication outputs
+with Gerber/drill evidence so readiness reports can prove that generated
+packages are manufacturer-release candidates rather than only KiCad-parsable
+projects.
 
 ### Component Intelligence
 
@@ -600,16 +609,12 @@ goldens for retry summary shape, spacing/fanout/distance adjustments,
 unsupported skip behavior, selected stop conditions, CLI output, and pad-backed
 full-board seed evidence. Generated full-board boundary coverage now includes
 hydrated-pad retry evidence for LED and multi-block sensor/header workflows,
-plus a documented fixed-placement boundary that prevents true generated-board
-retry movement today.
+generated placement mobility summaries, local-route mobility summaries, and
+hard-constraint preservation under retry adjustment.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver; thermal placement, true congestion analysis, differential pairs,
-true generated-board retry movement improvement, and final DRC-grade layout
-decisions remain future work.
-
-The next placement/retry work item is to make generated block-local placement
-semantics flexible enough for retry to move eligible components while
-preserving local-route intent and hard constraints.
+larger-board convergence, and final DRC-grade layout decisions remain future
+work.
 
 ### Routing
 
