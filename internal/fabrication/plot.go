@@ -70,6 +70,220 @@ type PlotRunner interface {
 
 type ExecPlotRunner struct{}
 
+func PlotFabricationOutputs(ctx context.Context, request PlotRequest, runner PlotRunner) PlotResult {
+	normalized, issues := normalizePlotRequest(request)
+	result := PlotResult{Issues: issues}
+	if len(issues) > 0 {
+		return finalizePlotResult(result)
+	}
+	if !normalized.Execute {
+		result.SkippedReason = "dry_run"
+		result.Commands = append(result.Commands,
+			skippedPlotEvidence(PlotKindGerber, normalized.GerberDir, "dry_run"),
+			skippedPlotEvidence(PlotKindDrill, normalized.DrillDir, "dry_run"),
+		)
+		return finalizePlotResult(result)
+	}
+	if strings.TrimSpace(normalized.KiCadCLI) == "" {
+		result.SkippedReason = "missing_kicad_cli"
+		result.Issues = append(result.Issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Path:       "fabrication.kicad_cli",
+			Message:    "KiCad CLI is required to generate Gerber and drill artifacts",
+			Suggestion: "rerun export fabrication with --kicad-cli and --execute",
+		})
+		result.Commands = append(result.Commands,
+			skippedPlotEvidence(PlotKindGerber, normalized.GerberDir, "missing_kicad_cli"),
+			skippedPlotEvidence(PlotKindDrill, normalized.DrillDir, "missing_kicad_cli"),
+		)
+		return finalizePlotResult(result)
+	}
+	if runner == nil {
+		runner = ExecPlotRunner{}
+	}
+	for _, dir := range []struct {
+		path string
+		name string
+	}{
+		{path: normalized.GerberDir, name: "fabrication/gerbers"},
+		{path: normalized.DrillDir, name: "fabrication/drill"},
+	} {
+		if issue := preparePlotOutputDir(dir.path, dir.name, normalized.PackageDir, normalized.Overwrite); issue != nil {
+			result.Issues = append(result.Issues, *issue)
+		}
+	}
+	if len(result.Issues) > 0 {
+		return finalizePlotResult(result)
+	}
+	commands := []PlotCommand{
+		{
+			Kind:      PlotKindGerber,
+			Argv:      gerberPlotArgv(normalized),
+			OutputDir: normalized.GerberDir,
+		},
+		{
+			Kind:      PlotKindDrill,
+			Argv:      drillPlotArgv(normalized),
+			OutputDir: normalized.DrillDir,
+		},
+	}
+	if err := ctx.Err(); err != nil {
+		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityError, Path: "fabrication/plot", Message: err.Error()})
+		return finalizePlotResult(result)
+	}
+	result.Attempted = true
+	evidenceByIndex := make([]PlotCommandEvidence, len(commands))
+	var wg sync.WaitGroup
+	launched := 0
+	for index, command := range commands {
+		if err := ctx.Err(); err != nil {
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityError, Path: "fabrication/plot", Message: err.Error()})
+			break
+		}
+		launched++
+		wg.Add(1)
+		go func(index int, command PlotCommand) {
+			defer wg.Done()
+			evidenceByIndex[index] = runner.RunPlotCommand(ctx, command)
+		}(index, command)
+	}
+	wg.Wait()
+	for index, command := range commands[:launched] {
+		evidence := evidenceByIndex[index]
+		evidence.GeneratedPaths = normalizeGeneratedPlotPaths(normalized.PackageDir, evidence.GeneratedPaths)
+		result.Commands = append(result.Commands, evidence)
+		result.GeneratedPaths = append(result.GeneratedPaths, evidence.GeneratedPaths...)
+		if evidence.ExitCode != 0 {
+			message := fmt.Sprintf("KiCad CLI %s export failed", command.Kind)
+			if strings.TrimSpace(evidence.StderrSnippet) != "" {
+				message += ": " + evidence.StderrSnippet
+			}
+			result.Issues = append(result.Issues, reports.Issue{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityError,
+				Path:     plotIssuePath(command.Kind),
+				Message:  message,
+			})
+		}
+	}
+	return finalizePlotResult(result)
+}
+
+func plotIssuePath(kind PlotKind) string {
+	switch kind {
+	case PlotKindGerber:
+		return "fabrication/gerbers"
+	case PlotKindDrill:
+		return "fabrication/drill"
+	default:
+		return "fabrication/plot"
+	}
+}
+
+func skippedPlotEvidence(kind PlotKind, outputDir string, reason string) PlotCommandEvidence {
+	return PlotCommandEvidence{Kind: kind, OutputDir: outputDir, SkippedReason: reason}
+}
+
+func gerberPlotArgv(request PlotRequest) []string {
+	return []string{
+		request.KiCadCLI,
+		"pcb",
+		"export",
+		"gerbers",
+		"--output",
+		request.GerberDir,
+		request.PCBPath,
+	}
+}
+
+func drillPlotArgv(request PlotRequest) []string {
+	return []string{
+		request.KiCadCLI,
+		"pcb",
+		"export",
+		"drill",
+		"--output",
+		request.DrillDir,
+		request.PCBPath,
+	}
+}
+
+func preparePlotOutputDir(path string, label string, packageDir string, overwrite bool) *reports.Issue {
+	info, err := os.Stat(path)
+	if err == nil {
+		if !info.IsDir() {
+			return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: "fabrication output path exists and is not a directory"}
+		}
+		entries, readErr := os.ReadDir(path)
+		if readErr != nil {
+			return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: readErr.Error()}
+		}
+		if len(entries) > 0 && !overwrite {
+			return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: "overwrite is required to replace existing fabrication output"}
+		}
+		if overwrite {
+			if err := validateRemovablePlotDir(path, packageDir); err != nil {
+				return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: err.Error()}
+			}
+			if removeErr := os.RemoveAll(path); removeErr != nil {
+				return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: removeErr.Error()}
+			}
+		}
+	} else if !os.IsNotExist(err) {
+		return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: err.Error()}
+	}
+	if err := os.MkdirAll(path, 0o755); err != nil {
+		return &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: label, Message: err.Error()}
+	}
+	return nil
+}
+
+func validateRemovablePlotDir(path string, packageDir string) error {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return err
+	}
+	absolutePackage, err := filepath.Abs(packageDir)
+	if err != nil {
+		return err
+	}
+	cleaned := filepath.Clean(absolute)
+	parent := filepath.Dir(cleaned)
+	if cleaned == parent {
+		return fmt.Errorf("refusing to remove unsafe fabrication output path")
+	}
+	if !pathInside(filepath.Clean(absolutePackage), cleaned) {
+		return fmt.Errorf("refusing to remove fabrication output outside package directory")
+	}
+	base := filepath.Base(cleaned)
+	if base != "gerbers" && base != "drill" {
+		return fmt.Errorf("refusing to remove non-fabrication output directory")
+	}
+	return nil
+}
+
+func normalizeGeneratedPlotPaths(packageDir string, paths []string) []string {
+	out := make([]string, 0, len(paths))
+	for _, path := range paths {
+		rel, err := packageRelativePath(packageDir, path)
+		if err != nil {
+			out = append(out, filepath.ToSlash(filepath.Base(path)))
+			continue
+		}
+		out = append(out, rel)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func finalizePlotResult(result PlotResult) PlotResult {
+	result.Issues = dedupeIssues(result.Issues)
+	slices.SortFunc(result.Issues, compareIssues)
+	slices.Sort(result.GeneratedPaths)
+	return result
+}
+
 func (ExecPlotRunner) RunPlotCommand(ctx context.Context, command PlotCommand) PlotCommandEvidence {
 	evidence := PlotCommandEvidence{
 		Kind:      command.Kind,

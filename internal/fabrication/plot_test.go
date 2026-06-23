@@ -98,6 +98,20 @@ func TestPlotCommandWorkingDirUsesExistingParent(t *testing.T) {
 	}
 }
 
+func TestValidateRemovablePlotDirRejectsUnexpectedLeaf(t *testing.T) {
+	root := t.TempDir()
+	if err := validateRemovablePlotDir(filepath.Join(root, "fabrication"), root); err == nil {
+		t.Fatalf("validateRemovablePlotDir accepted non-plot directory")
+	}
+}
+
+func TestValidateRemovablePlotDirRejectsOutsidePackage(t *testing.T) {
+	root := t.TempDir()
+	if err := validateRemovablePlotDir(filepath.Join(root, "gerbers"), filepath.Join(root, "fabrication")); err == nil {
+		t.Fatalf("validateRemovablePlotDir accepted outside package directory")
+	}
+}
+
 func TestCommandSnippetIsRuneSafe(t *testing.T) {
 	input := ""
 	for range 600 {

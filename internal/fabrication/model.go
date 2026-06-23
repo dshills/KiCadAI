@@ -104,12 +104,13 @@ type Summary struct {
 }
 
 type Options struct {
-	Command   string    `json:"command,omitempty"`
-	Execute   bool      `json:"execute"`
-	Overwrite bool      `json:"overwrite"`
-	Output    string    `json:"output,omitempty"`
-	KiCadCLI  string    `json:"kicad_cli,omitempty"`
-	CLIPolicy CLIPolicy `json:"cli_policy,omitempty"`
+	Command    string     `json:"command,omitempty"`
+	Execute    bool       `json:"execute"`
+	Overwrite  bool       `json:"overwrite"`
+	Output     string     `json:"output,omitempty"`
+	KiCadCLI   string     `json:"kicad_cli,omitempty"`
+	CLIPolicy  CLIPolicy  `json:"cli_policy,omitempty"`
+	PlotRunner PlotRunner `json:"-"`
 }
 
 type Manifest struct {

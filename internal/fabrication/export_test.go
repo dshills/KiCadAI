@@ -36,6 +36,121 @@ func TestExportPackageExecuteWritesArtifacts(t *testing.T) {
 	}
 }
 
+func TestExportPackageDryRunDoesNotCreatePlotDirectories(t *testing.T) {
+	root := testFabricationProject(t)
+	result := ExportPackage(context.Background(), root, Options{KiCadCLI: "kicad-cli"})
+	if !result.DryRun {
+		t.Fatalf("DryRun = false, want true")
+	}
+	for _, rel := range []string{"gerbers", "drill"} {
+		if _, err := os.Stat(filepath.Join(root, "fabrication", rel)); !os.IsNotExist(err) {
+			t.Fatalf("%s exists after dry-run or stat failed: %v", rel, err)
+		}
+	}
+	if status := artifactStatus(result.Artifacts, ArtifactGerber); status != ArtifactExpected {
+		t.Fatalf("gerber artifact status = %s, want expected", status)
+	}
+}
+
+func TestExportPackageExecuteWithFakeRunnerWritesPlotDirectories(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	result := ExportPackage(context.Background(), root, Options{
+		Execute:    true,
+		Overwrite:  true,
+		KiCadCLI:   "kicad-cli",
+		PlotRunner: writingPlotRunner{},
+	})
+	for _, rel := range []string{"gerbers/demo-F_Cu.gbr", "drill/demo.drl"} {
+		if _, err := os.Stat(filepath.Join(root, "fabrication", rel)); err != nil {
+			t.Fatalf("%s not written: %v", rel, err)
+		}
+	}
+	if status := artifactStatus(result.Artifacts, ArtifactGerber); status != ArtifactGenerated {
+		t.Fatalf("gerber artifact status = %s, want generated", status)
+	}
+	if status := artifactStatus(result.Artifacts, ArtifactDrill); status != ArtifactGenerated {
+		t.Fatalf("drill artifact status = %s, want generated", status)
+	}
+}
+
+func TestExportPackageUsesCustomOutputPathForPlotArtifacts(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	result := ExportPackage(context.Background(), root, Options{
+		Output:     "release",
+		Execute:    true,
+		Overwrite:  true,
+		KiCadCLI:   "kicad-cli",
+		PlotRunner: writingPlotRunner{},
+	})
+	if path := artifactPath(result.Artifacts, ArtifactGerber); path != "release/gerbers" {
+		t.Fatalf("gerber artifact path = %q, want release/gerbers", path)
+	}
+	if path := artifactPath(result.Artifacts, ArtifactDrill); path != "release/drill" {
+		t.Fatalf("drill artifact path = %q, want release/drill", path)
+	}
+}
+
+func TestDiscoverPlotPCBPathUsesExistingBoardWhenNameDiffers(t *testing.T) {
+	root := testFabricationProject(t)
+	boardPath := filepath.Join(root, "board.kicad_pcb")
+	if err := os.WriteFile(boardPath, []byte("(kicad_pcb)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	got, issue := discoverPlotPCBPath(root, "demo")
+	if issue != nil {
+		t.Fatalf("discoverPlotPCBPath issue: %#v", issue)
+	}
+	if got != boardPath {
+		t.Fatalf("PCB path = %q, want %q", got, boardPath)
+	}
+}
+
+func TestDiscoverPlotPCBPathBlocksAmbiguousBoards(t *testing.T) {
+	root := testFabricationProject(t)
+	for _, name := range []string{"a.kicad_pcb", "b.kicad_pcb"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte("(kicad_pcb)\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_, issue := discoverPlotPCBPath(root, "demo")
+	if issue == nil {
+		t.Fatalf("discoverPlotPCBPath accepted ambiguous board files")
+	}
+}
+
+func TestExportPackageExecuteMissingKiCadCLIBlocksPlotArtifacts(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	result := ExportPackage(context.Background(), root, Options{Execute: true})
+	if !hasIssuePath(result.Issues, "fabrication.kicad_cli") {
+		t.Fatalf("issues = %#v, want missing KiCad CLI issue", result.Issues)
+	}
+	if status := artifactStatus(result.Artifacts, ArtifactGerber); status != ArtifactBlocked {
+		t.Fatalf("gerber artifact status = %s, want blocked", status)
+	}
+}
+
+func TestExportPackageBlocksExistingPlotDirWithoutOverwrite(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	gerberDir := filepath.Join(root, "fabrication", "gerbers")
+	if err := os.MkdirAll(gerberDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(gerberDir, "existing.gbr"), []byte("existing"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	result := ExportPackage(context.Background(), root, Options{
+		Execute:  true,
+		KiCadCLI: "kicad-cli",
+	})
+	if !hasIssuePath(result.Issues, "fabrication/gerbers") {
+		t.Fatalf("issues = %#v, want overwrite issue", result.Issues)
+	}
+}
+
 func TestExportBlocksExistingFileWithoutOverwrite(t *testing.T) {
 	root := testFabricationProject(t)
 	fabricationDir := filepath.Join(root, "fabrication")
@@ -62,6 +177,14 @@ func TestExportRejectsOutputOutsideProject(t *testing.T) {
 	}
 }
 
+func TestDiscoverPlotPCBPathBlocksMissingBoard(t *testing.T) {
+	root := testFabricationProject(t)
+	_, issue := discoverPlotPCBPath(root, "demo")
+	if issue == nil || issue.Code != reports.CodeMissingFile {
+		t.Fatalf("issue = %#v, want missing PCB issue", issue)
+	}
+}
+
 func testFabricationProject(t *testing.T) string {
 	t.Helper()
 	root := t.TempDir()
@@ -71,6 +194,13 @@ func testFabricationProject(t *testing.T) string {
 	return root
 }
 
+func writeTestPCB(t *testing.T, root string, name string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, name), []byte("(kicad_pcb)\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func artifactStatus(artifacts []Artifact, kind ArtifactKind) ArtifactStatus {
 	for _, artifact := range artifacts {
 		if artifact.Kind == kind {
@@ -78,4 +208,35 @@ func artifactStatus(artifacts []Artifact, kind ArtifactKind) ArtifactStatus {
 		}
 	}
 	return ""
+}
+
+func artifactPath(artifacts []Artifact, kind ArtifactKind) string {
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind {
+			return artifact.Path
+		}
+	}
+	return ""
+}
+
+type writingPlotRunner struct{}
+
+func (writingPlotRunner) RunPlotCommand(ctx context.Context, command PlotCommand) PlotCommandEvidence {
+	if err := ctx.Err(); err != nil {
+		return PlotCommandEvidence{Kind: command.Kind, Argv: command.Argv, OutputDir: command.OutputDir, ExitCode: -1, StderrSnippet: err.Error()}
+	}
+	name := "demo-F_Cu.gbr"
+	if command.Kind == PlotKindDrill {
+		name = "demo.drl"
+	}
+	path := filepath.Join(command.OutputDir, name)
+	if err := os.WriteFile(path, []byte("plot"), 0o644); err != nil {
+		return PlotCommandEvidence{Kind: command.Kind, Argv: command.Argv, OutputDir: command.OutputDir, ExitCode: -1, StderrSnippet: err.Error()}
+	}
+	return PlotCommandEvidence{
+		Kind:           command.Kind,
+		Argv:           command.Argv,
+		OutputDir:      command.OutputDir,
+		GeneratedPaths: []string{path},
+	}
 }
