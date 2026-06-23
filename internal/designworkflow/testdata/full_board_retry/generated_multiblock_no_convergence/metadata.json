@@ -1,0 +1,21 @@
+{
+  "name": "generated_multiblock_no_convergence",
+  "request": "request.json",
+  "intent": "Generated larger-board fixture declaring a bounded safe stop when retry cannot improve routing evidence.",
+  "fixture_class": "generated_multiblock_no_convergence",
+  "expected_categories": ["increase_spacing", "improve_fanout", "reduce_distance"],
+  "expected_stop_reason": "non_improving_retry",
+  "expected_improvement": "safe_stop_no_convergence",
+  "expected_improved_metric": "none_safe_stop",
+  "preserve_constraints": ["net_assignments"],
+  "preserve_fixed_refs": [],
+  "expected_routing_status": "blocked",
+  "expected_baseline_status": "blocked",
+  "expected_final_status": "blocked",
+  "expected_min_attempts": 1,
+  "expected_min_applied": 0,
+  "expect_pad_hydration": true,
+  "expected_min_hydrated_pads": 4,
+  "expect_project_write": false,
+  "determinism": "generated request records non-converging retry expectations without external tools"
+}

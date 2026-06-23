@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0",
+  "name": "generated_multiblock_converges",
+  "intent": {
+    "summary": "Generated multi-block retry convergence fixture."
+  },
+  "board": {
+    "width_mm": 120,
+    "height_mm": 90,
+    "layers": 2,
+    "edge_clearance_mm": 1
+  },
+  "blocks": [
+    {
+      "id": "sensor",
+      "block_id": "i2c_sensor",
+      "params": {
+        "i2c_address": "0x48",
+        "include_pullups": true
+      }
+    },
+    {
+      "id": "header",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["VCC", "GND", "SDA", "SCL"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": "sensor.VCC", "to": "header.VCC", "net_alias": "VCC"},
+    {"from": "sensor.GND", "to": "header.GND", "net_alias": "GND"},
+    {"from": "sensor.SDA", "to": "header.SDA", "net_alias": "SDA"},
+    {"from": "sensor.SCL", "to": "header.SCL", "net_alias": "SCL"}
+  ],
+  "validation": {
+    "acceptance": "structural"
+  },
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 3,
+    "allowed_hint_categories": ["increase_spacing", "improve_fanout", "reduce_distance", "move_from_edge"],
+    "stop_on_non_improvement": true
+  }
+}

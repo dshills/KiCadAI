@@ -1,0 +1,21 @@
+{
+  "name": "generated_multiblock_drc_regression",
+  "request": "request.json",
+  "intent": "Generated larger-board fixture declaring that a later retry can route more nets while worsening DRC evidence.",
+  "fixture_class": "generated_multiblock_drc_regression",
+  "expected_categories": ["increase_spacing", "improve_fanout"],
+  "expected_stop_reason": "drc_regression",
+  "expected_improvement": "best_attempt_preserves_drc_quality",
+  "expected_improved_metric": "drc_blocking_count",
+  "preserve_constraints": ["net_assignments", "fixed_refs"],
+  "preserve_fixed_refs": [],
+  "expected_routing_status": "blocked",
+  "expected_baseline_status": "blocked",
+  "expected_final_status": "blocked",
+  "expected_min_attempts": 1,
+  "expected_min_applied": 0,
+  "expect_pad_hydration": true,
+  "expected_min_hydrated_pads": 4,
+  "expect_project_write": false,
+  "determinism": "fixture-backed DRC evidence drives deterministic regression expectations"
+}

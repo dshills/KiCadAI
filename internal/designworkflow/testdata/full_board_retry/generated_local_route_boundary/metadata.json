@@ -1,0 +1,21 @@
+{
+  "name": "generated_local_route_boundary",
+  "request": "request.json",
+  "intent": "Generated larger-board fixture declaring local-route mobility preservation through retry.",
+  "fixture_class": "generated_local_route_boundary",
+  "expected_categories": ["increase_spacing", "reduce_distance"],
+  "expected_stop_reason": "max_attempts",
+  "expected_improvement": "local_route_boundary_preserved",
+  "expected_improved_metric": "local_route_mobility",
+  "preserve_constraints": ["local_routes", "net_assignments"],
+  "preserve_fixed_refs": [],
+  "expected_routing_status": "blocked",
+  "expected_baseline_status": "blocked",
+  "expected_final_status": "blocked",
+  "expected_min_attempts": 1,
+  "expected_min_applied": 0,
+  "expect_pad_hydration": true,
+  "expected_min_hydrated_pads": 14,
+  "expect_project_write": false,
+  "determinism": "fixture declares local route mobility expectations without requiring real KiCad"
+}

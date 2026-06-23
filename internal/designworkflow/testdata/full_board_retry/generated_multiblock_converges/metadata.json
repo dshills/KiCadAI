@@ -1,0 +1,21 @@
+{
+  "name": "generated_multiblock_converges",
+  "request": "request.json",
+  "intent": "Generated larger-board fixture declaring a multi-block convergence case with route, validation, and DRC evidence expectations.",
+  "fixture_class": "generated_multiblock_converges",
+  "expected_categories": ["increase_spacing", "improve_fanout", "reduce_distance", "move_from_edge"],
+  "expected_stop_reason": "max_attempts",
+  "expected_improvement": "larger_board_retry_convergence",
+  "expected_improved_metric": "route_validation_or_drc_score",
+  "preserve_constraints": ["net_assignments", "fixed_refs", "edge_constraints", "local_routes"],
+  "preserve_fixed_refs": [],
+  "expected_routing_status": "blocked",
+  "expected_baseline_status": "blocked",
+  "expected_final_status": "blocked",
+  "expected_min_attempts": 1,
+  "expected_min_applied": 0,
+  "expect_pad_hydration": true,
+  "expected_min_hydrated_pads": 14,
+  "expect_project_write": false,
+  "determinism": "generated request stays hermetic and records larger-board retry convergence expectations without real KiCad"
+}

@@ -1,0 +1,36 @@
+{
+  "version": "0.1.0",
+  "name": "generated_multiblock_no_convergence",
+  "intent": {
+    "summary": "Generated multi-block retry fixture for non-convergence cases."
+  },
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2,
+    "edge_clearance_mm": 1
+  },
+  "blocks": [
+    {"id": "status", "block_id": "led_indicator"},
+    {
+      "id": "header",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["VCC", "GND"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": "status.VCC", "to": "header.VCC", "net_alias": "VCC"},
+    {"from": "status.GND", "to": "header.GND", "net_alias": "GND"}
+  ],
+  "validation": {
+    "acceptance": "structural"
+  },
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 2,
+    "allowed_hint_categories": ["increase_spacing", "improve_fanout", "reduce_distance"],
+    "stop_on_non_improvement": true
+  }
+}

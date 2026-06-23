@@ -1,0 +1,21 @@
+{
+  "name": "generated_fixed_boundary",
+  "request": "request.json",
+  "intent": "Generated larger-board fixture declaring fixed boundary preservation through placement-routing retry.",
+  "fixture_class": "generated_fixed_boundary",
+  "expected_categories": ["increase_spacing", "move_from_edge"],
+  "expected_stop_reason": "max_attempts",
+  "expected_improvement": "fixed_boundary_preserved",
+  "expected_improved_metric": "moved_and_blocked_refs",
+  "preserve_constraints": ["fixed_refs", "edge_constraints", "net_assignments"],
+  "preserve_fixed_refs": ["header"],
+  "expected_routing_status": "blocked",
+  "expected_baseline_status": "blocked",
+  "expected_final_status": "blocked",
+  "expected_min_attempts": 1,
+  "expected_min_applied": 0,
+  "expect_pad_hydration": true,
+  "expected_min_hydrated_pads": 14,
+  "expect_project_write": false,
+  "determinism": "fixture declares immovable boundary expectations for generated retry layouts"
+}

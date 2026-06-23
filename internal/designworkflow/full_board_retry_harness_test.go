@@ -520,6 +520,40 @@ func TestFullBoardRetryFixtureMetadataDeclaresEvidenceContract(t *testing.T) {
 	}
 }
 
+func TestFullBoardRetryLargerConvergenceFixtureFamiliesDeclared(t *testing.T) {
+	required := []string{
+		"generated_multiblock_converges",
+		"generated_multiblock_drc_regression",
+		"generated_multiblock_no_convergence",
+		"generated_fixed_boundary",
+		"generated_local_route_boundary",
+	}
+	for _, name := range required {
+		t.Run(name, func(t *testing.T) {
+			metadata := loadFullBoardRetryMetadata(t, name)
+			if metadata.FixtureClass != name {
+				t.Fatalf("fixture class = %q, want %q", metadata.FixtureClass, name)
+			}
+			if metadata.Request != "request.json" {
+				t.Fatalf("request = %q, want request.json", metadata.Request)
+			}
+			if metadata.ExpectedImprovement == "" {
+				t.Fatalf("expected improvement missing: %#v", metadata)
+			}
+			if metadata.ExpectedImprovedMetric == "" {
+				t.Fatalf("expected improved metric missing: %#v", metadata)
+			}
+			request := loadFullBoardRetryRequestForTest(t, name)
+			if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts < 2 {
+				t.Fatalf("retry policy = %#v", request.RoutingRetry)
+			}
+			if metadata.ExpectPadHydration && metadata.ExpectedMinHydratedPads == 0 {
+				t.Fatalf("pad hydration expectation lacks minimum: %#v", metadata)
+			}
+		})
+	}
+}
+
 func fullBoardRetryFixtureNames(t *testing.T) []string {
 	t.Helper()
 	entries, err := os.ReadDir(fullBoardRetryFixtureRoot)
