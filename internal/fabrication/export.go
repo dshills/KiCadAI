@@ -37,6 +37,7 @@ func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
 		return exportReadiness(ctx, targetPath, opts, result, nil, nil, false)
 	}
 	result.Issues = append(result.Issues, reportData.Issues...)
+	applyReportEvidence(&result, reportData, opts)
 	bomCSV, err := MarshalBOMCSV(reportData.BOM)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "bom.csv", Message: err.Error()})
@@ -53,6 +54,7 @@ func ExportPackage(ctx context.Context, targetPath string, opts Options) Result 
 		return exportReadiness(ctx, targetPath, opts, result, nil, nil, true)
 	}
 	result.Issues = append(result.Issues, reportData.Issues...)
+	applyReportEvidence(&result, reportData, opts)
 	bomCSV, err := MarshalBOMCSV(reportData.BOM)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "bom.csv", Message: err.Error()})
@@ -451,20 +453,24 @@ func artifactStatusForEvidence(status EvidenceStatus) ArtifactStatus {
 
 func summaryEvidence(summary Summary) map[string]EvidenceStatus {
 	return map[string]EvidenceStatus{
-		"project":             summary.Project,
-		"schematic":           summary.Schematic,
-		"pcb":                 summary.PCB,
-		"writer_correctness":  summary.WriterCorrectness,
-		"board_validation":    summary.BoardValidation,
-		"erc":                 summary.ERC,
-		"drc":                 summary.DRC,
-		"bom":                 summary.BOM,
-		"cpl":                 summary.CPL,
-		"gerber":              summary.Gerber,
-		"drill":               summary.Drill,
-		"manifest":            summary.Manifest,
-		"component_readiness": summary.ComponentReadiness,
-		"block_readiness":     summary.BlockReadiness,
+		"project":              summary.Project,
+		"schematic":            summary.Schematic,
+		"pcb":                  summary.PCB,
+		"writer_correctness":   summary.WriterCorrectness,
+		"board_validation":     summary.BoardValidation,
+		"erc":                  summary.ERC,
+		"drc":                  summary.DRC,
+		"bom":                  summary.BOM,
+		"cpl":                  summary.CPL,
+		"gerber":               summary.Gerber,
+		"drill":                summary.Drill,
+		"manifest":             summary.Manifest,
+		"component_readiness":  summary.ComponentReadiness,
+		"block_readiness":      summary.BlockReadiness,
+		"component_identity":   summary.ComponentIdentity,
+		"bom_cpl_consistency":  summary.BOMCPLConsistency,
+		"manufacturer_profile": summary.ManufacturerProfile,
+		"assembly_readiness":   summary.AssemblyReadiness,
 	}
 }
 

@@ -87,31 +87,36 @@ type Artifact struct {
 }
 
 type Summary struct {
-	Generated          bool           `json:"generated"`
-	Project            EvidenceStatus `json:"project"`
-	Schematic          EvidenceStatus `json:"schematic"`
-	PCB                EvidenceStatus `json:"pcb"`
-	WriterCorrectness  EvidenceStatus `json:"writer_correctness"`
-	BoardValidation    EvidenceStatus `json:"board_validation"`
-	ERC                EvidenceStatus `json:"erc"`
-	DRC                EvidenceStatus `json:"drc"`
-	BOM                EvidenceStatus `json:"bom"`
-	CPL                EvidenceStatus `json:"cpl"`
-	Gerber             EvidenceStatus `json:"gerber"`
-	Drill              EvidenceStatus `json:"drill"`
-	Manifest           EvidenceStatus `json:"manifest"`
-	ComponentReadiness EvidenceStatus `json:"component_readiness"`
-	BlockReadiness     EvidenceStatus `json:"block_readiness"`
+	Generated           bool           `json:"generated"`
+	Project             EvidenceStatus `json:"project"`
+	Schematic           EvidenceStatus `json:"schematic"`
+	PCB                 EvidenceStatus `json:"pcb"`
+	WriterCorrectness   EvidenceStatus `json:"writer_correctness"`
+	BoardValidation     EvidenceStatus `json:"board_validation"`
+	ERC                 EvidenceStatus `json:"erc"`
+	DRC                 EvidenceStatus `json:"drc"`
+	BOM                 EvidenceStatus `json:"bom"`
+	CPL                 EvidenceStatus `json:"cpl"`
+	Gerber              EvidenceStatus `json:"gerber"`
+	Drill               EvidenceStatus `json:"drill"`
+	Manifest            EvidenceStatus `json:"manifest"`
+	ComponentReadiness  EvidenceStatus `json:"component_readiness"`
+	BlockReadiness      EvidenceStatus `json:"block_readiness"`
+	ComponentIdentity   EvidenceStatus `json:"component_identity"`
+	BOMCPLConsistency   EvidenceStatus `json:"bom_cpl_consistency"`
+	ManufacturerProfile EvidenceStatus `json:"manufacturer_profile"`
+	AssemblyReadiness   EvidenceStatus `json:"assembly_readiness"`
 }
 
 type Options struct {
-	Command    string     `json:"command,omitempty"`
-	Execute    bool       `json:"execute"`
-	Overwrite  bool       `json:"overwrite"`
-	Output     string     `json:"output,omitempty"`
-	KiCadCLI   string     `json:"kicad_cli,omitempty"`
-	CLIPolicy  CLIPolicy  `json:"cli_policy,omitempty"`
-	PlotRunner PlotRunner `json:"-"`
+	Command             string     `json:"command,omitempty"`
+	Execute             bool       `json:"execute"`
+	Overwrite           bool       `json:"overwrite"`
+	Output              string     `json:"output,omitempty"`
+	KiCadCLI            string     `json:"kicad_cli,omitempty"`
+	CLIPolicy           CLIPolicy  `json:"cli_policy,omitempty"`
+	ManufacturerProfile string     `json:"manufacturer_profile,omitempty"`
+	PlotRunner          PlotRunner `json:"-"`
 }
 
 type Manifest struct {
