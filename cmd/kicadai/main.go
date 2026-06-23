@@ -103,7 +103,7 @@ Global flags:
   --with-pcb            Include PCB output for generation commands
   --overwrite           Allow generation commands to replace an existing project directory
   --json                Print command output as JSON when supported
-  --kicad-cli string    KiCad CLI executable path for KiCad-backed checks
+  --kicad-cli string    KiCad CLI executable path for KiCad-backed checks and fabrication plotting
   --keep-artifacts      Keep KiCad-backed artifact workspaces
   --artifact-dir string Directory for retained KiCad-backed artifacts
   --timeout duration    KiCad CLI timeout, for example 10s or 2m

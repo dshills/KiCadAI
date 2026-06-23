@@ -16,7 +16,9 @@ import (
 	"kicadai/internal/config"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
+	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/provenance"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
@@ -1380,6 +1382,67 @@ func TestRunExportPreviewJSON(t *testing.T) {
 	}
 }
 
+func TestRunExportFabricationExecuteGeneratesPlotEvidence(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeCLITestPCB(t, root)
+	cliPath := writeFakeKiCadCLI(t)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--execute", "--overwrite", "--kicad-cli", cliPath, "export", "fabrication", root}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected blocked readiness from missing schematic/BOM evidence")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"kind": "gerber"`,
+		`"generator": "kicad-cli"`,
+		`"files": [`,
+		`"gerbers/demo-F_Cu.gbr"`,
+		`"drill/demo.drl"`,
+		`"gerber": "pass"`,
+		`"drill": "pass"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunExportFabricationExecuteMissingKiCadCLIReportsEvidence(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeCLITestPCB(t, root)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "--execute", "--overwrite", "export", "fabrication", root}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing KiCad CLI error")
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"path": "fabrication.kicad_cli"`,
+		`"gerber": "missing"`,
+		`"drill": "missing"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestRunEvaluatePCBJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "board.kicad_pcb")
 	if err := os.WriteFile(path, []byte(`(kicad_pcb (gr_rect (layer "Edge.Cuts")) (footprint "Test:One" (pad "1" smd rect (layers "F.Cu"))))`), 0o644); err != nil {
@@ -1404,6 +1467,82 @@ func TestRunEvaluatePCBJSON(t *testing.T) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
 	}
+}
+
+func writeCLITestPCB(t *testing.T, root string) {
+	t.Helper()
+	file, err := os.Create(filepath.Join(root, "demo.kicad_pcb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := pcbfiles.PCBFile{
+		Version:          kicadfiles.KiCadPCBFormatV20260206,
+		Generator:        "kicadai-test",
+		GeneratorVersion: "cli-phase5",
+		General:          pcbfiles.DefaultGeneral(),
+		Paper:            kicadfiles.Paper{Name: "A4"},
+		Layers:           pcbfiles.DefaultTwoLayerStack(),
+		Setup:            pcbfiles.DefaultSetup(),
+		Drawings: []pcbfiles.Drawing{{
+			UUID:  kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+			Layer: kicadfiles.LayerEdge,
+			Kind:  "line",
+			Line: &pcbfiles.LineDrawing{
+				Start: kicadfiles.Point{X: kicadfiles.MM(0), Y: kicadfiles.MM(0)},
+				End:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(0)},
+				Width: kicadfiles.MM(0.1),
+			},
+		}},
+		Vias: []pcbfiles.Via{{
+			UUID:     kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+			Position: kicadfiles.Point{X: kicadfiles.MM(5), Y: kicadfiles.MM(5)},
+			Size:     kicadfiles.MM(0.8),
+			Drill:    kicadfiles.MM(0.4),
+			Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+		}},
+	}
+	if err := pcbfiles.Write(file, board); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func writeFakeKiCadCLI(t *testing.T) string {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		t.Skip("fake kicad-cli shell shim requires POSIX shell execution")
+	}
+	path := filepath.Join(t.TempDir(), "kicad-cli")
+	script := `#!/bin/sh
+kind=""
+out=""
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    gerber|gerbers) kind="gerbers" ;;
+    drill) kind="drill" ;;
+    --output) shift; out="$1" ;;
+  esac
+  shift
+done
+mkdir -p "$out"
+if [ "$kind" = "gerbers" ]; then
+  for layer in F_Cu B_Cu F_Mask B_Mask F_SilkS B_SilkS Edge_Cuts; do
+    printf "artifact\n" > "$out/demo-$layer.gbr"
+  done
+elif [ "$kind" = "drill" ]; then
+  printf "artifact\n" > "$out/demo.drl"
+else
+  echo "unexpected export kind" >&2
+  exit 1
+fi
+`
+	if err := os.WriteFile(path, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func TestRunEvaluateMissingTargetJSON(t *testing.T) {
