@@ -16,6 +16,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		voltageRegulatorDefinition(),
 		mcuMinimalDefinition(),
 		crystalOscillatorDefinition(),
+		resetProgrammingHeaderDefinition(),
 		usbCPowerDefinition(),
 		i2cSensorDefinition(),
 		opampGainStageDefinition(),

@@ -35,8 +35,11 @@ func TestBuiltinInventoryReportsUnsupportedRoadmapGaps(t *testing.T) {
 	for _, family := range inventory.Families {
 		byID[family.ID] = family
 	}
-	for _, id := range []string{"reset_programming_header", "esd_protection", "reverse_polarity_protection"} {
-		family := byID[id]
+	for _, id := range []string{"esd_protection", "reverse_polarity_protection"} {
+		family, ok := byID[id]
+		if !ok {
+			t.Fatalf("%s missing from inventory", id)
+		}
 		if family.Implemented {
 			t.Fatalf("%s unexpectedly implemented: %#v", id, family)
 		}

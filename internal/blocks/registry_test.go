@@ -26,6 +26,7 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 		"led_indicator",
 		"mcu_minimal",
 		"opamp_gain_stage",
+		"reset_programming_header",
 		"usb_c_power",
 		"voltage_regulator",
 	}
@@ -98,14 +99,15 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 			t.Fatalf("%s missing component or PCB realization metadata: %#v", definition.ID, definition)
 		}
 		structuralBlocks := map[string]bool{
-			"connector_breakout": true,
-			"crystal_oscillator": true,
-			"i2c_sensor":         true,
-			"led_indicator":      true,
-			"mcu_minimal":        true,
-			"opamp_gain_stage":   true,
-			"usb_c_power":        true,
-			"voltage_regulator":  true,
+			"connector_breakout":       true,
+			"crystal_oscillator":       true,
+			"i2c_sensor":               true,
+			"led_indicator":            true,
+			"mcu_minimal":              true,
+			"opamp_gain_stage":         true,
+			"reset_programming_header": true,
+			"usb_c_power":              true,
+			"voltage_regulator":        true,
 		}
 		if structuralBlocks[definition.ID] {
 			if definition.Verification.Level != VerificationStructural {

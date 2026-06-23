@@ -65,9 +65,9 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		Name:     "Reset And Programming Header",
 		Category: "digital",
 		Gaps: []string{
-			"standalone block generator is not implemented",
 			"requires target-specific programming interface metadata",
-			"requires connector pinout evidence",
+			"SWD/JTAG support is not implemented",
+			"header edge placement still requires layout review",
 		},
 	},
 	{
