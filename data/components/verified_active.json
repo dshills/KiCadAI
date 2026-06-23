@@ -202,6 +202,49 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Crystal"], "pinmap_checked": true}
     },
     {
+      "id": "crystal.abracon.abm3_16mhz.5032_2pin",
+      "family": "crystal",
+      "name": "Abracon ABM3 16 MHz 5.0x3.2 mm crystal",
+      "generic": false,
+      "manufacturer": "Abracon",
+      "mpn": "ABM3-16.000MHZ-D2Y-T",
+      "tags": ["crystal", "smd", "5032", "2pin", "16mhz", "mcu_clock"],
+      "values": [{"kind": "frequency", "typ": "16", "unit": "MHz"}, {"kind": "load_capacitance", "typ": "18", "unit": "pF"}],
+      "ratings": [{"kind": "drive_level", "max": "100", "unit": "uW"}, {"kind": "frequency_stability", "max": "30", "unit": "ppm"}],
+      "companions": [{"id": "crystal.load_capacitors", "family": "capacitor", "role": "load_capacitor", "required": true, "description": "Select load capacitors from the crystal load capacitance and estimated board stray capacitance."}],
+      "placement_hints": [{"kind": "near", "target": "mcu_oscillator_pins", "value": "10", "unit": "mm", "description": "Place close to MCU oscillator pins with short symmetric traces."}],
+      "routing_hints": [{"kind": "short_loop", "net_role": "clock", "description": "Keep XTAL loop short and isolated from fast switching nets."}],
+      "properties": [
+        {"name": "Component ID", "value": "crystal.abracon.abm3_16mhz.5032_2pin"},
+        {"name": "Manufacturer", "value": "Abracon"},
+        {"name": "MPN", "value": "ABM3-16.000MHZ-D2Y-T"},
+        {"name": "Package", "value": "5032_2pin"},
+        {"name": "Component Class", "value": "active"}
+      ],
+      "symbols": [{
+        "symbol_id": "Device:Crystal",
+        "function_pins": [
+          {"function": "XTAL_1", "symbol_pin": "1", "required": true},
+          {"function": "XTAL_2", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Crystal"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "5032_2pin",
+        "name": "5032 2-pin SMD",
+        "footprint_id": "Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm",
+        "package_type": "5032_2pin",
+        "mpn": "ABM3-16.000MHZ-D2Y-T",
+        "pinmap_id": "Device:Crystal|Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm",
+        "pad_functions": [
+          {"function": "XTAL_1", "pad": "1"},
+          {"function": "XTAL_2", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Crystal"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "datasheet:Abracon ABM3 series", "builtin_pinmap:Device:Crystal"], "pinmap_checked": true, "notes": ["Oscillator startup margin and exact load-capacitor calculation remain design-specific."]}
+    },
+    {
       "id": "usb_c.gct.usb4125_power_only_6p",
       "family": "usb_c",
       "name": "GCT USB4125 power-only USB-C receptacle",

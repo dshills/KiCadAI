@@ -363,6 +363,7 @@ func TestSelectVerifiedCrystal(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query: Query{
+			Text:      "generic",
 			Family:    "crystal",
 			Package:   "5032",
 			ValueKind: "frequency",
@@ -375,6 +376,35 @@ func TestSelectVerifiedCrystal(t *testing.T) {
 	}
 	if selection.Component.ID != "crystal.generic.5032_2pin" {
 		t.Fatalf("unexpected crystal selection: %+v", selection.Candidate)
+	}
+}
+
+func TestSelectConcreteCrystalForFabricationCandidate(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "crystal",
+			Package:   "5032",
+			ValueKind: "frequency",
+			Value:     "16",
+		},
+		Acceptance:        AcceptanceFabricationCandidate,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+	})
+	if !result.OK {
+		t.Fatalf("select concrete crystal failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "crystal.abracon.abm3_16mhz.5032_2pin" {
+		t.Fatalf("selected component ID = %s", selection.Component.ID)
+	}
+	if selection.Component.Manufacturer != "Abracon" || selection.Component.MPN != "ABM3-16.000MHZ-D2Y-T" {
+		t.Fatalf("selected crystal missing manufacturer evidence: %+v", selection.Component)
+	}
+	for _, fn := range []string{"XTAL_1", "XTAL_2"} {
+		if !componentHasFunction(selection.Component, fn) {
+			t.Fatalf("selected crystal missing function %s", fn)
+		}
 	}
 }
 
