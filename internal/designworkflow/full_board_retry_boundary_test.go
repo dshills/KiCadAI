@@ -65,6 +65,15 @@ func TestFullBoardRetryGeneratedUnsupportedBoundaryEvidence(t *testing.T) {
 	if !evidence.HasPadHydration || evidence.PadHydration.HydratedComponents < metadata.ExpectedMinHydratedPads {
 		t.Fatalf("pad hydration evidence = %#v metadata=%#v", evidence.PadHydration, metadata)
 	}
+	if !evidence.HasMobility || evidence.Mobility.EligibleCount == 0 || evidence.Mobility.GroupTransformCount == 0 {
+		t.Fatalf("generated boundary mobility evidence = %#v", evidence.Mobility)
+	}
+	if !evidence.HasLocalRouteMobility {
+		t.Fatal("generated boundary local route mobility evidence missing")
+	}
+	if evidence.LocalRouteMobility.Total == 0 || evidence.LocalRouteMobility.Transformable+evidence.LocalRouteMobility.Rebuildable == 0 {
+		t.Fatalf("generated boundary local route mobility = %#v", evidence.LocalRouteMobility)
+	}
 	if !evidence.HasRetry || evidence.Retry.StopReason != metadata.ExpectedStopReason {
 		t.Fatalf("generated boundary retry evidence = %#v metadata=%#v", evidence.Retry, metadata)
 	}

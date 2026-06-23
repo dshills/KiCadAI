@@ -58,6 +58,10 @@ type fullBoardRetryEvidence struct {
 	BlockingIssues        int
 	PadHydration          PadHydrationSummary
 	HasPadHydration       bool
+	Mobility              placement.MobilitySummary
+	HasMobility           bool
+	LocalRouteMobility    LocalRouteMobilitySummary
+	HasLocalRouteMobility bool
 	Retry                 placementRoutingRetrySummary
 	HasRetry              bool
 	Artifacts             int
@@ -94,7 +98,7 @@ func loadFullBoardRetryMetadata(t *testing.T, name string) fullBoardRetryFixture
 
 func fullBoardRetryEvidenceFromWorkflow(t *testing.T, fixture string, result WorkflowResult) fullBoardRetryEvidence {
 	t.Helper()
-	stage, ok := stageByName(result, StageRouting)
+	routingStage, ok := stageByName(result, StageRouting)
 	if !ok {
 		t.Fatalf("routing stage missing for fixture %q: %#v", fixture, result.Stages)
 	}
@@ -102,10 +106,10 @@ func fullBoardRetryEvidenceFromWorkflow(t *testing.T, fixture string, result Wor
 		Fixture:    fixture,
 		Artifacts:  len(WorkflowArtifacts(result)),
 		HasRetry:   false,
-		RoutedNets: intFromStageSummary(stage.Summary, "routed_nets"),
-		FailedNets: intFromStageSummary(stage.Summary, "failed_nets"),
+		RoutedNets: intFromStageSummary(routingStage.Summary, "routed_nets"),
+		FailedNets: intFromStageSummary(routingStage.Summary, "failed_nets"),
 	}
-	if status, ok := fullBoardRetryRoutingStatusFromAny(stage.Summary["status"]); ok {
+	if status, ok := fullBoardRetryRoutingStatusFromAny(routingStage.Summary["status"]); ok {
 		evidence.RoutingStatus = status
 	}
 	evidence.BaselineRoutingStatus = evidence.RoutingStatus
@@ -114,17 +118,25 @@ func fullBoardRetryEvidenceFromWorkflow(t *testing.T, fixture string, result Wor
 	evidence.FinalRoutingStatus = evidence.RoutingStatus
 	evidence.FinalRoutedNets = evidence.RoutedNets
 	evidence.FinalFailedNets = evidence.FailedNets
-	if summary, ok := retrySummaryFromStage(t, stage); ok {
-		evidence.Retry = summary
-		evidence.HasRetry = true
-		evidence.BaselineRoutingStatus, evidence.BaselineRoutedNets, evidence.BaselineFailedNets = fullBoardRetryBaselineFromSummary(summary, evidence.RoutingStatus, evidence.RoutedNets, evidence.FailedNets)
-	}
-	evidence.BlockingIssues = fullBoardRetryBlockingIssueCount(result.Stages)
 	if placementStage, ok := stageByName(result, StagePlacement); ok {
 		if padSummary, ok := fullBoardRetryPadHydrationSummary(placementStage); ok {
 			evidence.PadHydration = padSummary
 			evidence.HasPadHydration = true
 		}
+		if mobility, ok := fullBoardRetryMobilitySummary(placementStage); ok {
+			evidence.Mobility = mobility
+			evidence.HasMobility = true
+		}
+	}
+	if summary, ok := retrySummaryFromStage(t, routingStage); ok {
+		evidence.Retry = summary
+		evidence.HasRetry = true
+		evidence.BaselineRoutingStatus, evidence.BaselineRoutedNets, evidence.BaselineFailedNets = fullBoardRetryBaselineFromSummary(summary, evidence.RoutingStatus, evidence.RoutedNets, evidence.FailedNets)
+	}
+	evidence.BlockingIssues = fullBoardRetryBlockingIssueCount(result.Stages)
+	if localRouteMobility, ok := fullBoardRetryLocalRouteMobilitySummary(routingStage); ok {
+		evidence.LocalRouteMobility = localRouteMobility
+		evidence.HasLocalRouteMobility = true
 	}
 	return evidence
 }
@@ -181,6 +193,58 @@ func fullBoardRetryPadHydrationSummary(stage StageResult) (PadHydrationSummary, 
 	default:
 		return PadHydrationSummary{}, false
 	}
+}
+
+func fullBoardRetryMobilitySummary(stage StageResult) (placement.MobilitySummary, bool) {
+	if stage.Summary == nil {
+		return placement.MobilitySummary{}, false
+	}
+	raw, ok := stage.Summary["mobility"]
+	if !ok {
+		return placement.MobilitySummary{}, false
+	}
+	switch summary := raw.(type) {
+	case placement.MobilitySummary:
+		return summary, true
+	case map[string]any:
+		var decoded placement.MobilitySummary
+		if decodeStageSummaryMap(summary, &decoded) {
+			return decoded, true
+		}
+		return placement.MobilitySummary{}, false
+	default:
+		return placement.MobilitySummary{}, false
+	}
+}
+
+func fullBoardRetryLocalRouteMobilitySummary(stage StageResult) (LocalRouteMobilitySummary, bool) {
+	if stage.Summary == nil {
+		return LocalRouteMobilitySummary{}, false
+	}
+	raw, ok := stage.Summary["local_route_mobility"]
+	if !ok {
+		return LocalRouteMobilitySummary{}, false
+	}
+	switch summary := raw.(type) {
+	case LocalRouteMobilitySummary:
+		return summary, true
+	case map[string]any:
+		var decoded LocalRouteMobilitySummary
+		if decodeStageSummaryMap(summary, &decoded) {
+			return decoded, true
+		}
+		return LocalRouteMobilitySummary{}, false
+	default:
+		return LocalRouteMobilitySummary{}, false
+	}
+}
+
+func decodeStageSummaryMap(raw map[string]any, out any) bool {
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return false
+	}
+	return json.Unmarshal(data, out) == nil
 }
 
 func fullBoardRetryPadHydrationSummaryFromMap(raw map[string]any) PadHydrationSummary {

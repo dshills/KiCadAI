@@ -40,6 +40,10 @@ func TestFullBoardRetryGeneratedMultiBlockBoundaryEvidence(t *testing.T) {
 	if mobility.EligibleCount == 0 || mobility.GroupTransformCount == 0 {
 		t.Fatalf("expected generated multiblock mobility evidence: %#v", mobility)
 	}
+	localRoutes, ok := fullBoardRetryLocalRouteMobilitySummary(routingStage)
+	if !ok || localRoutes.Total == 0 || localRoutes.Transformable+localRoutes.Rebuildable == 0 {
+		t.Fatalf("expected generated multiblock local-route mobility evidence: %#v", routingStage.Summary)
+	}
 	if got := string(routingStage.Status); got != metadata.ExpectedRoutingStatus {
 		t.Fatalf("routing status = %s, want %s", got, metadata.ExpectedRoutingStatus)
 	}
