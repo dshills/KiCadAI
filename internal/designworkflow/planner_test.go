@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"slices"
+	"sort"
 	"strings"
 	"testing"
 
@@ -46,6 +47,39 @@ func TestPlanBlocksComposesExplicitRequest(t *testing.T) {
 	}
 	if !slices.Contains(evidence[1].RequiredRoutes, "series") {
 		t.Fatalf("LED required routes = %#v", evidence[1].RequiredRoutes)
+	}
+}
+
+func TestPlanBlocksComposesExpandedVerifiedCoverageBlocks(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_mcu_support",
+		Board:   BoardSpec{WidthMM: 60, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "clk", BlockID: "crystal_oscillator"},
+			{ID: "prog", BlockID: "reset_programming_header"},
+			{ID: "esd", BlockID: "esd_protection"},
+			{ID: "polarity", BlockID: "reverse_polarity_protection"},
+		},
+	}
+	result := PlanBlocks(context.Background(), newExpandedCoverageTestRegistry(), request)
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("PlanBlocks issues = %#v", result.Stage.Issues)
+	}
+	if result.Stage.Status != StageStatusWarning || len(result.Output.Instances) != len(request.Blocks) {
+		t.Fatalf("result = %#v", result)
+	}
+	evidence, ok := result.Stage.Summary["block_evidence"].([]BlockEvidenceSummary)
+	if !ok || len(evidence) != len(request.Blocks) {
+		t.Fatalf("block evidence = %#v", result.Stage.Summary["block_evidence"])
+	}
+	for _, summary := range evidence {
+		if summary.Readiness != blocks.BlockReadinessPartial {
+			t.Fatalf("%s readiness = %q", summary.BlockID, summary.Readiness)
+		}
+		if summary.VerificationLevel != string(blocks.VerificationStructural) {
+			t.Fatalf("%s verification = %#v", summary.BlockID, summary)
+		}
 	}
 }
 
@@ -191,4 +225,89 @@ func testBlockDefinition(id string, level blocks.VerificationLevel) blocks.Block
 			Level: level,
 		},
 	}
+}
+
+type expandedCoverageTestRegistry struct {
+	definitions map[string]blocks.BlockDefinition
+}
+
+func newExpandedCoverageTestRegistry() expandedCoverageTestRegistry {
+	ids := []string{
+		"crystal_oscillator",
+		"reset_programming_header",
+		"esd_protection",
+		"reverse_polarity_protection",
+	}
+	definitions := map[string]blocks.BlockDefinition{}
+	for _, id := range ids {
+		definitions[id] = testBlockDefinition(id, blocks.VerificationStructural)
+	}
+	return expandedCoverageTestRegistry{definitions: definitions}
+}
+
+func (registry expandedCoverageTestRegistry) ListBlocks() []blocks.BlockSummary {
+	summaries := make([]blocks.BlockSummary, 0, len(registry.definitions))
+	for _, id := range registry.definitionIDs() {
+		definition := registry.definitions[id]
+		summaries = append(summaries, testBlockSummary(definition))
+	}
+	return summaries
+}
+
+func (registry expandedCoverageTestRegistry) GetBlock(id string) (blocks.BlockDefinition, bool) {
+	definition, ok := registry.definitions[id]
+	return definition, ok
+}
+
+func (registry expandedCoverageTestRegistry) ValidateDefinition(definition blocks.BlockDefinition) []reports.Issue {
+	return nil
+}
+
+func (registry expandedCoverageTestRegistry) ValidateRequest(request blocks.BlockRequest) []reports.Issue {
+	if _, ok := registry.definitions[request.BlockID]; !ok {
+		return []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Message: "missing"}}
+	}
+	return nil
+}
+
+func (registry expandedCoverageTestRegistry) Instantiate(ctx context.Context, request blocks.BlockRequest) (blocks.BlockOutput, []reports.Issue) {
+	definition, ok := registry.definitions[request.BlockID]
+	if !ok {
+		issues := []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Message: "missing"}}
+		return blocks.BlockOutput{Issues: issues}, issues
+	}
+	output := blocks.BlockOutput{
+		Definition: testBlockSummary(definition),
+		Instance: blocks.BlockInstance{
+			BlockID:    request.BlockID,
+			InstanceID: request.InstanceID,
+			Params:     request.Params,
+		},
+	}
+	return output, nil
+}
+
+func (registry expandedCoverageTestRegistry) Inventory() blocks.BlockLibraryInventory {
+	families := make([]blocks.BlockFamilyInventory, 0, len(registry.definitions))
+	for _, id := range registry.definitionIDs() {
+		definition := registry.definitions[id]
+		families = append(families, blocks.BlockFamilyInventory{
+			ID:                definition.ID,
+			Name:              definition.Name,
+			Category:          definition.Category,
+			Implemented:       true,
+			Readiness:         blocks.BlockReadinessPartial,
+			VerificationLevel: definition.Verification.Level,
+		})
+	}
+	return blocks.BlockLibraryInventory{Families: families}
+}
+
+func (registry expandedCoverageTestRegistry) definitionIDs() []string {
+	ids := make([]string, 0, len(registry.definitions))
+	for id := range registry.definitions {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids
 }
