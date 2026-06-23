@@ -4,21 +4,62 @@ import (
 	"context"
 	"encoding/binary"
 	"hash/fnv"
+	"math"
 	"slices"
 	"strconv"
 
 	"kicadai/internal/placement"
+	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 )
 
 type placementRoutingRetrySummary struct {
-	Enabled        bool             `json:"enabled"`
-	Attempts       int              `json:"attempts"`
-	Applied        int              `json:"applied"`
-	StopReason     string           `json:"stop_reason,omitempty"`
-	HintCategories []string         `json:"hint_categories,omitempty"`
-	AttemptHistory []map[string]any `json:"attempt_history,omitempty"`
+	Enabled         bool                                  `json:"enabled"`
+	Attempts        int                                   `json:"attempts"`
+	Applied         int                                   `json:"applied"`
+	StopReason      string                                `json:"stop_reason,omitempty"`
+	SelectedAttempt int                                   `json:"selected_attempt,omitempty"`
+	SelectedReason  string                                `json:"selected_reason,omitempty"`
+	HintCategories  []string                              `json:"hint_categories,omitempty"`
+	AttemptHistory  []placementRoutingRetryAttemptSummary `json:"attempt_history,omitempty"`
 }
+
+type placementRoutingRetryAttemptSummary struct {
+	Attempt                   int                 `json:"attempt"`
+	Placement                 map[string]any      `json:"placement,omitempty"`
+	BaselineRoutingStatus     routing.Status      `json:"baseline_routing_status,omitempty"`
+	BaselineRouteScore        float64             `json:"baseline_route_score,omitempty"`
+	BaselineRoutedNets        int                 `json:"baseline_routed_nets"`
+	BaselineFailedNets        int                 `json:"baseline_failed_nets"`
+	RoutingStatus             routing.Status      `json:"routing_status,omitempty"`
+	RouteScore                float64             `json:"route_score,omitempty"`
+	RoutedNets                int                 `json:"routed_nets"`
+	FailedNets                int                 `json:"failed_nets"`
+	SkippedNets               int                 `json:"skipped_nets,omitempty"`
+	PlacementScore            float64             `json:"placement_score,omitempty"`
+	BoardValidationBlocking   int                 `json:"board_validation_blocking"`
+	BoardValidationIssueCount int                 `json:"board_validation_issue_count"`
+	DRCStatus                 retryEvidenceStatus `json:"drc_status,omitempty"`
+	DRCIssueCount             int                 `json:"drc_issue_count,omitempty"`
+	DRCBlockingCount          int                 `json:"drc_blocking_count,omitempty"`
+	DRCSource                 string              `json:"drc_source,omitempty"`
+	EligibleRefCount          int                 `json:"eligible_ref_count"`
+	BlockedRefCount           int                 `json:"blocked_ref_count"`
+	Selected                  bool                `json:"selected,omitempty"`
+	SelectedReason            string              `json:"selected_reason,omitempty"`
+	RegressionFlags           []string            `json:"regression_flags,omitempty"`
+	RetryAdjustment           string              `json:"retry_adjustment,omitempty"`
+}
+
+type retryEvidenceStatus string
+
+const (
+	retryEvidencePass    retryEvidenceStatus = "pass"
+	retryEvidenceFail    retryEvidenceStatus = "fail"
+	retryEvidenceMissing retryEvidenceStatus = "missing"
+	retryEvidenceSkipped retryEvidenceStatus = "skipped"
+	retryEvidenceWarning retryEvidenceStatus = "warning"
+)
 
 func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, routed RoutingStageResult, routingOpts RoutingOptions, policy RoutingRetryPolicySpec) (PlacementStageResult, RoutingStageResult, placementRoutingRetrySummary) {
 	summary := placementRoutingRetrySummary{Enabled: policy.Enabled, Attempts: 1}
@@ -28,6 +69,11 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 	}
 	bestPlaced := placed
 	bestRouted := routed
+	bestAttempt := placementRoutingAttemptSummaryForResult(1, nil, &placed, routed, "")
+	bestAttempt.Placement = placed.Stage.Summary
+	bestAttempt.Selected = true
+	bestAttempt.SelectedReason = "initial_attempt"
+	summary.AttemptHistory = append(summary.AttemptHistory, bestAttempt)
 	currentPlaced := placed
 	currentRouted := routed
 	seenStates := map[string]struct{}{placementStateHash(currentPlaced.Result.Placements): {}}
@@ -74,32 +120,33 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 		summary.Attempts = attempt
 		summary.Applied++
 		ensureStageSummary(&nextRouted.Stage)
-		nextRouted.Stage.Summary["retry_adjustment"] = PlacementRetryAdjustmentSummary(adjustment)
-		summary.AttemptHistory = append(summary.AttemptHistory, map[string]any{
-			"attempt":                 attempt,
-			"placement":               nextPlaced.Stage.Summary,
-			"baseline_routing_status": currentRouted.Result.Status,
-			"baseline_failed_nets":    currentRouted.Result.Metrics.FailedNetCount,
-			"baseline_routed_nets":    currentRouted.Result.Metrics.RoutedNetCount,
-			"routing_status":          nextRouted.Result.Status,
-			"failed_nets":             nextRouted.Result.Metrics.FailedNetCount,
-			"routed_nets":             nextRouted.Result.Metrics.RoutedNetCount,
-			"eligible_ref_count":      adjustment.EligibleRefs,
-			"blocked_ref_count":       adjustment.BlockedRefs,
-		})
+		adjustmentSummary := PlacementRetryAdjustmentSummary(adjustment)
+		nextRouted.Stage.Summary["retry_adjustment"] = adjustmentSummary
+		attemptSummary := placementRoutingAttemptSummaryForResult(attempt, &currentRouted, &nextPlaced, nextRouted, adjustmentSummary)
+		attemptSummary.Placement = nextPlaced.Stage.Summary
+		attemptSummary.EligibleRefCount = adjustment.EligibleRefs
+		attemptSummary.BlockedRefCount = adjustment.BlockedRefs
+		attemptSummary.RegressionFlags = placementRoutingRegressionFlags(attemptSummary, bestAttempt)
 		if routingAttemptBetter(nextRouted, bestRouted) {
 			bestPlaced = nextPlaced
 			bestRouted = nextRouted
+			attemptSummary.SelectedReason = routingAttemptSelectionReason(nextRouted, bestAttempt)
+			bestAttempt = attemptSummary
 		} else if policy.StopOnNonImprovement {
+			summary.AttemptHistory = append(summary.AttemptHistory, attemptSummary)
 			summary.StopReason = "non_improving_retry"
 			break
 		}
+		summary.AttemptHistory = append(summary.AttemptHistory, attemptSummary)
 		currentPlaced = nextPlaced
 		currentRouted = nextRouted
 	}
 	if summary.StopReason == "" {
 		summary.StopReason = "max_attempts"
 	}
+	summary.SelectedAttempt = bestAttempt.Attempt
+	summary.SelectedReason = bestAttempt.SelectedReason
+	markSelectedRetryAttempt(summary.AttemptHistory, bestAttempt)
 	ensureStageSummary(&bestRouted.Stage)
 	bestRouted.Stage.Summary["routing_retry"] = summary
 	return bestPlaced, bestRouted, summary
@@ -174,6 +221,136 @@ func routingAttemptBetter(candidate RoutingStageResult, current RoutingStageResu
 		return candidate.Result.Metrics.RoutedNetCount > current.Result.Metrics.RoutedNetCount
 	}
 	return false
+}
+
+func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStageResult, placed *PlacementStageResult, routed RoutingStageResult, adjustment string) placementRoutingRetryAttemptSummary {
+	summary := placementRoutingRetryAttemptSummary{
+		Attempt:                 attempt,
+		RoutingStatus:           routed.Result.Status,
+		RouteScore:              routeQualityScore(routed),
+		RoutedNets:              routed.Result.Metrics.RoutedNetCount,
+		FailedNets:              routed.Result.Metrics.FailedNetCount,
+		SkippedNets:             skippedNetCount(routed),
+		PlacementScore:          placementQualityScore(placed),
+		DRCStatus:               retryEvidenceSkipped,
+		DRCSource:               "skipped",
+		RetryAdjustment:         adjustment,
+		RegressionFlags:         nil,
+		BoardValidationBlocking: 0,
+	}
+	summary.BoardValidationIssueCount, summary.BoardValidationBlocking = summarizeRetryIssues(routed.Stage.Issues)
+	if baseline != nil {
+		summary.BaselineRoutingStatus = baseline.Result.Status
+		summary.BaselineRouteScore = routeQualityScore(*baseline)
+		summary.BaselineRoutedNets = baseline.Result.Metrics.RoutedNetCount
+		summary.BaselineFailedNets = baseline.Result.Metrics.FailedNetCount
+	} else {
+		summary.BaselineRoutingStatus = summary.RoutingStatus
+		summary.BaselineRouteScore = summary.RouteScore
+		summary.BaselineRoutedNets = summary.RoutedNets
+		summary.BaselineFailedNets = summary.FailedNets
+	}
+	return normalizePlacementRoutingRetryAttempt(summary)
+}
+
+func normalizePlacementRoutingRetryAttempt(summary placementRoutingRetryAttemptSummary) placementRoutingRetryAttemptSummary {
+	if summary.Attempt < 0 {
+		summary.Attempt = 0
+	}
+	if math.IsNaN(summary.RouteScore) || math.IsInf(summary.RouteScore, 0) {
+		summary.RouteScore = 0
+	}
+	if math.IsNaN(summary.BaselineRouteScore) || math.IsInf(summary.BaselineRouteScore, 0) {
+		summary.BaselineRouteScore = 0
+	}
+	if math.IsNaN(summary.PlacementScore) || math.IsInf(summary.PlacementScore, 0) {
+		summary.PlacementScore = 0
+	}
+	if summary.DRCStatus == "" {
+		summary.DRCStatus = retryEvidenceSkipped
+	}
+	if summary.DRCSource == "" {
+		summary.DRCSource = string(summary.DRCStatus)
+	}
+	if summary.SkippedNets < 0 {
+		summary.SkippedNets = 0
+	}
+	return summary
+}
+
+func routeQualityScore(routed RoutingStageResult) float64 {
+	if routed.Result.Quality == nil {
+		return 0
+	}
+	return routed.Result.Quality.Score.Overall
+}
+
+func placementQualityScore(placed *PlacementStageResult) float64 {
+	if placed == nil || placed.Result.Quality == nil {
+		return 0
+	}
+	return placed.Result.Quality.Score.Total
+}
+
+func skippedNetCount(routed RoutingStageResult) int {
+	total := len(routed.Request.Nets)
+	if total == 0 {
+		return 0
+	}
+	skipped := total - routed.Result.Metrics.RoutedNetCount - routed.Result.Metrics.FailedNetCount
+	if skipped < 0 {
+		return 0
+	}
+	return skipped
+}
+
+func summarizeRetryIssues(issues []reports.Issue) (total int, blocking int) {
+	for _, issue := range issues {
+		total++
+		if issue.Blocking() {
+			blocking++
+		}
+	}
+	return total, blocking
+}
+
+func routingAttemptSelectionReason(candidate RoutingStageResult, previousBest placementRoutingRetryAttemptSummary) string {
+	switch {
+	case routingStatusRank(candidate.Result.Status) > routingStatusRank(previousBest.RoutingStatus):
+		return "routing_status_improved"
+	case candidate.Result.Metrics.FailedNetCount < previousBest.FailedNets:
+		return "fewer_failed_nets"
+	case candidate.Result.Metrics.RoutedNetCount > previousBest.RoutedNets:
+		return "more_routed_nets"
+	default:
+		return "best_ranked_attempt"
+	}
+}
+
+func placementRoutingRegressionFlags(candidate, currentBest placementRoutingRetryAttemptSummary) []string {
+	var flags []string
+	if candidate.BoardValidationBlocking > currentBest.BoardValidationBlocking {
+		flags = append(flags, "board_validation_regression")
+	}
+	if candidate.DRCBlockingCount > currentBest.DRCBlockingCount {
+		flags = append(flags, "drc_regression")
+	}
+	if candidate.RouteScore < currentBest.RouteScore {
+		flags = append(flags, "route_quality_regression")
+	}
+	return flags
+}
+
+func markSelectedRetryAttempt(history []placementRoutingRetryAttemptSummary, selected placementRoutingRetryAttemptSummary) {
+	for index := range history {
+		history[index].Selected = false
+		history[index].SelectedReason = ""
+		if history[index].Attempt != selected.Attempt {
+			continue
+		}
+		history[index].Selected = true
+		history[index].SelectedReason = selected.SelectedReason
+	}
 }
 
 func routingStatusRank(status routing.Status) int {

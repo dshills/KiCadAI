@@ -146,11 +146,11 @@ func fullBoardRetryBaselineFromSummary(summary placementRoutingRetrySummary, fal
 		return fallbackStatus, fallbackRouted, fallbackFailed
 	}
 	first := summary.AttemptHistory[0]
-	status, _ := fullBoardRetryRoutingStatusFromAny(first["baseline_routing_status"])
+	status := first.BaselineRoutingStatus
 	if status == "" {
 		status = fallbackStatus
 	}
-	return status, intFromStageSummary(first, "baseline_routed_nets"), intFromStageSummary(first, "baseline_failed_nets")
+	return status, first.BaselineRoutedNets, first.BaselineFailedNets
 }
 
 func fullBoardRetryRoutingStatusFromAny(value any) (routing.Status, bool) {
@@ -585,18 +585,22 @@ func TestFullBoardRetryEvidenceExtractorReadsRetryAndPadHydration(t *testing.T) 
 				"routed_nets": 2,
 				"failed_nets": 0,
 				"routing_retry": placementRoutingRetrySummary{
-					Enabled:    true,
-					Attempts:   2,
-					Applied:    1,
-					StopReason: "routed",
-					AttemptHistory: []map[string]any{{
-						"attempt":                 2,
-						"baseline_routing_status": string(routing.StatusBlocked),
-						"baseline_routed_nets":    0,
-						"baseline_failed_nets":    2,
-						"routing_status":          string(routing.StatusRouted),
-						"routed_nets":             2,
-						"failed_nets":             0,
+					Enabled:         true,
+					Attempts:        2,
+					Applied:         1,
+					StopReason:      "routed",
+					SelectedAttempt: 2,
+					SelectedReason:  "routing_status_improved",
+					AttemptHistory: []placementRoutingRetryAttemptSummary{{
+						Attempt:               2,
+						BaselineRoutingStatus: routing.StatusBlocked,
+						BaselineRoutedNets:    0,
+						BaselineFailedNets:    2,
+						RoutingStatus:         routing.StatusRouted,
+						RoutedNets:            2,
+						FailedNets:            0,
+						Selected:              true,
+						SelectedReason:        "routing_status_improved",
 					}},
 				},
 			},

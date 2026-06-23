@@ -216,8 +216,13 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if stop, ok := retry["stop_reason"].(string); !ok || stop != "no_eligible_hints" {
 		t.Fatalf("retry stop = %#v", retry["stop_reason"])
 	}
-	if _, hasHistory := retry["attempt_history"]; hasHistory {
-		t.Fatalf("retry attempt history should be absent for no-eligible-hints boundary: %#v", retry["attempt_history"])
+	history, hasHistory := retry["attempt_history"].([]any)
+	if !hasHistory || len(history) != 1 {
+		t.Fatalf("retry attempt history = %#v, want baseline attempt only", retry["attempt_history"])
+	}
+	first, ok := history[0].(map[string]any)
+	if !ok || first["attempt"] != float64(1) || first["selected"] != true {
+		t.Fatalf("retry baseline attempt = %#v", history[0])
 	}
 	if _, hasCategories := retry["hint_categories"]; hasCategories {
 		t.Fatalf("retry hint categories should be absent for no-eligible-hints boundary: %#v", retry["hint_categories"])

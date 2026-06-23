@@ -68,7 +68,7 @@ func TestRetryGoldenNonImprovingFixtureRanksBestAttempt(t *testing.T) {
 
 	_, bestRouted, summary := maybeRetryPlacementRouting(context.Background(), request, PCBFragmentResult{}, placed, routed, RoutingOptions{Skip: true}, request.RoutingRetry)
 	assertRetrySummaryInvariant(t, summary, true)
-	if summary.StopReason != "non_improving_retry" || len(summary.AttemptHistory) != 1 || summary.AttemptHistory[0]["attempt"] != 2 {
+	if summary.StopReason != "non_improving_retry" || len(summary.AttemptHistory) != 2 || summary.AttemptHistory[1].Attempt != 2 {
 		t.Fatalf("summary = %#v", summary)
 	}
 	if !reflect.DeepEqual(bestRouted.Result, routed.Result) {

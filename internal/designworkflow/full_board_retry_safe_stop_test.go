@@ -33,7 +33,7 @@ func TestFullBoardRetrySafeStopPreservesBestAttempt(t *testing.T) {
 	if !slices.Equal(summary.HintCategories, metadata.ExpectedCategories) {
 		t.Fatalf("hint categories = %#v, want %#v", summary.HintCategories, metadata.ExpectedCategories)
 	}
-	if len(summary.AttemptHistory) != 1 || intFromStageSummary(summary.AttemptHistory[0], "attempt") != 2 {
+	if len(summary.AttemptHistory) != 2 || summary.AttemptHistory[1].Attempt != 2 {
 		t.Fatalf("attempt history = %#v", summary.AttemptHistory)
 	}
 	if !reflect.DeepEqual(bestRouted.Result, initial.Result) {

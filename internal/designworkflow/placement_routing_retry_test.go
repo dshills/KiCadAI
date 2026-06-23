@@ -1,9 +1,12 @@
 package designworkflow
 
 import (
+	"encoding/json"
+	"math"
 	"testing"
 
 	"kicadai/internal/placement"
+	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 )
 
@@ -40,6 +43,75 @@ func TestRoutingAttemptBetterPrefersRoutedStatus(t *testing.T) {
 
 	if !routingAttemptBetter(candidate, current) {
 		t.Fatalf("routed candidate should rank better")
+	}
+}
+
+func TestPlacementRoutingRetryAttemptSummaryNormalizesEvidence(t *testing.T) {
+	summary := normalizePlacementRoutingRetryAttempt(placementRoutingRetryAttemptSummary{
+		Attempt:            -1,
+		RouteScore:         math.Inf(1),
+		BaselineRouteScore: math.NaN(),
+		PlacementScore:     math.Inf(-1),
+		SkippedNets:        -4,
+	})
+	if summary.Attempt != 0 || summary.RouteScore != 0 || summary.BaselineRouteScore != 0 || summary.PlacementScore != 0 || summary.SkippedNets != 0 {
+		t.Fatalf("normalized summary = %#v", summary)
+	}
+	if summary.DRCStatus != retryEvidenceSkipped || summary.DRCSource != "skipped" {
+		t.Fatalf("DRC normalization = %#v", summary)
+	}
+}
+
+func TestPlacementRoutingRetryAttemptSummaryCountsIssues(t *testing.T) {
+	routed := RoutingStageResult{
+		Result: routing.Result{Status: routing.StatusPartial},
+		Stage: StageResult{Issues: []reports.Issue{
+			{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning},
+			{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked},
+		}},
+	}
+	routed.Result.Metrics.RoutedNetCount = 1
+	routed.Result.Metrics.FailedNetCount = 2
+
+	summary := placementRoutingAttemptSummaryForResult(2, nil, nil, routed, "")
+	if summary.Attempt != 2 || summary.RoutingStatus != routing.StatusPartial || summary.RoutedNets != 1 || summary.FailedNets != 2 {
+		t.Fatalf("route summary = %#v", summary)
+	}
+	if summary.BoardValidationIssueCount != 2 || summary.BoardValidationBlocking != 1 {
+		t.Fatalf("issue summary = %#v", summary)
+	}
+}
+
+func TestPlacementRoutingRetrySummaryJSONKeepsExistingFields(t *testing.T) {
+	summary := placementRoutingRetrySummary{
+		Enabled:         true,
+		Attempts:        2,
+		Applied:         1,
+		StopReason:      "max_attempts",
+		SelectedAttempt: 2,
+		SelectedReason:  "more_routed_nets",
+		AttemptHistory: []placementRoutingRetryAttemptSummary{{
+			Attempt:       2,
+			RoutingStatus: routing.StatusRouted,
+			RoutedNets:    2,
+			Selected:      true,
+		}},
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatalf("marshal summary: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("decode summary: %v", err)
+	}
+	if decoded["enabled"] != true || decoded["stop_reason"] != "max_attempts" || int(decoded["selected_attempt"].(float64)) != 2 {
+		t.Fatalf("decoded summary = %#v", decoded)
+	}
+	history := decoded["attempt_history"].([]any)
+	first := history[0].(map[string]any)
+	if first["routing_status"] != string(routing.StatusRouted) || first["selected"] != true {
+		t.Fatalf("decoded attempt = %#v", first)
 	}
 }
 
