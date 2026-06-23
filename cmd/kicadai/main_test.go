@@ -190,10 +190,14 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	}
 	placementStage := cliRetryStageByName(t, result.Data.Stages, "placement")
 	assertCLIPadHydrationSummary(t, placementStage, 2, 2, 4)
+	assertCLINestedSummaryNumber(t, placementStage, "mobility", "eligible_count", 2)
+	assertCLINestedSummaryNumber(t, placementStage, "mobility", "group_transform_count", 2)
 	routingStage := cliRetryStageByName(t, result.Data.Stages, "routing")
 	if routingStage.Status != "blocked" {
 		t.Fatalf("routing stage status = %q, want blocked", routingStage.Status)
 	}
+	assertCLINestedSummaryNumber(t, routingStage, "local_route_mobility", "total", 1)
+	assertCLINestedSummaryNumber(t, routingStage, "local_route_mobility", "transformable", 1)
 	retry, ok := routingStage.Summary["routing_retry"].(map[string]any)
 	if !ok {
 		t.Fatalf("routing retry summary missing: %#v", routingStage.Summary)
@@ -218,6 +222,29 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	}
 	if cliRetryStageHasIssue(routingStage, "footprint pad summaries") {
 		t.Fatalf("routing stage still has pad-summary issue: %#v", routingStage.Issues)
+	}
+}
+
+func assertCLINestedSummaryNumber(t *testing.T, stage cliRetryStageSnapshot, summaryKey string, field string, want float64) {
+	t.Helper()
+	raw, ok := stage.Summary[summaryKey]
+	if !ok {
+		t.Fatalf("%s summary missing: %#v", summaryKey, stage.Summary)
+	}
+	summary, ok := raw.(map[string]any)
+	if !ok {
+		t.Fatalf("%s summary has type %T: %#v", summaryKey, raw, raw)
+	}
+	rawValue, ok := summary[field]
+	if !ok {
+		t.Fatalf("%s.%s is missing: %#v", summaryKey, field, summary)
+	}
+	value, ok := rawValue.(float64)
+	if !ok {
+		t.Fatalf("%s.%s has type %T: %#v, want float64", summaryKey, field, rawValue, rawValue)
+	}
+	if value != want {
+		t.Fatalf("%s.%s = %v, want %v", summaryKey, field, value, want)
 	}
 }
 
