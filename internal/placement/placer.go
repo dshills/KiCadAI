@@ -51,7 +51,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	padsByRef := componentPadMaps(components)
 	rotatedPadsByRef := componentRotatedPadMaps(components, padsByRef)
 	netsByRef := netsByComponent(request.Nets)
-	netMembershipByRef := advancedNetMembershipByRef(request.Nets)
+	advancedRequestContext := newAdvancedPlacementRequestContext(request)
 	keepTogetherPeersByRef := keepTogetherPeersByComponent(request)
 	placedByRef := make(map[string]PlacementResult, len(components))
 	for index, component := range components {
@@ -65,7 +65,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 			result.Metrics.UnplacedCount += totalComponents - index
 			break
 		}
-		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, netMembershipByRef, keepTogetherPeersByRef, result.CandidateScoring)
+		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, advancedRequestContext, keepTogetherPeersByRef, result.CandidateScoring)
 		if !ok {
 			result.Status = StatusPartial
 			result.Metrics.UnplacedCount++
@@ -170,7 +170,7 @@ func slicesForPlacement(components []Component) []Component {
 	return ordered
 }
 
-func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, netMembershipByRef map[string]componentNetMembership, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) (PlacementResult, bool, []reports.Issue) {
+func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) (PlacementResult, bool, []reports.Issue) {
 	componentRef := normalizeRef(component.Ref)
 	if component.Fixed {
 		if component.Position == nil {
@@ -207,7 +207,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 		return placement, true, nil
 	}
 	congestionContext := newCongestionCandidateScoringContext(placedByRef)
-	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, netMembershipByRef, keepTogetherPeersByRef, congestionContext, scoring) {
+	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, advancedRequestContext, keepTogetherPeersByRef, congestionContext, scoring) {
 		placement := candidate.Placement
 		if conflict, ok := occupancy.FirstConflictDetail(placement); ok {
 			message := conflict.Message()
@@ -220,7 +220,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 	return PlacementResult{}, false, nil
 }
 
-func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, netMembershipByRef map[string]componentNetMembership, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
+func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
 	usable := BoardUsableRect(request.Board, request.Rules)
 	grid := request.Rules.GridMM
 	if grid <= 0 {
@@ -229,7 +229,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	rotations := componentRotations(component)
 	layers := candidateLayers(component, request.Rules)
 	maxCandidates := request.Rules.MaxCandidatesPerPart
-	advancedContext := newAdvancedCandidateScoringContext(component, componentRef, request, placedByRef, netMembershipByRef[componentRef])
+	advancedContext := newAdvancedCandidateScoringContext(component, componentRef, request, placedByRef, advancedRequestContext)
 	candidates := make([]placementCandidate, 0, maxCandidates)
 	xCount := max(1, int(math.Floor((usable.Max.XMM-usable.Min.XMM)/grid))+1)
 	yCount := max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)

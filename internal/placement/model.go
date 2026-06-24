@@ -211,6 +211,7 @@ type CandidateScoreWeights struct {
 	Mobility            float64
 	Thermal             float64
 	HighCurrent         float64
+	CreepageClearance   float64
 }
 
 type ProximityRule struct {
@@ -501,6 +502,7 @@ const (
 	CandidateScoreMobility            CandidateScoreDimensionName = "mobility"
 	CandidateScoreThermal             CandidateScoreDimensionName = "thermal"
 	CandidateScoreHighCurrent         CandidateScoreDimensionName = "high_current"
+	CandidateScoreCreepageClearance   CandidateScoreDimensionName = "creepage_clearance"
 )
 
 type CandidateRejectionReasonName string
@@ -587,6 +589,7 @@ func DefaultRules() Rules {
 				Mobility:            1,
 				Thermal:             1,
 				HighCurrent:         1,
+				CreepageClearance:   1,
 			},
 		},
 	}

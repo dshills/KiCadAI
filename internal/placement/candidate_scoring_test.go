@@ -308,6 +308,85 @@ func TestPlaceCandidateScoringReportsHighCurrentDimension(t *testing.T) {
 	}
 }
 
+func TestPlaceCandidateScoringReportsClearanceDimension(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 20, YMM: 12, Layer: "F.Cu"}
+	req.AdvancedRules.CreepageClearance = []CreepageClearancePlacementRule{{
+		ID:             "domain-gap",
+		DomainA:        PlacementRuleDomain{Refs: []string{"R2"}},
+		DomainB:        PlacementRuleDomain{Refs: []string{"R1"}},
+		MinClearanceMM: 5,
+		MinCreepageMM:  6,
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{CreepageClearance: 1}
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreCreepageClearance) {
+		t.Fatalf("clearance dimension missing: %#v", winner.Dimensions)
+	}
+	if !candidateScoreDimensionEvidenceContains(winner, CandidateScoreCreepageClearance, "creepage_proof_unsupported") {
+		t.Fatalf("unsupported creepage evidence missing: %#v", winner.Dimensions)
+	}
+}
+
+func TestPlaceCandidateScoringRejectsHardClearance(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 20, YMM: 12, Layer: "F.Cu"}
+	req.AdvancedRules.CreepageClearance = []CreepageClearancePlacementRule{{
+		ID:             "domain-gap",
+		DomainA:        PlacementRuleDomain{Refs: []string{"R2"}},
+		DomainB:        PlacementRuleDomain{Refs: []string{"R1"}},
+		MinClearanceMM: 100,
+		Enforcement:    AdvancedRuleHard,
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.CandidateScoring.RejectedByReason[string(CandidateRejectAdvancedRule)] == 0 {
+		t.Fatalf("advanced-rule rejections missing: %#v", result.CandidateScoring.RejectedByReason)
+	}
+	if result.Status != StatusPartial {
+		t.Fatalf("status = %s, want partial because all R2 candidates violate hard clearance", result.Status)
+	}
+}
+
+func TestPlaceCandidateScoringClearanceDomainCanUseNets(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 20, YMM: 12, Layer: "F.Cu"}
+	req.Nets = []Net{
+		{Name: "HOT", Role: NetPower, Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}}},
+		{Name: "COLD", Role: NetSignal, Endpoints: []Endpoint{{Ref: "R2", Pin: "1"}}},
+	}
+	req.AdvancedRules.CreepageClearance = []CreepageClearancePlacementRule{{
+		ID:             "net-domain-gap",
+		DomainA:        PlacementRuleDomain{Nets: []string{"COLD"}},
+		DomainB:        PlacementRuleDomain{Nets: []string{"HOT"}},
+		MinClearanceMM: 5,
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{CreepageClearance: 1}
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreCreepageClearance) {
+		t.Fatalf("net-domain clearance dimension missing: %#v", winner.Dimensions)
+	}
+}
+
 func TestCandidateScoringDeterministicAndGeometrySafe(t *testing.T) {
 	req := twoComponentRequest()
 	req.Components[0].Fixed = true
@@ -409,6 +488,20 @@ func candidateScoreHasDimension(score CandidateScore, name CandidateScoreDimensi
 	for _, dimension := range score.Dimensions {
 		if dimension.Name == name {
 			return true
+		}
+	}
+	return false
+}
+
+func candidateScoreDimensionEvidenceContains(score CandidateScore, name CandidateScoreDimensionName, want string) bool {
+	for _, dimension := range score.Dimensions {
+		if dimension.Name != name {
+			continue
+		}
+		for _, evidence := range dimension.Evidence {
+			if strings.Contains(evidence, want) {
+				return true
+			}
 		}
 	}
 	return false

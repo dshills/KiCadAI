@@ -60,6 +60,7 @@ func normalizeCandidateScoreWeights(weights CandidateScoreWeights) CandidateScor
 	weights.Mobility = normalizeCandidateScoreWeight(weights.Mobility)
 	weights.Thermal = normalizeCandidateScoreWeight(weights.Thermal)
 	weights.HighCurrent = normalizeCandidateScoreWeight(weights.HighCurrent)
+	weights.CreepageClearance = normalizeCandidateScoreWeight(weights.CreepageClearance)
 	return weights
 }
 
@@ -363,8 +364,21 @@ func appendCongestionFanoutCandidateDimensions(dimensions []CandidateScoreDimens
 }
 
 type advancedCandidateScoringContext struct {
-	ThermalRules     []thermalCandidateRule
-	HighCurrentRules []highCurrentCandidateRule
+	ThermalRules           []thermalCandidateRule
+	HighCurrentRules       []highCurrentCandidateRule
+	CreepageClearanceRules []clearanceCandidateRule
+}
+
+type advancedPlacementRequestContext struct {
+	ComponentsByRef        map[string]Component
+	NetMembershipByRef     map[string]componentNetMembership
+	CreepageClearanceRules []preparedClearanceRule
+}
+
+type preparedClearanceRule struct {
+	Rule    CreepageClearancePlacementRule
+	DomainA placementRuleDomainMatch
+	DomainB placementRuleDomainMatch
 }
 
 type thermalCandidateRule struct {
@@ -377,13 +391,41 @@ type highCurrentCandidateRule struct {
 	TargetPoints []Point
 }
 
+type clearanceCandidateRule struct {
+	Rule         CreepageClearancePlacementRule
+	TargetPoints []Point
+}
+
+type placementRuleDomainMatch struct {
+	Refs     map[string]struct{}
+	Roles    map[string]struct{}
+	Nets     map[string]struct{}
+	NetRoles map[NetRole]struct{}
+}
+
 type componentNetMembership struct {
 	Names map[string]struct{}
 	Roles map[NetRole]struct{}
 }
 
-func newAdvancedCandidateScoringContext(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, netMembership componentNetMembership) advancedCandidateScoringContext {
+func newAdvancedPlacementRequestContext(request Request) advancedPlacementRequestContext {
+	context := advancedPlacementRequestContext{
+		ComponentsByRef:    componentsByNormalizedRef(request.Components),
+		NetMembershipByRef: advancedNetMembershipByRef(request.Nets),
+	}
+	for _, rule := range request.AdvancedRules.CreepageClearance {
+		context.CreepageClearanceRules = append(context.CreepageClearanceRules, preparedClearanceRule{
+			Rule:    rule,
+			DomainA: newPlacementRuleDomainMatch(rule.DomainA),
+			DomainB: newPlacementRuleDomainMatch(rule.DomainB),
+		})
+	}
+	return context
+}
+
+func newAdvancedCandidateScoringContext(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, requestContext advancedPlacementRequestContext) advancedCandidateScoringContext {
 	context := advancedCandidateScoringContext{}
+	netMembership := requestContext.NetMembershipByRef[componentRef]
 	for _, rule := range request.AdvancedRules.Thermal {
 		if thermalRuleAffectsComponent(rule, component, componentRef) {
 			context.ThermalRules = append(context.ThermalRules, thermalCandidateRule{
@@ -404,7 +446,38 @@ func newAdvancedCandidateScoringContext(component Component, componentRef string
 			TargetPoints: placedCentersForRefs(highCurrentTargetRefs(rule, componentRef, sourceRefs, sinkRefs), placedByRef),
 		})
 	}
+	for _, prepared := range requestContext.CreepageClearanceRules {
+		rule := prepared.Rule
+		domainA := prepared.DomainA
+		domainB := prepared.DomainB
+		if domainAffectsComponent(domainA, component, componentRef, netMembership) {
+			context.CreepageClearanceRules = append(context.CreepageClearanceRules, clearanceCandidateRule{
+				Rule:         rule,
+				TargetPoints: placedCentersForDomain(domainB, placedByRef, requestContext.ComponentsByRef, requestContext.NetMembershipByRef),
+			})
+			continue
+		}
+		if domainAffectsComponent(domainB, component, componentRef, netMembership) {
+			context.CreepageClearanceRules = append(context.CreepageClearanceRules, clearanceCandidateRule{
+				Rule:         rule,
+				TargetPoints: placedCentersForDomain(domainA, placedByRef, requestContext.ComponentsByRef, requestContext.NetMembershipByRef),
+			})
+		}
+	}
 	return context
+}
+
+func newPlacementRuleDomainMatch(domain PlacementRuleDomain) placementRuleDomainMatch {
+	match := placementRuleDomainMatch{
+		Refs:     normalizedRefSet(domain.Refs),
+		Roles:    lowerStringSet(domain.Roles),
+		Nets:     upperStringSet(domain.Nets),
+		NetRoles: map[NetRole]struct{}{},
+	}
+	for _, role := range domain.NetRoles {
+		match.NetRoles[role] = struct{}{}
+	}
+	return match
 }
 
 func advancedNetMembershipByRef(nets []Net) map[string]componentNetMembership {
@@ -442,6 +515,11 @@ func appendThermalHighCurrentCandidateDimensions(dimensions []CandidateScoreDime
 	}
 	if weights.HighCurrent > 0 {
 		if dimension, ok := highCurrentCandidateDimension(placement, request, placedByRef, advancedContext.HighCurrentRules, weights.HighCurrent); ok {
+			dimensions = append(dimensions, dimension)
+		}
+	}
+	if weights.CreepageClearance > 0 {
+		if dimension, ok := clearanceCandidateDimension(placement, request, advancedContext.CreepageClearanceRules, weights.CreepageClearance); ok {
 			dimensions = append(dimensions, dimension)
 		}
 	}
@@ -530,6 +608,49 @@ func highCurrentCandidateDimension(placement PlacementResult, request Request, p
 	}, true
 }
 
+func clearanceCandidateDimension(placement PlacementResult, request Request, rules []clearanceCandidateRule, weight float64) (CandidateScoreDimension, bool) {
+	if len(rules) == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	boardDiagonal := boardDistance(request.Board.WidthMM, request.Board.HeightMM)
+	if boardDiagonal <= 0 {
+		boardDiagonal = 1
+	}
+	scoreTotal := 0.0
+	scoreCount := 0.0
+	evidence := []string{}
+	for _, candidateRule := range rules {
+		rule := candidateRule.Rule
+		if rule.MinCreepageMM > 0 {
+			evidence = append(evidence, "rule="+rule.ID+" creepage_proof_unsupported")
+		}
+		if len(candidateRule.TargetPoints) == 0 {
+			scoreTotal += 0.5
+			scoreCount++
+			evidence = append(evidence, "rule="+rule.ID+" clearance_target_not_placed")
+			continue
+		}
+		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok {
+			normalizer := boardDiagonal
+			if rule.MinClearanceMM > 0 {
+				normalizer = rule.MinClearanceMM
+			}
+			scoreTotal += clampCandidateUnitScore(distanceSq / square(normalizer))
+			scoreCount++
+			evidence = append(evidence, "rule="+rule.ID+" clearance_checked")
+		}
+	}
+	if scoreCount == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	return CandidateScoreDimension{
+		Name:     CandidateScoreCreepageClearance,
+		Score:    scoreTotal / scoreCount,
+		Weight:   weight,
+		Evidence: evidence,
+	}, true
+}
+
 func advancedPlacementHardRejection(component Component, placement PlacementResult, advancedContext advancedCandidateScoringContext) (CandidateRejectionReasonName, string, []string, bool) {
 	for _, candidateRule := range advancedContext.ThermalRules {
 		rule := candidateRule.Rule
@@ -548,6 +669,16 @@ func advancedPlacementHardRejection(component Component, placement PlacementResu
 		}
 		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok && distanceSq > square(rule.MaxPreferredLengthMM) {
 			message := fmt.Sprintf("candidate violates high-current rule %s: squared distance %.3f exceeds limit %.3f", rule.ID, distanceSq, square(rule.MaxPreferredLengthMM))
+			return CandidateRejectAdvancedRule, message, []string{component.Ref}, true
+		}
+	}
+	for _, candidateRule := range advancedContext.CreepageClearanceRules {
+		rule := candidateRule.Rule
+		if rule.Enforcement != AdvancedRuleHard || rule.MinClearanceMM <= 0 || len(candidateRule.TargetPoints) == 0 {
+			continue
+		}
+		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok && distanceSq < square(rule.MinClearanceMM) {
+			message := fmt.Sprintf("candidate violates clearance rule %s: squared distance %.3f is below limit %.3f", rule.ID, distanceSq, square(rule.MinClearanceMM))
 			return CandidateRejectAdvancedRule, message, []string{component.Ref}, true
 		}
 	}
@@ -609,6 +740,37 @@ func highCurrentTargetRefs(rule HighCurrentPlacementRule, componentRef string, s
 	return uniqueSortedStrings(targets)
 }
 
+func domainAffectsComponent(domain placementRuleDomainMatch, component Component, componentRef string, membership componentNetMembership) bool {
+	if _, ok := domain.Refs[componentRef]; ok {
+		return true
+	}
+	if _, ok := domain.Roles[strings.ToLower(strings.TrimSpace(component.Role))]; ok {
+		return true
+	}
+	for net := range domain.Nets {
+		if _, ok := membership.Names[net]; ok {
+			return true
+		}
+	}
+	for role := range domain.NetRoles {
+		if _, ok := membership.Roles[role]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func placedCentersForDomain(domain placementRuleDomainMatch, placedByRef map[string]PlacementResult, componentsByRef map[string]Component, netMembershipByRef map[string]componentNetMembership) []Point {
+	points := make([]Point, 0, len(placedByRef))
+	for ref, placement := range placedByRef {
+		component := componentsByRef[ref]
+		if domainAffectsComponent(domain, component, ref, netMembershipByRef[ref]) {
+			points = append(points, placement.Bounds.Center())
+		}
+	}
+	return points
+}
+
 func normalizedRefSet(values []string) map[string]struct{} {
 	out := make(map[string]struct{}, len(values))
 	for _, value := range values {
@@ -623,6 +785,17 @@ func upperStringSet(values []string) map[string]struct{} {
 	out := make(map[string]struct{}, len(values))
 	for _, value := range values {
 		value = strings.ToUpper(strings.TrimSpace(value))
+		if value != "" {
+			out[value] = struct{}{}
+		}
+	}
+	return out
+}
+
+func lowerStringSet(values []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
 		if value != "" {
 			out[value] = struct{}{}
 		}
