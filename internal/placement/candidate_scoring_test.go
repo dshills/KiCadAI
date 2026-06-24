@@ -179,6 +179,38 @@ func TestPlaceCandidateScoringOmitsGroupDimensionWithoutGroupMetadata(t *testing
 	}
 }
 
+func TestPlaceCandidateScoringReportsElectricalDimensions(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreElectricalProximity) {
+		t.Fatalf("electrical proximity dimension missing: %#v", winner.Dimensions)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreRouteLength) {
+		t.Fatalf("route length dimension missing: %#v", winner.Dimensions)
+	}
+}
+
+func candidateScoreForRef(scores []CandidateScore, ref string) (CandidateScore, bool) {
+	for _, score := range scores {
+		if score.Ref == ref {
+			return score, true
+		}
+	}
+	return CandidateScore{}, false
+}
+
 func candidateScoreHasDimension(score CandidateScore, name CandidateScoreDimensionName) bool {
 	for _, dimension := range score.Dimensions {
 		if dimension.Name == name {

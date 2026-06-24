@@ -266,11 +266,13 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	anchor, hasAnchor := groupAnchorPoint(component, request)
 	groupTarget, hasGroupTarget := groupKeepTogetherTarget(componentRef, keepTogetherPeersByRef, placedByRef)
 	netTargets := netScoreTargets(componentRef, netsByRef[componentRef], placedByRef, rotatedPadsByRef)
+	electricalContext := newElectricalCandidateScoringContext(request, netTargets)
 	seedBase := seedTieBreakBase(request.Seed, component.Ref)
 	rotatedPadsByRotation := rotatedPadsByRef[componentRef]
 	scored := make([]scoredPlacementCandidate, len(candidates))
 	for index, candidate := range candidates {
 		dimensions := semanticCandidateDimensions(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget)
+		dimensions = appendElectricalCandidateDimensions(dimensions, candidate.Placement.Position, electricalContext, rotatedPadsByRotation[rotationKey(candidate.Placement.Position.RotationDeg)])
 		candidates[index].Dimensions = dimensions
 		candidates[index].Total = weightedCandidateDimensionTotal(dimensions)
 		scored[index] = scoredPlacementCandidate{

@@ -190,6 +190,104 @@ func semanticCandidateDimensions(component Component, placement Placement, reque
 	return dimensions
 }
 
+type electricalCandidateScoringContext struct {
+	Targets             []netScoreTarget
+	Weights             CandidateScoreWeights
+	ProximityNormalizer float64
+	RouteNormalizer     float64
+}
+
+func newElectricalCandidateScoringContext(request Request, netTargets []netScoreTarget) electricalCandidateScoringContext {
+	weightSum := netTargetWeightSum(netTargets)
+	if weightSum <= 0 {
+		weightSum = 1
+	}
+	proximityNormalizer := boardDistance(request.Board.WidthMM, request.Board.HeightMM) * weightSum
+	if proximityNormalizer <= 0 {
+		proximityNormalizer = 1
+	}
+	routeNormalizer := (request.Board.WidthMM + request.Board.HeightMM) * weightSum
+	if routeNormalizer <= 0 {
+		routeNormalizer = 1
+	}
+	return electricalCandidateScoringContext{
+		Targets:             netTargets,
+		Weights:             request.Rules.CandidateScoring.Weights,
+		ProximityNormalizer: proximityNormalizer,
+		RouteNormalizer:     routeNormalizer,
+	}
+}
+
+func appendElectricalCandidateDimensions(dimensions []CandidateScoreDimension, placement Placement, context electricalCandidateScoringContext, rotatedPadsByName map[string]Point) []CandidateScoreDimension {
+	if len(context.Targets) == 0 {
+		return dimensions
+	}
+	if context.Weights.ElectricalProximity > 0 {
+		proximityDistance := netEuclideanDistanceScore(placement, context.Targets, rotatedPadsByName)
+		proximityScore := clampCandidateUnitScore(1 - proximityDistance/context.ProximityNormalizer)
+		dimensions = append(dimensions, CandidateScoreDimension{
+			Name:   CandidateScoreElectricalProximity,
+			Score:  proximityScore,
+			Weight: context.Weights.ElectricalProximity,
+		})
+	}
+	if context.Weights.RouteLength > 0 {
+		routeDistance := netManhattanDistanceScore(placement, context.Targets, rotatedPadsByName)
+		routeScore := clampCandidateUnitScore(1 - routeDistance/context.RouteNormalizer)
+		dimensions = append(dimensions, CandidateScoreDimension{
+			Name:   CandidateScoreRouteLength,
+			Score:  routeScore,
+			Weight: context.Weights.RouteLength,
+		})
+	}
+	return dimensions
+}
+
+func clampCandidateUnitScore(score float64) float64 {
+	if score < 0 {
+		return 0
+	}
+	if score > 1 {
+		return 1
+	}
+	return score
+}
+
+func netEuclideanDistanceScore(placement Placement, targets []netScoreTarget, rotatedPadsByName map[string]Point) float64 {
+	total := 0.0
+	for _, target := range targets {
+		point := absoluteComponentPadPoint(rotatedPadsByName, target.CurrentPin, placement)
+		dx := point.XMM - target.Target.XMM
+		dy := point.YMM - target.Target.YMM
+		total += netTargetEffectiveWeight(target) * boardDistance(dx, dy)
+	}
+	return total
+}
+
+func netTargetWeightSum(targets []netScoreTarget) float64 {
+	total := 0.0
+	for _, target := range targets {
+		total += netTargetEffectiveWeight(target)
+	}
+	return total
+}
+
+func netTargetEffectiveWeight(target netScoreTarget) float64 {
+	if target.Weight <= 0 {
+		return 1
+	}
+	return float64(target.Weight)
+}
+
+func netManhattanDistanceScore(placement Placement, targets []netScoreTarget, rotatedPadsByName map[string]Point) float64 {
+	total := 0.0
+	for _, target := range targets {
+		point := absoluteComponentPadPoint(rotatedPadsByName, target.CurrentPin, placement)
+		total += netTargetEffectiveWeight(target) * (math.Abs(point.XMM-target.Target.XMM) + math.Abs(point.YMM-target.Target.YMM))
+	}
+	return total
+}
+
 func groupCohesionCandidateDimension(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool, weight float64) (CandidateScoreDimension, bool) {
 	if component.GroupID == "" || (!hasAnchor && !hasGroupTarget) {
 		return CandidateScoreDimension{}, false
