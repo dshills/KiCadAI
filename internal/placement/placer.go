@@ -200,6 +200,9 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 				geometryIssue(reports.CodePlacementCollision, path, "fixed placement conflicts with "+message),
 			}
 		}
+		anchor, hasAnchor := groupAnchorPoint(component, request)
+		dimensions := semanticCandidateDimensions(component, placement.Position, request, anchor, hasAnchor, Point{}, false)
+		recordCandidateWinner(scoring, component, placement, placementCandidate{Placement: placement, Index: 0, Dimensions: dimensions, Total: weightedCandidateDimensionTotal(dimensions)})
 		return placement, true, nil
 	}
 	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef, scoring) {
@@ -209,6 +212,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 			recordCandidateRejection(scoring, component, componentRef, placement.Position, candidate.Index, candidateRejectionReasonForConflict(conflict), "candidate conflicts with "+message, message)
 			continue
 		}
+		recordCandidateWinner(scoring, component, placement, candidate)
 		return placement, true, nil
 	}
 	return PlacementResult{}, false, nil
@@ -266,6 +270,9 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	rotatedPadsByRotation := rotatedPadsByRef[componentRef]
 	scored := make([]scoredPlacementCandidate, len(candidates))
 	for index, candidate := range candidates {
+		dimensions := semanticCandidateDimensions(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget)
+		candidates[index].Dimensions = dimensions
+		candidates[index].Total = weightedCandidateDimensionTotal(dimensions)
 		scored[index] = scoredPlacementCandidate{
 			CandidateIndex: index,
 			Score:          placementScore(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget, netTargets, rotatedPadsByRotation, seedBase),
@@ -289,8 +296,10 @@ func candidatePlacements(component Component, componentRef string, request Reque
 }
 
 type placementCandidate struct {
-	Placement PlacementResult
-	Index     int
+	Placement  PlacementResult
+	Index      int
+	Total      float64
+	Dimensions []CandidateScoreDimension
 }
 
 type scoredPlacementCandidate struct {

@@ -135,6 +135,59 @@ func TestPlaceCandidateScoringReportsFixedKeepoutRejection(t *testing.T) {
 	}
 }
 
+func TestPlaceCandidateScoringReportsSemanticRoleAndGroupDimensions(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Role = string(IntentDecoupling)
+	req.Components[0].GroupID = "power"
+	req.Groups = []Group{{
+		ID:         "power",
+		Components: []string{"R1"},
+		Anchor:     GroupAnchor{At: &Point{XMM: 30, YMM: 20}},
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.CandidateScoring == nil || len(result.CandidateScoring.WinningCandidates) != 1 {
+		t.Fatalf("winning candidate scoring missing: %#v", result.CandidateScoring)
+	}
+	winner := result.CandidateScoring.WinningCandidates[0]
+	if !candidateScoreHasDimension(winner, CandidateScoreSemanticRole) {
+		t.Fatalf("semantic role dimension missing: %#v", winner.Dimensions)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreGroupCohesion) {
+		t.Fatalf("group cohesion dimension missing: %#v", winner.Dimensions)
+	}
+}
+
+func TestPlaceCandidateScoringOmitsGroupDimensionWithoutGroupMetadata(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Role = string(IntentConnector)
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.CandidateScoring == nil || len(result.CandidateScoring.WinningCandidates) != 1 {
+		t.Fatalf("winning candidate scoring missing: %#v", result.CandidateScoring)
+	}
+	winner := result.CandidateScoring.WinningCandidates[0]
+	if !candidateScoreHasDimension(winner, CandidateScoreSemanticRole) {
+		t.Fatalf("semantic role dimension missing: %#v", winner.Dimensions)
+	}
+	if candidateScoreHasDimension(winner, CandidateScoreGroupCohesion) {
+		t.Fatalf("unexpected group cohesion dimension: %#v", winner.Dimensions)
+	}
+}
+
+func candidateScoreHasDimension(score CandidateScore, name CandidateScoreDimensionName) bool {
+	for _, dimension := range score.Dimensions {
+		if dimension.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
 func TestNormalizeCandidateScoringReportSortsAndBoundsEvidence(t *testing.T) {
 	longEvidence := strings.Repeat("a", candidateScoreMaxEvidenceLength+20)
 	report := CandidateScoringReport{

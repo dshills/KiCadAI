@@ -1,6 +1,7 @@
 package placement
 
 import (
+	"fmt"
 	"math"
 	"slices"
 	"strings"
@@ -133,6 +134,94 @@ func recordCandidateRejection(report *CandidateScoringReport, component Componen
 		}},
 		Evidence: []string{message},
 	})
+}
+
+func recordCandidateWinner(report *CandidateScoringReport, component Component, placement PlacementResult, candidate placementCandidate) {
+	if report == nil {
+		return
+	}
+	report.WinningCandidates = append(report.WinningCandidates, CandidateScore{
+		Ref:        component.Ref,
+		Role:       component.Role,
+		Index:      candidate.Index,
+		Placement:  placement.Position,
+		Total:      candidate.Total,
+		Dimensions: candidate.Dimensions,
+		Evidence:   []string{"selected placement candidate"},
+	})
+}
+
+func weightedCandidateDimensionTotal(dimensions []CandidateScoreDimension) float64 {
+	if len(dimensions) == 0 {
+		return 0
+	}
+	totalWeight := 0.0
+	total := 0.0
+	for _, dimension := range dimensions {
+		if dimension.Weight <= 0 {
+			continue
+		}
+		totalWeight += dimension.Weight
+		total += dimension.Score * dimension.Weight
+	}
+	if totalWeight == 0 {
+		return 0
+	}
+	return total / totalWeight
+}
+
+func semanticCandidateDimensions(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool) []CandidateScoreDimension {
+	weights := request.Rules.CandidateScoring.Weights
+	dimensions := make([]CandidateScoreDimension, 0, 2)
+	if component.Role != "" && weights.SemanticRole > 0 {
+		dimensions = append(dimensions, CandidateScoreDimension{
+			Name:     CandidateScoreSemanticRole,
+			Score:    1,
+			Weight:   weights.SemanticRole,
+			Evidence: []string{"role=" + component.Role},
+		})
+	}
+	if weights.GroupCohesion > 0 {
+		groupDimension, ok := groupCohesionCandidateDimension(component, placement, request, anchor, hasAnchor, groupTarget, hasGroupTarget, weights.GroupCohesion)
+		if ok {
+			dimensions = append(dimensions, groupDimension)
+		}
+	}
+	return dimensions
+}
+
+func groupCohesionCandidateDimension(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool, weight float64) (CandidateScoreDimension, bool) {
+	if component.GroupID == "" || (!hasAnchor && !hasGroupTarget) {
+		return CandidateScoreDimension{}, false
+	}
+	boardDiagonal := boardDistance(request.Board.WidthMM, request.Board.HeightMM)
+	if boardDiagonal <= 0 {
+		boardDiagonal = 1
+	}
+	score := 0.0
+	evidence := []string{"group=" + component.GroupID}
+	count := 0.0
+	if hasAnchor {
+		distance := boardDistance(placement.XMM-anchor.XMM, placement.YMM-anchor.YMM)
+		score += 1 - min(1, distance/boardDiagonal)
+		count++
+		evidence = append(evidence, fmt.Sprintf("anchor_distance_mm=%.3f", distance))
+	}
+	if hasGroupTarget {
+		distance := boardDistance(placement.XMM-groupTarget.XMM, placement.YMM-groupTarget.YMM)
+		score += 1 - min(1, distance/boardDiagonal)
+		count++
+		evidence = append(evidence, fmt.Sprintf("peer_distance_mm=%.3f", distance))
+	}
+	if count == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	return CandidateScoreDimension{
+		Name:     CandidateScoreGroupCohesion,
+		Score:    score / count,
+		Weight:   weight,
+		Evidence: evidence,
+	}, true
 }
 
 func candidateRejectionReasonForConflict(conflict occupancyConflict) CandidateRejectionReasonName {
