@@ -38,6 +38,10 @@
       "placements": [
         {"role": "tvs", "footprint_id": "Diode_SMD:D_SOD-323"}
       ],
+      "required_local_routes": [
+        "esd_signal_entry_to_tvs",
+        "esd_tvs_to_ground"
+      ],
       "require_realization": true,
       "allow_unrouted": true
     }
