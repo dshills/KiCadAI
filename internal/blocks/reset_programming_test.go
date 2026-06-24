@@ -36,7 +36,10 @@ func TestResetProgrammingInventoryAndDefinition(t *testing.T) {
 
 func TestResetProgrammingInstantiateISPAndRealize(t *testing.T) {
 	registry := NewBuiltinRegistry()
-	definition, _ := registry.GetBlock("reset_programming_header")
+	definition, ok := registry.GetBlock("reset_programming_header")
+	if !ok {
+		t.Fatal("missing reset_programming_header")
+	}
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{BlockID: "reset_programming_header", InstanceID: "prog1"})
 	if reports.HasBlockingIssue(issues) {
 		t.Fatalf("instantiate issues = %#v", issues)
@@ -51,13 +54,43 @@ func TestResetProgrammingInstantiateISPAndRealize(t *testing.T) {
 	if reports.HasBlockingIssue(realized.Issues) {
 		t.Fatalf("realize issues = %#v", realized.Issues)
 	}
-	if len(realized.Components) != 1 || len(realized.LocalRoutes) != 0 {
+	if len(realized.Components) != 3 || len(realized.LocalRoutes) != 2 || len(realized.Timing) != 1 {
 		t.Fatalf("realized = %#v", realized)
+	}
+	timing := realized.Timing[0]
+	if timing.ID != "reset_programming_path" || !timing.Satisfied || !timing.GroundReturnPresent || timing.SourceToConsumerDistanceMM == nil {
+		t.Fatalf("timing evidence = %#v", timing)
+	}
+}
+
+func TestResetProgrammingTimingFindsLongResetRoute(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("reset_programming_header")
+	if !ok {
+		t.Fatal("missing reset_programming_header")
+	}
+	definition = cloneBlockDefinition(definition)
+	definition.PCBRealization.LocalRoutes[0].Waypoints = []RelativePoint{{XMM: 100, YMM: 0}}
+	definition.PCBRealization.TimingFixtures[0].MaxClockRouteLengthMM = timingMM(10)
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{BlockID: "reset_programming_header", InstanceID: "prog1"})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if len(realized.Timing) != 1 || realized.Timing[0].Satisfied {
+		t.Fatalf("timing evidence = %#v, want unsatisfied long reset route", realized.Timing)
+	}
+	if !hasTimingFinding(realized.Timing[0].Findings, TimingFindingResetProgrammingRouteLength) {
+		t.Fatalf("findings = %#v, want long reset/programming route", realized.Timing[0].Findings)
 	}
 }
 
 func TestResetProgrammingInstantiateUARTWithoutSwitch(t *testing.T) {
 	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("reset_programming_header")
+	if !ok {
+		t.Fatal("missing reset_programming_header")
+	}
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{
 		BlockID:    "reset_programming_header",
 		InstanceID: "prog1",
@@ -75,6 +108,13 @@ func TestResetProgrammingInstantiateUARTWithoutSwitch(t *testing.T) {
 	if countOperations(output.Operations, transactions.OpAddSymbol) != 2 || countOperations(output.Operations, transactions.OpConnect) != 6 {
 		t.Fatalf("operations = %#v", output.Operations)
 	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realize issues = %#v", realized.Issues)
+	}
+	if len(realized.Components) != 1 || len(realized.LocalRoutes) != 0 || len(realized.Timing) != 0 {
+		t.Fatalf("realized = %#v", realized)
+	}
 }
 
 func TestResetProgrammingRejectsUnsupportedInterface(t *testing.T) {
@@ -86,5 +126,17 @@ func TestResetProgrammingRejectsUnsupportedInterface(t *testing.T) {
 	})
 	if !reports.HasBlockingIssue(issues) || !hasBlockIssuePath(issues, "params.programming_interface") {
 		t.Fatalf("issues = %#v, want unsupported programming interface blocker", issues)
+	}
+}
+
+func TestResetProgrammingRejectsUnsupportedISPFootprint(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	_, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "reset_programming_header",
+		InstanceID: "prog1",
+		Params:     map[string]any{"isp_header_footprint": "Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Angled"},
+	})
+	if !reports.HasBlockingIssue(issues) || !hasBlockIssuePath(issues, "params.isp_header_footprint") {
+		t.Fatalf("issues = %#v, want unsupported ISP footprint blocker", issues)
 	}
 }

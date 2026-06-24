@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -142,6 +143,9 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.RoleRefs[role] = ref
 	}
 	for _, component := range definition.PCBRealization.Components {
+		if !realizationWhenMatches(component.When, output.Instance.Params) {
+			continue
+		}
 		ref := roleRefs[component.ComponentRole]
 		if ref == "" {
 			result.Issues = append(result.Issues, reports.Issue{
@@ -199,6 +203,9 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 	placements := realizedPlacementMap(result.Components)
 	componentByRole := blockComponentByRole(definition.Components)
 	for _, route := range definition.PCBRealization.LocalRoutes {
+		if !realizationWhenMatches(route.When, output.Instance.Params) {
+			continue
+		}
 		fromRef := roleRefs[route.From.ComponentRole]
 		toRef := roleRefs[route.To.ComponentRole]
 		if fromRef == "" || toRef == "" {
@@ -259,11 +266,46 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.LocalRoutes = append(result.LocalRoutes, realizedRoute)
 		result.Operations = append(result.Operations, operation)
 	}
-	result.Timing = buildTimingFixtureEvidence(definition.PCBRealization.TimingFixtures, output, result.Components, result.LocalRoutes)
+	result.Timing = buildTimingFixtureEvidence(activeTimingFixtures(definition.PCBRealization.TimingFixtures, output.Instance.Params), output, result.Components, result.LocalRoutes)
 	result.Metadata["components"] = RealizationMetric{Count: len(result.Components)}
 	result.Metadata["local_routes"] = RealizationMetric{Count: len(result.LocalRoutes)}
 	result.Metadata["timing"] = RealizationMetric{Count: len(result.Timing)}
 	return result
+}
+
+func activeTimingFixtures(fixtures []PCBTimingFixture, params map[string]any) []PCBTimingFixture {
+	if len(fixtures) == 0 {
+		return nil
+	}
+	active := make([]PCBTimingFixture, 0, len(fixtures))
+	for _, fixture := range fixtures {
+		if realizationWhenMatches(fixture.When, params) {
+			active = append(active, fixture)
+		}
+	}
+	return active
+}
+
+func realizationWhenMatches(condition RealizationWhen, params map[string]any) bool {
+	for key, want := range condition.Params {
+		if !parameterValuesEqual(params[key], want) {
+			return false
+		}
+	}
+	return true
+}
+
+func parameterValuesEqual(got any, want any) bool {
+	switch expected := want.(type) {
+	case bool:
+		value, ok := got.(bool)
+		return ok && value == expected
+	case string:
+		value, ok := got.(string)
+		return ok && strings.TrimSpace(value) == expected
+	default:
+		return reflect.DeepEqual(got, want)
+	}
 }
 
 func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput, components []RealizedPCBComponent, routes []RealizedPCBLocalRoute) []TimingFixtureEvidence {
@@ -372,7 +414,13 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 			}
 			if _, ok := clockNetSet[route.NetName]; ok {
 				item.ClockRouteLengthsMM[route.ID] = route.LengthMM
-				item.Findings = appendThresholdFinding(item.Findings, TimingFindingClockRoutesLength, "timing route exceeds maximum length", route.LengthMM, fixture.MaxClockRouteLengthMM, []string{route.From.Ref, route.To.Ref}, []string{route.NetName})
+				findingID := TimingFindingClockRoutesLength
+				message := "timing route exceeds maximum length"
+				if fixture.Kind == PCBTimingKindReset {
+					findingID = TimingFindingResetProgrammingRouteLength
+					message = "reset/programming route exceeds maximum length"
+				}
+				item.Findings = appendThresholdFinding(item.Findings, findingID, message, route.LengthMM, fixture.MaxClockRouteLengthMM, []string{route.From.Ref, route.To.Ref}, []string{route.NetName})
 			}
 			if route.NetName == item.GroundNet {
 				item.GroundReturnPresent = true
@@ -382,7 +430,17 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 			item.ClockRouteLengthsMM = nil
 		}
 		if fixture.GroundNetTemplate != "" && !item.GroundReturnPresent {
-			item.Findings = append(item.Findings, timingFinding(TimingFindingGroundReturnPresent, reports.SeverityError, "timing fixture has no local ground return evidence", nil, nil, item.LoadCapacitorRefs, []string{item.GroundNet}))
+			findingID := TimingFindingGroundReturnPresent
+			message := "timing fixture has no local ground return evidence"
+			refs := item.LoadCapacitorRefs
+			if len(refs) == 0 {
+				refs = compactStrings(item.SourceRef, item.ConsumerRef)
+			}
+			if fixture.Kind == PCBTimingKindReset {
+				findingID = TimingFindingProgrammingGroundReference
+				message = "programming header has no local ground reference evidence"
+			}
+			item.Findings = append(item.Findings, timingFinding(findingID, reports.SeverityError, message, nil, nil, refs, []string{item.GroundNet}))
 		}
 		item.Satisfied = timingFindingsSatisfied(item.Findings)
 		evidence = append(evidence, item)
@@ -440,6 +498,16 @@ func timingFindingsSatisfied(findings []TimingFixtureFinding) bool {
 		}
 	}
 	return true
+}
+
+func compactStrings(values ...string) []string {
+	out := make([]string, 0, len(values))
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 type emittedComponentFact struct {

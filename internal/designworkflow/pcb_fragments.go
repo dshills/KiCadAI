@@ -224,8 +224,12 @@ func timingFindingSuggestion(id string) string {
 		return "place load capacitors more symmetrically around the crystal"
 	case blocks.TimingFindingClockRoutesLength:
 		return "shorten local timing routes or relax the timing route threshold"
+	case blocks.TimingFindingResetProgrammingRouteLength:
+		return "shorten reset/programming routes or relax the reset timing threshold"
 	case blocks.TimingFindingGroundReturnPresent:
 		return "add local ground-return evidence for timing capacitors or decoupling"
+	case blocks.TimingFindingProgrammingGroundReference:
+		return "add local programming-header ground reference evidence"
 	case blocks.TimingFindingDecouplingPresent:
 		return "place the required local timing decoupling component in the PCB realization"
 	case blocks.TimingFindingEnableControlPresent:

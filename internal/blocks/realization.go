@@ -41,6 +41,11 @@ type PCBComponentRealization struct {
 	Placement      RelativePlacement `json:"placement"`
 	Side           string            `json:"side,omitempty"`
 	Properties     map[string]string `json:"properties,omitempty"`
+	When           RealizationWhen   `json:"when,omitempty"`
+}
+
+type RealizationWhen struct {
+	Params map[string]any `json:"params,omitempty"`
 }
 
 type RelativePlacement struct {
@@ -76,6 +81,7 @@ type PCBLocalRoute struct {
 	WidthMM     float64         `json:"width_mm,omitempty"`
 	Required    bool            `json:"required,omitempty"`
 	Description string          `json:"description,omitempty"`
+	When        RealizationWhen `json:"when,omitempty"`
 }
 
 type PCBTimingRole string
@@ -83,14 +89,17 @@ type PCBTimingRole string
 const (
 	PCBTimingKindCrystal    = "crystal"
 	PCBTimingKindOscillator = "oscillator"
+	PCBTimingKindReset      = "reset_programming"
 
-	PCBTimingRoleCrystal       PCBTimingRole = "crystal"
-	PCBTimingRoleOscillator    PCBTimingRole = "oscillator"
-	PCBTimingRoleConsumer      PCBTimingRole = "clock_consumer"
-	PCBTimingRoleLoadCapacitor PCBTimingRole = "load_capacitor"
-	PCBTimingRoleDecoupling    PCBTimingRole = "decoupling"
-	PCBTimingRoleEnableControl PCBTimingRole = "enable_control"
-	PCBTimingRoleGroundReturn  PCBTimingRole = "ground_return"
+	PCBTimingRoleCrystal           PCBTimingRole = "crystal"
+	PCBTimingRoleOscillator        PCBTimingRole = "oscillator"
+	PCBTimingRoleConsumer          PCBTimingRole = "clock_consumer"
+	PCBTimingRoleLoadCapacitor     PCBTimingRole = "load_capacitor"
+	PCBTimingRoleDecoupling        PCBTimingRole = "decoupling"
+	PCBTimingRoleEnableControl     PCBTimingRole = "enable_control"
+	PCBTimingRoleGroundReturn      PCBTimingRole = "ground_return"
+	PCBTimingRoleResetPullup       PCBTimingRole = "reset_pullup"
+	PCBTimingRoleProgrammingHeader PCBTimingRole = "programming_header"
 )
 
 type PCBTimingFixture struct {
@@ -114,6 +123,7 @@ type PCBTimingFixture struct {
 	PreferredLayer                string                   `json:"preferred_layer,omitempty"`
 	Roles                         map[string]PCBTimingRole `json:"roles,omitempty"`
 	Description                   string                   `json:"description,omitempty"`
+	When                          RealizationWhen          `json:"when,omitempty"`
 }
 
 type RouteEndpoint struct {
@@ -407,7 +417,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 
 func validPCBTimingKind(kind string) bool {
 	switch kind {
-	case PCBTimingKindCrystal, PCBTimingKindOscillator:
+	case PCBTimingKindCrystal, PCBTimingKindOscillator, PCBTimingKindReset:
 		return true
 	default:
 		return false
@@ -422,7 +432,9 @@ func validPCBTimingRole(role PCBTimingRole) bool {
 		PCBTimingRoleLoadCapacitor,
 		PCBTimingRoleDecoupling,
 		PCBTimingRoleEnableControl,
-		PCBTimingRoleGroundReturn:
+		PCBTimingRoleGroundReturn,
+		PCBTimingRoleResetPullup,
+		PCBTimingRoleProgrammingHeader:
 		return true
 	default:
 		return false
@@ -566,6 +578,7 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.Components = append([]PCBComponentRealization(nil), realization.Components...)
 	for i := range clone.Components {
 		clone.Components[i].Properties = cloneStringMap(realization.Components[i].Properties)
+		clone.Components[i].When.Params = cloneAnyParams(realization.Components[i].When.Params)
 	}
 	clone.PlacementGroups = append([]PCBPlacementGroup(nil), realization.PlacementGroups...)
 	for i := range clone.PlacementGroups {
@@ -578,6 +591,7 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.LocalRoutes = append([]PCBLocalRoute(nil), realization.LocalRoutes...)
 	for i := range clone.LocalRoutes {
 		clone.LocalRoutes[i].Waypoints = append([]RelativePoint(nil), realization.LocalRoutes[i].Waypoints...)
+		clone.LocalRoutes[i].When.Params = cloneAnyParams(realization.LocalRoutes[i].When.Params)
 	}
 	if len(realization.TimingFixtures) > 0 {
 		clone.TimingFixtures = make([]PCBTimingFixture, len(realization.TimingFixtures))
@@ -595,6 +609,7 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 		timing.MaxClockRouteLengthMM = cloneFloat64Ptr(timing.MaxClockRouteLengthMM)
 		timing.MinNoiseKeepoutMM = cloneFloat64Ptr(timing.MinNoiseKeepoutMM)
 		timing.Roles = cloneTimingRoleMap(timing.Roles)
+		timing.When.Params = cloneAnyParams(timing.When.Params)
 		clone.TimingFixtures[i] = timing
 	}
 	clone.Zones = append([]PCBZoneRealization(nil), realization.Zones...)

@@ -133,6 +133,32 @@ func TestTimingFindingSuggestionsIncludeOscillatorEvidence(t *testing.T) {
 	}
 }
 
+func TestTimingFindingSuggestionsIncludeResetProgrammingEvidence(t *testing.T) {
+	issues := timingEvidenceIssues(blocks.BlockPCBRealizationResult{
+		Timing: []blocks.TimingFixtureEvidence{{
+			ID: "reset",
+			Findings: []blocks.TimingFixtureFinding{{
+				ID:       blocks.TimingFindingResetProgrammingRouteLength,
+				Severity: reports.SeverityError,
+				Message:  "reset route too long",
+			}, {
+				ID:       blocks.TimingFindingProgrammingGroundReference,
+				Severity: reports.SeverityError,
+				Message:  "ground missing",
+			}},
+		}},
+	})
+	if len(issues) != 2 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if issues[0].Suggestion != "shorten reset/programming routes or relax the reset timing threshold" {
+		t.Fatalf("reset route suggestion = %q", issues[0].Suggestion)
+	}
+	if issues[1].Suggestion != "add local programming-header ground reference evidence" {
+		t.Fatalf("ground reference suggestion = %q", issues[1].Suggestion)
+	}
+}
+
 func TestRealizePCBFragmentsWarnsWhenBoardTooSmall(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

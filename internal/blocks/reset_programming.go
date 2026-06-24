@@ -18,7 +18,7 @@ func resetProgrammingHeaderDefinition() BlockDefinition {
 			{Name: "include_reset_switch", Type: ParameterBool, Default: true, Description: "When true, add a reset pushbutton from RESET to GND."},
 			{Name: "pullup_value", Type: ParameterResistance, Default: "10k", Description: "Reset pull-up resistor value."},
 			{Name: "pullup_footprint", Type: ParameterFootprintID, Default: "Resistor_SMD:R_0805_2012Metric", Description: "Reset pull-up resistor footprint."},
-			{Name: "isp_header_footprint", Type: ParameterFootprintID, Default: ispHeaderFootprint, Description: "AVR ISP header footprint."},
+			{Name: "isp_header_footprint", Type: ParameterFootprintID, Default: ispHeaderFootprint, Description: "Verified AVR ISP 2x3 header footprint used by default PCB local routes."},
 			{Name: "uart_header_footprint", Type: ParameterFootprintID, Default: uartHeaderFootprint, Description: "UART header footprint."},
 			{Name: "reset_switch_footprint", Type: ParameterFootprintID, Default: resetSwitchFootprint, Description: "Reset switch footprint."},
 		},
@@ -90,8 +90,30 @@ func resetProgrammingPCBRealization() *PCBRealization {
 		VerificationLevel: PCBVerificationUnrealized,
 		Components: []PCBComponentRealization{
 			{ComponentRole: "reset_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
+			{ComponentRole: "reset_switch", FootprintParam: "reset_switch_footprint", Placement: RelativePlacement{XMM: -7, YMM: 0, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"include_reset_switch": true}}},
+			{ComponentRole: "isp_header", FootprintParam: "isp_header_footprint", Placement: RelativePlacement{XMM: 12, YMM: 0, Layer: "F.Cu"}, When: RealizationWhen{Params: map[string]any{"programming_interface": "isp"}}},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "reset_programming", ComponentRoles: []string{"reset_pullup"}, AnchorRole: "reset_pullup", Bounds: &RelativeBounds{MinXMM: -3, MinYMM: -3, MaxXMM: 3, MaxYMM: 3}, Description: "Keep reset pull-up close to the target MCU reset net."}},
+		PlacementGroups: []PCBPlacementGroup{{ID: "reset_programming", ComponentRoles: []string{"reset_pullup", "reset_switch", "isp_header"}, AnchorRole: "reset_pullup", Bounds: &RelativeBounds{MinXMM: -8, MinYMM: -4, MaxXMM: 14, MaxYMM: 4}, Description: "Keep reset pull-up, reset switch, and default ISP header compact."}},
+		LocalRoutes: []PCBLocalRoute{
+			{ID: "reset_pullup_to_header", NetTemplate: "reset", From: RouteEndpoint{ComponentRole: "reset_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "isp_header", Pin: "5"}, Layer: "F.Cu", WidthMM: 0.2, Required: true, When: RealizationWhen{Params: map[string]any{"programming_interface": "isp"}}},
+			{ID: "reset_switch_to_header_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "reset_switch", Pin: "2"}, To: RouteEndpoint{ComponentRole: "isp_header", Pin: "6"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"programming_interface": "isp", "include_reset_switch": true}}},
+		},
+		TimingFixtures: []PCBTimingFixture{{
+			ID:                            "reset_programming_path",
+			TimingGroupID:                 "reset_programming",
+			Kind:                          PCBTimingKindReset,
+			SourceRole:                    "reset_pullup",
+			ConsumerRole:                  "isp_header",
+			GroundNetTemplate:             "gnd",
+			ClockNetTemplates:             []string{"reset"},
+			LocalRouteIDs:                 []string{"reset_pullup_to_header", "reset_switch_to_header_ground"},
+			MaxSourceToConsumerDistanceMM: timingMM(20),
+			MaxClockRouteLengthMM:         timingMM(30),
+			PreferredLayer:                "F.Cu",
+			Roles:                         map[string]PCBTimingRole{"reset_pullup": PCBTimingRoleResetPullup, "isp_header": PCBTimingRoleProgrammingHeader, "reset_switch": PCBTimingRoleGroundReturn},
+			Description:                   "Keep the reset pull-up path and programming header ground reference compact.",
+			When:                          RealizationWhen{Params: map[string]any{"programming_interface": "isp", "include_reset_switch": true}},
+		}},
 		Constraints: []PCBConstraint{
 			{ID: "reset_pullup_proximity", Kind: "proximity", NetTemplate: "reset", AppliesTo: []string{"reset_pullup"}, MaxLengthMM: 20, Description: "Reset pull-up should stay near the target MCU reset net."},
 		},
@@ -119,6 +141,8 @@ func instantiateResetProgrammingHeader(definition BlockDefinition, request Block
 	case "isp":
 		if stringParam(params, "isp_header_footprint") == "" {
 			issues = append(issues, blockIssue("params.isp_header_footprint", "isp_header_footprint is required"))
+		} else if stringParam(params, "isp_header_footprint") != ispHeaderFootprint {
+			issues = append(issues, blockIssue("params.isp_header_footprint", "only the verified AVR ISP 2x3 header footprint is currently supported by PCB realization"))
 		}
 	case "uart":
 		if stringParam(params, "uart_header_footprint") == "" {
