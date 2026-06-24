@@ -20,6 +20,10 @@ const (
 	candidateScoreFloatPrecision              int = 1000
 	candidateScoreMaxEvidenceLength           int = 160
 	candidatePlacementCompareEpsilon              = 1e-9
+	candidateCongestionPlacedSaturationCount      = 100.0
+	candidateFanoutSideCount                      = 4.0
+	candidateFanoutPadPressureLimit               = 32.0
+	candidateCongestionCellMM                     = 10.0
 )
 
 func normalizeCandidateScoringRules(rules CandidateScoringRules) CandidateScoringRules {
@@ -286,6 +290,89 @@ func netManhattanDistanceScore(placement Placement, targets []netScoreTarget, ro
 		total += netTargetEffectiveWeight(target) * (math.Abs(point.XMM-target.Target.XMM) + math.Abs(point.YMM-target.Target.YMM))
 	}
 	return total
+}
+
+type congestionCandidateScoringContext struct {
+	Cells map[congestionCellKey]int
+}
+
+type congestionCellKey struct {
+	Layer string
+	X     int
+	Y     int
+}
+
+func newCongestionCandidateScoringContext(placedByRef map[string]PlacementResult) congestionCandidateScoringContext {
+	context := congestionCandidateScoringContext{Cells: make(map[congestionCellKey]int, len(placedByRef))}
+	for _, placed := range placedByRef {
+		center := placed.Bounds.Center()
+		key := congestionCellKey{
+			Layer: placed.Position.Layer,
+			X:     int(math.Floor(center.XMM / candidateCongestionCellMM)),
+			Y:     int(math.Floor(center.YMM / candidateCongestionCellMM)),
+		}
+		context.Cells[key]++
+	}
+	return context
+}
+
+func appendCongestionFanoutCandidateDimensions(dimensions []CandidateScoreDimension, component Component, placement PlacementResult, request Request, congestionContext congestionCandidateScoringContext) []CandidateScoreDimension {
+	weights := request.Rules.CandidateScoring.Weights
+	if weights.Congestion > 0 {
+		nearby := congestionContext.NearbyCount(placement)
+		dimensions = append(dimensions, CandidateScoreDimension{
+			Name:   CandidateScoreCongestion,
+			Score:  clampCandidateUnitScore(1 - float64(nearby)/candidateCongestionPlacedSaturationCount),
+			Weight: weights.Congestion,
+		})
+	}
+	if weights.Fanout > 0 {
+		clearance := max(request.Rules.ComponentSpacingMM, request.Rules.ConnectorEdgeClearanceMM)
+		availableSides := cheapFanoutAvailableSideCount(request.Board, placement, clearance)
+		padCount := max(1, len(component.Pads))
+		sideScore := float64(availableSides) / candidateFanoutSideCount
+		padPressure := min(1, float64(padCount)/candidateFanoutPadPressureLimit)
+		score := clampCandidateUnitScore(sideScore * (1 - padPressure/2))
+		dimensions = append(dimensions, CandidateScoreDimension{
+			Name:   CandidateScoreFanout,
+			Score:  score,
+			Weight: weights.Fanout,
+		})
+	}
+	return dimensions
+}
+
+func (context congestionCandidateScoringContext) NearbyCount(candidate PlacementResult) int {
+	if len(context.Cells) == 0 {
+		return 0
+	}
+	center := candidate.Bounds.Center()
+	baseX := int(math.Floor(center.XMM / candidateCongestionCellMM))
+	baseY := int(math.Floor(center.YMM / candidateCongestionCellMM))
+	count := 0
+	for dx := -1; dx <= 1; dx++ {
+		for dy := -1; dy <= 1; dy++ {
+			count += context.Cells[congestionCellKey{Layer: candidate.Position.Layer, X: baseX + dx, Y: baseY + dy}]
+		}
+	}
+	return count
+}
+
+func cheapFanoutAvailableSideCount(board BoardPlacementArea, placement PlacementResult, clearance float64) int {
+	count := 0
+	if placement.Bounds.Min.XMM-board.Origin.XMM >= clearance {
+		count++
+	}
+	if board.Origin.XMM+board.WidthMM-placement.Bounds.Max.XMM >= clearance {
+		count++
+	}
+	if placement.Bounds.Min.YMM-board.Origin.YMM >= clearance {
+		count++
+	}
+	if board.Origin.YMM+board.HeightMM-placement.Bounds.Max.YMM >= clearance {
+		count++
+	}
+	return count
 }
 
 func groupCohesionCandidateDimension(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool, weight float64) (CandidateScoreDimension, bool) {

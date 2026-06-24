@@ -205,7 +205,8 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 		recordCandidateWinner(scoring, component, placement, placementCandidate{Placement: placement, Index: 0, Dimensions: dimensions, Total: weightedCandidateDimensionTotal(dimensions)})
 		return placement, true, nil
 	}
-	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef, scoring) {
+	congestionContext := newCongestionCandidateScoringContext(placedByRef)
+	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef, congestionContext, scoring) {
 		placement := candidate.Placement
 		if conflict, ok := occupancy.FirstConflictDetail(placement); ok {
 			message := conflict.Message()
@@ -218,7 +219,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 	return PlacementResult{}, false, nil
 }
 
-func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) []placementCandidate {
+func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
 	usable := BoardUsableRect(request.Board, request.Rules)
 	grid := request.Rules.GridMM
 	if grid <= 0 {
@@ -273,6 +274,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	for index, candidate := range candidates {
 		dimensions := semanticCandidateDimensions(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget)
 		dimensions = appendElectricalCandidateDimensions(dimensions, candidate.Placement.Position, electricalContext, rotatedPadsByRotation[rotationKey(candidate.Placement.Position.RotationDeg)])
+		dimensions = appendCongestionFanoutCandidateDimensions(dimensions, component, candidate.Placement, request, congestionContext)
 		candidates[index].Dimensions = dimensions
 		candidates[index].Total = weightedCandidateDimensionTotal(dimensions)
 		scored[index] = scoredPlacementCandidate{

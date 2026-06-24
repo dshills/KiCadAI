@@ -202,6 +202,27 @@ func TestPlaceCandidateScoringReportsElectricalDimensions(t *testing.T) {
 	}
 }
 
+func TestPlaceCandidateScoringReportsCongestionAndFanoutDimensions(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Components[1].Pads = []PadSummary{{Name: "1"}, {Name: "2"}, {Name: "3"}, {Name: "4"}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreCongestion) {
+		t.Fatalf("congestion dimension missing: %#v", winner.Dimensions)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreFanout) {
+		t.Fatalf("fanout dimension missing: %#v", winner.Dimensions)
+	}
+}
+
 func candidateScoreForRef(scores []CandidateScore, ref string) (CandidateScore, bool) {
 	for _, score := range scores {
 		if score.Ref == ref {
