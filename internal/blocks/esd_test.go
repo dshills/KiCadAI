@@ -55,6 +55,28 @@ func TestESDProtectionInstantiateAndRealize(t *testing.T) {
 	if len(realized.Components) != 1 || realized.Components[0].Placement.XMM != 2 {
 		t.Fatalf("realized = %#v", realized)
 	}
+	if len(realized.EntryAnchors) != 2 {
+		t.Fatalf("entry anchors = %#v, want signal and ground anchors", realized.EntryAnchors)
+	}
+	if len(realized.LocalRoutes) != 2 {
+		t.Fatalf("local routes = %#v, want signal and ground route evidence", realized.LocalRoutes)
+	}
+	routeIDs := map[string]bool{}
+	for _, route := range realized.LocalRoutes {
+		routeIDs[route.ID] = true
+		if route.LengthMM <= 0 {
+			t.Fatalf("realized route %s length = %f, want calculated positive length", route.ID, route.LengthMM)
+		}
+	}
+	if !routeIDs["esd_signal_entry_to_tvs"] || !routeIDs["esd_tvs_to_ground"] {
+		t.Fatalf("route IDs = %#v", routeIDs)
+	}
+	for _, unsupported := range definition.PCBRealization.UnsupportedBehaviors {
+		if unsupported == "route-through connector ordering is advisory until ordered net segments are modeled" ||
+			unsupported == "external connector entry-point proximity is advisory until entry anchors are modeled" {
+			t.Fatalf("unexpected stale unsupported behavior: %q", unsupported)
+		}
+	}
 }
 
 func TestESDProtectionRejectsUnsupportedVoltageAndFootprint(t *testing.T) {

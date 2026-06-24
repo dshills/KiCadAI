@@ -71,15 +71,21 @@ func esdProtectionPCBRealization() *PCBRealization {
 		Components: []PCBComponentRealization{
 			{ComponentRole: "tvs", FootprintParam: "tvs_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
 		},
+		EntryAnchors: []PCBEntryAnchor{
+			{ID: "signal_entry", Port: "SIGNAL", NetTemplate: "signal", Placement: RelativePlacement{XMM: -2.5, YMM: 0, Layer: "F.Cu"}, Description: "Protected signal entry point before the TVS shunt."},
+			{ID: "ground_return", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: 0, YMM: 2.5, Layer: "F.Cu"}, Description: "Short local ground return target for the TVS."},
+		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "esd_shunt", ComponentRoles: []string{"tvs"}, AnchorRole: "tvs", Bounds: &RelativeBounds{MinXMM: -2, MinYMM: -2, MaxXMM: 2, MaxYMM: 2}, Description: "Place TVS adjacent to the external connector or exposed trace."}},
+		LocalRoutes: []PCBLocalRoute{
+			{ID: "esd_signal_entry_to_tvs", NetTemplate: "signal", From: RouteEndpoint{AnchorID: "signal_entry"}, To: RouteEndpoint{ComponentRole: "tvs", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, Description: "Short protected-line path from the connector-side entry anchor to the TVS."},
+			{ID: "esd_tvs_to_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "tvs", Pin: "2"}, To: RouteEndpoint{AnchorID: "ground_return"}, Layer: "F.Cu", WidthMM: 0.5, Required: true, Description: "Short low-inductance TVS ground return."},
+		},
 		Constraints: []PCBConstraint{
 			{ID: "esd_ground_short", Kind: "max_length", NetTemplate: "gnd", AppliesTo: []string{"tvs"}, MaxLengthMM: 3, Description: "Ground return should be short and low inductance."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"signal", "gnd"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"signal", "gnd"}, RequiredRoutes: []string{"esd_signal_entry_to_tvs", "esd_tvs_to_ground"}},
 		UnsupportedBehaviors: []string{
 			"surge rating and line capacitance are not selected from signal class yet",
-			"route-through connector ordering is advisory until ordered net segments are modeled",
-			"external connector entry-point proximity is advisory until entry anchors are modeled",
 		},
 	}
 }
