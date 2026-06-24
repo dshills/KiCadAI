@@ -481,8 +481,10 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 	if strings.TrimSpace(opts.OutputDir) == "" {
 		if requiredERC || requiredDRC {
 			return StageResult{
-				Name:   "erc_drc",
-				Issues: []reports.Issue{ercDRCRunIssue(manifest, "output_dir", "ERC/DRC verification requires an output directory")},
+				Name:    "erc_drc",
+				Status:  StatusBlocked,
+				Issues:  []reports.Issue{ercDRCRunIssue(manifest, "output_dir", "ERC/DRC verification requires an output directory")},
+				Summary: "ERC/DRC blocked: missing output directory",
 			}, nil
 		}
 		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because no output directory was provided"}, nil
@@ -530,8 +532,8 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 		issues = append(issues, missingExpectedCheckIssues(manifest, allFindings, manifest.Expected.ERCDRC.ExpectedIssues)...)
 	}
 
-	summary := fmt.Sprintf("ran %d KiCad ERC/DRC check(s) for %s", len(kinds), projectDir)
-	return StageResult{Name: "erc_drc", Issues: issues, Summary: summary}, artifacts
+	summary := fmt.Sprintf("ran %d KiCad ERC/DRC check(s) for %s and produced %d artifact(s)", len(kinds), projectDir, len(artifacts))
+	return StageResult{Name: "erc_drc", Status: statusForIssues(issues), Issues: issues, Summary: summary}, artifacts
 }
 
 func ercDRCRequirements(expected Expected, opts RunOptions) (bool, bool) {

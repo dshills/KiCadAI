@@ -3,6 +3,7 @@ package verification
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -102,6 +103,17 @@ func TestRunCaseERCDRCSkipsWhenKiCadMissingAndOptional(t *testing.T) {
 	}
 }
 
+func TestRunCaseERCDRCSkipsWhenOutputDirMissingAndOptional(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.ERCDRC.AllowedCodes = []string{"OPTIONAL_EXPECTATION"}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if !ok || stage.Status != StatusSkipped || result.Status != StatusPass || !strings.Contains(stage.Summary, "no output directory") {
+		t.Fatalf("status=%s stage=%#v issues=%#v", result.Status, stage, result.Issues)
+	}
+}
+
 func TestRunCaseERCDRCBlocksWhenRequiredAndKiCadMissing(t *testing.T) {
 	t.Setenv(checks.EnvKiCadCLI, filepath.Join(t.TempDir(), "missing-kicad-cli"))
 	manifest := validManifest()
@@ -113,6 +125,17 @@ func TestRunCaseERCDRCBlocksWhenRequiredAndKiCadMissing(t *testing.T) {
 		Overwrite: true,
 	})
 	if result.Status != StatusBlocked || !hasIssue(result.Issues, "kicad-cli") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseERCDRCBlocksWhenOutputDirMissingAndRequired(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.ERCDRC.Required = true
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || !hasIssue(result.Issues, "requires an output directory") || !strings.Contains(stage.Summary, "missing output directory") {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -147,18 +170,23 @@ func TestRunCaseERCDRCMockedPass(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Nets[0].Name = "status_led_series"
 	manifest.Expected.EvidenceLevel = EvidenceERCDRCVerified
+	reportDir := t.TempDir()
 	result := RunCase(context.Background(), manifest, RunOptions{
 		Registry:  blocks.NewBuiltinRegistry(),
 		OutputDir: filepath.Join(t.TempDir(), "out"),
 		Overwrite: true,
 		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
-			return checks.CheckResult{Kind: kind}, nil
+			reportPath := filepath.Join(reportDir, string(kind)+".json")
+			if err := os.WriteFile(reportPath, []byte(`{"findings":[]}`), 0o644); err != nil {
+				return checks.CheckResult{}, fmt.Errorf("write mocked report: %w", err)
+			}
+			return checks.CheckResult{Kind: kind, ReportPath: reportPath}, nil
 		},
 	})
 	stage, ok := findStage(result.Stages, "erc_drc")
-	if result.Status != StatusPass || !ok || stage.Status != StatusPass || result.EvidenceLevel != EvidenceERCDRCVerified {
-		t.Fatalf("result = %#v", result)
+	if result.Status != StatusPass || !ok || stage.Status != StatusPass || result.EvidenceLevel != EvidenceERCDRCVerified || len(result.Artifacts) == 0 || !strings.Contains(stage.Summary, "produced") {
+		t.Fatalf("status=%s stage=%#v artifacts=%#v issues=%#v", result.Status, stage, result.Artifacts, result.Issues)
 	}
 }
 
