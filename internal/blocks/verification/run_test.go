@@ -352,6 +352,52 @@ func TestRunCasePCBRealizationBlocksTimingExpectationMismatch(t *testing.T) {
 	}
 }
 
+func TestRunCaseBoardValidationRequiresOutputDir(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.PCB.RequireBoardValidation = true
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasStage(result.Stages, "board_validation") || !hasIssue(result.Issues, "board validation requires an output directory") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseBoardValidationCatchesGeneratedProjectNetAssignments(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.PCB.RequireBoardValidation = true
+	manifest.Expected.PCB.AllowUnrouted = true
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+	})
+	stage, ok := findStage(result.Stages, "board_validation")
+	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || len(result.Artifacts) == 0 || !hasIssue(result.Issues, "uses unknown net code") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestContextualizeBoardValidationIssuesAddsCaseContext(t *testing.T) {
+	manifest := validManifest()
+	issues := []reports.Issue{{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityError,
+		Path:     "footprints.0.pads.0.net_code",
+		Message:  "bad net",
+	}}
+	got := contextualizeBoardValidationIssues(manifest, issues)
+	if len(got) != 1 {
+		t.Fatalf("issues = %#v", got)
+	}
+	if got[0].Path != "verification.led_indicator_default.board_validation.footprints_0_pads_0_net_code" {
+		t.Fatalf("path = %q", got[0].Path)
+	}
+	if got[0].Suggestion == "" || issues[0].Suggestion != "" {
+		t.Fatalf("got=%#v original=%#v", got, issues)
+	}
+}
+
 func TestAssertPCBRequiredRouteTrimsExpectedName(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.EvidenceLevel = EvidencePCBVerified

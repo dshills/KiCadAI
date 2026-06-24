@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/boardvalidation"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -180,9 +181,18 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 			return result
 		}
 	}
+	if manifest.Expected.PCB.RequireBoardValidation {
+		stage, artifacts := runBoardValidationStage(ctx, manifest, &output, opts)
+		result.Artifacts = append(result.Artifacts, artifacts...)
+		result.addStage(stage)
+		if reports.HasBlockingIssue(stage.Issues) {
+			result.finish()
+			return result
+		}
+	}
 	if ercDRCRequested(manifest.Expected, opts) {
 		ercRunOpts := opts
-		if writerRequested(manifest.Expected.Writer) {
+		if writerRequested(manifest.Expected.Writer) || manifest.Expected.PCB.RequireBoardValidation {
 			ercRunOpts.Overwrite = false
 		}
 		stage, artifacts := runERCDRCStage(ctx, manifest, &output, ercRunOpts)
@@ -251,6 +261,84 @@ func runPCBRealizationStage(manifest Manifest, definition blocks.BlockDefinition
 	issues = append(issues, assertPCBRealization(manifest, realized)...)
 	summary := fmt.Sprintf("realized %d component(s), %d local route(s), %d timing fixture(s)", len(realized.Components), len(realized.LocalRoutes), len(realized.Timing))
 	return StageResult{Name: "pcb_realization", Issues: issues, Summary: summary}
+}
+
+func runBoardValidationStage(ctx context.Context, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) (StageResult, []reports.Artifact) {
+	if strings.TrimSpace(opts.OutputDir) == "" {
+		return StageResult{
+			Name:    "board_validation",
+			Issues:  []reports.Issue{runIssue("verification."+pathID(manifest.ID)+".board_validation.output_dir", "board validation requires an output directory")},
+			Summary: "board validation failed: missing output directory",
+		}, nil
+	}
+	projectDir, artifacts, issues := ensureProjectForExternalChecks(manifest, output, opts)
+	issues = contextualizeBoardValidationPrepIssues(manifest, issues)
+	if reports.HasBlockingIssue(issues) {
+		return StageResult{Name: "board_validation", Issues: issues, Summary: "failed to prepare generated project for board validation"}, artifacts
+	}
+	result := boardvalidation.Validate(ctx, projectDir, boardvalidation.Options{
+		StrictUnrouted:  !manifest.Expected.PCB.AllowUnrouted,
+		KiCadCLI:        opts.KiCadCLI,
+		AllowMissingDRC: true,
+	})
+	artifacts = append(artifacts, result.Artifacts...)
+	issues = append(issues, contextualizeBoardValidationIssues(manifest, result.Issues)...)
+	summary := fmt.Sprintf("board validation %s: checks=%d issues=%d blocking=%d", result.Status, result.Summary.TotalChecks, result.Summary.TotalIssues, result.Summary.BlockingIssues)
+	return StageResult{Name: "board_validation", Issues: issues, Summary: summary}, artifacts
+}
+
+func contextualizeBoardValidationIssues(manifest Manifest, issues []reports.Issue) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	out := cloneReportIssues(issues)
+	prefix := "verification." + pathID(manifest.ID) + ".board_validation"
+	for i := range out {
+		if out[i].Path == "" {
+			out[i].Path = prefix
+		} else {
+			out[i].Path = prefix + "." + pathSegment(out[i].Path)
+		}
+		if out[i].Suggestion == "" {
+			out[i].Suggestion = "review board validation evidence for case " + manifest.ID + " block " + manifest.BlockID
+		}
+	}
+	return out
+}
+
+func contextualizeBoardValidationPrepIssues(manifest Manifest, issues []reports.Issue) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	out := cloneReportIssues(issues)
+	prefix := "verification." + pathID(manifest.ID) + ".board_validation.prepare"
+	for i := range out {
+		previousPath := strings.TrimSpace(out[i].Path)
+		if previousPath == "" {
+			out[i].Path = prefix
+		} else {
+			out[i].Path = prefix + "." + pathSegment(previousPath)
+		}
+		if out[i].Suggestion == "" {
+			out[i].Suggestion = "fix generated project preparation for board validation case " + manifest.ID + " block " + manifest.BlockID
+		}
+	}
+	return out
+}
+
+// cloneReportIssues should stay in sync with reports.Issue reference fields.
+func cloneReportIssues(issues []reports.Issue) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	out := make([]reports.Issue, len(issues))
+	for index, issue := range issues {
+		issue.UUIDs = slices.Clone(issue.UUIDs)
+		issue.Refs = slices.Clone(issue.Refs)
+		issue.Nets = slices.Clone(issue.Nets)
+		out[index] = issue
+	}
+	return out
 }
 
 func assertPCBRealization(manifest Manifest, realized blocks.BlockPCBRealizationResult) []reports.Issue {
