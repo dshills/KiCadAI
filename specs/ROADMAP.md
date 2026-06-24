@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-23
+Date: 2026-06-24
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -49,7 +49,8 @@ from validation feedback to safe automatic repair.
   evidence output.
 - Circuit block library expansion foundation with inventory, readiness gaps,
   electrical rules, PCB constraints, required local routes, verification corpus
-  guards, and design workflow evidence output.
+  guards, PCB realization and board-validation evidence hooks, hardened
+  optional/required KiCad ERC/DRC policy, and design workflow evidence output.
 - Placement engine hardening foundation with deterministic model support,
   block-derived placement intent, proximity/region/mechanical/routing-readiness
   quality reports, coarse congestion reports, component fanout/escape readiness
@@ -111,9 +112,11 @@ loop confidence:
   thermal, lifecycle, availability, and design-rule evidence;
 - circuit block coverage now includes concrete structural generators for
   crystal/canned oscillator, standalone reset/programming, ESD, and
-  reverse-polarity protection families, plus conditional realization for the
-  default reset/programming ISP fixture, but these newer blocks still need more
-  variants and stronger KiCad-backed layout proof;
+  reverse-polarity protection families. It also includes conditional
+  realization for the default reset/programming ISP fixture, manifest-level PCB
+  realization evidence, and deterministic timing/local-route checks where
+  modeled. These newer blocks still need more variants, entry-anchor/power-path
+  route modeling, and stronger KiCad-backed layout proof;
 - placement now models several PCB-quality rule families and first-pass
   timing-sensitive crystal, canned oscillator, and reset/programming fixture
   evidence, but larger-board KiCad DRC-backed proof and broader
@@ -227,22 +230,30 @@ Implemented foundation.
 - Reset/programming realization supports conditional default ISP/header/reset
   switch PCB evidence, route-length timing evidence, and programming-header
   ground-reference findings without breaking UART/no-switch instantiation.
+- Crystal, canned oscillator, and reset/programming verification manifests now
+  assert required local routes and satisfied timing fixtures.
+- ESD and reverse-polarity protection verification manifests now require PCB
+  realization evidence for the currently modeled placement/constraint
+  realization.
+- Block verification can require internal board validation and has explicit
+  optional versus required KiCad ERC/DRC behavior with skipped/blocking stage
+  summaries.
 - Block verification corpus covers every built-in block and has regression
-  guards that required routes remain defined.
+  guards that required routes, timing fixtures, and realization stages remain
+  defined.
 - `design create` block-planning output exposes block readiness, verification
   level, rule IDs, required routes, and known gaps for AI-facing explanation.
 
 ### Remaining Work
 
-- Raise the newer crystal/canned oscillator, reset/programming, ESD, and
-  reverse-polarity protection manifests beyond schematic/structural evidence
-  with stronger PCB and KiCad-backed checks.
+- Add route-through entry anchors and power-path local route realization for
+  ESD and reverse-polarity protection blocks.
+- Add stable KiCad-backed ERC/DRC evidence to block verification manifests
+  where external KiCad CLI is available.
 - Add entry-anchor modeling for connector-adjacent ESD and input-protection
   placement/routing constraints.
 - Replace remaining structural/generic active templates with concrete
   component-catalog-backed parts where fabrication readiness is desired.
-- Add KiCad-backed ERC/DRC evidence to block verification manifests where
-  external KiCad CLI is available.
 - Convert more semantic PCB constraints into downstream placement, routing,
   DRC, and repair enforcement.
 - Broaden block variants beyond the initial verified/default topologies.

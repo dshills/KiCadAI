@@ -562,13 +562,16 @@ manufacturing candidates.
 
 Circuit blocks also have a verification harness with checked-in manifests for
 all built-in blocks. It verifies schematic semantics, PCB placement/pad/route
-expectations where declared, writer correctness when requested, and optional
-KiCad ERC/DRC evidence. The oscillator and reset/programming blocks now include
-timing-fixture evidence for local decoupling, reset/programming route length,
-enable/control presence, and ground-reference checks where the current
-realization model can prove them. The newer timing and protection manifests
-still need stronger KiCad-backed layout evidence before fabrication readiness
-claims.
+expectations where declared, PCB realization metadata, internal board
+validation, writer correctness when requested, and optional KiCad ERC/DRC
+evidence. The oscillator and reset/programming manifests now
+assert realized local routes and timing fixtures for local decoupling,
+reset/programming route length, enable/control presence, and ground-reference
+checks where the current realization model can prove them. ESD and
+reverse-polarity protection manifests now require realization evidence, but
+their route-through entry anchors and power-path local routes are not yet
+modeled. Stronger KiCad-backed layout evidence remains required before
+fabrication readiness claims.
 
 ```sh
 kicadai --json --builtins block verify
@@ -578,17 +581,19 @@ kicadai --json --suite ./internal/blocks/testdata/verification --output ./out/bl
 
 KiCad-backed checks are skipped unless a manifest or flag requires them. Use
 `--kicad-cli`, `--require-erc`, `--require-drc`, `--keep-artifacts`, and
-`--artifact-dir` when external ERC/DRC evidence is required. Golden report
-snapshots live under `cmd/kicadai/testdata/golden/block_verification` and can
-be refreshed with:
-
-The `./internal/...` paths above are source-tree paths for repository
-development. For general use, prefer `--builtins` or pass your own manifest
-path through `--case` or `--suite`.
+`--artifact-dir` when external ERC/DRC evidence is required. Optional ERC/DRC
+expectations are visible as skipped when no output directory or KiCad CLI is
+available; required ERC/DRC fails verification with an explicit reason. Golden
+report snapshots live under `cmd/kicadai/testdata/golden/block_verification`
+and can be refreshed with:
 
 ```sh
 go test ./cmd/kicadai -run TestRunBlockVerificationGoldens -update-block-verification-goldens
 ```
+
+The `./internal/...` paths above are source-tree paths for repository
+development. For general use, prefer `--builtins` or pass your own manifest
+path through `--case` or `--suite`.
 
 See [docs/circuit-block-verification.md](docs/circuit-block-verification.md)
 for evidence levels, manifest structure, and extension guidance.

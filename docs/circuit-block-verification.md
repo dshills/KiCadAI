@@ -13,11 +13,18 @@ Each manifest can verify:
   memberships;
 - PCB placements, footprint IDs, pad-net assignments, required routes, and
   required zones;
+- PCB realization metadata, including required block-local route IDs and timing
+  fixture satisfaction where a block exposes that evidence;
+- internal board validation for generated block projects when explicitly
+  requested;
 - writer correctness for generated KiCad projects;
 - optional KiCad ERC/DRC evidence through `kicad-cli`.
 
-Default tests do not require KiCad. ERC/DRC stages are skipped unless a manifest
-or CLI flag requires them.
+Default tests do not require KiCad. Board validation writes a generated project
+when requested, then runs deterministic in-process validation logic by default.
+ERC/DRC stages are visible as skipped unless a manifest or CLI flag requires
+them, and required KiCad evidence fails verification when `kicad-cli` or an
+output directory is unavailable.
 
 ## Evidence Levels
 
@@ -28,6 +35,120 @@ or CLI flag requires them.
 - `pcb_verified`: local PCB placement/pad/route/zone expectations are asserted.
 - `erc_drc_verified`: KiCad ERC/DRC evidence is required.
 - `reference_verified`: strongest level, reserved for reference-backed evidence.
+
+## PCB Evidence Fields
+
+The `expected.pcb` section supports deterministic PCB evidence without requiring
+KiCad:
+
+- `require_realization` (boolean): run `RealizeBlockPCB` and fail on blocking
+  realization issues. Use this when realization evidence is needed without
+  writing a generated project; it is redundant when `require_board_validation`
+  is true because board validation takes precedence and always performs
+  realization.
+- `require_board_validation` (boolean): write a generated project and run
+  internal board validation. This catches invalid pad-net assignments, route
+  completion gaps, zone issues, and related structural problems without needing
+  KiCad CLI. Board validation implicitly enables the realization stage.
+- `allow_unrouted` (boolean): only applies when `require_board_validation` is
+  true; allow intentionally incomplete local routing during board validation.
+  It has no effect without board validation.
+- `required_local_routes` (list of strings): assert realized block-local route
+  IDs exist.
+- `timing_fixtures` (list of objects): each object must contain an `id` string
+  to identify the realized fixture and may optionally require `satisfied`
+  (boolean), `required_findings` (list of strings), or `forbidden_findings`
+  (list of strings). If `satisfied` is omitted, only fixture presence and
+  finding lists are checked. Finding strings match internal timing finding IDs
+  exactly. `satisfied` checks the fixture's overall realized pass/fail state;
+  `required_findings` and `forbidden_findings` are additional ID presence or
+  absence assertions and do not change that overall state.
+
+Blocking realization issues are fatal generator or metadata problems that make
+the requested PCB fragment unsafe to trust, such as missing realized components,
+unresolved route endpoints, or invalid conditional realization metadata. Local
+route and timing fixture IDs come from the block's PCB realization metadata and
+can be discovered with `kicadai --json --builtins block show <block_id>` or by
+inspecting a successful `kicadai --json --builtins block realize-pcb <block_id>`
+result.
+
+Common timing finding IDs include:
+
+- `timing.decoupling.present`
+- `timing.decoupling.proximity`
+- `timing.clock_routes.length`
+- `timing.ground_return.present`
+- `timing.reset_programming.route_length`
+- `timing.programming.ground_reference`
+
+These IDs identify emitted timing check results. Use `forbidden_findings` for
+findings that must not appear in a passing fixture, and `required_findings` only
+when a manifest intentionally expects a diagnostic to be present.
+
+Protection blocks currently require realization evidence, but they do not yet
+emit protection-specific timing findings because entry-anchor and power-path
+route checks are not modeled.
+
+Example:
+
+```json
+{
+  "expected": {
+    "pcb": {
+      "require_board_validation": true,
+      "allow_unrouted": false,
+      "required_local_routes": ["xtal1_load", "xtal2_load"],
+      "timing_fixtures": [
+        {
+          "id": "crystal_loop",
+          "satisfied": true,
+          "forbidden_findings": ["timing.clock_routes.length"]
+        }
+      ]
+    }
+  }
+}
+```
+
+## ERC/DRC Manifest Fields
+
+The `expected.erc_drc` section controls KiCad-backed evidence:
+
+- `required` (boolean): require both ERC and DRC unless narrower flags are set.
+- `require_erc` (boolean): require ERC evidence.
+- `require_drc` (boolean): require DRC evidence.
+- `allowed_codes` (list of strings): allow known KiCad finding codes.
+- `expected_issues` (list of strings): require specific finding codes, IDs,
+  rules, or message substrings to appear. Prefer stable codes, IDs, and rules
+  over message substrings because KiCad messages can vary by version.
+
+If `expected.evidence_level` is `erc_drc_verified` or `reference_verified`, ERC
+and DRC are required even without `expected.erc_drc.required`; an explicit
+`expected.erc_drc.required: false` does not override the evidence level. If the
+evidence level does not require KiCad checks, `required`, `require_erc`, and
+`require_drc` decide whether missing KiCad evidence blocks. Optional ERC/DRC
+expectations can be expressed with `allowed_codes` or `expected_issues` while
+leaving the required flags false; they produce a visible skipped stage when
+KiCad CLI or an output directory is unavailable.
+
+Example:
+
+```json
+{
+  "expected": {
+    "erc_drc": {
+      "require_erc": true,
+      "require_drc": true,
+      "allowed_codes": ["unconnected_items"]
+    }
+  }
+}
+```
+
+Timing blocks currently assert local routes and timing fixtures. Protection
+blocks assert realization evidence for currently modeled placement and
+constraint metadata, while route-through entry anchors and power-path routes
+remain excluded until those topology details are modeled.
 
 ## CLI Usage
 
@@ -67,6 +188,11 @@ kicadai --json \
   --require-drc \
   block verify
 ```
+
+Optional ERC/DRC expectations are reported as a skipped `erc_drc` stage when no
+output directory or KiCad CLI is available. Required ERC/DRC expectations block
+with an explicit reason. When checks run, report artifacts are included in the
+result.
 
 ## Adding A Built-In Manifest
 
