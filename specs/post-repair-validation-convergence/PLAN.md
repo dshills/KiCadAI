@@ -7,6 +7,20 @@ This plan implements `specs/post-repair-validation-convergence/SPEC.md`.
 Each phase should be implemented, reviewed with Prism, tested, and committed
 before moving to the next phase.
 
+## Implementation Status
+
+Completed on 2026-06-24.
+
+- Phase 1: `84fe163 Add normalized repair validation findings`
+- Phase 2: `3114f2c Normalize KiCad check evidence for repair`
+- Phase 3: `7756120 Normalize writer and board validation evidence`
+- Phase 4: `b481475 Add normalized validation convergence deltas`
+- Phase 5: `3fe5540 Add validation repair loop budget ledger`
+- Phase 6: `2796dbb Add explicit KiCad zone refill policy`
+- Phase 7: `8ae1869 Add opt-in KiCad validation fixtures`
+- Phase 8: `204c956 Expose repair convergence evidence`
+- Phase 9: final verification and closeout
+
 ## Phase 1: Normalized Finding Model
 
 ### Goal
