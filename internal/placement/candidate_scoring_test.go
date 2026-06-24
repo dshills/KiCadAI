@@ -387,6 +387,65 @@ func TestPlaceCandidateScoringClearanceDomainCanUseNets(t *testing.T) {
 	}
 }
 
+func TestPlaceCandidateScoringReportsDifferentialPairDimension(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 30, YMM: 12, Layer: "F.Cu"}
+	req.Nets = []Net{
+		{Name: "USB_P", Role: NetDifferential, Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}},
+		{Name: "USB_N", Role: NetDifferential, Endpoints: []Endpoint{{Ref: "R1", Pin: "2"}, {Ref: "R2", Pin: "2"}}},
+	}
+	req.AdvancedRules.DifferentialPair = []DifferentialPairPlacementRule{{
+		ID:                   "usb-pair",
+		PositiveNet:          "USB_P",
+		NegativeNet:          "USB_N",
+		SourceRefs:           []string{"R1"},
+		SinkRefs:             []string{"R2"},
+		PreferredOrientation: "parallel",
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{DifferentialPair: 1}
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreDifferentialPair) {
+		t.Fatalf("differential-pair dimension missing: %#v", winner.Dimensions)
+	}
+}
+
+func TestPlaceCandidateScoringReportsControlledImpedanceDimension(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 30, YMM: 12, Layer: "F.Cu"}
+	req.Nets = []Net{{Name: "USB_P", Role: NetDifferential, Endpoints: []Endpoint{{Ref: "R1", Pin: "1"}, {Ref: "R2", Pin: "1"}}}}
+	req.AdvancedRules.ControlledImpedance = []ControlledImpedancePlacementRule{{
+		ID:              "usb-impedance",
+		Nets:            []string{"USB_P"},
+		SourceRefs:      []string{"R1"},
+		SinkRefs:        []string{"R2"},
+		PreferredLayers: []string{"F.Cu"},
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{ControlledImpedance: 1}
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreControlledImpedance) {
+		t.Fatalf("controlled-impedance dimension missing: %#v", winner.Dimensions)
+	}
+	if !candidateScoreDimensionEvidenceContains(winner, CandidateScoreControlledImpedance, "reference_plane_missing") {
+		t.Fatalf("missing reference-plane evidence absent: %#v", winner.Dimensions)
+	}
+}
+
 func TestCandidateScoringDeterministicAndGeometrySafe(t *testing.T) {
 	req := twoComponentRequest()
 	req.Components[0].Fixed = true

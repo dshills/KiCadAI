@@ -282,7 +282,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		dimensions := semanticCandidateDimensions(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget)
 		dimensions = appendElectricalCandidateDimensions(dimensions, candidate.Placement.Position, electricalContext, rotatedPadsByRotation[rotationKey(candidate.Placement.Position.RotationDeg)])
 		dimensions = appendCongestionFanoutCandidateDimensions(dimensions, component, candidate.Placement, request, congestionContext)
-		dimensions = appendThermalHighCurrentCandidateDimensions(dimensions, component, candidate.Placement, request, placedByRef, advancedContext)
+		dimensions = appendAdvancedCandidateDimensions(dimensions, component, candidate.Placement, request, placedByRef, advancedContext)
 		total := weightedCandidateDimensionTotal(dimensions)
 		scored[index] = scoredPlacementCandidate{
 			CandidateIndex: index,

@@ -61,6 +61,8 @@ func normalizeCandidateScoreWeights(weights CandidateScoreWeights) CandidateScor
 	weights.Thermal = normalizeCandidateScoreWeight(weights.Thermal)
 	weights.HighCurrent = normalizeCandidateScoreWeight(weights.HighCurrent)
 	weights.CreepageClearance = normalizeCandidateScoreWeight(weights.CreepageClearance)
+	weights.DifferentialPair = normalizeCandidateScoreWeight(weights.DifferentialPair)
+	weights.ControlledImpedance = normalizeCandidateScoreWeight(weights.ControlledImpedance)
 	return weights
 }
 
@@ -367,6 +369,8 @@ type advancedCandidateScoringContext struct {
 	ThermalRules           []thermalCandidateRule
 	HighCurrentRules       []highCurrentCandidateRule
 	CreepageClearanceRules []clearanceCandidateRule
+	DifferentialPairRules  []differentialPairCandidateRule
+	ImpedanceRules         []impedanceCandidateRule
 }
 
 type advancedPlacementRequestContext struct {
@@ -393,6 +397,16 @@ type highCurrentCandidateRule struct {
 
 type clearanceCandidateRule struct {
 	Rule         CreepageClearancePlacementRule
+	TargetPoints []Point
+}
+
+type differentialPairCandidateRule struct {
+	Rule         DifferentialPairPlacementRule
+	TargetPoints []Point
+}
+
+type impedanceCandidateRule struct {
+	Rule         ControlledImpedancePlacementRule
 	TargetPoints []Point
 }
 
@@ -464,6 +478,24 @@ func newAdvancedCandidateScoringContext(component Component, componentRef string
 			})
 		}
 	}
+	for _, rule := range request.AdvancedRules.DifferentialPair {
+		if !differentialPairRuleAffectsComponent(rule, componentRef, netMembership) {
+			continue
+		}
+		context.DifferentialPairRules = append(context.DifferentialPairRules, differentialPairCandidateRule{
+			Rule:         rule,
+			TargetPoints: placedCentersForRefs(highSpeedTargetRefs(rule.SourceRefs, rule.SinkRefs, componentRef), placedByRef),
+		})
+	}
+	for _, rule := range request.AdvancedRules.ControlledImpedance {
+		if !impedanceRuleAffectsComponent(rule, componentRef, netMembership) {
+			continue
+		}
+		context.ImpedanceRules = append(context.ImpedanceRules, impedanceCandidateRule{
+			Rule:         rule,
+			TargetPoints: placedCentersForRefs(highSpeedTargetRefs(rule.SourceRefs, rule.SinkRefs, componentRef), placedByRef),
+		})
+	}
 	return context
 }
 
@@ -506,7 +538,7 @@ func advancedNetMembershipByRef(nets []Net) map[string]componentNetMembership {
 	return byRef
 }
 
-func appendThermalHighCurrentCandidateDimensions(dimensions []CandidateScoreDimension, component Component, placement PlacementResult, request Request, placedByRef map[string]PlacementResult, advancedContext advancedCandidateScoringContext) []CandidateScoreDimension {
+func appendAdvancedCandidateDimensions(dimensions []CandidateScoreDimension, component Component, placement PlacementResult, request Request, placedByRef map[string]PlacementResult, advancedContext advancedCandidateScoringContext) []CandidateScoreDimension {
 	weights := request.Rules.CandidateScoring.Weights
 	if weights.Thermal > 0 {
 		if dimension, ok := thermalCandidateDimension(placement, request.Board, advancedContext.ThermalRules, weights.Thermal); ok {
@@ -520,6 +552,16 @@ func appendThermalHighCurrentCandidateDimensions(dimensions []CandidateScoreDime
 	}
 	if weights.CreepageClearance > 0 {
 		if dimension, ok := clearanceCandidateDimension(placement, request, advancedContext.CreepageClearanceRules, weights.CreepageClearance); ok {
+			dimensions = append(dimensions, dimension)
+		}
+	}
+	if weights.DifferentialPair > 0 {
+		if dimension, ok := differentialPairCandidateDimension(placement, request, advancedContext.DifferentialPairRules, weights.DifferentialPair); ok {
+			dimensions = append(dimensions, dimension)
+		}
+	}
+	if weights.ControlledImpedance > 0 {
+		if dimension, ok := impedanceCandidateDimension(placement, request, advancedContext.ImpedanceRules, weights.ControlledImpedance); ok {
 			dimensions = append(dimensions, dimension)
 		}
 	}
@@ -651,6 +693,77 @@ func clearanceCandidateDimension(placement PlacementResult, request Request, rul
 	}, true
 }
 
+func differentialPairCandidateDimension(placement PlacementResult, request Request, rules []differentialPairCandidateRule, weight float64) (CandidateScoreDimension, bool) {
+	if len(rules) == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	normalizer := boardDistance(request.Board.WidthMM, request.Board.HeightMM)
+	if normalizer <= 0 {
+		normalizer = 1
+	}
+	scoreTotal := 0.0
+	evidence := []string{}
+	for _, candidateRule := range rules {
+		rule := candidateRule.Rule
+		if len(candidateRule.TargetPoints) == 0 {
+			scoreTotal += 0.5
+			evidence = append(evidence, "rule="+rule.ID+" differential_endpoint_metadata_incomplete")
+			continue
+		}
+		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok {
+			scoreTotal += clampCandidateUnitScore(1 - distanceSq/square(normalizer))
+			evidence = append(evidence, "rule="+rule.ID+" differential_pair_skew_proxy_checked")
+		}
+		if strings.TrimSpace(rule.PreferredOrientation) != "" {
+			evidence = append(evidence, "rule="+rule.ID+" preferred_orientation="+rule.PreferredOrientation)
+		}
+	}
+	return CandidateScoreDimension{
+		Name:     CandidateScoreDifferentialPair,
+		Score:    scoreTotal / float64(len(rules)),
+		Weight:   weight,
+		Evidence: evidence,
+	}, true
+}
+
+func impedanceCandidateDimension(placement PlacementResult, request Request, rules []impedanceCandidateRule, weight float64) (CandidateScoreDimension, bool) {
+	if len(rules) == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	normalizer := boardDistance(request.Board.WidthMM, request.Board.HeightMM)
+	if normalizer <= 0 {
+		normalizer = 1
+	}
+	scoreTotal := 0.0
+	evidence := []string{}
+	for _, candidateRule := range rules {
+		rule := candidateRule.Rule
+		ruleScore := 0.5
+		if len(candidateRule.TargetPoints) > 0 {
+			if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok {
+				ruleScore = clampCandidateUnitScore(1 - distanceSq/square(normalizer))
+				evidence = append(evidence, "rule="+rule.ID+" impedance_corridor_checked")
+			}
+		}
+		if len(rule.PreferredLayers) > 0 {
+			if stringSliceContainsFold(rule.PreferredLayers, placement.Position.Layer) {
+				ruleScore = min(1, ruleScore+0.25)
+				evidence = append(evidence, "rule="+rule.ID+" preferred_layer_satisfied")
+			}
+		}
+		if strings.TrimSpace(rule.ReferencePlane) == "" {
+			evidence = append(evidence, "rule="+rule.ID+" reference_plane_missing")
+		}
+		scoreTotal += ruleScore
+	}
+	return CandidateScoreDimension{
+		Name:     CandidateScoreControlledImpedance,
+		Score:    scoreTotal / float64(len(rules)),
+		Weight:   weight,
+		Evidence: evidence,
+	}, true
+}
+
 func advancedPlacementHardRejection(component Component, placement PlacementResult, advancedContext advancedCandidateScoringContext) (CandidateRejectionReasonName, string, []string, bool) {
 	for _, candidateRule := range advancedContext.ThermalRules {
 		rule := candidateRule.Rule
@@ -737,6 +850,64 @@ func highCurrentTargetRefs(rule HighCurrentPlacementRule, componentRef string, s
 	}
 	targets = append([]string(nil), rule.SourceRefs...)
 	targets = append(targets, rule.SinkRefs...)
+	return uniqueSortedStrings(targets)
+}
+
+func differentialPairRuleAffectsComponent(rule DifferentialPairPlacementRule, componentRef string, membership componentNetMembership) bool {
+	sourceRefs := normalizedRefSet(rule.SourceRefs)
+	sinkRefs := normalizedRefSet(rule.SinkRefs)
+	if _, ok := sourceRefs[componentRef]; ok {
+		return true
+	}
+	if _, ok := sinkRefs[componentRef]; ok {
+		return true
+	}
+	if _, ok := membership.Names[strings.ToUpper(strings.TrimSpace(rule.PositiveNet))]; ok {
+		return true
+	}
+	if _, ok := membership.Names[strings.ToUpper(strings.TrimSpace(rule.NegativeNet))]; ok {
+		return true
+	}
+	return false
+}
+
+func impedanceRuleAffectsComponent(rule ControlledImpedancePlacementRule, componentRef string, membership componentNetMembership) bool {
+	sourceRefs := normalizedRefSet(rule.SourceRefs)
+	sinkRefs := normalizedRefSet(rule.SinkRefs)
+	if _, ok := sourceRefs[componentRef]; ok {
+		return true
+	}
+	if _, ok := sinkRefs[componentRef]; ok {
+		return true
+	}
+	for net := range upperStringSet(rule.Nets) {
+		if _, ok := membership.Names[net]; ok {
+			return true
+		}
+	}
+	for _, role := range rule.NetRoles {
+		if _, ok := membership.Roles[role]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func highSpeedTargetRefs(sourceRefs []string, sinkRefs []string, componentRef string) []string {
+	sourceSet := normalizedRefSet(sourceRefs)
+	sinkSet := normalizedRefSet(sinkRefs)
+	var targets []string
+	if _, ok := sourceSet[componentRef]; ok {
+		targets = append(targets, sinkRefs...)
+	}
+	if _, ok := sinkSet[componentRef]; ok {
+		targets = append(targets, sourceRefs...)
+	}
+	if len(targets) > 0 {
+		return uniqueSortedStrings(targets)
+	}
+	targets = append([]string(nil), sourceRefs...)
+	targets = append(targets, sinkRefs...)
 	return uniqueSortedStrings(targets)
 }
 

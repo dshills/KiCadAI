@@ -212,6 +212,8 @@ type CandidateScoreWeights struct {
 	Thermal             float64
 	HighCurrent         float64
 	CreepageClearance   float64
+	DifferentialPair    float64
+	ControlledImpedance float64
 }
 
 type ProximityRule struct {
@@ -503,6 +505,8 @@ const (
 	CandidateScoreThermal             CandidateScoreDimensionName = "thermal"
 	CandidateScoreHighCurrent         CandidateScoreDimensionName = "high_current"
 	CandidateScoreCreepageClearance   CandidateScoreDimensionName = "creepage_clearance"
+	CandidateScoreDifferentialPair    CandidateScoreDimensionName = "differential_pair"
+	CandidateScoreControlledImpedance CandidateScoreDimensionName = "controlled_impedance"
 )
 
 type CandidateRejectionReasonName string
@@ -590,6 +594,8 @@ func DefaultRules() Rules {
 				Thermal:             1,
 				HighCurrent:         1,
 				CreepageClearance:   1,
+				DifferentialPair:    1,
+				ControlledImpedance: 1,
 			},
 		},
 	}
