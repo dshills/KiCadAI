@@ -26,7 +26,7 @@ Date: 2026-06-14
 ## Verified
 
 - `go test ./...`
-- `go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json --mode single_layer --grid 1 --trace-width 0.1 --clearance 0.2 route request`
+- `kicadai --json --request ./examples/routing/simple_request.json --mode single_layer --grid 1 --trace-width 0.1 --clearance 0.2 route request`
 - Prism staged reviews were run for each implementation phase. Actionable high
   and medium findings were addressed unless they required a deliberate API
   change outside the phase scope.

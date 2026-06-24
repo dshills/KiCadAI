@@ -116,7 +116,7 @@ validator for Gerber and drill outputs.
 `export fabrication` remains dry-run by default:
 
 ```sh
-go run ./cmd/kicadai --json --kicad-cli /path/to/kicad-cli export fabrication ./project
+kicadai --json --kicad-cli /path/to/kicad-cli export fabrication ./project
 ```
 
 Expected behavior:
@@ -135,7 +135,7 @@ Expected behavior:
 Writing fabrication outputs requires `--execute`:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --execute \
   --overwrite \

@@ -6,7 +6,7 @@ explicit circuit blocks rather than natural-language planning.
 Run:
 
 ```sh
-go run ./cmd/kicadai --json --request examples/design/led_indicator.json --output /tmp/kicadai-led --overwrite design create
+kicadai --json --request examples/design/led_indicator.json --output /tmp/kicadai-led --overwrite design create
 ```
 
 The LED example targets structural acceptance and skips board routing. The

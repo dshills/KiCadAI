@@ -17,7 +17,7 @@ The current readiness review and gap matrix are tracked in
 Use `block list` to see the registry:
 
 ```sh
-go run ./cmd/kicadai --json block list
+kicadai --json block list
 ```
 
 Current built-in blocks:
@@ -35,7 +35,7 @@ Current built-in blocks:
 Inspect one block:
 
 ```sh
-go run ./cmd/kicadai --json block show led_indicator
+kicadai --json block show led_indicator
 ```
 
 `block show` returns parameters, ports, required libraries, and verification
@@ -94,7 +94,7 @@ Request files use this shape:
 Generate a KiCad project:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request examples/blocks/requests/led_indicator.json \
   --output ./out/led_indicator \
@@ -128,7 +128,7 @@ Connector breakout request:
 Generate it:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request examples/blocks/requests/connector_breakout.json \
   --output ./out/connector_breakout \
@@ -196,7 +196,7 @@ Composition connects named ports from multiple block instances.
 Generate the composed project:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request examples/blocks/requests/composed_sensor_breakout.json \
   --output ./out/composed_sensor_breakout \
@@ -218,8 +218,8 @@ ref/pin-based nets rather than routed schematic artwork.
 Checked-in examples live under `examples/blocks/`.
 
 ```sh
-go run ./cmd/kicadai --json inspect project examples/blocks/led_indicator
-go run ./cmd/kicadai --json inspect project examples/blocks/composed_sensor_breakout
+kicadai --json inspect project examples/blocks/led_indicator
+kicadai --json inspect project examples/blocks/composed_sensor_breakout
 ```
 
 The example directories include:
@@ -244,7 +244,7 @@ export KICADAI_SYMBOLS_ROOT=/path/to/kicad-symbols
 export KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints
 export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
 
-go run ./cmd/kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
+kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
 ```
 
 Resolver-backed validation is needed before agents should treat generated
@@ -255,7 +255,7 @@ Pinmap validation checks whether schematic symbol-to-footprint assignments have
 verified pin mappings:
 
 ```sh
-go run ./cmd/kicadai --json pinmap validate examples/blocks/led_indicator
+kicadai --json pinmap validate examples/blocks/led_indicator
 ```
 
 ## AI Usage Pattern

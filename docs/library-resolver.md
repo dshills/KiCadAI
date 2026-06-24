@@ -19,7 +19,7 @@ export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
 Equivalent flags:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --klc-root /path/to/klc \
   --symbols-root /path/to/kicad-symbols \
   --footprints-root /path/to/kicad-footprints \
@@ -32,23 +32,23 @@ go run ./cmd/kicadai --json \
 Index summary:
 
 ```sh
-go run ./cmd/kicadai --json library index
+kicadai --json library index
 ```
 
 Resolve records:
 
 ```sh
-go run ./cmd/kicadai --json library symbol Device:R
-go run ./cmd/kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
+kicadai --json library symbol Device:R
+kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
 ```
 
 Inspect hardened symbol evidence:
 
 ```sh
-go run ./cmd/kicadai --json library symbols list
-go run ./cmd/kicadai --json library symbols show Device:R
-go run ./cmd/kicadai --json library symbols pins Device:R
-go run ./cmd/kicadai --json library symbols validate Device:R
+kicadai --json library symbols list
+kicadai --json library symbols show Device:R
+kicadai --json library symbols pins Device:R
+kicadai --json library symbols validate Device:R
 ```
 
 The nested `library symbols` commands return stable JSON for AI agents and
@@ -62,35 +62,35 @@ diagnostics.
 Search:
 
 ```sh
-go run ./cmd/kicadai --json library search-symbols resistor
-go run ./cmd/kicadai --json library search-footprints 0805
+kicadai --json library search-symbols resistor
+kicadai --json library search-footprints 0805
 ```
 
 Compatibility and pinmap candidate generation:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
 
-go run ./cmd/kicadai --json \
+kicadai --json \
   library compatible-footprints Device:R
 
-go run ./cmd/kicadai --json \
+kicadai --json \
   library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
 ```
 
 KLC checks:
 
 ```sh
-go run ./cmd/kicadai --json library klc-symbol Device:R
-go run ./cmd/kicadai --json library klc-footprint Resistor_SMD:R_0805_2012Metric
+kicadai --json library klc-symbol Device:R
+kicadai --json library klc-footprint Resistor_SMD:R_0805_2012Metric
 ```
 
 Templates:
 
 ```sh
-go run ./cmd/kicadai --json library templates
-go run ./cmd/kicadai --json library template Arduino_Nano
+kicadai --json library templates
+kicadai --json library template Arduino_Nano
 ```
 
 ## Cache
@@ -99,7 +99,7 @@ Large KiCad libraries are expensive to parse repeatedly. Enable the optional
 cache with either a flag or `KICADAI_LIBRARY_CACHE`:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --library-cache .kicadai/library-index.json \
   library index
 ```

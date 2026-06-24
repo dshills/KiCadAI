@@ -80,7 +80,7 @@ Compatibility means:
 The Phase 17 readiness run used:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --kicad-cli "$KICADAI_KICAD_CLI" \
   roundtrip schematic examples/blocks/led_indicator/led_indicator.kicad_sch
@@ -287,8 +287,8 @@ The opt-in tests should fail on unexpected diffs and report artifact paths.
 Existing commands should continue to work:
 
 ```sh
-go run ./cmd/kicadai --json inspect project examples/blocks/led_indicator
-go run ./cmd/kicadai --json roundtrip schematic examples/blocks/led_indicator/led_indicator.kicad_sch
+kicadai --json inspect project examples/blocks/led_indicator
+kicadai --json roundtrip schematic examples/blocks/led_indicator/led_indicator.kicad_sch
 ```
 
 No new CLI command is required for this project. If a helper is added, it should

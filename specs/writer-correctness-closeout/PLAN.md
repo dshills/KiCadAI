@@ -676,15 +676,15 @@ Run focused CLI examples:
 ```sh
 out_dir="$(mktemp -d)"
 trap 'rm -rf "$out_dir"' EXIT
-go run ./cmd/kicadai --json writer check examples/07_generated_pcb
-go run ./cmd/kicadai --json design create --request examples/design/led_indicator.json --output "$out_dir" --overwrite
-go run ./cmd/kicadai --json writer check "$out_dir"
+kicadai --json writer check examples/07_generated_pcb
+kicadai --json design create --request examples/design/led_indicator.json --output "$out_dir" --overwrite
+kicadai --json writer check "$out_dir"
 ```
 
 If KiCad CLI is available:
 
 ```sh
-go run ./cmd/kicadai --json writer check --require-kicad-roundtrip --keep-artifacts examples/07_generated_pcb
+kicadai --json writer check --require-kicad-roundtrip --keep-artifacts examples/07_generated_pcb
 ```
 
 Run Prism before each phase commit:

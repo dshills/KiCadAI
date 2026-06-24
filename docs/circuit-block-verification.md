@@ -34,13 +34,13 @@ or CLI flag requires them.
 Run all built-in manifests:
 
 ```sh
-go run ./cmd/kicadai --json --builtins block verify
+kicadai --json --builtins block verify
 ```
 
 Run one manifest:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json \
   block verify
 ```
@@ -48,7 +48,7 @@ go run ./cmd/kicadai --json \
 Run a suite and retain generated projects:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --suite ./internal/blocks/testdata/verification \
   --output ./out/block-verification \
   --overwrite \
@@ -58,7 +58,7 @@ go run ./cmd/kicadai --json \
 Require KiCad evidence:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --builtins \
   --output ./out/block-verification \
   --overwrite \

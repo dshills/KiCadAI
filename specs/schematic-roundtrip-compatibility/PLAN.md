@@ -109,7 +109,7 @@ GOCACHE=/tmp/kicadai-gocache go test ./...
 Optional smoke:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --request examples/blocks/requests/led_indicator.json \
   --output /tmp/kicadai-led-roundtrip-smoke \
   --name led_indicator \
@@ -309,7 +309,7 @@ writer output.
 Use the existing request files, for example:
 
 ```sh
-go run ./cmd/kicadai --json \
+kicadai --json \
   --request examples/blocks/requests/led_indicator.json \
   --output examples/blocks/led_indicator \
   --name led_indicator \
@@ -335,7 +335,7 @@ find examples/blocks -mindepth 1 -maxdepth 1 -type d \
   ! -name reports \
   -print0 |
 while IFS= read -r -d '' d; do
-  go run ./cmd/kicadai --json inspect project "$d" >/dev/null
+  kicadai --json inspect project "$d" >/dev/null
 done
 
 rg --fixed-strings -- '-0.0' examples/blocks
@@ -444,7 +444,7 @@ find examples/blocks -mindepth 1 -maxdepth 1 -type d \
   ! -name reports \
   -print0 |
 while IFS= read -r -d '' d; do
-  go run ./cmd/kicadai --json inspect project "$d" >/dev/null
+  kicadai --json inspect project "$d" >/dev/null
 done
 
 rg --fixed-strings -- '-0.0' examples/blocks

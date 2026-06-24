@@ -5,7 +5,7 @@ KiCadAI can generate KiCad project files directly from Go. This path is independ
 ## Generate an LED Project
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --output led_indicator \
   --name led_indicator \
   --seed demo \

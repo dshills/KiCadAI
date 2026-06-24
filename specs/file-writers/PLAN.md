@@ -588,7 +588,7 @@ generate-led-demo
 
 ### Done When
 
-- `go run ./cmd/kicadai generate-led-demo --output <dir> --name led_indicator --with-pcb --json` writes a complete project.
+- `kicadai generate-led-demo --output <dir> --name led_indicator --with-pcb --json` writes a complete project.
 
 ## Phase 12: Optional KiCad Validation Workflow
 

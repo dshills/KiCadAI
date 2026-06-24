@@ -25,7 +25,7 @@ They cover:
 Real KiCad checks can be run from the CLI:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   --keep-artifacts \

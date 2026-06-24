@@ -88,10 +88,10 @@ Run tests:
 make test
 ```
 
-Run the CLI from source:
+Run the compiled CLI:
 
 ```sh
-go run ./cmd/kicadai --help
+kicadai --help
 ```
 
 Build a local binary:
@@ -103,7 +103,7 @@ go build -o bin/kicadai ./cmd/kicadai
 Generate a simple LED project without contacting KiCad:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --output /tmp/led_indicator \
   --name led_indicator \
@@ -120,17 +120,17 @@ Live IPC commands require KiCad to be running with the API enabled. Open the
 project/editor you want to inspect, then run:
 
 ```sh
-go run ./cmd/kicadai --json config
-go run ./cmd/kicadai --json ping
-go run ./cmd/kicadai --json version
-go run ./cmd/kicadai --json documents
-go run ./cmd/kicadai --json capabilities
+kicadai --json config
+kicadai --json ping
+kicadai --json version
+kicadai --json documents
+kicadai --json capabilities
 ```
 
 Connection flags:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --socket ipc:///tmp/kicad/api.sock \
   --token "$KICAD_API_TOKEN" \
   --timeout-ms 5000 \
@@ -156,32 +156,32 @@ All structured project-analysis and generation commands currently require
 `--json`.
 
 ```sh
-go run ./cmd/kicadai --json config
-go run ./cmd/kicadai --json ping
-go run ./cmd/kicadai --json version
-go run ./cmd/kicadai --json documents
-go run ./cmd/kicadai --json capabilities
-go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
-go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
-go run ./cmd/kicadai --json writer check ./examples/07_generated_pcb
-go run ./cmd/kicadai --json validate board ./examples/07_generated_pcb
-go run ./cmd/kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
-go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
-go run ./cmd/kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-go run ./cmd/kicadai --json pinmap list
-go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
-go run ./cmd/kicadai --json --request ./examples/placement/simple_request.json place request
-go run ./cmd/kicadai --json --request ./examples/routing/simple_request.json route request
-go run ./cmd/kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
-go run ./cmd/kicadai --json --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
-go run ./cmd/kicadai --json --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
+kicadai --json config
+kicadai --json ping
+kicadai --json version
+kicadai --json documents
+kicadai --json capabilities
+kicadai --json inspect project ./examples/07_generated_pcb
+kicadai --json evaluate project ./examples/07_generated_pcb
+kicadai --json writer check ./examples/07_generated_pcb
+kicadai --json validate board ./examples/07_generated_pcb
+kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
+kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --json pinmap list
+kicadai --json pinmap validate ./examples/01_led_indicator
+kicadai --json --request ./examples/placement/simple_request.json place request
+kicadai --json --request ./examples/routing/simple_request.json route request
+kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
+kicadai --json --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
+kicadai --json --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 # For integrations that already produce a generated repair bundle:
-go run ./cmd/kicadai --json --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
+kicadai --json --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
 # Generate/apply a repair bundle during design create, then replay that saved
 # bundle later for reproducible target-apply validation:
-go run ./cmd/kicadai --json --request ./examples/design/led_indicator.json --output ./out/led_indicator --overwrite --repair-apply --skip-routing design create
-go run ./cmd/kicadai --json --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
-go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
+kicadai --json --request ./examples/design/led_indicator.json --output ./out/led_indicator --overwrite --repair-apply --skip-routing design create
+kicadai --json --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
+kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
 
 ### Live IPC Commands
@@ -266,13 +266,13 @@ For non-`design create` flows, `repair export-bundle` packages structured
 stage issues against a generated target:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --target ./out/led_indicator \
   --request ./examples/repair/missing_footprint_stage_issues.json \
   repair export-bundle
 
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --execute \
   --overwrite \
@@ -291,7 +291,7 @@ transaction.
 LED generation:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --output ./out/led_indicator \
   --name led_indicator \
@@ -318,7 +318,7 @@ Breakout generation request:
 Run it:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request ./request.json \
   --output ./out/sensor_breakout \
@@ -363,7 +363,7 @@ by local smoke tests.
 Runnable example:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request ./examples/design_retry/placement_routing_retry.json \
   --output ./out/placement_routing_retry_demo \
@@ -435,11 +435,11 @@ allowed passive rule-inferred records.
 Examples:
 
 ```sh
-go run ./cmd/kicadai --json component list
-go run ./cmd/kicadai --json component show resistor.generic.0805
-go run ./cmd/kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-go run ./cmd/kicadai --json --request ./examples/components/select_resistor.json component select
-go run ./cmd/kicadai --json component validate
+kicadai --json component list
+kicadai --json component show resistor.generic.0805
+kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --json --request ./examples/components/select_resistor.json component select
+kicadai --json component validate
 ```
 
 `design create` includes a `component_selection` stage after block planning and
@@ -457,7 +457,7 @@ routes, writes the KiCad project, runs structural/connectivity validation, and
 returns stage-by-stage feedback.
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request ./examples/design/led_indicator.json \
   --output ./out/led_indicator \
@@ -540,10 +540,10 @@ readiness gaps. `design create` includes that block readiness in its
 required local routes, and known limitations before writing a project.
 
 ```sh
-go run ./cmd/kicadai --json block list
-go run ./cmd/kicadai --json block show led_indicator
-go run ./cmd/kicadai --json --request ./examples/blocks/requests/led_indicator.json block instantiate led_indicator
-go run ./cmd/kicadai --json --request ./examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
+kicadai --json block list
+kicadai --json block show led_indicator
+kicadai --json --request ./examples/blocks/requests/led_indicator.json block instantiate led_indicator
+kicadai --json --request ./examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
 ```
 
 `block realize-pcb` returns:
@@ -571,9 +571,9 @@ still need stronger KiCad-backed layout evidence before fabrication readiness
 claims.
 
 ```sh
-go run ./cmd/kicadai --json --builtins block verify
-go run ./cmd/kicadai --json --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json block verify
-go run ./cmd/kicadai --json --suite ./internal/blocks/testdata/verification --output ./out/block-verification --overwrite block verify
+kicadai --json --builtins block verify
+kicadai --json --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json block verify
+kicadai --json --suite ./internal/blocks/testdata/verification --output ./out/block-verification --overwrite block verify
 ```
 
 KiCad-backed checks are skipped unless a manifest or flag requires them. Use
@@ -600,7 +600,7 @@ placed components, geometry issues, metrics, and `place_footprint` transaction
 operations for successful placements.
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request ./examples/placement/simple_request.json \
   place request
@@ -674,7 +674,7 @@ metrics, issues, AI-facing repair diagnostics, and route-shaped operations.
 Run routing from JSON:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request ./examples/routing/simple_request.json \
   --mode single_layer \
@@ -716,7 +716,7 @@ connectivity checks, unrouted-net summaries, route endpoint checks, zone
 evidence, and optional KiCad DRC evidence into one JSON result.
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   validate board ./examples/07_generated_pcb
 ```
@@ -804,8 +804,8 @@ schematic-to-PCB transfer, footprint pad net assignments, copper net
 references, zone references, and optional KiCad round-trip stability.
 
 ```sh
-go run ./cmd/kicadai --json writer check ./examples/07_generated_pcb/generated_pcb.kicad_pcb
-go run ./cmd/kicadai --json writer check --strict-diffs --allow-unrouted ./examples/07_generated_pcb
+kicadai --json writer check ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai --json writer check --strict-diffs --allow-unrouted ./examples/07_generated_pcb
 ```
 
 The command accepts a project directory, `.kicad_pro`, `.kicad_sch`, or
@@ -851,9 +851,9 @@ Current limits:
 Inspect KiCad projects and files:
 
 ```sh
-go run ./cmd/kicadai --json inspect project ./examples/07_generated_pcb
-go run ./cmd/kicadai --json inspect schematic ./examples/01_led_indicator/led_indicator.kicad_sch
-go run ./cmd/kicadai --json inspect pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai --json inspect project ./examples/07_generated_pcb
+kicadai --json inspect schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+kicadai --json inspect pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
 ```
 
 Inspection reports summarize discovered files, symbol counts, footprint counts,
@@ -864,9 +864,9 @@ and reader issues.
 Evaluate projects and files for generated-output readiness:
 
 ```sh
-go run ./cmd/kicadai --json evaluate project ./examples/07_generated_pcb
-go run ./cmd/kicadai --json evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
-go run ./cmd/kicadai --json evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai --json evaluate project ./examples/07_generated_pcb
+kicadai --json evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+kicadai --json evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
 ```
 
 Current evaluation includes checks for missing files, duplicate references,
@@ -882,9 +882,9 @@ summaries with stable IDs, and apply annotates operation-scoped failures with
 the same IDs where attribution is safe.
 
 ```sh
-go run ./cmd/kicadai --json transaction validate ./tx.json
-go run ./cmd/kicadai --json transaction plan ./out/project ./tx.json
-go run ./cmd/kicadai --json --overwrite transaction apply ./out/project ./tx.json
+kicadai --json transaction validate ./tx.json
+kicadai --json transaction plan ./out/project ./tx.json
+kicadai --json --overwrite transaction apply ./out/project ./tx.json
 ```
 
 For AI repair loops, add `--feedback` to validation or planning. The command
@@ -892,8 +892,8 @@ keeps the raw issue list and also returns a grouped `feedback` object keyed by
 stable operation IDs.
 
 ```sh
-go run ./cmd/kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
-go run ./cmd/kicadai --json --feedback transaction plan ./out/invalid_feedback ./examples/transactions/invalid_feedback.json
+kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
+kicadai --json --feedback transaction plan ./out/invalid_feedback ./examples/transactions/invalid_feedback.json
 ```
 
 Each transaction operation summary includes an `id`, and operation-scoped
@@ -979,13 +979,13 @@ human-verified pin mappings before fabrication readiness is claimed.
 List built-in pinmaps:
 
 ```sh
-go run ./cmd/kicadai --json pinmap list
+kicadai --json pinmap list
 ```
 
 Validate a project:
 
 ```sh
-go run ./cmd/kicadai --json pinmap validate ./examples/01_led_indicator
+kicadai --json pinmap validate ./examples/01_led_indicator
 ```
 
 Current built-in mappings include common resistors, capacitors, LEDs, simple
@@ -1004,21 +1004,21 @@ export KICADAI_SYMBOLS_ROOT=/path/to/kicad-symbols
 export KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints
 export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
 
-go run ./cmd/kicadai --json library symbol Device:R
-go run ./cmd/kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
-go run ./cmd/kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
-go run ./cmd/kicadai --json library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
-go run ./cmd/kicadai --json library templates
+kicadai --json library symbol Device:R
+kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
+kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
+kicadai --json library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
+kicadai --json library templates
 ```
 
 Hardened symbol inspection commands expose resolver evidence without requiring
 agents to read raw `.kicad_sym` files:
 
 ```sh
-go run ./cmd/kicadai --json library symbols list
-go run ./cmd/kicadai --json library symbols show Device:R
-go run ./cmd/kicadai --json library symbols pins Device:R
-go run ./cmd/kicadai --json library symbols validate Device:R
+kicadai --json library symbols list
+kicadai --json library symbols show Device:R
+kicadai --json library symbols pins Device:R
+kicadai --json library symbols validate Device:R
 ```
 
 These commands report parsed units, common pins, electrical types, power-symbol
@@ -1038,16 +1038,16 @@ schematic generation. Blocks declare parameters, ports, required libraries, and
 verification levels.
 
 ```sh
-go run ./cmd/kicadai --json block list
-go run ./cmd/kicadai --json block show led_indicator
-go run ./cmd/kicadai \
+kicadai --json block list
+kicadai --json block show led_indicator
+kicadai \
   --json \
   --request examples/blocks/requests/led_indicator.json \
   --output ./out/led_indicator \
   --name led_indicator \
   --overwrite \
   block instantiate led_indicator
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --request examples/blocks/requests/composed_sensor_breakout.json \
   --output ./out/composed_sensor_breakout \
@@ -1081,13 +1081,13 @@ Round-trip commands use `kicad-cli` to save or normalize files and compare the
 result:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   roundtrip schematic ./examples/01_led_indicator/led_indicator.kicad_sch
 
-go run ./cmd/kicadai --json roundtrip pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
-go run ./cmd/kicadai --json roundtrip project ./examples/07_generated_pcb
+kicadai --json roundtrip pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai --json roundtrip project ./examples/07_generated_pcb
 ```
 
 Useful flags:
@@ -1106,13 +1106,13 @@ KiCad-backed ERC/DRC checks run through `kicad-cli`, preserve the raw JSON
 report, and return structured findings for AI repair loops:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 
-go run ./cmd/kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
-go run ./cmd/kicadai --json check project ./examples/checks/drc_pass
+kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai --json check project ./examples/checks/drc_pass
 ```
 
 Useful flags:
@@ -1151,9 +1151,9 @@ machine-to-machine workflows today, so they are dry-run by default and require
 structured-command usage error instead of a human summary.
 
 ```sh
-go run ./cmd/kicadai --json export preview ./project
-go run ./cmd/kicadai --json export bom ./project
-go run ./cmd/kicadai --json export fabrication ./project
+kicadai --json export preview ./project
+kicadai --json export bom ./project
+kicadai --json export fabrication ./project
 ```
 
 Fabrication reports now include explicit assembly evidence:
@@ -1173,7 +1173,7 @@ Use `--execute` to write files and `--overwrite` to replace existing package
 files. KiCad CLI is required for Gerber and drill generation:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --execute \
   --overwrite \
@@ -1336,7 +1336,7 @@ go test ./internal/kicadfiles/checks
 Real ERC/DRC CLI smoke checks:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   --keep-artifacts \

@@ -392,14 +392,14 @@ Run before declaring the placement engine initial implementation complete:
 
 ```sh
 GOCACHE="$(mktemp -d)" go test ./...
-go run ./cmd/kicadai --json inspect project ./examples/placement/basic
-go run ./cmd/kicadai --json evaluate project ./examples/placement/basic
+kicadai --json inspect project ./examples/placement/basic
+kicadai --json evaluate project ./examples/placement/basic
 ```
 
 If KiCad CLI is available:
 
 ```sh
-go run ./cmd/kicadai \
+kicadai \
   --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   check project ./examples/placement/basic

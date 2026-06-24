@@ -509,8 +509,8 @@ go test ./internal/kicadfiles/checks
 Optional CLI smoke:
 
 ```sh
-go run ./cmd/kicadai --json --kicad-cli "$KICADAI_KICAD_CLI" check erc examples/checks/erc_fail/erc_fail.kicad_sch
-go run ./cmd/kicadai --json --kicad-cli "$KICADAI_KICAD_CLI" check drc examples/checks/drc_fail/drc_fail.kicad_pcb
+kicadai --json --kicad-cli "$KICADAI_KICAD_CLI" check erc examples/checks/erc_fail/erc_fail.kicad_sch
+kicadai --json --kicad-cli "$KICADAI_KICAD_CLI" check drc examples/checks/drc_fail/drc_fail.kicad_pcb
 ```
 
 ## Readiness Integration

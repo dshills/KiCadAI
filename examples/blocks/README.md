@@ -19,8 +19,8 @@ This directory contains KiCad projects generated through the public block CLI.
 Run from the repository root:
 
 ```sh
-GOCACHE=/tmp/kicadai-gocache go run ./cmd/kicadai --json --request examples/blocks/requests/led_indicator.json --output examples/blocks/led_indicator --name led_indicator --overwrite block instantiate led_indicator
-GOCACHE=/tmp/kicadai-gocache go run ./cmd/kicadai --json --request examples/blocks/requests/composed_sensor_breakout.json --output examples/blocks/composed_sensor_breakout --name composed_sensor_breakout --overwrite block compose
+kicadai --json --request examples/blocks/requests/led_indicator.json --output examples/blocks/led_indicator --name led_indicator --overwrite block instantiate led_indicator
+kicadai --json --request examples/blocks/requests/composed_sensor_breakout.json --output examples/blocks/composed_sensor_breakout --name composed_sensor_breakout --overwrite block compose
 ```
 
 Use the same pattern for the other request files.
@@ -32,7 +32,7 @@ workflow. This returns instantiated schematic operations, realized PCB
 components, local routes, and a placement request derived from the block:
 
 ```sh
-GOCACHE=/tmp/kicadai-gocache go run ./cmd/kicadai --json --request examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
+kicadai --json --request examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
 ```
 
 The current realization output is intended for agent planning and validation.

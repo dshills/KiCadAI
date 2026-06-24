@@ -417,7 +417,7 @@ Expose the workflow through `kicadai design create`.
 - User can run:
 
 ```sh
-go run ./cmd/kicadai --json design create --request examples/design/led.json --output /tmp/kicadai-led --overwrite
+kicadai --json design create --request examples/design/led.json --output /tmp/kicadai-led --overwrite
 ```
 
 ### Commit Message

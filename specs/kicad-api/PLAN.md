@@ -38,7 +38,7 @@ internal/kiapi/api_inventory.json
 4. Add a readable inventory report command:
 
 ```text
-go run ./cmd/kicadai --json api-inventory
+kicadai --json api-inventory
 ```
 
 5. Add tests that fail if command messages are added without inventory coverage.

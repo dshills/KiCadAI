@@ -40,7 +40,7 @@ Makefile
 
 ```text
 go test ./...
-go run ./cmd/kicadai --help
+kicadai --help
 ```
 
 ### Deliverables
@@ -53,7 +53,7 @@ go run ./cmd/kicadai --help
 ### Done When
 
 - `go test ./...` succeeds.
-- `go run ./cmd/kicadai --help` prints usable command help.
+- `kicadai --help` prints usable command help.
 
 ## Phase 1: KiCad API Source Strategy
 
