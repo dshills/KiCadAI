@@ -89,6 +89,7 @@ const (
 	PCBTimingRoleConsumer      PCBTimingRole = "clock_consumer"
 	PCBTimingRoleLoadCapacitor PCBTimingRole = "load_capacitor"
 	PCBTimingRoleDecoupling    PCBTimingRole = "decoupling"
+	PCBTimingRoleEnableControl PCBTimingRole = "enable_control"
 	PCBTimingRoleGroundReturn  PCBTimingRole = "ground_return"
 )
 
@@ -99,11 +100,14 @@ type PCBTimingFixture struct {
 	SourceRole                    string                   `json:"source_role"`
 	ConsumerRole                  string                   `json:"consumer_role,omitempty"`
 	LoadCapacitorRoles            []string                 `json:"load_capacitor_roles,omitempty"`
+	DecouplingRoles               []string                 `json:"decoupling_roles,omitempty"`
+	EnableControlRoles            []string                 `json:"enable_control_roles,omitempty"`
 	GroundNetTemplate             string                   `json:"ground_net_template,omitempty"`
 	ClockNetTemplates             []string                 `json:"clock_net_templates,omitempty"`
 	LocalRouteIDs                 []string                 `json:"local_route_ids,omitempty"`
 	MaxSourceToConsumerDistanceMM *float64                 `json:"max_source_to_consumer_distance_mm,omitempty"`
 	MaxLoadCapDistanceMM          *float64                 `json:"max_load_cap_distance_mm,omitempty"`
+	MaxDecouplingDistanceMM       *float64                 `json:"max_decoupling_distance_mm,omitempty"`
 	MaxLoadCapAsymmetryMM         *float64                 `json:"max_load_cap_asymmetry_mm,omitempty"`
 	MaxClockRouteLengthMM         *float64                 `json:"max_clock_route_length_mm,omitempty"`
 	MinNoiseKeepoutMM             *float64                 `json:"min_noise_keepout_mm,omitempty"`
@@ -293,6 +297,22 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			}
 			issues = append(issues, validateKnownRole(rolePath, trimmedRole, roles)...)
 		}
+		for roleIndex, role := range timing.DecouplingRoles {
+			rolePath := fmt.Sprintf("%s.decoupling_roles.%d", timingPath, roleIndex)
+			trimmedRole := strings.TrimSpace(role)
+			if trimmedRole != role {
+				issues = append(issues, blockIssue(rolePath, "decoupling role must not contain leading or trailing whitespace"))
+			}
+			issues = append(issues, validateKnownRole(rolePath, trimmedRole, roles)...)
+		}
+		for roleIndex, role := range timing.EnableControlRoles {
+			rolePath := fmt.Sprintf("%s.enable_control_roles.%d", timingPath, roleIndex)
+			trimmedRole := strings.TrimSpace(role)
+			if trimmedRole != role {
+				issues = append(issues, blockIssue(rolePath, "enable control role must not contain leading or trailing whitespace"))
+			}
+			issues = append(issues, validateKnownRole(rolePath, trimmedRole, roles)...)
+		}
 		for roleName, timingRole := range timing.Roles {
 			issues = append(issues, validateKnownRole(timingPath+".roles."+roleName, roleName, roles)...)
 			if !validPCBTimingRole(timingRole) {
@@ -315,6 +335,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		}
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_source_to_consumer_distance_mm", timing.MaxSourceToConsumerDistanceMM)...)
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_load_cap_distance_mm", timing.MaxLoadCapDistanceMM)...)
+		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_decoupling_distance_mm", timing.MaxDecouplingDistanceMM)...)
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_load_cap_asymmetry_mm", timing.MaxLoadCapAsymmetryMM)...)
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_clock_route_length_mm", timing.MaxClockRouteLengthMM)...)
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".min_noise_keepout_mm", timing.MinNoiseKeepoutMM)...)
@@ -400,6 +421,7 @@ func validPCBTimingRole(role PCBTimingRole) bool {
 		PCBTimingRoleConsumer,
 		PCBTimingRoleLoadCapacitor,
 		PCBTimingRoleDecoupling,
+		PCBTimingRoleEnableControl,
 		PCBTimingRoleGroundReturn:
 		return true
 	default:
@@ -561,16 +583,19 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 		clone.TimingFixtures = make([]PCBTimingFixture, len(realization.TimingFixtures))
 	}
 	for i, timing := range realization.TimingFixtures {
+		timing.LoadCapacitorRoles = append([]string(nil), timing.LoadCapacitorRoles...)
+		timing.DecouplingRoles = append([]string(nil), timing.DecouplingRoles...)
+		timing.EnableControlRoles = append([]string(nil), timing.EnableControlRoles...)
+		timing.ClockNetTemplates = append([]string(nil), timing.ClockNetTemplates...)
+		timing.LocalRouteIDs = append([]string(nil), timing.LocalRouteIDs...)
+		timing.MaxSourceToConsumerDistanceMM = cloneFloat64Ptr(timing.MaxSourceToConsumerDistanceMM)
+		timing.MaxLoadCapDistanceMM = cloneFloat64Ptr(timing.MaxLoadCapDistanceMM)
+		timing.MaxDecouplingDistanceMM = cloneFloat64Ptr(timing.MaxDecouplingDistanceMM)
+		timing.MaxLoadCapAsymmetryMM = cloneFloat64Ptr(timing.MaxLoadCapAsymmetryMM)
+		timing.MaxClockRouteLengthMM = cloneFloat64Ptr(timing.MaxClockRouteLengthMM)
+		timing.MinNoiseKeepoutMM = cloneFloat64Ptr(timing.MinNoiseKeepoutMM)
+		timing.Roles = cloneTimingRoleMap(timing.Roles)
 		clone.TimingFixtures[i] = timing
-		clone.TimingFixtures[i].LoadCapacitorRoles = append([]string(nil), timing.LoadCapacitorRoles...)
-		clone.TimingFixtures[i].ClockNetTemplates = append([]string(nil), timing.ClockNetTemplates...)
-		clone.TimingFixtures[i].LocalRouteIDs = append([]string(nil), timing.LocalRouteIDs...)
-		clone.TimingFixtures[i].MaxSourceToConsumerDistanceMM = cloneFloat64Ptr(timing.MaxSourceToConsumerDistanceMM)
-		clone.TimingFixtures[i].MaxLoadCapDistanceMM = cloneFloat64Ptr(timing.MaxLoadCapDistanceMM)
-		clone.TimingFixtures[i].MaxLoadCapAsymmetryMM = cloneFloat64Ptr(timing.MaxLoadCapAsymmetryMM)
-		clone.TimingFixtures[i].MaxClockRouteLengthMM = cloneFloat64Ptr(timing.MaxClockRouteLengthMM)
-		clone.TimingFixtures[i].MinNoiseKeepoutMM = cloneFloat64Ptr(timing.MinNoiseKeepoutMM)
-		clone.TimingFixtures[i].Roles = cloneTimingRoleMap(timing.Roles)
 	}
 	clone.Zones = append([]PCBZoneRealization(nil), realization.Zones...)
 	for i := range clone.Zones {

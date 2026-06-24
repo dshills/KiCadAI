@@ -59,17 +59,22 @@ type TimingFixtureEvidence struct {
 	SourceRef                     string                   `json:"source_ref,omitempty"`
 	ConsumerRef                   string                   `json:"consumer_ref,omitempty"`
 	LoadCapacitorRefs             []string                 `json:"load_capacitor_refs,omitempty"`
+	DecouplingRefs                []string                 `json:"decoupling_refs,omitempty"`
+	EnableControlRefs             []string                 `json:"enable_control_refs,omitempty"`
 	ClockNets                     []string                 `json:"clock_nets,omitempty"`
 	GroundNet                     string                   `json:"ground_net,omitempty"`
 	SourceToConsumerDistanceMM    *float64                 `json:"source_to_consumer_distance_mm,omitempty"`
 	MaxSourceToConsumerDistanceMM *float64                 `json:"max_source_to_consumer_distance_mm,omitempty"`
 	LoadCapacitorDistancesMM      map[string]float64       `json:"load_capacitor_distances_mm,omitempty"`
+	DecouplingDistancesMM         map[string]float64       `json:"decoupling_distances_mm,omitempty"`
 	LoadCapacitorAsymmetryMM      *float64                 `json:"load_capacitor_asymmetry_mm,omitempty"`
 	MaxLoadCapDistanceMM          *float64                 `json:"max_load_cap_distance_mm,omitempty"`
+	MaxDecouplingDistanceMM       *float64                 `json:"max_decoupling_distance_mm,omitempty"`
 	MaxLoadCapAsymmetryMM         *float64                 `json:"max_load_cap_asymmetry_mm,omitempty"`
 	ClockRouteLengthsMM           map[string]float64       `json:"clock_route_lengths_mm,omitempty"`
 	MaxClockRouteLengthMM         *float64                 `json:"max_clock_route_length_mm,omitempty"`
 	GroundReturnPresent           bool                     `json:"ground_return_present"`
+	EnableControlPresent          bool                     `json:"enable_control_present"`
 	Satisfied                     bool                     `json:"satisfied"`
 	Findings                      []TimingFixtureFinding   `json:"findings,omitempty"`
 	Roles                         map[string]PCBTimingRole `json:"roles,omitempty"`
@@ -275,6 +280,7 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 			Kind:                          fixture.Kind,
 			MaxSourceToConsumerDistanceMM: cloneFloat64Ptr(fixture.MaxSourceToConsumerDistanceMM),
 			MaxLoadCapDistanceMM:          cloneFloat64Ptr(fixture.MaxLoadCapDistanceMM),
+			MaxDecouplingDistanceMM:       cloneFloat64Ptr(fixture.MaxDecouplingDistanceMM),
 			MaxLoadCapAsymmetryMM:         cloneFloat64Ptr(fixture.MaxLoadCapAsymmetryMM),
 			MaxClockRouteLengthMM:         cloneFloat64Ptr(fixture.MaxClockRouteLengthMM),
 			GroundNet:                     InstanceNetName(output.Instance.InstanceID, fixture.GroundNetTemplate),
@@ -318,6 +324,34 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 		if len(item.LoadCapacitorDistancesMM) == 0 {
 			item.LoadCapacitorDistancesMM = nil
 		}
+		if len(fixture.DecouplingRoles) != 0 {
+			item.DecouplingDistancesMM = map[string]float64{}
+		}
+		for _, role := range fixture.DecouplingRoles {
+			decoupling, ok := componentsByRole[role]
+			if !ok {
+				item.Findings = append(item.Findings, timingFinding(TimingFindingDecouplingPresent, reports.SeverityError, fmt.Sprintf("timing decoupling component for role %q is missing", role), nil, nil, nil, nil))
+				continue
+			}
+			item.DecouplingRefs = append(item.DecouplingRefs, decoupling.Ref)
+			if hasSource {
+				distance := placementDistance(source.Placement, decoupling.Placement)
+				item.DecouplingDistancesMM[decoupling.Ref] = distance
+				item.Findings = appendThresholdFinding(item.Findings, TimingFindingDecouplingProximity, "decoupling component exceeds maximum source distance", distance, fixture.MaxDecouplingDistanceMM, []string{source.Ref, decoupling.Ref}, nil)
+			}
+		}
+		if len(item.DecouplingDistancesMM) == 0 {
+			item.DecouplingDistancesMM = nil
+		}
+		for _, role := range fixture.EnableControlRoles {
+			control, ok := componentsByRole[role]
+			if !ok {
+				item.Findings = append(item.Findings, timingFinding(TimingFindingEnableControlPresent, reports.SeverityError, fmt.Sprintf("timing enable/control component for role %q is missing", role), nil, nil, nil, nil))
+				continue
+			}
+			item.EnableControlRefs = append(item.EnableControlRefs, control.Ref)
+		}
+		item.EnableControlPresent = len(fixture.EnableControlRoles) != 0 && len(item.EnableControlRefs) == len(fixture.EnableControlRoles)
 		if len(loadDistances) >= 2 {
 			asymmetry := math.Abs(loadDistances[0] - loadDistances[1])
 			item.LoadCapacitorAsymmetryMM = &asymmetry
