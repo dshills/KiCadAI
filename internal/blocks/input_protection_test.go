@@ -54,6 +54,27 @@ func TestReversePolarityInstantiateAndRealize(t *testing.T) {
 	if len(realized.Components) != 1 || realized.Components[0].Placement.XMM != 4 {
 		t.Fatalf("realized = %#v", realized)
 	}
+	if len(realized.EntryAnchors) != 3 {
+		t.Fatalf("entry anchors = %#v, want raw, protected, and ground anchors", realized.EntryAnchors)
+	}
+	if len(realized.LocalRoutes) != 2 {
+		t.Fatalf("local routes = %#v, want raw and protected power-path evidence", realized.LocalRoutes)
+	}
+	routeIDs := map[string]bool{}
+	for _, route := range realized.LocalRoutes {
+		routeIDs[route.ID] = true
+		if route.WidthMM < 0.6 {
+			t.Fatalf("route %s width = %f, want power-path width", route.ID, route.WidthMM)
+		}
+	}
+	if !routeIDs["raw_input_to_diode"] || !routeIDs["diode_to_protected_output"] {
+		t.Fatalf("route IDs = %#v", routeIDs)
+	}
+	for _, unsupported := range definition.PCBRealization.UnsupportedBehaviors {
+		if unsupported == "raw connector entry anchors are advisory until entry-point roles are modeled" {
+			t.Fatalf("unexpected stale unsupported behavior: %q", unsupported)
+		}
+	}
 }
 
 func TestReversePolarityRejectsInvalidRatings(t *testing.T) {
@@ -69,5 +90,19 @@ func TestReversePolarityRejectsInvalidRatings(t *testing.T) {
 	})
 	if !reports.HasBlockingIssue(issues) || !hasBlockIssuePath(issues, "params.input_voltage") || !hasBlockIssuePath(issues, "params.input_current") || !hasBlockIssuePath(issues, "params.diode_footprint") {
 		t.Fatalf("issues = %#v, want voltage/current/footprint blockers", issues)
+	}
+}
+
+func TestReversePolarityRejectsNonPositiveCurrent(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	_, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "reverse_polarity_protection",
+		InstanceID: "prot1",
+		Params: map[string]any{
+			"input_current": "-1mA",
+		},
+	})
+	if !reports.HasBlockingIssue(issues) || !hasBlockIssuePath(issues, "params.input_current") {
+		t.Fatalf("issues = %#v, want current blocker", issues)
 	}
 }
