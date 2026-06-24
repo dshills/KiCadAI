@@ -86,15 +86,20 @@ type TimingFixtureFinding struct {
 }
 
 const (
-	TimingFindingFixtureSourcePresent   = "timing.fixture.source_present"
-	TimingFindingFixtureConsumerPresent = "timing.fixture.consumer_present"
-	TimingFindingClockSourceProximity   = "timing.clock_source.proximity"
-	TimingFindingLoadCapsPresent        = "timing.load_caps.present"
-	TimingFindingLoadCapsProximity      = "timing.load_caps.proximity"
-	TimingFindingLoadCapsSymmetry       = "timing.load_caps.symmetry"
-	TimingFindingClockRoutesPresent     = "timing.clock_routes.present"
-	TimingFindingClockRoutesLength      = "timing.clock_routes.length"
-	TimingFindingGroundReturnPresent    = "timing.ground_return.present"
+	TimingFindingFixtureSourcePresent        = "timing.fixture.source_present"
+	TimingFindingFixtureConsumerPresent      = "timing.fixture.consumer_present"
+	TimingFindingClockSourceProximity        = "timing.clock_source.proximity"
+	TimingFindingLoadCapsPresent             = "timing.load_caps.present"
+	TimingFindingLoadCapsProximity           = "timing.load_caps.proximity"
+	TimingFindingLoadCapsSymmetry            = "timing.load_caps.symmetry"
+	TimingFindingClockRoutesPresent          = "timing.clock_routes.present"
+	TimingFindingClockRoutesLength           = "timing.clock_routes.length"
+	TimingFindingGroundReturnPresent         = "timing.ground_return.present"
+	TimingFindingDecouplingPresent           = "timing.decoupling.present"
+	TimingFindingDecouplingProximity         = "timing.decoupling.proximity"
+	TimingFindingEnableControlPresent        = "timing.enable_control.present"
+	TimingFindingResetProgrammingRouteLength = "timing.reset_programming.route_length"
+	TimingFindingProgrammingGroundReference  = "timing.programming.ground_reference"
 )
 
 const (
