@@ -185,6 +185,46 @@ func TestDiagnosticsForQualityReportsFanoutPressure(t *testing.T) {
 	}
 }
 
+func TestDiagnosticsForQualityReportsWeakAdvancedScore(t *testing.T) {
+	req := minimalRequest()
+	result := Place(req)
+	result.CandidateScoring = &CandidateScoringReport{
+		WinningCandidates: []CandidateScore{{
+			Ref: "R1",
+			Dimensions: []CandidateScoreDimension{{
+				Name:  CandidateScoreControlledImpedance,
+				Score: 0.2,
+			}},
+		}},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnosticByAction(quality.Diagnostics, PlacementActionReserveHighSpeedCorridor)
+	if got == nil || got.Category != PlacementDiagnosticAdvancedRules || got.Severity != reports.SeverityWarning {
+		t.Fatalf("advanced diagnostic = %#v", got)
+	}
+}
+
+func TestDiagnosticsForQualityMapsAdvancedRuleIssues(t *testing.T) {
+	req := minimalRequest()
+	result := Result{
+		Status: StatusPartial,
+		Issues: []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Message:  "candidate violates thermal rule hot-away",
+			Path:     "candidate_scoring",
+			Refs:     []string{"R1"},
+		}},
+	}
+	quality := BuildQualityReport(req, result)
+
+	got := findPlacementDiagnostic(quality.Diagnostics, PlacementDiagnosticAdvancedRules)
+	if got == nil || got.Action != PlacementActionAdjustConstraints || got.Severity != reports.SeverityError {
+		t.Fatalf("advanced issue diagnostic = %#v", got)
+	}
+}
+
 func findPlacementDiagnostic(diagnostics []PlacementDiagnostic, category PlacementDiagnosticCategory) *PlacementDiagnostic {
 	for i := range diagnostics {
 		if diagnostics[i].Category == category {

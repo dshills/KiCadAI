@@ -20,6 +20,7 @@ const (
 	PlacementDiagnosticFanout           PlacementDiagnosticCategory = "fanout"
 	PlacementDiagnosticRoutingReadiness PlacementDiagnosticCategory = "routing_readiness"
 	PlacementDiagnosticValidation       PlacementDiagnosticCategory = "validation"
+	PlacementDiagnosticAdvancedRules    PlacementDiagnosticCategory = "advanced_rules"
 )
 
 type PlacementDiagnosticAction string
@@ -36,6 +37,11 @@ const (
 	PlacementActionImproveRoutingReadiness  PlacementDiagnosticAction = "improve_routing_readiness"
 	PlacementActionProceedToRouting         PlacementDiagnosticAction = "proceed_to_routing"
 	PlacementActionInspectValidationIssue   PlacementDiagnosticAction = "inspect_validation_issue"
+	PlacementActionAdjustThermalPlacement   PlacementDiagnosticAction = "adjust_thermal_placement"
+	PlacementActionShortenHighCurrentPath   PlacementDiagnosticAction = "shorten_high_current_path"
+	PlacementActionIncreaseDomainSpacing    PlacementDiagnosticAction = "increase_domain_spacing"
+	PlacementActionImprovePairSymmetry      PlacementDiagnosticAction = "improve_pair_symmetry"
+	PlacementActionReserveHighSpeedCorridor PlacementDiagnosticAction = "reserve_high_speed_corridor"
 )
 
 type PlacementDiagnostic struct {
@@ -115,6 +121,7 @@ func DiagnosticsForQuality(request Request, result Result, quality QualityReport
 	diagnostics = append(diagnostics, fanoutReportDiagnostics(quality.FanoutReports)...)
 	diagnostics = append(diagnostics, netReportDiagnostics(quality.NetReports)...)
 	diagnostics = append(diagnostics, netProximityDiagnostics(request, placementsByRef)...)
+	diagnostics = append(diagnostics, advancedRuleScoreDiagnostics(result.CandidateScoring)...)
 	if quality.Ready && len(diagnostics) == 0 {
 		diagnostics = append(diagnostics, PlacementDiagnostic{
 			Category:   PlacementDiagnosticRoutingReadiness,
@@ -138,6 +145,10 @@ func diagnosticsForIssues(issues []reports.Issue) []PlacementDiagnostic {
 			category = PlacementDiagnosticConstraint
 			action = PlacementActionAdjustConstraints
 		}
+		if hasAdvancedRuleRef(issue) {
+			category = PlacementDiagnosticAdvancedRules
+			action = PlacementActionAdjustConstraints
+		}
 		diagnostics = append(diagnostics, PlacementDiagnostic{
 			Category:   category,
 			Action:     action,
@@ -150,6 +161,56 @@ func diagnosticsForIssues(issues []reports.Issue) []PlacementDiagnostic {
 		})
 	}
 	return diagnostics
+}
+
+func hasAdvancedRuleRef(issue reports.Issue) bool {
+	message := strings.ToLower(issue.Message)
+	return strings.Contains(message, "advanced") ||
+		strings.Contains(message, "thermal rule") ||
+		strings.Contains(message, "clearance rule") ||
+		strings.Contains(message, "high-current rule")
+}
+
+func advancedRuleScoreDiagnostics(report *CandidateScoringReport) []PlacementDiagnostic {
+	if report == nil {
+		return nil
+	}
+	var diagnostics []PlacementDiagnostic
+	for _, candidate := range report.WinningCandidates {
+		for _, dimension := range candidate.Dimensions {
+			action, suggestion, ok := advancedRuleDiagnosticAction(dimension.Name)
+			if !ok || dimension.Score >= 0.75 {
+				continue
+			}
+			diagnostics = append(diagnostics, PlacementDiagnostic{
+				Category:   PlacementDiagnosticAdvancedRules,
+				Action:     action,
+				Severity:   reports.SeverityWarning,
+				Message:    fmt.Sprintf("Advanced placement rule score for %s is %.3f on %s.", candidate.Ref, dimension.Score, dimension.Name),
+				Suggestion: suggestion,
+				Path:       "candidate_scoring.winning_candidates." + candidate.Ref + "." + string(dimension.Name),
+				Refs:       []string{candidate.Ref},
+			})
+		}
+	}
+	return diagnostics
+}
+
+func advancedRuleDiagnosticAction(name CandidateScoreDimensionName) (PlacementDiagnosticAction, string, bool) {
+	switch name {
+	case CandidateScoreThermal:
+		return PlacementActionAdjustThermalPlacement, "Move heat sources toward thermal regions or farther from thermally sensitive components.", true
+	case CandidateScoreHighCurrent:
+		return PlacementActionShortenHighCurrentPath, "Move high-current source and load components closer together or reduce path congestion.", true
+	case CandidateScoreCreepageClearance:
+		return PlacementActionIncreaseDomainSpacing, "Increase spacing between declared electrical domains or relax the clearance rule.", true
+	case CandidateScoreDifferentialPair:
+		return PlacementActionImprovePairSymmetry, "Move differential-pair endpoints to improve placement-level symmetry before routing.", true
+	case CandidateScoreControlledImpedance:
+		return PlacementActionReserveHighSpeedCorridor, "Reserve a clearer high-speed routing corridor and provide reference-plane metadata where available.", true
+	default:
+		return "", "", false
+	}
 }
 
 func placementDiagnosticSuggestion(explicit string, category PlacementDiagnosticCategory) string {
