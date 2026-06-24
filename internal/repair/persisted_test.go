@@ -41,6 +41,9 @@ func TestApplyPersistedBundleReplaysOutlineRepair(t *testing.T) {
 	if result.Status != StatusRepaired || len(result.Issues) != 0 {
 		t.Fatalf("result = %#v", result)
 	}
+	if len(result.Normalized) != 0 || result.Convergence.StopReason != StopReasonClean || result.Convergence.ClearedCount != 1 {
+		t.Fatalf("normalized convergence = %#v findings=%#v", result.Convergence, result.Normalized)
+	}
 	if !hasOperation(result.Transaction, transactions.OpSetBoardOutline) {
 		t.Fatalf("repaired transaction missing outline: %#v", result.Transaction.Operations)
 	}

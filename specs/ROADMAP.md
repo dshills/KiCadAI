@@ -277,19 +277,21 @@ missing KiCad DRC evidence.
 
 ### Remaining Work
 
-- Expand post-repair adapters to include richer parser-specific evidence once
-  ERC/DRC findings are mapped to repair categories consistently across all
-  flows.
+- Continue enriching parser-specific repair categories where KiCad introduces
+  new ERC/DRC report shapes.
 - Extend retry budgets from persisted repair apply into full generate,
   validate, repair, and revalidate loops.
-- Implement KiCad zone refill only under explicit KiCad CLI policy.
-- Broaden CLI fixtures with real KiCad ERC/DRC artifacts under opt-in
-  integration configuration.
+- Use explicit KiCad zone refill policy and normalized convergence evidence in
+  higher-level retry loops.
+- Keep broadening checked-in and opt-in KiCad ERC/DRC artifact fixtures as new
+  local KiCad versions are validated.
 
 ### Acceptance Gates
 
 - `repair apply --target ...` can produce final validation evidence from
   built-in adapters.
+- `repair apply --target ...` exposes normalized findings and convergence stop
+  reasons for AI callers.
 - Repairs report `repaired` only when post-write validation is clean.
 - Repairs report `partial` when only non-blocking issues remain or when
   blocking issue counts improve but are not eliminated.

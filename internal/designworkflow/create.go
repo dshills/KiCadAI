@@ -230,6 +230,7 @@ func persistedValidationRepairStage(ctx context.Context, request *Request, writt
 		"validation_count": len(result.Validation),
 		"artifact_count":   len(result.Artifacts),
 		"validation_delta": result.Delta,
+		"convergence":      result.Convergence,
 	}
 	if len(stage.Issues) > 0 {
 		stage.Status = moreSevereStageStatus(stage.Status, StageStatusForIssues(stage.Issues))

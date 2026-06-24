@@ -49,6 +49,8 @@ type PersistedApplyResult struct {
 	ZoneRefill  *ZoneRefillResult        `json:"zone_refill,omitempty"`
 	Summary     ValidationSummary        `json:"summary,omitempty"`
 	Delta       ValidationDelta          `json:"delta,omitempty"`
+	Normalized  []NormalizedFinding      `json:"normalized_findings,omitempty"`
+	Convergence NormalizedDeltaSummary   `json:"convergence,omitempty"`
 	Issues      []reports.Issue          `json:"issues,omitempty"`
 	Artifacts   []reports.Artifact       `json:"artifacts,omitempty"`
 }
@@ -206,6 +208,10 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 func finalizePersistedValidationResult(result PersistedApplyResult, stageIssues []StageIssues) PersistedApplyResult {
 	result.Summary = SummarizePostValidation(result.Validation)
 	result.Delta = CompareValidationIssues(flattenIssues(stageIssues), result.Issues)
+	before := NormalizeStageIssues(stageIssues)
+	after := NormalizePostApplyValidations(result.Validation)
+	result.Normalized = after
+	result.Convergence = CompareNormalizedFindings(before, after)
 	result.Status = statusFromValidationDelta(result.Delta)
 	return finalizePersistedResult(result)
 }

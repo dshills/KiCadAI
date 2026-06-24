@@ -226,6 +226,10 @@ Results for the `repair apply` command include:
 - `summary`: adapter count, skipped count, issue totals, blocking counts, and
   artifacts.
 - `delta`: before/after issue summaries with cleared, repeated, and new issues.
+- `normalized_findings`: AI-facing post-apply findings with source, category,
+  repairability, subject, stable key, and evidence path fields.
+- `convergence`: normalized before/after convergence with cleared, repeated,
+  new, worsened, and stop-reason counts.
 - `budget`: normalized retry limits, attempt count, and exhaustion status.
 
 Post-repair statuses are intended for AI callers:
