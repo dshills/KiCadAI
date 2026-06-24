@@ -214,6 +214,7 @@ type CandidateScoreWeights struct {
 	CreepageClearance   float64
 	DifferentialPair    float64
 	ControlledImpedance float64
+	TimingSensitive     float64
 }
 
 type ProximityRule struct {
@@ -507,6 +508,7 @@ const (
 	CandidateScoreCreepageClearance   CandidateScoreDimensionName = "creepage_clearance"
 	CandidateScoreDifferentialPair    CandidateScoreDimensionName = "differential_pair"
 	CandidateScoreControlledImpedance CandidateScoreDimensionName = "controlled_impedance"
+	CandidateScoreTimingSensitive     CandidateScoreDimensionName = "timing_sensitive"
 )
 
 type CandidateRejectionReasonName string
@@ -596,6 +598,7 @@ func DefaultRules() Rules {
 				CreepageClearance:   1,
 				DifferentialPair:    1,
 				ControlledImpedance: 1,
+				TimingSensitive:     1,
 			},
 		},
 	}
@@ -696,11 +699,11 @@ func NormalizeRequest(request Request) Request {
 	for i := range request.ProximityRules {
 		request.ProximityRules[i].ID = stableRuleID(request.ProximityRules[i].ID, "proximity", i)
 		request.ProximityRules[i].Source = strings.TrimSpace(request.ProximityRules[i].Source)
-		request.ProximityRules[i].AnchorRef = strings.TrimSpace(request.ProximityRules[i].AnchorRef)
+		request.ProximityRules[i].AnchorRef = normalizeRef(request.ProximityRules[i].AnchorRef)
 		if request.ProximityRules[i].Weight <= 0 {
 			request.ProximityRules[i].Weight = 1
 		}
-		request.ProximityRules[i].TargetRefs = uniqueSortedStrings(request.ProximityRules[i].TargetRefs)
+		request.ProximityRules[i].TargetRefs = uniqueSortedRefs(request.ProximityRules[i].TargetRefs)
 		request.ProximityRules[i].AnchorPins = uniqueSortedStrings(request.ProximityRules[i].AnchorPins)
 		request.ProximityRules[i].TargetPins = uniqueSortedStrings(request.ProximityRules[i].TargetPins)
 	}
@@ -1579,6 +1582,23 @@ func uniqueSortedStrings(values []string) []string {
 	}
 	out := make([]string, 0, len(seen))
 	for _, value := range seen {
+		out = append(out, value)
+	}
+	slices.Sort(out)
+	return out
+}
+
+func uniqueSortedRefs(values []string) []string {
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		ref := normalizeRef(value)
+		if ref == "" {
+			continue
+		}
+		seen[ref] = struct{}{}
+	}
+	out := make([]string, 0, len(seen))
+	for value := range seen {
 		out = append(out, value)
 	}
 	slices.Sort(out)

@@ -274,6 +274,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	groupTarget, hasGroupTarget := groupKeepTogetherTarget(componentRef, keepTogetherPeersByRef, placedByRef)
 	netTargets := netScoreTargets(componentRef, netsByRef[componentRef], placedByRef, rotatedPadsByRef)
 	electricalContext := newElectricalCandidateScoringContext(request, netTargets)
+	timingContext := newTimingSensitiveCandidateScoringContext(componentRef, request, placedByRef)
 	seedBase := seedTieBreakBase(request.Seed, component.Ref)
 	rotatedPadsByRotation := rotatedPadsByRef[componentRef]
 	scored := make([]scoredPlacementCandidate, len(candidates))
@@ -283,6 +284,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 		dimensions = appendElectricalCandidateDimensions(dimensions, candidate.Placement.Position, electricalContext, rotatedPadsByRotation[rotationKey(candidate.Placement.Position.RotationDeg)])
 		dimensions = appendCongestionFanoutCandidateDimensions(dimensions, component, candidate.Placement, request, congestionContext)
 		dimensions = appendAdvancedCandidateDimensions(dimensions, component, candidate.Placement, request, placedByRef, advancedContext)
+		dimensions = appendTimingSensitiveCandidateDimensions(dimensions, candidate.Placement, timingContext)
 		total := weightedCandidateDimensionTotal(dimensions)
 		scored[index] = scoredPlacementCandidate{
 			CandidateIndex: index,

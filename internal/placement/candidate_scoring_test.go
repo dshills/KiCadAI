@@ -208,6 +208,41 @@ func TestPlaceCandidateScoringReportsElectricalDimensions(t *testing.T) {
 	}
 }
 
+func TestPlaceCandidateScoringReportsTimingSensitiveDimension(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Ref = "Y1"
+	req.Components[0].Role = "crystal"
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Components[1].Ref = "C1"
+	req.Components[1].Role = "load_capacitor"
+	req.Nets[0].Endpoints = []Endpoint{{Ref: "Y1", Pin: "1"}, {Ref: "C1", Pin: "1"}}
+	req.ProximityRules = []ProximityRule{{
+		ID:            "clock-loop",
+		Role:          IntentClock,
+		AnchorRef:     "Y1",
+		TargetRefs:    []string{"C1"},
+		MaxDistanceMM: 8,
+		Weight:        5,
+		Required:      true,
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{TimingSensitive: 1}
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "C1")
+	if !ok {
+		t.Fatalf("C1 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreTimingSensitive) {
+		t.Fatalf("timing-sensitive dimension missing: %#v", winner.Dimensions)
+	}
+}
+
 func TestPlaceCandidateScoringReportsCongestionAndFanoutDimensions(t *testing.T) {
 	req := twoComponentRequest()
 	req.Components[0].Fixed = true

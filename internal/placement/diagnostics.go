@@ -42,6 +42,7 @@ const (
 	PlacementActionIncreaseDomainSpacing    PlacementDiagnosticAction = "increase_domain_spacing"
 	PlacementActionImprovePairSymmetry      PlacementDiagnosticAction = "improve_pair_symmetry"
 	PlacementActionReserveHighSpeedCorridor PlacementDiagnosticAction = "reserve_high_speed_corridor"
+	PlacementActionTightenTimingPlacement   PlacementDiagnosticAction = "tighten_timing_placement"
 )
 
 type PlacementDiagnostic struct {
@@ -208,6 +209,8 @@ func advancedRuleDiagnosticAction(name CandidateScoreDimensionName) (PlacementDi
 		return PlacementActionImprovePairSymmetry, "Move differential-pair endpoints to improve placement-level symmetry before routing.", true
 	case CandidateScoreControlledImpedance:
 		return PlacementActionReserveHighSpeedCorridor, "Reserve a clearer high-speed routing corridor and provide reference-plane metadata where available.", true
+	case CandidateScoreTimingSensitive:
+		return PlacementActionTightenTimingPlacement, "Move timing-sensitive sources, load capacitors, and clock consumers closer together.", true
 	default:
 		return "", "", false
 	}

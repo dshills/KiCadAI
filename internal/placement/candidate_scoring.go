@@ -63,6 +63,7 @@ func normalizeCandidateScoreWeights(weights CandidateScoreWeights) CandidateScor
 	weights.CreepageClearance = normalizeCandidateScoreWeight(weights.CreepageClearance)
 	weights.DifferentialPair = normalizeCandidateScoreWeight(weights.DifferentialPair)
 	weights.ControlledImpedance = normalizeCandidateScoreWeight(weights.ControlledImpedance)
+	weights.TimingSensitive = normalizeCandidateScoreWeight(weights.TimingSensitive)
 	return weights
 }
 
@@ -566,6 +567,147 @@ func appendAdvancedCandidateDimensions(dimensions []CandidateScoreDimension, com
 		}
 	}
 	return dimensions
+}
+
+type timingSensitiveCandidateScoringContext struct {
+	ComponentRef string
+	Weight       float64
+	Rules        []timingSensitiveCandidateRule
+}
+
+type timingSensitiveCandidateRule struct {
+	ID                string
+	AnchorRef         string
+	AnchorPoint       *Point
+	TargetPoints      []timingSensitiveTargetPoint
+	ComponentIsAnchor bool
+	ComponentIsTarget bool
+	MaxDistance       float64
+}
+
+type timingSensitiveTargetPoint struct {
+	Ref   string
+	Point Point
+}
+
+func newTimingSensitiveCandidateScoringContext(componentRef string, request Request, placedByRef map[string]PlacementResult) timingSensitiveCandidateScoringContext {
+	weight := request.Rules.CandidateScoring.Weights.TimingSensitive
+	if weight <= 0 {
+		return timingSensitiveCandidateScoringContext{}
+	}
+	componentRef = normalizeRef(componentRef)
+	defaultMaxDistance := boardDistance(request.Board.WidthMM, request.Board.HeightMM)
+	if defaultMaxDistance <= 0 {
+		defaultMaxDistance = 100
+	}
+	context := timingSensitiveCandidateScoringContext{ComponentRef: componentRef, Weight: weight}
+	for _, rule := range request.ProximityRules {
+		if !timingSensitiveIntentRole(rule.Role) {
+			continue
+		}
+		maxDistance := rule.MaxDistanceMM
+		if maxDistance <= 0 {
+			maxDistance = defaultMaxDistance
+		}
+		anchorRef := rule.AnchorRef
+		normalizedTargets := rule.TargetRefs
+		componentIsAnchor := anchorRef == componentRef
+		componentIsTarget := normalizedRefsContain(normalizedTargets, componentRef)
+		if !componentIsAnchor && !componentIsTarget {
+			continue
+		}
+		var anchorPoint *Point
+		if anchor, ok := placedByRef[anchorRef]; ok {
+			center := anchor.Bounds.Center()
+			anchorPoint = &center
+		}
+		var targetPoints []timingSensitiveTargetPoint
+		if componentIsAnchor {
+			targetPoints = make([]timingSensitiveTargetPoint, 0, len(normalizedTargets))
+			for _, targetRef := range normalizedTargets {
+				target, ok := placedByRef[targetRef]
+				if !ok {
+					continue
+				}
+				targetPoints = append(targetPoints, timingSensitiveTargetPoint{Ref: targetRef, Point: target.Bounds.Center()})
+			}
+		}
+		context.Rules = append(context.Rules, timingSensitiveCandidateRule{
+			ID:                rule.ID,
+			AnchorRef:         anchorRef,
+			AnchorPoint:       anchorPoint,
+			TargetPoints:      targetPoints,
+			ComponentIsAnchor: componentIsAnchor,
+			ComponentIsTarget: componentIsTarget,
+			MaxDistance:       maxDistance,
+		})
+	}
+	return context
+}
+
+func appendTimingSensitiveCandidateDimensions(dimensions []CandidateScoreDimension, placement PlacementResult, context timingSensitiveCandidateScoringContext) []CandidateScoreDimension {
+	if context.Weight <= 0 || len(context.Rules) == 0 {
+		return dimensions
+	}
+	scoreTotal := 0.0
+	scoreCount := 0.0
+	evidence := []string{}
+	candidateCenter := placement.Bounds.Center()
+	for _, rule := range context.Rules {
+		if rule.ComponentIsAnchor {
+			for _, target := range rule.TargetPoints {
+				distance := pointDistance(candidateCenter, target.Point)
+				scoreTotal += clampCandidateUnitScore(1 - distance/rule.MaxDistance)
+				scoreCount++
+				if len(evidence) < defaultCandidateScoreEvidencePerDimension {
+					evidence = append(evidence, "rule="+rule.ID+" target="+target.Ref+" timing_distance_checked")
+				}
+			}
+		}
+		if !rule.ComponentIsTarget {
+			continue
+		}
+		if rule.AnchorPoint == nil {
+			continue
+		}
+		distance := pointDistance(candidateCenter, *rule.AnchorPoint)
+		scoreTotal += clampCandidateUnitScore(1 - distance/rule.MaxDistance)
+		scoreCount++
+		if len(evidence) < defaultCandidateScoreEvidencePerDimension {
+			evidence = append(evidence, "rule="+rule.ID+" anchor="+rule.AnchorRef+" timing_distance_checked")
+		}
+	}
+	if scoreCount == 0 {
+		return dimensions
+	}
+	return append(dimensions, CandidateScoreDimension{
+		Name:     CandidateScoreTimingSensitive,
+		Score:    scoreTotal / scoreCount,
+		Weight:   context.Weight,
+		Evidence: evidence,
+	})
+}
+
+func timingSensitiveIntentRole(role IntentRole) bool {
+	switch role {
+	case IntentClock, IntentReset, IntentProgramming:
+		return true
+	default:
+		return false
+	}
+}
+
+func normalizedRefsContain(refs []string, ref string) bool {
+	for _, candidate := range refs {
+		if candidate == ref {
+			return true
+		}
+	}
+	return false
+}
+
+func pointDistance(first Point, second Point) float64 {
+	return math.Hypot(first.XMM-second.XMM, first.YMM-second.YMM)
 }
 
 func thermalCandidateDimension(placement PlacementResult, board BoardPlacementArea, rules []thermalCandidateRule, weight float64) (CandidateScoreDimension, bool) {

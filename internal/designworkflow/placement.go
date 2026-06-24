@@ -220,7 +220,8 @@ func advancedPlacementDimension(name placement.CandidateScoreDimensionName) bool
 		placement.CandidateScoreHighCurrent,
 		placement.CandidateScoreCreepageClearance,
 		placement.CandidateScoreDifferentialPair,
-		placement.CandidateScoreControlledImpedance:
+		placement.CandidateScoreControlledImpedance,
+		placement.CandidateScoreTimingSensitive:
 		return true
 	default:
 		return false
