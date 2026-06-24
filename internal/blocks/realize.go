@@ -86,6 +86,18 @@ type TimingFixtureFinding struct {
 }
 
 const (
+	TimingFindingFixtureSourcePresent   = "timing.fixture.source_present"
+	TimingFindingFixtureConsumerPresent = "timing.fixture.consumer_present"
+	TimingFindingClockSourceProximity   = "timing.clock_source.proximity"
+	TimingFindingLoadCapsPresent        = "timing.load_caps.present"
+	TimingFindingLoadCapsProximity      = "timing.load_caps.proximity"
+	TimingFindingLoadCapsSymmetry       = "timing.load_caps.symmetry"
+	TimingFindingClockRoutesPresent     = "timing.clock_routes.present"
+	TimingFindingClockRoutesLength      = "timing.clock_routes.length"
+	TimingFindingGroundReturnPresent    = "timing.ground_return.present"
+)
+
+const (
 	degreesToRadians             = math.Pi / 180
 	routeCoordinateSnapEpsilonMM = 1e-9
 )
@@ -268,7 +280,7 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 		if hasSource {
 			item.SourceRef = source.Ref
 		} else {
-			item.Findings = append(item.Findings, timingFinding("timing.fixture.source_present", reports.SeverityError, "timing fixture source component is missing", nil, nil, nil, nil))
+			item.Findings = append(item.Findings, timingFinding(TimingFindingFixtureSourcePresent, reports.SeverityError, "timing fixture source component is missing", nil, nil, nil, nil))
 		}
 		if fixture.ConsumerRole != "" {
 			if consumer, ok := componentsByRole[fixture.ConsumerRole]; ok {
@@ -276,10 +288,10 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 				if hasSource {
 					distance := placementDistance(source.Placement, consumer.Placement)
 					item.SourceToConsumerDistanceMM = &distance
-					item.Findings = appendThresholdFinding(item.Findings, "timing.clock_source.proximity", "clock source exceeds maximum source-to-consumer distance", distance, fixture.MaxSourceToConsumerDistanceMM, []string{source.Ref, consumer.Ref}, item.ClockNets)
+					item.Findings = appendThresholdFinding(item.Findings, TimingFindingClockSourceProximity, "clock source exceeds maximum source-to-consumer distance", distance, fixture.MaxSourceToConsumerDistanceMM, []string{source.Ref, consumer.Ref}, item.ClockNets)
 				}
 			} else {
-				item.Findings = append(item.Findings, timingFinding("timing.fixture.consumer_present", reports.SeverityWarning, "timing fixture consumer component is missing", nil, nil, nil, nil))
+				item.Findings = append(item.Findings, timingFinding(TimingFindingFixtureConsumerPresent, reports.SeverityWarning, "timing fixture consumer component is missing", nil, nil, nil, nil))
 			}
 		}
 		item.LoadCapacitorDistancesMM = map[string]float64{}
@@ -287,7 +299,7 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 		for _, role := range fixture.LoadCapacitorRoles {
 			load, ok := componentsByRole[role]
 			if !ok {
-				item.Findings = append(item.Findings, timingFinding("timing.load_caps.present", reports.SeverityError, "timing load capacitor component is missing", nil, nil, nil, nil))
+				item.Findings = append(item.Findings, timingFinding(TimingFindingLoadCapsPresent, reports.SeverityError, "timing load capacitor component is missing", nil, nil, nil, nil))
 				continue
 			}
 			item.LoadCapacitorRefs = append(item.LoadCapacitorRefs, load.Ref)
@@ -295,7 +307,7 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 				distance := placementDistance(source.Placement, load.Placement)
 				item.LoadCapacitorDistancesMM[load.Ref] = distance
 				loadDistances = append(loadDistances, distance)
-				item.Findings = appendThresholdFinding(item.Findings, "timing.load_caps.proximity", "load capacitor exceeds maximum source distance", distance, fixture.MaxLoadCapDistanceMM, []string{source.Ref, load.Ref}, nil)
+				item.Findings = appendThresholdFinding(item.Findings, TimingFindingLoadCapsProximity, "load capacitor exceeds maximum source distance", distance, fixture.MaxLoadCapDistanceMM, []string{source.Ref, load.Ref}, nil)
 			}
 		}
 		if len(item.LoadCapacitorDistancesMM) == 0 {
@@ -304,7 +316,7 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 		if len(loadDistances) >= 2 {
 			asymmetry := math.Abs(loadDistances[0] - loadDistances[1])
 			item.LoadCapacitorAsymmetryMM = &asymmetry
-			item.Findings = appendThresholdFinding(item.Findings, "timing.load_caps.symmetry", "load capacitor placement exceeds symmetry tolerance", asymmetry, fixture.MaxLoadCapAsymmetryMM, item.LoadCapacitorRefs, nil)
+			item.Findings = appendThresholdFinding(item.Findings, TimingFindingLoadCapsSymmetry, "load capacitor placement exceeds symmetry tolerance", asymmetry, fixture.MaxLoadCapAsymmetryMM, item.LoadCapacitorRefs, nil)
 		}
 		item.ClockRouteLengthsMM = map[string]float64{}
 		clockNetSet := map[string]struct{}{}
@@ -316,12 +328,12 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 		for _, routeID := range fixture.LocalRouteIDs {
 			route, ok := routesByID[routeID]
 			if !ok {
-				item.Findings = append(item.Findings, timingFinding("timing.clock_routes.present", reports.SeverityError, "timing local route is missing", nil, nil, nil, nil))
+				item.Findings = append(item.Findings, timingFinding(TimingFindingClockRoutesPresent, reports.SeverityError, "timing local route is missing", nil, nil, nil, nil))
 				continue
 			}
 			if _, ok := clockNetSet[route.NetName]; ok {
 				item.ClockRouteLengthsMM[route.ID] = route.LengthMM
-				item.Findings = appendThresholdFinding(item.Findings, "timing.clock_routes.length", "timing route exceeds maximum length", route.LengthMM, fixture.MaxClockRouteLengthMM, []string{route.From.Ref, route.To.Ref}, []string{route.NetName})
+				item.Findings = appendThresholdFinding(item.Findings, TimingFindingClockRoutesLength, "timing route exceeds maximum length", route.LengthMM, fixture.MaxClockRouteLengthMM, []string{route.From.Ref, route.To.Ref}, []string{route.NetName})
 			}
 			if route.NetName == item.GroundNet {
 				item.GroundReturnPresent = true
@@ -331,7 +343,7 @@ func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput,
 			item.ClockRouteLengthsMM = nil
 		}
 		if fixture.GroundNetTemplate != "" && !item.GroundReturnPresent {
-			item.Findings = append(item.Findings, timingFinding("timing.ground_return.present", reports.SeverityError, "timing fixture has no local ground return evidence", nil, nil, item.LoadCapacitorRefs, []string{item.GroundNet}))
+			item.Findings = append(item.Findings, timingFinding(TimingFindingGroundReturnPresent, reports.SeverityError, "timing fixture has no local ground return evidence", nil, nil, item.LoadCapacitorRefs, []string{item.GroundNet}))
 		}
 		item.Satisfied = timingFindingsSatisfied(item.Findings)
 		evidence = append(evidence, item)

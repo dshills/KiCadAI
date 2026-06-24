@@ -67,7 +67,9 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		}
 		originX, originY := fragmentOrigin(index, columns)
 		realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{OriginXMM: originX, OriginYMM: originY})
-		issues = append(issues, prefixIssues(fmt.Sprintf("blocks[%d].pcb_realization", index), realization.Issues)...)
+		realizationPath := fmt.Sprintf("blocks[%d].pcb_realization", index)
+		realizationIssues := append(cloneIssues(realization.Issues), timingEvidenceIssues(realization)...)
+		issues = append(issues, prefixIssues(realizationPath, realizationIssues)...)
 		fragment := BlockFragment{
 			InstanceID:  instance.ID,
 			BlockID:     instance.BlockID,
@@ -83,13 +85,14 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		fragments = append(fragments, fragment)
 	}
 	issues = append(issues, validateFragmentBounds(request, fragments)...)
-	componentCount, routeCount := fragmentCounts(fragments)
+	componentCount, routeCount, timingCount := fragmentCounts(fragments)
 	stage := NewStageResult(StagePCBRealization, issues)
 	stage.Summary = map[string]any{
 		"block_count":     len(request.Blocks),
 		"fragment_count":  len(fragments),
 		"component_count": componentCount,
 		"local_routes":    routeCount,
+		"timing_results":  timingCount,
 	}
 	return PCBFragmentResult{Fragments: fragments, Stage: stage}
 }
@@ -170,14 +173,60 @@ func validateFragmentBounds(request Request, fragments []BlockFragment) []report
 	return issues
 }
 
-func fragmentCounts(fragments []BlockFragment) (int, int) {
+func fragmentCounts(fragments []BlockFragment) (int, int, int) {
 	componentCount := 0
 	routeCount := 0
+	timingCount := 0
 	for _, fragment := range fragments {
 		componentCount += len(fragment.Realization.Components)
 		routeCount += len(fragment.Realization.LocalRoutes)
+		timingCount += len(fragment.Realization.Timing)
 	}
-	return componentCount, routeCount
+	return componentCount, routeCount, timingCount
+}
+
+func timingEvidenceIssues(realization blocks.BlockPCBRealizationResult) []reports.Issue {
+	var issues []reports.Issue
+	for timingIndex, timing := range realization.Timing {
+		pathID := timing.ID
+		if pathID == "" {
+			pathID = fmt.Sprintf("result.%d", timingIndex)
+		}
+		for findingIndex, finding := range timing.Findings {
+			if finding.Severity != reports.SeverityWarning && finding.Severity != reports.SeverityError && finding.Severity != reports.SeverityBlocked {
+				continue
+			}
+			findingID := finding.ID
+			if findingID == "" {
+				findingID = fmt.Sprintf("finding.%d", findingIndex)
+			}
+			issues = append(issues, reports.Issue{
+				Code:       reports.CodeValidationFailed,
+				Severity:   finding.Severity,
+				Path:       "timing." + pathID + "." + findingID,
+				Message:    finding.Message,
+				Refs:       append([]string(nil), finding.Refs...),
+				Nets:       append([]string(nil), finding.Nets...),
+				Suggestion: timingFindingSuggestion(finding.ID),
+			})
+		}
+	}
+	return issues
+}
+
+func timingFindingSuggestion(id string) string {
+	switch id {
+	case blocks.TimingFindingClockSourceProximity, blocks.TimingFindingLoadCapsProximity:
+		return "move timing-sensitive components closer to the clock source or consumer"
+	case blocks.TimingFindingLoadCapsSymmetry:
+		return "place load capacitors more symmetrically around the crystal"
+	case blocks.TimingFindingClockRoutesLength:
+		return "shorten local timing routes or relax the timing route threshold"
+	case blocks.TimingFindingGroundReturnPresent:
+		return "add local ground-return evidence for timing capacitors or decoupling"
+	default:
+		return "review timing-sensitive layout evidence and constraints"
+	}
 }
 
 func prefixIssues(prefix string, issues []reports.Issue) []reports.Issue {

@@ -29,6 +29,48 @@ func TestRealizePCBFragmentsCreatesLEDFragment(t *testing.T) {
 	}
 }
 
+func TestFragmentCountsIncludesTimingResults(t *testing.T) {
+	componentCount, routeCount, timingCount := fragmentCounts([]BlockFragment{{
+		Realization: blocks.BlockPCBRealizationResult{
+			Components:  []blocks.RealizedPCBComponent{{Ref: "Y1"}},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{ID: "xtal"}},
+			Timing:      []blocks.TimingFixtureEvidence{{ID: "clock"}},
+		},
+	}})
+	if componentCount != 1 || routeCount != 1 || timingCount != 1 {
+		t.Fatalf("counts = %d %d %d", componentCount, routeCount, timingCount)
+	}
+}
+
+func TestTimingEvidenceIssuesReportsWarningsAndRelativePaths(t *testing.T) {
+	issues := timingEvidenceIssues(blocks.BlockPCBRealizationResult{
+		Timing: []blocks.TimingFixtureEvidence{{
+			Findings: []blocks.TimingFixtureFinding{{
+				Severity: reports.SeverityWarning,
+				Message:  "near limit",
+			}},
+		}, {
+			ID: "clock",
+			Findings: []blocks.TimingFixtureFinding{{
+				ID:       blocks.TimingFindingGroundReturnPresent,
+				Severity: reports.SeverityError,
+				Message:  "missing ground",
+				Refs:     []string{"C1"},
+				Nets:     []string{"GND"},
+			}},
+		}},
+	})
+	if len(issues) != 2 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if issues[0].Path != "timing.result.0.finding.0" || issues[1].Path != "timing.clock.timing.ground_return.present" {
+		t.Fatalf("issue paths = %#v", issues)
+	}
+	if issues[0].Severity != reports.SeverityWarning || issues[1].Suggestion == "" {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestRealizePCBFragmentsWarnsWhenBoardTooSmall(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
