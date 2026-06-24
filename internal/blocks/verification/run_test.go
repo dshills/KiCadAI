@@ -296,6 +296,62 @@ func TestRunCasePCBRequiredRouteBlocksWhenMissing(t *testing.T) {
 	}
 }
 
+func TestRunCasePCBRealizationAssertionsPass(t *testing.T) {
+	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "canned_oscillator_default", "manifest.json"))
+	if len(issues) != 0 {
+		t.Fatalf("load issues = %#v", issues)
+	}
+	satisfied := true
+	manifest.Expected.PCB.RequireRealization = true
+	manifest.Expected.PCB.RequiredLocalRoutes = []string{"osc_vcc_decoupling", "osc_gnd_decoupling"}
+	manifest.Expected.PCB.TimingFixtures = []ExpectedTimingFixture{{ID: "canned_oscillator_core", Satisfied: &satisfied}}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusPass || !hasStage(result.Stages, "pcb_realization") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCasePCBRealizationBlocksMissingLocalRoute(t *testing.T) {
+	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "canned_oscillator_default", "manifest.json"))
+	if len(issues) != 0 {
+		t.Fatalf("load issues = %#v", issues)
+	}
+	manifest.Expected.PCB.RequiredLocalRoutes = []string{"missing_route"}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "missing required local route missing_route") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCasePCBRealizationBlocksMissingTimingFixture(t *testing.T) {
+	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "canned_oscillator_default", "manifest.json"))
+	if len(issues) != 0 {
+		t.Fatalf("load issues = %#v", issues)
+	}
+	manifest.Expected.PCB.TimingFixtures = []ExpectedTimingFixture{{ID: "missing_timing"}}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "missing expected timing fixture missing_timing") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCasePCBRealizationBlocksTimingExpectationMismatch(t *testing.T) {
+	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "canned_oscillator_default", "manifest.json"))
+	if len(issues) != 0 {
+		t.Fatalf("load issues = %#v", issues)
+	}
+	satisfied := false
+	manifest.Expected.PCB.TimingFixtures = []ExpectedTimingFixture{{
+		ID:               "canned_oscillator_core",
+		Satisfied:        &satisfied,
+		RequiredFindings: []string{blocks.TimingFindingDecouplingPresent},
+	}}
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusBlocked || !hasIssue(result.Issues, "expected timing fixture satisfied=false, got true") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 func TestAssertPCBRequiredRouteTrimsExpectedName(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.EvidenceLevel = EvidencePCBVerified

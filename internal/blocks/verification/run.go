@@ -117,9 +117,9 @@ type connectEdge struct {
 }
 
 func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult {
-	registry := opts.Registry
-	if registry == nil {
-		registry = blocks.NewBuiltinRegistry()
+	activeRegistry := opts.Registry
+	if activeRegistry == nil {
+		activeRegistry = blocks.NewBuiltinRegistry()
 	}
 	result := RunResult{
 		CaseID:        manifest.ID,
@@ -127,14 +127,14 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 		EvidenceLevel: manifest.Expected.EvidenceLevel,
 		Status:        StatusPass,
 	}
-	manifestIssues := ValidateManifest(manifest, registry)
+	manifestIssues := ValidateManifest(manifest, activeRegistry)
 	result.addStage(StageResult{Name: "manifest", Issues: manifestIssues, Summary: "validated manifest"})
 	if reports.HasBlockingIssue(manifestIssues) {
 		result.finish()
 		return result
 	}
 	request := blocks.BlockRequest{BlockID: manifest.BlockID, InstanceID: requestInstanceID(manifest), Params: manifest.Request.Params}
-	output, instantiateIssues := registry.Instantiate(ctx, request)
+	output, instantiateIssues := activeRegistry.Instantiate(ctx, request)
 	result.Output = &output
 	instantiateIssues = append(instantiateIssues, output.Issues...)
 	result.addStage(StageResult{Name: "instantiate", Issues: instantiateIssues, Summary: fmt.Sprintf("generated %d operation(s)", len(output.Operations))})
@@ -148,6 +148,20 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 	if reports.HasBlockingIssue(semanticIssues) {
 		result.finish()
 		return result
+	}
+	if pcbRealizationRequested(manifest.Expected.PCB) {
+		definition, ok := activeRegistry.GetBlock(manifest.BlockID)
+		if !ok {
+			result.addStage(StageResult{Name: "pcb_realization", Issues: []reports.Issue{runIssue("verification."+pathID(manifest.ID)+".pcb_realization.block", "block definition not found "+manifest.BlockID)}, Summary: "failed to load block definition"})
+			result.finish()
+			return result
+		}
+		stage := runPCBRealizationStage(manifest, definition, output)
+		result.addStage(stage)
+		if reports.HasBlockingIssue(stage.Issues) {
+			result.finish()
+			return result
+		}
 	}
 	if pcbAssertionsRequested(manifest.Expected) {
 		pcbIssues := assertPCB(manifest, summary)
@@ -222,6 +236,76 @@ func dedupeArtifacts(artifacts []reports.Artifact) []reports.Artifact {
 
 func writerRequested(writer ExpectedWriter) bool {
 	return writer.Required || writer.OK || writer.AllowUnrouted || writer.RequireRoundTrip
+}
+
+func pcbRealizationRequested(pcb ExpectedPCB) bool {
+	return pcb.RequireRealization ||
+		pcb.RequireBoardValidation ||
+		len(pcb.RequiredLocalRoutes) > 0 ||
+		len(pcb.TimingFixtures) > 0
+}
+
+func runPCBRealizationStage(manifest Manifest, definition blocks.BlockDefinition, output blocks.BlockOutput) StageResult {
+	realized := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{})
+	issues := append([]reports.Issue(nil), realized.Issues...)
+	issues = append(issues, assertPCBRealization(manifest, realized)...)
+	summary := fmt.Sprintf("realized %d component(s), %d local route(s), %d timing fixture(s)", len(realized.Components), len(realized.LocalRoutes), len(realized.Timing))
+	return StageResult{Name: "pcb_realization", Issues: issues, Summary: summary}
+}
+
+func assertPCBRealization(manifest Manifest, realized blocks.BlockPCBRealizationResult) []reports.Issue {
+	var issues []reports.Issue
+	basePath := "verification." + pathID(manifest.ID) + ".pcb_realization"
+	localRoutes := map[string]blocks.RealizedPCBLocalRoute{}
+	for _, route := range realized.LocalRoutes {
+		localRoutes[strings.TrimSpace(route.ID)] = route
+	}
+	for _, routeID := range manifest.Expected.PCB.RequiredLocalRoutes {
+		routeID = strings.TrimSpace(routeID)
+		if _, ok := localRoutes[routeID]; !ok {
+			issues = append(issues, runIssue(basePath+".local_routes."+pathSegment(routeID), "missing required local route "+routeID))
+		}
+	}
+	timingByID := map[string]blocks.TimingFixtureEvidence{}
+	for _, timing := range realized.Timing {
+		timingByID[strings.TrimSpace(timing.ID)] = timing
+	}
+	for _, expected := range manifest.Expected.PCB.TimingFixtures {
+		timingID := strings.TrimSpace(expected.ID)
+		path := basePath + ".timing." + pathSegment(timingID)
+		actual, ok := timingByID[timingID]
+		if !ok {
+			issues = append(issues, runIssue(path, "missing expected timing fixture "+timingID))
+			continue
+		}
+		if expected.Satisfied != nil && actual.Satisfied != *expected.Satisfied {
+			issues = append(issues, runIssue(path+".satisfied", fmt.Sprintf("expected timing fixture satisfied=%t, got %t", *expected.Satisfied, actual.Satisfied)))
+		}
+		findings := timingFindingIDSet(actual.Findings)
+		for _, findingID := range expected.RequiredFindings {
+			findingID = strings.TrimSpace(findingID)
+			if _, ok := findings[findingID]; !ok {
+				issues = append(issues, runIssue(path+".required_findings."+pathSegment(findingID), "missing required timing finding "+findingID))
+			}
+		}
+		for _, findingID := range expected.ForbiddenFindings {
+			findingID = strings.TrimSpace(findingID)
+			if _, ok := findings[findingID]; ok {
+				issues = append(issues, runIssue(path+".forbidden_findings."+pathSegment(findingID), "forbidden timing finding present "+findingID))
+			}
+		}
+	}
+	return issues
+}
+
+func timingFindingIDSet(findings []blocks.TimingFixtureFinding) map[string]struct{} {
+	ids := map[string]struct{}{}
+	for _, finding := range findings {
+		if id := strings.TrimSpace(finding.ID); id != "" {
+			ids[id] = struct{}{}
+		}
+	}
+	return ids
 }
 
 func runWriterStage(ctx context.Context, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) (StageResult, []reports.Artifact) {
