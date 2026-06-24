@@ -207,3 +207,88 @@ func TestNormalizeIssueClassifiesExternalAndPreservationBlocked(t *testing.T) {
 		t.Fatalf("preservation = %+v", preservation)
 	}
 }
+
+func TestNormalizeIssueTrimsCategoryBeforeDefaulting(t *testing.T) {
+	finding := NormalizeIssue(
+		reports.Issue{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline"},
+		NormalizeFindingOptions{Category: "   "},
+	)
+	if finding.Category != FindingCategoryOutline {
+		t.Fatalf("category = %q, want outline", finding.Category)
+	}
+}
+
+func TestCompareNormalizedFindingsReportsDeltaCounts(t *testing.T) {
+	cleared := NormalizeIssue(reports.Issue{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Path: "outline", Message: "missing"}, NormalizeFindingOptions{Source: FindingSourceBoard})
+	repeated := NormalizeIssue(reports.Issue{Code: reports.CodeDisconnectedPad, Severity: reports.SeverityError, Path: "pad", Message: "disconnected", Refs: []string{"J1"}}, NormalizeFindingOptions{Source: FindingSourceBoard})
+	newWarning := NormalizeIssue(reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "zone", Message: "zone fill evidence missing"}, NormalizeFindingOptions{Source: FindingSourceBoard, Category: FindingCategoryZone})
+	delta := CompareNormalizedFindings([]NormalizedFinding{cleared, repeated}, []NormalizedFinding{repeated, newWarning})
+	if delta.ClearedCount != 1 || delta.RepeatedCount != 1 || delta.NewCount != 1 {
+		t.Fatalf("unexpected delta counts: %+v", delta)
+	}
+	if delta.Before.BlockingCount != 2 || delta.After.BlockingCount != 1 || !delta.Improved || delta.Worse {
+		t.Fatalf("unexpected summary flags: %+v", delta)
+	}
+	if delta.ByCategory[string(FindingCategoryOutline)].Cleared != 1 || delta.ByCategory[string(FindingCategoryConnectivity)].Repeated != 1 {
+		t.Fatalf("unexpected category deltas: %+v", delta.ByCategory)
+	}
+}
+
+func TestCompareNormalizedFindingsPreservesDuplicateKeys(t *testing.T) {
+	finding := NormalizeIssue(reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "same", Message: "same"}, NormalizeFindingOptions{Source: FindingSourceBoard})
+	delta := CompareNormalizedFindings([]NormalizedFinding{finding, finding}, nil)
+	if delta.Before.IssueCount != 2 || delta.ClearedCount != 2 {
+		t.Fatalf("duplicate findings should be preserved: %+v", delta)
+	}
+}
+
+func TestCompareNormalizedFindingsReportsWorsenedSeverity(t *testing.T) {
+	before := NormalizeIssue(reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "drc", Message: "same"}, NormalizeFindingOptions{Source: FindingSourceKiCadDRC, Category: FindingCategoryBoardDRC})
+	after := before
+	after.Severity = reports.SeverityError
+	after.Key = before.Key
+	delta := CompareNormalizedFindings([]NormalizedFinding{before}, []NormalizedFinding{after})
+	if delta.WorsenedCount != 1 || !delta.Worse || delta.StopReason != StopReasonRepeatedEvidence {
+		t.Fatalf("unexpected worsened delta: %+v", delta)
+	}
+}
+
+func TestCompareNormalizedFindingsTreatsSeverityReductionAsImprovement(t *testing.T) {
+	before := NormalizeIssue(reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "drc", Message: "same"}, NormalizeFindingOptions{Source: FindingSourceKiCadDRC, Category: FindingCategoryBoardDRC})
+	after := before
+	after.Severity = reports.SeverityWarning
+	after.Key = before.Key
+	delta := CompareNormalizedFindings([]NormalizedFinding{before}, []NormalizedFinding{after})
+	if !delta.Improved || delta.StopReason != StopReasonPartialNonBlocking {
+		t.Fatalf("severity reduction should count as improvement to partial clean state: %+v", delta)
+	}
+}
+
+func TestSelectConvergenceStopReasonPriority(t *testing.T) {
+	clean := CompareNormalizedFindings(nil, nil)
+	if clean.StopReason != StopReasonClean {
+		t.Fatalf("clean stop reason = %q", clean.StopReason)
+	}
+	external := NormalizeIssue(reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityError, Message: "missing"}, NormalizeFindingOptions{Category: FindingCategoryExternalTool, Repairability: RepairabilityExternalToolBlocked})
+	delta := CompareNormalizedFindings(nil, []NormalizedFinding{external})
+	if delta.StopReason != StopReasonExternalToolBlocked {
+		t.Fatalf("external stop reason = %q; delta=%+v", delta.StopReason, delta)
+	}
+	unsupported := NormalizeIssue(reports.Issue{Code: reports.CodeUnsupportedOperation, Severity: reports.SeverityBlocked, Message: "unsupported"}, NormalizeFindingOptions{Category: FindingCategoryUnsupported, Repairability: RepairabilityUnsupported})
+	delta = CompareNormalizedFindings(nil, []NormalizedFinding{unsupported})
+	if delta.StopReason != StopReasonUnsupportedFindings {
+		t.Fatalf("unsupported stop reason = %q; delta=%+v", delta.StopReason, delta)
+	}
+}
+
+func TestSelectConvergenceStopReasonDoesNotStopWhenStillImproving(t *testing.T) {
+	cleared := NormalizeIssue(reports.Issue{Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Path: "outline", Message: "missing"}, NormalizeFindingOptions{Category: FindingCategoryOutline})
+	remaining := NormalizeIssue(reports.Issue{Code: reports.CodeUnsupportedOperation, Severity: reports.SeverityBlocked, Path: "unsupported", Message: "unsupported"}, NormalizeFindingOptions{Category: FindingCategoryUnsupported, Repairability: RepairabilityUnsupported})
+	delta := CompareNormalizedFindings([]NormalizedFinding{cleared, remaining}, []NormalizedFinding{remaining})
+	if !delta.Improved {
+		t.Fatalf("delta should show improvement: %+v", delta)
+	}
+	if delta.StopReason != "" {
+		t.Fatalf("improving delta should not produce terminal stop reason yet: %+v", delta)
+	}
+}

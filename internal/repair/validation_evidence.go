@@ -47,6 +47,69 @@ type ValidationDelta struct {
 	Worsened bool              `json:"worsened,omitempty"`
 }
 
+type ConvergenceStopReason string
+
+const (
+	StopReasonClean                   ConvergenceStopReason = "clean"
+	StopReasonPartialNonBlocking      ConvergenceStopReason = "partial_non_blocking_remaining"
+	StopReasonNoRepairableFindings    ConvergenceStopReason = "no_repairable_findings"
+	StopReasonUnsupportedFindings     ConvergenceStopReason = "unsupported_findings"
+	StopReasonPreservationBlocked     ConvergenceStopReason = "preservation_blocked"
+	StopReasonExternalToolBlocked     ConvergenceStopReason = "external_tool_blocked"
+	StopReasonTotalBudgetExhausted    ConvergenceStopReason = "total_budget_exhausted"
+	StopReasonCategoryBudgetExhausted ConvergenceStopReason = "category_budget_exhausted"
+	StopReasonNoImprovement           ConvergenceStopReason = "no_improvement"
+	StopReasonRepeatedEvidence        ConvergenceStopReason = "repeated_evidence"
+	StopReasonStaleGeneratedTarget    ConvergenceStopReason = "stale_generated_target"
+	StopReasonValidationError         ConvergenceStopReason = "validation_error"
+)
+
+type NormalizedEvidenceSummary struct {
+	IssueCount               int            `json:"issue_count"`
+	BlockingCount            int            `json:"blocking_count"`
+	RepairableCount          int            `json:"repairable_count"`
+	UnsupportedCount         int            `json:"unsupported_count"`
+	ExternalToolBlockedCount int            `json:"external_tool_blocked_count"`
+	PreservationBlockedCount int            `json:"preservation_blocked_count"`
+	InformationalCount       int            `json:"informational_count"`
+	BySource                 map[string]int `json:"by_source,omitempty"`
+	ByCategory               map[string]int `json:"by_category,omitempty"`
+	ByRepairability          map[string]int `json:"by_repairability,omitempty"`
+	ByCode                   map[string]int `json:"by_code,omitempty"`
+}
+
+type NormalizedDeltaSummary struct {
+	Before                   NormalizedEvidenceSummary `json:"before"`
+	After                    NormalizedEvidenceSummary `json:"after"`
+	Cleared                  []NormalizedFinding       `json:"cleared,omitempty"`
+	Repeated                 []NormalizedFinding       `json:"repeated,omitempty"`
+	New                      []NormalizedFinding       `json:"new,omitempty"`
+	Worsened                 []NormalizedFinding       `json:"worsened,omitempty"`
+	ByCategory               map[string]CategoryDelta  `json:"by_category,omitempty"`
+	ClearedCount             int                       `json:"cleared_count"`
+	RepeatedCount            int                       `json:"repeated_count"`
+	NewCount                 int                       `json:"new_count"`
+	WorsenedCount            int                       `json:"worsened_count"`
+	NewBlockingCount         int                       `json:"new_blocking_count"`
+	RepeatedBlockingCount    int                       `json:"repeated_blocking_count"`
+	UnsupportedCount         int                       `json:"unsupported_count"`
+	ExternalToolBlockedCount int                       `json:"external_tool_blocked_count"`
+	PreservationBlockedCount int                       `json:"preservation_blocked_count"`
+	Worse                    bool                      `json:"worse,omitempty"`
+	Improved                 bool                      `json:"improved,omitempty"`
+	StopReason               ConvergenceStopReason     `json:"stop_reason,omitempty"`
+}
+
+type CategoryDelta struct {
+	Before        int `json:"before"`
+	After         int `json:"after"`
+	Cleared       int `json:"cleared"`
+	Repeated      int `json:"repeated"`
+	New           int `json:"new"`
+	Worsened      int `json:"worsened"`
+	BlockingAfter int `json:"blocking_after"`
+}
+
 type FindingSource string
 
 const (
@@ -182,6 +245,98 @@ func CompareValidationIssues(before []reports.Issue, after []reports.Issue) Vali
 	return delta
 }
 
+func SummarizeNormalizedFindings(findings []NormalizedFinding) NormalizedEvidenceSummary {
+	summary := NormalizedEvidenceSummary{IssueCount: len(findings)}
+	for _, finding := range findings {
+		if finding.Severity == reports.SeverityError || finding.Severity == reports.SeverityBlocked {
+			summary.BlockingCount++
+		}
+		switch finding.Repairability {
+		case RepairabilityRepairable:
+			summary.RepairableCount++
+		case RepairabilityUnsupported:
+			summary.UnsupportedCount++
+		case RepairabilityExternalToolBlocked:
+			summary.ExternalToolBlockedCount++
+		case RepairabilityPreservationBlocked:
+			summary.PreservationBlockedCount++
+		case RepairabilityInformational:
+			summary.InformationalCount++
+		}
+		incrementStringCount(&summary.BySource, string(finding.Source))
+		incrementStringCount(&summary.ByCategory, string(finding.Category))
+		incrementStringCount(&summary.ByRepairability, string(finding.Repairability))
+		incrementStringCount(&summary.ByCode, string(finding.Code))
+	}
+	return summary
+}
+
+func CompareNormalizedFindings(before []NormalizedFinding, after []NormalizedFinding) NormalizedDeltaSummary {
+	beforeByKey := normalizedFindingMap(before)
+	afterByKey := normalizedFindingMap(after)
+	delta := NormalizedDeltaSummary{
+		Before:     summarizeNormalizedFindingMap(beforeByKey),
+		After:      summarizeNormalizedFindingMap(afterByKey),
+		ByCategory: map[string]CategoryDelta{},
+	}
+	for key, beforeFinding := range beforeByKey {
+		if afterFinding, ok := afterByKey[key]; ok {
+			delta.Repeated = append(delta.Repeated, afterFinding)
+			if severityRankForEvidence(afterFinding.Severity) > severityRankForEvidence(beforeFinding.Severity) {
+				delta.Worsened = append(delta.Worsened, afterFinding)
+			}
+			continue
+		}
+		delta.Cleared = append(delta.Cleared, beforeFinding)
+	}
+	for key, afterFinding := range afterByKey {
+		if _, ok := beforeByKey[key]; !ok {
+			delta.New = append(delta.New, afterFinding)
+		}
+	}
+	SortNormalizedFindings(delta.Cleared)
+	SortNormalizedFindings(delta.Repeated)
+	SortNormalizedFindings(delta.New)
+	SortNormalizedFindings(delta.Worsened)
+	delta.ClearedCount = len(delta.Cleared)
+	delta.RepeatedCount = len(delta.Repeated)
+	delta.NewCount = len(delta.New)
+	delta.WorsenedCount = len(delta.Worsened)
+	delta.NewBlockingCount = countBlockingFindings(delta.New)
+	delta.RepeatedBlockingCount = countBlockingFindings(delta.Repeated)
+	delta.UnsupportedCount = countRepairability(delta.After, RepairabilityUnsupported)
+	delta.ExternalToolBlockedCount = countRepairability(delta.After, RepairabilityExternalToolBlocked)
+	delta.PreservationBlockedCount = countRepairability(delta.After, RepairabilityPreservationBlocked)
+	delta.ByCategory = categoryDeltas(beforeByKey, afterByKey, delta)
+	delta.Worse = delta.After.BlockingCount > delta.Before.BlockingCount || delta.NewBlockingCount > 0 || delta.WorsenedCount > 0
+	delta.Improved = (delta.ClearedCount > 0 || delta.After.BlockingCount < delta.Before.BlockingCount) && !delta.Worse
+	delta.StopReason = SelectConvergenceStopReason(delta)
+	return delta
+}
+
+func SelectConvergenceStopReason(delta NormalizedDeltaSummary) ConvergenceStopReason {
+	switch {
+	case delta.After.BlockingCount == 0 && delta.After.IssueCount == 0:
+		return StopReasonClean
+	case delta.After.BlockingCount == 0:
+		return StopReasonPartialNonBlocking
+	case delta.Improved:
+		return ""
+	case delta.PreservationBlockedCount > 0:
+		return StopReasonPreservationBlocked
+	case delta.ExternalToolBlockedCount > 0:
+		return StopReasonExternalToolBlocked
+	case delta.UnsupportedCount > 0:
+		return StopReasonUnsupportedFindings
+	case delta.RepeatedBlockingCount > 0 && delta.NewBlockingCount == 0:
+		return StopReasonRepeatedEvidence
+	case delta.After.RepairableCount == 0:
+		return StopReasonNoRepairableFindings
+	default:
+		return StopReasonNoImprovement
+	}
+}
+
 func NormalizeIssue(issue reports.Issue, opts NormalizeFindingOptions) NormalizedFinding {
 	normalizedPath := slashPathForEvidence(issue.Path)
 	finding := NormalizedFinding{
@@ -198,6 +353,9 @@ func NormalizeIssue(issue reports.Issue, opts NormalizeFindingOptions) Normalize
 		EvidencePath:  slashPathForEvidence(opts.EvidencePath),
 		RawCode:       strings.TrimSpace(opts.RawCode),
 	}
+	finding.Source = FindingSource(strings.TrimSpace(string(finding.Source)))
+	finding.Category = FindingCategory(strings.TrimSpace(string(finding.Category)))
+	finding.Repairability = Repairability(strings.TrimSpace(string(finding.Repairability)))
 	if finding.Source == "" {
 		finding.Source = FindingSourceRepair
 	}
@@ -367,6 +525,167 @@ func blockingIssues(issues []reports.Issue) []reports.Issue {
 		}
 	}
 	return blocking
+}
+
+func normalizedFindingMap(findings []NormalizedFinding) map[string]NormalizedFinding {
+	mapped := make(map[string]NormalizedFinding, len(findings))
+	collisions := map[string]int{}
+	for _, finding := range findings {
+		key := finding.Key
+		if key == "" {
+			key = NormalizedFindingKey(finding)
+			finding.Key = key
+		}
+		mapKey := key
+		if _, ok := mapped[mapKey]; ok {
+			collisions[key]++
+			mapKey = key + "#duplicate:" + strconv.Itoa(collisions[key])
+		}
+		mapped[mapKey] = finding
+	}
+	return mapped
+}
+
+func summarizeNormalizedFindingMap(mapped map[string]NormalizedFinding) NormalizedEvidenceSummary {
+	summary := NormalizedEvidenceSummary{}
+	for _, finding := range mapped {
+		summary.IssueCount++
+		if finding.Severity == reports.SeverityError || finding.Severity == reports.SeverityBlocked {
+			summary.BlockingCount++
+		}
+		switch finding.Repairability {
+		case RepairabilityRepairable:
+			summary.RepairableCount++
+		case RepairabilityUnsupported:
+			summary.UnsupportedCount++
+		case RepairabilityExternalToolBlocked:
+			summary.ExternalToolBlockedCount++
+		case RepairabilityPreservationBlocked:
+			summary.PreservationBlockedCount++
+		case RepairabilityInformational:
+			summary.InformationalCount++
+		}
+		incrementStringCount(&summary.BySource, string(finding.Source))
+		incrementStringCount(&summary.ByCategory, string(finding.Category))
+		incrementStringCount(&summary.ByRepairability, string(finding.Repairability))
+		incrementStringCount(&summary.ByCode, string(finding.Code))
+	}
+	return summary
+}
+
+func findingsFromMap(mapped map[string]NormalizedFinding) []NormalizedFinding {
+	findings := make([]NormalizedFinding, 0, len(mapped))
+	for _, finding := range mapped {
+		findings = append(findings, finding)
+	}
+	SortNormalizedFindings(findings)
+	return findings
+}
+
+func categoryDeltas(before map[string]NormalizedFinding, after map[string]NormalizedFinding, delta NormalizedDeltaSummary) map[string]CategoryDelta {
+	categories := map[string]CategoryDelta{}
+	for _, finding := range before {
+		category := normalizedCategoryKey(finding.Category)
+		entry := categories[category]
+		entry.Before++
+		categories[category] = entry
+	}
+	for _, finding := range after {
+		category := normalizedCategoryKey(finding.Category)
+		entry := categories[category]
+		entry.After++
+		if finding.Severity == reports.SeverityError || finding.Severity == reports.SeverityBlocked {
+			entry.BlockingAfter++
+		}
+		categories[category] = entry
+	}
+	for _, finding := range delta.Cleared {
+		category := normalizedCategoryKey(finding.Category)
+		entry := categories[category]
+		entry.Cleared++
+		categories[category] = entry
+	}
+	for _, finding := range delta.Repeated {
+		category := normalizedCategoryKey(finding.Category)
+		entry := categories[category]
+		entry.Repeated++
+		categories[category] = entry
+	}
+	for _, finding := range delta.New {
+		category := normalizedCategoryKey(finding.Category)
+		entry := categories[category]
+		entry.New++
+		categories[category] = entry
+	}
+	for _, finding := range delta.Worsened {
+		category := normalizedCategoryKey(finding.Category)
+		entry := categories[category]
+		entry.Worsened++
+		categories[category] = entry
+	}
+	for category, entry := range categories {
+		if category == "" || entry == (CategoryDelta{}) {
+			delete(categories, category)
+		}
+	}
+	return categories
+}
+
+func countBlockingFindings(findings []NormalizedFinding) int {
+	count := 0
+	for _, finding := range findings {
+		if finding.Severity == reports.SeverityError || finding.Severity == reports.SeverityBlocked {
+			count++
+		}
+	}
+	return count
+}
+
+func countRepairability(summary NormalizedEvidenceSummary, repairability Repairability) int {
+	switch repairability {
+	case RepairabilityUnsupported:
+		return summary.UnsupportedCount
+	case RepairabilityExternalToolBlocked:
+		return summary.ExternalToolBlockedCount
+	case RepairabilityPreservationBlocked:
+		return summary.PreservationBlockedCount
+	case RepairabilityInformational:
+		return summary.InformationalCount
+	case RepairabilityRepairable:
+		return summary.RepairableCount
+	default:
+		return 0
+	}
+}
+
+func severityRankForEvidence(severity reports.Severity) int {
+	switch severity {
+	case reports.SeverityInfo:
+		return 0
+	case reports.SeverityWarning:
+		return 1
+	case reports.SeverityError:
+		return 2
+	case reports.SeverityBlocked:
+		return 3
+	default:
+		return 3
+	}
+}
+
+func normalizedCategoryKey(category FindingCategory) string {
+	return strings.TrimSpace(string(category))
+}
+
+func incrementStringCount(values *map[string]int, key string) {
+	key = strings.TrimSpace(key)
+	if key == "" {
+		return
+	}
+	if *values == nil {
+		*values = map[string]int{}
+	}
+	(*values)[key]++
 }
 
 func sortedStrings(values []string) []string {
