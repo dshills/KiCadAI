@@ -79,13 +79,17 @@ type ExpectedPin struct {
 }
 
 type ExpectedPCB struct {
-	Placements     []ExpectedPlacement `json:"placements,omitempty"`
-	RequiredRoutes []string            `json:"required_routes,omitempty"`
-	RequiredZones  []string            `json:"required_zones,omitempty"`
-	PadNets        []ExpectedPadNet    `json:"pad_nets,omitempty"`
-	AllowUnrouted  bool                `json:"allow_unrouted,omitempty"`
-	RequireRoutes  bool                `json:"require_routes,omitempty"`
-	RequireZones   bool                `json:"require_zones,omitempty"`
+	Placements             []ExpectedPlacement     `json:"placements,omitempty"`
+	RequiredRoutes         []string                `json:"required_routes,omitempty"`
+	RequiredLocalRoutes    []string                `json:"required_local_routes,omitempty"`
+	RequiredZones          []string                `json:"required_zones,omitempty"`
+	TimingFixtures         []ExpectedTimingFixture `json:"timing_fixtures,omitempty"`
+	PadNets                []ExpectedPadNet        `json:"pad_nets,omitempty"`
+	AllowUnrouted          bool                    `json:"allow_unrouted,omitempty"`
+	RequireRoutes          bool                    `json:"require_routes,omitempty"`
+	RequireZones           bool                    `json:"require_zones,omitempty"`
+	RequireRealization     bool                    `json:"require_realization,omitempty"`
+	RequireBoardValidation bool                    `json:"require_board_validation,omitempty"`
 }
 
 type ExpectedPlacement struct {
@@ -103,6 +107,13 @@ type ExpectedPadNet struct {
 	Ref string `json:"ref"`
 	Pad string `json:"pad"`
 	Net string `json:"net"`
+}
+
+type ExpectedTimingFixture struct {
+	ID                string   `json:"id"`
+	Satisfied         *bool    `json:"satisfied,omitempty"`
+	RequiredFindings  []string `json:"required_findings,omitempty"`
+	ForbiddenFindings []string `json:"forbidden_findings,omitempty"`
 }
 
 type ExpectedWriter struct {
@@ -391,7 +402,77 @@ func validateExpectedPCB(path string, pcb ExpectedPCB, componentRefs map[string]
 		}
 	}
 	issues = append(issues, validateUniqueStrings(path+".required_routes", "duplicate required route", pcb.RequiredRoutes)...)
+	issues = append(issues, validateUniqueStrings(path+".required_local_routes", "duplicate required local route", pcb.RequiredLocalRoutes)...)
+	issues = append(issues, validateIdentifierStrings(path+".required_local_routes", "required local route", pcb.RequiredLocalRoutes)...)
 	issues = append(issues, validateUniqueStrings(path+".required_zones", "duplicate required zone", pcb.RequiredZones)...)
+	issues = append(issues, validateExpectedTimingFixtures(path+".timing_fixtures", pcb.TimingFixtures)...)
+	return issues
+}
+
+func validateExpectedTimingFixtures(path string, fixtures []ExpectedTimingFixture) []reports.Issue {
+	var issues []reports.Issue
+	seen := map[string]struct{}{}
+	for index, fixture := range fixtures {
+		fixturePath := fmt.Sprintf("%s.%d", path, index)
+		id := strings.TrimSpace(fixture.ID)
+		if id == "" {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, fixturePath+".id", "expected timing fixture ID is required"))
+		} else if id != fixture.ID {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, fixturePath+".id", "expected timing fixture ID must not contain leading or trailing whitespace"))
+		} else if strings.ContainsAny(fixture.ID, " \t\n\r") {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, fixturePath+".id", "expected timing fixture ID must not contain whitespace"))
+		} else if _, exists := seen[id]; exists {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, fixturePath+".id", "duplicate expected timing fixture "+id))
+		} else {
+			seen[id] = struct{}{}
+		}
+		issues = append(issues, validateUniqueStrings(fixturePath+".required_findings", "duplicate required timing finding", fixture.RequiredFindings)...)
+		issues = append(issues, validateUniqueStrings(fixturePath+".forbidden_findings", "duplicate forbidden timing finding", fixture.ForbiddenFindings)...)
+		issues = append(issues, validateIdentifierStrings(fixturePath+".required_findings", "required timing finding", fixture.RequiredFindings)...)
+		issues = append(issues, validateIdentifierStrings(fixturePath+".forbidden_findings", "forbidden timing finding", fixture.ForbiddenFindings)...)
+		issues = append(issues, validateDisjointTimingFindings(fixturePath, fixture.RequiredFindings, fixture.ForbiddenFindings)...)
+	}
+	return issues
+}
+
+func validateIdentifierStrings(path string, label string, values []string) []reports.Issue {
+	var issues []reports.Issue
+	for index, value := range values {
+		valuePath := fmt.Sprintf("%s.%d", path, index)
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, valuePath, label+" ID is required"))
+		} else if trimmed != value {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, valuePath, label+" ID must not contain leading or trailing whitespace"))
+		} else if strings.ContainsAny(value, " \t\n\r") {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, valuePath, label+" ID must not contain whitespace"))
+		}
+	}
+	return issues
+}
+
+func validateDisjointTimingFindings(path string, required []string, forbidden []string) []reports.Issue {
+	requiredSet := map[string]struct{}{}
+	for _, finding := range required {
+		if trimmed := strings.TrimSpace(finding); trimmed != "" {
+			requiredSet[trimmed] = struct{}{}
+		}
+	}
+	var issues []reports.Issue
+	reported := map[string]struct{}{}
+	for index, finding := range forbidden {
+		trimmed := strings.TrimSpace(finding)
+		if trimmed == "" {
+			continue
+		}
+		if _, duplicate := reported[trimmed]; duplicate {
+			continue
+		}
+		if _, exists := requiredSet[trimmed]; exists {
+			issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, fmt.Sprintf("%s.forbidden_findings.%d", path, index), "timing finding cannot be both required and forbidden "+trimmed))
+			reported[trimmed] = struct{}{}
+		}
+	}
 	return issues
 }
 

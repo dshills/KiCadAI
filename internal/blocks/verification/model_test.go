@@ -114,6 +114,55 @@ func TestValidateManifestReportsDuplicatePlacementByRefAndRole(t *testing.T) {
 	}
 }
 
+func TestValidateManifestReportsDuplicateRequiredLocalRoute(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.PCB.RequiredLocalRoutes = []string{"led_local", "led_local", "", " route ", "bad route"}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	for _, want := range []string{
+		"duplicate required local route led_local",
+		"required local route ID is required",
+		"required local route ID must not contain leading or trailing whitespace",
+		"required local route ID must not contain whitespace",
+	} {
+		if !hasIssue(issues, want) {
+			t.Fatalf("issues missing %q: %#v", want, issues)
+		}
+	}
+}
+
+func TestValidateManifestReportsInvalidTimingFixtureExpectations(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.PCB.TimingFixtures = []ExpectedTimingFixture{{
+		ID:                "",
+		RequiredFindings:  []string{"timing.a", "timing.a", ""},
+		ForbiddenFindings: []string{" timing.c "},
+	}, {
+		ID:                "clock",
+		RequiredFindings:  []string{"timing.shared"},
+		ForbiddenFindings: []string{"timing.shared"},
+	}, {
+		ID: "bad clock",
+	}, {
+		ID:                "clock",
+		ForbiddenFindings: []string{"timing.b", "timing.b"},
+	}}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	for _, want := range []string{
+		"expected timing fixture ID is required",
+		"expected timing fixture ID must not contain whitespace",
+		"duplicate expected timing fixture clock",
+		"duplicate required timing finding timing.a",
+		"duplicate forbidden timing finding timing.b",
+		"required timing finding ID is required",
+		"forbidden timing finding ID must not contain leading or trailing whitespace",
+		"timing finding cannot be both required and forbidden timing.shared",
+	} {
+		if !hasIssue(issues, want) {
+			t.Fatalf("issues missing %q: %#v", want, issues)
+		}
+	}
+}
+
 func TestValidateManifestReportsUnknownPadNetRefs(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Components[0].Ref = "R1"
