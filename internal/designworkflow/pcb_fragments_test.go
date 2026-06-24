@@ -3,8 +3,10 @@ package designworkflow
 import (
 	"context"
 	"testing"
+	"time"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
 
@@ -16,8 +18,10 @@ func TestRealizePCBFragmentsCreatesLEDFragment(t *testing.T) {
 		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
 	}
 	registry := blocks.NewBuiltinRegistry()
-	plan := PlanBlocks(context.Background(), registry, request)
-	result := RealizePCBFragments(context.Background(), registry, plan)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	plan := PlanBlocks(ctx, registry, request)
+	result := RealizePCBFragments(ctx, registry, plan)
 	if reports.HasBlockingIssue(result.Stage.Issues) {
 		t.Fatalf("fragment issues = %#v", result.Stage.Issues)
 	}
@@ -39,6 +43,38 @@ func TestFragmentCountsIncludesTimingResults(t *testing.T) {
 	}})
 	if componentCount != 1 || routeCount != 1 || timingCount != 1 {
 		t.Fatalf("counts = %d %d %d", componentCount, routeCount, timingCount)
+	}
+}
+
+func TestRealizePCBFragmentsIncludesCannedOscillatorTiming(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "clock_board",
+		Board:   BoardSpec{WidthMM: 50, HeightMM: 30, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "clk1", BlockID: "canned_oscillator"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	result := RealizePCBFragments(context.Background(), registry, plan)
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("fragment issues = %#v", result.Stage.Issues)
+	}
+	if len(result.Fragments) != 1 || len(result.Fragments[0].Realization.Timing) != 1 {
+		t.Fatalf("fragments = %#v", result.Fragments)
+	}
+	if result.Stage.Summary["timing_results"] != 1 {
+		t.Fatalf("summary = %#v", result.Stage.Summary)
+	}
+	rules := proximityRulesFromFragment(result.Fragments[0])
+	foundClockRule := false
+	for _, rule := range rules {
+		if rule.Role == placement.IntentClock {
+			foundClockRule = true
+			break
+		}
+	}
+	if !foundClockRule {
+		t.Fatalf("proximity rules = %#v, want clock-intent oscillator rule", rules)
 	}
 }
 
@@ -67,6 +103,32 @@ func TestTimingEvidenceIssuesReportsWarningsAndRelativePaths(t *testing.T) {
 		t.Fatalf("issue paths = %#v", issues)
 	}
 	if issues[0].Severity != reports.SeverityWarning || issues[1].Suggestion == "" {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestTimingFindingSuggestionsIncludeOscillatorEvidence(t *testing.T) {
+	issues := timingEvidenceIssues(blocks.BlockPCBRealizationResult{
+		Timing: []blocks.TimingFixtureEvidence{{
+			ID: "osc",
+			Findings: []blocks.TimingFixtureFinding{{
+				ID:       blocks.TimingFindingDecouplingProximity,
+				Severity: reports.SeverityError,
+				Message:  "decoupling far away",
+			}, {
+				ID:       blocks.TimingFindingEnableControlPresent,
+				Severity: reports.SeverityError,
+				Message:  "enable missing",
+			}},
+		}},
+	})
+	if len(issues) != 2 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if issues[0].Suggestion != "move timing decoupling closer to the clock source" {
+		t.Fatalf("decoupling suggestion = %q", issues[0].Suggestion)
+	}
+	if issues[1].Suggestion != "place the required timing enable/control component in the PCB realization" {
 		t.Fatalf("issues = %#v", issues)
 	}
 }

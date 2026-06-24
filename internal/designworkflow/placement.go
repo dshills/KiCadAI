@@ -490,6 +490,7 @@ func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 
 func proximityRulesFromFragment(fragment BlockFragment) []placement.ProximityRule {
 	rules := []placement.ProximityRule{}
+	timingIntentByGroup := placementTimingIntentByGroup(fragment)
 	for _, group := range fragment.PlacementGroups {
 		anchorRef := fragment.Realization.RoleRefs[strings.TrimSpace(group.AnchorRole)]
 		if anchorRef == "" && len(group.ComponentRoles) > 0 {
@@ -508,10 +509,14 @@ func proximityRulesFromFragment(fragment BlockFragment) []placement.ProximityRul
 		if len(targets) == 0 {
 			continue
 		}
+		role := placementRoleFromGroup(group)
+		if timingRole := timingIntentByGroup[strings.TrimSpace(group.ID)]; timingRole != "" {
+			role = timingRole
+		}
 		rules = append(rules, placement.ProximityRule{
 			ID:            blockPlacementGroupID(fragment, group.ID) + ".cohesion",
 			Source:        "block:" + fragment.BlockID,
-			Role:          placementRoleFromGroup(group),
+			Role:          role,
 			AnchorRef:     anchorRef,
 			TargetRefs:    targets,
 			MaxDistanceMM: max(2, boundsDiagonalValue(group.Bounds)),
@@ -566,19 +571,47 @@ func boundsDiagonalValue(bounds *blocks.RelativeBounds) float64 {
 func placementRoleFromGroup(group blocks.PCBPlacementGroup) placement.IntentRole {
 	name := normalizeRoleName(group.ID + " " + group.Description + " " + strings.Join(group.ComponentRoles, " "))
 	switch {
-	case strings.Contains(name, "decoupling"):
+	case placementTextHasToken(name, "decoupling"):
 		return placement.IntentDecoupling
-	case strings.Contains(name, "feedback"):
+	case placementTextHasToken(name, "feedback"):
 		return placement.IntentFeedback
-	case strings.Contains(name, "connector"):
+	case placementTextHasToken(name, "connector"):
 		return placement.IntentConnector
-	case strings.Contains(name, "regulator"), strings.Contains(name, "power"):
+	case placementTextHasToken(name, "regulator"), placementTextHasToken(name, "power"):
 		return placement.IntentPowerPath
-	case strings.Contains(name, "clock"), strings.Contains(name, "crystal"):
+	case clockRelatedPlacementText(name):
 		return placement.IntentClock
 	default:
 		return ""
 	}
+}
+
+func clockRelatedPlacementText(text string) bool {
+	return placementTextHasToken(text, "clock") || placementTextHasToken(text, "crystal") || placementTextHasToken(text, "xtal") || placementTextHasToken(text, "oscillator") || placementTextHasToken(text, "osc")
+}
+
+func placementTextHasToken(normalizedText string, token string) bool {
+	for _, candidate := range strings.Fields(strings.ReplaceAll(normalizeRoleName(normalizedText), "_", " ")) {
+		if candidate == token || strings.HasPrefix(candidate, token) {
+			return true
+		}
+	}
+	return false
+}
+
+func placementTimingIntentByGroup(fragment BlockFragment) map[string]placement.IntentRole {
+	intents := map[string]placement.IntentRole{}
+	for _, timing := range fragment.Realization.Timing {
+		groupID := strings.TrimSpace(timing.TimingGroupID)
+		if groupID == "" {
+			continue
+		}
+		switch timing.Kind {
+		case blocks.PCBTimingKindCrystal, blocks.PCBTimingKindOscillator:
+			intents[groupID] = placement.IntentClock
+		}
+	}
+	return intents
 }
 
 func placementRoleFromNetName(name string) placement.IntentRole {

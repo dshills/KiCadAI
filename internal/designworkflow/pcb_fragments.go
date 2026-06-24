@@ -218,12 +218,18 @@ func timingFindingSuggestion(id string) string {
 	switch id {
 	case blocks.TimingFindingClockSourceProximity, blocks.TimingFindingLoadCapsProximity:
 		return "move timing-sensitive components closer to the clock source or consumer"
+	case blocks.TimingFindingDecouplingProximity:
+		return "move timing decoupling closer to the clock source"
 	case blocks.TimingFindingLoadCapsSymmetry:
 		return "place load capacitors more symmetrically around the crystal"
 	case blocks.TimingFindingClockRoutesLength:
 		return "shorten local timing routes or relax the timing route threshold"
 	case blocks.TimingFindingGroundReturnPresent:
 		return "add local ground-return evidence for timing capacitors or decoupling"
+	case blocks.TimingFindingDecouplingPresent:
+		return "place the required local timing decoupling component in the PCB realization"
+	case blocks.TimingFindingEnableControlPresent:
+		return "place the required timing enable/control component in the PCB realization"
 	default:
 		return "review timing-sensitive layout evidence and constraints"
 	}
