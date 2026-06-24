@@ -8,7 +8,7 @@ three related capabilities:
 - CLI tools for generation, inspection, evaluation, connectivity-first board
   validation, ERC/DRC feedback, validation repair planning, round-trip validation, transactions,
   operation-correlated feedback, component intelligence, and pinmap readiness
-  checks, plus placement congestion/fanout scoring and bounded
+  checks, plus placement congestion/fanout/advanced-rule scoring and bounded
   placement-routing retry evidence, and fabrication readiness previews.
 
 The practical near-term goal is to let agents build and review KiCad-native
@@ -36,11 +36,15 @@ within a capped budget while returning best-attempt evidence. Generated
 placements carry mobility classes (`fixed`, `group_transform`, `local_rebuild`,
 `soft_preferred`, and `unowned`) plus route-handling policy so retry can move
 eligible generated block-local refs while preserving hard constraints and
-local-route intent. Golden tests now cover retry behavior across fixtures,
-categories, stop conditions, unsupported skips, CLI summaries, pad-backed
-full-board seed fixtures for spacing improvement, reduce-distance rule
-evidence, safe non-improvement stops, generated mobility ownership, and
-local-route mobility evidence. The generated `design create` workflow now
+local-route intent. Placement candidate scoring now includes advanced PCB rule
+families for thermal placement, high-current paths, creepage/clearance domains,
+differential-pair placement readiness, and controlled-impedance corridor
+evidence. These rules support hard rejection where placement-time proof is
+possible and workflow summaries for AI callers. Golden tests now cover retry
+behavior across fixtures, categories, stop conditions, unsupported skips, CLI
+summaries, pad-backed full-board seed fixtures for spacing improvement,
+reduce-distance rule evidence, safe non-improvement stops, generated mobility
+ownership, and local-route mobility evidence. The generated `design create` workflow now
 hydrates footprint pad summaries through resolver-backed records or verified
 built-in seed templates, so generated boards reach real routing/connectivity
 evidence instead of stopping at missing pads.
@@ -607,6 +611,15 @@ Current placement support includes:
 - hard and optional keepouts plus mechanical constraints;
 - component spacing, group anchors, and group spread checks;
 - proximity rules and region preferences;
+- semantic candidate scoring for component role, group cohesion, electrical
+  proximity, route length, congestion, fanout, edge, region, and mobility;
+- advanced placement rules for thermal spacing/edge preference, high-current
+  source-load proximity, creepage/clearance domain spacing, differential-pair
+  placement readiness, and controlled-impedance corridor/reference-plane
+  evidence;
+- timing-sensitive placement scoring for clock-source proximity rules, used by
+  crystal/oscillator block realization evidence;
+- hard candidate rejection for checkable advanced-rule violations;
 - per-net HPWL and routing-readiness reports;
 - footprint-derived bounds helpers;
 - transaction operation output.
@@ -625,7 +638,14 @@ larger of the JSON `board.margin_mm` and `rules.board_edge_clearance_mm` values
   mechanical keepouts, region satisfaction, routing readiness, and proximity.
 - `diagnostics` maps placement quality issues to repairable actions for
   missing placements, keepouts, regions, proximity, routing readiness,
-  estimated footprint geometry, grouping, and validation issues.
+  estimated footprint geometry, grouping, advanced placement rules, and
+  validation issues.
+- Design workflow placement summaries include advanced-rule dimension counts,
+  worst scores, hard violations, warning counts, and unsupported/missing proof
+  evidence for AI callers.
+- Design workflow PCB realization summaries include `timing_results`, and
+  timing evidence findings are surfaced as stage issues with refs, nets, and
+  repair suggestions when thresholds are violated.
 
 The placement hardening golden corpus covers representative LED, regulator,
 MCU minimal, USB-C power, I2C sensor, op-amp gain-stage, and connector-breakout
@@ -637,9 +657,10 @@ hydrated-pad retry evidence for LED and multi-block sensor/header workflows,
 generated placement mobility summaries, local-route mobility summaries, and
 hard-constraint preservation under retry adjustment.
 Placement is still a deterministic heuristic, not a production-grade constraint
-solver; thermal placement, true congestion analysis, differential pairs,
-larger-board convergence, and final DRC-grade layout decisions remain future
-work.
+solver. Advanced placement rules are placement-level heuristics and evidence,
+not thermal simulation, impedance calculation, or routed length matching.
+Larger-board convergence, spatial acceleration for large hard-rule sets, and
+final KiCad DRC-backed layout proof remain future work.
 
 ### Routing
 

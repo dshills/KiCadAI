@@ -53,7 +53,10 @@ from validation feedback to safe automatic repair.
 - Placement engine hardening foundation with deterministic model support,
   block-derived placement intent, proximity/region/mechanical/routing-readiness
   quality reports, coarse congestion reports, component fanout/escape readiness
-  reports, repairable diagnostics, and golden corpus coverage.
+  reports, semantic candidate scoring, advanced placement rules for thermal,
+  high-current, creepage/clearance, differential-pair, and
+  controlled-impedance intent, repairable diagnostics, workflow evidence, and
+  golden corpus coverage.
 - Routing engine hardening foundation with shared `internal/pcbrules`,
   per-net quality reports, net-class and role-aware routing, obstacle
   diagnostics, via/layer policy diagnostics, length policy evidence, explicit
@@ -110,7 +113,10 @@ loop confidence:
   crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
   protection families, but these newer blocks still need more variants and
   stronger KiCad-backed layout proof;
-- placement and routing need stronger rules for real PCB quality;
+- placement now models several PCB-quality rule families and first-pass
+  timing-sensitive crystal/oscillator fixture evidence, but larger-board KiCad
+  DRC-backed proof and broader timing-sensitive block variants are still
+  needed;
 - placement-routing retry now includes focused pad-backed seeds, generated
   workflow coverage, larger generated fixture families, selected attempt
   evidence, optional DRC evidence, and generated mobility policy coverage. It
@@ -321,11 +327,27 @@ intent and quality evidence for:
 - coarse congestion reports with deterministic grid utilization evidence;
 - component fanout and escape-readiness reports with edge, keepout, neighbor,
   and escape-demand pressure;
+- semantic candidate scoring for role, group, electrical proximity,
+  route-length, congestion, fanout, edge, region, and mobility dimensions;
+- advanced placement rules for thermal spacing/edge preferences, high-current
+  source-load proximity, creepage/clearance domain spacing, differential-pair
+  placement-readiness, and controlled-impedance corridor/reference-plane
+  evidence;
+- hard candidate rejection for checkable advanced-rule violations, including
+  thermal spacing, high-current length limits, and clearance spacing;
 - repairable placement diagnostics for missing placements, keepouts, regions,
   proximity, routing readiness, fanout, estimated footprint geometry, grouping,
-  and validation issues;
+  advanced placement rules, and validation issues;
+- design workflow placement summaries for advanced rule dimension counts, worst
+  scores, hard violations, warnings, and unsupported/missing proof evidence;
 - golden placement corpus coverage for LED, regulator, MCU minimal, USB-C
   power, I2C sensor, op-amp gain-stage, and connector-breakout layouts;
+- mixed advanced-rule regression coverage for thermal, high-current,
+  clearance, differential-pair, and controlled-impedance scoring evidence;
+- crystal/oscillator timing fixture metadata, realized timing evidence, local
+  clock route length checks, load-cap proximity/symmetry evidence, ground-return
+  evidence, timing-sensitive placement scoring, and workflow `timing_results`
+  issue reporting;
 - pad-backed full-board retry seed coverage for spacing improvement,
   reduce-distance rule evidence, safe non-improvement stops, hard-constraint
   preservation, generated pad hydration, generated placement
@@ -333,12 +355,12 @@ intent and quality evidence for:
 
 ### Remaining Work
 
-- Add richer candidate scoring from semantic component roles and the new
-  congestion/fanout reports, not only post-placement quality reports.
-- Add thermal, high-current, creepage/clearance, differential-pair, and
-  controlled-impedance placement rules.
-- Add crystal/oscillator and other timing-sensitive block fixtures once those
-  blocks are implemented.
+- Expand timing-sensitive fixture coverage beyond the current crystal
+  oscillator path into canned oscillators and other timing-critical blocks.
+- Add spatial indexing or equivalent acceleration for very large
+  advanced-rule hard-constraint sets.
+- Add structured advanced-rule issue metadata instead of message-based
+  diagnostic bridging.
 - Expand placement-routing retry with richer convergence criteria across
   larger boards.
 - Validate hardened placement outputs against KiCad DRC evidence in larger
