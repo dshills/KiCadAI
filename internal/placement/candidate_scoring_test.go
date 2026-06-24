@@ -23,7 +23,7 @@ func TestNormalizeCandidateScoringRulesDefaults(t *testing.T) {
 	if got.MaxEvidencePerDimension != defaultCandidateScoreEvidencePerDimension {
 		t.Fatalf("max evidence = %d", got.MaxEvidencePerDimension)
 	}
-	if got.Weights.HardConstraints != 1 || got.Weights.Fanout != 1 || got.Weights.Mobility != 1 {
+	if got.Weights.HardConstraints != 1 || got.Weights.Fanout != 1 || got.Weights.Mobility != 1 || got.Weights.Thermal != 1 || got.Weights.HighCurrent != 1 {
 		t.Fatalf("weights not defaulted: %#v", got.Weights)
 	}
 }
@@ -226,6 +226,85 @@ func TestPlaceCandidateScoringReportsCongestionAndFanoutDimensions(t *testing.T)
 	}
 	if !candidateScoreHasDimension(winner, CandidateScoreFanout) {
 		t.Fatalf("fanout dimension missing: %#v", winner.Dimensions)
+	}
+}
+
+func TestPlaceCandidateScoringReportsThermalDimension(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Role = "regulator"
+	req.AdvancedRules.Thermal = []ThermalPlacementRule{{
+		ID:            "thermal-edge",
+		Roles:         []string{"regulator"},
+		ThermalRole:   ThermalRoleRegulator,
+		PreferredEdge: EdgeRight,
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{Thermal: 1}
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R1")
+	if !ok {
+		t.Fatalf("R1 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreThermal) {
+		t.Fatalf("thermal dimension missing: %#v", winner.Dimensions)
+	}
+	if winner.Placement.XMM < req.Board.WidthMM/2 {
+		t.Fatalf("thermal preferred-edge scoring did not move toward right edge: %#v", winner.Placement)
+	}
+}
+
+func TestPlaceCandidateScoringRejectsHardThermalSpacing(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 20, YMM: 12, Layer: "F.Cu"}
+	req.AdvancedRules.Thermal = []ThermalPlacementRule{{
+		ID:            "hot-away",
+		Refs:          []string{"R2"},
+		KeepAwayRefs:  []string{"R1"},
+		MinDistanceMM: 100,
+		Enforcement:   AdvancedRuleHard,
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.CandidateScoring == nil {
+		t.Fatal("candidate scoring report missing")
+	}
+	if result.CandidateScoring.RejectedByReason[string(CandidateRejectAdvancedRule)] == 0 {
+		t.Fatalf("advanced-rule rejections missing: %#v", result.CandidateScoring.RejectedByReason)
+	}
+	if result.Status != StatusPartial {
+		t.Fatalf("status = %s, want partial because all R2 candidates violate hard thermal spacing", result.Status)
+	}
+}
+
+func TestPlaceCandidateScoringReportsHighCurrentDimension(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 30, YMM: 12, Layer: "F.Cu"}
+	req.AdvancedRules.HighCurrent = []HighCurrentPlacementRule{{
+		ID:         "power-path",
+		Nets:       []string{"N1"},
+		SourceRefs: []string{"R1"},
+		SinkRefs:   []string{"R2"},
+	}}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.Weights = CandidateScoreWeights{HighCurrent: 1}
+
+	result := Place(req)
+	winner, ok := candidateScoreForRef(result.CandidateScoring.WinningCandidates, "R2")
+	if !ok {
+		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
+	}
+	if !candidateScoreHasDimension(winner, CandidateScoreHighCurrent) {
+		t.Fatalf("high-current dimension missing: %#v", winner.Dimensions)
+	}
+	if winner.Placement.XMM < 20 {
+		t.Fatalf("high-current scoring did not move sink toward source: %#v", winner.Placement)
 	}
 }
 

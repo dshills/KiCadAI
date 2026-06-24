@@ -209,6 +209,8 @@ type CandidateScoreWeights struct {
 	Edge                float64
 	Region              float64
 	Mobility            float64
+	Thermal             float64
+	HighCurrent         float64
 }
 
 type ProximityRule struct {
@@ -497,6 +499,8 @@ const (
 	CandidateScoreEdge                CandidateScoreDimensionName = "edge"
 	CandidateScoreRegion              CandidateScoreDimensionName = "region"
 	CandidateScoreMobility            CandidateScoreDimensionName = "mobility"
+	CandidateScoreThermal             CandidateScoreDimensionName = "thermal"
+	CandidateScoreHighCurrent         CandidateScoreDimensionName = "high_current"
 )
 
 type CandidateRejectionReasonName string
@@ -512,6 +516,7 @@ const (
 	CandidateRejectGroupConstraint   CandidateRejectionReasonName = "group_constraint"
 	CandidateRejectMissingGeometry   CandidateRejectionReasonName = "missing_geometry"
 	CandidateRejectUnsupportedPolicy CandidateRejectionReasonName = "unsupported_policy"
+	CandidateRejectAdvancedRule      CandidateRejectionReasonName = "advanced_rule"
 )
 
 type CandidateScoringReport struct {
@@ -580,6 +585,8 @@ func DefaultRules() Rules {
 				Edge:                1,
 				Region:              1,
 				Mobility:            1,
+				Thermal:             1,
+				HighCurrent:         1,
 			},
 		},
 	}

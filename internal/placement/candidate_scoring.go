@@ -58,6 +58,8 @@ func normalizeCandidateScoreWeights(weights CandidateScoreWeights) CandidateScor
 	weights.Edge = normalizeCandidateScoreWeight(weights.Edge)
 	weights.Region = normalizeCandidateScoreWeight(weights.Region)
 	weights.Mobility = normalizeCandidateScoreWeight(weights.Mobility)
+	weights.Thermal = normalizeCandidateScoreWeight(weights.Thermal)
+	weights.HighCurrent = normalizeCandidateScoreWeight(weights.HighCurrent)
 	return weights
 }
 
@@ -358,6 +360,334 @@ func appendCongestionFanoutCandidateDimensions(dimensions []CandidateScoreDimens
 		})
 	}
 	return dimensions
+}
+
+type advancedCandidateScoringContext struct {
+	ThermalRules     []thermalCandidateRule
+	HighCurrentRules []highCurrentCandidateRule
+}
+
+type thermalCandidateRule struct {
+	Rule           ThermalPlacementRule
+	KeepAwayPoints []Point
+}
+
+type highCurrentCandidateRule struct {
+	Rule         HighCurrentPlacementRule
+	TargetPoints []Point
+}
+
+type componentNetMembership struct {
+	Names map[string]struct{}
+	Roles map[NetRole]struct{}
+}
+
+func newAdvancedCandidateScoringContext(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, netMembership componentNetMembership) advancedCandidateScoringContext {
+	context := advancedCandidateScoringContext{}
+	for _, rule := range request.AdvancedRules.Thermal {
+		if thermalRuleAffectsComponent(rule, component, componentRef) {
+			context.ThermalRules = append(context.ThermalRules, thermalCandidateRule{
+				Rule:           rule,
+				KeepAwayPoints: placedCentersForRefs(rule.KeepAwayRefs, placedByRef),
+			})
+		}
+	}
+	for _, rule := range request.AdvancedRules.HighCurrent {
+		sourceRefs := normalizedRefSet(rule.SourceRefs)
+		sinkRefs := normalizedRefSet(rule.SinkRefs)
+		netNames := upperStringSet(rule.Nets)
+		if !highCurrentRuleAffectsComponent(rule, componentRef, netMembership, sourceRefs, sinkRefs, netNames) {
+			continue
+		}
+		context.HighCurrentRules = append(context.HighCurrentRules, highCurrentCandidateRule{
+			Rule:         rule,
+			TargetPoints: placedCentersForRefs(highCurrentTargetRefs(rule, componentRef, sourceRefs, sinkRefs), placedByRef),
+		})
+	}
+	return context
+}
+
+func advancedNetMembershipByRef(nets []Net) map[string]componentNetMembership {
+	byRef := map[string]componentNetMembership{}
+	for _, net := range nets {
+		netName := strings.ToUpper(strings.TrimSpace(net.Name))
+		for _, endpoint := range net.Endpoints {
+			ref := normalizeRef(endpoint.Ref)
+			if ref == "" {
+				continue
+			}
+			membership := byRef[ref]
+			if membership.Names == nil {
+				membership.Names = map[string]struct{}{}
+			}
+			if membership.Roles == nil {
+				membership.Roles = map[NetRole]struct{}{}
+			}
+			if netName != "" {
+				membership.Names[netName] = struct{}{}
+			}
+			membership.Roles[net.Role] = struct{}{}
+			byRef[ref] = membership
+		}
+	}
+	return byRef
+}
+
+func appendThermalHighCurrentCandidateDimensions(dimensions []CandidateScoreDimension, component Component, placement PlacementResult, request Request, placedByRef map[string]PlacementResult, advancedContext advancedCandidateScoringContext) []CandidateScoreDimension {
+	weights := request.Rules.CandidateScoring.Weights
+	if weights.Thermal > 0 {
+		if dimension, ok := thermalCandidateDimension(placement, request.Board, advancedContext.ThermalRules, weights.Thermal); ok {
+			dimensions = append(dimensions, dimension)
+		}
+	}
+	if weights.HighCurrent > 0 {
+		if dimension, ok := highCurrentCandidateDimension(placement, request, placedByRef, advancedContext.HighCurrentRules, weights.HighCurrent); ok {
+			dimensions = append(dimensions, dimension)
+		}
+	}
+	return dimensions
+}
+
+func thermalCandidateDimension(placement PlacementResult, board BoardPlacementArea, rules []thermalCandidateRule, weight float64) (CandidateScoreDimension, bool) {
+	if len(rules) == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	scoreTotal := 0.0
+	scoreCount := 0.0
+	evidence := []string{}
+	for _, candidateRule := range rules {
+		rule := candidateRule.Rule
+		ruleScore := 0.0
+		ruleCount := 0.0
+		if rule.PreferredEdge != "" && rule.PreferredEdge != EdgeNone {
+			ruleScore += thermalPreferredEdgeScore(rule.PreferredEdge, placement, board)
+			ruleCount++
+			evidence = append(evidence, "rule="+rule.ID+" preferred_edge="+string(rule.PreferredEdge))
+		}
+		if rule.MinDistanceMM > 0 && len(candidateRule.KeepAwayPoints) > 0 {
+			if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.KeepAwayPoints); ok {
+				ruleScore += clampCandidateUnitScore(distanceSq / square(rule.MinDistanceMM))
+				ruleCount++
+				evidence = append(evidence, "rule="+rule.ID+" thermal_keepaway_checked")
+			}
+		}
+		if ruleCount == 0 {
+			ruleScore = 0.5
+			ruleCount = 1
+			evidence = append(evidence, "rule="+rule.ID+" thermal_metadata_incomplete")
+		}
+		scoreTotal += ruleScore / ruleCount
+		scoreCount++
+	}
+	if scoreCount == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	return CandidateScoreDimension{
+		Name:     CandidateScoreThermal,
+		Score:    scoreTotal / scoreCount,
+		Weight:   weight,
+		Evidence: evidence,
+	}, true
+}
+
+func highCurrentCandidateDimension(placement PlacementResult, request Request, placedByRef map[string]PlacementResult, rules []highCurrentCandidateRule, weight float64) (CandidateScoreDimension, bool) {
+	if len(rules) == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	boardDiagonal := boardDistance(request.Board.WidthMM, request.Board.HeightMM)
+	if boardDiagonal <= 0 {
+		boardDiagonal = 1
+	}
+	scoreTotal := 0.0
+	scoreCount := 0.0
+	evidence := []string{}
+	for _, candidateRule := range rules {
+		rule := candidateRule.Rule
+		if len(candidateRule.TargetPoints) == 0 {
+			scoreTotal += 0.5
+			scoreCount++
+			evidence = append(evidence, "rule="+rule.ID+" high_current_endpoint_metadata_incomplete")
+			continue
+		}
+		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok {
+			normalizer := boardDiagonal
+			if rule.MaxPreferredLengthMM > 0 {
+				normalizer = rule.MaxPreferredLengthMM
+			}
+			scoreTotal += clampCandidateUnitScore(1 - distanceSq/square(normalizer))
+			scoreCount++
+			evidence = append(evidence, "rule="+rule.ID+" high_current_distance_checked")
+		}
+	}
+	if scoreCount == 0 {
+		return CandidateScoreDimension{}, false
+	}
+	return CandidateScoreDimension{
+		Name:     CandidateScoreHighCurrent,
+		Score:    scoreTotal / scoreCount,
+		Weight:   weight,
+		Evidence: evidence,
+	}, true
+}
+
+func advancedPlacementHardRejection(component Component, placement PlacementResult, advancedContext advancedCandidateScoringContext) (CandidateRejectionReasonName, string, []string, bool) {
+	for _, candidateRule := range advancedContext.ThermalRules {
+		rule := candidateRule.Rule
+		if rule.Enforcement != AdvancedRuleHard || rule.MinDistanceMM <= 0 {
+			continue
+		}
+		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.KeepAwayPoints); ok && distanceSq < square(rule.MinDistanceMM) {
+			message := fmt.Sprintf("candidate violates thermal rule %s: squared distance %.3f is below limit %.3f", rule.ID, distanceSq, square(rule.MinDistanceMM))
+			return CandidateRejectAdvancedRule, message, []string{component.Ref}, true
+		}
+	}
+	for _, candidateRule := range advancedContext.HighCurrentRules {
+		rule := candidateRule.Rule
+		if rule.Enforcement != AdvancedRuleHard || rule.MaxPreferredLengthMM <= 0 || len(candidateRule.TargetPoints) == 0 {
+			continue
+		}
+		if distanceSq, ok := nearestPointDistanceSquared(placement, candidateRule.TargetPoints); ok && distanceSq > square(rule.MaxPreferredLengthMM) {
+			message := fmt.Sprintf("candidate violates high-current rule %s: squared distance %.3f exceeds limit %.3f", rule.ID, distanceSq, square(rule.MaxPreferredLengthMM))
+			return CandidateRejectAdvancedRule, message, []string{component.Ref}, true
+		}
+	}
+	return "", "", nil, false
+}
+
+func thermalRuleAffectsComponent(rule ThermalPlacementRule, component Component, componentRef string) bool {
+	if stringSliceContainsFold(rule.Refs, componentRef) {
+		return true
+	}
+	for _, role := range rule.Roles {
+		if strings.EqualFold(role, component.Role) {
+			return true
+		}
+	}
+	return false
+}
+
+func highCurrentRuleAffectsComponent(rule HighCurrentPlacementRule, componentRef string, membership componentNetMembership, sourceRefs map[string]struct{}, sinkRefs map[string]struct{}, netNames map[string]struct{}) bool {
+	if _, ok := sourceRefs[componentRef]; ok {
+		return true
+	}
+	if _, ok := sinkRefs[componentRef]; ok {
+		return true
+	}
+	if len(rule.Nets) == 0 && len(rule.NetRoles) == 0 {
+		return false
+	}
+	nameMatches := len(rule.Nets) == 0
+	for net := range netNames {
+		if _, ok := membership.Names[net]; ok {
+			nameMatches = true
+			break
+		}
+	}
+	roleMatches := len(rule.NetRoles) == 0
+	for _, role := range rule.NetRoles {
+		if _, ok := membership.Roles[role]; ok {
+			roleMatches = true
+			break
+		}
+	}
+	return nameMatches && roleMatches
+}
+
+func highCurrentTargetRefs(rule HighCurrentPlacementRule, componentRef string, sourceRefs map[string]struct{}, sinkRefs map[string]struct{}) []string {
+	var targets []string
+	if _, ok := sourceRefs[componentRef]; ok {
+		targets = append(targets, rule.SinkRefs...)
+	}
+	if _, ok := sinkRefs[componentRef]; ok {
+		targets = append(targets, rule.SourceRefs...)
+	}
+	if len(targets) > 0 {
+		return uniqueSortedStrings(targets)
+	}
+	targets = append([]string(nil), rule.SourceRefs...)
+	targets = append(targets, rule.SinkRefs...)
+	return uniqueSortedStrings(targets)
+}
+
+func normalizedRefSet(values []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		if ref := normalizeRef(value); ref != "" {
+			out[ref] = struct{}{}
+		}
+	}
+	return out
+}
+
+func upperStringSet(values []string) map[string]struct{} {
+	out := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		value = strings.ToUpper(strings.TrimSpace(value))
+		if value != "" {
+			out[value] = struct{}{}
+		}
+	}
+	return out
+}
+
+func placedCentersForRefs(refs []string, placedByRef map[string]PlacementResult) []Point {
+	points := make([]Point, 0, len(refs))
+	for _, ref := range refs {
+		if placed, ok := placedByRef[normalizeRef(ref)]; ok {
+			points = append(points, placed.Bounds.Center())
+		}
+	}
+	return points
+}
+
+func nearestPointDistanceSquared(placement PlacementResult, points []Point) (float64, bool) {
+	candidateCenter := placement.Bounds.Center()
+	best := 0.0
+	found := false
+	for _, point := range points {
+		distance := square(candidateCenter.XMM-point.XMM) + square(candidateCenter.YMM-point.YMM)
+		if !found || distance < best {
+			best = distance
+			found = true
+		}
+	}
+	return best, found
+}
+
+func square(value float64) float64 {
+	return value * value
+}
+
+func thermalPreferredEdgeScore(edge EdgeConstraint, placement PlacementResult, board BoardPlacementArea) float64 {
+	center := placement.Bounds.Center()
+	switch edge {
+	case EdgeLeft:
+		return clampCandidateUnitScore(1 - (center.XMM-board.Origin.XMM)/max(1, board.WidthMM))
+	case EdgeRight:
+		return clampCandidateUnitScore(1 - (board.Origin.XMM+board.WidthMM-center.XMM)/max(1, board.WidthMM))
+	case EdgeTop:
+		return clampCandidateUnitScore(1 - (center.YMM-board.Origin.YMM)/max(1, board.HeightMM))
+	case EdgeBottom:
+		return clampCandidateUnitScore(1 - (board.Origin.YMM+board.HeightMM-center.YMM)/max(1, board.HeightMM))
+	case EdgeAny:
+		left := center.XMM - board.Origin.XMM
+		right := board.Origin.XMM + board.WidthMM - center.XMM
+		top := center.YMM - board.Origin.YMM
+		bottom := board.Origin.YMM + board.HeightMM - center.YMM
+		return clampCandidateUnitScore(1 - min(min(left, right), min(top, bottom))/max(1, min(board.WidthMM, board.HeightMM)))
+	default:
+		return 0.5
+	}
+}
+
+func stringSliceContainsFold(values []string, want string) bool {
+	want = strings.TrimSpace(want)
+	for _, value := range values {
+		if strings.EqualFold(strings.TrimSpace(value), want) {
+			return true
+		}
+	}
+	return false
 }
 
 func (context congestionCandidateScoringContext) NearbyCount(candidate PlacementResult) int {
