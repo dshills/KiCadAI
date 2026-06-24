@@ -60,10 +60,13 @@ func TestValidatePCBRealizationRejectsAnchorOutsideGroup(t *testing.T) {
 }
 
 func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
-	definition := minimalRealizationDefinition()
+	definition := timingRealizationDefinition()
 	clone := cloneBlockDefinition(definition)
 	clone.PCBRealization.Components[0].Properties["k"] = "changed"
 	clone.PCBRealization.LocalRoutes[0].Waypoints[0].XMM = 99
+	clone.PCBRealization.TimingFixtures[0].LoadCapacitorRoles[0] = "changed"
+	*clone.PCBRealization.TimingFixtures[0].MaxLoadCapDistanceMM = 99
+	clone.PCBRealization.TimingFixtures[0].Roles["crystal"] = PCBTimingRoleOscillator
 
 	if definition.PCBRealization.Components[0].Properties["k"] != "v" {
 		t.Fatalf("component properties were not cloned: %#v", definition.PCBRealization.Components[0].Properties)
@@ -71,6 +74,44 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 	if definition.PCBRealization.LocalRoutes[0].Waypoints[0].XMM == 99 {
 		t.Fatalf("route waypoints were not cloned")
 	}
+	if definition.PCBRealization.TimingFixtures[0].LoadCapacitorRoles[0] == "changed" {
+		t.Fatalf("timing load capacitor roles were not cloned")
+	}
+	if *definition.PCBRealization.TimingFixtures[0].MaxLoadCapDistanceMM == 99 {
+		t.Fatalf("timing threshold pointer was not cloned")
+	}
+	if definition.PCBRealization.TimingFixtures[0].Roles["crystal"] != PCBTimingRoleCrystal {
+		t.Fatalf("timing role map was not cloned: %#v", definition.PCBRealization.TimingFixtures[0].Roles)
+	}
+}
+
+func TestValidatePCBRealizationRejectsInvalidTimingFixture(t *testing.T) {
+	definition := timingRealizationDefinition()
+	definition.PCBRealization.TimingFixtures = append(definition.PCBRealization.TimingFixtures, PCBTimingFixture{
+		ID:                   "bad",
+		TimingGroupID:        " bad_group",
+		Kind:                 "timer",
+		SourceRole:           "missing",
+		LoadCapacitorRoles:   []string{" missing_cap"},
+		GroundNetTemplate:    " gnd",
+		ClockNetTemplates:    []string{"xtal1", ""},
+		LocalRouteIDs:        []string{" missing_route"},
+		MaxLoadCapDistanceMM: floatPtr(math.NaN()),
+		PreferredLayer:       "Nope.Cu",
+		Roles:                map[string]PCBTimingRole{"crystal": "bad_role"},
+	})
+
+	issues := ValidatePCBRealization(definition)
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.kind")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.timing_group_id")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.source_role")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.load_capacitor_roles.0")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.ground_net_template")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.clock_net_templates.1")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.local_route_ids.0")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.max_load_cap_distance_mm")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.preferred_layer")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.timing.1.roles.crystal")
 }
 
 func minimalRealizationDefinition() BlockDefinition {
@@ -133,6 +174,41 @@ func minimalRealizationDefinition() BlockDefinition {
 			}},
 		},
 	}
+}
+
+func timingRealizationDefinition() BlockDefinition {
+	definition := minimalRealizationDefinition()
+	definition.Components = append(definition.Components,
+		BlockComponent{Role: "crystal", RefPrefix: "Y", SymbolID: "Device:Crystal", FootprintID: "Crystal:Crystal_SMD_5032-2Pin_5.0x3.2mm"},
+		BlockComponent{Role: "load_capacitor", RefPrefix: "C", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0603_1608Metric"},
+	)
+	definition.PCBRealization.LocalRoutes = append(definition.PCBRealization.LocalRoutes, PCBLocalRoute{
+		ID:          "xtal_load",
+		NetTemplate: "XTAL1",
+		From:        RouteEndpoint{ComponentRole: "crystal", Pin: "1"},
+		To:          RouteEndpoint{ComponentRole: "load_capacitor", Pin: "1"},
+		Layer:       "F.Cu",
+		WidthMM:     0.2,
+	})
+	definition.PCBRealization.TimingFixtures = []PCBTimingFixture{{
+		ID:                    "demo_timing",
+		TimingGroupID:         "demo_clock",
+		Kind:                  "crystal",
+		SourceRole:            "crystal",
+		LoadCapacitorRoles:    []string{"load_capacitor"},
+		GroundNetTemplate:     "GND",
+		ClockNetTemplates:     []string{"XTAL1"},
+		LocalRouteIDs:         []string{"xtal_load"},
+		MaxLoadCapDistanceMM:  floatPtr(8),
+		MaxLoadCapAsymmetryMM: floatPtr(1),
+		PreferredLayer:        "F.Cu",
+		Roles:                 map[string]PCBTimingRole{"crystal": PCBTimingRoleCrystal, "load_capacitor": PCBTimingRoleLoadCapacitor},
+	}}
+	return definition
+}
+
+func floatPtr(value float64) *float64 {
+	return &value
 }
 
 func assertIssuePath(t *testing.T, issues []reports.Issue, path string) {

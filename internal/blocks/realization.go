@@ -25,6 +25,7 @@ type PCBRealization struct {
 	Components           []PCBComponentRealization `json:"components,omitempty"`
 	PlacementGroups      []PCBPlacementGroup       `json:"placement_groups,omitempty"`
 	LocalRoutes          []PCBLocalRoute           `json:"local_routes,omitempty"`
+	TimingFixtures       []PCBTimingFixture        `json:"timing,omitempty"`
 	Zones                []PCBZoneRealization      `json:"zones,omitempty"`
 	Keepouts             []PCBKeepout              `json:"keepouts,omitempty"`
 	Constraints          []PCBConstraint           `json:"constraints,omitempty"`
@@ -75,6 +76,40 @@ type PCBLocalRoute struct {
 	WidthMM     float64         `json:"width_mm,omitempty"`
 	Required    bool            `json:"required,omitempty"`
 	Description string          `json:"description,omitempty"`
+}
+
+type PCBTimingRole string
+
+const (
+	PCBTimingKindCrystal    = "crystal"
+	PCBTimingKindOscillator = "oscillator"
+
+	PCBTimingRoleCrystal       PCBTimingRole = "crystal"
+	PCBTimingRoleOscillator    PCBTimingRole = "oscillator"
+	PCBTimingRoleConsumer      PCBTimingRole = "clock_consumer"
+	PCBTimingRoleLoadCapacitor PCBTimingRole = "load_capacitor"
+	PCBTimingRoleDecoupling    PCBTimingRole = "decoupling"
+	PCBTimingRoleGroundReturn  PCBTimingRole = "ground_return"
+)
+
+type PCBTimingFixture struct {
+	ID                            string                   `json:"id"`
+	TimingGroupID                 string                   `json:"timing_group_id,omitempty"`
+	Kind                          string                   `json:"kind"`
+	SourceRole                    string                   `json:"source_role"`
+	ConsumerRole                  string                   `json:"consumer_role,omitempty"`
+	LoadCapacitorRoles            []string                 `json:"load_capacitor_roles,omitempty"`
+	GroundNetTemplate             string                   `json:"ground_net_template,omitempty"`
+	ClockNetTemplates             []string                 `json:"clock_net_templates,omitempty"`
+	LocalRouteIDs                 []string                 `json:"local_route_ids,omitempty"`
+	MaxSourceToConsumerDistanceMM *float64                 `json:"max_source_to_consumer_distance_mm,omitempty"`
+	MaxLoadCapDistanceMM          *float64                 `json:"max_load_cap_distance_mm,omitempty"`
+	MaxLoadCapAsymmetryMM         *float64                 `json:"max_load_cap_asymmetry_mm,omitempty"`
+	MaxClockRouteLengthMM         *float64                 `json:"max_clock_route_length_mm,omitempty"`
+	MinNoiseKeepoutMM             *float64                 `json:"min_noise_keepout_mm,omitempty"`
+	PreferredLayer                string                   `json:"preferred_layer,omitempty"`
+	Roles                         map[string]PCBTimingRole `json:"roles,omitempty"`
+	Description                   string                   `json:"description,omitempty"`
 }
 
 type RouteEndpoint struct {
@@ -200,6 +235,91 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", routePath, waypointIndex), point)...)
 		}
 	}
+	timingIDs := make(map[string]struct{})
+	for index, timing := range realization.TimingFixtures {
+		timingPath := fmt.Sprintf("%s.timing.%d", path, index)
+		id := strings.TrimSpace(timing.ID)
+		if id == "" {
+			issues = append(issues, blockIssue(timingPath+".id", "timing fixture ID is required"))
+		} else if id != timing.ID {
+			issues = append(issues, blockIssue(timingPath+".id", "timing fixture ID must not contain leading or trailing whitespace"))
+		} else if _, exists := timingIDs[id]; exists {
+			issues = append(issues, blockIssue(timingPath+".id", fmt.Sprintf("duplicate timing fixture ID %q", id)))
+		} else {
+			timingIDs[id] = struct{}{}
+		}
+		kind := strings.TrimSpace(timing.Kind)
+		if kind == "" {
+			issues = append(issues, blockIssue(timingPath+".kind", "timing fixture kind is required"))
+		} else if kind != timing.Kind {
+			issues = append(issues, blockIssue(timingPath+".kind", "timing fixture kind must not contain leading or trailing whitespace"))
+		} else if !validPCBTimingKind(kind) {
+			issues = append(issues, blockIssue(timingPath+".kind", "unsupported timing fixture kind "+kind))
+		}
+		if groupID := strings.TrimSpace(timing.TimingGroupID); groupID != timing.TimingGroupID {
+			issues = append(issues, blockIssue(timingPath+".timing_group_id", "timing group ID must not contain leading or trailing whitespace"))
+		}
+		sourceRole := strings.TrimSpace(timing.SourceRole)
+		if sourceRole == "" {
+			issues = append(issues, blockIssue(timingPath+".source_role", "timing fixture source role is required"))
+		} else if sourceRole != timing.SourceRole {
+			issues = append(issues, blockIssue(timingPath+".source_role", "source role must not contain leading or trailing whitespace"))
+		}
+		if sourceRole != "" {
+			issues = append(issues, validateKnownRole(timingPath+".source_role", sourceRole, roles)...)
+		}
+		consumerRole := strings.TrimSpace(timing.ConsumerRole)
+		if timing.ConsumerRole != "" && consumerRole != timing.ConsumerRole {
+			issues = append(issues, blockIssue(timingPath+".consumer_role", "consumer role must not contain leading or trailing whitespace"))
+		}
+		if consumerRole != "" {
+			issues = append(issues, validateKnownRole(timingPath+".consumer_role", consumerRole, roles)...)
+		}
+		if strings.TrimSpace(timing.GroundNetTemplate) != timing.GroundNetTemplate {
+			issues = append(issues, blockIssue(timingPath+".ground_net_template", "ground net template must not contain leading or trailing whitespace"))
+		}
+		for netIndex, netTemplate := range timing.ClockNetTemplates {
+			if strings.TrimSpace(netTemplate) == "" {
+				issues = append(issues, blockIssue(fmt.Sprintf("%s.clock_net_templates.%d", timingPath, netIndex), "clock net template is required"))
+			} else if strings.TrimSpace(netTemplate) != netTemplate {
+				issues = append(issues, blockIssue(fmt.Sprintf("%s.clock_net_templates.%d", timingPath, netIndex), "clock net template must not contain leading or trailing whitespace"))
+			}
+		}
+		for roleIndex, role := range timing.LoadCapacitorRoles {
+			rolePath := fmt.Sprintf("%s.load_capacitor_roles.%d", timingPath, roleIndex)
+			trimmedRole := strings.TrimSpace(role)
+			if trimmedRole != role {
+				issues = append(issues, blockIssue(rolePath, "load capacitor role must not contain leading or trailing whitespace"))
+			}
+			issues = append(issues, validateKnownRole(rolePath, trimmedRole, roles)...)
+		}
+		for roleName, timingRole := range timing.Roles {
+			issues = append(issues, validateKnownRole(timingPath+".roles."+roleName, roleName, roles)...)
+			if !validPCBTimingRole(timingRole) {
+				issues = append(issues, blockIssue(timingPath+".roles."+roleName, "unsupported timing role "+string(timingRole)))
+			}
+		}
+		for routeIndex, routeID := range timing.LocalRouteIDs {
+			routePath := fmt.Sprintf("%s.local_route_ids.%d", timingPath, routeIndex)
+			trimmedRouteID := strings.TrimSpace(routeID)
+			if trimmedRouteID == "" {
+				issues = append(issues, blockIssue(fmt.Sprintf("%s.local_route_ids.%d", timingPath, routeIndex), "local route ID is required"))
+				continue
+			}
+			if trimmedRouteID != routeID {
+				issues = append(issues, blockIssue(routePath, "local route ID must not contain leading or trailing whitespace"))
+			}
+			if _, ok := routeIDs[trimmedRouteID]; !ok {
+				issues = append(issues, blockIssue(routePath, "unknown local route ID "+trimmedRouteID))
+			}
+		}
+		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_source_to_consumer_distance_mm", timing.MaxSourceToConsumerDistanceMM)...)
+		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_load_cap_distance_mm", timing.MaxLoadCapDistanceMM)...)
+		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_load_cap_asymmetry_mm", timing.MaxLoadCapAsymmetryMM)...)
+		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_clock_route_length_mm", timing.MaxClockRouteLengthMM)...)
+		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".min_noise_keepout_mm", timing.MinNoiseKeepoutMM)...)
+		issues = append(issues, validateLayer(timingPath+".preferred_layer", timing.PreferredLayer, true)...)
+	}
 	zoneIDs := map[string]struct{}{}
 	for index, zone := range realization.Zones {
 		zonePath := fmt.Sprintf("%s.zones.%d", path, index)
@@ -262,6 +382,29 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		}
 	}
 	return issues
+}
+
+func validPCBTimingKind(kind string) bool {
+	switch kind {
+	case PCBTimingKindCrystal, PCBTimingKindOscillator:
+		return true
+	default:
+		return false
+	}
+}
+
+func validPCBTimingRole(role PCBTimingRole) bool {
+	switch role {
+	case PCBTimingRoleCrystal,
+		PCBTimingRoleOscillator,
+		PCBTimingRoleConsumer,
+		PCBTimingRoleLoadCapacitor,
+		PCBTimingRoleDecoupling,
+		PCBTimingRoleGroundReturn:
+		return true
+	default:
+		return false
+	}
 }
 
 func validateKnownKeepoutTarget(path string, target string, roles map[string]struct{}) []reports.Issue {
@@ -342,6 +485,16 @@ func validateBounds(path string, bounds RelativeBounds) []reports.Issue {
 	return nil
 }
 
+func validateOptionalNonNegativeMM(path string, value *float64) []reports.Issue {
+	if value == nil {
+		return nil
+	}
+	if *value < 0 || math.IsNaN(*value) || math.IsInf(*value, 0) {
+		return []reports.Issue{blockIssue(path, "timing dimension must be finite and non-negative")}
+	}
+	return nil
+}
+
 func validateLayer(path string, layer string, allowEmpty bool) []reports.Issue {
 	layer = strings.TrimSpace(layer)
 	if layer == "" && allowEmpty {
@@ -404,6 +557,21 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	for i := range clone.LocalRoutes {
 		clone.LocalRoutes[i].Waypoints = append([]RelativePoint(nil), realization.LocalRoutes[i].Waypoints...)
 	}
+	if len(realization.TimingFixtures) > 0 {
+		clone.TimingFixtures = make([]PCBTimingFixture, len(realization.TimingFixtures))
+	}
+	for i, timing := range realization.TimingFixtures {
+		clone.TimingFixtures[i] = timing
+		clone.TimingFixtures[i].LoadCapacitorRoles = append([]string(nil), timing.LoadCapacitorRoles...)
+		clone.TimingFixtures[i].ClockNetTemplates = append([]string(nil), timing.ClockNetTemplates...)
+		clone.TimingFixtures[i].LocalRouteIDs = append([]string(nil), timing.LocalRouteIDs...)
+		clone.TimingFixtures[i].MaxSourceToConsumerDistanceMM = cloneFloat64Ptr(timing.MaxSourceToConsumerDistanceMM)
+		clone.TimingFixtures[i].MaxLoadCapDistanceMM = cloneFloat64Ptr(timing.MaxLoadCapDistanceMM)
+		clone.TimingFixtures[i].MaxLoadCapAsymmetryMM = cloneFloat64Ptr(timing.MaxLoadCapAsymmetryMM)
+		clone.TimingFixtures[i].MaxClockRouteLengthMM = cloneFloat64Ptr(timing.MaxClockRouteLengthMM)
+		clone.TimingFixtures[i].MinNoiseKeepoutMM = cloneFloat64Ptr(timing.MinNoiseKeepoutMM)
+		clone.TimingFixtures[i].Roles = cloneTimingRoleMap(timing.Roles)
+	}
 	clone.Zones = append([]PCBZoneRealization(nil), realization.Zones...)
 	for i := range clone.Zones {
 		clone.Zones[i].Points = append([]RelativePoint(nil), realization.Zones[i].Points...)
@@ -422,4 +590,23 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.Validation.AllowedUnroutedNets = append([]string(nil), realization.Validation.AllowedUnroutedNets...)
 	clone.UnsupportedBehaviors = append([]string(nil), realization.UnsupportedBehaviors...)
 	return &clone
+}
+
+func cloneFloat64Ptr(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneTimingRoleMap(values map[string]PCBTimingRole) map[string]PCBTimingRole {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]PCBTimingRole, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
