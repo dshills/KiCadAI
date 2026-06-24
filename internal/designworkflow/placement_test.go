@@ -113,6 +113,31 @@ func TestPlaceFragmentsSummarizesCandidateScoring(t *testing.T) {
 	}
 }
 
+func TestPlacementCandidateScoringSummaryIncludesAdvancedRules(t *testing.T) {
+	report := &placement.CandidateScoringReport{
+		RejectedByReason: map[string]int{string(placement.CandidateRejectAdvancedRule): 2},
+		WinningCandidates: []placement.CandidateScore{{
+			Ref: "U1",
+			Dimensions: []placement.CandidateScoreDimension{{
+				Name:     placement.CandidateScoreControlledImpedance,
+				Score:    0.4,
+				Evidence: []string{"rule=usb reference_plane_missing"},
+			}},
+		}},
+	}
+
+	summary := placementCandidateScoringSummary(report)
+	if summary == nil || summary.AdvancedRules == nil {
+		t.Fatalf("advanced summary missing: %#v", summary)
+	}
+	if summary.AdvancedRules.DimensionCounts[string(placement.CandidateScoreControlledImpedance)] != 1 {
+		t.Fatalf("dimension counts = %#v", summary.AdvancedRules.DimensionCounts)
+	}
+	if summary.AdvancedRules.HardViolations != 2 || summary.AdvancedRules.Warnings != 1 || summary.AdvancedRules.Unsupported != 1 {
+		t.Fatalf("advanced summary counts = %#v", summary.AdvancedRules)
+	}
+}
+
 func TestPlaceFragmentsHydratesGeneratedPadsFromVerifiedTemplates(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()

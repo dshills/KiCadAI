@@ -123,15 +123,26 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 }
 
 type PlacementCandidateScoringSummary struct {
-	Enabled             bool           `json:"enabled"`
-	Policy              string         `json:"policy,omitempty"`
-	ScoreVersion        string         `json:"score_version,omitempty"`
-	AverageWinningScore float64        `json:"average_winning_score"`
-	LowestWinningScore  float64        `json:"lowest_winning_score"`
-	WinningCount        int            `json:"winning_count"`
-	AlternativeCount    int            `json:"alternative_count"`
-	RejectedByReason    map[string]int `json:"rejected_by_reason,omitempty"`
+	Enabled             bool                          `json:"enabled"`
+	Policy              string                        `json:"policy,omitempty"`
+	ScoreVersion        string                        `json:"score_version,omitempty"`
+	AverageWinningScore float64                       `json:"average_winning_score"`
+	LowestWinningScore  float64                       `json:"lowest_winning_score"`
+	WinningCount        int                           `json:"winning_count"`
+	AlternativeCount    int                           `json:"alternative_count"`
+	RejectedByReason    map[string]int                `json:"rejected_by_reason,omitempty"`
+	AdvancedRules       *AdvancedPlacementRuleSummary `json:"advanced_rules,omitempty"`
 }
+
+type AdvancedPlacementRuleSummary struct {
+	DimensionCounts map[string]int     `json:"dimension_counts,omitempty"`
+	WorstScores     map[string]float64 `json:"worst_scores,omitempty"`
+	HardViolations  int                `json:"hard_violations,omitempty"`
+	Warnings        int                `json:"warnings,omitempty"`
+	Unsupported     int                `json:"unsupported,omitempty"`
+}
+
+const advancedRuleWarningThreshold = 0.75
 
 func placementCandidateScoringSummary(report *placement.CandidateScoringReport) *PlacementCandidateScoringSummary {
 	if report == nil {
@@ -146,6 +157,73 @@ func placementCandidateScoringSummary(report *placement.CandidateScoringReport) 
 		WinningCount:        len(report.WinningCandidates),
 		AlternativeCount:    len(report.AlternativeCandidates),
 		RejectedByReason:    cloneStringIntMap(report.RejectedByReason),
+		AdvancedRules:       advancedPlacementRuleSummary(report),
+	}
+}
+
+func advancedPlacementRuleSummary(report *placement.CandidateScoringReport) *AdvancedPlacementRuleSummary {
+	if report == nil {
+		return nil
+	}
+	summary := &AdvancedPlacementRuleSummary{}
+	for _, candidate := range report.WinningCandidates {
+		for _, dimension := range candidate.Dimensions {
+			if !advancedPlacementDimension(dimension.Name) {
+				continue
+			}
+			if summary.DimensionCounts == nil {
+				summary.DimensionCounts = map[string]int{}
+			}
+			if summary.WorstScores == nil {
+				summary.WorstScores = map[string]float64{}
+			}
+			name := string(dimension.Name)
+			summary.DimensionCounts[name]++
+			score := finitePlacementSummaryFloat(dimension.Score)
+			if _, ok := summary.WorstScores[name]; !ok || score < summary.WorstScores[name] {
+				summary.WorstScores[name] = score
+			}
+			if score < advancedRuleWarningThreshold {
+				summary.Warnings++
+			}
+			unsupported := false
+			for _, evidence := range dimension.Evidence {
+				evidence = strings.ToLower(evidence)
+				if strings.Contains(evidence, "unsupported") || strings.Contains(evidence, "missing") {
+					unsupported = true
+					break
+				}
+			}
+			if unsupported {
+				summary.Unsupported++
+			}
+		}
+	}
+	if report.RejectedByReason != nil {
+		summary.HardViolations = report.RejectedByReason[string(placement.CandidateRejectAdvancedRule)]
+	}
+	if len(summary.DimensionCounts) == 0 && summary.HardViolations == 0 {
+		return nil
+	}
+	if len(summary.DimensionCounts) == 0 {
+		summary.DimensionCounts = nil
+	}
+	if len(summary.WorstScores) == 0 {
+		summary.WorstScores = nil
+	}
+	return summary
+}
+
+func advancedPlacementDimension(name placement.CandidateScoreDimensionName) bool {
+	switch name {
+	case placement.CandidateScoreThermal,
+		placement.CandidateScoreHighCurrent,
+		placement.CandidateScoreCreepageClearance,
+		placement.CandidateScoreDifferentialPair,
+		placement.CandidateScoreControlledImpedance:
+		return true
+	default:
+		return false
 	}
 }
 
