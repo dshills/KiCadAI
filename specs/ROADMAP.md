@@ -110,13 +110,14 @@ loop confidence:
 - many production-ready active parts still need datasheet-backed electrical,
   thermal, lifecycle, availability, and design-rule evidence;
 - circuit block coverage now includes concrete structural generators for
-  crystal/oscillator, standalone reset/programming, ESD, and reverse-polarity
-  protection families, but these newer blocks still need more variants and
-  stronger KiCad-backed layout proof;
+  crystal/canned oscillator, standalone reset/programming, ESD, and
+  reverse-polarity protection families, plus conditional realization for the
+  default reset/programming ISP fixture, but these newer blocks still need more
+  variants and stronger KiCad-backed layout proof;
 - placement now models several PCB-quality rule families and first-pass
-  timing-sensitive crystal/oscillator fixture evidence, but larger-board KiCad
-  DRC-backed proof and broader timing-sensitive block variants are still
-  needed;
+  timing-sensitive crystal, canned oscillator, and reset/programming fixture
+  evidence, but larger-board KiCad DRC-backed proof and broader
+  timing-sensitive block variants are still needed;
 - placement-routing retry now includes focused pad-backed seeds, generated
   workflow coverage, larger generated fixture families, selected attempt
   evidence, optional DRC evidence, and generated mobility policy coverage. It
@@ -210,7 +211,7 @@ Implemented foundation.
   readiness, validation rules, PCB rules, required roles, exported ports, and
   explicit unsupported gaps.
 - LED indicator, connector breakout, voltage regulator, MCU minimal, USB-C
-  power, I2C sensor, op-amp gain-stage, crystal oscillator,
+  power, I2C sensor, op-amp gain-stage, crystal oscillator, canned oscillator,
   reset/programming header, ESD protection, and reverse-polarity protection
   blocks declare electrical rules, PCB constraints, and required local-route
   expectations where supported by the current realization model.
@@ -220,6 +221,12 @@ Implemented foundation.
 - MCU minimal realization now includes power decoupling, AREF decoupling,
   reset pull-up, and local route evidence for its supported ATmega328P-A
   template.
+- Canned oscillator realization includes local decoupling, enable pull-up,
+  local routes, timing evidence, and workflow repair suggestions for missing or
+  distant decoupling/control evidence.
+- Reset/programming realization supports conditional default ISP/header/reset
+  switch PCB evidence, route-length timing evidence, and programming-header
+  ground-reference findings without breaking UART/no-switch instantiation.
 - Block verification corpus covers every built-in block and has regression
   guards that required routes remain defined.
 - `design create` block-planning output exposes block readiness, verification
@@ -227,12 +234,9 @@ Implemented foundation.
 
 ### Remaining Work
 
-- Raise the newer crystal/oscillator, reset/programming, ESD, and
+- Raise the newer crystal/canned oscillator, reset/programming, ESD, and
   reverse-polarity protection manifests beyond schematic/structural evidence
   with stronger PCB and KiCad-backed checks.
-- Add conditional PCB realization support so reset/programming headers and
-  optional reset switches can declare mode-specific placements/routes without
-  referencing absent roles.
 - Add entry-anchor modeling for connector-adjacent ESD and input-protection
   placement/routing constraints.
 - Replace remaining structural/generic active templates with concrete
@@ -344,10 +348,11 @@ intent and quality evidence for:
   power, I2C sensor, op-amp gain-stage, and connector-breakout layouts;
 - mixed advanced-rule regression coverage for thermal, high-current,
   clearance, differential-pair, and controlled-impedance scoring evidence;
-- crystal/oscillator timing fixture metadata, realized timing evidence, local
-  clock route length checks, load-cap proximity/symmetry evidence, ground-return
-  evidence, timing-sensitive placement scoring, and workflow `timing_results`
-  issue reporting;
+- crystal/canned oscillator timing fixture metadata, reset/programming timing
+  metadata, realized timing evidence, local route length checks, load-cap and
+  decoupling proximity/symmetry evidence, enable/control presence,
+  ground-reference evidence, timing-sensitive placement scoring, and workflow
+  `timing_results` issue reporting;
 - pad-backed full-board retry seed coverage for spacing improvement,
   reduce-distance rule evidence, safe non-improvement stops, hard-constraint
   preservation, generated pad hydration, generated placement
@@ -355,8 +360,9 @@ intent and quality evidence for:
 
 ### Remaining Work
 
-- Expand timing-sensitive fixture coverage beyond the current crystal
-  oscillator path into canned oscillators and other timing-critical blocks.
+- Expand timing-sensitive fixture coverage beyond the current crystal, canned
+  oscillator, and reset/programming paths into other timing-critical blocks and
+  KiCad-backed DRC-clean fixture evidence.
 - Add spatial indexing or equivalent acceleration for very large
   advanced-rule hard-constraint sets.
 - Add structured advanced-rule issue metadata instead of message-based

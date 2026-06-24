@@ -528,10 +528,10 @@ Current gaps for autonomous one-shot schematic + PCB generation:
 
 The block library contains reusable schematic templates for LED indicators,
 connector breakouts, voltage regulators, I2C sensors, op-amp gain stages,
-USB-C power input, a minimal ATmega328P-A system, crystal oscillators,
-reset/programming headers, 5 V ESD shunts, and series-diode reverse-polarity
-input protection. Blocks can be listed, inspected, validated, instantiated,
-composed, and now realized as PCB fragments.
+USB-C power input, a minimal ATmega328P-A system, crystal and canned
+oscillators, reset/programming headers, 5 V ESD shunts, and series-diode
+reverse-polarity input protection. Blocks can be listed, inspected, validated,
+instantiated, composed, and now realized as PCB fragments.
 
 Built-in blocks now declare machine-readable electrical rules, PCB rules, local
 route requirements, placement/proximity constraints, verification evidence, and
@@ -563,10 +563,12 @@ manufacturing candidates.
 Circuit blocks also have a verification harness with checked-in manifests for
 all built-in blocks. It verifies schematic semantics, PCB placement/pad/route
 expectations where declared, writer correctness when requested, and optional
-KiCad ERC/DRC evidence. The newer crystal oscillator, reset/programming, ESD,
-and reverse-polarity manifests currently provide schematic/structural evidence;
-they still need stronger KiCad-backed layout evidence before fabrication
-readiness claims.
+KiCad ERC/DRC evidence. The oscillator and reset/programming blocks now include
+timing-fixture evidence for local decoupling, reset/programming route length,
+enable/control presence, and ground-reference checks where the current
+realization model can prove them. The newer timing and protection manifests
+still need stronger KiCad-backed layout evidence before fabrication readiness
+claims.
 
 ```sh
 go run ./cmd/kicadai --json --builtins block verify
@@ -618,7 +620,7 @@ Current placement support includes:
   placement readiness, and controlled-impedance corridor/reference-plane
   evidence;
 - timing-sensitive placement scoring for clock-source proximity rules, used by
-  crystal/oscillator block realization evidence;
+  crystal, canned oscillator, and reset/programming realization evidence;
 - hard candidate rejection for checkable advanced-rule violations;
 - per-net HPWL and routing-readiness reports;
 - footprint-derived bounds helpers;
@@ -1056,15 +1058,15 @@ go run ./cmd/kicadai \
 
 Current built-in blocks include LED indicator, connector breakout, voltage
 regulator, I2C sensor, op-amp gain stage, USB-C power input, MCU minimal
-system, crystal oscillator, reset/programming header, 5 V ESD protection, and
-reverse-polarity input protection. These blocks now carry electrical and PCB
-rule metadata for required companions, decoupling, pull-ups, rail
-compatibility, enable/reset/programming handling, edge constraints, keepouts,
-proximity constraints, route priorities, and required local routes where the
-current realization model supports them. The newer protection and timing blocks
-remain structural/partial: they use verified seed records and checked-in
-verification manifests, but need more variants and stronger KiCad-backed layout
-evidence before fabrication-readiness claims.
+system, crystal oscillator, canned oscillator, reset/programming header, 5 V
+ESD protection, and reverse-polarity input protection. These blocks now carry
+electrical and PCB rule metadata for required companions, decoupling, pull-ups,
+rail compatibility, enable/reset/programming handling, edge constraints,
+keepouts, proximity constraints, route priorities, conditional realization, and
+required local routes where the current realization model supports them. The
+newer protection and timing blocks remain structural/partial: they use verified
+seed records and checked-in verification manifests, but need more variants and
+stronger KiCad-backed layout evidence before fabrication-readiness claims.
 
 The generated block examples are structural schematic/project outputs; they are
 not yet fabrication-ready PCB designs. See
