@@ -35,6 +35,7 @@ type PersistedApplyOptions struct {
 	InspectProject func(path string) (inspect.ProjectSummary, error)
 	PostValidation PostValidationOptions
 	PostValidators []PostApplyValidator
+	ZoneRefill     ZoneRefillRunner
 }
 
 type PersistedApplyResult struct {
@@ -45,6 +46,7 @@ type PersistedApplyResult struct {
 	Apply       transactions.ApplyResult `json:"apply,omitempty"`
 	Transaction transactions.Transaction `json:"transaction,omitempty"`
 	Validation  []PostApplyValidation    `json:"validation,omitempty"`
+	ZoneRefill  *ZoneRefillResult        `json:"zone_refill,omitempty"`
 	Summary     ValidationSummary        `json:"summary,omitempty"`
 	Delta       ValidationDelta          `json:"delta,omitempty"`
 	Issues      []reports.Issue          `json:"issues,omitempty"`
@@ -176,26 +178,51 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 		return finalizePersistedResult(result)
 	}
 	applyResult, artifacts, issues := replayGeneratedTransaction(ctx, tx, outputDir, opts)
+	applyIssues := append([]reports.Issue(nil), applyResult.Issues...)
 	result.Artifacts = appendArtifacts(result.Artifacts, artifacts)
-	result.Issues = appendIssues(result.Issues, issues, applyResult.Issues)
+	result.Issues = appendIssues(result.Issues, issues, applyIssues)
 	applyResult.Artifacts = nil
 	applyResult.Issues = nil
 	result.Apply = applyResult
+	if zoneRefillValidation, ok := runRequestedZoneRefill(ctx, target, outputDir, opts); ok {
+		result.Validation = append(result.Validation, zoneRefillValidation.PostApplyValidation())
+		result.ZoneRefill = &zoneRefillValidation
+		if reports.HasBlockingIssue(zoneRefillValidation.Issues) {
+			collectPostValidationEvidence(&result, result.Validation)
+			return finalizePersistedValidationResult(result, bundle.StageIssues)
+		}
+	}
 	postValidators := append(BuiltInPostApplyValidators(opts.PostValidation), opts.PostValidators...)
-	result.Validation = runPostApplyValidators(ctx, PostApplyValidationContext{
+	result.Validation = append(result.Validation, runPostApplyValidators(ctx, PostApplyValidationContext{
 		OutputDir:   outputDir,
 		Target:      target,
 		Transaction: tx,
 		Apply:       applyResult,
-	}, postValidators)
-	for _, validation := range result.Validation {
+	}, postValidators)...)
+	collectPostValidationEvidence(&result, result.Validation)
+	return finalizePersistedValidationResult(result, bundle.StageIssues)
+}
+
+func finalizePersistedValidationResult(result PersistedApplyResult, stageIssues []StageIssues) PersistedApplyResult {
+	result.Summary = SummarizePostValidation(result.Validation)
+	result.Delta = CompareValidationIssues(flattenIssues(stageIssues), result.Issues)
+	result.Status = statusFromValidationDelta(result.Delta)
+	return finalizePersistedResult(result)
+}
+
+func collectPostValidationEvidence(result *PersistedApplyResult, validations []PostApplyValidation) {
+	for _, validation := range validations {
 		result.Artifacts = appendArtifacts(result.Artifacts, validation.Artifacts)
 		result.Issues = appendIssues(result.Issues, validation.Issues)
 	}
-	result.Summary = SummarizePostValidation(result.Validation)
-	result.Delta = CompareValidationIssues(flattenIssues(bundle.StageIssues), result.Issues)
-	result.Status = statusFromValidationDelta(result.Delta)
-	return finalizePersistedResult(result)
+}
+
+func runRequestedZoneRefill(ctx context.Context, target Target, outputDir string, opts PersistedApplyOptions) (ZoneRefillResult, bool) {
+	zoneOpts := zoneRefillOptionsFromPostValidation(opts.PostValidation)
+	if normalizeZoneRefillPolicy(zoneOpts.Policy) == ZoneRefillNever {
+		return ZoneRefillResult{}, false
+	}
+	return RunZoneRefill(ctx, target, outputDir, zoneOpts, opts.ZoneRefill), true
 }
 
 func normalizeRepairOptions(opts Options) Options {

@@ -117,6 +117,7 @@ Global flags:
   --allow-missing-drc   Do not fail board validation when KiCad DRC is unavailable
   --strict-zones        Treat zones without fill evidence as blocking
   --strict-unrouted     Treat unrouted multi-pad nets as blocking
+  --zone-refill string  KiCad zone refill policy: never, before_validation, after_repair_before_validation
   --klc-root string        KiCad Library Convention repository root
   --symbols-root string    KiCad symbol library root
   --footprints-root string KiCad footprint library root
@@ -210,6 +211,7 @@ type cliOptions struct {
 	allowMissingDRC       bool
 	strictZones           bool
 	strictUnrouted        bool
+	zoneRefill            string
 	requireKiCadRoundTrip bool
 	strictDiffs           bool
 	allowUnrouted         bool
@@ -389,6 +391,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.allowMissingDRC, "allow-missing-drc", false, "do not fail board validation when KiCad DRC is unavailable")
 	flags.BoolVar(&opts.strictZones, "strict-zones", false, "treat zones without fill evidence as blocking")
 	flags.BoolVar(&opts.strictUnrouted, "strict-unrouted", false, "treat unrouted multi-pad nets as blocking")
+	flags.StringVar(&opts.zoneRefill, "zone-refill", string(repair.ZoneRefillNever), "KiCad zone refill policy: never, before_validation, after_repair_before_validation")
 	flags.BoolVar(&opts.requireKiCadRoundTrip, "require-kicad-roundtrip", false, "require KiCad round-trip evidence for writer checks")
 	flags.BoolVar(&opts.strictDiffs, "strict-diffs", false, "treat benign round-trip differences as writer failures")
 	flags.BoolVar(&opts.allowUnrouted, "allow-unrouted", false, "allow unrouted nets in writer checks")
@@ -3256,6 +3259,7 @@ func repairPostValidationOptions(opts cliOptions) repair.PostValidationOptions {
 		KeepArtifacts:           opts.keepArtifacts,
 		ArtifactDir:             opts.artifactDir,
 		KiCadCLI:                opts.kicadCLI,
+		ZoneRefill:              opts.zoneRefill,
 	}
 }
 

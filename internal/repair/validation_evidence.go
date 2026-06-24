@@ -23,6 +23,7 @@ type PostValidationOptions struct {
 	KeepArtifacts           bool   `json:"keep_artifacts"`
 	ArtifactDir             string `json:"artifact_dir,omitempty"`
 	KiCadCLI                string `json:"kicad_cli,omitempty"`
+	ZoneRefill              string `json:"zone_refill,omitempty"`
 }
 
 type ValidationSummary struct {
