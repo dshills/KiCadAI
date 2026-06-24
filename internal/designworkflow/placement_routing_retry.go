@@ -178,6 +178,9 @@ func placeAdjustedRequest(ctx context.Context, request placement.Request) Placem
 		"retry":           true,
 		"mobility":        mobilitySummary,
 	}
+	if scoring := placementCandidateScoringSummary(result.CandidateScoring); scoring != nil {
+		stage.Summary["candidate_scoring"] = scoring
+	}
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
 		stage.Status = StageStatusWarning
 	}
@@ -189,7 +192,7 @@ func preserveRetryPlacementEvidence(next *StageResult, current StageResult) {
 		return
 	}
 	ensureStageSummary(next)
-	for _, key := range []string{"pad_hydration"} {
+	for _, key := range []string{"pad_hydration", "candidate_scoring"} {
 		if _, exists := next.Summary[key]; exists {
 			continue
 		}

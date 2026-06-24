@@ -109,6 +109,9 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		"fixed_count":     result.Metrics.FixedCount,
 		"mobility":        mobilitySummary,
 	}
+	if scoring := placementCandidateScoringSummary(result.CandidateScoring); scoring != nil {
+		stage.Summary["candidate_scoring"] = scoring
+	}
 	if len(padEntries) != 0 || len(padIssues) != 0 {
 		stage.Summary["pad_hydration"] = summarizePadHydration(padEntries, padIssues)
 	}
@@ -117,6 +120,51 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Status = StageStatusWarning
 	}
 	return PlacementStageResult{Request: placementRequest, Result: result, Stage: stage}
+}
+
+type PlacementCandidateScoringSummary struct {
+	Enabled             bool           `json:"enabled"`
+	Policy              string         `json:"policy,omitempty"`
+	ScoreVersion        string         `json:"score_version,omitempty"`
+	AverageWinningScore float64        `json:"average_winning_score"`
+	LowestWinningScore  float64        `json:"lowest_winning_score"`
+	WinningCount        int            `json:"winning_count"`
+	AlternativeCount    int            `json:"alternative_count"`
+	RejectedByReason    map[string]int `json:"rejected_by_reason,omitempty"`
+}
+
+func placementCandidateScoringSummary(report *placement.CandidateScoringReport) *PlacementCandidateScoringSummary {
+	if report == nil {
+		return nil
+	}
+	return &PlacementCandidateScoringSummary{
+		Enabled:             report.Enabled,
+		Policy:              report.Policy,
+		ScoreVersion:        report.ScoreVersion,
+		AverageWinningScore: finitePlacementSummaryFloat(report.AverageWinningScore),
+		LowestWinningScore:  finitePlacementSummaryFloat(report.LowestWinningScore),
+		WinningCount:        len(report.WinningCandidates),
+		AlternativeCount:    len(report.AlternativeCandidates),
+		RejectedByReason:    cloneStringIntMap(report.RejectedByReason),
+	}
+}
+
+func finitePlacementSummaryFloat(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0
+	}
+	return value
+}
+
+func cloneStringIntMap(values map[string]int) map[string]int {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make(map[string]int, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
 }
 
 func hydratePlacementRequestPads(request placement.Request, index *libraryresolver.LibraryIndex) (placement.Request, []PadHydrationEntry, []reports.Issue) {

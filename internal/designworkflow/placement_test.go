@@ -90,6 +90,29 @@ func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsSummarizesCandidateScoring(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "status_board",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+	rules := placement.DefaultRules()
+	rules.CandidateScoring.Enabled = true
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{Rules: rules})
+	summary, ok := result.Stage.Summary["candidate_scoring"].(*PlacementCandidateScoringSummary)
+	if !ok {
+		t.Fatalf("candidate scoring summary = %#v", result.Stage.Summary["candidate_scoring"])
+	}
+	if !summary.Enabled || summary.WinningCount == 0 || summary.ScoreVersion == "" {
+		t.Fatalf("candidate scoring summary incomplete: %#v", summary)
+	}
+}
+
 func TestPlaceFragmentsHydratesGeneratedPadsFromVerifiedTemplates(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
 	defer cancel()
