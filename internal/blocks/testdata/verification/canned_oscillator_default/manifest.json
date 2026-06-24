@@ -1,0 +1,83 @@
+{
+  "id": "canned_oscillator_default",
+  "block_id": "canned_oscillator",
+  "description": "Default 16 MHz packaged oscillator with local decoupling and enable pull-up.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "clk"
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "components": [
+      {
+        "role": "oscillator",
+        "ref_prefix": "Y",
+        "symbol_id": "Oscillator:Oscillator",
+        "footprint_id": "Oscillator:Oscillator_SMD_7050-4Pin_7.0x5.0mm",
+        "value": "16MHz"
+      },
+      {
+        "role": "decoupling",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0603_1608Metric",
+        "value": "100n"
+      },
+      {
+        "role": "enable_pullup",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0603_1608Metric",
+        "value": "10k"
+      }
+    ],
+    "ports": [
+      {"name": "CLK_OUT", "direction": "output"},
+      {"name": "VCC", "direction": "power"},
+      {"name": "GND", "direction": "power"},
+      {"name": "EN", "direction": "input"}
+    ],
+    "nets": [
+      {
+        "name": "clk_vcc",
+        "visibility": "exported",
+        "pins": [
+          {"role": "oscillator", "pin": "4"},
+          {"role": "decoupling", "pin": "1"},
+          {"role": "enable_pullup", "pin": "1"}
+        ]
+      },
+      {
+        "name": "clk_gnd",
+        "visibility": "exported",
+        "pins": [
+          {"role": "oscillator", "pin": "2"},
+          {"role": "decoupling", "pin": "2"}
+        ]
+      },
+      {
+        "name": "clk_clk_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "oscillator", "pin": "3"}
+        ]
+      },
+      {
+        "name": "clk_enable",
+        "visibility": "exported",
+        "pins": [
+          {"role": "oscillator", "pin": "1"},
+          {"role": "enable_pullup", "pin": "2"}
+        ]
+      }
+    ],
+    "pcb": {
+      "placements": [
+        {"role": "oscillator", "footprint_id": "Oscillator:Oscillator_SMD_7050-4Pin_7.0x5.0mm"},
+        {"role": "decoupling", "footprint_id": "Capacitor_SMD:C_0603_1608Metric"},
+        {"role": "enable_pullup", "footprint_id": "Resistor_SMD:R_0603_1608Metric"}
+      ],
+      "allow_unrouted": true
+    }
+  }
+}
