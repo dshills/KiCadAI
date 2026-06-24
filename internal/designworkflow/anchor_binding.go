@@ -1,6 +1,8 @@
 package designworkflow
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"sort"
 	"strings"
 
@@ -317,4 +319,14 @@ func sortAnchorBindingIssues(issues []AnchorBindingIssue) {
 	sort.SliceStable(issues, func(i, j int) bool {
 		return issues[i].ID < issues[j].ID
 	})
+}
+
+func physicalEndpointID(kind PhysicalEndpointKind, ref string, pad string) string {
+	kind = PhysicalEndpointKind(strings.TrimSpace(string(kind)))
+	ref = strings.TrimSpace(ref)
+	pad = strings.TrimSpace(pad)
+	input := "kind=" + string(kind) + "\nref=" + ref + "\npad=" + pad + "\n"
+	sum := sha256.Sum256([]byte(input))
+	hash := hex.EncodeToString(sum[:])[:8]
+	return string(kind) + ":" + ref + ":" + pad + ":" + hash
 }
