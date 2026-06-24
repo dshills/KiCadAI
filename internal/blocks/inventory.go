@@ -61,6 +61,16 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		},
 	},
 	{
+		ID:       "canned_oscillator",
+		Name:     "Canned Oscillator",
+		Category: "timing",
+		Gaps: []string{
+			"oscillator startup and jitter are not simulated",
+			"consumer IC clock-pin composition rules are not automatic yet",
+			"signal-integrity review is still required before fabrication",
+		},
+	},
+	{
 		ID:       "reset_programming_header",
 		Name:     "Reset And Programming Header",
 		Category: "digital",

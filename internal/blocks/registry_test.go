@@ -20,6 +20,7 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 		got = append(got, summary.ID)
 	}
 	want := []string{
+		"canned_oscillator",
 		"connector_breakout",
 		"crystal_oscillator",
 		"esd_protection",
@@ -36,7 +37,7 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 		t.Fatalf("IDs = %#v, want %#v", got, want)
 	}
 	summaries[0].ID = "mutated"
-	if registry.ListBlocks()[0].ID != "connector_breakout" {
+	if registry.ListBlocks()[0].ID != "canned_oscillator" {
 		t.Fatalf("ListBlocks returned mutable backing slice")
 	}
 }
@@ -102,6 +103,7 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 		}
 		structuralBlocks := map[string]bool{
 			"connector_breakout":          true,
+			"canned_oscillator":           true,
 			"crystal_oscillator":          true,
 			"esd_protection":              true,
 			"i2c_sensor":                  true,

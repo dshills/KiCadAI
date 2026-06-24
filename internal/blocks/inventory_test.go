@@ -12,6 +12,7 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 		got = append(got, family.ID)
 	}
 	want := []string{
+		"canned_oscillator",
 		"connector_breakout",
 		"crystal_oscillator",
 		"esd_protection",

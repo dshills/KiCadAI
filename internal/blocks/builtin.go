@@ -16,6 +16,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		voltageRegulatorDefinition(),
 		mcuMinimalDefinition(),
 		crystalOscillatorDefinition(),
+		cannedOscillatorDefinition(),
 		resetProgrammingHeaderDefinition(),
 		esdProtectionDefinition(),
 		reversePolarityProtectionDefinition(),
