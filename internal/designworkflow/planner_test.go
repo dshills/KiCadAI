@@ -3,7 +3,6 @@ package designworkflow
 import (
 	"context"
 	"slices"
-	"sort"
 	"strings"
 	"testing"
 
@@ -73,6 +72,7 @@ func TestPlanBlocksComposesExpandedVerifiedCoverageBlocks(t *testing.T) {
 	if !ok || len(evidence) != len(request.Blocks) {
 		t.Fatalf("block evidence = %#v", result.Stage.Summary["block_evidence"])
 	}
+	requiredRoutesByBlock := map[string][]string{}
 	for _, summary := range evidence {
 		if summary.Readiness != blocks.BlockReadinessPartial {
 			t.Fatalf("%s readiness = %q", summary.BlockID, summary.Readiness)
@@ -80,6 +80,24 @@ func TestPlanBlocksComposesExpandedVerifiedCoverageBlocks(t *testing.T) {
 		if summary.VerificationLevel != string(blocks.VerificationStructural) {
 			t.Fatalf("%s verification = %#v", summary.BlockID, summary)
 		}
+		requiredRoutesByBlock[summary.BlockID] = summary.RequiredRoutes
+	}
+	assertRequiredRouteSet(t, requiredRoutesByBlock, "esd_protection", []string{"esd_signal_entry_to_tvs", "esd_tvs_to_ground"})
+	assertRequiredRouteSet(t, requiredRoutesByBlock, "reverse_polarity_protection", []string{"diode_to_protected_output", "raw_input_to_diode"})
+}
+
+func assertRequiredRouteSet(t *testing.T, routesByBlock map[string][]string, blockID string, want []string) {
+	t.Helper()
+	got, ok := routesByBlock[blockID]
+	if !ok {
+		t.Fatalf("block %s missing from evidence summary", blockID)
+	}
+	got = slices.Clone(got)
+	want = slices.Clone(want)
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("%s required routes = %#v, want exactly %#v", blockID, got, want)
 	}
 }
 
@@ -242,7 +260,22 @@ func newExpandedCoverageTestRegistry() expandedCoverageTestRegistry {
 	for _, id := range ids {
 		definitions[id] = testBlockDefinition(id, blocks.VerificationStructural)
 	}
+	definitions["esd_protection"] = withRequiredRoutes(definitions["esd_protection"], "esd_signal_entry_to_tvs", "esd_tvs_to_ground")
+	definitions["reverse_polarity_protection"] = withRequiredRoutes(definitions["reverse_polarity_protection"], "diode_to_protected_output", "raw_input_to_diode")
 	return expandedCoverageTestRegistry{definitions: definitions}
+}
+
+func withRequiredRoutes(definition blocks.BlockDefinition, routes ...string) blocks.BlockDefinition {
+	if definition.PCBRealization == nil {
+		definition.PCBRealization = &blocks.PCBRealization{}
+	} else {
+		realization := *definition.PCBRealization
+		definition.PCBRealization = &realization
+	}
+	validation := definition.PCBRealization.Validation
+	validation.RequiredRoutes = slices.Clone(routes)
+	definition.PCBRealization.Validation = validation
+	return definition
 }
 
 func (registry expandedCoverageTestRegistry) ListBlocks() []blocks.BlockSummary {
@@ -308,6 +341,6 @@ func (registry expandedCoverageTestRegistry) definitionIDs() []string {
 	for id := range registry.definitions {
 		ids = append(ids, id)
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	return ids
 }
