@@ -103,3 +103,107 @@ func TestCompareValidationIssuesSummariesUseUniqueIssueIdentity(t *testing.T) {
 		t.Fatalf("delta should summarize unique issues: %+v", delta)
 	}
 }
+
+func TestNormalizeIssueDefaultsStructuredFields(t *testing.T) {
+	issue := reports.Issue{
+		Code:        reports.CodeDisconnectedPad,
+		Severity:    reports.SeverityError,
+		Path:        `out\demo.kicad_pcb/footprints/J1/pads/1`,
+		Message:     "pad is disconnected",
+		Refs:        []string{"J1"},
+		Nets:        []string{"GND"},
+		OperationID: "route-1",
+	}
+	finding := NormalizeIssue(issue, NormalizeFindingOptions{
+		Source:  FindingSourceBoard,
+		Adapter: "board",
+		Subject: FindingSubject{Pad: "1", Layer: "F.Cu"},
+	})
+	if finding.Source != FindingSourceBoard || finding.Category != FindingCategoryConnectivity || finding.Repairability != RepairabilityRepairable {
+		t.Fatalf("unexpected normalized classification: %+v", finding)
+	}
+	if finding.Subject.Ref != "J1" || finding.Subject.Net != "GND" || finding.Subject.Pad != "1" || finding.Subject.File != "out/demo.kicad_pcb" {
+		t.Fatalf("unexpected subject: %+v", finding.Subject)
+	}
+	if finding.Path != "out/demo.kicad_pcb/footprints/J1/pads/1" || finding.OperationID != "route-1" || finding.Key == "" {
+		t.Fatalf("unexpected normalized fields: %+v", finding)
+	}
+}
+
+func TestNormalizedFindingKeyIncludesMessageWithStructuredSubject(t *testing.T) {
+	base := NormalizeIssue(reports.Issue{
+		Code:     reports.CodeInvalidNetAssignment,
+		Severity: reports.SeverityError,
+		Path:     "pcb/pad",
+		Message:  "old wording",
+	}, NormalizeFindingOptions{
+		Source:   FindingSourceBoard,
+		Category: FindingCategoryPadNet,
+		Subject:  FindingSubject{Ref: "U1", Pad: "4", Net: "VCC"},
+	})
+	renamed := base
+	renamed.Message = "new wording"
+	renamed.Key = NormalizedFindingKey(renamed)
+	if base.Key == renamed.Key {
+		t.Fatalf("structured findings with different messages should not collide:\nbase=%q\nrenamed=%q", base.Key, renamed.Key)
+	}
+}
+
+func TestNormalizedFindingKeySeparatesVariableLengthParts(t *testing.T) {
+	left := NormalizedFinding{Source: "ab", Category: "c", Code: reports.CodeValidationFailed, Severity: reports.SeverityError}
+	right := NormalizedFinding{Source: "a", Category: "bc", Code: reports.CodeValidationFailed, Severity: reports.SeverityError}
+	if NormalizedFindingKey(left) == NormalizedFindingKey(right) {
+		t.Fatalf("variable length key parts collided")
+	}
+}
+
+func TestNormalizedFindingKeyFallsBackToMessageWhenSubjectIsEmpty(t *testing.T) {
+	base := NormalizeIssue(reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Message: "first"}, NormalizeFindingOptions{Source: FindingSourceRepair})
+	renamed := NormalizeIssue(reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Message: "second"}, NormalizeFindingOptions{Source: FindingSourceRepair})
+	if base.Key == renamed.Key {
+		t.Fatalf("sparse findings should use message fallback:\nbase=%q\nrenamed=%q", base.Key, renamed.Key)
+	}
+}
+
+func TestNormalizedFindingKeyIncludesMessageForFileOnlySubject(t *testing.T) {
+	base := NormalizeIssue(reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityError,
+		Path:     "out/demo.kicad_sch",
+		Message:  "missing right paren",
+	}, NormalizeFindingOptions{Source: FindingSourceWriter})
+	other := NormalizeIssue(reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityError,
+		Path:     "out/demo.kicad_sch",
+		Message:  "unknown symbol library",
+	}, NormalizeFindingOptions{Source: FindingSourceWriter})
+	if base.Subject.File == "" || other.Subject.File == "" {
+		t.Fatalf("expected file subjects: base=%+v other=%+v", base, other)
+	}
+	if base.Key == other.Key {
+		t.Fatalf("file-only findings with different messages should not collide:\nbase=%q\nother=%q", base.Key, other.Key)
+	}
+}
+
+func TestNormalizeIssuesSortsDeterministically(t *testing.T) {
+	issues := []reports.Issue{
+		{Code: reports.CodeDisconnectedPad, Severity: reports.SeverityError, Message: "b", Refs: []string{"U2"}},
+		{Code: reports.CodeDisconnectedPad, Severity: reports.SeverityError, Message: "a", Refs: []string{"U1"}},
+	}
+	findings := NormalizeIssues(issues, NormalizeFindingOptions{Source: FindingSourceBoard})
+	if len(findings) != 2 || findings[0].Subject.Ref != "U1" || findings[1].Subject.Ref != "U2" {
+		t.Fatalf("findings not sorted deterministically: %+v", findings)
+	}
+}
+
+func TestNormalizeIssueClassifiesExternalAndPreservationBlocked(t *testing.T) {
+	external := NormalizeIssue(reports.Issue{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityError, Message: "missing kicad-cli"}, NormalizeFindingOptions{})
+	if external.Category != FindingCategoryExternalTool || external.Repairability != RepairabilityExternalToolBlocked {
+		t.Fatalf("external = %+v", external)
+	}
+	preservation := NormalizeIssue(reports.Issue{Code: reports.CodePreservationConflict, Severity: reports.SeverityBlocked, Message: "imported"}, NormalizeFindingOptions{})
+	if preservation.Category != FindingCategoryPreservation || preservation.Repairability != RepairabilityPreservationBlocked {
+		t.Fatalf("preservation = %+v", preservation)
+	}
+}

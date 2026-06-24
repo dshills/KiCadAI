@@ -47,6 +47,84 @@ type ValidationDelta struct {
 	Worsened bool              `json:"worsened,omitempty"`
 }
 
+type FindingSource string
+
+const (
+	FindingSourceTransaction FindingSource = "transaction"
+	FindingSourceWriter      FindingSource = "writer_correctness"
+	FindingSourceBoard       FindingSource = "board_validation"
+	FindingSourceKiCadERC    FindingSource = "kicad_erc"
+	FindingSourceKiCadDRC    FindingSource = "kicad_drc"
+	FindingSourceRoundTrip   FindingSource = "round_trip"
+	FindingSourceRepair      FindingSource = "repair"
+	FindingSourceWorkflow    FindingSource = "workflow"
+)
+
+type FindingCategory string
+
+const (
+	FindingCategoryUnknown          FindingCategory = "unknown"
+	FindingCategoryParse            FindingCategory = "parse"
+	FindingCategoryProjectStructure FindingCategory = "project_structure"
+	FindingCategorySchematicERC     FindingCategory = "schematic_erc"
+	FindingCategoryBoardDRC         FindingCategory = "board_drc"
+	FindingCategoryConnectivity     FindingCategory = "connectivity"
+	FindingCategoryPadNet           FindingCategory = "pad_net"
+	FindingCategoryRoute            FindingCategory = "route"
+	FindingCategoryZone             FindingCategory = "zone"
+	FindingCategoryOutline          FindingCategory = "outline"
+	FindingCategoryRoundTrip        FindingCategory = "round_trip"
+	FindingCategoryExternalTool     FindingCategory = "external_tool"
+	FindingCategoryPreservation     FindingCategory = "preservation"
+	FindingCategoryUnsupported      FindingCategory = "unsupported"
+)
+
+type Repairability string
+
+const (
+	RepairabilityRepairable          Repairability = "repairable"
+	RepairabilityUnsupported         Repairability = "unsupported"
+	RepairabilityExternalToolBlocked Repairability = "external_tool_blocked"
+	RepairabilityPreservationBlocked Repairability = "preservation_blocked"
+	RepairabilityInformational       Repairability = "informational"
+)
+
+type FindingSubject struct {
+	Ref      string `json:"ref,omitempty"`
+	Net      string `json:"net,omitempty"`
+	Layer    string `json:"layer,omitempty"`
+	Pad      string `json:"pad,omitempty"`
+	File     string `json:"file,omitempty"`
+	Rule     string `json:"rule,omitempty"`
+	Location string `json:"location,omitempty"`
+}
+
+type NormalizedFinding struct {
+	Key           string           `json:"key"`
+	Source        FindingSource    `json:"source"`
+	Adapter       string           `json:"adapter,omitempty"`
+	Category      FindingCategory  `json:"category"`
+	Repairability Repairability    `json:"repairability"`
+	Code          reports.Code     `json:"code"`
+	Severity      reports.Severity `json:"severity"`
+	Path          string           `json:"path,omitempty"`
+	Message       string           `json:"message"`
+	Subject       FindingSubject   `json:"subject,omitempty"`
+	OperationID   string           `json:"operation_id,omitempty"`
+	EvidencePath  string           `json:"evidence_path,omitempty"`
+	RawCode       string           `json:"raw_code,omitempty"`
+}
+
+type NormalizeFindingOptions struct {
+	Source        FindingSource
+	Adapter       string
+	Category      FindingCategory
+	Repairability Repairability
+	EvidencePath  string
+	RawCode       string
+	Subject       FindingSubject
+}
+
 func SummarizePostValidation(validations []PostApplyValidation) ValidationSummary {
 	summary := ValidationSummary{AdapterCount: len(validations)}
 	uniqueIssues := map[string]reports.Issue{}
@@ -104,6 +182,92 @@ func CompareValidationIssues(before []reports.Issue, after []reports.Issue) Vali
 	return delta
 }
 
+func NormalizeIssue(issue reports.Issue, opts NormalizeFindingOptions) NormalizedFinding {
+	normalizedPath := slashPathForEvidence(issue.Path)
+	finding := NormalizedFinding{
+		Source:        opts.Source,
+		Adapter:       strings.TrimSpace(opts.Adapter),
+		Category:      opts.Category,
+		Repairability: opts.Repairability,
+		Code:          issue.Code,
+		Severity:      issue.Severity,
+		Path:          normalizedPath,
+		Message:       strings.TrimSpace(issue.Message),
+		Subject:       opts.Subject,
+		OperationID:   strings.TrimSpace(issue.OperationID),
+		EvidencePath:  slashPathForEvidence(opts.EvidencePath),
+		RawCode:       strings.TrimSpace(opts.RawCode),
+	}
+	if finding.Source == "" {
+		finding.Source = FindingSourceRepair
+	}
+	if finding.Category == "" {
+		finding.Category = defaultFindingCategory(issue)
+	}
+	if finding.Repairability == "" {
+		finding.Repairability = defaultRepairability(issue, finding.Category)
+	}
+	if finding.Subject.Ref == "" && len(issue.Refs) == 1 {
+		finding.Subject.Ref = strings.TrimSpace(issue.Refs[0])
+	}
+	if finding.Subject.Net == "" && len(issue.Nets) == 1 {
+		finding.Subject.Net = strings.TrimSpace(issue.Nets[0])
+	}
+	if finding.Subject.File == "" {
+		finding.Subject.File = fileSubjectFromPath(normalizedPath)
+	}
+	finding.Subject = normalizeFindingSubject(finding.Subject)
+	finding.Key = NormalizedFindingKey(finding)
+	return finding
+}
+
+func NormalizeIssues(issues []reports.Issue, opts NormalizeFindingOptions) []NormalizedFinding {
+	findings := make([]NormalizedFinding, 0, len(issues))
+	for _, issue := range issues {
+		findings = append(findings, NormalizeIssue(issue, opts))
+	}
+	SortNormalizedFindings(findings)
+	return findings
+}
+
+func NormalizedFindingKey(finding NormalizedFinding) string {
+	var builder strings.Builder
+	writeKeyPart(&builder, string(finding.Source))
+	writeKeyPart(&builder, string(finding.Category))
+	if finding.RawCode != "" {
+		writeKeyPart(&builder, finding.RawCode)
+	} else {
+		writeKeyPart(&builder, string(finding.Code))
+	}
+	writeKeyPart(&builder, string(finding.Severity))
+	writeKeyPart(&builder, finding.Path)
+	writeKeyPart(&builder, strings.TrimSpace(finding.OperationID))
+	writeKeyPart(&builder, finding.EvidencePath)
+	writeKeyPart(&builder, finding.Subject.Ref)
+	writeKeyPart(&builder, finding.Subject.Net)
+	writeKeyPart(&builder, finding.Subject.Layer)
+	writeKeyPart(&builder, finding.Subject.Pad)
+	writeKeyPart(&builder, finding.Subject.File)
+	writeKeyPart(&builder, finding.Subject.Rule)
+	writeKeyPart(&builder, finding.Subject.Location)
+	writeKeyPart(&builder, strings.TrimSpace(finding.Message))
+	return builder.String()
+}
+
+func SortNormalizedFindings(findings []NormalizedFinding) {
+	if len(findings) < 2 {
+		return
+	}
+	for index := range findings {
+		if findings[index].Key == "" {
+			findings[index].Key = NormalizedFindingKey(findings[index])
+		}
+	}
+	sort.SliceStable(findings, func(i, j int) bool {
+		return findings[i].Key < findings[j].Key
+	})
+}
+
 func StableIssueKey(issue reports.Issue) string {
 	var builder strings.Builder
 	writeKeyPart(&builder, string(issue.Code))
@@ -129,7 +293,7 @@ func writeKeyPart(builder *strings.Builder, part string) {
 	builder.WriteString(strconv.Itoa(len(part)))
 	builder.WriteByte(':')
 	builder.WriteString(part)
-	builder.WriteByte('|')
+	builder.WriteByte(0)
 }
 
 func addIssueSummary(summary *ValidationSummary, issues []reports.Issue) {
@@ -216,4 +380,88 @@ func sortedStrings(values []string) []string {
 
 func slashPathForEvidence(path string) string {
 	return strings.ReplaceAll(strings.TrimSpace(path), "\\", "/")
+}
+
+func defaultFindingCategory(issue reports.Issue) FindingCategory {
+	switch issue.Code {
+	case reports.CodeMissingBoardOutline:
+		return FindingCategoryOutline
+	case reports.CodeDisconnectedPad:
+		return FindingCategoryConnectivity
+	case reports.CodeInvalidNetAssignment:
+		if containsEvidenceText(issue.Path, "zone") || containsEvidenceText(issue.Message, "zone") {
+			return FindingCategoryZone
+		}
+		return FindingCategoryPadNet
+	case reports.CodeKiCadCLIFailed, reports.CodeSkippedExternalTool:
+		return FindingCategoryExternalTool
+	case reports.CodeRoundTripDiff:
+		return FindingCategoryRoundTrip
+	case reports.CodePreservationConflict:
+		return FindingCategoryPreservation
+	case reports.CodeUnsupportedImportedObject, reports.CodeUnsupportedOperation:
+		return FindingCategoryUnsupported
+	case reports.CodeMissingFile:
+		return FindingCategoryProjectStructure
+	default:
+		path := strings.ToLower(issue.Path)
+		message := strings.ToLower(issue.Message)
+		switch {
+		case strings.Contains(path, "parse") || strings.Contains(message, "parse"):
+			return FindingCategoryParse
+		case strings.Contains(path, "route") || strings.Contains(message, "route"):
+			return FindingCategoryRoute
+		case strings.Contains(path, "zone") || strings.Contains(message, "zone"):
+			return FindingCategoryZone
+		case strings.Contains(path, "outline") || strings.Contains(message, "outline") || strings.Contains(path, "edge.cuts") || strings.Contains(message, "edge.cuts"):
+			return FindingCategoryOutline
+		default:
+			return FindingCategoryUnknown
+		}
+	}
+}
+
+func defaultRepairability(issue reports.Issue, category FindingCategory) Repairability {
+	if issue.Severity == reports.SeverityInfo || issue.Severity == reports.SeverityWarning {
+		return RepairabilityInformational
+	}
+	switch category {
+	case FindingCategoryExternalTool:
+		return RepairabilityExternalToolBlocked
+	case FindingCategoryPreservation:
+		return RepairabilityPreservationBlocked
+	case FindingCategoryUnsupported:
+		return RepairabilityUnsupported
+	default:
+		return RepairabilityRepairable
+	}
+}
+
+func normalizeFindingSubject(subject FindingSubject) FindingSubject {
+	return FindingSubject{
+		Ref:      strings.TrimSpace(subject.Ref),
+		Net:      strings.TrimSpace(subject.Net),
+		Layer:    strings.TrimSpace(subject.Layer),
+		Pad:      strings.TrimSpace(subject.Pad),
+		File:     slashPathForEvidence(subject.File),
+		Rule:     strings.TrimSpace(subject.Rule),
+		Location: strings.TrimSpace(subject.Location),
+	}
+}
+
+func fileSubjectFromPath(path string) string {
+	if path == "" {
+		return ""
+	}
+	for _, marker := range []string{".kicad_sch", ".kicad_pcb", ".kicad_pro", ".kicad_sym"} {
+		index := strings.Index(path, marker)
+		if index >= 0 {
+			return path[:index+len(marker)]
+		}
+	}
+	return ""
+}
+
+func containsEvidenceText(value string, needle string) bool {
+	return strings.Contains(strings.ToLower(value), strings.ToLower(needle))
 }
