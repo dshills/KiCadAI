@@ -1,0 +1,9 @@
+{
+  "$schema": "https://schemas.kicad.org/drc.v1.json",
+  "coordinate_units": "mm",
+  "kicad_version": "10.0.3",
+  "violations": [],
+  "drc_violations": [],
+  "unconnected_items": [],
+  "schematic_parity": []
+}
