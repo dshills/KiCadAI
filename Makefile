@@ -31,8 +31,7 @@ build:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go build -o "$(BIN)" ./cmd/kicadai
 
 install:
-	mkdir -p "$(BIN_DIR)"
-	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" GOBIN="$(BIN_DIR)" go install ./cmd/kicadai
+	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go install ./cmd/kicadai
 
 test:
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go test ./...
