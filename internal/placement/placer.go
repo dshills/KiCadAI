@@ -271,26 +271,37 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	seedBase := seedTieBreakBase(request.Seed, component.Ref)
 	rotatedPadsByRotation := rotatedPadsByRef[componentRef]
 	scored := make([]scoredPlacementCandidate, len(candidates))
-	for index, candidate := range candidates {
+	for index := range candidates {
+		candidate := candidates[index]
 		dimensions := semanticCandidateDimensions(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget)
 		dimensions = appendElectricalCandidateDimensions(dimensions, candidate.Placement.Position, electricalContext, rotatedPadsByRotation[rotationKey(candidate.Placement.Position.RotationDeg)])
 		dimensions = appendCongestionFanoutCandidateDimensions(dimensions, component, candidate.Placement, request, congestionContext)
-		candidates[index].Dimensions = dimensions
-		candidates[index].Total = weightedCandidateDimensionTotal(dimensions)
+		total := weightedCandidateDimensionTotal(dimensions)
 		scored[index] = scoredPlacementCandidate{
 			CandidateIndex: index,
-			Score:          placementScore(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget, netTargets, rotatedPadsByRotation, seedBase),
+			LegacyCost:     placementScore(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget, netTargets, rotatedPadsByRotation, seedBase),
+			Total:          total,
+			Dimensions:     dimensions,
 		}
 	}
+	scoringEnabled := request.Rules.CandidateScoring.Enabled
 	sort.Slice(scored, func(i int, j int) bool {
-		if scored[i].Score != scored[j].Score {
-			return scored[i].Score < scored[j].Score
+		if scoringEnabled && scored[i].Total != scored[j].Total {
+			return scored[i].Total > scored[j].Total
 		}
-		return placementLess(candidates[scored[i].CandidateIndex].Placement.Position, candidates[scored[j].CandidateIndex].Placement.Position)
+		if scored[i].LegacyCost != scored[j].LegacyCost {
+			return scored[i].LegacyCost < scored[j].LegacyCost
+		}
+		if comparison := placementCompare(candidates[scored[i].CandidateIndex].Placement.Position, candidates[scored[j].CandidateIndex].Placement.Position); comparison != 0 {
+			return comparison < 0
+		}
+		return candidates[scored[i].CandidateIndex].Index < candidates[scored[j].CandidateIndex].Index
 	})
 	ordered := make([]placementCandidate, len(candidates))
 	for index, candidate := range scored {
 		ordered[index] = candidates[candidate.CandidateIndex]
+		ordered[index].Total = candidate.Total
+		ordered[index].Dimensions = candidate.Dimensions
 	}
 	candidates = ordered
 	if len(candidates) > maxCandidates {
@@ -308,20 +319,42 @@ type placementCandidate struct {
 
 type scoredPlacementCandidate struct {
 	CandidateIndex int
-	Score          float64
+	LegacyCost     float64
+	Total          float64
+	Dimensions     []CandidateScoreDimension
 }
 
 func placementLess(left Placement, right Placement) bool {
+	return placementCompare(left, right) < 0
+}
+
+func placementCompare(left Placement, right Placement) int {
 	if math.Abs(left.YMM-right.YMM) > placementCompareEpsilon {
-		return left.YMM < right.YMM
+		return compareFloat64(left.YMM, right.YMM)
 	}
 	if math.Abs(left.XMM-right.XMM) > placementCompareEpsilon {
-		return left.XMM < right.XMM
+		return compareFloat64(left.XMM, right.XMM)
 	}
 	if math.Abs(left.RotationDeg-right.RotationDeg) > placementCompareEpsilon {
-		return left.RotationDeg < right.RotationDeg
+		return compareFloat64(left.RotationDeg, right.RotationDeg)
 	}
-	return left.Layer < right.Layer
+	if left.Layer < right.Layer {
+		return -1
+	}
+	if left.Layer > right.Layer {
+		return 1
+	}
+	return 0
+}
+
+func compareFloat64(left float64, right float64) int {
+	if left < right {
+		return -1
+	}
+	if left > right {
+		return 1
+	}
+	return 0
 }
 
 func candidateLayers(component Component, rules Rules) []string {

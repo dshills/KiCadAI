@@ -194,6 +194,9 @@ func TestPlaceCandidateScoringReportsElectricalDimensions(t *testing.T) {
 	if !ok {
 		t.Fatalf("R2 winning candidate missing: %#v", result.CandidateScoring.WinningCandidates)
 	}
+	if winner.Total <= 0 || result.CandidateScoring.AverageWinningScore <= 0 {
+		t.Fatalf("winning score summary missing: winner=%#v report=%#v", winner, result.CandidateScoring)
+	}
 	if !candidateScoreHasDimension(winner, CandidateScoreElectricalProximity) {
 		t.Fatalf("electrical proximity dimension missing: %#v", winner.Dimensions)
 	}

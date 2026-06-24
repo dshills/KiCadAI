@@ -95,10 +95,28 @@ func NormalizeCandidateScoringReport(report CandidateScoringReport, rules Candid
 	report.AggregateDimensions = normalizeCandidateScoreDimensions(report.AggregateDimensions, rules.MaxEvidencePerDimension)
 	report.TopPenalties = normalizeCandidateScoreDimensions(report.TopPenalties, rules.MaxEvidencePerDimension)
 	report.WinningCandidates = normalizeCandidateScores(report.WinningCandidates, rules.MaxEvidencePerDimension)
+	if len(report.WinningCandidates) > 0 {
+		report.AverageWinningScore, report.LowestWinningScore = candidateWinningScoreSummary(report.WinningCandidates)
+	}
 	report.AlternativeCandidates = normalizeCandidateScores(report.AlternativeCandidates, rules.MaxEvidencePerDimension)
 	report.AlternativeCandidates = limitCandidateScoresPerRef(report.AlternativeCandidates, rules.MaxAlternativesPerComponent)
 	report.RejectedByReason = normalizeCandidateReasonCounts(report.RejectedByReason)
 	return report
+}
+
+func candidateWinningScoreSummary(scores []CandidateScore) (average float64, lowest float64) {
+	if len(scores) == 0 {
+		return 0, 0
+	}
+	lowest = scores[0].Total
+	total := lowest
+	for _, score := range scores[1:] {
+		if score.Total < lowest {
+			lowest = score.Total
+		}
+		total += score.Total
+	}
+	return roundCandidateScore(total / float64(len(scores))), roundCandidateScore(lowest)
 }
 
 func recordCandidateRejection(report *CandidateScoringReport, component Component, refKey string, placement Placement, index int, reason CandidateRejectionReasonName, message string, refs ...string) {
