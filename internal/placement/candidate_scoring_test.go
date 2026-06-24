@@ -73,6 +73,68 @@ func TestPlaceCandidateScoringReportIsOptIn(t *testing.T) {
 	}
 }
 
+func TestPlaceCandidateScoringReportsOutsideBoardRejections(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 2
+	req.Board.HeightMM = 2
+	req.Board.MarginMM = 0
+	req.Rules.BoardEdgeClearanceMM = 0.1
+	req.Rules.CandidateScoring.Enabled = true
+	req.Rules.CandidateScoring.MaxAlternativesPerComponent = 1
+
+	result := Place(req)
+	if result.CandidateScoring == nil {
+		t.Fatal("candidate scoring report missing")
+	}
+	if result.CandidateScoring.RejectedByReason[string(CandidateRejectOutsideBoard)] == 0 {
+		t.Fatalf("outside-board rejections missing: %#v", result.CandidateScoring.RejectedByReason)
+	}
+	if len(result.CandidateScoring.AlternativeCandidates) != 1 || !result.CandidateScoring.AlternativeCandidates[0].Rejected {
+		t.Fatalf("bounded rejected alternative missing: %#v", result.CandidateScoring.AlternativeCandidates)
+	}
+}
+
+func TestPlaceCandidateScoringReportsCollisionRejections(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	if result.CandidateScoring == nil {
+		t.Fatal("candidate scoring report missing")
+	}
+	if result.CandidateScoring.RejectedByReason[string(CandidateRejectCollision)] == 0 {
+		t.Fatalf("collision rejections missing: %#v placements=%#v", result.CandidateScoring.RejectedByReason, result.Placements)
+	}
+	if issues := ValidateGeometry(req, result.Placements); len(issues) != 0 {
+		t.Fatalf("collision rejection allowed invalid winner: %#v", issues)
+	}
+}
+
+func TestPlaceCandidateScoringReportsFixedKeepoutRejection(t *testing.T) {
+	req := minimalRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Keepouts = []Keepout{{
+		ID:     "mounting",
+		Bounds: Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 6, YMM: 6}},
+		Layers: []string{"F.Cu"},
+	}}
+	req.Rules.CandidateScoring.Enabled = true
+
+	result := Place(req)
+	if result.CandidateScoring == nil {
+		t.Fatal("candidate scoring report missing")
+	}
+	if result.CandidateScoring.RejectedByReason[string(CandidateRejectKeepout)] != 1 {
+		t.Fatalf("keepout rejection count = %#v", result.CandidateScoring.RejectedByReason)
+	}
+}
+
 func TestNormalizeCandidateScoringReportSortsAndBoundsEvidence(t *testing.T) {
 	longEvidence := strings.Repeat("a", candidateScoreMaxEvidenceLength+20)
 	report := CandidateScoringReport{

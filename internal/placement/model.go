@@ -400,6 +400,7 @@ type CandidateScoringReport struct {
 	TopPenalties          []CandidateScoreDimension `json:"top_penalties,omitempty"`
 	WinningCandidates     []CandidateScore          `json:"winning_candidates,omitempty"`
 	AlternativeCandidates []CandidateScore          `json:"alternative_candidates,omitempty"`
+	rejectedSamplesByRef  map[string]int
 }
 
 type CandidateScore struct {

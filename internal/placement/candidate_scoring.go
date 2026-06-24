@@ -4,6 +4,8 @@ import (
 	"math"
 	"slices"
 	"strings"
+
+	"kicadai/internal/reports"
 )
 
 const (
@@ -13,6 +15,7 @@ const (
 	defaultCandidateScoreEvidencePerDimension     = 4
 	maxCandidateAlternativesPerComponent          = 32
 	maxCandidateScoreEvidencePerDimension         = 16
+	maxCandidateRejectedSamplesPerComponent       = 64
 	candidateScoreFloatPrecision              int = 1000
 	candidateScoreMaxEvidenceLength           int = 160
 	candidatePlacementCompareEpsilon              = 1e-9
@@ -91,6 +94,52 @@ func NormalizeCandidateScoringReport(report CandidateScoringReport, rules Candid
 	report.AlternativeCandidates = limitCandidateScoresPerRef(report.AlternativeCandidates, rules.MaxAlternativesPerComponent)
 	report.RejectedByReason = normalizeCandidateReasonCounts(report.RejectedByReason)
 	return report
+}
+
+func recordCandidateRejection(report *CandidateScoringReport, component Component, refKey string, placement Placement, index int, reason CandidateRejectionReasonName, message string, refs ...string) {
+	if report == nil {
+		return
+	}
+	if report.RejectedByReason == nil {
+		report.RejectedByReason = map[string]int{}
+	}
+	if report.rejectedSamplesByRef == nil {
+		report.rejectedSamplesByRef = map[string]int{}
+	}
+	reasonKey := string(reason)
+	if reasonKey == "" {
+		reasonKey = string(CandidateRejectUnsupportedPolicy)
+	}
+	report.RejectedByReason[reasonKey]++
+	if refKey == "" {
+		refKey = component.Ref
+	}
+	if report.rejectedSamplesByRef[refKey] >= maxCandidateRejectedSamplesPerComponent {
+		return
+	}
+	report.rejectedSamplesByRef[refKey]++
+	report.AlternativeCandidates = append(report.AlternativeCandidates, CandidateScore{
+		Ref:       component.Ref,
+		Role:      component.Role,
+		Index:     index,
+		Placement: normalizePlacementLayer(placement),
+		Rejected:  true,
+		Total:     0,
+		Reasons: []CandidateRejectionReason{{
+			Name:     reason,
+			Severity: reports.SeverityError,
+			Message:  message,
+			Refs:     refs,
+		}},
+		Evidence: []string{message},
+	})
+}
+
+func candidateRejectionReasonForConflict(conflict occupancyConflict) CandidateRejectionReasonName {
+	if conflict.Kind == occupancyConflictKeepout {
+		return CandidateRejectKeepout
+	}
+	return CandidateRejectCollision
 }
 
 func limitCandidateScoresPerRef(scores []CandidateScore, limit int) []CandidateScore {

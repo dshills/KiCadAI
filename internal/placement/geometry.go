@@ -127,6 +127,32 @@ type occupancy struct {
 	keepouts   []Keepout
 }
 
+type occupancyConflictKind string
+
+const (
+	occupancyConflictKeepout   occupancyConflictKind = "keepout"
+	occupancyConflictComponent occupancyConflictKind = "component"
+)
+
+type occupancyConflict struct {
+	Kind occupancyConflictKind
+	Name string
+}
+
+func (conflict occupancyConflict) Message() string {
+	switch conflict.Kind {
+	case occupancyConflictKeepout:
+		if conflict.Name != "" {
+			return "keepout " + conflict.Name
+		}
+		return "keepout"
+	case occupancyConflictComponent:
+		return "component " + conflict.Name
+	default:
+		return conflict.Name
+	}
+}
+
 func newOccupancy(request Request) *occupancy {
 	return &occupancy{keepouts: request.Keepouts}
 }
@@ -137,6 +163,14 @@ func (o *occupancy) Add(placement PlacementResult) {
 }
 
 func (o *occupancy) FirstConflict(candidate PlacementResult) (string, bool) {
+	conflict, ok := o.FirstConflictDetail(candidate)
+	if !ok {
+		return "", false
+	}
+	return conflict.Message(), true
+}
+
+func (o *occupancy) FirstConflictDetail(candidate PlacementResult) (occupancyConflict, bool) {
 	candidate.Position = normalizePlacementLayer(candidate.Position)
 	candidateLayer := candidate.Position.Layer
 	for _, keepout := range o.keepouts {
@@ -144,10 +178,7 @@ func (o *occupancy) FirstConflict(candidate PlacementResult) (string, bool) {
 			continue
 		}
 		if keepoutAppliesToLayer(keepout, candidateLayer) && keepout.Bounds.Intersects(candidate.Bounds) {
-			if keepout.ID != "" {
-				return "keepout " + keepout.ID, true
-			}
-			return "keepout", true
+			return occupancyConflict{Kind: occupancyConflictKeepout, Name: keepout.ID}, true
 		}
 	}
 	for _, existing := range o.placements {
@@ -155,10 +186,10 @@ func (o *occupancy) FirstConflict(candidate PlacementResult) (string, bool) {
 			continue
 		}
 		if existing.Bounds.Intersects(candidate.Bounds) {
-			return "component " + existing.Ref, true
+			return occupancyConflict{Kind: occupancyConflictComponent, Name: existing.Ref}, true
 		}
 	}
-	return "", false
+	return occupancyConflict{}, false
 }
 
 func rotatedBounds(bounds Bounds, placement Placement, spacing float64) Rect {

@@ -264,7 +264,7 @@ func TestPlaceContinuesPastInvalidCandidateRotation(t *testing.T) {
 	req.Components[0].Rotation.AllowedDeg = []float64{45, 0}
 
 	padsByRef := componentPadMaps(req.Components)
-	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets), keepTogetherPeersByComponent(req))
+	result, ok, _ := placeComponent(req.Components[0], req, newOccupancy(req), nil, padsByRef, componentRotatedPadMaps(req.Components, padsByRef), netsByComponent(req.Nets), keepTogetherPeersByComponent(req), nil)
 	if !ok {
 		t.Fatal("placeComponent failed after invalid candidate rotation")
 	}

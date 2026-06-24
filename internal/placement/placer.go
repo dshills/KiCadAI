@@ -64,7 +64,7 @@ func PlaceContext(ctx context.Context, request Request) Result {
 			result.Metrics.UnplacedCount += totalComponents - index
 			break
 		}
-		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef)
+		placement, ok, placementIssues := placeComponent(component, request, occupancy, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef, result.CandidateScoring)
 		if !ok {
 			result.Status = StatusPartial
 			result.Metrics.UnplacedCount++
@@ -123,6 +123,10 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		result.Status = StatusPartial
 	}
 	result.Metrics.HPWLMM = hpwl(request.Nets, result.Placements)
+	if result.CandidateScoring != nil {
+		normalized := NormalizeCandidateScoringReport(*result.CandidateScoring, request.Rules.CandidateScoring)
+		result.CandidateScoring = &normalized
+	}
 	return result
 }
 
@@ -165,34 +169,44 @@ func slicesForPlacement(components []Component) []Component {
 	return ordered
 }
 
-func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string) (PlacementResult, bool, []reports.Issue) {
+func placeComponent(component Component, request Request, occupancy *occupancy, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) (PlacementResult, bool, []reports.Issue) {
+	componentRef := normalizeRef(component.Ref)
 	if component.Fixed {
 		if component.Position == nil {
+			recordCandidateRejection(scoring, component, componentRef, Placement{}, 0, CandidateRejectMobility, "fixed placement is missing a position")
 			return PlacementResult{}, false, nil
 		}
 		placement, ok := NewPlacementResult(component, *component.Position, request.Rules)
 		if !ok {
+			recordCandidateRejection(scoring, component, componentRef, *component.Position, 0, CandidateRejectMissingGeometry, "fixed placement bounds are unavailable")
 			return PlacementResult{}, false, nil
 		}
 		physicalBounds, ok := ComponentPhysicalBounds(component, placement.Position)
 		if !ok {
+			recordCandidateRejection(scoring, component, componentRef, placement.Position, 0, CandidateRejectMissingGeometry, "fixed physical bounds are unavailable")
 			return PlacementResult{}, false, nil
 		}
 		path := "components." + component.Ref + ".position"
 		if !BoardUsableRect(request.Board, request.Rules).Contains(physicalBounds) {
+			recordCandidateRejection(scoring, component, componentRef, placement.Position, 0, CandidateRejectOutsideBoard, "fixed placement is outside usable board area")
 			return PlacementResult{}, false, []reports.Issue{
 				geometryIssue(reports.CodePlacementOutsideBoard, path, "fixed placement is outside usable board area"),
 			}
 		}
-		if conflict, ok := occupancy.FirstConflict(placement); ok {
+		if conflict, ok := occupancy.FirstConflictDetail(placement); ok {
+			message := conflict.Message()
+			recordCandidateRejection(scoring, component, componentRef, placement.Position, 0, candidateRejectionReasonForConflict(conflict), "fixed placement conflicts with "+message, message)
 			return PlacementResult{}, false, []reports.Issue{
-				geometryIssue(reports.CodePlacementCollision, path, "fixed placement conflicts with "+conflict),
+				geometryIssue(reports.CodePlacementCollision, path, "fixed placement conflicts with "+message),
 			}
 		}
 		return placement, true, nil
 	}
-	for _, placement := range candidatePlacements(component, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef) {
-		if _, conflict := occupancy.FirstConflict(placement); conflict {
+	for _, candidate := range candidatePlacements(component, componentRef, request, placedByRef, padsByRef, rotatedPadsByRef, netsByRef, keepTogetherPeersByRef, scoring) {
+		placement := candidate.Placement
+		if conflict, ok := occupancy.FirstConflictDetail(placement); ok {
+			message := conflict.Message()
+			recordCandidateRejection(scoring, component, componentRef, placement.Position, candidate.Index, candidateRejectionReasonForConflict(conflict), "candidate conflicts with "+message, message)
 			continue
 		}
 		return placement, true, nil
@@ -200,7 +214,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 	return PlacementResult{}, false, nil
 }
 
-func candidatePlacements(component Component, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string) []PlacementResult {
+func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, keepTogetherPeersByRef map[string][]string, scoring *CandidateScoringReport) []placementCandidate {
 	usable := BoardUsableRect(request.Board, request.Rules)
 	grid := request.Rules.GridMM
 	if grid <= 0 {
@@ -209,35 +223,43 @@ func candidatePlacements(component Component, request Request, placedByRef map[s
 	rotations := componentRotations(component)
 	layers := candidateLayers(component, request.Rules)
 	maxCandidates := request.Rules.MaxCandidatesPerPart
-	candidates := make([]PlacementResult, 0, maxCandidates)
+	candidates := make([]placementCandidate, 0, maxCandidates)
 	xCount := max(1, int(math.Floor((usable.Max.XMM-usable.Min.XMM)/grid))+1)
 	yCount := max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)
 	variantsPerPoint := max(1, len(rotations)*len(layers))
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
 	xIndices := sampledIndices(xCount, axisSamples)
 	yIndices := sampledIndices(yCount, axisSamples)
+	candidateIndex := 0
 	for _, yIndex := range yIndices {
 		y := usable.Min.YMM + float64(yIndex)*grid
 		for _, xIndex := range xIndices {
 			x := usable.Min.XMM + float64(xIndex)*grid
 			for _, rotation := range rotations {
 				for _, layer := range layers {
+					index := candidateIndex
+					candidateIndex++
 					candidate := Placement{XMM: roundToGrid(x, grid), YMM: roundToGrid(y, grid), RotationDeg: rotation, Layer: layer}
 					candidateResult, ok := NewPlacementResult(component, candidate, request.Rules)
 					if !ok {
+						recordCandidateRejection(scoring, component, componentRef, candidate, index, CandidateRejectMissingGeometry, "candidate bounds are unavailable")
 						continue
 					}
 					physicalBounds, ok := ComponentPhysicalBounds(component, candidateResult.Position)
-					if !ok || !usable.Contains(physicalBounds) {
+					if !ok {
+						recordCandidateRejection(scoring, component, componentRef, candidate, index, CandidateRejectMissingGeometry, "candidate physical bounds are unavailable")
 						continue
 					}
-					candidates = append(candidates, candidateResult)
+					if !usable.Contains(physicalBounds) {
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectOutsideBoard, "candidate is outside usable board area")
+						continue
+					}
+					candidates = append(candidates, placementCandidate{Placement: candidateResult, Index: index})
 				}
 			}
 		}
 	}
 	anchor, hasAnchor := groupAnchorPoint(component, request)
-	componentRef := normalizeRef(component.Ref)
 	groupTarget, hasGroupTarget := groupKeepTogetherTarget(componentRef, keepTogetherPeersByRef, placedByRef)
 	netTargets := netScoreTargets(componentRef, netsByRef[componentRef], placedByRef, rotatedPadsByRef)
 	seedBase := seedTieBreakBase(request.Seed, component.Ref)
@@ -246,16 +268,16 @@ func candidatePlacements(component Component, request Request, placedByRef map[s
 	for index, candidate := range candidates {
 		scored[index] = scoredPlacementCandidate{
 			CandidateIndex: index,
-			Score:          placementScore(component, candidate.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget, netTargets, rotatedPadsByRotation, seedBase),
+			Score:          placementScore(component, candidate.Placement.Position, request, anchor, hasAnchor, groupTarget, hasGroupTarget, netTargets, rotatedPadsByRotation, seedBase),
 		}
 	}
 	sort.Slice(scored, func(i int, j int) bool {
 		if scored[i].Score != scored[j].Score {
 			return scored[i].Score < scored[j].Score
 		}
-		return placementLess(candidates[scored[i].CandidateIndex].Position, candidates[scored[j].CandidateIndex].Position)
+		return placementLess(candidates[scored[i].CandidateIndex].Placement.Position, candidates[scored[j].CandidateIndex].Placement.Position)
 	})
-	ordered := make([]PlacementResult, len(candidates))
+	ordered := make([]placementCandidate, len(candidates))
 	for index, candidate := range scored {
 		ordered[index] = candidates[candidate.CandidateIndex]
 	}
@@ -264,6 +286,11 @@ func candidatePlacements(component Component, request Request, placedByRef map[s
 		candidates = candidates[:maxCandidates]
 	}
 	return candidates
+}
+
+type placementCandidate struct {
+	Placement PlacementResult
+	Index     int
 }
 
 type scoredPlacementCandidate struct {
