@@ -77,6 +77,16 @@
         {"role": "decoupling", "footprint_id": "Capacitor_SMD:C_0603_1608Metric"},
         {"role": "enable_pullup", "footprint_id": "Resistor_SMD:R_0603_1608Metric"}
       ],
+      "required_local_routes": [
+        "osc_vcc_decoupling",
+        "osc_gnd_decoupling",
+        "osc_enable_pullup",
+        "osc_enable_vcc"
+      ],
+      "timing_fixtures": [
+        {"id": "canned_oscillator_core", "satisfied": true}
+      ],
+      "require_realization": true,
       "allow_unrouted": true
     }
   }

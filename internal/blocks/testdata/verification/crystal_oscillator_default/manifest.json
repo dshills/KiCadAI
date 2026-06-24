@@ -69,6 +69,15 @@
         {"role": "load_capacitor_1", "footprint_id": "Capacitor_SMD:C_0603_1608Metric"},
         {"role": "load_capacitor_2", "footprint_id": "Capacitor_SMD:C_0603_1608Metric"}
       ],
+      "required_local_routes": [
+        "xtal1_load",
+        "xtal2_load",
+        "load_caps_ground"
+      ],
+      "timing_fixtures": [
+        {"id": "crystal_loop", "satisfied": true}
+      ],
+      "require_realization": true,
       "allow_unrouted": true
     }
   }

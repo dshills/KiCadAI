@@ -94,6 +94,14 @@
         {"role": "reset_switch", "footprint_id": "Button_Switch_SMD:SW_SPST_SKQG_WithStem"},
         {"role": "isp_header", "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_2x03_P2.54mm_Vertical"}
       ],
+      "required_local_routes": [
+        "reset_pullup_to_header",
+        "reset_switch_to_header_ground"
+      ],
+      "timing_fixtures": [
+        {"id": "reset_programming_path", "satisfied": true}
+      ],
+      "require_realization": true,
       "allow_unrouted": true
     }
   }
