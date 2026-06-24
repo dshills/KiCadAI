@@ -2,12 +2,15 @@ package placement
 
 import (
 	"math"
+	"sort"
 	"strings"
 	"testing"
 	"unicode/utf8"
 
 	"kicadai/internal/reports"
 )
+
+const candidateScoringHPWLToleranceMM = 0.001
 
 func TestNormalizeCandidateScoringRulesDefaults(t *testing.T) {
 	got := normalizeCandidateScoringRules(DefaultRules().CandidateScoring)
@@ -224,6 +227,94 @@ func TestPlaceCandidateScoringReportsCongestionAndFanoutDimensions(t *testing.T)
 	if !candidateScoreHasDimension(winner, CandidateScoreFanout) {
 		t.Fatalf("fanout dimension missing: %#v", winner.Dimensions)
 	}
+}
+
+func TestCandidateScoringDeterministicAndGeometrySafe(t *testing.T) {
+	req := twoComponentRequest()
+	req.Components[0].Fixed = true
+	req.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	req.Rules = DefaultRules()
+	req.Rules.CandidateScoring.Enabled = true
+
+	first := Place(CloneRequest(req))
+	second := Place(CloneRequest(req))
+	if first.CandidateScoring == nil || second.CandidateScoring == nil {
+		t.Fatalf("candidate scoring missing: first=%#v second=%#v", first.CandidateScoring, second.CandidateScoring)
+	}
+	if len(first.Placements) == 0 || len(second.Placements) == 0 {
+		t.Fatalf("placements missing: first=%d second=%d", len(first.Placements), len(second.Placements))
+	}
+	if math.IsNaN(first.CandidateScoring.AverageWinningScore) || math.IsNaN(second.CandidateScoring.AverageWinningScore) ||
+		math.IsNaN(first.CandidateScoring.LowestWinningScore) || math.IsNaN(second.CandidateScoring.LowestWinningScore) {
+		t.Fatalf("candidate scoring contains NaN: first=%#v second=%#v", first.CandidateScoring, second.CandidateScoring)
+	}
+	if math.IsInf(first.CandidateScoring.AverageWinningScore, 0) || math.IsInf(second.CandidateScoring.AverageWinningScore, 0) ||
+		math.IsInf(first.CandidateScoring.LowestWinningScore, 0) || math.IsInf(second.CandidateScoring.LowestWinningScore, 0) {
+		t.Fatalf("candidate scoring contains infinity: first=%#v second=%#v", first.CandidateScoring, second.CandidateScoring)
+	}
+	if math.Abs(first.CandidateScoring.AverageWinningScore-second.CandidateScoring.AverageWinningScore) > 1e-9 ||
+		math.Abs(first.CandidateScoring.LowestWinningScore-second.CandidateScoring.LowestWinningScore) > 1e-9 {
+		t.Fatalf("candidate scoring not deterministic: first=%#v second=%#v", first.CandidateScoring, second.CandidateScoring)
+	}
+	if !placementsNearlyEqual(first.Placements, second.Placements) {
+		t.Fatalf("placements not deterministic: first=%#v second=%#v", first.Placements, second.Placements)
+	}
+	geometryIssues := ValidateGeometry(req, first.Placements)
+	if len(geometryIssues) != 0 {
+		t.Fatalf("scored placement failed geometry validation: %#v", geometryIssues)
+	}
+}
+
+func TestCandidateScoringPreservesOrImprovesHPWL(t *testing.T) {
+	baseline := twoComponentRequest()
+	baseline.Components[0].Fixed = true
+	baseline.Components[0].Position = &Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}
+	baseline.Rules = DefaultRules()
+	baseline.Rules.CandidateScoring.Enabled = false
+	scored := CloneRequest(baseline)
+	scored.Rules.CandidateScoring.Enabled = true
+
+	baselineResult := Place(baseline)
+	scoredResult := Place(scored)
+	if scoredResult.Metrics.PlacedCount != baselineResult.Metrics.PlacedCount {
+		t.Fatalf("placed count changed: scored=%d baseline=%d", scoredResult.Metrics.PlacedCount, baselineResult.Metrics.PlacedCount)
+	}
+	if baselineResult.Metrics.PlacedCount < 2 {
+		t.Fatalf("baseline placement did not exercise movable component: %#v", baselineResult.Metrics)
+	}
+	if scoredResult.Metrics.HPWLMM > baselineResult.Metrics.HPWLMM+candidateScoringHPWLToleranceMM {
+		t.Fatalf("scored HPWL regressed: scored=%f baseline=%f placed=%d", scoredResult.Metrics.HPWLMM, baselineResult.Metrics.HPWLMM, scoredResult.Metrics.PlacedCount)
+	}
+}
+
+func placementsNearlyEqual(first []PlacementResult, second []PlacementResult) bool {
+	if len(first) != len(second) {
+		return false
+	}
+	first = append([]PlacementResult(nil), first...)
+	second = append([]PlacementResult(nil), second...)
+	sort.Slice(first, func(i, j int) bool {
+		return first[i].Ref < first[j].Ref
+	})
+	sort.Slice(second, func(i, j int) bool {
+		return second[i].Ref < second[j].Ref
+	})
+	for index := range first {
+		if first[index].Ref != second[index].Ref || first[index].FootprintID != second[index].FootprintID {
+			return false
+		}
+		if !positionNearlyEqual(first[index].Position, second[index].Position) {
+			return false
+		}
+	}
+	return true
+}
+
+func positionNearlyEqual(first Placement, second Placement) bool {
+	return math.Abs(first.XMM-second.XMM) <= 1e-9 &&
+		math.Abs(first.YMM-second.YMM) <= 1e-9 &&
+		math.Abs(first.RotationDeg-second.RotationDeg) <= 1e-9 &&
+		first.Layer == second.Layer
 }
 
 func candidateScoreForRef(scores []CandidateScore, ref string) (CandidateScore, bool) {
