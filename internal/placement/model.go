@@ -186,6 +186,28 @@ type Rules struct {
 	AllowBackLayer           bool
 	ConnectorEdgeClearanceMM float64
 	MaxCandidatesPerPart     int
+	CandidateScoring         CandidateScoringRules
+}
+
+type CandidateScoringRules struct {
+	Enabled                     bool
+	Policy                      string
+	MaxAlternativesPerComponent int
+	MaxEvidencePerDimension     int
+	Weights                     CandidateScoreWeights
+}
+
+type CandidateScoreWeights struct {
+	HardConstraints     float64
+	SemanticRole        float64
+	GroupCohesion       float64
+	ElectricalProximity float64
+	RouteLength         float64
+	Congestion          float64
+	Fanout              float64
+	Edge                float64
+	Region              float64
+	Mobility            float64
 }
 
 type ProximityRule struct {
@@ -244,12 +266,13 @@ type Placement struct {
 }
 
 type Result struct {
-	Status     Status                   `json:"status"`
-	Placements []PlacementResult        `json:"placements"`
-	Issues     []reports.Issue          `json:"issues"`
-	Metrics    Metrics                  `json:"metrics"`
-	Operations []transactions.Operation `json:"operations,omitempty"`
-	Quality    *QualityReport           `json:"quality,omitempty"`
+	Status           Status                   `json:"status"`
+	Placements       []PlacementResult        `json:"placements"`
+	Issues           []reports.Issue          `json:"issues"`
+	Metrics          Metrics                  `json:"metrics"`
+	Operations       []transactions.Operation `json:"operations,omitempty"`
+	Quality          *QualityReport           `json:"quality,omitempty"`
+	CandidateScoring *CandidateScoringReport  `json:"candidate_scoring,omitempty"`
 }
 
 type PlacementResult struct {
@@ -335,6 +358,76 @@ type ScoreDimension struct {
 	Suggestion string   `json:"suggestion,omitempty"`
 }
 
+type CandidateScoreDimensionName string
+
+const (
+	CandidateScoreHardConstraints     CandidateScoreDimensionName = "hard_constraints"
+	CandidateScoreSemanticRole        CandidateScoreDimensionName = "semantic_role"
+	CandidateScoreGroupCohesion       CandidateScoreDimensionName = "group_cohesion"
+	CandidateScoreElectricalProximity CandidateScoreDimensionName = "electrical_proximity"
+	CandidateScoreRouteLength         CandidateScoreDimensionName = "route_length"
+	CandidateScoreCongestion          CandidateScoreDimensionName = "congestion"
+	CandidateScoreFanout              CandidateScoreDimensionName = "fanout"
+	CandidateScoreEdge                CandidateScoreDimensionName = "edge"
+	CandidateScoreRegion              CandidateScoreDimensionName = "region"
+	CandidateScoreMobility            CandidateScoreDimensionName = "mobility"
+)
+
+type CandidateRejectionReasonName string
+
+const (
+	CandidateRejectOutsideBoard      CandidateRejectionReasonName = "outside_board"
+	CandidateRejectCollision         CandidateRejectionReasonName = "collision"
+	CandidateRejectKeepout           CandidateRejectionReasonName = "keepout"
+	CandidateRejectMobility          CandidateRejectionReasonName = "mobility"
+	CandidateRejectEdge              CandidateRejectionReasonName = "edge"
+	CandidateRejectSide              CandidateRejectionReasonName = "side"
+	CandidateRejectRotation          CandidateRejectionReasonName = "rotation"
+	CandidateRejectGroupConstraint   CandidateRejectionReasonName = "group_constraint"
+	CandidateRejectMissingGeometry   CandidateRejectionReasonName = "missing_geometry"
+	CandidateRejectUnsupportedPolicy CandidateRejectionReasonName = "unsupported_policy"
+)
+
+type CandidateScoringReport struct {
+	Enabled               bool                      `json:"enabled"`
+	Policy                string                    `json:"policy,omitempty"`
+	ScoreVersion          string                    `json:"score_version,omitempty"`
+	AverageWinningScore   float64                   `json:"average_winning_score,omitempty"`
+	LowestWinningScore    float64                   `json:"lowest_winning_score,omitempty"`
+	RejectedCount         int                       `json:"rejected_count,omitempty"`
+	RejectedByReason      map[string]int            `json:"rejected_by_reason,omitempty"`
+	AggregateDimensions   []CandidateScoreDimension `json:"aggregate_dimensions,omitempty"`
+	TopPenalties          []CandidateScoreDimension `json:"top_penalties,omitempty"`
+	WinningCandidates     []CandidateScore          `json:"winning_candidates,omitempty"`
+	AlternativeCandidates []CandidateScore          `json:"alternative_candidates,omitempty"`
+}
+
+type CandidateScore struct {
+	Ref        string                     `json:"ref"`
+	Role       string                     `json:"role,omitempty"`
+	Index      int                        `json:"index"`
+	Placement  Placement                  `json:"placement"`
+	Total      float64                    `json:"total"`
+	Dimensions []CandidateScoreDimension  `json:"dimensions,omitempty"`
+	Rejected   bool                       `json:"rejected,omitempty"`
+	Reasons    []CandidateRejectionReason `json:"reasons,omitempty"`
+	Evidence   []string                   `json:"evidence,omitempty"`
+}
+
+type CandidateScoreDimension struct {
+	Name     CandidateScoreDimensionName `json:"name"`
+	Score    float64                     `json:"score"`
+	Weight   float64                     `json:"weight"`
+	Evidence []string                    `json:"evidence,omitempty"`
+}
+
+type CandidateRejectionReason struct {
+	Name     CandidateRejectionReasonName `json:"name"`
+	Severity reports.Severity             `json:"severity,omitempty"`
+	Message  string                       `json:"message,omitempty"`
+	Refs     []string                     `json:"refs,omitempty"`
+}
+
 func DefaultRules() Rules {
 	return Rules{
 		GridMM:                   0.5,
@@ -345,6 +438,23 @@ func DefaultRules() Rules {
 		AllowBackLayer:           false,
 		ConnectorEdgeClearanceMM: 1.0,
 		MaxCandidatesPerPart:     5000,
+		CandidateScoring: CandidateScoringRules{
+			Policy:                      defaultCandidateScoringPolicy,
+			MaxAlternativesPerComponent: defaultCandidateAlternativesPerComponent,
+			MaxEvidencePerDimension:     defaultCandidateScoreEvidencePerDimension,
+			Weights: CandidateScoreWeights{
+				HardConstraints:     1,
+				SemanticRole:        1,
+				GroupCohesion:       1,
+				ElectricalProximity: 1,
+				RouteLength:         1,
+				Congestion:          1,
+				Fanout:              1,
+				Edge:                1,
+				Region:              1,
+				Mobility:            1,
+			},
+		},
 	}
 }
 
@@ -485,6 +595,7 @@ func normalizeRules(rules Rules) Rules {
 	} else if rules.MaxCandidatesPerPart > maxCandidatesPerPartLimit {
 		rules.MaxCandidatesPerPart = maxCandidatesPerPartLimit
 	}
+	rules.CandidateScoring = normalizeCandidateScoringRules(rules.CandidateScoring)
 	return rules
 }
 

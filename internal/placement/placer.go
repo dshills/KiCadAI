@@ -27,7 +27,8 @@ func PlaceContext(ctx context.Context, request Request) Result {
 	request = NormalizeRequest(request)
 	totalComponents := len(request.Components)
 	result := Result{
-		Status: StatusPlaced,
+		Status:           StatusPlaced,
+		CandidateScoring: NewCandidateScoringReport(request.Rules.CandidateScoring),
 		Metrics: Metrics{
 			ComponentCount: totalComponents,
 		},
