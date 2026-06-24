@@ -50,6 +50,110 @@ func TestValidatePCBRealizationRejectsInvalidRoute(t *testing.T) {
 	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.1.width_mm")
 }
 
+func TestValidatePCBRealizationAcceptsEntryAnchorRoute(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:          "input_entry",
+		Port:        "IN",
+		NetTemplate: "SIG",
+		Placement:   RelativePlacement{XMM: -1, YMM: 2, Layer: "F.Cu"},
+	}}
+	definition.PCBRealization.LocalRoutes = append(definition.PCBRealization.LocalRoutes, PCBLocalRoute{
+		ID:          "entry_to_resistor",
+		NetTemplate: "SIG",
+		From:        RouteEndpoint{AnchorID: "input_entry"},
+		To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+		Layer:       "F.Cu",
+		WidthMM:     0.25,
+	})
+
+	issues := ValidatePCBRealization(definition)
+	if len(issues) != 0 {
+		t.Fatalf("ValidatePCBRealization issues = %#v, want none", issues)
+	}
+}
+
+func TestValidatePCBRealizationRejectsInvalidEntryAnchors(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{
+		{
+			ID:        "input_entry",
+			Port:      "IN",
+			Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+		},
+		{
+			ID:          "input_entry",
+			Port:        "OUT",
+			NetTemplate: " SIG",
+			Placement:   RelativePlacement{XMM: math.NaN(), YMM: 0, Layer: "Nope.Cu"},
+			Side:        "sideways",
+			When:        RealizationWhen{Params: map[string]any{"missing": true}},
+		},
+	}
+
+	issues := ValidatePCBRealization(definition)
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.id")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.port")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.net_template")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.side")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.placement")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.placement.layer")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.1.when.params.missing")
+}
+
+func TestValidatePCBRealizationRejectsInvalidRouteEndpointModes(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:        "input_entry",
+		Port:      "IN",
+		Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	}}
+	definition.PCBRealization.LocalRoutes = append(definition.PCBRealization.LocalRoutes,
+		PCBLocalRoute{
+			ID:          "missing_mode",
+			NetTemplate: "SIG",
+			From:        RouteEndpoint{},
+			To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+			Layer:       "F.Cu",
+		},
+		PCBLocalRoute{
+			ID:          "conflicting_mode",
+			NetTemplate: "SIG",
+			From:        RouteEndpoint{ComponentRole: "resistor", Pin: "1", AnchorID: "input_entry"},
+			To:          RouteEndpoint{ComponentRole: "led", Pin: "A"},
+			Layer:       "F.Cu",
+		},
+		PCBLocalRoute{
+			ID:          "unknown_anchor",
+			NetTemplate: "SIG",
+			From:        RouteEndpoint{AnchorID: "missing"},
+			To:          RouteEndpoint{ComponentRole: "led", Pin: "A"},
+			Layer:       "F.Cu",
+		},
+		PCBLocalRoute{
+			ID:          "unknown_port",
+			NetTemplate: "SIG",
+			From:        RouteEndpoint{Port: "OUT"},
+			To:          RouteEndpoint{ComponentRole: "led", Pin: "A"},
+			Layer:       "F.Cu",
+		},
+	)
+
+	issues := ValidatePCBRealization(definition)
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.1.from")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.2.from")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.3.from.anchor_id")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.4.from.port")
+}
+
+func TestValidatePCBRealizationRejectsInvalidZoneCondition(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.PCBRealization.Zones[0].When = RealizationWhen{Params: map[string]any{"missing": true}}
+
+	issues := ValidatePCBRealization(definition)
+	assertIssuePath(t, issues, "block.demo.pcb_realization.zones.0.when.params.missing")
+}
+
 func TestValidatePCBRealizationRejectsAnchorOutsideGroup(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.PCBRealization.PlacementGroups[0].AnchorRole = "led"
@@ -61,9 +165,20 @@ func TestValidatePCBRealizationRejectsAnchorOutsideGroup(t *testing.T) {
 
 func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 	definition := timingRealizationDefinition()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:        "input_entry",
+		Port:      "IN",
+		Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+		When:      RealizationWhen{Params: map[string]any{"enabled": true}},
+	}}
+	definition.PCBRealization.LocalRoutes[0].When = RealizationWhen{Params: map[string]any{"enabled": true}}
+	definition.PCBRealization.Zones[0].When = RealizationWhen{Params: map[string]any{"enabled": true}}
 	clone := cloneBlockDefinition(definition)
 	clone.PCBRealization.Components[0].Properties["k"] = "changed"
+	clone.PCBRealization.EntryAnchors[0].When.Params["enabled"] = false
 	clone.PCBRealization.LocalRoutes[0].Waypoints[0].XMM = 99
+	clone.PCBRealization.LocalRoutes[0].When.Params["enabled"] = false
+	clone.PCBRealization.Zones[0].When.Params["enabled"] = false
 	fixture := &clone.PCBRealization.TimingFixtures[0]
 	if len(fixture.LoadCapacitorRoles) == 0 || len(fixture.DecouplingRoles) == 0 || len(fixture.EnableControlRoles) == 0 {
 		t.Fatalf("test fixture missing timing roles: %#v", fixture)
@@ -81,8 +196,17 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 	if definition.PCBRealization.Components[0].Properties["k"] != "v" {
 		t.Fatalf("component properties were not cloned: %#v", definition.PCBRealization.Components[0].Properties)
 	}
+	if definition.PCBRealization.EntryAnchors[0].When.Params["enabled"] != true {
+		t.Fatalf("entry anchor condition params were not cloned")
+	}
 	if definition.PCBRealization.LocalRoutes[0].Waypoints[0].XMM == 99 {
 		t.Fatalf("route waypoints were not cloned")
+	}
+	if definition.PCBRealization.LocalRoutes[0].When.Params["enabled"] != true {
+		t.Fatalf("route condition params were not cloned")
+	}
+	if definition.PCBRealization.Zones[0].When.Params["enabled"] != true {
+		t.Fatalf("zone condition params were not cloned")
 	}
 	originalFixture := definition.PCBRealization.TimingFixtures[0]
 	if originalFixture.LoadCapacitorRoles[0] == "changed" {

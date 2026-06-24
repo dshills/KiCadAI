@@ -3,11 +3,14 @@ package blocks
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/reports"
 )
+
+var realizationPathSegmentReplacer = strings.NewReplacer(".", "_", " ", "_", "/", "_", "\\", "_", ":", "_")
 
 type PCBVerificationLevel string
 
@@ -23,6 +26,7 @@ type PCBRealization struct {
 	Version              string                    `json:"version"`
 	VerificationLevel    PCBVerificationLevel      `json:"verification_level"`
 	Components           []PCBComponentRealization `json:"components,omitempty"`
+	EntryAnchors         []PCBEntryAnchor          `json:"entry_anchors,omitempty"`
 	PlacementGroups      []PCBPlacementGroup       `json:"placement_groups,omitempty"`
 	LocalRoutes          []PCBLocalRoute           `json:"local_routes,omitempty"`
 	TimingFixtures       []PCBTimingFixture        `json:"timing,omitempty"`
@@ -62,6 +66,16 @@ type PCBPlacementGroup struct {
 	AnchorRole     string          `json:"anchor_role,omitempty"`
 	Bounds         *RelativeBounds `json:"bounds,omitempty"`
 	Description    string          `json:"description,omitempty"`
+}
+
+type PCBEntryAnchor struct {
+	ID          string            `json:"id"`
+	Port        string            `json:"port"`
+	NetTemplate string            `json:"net_template,omitempty"`
+	Placement   RelativePlacement `json:"placement"`
+	Side        string            `json:"side,omitempty"`
+	Description string            `json:"description,omitempty"`
+	When        RealizationWhen   `json:"when,omitempty"`
 }
 
 type RelativeBounds struct {
@@ -127,8 +141,10 @@ type PCBTimingFixture struct {
 }
 
 type RouteEndpoint struct {
-	ComponentRole string `json:"component_role"`
-	Pin           string `json:"pin"`
+	ComponentRole string `json:"component_role,omitempty"`
+	Pin           string `json:"pin,omitempty"`
+	AnchorID      string `json:"anchor_id,omitempty"`
+	Port          string `json:"port,omitempty"`
 }
 
 type RelativePoint struct {
@@ -144,6 +160,7 @@ type PCBZoneRealization struct {
 	Points       []RelativePoint `json:"points"`
 	ThermalGapMM float64         `json:"thermal_gap_mm,omitempty"`
 	Description  string          `json:"description,omitempty"`
+	When         RealizationWhen `json:"when,omitempty"`
 }
 
 type PCBKeepout struct {
@@ -189,6 +206,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, blockIssue(path+".verification_level", "unsupported PCB verification level "+string(realization.VerificationLevel)))
 	}
 	roles := componentRoleSet(definition.Components)
+	ports := portNameSet(definition.Ports)
 	parameters := parameterNameSet(definition.Parameters)
 	for index, component := range realization.Components {
 		componentPath := fmt.Sprintf("%s.components.%d", path, index)
@@ -201,6 +219,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 				issues = append(issues, blockIssue(componentPath+".footprint_param", "unknown footprint parameter "+component.FootprintParam))
 			}
 		}
+		issues = append(issues, validateRealizationWhen(componentPath+".when", component.When, parameters)...)
 		issues = append(issues, validateRelativePlacement(componentPath+".placement", component.Placement)...)
 	}
 	groupIDs := map[string]struct{}{}
@@ -226,6 +245,38 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			issues = append(issues, validateBounds(groupPath+".bounds", *group.Bounds)...)
 		}
 	}
+	anchorIDs := map[string]struct{}{}
+	for index, anchor := range realization.EntryAnchors {
+		anchorPath := fmt.Sprintf("%s.entry_anchors.%d", path, index)
+		id := strings.TrimSpace(anchor.ID)
+		validID := false
+		if id == "" {
+			issues = append(issues, blockIssue(anchorPath+".id", "entry anchor ID is required"))
+		} else if id != anchor.ID {
+			issues = append(issues, blockIssue(anchorPath+".id", "entry anchor ID must not contain leading or trailing whitespace"))
+		} else if _, exists := anchorIDs[id]; exists {
+			issues = append(issues, blockIssue(anchorPath+".id", "duplicate entry anchor ID "+id))
+		} else {
+			validID = true
+		}
+		if validID {
+			anchorIDs[id] = struct{}{}
+		}
+		port := strings.TrimSpace(anchor.Port)
+		if port == "" {
+			issues = append(issues, blockIssue(anchorPath+".port", "entry anchor port is required"))
+		} else if port != anchor.Port {
+			issues = append(issues, blockIssue(anchorPath+".port", "entry anchor port must not contain leading or trailing whitespace"))
+		} else if _, ok := ports[port]; !ok {
+			issues = append(issues, blockIssue(anchorPath+".port", "unknown entry anchor port "+port))
+		}
+		if strings.TrimSpace(anchor.NetTemplate) != anchor.NetTemplate {
+			issues = append(issues, blockIssue(anchorPath+".net_template", "entry anchor net template must not contain leading or trailing whitespace"))
+		}
+		issues = append(issues, validatePCBRealizationSide(anchorPath+".side", anchor.Side)...)
+		issues = append(issues, validateRealizationWhen(anchorPath+".when", anchor.When, parameters)...)
+		issues = append(issues, validateRelativePlacement(anchorPath+".placement", anchor.Placement)...)
+	}
 	routeIDs := map[string]struct{}{}
 	for index, route := range realization.LocalRoutes {
 		routePath := fmt.Sprintf("%s.local_routes.%d", path, index)
@@ -239,12 +290,13 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		if strings.TrimSpace(route.NetTemplate) == "" {
 			issues = append(issues, blockIssue(routePath+".net_template", "local route net template is required"))
 		}
-		issues = append(issues, validateRouteEndpoint(routePath+".from", route.From, roles)...)
-		issues = append(issues, validateRouteEndpoint(routePath+".to", route.To, roles)...)
+		issues = append(issues, validateRouteEndpoint(routePath+".from", route.From, roles, ports, anchorIDs)...)
+		issues = append(issues, validateRouteEndpoint(routePath+".to", route.To, roles, ports, anchorIDs)...)
 		issues = append(issues, validateLayer(routePath+".layer", route.Layer, true)...)
 		if route.WidthMM < 0 || !finite(route.WidthMM) {
 			issues = append(issues, blockIssue(routePath+".width_mm", "route width must be finite and non-negative"))
 		}
+		issues = append(issues, validateRealizationWhen(routePath+".when", route.When, parameters)...)
 		for waypointIndex, point := range route.Waypoints {
 			issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", routePath, waypointIndex), point)...)
 		}
@@ -350,6 +402,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".max_clock_route_length_mm", timing.MaxClockRouteLengthMM)...)
 		issues = append(issues, validateOptionalNonNegativeMM(timingPath+".min_noise_keepout_mm", timing.MinNoiseKeepoutMM)...)
 		issues = append(issues, validateLayer(timingPath+".preferred_layer", timing.PreferredLayer, true)...)
+		issues = append(issues, validateRealizationWhen(timingPath+".when", timing.When, parameters)...)
 	}
 	zoneIDs := map[string]struct{}{}
 	for index, zone := range realization.Zones {
@@ -374,6 +427,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		if zone.ThermalGapMM < 0 || !finite(zone.ThermalGapMM) {
 			issues = append(issues, blockIssue(zonePath+".thermal_gap_mm", "thermal gap must be finite and non-negative"))
 		}
+		issues = append(issues, validateRealizationWhen(zonePath+".when", zone.When, parameters)...)
 	}
 	keepoutIDs := map[string]struct{}{}
 	for index, keepout := range realization.Keepouts {
@@ -473,6 +527,17 @@ func parameterNameSet(parameters []BlockParameter) map[string]struct{} {
 	return names
 }
 
+func portNameSet(ports []BlockPort) map[string]struct{} {
+	names := map[string]struct{}{}
+	for _, port := range ports {
+		name := strings.TrimSpace(port.Name)
+		if name != "" {
+			names[name] = struct{}{}
+		}
+	}
+	return names
+}
+
 func validateKnownRole(path string, role string, roles map[string]struct{}) []reports.Issue {
 	role = strings.TrimSpace(role)
 	if role == "" {
@@ -484,13 +549,113 @@ func validateKnownRole(path string, role string, roles map[string]struct{}) []re
 	return nil
 }
 
-func validateRouteEndpoint(path string, endpoint RouteEndpoint, roles map[string]struct{}) []reports.Issue {
+func validateRouteEndpoint(path string, endpoint RouteEndpoint, roles map[string]struct{}, ports map[string]struct{}, anchors map[string]struct{}) []reports.Issue {
 	var issues []reports.Issue
-	issues = append(issues, validateKnownRole(path+".component_role", endpoint.ComponentRole, roles)...)
-	if strings.TrimSpace(endpoint.Pin) == "" {
-		issues = append(issues, blockIssue(path+".pin", "route endpoint pin is required"))
+	componentRole := strings.TrimSpace(endpoint.ComponentRole)
+	pin := strings.TrimSpace(endpoint.Pin)
+	anchorID := strings.TrimSpace(endpoint.AnchorID)
+	port := strings.TrimSpace(endpoint.Port)
+	componentMode := componentRole != "" || pin != ""
+	anchorMode := anchorID != ""
+	portMode := port != ""
+	modeCount := 0
+	if componentMode {
+		modeCount++
+	}
+	if anchorMode {
+		modeCount++
+	}
+	if portMode {
+		modeCount++
+	}
+	if modeCount == 0 {
+		return []reports.Issue{blockIssue(path, "route endpoint requires component_role/pin, anchor_id, or port")}
+	}
+	if modeCount > 1 {
+		return []reports.Issue{blockIssue(path, "route endpoint must use exactly one endpoint mode")}
+	}
+	if componentMode {
+		issues = append(issues, validateKnownRole(path+".component_role", componentRole, roles)...)
+		if componentRole != endpoint.ComponentRole {
+			issues = append(issues, blockIssue(path+".component_role", "route endpoint component role must not contain leading or trailing whitespace"))
+		}
+		if pin == "" {
+			issues = append(issues, blockIssue(path+".pin", "route endpoint pin is required"))
+		} else if pin != endpoint.Pin {
+			issues = append(issues, blockIssue(path+".pin", "route endpoint pin must not contain leading or trailing whitespace"))
+		}
+		return issues
+	}
+	if anchorMode {
+		if anchorID != endpoint.AnchorID {
+			issues = append(issues, blockIssue(path+".anchor_id", "route endpoint anchor ID must not contain leading or trailing whitespace"))
+		}
+		if _, ok := anchors[anchorID]; !ok {
+			issues = append(issues, blockIssue(path+".anchor_id", "unknown route endpoint anchor "+anchorID))
+		}
+		return issues
+	}
+	if portMode {
+		if port != endpoint.Port {
+			issues = append(issues, blockIssue(path+".port", "route endpoint port must not contain leading or trailing whitespace"))
+		}
+		if _, ok := ports[port]; !ok {
+			issues = append(issues, blockIssue(path+".port", "unknown route endpoint port "+port))
+		}
+		return issues
+	}
+	return nil
+}
+
+func validateRealizationWhen(path string, condition RealizationWhen, parameters map[string]struct{}) []reports.Issue {
+	if len(condition.Params) == 0 {
+		return nil
+	}
+	var issues []reports.Issue
+	names := make([]string, 0, len(condition.Params))
+	for name := range condition.Params {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			issues = append(issues, blockIssue(path+".params", "condition parameter name is required"))
+			continue
+		}
+		if trimmed != name {
+			issues = append(issues, blockIssue(path+".params."+realizationPathSegment(trimmed), "condition parameter name must not contain leading or trailing whitespace"))
+			continue
+		}
+		if _, ok := parameters[trimmed]; !ok {
+			issues = append(issues, blockIssue(path+".params."+realizationPathSegment(trimmed), "unknown condition parameter "+trimmed))
+		}
 	}
 	return issues
+}
+
+func realizationPathSegment(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "unknown"
+	}
+	return realizationPathSegmentReplacer.Replace(value)
+}
+
+func validatePCBRealizationSide(path string, side string) []reports.Issue {
+	trimmed := strings.TrimSpace(side)
+	if trimmed == "" {
+		return nil
+	}
+	if trimmed != side {
+		return []reports.Issue{blockIssue(path, "side must not contain leading or trailing whitespace")}
+	}
+	switch strings.ToLower(trimmed) {
+	case "front", "top", "back", "bottom":
+		return nil
+	default:
+		return []reports.Issue{blockIssue(path, "side must be front/top or back/bottom")}
+	}
 }
 
 func validateRelativePlacement(path string, placement RelativePlacement) []reports.Issue {
@@ -578,7 +743,7 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.Components = append([]PCBComponentRealization(nil), realization.Components...)
 	for i := range clone.Components {
 		clone.Components[i].Properties = cloneStringMap(realization.Components[i].Properties)
-		clone.Components[i].When.Params = cloneAnyParams(realization.Components[i].When.Params)
+		clone.Components[i].When = cloneRealizationWhen(realization.Components[i].When)
 	}
 	clone.PlacementGroups = append([]PCBPlacementGroup(nil), realization.PlacementGroups...)
 	for i := range clone.PlacementGroups {
@@ -588,10 +753,14 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 			clone.PlacementGroups[i].Bounds = &bounds
 		}
 	}
+	clone.EntryAnchors = append([]PCBEntryAnchor(nil), realization.EntryAnchors...)
+	for i := range clone.EntryAnchors {
+		clone.EntryAnchors[i].When = cloneRealizationWhen(realization.EntryAnchors[i].When)
+	}
 	clone.LocalRoutes = append([]PCBLocalRoute(nil), realization.LocalRoutes...)
 	for i := range clone.LocalRoutes {
 		clone.LocalRoutes[i].Waypoints = append([]RelativePoint(nil), realization.LocalRoutes[i].Waypoints...)
-		clone.LocalRoutes[i].When.Params = cloneAnyParams(realization.LocalRoutes[i].When.Params)
+		clone.LocalRoutes[i].When = cloneRealizationWhen(realization.LocalRoutes[i].When)
 	}
 	if len(realization.TimingFixtures) > 0 {
 		clone.TimingFixtures = make([]PCBTimingFixture, len(realization.TimingFixtures))
@@ -609,12 +778,13 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 		timing.MaxClockRouteLengthMM = cloneFloat64Ptr(timing.MaxClockRouteLengthMM)
 		timing.MinNoiseKeepoutMM = cloneFloat64Ptr(timing.MinNoiseKeepoutMM)
 		timing.Roles = cloneTimingRoleMap(timing.Roles)
-		timing.When.Params = cloneAnyParams(timing.When.Params)
+		timing.When = cloneRealizationWhen(timing.When)
 		clone.TimingFixtures[i] = timing
 	}
 	clone.Zones = append([]PCBZoneRealization(nil), realization.Zones...)
 	for i := range clone.Zones {
 		clone.Zones[i].Points = append([]RelativePoint(nil), realization.Zones[i].Points...)
+		clone.Zones[i].When = cloneRealizationWhen(realization.Zones[i].When)
 	}
 	clone.Keepouts = append([]PCBKeepout(nil), realization.Keepouts...)
 	for i := range clone.Keepouts {
@@ -638,6 +808,11 @@ func cloneFloat64Ptr(value *float64) *float64 {
 	}
 	clone := *value
 	return &clone
+}
+
+func cloneRealizationWhen(condition RealizationWhen) RealizationWhen {
+	condition.Params = cloneAnyParams(condition.Params)
+	return condition
 }
 
 func cloneTimingRoleMap(values map[string]PCBTimingRole) map[string]PCBTimingRole {
