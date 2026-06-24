@@ -79,6 +79,162 @@ func TestRealizeBlockPCBOffsetsRouteWaypoints(t *testing.T) {
 	}
 }
 
+func TestRealizeBlockPCBProducesEntryAnchorRoutes(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.Components[0].Pins = twoTerminalHorizontalPins()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:          "input_entry",
+		Port:        "IN",
+		NetTemplate: "SIG",
+		Placement:   RelativePlacement{XMM: -3, YMM: 1, Layer: "F.Cu"},
+		Description: "Signal entry",
+	}}
+	definition.PCBRealization.LocalRoutes = []PCBLocalRoute{{
+		ID:          "entry_to_resistor",
+		NetTemplate: "SIG",
+		From:        RouteEndpoint{AnchorID: "input_entry"},
+		To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+		Waypoints:   []RelativePoint{{XMM: -1, YMM: 1}},
+		Layer:       "F.Cu",
+		WidthMM:     0.25,
+	}}
+	output := BlockOutput{
+		Definition: Summary(definition),
+		Instance: BlockInstance{
+			BlockID:    definition.ID,
+			InstanceID: "demo1",
+			Params:     map[string]any{"footprint": "Device:R_0805"},
+			Refs:       []string{"R1"},
+		},
+		Operations: mustSingleComponentOps(t,
+			BlockComponent{Role: "resistor", RefPrefix: "R", Value: "10k", SymbolID: "Device:R", FootprintID: "Device:R_0805", Pins: twoTerminalHorizontalPins()}, "R1",
+		),
+	}
+
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{OriginXMM: 10, OriginYMM: 20})
+	if reports.HasBlockingIssue(result.Issues) || len(result.Issues) != 0 {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	if len(result.EntryAnchors) != 1 {
+		t.Fatalf("entry anchors = %#v, want one", result.EntryAnchors)
+	}
+	anchor := result.EntryAnchors[0]
+	if anchor.ID != "input_entry" || anchor.NetName != "demo1_SIG" || anchor.Placement.XMM != 7 || anchor.Placement.YMM != 21 {
+		t.Fatalf("entry anchor = %#v", anchor)
+	}
+	if len(result.LocalRoutes) != 1 {
+		t.Fatalf("local routes = %#v, want one", result.LocalRoutes)
+	}
+	route := result.LocalRoutes[0]
+	if route.From.Ref != "@anchor:input_entry" || route.From.Pin != "IN" || route.To.Ref != "R1" || route.To.Pin != "1" {
+		t.Fatalf("realized route endpoints = %#v -> %#v", route.From, route.To)
+	}
+	if route.LengthMM <= 0 {
+		t.Fatalf("route length = %f, want positive", route.LengthMM)
+	}
+	var op transactions.RouteOperation
+	for _, operation := range result.Operations {
+		if operation.Op == transactions.OpRoute {
+			if err := decodeOperation(operation, &op); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if len(op.Points) != 3 || op.Points[0].XMM != 7 || op.Points[0].YMM != 21 || op.Points[1].XMM != 9 || op.Points[1].YMM != 21 {
+		t.Fatalf("route operation points = %#v", op.Points)
+	}
+	if result.Metadata["entry_anchors"].Count != 1 {
+		t.Fatalf("metadata = %#v", result.Metadata)
+	}
+}
+
+func TestRealizeBlockPCBResolvesPortEndpointThroughEntryAnchor(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.Components[0].Pins = twoTerminalHorizontalPins()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:        "input_entry",
+		Port:      "IN",
+		Placement: RelativePlacement{XMM: -3, YMM: 0, Layer: "F.Cu"},
+	}}
+	definition.PCBRealization.LocalRoutes = []PCBLocalRoute{{
+		ID:          "port_to_resistor",
+		NetTemplate: "SIG",
+		From:        RouteEndpoint{Port: "IN"},
+		To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+		Layer:       "F.Cu",
+	}}
+	output := singleResistorOutput(t, definition)
+
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if len(result.LocalRoutes) != 1 || result.LocalRoutes[0].From.Ref != "@anchor:input_entry" {
+		t.Fatalf("local routes = %#v", result.LocalRoutes)
+	}
+}
+
+func TestRealizeBlockPCBSkipsConditionalEntryAnchorAndRoute(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.Parameters = append(definition.Parameters, BlockParameter{Name: "enabled", Type: ParameterBool, Default: true})
+	definition.Components[0].Pins = twoTerminalHorizontalPins()
+	condition := RealizationWhen{Params: map[string]any{"enabled": true}}
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:        "input_entry",
+		Port:      "IN",
+		Placement: RelativePlacement{XMM: -3, YMM: 0, Layer: "F.Cu"},
+		When:      condition,
+	}}
+	definition.PCBRealization.LocalRoutes = []PCBLocalRoute{{
+		ID:          "conditional",
+		NetTemplate: "SIG",
+		From:        RouteEndpoint{AnchorID: "input_entry"},
+		To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+		Layer:       "F.Cu",
+		When:        condition,
+	}}
+	output := singleResistorOutput(t, definition)
+	output.Instance.Params["enabled"] = false
+
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if len(result.EntryAnchors) != 0 || len(result.LocalRoutes) != 0 {
+		t.Fatalf("anchors/routes = %#v %#v, want none", result.EntryAnchors, result.LocalRoutes)
+	}
+}
+
+func TestRealizeBlockPCBReportsInactiveAnchorRouteEndpoint(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.Parameters = append(definition.Parameters, BlockParameter{Name: "enabled", Type: ParameterBool, Default: true})
+	definition.Components[0].Pins = twoTerminalHorizontalPins()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID:        "input_entry",
+		Port:      "IN",
+		Placement: RelativePlacement{XMM: -3, YMM: 0, Layer: "F.Cu"},
+		When:      RealizationWhen{Params: map[string]any{"enabled": true}},
+	}}
+	definition.PCBRealization.LocalRoutes = []PCBLocalRoute{{
+		ID:          "missing_anchor",
+		NetTemplate: "SIG",
+		From:        RouteEndpoint{AnchorID: "input_entry"},
+		To:          RouteEndpoint{ComponentRole: "resistor", Pin: "1"},
+		Layer:       "F.Cu",
+	}}
+	output := singleResistorOutput(t, definition)
+	output.Instance.Params["enabled"] = false
+
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if len(result.EntryAnchors) != 0 || len(result.LocalRoutes) != 0 {
+		t.Fatalf("anchors/routes = %#v %#v, want route skipped", result.EntryAnchors, result.LocalRoutes)
+	}
+	if len(result.Issues) == 0 {
+		t.Fatalf("issues = %#v, want inactive anchor endpoint issue", result.Issues)
+	}
+	assertIssuePath(t, result.Issues, "pcb_realization.local_routes.missing_anchor.from")
+}
+
 func TestRealizeBlockPCBBlocksMissingFootprint(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.PCBRealization.Components[0].FootprintParam = ""
@@ -117,6 +273,31 @@ func mustComponentOps(t *testing.T, first BlockComponent, firstRef string, secon
 		t.Fatalf("second component issues = %#v", issues)
 	}
 	return append(firstOps, secondOps...)
+}
+
+func mustSingleComponentOps(t *testing.T, component BlockComponent, ref string) []transactions.Operation {
+	t.Helper()
+	ops, issues := ComponentOperations(component, ref, transactions.Point{})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("component issues = %#v", issues)
+	}
+	return ops
+}
+
+func singleResistorOutput(t *testing.T, definition BlockDefinition) BlockOutput {
+	t.Helper()
+	return BlockOutput{
+		Definition: Summary(definition),
+		Instance: BlockInstance{
+			BlockID:    definition.ID,
+			InstanceID: "demo1",
+			Params:     map[string]any{"footprint": "Device:R_0805"},
+			Refs:       []string{"R1"},
+		},
+		Operations: mustSingleComponentOps(t,
+			BlockComponent{Role: "resistor", RefPrefix: "R", Value: "10k", SymbolID: "Device:R", FootprintID: "Device:R_0805", Pins: twoTerminalHorizontalPins()}, "R1",
+		),
+	}
 }
 
 func countOperations(operations []transactions.Operation, kind transactions.OperationKind) int {

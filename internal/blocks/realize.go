@@ -18,17 +18,18 @@ type PCBRealizationOptions struct {
 }
 
 type BlockPCBRealizationResult struct {
-	Definition  BlockSummary                 `json:"definition"`
-	Instance    BlockInstance                `json:"instance"`
-	Components  []RealizedPCBComponent       `json:"components,omitempty"`
-	LocalRoutes []RealizedPCBLocalRoute      `json:"local_routes,omitempty"`
-	Timing      []TimingFixtureEvidence      `json:"timing,omitempty"`
-	Operations  []transactions.Operation     `json:"operations,omitempty"`
-	Validation  PCBValidationExpectations    `json:"validation,omitempty"`
-	Issues      []reports.Issue              `json:"issues,omitempty"`
-	Unsupported []string                     `json:"unsupported,omitempty"`
-	RoleRefs    map[string]string            `json:"role_refs,omitempty"`
-	Metadata    map[string]RealizationMetric `json:"metadata,omitempty"`
+	Definition   BlockSummary                 `json:"definition"`
+	Instance     BlockInstance                `json:"instance"`
+	Components   []RealizedPCBComponent       `json:"components,omitempty"`
+	EntryAnchors []RealizedPCBEntryAnchor     `json:"entry_anchors,omitempty"`
+	LocalRoutes  []RealizedPCBLocalRoute      `json:"local_routes,omitempty"`
+	Timing       []TimingFixtureEvidence      `json:"timing,omitempty"`
+	Operations   []transactions.Operation     `json:"operations,omitempty"`
+	Validation   PCBValidationExpectations    `json:"validation,omitempty"`
+	Issues       []reports.Issue              `json:"issues,omitempty"`
+	Unsupported  []string                     `json:"unsupported,omitempty"`
+	RoleRefs     map[string]string            `json:"role_refs,omitempty"`
+	Metadata     map[string]RealizationMetric `json:"metadata,omitempty"`
 }
 
 type RealizationMetric struct {
@@ -41,6 +42,15 @@ type RealizedPCBComponent struct {
 	FootprintID   string            `json:"footprint_id"`
 	Value         string            `json:"value,omitempty"`
 	Placement     RelativePlacement `json:"placement"`
+}
+
+type RealizedPCBEntryAnchor struct {
+	ID          string            `json:"id"`
+	Port        string            `json:"port"`
+	NetName     string            `json:"net_name,omitempty"`
+	Placement   RelativePlacement `json:"placement"`
+	Side        string            `json:"side,omitempty"`
+	Description string            `json:"description,omitempty"`
 }
 
 type RealizedPCBLocalRoute struct {
@@ -201,56 +211,50 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.Operations = append(result.Operations, operation)
 	}
 	placements := realizedPlacementMap(result.Components)
+	for _, anchor := range definition.PCBRealization.EntryAnchors {
+		if !realizationWhenMatches(anchor.When, output.Instance.Params) {
+			continue
+		}
+		placement := anchor.Placement
+		placement.XMM += opts.OriginXMM
+		placement.YMM += opts.OriginYMM
+		placement.Layer = firstNonEmptyString(anchor.Placement.Layer, opts.Layer, "F.Cu")
+		realized := RealizedPCBEntryAnchor{
+			ID:          anchor.ID,
+			Port:        anchor.Port,
+			Placement:   placement,
+			Side:        anchor.Side,
+			Description: anchor.Description,
+		}
+		if strings.TrimSpace(anchor.NetTemplate) != "" {
+			realized.NetName = InstanceNetName(output.Instance.InstanceID, anchor.NetTemplate)
+		}
+		result.EntryAnchors = append(result.EntryAnchors, realized)
+	}
+	anchors := realizedAnchorMap(result.EntryAnchors)
+	anchorsByPort := realizedAnchorsByPort(result.EntryAnchors)
 	componentByRole := blockComponentByRole(definition.Components)
 	for _, route := range definition.PCBRealization.LocalRoutes {
 		if !realizationWhenMatches(route.When, output.Instance.Params) {
 			continue
 		}
-		fromRef := roleRefs[route.From.ComponentRole]
-		toRef := roleRefs[route.To.ComponentRole]
-		if fromRef == "" || toRef == "" {
-			result.Issues = append(result.Issues, reports.Issue{
-				Code:     reports.CodeValidationFailed,
-				Severity: reports.SeverityWarning,
-				Path:     "pcb_realization.local_routes." + route.ID,
-				Message:  "local route endpoint component was not emitted by block instantiation",
-			})
-			continue
-		}
-		if _, ok := placements[route.From.ComponentRole]; !ok {
-			result.Issues = append(result.Issues, reports.Issue{
-				Code:     reports.CodeValidationFailed,
-				Severity: reports.SeverityWarning,
-				Path:     "pcb_realization.local_routes." + route.ID + ".from",
-				Message:  "local route source component was not placed",
-				Refs:     []string{fromRef},
-			})
-			continue
-		}
-		if _, ok := placements[route.To.ComponentRole]; !ok {
-			result.Issues = append(result.Issues, reports.Issue{
-				Code:     reports.CodeValidationFailed,
-				Severity: reports.SeverityWarning,
-				Path:     "pcb_realization.local_routes." + route.ID + ".to",
-				Message:  "local route target component was not placed",
-				Refs:     []string{toRef},
-			})
+		from, fromIssues := resolveRealizedRouteEndpoint(route.ID, "from", route.From, roleRefs, placements, componentByRole, anchors, anchorsByPort)
+		to, toIssues := resolveRealizedRouteEndpoint(route.ID, "to", route.To, roleRefs, placements, componentByRole, anchors, anchorsByPort)
+		if len(fromIssues) != 0 || len(toIssues) != 0 {
+			result.Issues = append(result.Issues, fromIssues...)
+			result.Issues = append(result.Issues, toIssues...)
 			continue
 		}
 		netName := InstanceNetName(output.Instance.InstanceID, route.NetTemplate)
 		realizedRoute := RealizedPCBLocalRoute{
 			ID:      route.ID,
 			NetName: netName,
-			From:    transactions.Endpoint{Ref: fromRef, Pin: route.From.Pin},
-			To:      transactions.Endpoint{Ref: toRef, Pin: route.To.Pin},
+			From:    from.Endpoint,
+			To:      to.Endpoint,
 			Layer:   firstNonEmptyString(route.Layer, opts.Layer, "F.Cu"),
 			WidthMM: route.WidthMM,
 		}
-		points, pointIssues := routePoints(route, placements, componentByRole, opts)
-		if len(pointIssues) != 0 {
-			result.Issues = append(result.Issues, pointIssues...)
-			continue
-		}
+		points := routePoints(route, from.Point, to.Point, opts)
 		realizedRoute.LengthMM = routePointLength(points)
 		operation, err := wrapOperation(transactions.OpRoute, transactions.RouteOperation{
 			Op:      transactions.OpRoute,
@@ -267,7 +271,11 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.Operations = append(result.Operations, operation)
 	}
 	result.Timing = buildTimingFixtureEvidence(activeTimingFixtures(definition.PCBRealization.TimingFixtures, output.Instance.Params), output, result.Components, result.LocalRoutes)
+	if result.Metadata == nil {
+		result.Metadata = map[string]RealizationMetric{}
+	}
 	result.Metadata["components"] = RealizationMetric{Count: len(result.Components)}
+	result.Metadata["entry_anchors"] = RealizationMetric{Count: len(result.EntryAnchors)}
 	result.Metadata["local_routes"] = RealizationMetric{Count: len(result.LocalRoutes)}
 	result.Metadata["timing"] = RealizationMetric{Count: len(result.Timing)}
 	return result
@@ -628,6 +636,31 @@ func realizedPlacementMap(components []RealizedPCBComponent) map[string]Relative
 	return placements
 }
 
+func realizedAnchorMap(anchors []RealizedPCBEntryAnchor) map[string]RealizedPCBEntryAnchor {
+	byID := map[string]RealizedPCBEntryAnchor{}
+	for _, anchor := range anchors {
+		if id := strings.TrimSpace(anchor.ID); id != "" {
+			byID[id] = anchor
+		}
+	}
+	return byID
+}
+
+func realizedAnchorsByPort(anchors []RealizedPCBEntryAnchor) map[string]RealizedPCBEntryAnchor {
+	byPort := map[string]RealizedPCBEntryAnchor{}
+	for _, anchor := range anchors {
+		port := strings.TrimSpace(anchor.Port)
+		if port == "" {
+			continue
+		}
+		if _, exists := byPort[port]; exists {
+			continue
+		}
+		byPort[port] = anchor
+	}
+	return byPort
+}
+
 func blockComponentByRole(components []BlockComponent) map[string]BlockComponent {
 	byRole := map[string]BlockComponent{}
 	for _, component := range components {
@@ -642,21 +675,69 @@ func blockComponentByRole(components []BlockComponent) map[string]BlockComponent
 	return byRole
 }
 
-func routePoints(route PCBLocalRoute, placements map[string]RelativePlacement, components map[string]BlockComponent, opts PCBRealizationOptions) ([]transactions.Point, []reports.Issue) {
-	from, ok := routeEndpointPoint(route.From, placements, components)
-	if !ok {
-		return nil, []reports.Issue{routePinIssue(route.ID, "from", route.From)}
+type realizedRouteEndpoint struct {
+	Endpoint transactions.Endpoint
+	Point    transactions.Point
+}
+
+func resolveRealizedRouteEndpoint(routeID string, side string, endpoint RouteEndpoint, roleRefs map[string]string, placements map[string]RelativePlacement, components map[string]BlockComponent, anchors map[string]RealizedPCBEntryAnchor, anchorsByPort map[string]RealizedPCBEntryAnchor) (realizedRouteEndpoint, []reports.Issue) {
+	componentRole := strings.TrimSpace(endpoint.ComponentRole)
+	pin := strings.TrimSpace(endpoint.Pin)
+	anchorID := strings.TrimSpace(endpoint.AnchorID)
+	port := strings.TrimSpace(endpoint.Port)
+	if componentRole != "" || pin != "" {
+		return resolveComponentRouteEndpoint(routeID, side, componentRole, pin, endpoint, roleRefs, placements, components)
 	}
-	to, ok := routeEndpointPoint(route.To, placements, components)
-	if !ok {
-		return nil, []reports.Issue{routePinIssue(route.ID, "to", route.To)}
+	if anchorID != "" {
+		anchor, ok := anchors[anchorID]
+		if !ok {
+			return realizedRouteEndpoint{}, []reports.Issue{routeEndpointIssue(routeID, side, "local route endpoint anchor is not active")}
+		}
+		return realizedRouteEndpoint{
+			Endpoint: transactions.Endpoint{Ref: anchorRef(anchor.ID), Pin: firstNonEmptyString(anchor.Port, anchor.ID)},
+			Point:    transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM},
+		}, nil
 	}
+	if port != "" {
+		anchor, ok := anchorsByPort[port]
+		if !ok {
+			return realizedRouteEndpoint{}, []reports.Issue{routeEndpointIssue(routeID, side, "local route endpoint port has no active entry anchor")}
+		}
+		return realizedRouteEndpoint{
+			Endpoint: transactions.Endpoint{Ref: anchorRef(anchor.ID), Pin: anchor.Port},
+			Point:    transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM},
+		}, nil
+	}
+	return realizedRouteEndpoint{}, []reports.Issue{routeEndpointIssue(routeID, side, "local route endpoint could not be resolved")}
+}
+
+func resolveComponentRouteEndpoint(routeID string, side string, role string, pinNumber string, endpoint RouteEndpoint, roleRefs map[string]string, placements map[string]RelativePlacement, components map[string]BlockComponent) (realizedRouteEndpoint, []reports.Issue) {
+	ref := roleRefs[role]
+	if ref == "" {
+		return realizedRouteEndpoint{}, []reports.Issue{routeEndpointIssue(routeID, side, "local route endpoint component was not emitted by block instantiation")}
+	}
+	placement, ok := placements[role]
+	if !ok {
+		return realizedRouteEndpoint{}, []reports.Issue{routeEndpointIssueWithRefs(routeID, side, "local route endpoint component was not placed", []string{ref})}
+	}
+	pin, ok := componentPin(components[role], pinNumber)
+	if !ok {
+		return realizedRouteEndpoint{}, []reports.Issue{routePinIssue(routeID, side, endpoint)}
+	}
+	x, y := rotatePoint(pin.XMM, pin.YMM, placement.RotationDeg)
+	return realizedRouteEndpoint{
+		Endpoint: transactions.Endpoint{Ref: ref, Pin: pinNumber},
+		Point:    transactions.Point{XMM: placement.XMM + x, YMM: placement.YMM + y},
+	}, nil
+}
+
+func routePoints(route PCBLocalRoute, from transactions.Point, to transactions.Point, opts PCBRealizationOptions) []transactions.Point {
 	points := []transactions.Point{from}
 	for _, waypoint := range route.Waypoints {
 		points = append(points, transactions.Point{XMM: waypoint.XMM + opts.OriginXMM, YMM: waypoint.YMM + opts.OriginYMM})
 	}
 	points = append(points, to)
-	return points, nil
+	return points
 }
 
 func routePointLength(points []transactions.Point) float64 {
@@ -668,16 +749,6 @@ func routePointLength(points []transactions.Point) float64 {
 		length += math.Hypot(points[index].XMM-points[index-1].XMM, points[index].YMM-points[index-1].YMM)
 	}
 	return length
-}
-
-func routeEndpointPoint(endpoint RouteEndpoint, placements map[string]RelativePlacement, components map[string]BlockComponent) (transactions.Point, bool) {
-	placement := placements[endpoint.ComponentRole]
-	pin, ok := componentPin(components[endpoint.ComponentRole], endpoint.Pin)
-	if !ok {
-		return transactions.Point{}, false
-	}
-	x, y := rotatePoint(pin.XMM, pin.YMM, placement.RotationDeg)
-	return transactions.Point{XMM: placement.XMM + x, YMM: placement.YMM + y}, true
 }
 
 func componentPin(component BlockComponent, pinNumber string) (transactions.PinSpec, bool) {
@@ -696,6 +767,24 @@ func routePinIssue(routeID string, side string, endpoint RouteEndpoint) reports.
 		Path:     "pcb_realization.local_routes." + routeID + "." + side + ".pin",
 		Message:  "route endpoint pin " + endpoint.Pin + " was not found on component role " + endpoint.ComponentRole,
 	}
+}
+
+func routeEndpointIssue(routeID string, side string, message string) reports.Issue {
+	return routeEndpointIssueWithRefs(routeID, side, message, nil)
+}
+
+func routeEndpointIssueWithRefs(routeID string, side string, message string, refs []string) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityWarning,
+		Path:     "pcb_realization.local_routes." + routeID + "." + side,
+		Message:  message,
+		Refs:     append([]string(nil), refs...),
+	}
+}
+
+func anchorRef(id string) string {
+	return "@anchor:" + strings.TrimSpace(id)
 }
 
 func rotatePoint(x float64, y float64, rotationDeg float64) (float64, float64) {
