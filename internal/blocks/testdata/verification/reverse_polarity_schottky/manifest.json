@@ -44,6 +44,7 @@
       "placements": [
         {"role": "series_diode", "footprint_id": "Diode_SMD:D_SMA"}
       ],
+      "require_realization": true,
       "allow_unrouted": true
     }
   }

@@ -99,6 +99,10 @@
             "status": "pass"
           },
           {
+            "name": "pcb_realization",
+            "status": "pass"
+          },
+          {
             "name": "pcb_assertions",
             "status": "pass"
           }
@@ -242,6 +246,10 @@
           },
           {
             "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "pcb_realization",
             "status": "pass"
           },
           {
