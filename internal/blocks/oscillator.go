@@ -133,6 +133,23 @@ func crystalOscillatorPCBRealization() *PCBRealization {
 			{ID: "xtal2_load", NetTemplate: "xtal2", From: RouteEndpoint{ComponentRole: "crystal", Pin: "2"}, To: RouteEndpoint{ComponentRole: "load_capacitor_2", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.2, Required: true},
 			{ID: "load_caps_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "load_capacitor_1", Pin: "2"}, To: RouteEndpoint{ComponentRole: "load_capacitor_2", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 		},
+		TimingFixtures: []PCBTimingFixture{{
+			ID:                    "crystal_loop",
+			TimingGroupID:         "oscillator_core",
+			Kind:                  PCBTimingKindCrystal,
+			SourceRole:            "crystal",
+			LoadCapacitorRoles:    []string{"load_capacitor_1", "load_capacitor_2"},
+			GroundNetTemplate:     "gnd",
+			ClockNetTemplates:     []string{"xtal1", "xtal2"},
+			LocalRouteIDs:         []string{"xtal1_load", "xtal2_load", "load_caps_ground"},
+			MaxLoadCapDistanceMM:  timingMM(6),
+			MaxLoadCapAsymmetryMM: timingMM(0.25),
+			MaxClockRouteLengthMM: timingMM(8),
+			MinNoiseKeepoutMM:     timingMM(5),
+			PreferredLayer:        "F.Cu",
+			Roles:                 map[string]PCBTimingRole{"crystal": PCBTimingRoleCrystal, "load_capacitor_1": PCBTimingRoleLoadCapacitor, "load_capacitor_2": PCBTimingRoleLoadCapacitor},
+			Description:           "Keep the verified crystal loop compact and symmetric around the crystal.",
+		}},
 		Constraints: []PCBConstraint{
 			{ID: "oscillator_mcu_proximity", Kind: "proximity", NetTemplate: "xtal1", AppliesTo: []string{"crystal"}, MaxLengthMM: 10, Description: "Place the oscillator close to MCU oscillator pins."},
 			{ID: "oscillator_loop_short", Kind: "max_length", NetTemplate: "xtal1", AppliesTo: []string{"crystal", "load_capacitor_1", "load_capacitor_2"}, MaxLengthMM: 12, Description: "Keep the local crystal loop short."},
@@ -143,6 +160,10 @@ func crystalOscillatorPCBRealization() *PCBRealization {
 			"shield/guard-ring layout is not generated",
 		},
 	}
+}
+
+func timingMM(value float64) *float64 {
+	return &value
 }
 
 func instantiateCrystalOscillator(definition BlockDefinition, request BlockRequest, params map[string]any, issues []reports.Issue) BlockOutput {

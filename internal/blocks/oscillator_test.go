@@ -59,6 +59,19 @@ func TestCrystalOscillatorInstantiateAndRealize(t *testing.T) {
 	if len(realized.Components) != 3 || len(realized.LocalRoutes) != 3 {
 		t.Fatalf("realized = %#v", realized)
 	}
+	if len(realized.Timing) != 1 {
+		t.Fatalf("timing evidence = %#v, want one fixture", realized.Timing)
+	}
+	timing := realized.Timing[0]
+	if timing.ID != "crystal_loop" || !timing.Satisfied || !timing.GroundReturnPresent {
+		t.Fatalf("timing evidence = %#v", timing)
+	}
+	if timing.LoadCapacitorAsymmetryMM == nil || *timing.LoadCapacitorAsymmetryMM != 0 {
+		t.Fatalf("load capacitor asymmetry = %#v", timing.LoadCapacitorAsymmetryMM)
+	}
+	if len(timing.ClockRouteLengthsMM) != 2 || timing.ClockRouteLengthsMM["xtal1_load"] <= 0 {
+		t.Fatalf("clock route lengths = %#v", timing.ClockRouteLengthsMM)
+	}
 	if realized.Components[0].Placement.XMM != 20 {
 		t.Fatalf("realized placement = %#v", realized.Components[0])
 	}

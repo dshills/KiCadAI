@@ -21,6 +21,7 @@ type BlockPCBRealizationResult struct {
 	Instance    BlockInstance                `json:"instance"`
 	Components  []RealizedPCBComponent       `json:"components,omitempty"`
 	LocalRoutes []RealizedPCBLocalRoute      `json:"local_routes,omitempty"`
+	Timing      []TimingFixtureEvidence      `json:"timing,omitempty"`
 	Operations  []transactions.Operation     `json:"operations,omitempty"`
 	Validation  PCBValidationExpectations    `json:"validation,omitempty"`
 	Issues      []reports.Issue              `json:"issues,omitempty"`
@@ -42,12 +43,46 @@ type RealizedPCBComponent struct {
 }
 
 type RealizedPCBLocalRoute struct {
-	ID      string                `json:"id"`
-	NetName string                `json:"net_name"`
-	From    transactions.Endpoint `json:"from"`
-	To      transactions.Endpoint `json:"to"`
-	Layer   string                `json:"layer,omitempty"`
-	WidthMM float64               `json:"width_mm,omitempty"`
+	ID       string                `json:"id"`
+	NetName  string                `json:"net_name"`
+	From     transactions.Endpoint `json:"from"`
+	To       transactions.Endpoint `json:"to"`
+	Layer    string                `json:"layer,omitempty"`
+	WidthMM  float64               `json:"width_mm,omitempty"`
+	LengthMM float64               `json:"length_mm,omitempty"`
+}
+
+type TimingFixtureEvidence struct {
+	ID                            string                   `json:"id"`
+	TimingGroupID                 string                   `json:"timing_group_id,omitempty"`
+	Kind                          string                   `json:"kind"`
+	SourceRef                     string                   `json:"source_ref,omitempty"`
+	ConsumerRef                   string                   `json:"consumer_ref,omitempty"`
+	LoadCapacitorRefs             []string                 `json:"load_capacitor_refs,omitempty"`
+	ClockNets                     []string                 `json:"clock_nets,omitempty"`
+	GroundNet                     string                   `json:"ground_net,omitempty"`
+	SourceToConsumerDistanceMM    *float64                 `json:"source_to_consumer_distance_mm,omitempty"`
+	MaxSourceToConsumerDistanceMM *float64                 `json:"max_source_to_consumer_distance_mm,omitempty"`
+	LoadCapacitorDistancesMM      map[string]float64       `json:"load_capacitor_distances_mm,omitempty"`
+	LoadCapacitorAsymmetryMM      *float64                 `json:"load_capacitor_asymmetry_mm,omitempty"`
+	MaxLoadCapDistanceMM          *float64                 `json:"max_load_cap_distance_mm,omitempty"`
+	MaxLoadCapAsymmetryMM         *float64                 `json:"max_load_cap_asymmetry_mm,omitempty"`
+	ClockRouteLengthsMM           map[string]float64       `json:"clock_route_lengths_mm,omitempty"`
+	MaxClockRouteLengthMM         *float64                 `json:"max_clock_route_length_mm,omitempty"`
+	GroundReturnPresent           bool                     `json:"ground_return_present"`
+	Satisfied                     bool                     `json:"satisfied"`
+	Findings                      []TimingFixtureFinding   `json:"findings,omitempty"`
+	Roles                         map[string]PCBTimingRole `json:"roles,omitempty"`
+}
+
+type TimingFixtureFinding struct {
+	ID          string           `json:"id"`
+	Severity    reports.Severity `json:"severity"`
+	Message     string           `json:"message"`
+	MeasuredMM  *float64         `json:"measured_mm,omitempty"`
+	ThresholdMM *float64         `json:"threshold_mm,omitempty"`
+	Refs        []string         `json:"refs,omitempty"`
+	Nets        []string         `json:"nets,omitempty"`
 }
 
 const (
@@ -187,6 +222,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			result.Issues = append(result.Issues, pointIssues...)
 			continue
 		}
+		realizedRoute.LengthMM = routePointLength(points)
 		operation, err := wrapOperation(transactions.OpRoute, transactions.RouteOperation{
 			Op:      transactions.OpRoute,
 			NetName: netName,
@@ -201,9 +237,158 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.LocalRoutes = append(result.LocalRoutes, realizedRoute)
 		result.Operations = append(result.Operations, operation)
 	}
+	result.Timing = buildTimingFixtureEvidence(definition.PCBRealization.TimingFixtures, output, result.Components, result.LocalRoutes)
 	result.Metadata["components"] = RealizationMetric{Count: len(result.Components)}
 	result.Metadata["local_routes"] = RealizationMetric{Count: len(result.LocalRoutes)}
+	result.Metadata["timing"] = RealizationMetric{Count: len(result.Timing)}
 	return result
+}
+
+func buildTimingFixtureEvidence(fixtures []PCBTimingFixture, output BlockOutput, components []RealizedPCBComponent, routes []RealizedPCBLocalRoute) []TimingFixtureEvidence {
+	if len(fixtures) == 0 {
+		return nil
+	}
+	componentsByRole := realizedComponentsByRole(components)
+	routesByID := realizedRoutesByID(routes)
+	evidence := make([]TimingFixtureEvidence, 0, len(fixtures))
+	for _, fixture := range fixtures {
+		item := TimingFixtureEvidence{
+			ID:                            fixture.ID,
+			TimingGroupID:                 fixture.TimingGroupID,
+			Kind:                          fixture.Kind,
+			MaxSourceToConsumerDistanceMM: cloneFloat64Ptr(fixture.MaxSourceToConsumerDistanceMM),
+			MaxLoadCapDistanceMM:          cloneFloat64Ptr(fixture.MaxLoadCapDistanceMM),
+			MaxLoadCapAsymmetryMM:         cloneFloat64Ptr(fixture.MaxLoadCapAsymmetryMM),
+			MaxClockRouteLengthMM:         cloneFloat64Ptr(fixture.MaxClockRouteLengthMM),
+			GroundNet:                     InstanceNetName(output.Instance.InstanceID, fixture.GroundNetTemplate),
+			Roles:                         cloneTimingRoleMap(fixture.Roles),
+			Satisfied:                     true,
+		}
+		source, hasSource := componentsByRole[fixture.SourceRole]
+		if hasSource {
+			item.SourceRef = source.Ref
+		} else {
+			item.Findings = append(item.Findings, timingFinding("timing.fixture.source_present", reports.SeverityError, "timing fixture source component is missing", nil, nil, nil, nil))
+		}
+		if fixture.ConsumerRole != "" {
+			if consumer, ok := componentsByRole[fixture.ConsumerRole]; ok {
+				item.ConsumerRef = consumer.Ref
+				if hasSource {
+					distance := placementDistance(source.Placement, consumer.Placement)
+					item.SourceToConsumerDistanceMM = &distance
+					item.Findings = appendThresholdFinding(item.Findings, "timing.clock_source.proximity", "clock source exceeds maximum source-to-consumer distance", distance, fixture.MaxSourceToConsumerDistanceMM, []string{source.Ref, consumer.Ref}, item.ClockNets)
+				}
+			} else {
+				item.Findings = append(item.Findings, timingFinding("timing.fixture.consumer_present", reports.SeverityWarning, "timing fixture consumer component is missing", nil, nil, nil, nil))
+			}
+		}
+		item.LoadCapacitorDistancesMM = map[string]float64{}
+		loadDistances := []float64{}
+		for _, role := range fixture.LoadCapacitorRoles {
+			load, ok := componentsByRole[role]
+			if !ok {
+				item.Findings = append(item.Findings, timingFinding("timing.load_caps.present", reports.SeverityError, "timing load capacitor component is missing", nil, nil, nil, nil))
+				continue
+			}
+			item.LoadCapacitorRefs = append(item.LoadCapacitorRefs, load.Ref)
+			if hasSource {
+				distance := placementDistance(source.Placement, load.Placement)
+				item.LoadCapacitorDistancesMM[load.Ref] = distance
+				loadDistances = append(loadDistances, distance)
+				item.Findings = appendThresholdFinding(item.Findings, "timing.load_caps.proximity", "load capacitor exceeds maximum source distance", distance, fixture.MaxLoadCapDistanceMM, []string{source.Ref, load.Ref}, nil)
+			}
+		}
+		if len(item.LoadCapacitorDistancesMM) == 0 {
+			item.LoadCapacitorDistancesMM = nil
+		}
+		if len(loadDistances) >= 2 {
+			asymmetry := math.Abs(loadDistances[0] - loadDistances[1])
+			item.LoadCapacitorAsymmetryMM = &asymmetry
+			item.Findings = appendThresholdFinding(item.Findings, "timing.load_caps.symmetry", "load capacitor placement exceeds symmetry tolerance", asymmetry, fixture.MaxLoadCapAsymmetryMM, item.LoadCapacitorRefs, nil)
+		}
+		item.ClockRouteLengthsMM = map[string]float64{}
+		clockNetSet := map[string]struct{}{}
+		for _, netTemplate := range fixture.ClockNetTemplates {
+			netName := InstanceNetName(output.Instance.InstanceID, netTemplate)
+			clockNetSet[netName] = struct{}{}
+			item.ClockNets = append(item.ClockNets, netName)
+		}
+		for _, routeID := range fixture.LocalRouteIDs {
+			route, ok := routesByID[routeID]
+			if !ok {
+				item.Findings = append(item.Findings, timingFinding("timing.clock_routes.present", reports.SeverityError, "timing local route is missing", nil, nil, nil, nil))
+				continue
+			}
+			if _, ok := clockNetSet[route.NetName]; ok {
+				item.ClockRouteLengthsMM[route.ID] = route.LengthMM
+				item.Findings = appendThresholdFinding(item.Findings, "timing.clock_routes.length", "timing route exceeds maximum length", route.LengthMM, fixture.MaxClockRouteLengthMM, []string{route.From.Ref, route.To.Ref}, []string{route.NetName})
+			}
+			if route.NetName == item.GroundNet {
+				item.GroundReturnPresent = true
+			}
+		}
+		if len(item.ClockRouteLengthsMM) == 0 {
+			item.ClockRouteLengthsMM = nil
+		}
+		if fixture.GroundNetTemplate != "" && !item.GroundReturnPresent {
+			item.Findings = append(item.Findings, timingFinding("timing.ground_return.present", reports.SeverityError, "timing fixture has no local ground return evidence", nil, nil, item.LoadCapacitorRefs, []string{item.GroundNet}))
+		}
+		item.Satisfied = timingFindingsSatisfied(item.Findings)
+		evidence = append(evidence, item)
+	}
+	return evidence
+}
+
+func realizedComponentsByRole(components []RealizedPCBComponent) map[string]RealizedPCBComponent {
+	byRole := map[string]RealizedPCBComponent{}
+	for _, component := range components {
+		if role := strings.TrimSpace(component.ComponentRole); role != "" {
+			byRole[role] = component
+		}
+	}
+	return byRole
+}
+
+func realizedRoutesByID(routes []RealizedPCBLocalRoute) map[string]RealizedPCBLocalRoute {
+	byID := map[string]RealizedPCBLocalRoute{}
+	for _, route := range routes {
+		if id := strings.TrimSpace(route.ID); id != "" {
+			byID[id] = route
+		}
+	}
+	return byID
+}
+
+func placementDistance(first RelativePlacement, second RelativePlacement) float64 {
+	return math.Hypot(first.XMM-second.XMM, first.YMM-second.YMM)
+}
+
+func appendThresholdFinding(findings []TimingFixtureFinding, id string, message string, measured float64, threshold *float64, refs []string, nets []string) []TimingFixtureFinding {
+	if threshold == nil || measured <= *threshold {
+		return findings
+	}
+	return append(findings, timingFinding(id, reports.SeverityError, message, &measured, threshold, refs, nets))
+}
+
+func timingFinding(id string, severity reports.Severity, message string, measured *float64, threshold *float64, refs []string, nets []string) TimingFixtureFinding {
+	return TimingFixtureFinding{
+		ID:          id,
+		Severity:    severity,
+		Message:     message,
+		MeasuredMM:  cloneFloat64Ptr(measured),
+		ThresholdMM: cloneFloat64Ptr(threshold),
+		Refs:        append([]string(nil), refs...),
+		Nets:        append([]string(nil), nets...),
+	}
+}
+
+func timingFindingsSatisfied(findings []TimingFixtureFinding) bool {
+	for _, finding := range findings {
+		if finding.Severity == reports.SeverityError || finding.Severity == reports.SeverityBlocked {
+			return false
+		}
+	}
+	return true
 }
 
 type emittedComponentFact struct {
@@ -353,6 +538,17 @@ func routePoints(route PCBLocalRoute, placements map[string]RelativePlacement, c
 	}
 	points = append(points, to)
 	return points, nil
+}
+
+func routePointLength(points []transactions.Point) float64 {
+	if len(points) < 2 {
+		return 0
+	}
+	length := 0.0
+	for index := 1; index < len(points); index++ {
+		length += math.Hypot(points[index].XMM-points[index-1].XMM, points[index].YMM-points[index-1].YMM)
+	}
+	return length
 }
 
 func routeEndpointPoint(endpoint RouteEndpoint, placements map[string]RelativePlacement, components map[string]BlockComponent) (transactions.Point, bool) {
