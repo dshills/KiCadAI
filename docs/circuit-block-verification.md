@@ -85,9 +85,36 @@ These IDs identify emitted timing check results. Use `forbidden_findings` for
 findings that must not appear in a passing fixture, and `required_findings` only
 when a manifest intentionally expects a diagnostic to be present.
 
-Protection blocks currently require realization evidence, but they do not yet
-emit protection-specific timing findings because entry-anchor and power-path
-route checks are not modeled.
+Protection blocks currently require realization evidence for modeled
+entry-anchor and power-path routes. The standard ESD manifest requires route
+IDs `esd_signal_entry_to_tvs` and `esd_tvs_to_ground`; the standard
+diode-based reverse-polarity manifest requires `raw_input_to_diode` and
+`diode_to_protected_output`. Manifests declare these IDs in
+`expected.pcb.required_local_routes`; they are route evidence requirements, not
+`required_findings` diagnostics. The verification engine performs literal
+string matching between
+`expected.pcb.required_local_routes[]` and realized
+`realization.local_routes[].id` values; matching is case-sensitive. Anchor
+presence is verified through required routes whose endpoint `anchor_id` values
+reference `realization.entry_anchors[].id`. These checks prove block-local
+route evidence, not surge/thermal behavior or final KiCad-backed board DRC.
+The standard manifests assert route IDs that encode the intended signal,
+ground, raw-input, and protected-output paths.
+
+Example protection route requirement:
+
+```json
+{
+  "expected": {
+    "pcb": {
+      "required_local_routes": [
+        "esd_signal_entry_to_tvs",
+        "esd_tvs_to_ground"
+      ]
+    }
+  }
+}
+```
 
 Example:
 
@@ -146,9 +173,9 @@ Example:
 ```
 
 Timing blocks currently assert local routes and timing fixtures. Protection
-blocks assert realization evidence for currently modeled placement and
-constraint metadata, while route-through entry anchors and power-path routes
-remain excluded until those topology details are modeled.
+blocks assert realization evidence for modeled placement, entry-anchor, and
+power-path route metadata. Entry anchors are evidence points until higher-level
+board composition maps them to physical connector pads or board-edge features.
 
 ## CLI Usage
 

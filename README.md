@@ -551,7 +551,15 @@ kicadai --json --request ./examples/blocks/requests/led_indicator.json block rea
 - the normal block instantiation output with schematic transactions;
 - `realization.components[]` with refs, footprints, role names, and relative
   PCB placements;
-- `realization.local_routes[]` and route operations for verified local nets;
+- `realization.entry_anchors[]` with `id`, `port` (the block-level logical
+  port associated with the anchor), `net_name`, `description`,
+  block-origin-relative `placement.x_mm` and `placement.y_mm`, and string
+  `placement.layer` values such as `"F.Cu"` for block-boundary entry/exit
+  points such as connector-adjacent ESD inputs and protected power-path
+  endpoints;
+- `realization.local_routes[]` with `id`, `net_name`, endpoint refs/pins, and
+  endpoint objects that use either component refs/pins or anchor references
+  through `anchor_id`, plus route operations for verified local nets;
 - `placement_request`, a ready input for the placement engine.
 
 This is the first PCB-fragment layer for the circuit block library. It does not
@@ -568,10 +576,12 @@ evidence. The oscillator and reset/programming manifests now
 assert realized local routes and timing fixtures for local decoupling,
 reset/programming route length, enable/control presence, and ground-reference
 checks where the current realization model can prove them. ESD and
-reverse-polarity protection manifests now require realization evidence, but
-their route-through entry anchors and power-path local routes are not yet
-modeled. Stronger KiCad-backed layout evidence remains required before
-fabrication readiness claims.
+reverse-polarity protection manifests now require modeled entry-anchor route
+and power-path local-route evidence via `expected.pcb.required_local_routes`.
+Those anchors are still evidence points until board-level composition binds
+them to physical connector pads or board-edge features. Stronger KiCad-backed
+DRC, surge/thermal, and layout evidence remains required before fabrication
+readiness claims.
 
 ```sh
 kicadai --json --builtins block verify

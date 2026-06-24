@@ -115,8 +115,10 @@ loop confidence:
   reverse-polarity protection families. It also includes conditional
   realization for the default reset/programming ISP fixture, manifest-level PCB
   realization evidence, and deterministic timing/local-route checks where
-  modeled. These newer blocks still need more variants, entry-anchor/power-path
-  route modeling, and stronger KiCad-backed layout proof;
+  modeled. ESD and reverse-polarity protection now include entry-anchor and
+  power-path local-route evidence. These newer blocks still need more variants,
+  physical board-composition binding for anchors, and stronger KiCad-backed
+  layout proof;
 - placement now models several PCB-quality rule families and first-pass
   timing-sensitive crystal, canned oscillator, and reset/programming fixture
   evidence, but larger-board KiCad DRC-backed proof and broader
@@ -233,8 +235,8 @@ Implemented foundation.
 - Crystal, canned oscillator, and reset/programming verification manifests now
   assert required local routes and satisfied timing fixtures.
 - ESD and reverse-polarity protection verification manifests now require PCB
-  realization evidence for the currently modeled placement/constraint
-  realization.
+  realization evidence for the currently modeled placement, entry anchors, and
+  power-path local routes.
 - Block verification can require internal board validation and has explicit
   optional versus required KiCad ERC/DRC behavior with skipped/blocking stage
   summaries.
@@ -246,12 +248,10 @@ Implemented foundation.
 
 ### Remaining Work
 
-- Add route-through entry anchors and power-path local route realization for
-  ESD and reverse-polarity protection blocks.
 - Add stable KiCad-backed ERC/DRC evidence to block verification manifests
   where external KiCad CLI is available.
-- Add entry-anchor modeling for connector-adjacent ESD and input-protection
-  placement/routing constraints.
+- Bind entry anchors to physical connector pads, board-edge points, or imported
+  mechanical constraints during board-level composition.
 - Replace remaining structural/generic active templates with concrete
   component-catalog-backed parts where fabrication readiness is desired.
 - Convert more semantic PCB constraints into downstream placement, routing,
