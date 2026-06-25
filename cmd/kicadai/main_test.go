@@ -181,6 +181,56 @@ func TestRunIntentPlanWritesArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateRequiresOutput(t *testing.T) {
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "intent.json")
+	if err := os.WriteFile(requestPath, []byte(`{"version":"0.1.0","name":"missing_output","board":{"width_mm":10,"height_mm":10,"layers":2}}`), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", requestPath, "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing output error")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || len(result.Issues) != 1 || result.Issues[0].Path != "output" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunIntentCreateReportsBlockedPlan(t *testing.T) {
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "intent.json")
+	output := filepath.Join(dir, "out")
+	request := `{
+  "version": "0.1.0",
+  "name": "blocked_intent",
+  "kind": "breakout",
+  "board": {"width_mm": 40, "height_mm": 25, "layers": 2},
+  "functions": [{"kind": "sensor", "family": "rf_sensor", "strength": "required"}]
+}`
+	if err := os.WriteFile(requestPath, []byte(request), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", requestPath, "--output", output, "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected blocked intent error")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || len(result.Issues) == 0 {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
 	tests := []struct {
 		name          string

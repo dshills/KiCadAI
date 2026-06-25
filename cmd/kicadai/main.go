@@ -312,7 +312,7 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 	case "inspect":
 		return runInspect(opts, stdout)
 	case "intent":
-		return runIntent(opts, stdout)
+		return runIntent(ctx, opts, stdout)
 	case "evaluate":
 		return runEvaluate(opts, stdout)
 	case "library":
@@ -2379,13 +2379,20 @@ func runDesign(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	return runDesignCreate(ctx, opts, stdout)
 }
 
-func runIntent(opts cliOptions, stdout io.Writer) error {
+type intentCreateResult struct {
+	Plan     intentplanner.PlanResult      `json:"plan"`
+	Workflow designworkflow.WorkflowResult `json:"workflow,omitempty"`
+}
+
+func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: plan or explain"})
 	}
 	switch opts.commandArgs[0] {
 	case "plan", "explain":
-		return runIntentPlan(opts, stdout, opts.commandArgs[0])
+		return runIntentPlan(ctx, opts, stdout, opts.commandArgs[0])
+	case "create":
+		return runIntentCreate(ctx, opts, stdout)
 	default:
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent." + opts.commandArgs[0], Message: "unsupported intent subcommand " + opts.commandArgs[0]})
 	}
@@ -2403,7 +2410,77 @@ type intentExplainResult struct {
 	KnownGaps      []intentplanner.PlanNote            `json:"known_gaps"`
 }
 
-func runIntentPlan(opts cliOptions, stdout io.Writer, subcommand string) error {
+func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("intent create requires --json")
+	}
+	if strings.TrimSpace(opts.output) == "" {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "--output is required"}
+		if err := writeReportFailure(stdout, "intent", issue); err != nil {
+			return err
+		}
+		return errors.New(issue.Message)
+	}
+	plan, issues, err := loadIntentPlan(opts)
+	if err != nil {
+		return err
+	}
+	if reports.HasBlockingIssue(issues) || reports.HasBlockingIssue(plan.Issues) || plan.GeneratedRequest == nil || plan.Status == intentplanner.PlanStatusBlocked || plan.Status == intentplanner.PlanStatusNeedsClarification {
+		allIssues := append([]reports.Issue(nil), issues...)
+		allIssues = append(allIssues, plan.Issues...)
+		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan}, allIssues, plan.Artifacts)
+		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
+			return writeErr
+		}
+		return errors.New("intent create blocked by plan issues")
+	}
+	checkOpts, err := checkOptions(opts)
+	if err != nil {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "check_options", Message: err.Error()})
+	}
+	createOpts, err := designCreateOptions(opts, checkOpts)
+	if err != nil {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
+	}
+	workflow := designworkflow.Create(ctx, *plan.GeneratedRequest, createOpts)
+	artifactDir := filepath.Join(opts.output, ".kicadai")
+	plan, artifactIssues := intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: artifactDir, Overwrite: true})
+	allIssues := append([]reports.Issue(nil), issues...)
+	allIssues = append(allIssues, plan.Issues...)
+	allIssues = append(allIssues, artifactIssues...)
+	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
+	artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
+	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
+	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow}, allIssues, artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("intent create reported issues")
+	}
+	return nil
+}
+
+func loadIntentPlan(opts cliOptions) (intentplanner.PlanResult, []reports.Issue, error) {
+	if strings.TrimSpace(opts.requestPath) == "" {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "--request is required"}
+		return intentplanner.PlanResult{}, []reports.Issue{issue}, nil
+	}
+	file, err := os.Open(opts.requestPath)
+	if err != nil {
+		issue := reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()}
+		return intentplanner.PlanResult{}, []reports.Issue{issue}, nil
+	}
+	defer file.Close()
+	request, issues := intentplanner.DecodeRequestStrict(file)
+	if reports.HasBlockingIssue(issues) {
+		return intentplanner.PlanResult{}, issues, nil
+	}
+	return intentplanner.Plan(request), issues, nil
+}
+
+func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subcommand string) error {
+	_ = ctx
 	if !opts.jsonOutput {
 		return fmt.Errorf("intent plan requires --json")
 	}
