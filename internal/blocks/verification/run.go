@@ -45,6 +45,7 @@ type RunOptions struct {
 	OutputDir     string
 	Overwrite     bool
 	KeepArtifacts bool
+	KiCadCorpus   KiCadCorpusOptions
 	WriterOptions writercorrectness.Options
 	KiCadCLI      string
 	RequireERC    bool
@@ -57,14 +58,15 @@ type RunOptions struct {
 type CheckRunner func(ctx context.Context, kind checks.CheckKind, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, error)
 
 type RunResult struct {
-	CaseID        string              `json:"case_id"`
-	BlockID       string              `json:"block_id"`
-	EvidenceLevel EvidenceLevel       `json:"evidence_level"`
-	Status        Status              `json:"status"`
-	Stages        []StageResult       `json:"stages"`
-	Output        *blocks.BlockOutput `json:"output,omitempty"`
-	Issues        []reports.Issue     `json:"issues,omitempty"`
-	Artifacts     []reports.Artifact  `json:"artifacts,omitempty"`
+	CaseID        string                 `json:"case_id"`
+	BlockID       string                 `json:"block_id"`
+	EvidenceLevel EvidenceLevel          `json:"evidence_level"`
+	Status        Status                 `json:"status"`
+	KiCadCorpus   *KiCadCorpusCaseResult `json:"kicad_corpus,omitempty"`
+	Stages        []StageResult          `json:"stages"`
+	Output        *blocks.BlockOutput    `json:"output,omitempty"`
+	Issues        []reports.Issue        `json:"issues,omitempty"`
+	Artifacts     []reports.Artifact     `json:"artifacts,omitempty"`
 }
 
 type StageResult struct {
@@ -132,6 +134,10 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 		BlockID:       manifest.BlockID,
 		EvidenceLevel: manifest.Expected.EvidenceLevel,
 		Status:        StatusPass,
+	}
+	if manifest.Expected.KiCadCorpus.Include {
+		corpus := corpusCaseResult(manifest, KiCadCorpusResultSkip)
+		result.KiCadCorpus = &corpus
 	}
 	manifestIssues := ValidateManifest(manifest, activeRegistry)
 	result.addStage(StageResult{Name: "manifest", Issues: manifestIssues, Summary: "validated manifest"})
@@ -229,6 +235,23 @@ func (result *RunResult) finish() {
 				result.Status = StatusWarning
 			}
 		}
+	}
+	result.finishKiCadCorpus()
+}
+
+func (result *RunResult) finishKiCadCorpus() {
+	if result.KiCadCorpus == nil {
+		return
+	}
+	switch result.Status {
+	case StatusPass:
+		result.KiCadCorpus.Status = KiCadCorpusResultPass
+	case StatusWarning:
+		result.KiCadCorpus.Status = KiCadCorpusResultBlocked
+	case StatusBlocked:
+		result.KiCadCorpus.Status = KiCadCorpusResultBlocked
+	case StatusSkipped:
+		result.KiCadCorpus.Status = KiCadCorpusResultSkip
 	}
 }
 
