@@ -543,22 +543,29 @@ generate deterministic BOM/CPL reports where evidence exists, hydrate BOM rows
 with component identity evidence, hydrate CPL rows with BOM linkage, side, and
 rotation evidence, validate BOM/CPL consistency, enforce safe
 dry-run/execute/overwrite behavior, emit package manifests/readiness reports,
-generate and validate KiCad-CLI-backed Gerber/drill artifacts, expose optional
-or required KiCad CLI evidence policy, and optionally apply the built-in
-`generic_assembly` manufacturer profile through `--manufacturer-profile`.
+generate and validate KiCad-CLI-backed Gerber/drill artifacts, emit
+`physical-rules.json`, run modeled physical fabrication checks for stackup, net
+classes, solder mask/paste pad policy, Edge.Cuts containment, courtyard
+presence/overlap, silkscreen board clearance, and mounting-hole
+geometry/edge clearance, expose optional or required KiCad CLI evidence policy,
+and optionally apply the built-in `generic_assembly` manufacturer profile
+through `--manufacturer-profile`.
 `design create` treats `validation.acceptance: fabrication-candidate` as a
 request to prove fabrication readiness; partial readiness status (`candidate`
 or `blocked`) downgrades achieved acceptance and leaves
-`acceptance.fabrication_ready` false.
+`acceptance.fabrication_ready` false. The `fabrication_readiness` workflow stage
+now includes compact physical-rule status, blocker/warning counts, profile, and
+report path where available.
 
 ### Remaining Work
 
-- Add stackup, net class, solder mask, paste, edge cuts, courtyard, silkscreen,
-  and mounting-hole checks.
-- Expand fabrication-readiness score and blocking issue taxonomy as new gates
-  become executable.
-- Add additional manufacturer profile presets and profile import once specific
+- Expand physical DFM coverage beyond currently modeled checks, especially
+  annular ring policy, copper slivers, solder mask slivers, castellations,
+  impedance constraints, panelization, board finish, and fabrication notes.
+- Add richer manufacturer profile presets and profile import once specific
   fabricator rule sources are selected.
+- Compare physical-rule evidence with optional KiCad DRC categories and
+  manufacturer outputs where those tools expose machine-readable findings.
 
 ### Acceptance Gates
 

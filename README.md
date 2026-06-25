@@ -1282,6 +1282,7 @@ Default package paths are under `<project>/fabrication/`:
 
 - `readiness.json`
 - `package-manifest.json`
+- `physical-rules.json`
 - `bom.csv`
 - `cpl.csv`
 - `gerbers/`
@@ -1302,22 +1303,31 @@ stay deterministic and do not invoke external tools. With `--kicad-cli` and
 outputs, validates required copper, mask, silkscreen, Edge.Cuts, and drill
 files, and records generated file lists in `package-manifest.json`. Missing
 `ready`-level evidence keeps the status at `candidate` or `blocked`, never
-`ready`. With `--require-drc`, missing or failing external fabrication evidence
-is blocking. `design create` now runs a dry-run fabrication preview only when
-the input request JSON sets `validation.acceptance` to
+`ready`. Physical fabrication checks now run during `export preview`,
+`export fabrication` without `--execute`, and `export fabrication` execution.
+The generated
+`physical-rules.json` report covers stackup, net classes, solder mask/paste pad
+policy, Edge.Cuts containment, courtyard overlap/presence, silkscreen board
+clearance, and mounting-hole geometry/edge clearance. Physical-rule blockers are
+included in readiness status and package manifests. With `--require-drc`,
+missing or failing external fabrication evidence is blocking. `design create`
+now runs a dry-run fabrication preview only when the input request JSON sets
+`validation.acceptance` to
 `fabrication-candidate`, which is the highest current design acceptance level
 and functions as a request to prove fabrication readiness. That input value is
 an enum value; the output field `acceptance.fabrication_ready` is a JSON field
 name and boolean. In the output workflow result, partial readiness status
 (`candidate` or `blocked`) downgrades the achieved acceptance and leaves
-`acceptance.fabrication_ready` false.
+`acceptance.fabrication_ready` false. The `fabrication_readiness` workflow stage
+also exposes a compact `physical_rules` summary with status, blocker count,
+warning count, active physical-rule/manufacturer profile, and report path
+relative to the project root when available.
 
 This is still not a manufacturer acceptance guarantee. KiCadAI validates the
 presence, identity consistency, and local profile compatibility of modeled
 fabrication outputs, but broader DFM checks such as manufacturer-specific
-stackups, annular ring policy, solder slivers, impedance, panelization,
-assembly notes, live part availability, and procurement readiness remain
-separate gates.
+annular ring policy, solder mask slivers, impedance, panelization, assembly notes,
+live part availability, and procurement readiness remain separate gates.
 
 ## Examples
 
