@@ -108,7 +108,7 @@ func TestRunCaseERCDRCSkipsWhenKiCadMissingAndOptional(t *testing.T) {
 		Overwrite: true,
 	})
 	stage, ok := findStage(result.Stages, "erc_drc")
-	if !ok || stage.Status != StatusSkipped || result.Status != StatusPass {
+	if !ok || stage.Status != StatusSkipped || result.Status != StatusPass || len(result.Artifacts) == 0 || !strings.Contains(stage.Summary, "KiCad CLI is unavailable") {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -136,7 +136,7 @@ func TestRunCaseERCDRCBlocksWhenRequiredAndKiCadMissing(t *testing.T) {
 		Overwrite: true,
 	})
 	stage, ok := findStage(result.Stages, "erc_drc")
-	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || !hasIssue(result.Issues, "kicad-cli") || !hasIssuePath(result.Issues, ".erc_drc.kicad_cli") || !strings.Contains(stage.Summary, "KiCad CLI is required") {
+	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || len(result.Artifacts) == 0 || !hasIssue(result.Issues, "kicad-cli") || !hasIssuePath(result.Issues, ".erc_drc.kicad_cli") || !strings.Contains(stage.Summary, "KiCad CLI is required") {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -301,6 +301,95 @@ func TestEnsureProjectForExternalChecksBlocksStaleCacheHit(t *testing.T) {
 	_, _, issues := ensureProjectForExternalChecks(manifest, &blocks.BlockOutput{}, RunOptions{OutputDir: outputDir})
 	if !hasIssue(issues, "stale or incomplete") {
 		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestEnsureProjectForExternalChecksBlocksCacheHitWhenCheckContextChanges(t *testing.T) {
+	manifest := validManifest()
+	output := &blocks.BlockOutput{}
+	outputDir := t.TempDir()
+	projectDir := filepath.Join(outputDir, manifest.ID)
+	if err := os.MkdirAll(projectDir, 0o755); err != nil {
+		t.Fatalf("mkdir project: %v", err)
+	}
+	opts := RunOptions{OutputDir: outputDir}
+	checkOpts := checks.Options{Units: "mm"}
+	cli := checks.KiCadCLI{Path: "/usr/local/bin/kicad-cli"}
+	if err := writeProjectSentinelWithChecks(projectDir, manifest, output, opts, checkOpts, cli, "10.0.3"); err != nil {
+		t.Fatalf("write sentinel: %v", err)
+	}
+	_, _, issues := ensureProjectForExternalChecksWithChecks(manifest, output, opts, checks.Options{Units: "in"}, cli, "10.0.3")
+	if !hasIssue(issues, "stale or incomplete") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestGenericProjectSentinelMatchesCheckAwareWrite(t *testing.T) {
+	manifest := validManifest()
+	output := &blocks.BlockOutput{}
+	projectDir := t.TempDir()
+	if err := writeProjectSentinelWithChecks(projectDir, manifest, output, RunOptions{}, checks.Options{Units: "mm"}, checks.KiCadCLI{Path: "/usr/local/bin/kicad-cli"}, "10.0.3"); err != nil {
+		t.Fatalf("write sentinel: %v", err)
+	}
+	if !projectSentinelMatches(projectDir, manifest, output, RunOptions{}) {
+		t.Fatal("generic sentinel did not match check-aware write")
+	}
+	if _, err := os.Stat(filepath.Join(projectDir, checkSentinelName)); err != nil {
+		t.Fatalf("missing check sentinel: %v", err)
+	}
+}
+
+func TestCheckAwareProjectSentinelRequiresCheckSentinel(t *testing.T) {
+	manifest := validManifest()
+	output := &blocks.BlockOutput{}
+	projectDir := t.TempDir()
+	if err := writeProjectSentinel(projectDir, manifest, output, RunOptions{}); err != nil {
+		t.Fatalf("write generic sentinel: %v", err)
+	}
+	if projectSentinelMatchesWithChecks(projectDir, manifest, output, RunOptions{}, checks.Options{Units: "mm"}, checks.KiCadCLI{Path: "/usr/local/bin/kicad-cli"}, "10.0.3") {
+		t.Fatal("check-aware sentinel matched without check sentinel")
+	}
+}
+
+func TestProjectSignatureSortsAllowlistEntries(t *testing.T) {
+	manifest := validManifest()
+	output := &blocks.BlockOutput{}
+	opts := RunOptions{}
+	cli := checks.KiCadCLI{Path: "/usr/local/bin/kicad-cli"}
+	left := checks.Options{Allowlist: []checks.AllowlistEntry{
+		{Code: "B", Reason: "second"},
+		{Code: "A", Reason: "first"},
+	}}
+	right := checks.Options{Allowlist: []checks.AllowlistEntry{
+		{Code: "A", Reason: "first"},
+		{Code: "B", Reason: "second"},
+	}}
+	if projectSignatureWithChecks(manifest, output, opts, left, cli, "10.0.3") != projectSignatureWithChecks(manifest, output, opts, right, cli, "10.0.3") {
+		t.Fatal("allowlist order changed project signature")
+	}
+}
+
+func TestCheckArtifactsUseStableDescriptions(t *testing.T) {
+	artifacts := checkArtifacts(checks.CheckResult{
+		Kind:       checks.CheckKindDRC,
+		ReportPath: filepath.Join("out", "drc.json"),
+	})
+	if len(artifacts) != 1 || artifacts[0].Kind != reports.ArtifactDRCReport || artifacts[0].Path != "out/drc.json" || artifacts[0].Description != "KiCad DRC JSON report" {
+		t.Fatalf("artifacts = %#v", artifacts)
+	}
+}
+
+func TestCheckRunErrorMessageIncludesExecutionContext(t *testing.T) {
+	message := checkRunErrorMessage(checks.CheckResult{
+		Kind:         checks.CheckKindERC,
+		KiCadCLIPath: "/usr/local/bin/kicad-cli",
+		TargetPath:   "case/project.kicad_pro",
+		ReportPath:   "case/erc.json",
+	}, fmt.Errorf("erc failed"))
+	for _, want := range []string{"erc failed", "kind=erc", "cli=/usr/local/bin/kicad-cli", "target=case/project.kicad_pro", "report=case/erc.json"} {
+		if !strings.Contains(message, want) {
+			t.Fatalf("message %q missing %q", message, want)
+		}
 	}
 }
 

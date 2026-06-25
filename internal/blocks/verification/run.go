@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
+	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/boardvalidation"
@@ -32,7 +34,10 @@ const (
 	defaultPlacementToleranceMM  = 0.001
 	defaultPlacementToleranceDeg = 0.1
 	projectSentinelName          = ".kicadai-block-verification"
+	checkSentinelName            = ".kicadai-block-verification.erc_drc"
 )
+
+var kicadCLIVersionCache sync.Map
 
 type RunOptions struct {
 	Registry      blocks.Registry
@@ -490,29 +495,36 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 				Summary: "ERC/DRC blocked: missing output directory",
 			}, nil
 		}
-		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because no output directory was provided"}, nil
-	}
-
-	projectDir, artifacts, issues := ensureProjectForExternalChecks(manifest, output, opts)
-	if reports.HasBlockingIssue(issues) {
-		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to prepare generated project for ERC/DRC"}, artifacts
+		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because no output directory was provided; pass --output to generate a KiCad project for optional checks"}, nil
 	}
 
 	activeCheckOpts, allowlistIssues := checkOptions(manifest, opts)
+	var issues []reports.Issue
 	issues = append(issues, allowlistIssues...)
 	if reports.HasBlockingIssue(allowlistIssues) {
-		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to configure ERC/DRC allowlist"}, artifacts
+		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to configure ERC/DRC allowlist"}, nil
 	}
 
-	cli, err := checks.DiscoverCLI(activeCheckOpts.KiCadCLI)
-	if err != nil {
-		if requiredERC || requiredDRC {
-			issues = append(issues, ercDRCRunIssue(manifest, "kicad_cli", err.Error()))
-			return StageResult{Name: "erc_drc", Issues: issues, Summary: "KiCad CLI is required but unavailable"}, artifacts
-		}
-		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because KiCad CLI is unavailable"}, artifacts
+	cli, cliErr := checks.DiscoverCLI(activeCheckOpts.KiCadCLI)
+	cliVersion := ""
+	if cliErr == nil {
+		activeCheckOpts.KiCadCLI = cli.Path
+		cliVersion = detectKiCadCLIVersion(ctx, cli)
 	}
-	activeCheckOpts.KiCadCLI = cli.Path
+
+	projectDir, artifacts, projectIssues := ensureProjectForExternalChecksWithChecks(manifest, output, opts, activeCheckOpts, cli, cliVersion)
+	issues = append(issues, projectIssues...)
+	if reports.HasBlockingIssue(projectIssues) {
+		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to prepare generated project for ERC/DRC"}, artifacts
+	}
+
+	if cliErr != nil {
+		if requiredERC || requiredDRC {
+			issues = append(issues, ercDRCRunIssue(manifest, "kicad_cli", cliErr.Error()))
+			return StageResult{Name: "erc_drc", Issues: issues, Summary: "KiCad CLI is required but unavailable for " + projectDir}, artifacts
+		}
+		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because KiCad CLI is unavailable for " + projectDir + "; set --kicad-cli or KICADAI_KICAD_CLI to run optional checks"}, artifacts
+	}
 
 	runner := opts.CheckRunner
 	if runner == nil {
@@ -571,14 +583,32 @@ func ercDRCKinds(expected Expected, opts RunOptions) []checks.CheckKind {
 	return kinds
 }
 
+func detectKiCadCLIVersion(ctx context.Context, cli checks.KiCadCLI) string {
+	if value, ok := kicadCLIVersionCache.Load(cli.Path); ok {
+		return value.(string)
+	}
+	versionCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	version, err := checks.ExecRunner{}.Version(versionCtx, cli.Path)
+	if err != nil {
+		version = ""
+	}
+	kicadCLIVersionCache.Store(cli.Path, version)
+	return version
+}
+
 func ensureProjectForExternalChecks(manifest Manifest, output *blocks.BlockOutput, opts RunOptions) (string, []reports.Artifact, []reports.Issue) {
+	return ensureProjectForExternalChecksWithChecks(manifest, output, opts, checks.Options{}, checks.KiCadCLI{}, "")
+}
+
+func ensureProjectForExternalChecksWithChecks(manifest Manifest, output *blocks.BlockOutput, opts RunOptions, checkOpts checks.Options, cli checks.KiCadCLI, cliVersion string) (string, []reports.Artifact, []reports.Issue) {
 	if err := os.MkdirAll(opts.OutputDir, 0o755); err != nil {
 		return "", nil, []reports.Issue{ercDRCRunIssue(manifest, "output_dir", err.Error())}
 	}
 	projectDir := caseOutputDir(opts.OutputDir, manifest.ID)
 	_, err := os.Stat(projectDir)
 	if err == nil && !opts.Overwrite {
-		if projectSentinelMatches(projectDir, manifest, output, opts) {
+		if projectSentinelMatchesWithChecks(projectDir, manifest, output, opts, checkOpts, cli, cliVersion) {
 			return projectDir, existingProjectArtifacts(projectDir), nil
 		}
 		return projectDir, nil, []reports.Issue{ercDRCRunIssue(manifest, "project", "existing generated project is stale or incomplete; rerun with overwrite")}
@@ -595,7 +625,7 @@ func ensureProjectForExternalChecks(manifest Manifest, output *blocks.BlockOutpu
 	if reports.HasBlockingIssue(issues) {
 		return projectDir, apply.Artifacts, issues
 	}
-	if err := writeProjectSentinel(projectDir, manifest, output, opts); err != nil {
+	if err := writeProjectSentinelWithChecks(projectDir, manifest, output, opts, checkOpts, cli, cliVersion); err != nil {
 		issues = append(issues, ercDRCRunIssue(manifest, "sentinel", err.Error()))
 	}
 	return projectDir, apply.Artifacts, issues
@@ -663,9 +693,26 @@ func checkResultIssues(manifest Manifest, result checks.CheckResult, err error) 
 		})
 	}
 	if err != nil {
-		issues = append(issues, ercDRCRunIssue(manifest, string(result.Kind), err.Error()))
+		issues = append(issues, ercDRCRunIssue(manifest, string(result.Kind), checkRunErrorMessage(result, err)))
 	}
 	return issues
+}
+
+func checkRunErrorMessage(result checks.CheckResult, err error) string {
+	parts := []string{err.Error()}
+	if result.Kind != "" {
+		parts = append(parts, "kind="+string(result.Kind))
+	}
+	if result.KiCadCLIPath != "" {
+		parts = append(parts, "cli="+result.KiCadCLIPath)
+	}
+	if result.TargetPath != "" {
+		parts = append(parts, "target="+result.TargetPath)
+	}
+	if result.ReportPath != "" {
+		parts = append(parts, "report="+result.ReportPath)
+	}
+	return strings.Join(parts, "; ")
 }
 
 func missingExpectedCheckIssues(manifest Manifest, findings []checks.CheckFinding, expected []string) []reports.Issue {
@@ -749,7 +796,7 @@ func checkArtifacts(result checks.CheckResult) []reports.Artifact {
 	return []reports.Artifact{{
 		Kind:        kind,
 		Path:        filepath.ToSlash(result.ReportPath),
-		Description: string(result.Kind) + " JSON report",
+		Description: "KiCad " + strings.ToUpper(string(result.Kind)) + " JSON report",
 	}}
 }
 
@@ -779,34 +826,98 @@ func findingFingerprint(finding checks.CheckFinding) string {
 }
 
 func writeProjectSentinel(projectDir string, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) error {
-	return os.WriteFile(filepath.Join(projectDir, projectSentinelName), []byte(projectSignature(manifest, output, opts)), 0o644)
+	return writeProjectSentinelWithChecks(projectDir, manifest, output, opts, checks.Options{}, checks.KiCadCLI{}, "")
+}
+
+func writeProjectSentinelWithChecks(projectDir string, manifest Manifest, output *blocks.BlockOutput, opts RunOptions, checkOpts checks.Options, cli checks.KiCadCLI, cliVersion string) error {
+	if err := os.WriteFile(filepath.Join(projectDir, projectSentinelName), []byte(projectSignature(manifest, output, opts)), 0o644); err != nil {
+		return err
+	}
+	if hasCheckSignatureContext(checkOpts, cli, cliVersion) {
+		return os.WriteFile(filepath.Join(projectDir, checkSentinelName), []byte(projectSignatureWithChecks(manifest, output, opts, checkOpts, cli, cliVersion)), 0o644)
+	}
+	return nil
 }
 
 func projectSentinelMatches(projectDir string, manifest Manifest, output *blocks.BlockOutput, opts RunOptions) bool {
+	return projectSentinelMatchesWithChecks(projectDir, manifest, output, opts, checks.Options{}, checks.KiCadCLI{}, "")
+}
+
+func projectSentinelMatchesWithChecks(projectDir string, manifest Manifest, output *blocks.BlockOutput, opts RunOptions, checkOpts checks.Options, cli checks.KiCadCLI, cliVersion string) bool {
 	data, err := os.ReadFile(filepath.Join(projectDir, projectSentinelName))
-	return err == nil && strings.TrimSpace(string(data)) == projectSignature(manifest, output, opts)
+	if err != nil || strings.TrimSpace(string(data)) != projectSignature(manifest, output, opts) {
+		return false
+	}
+	if !hasCheckSignatureContext(checkOpts, cli, cliVersion) {
+		return true
+	}
+	checkData, err := os.ReadFile(filepath.Join(projectDir, checkSentinelName))
+	return err == nil && strings.TrimSpace(string(checkData)) == projectSignatureWithChecks(manifest, output, opts, checkOpts, cli, cliVersion)
 }
 
 func projectSignature(manifest Manifest, output *blocks.BlockOutput, opts RunOptions) string {
+	return projectSignatureWithChecks(manifest, output, opts, checks.Options{}, checks.KiCadCLI{}, "")
+}
+
+func projectSignatureWithChecks(manifest Manifest, output *blocks.BlockOutput, opts RunOptions, checkOpts checks.Options, cli checks.KiCadCLI, cliVersion string) string {
 	hash := fnv.New64a()
 	effectiveAllowUnrouted := opts.WriterOptions.AllowUnrouted || manifest.Expected.Writer.AllowUnrouted
 	effectiveRoundTrip := opts.WriterOptions.RequireKiCadRoundTrip || manifest.Expected.Writer.RequireRoundTrip
 	hashStrings(hash,
-		manifest.ID,
-		manifest.BlockID,
+		"manifest_id="+manifest.ID,
+		"block_id="+manifest.BlockID,
+		"request_instance="+manifest.Request.InstanceID,
 		fmt.Sprintf("expected_writer_required=%t", manifest.Expected.Writer.Required),
 		fmt.Sprintf("expected_writer_ok=%t", manifest.Expected.Writer.OK),
 		fmt.Sprintf("expected_writer_allow_unrouted=%t", manifest.Expected.Writer.AllowUnrouted),
 		fmt.Sprintf("expected_writer_roundtrip=%t", manifest.Expected.Writer.RequireRoundTrip),
 		fmt.Sprintf("effective_writer_allow_unrouted=%t", effectiveAllowUnrouted),
 		fmt.Sprintf("effective_writer_roundtrip=%t", effectiveRoundTrip),
+		"check_cli="+checkOpts.KiCadCLI,
+		"resolved_cli="+cli.Path,
+		"resolved_cli_version="+cliVersion,
+		"check_units="+checkOpts.Units,
 	)
+	if len(checkOpts.Allowlist) > 0 {
+		allowlist := append([]checks.AllowlistEntry(nil), checkOpts.Allowlist...)
+		slices.SortFunc(allowlist, func(left checks.AllowlistEntry, right checks.AllowlistEntry) int {
+			return strings.Compare(allowlistSignatureKey(left), allowlistSignatureKey(right))
+		})
+		for _, entry := range allowlist {
+			hashStrings(hash, "allowlist", string(entry.Kind), entry.Target, entry.Severity, entry.Rule, entry.Code, entry.Message, entry.Reference, entry.Net, entry.Layer, string(entry.RepairCategory), entry.Reason)
+		}
+	}
+	hashMap(hash, manifest.Request.Params)
 	for _, operation := range output.Operations {
 		hashStrings(hash, string(operation.Op))
 		_, _ = hash.Write(operation.Raw)
 		_, _ = hash.Write([]byte{0})
 	}
 	return fmt.Sprintf("%016x", hash.Sum64())
+}
+
+func hasCheckSignatureContext(checkOpts checks.Options, cli checks.KiCadCLI, cliVersion string) bool {
+	return checkOpts.KiCadCLI != "" ||
+		checkOpts.Units != "" ||
+		len(checkOpts.Allowlist) > 0 ||
+		cli.Path != "" ||
+		cliVersion != ""
+}
+
+func allowlistSignatureKey(entry checks.AllowlistEntry) string {
+	return strings.Join([]string{
+		string(entry.Kind),
+		entry.Target,
+		entry.Severity,
+		entry.Rule,
+		entry.Code,
+		entry.Message,
+		entry.Reference,
+		entry.Net,
+		entry.Layer,
+		string(entry.RepairCategory),
+		entry.Reason,
+	}, "\x00")
 }
 
 func stableStringHash(value string) string {
@@ -830,6 +941,27 @@ func hashStringSlice(hash stringHasher, values []string) {
 	for _, value := range values {
 		_, _ = hash.Write([]byte(value))
 		_, _ = hash.Write([]byte{0})
+	}
+	_, _ = hash.Write([]byte{0})
+}
+
+func hashMap(hash stringHasher, values map[string]any) {
+	if len(values) == 0 {
+		_, _ = hash.Write([]byte{0})
+		return
+	}
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	slices.Sort(keys)
+	for _, key := range keys {
+		data, err := json.Marshal(values[key])
+		if err != nil {
+			hashStrings(hash, key, fmt.Sprintf("%T", values[key]), "marshal_error="+err.Error())
+			continue
+		}
+		hashStrings(hash, key, string(data))
 	}
 	_, _ = hash.Write([]byte{0})
 }
