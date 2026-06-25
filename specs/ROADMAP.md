@@ -238,10 +238,11 @@ Implemented foundation.
   realization evidence for the currently modeled placement, entry anchors, and
   power-path local routes.
 - `design create` routing summaries now include board-level anchor binding
-  evidence for realized entry anchors, including physical endpoint discovery,
-  connector/interface resolution for protection blocks, endpoint-to-anchor route
-  operations, and structured missing/ambiguous/net-mismatch/not-routable
-  diagnostics.
+  evidence for realized entry anchors, including physical endpoint discovery
+  for connector/interface pads, derived board-edge endpoints, explicit
+  `external_endpoints` for board-edge and imported-mechanical points,
+  endpoint-to-anchor route operations, and structured
+  missing/ambiguous/invalid/unsupported/net-mismatched/not-routable diagnostics.
 - Block verification can require internal board validation and has explicit
   optional versus required KiCad ERC/DRC behavior with skipped/blocking stage
   summaries.
@@ -266,8 +267,9 @@ Implemented foundation.
 
 - Expand real KiCad-backed ERC/DRC evidence from selected local smoke manifests
   to a broader DRC-clean block corpus as generated PCB quality improves.
-- Extend anchor binding beyond connector/interface pads to board-edge points
-  and imported mechanical constraints.
+- Broaden board-edge/imported-mechanical anchor binding proof with larger
+  KiCad-backed generated fixtures and repair suggestions for bad endpoint
+  declarations.
 - Replace remaining structural/generic active templates with concrete
   component-catalog-backed parts where fabrication readiness is desired.
 - Convert more semantic PCB constraints into downstream placement, routing,

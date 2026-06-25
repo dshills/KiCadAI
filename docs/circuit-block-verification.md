@@ -175,7 +175,15 @@ Example:
 Timing blocks currently assert local routes and timing fixtures. Protection
 blocks assert realization evidence for modeled placement, entry-anchor, and
 power-path route metadata. Entry anchors are evidence points until higher-level
-board composition maps them to physical connector pads or board-edge features.
+board composition maps them to physical connector pads, derived board-edge pad
+points, explicit `external_endpoints`, or imported-mechanical points.
+
+Board-level anchor binding in `design create` proves external-interface intent:
+it can show that a protection anchor is tied to a connector pad, a board-edge
+point, or an imported-mechanical interface coordinate, and it can emit a route
+operation when the endpoint and anchor have compatible nets and points. This is
+stronger evidence than block-local route metadata, but it is not KiCad DRC,
+DFM, surge, thermal, or fabrication-readiness proof by itself.
 
 ## CLI Usage
 

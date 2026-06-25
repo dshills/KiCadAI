@@ -54,10 +54,13 @@ policy, search-pressure quality scoring, explicit zone policy behavior,
 via/layer diagnostics, coupled-net intent reporting, workflow integration, and
 golden route coverage.
 Circuit-block entry anchors now have board-level binding evidence in
-`design create`: placed connector/interface pads can bind to ESD and
-reverse-polarity protection anchors, endpoint-to-anchor route operations are
-emitted when geometry is known, and routing summaries report bound, unbound,
-ambiguous, invalid, unsupported, routed, and not-routable anchor states.
+`design create`: placed connector/interface pads, derived board-edge pad
+points, explicit `board_edge_point` endpoints, and `imported_mechanical_point`
+endpoints can bind to
+ESD and reverse-polarity protection anchors. Endpoint-to-anchor route
+operations are emitted when geometry is known, and routing summaries report
+bound, missing, ambiguous, invalid, unsupported, net-mismatched, routed, and
+not-routable anchor states.
 Closed-loop validation repair now has a deterministic foundation: issue
 classification, repair planning, safe transaction-level executors, a bounded
 runner that requires revalidation before reporting success, persisted repairs
@@ -585,13 +588,66 @@ reverse-polarity protection manifests now require modeled entry-anchor route
 and power-path local-route evidence via `expected.pcb.required_local_routes`.
 `design create` now adds board-level `anchor_bindings` evidence in the routing
 stage when realized blocks expose entry anchors. The workflow discovers placed
-physical pad endpoints, resolves required protection anchors to connector or
-connector-like endpoints, emits endpoint-to-anchor route operations when both
-coordinates are known, and reports missing, ambiguous, net-mismatched, or
-not-routable bindings as structured issues. This binding evidence prevents
+physical pad endpoints, derives `board_edge_point` endpoints from edge-constrained
+pads, accepts request-declared `external_endpoints`, resolves required
+protection anchors to connector, `board_edge_point`, or
+`imported_mechanical_point` endpoints,
+emits endpoint-to-anchor route operations when both coordinates are known, and
+reports bound, missing, ambiguous, invalid, unsupported, net-mismatched, routed,
+or not-routable bindings as structured evidence. This binding evidence prevents
 synthetic anchors from being mistaken for proven external interfaces, but it is
-not a substitute for KiCad DRC, surge/thermal analysis, or fabrication
-readiness gates.
+not a substitute for KiCad DRC, surge/thermal analysis, DFM checks, or
+fabrication readiness gates.
+
+In the root object of a `design create` request JSON, request-declared external
+endpoints use this shape:
+
+```json
+{
+  "external_endpoints": [
+    {
+      "id": "edge_vin",
+      "kind": "board_edge_point",
+      "net_name": "VIN_RAW",
+      "roles": ["power_entry", "edge"],
+      "layers": ["F.Cu"],
+      "point": {"x_mm": 0, "y_mm": 12.5},
+      "edge": "left",
+      "required": true
+    }
+  ]
+}
+```
+
+Use `kind: "imported_mechanical_point"` for user/importer-supplied interface
+coordinates. `id` is required for every external endpoint, normalized by
+trimming whitespace, lowercasing, replacing every run of non-`[a-z0-9_]`
+characters with `_`, trimming leading/trailing `_`, and must be unique within
+the `external_endpoints` array after normalization; missing or duplicate IDs
+fail request validation. IDs are used as stable diagnostic and evidence
+identifiers, not as references from other request fields yet. The optional
+`edge` field is descriptive evidence for
+`board_edge_point` endpoints; values normalize to lowercase and the valid values
+are `left`, `right`, `top`, and `bottom` in the rectangular board coordinate
+space, where `top` is the minimum Y edge and `bottom` is the maximum Y edge.
+Non-rectangular boards should use the nearest cardinal direction until
+polygon-edge endpoint support exists. `point.x_mm` and `point.y_mm` are
+millimeters in the board coordinate frame used by the generated PCB. This
+follows KiCad's positive-down Y convention, so smaller Y values are visually
+above larger Y values. `roles` describe external-interface intent; useful values
+include `connector`, `edge`, `external`, `power_entry`, `mechanical_interface`,
+and `castellated`. Layer names are normalized to KiCad canonical names, so
+`f.cu` becomes `F.Cu`; unsupported copper or technical layers fail validation.
+For physically required endpoints, prefer an explicit copper layer list such as
+`["F.Cu"]` or `["B.Cu"]` that matches the real interface copper. Omitted
+`layers`, `null`, or `[]` is permissive fallback behavior: it acts as a binding
+wildcard that can match an anchor on any available copper layer, but it does not
+prove the physical endpoint exists on every copper layer. Optional endpoints can
+omit `point` or `net_name` and remain visible as advisory evidence, but they
+cannot produce route evidence until both are known. Endpoints marked
+`"required": true` fail request validation unless `point` is a non-null object
+with finite numeric `x_mm` and `y_mm` values and `net_name` is a non-empty
+string.
 
 ```sh
 kicadai --json --builtins block verify
@@ -659,7 +715,9 @@ Current placement support includes:
 Requests can use explicit component bounds or hydrate bounds from the library
 resolver in Go before calling `placement.Place`. The usable board area uses the
 larger of the JSON `board.margin_mm` and `rules.board_edge_clearance_mm` values
-(`Board.MarginMM` and `Rules.BoardEdgeClearanceMM` in Go).
+(`Board.MarginMM` and `Rules.BoardEdgeClearanceMM` in Go). Board coordinates
+follow KiCad's schematic/PCB file convention: X increases to the right and Y
+increases downward.
 
 `placement.BuildQualityReport` returns AI-facing evidence for repair loops:
 
