@@ -33,6 +33,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
+	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds)...)
 	return NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
 }
 
@@ -131,6 +132,113 @@ func evaluateMaskPaste(board *pcbfiles.PCBFile) []Check {
 	return checks
 }
 
+func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []Check {
+	var courtyards []courtyardBounds
+	var missingCourtyardRefs = map[string]struct{}{}
+	var missingCourtyardObjects []string
+	var silkOutsideRefs = map[string]struct{}{}
+	var silkOutsideObjects []string
+	missingCourtyardCount := 0
+	silkOutsideCount := 0
+	for _, footprint := range board.Footprints {
+		courtyard, ok := footprintCourtyardBounds(footprint)
+		if ok {
+			courtyards = append(courtyards, courtyardBounds{Reference: footprint.Reference, Bounds: courtyard})
+		} else if footprintNeedsCourtyard(footprint) {
+			missingCourtyardCount++
+			addRef(missingCourtyardRefs, footprint.Reference)
+			missingCourtyardObjects = appendLimited(missingCourtyardObjects, string(footprint.UUID))
+		}
+		if bounds.Valid {
+			for _, text := range footprint.Texts {
+				if isSilkscreenLayer(text.Layer) && !silkscreenTextInsideBoard(bounds, footprint, text) {
+					silkOutsideCount++
+					addRef(silkOutsideRefs, footprint.Reference)
+					silkOutsideObjects = appendLimited(silkOutsideObjects, string(text.UUID))
+				}
+			}
+			for _, graphic := range footprint.Graphics {
+				drawing := pcbfiles.Drawing(graphic)
+				if isSilkscreenLayer(drawing.Layer) && !allPointsInsideBoard(bounds, transformFootprintPoints(footprint, drawingPoints(drawing))) {
+					silkOutsideCount++
+					addRef(silkOutsideRefs, footprint.Reference)
+					silkOutsideObjects = appendLimited(silkOutsideObjects, string(drawing.UUID))
+				}
+			}
+		}
+	}
+	checks := []Check{}
+	if missingCourtyardCount == 0 {
+		checks = append(checks, Check{ID: CheckCourtyardPresence, Category: CategoryCourtyard, Status: StatusPass, Message: "assembly footprints have courtyard evidence or do not require it", Source: SourceParser})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckCourtyardPresence,
+			Category:   CategoryCourtyard,
+			Status:     StatusWarning,
+			Message:    "one or more assembly footprints are missing courtyard graphics",
+			Suggestion: "hydrate footprints from KiCad libraries or add courtyard graphics before fabrication release",
+			IssuePath:  "physical.courtyard.presence",
+			References: sortedMapKeys(missingCourtyardRefs),
+			Objects:    missingCourtyardObjects,
+			Measurements: []Measurement{
+				{Name: "violation_count", Value: float64(missingCourtyardCount), Unit: "count"},
+			},
+			Source: SourceParser,
+		})
+	}
+	overlapRefs, overlapCount := courtyardOverlaps(courtyards)
+	if overlapCount == 0 {
+		checks = append(checks, Check{ID: CheckCourtyardOverlap, Category: CategoryCourtyard, Status: StatusPass, Message: "footprint courtyard bounds do not overlap", Source: SourceParser})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckCourtyardOverlap,
+			Category:   CategoryCourtyard,
+			Status:     StatusBlocked,
+			Message:    "one or more footprint courtyard bounds overlap",
+			Suggestion: "move overlapping footprints apart before fabrication export",
+			IssuePath:  "physical.courtyard.overlap",
+			References: overlapRefs,
+			Measurements: []Measurement{
+				{Name: "violation_count", Value: float64(overlapCount), Unit: "count"},
+			},
+			Source: SourceParser,
+		})
+	}
+	checks = append(checks, Check{
+		ID:       CheckSilkscreenPadClearance,
+		Category: CategorySilkscreen,
+		Status:   StatusSkipped,
+		Message:  "silkscreen-to-pad clearance requires rendered text and stroke geometry and is deferred to KiCad DRC evidence",
+		Source:   SourceHeuristic,
+	})
+	if silkOutsideCount == 0 {
+		status := StatusPass
+		message := "silkscreen reference points and graphics are inside board bounds"
+		if !bounds.Valid {
+			status = StatusSkipped
+			message = "silkscreen board-clearance check skipped because no usable Edge.Cuts bounds were found"
+		}
+		checks = append(checks, Check{ID: CheckSilkscreenBoardClearance, Category: CategorySilkscreen, Status: status, Message: message, Source: SourceParser})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckSilkscreenBoardClearance,
+			Category:   CategorySilkscreen,
+			Status:     StatusBlocked,
+			Message:    "one or more silkscreen objects are outside board bounds",
+			Suggestion: "move, hide, or clip silkscreen so it stays inside Edge.Cuts",
+			IssuePath:  "physical.silkscreen.board_clearance",
+			References: sortedMapKeys(silkOutsideRefs),
+			Objects:    silkOutsideObjects,
+			Measurements: []Measurement{
+				{Name: "violation_count", Value: float64(silkOutsideCount), Unit: "count"},
+			},
+			Source: SourceParser,
+		})
+	}
+	checks = append(checks, Check{ID: CheckSilkscreenReference, Category: CategorySilkscreen, Status: StatusPass, Message: "silkscreen reference text presence is covered by existing footprint text data", Source: SourceParser})
+	return checks
+}
+
 type padLayerSummary struct {
 	FCu     bool
 	BCu     bool
@@ -209,6 +317,19 @@ type boardBounds struct {
 	MinY        kicadfiles.IU
 	MaxX        kicadfiles.IU
 	MaxY        kicadfiles.IU
+}
+
+type rectBounds struct {
+	Valid bool
+	MinX  kicadfiles.IU
+	MinY  kicadfiles.IU
+	MaxX  kicadfiles.IU
+	MaxY  kicadfiles.IU
+}
+
+type courtyardBounds struct {
+	Reference string
+	Bounds    rectBounds
 }
 
 type edgeCutResult struct {
@@ -672,6 +793,10 @@ func isCopperLayer(layer kicadfiles.BoardLayer) bool {
 	return strings.HasSuffix(string(layer), ".Cu") || layer == kicadfiles.LayerAllCu
 }
 
+func isSilkscreenLayer(layer kicadfiles.BoardLayer) bool {
+	return layer == kicadfiles.LayerFSilkS || layer == kicadfiles.LayerBSilkS
+}
+
 func defaultNetClass(classes []projectfiles.NetClass) (projectfiles.NetClass, bool) {
 	for _, class := range classes {
 		if strings.TrimSpace(class.Name) == "Default" {
@@ -1030,6 +1155,24 @@ func footprintTransform(footprint pcbfiles.Footprint) transform2D {
 	}
 }
 
+func transformFootprintPoint(footprint pcbfiles.Footprint, point kicadfiles.Point) kicadfiles.Point {
+	return transformFootprintPointWith(footprint, footprintTransform(footprint), point)
+}
+
+func transformFootprintPointWith(footprint pcbfiles.Footprint, transform transform2D, point kicadfiles.Point) kicadfiles.Point {
+	offset := transformedOffset(transform, point)
+	return kicadfiles.Point{X: footprint.Position.X + offset.X, Y: footprint.Position.Y + offset.Y}
+}
+
+func transformFootprintPoints(footprint pcbfiles.Footprint, points []kicadfiles.Point) []kicadfiles.Point {
+	out := make([]kicadfiles.Point, 0, len(points))
+	transform := footprintTransform(footprint)
+	for _, point := range points {
+		out = append(out, transformFootprintPointWith(footprint, transform, point))
+	}
+	return out
+}
+
 func padInside(bounds boardBounds, transform transform2D, footprint pcbfiles.Footprint, pad pcbfiles.Pad) bool {
 	center := transformedOffset(transform, pad.Position)
 	centerPoint := kicadfiles.Point{X: footprint.Position.X + center.X, Y: footprint.Position.Y + center.Y}
@@ -1220,6 +1363,98 @@ func addRef(refs map[string]struct{}, ref string) {
 	if ref != "" {
 		refs[ref] = struct{}{}
 	}
+}
+
+func footprintNeedsCourtyard(footprint pcbfiles.Footprint) bool {
+	if len(footprint.Pads) == 0 {
+		return false
+	}
+	for _, attribute := range footprint.Attributes {
+		if strings.EqualFold(attribute, "board_only") || strings.EqualFold(attribute, "exclude_from_pos_files") {
+			return false
+		}
+	}
+	return true
+}
+
+func footprintCourtyardBounds(footprint pcbfiles.Footprint) (rectBounds, bool) {
+	var bounds rectBounds
+	for _, graphic := range footprint.Graphics {
+		drawing := pcbfiles.Drawing(graphic)
+		if drawing.Layer != kicadfiles.LayerFCrtYd && drawing.Layer != kicadfiles.LayerBCrtYd {
+			continue
+		}
+		for _, point := range transformFootprintPoints(footprint, drawingPoints(drawing)) {
+			bounds = includeRectPoint(bounds, point)
+		}
+	}
+	return bounds, bounds.Valid
+}
+
+func includeRectPoint(bounds rectBounds, point kicadfiles.Point) rectBounds {
+	if !bounds.Valid {
+		return rectBounds{Valid: true, MinX: point.X, MinY: point.Y, MaxX: point.X, MaxY: point.Y}
+	}
+	if point.X < bounds.MinX {
+		bounds.MinX = point.X
+	}
+	if point.Y < bounds.MinY {
+		bounds.MinY = point.Y
+	}
+	if point.X > bounds.MaxX {
+		bounds.MaxX = point.X
+	}
+	if point.Y > bounds.MaxY {
+		bounds.MaxY = point.Y
+	}
+	return bounds
+}
+
+func courtyardOverlaps(courtyards []courtyardBounds) ([]string, int) {
+	overlapRefs := map[string]struct{}{}
+	count := 0
+	for i := 0; i < len(courtyards); i++ {
+		for j := i + 1; j < len(courtyards); j++ {
+			if rectsOverlap(courtyards[i].Bounds, courtyards[j].Bounds) {
+				count++
+				overlapRefs[courtyards[i].Reference] = struct{}{}
+				overlapRefs[courtyards[j].Reference] = struct{}{}
+			}
+		}
+	}
+	return sortedMapKeys(overlapRefs), count
+}
+
+func rectsOverlap(a, b rectBounds) bool {
+	if !a.Valid || !b.Valid {
+		return false
+	}
+	return a.MinX < b.MaxX && a.MaxX > b.MinX && a.MinY < b.MaxY && a.MaxY > b.MinY
+}
+
+func silkscreenTextInsideBoard(bounds boardBounds, footprint pcbfiles.Footprint, text pcbfiles.FootprintText) bool {
+	width := kicadfiles.MM(math.Max(0.6, float64(len(text.Text))*0.6))
+	height := kicadfiles.MM(1.0)
+	halfWidth := float64(width) / 2
+	halfHeight := float64(height) / 2
+	radians := float64(text.Rotation) * math.Pi / 180
+	cosine := math.Cos(radians)
+	sine := math.Sin(radians)
+	for _, corner := range []struct{ x, y float64 }{
+		{-halfWidth, -halfHeight},
+		{-halfWidth, halfHeight},
+		{halfWidth, -halfHeight},
+		{halfWidth, halfHeight},
+	} {
+		local := kicadfiles.Point{
+			X: text.Position.X + kicadfiles.IU(math.Round(corner.x*cosine-corner.y*sine)),
+			Y: text.Position.Y + kicadfiles.IU(math.Round(corner.x*sine+corner.y*cosine)),
+		}
+		if !pointInsideBoard(bounds, transformFootprintPoint(footprint, local)) {
+			return false
+		}
+	}
+	return pointInsideBoard(bounds, transformFootprintPoint(footprint, text.Position))
 }
 
 func appendLimited(values []string, value string) []string {

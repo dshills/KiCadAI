@@ -334,6 +334,44 @@ func TestEvaluateBoardBlocksExtraPasteSideOnSMDPad(t *testing.T) {
 	assertCheckStatus(t, report, CheckSolderPastePadLayers, StatusBlocked)
 }
 
+func TestEvaluateBoardWarnsMissingCourtyard(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Graphics = nil
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCourtyardPresence, StatusWarning)
+}
+
+func TestEvaluateBoardBlocksCourtyardOverlap(t *testing.T) {
+	board := physicalRuleTestBoard()
+	second := board.Footprints[0]
+	second.UUID = kicadfiles.UUID("20000000-0000-4000-8000-000000000002")
+	second.Reference = "U2"
+	second.Position = point(5.5, 5)
+	board.Footprints = append(board.Footprints, second)
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCourtyardOverlap, StatusBlocked)
+}
+
+func TestEvaluateBoardBlocksSilkscreenOutsideBoard(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Graphics = append(board.Footprints[0].Graphics, pcbfiles.FootprintGraphic{
+		UUID:  kicadfiles.UUID("22000000-0000-4000-8000-000000000002"),
+		Layer: kicadfiles.LayerFSilkS,
+		Line:  &pcbfiles.LineDrawing{Start: point(20, 20), End: point(21, 20), Width: kicadfiles.MM(0.1)},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSilkscreenBoardClearance, StatusBlocked)
+}
+
 func assertCheckStatus(t *testing.T, report Report, id string, status Status) {
 	t.Helper()
 	for _, check := range report.Checks {
@@ -365,6 +403,10 @@ func physicalRuleTestBoard() pcbfiles.PCBFile {
 			UUID:      kicadfiles.UUID("20000000-0000-4000-8000-000000000001"),
 			Reference: "U1",
 			Position:  point(5, 5),
+			Graphics: []pcbfiles.FootprintGraphic{
+				pcbfiles.FootprintGraphic{UUID: kicadfiles.UUID("21000000-0000-4000-8000-000000000001"), Layer: kicadfiles.LayerFCrtYd, Rect: &pcbfiles.RectDrawing{Start: point(-1, -1), End: point(1, 1), Width: kicadfiles.MM(0.05)}},
+				pcbfiles.FootprintGraphic{UUID: kicadfiles.UUID("22000000-0000-4000-8000-000000000001"), Layer: kicadfiles.LayerFSilkS, Rect: &pcbfiles.RectDrawing{Start: point(-0.8, -0.8), End: point(0.8, 0.8), Width: kicadfiles.MM(0.1)}},
+			},
 			Pads: []pcbfiles.Pad{{
 				UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000001"),
 				Name:     "1",
