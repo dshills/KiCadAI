@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestValidateRequestAcceptsExplicitComposition(t *testing.T) {
@@ -138,6 +139,135 @@ func TestValidateRequestRejectsInvalidRoutingRetryPolicy(t *testing.T) {
 	assertIssuePath(t, issues, "routing_retry.min_routing_score_delta")
 	assertIssuePath(t, issues, "routing_retry.drc_policy")
 	assertIssuePath(t, issues, "routing_retry.allowed_hint_categories[0]")
+}
+
+func TestNormalizeRequestExternalEndpoints(t *testing.T) {
+	request := validRequest()
+	request.ExternalEndpoints = []ExternalEndpointSpec{{
+		ID:         " Edge VIN ",
+		Kind:       PhysicalEndpointBoardEdgePoint,
+		NetName:    " VIN_RAW ",
+		Roles:      []string{" Power ", "", "EDGE"},
+		Layers:     []string{" f.cu ", "", "edge.cuts"},
+		Edge:       " LEFT ",
+		Confidence: "",
+		Point:      &transactions.Point{XMM: 0, YMM: 5},
+	}}
+
+	normalized := NormalizeRequest(request)
+	endpoint := normalized.ExternalEndpoints[0]
+	if endpoint.ID != "edge_vin" || endpoint.NetName != "VIN_RAW" || endpoint.Edge != "left" {
+		t.Fatalf("normalized endpoint identity = %#v", endpoint)
+	}
+	if endpoint.Source != "request.external_endpoints" || endpoint.Confidence != PhysicalEndpointConfidenceHigh {
+		t.Fatalf("normalized endpoint metadata = %#v", endpoint)
+	}
+	if len(endpoint.Roles) != 2 || endpoint.Roles[0] != "power" || endpoint.Roles[1] != "edge" {
+		t.Fatalf("normalized roles = %#v", endpoint.Roles)
+	}
+	if len(endpoint.Layers) != 2 || endpoint.Layers[0] != "F.Cu" || endpoint.Layers[1] != "Edge.Cuts" {
+		t.Fatalf("normalized layers = %#v", endpoint.Layers)
+	}
+	endpoint.Point.XMM = 99
+	if request.ExternalEndpoints[0].Point.XMM != 0 {
+		t.Fatalf("NormalizeRequest did not clone endpoint point")
+	}
+}
+
+func TestValidateRequestAcceptsExternalEndpoints(t *testing.T) {
+	request := validRequest()
+	request.ExternalEndpoints = []ExternalEndpointSpec{
+		{
+			ID:       "edge_sig",
+			Kind:     PhysicalEndpointBoardEdgePoint,
+			NetName:  "SIG",
+			Roles:    []string{"signal", "edge"},
+			Point:    &transactions.Point{XMM: 0, YMM: 10},
+			Edge:     "left",
+			Required: true,
+		},
+		{
+			ID:      "mechanical_vin",
+			Kind:    PhysicalEndpointImportedMechanicalPoint,
+			NetName: "VIN",
+			Roles:   []string{"power_entry"},
+			Layers:  []string{},
+			Point:   &transactions.Point{XMM: 5, YMM: 10},
+		},
+		{
+			ID:     "advisory_no_point",
+			Kind:   PhysicalEndpointImportedMechanicalPoint,
+			Roles:  []string{"mechanical_interface"},
+			Source: "import.fixture",
+		},
+	}
+
+	if issues := ValidateRequest(request); len(issues) != 0 {
+		t.Fatalf("ValidateRequest issues = %#v", issues)
+	}
+}
+
+func TestValidateRequestRejectsInvalidExternalEndpointDeclarations(t *testing.T) {
+	request := validRequest()
+	request.ExternalEndpoints = []ExternalEndpointSpec{
+		{ID: "!!!", Kind: PhysicalEndpointKind("pad")},
+		{ID: "edge sig", Kind: PhysicalEndpointBoardEdgePoint, Required: true, Edge: "north", Confidence: PhysicalEndpointConfidence("maybe")},
+		{ID: "edge-sig", Kind: PhysicalEndpointBoardEdgePoint},
+		{ID: "board_edge_point_spoof", Kind: PhysicalEndpointBoardEdgePoint},
+	}
+
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "external_endpoints[0].id")
+	assertIssuePath(t, issues, "external_endpoints[0].kind")
+	assertIssuePath(t, issues, "external_endpoints[1].point")
+	assertIssuePath(t, issues, "external_endpoints[1].net_name")
+	assertIssuePath(t, issues, "external_endpoints[1].edge")
+	assertIssuePath(t, issues, "external_endpoints[1].confidence")
+	assertIssuePath(t, issues, "external_endpoints[2].id")
+	assertIssuePath(t, issues, "external_endpoints[3].id")
+}
+
+func TestValidateRequestRejectsExternalEndpointBoundsAndLayers(t *testing.T) {
+	request := validRequest()
+	request.ExternalEndpoints = []ExternalEndpointSpec{
+		{
+			ID:      "negative",
+			Kind:    PhysicalEndpointBoardEdgePoint,
+			Point:   &transactions.Point{XMM: -0.01, YMM: 0},
+			NetName: "SIG",
+		},
+		{
+			ID:      "too_wide",
+			Kind:    PhysicalEndpointBoardEdgePoint,
+			Point:   &transactions.Point{XMM: request.Board.WidthMM + 0.01, YMM: 0},
+			NetName: "SIG",
+		},
+		{
+			ID:      "inner_layer",
+			Kind:    PhysicalEndpointImportedMechanicalPoint,
+			NetName: "SIG",
+			Layers:  []string{"In1.Cu"},
+		},
+		{
+			ID:       "technical_only",
+			Kind:     PhysicalEndpointImportedMechanicalPoint,
+			NetName:  "SIG",
+			Layers:   []string{"Edge.Cuts"},
+			Required: true,
+		},
+		{
+			ID:     "bad_layer",
+			Kind:   PhysicalEndpointImportedMechanicalPoint,
+			Layers: []string{"F.SilkS"},
+		},
+	}
+
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "external_endpoints[0].point.x_mm")
+	assertIssuePath(t, issues, "external_endpoints[1].point.x_mm")
+	assertIssuePath(t, issues, "external_endpoints[2].layers[0]")
+	assertIssuePath(t, issues, "external_endpoints[3].layers")
+	assertIssuePath(t, issues, "external_endpoints[4].layers[0]")
 }
 
 func TestDecodeRequestStrictAcceptsRoutingRetryPolicy(t *testing.T) {

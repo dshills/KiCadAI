@@ -5,16 +5,20 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 const RequestVersion = "0.1.0"
 const maxRequestBytes = 1 << 20
+const anchorBindingGeometryEpsilonMM = 0.001
 
 type AcceptanceLevel string
 
@@ -27,17 +31,18 @@ const (
 )
 
 type Request struct {
-	Version      string                 `json:"version"`
-	Name         string                 `json:"name"`
-	Intent       Intent                 `json:"intent,omitempty"`
-	Board        BoardSpec              `json:"board"`
-	Libraries    LibrarySpec            `json:"libraries,omitempty"`
-	Components   ComponentPolicySpec    `json:"component_policy,omitempty"`
-	Blocks       []BlockInstanceSpec    `json:"blocks"`
-	Connections  []ConnectionSpec       `json:"connections,omitempty"`
-	Constraints  ConstraintSpec         `json:"constraints,omitempty"`
-	Validation   ValidationSpec         `json:"validation,omitempty"`
-	RoutingRetry RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
+	Version           string                 `json:"version"`
+	Name              string                 `json:"name"`
+	Intent            Intent                 `json:"intent,omitempty"`
+	Board             BoardSpec              `json:"board"`
+	Libraries         LibrarySpec            `json:"libraries,omitempty"`
+	Components        ComponentPolicySpec    `json:"component_policy,omitempty"`
+	Blocks            []BlockInstanceSpec    `json:"blocks"`
+	Connections       []ConnectionSpec       `json:"connections,omitempty"`
+	ExternalEndpoints []ExternalEndpointSpec `json:"external_endpoints,omitempty"`
+	Constraints       ConstraintSpec         `json:"constraints,omitempty"`
+	Validation        ValidationSpec         `json:"validation,omitempty"`
+	RoutingRetry      RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
 }
 
 type Intent struct {
@@ -88,6 +93,20 @@ type ConnectionSpec struct {
 	NetAlias string `json:"net_alias,omitempty"`
 }
 
+type ExternalEndpointSpec struct {
+	ID          string                     `json:"id"`
+	Kind        PhysicalEndpointKind       `json:"kind"`
+	NetName     string                     `json:"net_name,omitempty"`
+	Roles       []string                   `json:"roles,omitempty"`
+	Layers      []string                   `json:"layers,omitempty"`
+	Point       *transactions.Point        `json:"point,omitempty"`
+	Edge        string                     `json:"edge,omitempty"`
+	Source      string                     `json:"source,omitempty"`
+	Confidence  PhysicalEndpointConfidence `json:"confidence,omitempty"`
+	Required    bool                       `json:"required,omitempty"`
+	Description string                     `json:"description,omitempty"`
+}
+
 type ConstraintSpec struct {
 	RouteWidthMM   float64 `json:"route_width_mm,omitempty"`
 	ClearanceMM    float64 `json:"clearance_mm,omitempty"`
@@ -118,6 +137,14 @@ type RoutingRetryPolicySpec struct {
 }
 
 var projectNamePattern = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
+var externalEndpointIDPattern = regexp.MustCompile(`[^a-z0-9_]+`)
+var innerCopperLayerPattern = regexp.MustCompile(`(?i)^in([0-9]+)\.cu$`)
+
+var reservedExternalEndpointIDPrefixes = []string{
+	string(PhysicalEndpointBoardEdgePoint) + "_",
+	string(PhysicalEndpointFootprintPad) + "_",
+	string(PhysicalEndpointImportedMechanicalPoint) + "_",
+}
 
 func DecodeRequestStrict(reader io.Reader) (Request, []reports.Issue) {
 	var buffer bytes.Buffer
@@ -159,6 +186,7 @@ func NormalizeRequest(request Request) Request {
 		request.Connections[i].To = strings.TrimSpace(request.Connections[i].To)
 		request.Connections[i].NetAlias = strings.TrimSpace(request.Connections[i].NetAlias)
 	}
+	request.ExternalEndpoints = normalizeExternalEndpoints(request.ExternalEndpoints)
 	return request
 }
 
@@ -170,6 +198,110 @@ func NormalizeProjectName(name string) string {
 		return "kicadai_design"
 	}
 	return name
+}
+
+func normalizeExternalEndpoints(endpoints []ExternalEndpointSpec) []ExternalEndpointSpec {
+	if len(endpoints) == 0 {
+		return nil
+	}
+	normalized := make([]ExternalEndpointSpec, len(endpoints))
+	for i, endpoint := range endpoints {
+		endpoint.ID = normalizeExternalEndpointID(endpoint.ID)
+		endpoint.Kind = PhysicalEndpointKind(strings.ToLower(strings.TrimSpace(string(endpoint.Kind))))
+		endpoint.NetName = strings.TrimSpace(endpoint.NetName)
+		endpoint.Edge = strings.ToLower(strings.TrimSpace(endpoint.Edge))
+		endpoint.Source = strings.TrimSpace(endpoint.Source)
+		if endpoint.Source == "" {
+			endpoint.Source = "request.external_endpoints"
+		}
+		endpoint.Confidence = PhysicalEndpointConfidence(strings.ToLower(strings.TrimSpace(string(endpoint.Confidence))))
+		if endpoint.Confidence == "" {
+			if endpoint.Kind == PhysicalEndpointImportedMechanicalPoint {
+				endpoint.Confidence = PhysicalEndpointConfidenceMedium
+			} else {
+				endpoint.Confidence = PhysicalEndpointConfidenceHigh
+			}
+		}
+		endpoint.Description = strings.TrimSpace(endpoint.Description)
+		endpoint.Roles = normalizeStringList(endpoint.Roles, strings.ToLower)
+		endpoint.Layers = normalizeEndpointLayers(endpoint.Layers)
+		if endpoint.Point != nil {
+			point := *endpoint.Point
+			endpoint.Point = &point
+		}
+		normalized[i] = endpoint
+	}
+	return normalized
+}
+
+func normalizeExternalEndpointID(id string) string {
+	id = strings.ToLower(strings.TrimSpace(id))
+	id = externalEndpointIDPattern.ReplaceAllString(id, "_")
+	id = strings.Trim(id, "_")
+	return id
+}
+
+func normalizeStringList(values []string, normalize func(string) string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if normalize != nil {
+			value = normalize(value)
+		}
+		normalized = append(normalized, value)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func normalizeEndpointLayers(layers []string) []string {
+	if len(layers) == 0 {
+		return nil
+	}
+	normalized := make([]string, 0, len(layers))
+	for _, layer := range layers {
+		layer = strings.TrimSpace(layer)
+		if layer == "" {
+			continue
+		}
+		if canonical, ok := canonicalEndpointLayer(layer); ok {
+			normalized = append(normalized, canonical)
+			continue
+		}
+		normalized = append(normalized, layer)
+	}
+	if len(normalized) == 0 {
+		return nil
+	}
+	return normalized
+}
+
+func canonicalEndpointLayer(layer string) (string, bool) {
+	trimmed := strings.TrimSpace(layer)
+	switch strings.ToLower(trimmed) {
+	case "f.cu":
+		return "F.Cu", true
+	case "b.cu":
+		return "B.Cu", true
+	case "edge.cuts":
+		return "Edge.Cuts", true
+	}
+	matches := innerCopperLayerPattern.FindStringSubmatch(trimmed)
+	if len(matches) == 2 {
+		index, err := strconv.Atoi(matches[1])
+		if err == nil {
+			return fmt.Sprintf("In%d.Cu", index), true
+		}
+	}
+	return "", false
 }
 
 func normalizeRoutingRetryPolicy(policy RoutingRetryPolicySpec) RoutingRetryPolicySpec {
@@ -275,6 +407,7 @@ func ValidateRequest(request Request) []reports.Issue {
 			issues = append(issues, issue(path+".to", "connection references unknown block instance "+to.InstanceID))
 		}
 	}
+	issues = append(issues, validateExternalEndpoints(request)...)
 	if request.Constraints.RouteWidthMM < 0 {
 		issues = append(issues, issue("constraints.route_width_mm", "route width must be non-negative"))
 	}
@@ -310,6 +443,149 @@ func validPlacementRetryHintCategory(category PlacementRetryHintCategory) bool {
 	default:
 		return false
 	}
+}
+
+func validateExternalEndpoints(request Request) []reports.Issue {
+	var issues []reports.Issue
+	seen := map[string]int{}
+	for index, endpoint := range request.ExternalEndpoints {
+		path := fmt.Sprintf("external_endpoints[%d]", index)
+		if endpoint.ID == "" {
+			issues = append(issues, issue(path+".id", "external endpoint ID is required and must contain at least one alphanumeric or underscore character"))
+		} else {
+			if firstIndex, exists := seen[endpoint.ID]; exists {
+				issues = append(issues, issue(path+".id", fmt.Sprintf("duplicate external endpoint ID %q after normalization; first seen at external_endpoints[%d]", endpoint.ID, firstIndex)))
+			} else {
+				seen[endpoint.ID] = index
+			}
+			endpointID := strings.ToLower(endpoint.ID)
+			for _, prefix := range reservedExternalEndpointIDPrefixes {
+				if strings.HasPrefix(endpointID, strings.ToLower(prefix)) {
+					issues = append(issues, issue(path+".id", "external endpoint ID uses reserved system prefix "+prefix))
+					break
+				}
+			}
+		}
+		if !validExternalEndpointKind(endpoint.Kind) {
+			issues = append(issues, issue(path+".kind", "unsupported external endpoint kind "+string(endpoint.Kind)))
+		}
+		if !validExternalEndpointConfidence(endpoint.Confidence) {
+			issues = append(issues, issue(path+".confidence", "unsupported external endpoint confidence "+string(endpoint.Confidence)))
+		}
+		if endpoint.Edge != "" && !validExternalEndpointEdge(endpoint.Edge) {
+			issues = append(issues, issue(path+".edge", "external endpoint edge must be left, right, top, or bottom"))
+		}
+		if endpoint.Required && endpoint.Point == nil {
+			issues = append(issues, issue(path+".point", "required external endpoint must include a point"))
+		}
+		if endpoint.Required && endpoint.NetName == "" {
+			issues = append(issues, issue(path+".net_name", "required external endpoint must include net_name"))
+		}
+		if endpoint.Point != nil {
+			issues = append(issues, validateExternalEndpointPoint(path+".point", *endpoint.Point, request.Board)...)
+		}
+		issues = append(issues, validateExternalEndpointLayers(path, endpoint, request.Board)...)
+	}
+	return issues
+}
+
+func validExternalEndpointKind(kind PhysicalEndpointKind) bool {
+	switch kind {
+	case PhysicalEndpointBoardEdgePoint, PhysicalEndpointImportedMechanicalPoint:
+		return true
+	default:
+		return false
+	}
+}
+
+func validExternalEndpointConfidence(confidence PhysicalEndpointConfidence) bool {
+	switch confidence {
+	case PhysicalEndpointConfidenceHigh, PhysicalEndpointConfidenceMedium, PhysicalEndpointConfidenceLow:
+		return true
+	default:
+		return false
+	}
+}
+
+func validExternalEndpointEdge(edge string) bool {
+	switch edge {
+	case "left", "right", "top", "bottom":
+		return true
+	default:
+		return false
+	}
+}
+
+func validateExternalEndpointPoint(path string, point transactions.Point, board BoardSpec) []reports.Issue {
+	var issues []reports.Issue
+	if math.IsNaN(point.XMM) || math.IsInf(point.XMM, 0) {
+		issues = append(issues, issue(path+".x_mm", "external endpoint x coordinate must be finite"))
+	} else if point.XMM < -anchorBindingGeometryEpsilonMM {
+		issues = append(issues, issue(path+".x_mm", "external endpoint x coordinate is outside the board frame; check imported coordinate origin or Y-up conversion"))
+	} else if board.WidthMM > 0 && point.XMM > board.WidthMM+anchorBindingGeometryEpsilonMM {
+		issues = append(issues, issue(path+".x_mm", "external endpoint x coordinate is outside board width; check imported coordinate origin or Y-up conversion"))
+	}
+	if math.IsNaN(point.YMM) || math.IsInf(point.YMM, 0) {
+		issues = append(issues, issue(path+".y_mm", "external endpoint y coordinate must be finite"))
+	} else if point.YMM < -anchorBindingGeometryEpsilonMM {
+		issues = append(issues, issue(path+".y_mm", "external endpoint y coordinate is outside the board frame; check imported coordinate origin or Y-up conversion"))
+	} else if board.HeightMM > 0 && point.YMM > board.HeightMM+anchorBindingGeometryEpsilonMM {
+		issues = append(issues, issue(path+".y_mm", "external endpoint y coordinate is outside board height; check imported coordinate origin or Y-up conversion"))
+	}
+	return issues
+}
+
+func validateExternalEndpointLayers(path string, endpoint ExternalEndpointSpec, board BoardSpec) []reports.Issue {
+	var issues []reports.Issue
+	if len(endpoint.Layers) == 0 {
+		return nil
+	}
+	hasCopper := false
+	hasTechnicalOnly := false
+	for index, layer := range endpoint.Layers {
+		layerPath := fmt.Sprintf("%s.layers[%d]", path, index)
+		if layer == "" {
+			continue
+		}
+		if isDiagnosticTechnicalLayer(layer) {
+			hasTechnicalOnly = true
+			continue
+		}
+		if !isCopperLayer(layer) {
+			issues = append(issues, issue(layerPath, "external endpoint layer must be a supported KiCad copper layer or diagnostic technical layer"))
+			continue
+		}
+		hasCopper = true
+		inner, isInner := innerLayerNumber(layer)
+		if isInner && board.Layers > 0 && (inner < 1 || inner > board.Layers-2) {
+			issues = append(issues, issue(layerPath, "internal copper layer does not exist in declared board stackup"))
+		}
+	}
+	if !hasCopper && hasTechnicalOnly && (endpoint.Required || endpoint.NetName != "") {
+		issues = append(issues, issue(path+".layers", "electrical external endpoint must include at least one copper layer or omit layers for any copper"))
+	}
+	return issues
+}
+
+func isCopperLayer(layer string) bool {
+	if strings.EqualFold(layer, "F.Cu") || strings.EqualFold(layer, "B.Cu") {
+		return true
+	}
+	_, ok := innerLayerNumber(layer)
+	return ok
+}
+
+func innerLayerNumber(layer string) (int, bool) {
+	matches := innerCopperLayerPattern.FindStringSubmatch(layer)
+	if len(matches) != 2 {
+		return 0, false
+	}
+	index, err := strconv.Atoi(matches[1])
+	return index, err == nil
+}
+
+func isDiagnosticTechnicalLayer(layer string) bool {
+	return strings.EqualFold(layer, "Edge.Cuts")
 }
 
 func ToCompositionRequest(request Request) (blocks.CompositionRequest, []reports.Issue) {
