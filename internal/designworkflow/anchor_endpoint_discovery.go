@@ -1,6 +1,9 @@
 package designworkflow
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"fmt"
 	"math"
 	"sort"
 	"strings"
@@ -12,6 +15,8 @@ import (
 
 const physicalEndpointSourcePlacementPad = "placement.pad_summary"
 const physicalEndpointSourceExternalRequest = "request.external_endpoints"
+const physicalEndpointSourceEdgePad = "placement.edge_pad"
+const defaultDerivedBoardEdgeEndpointThresholdMM = 1.5
 
 type PhysicalEndpointDiscoveryOptions struct {
 	ExternalEndpoints []ExternalEndpointSpec
@@ -36,6 +41,8 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 	}
 	positions := placementPositions(placed)
 	netRoles := placementNetRoles(placed.Request.Nets)
+	frame := endpointBoardFrame(placed.Request, opts.Board)
+	edgeThresholdMM := derivedBoardEdgeEndpointThreshold(placed.Request, opts.Board)
 	for _, component := range placed.Request.Components {
 		ref := strings.TrimSpace(component.Ref)
 		if ref == "" {
@@ -53,6 +60,17 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 			continue
 		}
 		layer := firstNonEmpty(position.Layer, "F.Cu")
+		padNameCounts := componentPadNameCounts(component.Pads)
+		reportedDuplicatePadWarning := map[string]struct{}{}
+		if edgeFacingComponent(component.Edge) && (frame.WidthMM <= 0 || frame.HeightMM <= 0) {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityWarning,
+				Path:     "anchor_bindings.endpoints." + ref + ".edge",
+				Message:  "board-edge endpoint derivation skipped because board width and height must be positive",
+				Refs:     []string{ref},
+			})
+		}
 		for _, pad := range component.Pads {
 			padName := strings.TrimSpace(pad.Name)
 			if padName == "" {
@@ -93,6 +111,33 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 				seenEndpointIDs[endpoint.ID] = struct{}{}
 			}
 			endpoints = append(endpoints, endpoint)
+			if padNameCounts[padName] > 1 {
+				if _, reported := reportedDuplicatePadWarning[padName]; reported {
+					continue
+				}
+				reportedDuplicatePadWarning[padName] = struct{}{}
+			}
+			derived, deriveIssue, ok := derivedBoardEdgeEndpoint(component, endpoint, padNameCounts[padName], frame, edgeThresholdMM)
+			if deriveIssue != nil {
+				issues = append(issues, *deriveIssue)
+			}
+			if !ok {
+				continue
+			}
+			if derived.ID != "" {
+				if _, exists := seenEndpointIDs[derived.ID]; exists {
+					issues = append(issues, reports.Issue{
+						Code:     reports.CodeInvalidArgument,
+						Severity: reports.SeverityWarning,
+						Path:     "anchor_bindings.endpoints." + ref + "." + padName + ".edge",
+						Message:  "derived board-edge endpoint skipped because ID " + derived.ID + " is already in use",
+						Refs:     []string{ref},
+					})
+					continue
+				}
+				seenEndpointIDs[derived.ID] = struct{}{}
+			}
+			endpoints = append(endpoints, derived)
 		}
 	}
 	sortPhysicalEndpoints(endpoints)
@@ -161,6 +206,169 @@ func boardRelativeEndpointPoint(point transactions.Point, board BoardSpec) trans
 		point.YMM = board.HeightMM
 	}
 	return point
+}
+
+type endpointFrame struct {
+	OriginXMM float64
+	OriginYMM float64
+	WidthMM   float64
+	HeightMM  float64
+}
+
+func endpointBoardFrame(request placement.Request, board BoardSpec) endpointFrame {
+	frame := endpointFrame{
+		OriginXMM: request.Board.Origin.XMM,
+		OriginYMM: request.Board.Origin.YMM,
+		WidthMM:   request.Board.WidthMM,
+		HeightMM:  request.Board.HeightMM,
+	}
+	if board.WidthMM > 0 {
+		frame.WidthMM = board.WidthMM
+	}
+	if board.HeightMM > 0 {
+		frame.HeightMM = board.HeightMM
+	}
+	return frame
+}
+
+func (frame endpointFrame) toBoardRelative(point placement.Point) transactions.Point {
+	return transactions.Point{XMM: point.XMM - frame.OriginXMM, YMM: point.YMM - frame.OriginYMM}
+}
+
+func (frame endpointFrame) toGlobal(point transactions.Point) transactions.Point {
+	return transactions.Point{XMM: point.XMM + frame.OriginXMM, YMM: point.YMM + frame.OriginYMM}
+}
+
+func derivedBoardEdgeEndpointThreshold(request placement.Request, board BoardSpec) float64 {
+	threshold := defaultDerivedBoardEdgeEndpointThresholdMM
+	if request.Rules.BoardEdgeClearanceMM > threshold {
+		threshold = request.Rules.BoardEdgeClearanceMM
+	}
+	if board.EdgeClearanceMM > threshold {
+		threshold = board.EdgeClearanceMM
+	}
+	return threshold
+}
+
+func componentPadNameCounts(pads []placement.PadSummary) map[string]int {
+	counts := map[string]int{}
+	for _, pad := range pads {
+		name := strings.TrimSpace(pad.Name)
+		if name != "" {
+			counts[name]++
+		}
+	}
+	return counts
+}
+
+func derivedBoardEdgeEndpoint(component placement.Component, padEndpoint PhysicalEndpoint, padNameCount int, frame endpointFrame, thresholdMM float64) (PhysicalEndpoint, *reports.Issue, bool) {
+	if !edgeFacingComponent(component.Edge) || padEndpoint.Point == nil || frame.WidthMM <= 0 || frame.HeightMM <= 0 {
+		return PhysicalEndpoint{}, nil, false
+	}
+	if padNameCount > 1 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityWarning,
+			Path:     "anchor_bindings.endpoints." + padEndpoint.Ref + "." + padEndpoint.Pad + ".edge",
+			Message:  "derived board-edge endpoint skipped for duplicate pad name without durable pad discriminator",
+			Refs:     []string{padEndpoint.Ref},
+		}
+		return PhysicalEndpoint{}, &issue, false
+	}
+	boardPoint := frame.toBoardRelative(placement.Point{XMM: padEndpoint.Point.XMM, YMM: padEndpoint.Point.YMM})
+	edge, distance, ok := nearestBoardEdge(boardPoint, frame, component.Edge)
+	if !ok || distance > thresholdMM+anchorBindingGeometryEpsilonMM {
+		return PhysicalEndpoint{}, nil, false
+	}
+	projected := projectPointToBoardEdge(boardPoint, frame, edge)
+	globalProjected := frame.toGlobal(projected)
+	endpoint := PhysicalEndpoint{
+		ID:         derivedBoardEdgeEndpointID(padEndpoint.Ref, padEndpoint.Pad, ""),
+		Kind:       PhysicalEndpointBoardEdgePoint,
+		Ref:        padEndpoint.Ref,
+		Pad:        padEndpoint.Pad,
+		NetName:    padEndpoint.NetName,
+		Layers:     append([]string(nil), padEndpoint.Layers...),
+		Roles:      uniqueStrings(append(append([]string(nil), padEndpoint.Roles...), "edge", string(edge))),
+		Point:      &globalProjected,
+		Source:     physicalEndpointSourceEdgePad,
+		Confidence: padEndpoint.Confidence,
+	}
+	return endpoint, nil, true
+}
+
+func projectPointToBoardEdge(point transactions.Point, frame endpointFrame, edge placement.EdgeConstraint) transactions.Point {
+	switch edge {
+	case placement.EdgeLeft:
+		point.XMM = 0
+	case placement.EdgeRight:
+		point.XMM = frame.WidthMM
+	case placement.EdgeTop:
+		point.YMM = 0
+	case placement.EdgeBottom:
+		point.YMM = frame.HeightMM
+	}
+	return point
+}
+
+func edgeFacingComponent(edge placement.EdgeConstraint) bool {
+	switch edge {
+	case placement.EdgeAny, placement.EdgeLeft, placement.EdgeRight, placement.EdgeTop, placement.EdgeBottom:
+		return true
+	default:
+		return false
+	}
+}
+
+func nearestBoardEdge(point transactions.Point, frame endpointFrame, preferred placement.EdgeConstraint) (placement.EdgeConstraint, float64, bool) {
+	distances := []struct {
+		edge     placement.EdgeConstraint
+		distance float64
+	}{
+		{edge: placement.EdgeLeft, distance: math.Abs(point.XMM)},
+		{edge: placement.EdgeRight, distance: math.Abs(frame.WidthMM - point.XMM)},
+		{edge: placement.EdgeTop, distance: math.Abs(point.YMM)},
+		{edge: placement.EdgeBottom, distance: math.Abs(frame.HeightMM - point.YMM)},
+	}
+	best := distances[0]
+	for _, candidate := range distances[1:] {
+		if candidate.distance < best.distance {
+			best = candidate
+		}
+	}
+	if preferred != placement.EdgeNone && preferred != placement.EdgeAny {
+		for _, candidate := range distances {
+			if candidate.edge == preferred && math.Abs(candidate.distance-best.distance) <= anchorBindingGeometryEpsilonMM {
+				return candidate.edge, candidate.distance, true
+			}
+		}
+	}
+	return best.edge, best.distance, true
+}
+
+func derivedBoardEdgeEndpointID(ref string, pad string, discriminator string) string {
+	kind := string(PhysicalEndpointBoardEdgePoint)
+	seed := lengthPrefixedEndpointField("kind", kind) +
+		lengthPrefixedEndpointField("ref", strings.TrimSpace(ref)) +
+		lengthPrefixedEndpointField("pad", strings.TrimSpace(pad)) +
+		lengthPrefixedEndpointField("pad_discriminator", strings.TrimSpace(discriminator))
+	sum := sha256.Sum256([]byte(seed))
+	hash := hex.EncodeToString(sum[:])[:8]
+	return fmt.Sprintf("%s:%s:%s:%s", kind, endpointIDText(ref), endpointIDText(pad), hash)
+}
+
+func lengthPrefixedEndpointField(name string, value string) string {
+	return fmt.Sprintf("%s:%d:%s\n", name, len(value), value)
+}
+
+func endpointIDText(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = externalEndpointIDPattern.ReplaceAllString(value, "_")
+	value = strings.Trim(value, "_")
+	if value == "" {
+		return "unnamed"
+	}
+	return value
 }
 
 func placementPositions(placed PlacementStageResult) map[string]placement.Placement {
