@@ -1,7 +1,7 @@
 package intentplanner
 
 import (
-	"slices"
+	"strings"
 	"testing"
 
 	"kicadai/internal/designworkflow"
@@ -113,7 +113,7 @@ func TestPlanUsesStableInstanceIDs(t *testing.T) {
 			ids = append(ids, block.ID)
 		}
 	}
-	if !slices.Equal(ids, []string{"indicator", "indicator_2"}) {
+	if !equalStrings(ids, []string{"indicator", "indicator_2"}) {
 		t.Fatalf("ids = %#v", ids)
 	}
 }
@@ -238,6 +238,98 @@ func TestPlanDoesNotShortRepeatedSignalConsumers(t *testing.T) {
 	}
 }
 
+func TestPlanDerivesDraftComponentPolicy(t *testing.T) {
+	plan := Plan(Request{
+		Version:    "0.1.0",
+		Name:       "draft_policy",
+		Kind:       IntentBreakout,
+		Acceptance: designworkflow.AcceptanceDraft,
+		Board:      BoardIntent{WidthMM: 30, HeightMM: 20, Layers: 2},
+		Constraints: ConstraintIntent{
+			AllowPlaceholders: true,
+			SkipRouting:       true,
+		},
+		Functions: []FunctionIntent{{Kind: "connector"}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	if got := plan.GeneratedRequest.Components.MinimumConfidence; got != "placeholder" {
+		t.Fatalf("minimum confidence = %q, want placeholder", got)
+	}
+	if !plan.GeneratedRequest.Validation.SkipRouting {
+		t.Fatalf("SkipRouting not derived: %#v", plan.GeneratedRequest.Validation)
+	}
+}
+
+func TestPlanDerivesFabricationValidationPolicy(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "fab_policy",
+		Kind:    IntentBreakout,
+		Board:   BoardIntent{WidthMM: 30, HeightMM: 20, Layers: 2},
+		Manufacturing: ManufacturingIntent{
+			FabricationCandidate: true,
+			Profile:              "jlcpcb-2layer",
+		},
+		Constraints: ConstraintIntent{
+			RouteWidthMM: 0.25,
+			ClearanceMM:  0.2,
+		},
+		Functions: []FunctionIntent{{Kind: "connector"}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	validation := plan.GeneratedRequest.Validation
+	if validation.Acceptance != designworkflow.AcceptanceFabricationCandidate || !validation.RequireERC || !validation.RequireDRC || !validation.StrictUnrouted || !validation.StrictZones {
+		t.Fatalf("validation = %#v", validation)
+	}
+	if !plan.GeneratedRequest.RoutingRetry.Enabled {
+		t.Fatalf("routing retry not enabled: %#v", plan.GeneratedRequest.RoutingRetry)
+	}
+	if plan.GeneratedRequest.Components.MinimumConfidence != "verified" {
+		t.Fatalf("component confidence = %q", plan.GeneratedRequest.Components.MinimumConfidence)
+	}
+	if plan.GeneratedRequest.Constraints.RouteWidthMM != 0.25 || plan.GeneratedRequest.Constraints.ClearanceMM != 0.2 {
+		t.Fatalf("constraints = %#v", plan.GeneratedRequest.Constraints)
+	}
+	if !hasKnownGap(plan, "manufacturing.profile") {
+		t.Fatalf("manufacturing profile gap missing: %#v", plan.KnownGaps)
+	}
+}
+
+func TestPlanDerivesPackagePreferencesAndRatings(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "ratings_policy",
+		Kind:    IntentBreakout,
+		Board:   BoardIntent{WidthMM: 30, HeightMM: 20, Layers: 2},
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V", CurrentMA: 500}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 100}},
+		},
+		Constraints: ConstraintIntent{
+			PackagePreferences: map[string]string{"resistor": "0603"},
+		},
+		Functions: []FunctionIntent{{Kind: "sensor", Family: "i2c_sensor"}},
+		Interfaces: []InterfaceIntent{{
+			Kind:    "i2c",
+			Voltage: "3.3V",
+		}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	if got := plan.GeneratedRequest.Components.PackagePreferences["resistor"]; got != "0603" {
+		t.Fatalf("package preference = %q", got)
+	}
+	note, ok := noteByID(plan.Assumptions, "constraints.component_policy")
+	if !ok || !strings.Contains(note.Message, "input_voltage:5V") || !strings.Contains(note.Message, "rail_current:100mA") {
+		t.Fatalf("component policy note = %#v", note)
+	}
+}
+
 func hasWorkflowBlock(request designworkflow.Request, blockID string) bool {
 	for _, block := range request.Blocks {
 		if block.BlockID == blockID {
@@ -263,4 +355,25 @@ func hasKnownGap(plan PlanResult, id string) bool {
 		}
 	}
 	return false
+}
+
+func equalStrings(left []string, right []string) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if left[index] != right[index] {
+			return false
+		}
+	}
+	return true
+}
+
+func noteByID(notes []PlanNote, id string) (PlanNote, bool) {
+	for _, note := range notes {
+		if note.ID == id {
+			return note, true
+		}
+	}
+	return PlanNote{}, false
 }

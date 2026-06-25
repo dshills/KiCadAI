@@ -3,9 +3,11 @@ package intentplanner
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
 )
@@ -49,6 +51,7 @@ func Plan(request Request) PlanResult {
 		protectedSources: map[string]string{},
 	}
 	builder.applyBoardDefaults()
+	builder.applyPolicyDefaults()
 	builder.mapPower()
 	builder.mapFunctions()
 	builder.mapInterfaces()
@@ -110,6 +113,134 @@ func (builder *planBuilder) applyBoardDefaults() {
 		builder.workflow.Board.HeightMM = 30
 		builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: "board.height.default", Path: "board.height_mm", Message: "defaulted board height to 30 mm"})
 	}
+}
+
+func (builder *planBuilder) applyPolicyDefaults() {
+	acceptance := builder.request.Acceptance
+	if builder.request.Manufacturing.FabricationCandidate {
+		acceptance = designworkflow.AcceptanceFabricationCandidate
+	}
+	builder.workflow.Components = designworkflow.ComponentPolicySpec{
+		MinimumConfidence:  componentConfidenceForIntent(acceptance, builder.request.Constraints.AllowPlaceholders),
+		Acceptance:         componentAcceptanceForIntent(acceptance),
+		PackagePreferences: cloneStringMap(builder.request.Constraints.PackagePreferences),
+	}
+	if builder.request.Constraints.RouteWidthMM > 0 {
+		builder.workflow.Constraints.RouteWidthMM = builder.request.Constraints.RouteWidthMM
+	}
+	if builder.request.Constraints.ClearanceMM > 0 {
+		builder.workflow.Constraints.ClearanceMM = builder.request.Constraints.ClearanceMM
+	}
+	builder.workflow.Validation = validationForIntent(acceptance, builder.request.Constraints.SkipRouting)
+	builder.workflow.RoutingRetry = routingRetryForIntent(acceptance)
+	builder.recordComponentPolicy(acceptance)
+}
+
+func componentConfidenceForIntent(acceptance designworkflow.AcceptanceLevel, allowPlaceholders bool) components.ConfidenceLevel {
+	if allowPlaceholders && acceptance == designworkflow.AcceptanceDraft {
+		return components.ConfidencePlaceholder
+	}
+	switch acceptance {
+	case designworkflow.AcceptanceDraft:
+		return components.ConfidenceRuleInferred
+	case designworkflow.AcceptanceStructural:
+		return components.ConfidenceRuleInferred
+	case designworkflow.AcceptanceConnectivity:
+		return components.ConfidenceLibraryDerived
+	case designworkflow.AcceptanceERCDRC:
+		return components.ConfidenceLibraryDerived
+	case designworkflow.AcceptanceFabricationCandidate:
+		return components.ConfidenceVerified
+	default:
+		return components.ConfidenceRuleInferred
+	}
+}
+
+func componentAcceptanceForIntent(acceptance designworkflow.AcceptanceLevel) components.AcceptanceLevel {
+	switch acceptance {
+	case designworkflow.AcceptanceDraft:
+		return components.AcceptanceDraft
+	case designworkflow.AcceptanceStructural:
+		return components.AcceptanceStructural
+	case designworkflow.AcceptanceConnectivity:
+		return components.AcceptanceConnectivity
+	case designworkflow.AcceptanceERCDRC:
+		return components.AcceptanceERCDRC
+	case designworkflow.AcceptanceFabricationCandidate:
+		return components.AcceptanceFabricationCandidate
+	default:
+		return components.AcceptanceStructural
+	}
+}
+
+func validationForIntent(acceptance designworkflow.AcceptanceLevel, skipRouting bool) designworkflow.ValidationSpec {
+	validation := designworkflow.ValidationSpec{Acceptance: acceptance, SkipRouting: skipRouting}
+	switch acceptance {
+	case designworkflow.AcceptanceConnectivity:
+		validation.StrictUnrouted = !skipRouting
+	case designworkflow.AcceptanceERCDRC, designworkflow.AcceptanceFabricationCandidate:
+		validation.StrictUnrouted = !skipRouting
+		validation.StrictZones = true
+		validation.RequireERC = true
+		validation.RequireDRC = true
+	}
+	return validation
+}
+
+func routingRetryForIntent(acceptance designworkflow.AcceptanceLevel) designworkflow.RoutingRetryPolicySpec {
+	if acceptance != designworkflow.AcceptanceFabricationCandidate {
+		return designworkflow.RoutingRetryPolicySpec{}
+	}
+	return designworkflow.RoutingRetryPolicySpec{
+		Enabled:              true,
+		MaxAttempts:          2,
+		MinRoutingScoreDelta: 0.01,
+		DRCPolicy:            designworkflow.RetryDRCPolicyOptional,
+		PreserveFixed:        true,
+		StopOnNewBlockers:    true,
+	}
+}
+
+func (builder *planBuilder) recordComponentPolicy(acceptance designworkflow.AcceptanceLevel) {
+	var preferences []string
+	for _, key := range sortedStringKeys(builder.workflow.Components.PackagePreferences) {
+		preferences = append(preferences, key+":"+builder.workflow.Components.PackagePreferences[key])
+	}
+	message := "component policy derived from intent: confidence=" + string(builder.workflow.Components.MinimumConfidence) + ", acceptance=" + string(builder.workflow.Components.Acceptance)
+	if len(preferences) > 0 {
+		message += ", packages=" + strings.Join(preferences, ",")
+	}
+	if ratings := builder.requiredRatingStrings(); len(ratings) > 0 {
+		message += ", ratings=" + strings.Join(ratings, ",")
+	}
+	builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: "constraints.component_policy", Path: "constraints", Message: message})
+	if builder.request.Manufacturing.Profile != "" {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "manufacturing.profile", Path: "manufacturing.profile", Message: "manufacturing profile " + builder.request.Manufacturing.Profile + " is captured in the plan; the current design workflow has no dedicated manufacturing profile field"})
+	}
+	if acceptance == designworkflow.AcceptanceFabricationCandidate {
+		builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: "manufacturing.fabrication_candidate", Path: "manufacturing.fabrication_candidate", Message: "fabrication-candidate intent requires verified component confidence and ERC/DRC evidence"})
+	}
+}
+
+func (builder *planBuilder) requiredRatingStrings() []string {
+	var ratings []string
+	for _, input := range builder.request.Power.Inputs {
+		if input.Voltage != "" {
+			ratings = append(ratings, "input_voltage:"+input.Voltage)
+		}
+		if input.CurrentMA > 0 {
+			ratings = append(ratings, fmt.Sprintf("input_current:%gmA", input.CurrentMA))
+		}
+	}
+	for _, rail := range builder.request.Power.Rails {
+		if rail.Voltage != "" {
+			ratings = append(ratings, "rail_voltage:"+rail.Voltage)
+		}
+		if rail.CurrentMA > 0 {
+			ratings = append(ratings, fmt.Sprintf("rail_current:%gmA", rail.CurrentMA))
+		}
+	}
+	return ratings
 }
 
 func (builder *planBuilder) mapPower() {
@@ -749,6 +880,23 @@ func stringListParam(value any) []string {
 	default:
 		return nil
 	}
+}
+
+func cloneStringMap(values map[string]string) map[string]string {
+	out := make(map[string]string, len(values))
+	for key, value := range values {
+		out[key] = value
+	}
+	return out
+}
+
+func sortedStringKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func voltagesEquivalent(left string, right string) bool {
