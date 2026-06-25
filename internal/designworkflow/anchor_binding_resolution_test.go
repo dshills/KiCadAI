@@ -137,6 +137,122 @@ func TestResolveReversePolarityAnchorBindsConnectorPad(t *testing.T) {
 	}
 }
 
+func TestResolveReversePolarityAnchorBindsFootprintWithExternalRole(t *testing.T) {
+	fragments := testAnchorFragments("reverse_polarity_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "raw_input", Port: "VIN_RAW", NetName: "VIN_RAW", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoint := testPhysicalEndpoint("TP1", "1", "VIN_RAW", 0, 0)
+	endpoint.Roles = []string{"power_entry"}
+
+	summary := ResolveAnchorBindings(fragments, []PhysicalEndpoint{endpoint}, AnchorBindingOptions{})
+
+	if summary.Bound != 1 || summary.Bindings[0].EndpointRef != "TP1" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestResolveProtectionAnchorBindsBoardEdgeEndpoint(t *testing.T) {
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{{
+		ID:         "edge_sig",
+		Kind:       PhysicalEndpointBoardEdgePoint,
+		NetName:    "SIG",
+		Layers:     []string{"F.Cu"},
+		Roles:      []string{"edge", "signal"},
+		Point:      &transactions.Point{XMM: 0, YMM: 0},
+		Source:     physicalEndpointSourceExternalRequest,
+		Confidence: PhysicalEndpointConfidenceHigh,
+	}}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 1 || summary.Bindings[0].EndpointKind != PhysicalEndpointBoardEdgePoint {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestResolveReversePolarityAnchorBindsImportedMechanicalEndpoint(t *testing.T) {
+	fragments := testAnchorFragments("reverse_polarity_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "raw_input", Port: "VIN_RAW", NetName: "VIN_RAW", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{{
+		ID:      "mech_vin",
+		Kind:    PhysicalEndpointImportedMechanicalPoint,
+		NetName: "VIN_RAW",
+		Layers:  []string{"F.Cu"},
+		Roles:   []string{"power_entry"},
+		Point:   &transactions.Point{XMM: 0, YMM: 0},
+	}}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 1 || summary.Bindings[0].EndpointKind != PhysicalEndpointImportedMechanicalPoint {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestResolveProtectionAnchorRejectsImportedMechanicalWithoutExternalRole(t *testing.T) {
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{{
+		ID:      "mech",
+		Kind:    PhysicalEndpointImportedMechanicalPoint,
+		NetName: "SIG",
+		Layers:  []string{"F.Cu"},
+		Roles:   []string{"internal_fixture"},
+		Point:   &transactions.Point{XMM: 0, YMM: 0},
+	}}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 0 || summary.Issues[0].Category != AnchorBindingIssueMissingEndpoint {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestResolveProtectionAnchorRejectsImportedMechanicalWithOnlyGenericSignalRole(t *testing.T) {
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{{
+		ID:      "mech_signal",
+		Kind:    PhysicalEndpointImportedMechanicalPoint,
+		NetName: "SIG",
+		Layers:  []string{"F.Cu"},
+		Roles:   []string{"signal"},
+		Point:   &transactions.Point{XMM: 0, YMM: 0},
+	}}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 0 || summary.Issues[0].Category != AnchorBindingIssueMissingEndpoint {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestResolveProtectionAnchorAllowsImportedMechanicalConnectorRef(t *testing.T) {
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{{
+		ID:      "mech_j1",
+		Kind:    PhysicalEndpointImportedMechanicalPoint,
+		Ref:     "J_MECH",
+		NetName: "SIG",
+		Layers:  []string{"F.Cu"},
+		Point:   &transactions.Point{XMM: 0, YMM: 0},
+	}}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 1 || summary.Bindings[0].EndpointID != "mech_j1" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
 func TestResolveAnchorBindingsAllowsExplicitNetlessMatch(t *testing.T) {
 	fragments := testAnchorFragments("connector_breakout", blocks.RealizedPCBEntryAnchor{
 		ID: "mech", Port: "MECH", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},

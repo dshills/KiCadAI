@@ -236,7 +236,7 @@ func externalEndpointRequiredForBlock(blockID string, opts AnchorBindingOptions)
 func endpointHasRole(endpoint PhysicalEndpoint, role string) bool {
 	role = strings.ToLower(strings.TrimSpace(role))
 	for _, candidate := range endpoint.Roles {
-		if strings.ToLower(candidate) == role {
+		if strings.ToLower(strings.TrimSpace(candidate)) == role {
 			return true
 		}
 	}
@@ -244,11 +244,24 @@ func endpointHasRole(endpoint PhysicalEndpoint, role string) bool {
 }
 
 func endpointLooksExternal(endpoint PhysicalEndpoint) bool {
-	if endpointHasRole(endpoint, "connector") {
+	if endpoint.Kind == PhysicalEndpointBoardEdgePoint {
 		return true
 	}
 	ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
-	return strings.HasPrefix(ref, "J")
+	if strings.HasPrefix(ref, "J") {
+		return true
+	}
+	return endpointHasExternalRole(endpoint)
+}
+
+func endpointHasExternalRole(endpoint PhysicalEndpoint) bool {
+	for _, role := range endpoint.Roles {
+		switch strings.ToLower(strings.TrimSpace(role)) {
+		case "connector", "edge", "external", "power_entry", "mechanical_interface", "castellated":
+			return true
+		}
+	}
+	return false
 }
 
 func missingEndpointIssue(anchor collectedEntryAnchor, endpoints []PhysicalEndpoint, maxDistanceMM float64) AnchorBindingIssue {
