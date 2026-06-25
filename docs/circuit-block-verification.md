@@ -18,7 +18,8 @@ Each manifest can verify:
 - internal board validation for generated block projects when explicitly
   requested;
 - writer correctness for generated KiCad projects;
-- optional KiCad ERC/DRC evidence through `kicad-cli`.
+- optional KiCad ERC/DRC evidence through `kicad-cli`;
+- opt-in KiCad corpus membership and smoke-corpus summaries.
 
 Default tests do not require KiCad. Board validation writes a generated project
 when requested, then runs deterministic in-process validation logic by default.
@@ -172,6 +173,70 @@ Example:
 }
 ```
 
+## KiCad Corpus Manifest Fields
+
+The `expected.kicad_corpus` section marks a manifest as part of the opt-in
+KiCad-backed block corpus. Corpus mode is disabled by default; these fields do
+not change normal `block verify` output unless `--kicad-corpus` is passed.
+
+- `include`: select this manifest for corpus mode.
+- `tier`: one of `smoke`, `block`, `layout`, or `regression`.
+- `readiness`: one of `candidate`, `expected_fail`, `blocked`, or `reference`.
+- `expected_status`: current-run expectation for this manifest: `pass`,
+  `skip`, `expected_fail`, or `blocked`. Use `skip` for optional smoke cases
+  that should report skipped evidence on machines without local KiCad output or
+  CLI configuration. This is report metadata, not a strict equality gate; a
+  local configured KiCad run may produce `pass` for the same optional case.
+- `requires_erc` and `requires_drc`: strengthen KiCad check requirements only
+  in corpus mode.
+- `allowed_codes`: array of strings for corpus-specific KiCad finding
+  allowlist entries, such as `["SILKSCREEN_OVERLAP", "CLEARANCE"]`.
+- `expected_issues`: array of strings containing finding codes, IDs, rules, or
+  highly specific message fragments expected for an `expected_fail` case.
+  Matching is case-insensitive substring matching against individual issue
+  fields: issue path, message, code, refs, and nets. Prefer stable codes, IDs,
+  and rules because KiCad message text can change between versions. Avoid short
+  or common fragments such as `1`, `net`, or `error` because they can match
+  unrelated fields.
+- `notes`: required by manifest validation for `expected_fail` or `blocked`
+  readiness; also recommended whenever `expected_status` documents a current
+  failing state.
+
+`readiness` describes the case's intended maturity in the corpus. It does not
+override validation. `expected_status` describes the status expected from the
+current local run under the manifest's current evidence policy. For
+intentionally failing cases, keep these aligned:
+`readiness: "expected_fail"` with `expected_status: "expected_fail"`, or
+`readiness: "blocked"` with `expected_status: "blocked"`. If an
+`expected_fail` case produces no blocking findings, the current runner reports
+the corpus status as `pass`; update the manifest when that happens.
+
+Example:
+
+```json
+{
+  "expected": {
+    "kicad_corpus": {
+      "include": true,
+      "tier": "smoke",
+      "readiness": "candidate",
+      "expected_status": "skip",
+      "allowed_codes": ["OPTIONAL_KICAD_EVIDENCE"]
+    }
+  }
+}
+```
+
+Corpus result statuses:
+
+- `pass`: KiCad evidence ran and matched expectations.
+- `skip`: corpus case selected, but optional KiCad evidence did not run because
+  an output directory or KiCad CLI was unavailable.
+- `expected_fail`: blocking ERC/DRC findings matched the manifest's
+  `expected_issues` list.
+- `blocked`: required evidence was unavailable or unexpected findings appeared.
+- `not_in_corpus`: manifest was outside the selected corpus mode or tier.
+
 Timing blocks currently assert local routes and timing fixtures. Protection
 blocks assert realization evidence for modeled placement, entry-anchor, and
 power-path route metadata. Entry anchors are evidence points until higher-level
@@ -224,10 +289,62 @@ kicadai --json \
   block verify
 ```
 
+Run the opt-in KiCad corpus:
+
+```sh
+kicadai --json --builtins --kicad-corpus block verify
+```
+
+Run only the smoke tier and retain corpus artifacts:
+
+```sh
+kicadai --json \
+  --builtins \
+  --kicad-corpus \
+  --kicad-corpus-tier smoke \
+  --output ./out/block-kicad-corpus \
+  --overwrite \
+  block verify
+```
+
+Require local KiCad DRC evidence for selected corpus cases:
+
+```sh
+kicadai --json \
+  --builtins \
+  --kicad-corpus \
+  --kicad-corpus-tier smoke \
+  --output ./out/block-kicad-corpus \
+  --overwrite \
+  --kicad-cli <path-to-kicad-cli> \
+  --require-drc \
+  block verify
+```
+
 Optional ERC/DRC expectations are reported as a skipped `erc_drc` stage when no
 output directory or KiCad CLI is available. Required ERC/DRC expectations block
 with an explicit reason. When checks run, report artifacts are included in the
 result.
+
+When corpus mode runs with `--output`, KiCadAI writes:
+
+```text
+<output>/
+  corpus-summary.json
+  <case-id>/
+    reports/
+      corpus-result.json
+```
+
+Generated project and ERC/DRC report artifacts are written through the existing
+block verification and KiCad check paths when those stages run. Local real-KiCad
+smoke testing remains opt-in:
+
+```sh
+KICADAI_RUN_KICAD_CLI=1 \
+KICADAI_KICAD_CLI=/path/to/kicad-cli \
+go test ./internal/blocks/verification
+```
 
 ## Adding A Built-In Manifest
 

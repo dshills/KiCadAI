@@ -257,7 +257,13 @@ Implemented foundation.
 - A local opt-in block smoke test runs selected manifests through real
   `kicad-cli` only when `KICADAI_RUN_KICAD_CLI=1` is set; normal `go test
   ./...` remains KiCad-independent.
-- Block verification corpus covers every built-in block and has regression
+- A named opt-in KiCad block corpus now exists in `block verify` through
+  `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
+  `led_indicator_default` and `connector_breakout_4pin`, reports selected
+  case/status summaries, writes `corpus-summary.json` and per-case
+  `corpus-result.json` artifacts when `--output` is set, and has fake-runner
+  plus opt-in real KiCad smoke coverage.
+- The general block verification corpus covers every built-in block and has regression
   guards ensuring that required routes, timing fixtures, and realization stages
   remain defined.
 - `design create` block-planning output exposes block readiness, verification
@@ -265,8 +271,10 @@ Implemented foundation.
 
 ### Remaining Work
 
-- Expand real KiCad-backed ERC/DRC evidence from selected local smoke manifests
-  to a broader DRC-clean block corpus as generated PCB quality improves.
+- Promote more block manifests into the KiCad corpus, raise selected cases from
+  optional `skip` candidates to required `pass` candidates as generated PCB
+  quality improves, and broaden DRC-clean evidence beyond the initial smoke
+  tier.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.

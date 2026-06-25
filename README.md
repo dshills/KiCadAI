@@ -653,6 +653,7 @@ string.
 kicadai --json --builtins block verify
 kicadai --json --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json block verify
 kicadai --json --suite ./internal/blocks/testdata/verification --output ./out/block-verification --overwrite block verify
+kicadai --json --builtins --kicad-corpus --kicad-corpus-tier smoke block verify
 ```
 
 KiCad-backed checks are skipped unless a manifest or flag requires them. Use
@@ -662,6 +663,13 @@ expectations are visible as skipped when no output directory or KiCad CLI is
 available; required ERC/DRC fails verification with an explicit reason. A
 skipped optional ERC/DRC stage means the block remains structurally verified by
 the built-in harness, but it is not KiCad-clean or fabrication-ready evidence.
+The opt-in KiCad corpus currently seeds `led_indicator_default` and
+`connector_breakout_4pin` as smoke-tier candidates. Corpus mode emits a
+`kicad_corpus` summary and, with `--output`, writes `corpus-summary.json` plus
+per-case `reports/corpus-result.json` files. Normal `go test ./...` remains
+KiCad-independent by default; real KiCad smoke tests require
+`KICADAI_RUN_KICAD_CLI=1` and can use
+`KICADAI_KICAD_CLI=/path/to/kicad-cli` for non-default installs.
 When checks run, generated project freshness records the project signature and
 a separate ERC/DRC check-context signature for the resolved `kicad-cli` path
 and version, measurement units, and allowlist contents. Golden report snapshots
