@@ -141,9 +141,7 @@ func NormalizePlan(plan PlanResult) PlanResult {
 	slices.SortFunc(plan.KnownGaps, compareNotes)
 	slices.SortFunc(plan.Issues, compareIssues)
 	slices.SortFunc(plan.Artifacts, compareArtifacts)
-	if plan.Status == "" {
-		plan.Status = calculatePlanStatus(plan)
-	}
+	plan.Status = calculatePlanStatus(plan)
 	plan.Score = calculatePlanScore(plan)
 	if plan.Requirements == nil {
 		plan.Requirements = []RequirementRecord{}
