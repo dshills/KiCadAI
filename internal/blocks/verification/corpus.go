@@ -34,6 +34,7 @@ type KiCadCorpusCaseResult struct {
 	Readiness      KiCadCorpusReadiness      `json:"readiness,omitempty"`
 	Status         KiCadCorpusResultStatus   `json:"status"`
 	ExpectedStatus KiCadCorpusExpectedStatus `json:"expected_status,omitempty"`
+	ExpectedIssues []string                  `json:"expected_issues,omitempty"`
 	Notes          string                    `json:"notes,omitempty"`
 }
 
@@ -98,6 +99,7 @@ func corpusCaseResult(manifest Manifest, status KiCadCorpusResultStatus) KiCadCo
 		Readiness:      corpus.Readiness,
 		Status:         status,
 		ExpectedStatus: corpus.ExpectedStatus,
+		ExpectedIssues: slices.Clone(corpus.ExpectedIssues),
 		Notes:          strings.TrimSpace(corpus.Notes),
 	}
 }

@@ -80,6 +80,7 @@ func TestRunCaseUpdatesKiCadCorpusStatus(t *testing.T) {
 	manifest := corpusManifest("led_indicator_default", KiCadCorpusTierSmoke)
 	manifest.Expected.EvidenceLevel = EvidenceSchematicVerified
 	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus.RequiresDRC = false
 	result := RunCase(context.Background(), manifest, RunOptions{})
 	if result.Status != StatusPass {
 		t.Fatalf("status = %s issues=%#v", result.Status, result.Issues)

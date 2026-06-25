@@ -35,6 +35,7 @@ const (
 	defaultPlacementToleranceDeg = 0.1
 	projectSentinelName          = ".kicadai-block-verification"
 	checkSentinelName            = ".kicadai-block-verification.erc_drc"
+	stageERCDRCName              = "erc_drc"
 )
 
 var kicadCLIVersionCache sync.Map
@@ -243,16 +244,121 @@ func (result *RunResult) finishKiCadCorpus() {
 	if result.KiCadCorpus == nil {
 		return
 	}
+	if ercStage, ok := findRunStage(result.Stages, stageERCDRCName); ok {
+		switch ercStage.Status {
+		case StatusSkipped:
+			result.KiCadCorpus.Status = KiCadCorpusResultSkip
+			return
+		case StatusBlocked:
+			if result.isExpectedKiCadCorpusFailure() {
+				result.KiCadCorpus.Status = KiCadCorpusResultExpectedFail
+				return
+			}
+			result.KiCadCorpus.Status = KiCadCorpusResultBlocked
+			return
+		case StatusPass:
+			result.KiCadCorpus.Status = KiCadCorpusResultPass
+			return
+		case StatusWarning:
+			if result.isExpectedKiCadCorpusFailure() {
+				result.KiCadCorpus.Status = KiCadCorpusResultExpectedFail
+				return
+			}
+			result.KiCadCorpus.Status = KiCadCorpusResultBlocked
+			return
+		}
+	}
 	switch result.Status {
 	case StatusPass:
 		result.KiCadCorpus.Status = KiCadCorpusResultPass
 	case StatusWarning:
+		if result.isExpectedKiCadCorpusFailure() {
+			result.KiCadCorpus.Status = KiCadCorpusResultExpectedFail
+			return
+		}
 		result.KiCadCorpus.Status = KiCadCorpusResultBlocked
 	case StatusBlocked:
+		if result.isExpectedKiCadCorpusFailure() {
+			result.KiCadCorpus.Status = KiCadCorpusResultExpectedFail
+			return
+		}
 		result.KiCadCorpus.Status = KiCadCorpusResultBlocked
 	case StatusSkipped:
 		result.KiCadCorpus.Status = KiCadCorpusResultSkip
 	}
+}
+
+func (result *RunResult) isExpectedKiCadCorpusFailure() bool {
+	return result.KiCadCorpus != nil &&
+		result.KiCadCorpus.Readiness == KiCadCorpusReadinessExpectedFail &&
+		corpusHasExpectedIssueEvidence(result.KiCadCorpus.ExpectedStatus, result.KiCadCorpus.ExpectedIssues, result.Issues)
+}
+
+func findRunStage(stages []StageResult, name string) (StageResult, bool) {
+	for _, stage := range stages {
+		if stage.Name == name {
+			return stage, true
+		}
+	}
+	return StageResult{}, false
+}
+
+func corpusHasExpectedIssueEvidence(expected KiCadCorpusExpectedStatus, expectedIssues []string, issues []reports.Issue) bool {
+	if expected != KiCadCorpusStatusExpectedFail {
+		return false
+	}
+	if len(expectedIssues) == 0 {
+		return false
+	}
+	matched := false
+	for _, issue := range issues {
+		if issue.Severity != reports.SeverityError && issue.Severity != reports.SeverityWarning {
+			continue
+		}
+		if !issuePathHasStage(issue.Path, stageERCDRCName) {
+			return false
+		}
+		issueMatched := false
+		for _, expectedIssue := range expectedIssues {
+			if issueMatchesExpectedCorpusIssue(issue, expectedIssue) {
+				issueMatched = true
+				matched = true
+				break
+			}
+		}
+		if !issueMatched {
+			return false
+		}
+	}
+	return matched
+}
+
+func issuePathHasStage(path string, stage string) bool {
+	path = strings.TrimSpace(path)
+	stage = strings.TrimSpace(stage)
+	if path == "" || stage == "" {
+		return false
+	}
+	return path == stage ||
+		strings.HasPrefix(path, stage+".") ||
+		strings.HasSuffix(path, "."+stage) ||
+		strings.Contains(path, "."+stage+".")
+}
+
+func issueMatchesExpectedCorpusIssue(issue reports.Issue, expected string) bool {
+	expected = strings.ToLower(strings.TrimSpace(expected))
+	if expected == "" {
+		return false
+	}
+	candidates := []string{issue.Path, issue.Message, string(issue.Code)}
+	candidates = append(candidates, issue.Refs...)
+	candidates = append(candidates, issue.Nets...)
+	for _, candidate := range candidates {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(candidate)), expected) {
+			return true
+		}
+	}
+	return false
 }
 
 func dedupeArtifacts(artifacts []reports.Artifact) []reports.Artifact {
@@ -498,11 +604,15 @@ func ercDRCRequested(expected Expected, opts RunOptions) bool {
 		expected.ERCDRC.Required ||
 		expected.ERCDRC.RequireERC ||
 		expected.ERCDRC.RequireDRC ||
+		expected.KiCadCorpus.RequiresERC ||
+		expected.KiCadCorpus.RequiresDRC ||
 		expected.ERCDRC.Runner != "" ||
 		expected.ERCDRC.MinKiCadVersion != "" ||
 		expected.ERCDRC.MaxKiCadVersion != "" ||
 		len(expected.ERCDRC.AllowedCodes) > 0 ||
 		len(expected.ERCDRC.ExpectedIssues) > 0 ||
+		len(expected.KiCadCorpus.AllowedCodes) > 0 ||
+		len(expected.KiCadCorpus.ExpectedIssues) > 0 ||
 		expected.EvidenceLevel == EvidenceERCDRCVerified ||
 		expected.EvidenceLevel == EvidenceReferenceVerified
 }
@@ -512,20 +622,20 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 	if strings.TrimSpace(opts.OutputDir) == "" {
 		if requiredERC || requiredDRC {
 			return StageResult{
-				Name:    "erc_drc",
+				Name:    stageERCDRCName,
 				Status:  StatusBlocked,
 				Issues:  []reports.Issue{ercDRCRunIssue(manifest, "output_dir", "ERC/DRC verification requires an output directory")},
 				Summary: "ERC/DRC blocked: missing output directory",
 			}, nil
 		}
-		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because no output directory was provided; pass --output to generate a KiCad project for optional checks"}, nil
+		return StageResult{Name: stageERCDRCName, Status: StatusSkipped, Summary: "ERC/DRC skipped because no output directory was provided; pass --output to generate a KiCad project for optional checks"}, nil
 	}
 
 	activeCheckOpts, allowlistIssues := checkOptions(manifest, opts)
 	var issues []reports.Issue
 	issues = append(issues, allowlistIssues...)
 	if reports.HasBlockingIssue(allowlistIssues) {
-		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to configure ERC/DRC allowlist"}, nil
+		return StageResult{Name: stageERCDRCName, Issues: issues, Summary: "failed to configure ERC/DRC allowlist"}, nil
 	}
 
 	cli, cliErr := checks.DiscoverCLI(activeCheckOpts.KiCadCLI)
@@ -538,15 +648,15 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 	projectDir, artifacts, projectIssues := ensureProjectForExternalChecksWithChecks(manifest, output, opts, activeCheckOpts, cli, cliVersion)
 	issues = append(issues, projectIssues...)
 	if reports.HasBlockingIssue(projectIssues) {
-		return StageResult{Name: "erc_drc", Issues: issues, Summary: "failed to prepare generated project for ERC/DRC"}, artifacts
+		return StageResult{Name: stageERCDRCName, Issues: issues, Summary: "failed to prepare generated project for ERC/DRC"}, artifacts
 	}
 
 	if cliErr != nil {
 		if requiredERC || requiredDRC {
 			issues = append(issues, ercDRCRunIssue(manifest, "kicad_cli", cliErr.Error()))
-			return StageResult{Name: "erc_drc", Issues: issues, Summary: "KiCad CLI is required but unavailable for " + projectDir}, artifacts
+			return StageResult{Name: stageERCDRCName, Issues: issues, Summary: "KiCad CLI is required but unavailable for " + projectDir}, artifacts
 		}
-		return StageResult{Name: "erc_drc", Status: StatusSkipped, Summary: "ERC/DRC skipped because KiCad CLI is unavailable for " + projectDir + "; set --kicad-cli or KICADAI_KICAD_CLI to run optional checks"}, artifacts
+		return StageResult{Name: stageERCDRCName, Status: StatusSkipped, Summary: "ERC/DRC skipped because KiCad CLI is unavailable for " + projectDir + "; set --kicad-cli or KICADAI_KICAD_CLI to run optional checks"}, artifacts
 	}
 
 	runner := opts.CheckRunner
@@ -567,16 +677,16 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 		allFindings = append(allFindings, checkResult.Allowed...)
 	}
 	if !runFailed {
-		issues = append(issues, missingExpectedCheckIssues(manifest, allFindings, manifest.Expected.ERCDRC.ExpectedIssues)...)
+		issues = append(issues, missingExpectedCheckIssues(manifest, allFindings, expectedERCDRCIssues(manifest.Expected))...)
 	}
 
 	summary := fmt.Sprintf("ran %d KiCad ERC/DRC check(s) for %s and produced %d artifact(s)", len(kinds), projectDir, len(artifacts))
-	return StageResult{Name: "erc_drc", Status: statusForIssues(issues), Issues: issues, Summary: summary}, artifacts
+	return StageResult{Name: stageERCDRCName, Status: statusForIssues(issues), Issues: issues, Summary: summary}, artifacts
 }
 
 func ercDRCRequirements(expected Expected, opts RunOptions) (bool, bool) {
-	requireERC := opts.RequireERC || expected.ERCDRC.RequireERC
-	requireDRC := opts.RequireDRC || expected.ERCDRC.RequireDRC
+	requireERC := opts.RequireERC || expected.ERCDRC.RequireERC || expected.KiCadCorpus.RequiresERC
+	requireDRC := opts.RequireDRC || expected.ERCDRC.RequireDRC || expected.KiCadCorpus.RequiresDRC
 	if expected.EvidenceLevel == EvidenceERCDRCVerified || expected.EvidenceLevel == EvidenceReferenceVerified {
 		requireERC = true
 		requireDRC = true
@@ -671,6 +781,16 @@ func checkOptions(manifest Manifest, opts RunOptions) (checks.Options, []reports
 			Reason: "allowed by block verification manifest " + manifest.ID,
 		})
 	}
+	for _, code := range manifest.Expected.KiCadCorpus.AllowedCodes {
+		code = strings.TrimSpace(code)
+		if code == "" {
+			continue
+		}
+		checkOpts.Allowlist = append(checkOpts.Allowlist, checks.AllowlistEntry{
+			Code:   code,
+			Reason: "allowed by block KiCad corpus manifest " + manifest.ID,
+		})
+	}
 	if strings.TrimSpace(opts.AllowlistPath) == "" {
 		return checkOpts, nil
 	}
@@ -684,6 +804,35 @@ func checkOptions(manifest Manifest, opts RunOptions) (checks.Options, []reports
 	}
 	checkOpts.Allowlist = append(checkOpts.Allowlist, entries...)
 	return checkOpts, nil
+}
+
+func expectedERCDRCIssues(expected Expected) []string {
+	if len(expected.KiCadCorpus.ExpectedIssues) == 0 {
+		return expected.ERCDRC.ExpectedIssues
+	}
+	if len(expected.ERCDRC.ExpectedIssues) == 0 {
+		return expected.KiCadCorpus.ExpectedIssues
+	}
+	merged := make([]string, 0, len(expected.ERCDRC.ExpectedIssues)+len(expected.KiCadCorpus.ExpectedIssues))
+	seen := map[string]struct{}{}
+	merged = appendUniqueExpectedIssues(merged, seen, expected.ERCDRC.ExpectedIssues)
+	merged = appendUniqueExpectedIssues(merged, seen, expected.KiCadCorpus.ExpectedIssues)
+	return merged
+}
+
+func appendUniqueExpectedIssues(out []string, seen map[string]struct{}, values []string) []string {
+	for _, value := range values {
+		key := strings.TrimSpace(value)
+		if key == "" {
+			continue
+		}
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, value)
+	}
+	return out
 }
 
 func defaultCheckRunner(ctx context.Context, kind checks.CheckKind, cli checks.KiCadCLI, target string, opts checks.Options) (checks.CheckResult, error) {

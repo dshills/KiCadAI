@@ -271,6 +271,166 @@ func TestRunCaseERCDRCGlobalOptionsStrengthenManifest(t *testing.T) {
 	}
 }
 
+func TestRunCaseKiCadCorpusRequiresDRCAndPasses(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierSmoke,
+		Readiness:      KiCadCorpusReadinessCandidate,
+		ExpectedStatus: KiCadCorpusStatusPass,
+		RequiresDRC:    true,
+	}
+	var gotKinds []checks.CheckKind
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			gotKinds = append(gotKinds, kind)
+			return checks.CheckResult{Kind: kind}, nil
+		},
+	})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusPass || !ok || stage.Status != StatusPass || len(gotKinds) != 1 || gotKinds[0] != checks.CheckKindDRC {
+		t.Fatalf("kinds=%#v result=%#v", gotKinds, result)
+	}
+	if result.KiCadCorpus == nil || result.KiCadCorpus.Status != KiCadCorpusResultPass {
+		t.Fatalf("corpus = %#v", result.KiCadCorpus)
+	}
+}
+
+func TestRunCaseKiCadCorpusSkipsWhenOptionalKiCadUnavailable(t *testing.T) {
+	t.Setenv(checks.EnvKiCadCLI, filepath.Join(t.TempDir(), "missing-kicad-cli"))
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierSmoke,
+		Readiness:      KiCadCorpusReadinessCandidate,
+		ExpectedStatus: KiCadCorpusStatusSkip,
+		AllowedCodes:   []string{"OPTIONAL"},
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+	})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusPass || !ok || stage.Status != StatusSkipped {
+		t.Fatalf("result = %#v", result)
+	}
+	if result.KiCadCorpus == nil || result.KiCadCorpus.Status != KiCadCorpusResultSkip {
+		t.Fatalf("corpus = %#v", result.KiCadCorpus)
+	}
+}
+
+func TestRunCaseKiCadCorpusUnexpectedFindingBlocks(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierSmoke,
+		Readiness:      KiCadCorpusReadinessCandidate,
+		ExpectedStatus: KiCadCorpusStatusPass,
+		RequiresDRC:    true,
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			return checks.CheckResult{
+				Kind: kind,
+				Findings: []checks.CheckFinding{{
+					Kind:     kind,
+					Severity: "error",
+					Code:     "UNEXPECTED",
+					Message:  "unexpected corpus violation",
+				}},
+			}, nil
+		},
+	})
+	if result.Status != StatusBlocked || result.KiCadCorpus == nil || result.KiCadCorpus.Status != KiCadCorpusResultBlocked || !hasIssue(result.Issues, "unexpected corpus violation") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseKiCadCorpusExpectedFailClassifies(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierRegression,
+		Readiness:      KiCadCorpusReadinessExpectedFail,
+		ExpectedStatus: KiCadCorpusStatusExpectedFail,
+		RequiresDRC:    true,
+		ExpectedIssues: []string{"KNOWN_GAP"},
+		Notes:          "tracks known local route gap",
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			return checks.CheckResult{
+				Kind: kind,
+				Findings: []checks.CheckFinding{{
+					Kind:     kind,
+					Severity: "error",
+					Code:     "KNOWN_GAP",
+					Message:  "known corpus gap",
+				}},
+			}, nil
+		},
+	})
+	if result.Status != StatusBlocked || result.KiCadCorpus == nil || result.KiCadCorpus.Status != KiCadCorpusResultExpectedFail {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseKiCadCorpusExpectedFailDoesNotMaskUnexpectedFinding(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierRegression,
+		Readiness:      KiCadCorpusReadinessExpectedFail,
+		ExpectedStatus: KiCadCorpusStatusExpectedFail,
+		RequiresDRC:    true,
+		ExpectedIssues: []string{"KNOWN_GAP"},
+		Notes:          "tracks known local route gap",
+	}
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:  blocks.NewBuiltinRegistry(),
+		OutputDir: filepath.Join(t.TempDir(), "out"),
+		Overwrite: true,
+		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			return checks.CheckResult{
+				Kind: kind,
+				Findings: []checks.CheckFinding{{
+					Kind:     kind,
+					Severity: "error",
+					Code:     "KNOWN_GAP",
+					Message:  "known corpus gap",
+				}, {
+					Kind:     kind,
+					Severity: "error",
+					Code:     "NEW_REGRESSION",
+					Message:  "new corpus regression",
+				}},
+			}, nil
+		},
+	})
+	if result.Status != StatusBlocked || result.KiCadCorpus == nil || result.KiCadCorpus.Status != KiCadCorpusResultBlocked {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 func TestEnsureProjectForExternalChecksReturnsArtifactOnCacheHit(t *testing.T) {
 	manifest := validManifest()
 	output := &blocks.BlockOutput{}
