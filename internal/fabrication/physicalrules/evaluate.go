@@ -29,10 +29,176 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks := []Check{}
 	checks = append(checks, evaluateStackup(board)...)
 	checks = append(checks, evaluateNetClasses(board, project)...)
+	checks = append(checks, evaluateMaskPaste(board)...)
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
 	return NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
+}
+
+func evaluateMaskPaste(board *pcbfiles.PCBFile) []Check {
+	var maskObjects []string
+	var maskRefs = map[string]struct{}{}
+	var pasteObjects []string
+	var pasteRefs = map[string]struct{}{}
+	maskViolations := 0
+	pasteViolations := 0
+	for _, footprint := range board.Footprints {
+		for _, pad := range footprint.Pads {
+			layers := summarizePadLayers(pad)
+			if layers.requiresMask() && !layers.hasRequiredMask() {
+				maskViolations++
+				addRef(maskRefs, footprint.Reference)
+				maskObjects = appendLimited(maskObjects, string(pad.UUID))
+			}
+			if padRequiresPaste(pad) {
+				if !layers.hasRequiredPaste() {
+					pasteViolations++
+					addRef(pasteRefs, footprint.Reference)
+					pasteObjects = appendLimited(pasteObjects, string(pad.UUID))
+				}
+			} else if layers.hasAnyPaste() {
+				pasteViolations++
+				addRef(pasteRefs, footprint.Reference)
+				pasteObjects = appendLimited(pasteObjects, string(pad.UUID))
+			}
+		}
+	}
+	checks := []Check{
+		{
+			ID:       CheckSolderMaskArtifacts,
+			Category: CategorySolderMask,
+			Status:   StatusSkipped,
+			Message:  "solder mask artifact presence is checked during fabrication package validation",
+			Source:   SourceParser,
+		},
+		{
+			ID:       CheckSolderPasteArtifacts,
+			Category: CategorySolderPaste,
+			Status:   StatusSkipped,
+			Message:  "solder paste artifact presence is checked during fabrication package validation",
+			Source:   SourceParser,
+		},
+	}
+	if maskViolations == 0 {
+		checks = append(checks, Check{
+			ID:       CheckSolderMaskPadLayers,
+			Category: CategorySolderMask,
+			Status:   StatusPass,
+			Message:  "pad solder mask layers are consistent with pad copper layers",
+			Source:   SourceParser,
+		})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckSolderMaskPadLayers,
+			Category:   CategorySolderMask,
+			Status:     StatusBlocked,
+			Message:    "one or more pads are missing required solder mask layers",
+			Suggestion: "add matching F.Mask/B.Mask layers for assembly pads or use an explicit pad policy before fabrication export",
+			IssuePath:  "physical.solder_mask.pad_layers",
+			References: sortedMapKeys(maskRefs),
+			Objects:    maskObjects,
+			Measurements: []Measurement{
+				{Name: "violation_count", Value: float64(maskViolations), Unit: "count"},
+			},
+			Source: SourceParser,
+		})
+	}
+	if pasteViolations == 0 {
+		checks = append(checks, Check{
+			ID:       CheckSolderPastePadLayers,
+			Category: CategorySolderPaste,
+			Status:   StatusPass,
+			Message:  "pad solder paste layers are consistent with pad type and copper side",
+			Source:   SourceParser,
+		})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckSolderPastePadLayers,
+			Category:   CategorySolderPaste,
+			Status:     StatusBlocked,
+			Message:    "one or more pads have inconsistent solder paste layers",
+			Suggestion: "add paste only to SMD assembly pads on the matching side, or remove paste from THT and mechanical pads",
+			IssuePath:  "physical.solder_paste.pad_layers",
+			References: sortedMapKeys(pasteRefs),
+			Objects:    pasteObjects,
+			Measurements: []Measurement{
+				{Name: "violation_count", Value: float64(pasteViolations), Unit: "count"},
+			},
+			Source: SourceParser,
+		})
+	}
+	return checks
+}
+
+type padLayerSummary struct {
+	FCu     bool
+	BCu     bool
+	AllCu   bool
+	FMask   bool
+	BMask   bool
+	AllMask bool
+	FPaste  bool
+	BPaste  bool
+}
+
+func summarizePadLayers(pad pcbfiles.Pad) padLayerSummary {
+	var summary padLayerSummary
+	for _, layer := range pad.Layers {
+		switch layer {
+		case kicadfiles.LayerFCu:
+			summary.FCu = true
+		case kicadfiles.LayerBCu:
+			summary.BCu = true
+		case kicadfiles.LayerAllCu:
+			summary.AllCu = true
+			summary.FCu = true
+			summary.BCu = true
+		case kicadfiles.LayerFMask:
+			summary.FMask = true
+		case kicadfiles.LayerBMask:
+			summary.BMask = true
+		case kicadfiles.LayerAllMask:
+			summary.AllMask = true
+		case kicadfiles.LayerFPaste:
+			summary.FPaste = true
+		case kicadfiles.LayerBPaste:
+			summary.BPaste = true
+		}
+	}
+	return summary
+}
+
+func (summary padLayerSummary) requiresMask() bool {
+	return summary.FCu || summary.BCu || summary.AllCu
+}
+
+func (summary padLayerSummary) hasRequiredMask() bool {
+	if summary.AllMask {
+		return true
+	}
+	if summary.AllCu {
+		return summary.FMask && summary.BMask
+	}
+	if summary.FCu && !summary.FMask {
+		return false
+	}
+	if summary.BCu && !summary.BMask {
+		return false
+	}
+	return true
+}
+
+func padRequiresPaste(pad pcbfiles.Pad) bool {
+	return strings.EqualFold(pad.Type, "smd")
+}
+
+func (summary padLayerSummary) hasRequiredPaste() bool {
+	return summary.FCu == summary.FPaste && summary.BCu == summary.BPaste
+}
+
+func (summary padLayerSummary) hasAnyPaste() bool {
+	return summary.FPaste || summary.BPaste
 }
 
 type boardBounds struct {

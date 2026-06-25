@@ -290,6 +290,50 @@ func TestEvaluateBoardBlocksUndersizedVia(t *testing.T) {
 	assertCheckStatus(t, report, CheckNetClassViaDimensions, StatusBlocked)
 }
 
+func TestEvaluateBoardBlocksMissingSMDMaskAndPaste(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskPadLayers, StatusBlocked)
+	assertCheckStatus(t, report, CheckSolderPastePadLayers, StatusBlocked)
+}
+
+func TestEvaluateBoardBlocksPasteOnThroughHolePad(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.6)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask, kicadfiles.LayerFPaste}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskPadLayers, StatusPass)
+	assertCheckStatus(t, report, CheckSolderPastePadLayers, StatusBlocked)
+}
+
+func TestEvaluateBoardAllCuSMDRequiresBothPasteSides(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask, kicadfiles.LayerFPaste}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderPastePadLayers, StatusBlocked)
+}
+
+func TestEvaluateBoardBlocksExtraPasteSideOnSMDPad(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste, kicadfiles.LayerBPaste}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderPastePadLayers, StatusBlocked)
+}
+
 func assertCheckStatus(t *testing.T, report Report, id string, status Status) {
 	t.Helper()
 	for _, check := range report.Checks {
