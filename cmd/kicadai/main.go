@@ -27,6 +27,7 @@ import (
 	"kicadai/internal/fabrication"
 	breakoutgen "kicadai/internal/generate"
 	"kicadai/internal/inspect"
+	"kicadai/internal/intentplanner"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
@@ -66,6 +67,7 @@ Commands:
   writer        Check generated writer correctness
   validate      Validate generated board electrical correctness
   inspect       Inspect KiCad projects and files
+  intent        Plan or explain high-level AI design intent requests
   library       Index and query KiCad symbol and footprint libraries
   evaluate      Evaluate KiCad projects and files
   pinmap        List or validate symbol-footprint pinmaps
@@ -309,6 +311,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return a.runGenerateLEDDemo(opts, stdout)
 	case "inspect":
 		return runInspect(opts, stdout)
+	case "intent":
+		return runIntent(opts, stdout)
 	case "evaluate":
 		return runEvaluate(opts, stdout)
 	case "library":
@@ -2373,6 +2377,82 @@ func runDesign(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		})
 	}
 	return runDesignCreate(ctx, opts, stdout)
+}
+
+func runIntent(opts cliOptions, stdout io.Writer) error {
+	if len(opts.commandArgs) == 0 {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: plan or explain"})
+	}
+	switch opts.commandArgs[0] {
+	case "plan", "explain":
+		return runIntentPlan(opts, stdout, opts.commandArgs[0])
+	default:
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent." + opts.commandArgs[0], Message: "unsupported intent subcommand " + opts.commandArgs[0]})
+	}
+}
+
+type intentExplainResult struct {
+	Status         intentplanner.PlanStatus            `json:"status"`
+	Score          int                                 `json:"score"`
+	Intent         intentplanner.PlanIntentSummary     `json:"intent"`
+	Requirements   []intentplanner.RequirementRecord   `json:"requirements"`
+	SelectedBlocks []intentplanner.SelectedBlockRecord `json:"selected_blocks"`
+	Connections    []intentplanner.ConnectionRecord    `json:"connections"`
+	Assumptions    []intentplanner.PlanNote            `json:"assumptions"`
+	Clarifications []intentplanner.PlanNote            `json:"clarifications"`
+	KnownGaps      []intentplanner.PlanNote            `json:"known_gaps"`
+}
+
+func runIntentPlan(opts cliOptions, stdout io.Writer, subcommand string) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("intent plan requires --json")
+	}
+	if strings.TrimSpace(opts.requestPath) == "" {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "--request is required"})
+	}
+	file, err := os.Open(opts.requestPath)
+	if err != nil {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
+	}
+	defer file.Close()
+	request, issues := intentplanner.DecodeRequestStrict(file)
+	if reports.HasBlockingIssue(issues) {
+		result := reports.ResultWithIssues("intent", nil, issues, nil)
+		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
+			return writeErr
+		}
+		return errors.New("intent request reported blocking issues")
+	}
+	plan := intentplanner.Plan(request)
+	var artifactIssues []reports.Issue
+	if strings.TrimSpace(opts.output) != "" {
+		plan, artifactIssues = intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: opts.output, Overwrite: opts.overwrite})
+	}
+	plan.Issues = append(plan.Issues, issues...)
+	plan.Issues = append(plan.Issues, artifactIssues...)
+	plan = intentplanner.NormalizePlan(plan)
+	data := any(plan)
+	if subcommand == "explain" {
+		data = intentExplainResult{
+			Status:         plan.Status,
+			Score:          plan.Score,
+			Intent:         plan.Intent,
+			Requirements:   plan.Requirements,
+			SelectedBlocks: plan.SelectedBlocks,
+			Connections:    plan.Connections,
+			Assumptions:    plan.Assumptions,
+			Clarifications: plan.Clarifications,
+			KnownGaps:      plan.KnownGaps,
+		}
+	}
+	result := reports.ResultWithIssues("intent", data, plan.Issues, plan.Artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("intent plan reported issues")
+	}
+	return nil
 }
 
 func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {

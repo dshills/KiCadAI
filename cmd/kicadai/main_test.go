@@ -119,6 +119,68 @@ func TestRunDesignCreateMissingRequest(t *testing.T) {
 	}
 }
 
+func TestRunIntentPlanRequiresJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--request", "request.json", "intent", "plan"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "requires --json") {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestRunIntentPlanMissingRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--json", "intent", "plan"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing request error")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || len(result.Issues) != 1 || result.Issues[0].Path != "request" {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunIntentPlanWritesArtifacts(t *testing.T) {
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "intent.json")
+	output := filepath.Join(dir, "out")
+	request := `{
+  "version": "0.1.0",
+  "name": "intent_cli",
+  "kind": "breakout",
+  "board": {"width_mm": 40, "height_mm": 25, "layers": 2},
+  "power": {"inputs": [{"kind": "usb_c", "voltage": "5V"}], "rails": [{"name": "VCC", "voltage": "3.3V"}]},
+  "interfaces": [{"kind": "i2c", "voltage": "3.3V"}],
+  "functions": [{"kind": "sensor", "family": "i2c_sensor"}]
+}`
+	if err := os.WriteFile(requestPath, []byte(request), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "intent", "plan"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if !result.OK {
+		t.Fatalf("result = %#v", result)
+	}
+	for _, name := range []string{"intent-plan.json", "generated-request.json"} {
+		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
+			t.Fatalf("missing artifact %s: %v", name, err)
+		}
+	}
+}
+
 func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
 	tests := []struct {
 		name          string
