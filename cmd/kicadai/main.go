@@ -175,77 +175,79 @@ var usage = strings.NewReplacer(
 ).Replace(usageTemplate)
 
 type cliOptions struct {
-	socket                string
-	apiCredential         string
-	clientName            string
-	timeoutMS             int
-	documentType          string
-	documentID            string
-	originX               int64
-	originY               int64
-	prefix                string
-	output                string
-	target                string
-	requestPath           string
-	name                  string
-	seed                  string
-	libVCC                string
-	libGND                string
-	libResistor           string
-	libLED                string
-	execute               bool
-	withPCB               bool
-	overwrite             bool
-	jsonOutput            bool
-	kicadCLI              string
-	manufacturerProfile   string
-	keepArtifacts         bool
-	artifactDir           string
-	roundTimeout          string
-	allowlistPath         string
-	blockVerifyCase       string
-	blockVerifySuite      string
-	blockVerifyBuiltins   bool
-	requireERC            bool
-	requireDRC            bool
-	allowMissingDRC       bool
-	strictZones           bool
-	strictUnrouted        bool
-	zoneRefill            string
-	requireKiCadRoundTrip bool
-	strictDiffs           bool
-	allowUnrouted         bool
-	klcRoot               string
-	symbolsRoot           string
-	footprintsRoot        string
-	templatesRoot         string
-	libraryCache          string
-	refreshLibraryCache   bool
-	catalogDir            string
-	componentFamily       string
-	componentPackage      string
-	componentValueKind    string
-	componentValue        string
-	componentAcceptance   string
-	routeMode             string
-	routeGridMM           float64
-	routeTraceWidthMM     float64
-	routeClearanceMM      float64
-	routeAllowPartial     bool
-	routeAllowPartialSet  bool
-	repairEnabled         bool
-	repairApply           bool
-	maxRepairAttempts     int
-	skipRouting           bool
-	placementBoardWidth   float64
-	placementBoardHeight  float64
-	placementBoardMargin  float64
-	placementEstWidth     float64
-	placementEstHeight    float64
-	skipPlacementFeedback bool
-	feedbackOutput        bool
-	prettyOutput          bool
-	commandArgs           []string
+	socket                      string
+	apiCredential               string
+	clientName                  string
+	timeoutMS                   int
+	documentType                string
+	documentID                  string
+	originX                     int64
+	originY                     int64
+	prefix                      string
+	output                      string
+	target                      string
+	requestPath                 string
+	name                        string
+	seed                        string
+	libVCC                      string
+	libGND                      string
+	libResistor                 string
+	libLED                      string
+	execute                     bool
+	withPCB                     bool
+	overwrite                   bool
+	jsonOutput                  bool
+	kicadCLI                    string
+	manufacturerProfile         string
+	keepArtifacts               bool
+	artifactDir                 string
+	roundTimeout                string
+	allowlistPath               string
+	blockVerifyCase             string
+	blockVerifySuite            string
+	blockVerifyBuiltins         bool
+	blockVerifyKiCadCorpus      bool
+	blockVerifyKiCadCorpusTiers string
+	requireERC                  bool
+	requireDRC                  bool
+	allowMissingDRC             bool
+	strictZones                 bool
+	strictUnrouted              bool
+	zoneRefill                  string
+	requireKiCadRoundTrip       bool
+	strictDiffs                 bool
+	allowUnrouted               bool
+	klcRoot                     string
+	symbolsRoot                 string
+	footprintsRoot              string
+	templatesRoot               string
+	libraryCache                string
+	refreshLibraryCache         bool
+	catalogDir                  string
+	componentFamily             string
+	componentPackage            string
+	componentValueKind          string
+	componentValue              string
+	componentAcceptance         string
+	routeMode                   string
+	routeGridMM                 float64
+	routeTraceWidthMM           float64
+	routeClearanceMM            float64
+	routeAllowPartial           bool
+	routeAllowPartialSet        bool
+	repairEnabled               bool
+	repairApply                 bool
+	maxRepairAttempts           int
+	skipRouting                 bool
+	placementBoardWidth         float64
+	placementBoardHeight        float64
+	placementBoardMargin        float64
+	placementEstWidth           float64
+	placementEstHeight          float64
+	skipPlacementFeedback       bool
+	feedbackOutput              bool
+	prettyOutput                bool
+	commandArgs                 []string
 }
 
 type apiClient interface {
@@ -386,6 +388,8 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.blockVerifyCase, "case", "", "block verification manifest path")
 	flags.StringVar(&opts.blockVerifySuite, "suite", "", "block verification suite directory")
 	flags.BoolVar(&opts.blockVerifyBuiltins, "builtins", false, "run built-in block verification manifests")
+	flags.BoolVar(&opts.blockVerifyKiCadCorpus, "kicad-corpus", false, "run only block verification manifests included in the KiCad corpus")
+	flags.StringVar(&opts.blockVerifyKiCadCorpusTiers, "kicad-corpus-tier", "", "comma-separated KiCad corpus tier filter")
 	flags.BoolVar(&opts.requireERC, "require-erc", false, "require KiCad ERC evidence for block verification")
 	flags.BoolVar(&opts.requireDRC, "require-drc", false, "require KiCad DRC evidence for board validation or block verification")
 	flags.BoolVar(&opts.allowMissingDRC, "allow-missing-drc", false, "do not fail board validation when KiCad DRC is unavailable")
@@ -818,6 +822,7 @@ func runBlockVerify(ctx context.Context, opts cliOptions, registry blocks.Regist
 	if err != nil {
 		return blockVerificationCLIReport{}, nil, nil, err
 	}
+	manifests, initialCorpusSummary := verification.SelectKiCadCorpusManifests(manifests, runOptions.KiCadCorpus)
 	results := make([]verification.RunResult, 0, len(manifests))
 	issues := append([]reports.Issue(nil), loadIssues...)
 	var artifacts []reports.Artifact
@@ -832,8 +837,25 @@ func runBlockVerify(ctx context.Context, opts cliOptions, registry blocks.Regist
 		results = append(results, result)
 		issues = append(issues, result.Issues...)
 		artifacts = append(artifacts, result.Artifacts...)
+		if runOptions.KiCadCorpus.Enabled && result.KiCadCorpus != nil {
+			corpusArtifacts, corpusIssues := writeBlockVerificationCorpusCaseResult(opts, manifest.ID, *result.KiCadCorpus)
+			issues = append(issues, corpusIssues...)
+			artifacts = append(artifacts, corpusArtifacts...)
+		}
 	}
-	return blockVerificationCLIReport{Count: len(results), Results: results}, issues, artifacts, nil
+	corpusSummary := initialCorpusSummary
+	if runOptions.KiCadCorpus.Enabled {
+		corpusSummary = verification.BuildKiCadCorpusSummary(results)
+		corpusSummary.TotalCount = initialCorpusSummary.TotalCount
+		corpusArtifacts, corpusIssues := writeBlockVerificationCorpusSummary(opts, corpusSummary)
+		issues = append(issues, corpusIssues...)
+		artifacts = append(artifacts, corpusArtifacts...)
+	}
+	report := blockVerificationCLIReport{Count: len(results), Results: results}
+	if runOptions.KiCadCorpus.Enabled {
+		report.KiCadCorpus = &corpusSummary
+	}
+	return report, issues, artifacts, nil
 }
 
 func blockVerificationManifests(opts cliOptions) ([]verification.Manifest, []reports.Issue, error) {
@@ -907,15 +929,23 @@ func blockVerificationRunOptions(opts cliOptions, registry blocks.Registry) (ver
 	if err != nil {
 		return verification.RunOptions{}, err
 	}
+	corpusTiers, err := blockVerificationKiCadCorpusTiers(opts.blockVerifyKiCadCorpusTiers)
+	if err != nil {
+		return verification.RunOptions{}, err
+	}
 	return verification.RunOptions{
 		Registry:      registry,
 		OutputDir:     opts.output,
 		Overwrite:     opts.overwrite,
 		KeepArtifacts: opts.keepArtifacts,
-		KiCadCLI:      opts.kicadCLI,
-		RequireERC:    opts.requireERC,
-		RequireDRC:    opts.requireDRC,
-		CheckOptions:  checkOpts,
+		KiCadCorpus: verification.KiCadCorpusOptions{
+			Enabled: opts.blockVerifyKiCadCorpus,
+			Tiers:   corpusTiers,
+		},
+		KiCadCLI:     opts.kicadCLI,
+		RequireERC:   opts.requireERC,
+		RequireDRC:   opts.requireDRC,
+		CheckOptions: checkOpts,
 		WriterOptions: writercorrectness.Options{
 			KiCadCLI:              opts.kicadCLI,
 			AllowUnrouted:         opts.allowUnrouted,
@@ -925,6 +955,108 @@ func blockVerificationRunOptions(opts cliOptions, registry blocks.Registry) (ver
 			ArtifactDir:           opts.artifactDir,
 		},
 	}, nil
+}
+
+func blockVerificationKiCadCorpusTiers(value string) ([]verification.KiCadCorpusTier, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, nil
+	}
+	parts := strings.Split(value, ",")
+	tiers := make([]verification.KiCadCorpusTier, 0, len(parts))
+	for _, part := range parts {
+		tier := verification.KiCadCorpusTier(strings.TrimSpace(part))
+		switch tier {
+		case verification.KiCadCorpusTierSmoke, verification.KiCadCorpusTierBlock, verification.KiCadCorpusTierLayout, verification.KiCadCorpusTierRegression:
+			tiers = append(tiers, tier)
+		case "":
+		default:
+			return nil, fmt.Errorf("unsupported KiCad corpus tier %q", tier)
+		}
+	}
+	return tiers, nil
+}
+
+func writeBlockVerificationCorpusSummary(opts cliOptions, summary verification.KiCadCorpusSummary) ([]reports.Artifact, []reports.Issue) {
+	if strings.TrimSpace(opts.output) == "" {
+		return nil, nil
+	}
+	if err := os.MkdirAll(opts.output, 0o755); err != nil {
+		return nil, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "block.verify.kicad_corpus.output",
+			Message:  err.Error(),
+		}}
+	}
+	path := filepath.Join(opts.output, "corpus-summary.json")
+	if err := writeBlockVerificationJSONReport(path, summary, opts.overwrite); err != nil {
+		return nil, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "block.verify.kicad_corpus.summary",
+			Message:  err.Error(),
+		}}
+	}
+	return []reports.Artifact{{
+		Kind:        reports.ArtifactValidationReport,
+		Path:        filepath.ToSlash(path),
+		Description: "KiCad corpus summary JSON report",
+	}}, nil
+}
+
+func writeBlockVerificationCorpusCaseResult(opts cliOptions, caseID string, result verification.KiCadCorpusCaseResult) ([]reports.Artifact, []reports.Issue) {
+	if strings.TrimSpace(opts.output) == "" {
+		return nil, nil
+	}
+	safeCaseID := safeBlockVerificationPathSegment(caseID)
+	dir := filepath.Join(filepath.Clean(opts.output), safeCaseID, "reports")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "block.verify.kicad_corpus.case_result",
+			Message:  err.Error(),
+		}}
+	}
+	path := filepath.Join(dir, "corpus-result.json")
+	if err := writeBlockVerificationJSONReport(path, result, opts.overwrite); err != nil {
+		return nil, []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "block.verify.kicad_corpus.case_result",
+			Message:  err.Error(),
+		}}
+	}
+	return []reports.Artifact{{
+		Kind:        reports.ArtifactValidationReport,
+		Path:        filepath.ToSlash(path),
+		Description: "KiCad corpus case result JSON report",
+	}}, nil
+}
+
+const blockVerificationReportFileMode = 0o644
+
+func writeBlockVerificationJSONReport(path string, data any, overwrite bool) (err error) {
+	flags := os.O_WRONLY | os.O_CREATE
+	if overwrite {
+		flags |= os.O_TRUNC
+	} else {
+		flags |= os.O_EXCL
+	}
+	file, err := os.OpenFile(path, flags, blockVerificationReportFileMode)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		if closeErr := file.Close(); err == nil {
+			err = closeErr
+		}
+	}()
+	encoder := json.NewEncoder(file)
+	encoder.SetEscapeHTML(false)
+	encoder.SetIndent("", "  ")
+	return encoder.Encode(data)
 }
 
 func blockProjectName(opts cliOptions, fallback string) string {
@@ -964,8 +1096,9 @@ type blockPCBRealizationCLIResult struct {
 }
 
 type blockVerificationCLIReport struct {
-	Count   int                      `json:"count"`
-	Results []verification.RunResult `json:"results"`
+	Count       int                              `json:"count"`
+	KiCadCorpus *verification.KiCadCorpusSummary `json:"kicad_corpus,omitempty"`
+	Results     []verification.RunResult         `json:"results"`
 }
 
 type blockPlacementFeedbackOptions struct {

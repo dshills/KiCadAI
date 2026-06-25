@@ -55,6 +55,19 @@ func TestRunBlockVerificationGoldens(t *testing.T) {
 				return []string{"__CASE__", path, "__OUT__", filepath.Join(dir, "out")}
 			},
 		},
+		{
+			name: "kicad_corpus_optional_skip",
+			args: []string{"--json", "--case", "__CASE__", "--kicad-corpus", "--output", "__OUT__", "block", "verify"},
+			beforeRun: func(t *testing.T) []string {
+				t.Setenv("KICADAI_KICAD_CLI", filepath.Join(t.TempDir(), "missing-kicad-cli"))
+				dir := t.TempDir()
+				path := filepath.Join(dir, "corpus.json")
+				if err := os.WriteFile(path, []byte(optionalKiCadCorpusBlockVerificationManifest), 0o644); err != nil {
+					t.Fatalf("write corpus manifest: %v", err)
+				}
+				return []string{"__CASE__", path, "__OUT__", filepath.Join(dir, "out")}
+			},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -121,20 +134,42 @@ func normalizeBlockVerificationGolden(t *testing.T, data []byte) []byte {
 		Name   string `json:"name"`
 		Status string `json:"status"`
 	}
+	type snapshotCorpusCase struct {
+		CaseID         string   `json:"case_id"`
+		BlockID        string   `json:"block_id"`
+		Tier           string   `json:"tier,omitempty"`
+		Readiness      string   `json:"readiness,omitempty"`
+		Status         string   `json:"status"`
+		ExpectedStatus string   `json:"expected_status,omitempty"`
+		ExpectedIssues []string `json:"expected_issues,omitempty"`
+		Notes          string   `json:"notes,omitempty"`
+	}
 	type snapshotResult struct {
-		CaseID        string          `json:"case_id"`
-		BlockID       string          `json:"block_id"`
-		EvidenceLevel string          `json:"evidence_level"`
-		Status        string          `json:"status"`
-		Stages        []snapshotStage `json:"stages"`
-		Issues        []snapshotIssue `json:"issues,omitempty"`
+		CaseID        string              `json:"case_id"`
+		BlockID       string              `json:"block_id"`
+		EvidenceLevel string              `json:"evidence_level"`
+		Status        string              `json:"status"`
+		KiCadCorpus   *snapshotCorpusCase `json:"kicad_corpus,omitempty"`
+		Stages        []snapshotStage     `json:"stages"`
+		Issues        []snapshotIssue     `json:"issues,omitempty"`
+	}
+	type snapshotCorpusSummary struct {
+		Enabled        bool                 `json:"enabled"`
+		SelectedCount  int                  `json:"selected_count"`
+		TotalCount     int                  `json:"total_count"`
+		CaseIDs        []string             `json:"case_ids,omitempty"`
+		CountsByStatus map[string]int       `json:"counts_by_status,omitempty"`
+		CountsByTier   map[string]int       `json:"counts_by_tier,omitempty"`
+		CountsByBlock  map[string]int       `json:"counts_by_block,omitempty"`
+		Results        []snapshotCorpusCase `json:"results,omitempty"`
 	}
 	type snapshotReport struct {
 		OK      bool   `json:"ok"`
 		Command string `json:"command"`
 		Data    struct {
-			Count   int              `json:"count"`
-			Results []snapshotResult `json:"results"`
+			Count       int                    `json:"count"`
+			KiCadCorpus *snapshotCorpusSummary `json:"kicad_corpus,omitempty"`
+			Results     []snapshotResult       `json:"results"`
 		} `json:"data"`
 		Issues []snapshotIssue `json:"issues,omitempty"`
 	}
@@ -142,14 +177,16 @@ func normalizeBlockVerificationGolden(t *testing.T, data []byte) []byte {
 		OK      bool   `json:"ok"`
 		Command string `json:"command"`
 		Data    struct {
-			Count   int `json:"count"`
-			Results []struct {
-				CaseID        string          `json:"case_id"`
-				BlockID       string          `json:"block_id"`
-				EvidenceLevel string          `json:"evidence_level"`
-				Status        string          `json:"status"`
-				Stages        []snapshotStage `json:"stages"`
-				Issues        []snapshotIssue `json:"issues"`
+			Count       int                    `json:"count"`
+			KiCadCorpus *snapshotCorpusSummary `json:"kicad_corpus"`
+			Results     []struct {
+				CaseID        string              `json:"case_id"`
+				BlockID       string              `json:"block_id"`
+				EvidenceLevel string              `json:"evidence_level"`
+				Status        string              `json:"status"`
+				KiCadCorpus   *snapshotCorpusCase `json:"kicad_corpus"`
+				Stages        []snapshotStage     `json:"stages"`
+				Issues        []snapshotIssue     `json:"issues"`
 			} `json:"results"`
 		} `json:"data"`
 		Issues []snapshotIssue `json:"issues"`
@@ -159,12 +196,14 @@ func normalizeBlockVerificationGolden(t *testing.T, data []byte) []byte {
 	}
 	normalized := snapshotReport{OK: root.OK, Command: root.Command}
 	normalized.Data.Count = root.Data.Count
+	normalized.Data.KiCadCorpus = root.Data.KiCadCorpus
 	for _, result := range root.Data.Results {
 		normalized.Data.Results = append(normalized.Data.Results, snapshotResult{
 			CaseID:        result.CaseID,
 			BlockID:       result.BlockID,
 			EvidenceLevel: result.EvidenceLevel,
 			Status:        result.Status,
+			KiCadCorpus:   result.KiCadCorpus,
 			Stages:        result.Stages,
 			Issues:        result.Issues,
 		})
@@ -197,6 +236,26 @@ const optionalERCDRCBlockVerificationManifest = `{
   "expected": {
     "evidence_level": "schematic_verified",
     "erc_drc": {"allowed_codes": ["OPTIONAL_ONLY"]},
+    "components": [
+      {"role": "resistor", "ref_prefix": "R", "symbol_id": "Device:R"},
+      {"role": "led", "ref_prefix": "D", "symbol_id": "Device:LED"}
+    ]
+  }
+}`
+
+const optionalKiCadCorpusBlockVerificationManifest = `{
+  "id": "led_indicator_corpus_optional",
+  "block_id": "led_indicator",
+  "request": {"instance_id": "status"},
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "kicad_corpus": {
+      "include": true,
+      "tier": "smoke",
+      "readiness": "candidate",
+      "expected_status": "skip",
+      "allowed_codes": ["OPTIONAL_ONLY"]
+    },
     "components": [
       {"role": "resistor", "ref_prefix": "R", "symbol_id": "Device:R"},
       {"role": "led", "ref_prefix": "D", "symbol_id": "Device:LED"}

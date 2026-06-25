@@ -1,0 +1,68 @@
+{
+  "ok": true,
+  "command": "block",
+  "data": {
+    "count": 1,
+    "kicad_corpus": {
+      "enabled": true,
+      "selected_count": 1,
+      "total_count": 1,
+      "case_ids": [
+        "led_indicator_corpus_optional"
+      ],
+      "counts_by_status": {
+        "skip": 1
+      },
+      "counts_by_tier": {
+        "smoke": 1
+      },
+      "counts_by_block": {
+        "led_indicator": 1
+      },
+      "results": [
+        {
+          "case_id": "led_indicator_corpus_optional",
+          "block_id": "led_indicator",
+          "tier": "smoke",
+          "readiness": "candidate",
+          "status": "skip",
+          "expected_status": "skip"
+        }
+      ]
+    },
+    "results": [
+      {
+        "case_id": "led_indicator_corpus_optional",
+        "block_id": "led_indicator",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "kicad_corpus": {
+          "case_id": "led_indicator_corpus_optional",
+          "block_id": "led_indicator",
+          "tier": "smoke",
+          "readiness": "candidate",
+          "status": "skip",
+          "expected_status": "skip"
+        },
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
+          }
+        ]
+      }
+    ]
+  }
+}
