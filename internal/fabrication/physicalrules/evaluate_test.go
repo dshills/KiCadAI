@@ -372,6 +372,105 @@ func TestEvaluateBoardBlocksSilkscreenOutsideBoard(t *testing.T) {
 	assertCheckStatus(t, report, CheckSilkscreenBoardClearance, StatusBlocked)
 }
 
+func TestEvaluateBoardBlocksRequiredMissingMountingHoles(t *testing.T) {
+	board := physicalRuleTestBoard()
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{RequireMountingHoles: true})
+
+	assertCheckStatus(t, report, CheckMountingHolePresence, StatusBlocked)
+}
+
+func TestEvaluateBoardChecksMountingHoleGeometryAndEdge(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints = append(board.Footprints, pcbfiles.Footprint{
+		UUID:      kicadfiles.UUID("80000000-0000-4000-8000-000000000001"),
+		Reference: "H1",
+		Value:     "MountingHole",
+		Position:  point(0.5, 0.5),
+		Pads: []pcbfiles.Pad{{
+			UUID:     kicadfiles.UUID("81000000-0000-4000-8000-000000000001"),
+			Name:     "1",
+			Type:     "np_thru_hole",
+			Position: point(0, 0),
+			Size:     point(1, 1),
+			Drill:    kicadfiles.MM(0.6),
+			Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerAllMask},
+		}},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{MinHoleEdgeMM: 1.0})
+
+	assertCheckStatus(t, report, CheckMountingHolePresence, StatusPass)
+	assertCheckStatus(t, report, CheckMountingHoleGeometry, StatusPass)
+	assertCheckStatus(t, report, CheckMountingHoleEdgeClearance, StatusBlocked)
+}
+
+func TestEvaluateBoardBlocksInvalidMountingHoleDrill(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints = append(board.Footprints, pcbfiles.Footprint{
+		UUID:      kicadfiles.UUID("82000000-0000-4000-8000-000000000001"),
+		Reference: "H1",
+		Value:     "MountingHole",
+		Position:  point(5, 5),
+		Pads: []pcbfiles.Pad{{
+			UUID:     kicadfiles.UUID("83000000-0000-4000-8000-000000000001"),
+			Name:     "1",
+			Type:     "np_thru_hole",
+			Position: point(0, 0),
+			Size:     point(1, 1),
+			Drill:    0,
+			Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerAllMask},
+		}},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckMountingHoleGeometry, StatusBlocked)
+}
+
+func TestEvaluateBoardDoesNotTreatOrdinaryThroughHoleAsMountingHole(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Reference = "R1"
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.6)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckMountingHolePresence, StatusSkipped)
+}
+
+func TestEvaluateBoardDoesNotTreatHeaderReferenceAsMountingHole(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Reference = "H1"
+	board.Footprints[0].Value = "PinHeader_1x01"
+	board.Footprints[0].LibraryID = "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical"
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.6)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckMountingHolePresence, StatusSkipped)
+}
+
+func TestEvaluateBoardDoesNotTreatSMDPadInMountingHoleFootprintAsMountingHole(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Reference = "H1"
+	board.Footprints[0].Value = "MountingHole"
+	board.Footprints[0].LibraryID = "MountingHole:MountingHole_3.2mm"
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckMountingHolePresence, StatusSkipped)
+}
+
 func assertCheckStatus(t *testing.T, report Report, id string, status Status) {
 	t.Helper()
 	for _, check := range report.Checks {

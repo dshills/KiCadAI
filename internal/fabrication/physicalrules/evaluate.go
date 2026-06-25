@@ -34,6 +34,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, outline.Checks...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
 	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds)...)
+	checks = append(checks, evaluateMountingHoles(board, outline.Bounds, opts)...)
 	return NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
 }
 
@@ -239,6 +240,104 @@ func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []
 	return checks
 }
 
+func evaluateMountingHoles(board *pcbfiles.PCBFile, bounds boardBounds, opts Options) []Check {
+	var holes []mountingHole
+	for _, footprint := range board.Footprints {
+		footprintSuggestsHole := mountingHoleFootprintCandidate(footprint)
+		for _, pad := range footprint.Pads {
+			if isMountingHole(pad, footprintSuggestsHole) {
+				center := transformFootprintPoint(footprint, pad.Position)
+				holes = append(holes, mountingHole{Reference: footprint.Reference, UUID: string(pad.UUID), Center: center, Drill: pad.Drill})
+			}
+		}
+	}
+	checks := []Check{}
+	if opts.RequireMountingHoles && len(holes) == 0 {
+		checks = append(checks, Check{
+			ID:         CheckMountingHolePresence,
+			Category:   CategoryMountingHole,
+			Status:     StatusBlocked,
+			Message:    "mounting holes are required but none were found",
+			Suggestion: "add NPTH mounting holes with edge clearance and keepout evidence",
+			IssuePath:  "physical.mounting_hole.presence",
+			Source:     SourceProfile,
+		})
+	} else if len(holes) == 0 {
+		checks = append(checks, Check{ID: CheckMountingHolePresence, Category: CategoryMountingHole, Status: StatusSkipped, Message: "no mounting holes were required or detected", Source: SourceProfile})
+	} else {
+		checks = append(checks, Check{ID: CheckMountingHolePresence, Category: CategoryMountingHole, Status: StatusPass, Message: "mounting holes were detected", Measurements: []Measurement{{Name: "hole_count", Value: float64(len(holes)), Unit: "count"}}, Source: SourceParser})
+	}
+	var geometryObjects []string
+	var geometryRefs = map[string]struct{}{}
+	geometryViolations := 0
+	var edgeObjects []string
+	var edgeRefs = map[string]struct{}{}
+	edgeViolations := 0
+	minEdge := opts.MinHoleEdgeMM
+	minObservedEdge := math.Inf(1)
+	for _, hole := range holes {
+		if hole.Drill <= 0 {
+			geometryViolations++
+			addRef(geometryRefs, hole.Reference)
+			geometryObjects = appendLimited(geometryObjects, hole.UUID)
+		}
+		if bounds.Valid && minEdge > 0 && len(bounds.Polygons) > 0 {
+			clearance := pointPolygonDistance(hole.Center, bounds.Polygons) - math.Max(0, iuToMM(hole.Drill))/2
+			if clearance < minObservedEdge {
+				minObservedEdge = clearance
+			}
+			if clearance < minEdge {
+				edgeViolations++
+				addRef(edgeRefs, hole.Reference)
+				edgeObjects = appendLimited(edgeObjects, hole.UUID)
+			}
+		}
+	}
+	if len(holes) == 0 {
+		checks = append(checks, Check{ID: CheckMountingHoleGeometry, Category: CategoryMountingHole, Status: StatusSkipped, Message: "mounting-hole geometry check skipped because no mounting holes were detected", Source: SourceParser})
+	} else if geometryViolations == 0 {
+		checks = append(checks, Check{ID: CheckMountingHoleGeometry, Category: CategoryMountingHole, Status: StatusPass, Message: "detected mounting holes have positive drill sizes", Source: SourceParser})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckMountingHoleGeometry,
+			Category:   CategoryMountingHole,
+			Status:     StatusBlocked,
+			Message:    "one or more mounting holes have invalid drill geometry",
+			Suggestion: "set a positive drill diameter for each mounting hole",
+			IssuePath:  "physical.mounting_hole.geometry",
+			References: sortedMapKeys(geometryRefs),
+			Objects:    geometryObjects,
+			Measurements: []Measurement{
+				{Name: "violation_count", Value: float64(geometryViolations), Unit: "count"},
+			},
+			Source: SourceParser,
+		})
+	}
+	if len(holes) == 0 || minEdge <= 0 || !bounds.Valid || len(bounds.Polygons) == 0 {
+		checks = append(checks, Check{ID: CheckMountingHoleEdgeClearance, Category: CategoryMountingHole, Status: StatusSkipped, Message: "mounting-hole edge clearance requires detected holes, board polygon bounds, and a minimum edge-clearance policy", Source: SourceProfile})
+	} else if edgeViolations == 0 {
+		checks = append(checks, Check{ID: CheckMountingHoleEdgeClearance, Category: CategoryMountingHole, Status: StatusPass, Message: "mounting holes satisfy minimum edge clearance", Measurements: []Measurement{{Name: "min_hole_edge_clearance", Value: minEdge, Unit: "mm"}, {Name: "observed_min_hole_edge_clearance", Value: minObservedEdge, Unit: "mm"}}, Source: SourceProfile})
+	} else {
+		checks = append(checks, Check{
+			ID:         CheckMountingHoleEdgeClearance,
+			Category:   CategoryMountingHole,
+			Status:     StatusBlocked,
+			Message:    "one or more mounting holes violate minimum edge clearance",
+			Suggestion: "move mounting holes farther from Edge.Cuts or lower the profile threshold after review",
+			IssuePath:  "physical.mounting_hole.edge_clearance",
+			References: sortedMapKeys(edgeRefs),
+			Objects:    edgeObjects,
+			Measurements: []Measurement{
+				{Name: "min_hole_edge_clearance", Value: minEdge, Unit: "mm"},
+				{Name: "observed_min_hole_edge_clearance", Value: minObservedEdge, Unit: "mm"},
+				{Name: "violation_count", Value: float64(edgeViolations), Unit: "count"},
+			},
+			Source: SourceProfile,
+		})
+	}
+	return checks
+}
+
 type padLayerSummary struct {
 	FCu     bool
 	BCu     bool
@@ -330,6 +429,13 @@ type rectBounds struct {
 type courtyardBounds struct {
 	Reference string
 	Bounds    rectBounds
+}
+
+type mountingHole struct {
+	Reference string
+	UUID      string
+	Center    kicadfiles.Point
+	Drill     kicadfiles.IU
 }
 
 type edgeCutResult struct {
@@ -1375,6 +1481,29 @@ func footprintNeedsCourtyard(footprint pcbfiles.Footprint) bool {
 		}
 	}
 	return true
+}
+
+func mountingHoleFootprintCandidate(footprint pcbfiles.Footprint) bool {
+	ref := strings.ToUpper(strings.TrimSpace(footprint.Reference))
+	if strings.HasPrefix(ref, "MH") {
+		return true
+	}
+	libraryID := strings.ToLower(strings.TrimSpace(footprint.LibraryID))
+	value := strings.ToLower(strings.TrimSpace(footprint.Value))
+	return strings.Contains(libraryID, "mountinghole") ||
+		strings.Contains(libraryID, "mounting_hole") ||
+		strings.Contains(value, "mountinghole") ||
+		strings.Contains(value, "mounting hole")
+}
+
+func isMountingHole(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
+	if strings.EqualFold(pad.Type, "np_thru_hole") {
+		return true
+	}
+	if !strings.EqualFold(pad.Type, "thru_hole") {
+		return false
+	}
+	return footprintSuggestsHole
 }
 
 func footprintCourtyardBounds(footprint pcbfiles.Footprint) (rectBounds, bool) {
