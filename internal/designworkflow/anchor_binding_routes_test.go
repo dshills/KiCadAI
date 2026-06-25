@@ -49,6 +49,76 @@ func TestAddAnchorBindingRoutesCreatesRouteOperation(t *testing.T) {
 	}
 }
 
+func TestAddAnchorBindingRoutesCreatesBoardEdgeRouteOperation(t *testing.T) {
+	anchor := transactions.Point{XMM: 1, YMM: 2}
+	endpoint := transactions.Point{XMM: 0, YMM: 2}
+	summary := SummarizeAnchorBindings([]AnchorBinding{{
+		ID:              "inst1.signal_entry",
+		BlockInstanceID: "inst1",
+		AnchorID:        "signal_entry",
+		AnchorNetName:   "SIG",
+		AnchorPoint:     &anchor,
+		AnchorLayers:    []string{"F.Cu"},
+		EndpointID:      "edge_sig",
+		EndpointKind:    PhysicalEndpointBoardEdgePoint,
+		EndpointNetName: "SIG",
+		EndpointPoint:   &endpoint,
+		EndpointLayers:  []string{"F.Cu"},
+		Status:          AnchorBindingStatusBound,
+		Policy:          AnchorBindingPolicyRequired,
+		Required:        true,
+		RouteStatus:     AnchorRouteStatusSkipped,
+	}}, nil)
+
+	routed, operations := AddAnchorBindingRoutes(summary, AnchorBindingRouteOptions{WidthMM: 0.2})
+
+	if routed.Routed != 1 || len(operations) != 1 {
+		t.Fatalf("routed = %#v operations = %#v", routed, operations)
+	}
+	var payload transactions.RouteOperation
+	if err := json.Unmarshal(operations[0].Raw, &payload); err != nil {
+		t.Fatalf("unmarshal route = %v", err)
+	}
+	if payload.NetName != "SIG" || payload.Layer != "F.Cu" || payload.WidthMM != 0.2 || len(payload.Points) != 2 || payload.Points[0].XMM != 0 || payload.Points[0].YMM != 2 || payload.Points[1].XMM != 1 || payload.Points[1].YMM != 2 {
+		t.Fatalf("board edge route payload = %#v", payload)
+	}
+}
+
+func TestAddAnchorBindingRoutesCreatesImportedMechanicalRouteOperation(t *testing.T) {
+	anchor := transactions.Point{XMM: 4, YMM: 2}
+	endpoint := transactions.Point{XMM: 2, YMM: 2}
+	summary := SummarizeAnchorBindings([]AnchorBinding{{
+		ID:              "inst1.raw_input",
+		BlockInstanceID: "inst1",
+		AnchorID:        "raw_input",
+		AnchorNetName:   "VIN_RAW",
+		AnchorPoint:     &anchor,
+		AnchorLayers:    []string{"F.Cu"},
+		EndpointID:      "mech_vin",
+		EndpointKind:    PhysicalEndpointImportedMechanicalPoint,
+		EndpointNetName: "VIN_RAW",
+		EndpointPoint:   &endpoint,
+		EndpointLayers:  []string{"F.Cu"},
+		Status:          AnchorBindingStatusBound,
+		Policy:          AnchorBindingPolicyRequired,
+		Required:        true,
+		RouteStatus:     AnchorRouteStatusSkipped,
+	}}, nil)
+
+	routed, operations := AddAnchorBindingRoutes(summary, AnchorBindingRouteOptions{WidthMM: 0.2})
+
+	if routed.Routed != 1 || len(operations) != 1 {
+		t.Fatalf("routed = %#v operations = %#v", routed, operations)
+	}
+	var payload transactions.RouteOperation
+	if err := json.Unmarshal(operations[0].Raw, &payload); err != nil {
+		t.Fatalf("unmarshal route = %v", err)
+	}
+	if payload.NetName != "VIN_RAW" || payload.Layer != "F.Cu" || payload.WidthMM != 0.2 || len(payload.Points) != 2 || payload.Points[0].XMM != 2 || payload.Points[0].YMM != 2 || payload.Points[1].XMM != 4 || payload.Points[1].YMM != 2 {
+		t.Fatalf("imported mechanical route payload = %#v", payload)
+	}
+}
+
 func TestAddAnchorBindingRoutesReportsMissingCoordinates(t *testing.T) {
 	summary := SummarizeAnchorBindings([]AnchorBinding{{
 		ID:              "inst1.signal_entry",
