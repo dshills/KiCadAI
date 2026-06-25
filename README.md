@@ -53,6 +53,11 @@ resolution, route quality reports, net-class and role-aware routing, length
 policy, search-pressure quality scoring, explicit zone policy behavior,
 via/layer diagnostics, coupled-net intent reporting, workflow integration, and
 golden route coverage.
+Circuit-block entry anchors now have board-level binding evidence in
+`design create`: placed connector/interface pads can bind to ESD and
+reverse-polarity protection anchors, endpoint-to-anchor route operations are
+emitted when geometry is known, and routing summaries report bound, unbound,
+ambiguous, invalid, unsupported, routed, and not-routable anchor states.
 Closed-loop validation repair now has a deterministic foundation: issue
 classification, repair planning, safe transaction-level executors, a bounded
 runner that requires revalidation before reporting success, persisted repairs
@@ -578,10 +583,15 @@ reset/programming route length, enable/control presence, and ground-reference
 checks where the current realization model can prove them. ESD and
 reverse-polarity protection manifests now require modeled entry-anchor route
 and power-path local-route evidence via `expected.pcb.required_local_routes`.
-Those anchors are still evidence points until board-level composition binds
-them to physical connector pads or board-edge features. Stronger KiCad-backed
-DRC, surge/thermal, and layout evidence remains required before fabrication
-readiness claims.
+`design create` now adds board-level `anchor_bindings` evidence in the routing
+stage when realized blocks expose entry anchors. The workflow discovers placed
+physical pad endpoints, resolves required protection anchors to connector or
+connector-like endpoints, emits endpoint-to-anchor route operations when both
+coordinates are known, and reports missing, ambiguous, net-mismatched, or
+not-routable bindings as structured issues. This binding evidence prevents
+synthetic anchors from being mistaken for proven external interfaces, but it is
+not a substitute for KiCad DRC, surge/thermal analysis, or fabrication
+readiness gates.
 
 ```sh
 kicadai --json --builtins block verify

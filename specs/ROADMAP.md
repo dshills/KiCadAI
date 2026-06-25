@@ -116,9 +116,9 @@ loop confidence:
   realization for the default reset/programming ISP fixture, manifest-level PCB
   realization evidence, and deterministic timing/local-route checks where
   modeled. ESD and reverse-polarity protection now include entry-anchor and
-  power-path local-route evidence. These newer blocks still need more variants,
-  physical board-composition binding for anchors, and stronger KiCad-backed
-  layout proof;
+  power-path local-route evidence plus board-level connector/interface binding
+  evidence in `design create`. These newer blocks still need more variants and
+  stronger KiCad-backed layout proof;
 - placement now models several PCB-quality rule families and first-pass
   timing-sensitive crystal, canned oscillator, and reset/programming fixture
   evidence, but larger-board KiCad DRC-backed proof and broader
@@ -237,6 +237,11 @@ Implemented foundation.
 - ESD and reverse-polarity protection verification manifests now require PCB
   realization evidence for the currently modeled placement, entry anchors, and
   power-path local routes.
+- `design create` routing summaries now include board-level anchor binding
+  evidence for realized entry anchors, including physical endpoint discovery,
+  connector/interface resolution for protection blocks, endpoint-to-anchor route
+  operations, and structured missing/ambiguous/net-mismatch/not-routable
+  diagnostics.
 - Block verification can require internal board validation and has explicit
   optional versus required KiCad ERC/DRC behavior with skipped/blocking stage
   summaries.
@@ -250,8 +255,8 @@ Implemented foundation.
 
 - Add stable KiCad-backed ERC/DRC evidence to block verification manifests
   where external KiCad CLI is available.
-- Bind entry anchors to physical connector pads, board-edge points, or imported
-  mechanical constraints during board-level composition.
+- Extend anchor binding beyond connector/interface pads to board-edge points
+  and imported mechanical constraints.
 - Replace remaining structural/generic active templates with concrete
   component-catalog-backed parts where fabrication readiness is desired.
 - Convert more semantic PCB constraints into downstream placement, routing,
