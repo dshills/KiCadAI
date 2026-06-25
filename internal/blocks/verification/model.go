@@ -48,6 +48,7 @@ type Expected struct {
 	PCB           ExpectedPCB         `json:"pcb,omitempty"`
 	Writer        ExpectedWriter      `json:"writer,omitempty"`
 	ERCDRC        ExpectedERCDRC      `json:"erc_drc,omitempty"`
+	KiCadCorpus   ExpectedKiCadCorpus `json:"kicad_corpus,omitempty"`
 	Strict        bool                `json:"strict,omitempty"`
 }
 
@@ -143,6 +144,46 @@ type ExpectedERCDRC struct {
 	ExpectedIssues  []string           `json:"expected_issues,omitempty"`
 }
 
+type KiCadCorpusTier string
+
+const (
+	KiCadCorpusTierSmoke      KiCadCorpusTier = "smoke"
+	KiCadCorpusTierBlock      KiCadCorpusTier = "block"
+	KiCadCorpusTierLayout     KiCadCorpusTier = "layout"
+	KiCadCorpusTierRegression KiCadCorpusTier = "regression"
+)
+
+type KiCadCorpusReadiness string
+
+const (
+	KiCadCorpusReadinessCandidate    KiCadCorpusReadiness = "candidate"
+	KiCadCorpusReadinessExpectedFail KiCadCorpusReadiness = "expected_fail"
+	KiCadCorpusReadinessBlocked      KiCadCorpusReadiness = "blocked"
+	KiCadCorpusReadinessReference    KiCadCorpusReadiness = "reference"
+)
+
+type KiCadCorpusExpectedStatus string
+
+const (
+	KiCadCorpusStatusPass         KiCadCorpusExpectedStatus = "pass"
+	KiCadCorpusStatusSkip         KiCadCorpusExpectedStatus = "skip"
+	KiCadCorpusStatusExpectedFail KiCadCorpusExpectedStatus = "expected_fail"
+	KiCadCorpusStatusBlocked      KiCadCorpusExpectedStatus = "blocked"
+	KiCadCorpusStatusNotInCorpus  KiCadCorpusExpectedStatus = "not_in_corpus"
+)
+
+type ExpectedKiCadCorpus struct {
+	Include        bool                      `json:"include,omitempty"`
+	Tier           KiCadCorpusTier           `json:"tier,omitempty"`
+	Readiness      KiCadCorpusReadiness      `json:"readiness,omitempty"`
+	ExpectedStatus KiCadCorpusExpectedStatus `json:"expected_status,omitempty"`
+	RequiresERC    bool                      `json:"requires_erc,omitempty"`
+	RequiresDRC    bool                      `json:"requires_drc,omitempty"`
+	AllowedCodes   []string                  `json:"allowed_codes,omitempty"`
+	ExpectedIssues []string                  `json:"expected_issues,omitempty"`
+	Notes          string                    `json:"notes,omitempty"`
+}
+
 var manifestIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
 
 func LoadManifest(path string) (Manifest, []reports.Issue) {
@@ -195,6 +236,7 @@ func ValidateManifest(manifest Manifest, registry blocks.Registry) []reports.Iss
 	issues = append(issues, validateExpectedPCB(basePath+".expected.pcb", manifest.Expected.PCB, componentRefs, componentRoles, roleToRefs, expectedNetNames)...)
 	issues = append(issues, validateExpectedWriter(basePath+".expected.writer", manifest.Expected.Writer)...)
 	issues = append(issues, validateExpectedERCDRC(basePath+".expected.erc_drc", manifest.Expected.ERCDRC)...)
+	issues = append(issues, validateExpectedKiCadCorpus(basePath+".expected.kicad_corpus", manifest.Expected.KiCadCorpus, manifest.Expected)...)
 	return issues
 }
 
@@ -532,6 +574,57 @@ func validateExpectedERCDRC(path string, ercDRC ExpectedERCDRC) []reports.Issue 
 	issues = append(issues, validateUniqueStrings(path+".allowed_codes", "duplicate allowed ERC/DRC code", ercDRC.AllowedCodes)...)
 	issues = append(issues, validateUniqueStrings(path+".expected_issues", "duplicate expected ERC/DRC issue", ercDRC.ExpectedIssues)...)
 	return issues
+}
+
+func validateExpectedKiCadCorpus(path string, corpus ExpectedKiCadCorpus, expected Expected) []reports.Issue {
+	if !corpus.Include && isZeroKiCadCorpus(corpus) {
+		return nil
+	}
+	var issues []reports.Issue
+	if !corpus.Include {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".include", "KiCad corpus metadata requires include=true"))
+	}
+	switch corpus.Tier {
+	case KiCadCorpusTierSmoke, KiCadCorpusTierBlock, KiCadCorpusTierLayout, KiCadCorpusTierRegression:
+	case "":
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".tier", "KiCad corpus tier is required"))
+	default:
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".tier", "unsupported KiCad corpus tier "+string(corpus.Tier)))
+	}
+	switch corpus.Readiness {
+	case KiCadCorpusReadinessCandidate, KiCadCorpusReadinessExpectedFail, KiCadCorpusReadinessBlocked, KiCadCorpusReadinessReference:
+	case "":
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".readiness", "KiCad corpus readiness is required"))
+	default:
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".readiness", "unsupported KiCad corpus readiness "+string(corpus.Readiness)))
+	}
+	switch corpus.ExpectedStatus {
+	case KiCadCorpusStatusPass, KiCadCorpusStatusSkip, KiCadCorpusStatusExpectedFail, KiCadCorpusStatusBlocked, KiCadCorpusStatusNotInCorpus:
+	case "":
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".expected_status", "KiCad corpus expected status is required"))
+	default:
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".expected_status", "unsupported KiCad corpus expected status "+string(corpus.ExpectedStatus)))
+	}
+	if corpus.Readiness == KiCadCorpusReadinessCandidate && corpus.ExpectedStatus == KiCadCorpusStatusPass && evidenceRequiresFootprint(expected.EvidenceLevel) && !corpus.RequiresDRC && !expected.ERCDRC.RequireDRC {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".requires_drc", "KiCad corpus PCB pass candidates must require DRC evidence or use expected_fail or blocked readiness"))
+	}
+	if (corpus.Readiness == KiCadCorpusReadinessExpectedFail || corpus.Readiness == KiCadCorpusReadinessBlocked) && strings.TrimSpace(corpus.Notes) == "" {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".notes", "KiCad corpus expected-fail and blocked cases require notes"))
+	}
+	issues = append(issues, validateUniqueStrings(path+".allowed_codes", "duplicate KiCad corpus allowed code", corpus.AllowedCodes)...)
+	issues = append(issues, validateUniqueStrings(path+".expected_issues", "duplicate KiCad corpus expected issue", corpus.ExpectedIssues)...)
+	return issues
+}
+
+func isZeroKiCadCorpus(corpus ExpectedKiCadCorpus) bool {
+	return corpus.Tier == "" &&
+		corpus.Readiness == "" &&
+		corpus.ExpectedStatus == "" &&
+		!corpus.RequiresERC &&
+		!corpus.RequiresDRC &&
+		len(corpus.AllowedCodes) == 0 &&
+		len(corpus.ExpectedIssues) == 0 &&
+		strings.TrimSpace(corpus.Notes) == ""
 }
 
 type kicadVersion struct {

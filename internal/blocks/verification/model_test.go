@@ -306,6 +306,102 @@ func TestValidateManifestAcceptsFakeERCDRCRunnerPolicy(t *testing.T) {
 	}
 }
 
+func TestValidateManifestAcceptsKiCadCorpusMetadata(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierSmoke,
+		Readiness:      KiCadCorpusReadinessCandidate,
+		ExpectedStatus: KiCadCorpusStatusPass,
+		RequiresDRC:    true,
+		AllowedCodes:   []string{"known_warning"},
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsInvalidKiCadCorpusMetadata(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTier("daily"),
+		Readiness:      KiCadCorpusReadiness("almost"),
+		ExpectedStatus: KiCadCorpusExpectedStatus("clean"),
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	for _, want := range []string{
+		"unsupported KiCad corpus tier daily",
+		"unsupported KiCad corpus readiness almost",
+		"unsupported KiCad corpus expected status clean",
+	} {
+		if !hasIssue(issues, want) {
+			t.Fatalf("issues missing %q: %#v", want, issues)
+		}
+	}
+}
+
+func TestValidateManifestReportsKiCadCorpusMetadataWithoutInclude(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Tier:           KiCadCorpusTierSmoke,
+		Readiness:      KiCadCorpusReadinessCandidate,
+		ExpectedStatus: KiCadCorpusStatusSkip,
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "KiCad corpus metadata requires include=true") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsKiCadCorpusCandidateWithoutDRC(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.EvidenceLevel = EvidencePCBVerified
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierBlock,
+		Readiness:      KiCadCorpusReadinessCandidate,
+		ExpectedStatus: KiCadCorpusStatusPass,
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "KiCad corpus PCB pass candidates must require DRC evidence") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsKiCadCorpusBlockedWithoutNotes(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierBlock,
+		Readiness:      KiCadCorpusReadinessBlocked,
+		ExpectedStatus: KiCadCorpusStatusBlocked,
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "KiCad corpus expected-fail and blocked cases require notes") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsDuplicateKiCadCorpusPolicyValues(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.KiCadCorpus = ExpectedKiCadCorpus{
+		Include:        true,
+		Tier:           KiCadCorpusTierSmoke,
+		Readiness:      KiCadCorpusReadinessExpectedFail,
+		ExpectedStatus: KiCadCorpusStatusExpectedFail,
+		AllowedCodes:   []string{"A", "A"},
+		ExpectedIssues: []string{"B", "B"},
+		Notes:          "tracks known local routing gap",
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "duplicate KiCad corpus allowed code") || !hasIssue(issues, "duplicate KiCad corpus expected issue") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestValidateManifestReportsInvalidERCDRCVersionRange(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.ERCDRC = ExpectedERCDRC{
