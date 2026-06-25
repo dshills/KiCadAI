@@ -470,6 +470,9 @@ func ercDRCRequested(expected Expected, opts RunOptions) bool {
 		expected.ERCDRC.Required ||
 		expected.ERCDRC.RequireERC ||
 		expected.ERCDRC.RequireDRC ||
+		expected.ERCDRC.Runner != "" ||
+		expected.ERCDRC.MinKiCadVersion != "" ||
+		expected.ERCDRC.MaxKiCadVersion != "" ||
 		len(expected.ERCDRC.AllowedCodes) > 0 ||
 		len(expected.ERCDRC.ExpectedIssues) > 0 ||
 		expected.EvidenceLevel == EvidenceERCDRCVerified ||
@@ -543,7 +546,7 @@ func ercDRCRequirements(expected Expected, opts RunOptions) (bool, bool) {
 		requireERC = true
 		requireDRC = true
 	}
-	if expected.ERCDRC.Required && !expected.ERCDRC.RequireERC && !expected.ERCDRC.RequireDRC {
+	if (expected.ERCDRC.Required || expected.ERCDRC.Runner == ERCDRCRunnerRequiredReal) && !expected.ERCDRC.RequireERC && !expected.ERCDRC.RequireDRC {
 		requireERC = true
 		requireDRC = true
 	}
@@ -552,7 +555,9 @@ func ercDRCRequirements(expected Expected, opts RunOptions) (bool, bool) {
 
 func ercDRCKinds(expected Expected, opts RunOptions) []checks.CheckKind {
 	requireERC, requireDRC := ercDRCRequirements(expected, opts)
-	if !requireERC && !requireDRC {
+	if !requireERC && !requireDRC && ercDRCRequested(expected, opts) {
+		// Optional evidence policies such as allowed_codes and expected_issues
+		// still need concrete checks when KiCad is available.
 		requireERC = true
 		requireDRC = true
 	}

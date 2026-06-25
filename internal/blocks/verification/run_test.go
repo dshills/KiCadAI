@@ -30,6 +30,15 @@ func TestRunCaseLEDIndicatorPassesSemantics(t *testing.T) {
 	}
 }
 
+func TestRunCaseOmitsERCDRCStageWhenNotRequested(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
+	if result.Status != StatusPass || hasStage(result.Stages, "erc_drc") {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
 func TestRunCaseWriterRequiredReportsKnownPadNetGap(t *testing.T) {
 	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "connector_breakout_4pin", "manifest.json"))
 	if len(issues) != 0 {
@@ -119,6 +128,7 @@ func TestRunCaseERCDRCBlocksWhenRequiredAndKiCadMissing(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Nets[0].Name = "status_led_series"
 	manifest.Expected.ERCDRC.Required = true
+	manifest.Expected.ERCDRC.RequireDRC = true
 	result := RunCase(context.Background(), manifest, RunOptions{
 		Registry:  blocks.NewBuiltinRegistry(),
 		OutputDir: filepath.Join(t.TempDir(), "out"),
@@ -133,6 +143,7 @@ func TestRunCaseERCDRCBlocksWhenOutputDirMissingAndRequired(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Nets[0].Name = "status_led_series"
 	manifest.Expected.ERCDRC.Required = true
+	manifest.Expected.ERCDRC.RequireDRC = true
 	result := RunCase(context.Background(), manifest, RunOptions{Registry: blocks.NewBuiltinRegistry()})
 	stage, ok := findStage(result.Stages, "erc_drc")
 	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || !hasIssue(result.Issues, "requires an output directory") || !strings.Contains(stage.Summary, "missing output directory") {

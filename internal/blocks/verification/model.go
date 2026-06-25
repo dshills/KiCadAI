@@ -6,6 +6,7 @@ import (
 	"os"
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/blocks"
@@ -123,12 +124,23 @@ type ExpectedWriter struct {
 	RequireRoundTrip bool `json:"require_round_trip,omitempty"`
 }
 
+type ERCDRCRunnerPolicy string
+
+const (
+	ERCDRCRunnerOptional     ERCDRCRunnerPolicy = "optional"
+	ERCDRCRunnerFake         ERCDRCRunnerPolicy = "fake"
+	ERCDRCRunnerRequiredReal ERCDRCRunnerPolicy = "required_real"
+)
+
 type ExpectedERCDRC struct {
-	Required       bool     `json:"required,omitempty"`
-	RequireERC     bool     `json:"require_erc,omitempty"`
-	RequireDRC     bool     `json:"require_drc,omitempty"`
-	AllowedCodes   []string `json:"allowed_codes,omitempty"`
-	ExpectedIssues []string `json:"expected_issues,omitempty"`
+	Required        bool               `json:"required,omitempty"`
+	RequireERC      bool               `json:"require_erc,omitempty"`
+	RequireDRC      bool               `json:"require_drc,omitempty"`
+	Runner          ERCDRCRunnerPolicy `json:"runner,omitempty"`
+	MinKiCadVersion string             `json:"min_kicad_version,omitempty"`
+	MaxKiCadVersion string             `json:"max_kicad_version,omitempty"`
+	AllowedCodes    []string           `json:"allowed_codes,omitempty"`
+	ExpectedIssues  []string           `json:"expected_issues,omitempty"`
 }
 
 var manifestIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
@@ -489,9 +501,100 @@ func validateExpectedERCDRC(path string, ercDRC ExpectedERCDRC) []reports.Issue 
 	if (ercDRC.RequireERC || ercDRC.RequireDRC) && !ercDRC.Required {
 		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".required", "ERC or DRC requirements require erc_drc.required"))
 	}
+	switch ercDRC.Runner {
+	case "", ERCDRCRunnerOptional, ERCDRCRunnerFake, ERCDRCRunnerRequiredReal:
+	default:
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".runner", "unsupported ERC/DRC runner policy "+string(ercDRC.Runner)))
+	}
+	if ercDRC.Required && ercDRC.Runner == ERCDRCRunnerOptional {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".runner", "required ERC/DRC evidence cannot use optional runner policy"))
+	}
+	if (ercDRC.Required || ercDRC.Runner == ERCDRCRunnerRequiredReal) && !ercDRC.RequireERC && !ercDRC.RequireDRC {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".require_erc", "required ERC/DRC evidence must select require_erc or require_drc"))
+	}
+	if trimmed := strings.TrimSpace(ercDRC.MinKiCadVersion); ercDRC.MinKiCadVersion != "" && trimmed != ercDRC.MinKiCadVersion {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".min_kicad_version", "minimum KiCad version must not contain leading or trailing whitespace"))
+	}
+	if trimmed := strings.TrimSpace(ercDRC.MaxKiCadVersion); ercDRC.MaxKiCadVersion != "" && trimmed != ercDRC.MaxKiCadVersion {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".max_kicad_version", "maximum KiCad version must not contain leading or trailing whitespace"))
+	}
+	minVersion, minOK := parseKiCadVersion(ercDRC.MinKiCadVersion)
+	maxVersion, maxOK := parseKiCadVersion(ercDRC.MaxKiCadVersion)
+	if ercDRC.MinKiCadVersion != "" && !minOK {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".min_kicad_version", "minimum KiCad version must use numeric dotted form"))
+	}
+	if ercDRC.MaxKiCadVersion != "" && !maxOK {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".max_kicad_version", "maximum KiCad version must use numeric dotted form"))
+	}
+	if ercDRC.MinKiCadVersion != "" && ercDRC.MaxKiCadVersion != "" && minOK && maxOK && compareKiCadVersion(minVersion, maxVersion) > 0 {
+		issues = append(issues, issue(reports.CodeValidationFailed, reports.SeverityError, path+".max_kicad_version", "maximum KiCad version must be greater than or equal to minimum KiCad version"))
+	}
 	issues = append(issues, validateUniqueStrings(path+".allowed_codes", "duplicate allowed ERC/DRC code", ercDRC.AllowedCodes)...)
 	issues = append(issues, validateUniqueStrings(path+".expected_issues", "duplicate expected ERC/DRC issue", ercDRC.ExpectedIssues)...)
 	return issues
+}
+
+type kicadVersion struct {
+	parts         []int
+	prerelease    string
+	hasPrerelease bool
+}
+
+func parseKiCadVersion(value string) (kicadVersion, bool) {
+	if value == "" {
+		return kicadVersion{}, true
+	}
+	core, _, _ := strings.Cut(value, "+")
+	core, prerelease, hasPrerelease := strings.Cut(core, "-")
+	if core == "" {
+		return kicadVersion{}, false
+	}
+	parts := strings.Split(core, ".")
+	version := make([]int, len(parts))
+	for index, part := range parts {
+		if part == "" {
+			return kicadVersion{}, false
+		}
+		number, err := strconv.Atoi(part)
+		if err != nil || number < 0 {
+			return kicadVersion{}, false
+		}
+		version[index] = number
+	}
+	if hasPrerelease && prerelease == "" {
+		return kicadVersion{}, false
+	}
+	return kicadVersion{parts: version, prerelease: prerelease, hasPrerelease: hasPrerelease}, true
+}
+
+func compareKiCadVersion(left kicadVersion, right kicadVersion) int {
+	maxLen := max(len(left.parts), len(right.parts))
+	for index := 0; index < maxLen; index++ {
+		leftValue := 0
+		if index < len(left.parts) {
+			leftValue = left.parts[index]
+		}
+		rightValue := 0
+		if index < len(right.parts) {
+			rightValue = right.parts[index]
+		}
+		if leftValue > rightValue {
+			return 1
+		}
+		if leftValue < rightValue {
+			return -1
+		}
+	}
+	if left.hasPrerelease && !right.hasPrerelease {
+		return -1
+	}
+	if !left.hasPrerelease && right.hasPrerelease {
+		return 1
+	}
+	if left.hasPrerelease && right.hasPrerelease {
+		return strings.Compare(left.prerelease, right.prerelease)
+	}
+	return 0
 }
 
 func expectedNetNameSet(nets []ExpectedNet) map[string]struct{} {

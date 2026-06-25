@@ -242,6 +242,124 @@ func TestValidateManifestReportsERCDRCRequiresRequiredFlag(t *testing.T) {
 	}
 }
 
+func TestValidateManifestReportsInvalidERCDRCRunnerPolicy(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:   true,
+		RequireDRC: true,
+		Runner:     ERCDRCRunnerPolicy("best_effort"),
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "unsupported ERC/DRC runner policy best_effort") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsRequiredERCDRCOptionalRunnerConflict(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:   true,
+		RequireDRC: true,
+		Runner:     ERCDRCRunnerOptional,
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "required ERC/DRC evidence cannot use optional runner policy") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsRequiredERCDRCWithoutSelectedChecks(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{Runner: ERCDRCRunnerRequiredReal}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "required ERC/DRC evidence must select require_erc or require_drc") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsDuplicateERCDRCPolicyValues(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:       true,
+		RequireDRC:     true,
+		AllowedCodes:   []string{"DRC_A", "DRC_A"},
+		ExpectedIssues: []string{"ERC_A", "ERC_A"},
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "duplicate allowed ERC/DRC code") || !hasIssue(issues, "duplicate expected ERC/DRC issue") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestAcceptsFakeERCDRCRunnerPolicy(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:        true,
+		RequireERC:      true,
+		Runner:          ERCDRCRunnerFake,
+		MinKiCadVersion: "9.0.0",
+		MaxKiCadVersion: "10.99.0",
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsInvalidERCDRCVersionRange(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:        true,
+		RequireERC:      true,
+		MinKiCadVersion: "10.0.0",
+		MaxKiCadVersion: "9.99.0",
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "maximum KiCad version must be greater than or equal to minimum KiCad version") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsPrereleaseERCDRCVersionRange(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:        true,
+		RequireERC:      true,
+		MinKiCadVersion: "10.0.0",
+		MaxKiCadVersion: "10.0.0-rc1",
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "maximum KiCad version must be greater than or equal to minimum KiCad version") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsInvalidERCDRCVersionFormat(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:        true,
+		RequireDRC:      true,
+		MinKiCadVersion: "v10",
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "minimum KiCad version must use numeric dotted form") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateManifestReportsDelimiterOnlyERCDRCVersionFormat(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:        true,
+		RequireDRC:      true,
+		MaxKiCadVersion: "-",
+	}
+	issues := ValidateManifest(manifest, blocks.NewBuiltinRegistry())
+	if !hasIssue(issues, "maximum KiCad version must use numeric dotted form") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func TestValidateManifestReportsInvalidCaseID(t *testing.T) {
 	manifest := validManifest()
 	manifest.ID = "Bad ID"
