@@ -43,6 +43,8 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "routing skipped",
 			"local_route_mobility": localRouteMobility,
 		}}
+		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(fragments, placed, false, opts)
+		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
 	}
 	if placed.Stage.Status == StageStatusBlocked || reports.HasBlockingIssue(placed.Stage.Issues) {
@@ -50,10 +52,14 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "placement did not complete",
 			"local_route_mobility": localRouteMobility,
 		}}
+		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(fragments, placed, false, opts)
+		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
 	}
+	anchorBindings, anchorOperations, anchorIssues := anchorBindingDiagnostics(fragments, placed, true, opts)
 
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
+	issues = append(issues, anchorIssues...)
 	applyRoutingOptions(request, opts, &routingRequest)
 	result := routing.Result{Status: routing.StatusBlocked}
 	if !reports.HasBlockingIssue(issues) {
@@ -61,7 +67,8 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		issues = append(issues, result.Issues...)
 	}
 	routeOperations := transactionRouteOperations(result.Operations)
-	operations := append(localOperations, routeOperations...)
+	operations := append(localOperations, anchorOperations...)
+	operations = append(operations, routeOperations...)
 	stage := NewStageResult(StageRouting, issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
 	stage.Summary = map[string]any{
@@ -73,11 +80,57 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"repair_diagnostics":     len(routeDiagnostics),
 		"local_route_mobility":   localRouteMobility,
 	}
+	if len(anchorOperations) > 0 {
+		stage.Summary["anchor_binding_route_operations"] = len(anchorOperations)
+	}
+	addAnchorBindingSummaryToStage(&stage, anchorBindings)
 	if result.Quality != nil {
 		stage.Summary["quality_score"] = result.Quality.Score.Overall
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func anchorBindingDiagnostics(fragments PCBFragmentResult, placed PlacementStageResult, route bool, opts RoutingOptions) (AnchorBindingSummary, []transactions.Operation, []reports.Issue) {
+	if !fragmentsHaveEntryAnchors(fragments) {
+		return AnchorBindingSummary{}, nil, nil
+	}
+	endpoints, endpointIssues := DiscoverPhysicalEndpoints(placed)
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+	var operations []transactions.Operation
+	if route {
+		summary, operations = AddAnchorBindingRoutes(summary, AnchorBindingRouteOptions{WidthMM: opts.TraceWidthMM})
+	}
+	issues := append([]reports.Issue(nil), endpointIssues...)
+	issues = append(issues, AnchorBindingIssuesToReports("anchor_bindings", summary.Issues)...)
+	return summary, operations, issues
+}
+
+func reportAnchorDiagnostics(stage *StageResult, summary AnchorBindingSummary, issues []reports.Issue) {
+	if stage == nil {
+		return
+	}
+	stage.Issues = append(stage.Issues, issues...)
+	addAnchorBindingSummaryToStage(stage, summary)
+}
+
+func addAnchorBindingSummaryToStage(stage *StageResult, summary AnchorBindingSummary) {
+	if stage == nil || summary.Total == 0 && summary.IssueCount == 0 {
+		return
+	}
+	if stage.Summary == nil {
+		stage.Summary = map[string]any{}
+	}
+	stage.Summary["anchor_bindings"] = summary
+}
+
+func fragmentsHaveEntryAnchors(fragments PCBFragmentResult) bool {
+	for _, fragment := range fragments.Fragments {
+		if len(fragment.Realization.EntryAnchors) != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func applyRoutingOptions(request Request, opts RoutingOptions, routingRequest *routing.Request) {

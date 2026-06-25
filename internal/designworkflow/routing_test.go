@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"kicadai/internal/blocks"
@@ -35,6 +36,60 @@ func TestRoutePlacementUsesGeneratedPadSummariesForLocalRoutes(t *testing.T) {
 		t.Fatalf("local route mobility summary = %#v", result.Stage.Summary["local_route_mobility"])
 	}
 	assertIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
+}
+
+func TestRoutePlacementAddsAnchorBindingRoutes(t *testing.T) {
+	request := Request{Version: RequestVersion, Name: "anchor", Board: BoardSpec{WidthMM: 30, HeightMM: 20, Layers: 1}}
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 7, YMM: 10, Layer: "F.Cu"},
+	})
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Board: placement.BoardPlacementArea{WidthMM: 30, HeightMM: 20},
+			Rules: placement.DefaultRules(),
+			Components: []placement.Component{{
+				Ref:         "J1",
+				Role:        "connector",
+				FootprintID: "Test:Pad",
+				Pads:        []placement.PadSummary{{Name: "1", Net: "SIG", XMM: 0, YMM: 0, WidthMM: 1, HeightMM: 1}},
+			}},
+		},
+		Result: placement.Result{
+			Status: placement.StatusPlaced,
+			Placements: []placement.PlacementResult{{
+				Ref: "J1", FootprintID: "Test:Pad", Position: placement.Placement{XMM: 5, YMM: 10, Layer: "F.Cu"},
+			}},
+			Metrics: placement.Metrics{PlacedCount: 1},
+		},
+		Stage: NewStageResult(StagePlacement, nil),
+	}
+
+	result := RoutePlacement(context.Background(), request, fragments, placed, RoutingOptions{Mode: routing.ModeSingleLayer, TraceWidthMM: 0.3})
+
+	value, ok := result.Stage.Summary["anchor_bindings"]
+	if !ok {
+		t.Fatalf("anchor binding summary missing: %#v", result.Stage.Summary)
+	}
+	summary, ok := value.(AnchorBindingSummary)
+	if !ok || summary.Bound != 1 || summary.Routed != 1 {
+		t.Fatalf("anchor binding summary = %#v", value)
+	}
+	var found bool
+	for _, operation := range result.Operations {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var payload transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("route unmarshal = %v", err)
+		}
+		if payload.NetName == "SIG" && len(payload.Points) == 2 && payload.Points[0].XMM == 5 && payload.Points[1].XMM == 7 {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("operations = %#v, want anchor binding route", result.Operations)
+	}
 }
 
 func TestRoutePlacementRoutesSimpleSignalWithPads(t *testing.T) {
