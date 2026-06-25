@@ -603,9 +603,14 @@ KiCad-backed checks are skipped unless a manifest or flag requires them. Use
 `--kicad-cli`, `--require-erc`, `--require-drc`, `--keep-artifacts`, and
 `--artifact-dir` when external ERC/DRC evidence is required. Optional ERC/DRC
 expectations are visible as skipped when no output directory or KiCad CLI is
-available; required ERC/DRC fails verification with an explicit reason. Golden
-report snapshots live under `cmd/kicadai/testdata/golden/block_verification`
-and can be refreshed with:
+available; required ERC/DRC fails verification with an explicit reason. A
+skipped optional ERC/DRC stage means the block remains structurally verified by
+the built-in harness, but it is not KiCad-clean or fabrication-ready evidence.
+When checks run, generated project freshness records the project signature and
+a separate ERC/DRC check-context signature for the resolved `kicad-cli` path
+and version, measurement units, and allowlist contents. Golden report snapshots
+live under `cmd/kicadai/testdata/golden/block_verification` and can be
+refreshed with:
 
 ```sh
 go test ./cmd/kicadai -run TestRunBlockVerificationGoldens -update-block-verification-goldens
@@ -1356,9 +1361,22 @@ ERC/DRC parser and fake-runner tests:
 
 ```sh
 go test ./internal/kicadfiles/checks
+go test ./internal/blocks/verification
 ```
 
-Real ERC/DRC CLI smoke checks:
+Opt-in block ERC/DRC smoke tests with local KiCad:
+
+```sh
+KICADAI_RUN_KICAD_CLI=1 go test ./internal/blocks/verification -run TestOptionalKiCadBlockSmoke
+```
+
+The block smoke test is skipped by default and is intended for local proof, not
+as a required CI dependency. It currently exercises selected protection and
+oscillator block manifests and requires an explicit pass when enabled. Set
+`KICADAI_KICAD_CLI` to a full path only when `kicad-cli` is not discoverable on
+`PATH`.
+
+Direct real ERC/DRC CLI smoke checks:
 
 ```sh
 kicadai \

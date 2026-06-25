@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-24
+Date: 2026-06-25
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -245,16 +245,27 @@ Implemented foundation.
 - Block verification can require internal board validation and has explicit
   optional versus required KiCad ERC/DRC behavior with skipped/blocking stage
   summaries.
+- Representative protection and timing block manifests now declare optional
+  KiCad ERC/DRC proof intent. Deterministic fake-runner tests cover missing
+  CLI, required findings, allowed findings, artifact-producing pass cases, and
+  global `RequireERC`/`RequireDRC` strengthening.
+- ERC/DRC verification records stable report artifact descriptions, contextual
+  check failure messages, generated-project freshness sentinels, and separate
+  check-context signatures for resolved `kicad-cli`, version, units, and
+  allowlists.
+- A local opt-in block smoke test runs selected manifests through real
+  `kicad-cli` only when `KICADAI_RUN_KICAD_CLI=1` is set; normal `go test
+  ./...` remains KiCad-independent.
 - Block verification corpus covers every built-in block and has regression
-  guards that required routes, timing fixtures, and realization stages remain
-  defined.
+  guards ensuring that required routes, timing fixtures, and realization stages
+  remain defined.
 - `design create` block-planning output exposes block readiness, verification
   level, rule IDs, required routes, and known gaps for AI-facing explanation.
 
 ### Remaining Work
 
-- Add stable KiCad-backed ERC/DRC evidence to block verification manifests
-  where external KiCad CLI is available.
+- Expand real KiCad-backed ERC/DRC evidence from selected local smoke manifests
+  to a broader DRC-clean block corpus as generated PCB quality improves.
 - Extend anchor binding beyond connector/interface pads to board-edge points
   and imported mechanical constraints.
 - Replace remaining structural/generic active templates with concrete
