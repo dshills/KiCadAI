@@ -426,10 +426,15 @@ func (builder *planBuilder) connectPowerAndSignals() {
 	}
 	for _, target := range builder.powerTargets() {
 		supplySource, supplyPort := builder.supplySourceForTarget(target.id)
-		if supplySource != "" && target.id != "" && target.id != supplySource {
+		if supplySource != "" && target.id == supplySource {
+			continue
+		}
+		if supplySource != "" && target.id != "" {
 			builder.addConnection(supplySource+"."+supplyPort, target.id+"."+target.port, builder.supplyNetAlias(supplySource), "supply rail feeds "+target.id)
-		} else if target.id != "" {
+		} else if target.id != "" && builder.targetSupplyVoltage(target.id) != "" {
 			builder.addIssue("blocks."+target.id+".supply_voltage", "no compatible supply source found for "+target.id, "add a matching rail, regulator, or power input")
+		} else if target.id != "" {
+			builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "supply_voltage." + normalizeToken(target.id), Path: "blocks." + target.id, Message: "supply voltage for " + target.id + " is not explicit in the current block metadata"})
 		}
 	}
 	groundSource := firstNonEmpty(firstID(builder.usbPowerIDs), firstID(builder.regulatorIDs), firstID(builder.connectorIDs))

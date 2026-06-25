@@ -1,0 +1,34 @@
+{
+  "version": "0.1.0",
+  "name": "fabrication_sensor",
+  "summary": "Fabrication-candidate sensor breakout policy fixture.",
+  "kind": "sensor_node",
+  "acceptance": "fabrication-candidate",
+  "board": {
+    "width_mm": 50,
+    "height_mm": 35,
+    "layers": 2
+  },
+  "manufacturing": {
+    "fabrication_candidate": true,
+    "profile": "generic_assembly"
+  },
+  "power": {
+    "inputs": [
+      {"kind": "usb_c", "voltage": "5V", "current_ma": 500}
+    ],
+    "rails": [
+      {"name": "VCC", "voltage": "3.3V", "current_ma": 100}
+    ]
+  },
+  "interfaces": [
+    {"kind": "i2c", "voltage": "3.3V"}
+  ],
+  "functions": [
+    {"kind": "sensor", "family": "i2c_sensor"}
+  ],
+  "constraints": {
+    "route_width_mm": 0.25,
+    "clearance_mm": 0.2
+  }
+}

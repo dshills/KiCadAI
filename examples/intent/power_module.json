@@ -1,0 +1,28 @@
+{
+  "version": "0.1.0",
+  "name": "power_module",
+  "summary": "External 12 V input converted to 5 V and 3.3 V rails.",
+  "kind": "power_module",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 55,
+    "height_mm": 35,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "header", "voltage": "12V", "current_ma": 1000}
+    ],
+    "rails": [
+      {"name": "5V", "voltage": "5V", "current_ma": 500},
+      {"name": "3V3", "voltage": "3.3V", "current_ma": 250}
+    ]
+  },
+  "interfaces": [
+    {"kind": "power", "voltage": "5V"},
+    {"kind": "power", "voltage": "3.3V"}
+  ],
+  "protection": {
+    "reverse_polarity": "required"
+  }
+}

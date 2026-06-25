@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "name": "amplifier_module",
+  "summary": "Small op-amp gain stage with GPIO-style signal connector.",
+  "kind": "amplifier",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 50,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "usb_c", "voltage": "5V", "current_ma": 500}
+    ]
+  },
+  "interfaces": [
+    {"kind": "gpio", "voltage": "5V"}
+  ],
+  "functions": [
+    {"kind": "amplifier", "params": {"gain": 2, "single_supply": true}}
+  ]
+}

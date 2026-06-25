@@ -1,0 +1,25 @@
+{
+  "version": "0.1.0",
+  "name": "mcu_programmer",
+  "summary": "USB-powered MCU minimal system with clock and programming header planning gaps surfaced.",
+  "kind": "mcu_minimal",
+  "acceptance": "structural",
+  "board": {
+    "width_mm": 60,
+    "height_mm": 40,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "usb_c", "voltage": "5V", "current_ma": 500}
+    ]
+  },
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "5V"}},
+    {"kind": "clock", "family": "canned_oscillator", "params": {"supply_voltage": "5V"}},
+    {"kind": "reset_programming", "params": {"programming_interface": "isp"}}
+  ],
+  "protection": {
+    "reverse_polarity": "preferred"
+  }
+}
