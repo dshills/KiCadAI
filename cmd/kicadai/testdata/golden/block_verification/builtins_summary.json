@@ -29,6 +29,10 @@
           {
             "name": "pcb_assertions",
             "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
           }
         ]
       },
@@ -77,6 +81,10 @@
           {
             "name": "pcb_assertions",
             "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
           }
         ]
       },
@@ -105,6 +113,10 @@
           {
             "name": "pcb_assertions",
             "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
           }
         ]
       },
@@ -227,6 +239,10 @@
           {
             "name": "pcb_assertions",
             "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
           }
         ]
       },
@@ -255,6 +271,10 @@
           {
             "name": "pcb_assertions",
             "status": "pass"
+          },
+          {
+            "name": "erc_drc",
+            "status": "skipped"
           }
         ]
       },

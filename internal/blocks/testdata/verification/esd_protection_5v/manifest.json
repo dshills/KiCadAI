@@ -44,6 +44,9 @@
       ],
       "require_realization": true,
       "allow_unrouted": true
+    },
+    "erc_drc": {
+      "runner": "optional"
     }
   }
 }
