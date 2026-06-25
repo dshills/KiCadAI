@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"kicadai/internal/blocks"
@@ -134,7 +135,8 @@ func TestRunCaseERCDRCBlocksWhenRequiredAndKiCadMissing(t *testing.T) {
 		OutputDir: filepath.Join(t.TempDir(), "out"),
 		Overwrite: true,
 	})
-	if result.Status != StatusBlocked || !hasIssue(result.Issues, "kicad-cli") {
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || !hasIssue(result.Issues, "kicad-cli") || !hasIssuePath(result.Issues, ".erc_drc.kicad_cli") || !strings.Contains(stage.Summary, "KiCad CLI is required") {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -154,7 +156,8 @@ func TestRunCaseERCDRCBlocksWhenOutputDirMissingAndRequired(t *testing.T) {
 func TestRunCaseERCDRCMockedViolationBlocks(t *testing.T) {
 	manifest := validManifest()
 	manifest.Expected.Nets[0].Name = "status_led_series"
-	manifest.Expected.EvidenceLevel = EvidenceERCDRCVerified
+	manifest.Expected.ERCDRC.Required = true
+	manifest.Expected.ERCDRC.RequireDRC = true
 	result := RunCase(context.Background(), manifest, RunOptions{
 		Registry:  blocks.NewBuiltinRegistry(),
 		OutputDir: filepath.Join(t.TempDir(), "out"),
@@ -172,7 +175,8 @@ func TestRunCaseERCDRCMockedViolationBlocks(t *testing.T) {
 			}, nil
 		},
 	})
-	if result.Status != StatusBlocked || !hasIssue(result.Issues, "mocked unallowlisted violation") {
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || !hasIssue(result.Issues, "mocked unallowlisted violation") || !hasIssuePath(result.Issues, ".erc_drc.drc") || !strings.Contains(stage.Summary, "ran 1 KiCad ERC/DRC check(s)") {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -196,7 +200,7 @@ func TestRunCaseERCDRCMockedPass(t *testing.T) {
 		},
 	})
 	stage, ok := findStage(result.Stages, "erc_drc")
-	if result.Status != StatusPass || !ok || stage.Status != StatusPass || result.EvidenceLevel != EvidenceERCDRCVerified || len(result.Artifacts) == 0 || !strings.Contains(stage.Summary, "produced") {
+	if result.Status != StatusPass || !ok || stage.Status != StatusPass || result.EvidenceLevel != EvidenceERCDRCVerified || !hasArtifactKind(result.Artifacts, reports.ArtifactERCReport) || !hasArtifactKind(result.Artifacts, reports.ArtifactDRCReport) || !strings.Contains(stage.Summary, "ran 2 KiCad ERC/DRC check(s)") || !strings.Contains(stage.Summary, "produced") {
 		t.Fatalf("status=%s stage=%#v artifacts=%#v issues=%#v", result.Status, stage, result.Artifacts, result.Issues)
 	}
 }
@@ -227,8 +231,43 @@ func TestRunCaseERCDRCExpectedAllowedIssuePasses(t *testing.T) {
 			}, nil
 		},
 	})
-	if result.Status != StatusPass {
+	stage, ok := findStage(result.Stages, "erc_drc")
+	if result.Status != StatusPass || !ok || stage.Status != StatusPass || len(result.Issues) != 0 {
 		t.Fatalf("result = %#v", result)
+	}
+}
+
+func TestRunCaseERCDRCGlobalOptionsStrengthenManifest(t *testing.T) {
+	manifest := validManifest()
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.ERCDRC = ExpectedERCDRC{
+		Required:   true,
+		RequireERC: true,
+	}
+	var gotKindsMu sync.Mutex
+	var gotKinds []checks.CheckKind
+	result := RunCase(context.Background(), manifest, RunOptions{
+		Registry:   blocks.NewBuiltinRegistry(),
+		OutputDir:  filepath.Join(t.TempDir(), "out"),
+		Overwrite:  true,
+		KiCadCLI:   fakeExecutable(t, "kicad-cli"),
+		RequireDRC: true,
+		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
+			gotKindsMu.Lock()
+			gotKinds = append(gotKinds, kind)
+			gotKindsMu.Unlock()
+			return checks.CheckResult{Kind: kind}, nil
+		},
+	})
+	stage, ok := findStage(result.Stages, "erc_drc")
+	gotKindsMu.Lock()
+	gotERC := hasCheckKind(gotKinds, checks.CheckKindERC)
+	gotDRC := hasCheckKind(gotKinds, checks.CheckKindDRC)
+	gotKindCount := len(gotKinds)
+	gotKindsSnapshot := append([]checks.CheckKind(nil), gotKinds...)
+	gotKindsMu.Unlock()
+	if result.Status != StatusPass || !ok || stage.Status != StatusPass || gotKindCount != 2 || !gotERC || !gotDRC {
+		t.Fatalf("kinds=%#v result=%#v", gotKindsSnapshot, result)
 	}
 }
 
@@ -990,4 +1029,31 @@ func findStage(stages []StageResult, name string) (StageResult, bool) {
 		}
 	}
 	return StageResult{}, false
+}
+
+func hasIssuePath(issues []reports.Issue, fragment string) bool {
+	for _, issue := range issues {
+		if strings.Contains(issue.Path, fragment) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasArtifactKind(artifacts []reports.Artifact, kind reports.ArtifactKind) bool {
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCheckKind(kinds []checks.CheckKind, kind checks.CheckKind) bool {
+	for _, got := range kinds {
+		if got == kind {
+			return true
+		}
+	}
+	return false
 }
