@@ -8,6 +8,8 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/inspect"
+	"kicadai/internal/kicadfiles"
+	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/reports"
 )
 
@@ -75,6 +77,32 @@ func TestFabricationReadinessStageBlocksMissingPackageEvidence(t *testing.T) {
 	}
 }
 
+func TestFabricationReadinessStageSummarizesPhysicalRules(t *testing.T) {
+	root := t.TempDir()
+	if err := os.WriteFile(filepath.Join(root, "demo.kicad_pro"), []byte("{}\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	writeWorkflowTestPCB(t, filepath.Join(root, "demo.kicad_pcb"))
+	request := Request{Validation: ValidationSpec{Acceptance: AcceptanceFabricationCandidate}}
+	written := ProjectWriteResult{Inspection: inspect.ProjectSummary{Root: root}}
+
+	stage := FabricationReadinessStage(context.Background(), &request, &written)
+
+	physical, ok := stage.Summary["physical_rules"].(map[string]any)
+	if !ok {
+		t.Fatalf("physical_rules summary missing or wrong type: %#v", stage.Summary)
+	}
+	if physical["status"] == "" {
+		t.Fatalf("physical_rules status missing: %#v", physical)
+	}
+	if physical["report_path"] != "fabrication/physical-rules.json" {
+		t.Fatalf("physical_rules report_path = %#v", physical["report_path"])
+	}
+	if _, ok := physical["blocker_count"].(int); !ok {
+		t.Fatalf("physical_rules blocker_count missing: %#v", physical)
+	}
+}
+
 func TestWorkflowIssueAndArtifactCollectors(t *testing.T) {
 	result := WorkflowResult{Stages: []StageResult{{
 		Issues:    []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Message: "warn"}},
@@ -82,6 +110,39 @@ func TestWorkflowIssueAndArtifactCollectors(t *testing.T) {
 	}}}
 	if len(WorkflowIssues(result)) != 1 || len(WorkflowArtifacts(result)) != 1 {
 		t.Fatalf("collectors failed")
+	}
+}
+
+func writeWorkflowTestPCB(t *testing.T, path string) {
+	t.Helper()
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	board := pcbfiles.PCBFile{
+		Version:          kicadfiles.KiCadPCBFormatV20260206,
+		Generator:        "kicadai-test",
+		GeneratorVersion: "phase7",
+		General:          pcbfiles.DefaultGeneral(),
+		Paper:            kicadfiles.Paper{Name: "A4"},
+		Layers:           pcbfiles.DefaultTwoLayerStack(),
+		Setup:            pcbfiles.DefaultSetup(),
+		Drawings: []pcbfiles.Drawing{{
+			UUID:  kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+			Layer: kicadfiles.LayerEdge,
+			Rect: &pcbfiles.RectDrawing{
+				Start: kicadfiles.Point{X: kicadfiles.MM(0), Y: kicadfiles.MM(0)},
+				End:   kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(15)},
+				Width: kicadfiles.MM(0.1),
+			},
+		}},
+	}
+	if err := pcbfiles.Write(file, board); err != nil {
+		_ = file.Close()
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
 	}
 }
 

@@ -164,7 +164,28 @@ func FabricationReadinessStage(ctx context.Context, request *Request, written *P
 		"score":   result.Score,
 		"dry_run": result.DryRun,
 	}
+	if result.PhysicalRules != nil {
+		physicalSummary := map[string]any{
+			"status":        result.PhysicalRules.Status,
+			"blocker_count": result.PhysicalRules.Summary.BlockedCount,
+			"warning_count": result.PhysicalRules.Summary.WarningCount,
+			"profile":       result.PhysicalRules.Profile,
+		}
+		if reportPath := physicalRulesArtifactPath(result.Artifacts); reportPath != "" {
+			physicalSummary["report_path"] = reportPath
+		}
+		stage.Summary["physical_rules"] = physicalSummary
+	}
 	return stage
+}
+
+func physicalRulesArtifactPath(artifacts []fabrication.Artifact) string {
+	for _, artifact := range artifacts {
+		if artifact.Kind == fabrication.ArtifactPhysicalRules {
+			return artifact.Path
+		}
+	}
+	return ""
 }
 
 func repairStageShouldRun(opts repair.Options, groups []repair.StageIssues) bool {
