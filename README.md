@@ -9,7 +9,8 @@ three related capabilities:
   validation, ERC/DRC feedback, validation repair planning, round-trip validation, transactions,
   operation-correlated feedback, component intelligence, and pinmap readiness
   checks, plus placement congestion/fanout/advanced-rule scoring and bounded
-  placement-routing retry evidence, and fabrication readiness previews.
+  placement-routing retry evidence, fabrication readiness previews, and
+  deterministic intent planning.
 
 The practical near-term goal is to let agents build and review KiCad-native
 projects from structured intent while keeping the lower-level writer strict,
@@ -75,6 +76,11 @@ document discovery, and capability reporting. Live schematic/PCB mutation
 through the IPC API is still limited by the write commands exposed by the
 currently generated KiCad API surface, so actual design generation is done by
 writing KiCad files directly.
+
+The intent planner now provides the first higher-level AI orchestration layer.
+It accepts structured intent requests, derives requirements and constraints,
+maps supported goals to circuit blocks, emits assumptions and known gaps, and
+can hand the generated request to `design create` for project generation.
 
 ## Requirements
 
@@ -181,6 +187,9 @@ kicadai --json pinmap validate ./examples/01_led_indicator
 kicadai --json --request ./examples/placement/simple_request.json place request
 kicadai --json --request ./examples/routing/simple_request.json route request
 kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
+kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
+kicadai --json --request ./examples/intent/sensor_breakout.json intent explain
+kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
 kicadai --json --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 kicadai --json --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 # For integrations that already produce a generated repair bundle:
@@ -518,10 +527,78 @@ in `issues[]` and grouped under `data.feedback.repairs[]` so an agent can decide
 whether to revise the request, adjust placement/routing, or ask for external
 tooling.
 
+### Intent Planner
+
+The `intent` command family sits above `design create`. It is intended for AI
+callers that can produce structured intent but should not need to know the
+exact block IDs, validation defaults, or generated workflow request shape.
+
+```sh
+kicadai \
+  --json \
+  --request ./examples/intent/sensor_breakout.json \
+  --output ./out/intent_plan \
+  --overwrite \
+  intent plan
+
+kicadai \
+  --json \
+  --request ./examples/intent/sensor_breakout.json \
+  intent explain
+
+kicadai \
+  --json \
+  --request ./examples/intent/sensor_breakout.json \
+  --output ./out/intent_sensor \
+  --overwrite \
+  intent create
+```
+
+Commands:
+
+- `intent plan`: validates the intent request, derives requirements,
+  assumptions, known gaps, selected blocks, component policy, validation
+  policy, and a generated `design create` request.
+- `intent explain`: returns a compact AI-facing summary of requirements,
+  selected blocks, assumptions, gaps, and blocking issues to stdout.
+- `intent create`: plans intent, refuses ambiguous or blocking plans, runs
+  `design create`, and writes planner artifacts under the generated project's
+  `.kicadai/` directory.
+
+When `--output` is passed to `intent plan`, the planner writes
+standalone preview artifacts, `intent-plan.json` and
+`generated-request.json`, directly in that output directory so the plan can be
+inspected without creating project metadata. When
+`intent create` succeeds, it writes the generated KiCad project plus
+`.kicadai/intent-plan.json` and `.kicadai/generated-request.json` inside the
+project output directory. The `.kicadai/` paths are the persistent
+project-relative metadata locations once a KiCad project exists.
+
+`--output` is used for new generated content, including intent planning and
+project creation. `--target` is reserved for commands that inspect or repair an
+existing generated project; after `intent create` or `design create`, pass that
+generated project directory as `--target` to later target-oriented repair
+commands. Commands that write to an existing output directory require
+`--overwrite`.
+
+Examples live in `examples/intent/` and cover sensor breakout, MCU programmer,
+power module, amplifier module, and fabrication-oriented sensor requests.
+
+Current intent-planner gaps:
+
+- input is structured JSON, not free-form natural language;
+- MCU peripheral, clock, programming, and I2C support remain conservative known
+  gaps unless represented by verified block metadata;
+- some block supply-voltage metadata is still partial, so unsupported voltage
+  compatibility evidence is reported instead of guessed;
+- fabrication-focused intent maps to stricter validation/component/routing
+  policy, but external manufacturer acceptance remains a downstream
+  fabrication-readiness concern.
+
 Current gaps for autonomous one-shot schematic + PCB generation:
 
-- request planning is explicit block composition, not natural-language block
-  selection;
+- end-to-end autonomous design still depends on the planner's structured intent
+  request and verified block/component coverage;
 - placement is deterministic and conservative, not a full board-layout
   optimizer;
 - routing is suitable for small known-good nets and local fragment routes, not

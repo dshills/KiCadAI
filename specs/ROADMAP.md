@@ -135,7 +135,8 @@ loop confidence:
 - fabrication export now provides conservative readiness gates with BOM/CPL
   identity, consistency, and local manufacturer-profile evidence, but does not
   yet guarantee complete manufacturer acceptance;
-- natural-language intent planning is not yet a first-class pipeline.
+- structured intent planning now exists, but natural-language parsing and
+  broader semantic design synthesis are not yet first-class pipelines.
 
 ## Roadmap Principles
 
@@ -582,18 +583,42 @@ report path where available.
 Turn higher-level requests into validated KiCad projects with explainable
 decisions.
 
+### Status
+
+Implemented foundation.
+
 ### Current Foundation
 
 `design create` accepts structured requests and orchestrates block planning,
 component selection, schematic/PCB generation, placement, routing, validation,
 optional bounded placement-routing retry, and optional repair behavior.
 
+The `intent` command family now adds a structured planning layer above
+`design create`:
+
+- `intent plan` validates a structured intent request, derives requirements,
+  chooses supported circuit blocks, applies component/validation/routing policy
+  defaults, and emits `intent-plan.json` plus `generated-request.json` when an
+  output directory is provided.
+- `intent explain` returns a compact summary of requirements, selected blocks,
+  assumptions, known gaps, and blocking issues for AI callers.
+- `intent create` plans intent, refuses blocking or clarification-required
+  plans, runs `design create`, and persists planner artifacts under
+  `.kicadai/` in the generated project.
+
+Golden fixtures in `examples/intent/` cover sensor breakout, MCU programmer,
+power module, amplifier module, and fabrication-oriented sensor requests.
+Planning status is conservative: unsupported families, unsafe ambiguity, and
+missing proof become structured issues or known gaps instead of guessed design
+decisions.
+
 ### Remaining Work
 
-- Add an intent schema above block-level requests.
-- Parse user requirements into electrical, mechanical, manufacturing, and
-  validation constraints.
-- Select blocks and parts from verified catalogs.
+- Add a natural-language-to-intent adapter that produces the current structured
+  request schema with source attribution and confidence.
+- Expand semantic mapping for MCU peripheral roles, clock/programming support,
+  I2C buses, voltage-domain proof, and block supply requirements.
+- Select more blocks and parts from verified catalogs as coverage grows.
 - Calculate values and check ratings.
 - Produce a design rationale and known-limit report.
 - Connect bounded placement-routing retry, validation repair, and future
@@ -614,7 +639,8 @@ optional bounded placement-routing retry, and optional repair behavior.
    family.
 2. Add stackup, courtyard, solder mask/paste, silkscreen, and mounting-hole
    fabrication checks.
-3. Add intent-level planning only after the above gates are reliable.
+3. Expand structured intent planning into a semantic design synthesis loop with
+   richer MCU, interface, voltage-domain, and fabrication evidence.
 
 ## Definition Of Autonomous Ready
 
