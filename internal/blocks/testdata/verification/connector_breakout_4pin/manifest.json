@@ -12,6 +12,13 @@
   },
   "expected": {
     "evidence_level": "schematic_verified",
+    "kicad_corpus": {
+      "include": true,
+      "tier": "smoke",
+      "readiness": "candidate",
+      "expected_status": "skip",
+      "allowed_codes": ["OPTIONAL_KICAD_EVIDENCE"]
+    },
     "references": ["J1"],
     "components": [
       {

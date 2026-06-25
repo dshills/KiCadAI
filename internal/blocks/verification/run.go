@@ -136,7 +136,7 @@ func RunCase(ctx context.Context, manifest Manifest, opts RunOptions) RunResult 
 		EvidenceLevel: manifest.Expected.EvidenceLevel,
 		Status:        StatusPass,
 	}
-	if manifest.Expected.KiCadCorpus.Include {
+	if opts.KiCadCorpus.Enabled && manifest.Expected.KiCadCorpus.Include {
 		corpus := corpusCaseResult(manifest, KiCadCorpusResultSkip)
 		result.KiCadCorpus = &corpus
 	}
@@ -604,15 +604,15 @@ func ercDRCRequested(expected Expected, opts RunOptions) bool {
 		expected.ERCDRC.Required ||
 		expected.ERCDRC.RequireERC ||
 		expected.ERCDRC.RequireDRC ||
-		expected.KiCadCorpus.RequiresERC ||
-		expected.KiCadCorpus.RequiresDRC ||
+		(opts.KiCadCorpus.Enabled && expected.KiCadCorpus.RequiresERC) ||
+		(opts.KiCadCorpus.Enabled && expected.KiCadCorpus.RequiresDRC) ||
 		expected.ERCDRC.Runner != "" ||
 		expected.ERCDRC.MinKiCadVersion != "" ||
 		expected.ERCDRC.MaxKiCadVersion != "" ||
 		len(expected.ERCDRC.AllowedCodes) > 0 ||
 		len(expected.ERCDRC.ExpectedIssues) > 0 ||
-		len(expected.KiCadCorpus.AllowedCodes) > 0 ||
-		len(expected.KiCadCorpus.ExpectedIssues) > 0 ||
+		(opts.KiCadCorpus.Enabled && len(expected.KiCadCorpus.AllowedCodes) > 0) ||
+		(opts.KiCadCorpus.Enabled && len(expected.KiCadCorpus.ExpectedIssues) > 0) ||
 		expected.EvidenceLevel == EvidenceERCDRCVerified ||
 		expected.EvidenceLevel == EvidenceReferenceVerified
 }
@@ -677,7 +677,7 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 		allFindings = append(allFindings, checkResult.Allowed...)
 	}
 	if !runFailed {
-		issues = append(issues, missingExpectedCheckIssues(manifest, allFindings, expectedERCDRCIssues(manifest.Expected))...)
+		issues = append(issues, missingExpectedCheckIssues(manifest, allFindings, expectedERCDRCIssues(manifest.Expected, opts))...)
 	}
 
 	summary := fmt.Sprintf("ran %d KiCad ERC/DRC check(s) for %s and produced %d artifact(s)", len(kinds), projectDir, len(artifacts))
@@ -685,8 +685,8 @@ func runERCDRCStage(ctx context.Context, manifest Manifest, output *blocks.Block
 }
 
 func ercDRCRequirements(expected Expected, opts RunOptions) (bool, bool) {
-	requireERC := opts.RequireERC || expected.ERCDRC.RequireERC || expected.KiCadCorpus.RequiresERC
-	requireDRC := opts.RequireDRC || expected.ERCDRC.RequireDRC || expected.KiCadCorpus.RequiresDRC
+	requireERC := opts.RequireERC || expected.ERCDRC.RequireERC || (opts.KiCadCorpus.Enabled && expected.KiCadCorpus.RequiresERC)
+	requireDRC := opts.RequireDRC || expected.ERCDRC.RequireDRC || (opts.KiCadCorpus.Enabled && expected.KiCadCorpus.RequiresDRC)
 	if expected.EvidenceLevel == EvidenceERCDRCVerified || expected.EvidenceLevel == EvidenceReferenceVerified {
 		requireERC = true
 		requireDRC = true
@@ -781,15 +781,17 @@ func checkOptions(manifest Manifest, opts RunOptions) (checks.Options, []reports
 			Reason: "allowed by block verification manifest " + manifest.ID,
 		})
 	}
-	for _, code := range manifest.Expected.KiCadCorpus.AllowedCodes {
-		code = strings.TrimSpace(code)
-		if code == "" {
-			continue
+	if opts.KiCadCorpus.Enabled {
+		for _, code := range manifest.Expected.KiCadCorpus.AllowedCodes {
+			code = strings.TrimSpace(code)
+			if code == "" {
+				continue
+			}
+			checkOpts.Allowlist = append(checkOpts.Allowlist, checks.AllowlistEntry{
+				Code:   code,
+				Reason: "allowed by block KiCad corpus manifest " + manifest.ID,
+			})
 		}
-		checkOpts.Allowlist = append(checkOpts.Allowlist, checks.AllowlistEntry{
-			Code:   code,
-			Reason: "allowed by block KiCad corpus manifest " + manifest.ID,
-		})
 	}
 	if strings.TrimSpace(opts.AllowlistPath) == "" {
 		return checkOpts, nil
@@ -806,8 +808,8 @@ func checkOptions(manifest Manifest, opts RunOptions) (checks.Options, []reports
 	return checkOpts, nil
 }
 
-func expectedERCDRCIssues(expected Expected) []string {
-	if len(expected.KiCadCorpus.ExpectedIssues) == 0 {
+func expectedERCDRCIssues(expected Expected, opts RunOptions) []string {
+	if !opts.KiCadCorpus.Enabled || len(expected.KiCadCorpus.ExpectedIssues) == 0 {
 		return expected.ERCDRC.ExpectedIssues
 	}
 	if len(expected.ERCDRC.ExpectedIssues) == 0 {

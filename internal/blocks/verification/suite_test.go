@@ -52,6 +52,32 @@ func TestEveryBuiltinBlockHasManifest(t *testing.T) {
 	}
 }
 
+func TestBuiltInKiCadCorpusSmokeCases(t *testing.T) {
+	manifests, issues := LoadSuite(filepath.Join("..", "testdata", "verification"))
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	selected, summary := SelectKiCadCorpusManifests(manifests, KiCadCorpusOptions{
+		Enabled: true,
+		Tiers:   []KiCadCorpusTier{KiCadCorpusTierSmoke},
+	})
+	got := manifestIDs(selected)
+	want := []string{"connector_breakout_4pin", "led_indicator_default"}
+	slices.Sort(got)
+	slices.Sort(want)
+	if !slices.Equal(got, want) {
+		t.Fatalf("smoke corpus = %#v, want %#v summary=%#v", got, want, summary)
+	}
+	if summary.SelectedCount != 2 || summary.CountsByTier[KiCadCorpusTierSmoke] != 2 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	for _, manifest := range selected {
+		if manifest.Expected.KiCadCorpus.Readiness != KiCadCorpusReadinessCandidate {
+			t.Fatalf("%s readiness = %s", manifest.ID, manifest.Expected.KiCadCorpus.Readiness)
+		}
+	}
+}
+
 func TestBuiltInManifestsValidateAndRun(t *testing.T) {
 	registry := blocks.NewBuiltinRegistry()
 	manifests, issues := LoadSuite(filepath.Join("..", "testdata", "verification"))

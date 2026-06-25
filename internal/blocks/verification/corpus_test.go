@@ -81,12 +81,22 @@ func TestRunCaseUpdatesKiCadCorpusStatus(t *testing.T) {
 	manifest.Expected.EvidenceLevel = EvidenceSchematicVerified
 	manifest.Expected.Nets[0].Name = "status_led_series"
 	manifest.Expected.KiCadCorpus.RequiresDRC = false
-	result := RunCase(context.Background(), manifest, RunOptions{})
+	result := RunCase(context.Background(), manifest, RunOptions{KiCadCorpus: KiCadCorpusOptions{Enabled: true}})
 	if result.Status != StatusPass {
 		t.Fatalf("status = %s issues=%#v", result.Status, result.Issues)
 	}
 	if result.KiCadCorpus == nil || result.KiCadCorpus.Status != KiCadCorpusResultPass {
 		t.Fatalf("corpus = %#v", result.KiCadCorpus)
+	}
+}
+
+func TestRunCaseOmitsKiCadCorpusWhenDisabled(t *testing.T) {
+	manifest := corpusManifest("led_indicator_default", KiCadCorpusTierSmoke)
+	manifest.Expected.Nets[0].Name = "status_led_series"
+	manifest.Expected.KiCadCorpus.RequiresDRC = false
+	result := RunCase(context.Background(), manifest, RunOptions{})
+	if result.KiCadCorpus != nil {
+		t.Fatalf("corpus = %#v, want nil when corpus mode is disabled", result.KiCadCorpus)
 	}
 }
 

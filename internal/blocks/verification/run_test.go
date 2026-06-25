@@ -159,10 +159,11 @@ func TestRunCaseERCDRCMockedViolationBlocks(t *testing.T) {
 	manifest.Expected.ERCDRC.Required = true
 	manifest.Expected.ERCDRC.RequireDRC = true
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
-		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
+		KiCadCLI:    fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
 			return checks.CheckResult{
 				Kind: kind,
@@ -187,10 +188,11 @@ func TestRunCaseERCDRCMockedPass(t *testing.T) {
 	manifest.Expected.EvidenceLevel = EvidenceERCDRCVerified
 	reportDir := t.TempDir()
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
-		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
+		KiCadCLI:    fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
 			reportPath := filepath.Join(reportDir, string(kind)+".json")
 			if err := os.WriteFile(reportPath, []byte(`{"findings":[]}`), 0o644); err != nil {
@@ -283,10 +285,11 @@ func TestRunCaseKiCadCorpusRequiresDRCAndPasses(t *testing.T) {
 	}
 	var gotKinds []checks.CheckKind
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
-		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
+		KiCadCLI:    fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
 			gotKinds = append(gotKinds, kind)
 			return checks.CheckResult{Kind: kind}, nil
@@ -313,9 +316,10 @@ func TestRunCaseKiCadCorpusSkipsWhenOptionalKiCadUnavailable(t *testing.T) {
 		AllowedCodes:   []string{"OPTIONAL"},
 	}
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
 	})
 	stage, ok := findStage(result.Stages, "erc_drc")
 	if result.Status != StatusPass || !ok || stage.Status != StatusSkipped {
@@ -337,10 +341,11 @@ func TestRunCaseKiCadCorpusUnexpectedFindingBlocks(t *testing.T) {
 		RequiresDRC:    true,
 	}
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
-		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
+		KiCadCLI:    fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
 			return checks.CheckResult{
 				Kind: kind,
@@ -371,10 +376,11 @@ func TestRunCaseKiCadCorpusExpectedFailClassifies(t *testing.T) {
 		Notes:          "tracks known local route gap",
 	}
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
-		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
+		KiCadCLI:    fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
 			return checks.CheckResult{
 				Kind: kind,
@@ -405,10 +411,11 @@ func TestRunCaseKiCadCorpusExpectedFailDoesNotMaskUnexpectedFinding(t *testing.T
 		Notes:          "tracks known local route gap",
 	}
 	result := RunCase(context.Background(), manifest, RunOptions{
-		Registry:  blocks.NewBuiltinRegistry(),
-		OutputDir: filepath.Join(t.TempDir(), "out"),
-		Overwrite: true,
-		KiCadCLI:  fakeExecutable(t, "kicad-cli"),
+		Registry:    blocks.NewBuiltinRegistry(),
+		OutputDir:   filepath.Join(t.TempDir(), "out"),
+		Overwrite:   true,
+		KiCadCorpus: KiCadCorpusOptions{Enabled: true},
+		KiCadCLI:    fakeExecutable(t, "kicad-cli"),
 		CheckRunner: func(_ context.Context, kind checks.CheckKind, _ checks.KiCadCLI, _ string, _ checks.Options) (checks.CheckResult, error) {
 			return checks.CheckResult{
 				Kind: kind,
