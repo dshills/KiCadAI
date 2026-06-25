@@ -8,6 +8,7 @@ import (
 	"slices"
 	"strings"
 
+	"kicadai/internal/fabrication/physicalrules"
 	"kicadai/internal/reports"
 )
 
@@ -31,6 +32,7 @@ const (
 	ArtifactDrill           ArtifactKind = "drill"
 	ArtifactERC             ArtifactKind = "erc"
 	ArtifactDRC             ArtifactKind = "drc"
+	ArtifactPhysicalRules   ArtifactKind = "physical_rules"
 	ArtifactReadinessReport ArtifactKind = "readiness_report"
 )
 
@@ -106,6 +108,7 @@ type Summary struct {
 	BOMCPLConsistency   EvidenceStatus `json:"bom_cpl_consistency"`
 	ManufacturerProfile EvidenceStatus `json:"manufacturer_profile"`
 	AssemblyReadiness   EvidenceStatus `json:"assembly_readiness"`
+	PhysicalRules       EvidenceStatus `json:"physical_rules"`
 }
 
 type Options struct {
@@ -133,13 +136,14 @@ type Manifest struct {
 }
 
 type Result struct {
-	Status       ReadinessStatus `json:"status"`
-	Score        int             `json:"score"`
-	Summary      Summary         `json:"summary"`
-	Issues       []reports.Issue `json:"issues"`
-	Artifacts    []Artifact      `json:"artifacts"`
-	ManifestPath string          `json:"manifest_path,omitempty"`
-	DryRun       bool            `json:"dry_run"`
+	Status        ReadinessStatus       `json:"status"`
+	Score         int                   `json:"score"`
+	Summary       Summary               `json:"summary"`
+	Issues        []reports.Issue       `json:"issues"`
+	Artifacts     []Artifact            `json:"artifacts"`
+	PhysicalRules *physicalrules.Report `json:"physical_rules,omitempty"`
+	ManifestPath  string                `json:"manifest_path,omitempty"`
+	DryRun        bool                  `json:"dry_run"`
 }
 
 func CalculateStatus(issues []reports.Issue, evidence map[string]EvidenceStatus) ReadinessStatus {
@@ -288,7 +292,7 @@ func ValidateManifest(manifest Manifest) []reports.Issue {
 
 func validArtifactKind(kind ArtifactKind) bool {
 	switch kind {
-	case ArtifactBOM, ArtifactCPL, ArtifactManifest, ArtifactGerber, ArtifactDrill, ArtifactERC, ArtifactDRC, ArtifactReadinessReport:
+	case ArtifactBOM, ArtifactCPL, ArtifactManifest, ArtifactGerber, ArtifactDrill, ArtifactERC, ArtifactDRC, ArtifactPhysicalRules, ArtifactReadinessReport:
 		return true
 	default:
 		return false
@@ -399,7 +403,7 @@ func reportsArtifactKind(kind ArtifactKind) reports.ArtifactKind {
 		return reports.ArtifactERCReport
 	case ArtifactDRC:
 		return reports.ArtifactDRCReport
-	case ArtifactManifest, ArtifactReadinessReport:
+	case ArtifactManifest, ArtifactPhysicalRules, ArtifactReadinessReport:
 		return reports.ArtifactFabricationPackage
 	default:
 		return reports.ArtifactFabricationPackage

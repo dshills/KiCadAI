@@ -8,11 +8,12 @@ import (
 	"slices"
 	"strings"
 
+	"kicadai/internal/fabrication/physicalrules"
 	"kicadai/internal/reports"
 )
 
 func ExportPreview(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy})
+	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy, ManufacturerProfile: opts.ManufacturerProfile})
 	return exportReadiness(ctx, targetPath, opts, result, nil, nil, false)
 }
 
@@ -30,7 +31,7 @@ func MarshalResultJSON(result Result) ([]byte, error) {
 }
 
 func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy})
+	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy, ManufacturerProfile: opts.ManufacturerProfile})
 	reportData, err := BuildReports(ctx, targetPath)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "bom", Message: err.Error()})
@@ -47,7 +48,7 @@ func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
 }
 
 func ExportPackage(ctx context.Context, targetPath string, opts Options) Result {
-	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy})
+	result := Evaluate(ctx, targetPath, EvaluateOptions{KiCadCLI: opts.KiCadCLI, DryRun: !opts.Execute, CLIPolicy: opts.CLIPolicy, ManufacturerProfile: opts.ManufacturerProfile})
 	reportData, err := BuildReports(ctx, targetPath)
 	if err != nil {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "package", Message: err.Error()})
@@ -87,6 +88,14 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 		{Rel: "package-manifest.json", Kind: ArtifactManifest},
 	}
 	dataWrites := []exportWrite{}
+	if result.PhysicalRules != nil {
+		if reportJSON, err := physicalrules.MarshalReportJSON(*result.PhysicalRules); err == nil {
+			dataWrites = append(dataWrites, exportWrite{Rel: "physical-rules.json", Kind: ArtifactPhysicalRules, Data: reportJSON})
+		} else {
+			result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "physical-rules.json", Message: err.Error()})
+			result = finalizeExportResult(result)
+		}
+	}
 	if bomCSV != nil {
 		dataWrites = append(dataWrites, exportWrite{Rel: "bom.csv", Kind: ArtifactBOM, Data: bomCSV})
 	}
@@ -471,6 +480,7 @@ func summaryEvidence(summary Summary) map[string]EvidenceStatus {
 		"bom_cpl_consistency":  summary.BOMCPLConsistency,
 		"manufacturer_profile": summary.ManufacturerProfile,
 		"assembly_readiness":   summary.AssemblyReadiness,
+		"physical_rules":       summary.PhysicalRules,
 	}
 }
 

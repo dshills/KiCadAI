@@ -29,13 +29,39 @@ func TestExportPackageExecuteWritesArtifacts(t *testing.T) {
 	if result.DryRun {
 		t.Fatalf("DryRun = true, want false")
 	}
-	for _, rel := range []string{"readiness.json", "package-manifest.json", "bom.csv", "cpl.csv"} {
+	for _, rel := range []string{"readiness.json", "package-manifest.json", "physical-rules.json", "bom.csv", "cpl.csv"} {
 		if _, err := os.Stat(filepath.Join(root, "fabrication", rel)); err != nil {
 			t.Fatalf("%s not written: %v", rel, err)
 		}
 	}
 	if result.ManifestPath == "" {
 		t.Fatalf("ManifestPath is empty")
+	}
+}
+
+func TestExportPackageManifestsPhysicalRulesReport(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	result := ExportPackage(context.Background(), root, Options{Execute: true})
+	if result.PhysicalRules == nil {
+		t.Fatalf("PhysicalRules = nil, want report")
+	}
+	if status := artifactStatus(result.Artifacts, ArtifactPhysicalRules); status != ArtifactGenerated {
+		t.Fatalf("physical rules artifact status = %s, want generated", status)
+	}
+	data, err := os.ReadFile(filepath.Join(root, "fabrication", "package-manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var manifest Manifest
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		t.Fatal(err)
+	}
+	if manifest.Evidence["physical_rules"] == "" {
+		t.Fatalf("manifest evidence missing physical_rules: %#v", manifest.Evidence)
+	}
+	if artifact := manifestArtifact(manifest.Artifacts, ArtifactPhysicalRules); artifact.Path != "fabrication/physical-rules.json" {
+		t.Fatalf("physical rules manifest artifact = %#v, want physical-rules.json", artifact)
 	}
 }
 

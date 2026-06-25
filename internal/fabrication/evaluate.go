@@ -10,15 +10,19 @@ import (
 	"strings"
 
 	"kicadai/internal/boardvalidation"
+	"kicadai/internal/fabrication/physicalrules"
 	"kicadai/internal/inspect"
+	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	projectfiles "kicadai/internal/kicadfiles/project"
 	"kicadai/internal/reports"
 	"kicadai/internal/writercorrectness"
 )
 
 type EvaluateOptions struct {
-	KiCadCLI  string
-	DryRun    bool
-	CLIPolicy CLIPolicy
+	KiCadCLI            string
+	DryRun              bool
+	CLIPolicy           CLIPolicy
+	ManufacturerProfile string
 }
 
 func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Result {
@@ -75,6 +79,10 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 	evidence["drc"] = validation.DRC
 	resultSummary.DRC = validation.DRC
 	issues = append(issues, validation.Issues...)
+	physical := evaluatePhysicalRules(target, opts)
+	evidence["physical_rules"] = physicalStatusEvidence(physical.Status)
+	resultSummary.PhysicalRules = evidence["physical_rules"]
+	issues = append(issues, physical.Issues...)
 	addERCEvidence(summary, opts, evidence, &resultSummary, &issues)
 	addMissingExternalEvidence(opts, evidence, &resultSummary, &issues)
 
@@ -82,12 +90,13 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 	slices.SortFunc(issues, compareIssues)
 	status := CalculateStatus(issues, evidence)
 	return Result{
-		Status:    status,
-		Score:     Score(evidence),
-		Summary:   resultSummary,
-		Issues:    issues,
-		Artifacts: artifacts,
-		DryRun:    opts.DryRun,
+		Status:        status,
+		Score:         Score(evidence),
+		Summary:       resultSummary,
+		Issues:        issues,
+		Artifacts:     artifacts,
+		PhysicalRules: &physical,
+		DryRun:        opts.DryRun,
 	}
 }
 
@@ -95,6 +104,65 @@ type evaluationTarget struct {
 	Root        string
 	Name        string
 	ProjectPath string
+}
+
+func evaluatePhysicalRules(target evaluationTarget, opts EvaluateOptions) physicalrules.Report {
+	pcbPath, pcbIssue := discoverPlotPCBPath(target.Root, target.Name)
+	if pcbIssue != nil {
+		report := physicalrules.EvaluateBoard(nil, nil, physicalRuleOptions(opts))
+		report.Issues = append(report.Issues, *pcbIssue)
+		return physicalrules.Normalize(report)
+	}
+	board, err := pcbfiles.ReadFile(pcbPath)
+	if err != nil {
+		report := physicalrules.EvaluateBoard(nil, nil, physicalRuleOptions(opts))
+		report.Issues = append(report.Issues, reports.Issue{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     filepath.ToSlash(pcbPath),
+			Message:  err.Error(),
+		})
+		return physicalrules.Normalize(report)
+	}
+	var projectPtr *projectfiles.ProjectFile
+	var projectIssues []reports.Issue
+	if strings.TrimSpace(target.ProjectPath) != "" {
+		project, err := projectfiles.ReadFile(target.ProjectPath)
+		if err == nil {
+			projectPtr = &project
+		} else {
+			projectIssues = append(projectIssues, reports.Issue{
+				Code:       reports.CodeValidationFailed,
+				Severity:   reports.SeverityError,
+				Path:       filepath.ToSlash(target.ProjectPath),
+				Message:    err.Error(),
+				Suggestion: "repair the .kicad_pro file so net classes and fabrication constraints can be evaluated",
+			})
+		}
+	}
+	report := physicalrules.EvaluateBoard(&board, projectPtr, physicalRuleOptions(opts))
+	report.Board.Path = filepath.ToSlash(pcbPath)
+	report.Issues = append(report.Issues, projectIssues...)
+	return physicalrules.Normalize(report)
+}
+
+func physicalRuleOptions(opts EvaluateOptions) physicalrules.Options {
+	return physicalrules.Options{ProfileID: strings.TrimSpace(opts.ManufacturerProfile)}
+}
+
+func physicalStatusEvidence(status physicalrules.Status) EvidenceStatus {
+	switch status {
+	case physicalrules.StatusPass:
+		return EvidencePass
+	case physicalrules.StatusWarning:
+		return EvidenceWarning
+	case physicalrules.StatusBlocked:
+		return EvidenceFail
+	case physicalrules.StatusSkipped:
+		return EvidenceSkipped
+	default:
+		return EvidenceFail
+	}
 }
 
 func resolveEvaluationTarget(targetPath string) (evaluationTarget, error) {
@@ -522,6 +590,7 @@ func expectedFabricationArtifacts() []Artifact {
 	return []Artifact{
 		{Kind: ArtifactReadinessReport, Path: "fabrication/readiness.json", Status: ArtifactExpected, Required: true, Description: "fabrication readiness report"},
 		{Kind: ArtifactManifest, Path: "fabrication/package-manifest.json", Status: ArtifactExpected, Required: true, Description: "fabrication package manifest"},
+		{Kind: ArtifactPhysicalRules, Path: "fabrication/physical-rules.json", Status: ArtifactExpected, Required: true, Description: "physical fabrication rule report"},
 		{Kind: ArtifactBOM, Path: "fabrication/bom.csv", Status: ArtifactExpected, Required: true, Description: "bill of materials"},
 		{Kind: ArtifactCPL, Path: "fabrication/cpl.csv", Status: ArtifactExpected, Required: true, Description: "component placement list"},
 		{Kind: ArtifactGerber, Path: "fabrication/gerbers", Status: ArtifactExpected, Required: true, Description: "Gerber plot directory"},
