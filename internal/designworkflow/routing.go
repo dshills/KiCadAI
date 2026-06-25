@@ -26,6 +26,7 @@ type RoutingStageResult struct {
 }
 
 func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, opts RoutingOptions) RoutingStageResult {
+	normalized := NormalizeRequest(request)
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -38,12 +39,12 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	localOperations := localRouteOperations(fragments)
 	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
-	if opts.Skip || request.Validation.SkipRouting {
+	if opts.Skip || normalized.Validation.SkipRouting {
 		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
 			"reason":               "routing skipped",
 			"local_route_mobility": localRouteMobility,
 		}}
-		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(fragments, placed, false, opts)
+		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
 		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
 	}
@@ -52,15 +53,15 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "placement did not complete",
 			"local_route_mobility": localRouteMobility,
 		}}
-		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(fragments, placed, false, opts)
+		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
 		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
 	}
-	anchorBindings, anchorOperations, anchorIssues := anchorBindingDiagnostics(fragments, placed, true, opts)
+	anchorBindings, anchorOperations, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, true, opts)
 
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
 	issues = append(issues, anchorIssues...)
-	applyRoutingOptions(request, opts, &routingRequest)
+	applyRoutingOptions(normalized, opts, &routingRequest)
 	result := routing.Result{Status: routing.StatusBlocked}
 	if !reports.HasBlockingIssue(issues) {
 		result = routing.RouteRequestContext(ctx, routingRequest)
@@ -91,11 +92,14 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
 }
 
-func anchorBindingDiagnostics(fragments PCBFragmentResult, placed PlacementStageResult, route bool, opts RoutingOptions) (AnchorBindingSummary, []transactions.Operation, []reports.Issue) {
+func anchorBindingDiagnostics(request Request, fragments PCBFragmentResult, placed PlacementStageResult, route bool, opts RoutingOptions) (AnchorBindingSummary, []transactions.Operation, []reports.Issue) {
 	if !fragmentsHaveEntryAnchors(fragments) {
 		return AnchorBindingSummary{}, nil, nil
 	}
-	endpoints, endpointIssues := DiscoverPhysicalEndpoints(placed)
+	endpoints, endpointIssues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{
+		ExternalEndpoints: request.ExternalEndpoints,
+		Board:             request.Board,
+	})
 	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
 	var operations []transactions.Operation
 	if route {

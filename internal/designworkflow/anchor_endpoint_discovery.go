@@ -11,20 +11,31 @@ import (
 )
 
 const physicalEndpointSourcePlacementPad = "placement.pad_summary"
+const physicalEndpointSourceExternalRequest = "request.external_endpoints"
+
+type PhysicalEndpointDiscoveryOptions struct {
+	ExternalEndpoints []ExternalEndpointSpec
+	Board             BoardSpec
+}
 
 func DiscoverPhysicalEndpoints(placed PlacementStageResult) ([]PhysicalEndpoint, []reports.Issue) {
+	return DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{})
+}
+
+func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts PhysicalEndpointDiscoveryOptions) ([]PhysicalEndpoint, []reports.Issue) {
+	endpoints, issues := explicitPhysicalEndpoints(opts.ExternalEndpoints, opts.Board)
+	seenEndpointIDs := physicalEndpointIDSet(endpoints)
 	if placed.Stage.Status == StageStatusBlocked || reports.HasBlockingIssue(placed.Stage.Issues) {
-		return nil, []reports.Issue{{
+		issues = append(issues, reports.Issue{
 			Code:     reports.CodeValidationFailed,
 			Severity: reports.SeverityWarning,
 			Path:     "anchor_bindings.endpoints",
 			Message:  "physical endpoint discovery skipped because placement did not complete",
-		}}
+		})
+		return endpoints, issues
 	}
 	positions := placementPositions(placed)
 	netRoles := placementNetRoles(placed.Request.Nets)
-	endpoints := []PhysicalEndpoint{}
-	var issues []reports.Issue
 	for _, component := range placed.Request.Components {
 		ref := strings.TrimSpace(component.Ref)
 		if ref == "" {
@@ -68,11 +79,88 @@ func DiscoverPhysicalEndpoints(placed PlacementStageResult) ([]PhysicalEndpoint,
 				Source:     physicalEndpointSourcePlacementPad,
 				Confidence: endpointConfidence(netName, component.Role),
 			}
+			if endpoint.ID != "" {
+				if _, exists := seenEndpointIDs[endpoint.ID]; exists {
+					issues = append(issues, reports.Issue{
+						Code:     reports.CodeInvalidArgument,
+						Severity: reports.SeverityWarning,
+						Path:     "anchor_bindings.endpoints." + ref + "." + padName,
+						Message:  "physical endpoint skipped because ID " + endpoint.ID + " is already in use",
+						Refs:     []string{ref},
+					})
+					continue
+				}
+				seenEndpointIDs[endpoint.ID] = struct{}{}
+			}
 			endpoints = append(endpoints, endpoint)
 		}
 	}
 	sortPhysicalEndpoints(endpoints)
 	return endpoints, issues
+}
+
+func explicitPhysicalEndpoints(specs []ExternalEndpointSpec, board BoardSpec) ([]PhysicalEndpoint, []reports.Issue) {
+	if len(specs) == 0 {
+		return []PhysicalEndpoint{}, nil
+	}
+	seen := map[string]struct{}{}
+	endpoints := make([]PhysicalEndpoint, 0, len(specs))
+	var issues []reports.Issue
+	for _, spec := range normalizeExternalEndpoints(specs) {
+		endpoint := PhysicalEndpoint{
+			ID:         spec.ID,
+			Kind:       spec.Kind,
+			NetName:    spec.NetName,
+			Layers:     append([]string(nil), spec.Layers...),
+			Roles:      append([]string(nil), spec.Roles...),
+			Source:     firstNonEmpty(spec.Source, physicalEndpointSourceExternalRequest),
+			Confidence: spec.Confidence,
+		}
+		if spec.Point != nil {
+			point := boardRelativeEndpointPoint(*spec.Point, board)
+			endpoint.Point = &point
+		}
+		if endpoint.ID != "" {
+			if _, exists := seen[endpoint.ID]; exists {
+				issues = append(issues, reports.Issue{
+					Code:     reports.CodeInvalidArgument,
+					Severity: reports.SeverityWarning,
+					Path:     "anchor_bindings.endpoints.external_endpoints." + endpoint.ID,
+					Message:  "explicit physical endpoint skipped because ID " + endpoint.ID + " is already in use",
+				})
+				continue
+			}
+			seen[endpoint.ID] = struct{}{}
+		}
+		endpoints = append(endpoints, endpoint)
+	}
+	return endpoints, issues
+}
+
+func physicalEndpointIDSet(endpoints []PhysicalEndpoint) map[string]struct{} {
+	seen := make(map[string]struct{}, len(endpoints))
+	for _, endpoint := range endpoints {
+		if endpoint.ID != "" {
+			seen[endpoint.ID] = struct{}{}
+		}
+	}
+	return seen
+}
+
+func boardRelativeEndpointPoint(point transactions.Point, board BoardSpec) transactions.Point {
+	if point.XMM < 0 && point.XMM >= -anchorBindingGeometryEpsilonMM {
+		point.XMM = 0
+	}
+	if point.YMM < 0 && point.YMM >= -anchorBindingGeometryEpsilonMM {
+		point.YMM = 0
+	}
+	if board.WidthMM > 0 && point.XMM > board.WidthMM && point.XMM <= board.WidthMM+anchorBindingGeometryEpsilonMM {
+		point.XMM = board.WidthMM
+	}
+	if board.HeightMM > 0 && point.YMM > board.HeightMM && point.YMM <= board.HeightMM+anchorBindingGeometryEpsilonMM {
+		point.YMM = board.HeightMM
+	}
+	return point
 }
 
 func placementPositions(placed PlacementStageResult) map[string]placement.Placement {

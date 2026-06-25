@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"kicadai/internal/placement"
+	"kicadai/internal/transactions"
 )
 
 func TestDiscoverPhysicalEndpointsFromPlacedPads(t *testing.T) {
@@ -98,6 +99,141 @@ func TestDiscoverPhysicalEndpointsMirrorsBottomLayerPads(t *testing.T) {
 	}
 	if len(endpoints[0].Layers) != 1 || endpoints[0].Layers[0] != "B.Cu" {
 		t.Fatalf("bottom endpoint layers = %#v", endpoints[0].Layers)
+	}
+}
+
+func TestDiscoverPhysicalEndpointsIncludesExplicitExternalEndpoints(t *testing.T) {
+	placed := PlacementStageResult{
+		Request: placement.Request{},
+		Stage:   StageResult{Name: StagePlacement, Status: StageStatusOK},
+	}
+
+	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{
+		ExternalEndpoints: []ExternalEndpointSpec{
+			{
+				ID:         " Edge SIG ",
+				Kind:       PhysicalEndpointBoardEdgePoint,
+				NetName:    "SIG",
+				Roles:      []string{" external ", "signal"},
+				Layers:     []string{" f.cu "},
+				Point:      &transactions.Point{XMM: 0, YMM: 4},
+				Confidence: PhysicalEndpointConfidenceHigh,
+			},
+			{
+				ID:      "mech_vin",
+				Kind:    PhysicalEndpointImportedMechanicalPoint,
+				NetName: "VIN",
+				Roles:   []string{"power_entry"},
+				Point:   &transactions.Point{XMM: 2, YMM: 4},
+			},
+		},
+	})
+
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(endpoints) != 2 {
+		t.Fatalf("endpoints = %#v, want explicit endpoints", endpoints)
+	}
+	if endpoints[0].ID != "edge_sig" || endpoints[0].Kind != PhysicalEndpointBoardEdgePoint || endpoints[0].Source != physicalEndpointSourceExternalRequest {
+		t.Fatalf("board edge endpoint = %#v", endpoints[0])
+	}
+	if endpoints[0].Point == nil || endpoints[0].Point.XMM != 0 || endpoints[0].Point.YMM != 4 {
+		t.Fatalf("board edge point = %#v", endpoints[0].Point)
+	}
+	if len(endpoints[0].Layers) != 1 || endpoints[0].Layers[0] != "F.Cu" {
+		t.Fatalf("board edge layers = %#v", endpoints[0].Layers)
+	}
+	if endpoints[1].ID != "mech_vin" || endpoints[1].Kind != PhysicalEndpointImportedMechanicalPoint || endpoints[1].Confidence != PhysicalEndpointConfidenceMedium {
+		t.Fatalf("imported mechanical endpoint = %#v", endpoints[1])
+	}
+}
+
+func TestDiscoverPhysicalEndpointsKeepsOptionalExternalEndpointWithoutPoint(t *testing.T) {
+	placed := PlacementStageResult{
+		Request: placement.Request{},
+		Stage:   StageResult{Name: StagePlacement, Status: StageStatusOK},
+	}
+
+	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{
+		ExternalEndpoints: []ExternalEndpointSpec{{
+			ID:    "advisory",
+			Kind:  PhysicalEndpointImportedMechanicalPoint,
+			Roles: []string{"mechanical_interface"},
+		}},
+	})
+
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(endpoints) != 1 || endpoints[0].Point != nil {
+		t.Fatalf("optional endpoint without point was not preserved: %#v", endpoints)
+	}
+}
+
+func TestDiscoverPhysicalEndpointsKeepsExplicitEndpointsWhenPlacementBlocked(t *testing.T) {
+	placed := PlacementStageResult{
+		Stage: StageResult{Name: StagePlacement, Status: StageStatusBlocked},
+	}
+
+	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{
+		ExternalEndpoints: []ExternalEndpointSpec{{
+			ID:     "edge_sig",
+			Kind:   PhysicalEndpointBoardEdgePoint,
+			Point:  &transactions.Point{XMM: 0, YMM: 3},
+			Layers: []string{"F.Cu"},
+		}},
+	})
+
+	if len(endpoints) != 1 || endpoints[0].ID != "edge_sig" {
+		t.Fatalf("blocked placement explicit endpoints = %#v", endpoints)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("blocked placement issues = %#v", issues)
+	}
+}
+
+func TestDiscoverPhysicalEndpointsSnapsExplicitEndpointToBoardFrame(t *testing.T) {
+	placed := PlacementStageResult{
+		Request: placement.Request{},
+		Stage:   StageResult{Name: StagePlacement, Status: StageStatusOK},
+	}
+
+	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{
+		Board: BoardSpec{WidthMM: 10, HeightMM: 5},
+		ExternalEndpoints: []ExternalEndpointSpec{{
+			ID:    "edge_sig",
+			Kind:  PhysicalEndpointBoardEdgePoint,
+			Point: &transactions.Point{XMM: -0.0005, YMM: 5.0005},
+		}},
+	})
+
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(endpoints) != 1 || endpoints[0].Point == nil || endpoints[0].Point.XMM != 0 || endpoints[0].Point.YMM != 5 {
+		t.Fatalf("snapped endpoint = %#v", endpoints)
+	}
+}
+
+func TestDiscoverPhysicalEndpointsSkipsDuplicateExplicitEndpointIDs(t *testing.T) {
+	placed := PlacementStageResult{
+		Request: placement.Request{},
+		Stage:   StageResult{Name: StagePlacement, Status: StageStatusOK},
+	}
+
+	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{
+		ExternalEndpoints: []ExternalEndpointSpec{
+			{ID: "edge_sig", Kind: PhysicalEndpointBoardEdgePoint},
+			{ID: " edge sig ", Kind: PhysicalEndpointImportedMechanicalPoint},
+		},
+	})
+
+	if len(endpoints) != 1 || endpoints[0].ID != "edge_sig" {
+		t.Fatalf("deduped endpoints = %#v", endpoints)
+	}
+	if len(issues) != 1 {
+		t.Fatalf("duplicate explicit issues = %#v", issues)
 	}
 }
 
