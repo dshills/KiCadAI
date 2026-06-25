@@ -12,24 +12,27 @@ import (
 )
 
 type AnchorBindingOptions struct {
-	MaxProximityMM   float64
-	RequiredBlockIDs map[string]bool
+	MaxProximityMM           float64
+	RequiredBlockIDs         map[string]bool
+	ExternalEndpointBlockIDs map[string]bool
 }
 
 type collectedEntryAnchor struct {
-	BlockInstanceID string
-	BlockID         string
-	ID              string
-	Port            string
-	NetName         string
-	Point           transactions.Point
-	Layers          []string
-	Policy          AnchorBindingPolicy
+	BlockInstanceID          string
+	BlockID                  string
+	ID                       string
+	Port                     string
+	NetName                  string
+	Point                    transactions.Point
+	Layers                   []string
+	Policy                   AnchorBindingPolicy
+	ExternalEndpointRequired bool
 }
 
 const defaultAnchorBindingMaxProximityMM = 10
 
 var defaultRequiredAnchorBindingBlockIDs = map[string]bool{"esd_protection": true, "reverse_polarity_protection": true}
+var defaultExternalEndpointBlockIDs = map[string]bool{"esd_protection": true, "reverse_polarity_protection": true}
 
 func ResolveAnchorBindings(fragments PCBFragmentResult, endpoints []PhysicalEndpoint, opts AnchorBindingOptions) AnchorBindingSummary {
 	anchors := collectEntryAnchors(fragments, opts)
@@ -56,15 +59,17 @@ func collectEntryAnchors(fragments PCBFragmentResult, opts AnchorBindingOptions)
 		for _, anchor := range fragment.Realization.EntryAnchors {
 			point := transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM}
 			layers := []string{firstNonEmpty(anchor.Placement.Layer, "F.Cu")}
+			blockID := strings.TrimSpace(fragment.BlockID)
 			anchors = append(anchors, collectedEntryAnchor{
-				BlockInstanceID: fragment.InstanceID,
-				BlockID:         fragment.BlockID,
-				ID:              strings.TrimSpace(anchor.ID),
-				Port:            strings.TrimSpace(anchor.Port),
-				NetName:         strings.TrimSpace(anchor.NetName),
-				Point:           point,
-				Layers:          layers,
-				Policy:          defaultAnchorBindingPolicy(fragment, anchor, opts),
+				BlockInstanceID:          fragment.InstanceID,
+				BlockID:                  blockID,
+				ID:                       strings.TrimSpace(anchor.ID),
+				Port:                     strings.TrimSpace(anchor.Port),
+				NetName:                  strings.TrimSpace(anchor.NetName),
+				Point:                    point,
+				Layers:                   layers,
+				Policy:                   defaultAnchorBindingPolicy(fragment, anchor, opts),
+				ExternalEndpointRequired: externalEndpointRequiredForBlock(blockID, opts),
 			})
 		}
 	}
@@ -79,7 +84,7 @@ func collectEntryAnchors(fragments PCBFragmentResult, opts AnchorBindingOptions)
 
 func defaultAnchorBindingPolicy(fragment BlockFragment, anchor blocks.RealizedPCBEntryAnchor, opts AnchorBindingOptions) AnchorBindingPolicy {
 	blockID := strings.ToLower(strings.TrimSpace(fragment.BlockID))
-	if len(opts.RequiredBlockIDs) == 0 {
+	if opts.RequiredBlockIDs == nil {
 		return boolPolicy(defaultRequiredAnchorBindingBlockIDs[blockID])
 	}
 	return boolPolicy(opts.RequiredBlockIDs[blockID])
@@ -187,6 +192,7 @@ func (index physicalEndpointGrid) cellForPoint(point transactions.Point) gridCel
 
 func endpointCandidatesForAnchor(anchor collectedEntryAnchor, endpoints []PhysicalEndpoint, maxDistanceMM float64) []endpointCandidate {
 	candidates := []endpointCandidate{}
+	externalEndpointRequired := requiresExternalEndpoint(anchor)
 	for _, endpoint := range endpoints {
 		if endpoint.Point == nil {
 			continue
@@ -201,6 +207,9 @@ func endpointCandidatesForAnchor(anchor collectedEntryAnchor, endpoints []Physic
 		if !layersCompatible(anchor.Layers, endpoint.Layers) {
 			continue
 		}
+		if externalEndpointRequired && !endpointLooksExternal(endpoint) {
+			continue
+		}
 		candidates = append(candidates, endpointCandidate{endpoint: endpoint, distanceMM: distance})
 	}
 	sort.SliceStable(candidates, func(i, j int) bool {
@@ -210,6 +219,36 @@ func endpointCandidatesForAnchor(anchor collectedEntryAnchor, endpoints []Physic
 		return candidates[i].endpoint.ID < candidates[j].endpoint.ID
 	})
 	return candidates
+}
+
+func requiresExternalEndpoint(anchor collectedEntryAnchor) bool {
+	return anchor.ExternalEndpointRequired
+}
+
+func externalEndpointRequiredForBlock(blockID string, opts AnchorBindingOptions) bool {
+	blockID = strings.ToLower(strings.TrimSpace(blockID))
+	if opts.ExternalEndpointBlockIDs == nil {
+		return defaultExternalEndpointBlockIDs[blockID]
+	}
+	return opts.ExternalEndpointBlockIDs[blockID]
+}
+
+func endpointHasRole(endpoint PhysicalEndpoint, role string) bool {
+	role = strings.ToLower(strings.TrimSpace(role))
+	for _, candidate := range endpoint.Roles {
+		if strings.ToLower(candidate) == role {
+			return true
+		}
+	}
+	return false
+}
+
+func endpointLooksExternal(endpoint PhysicalEndpoint) bool {
+	if endpointHasRole(endpoint, "connector") {
+		return true
+	}
+	ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+	return strings.HasPrefix(ref, "J")
 }
 
 func missingEndpointIssue(anchor collectedEntryAnchor, endpoints []PhysicalEndpoint, maxDistanceMM float64) AnchorBindingIssue {

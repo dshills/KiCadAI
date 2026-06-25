@@ -13,7 +13,7 @@ func TestResolveAnchorBindingsBindsNearestMatchingEndpoint(t *testing.T) {
 		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 10, YMM: 10, Layer: "F.Cu"},
 	})
 	endpoints := []PhysicalEndpoint{
-		testPhysicalEndpoint("J1", "1", "SIG", 11, 10),
+		testConnectorEndpoint("J1", "1", "SIG", 11, 10),
 	}
 
 	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
@@ -46,7 +46,7 @@ func TestResolveAnchorBindingsReportsNetMismatch(t *testing.T) {
 	fragments := testAnchorFragments("reverse_polarity_protection", blocks.RealizedPCBEntryAnchor{
 		ID: "raw_input", Port: "VIN_RAW", NetName: "VIN", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
 	})
-	endpoints := []PhysicalEndpoint{testPhysicalEndpoint("J1", "1", "VCC", 0, 0)}
+	endpoints := []PhysicalEndpoint{testConnectorEndpoint("J1", "1", "VCC", 0, 0)}
 
 	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
 
@@ -62,7 +62,7 @@ func TestResolveAnchorBindingsIgnoresFarNetMismatch(t *testing.T) {
 	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
 		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
 	})
-	endpoints := []PhysicalEndpoint{testPhysicalEndpoint("J1", "1", "OTHER", 50, 0)}
+	endpoints := []PhysicalEndpoint{testConnectorEndpoint("J1", "1", "OTHER", 50, 0)}
 
 	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
 
@@ -76,8 +76,8 @@ func TestResolveAnchorBindingsReportsAmbiguousEndpoints(t *testing.T) {
 		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
 	})
 	endpoints := []PhysicalEndpoint{
-		testPhysicalEndpoint("J1", "1", "SIG", 1, 0),
-		testPhysicalEndpoint("J2", "1", "SIG", 1, 0),
+		testConnectorEndpoint("J1", "1", "SIG", 1, 0),
+		testConnectorEndpoint("J2", "1", "SIG", 1, 0),
 	}
 
 	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
@@ -95,8 +95,8 @@ func TestResolveAnchorBindingsSelectsEquivalentSameConnectorEndpoint(t *testing.
 		ID: "ground_return", Port: "GND", NetName: "GND", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
 	})
 	endpoints := []PhysicalEndpoint{
-		testPhysicalEndpoint("J1", "1", "GND", 3, 0),
-		testPhysicalEndpoint("J1", "2", "GND", 1, 0),
+		testConnectorEndpoint("J1", "1", "GND", 3, 0),
+		testConnectorEndpoint("J1", "2", "GND", 1, 0),
 	}
 
 	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
@@ -107,6 +107,33 @@ func TestResolveAnchorBindingsSelectsEquivalentSameConnectorEndpoint(t *testing.
 	binding := summary.Bindings[0]
 	if binding.EndpointPad != "2" || len(binding.EquivalentEndpointIDs) != 1 {
 		t.Fatalf("binding = %#v", binding)
+	}
+}
+
+func TestResolveProtectionAnchorDoesNotBindInternalComponentPad(t *testing.T) {
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "signal_entry", Port: "SIGNAL", NetName: "SIG", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
+	})
+	internal := testPhysicalEndpoint("D1", "1", "SIG", 0.5, 0)
+	internal.Roles = []string{"tvs"}
+
+	summary := ResolveAnchorBindings(fragments, []PhysicalEndpoint{internal}, AnchorBindingOptions{})
+
+	if summary.Bound != 0 || summary.Unbound != 1 || summary.Issues[0].Category != AnchorBindingIssueMissingEndpoint {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestResolveReversePolarityAnchorBindsConnectorPad(t *testing.T) {
+	fragments := testAnchorFragments("reverse_polarity_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "raw_input", Port: "VIN_RAW", NetName: "VIN_RAW", Placement: blocks.RelativePlacement{XMM: 2, YMM: 0, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{testConnectorEndpoint("J_PWR", "1", "VIN_RAW", 2.5, 0)}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 1 || summary.Bindings[0].EndpointRef != "J_PWR" || !summary.Bindings[0].Required {
+		t.Fatalf("summary = %#v", summary)
 	}
 }
 
@@ -143,6 +170,12 @@ func testPhysicalEndpoint(ref string, pad string, net string, x float64, y float
 		Source:     physicalEndpointSourcePlacementPad,
 		Confidence: PhysicalEndpointConfidenceHigh,
 	}
+}
+
+func testConnectorEndpoint(ref string, pad string, net string, x float64, y float64) PhysicalEndpoint {
+	endpoint := testPhysicalEndpoint(ref, pad, net, x, y)
+	endpoint.Roles = []string{"connector"}
+	return endpoint
 }
 
 func TestRequiredAnchorBindingIssueSeverityUsesRequiredFlag(t *testing.T) {
