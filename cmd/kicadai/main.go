@@ -2395,6 +2395,7 @@ func runDesign(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 type intentCreateResult struct {
 	Plan     intentplanner.PlanResult      `json:"plan"`
 	Workflow designworkflow.WorkflowResult `json:"workflow,omitempty"`
+	Draft    *intentDraftOutput            `json:"draft,omitempty"`
 }
 
 func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -2543,14 +2544,14 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		}
 		return errors.New(issue.Message)
 	}
-	plan, issues, err := loadIntentPlan(opts)
+	plan, issues, draft, sourceText, err := loadIntentPlanForCreate(opts)
 	if err != nil {
 		return err
 	}
 	if reports.HasBlockingIssue(issues) || reports.HasBlockingIssue(plan.Issues) || plan.GeneratedRequest == nil || plan.Status == intentplanner.PlanStatusBlocked || plan.Status == intentplanner.PlanStatusNeedsClarification {
 		allIssues := append([]reports.Issue(nil), issues...)
 		allIssues = append(allIssues, plan.Issues...)
-		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan}, allIssues, plan.Artifacts)
+		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Draft: draft}, allIssues, plan.Artifacts)
 		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
 			return writeErr
 		}
@@ -2567,13 +2568,16 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	workflow := designworkflow.Create(ctx, *plan.GeneratedRequest, createOpts)
 	artifactDir := filepath.Join(opts.output, ".kicadai")
 	plan, artifactIssues := intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: artifactDir, Overwrite: true})
+	if draft != nil {
+		artifactIssues = append(artifactIssues, writeIntentDraftArtifacts(artifactDir, sourceText, intentdraft.Result{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}, true)...)
+	}
 	allIssues := append([]reports.Issue(nil), issues...)
 	allIssues = append(allIssues, plan.Issues...)
 	allIssues = append(allIssues, artifactIssues...)
 	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
 	artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
-	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow}, allIssues, artifacts)
+	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow, Draft: draft}, allIssues, artifacts)
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}
@@ -2581,6 +2585,34 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		return errors.New("intent create reported issues")
 	}
 	return nil
+}
+
+func loadIntentPlanForCreate(opts cliOptions) (intentplanner.PlanResult, []reports.Issue, *intentDraftOutput, string, error) {
+	if strings.TrimSpace(opts.intentText) == "" && strings.TrimSpace(opts.intentFile) == "" {
+		plan, issues, err := loadIntentPlan(opts)
+		return plan, issues, nil, "", err
+	}
+	if strings.TrimSpace(opts.requestPath) != "" {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "use either --request or --text/--file for intent create, not both"}
+		return intentplanner.PlanResult{}, []reports.Issue{issue}, nil, "", nil
+	}
+	text, sourceType, sourceID, inputIssues := loadIntentDraftText(opts)
+	if len(inputIssues) > 0 {
+		return intentplanner.PlanResult{}, inputIssues, nil, "", nil
+	}
+	draft := intentdraft.Draft(text, intentdraft.Options{SourceType: sourceType, SourceID: sourceID, AcceptanceOverride: parseIntentAcceptance(opts.componentAcceptance), Strict: false})
+	draftOutput := &intentDraftOutput{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}
+	if intentdraft.BlockingClarifications(draft.Clarifications) {
+		issues := append([]reports.Issue(nil), draft.Issues...)
+		for _, clarification := range draft.Clarifications {
+			if clarification.Severity == "blocking" {
+				issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: clarification.Path, Message: clarification.Question, Suggestion: clarification.Suggestion})
+			}
+		}
+		return intentplanner.PlanResult{Status: intentplanner.PlanStatusNeedsClarification}, issues, draftOutput, text, nil
+	}
+	plan := intentplanner.Plan(draft.Request)
+	return plan, draft.Issues, draftOutput, text, nil
 }
 
 func loadIntentPlan(opts cliOptions) (intentplanner.PlanResult, []reports.Issue, error) {

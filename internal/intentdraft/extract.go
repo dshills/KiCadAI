@@ -105,6 +105,9 @@ func extractFunctions(source string, normalized string, request *intentplanner.R
 	}
 	if containsAny(normalized, "sensor", "temperature", "humidity", "pressure") {
 		function := intentplanner.FunctionIntent{Kind: "sensor", Family: "i2c_sensor", Interface: maybeI2C(normalized), Bus: maybeBus(normalized), Supply: firstRailAlias(request)}
+		if function.Interface == "i2c" && containsAny(normalized, "temperature") {
+			function.Params = map[string]any{"i2c_address": "0x48"}
+		}
 		request.Functions = append(request.Functions, function)
 		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, []string{"sensor", "temperature", "humidity", "pressure"}), confidenceRegexHigh, "keyword.function")
 	}

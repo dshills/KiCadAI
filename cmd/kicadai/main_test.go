@@ -273,6 +273,34 @@ func TestRunIntentCreateReportsBlockedPlan(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "project")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a 3.3V I2C temperature sensor breakout", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected downstream workflow validation to report issues for this draft")
+	}
+	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json"} {
+		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
+			t.Fatalf("missing artifact %s: %v", name, err)
+		}
+	}
+}
+
+func TestRunIntentCreateTextBlocksClarification(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "project")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "battery powered sensor", "--output", output, "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected clarification error")
+	}
+	if !strings.Contains(stdout.String(), "battery chemistry") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
 func TestRunIntentExplainReportsSemanticEvidence(t *testing.T) {
 	requestPath := filepath.Join("..", "..", "examples", "intent", "mcu_i2c_sensor.json")
 	var stdout bytes.Buffer
