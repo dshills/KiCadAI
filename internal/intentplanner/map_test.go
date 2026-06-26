@@ -222,6 +222,38 @@ func TestPlanBlocksTargetedGPIOAssignment(t *testing.T) {
 	}
 }
 
+func TestPlanRecordsValueCalculationResults(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "calculated_values",
+		Kind:    IntentAmplifier,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "indicator", Params: map[string]any{"supply_voltage": "5V", "led_forward_voltage": "2V", "led_current_ma": 10}},
+			{Kind: "amplifier", Params: map[string]any{"gain": 11}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "gpio", Voltage: "5V"}},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if got := synthesisCalculationResult(plan, "led_resistor", "resistance_ohms"); got != "300" {
+		t.Fatalf("LED resistor result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+	if got := synthesisCalculationResult(plan, "opamp_gain", "rf_over_rg"); got != "10.00" {
+		t.Fatalf("opamp gain result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+}
+
+func synthesisCalculationResult(plan PlanResult, kind string, key string) string {
+	for _, calculation := range plan.Synthesis.Calculations {
+		if calculation.Kind == kind {
+			return calculation.Result[key]
+		}
+	}
+	return ""
+}
+
 func TestPlanBlocksMultipleI2CBusesOnSingleMCU(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",

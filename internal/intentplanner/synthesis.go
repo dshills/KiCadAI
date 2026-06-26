@@ -299,6 +299,7 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Kind:        "led_resistor",
 				Path:        "blocks." + block.InstanceID,
 				Inputs:      paramsToStringMap(block.Params, "supply_voltage", "led_forward_voltage", "led_current_ma"),
+				Result:      ledResistorResult(block.Params),
 				Formula:     "(Vsupply - Vf) / Iled",
 				Assumptions: []string{"uses block defaults when request omits LED voltage or current"},
 				Confidence:  "policy",
@@ -309,6 +310,7 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Kind:        "i2c_pullup",
 				Path:        "blocks." + block.InstanceID,
 				Inputs:      paramsToStringMap(block.Params, "supply_voltage", "bus_speed_hz", "pullup_ohms"),
+				Result:      i2cPullupResult(block.Params),
 				Formula:     "default low-speed I2C pull-up policy",
 				Assumptions: []string{"exact pull-up value remains block/component policy unless explicitly requested"},
 				Confidence:  "policy",
@@ -319,6 +321,7 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Kind:       "regulator_headroom",
 				Path:       "blocks." + block.InstanceID,
 				Inputs:     paramsToStringMap(block.Params, "input_voltage", "output_voltage"),
+				Result:     regulatorHeadroomResult(block.Params),
 				Formula:    "Vin must exceed Vout plus regulator dropout",
 				Confidence: "policy",
 			})
@@ -328,6 +331,7 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Kind:        "crystal_load_cap",
 				Path:        "blocks." + block.InstanceID,
 				Inputs:      paramsToStringMap(block.Params, "frequency", "load_cap_pf", "stray_cap_pf"),
+				Result:      crystalLoadResult(block.Params),
 				Formula:     "Cload caps derived from crystal CL and estimated stray capacitance",
 				Assumptions: []string{"blocked from MCU wiring until external-clock topology is supported"},
 				Confidence:  "policy",
@@ -338,6 +342,7 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Kind:       "opamp_gain",
 				Path:       "blocks." + block.InstanceID,
 				Inputs:     paramsToStringMap(block.Params, "gain"),
+				Result:     opampGainResult(block.Params),
 				Formula:    "non-inverting gain = 1 + Rf/Rg",
 				Confidence: "policy",
 			})
@@ -396,6 +401,84 @@ func paramsToStringMap(params map[string]any, keys ...string) map[string]string 
 		return nil
 	}
 	return out
+}
+
+func ledResistorResult(params map[string]any) map[string]string {
+	supply, supplyOK := parseVoltage(paramValue(params, "supply_voltage"))
+	forward, forwardOK := parseVoltage(paramValue(params, "led_forward_voltage"))
+	currentMA, currentOK := parseFloatParam(params, "led_current_ma")
+	if !supplyOK || !forwardOK || !currentOK || currentMA <= 0 || supply <= forward {
+		return nil
+	}
+	ohms := (supply - forward) / (currentMA / 1000)
+	return map[string]string{"resistance_ohms": fmt.Sprintf("%.0f", ohms)}
+}
+
+func i2cPullupResult(params map[string]any) map[string]string {
+	if explicit := paramValue(params, "pullup_ohms"); explicit != "" {
+		return map[string]string{"pullup_ohms": explicit}
+	}
+	speed, speedOK := parseFloatParam(params, "bus_speed_hz")
+	if speedOK && speed > 100000 {
+		return map[string]string{"recommended_range_ohms": "2200-4700"}
+	}
+	return map[string]string{"recommended_range_ohms": "4700-10000"}
+}
+
+func regulatorHeadroomResult(params map[string]any) map[string]string {
+	input, inputOK := parseVoltage(paramValue(params, "input_voltage"))
+	output, outputOK := parseVoltage(paramValue(params, "output_voltage"))
+	if !inputOK || !outputOK {
+		return nil
+	}
+	return map[string]string{"headroom_v": fmt.Sprintf("%.2f", input-output)}
+}
+
+func crystalLoadResult(params map[string]any) map[string]string {
+	loadPF, loadOK := parseFloatParam(params, "load_cap_pf")
+	if !loadOK {
+		return nil
+	}
+	strayPF, strayOK := parseFloatParam(params, "stray_cap_pf")
+	if !strayOK {
+		strayPF = 2
+	}
+	capPF := (loadPF - strayPF) * 2
+	if capPF <= 0 {
+		return nil
+	}
+	return map[string]string{"capacitor_pf_each": fmt.Sprintf("%.1f", capPF)}
+}
+
+func opampGainResult(params map[string]any) map[string]string {
+	gain, ok := parseFloatParam(params, "gain")
+	if !ok || gain <= 1 {
+		return nil
+	}
+	return map[string]string{"rf_over_rg": fmt.Sprintf("%.2f", gain-1)}
+}
+
+func paramValue(params map[string]any, key string) string {
+	if params == nil {
+		return ""
+	}
+	value, ok := params[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func parseFloatParam(params map[string]any, key string) (float64, bool) {
+	value := paramValue(params, key)
+	if value == "" {
+		return 0, false
+	}
+	var parsed float64
+	if _, err := fmt.Sscanf(value, "%f", &parsed); err != nil {
+		return 0, false
+	}
+	return parsed, true
 }
 
 func (builder *planBuilder) recordAcceptancePolicyTrace() {
