@@ -3052,6 +3052,9 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 	if err != nil {
 		return designworkflow.CreateOptions{}, err
 	}
+	if !designworkflow.ComponentSourceDirAllowed(opts.sourceDir) {
+		return designworkflow.CreateOptions{}, fmt.Errorf("component source directory must be a project-relative path without parent traversal")
+	}
 	createOpts := designworkflow.CreateOptions{
 		OutputDir:   opts.output,
 		Overwrite:   opts.overwrite,
@@ -3059,6 +3062,7 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 		SkipRouting: opts.skipRouting,
 		Components: designworkflow.ComponentSelectionOptions{
 			CatalogDir: opts.catalogDir,
+			SourceDir:  opts.sourceDir,
 		},
 		Placement: designworkflow.PlacementOptions{
 			DefaultBounds: placement.Bounds{WidthMM: opts.placementEstWidth, HeightMM: opts.placementEstHeight, Source: placement.BoundsEstimated},

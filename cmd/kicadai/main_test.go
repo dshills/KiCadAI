@@ -1285,6 +1285,25 @@ func TestDesignCreateOptionsMapsPlacementFlags(t *testing.T) {
 	}
 }
 
+func TestDesignCreateOptionsMapsComponentSourceDir(t *testing.T) {
+	opts, err := designCreateOptions(cliOptions{
+		sourceDir: "component-sources",
+	}, checks.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if opts.Components.SourceDir != "component-sources" {
+		t.Fatalf("component source dir = %q", opts.Components.SourceDir)
+	}
+}
+
+func TestDesignCreateOptionsRejectsUnsafeComponentSourceDir(t *testing.T) {
+	_, err := designCreateOptions(cliOptions{sourceDir: "../component-sources"}, checks.Options{})
+	if err == nil {
+		t.Fatal("expected unsafe component source dir error")
+	}
+}
+
 func TestRunPlaceRequestJSON(t *testing.T) {
 	dir := t.TempDir()
 	request := filepath.Join(dir, "placement.json")

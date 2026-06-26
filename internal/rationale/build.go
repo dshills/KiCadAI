@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strings"
 
+	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentdraft"
 	"kicadai/internal/intentplanner"
@@ -475,6 +476,7 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 			Path:    string(stage.Name),
 			Summary: string(stage.Status),
 		})
+		report.Evidence = append(report.Evidence, procurementEvidenceFromStage(stage)...)
 		for index, issue := range stage.Issues {
 			report.Evidence = append(report.Evidence, EvidenceRecord{
 				ID:      fmt.Sprintf("stage_issue:%s:%03d", stage.Name, index+1),
@@ -498,6 +500,134 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 			Reason:   repair.Message,
 		})
 	}
+}
+
+func procurementEvidenceFromStage(stage designworkflow.StageResult) []EvidenceRecord {
+	if stage.Name != designworkflow.StageComponentSelection {
+		return nil
+	}
+	selected, ok := stage.Summary["selected_components"]
+	if !ok {
+		return nil
+	}
+	rows := selectedComponentSummaryRows(selected)
+	out := make([]EvidenceRecord, 0, len(rows))
+	for index, row := range rows {
+		procurement, ok := summaryMap(row["procurement"])
+		if !ok || procurement == nil || len(procurement) == 0 {
+			continue
+		}
+		componentID := summaryString(row["component_id"])
+		role := summaryString(row["role"])
+		lifecycle := summaryString(procurement["lifecycle_status"])
+		availability := summaryString(procurement["availability_status"])
+		sourceID := summaryString(procurement["source_id"])
+		summary := strings.Join(compactStrings([]string{
+			summaryKV("component", componentID),
+			summaryKV("lifecycle", lifecycle),
+			summaryKV("availability", availability),
+			summaryKV("source", sourceID),
+		}), " ")
+		out = append(out, EvidenceRecord{
+			ID:      fmt.Sprintf("component_procurement:%03d", index+1),
+			Kind:    "component_evidence",
+			Path:    strings.Join(compactStrings([]string{"component_selection", role, componentID}), "."),
+			Summary: summary,
+			Notes: compactStrings([]string{
+				summaryKV("manufacturer", procurement["manufacturer"]),
+				summaryKV("mpn", procurement["mpn"]),
+				summaryKV("lifecycle_source_date", procurement["lifecycle_source_date"]),
+				summaryKV("lifecycle_fresh", procurement["lifecycle_fresh"]),
+				summaryKV("availability_source_date", procurement["availability_source_date"]),
+				summaryKV("availability_fresh", procurement["availability_fresh"]),
+				summaryKV("outcome", procurement["outcome"]),
+			}),
+		})
+	}
+	return out
+}
+
+func selectedComponentSummaryRows(value any) []map[string]any {
+	switch typed := value.(type) {
+	case []map[string]any:
+		return typed
+	case []any:
+		rows := make([]map[string]any, 0, len(typed))
+		for _, item := range typed {
+			if row, ok := summaryMap(item); ok {
+				rows = append(rows, row)
+			}
+		}
+		return rows
+	default:
+		return nil
+	}
+}
+
+func summaryMap(value any) (map[string]any, bool) {
+	switch typed := value.(type) {
+	case map[string]any:
+		return typed, true
+	case map[string]string:
+		out := make(map[string]any, len(typed))
+		for key, item := range typed {
+			out[key] = item
+		}
+		return out, true
+	case components.ProcurementEvidence:
+		return procurementEvidenceMap(typed), true
+	case *components.ProcurementEvidence:
+		if typed == nil {
+			return nil, false
+		}
+		return procurementEvidenceMap(*typed), true
+	default:
+		return nil, false
+	}
+}
+
+func procurementEvidenceMap(evidence components.ProcurementEvidence) map[string]any {
+	return map[string]any{
+		"manufacturer":             evidence.Manufacturer,
+		"mpn":                      evidence.MPN,
+		"source_id":                evidence.SourceID,
+		"lifecycle_status":         evidence.LifecycleStatus,
+		"lifecycle_source_date":    evidence.LifecycleSourceDate,
+		"lifecycle_fresh":          boolPointerValue(evidence.LifecycleFresh),
+		"availability_status":      evidence.AvailabilityStatus,
+		"availability_source_date": evidence.AvailabilitySourceDate,
+		"availability_fresh":       boolPointerValue(evidence.AvailabilityFresh),
+		"outcome":                  evidence.Outcome,
+	}
+}
+
+func boolPointerValue(value *bool) any {
+	if value == nil {
+		return nil
+	}
+	return *value
+}
+
+func summaryString(value any) string {
+	if value == nil {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return strings.TrimSpace(typed)
+	case fmt.Stringer:
+		return strings.TrimSpace(typed.String())
+	default:
+		return strings.TrimSpace(fmt.Sprint(typed))
+	}
+}
+
+func summaryKV(key string, value any) string {
+	text := summaryString(value)
+	if text == "" {
+		return ""
+	}
+	return key + "=" + text
 }
 
 func LoadFromTarget(target string) TargetLoadResult {

@@ -50,6 +50,13 @@ func TestValidateRequestRejectsUnknownAcceptance(t *testing.T) {
 	assertIssuePath(t, issues, "validation.acceptance")
 }
 
+func TestValidateRequestRejectsUnsafeComponentSourceDir(t *testing.T) {
+	request := validRequest()
+	request.Components.SourceDir = "../component-sources"
+	issues := ValidateRequest(request)
+	assertIssuePath(t, issues, "component_policy.source_dir")
+}
+
 func TestValidateRequestRejectsInvalidEndpoint(t *testing.T) {
 	request := validRequest()
 	request.Connections[0].From = "sensor"

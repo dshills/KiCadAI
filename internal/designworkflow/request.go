@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -65,8 +66,10 @@ type LibrarySpec struct {
 
 type ComponentPolicySpec struct {
 	CatalogDir         string                           `json:"catalog_dir,omitempty"`
+	SourceDir          string                           `json:"source_dir,omitempty"`
 	MinimumConfidence  components.ConfidenceLevel       `json:"minimum_confidence,omitempty"`
 	Acceptance         components.AcceptanceLevel       `json:"acceptance,omitempty"`
+	Procurement        components.ProcurementPolicy     `json:"procurement_policy,omitempty"`
 	Overrides          map[string]ComponentOverrideSpec `json:"overrides,omitempty"`
 	PackagePreferences map[string]string                `json:"package_preferences,omitempty"`
 }
@@ -360,6 +363,9 @@ func ValidateRequest(request Request) []reports.Issue {
 	if componentIssue, ok := components.ValidateAcceptanceIssue("component_policy.acceptance", request.Components.Acceptance); ok {
 		issues = append(issues, componentIssue)
 	}
+	if invalidComponentPolicySourceDir(request.Components.SourceDir) {
+		issues = append(issues, issue("component_policy.source_dir", "component source directory must be a project-relative path without parent traversal"))
+	}
 	for key, override := range request.Components.Overrides {
 		path := "component_policy.overrides." + key
 		if strings.TrimSpace(key) == "" {
@@ -651,9 +657,40 @@ func cloneParams(params map[string]any) map[string]any {
 
 func normalizeComponentPolicy(policy ComponentPolicySpec) ComponentPolicySpec {
 	policy.CatalogDir = strings.TrimSpace(policy.CatalogDir)
+	policy.SourceDir = strings.TrimSpace(policy.SourceDir)
 	policy.Overrides = cloneComponentOverrides(policy.Overrides)
 	policy.PackagePreferences = cloneStringMap(policy.PackagePreferences)
 	return policy
+}
+
+func invalidComponentPolicySourceDir(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+	normalized := strings.ReplaceAll(value, "\\", "/")
+	if filepath.IsAbs(value) || strings.HasPrefix(normalized, "/") || windowsAbsolutePath(normalized) {
+		return true
+	}
+	for _, part := range strings.Split(normalized, "/") {
+		if part == ".." {
+			return true
+		}
+	}
+	clean := filepath.Clean(value)
+	return clean == ".." || strings.HasPrefix(clean, ".."+string(filepath.Separator))
+}
+
+func ComponentSourceDirAllowed(value string) bool {
+	return !invalidComponentPolicySourceDir(value)
+}
+
+func windowsAbsolutePath(value string) bool {
+	if len(value) < 2 || value[1] != ':' {
+		return false
+	}
+	drive := value[0]
+	return (drive >= 'A' && drive <= 'Z') || (drive >= 'a' && drive <= 'z')
 }
 
 func cloneComponentOverrides(overrides map[string]ComponentOverrideSpec) map[string]ComponentOverrideSpec {

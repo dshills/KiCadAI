@@ -175,7 +175,7 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": candidates}, findResult.Issues, nil)
 	}
 	var issues []reports.Issue
-	filtered := make([]Candidate, 0, len(candidates))
+	filtered := make([]acceptedCandidate, 0, len(candidates))
 	rejected := make([]CandidateRejection, 0, len(candidates))
 	for _, candidate := range candidates {
 		record, _, ok := findRecordVariant(catalog, candidate.ComponentID, candidate.VariantID)
@@ -183,32 +183,70 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 			continue
 		}
 		candidateIssues := selectionCandidateIssues(record, candidate, request)
-		if len(candidateIssues) > 0 {
+		if reports.HasBlockingIssue(candidateIssues) {
 			rejected = append(rejected, CandidateRejection{Candidate: candidate, Issues: candidateIssues})
 			continue
 		}
-		filtered = append(filtered, candidate)
+		filtered = append(filtered, acceptedCandidate{Candidate: candidate, Warnings: candidateIssues})
 	}
-	sortCandidates(filtered)
+	sortAcceptedCandidates(filtered)
 	if len(filtered) == 0 {
 		issues = append(issues, dedupeRejectedIssues(rejected)...)
 		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": candidates}, issues, nil)
 	}
-	if len(filtered) > 1 && !request.AllowAlternatives && filtered[0].Score == filtered[1].Score && filtered[0].Confidence == filtered[1].Confidence {
+	if len(filtered) > 1 && !request.AllowAlternatives && filtered[0].Candidate.Score == filtered[1].Candidate.Score && filtered[0].Candidate.Confidence == filtered[1].Candidate.Confidence {
 		issues = append(issues, NewIssue(CodeComponentAmbiguous, reports.SeverityBlocked, "component.select", "multiple components matched with equal score and confidence"))
-		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": filtered[:2]}, issues, nil)
+		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": firstCandidates(filtered, 2)}, issues, nil)
 	}
-	record, variant, _ := findRecordVariant(catalog, filtered[0].ComponentID, filtered[0].VariantID)
-	selection := Selection{Candidate: filtered[0], Component: record, Variant: variant, Rejected: rejected}
+	selected := filtered[0]
+	record, variant, _ := findRecordVariant(catalog, selected.Candidate.ComponentID, selected.Candidate.VariantID)
+	selection := Selection{Candidate: selected.Candidate, Component: record, Variant: variant, Rejected: rejected}
 	procurement, procurementWarnings := evaluateProcurement(record, request, false)
 	if procurement != nil {
 		selection.Procurement = procurement
 	}
+	selection.Warnings = append(selection.Warnings, selected.Warnings...)
 	selection.Warnings = append(selection.Warnings, procurementWarnings...)
-	if filtered[0].Confidence == ConfidencePlaceholder {
-		selection.Warnings = append(selection.Warnings, NewIssue(CodeComponentUnsafe, reports.SeverityWarning, "component."+filtered[0].ComponentID, "placeholder component selected for draft output"))
+	if selected.Candidate.Confidence == ConfidencePlaceholder {
+		selection.Warnings = append(selection.Warnings, NewIssue(CodeComponentUnsafe, reports.SeverityWarning, "component."+selected.Candidate.ComponentID, "placeholder component selected for draft output"))
 	}
 	return selection, reports.ResultWithIssues("component select", selection, append(issues, selection.Warnings...), nil)
+}
+
+type acceptedCandidate struct {
+	Candidate Candidate
+	Warnings  []reports.Issue
+}
+
+func sortAcceptedCandidates(candidates []acceptedCandidate) {
+	sort.Slice(candidates, func(i, j int) bool {
+		left := candidates[i].Candidate
+		right := candidates[j].Candidate
+		if left.Score != right.Score {
+			return left.Score > right.Score
+		}
+		if left.Confidence != right.Confidence {
+			return confidenceRank(left.Confidence) > confidenceRank(right.Confidence)
+		}
+		if left.ComponentID != right.ComponentID {
+			return left.ComponentID < right.ComponentID
+		}
+		return left.VariantID < right.VariantID
+	})
+}
+
+func firstCandidates(candidates []acceptedCandidate, limit int) []Candidate {
+	if limit < 0 {
+		limit = 0
+	}
+	if len(candidates) < limit {
+		limit = len(candidates)
+	}
+	out := make([]Candidate, 0, limit)
+	for _, candidate := range candidates[:limit] {
+		out = append(out, candidate.Candidate)
+	}
+	return out
 }
 
 func dedupeRejectedIssues(rejected []CandidateRejection) []reports.Issue {

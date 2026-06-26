@@ -297,3 +297,132 @@ func TestCreateComponentSelectionSummaryCarriesMetadata(t *testing.T) {
 		t.Fatalf("selected component evidence missing rejected count: %#v", selected[0])
 	}
 }
+
+func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "sourced_regulator",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "rail",
+			BlockID: "voltage_regulator",
+			Params: map[string]any{
+				"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+				"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+				"enable_mode":         "tied_input",
+			},
+		}},
+		Validation: ValidationSpec{Acceptance: AcceptanceConnectivity, SkipRouting: true},
+	}
+	result := Create(context.Background(), request, CreateOptions{
+		OutputDir: filepath.Join(t.TempDir(), "sourced_regulator"),
+		Components: ComponentSelectionOptions{
+			SourceDir: componentSourceFixtureDir(t, "valid"),
+		},
+	})
+	stage, ok := stageByName(result, StageComponentSelection)
+	if !ok {
+		t.Fatalf("component selection stage missing: %#v", result.Stages)
+	}
+	if stage.Status == StageStatusBlocked {
+		t.Fatalf("component selection blocked: %#v", stage)
+	}
+	procurement, ok := stage.Summary["procurement"].(map[string]any)
+	if !ok {
+		t.Fatalf("procurement summary missing: %#v", stage.Summary)
+	}
+	if procurement["lifecycle_evidence_count"] != 1 {
+		t.Fatalf("procurement summary = %#v, want one lifecycle evidence row", procurement)
+	}
+	selected, ok := stage.Summary["selected_components"].([]map[string]any)
+	if !ok {
+		t.Fatalf("selected components type = %T", stage.Summary["selected_components"])
+	}
+	found := false
+	for _, item := range selected {
+		if item["component_id"] != "regulator.linear.ap2112k_3v3.sot23_5" {
+			continue
+		}
+		procurement, ok := item["procurement"].(*components.ProcurementEvidence)
+		if !ok {
+			t.Fatalf("selected AP2112 procurement evidence missing: %#v", item)
+		}
+		if procurement.LifecycleStatus != components.LifecycleActive || procurement.AvailabilityStatus != components.AvailabilityNotChecked {
+			t.Fatalf("procurement = %#v", procurement)
+		}
+		found = true
+	}
+	if !found {
+		t.Fatalf("AP2112 selection missing from %#v", selected)
+	}
+}
+
+func TestCreateComponentSelectionStaleLifecycleWarnsForConnectivity(t *testing.T) {
+	request := sourcedAP2112WorkflowRequest(t, AcceptanceConnectivity, "stale")
+	result := Create(context.Background(), request, CreateOptions{
+		OutputDir: filepath.Join(t.TempDir(), "stale_connectivity"),
+		Components: ComponentSelectionOptions{
+			SourceDir: componentSourceFixtureDir(t, "stale"),
+		},
+	})
+	stage, ok := stageByName(result, StageComponentSelection)
+	if !ok {
+		t.Fatalf("component selection stage missing: %#v", result.Stages)
+	}
+	if stage.Status == StageStatusBlocked {
+		t.Fatalf("connectivity stale lifecycle should warn, not block: %#v", stage)
+	}
+	if !hasIssueCode(stage.Issues, components.CodeComponentLifecycleStale) {
+		t.Fatalf("expected stale lifecycle warning in %#v", stage.Issues)
+	}
+}
+
+func TestCreateComponentSelectionStaleLifecycleBlocksFabricationCandidate(t *testing.T) {
+	request := sourcedAP2112WorkflowRequest(t, AcceptanceFabricationCandidate, "stale")
+	result := Create(context.Background(), request, CreateOptions{
+		OutputDir: filepath.Join(t.TempDir(), "stale_fab"),
+		Components: ComponentSelectionOptions{
+			SourceDir: componentSourceFixtureDir(t, "stale"),
+		},
+	})
+	stage, ok := stageByName(result, StageComponentSelection)
+	if !ok {
+		t.Fatalf("component selection stage missing: %#v", result.Stages)
+	}
+	if stage.Status != StageStatusBlocked {
+		t.Fatalf("fabrication stale lifecycle stage = %#v, want blocked", stage)
+	}
+	if !hasIssueCode(stage.Issues, components.CodeComponentLifecycleStale) {
+		t.Fatalf("expected stale lifecycle blocker in %#v", stage.Issues)
+	}
+}
+
+func sourcedAP2112WorkflowRequest(t *testing.T, acceptance AcceptanceLevel, sourceFixture string) Request {
+	t.Helper()
+	_ = sourceFixture
+	return Request{
+		Version: RequestVersion,
+		Name:    "sourced_ap2112",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "rail",
+			BlockID: "voltage_regulator",
+			Params: map[string]any{
+				"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+				"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+				"enable_mode":         "tied_input",
+			},
+		}},
+		Validation: ValidationSpec{Acceptance: acceptance, SkipRouting: true},
+	}
+}
+
+func componentSourceFixtureDir(t *testing.T, name string) string {
+	t.Helper()
+	dir := filepath.Join("..", "components", "testdata", "sources", name)
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		t.Fatalf("component source fixture not found: %s", dir)
+	}
+	return dir
+}

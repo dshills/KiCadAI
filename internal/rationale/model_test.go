@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentdraft"
 	"kicadai/internal/intentplanner"
@@ -95,6 +96,44 @@ func TestBuildWithWorkflowSummary(t *testing.T) {
 	}
 	if len(report.NextActions) == 0 {
 		t.Fatalf("expected next actions")
+	}
+}
+
+func TestBuildWithWorkflowProcurementEvidence(t *testing.T) {
+	workflow := designworkflow.BuildWorkflowResult(
+		designworkflow.ProjectSummary{Name: "demo"},
+		designworkflow.AcceptanceConnectivity,
+		[]designworkflow.StageResult{{
+			Name:   designworkflow.StageComponentSelection,
+			Status: designworkflow.StageStatusOK,
+			Summary: map[string]any{
+				"selected_components": []map[string]any{{
+					"role":         "regulator",
+					"component_id": "regulator.linear.ap2112k_3v3.sot23_5",
+					"procurement": &components.ProcurementEvidence{
+						Manufacturer:           "Diodes Incorporated",
+						MPN:                    "AP2112K-3.3",
+						SourceID:               "curated_seed_procurement",
+						LifecycleStatus:        components.LifecycleActive,
+						LifecycleSourceDate:    "2026-06-26",
+						AvailabilityStatus:     components.AvailabilityNotChecked,
+						AvailabilitySourceDate: "2026-06-26",
+						Outcome:                "accepted",
+					},
+				}},
+			},
+		}},
+	)
+	report := Build(BuildOptions{Source: SourceSummary{Mode: "request"}, Workflow: &workflow})
+	found := false
+	for _, evidence := range report.Evidence {
+		if evidence.Kind == "component_evidence" && strings.Contains(evidence.Summary, "lifecycle=active") && strings.Contains(evidence.Summary, "source=curated_seed_procurement") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("procurement evidence missing from %#v", report.Evidence)
 	}
 }
 

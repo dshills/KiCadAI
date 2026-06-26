@@ -16,11 +16,14 @@ import (
 
 type ComponentSelectionOptions struct {
 	CatalogDir string
+	SourceDir  string
 	Catalog    *components.Catalog
+	Sources    *components.SourceCollection
 }
 
 type ComponentSelectionResult struct {
 	CatalogDir string                    `json:"catalog_dir,omitempty"`
+	SourceDir  string                    `json:"source_dir,omitempty"`
 	Selections []ComponentSelectionEntry `json:"selections,omitempty"`
 	Stage      StageResult               `json:"stage"`
 }
@@ -40,30 +43,46 @@ type ComponentSelectionEntry struct {
 	ResolverChecked bool                              `json:"resolver_checked,omitempty"`
 	PinMapChecked   bool                              `json:"pinmap_checked,omitempty"`
 	Companions      []components.CompanionRequirement `json:"companions,omitempty"`
+	Procurement     *components.ProcurementEvidence   `json:"procurement,omitempty"`
 	Rejected        []components.CandidateRejection   `json:"rejected,omitempty"`
 	Warnings        []reports.Issue                   `json:"warnings,omitempty"`
 }
 
 func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, plan BlockPlanResult, opts ComponentSelectionOptions) ComponentSelectionResult {
 	catalogDir := componentCatalogDir(plan.Request.Components, opts)
+	sourceDir := componentSourceDir(plan.Request.Components, opts)
 	catalog := opts.Catalog
 	if catalog == nil {
 		if _, err := os.Stat(catalogDir); err != nil {
 			issue := reports.Issue{Code: components.CodeCatalogReadFailed, Severity: reports.SeverityBlocked, Path: "component_policy.catalog_dir", Message: err.Error()}
-			return ComponentSelectionResult{CatalogDir: catalogDir, Stage: NewStageResult(StageComponentSelection, []reports.Issue{issue})}
+			return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Stage: NewStageResult(StageComponentSelection, []reports.Issue{issue})}
 		}
 		loaded, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: catalogDir})
 		if err != nil {
 			issue := reports.Issue{Code: components.CodeCatalogReadFailed, Severity: reports.SeverityBlocked, Path: "component_policy.catalog_dir", Message: err.Error()}
-			return ComponentSelectionResult{CatalogDir: catalogDir, Stage: NewStageResult(StageComponentSelection, []reports.Issue{issue})}
+			return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Stage: NewStageResult(StageComponentSelection, []reports.Issue{issue})}
 		}
 		catalog = loaded
 	}
 	issues := append([]reports.Issue(nil), catalog.Diagnostics...)
+	sources := opts.Sources
+	if sources != nil {
+		issues = append(issues, sources.Diagnostics...)
+	} else if sourceDir != "" {
+		loaded, err := components.LoadSources(ctx, components.SourceLoadOptions{SourceDir: sourceDir})
+		if err != nil {
+			issues = append(issues, reports.Issue{Code: components.CodeSourceReadFailed, Severity: reports.SeverityBlocked, Path: "component_policy.source_dir", Message: err.Error()})
+		} else if loaded == nil {
+			issues = append(issues, reports.Issue{Code: components.CodeSourceReadFailed, Severity: reports.SeverityBlocked, Path: "component_policy.source_dir", Message: "component source loader returned nil collection"})
+		} else {
+			sources = loaded
+			issues = append(issues, loaded.Diagnostics...)
+		}
+	}
 	if reports.HasBlockingIssue(issues) {
 		stage := NewStageResult(StageComponentSelection, issues)
-		stage.Summary = componentSelectionSummary(catalogDir, nil)
-		return ComponentSelectionResult{CatalogDir: catalogDir, Stage: stage}
+		stage.Summary = componentSelectionSummary(catalogDir, sourceDir, nil)
+		return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Stage: stage}
 	}
 	acceptance := componentAcceptanceForRequest(plan.Request)
 	var selections []ComponentSelectionEntry
@@ -93,6 +112,8 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 				continue
 			}
 			issues = append(issues, applyComponentPolicy(&request, plan.Request.Components, definition.ID, instance.ID, blockComponent.Role)...)
+			request.Sources = sources
+			request.Procurement = plan.Request.Components.Procurement
 			selection, result := components.Select(ctx, catalog, request)
 			issues = append(issues, result.Issues...)
 			if selection.Candidate.ComponentID == "" {
@@ -119,6 +140,7 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 					ResolverChecked: selectedResolverChecked(selection),
 					PinMapChecked:   selectedPinMapChecked(selection),
 					Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
+					Procurement:     cloneProcurementEvidence(selection.Procurement),
 					Rejected:        append([]components.CandidateRejection(nil), selection.Rejected...),
 					Warnings:        append([]reports.Issue(nil), selection.Warnings...),
 				})
@@ -126,8 +148,8 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 		}
 	}
 	stage := NewStageResult(StageComponentSelection, issues)
-	stage.Summary = componentSelectionSummary(catalogDir, selections)
-	return ComponentSelectionResult{CatalogDir: catalogDir, Selections: selections, Stage: stage}
+	stage.Summary = componentSelectionSummary(catalogDir, sourceDir, selections)
+	return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Selections: selections, Stage: stage}
 }
 
 func ApplyComponentSelectionsToPlan(plan *BlockPlanResult, registry blocks.Registry, selections []ComponentSelectionEntry) []reports.Issue {
@@ -283,6 +305,16 @@ func componentCatalogDir(policy ComponentPolicySpec, opts ComponentSelectionOpti
 		return opts.CatalogDir
 	}
 	return discoverDefaultComponentCatalogDir()
+}
+
+func componentSourceDir(policy ComponentPolicySpec, opts ComponentSelectionOptions) string {
+	if strings.TrimSpace(policy.SourceDir) != "" {
+		return strings.TrimSpace(policy.SourceDir)
+	}
+	if strings.TrimSpace(opts.SourceDir) != "" {
+		return strings.TrimSpace(opts.SourceDir)
+	}
+	return ""
 }
 
 func discoverDefaultComponentCatalogDir() string {
@@ -507,18 +539,20 @@ func componentSelectionPath(instanceID string, role string) string {
 	return "component_selection." + instanceID + "." + role
 }
 
-func componentSelectionSummary(catalogDir string, selections []ComponentSelectionEntry) map[string]any {
+func componentSelectionSummary(catalogDir string, sourceDir string, selections []ComponentSelectionEntry) map[string]any {
 	return map[string]any{
 		"catalog_dir":         catalogDir,
+		"source_dir":          sourceDir,
 		"selection_count":     len(selections),
 		"selected_components": selectedComponentSummary(selections),
+		"procurement":         procurementSelectionSummary(selections),
 	}
 }
 
 func selectedComponentSummary(selections []ComponentSelectionEntry) []map[string]any {
 	out := make([]map[string]any, 0, len(selections))
 	for _, selection := range selections {
-		out = append(out, map[string]any{
+		item := map[string]any{
 			"instance_id":      selection.InstanceID,
 			"role":             selection.Role,
 			"component_id":     selection.ComponentID,
@@ -532,7 +566,59 @@ func selectedComponentSummary(selections []ComponentSelectionEntry) []map[string
 			"pinmap_checked":   selection.PinMapChecked,
 			"companion_count":  len(selection.Companions),
 			"rejected_count":   len(selection.Rejected),
-		})
+		}
+		if selection.Procurement != nil {
+			item["procurement"] = selection.Procurement
+		}
+		out = append(out, item)
 	}
 	return out
+}
+
+func procurementSelectionSummary(selections []ComponentSelectionEntry) map[string]any {
+	selectedWithEvidence := 0
+	lifecycleEvidence := 0
+	availabilityEvidence := 0
+	warningCount := 0
+	blockedRejections := 0
+	for _, selection := range selections {
+		if selection.Procurement != nil {
+			selectedWithEvidence++
+			if selection.Procurement.LifecycleStatus != "" {
+				lifecycleEvidence++
+			}
+			if selection.Procurement.AvailabilityStatus != "" {
+				availabilityEvidence++
+			}
+		}
+		warningCount += len(selection.Warnings)
+		for _, rejection := range selection.Rejected {
+			if reports.HasBlockingIssue(rejection.Issues) {
+				blockedRejections++
+			}
+		}
+	}
+	return map[string]any{
+		"selected_with_evidence":      selectedWithEvidence,
+		"lifecycle_evidence_count":    lifecycleEvidence,
+		"availability_evidence_count": availabilityEvidence,
+		"warning_count":               warningCount,
+		"blocked_rejection_count":     blockedRejections,
+	}
+}
+
+func cloneProcurementEvidence(evidence *components.ProcurementEvidence) *components.ProcurementEvidence {
+	if evidence == nil {
+		return nil
+	}
+	clone := *evidence
+	if evidence.LifecycleFresh != nil {
+		value := *evidence.LifecycleFresh
+		clone.LifecycleFresh = &value
+	}
+	if evidence.AvailabilityFresh != nil {
+		value := *evidence.AvailabilityFresh
+		clone.AvailabilityFresh = &value
+	}
+	return &clone
 }
