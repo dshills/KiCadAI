@@ -560,10 +560,32 @@ Commands:
   assumptions, known gaps, selected blocks, component policy, validation
   policy, and a generated `design create` request.
 - `intent explain`: returns a compact AI-facing summary of requirements,
-  selected blocks, assumptions, gaps, and blocking issues to stdout.
+  selected blocks, assumptions, gaps, and blocking issues to stdout; with
+  `--text` or `--file` before `intent`, it drafts prose first.
 - `intent create`: plans intent, refuses ambiguous or blocking plans, runs
   `design create`, and writes planner artifacts under the generated project's
   `.kicadai/` directory.
+- `intent draft`: converts natural-language text into the structured intent
+  request schema with extraction evidence, confidence, and clarifications.
+
+Natural-language intake is CLI-first and deterministic:
+
+```sh
+kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent draft
+kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent explain
+kicadai --json --text "battery powered sensor" --strict intent draft
+```
+
+Flags are global in the current CLI and must appear before `intent`.
+
+Without `--output`, `intent draft` writes the draft report to stdout only.
+`--output ./out/draft` writes `intent-source.txt`,
+`intent-draft.json`, `intent-extraction.json`, and
+`intent-clarifications.json`. `--text/--file ... intent explain` drafts first
+and stops on blocking clarifications. `--text/--file ... intent create` drafts
+first, refuses blocking clarifications, then runs the existing planner and
+design workflow. Generated projects from prose persist the draft artifacts
+under `.kicadai/`.
 
 When `--output` is passed to `intent plan`, the planner writes
 standalone preview artifacts, `intent-plan.json` and
@@ -581,10 +603,11 @@ generated project directory as `--target` to later target-oriented repair
 commands. Commands that write to an existing output directory require
 `--overwrite`.
 
-Examples live in `examples/intent/` and cover sensor breakout, MCU programmer,
-power module, amplifier module, fabrication-oriented sensor requests, MCU plus
-I2C sensor, MCU ISP programming, external-clock limitation, multi-MCU ambiguity,
-and explicit voltage-domain supply examples.
+Structured JSON examples live in `examples/intent/` and cover sensor breakout,
+MCU programmer, power module, amplifier module, fabrication-oriented sensor
+requests, MCU plus I2C sensor, MCU ISP programming, external-clock limitation,
+multi-MCU ambiguity, and explicit voltage-domain supply examples. Natural
+language text examples live in `examples/intent_text/`.
 
 Structured intent supports semantic target, bus, and supply fields:
 
@@ -616,7 +639,8 @@ Implemented semantic mappings:
 
 Current intent-planner gaps:
 
-- input is structured JSON, not free-form natural language;
+- natural-language intake covers only the supported seed phrases and remains a
+  deterministic draft adapter, not a general LLM parser;
 - MCU semantic support is limited to the verified seed template and does not
   yet derive alternate functions from arbitrary KiCad symbols;
 - external MCU clock generation is still blocked until the MCU block can emit a

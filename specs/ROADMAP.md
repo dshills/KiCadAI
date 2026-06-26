@@ -629,11 +629,18 @@ intent:
   limitation instead of a vague missing pin-assignment gap;
 - golden fixtures cover supported semantic plans, partial known-gap plans, and
   intentionally blocked multi-MCU ambiguity.
+- `intent draft` now converts supported natural-language text into structured
+  intent with extraction evidence, confidence, and clarifications.
+- `--text/--file ... intent explain` drafts first, stops on blocking
+  clarifications, and otherwise reuses planner explanation output.
+- `--text/--file ... intent create` drafts first, refuses blocking
+  clarifications, runs the existing design workflow, and persists draft/source
+  artifacts under `.kicadai/`.
 
 ### Remaining Work
 
-- Add a natural-language-to-intent adapter that produces the current structured
-  request schema with source attribution and confidence.
+- Broaden natural-language coverage beyond deterministic seed phrases and add
+  future LLM adapter auditing against the draft result shape.
 - Expand semantic mapping beyond the seed MCU template, especially
   resolver-backed MCU alternate functions, additional bus peripherals, and
   safe external-clock topology generation.

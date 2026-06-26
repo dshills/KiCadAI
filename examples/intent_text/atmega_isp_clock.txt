@@ -1,0 +1,1 @@
+ATmega minimal board with ISP header and 16 MHz crystal.

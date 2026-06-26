@@ -1,0 +1,1 @@
+Make a 3.3V I2C temperature sensor breakout board.
