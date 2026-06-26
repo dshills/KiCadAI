@@ -135,8 +135,10 @@ loop confidence:
 - fabrication export now provides conservative readiness gates with BOM/CPL
   identity, consistency, and local manufacturer-profile evidence, but does not
   yet guarantee complete manufacturer acceptance;
-- structured intent planning now exists, but natural-language parsing and
-  broader semantic design synthesis are not yet first-class pipelines.
+- structured intent planning now exists, and the first semantic design
+  synthesis trace records topology, bus, voltage-domain, component-policy, and
+  calculation evidence. Natural-language parsing remains deterministic and
+  narrow, and broader topology synthesis is still intentionally limited.
   Deterministic rationale reports now explain supported planner decisions and
   blockers, but they do not replace broader synthesis.
 
@@ -646,16 +648,24 @@ intent:
 - `intent create` now persists `.kicadai/workflow-result.json` and
   `.kicadai/design-rationale.json` alongside planner artifacts so generated
   targets can be explained after creation.
+- `intent-plan.json` now includes `synthesis`, a deterministic trace with
+  topology decisions, bus/target/voltage-domain evidence, component policy
+  constraints, value-calculation records, and fail-closed synthesis gaps.
+- Semantic synthesis fixtures cover explicit MCU/I2C supply domains, UART
+  programming topology, blocked unknown supply aliases, and blocked external
+  clock topology.
 
 ### Remaining Work
 
 - Broaden natural-language coverage beyond deterministic seed phrases and add
   future LLM adapter auditing against the draft result shape.
-- Expand semantic mapping beyond the seed MCU template, especially
-  resolver-backed MCU alternate functions, additional bus peripherals, and
-  safe external-clock topology generation.
+- Expand semantic synthesis beyond the seed MCU template, especially
+  resolver-backed MCU alternate functions, additional bus peripherals,
+  supported GPIO assignment, and safe external-clock topology generation.
 - Select more blocks and parts from verified catalogs as coverage grows.
-- Calculate values and check ratings.
+- Convert planner-visible value calculations into safe block/component value
+  mutation where block support exists, then check selected ratings against the
+  calculated requirements.
 - Connect bounded placement-routing retry, validation repair, and future
   fabrication checks into a higher-level generate/validate/repair loop.
 - Store deeper part, footprint, routing, repair, and fabrication decision

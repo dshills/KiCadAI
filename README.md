@@ -559,7 +559,7 @@ Commands:
 
 - `intent plan`: validates the intent request, derives requirements,
   assumptions, known gaps, selected blocks, component policy, validation
-  policy, and a generated `design create` request.
+  policy, semantic synthesis trace, and a generated `design create` request.
 - `intent explain`: returns a compact AI-facing summary of requirements,
   selected blocks, assumptions, gaps, and blocking issues to stdout; with
   `--text` or `--file` before `intent`, it drafts prose first.
@@ -619,6 +619,20 @@ inspected without creating project metadata. When
 the project output directory. The `.kicadai/` paths are the persistent
 project-relative metadata locations once a KiCad project exists.
 
+`intent-plan.json` now includes `synthesis`, a deterministic trace with:
+
+- `decisions`: topology, bus resolution, voltage-domain choices, validation
+  policy, and known topology gates.
+- `evidence`: source intent fields, block capability records, generated net
+  evidence, and workflow policy evidence.
+- `constraints`: component confidence, acceptance, package, voltage, current,
+  and fabrication constraints.
+- `calculations`: policy-level value evidence for LED resistors, I2C pull-ups,
+  regulator headroom, crystal load capacitors, and op-amp gain where inputs are
+  known.
+- `gaps`: unsupported peripherals, voltage-domain problems, target ambiguity,
+  and other fail-closed synthesis limits.
+
 `--output` is used for new generated content, including intent planning and
 project creation. `--target` is reserved for commands that inspect or repair an
 existing generated project; after `intent create` or `design create`, pass that
@@ -631,6 +645,9 @@ MCU programmer, power module, amplifier module, fabrication-oriented sensor
 requests, MCU plus I2C sensor, MCU ISP programming, external-clock limitation,
 multi-MCU ambiguity, and explicit voltage-domain supply examples. Natural
 language text examples live in `examples/intent_text/`.
+Semantic synthesis fixtures are prefixed with `synthesis_` and cover explicit
+MCU/I2C supply domains, UART programming, blocked unknown supply aliases, and
+blocked external-clock topology.
 
 Structured intent supports semantic target, bus, and supply fields:
 
@@ -669,7 +686,10 @@ Current intent-planner gaps:
 - external MCU clock generation is still blocked until the MCU block can emit a
   safe non-internal clock topology;
 - design rationale reports explain current decisions and blockers, but they do
-  not create new synthesis capability by themselves;
+  not create new schematic/PCB topology beyond the deterministic planner;
+- synthesis calculations are planner-visible policy evidence first; exact
+  block-level component value mutation remains limited to blocks that already
+  expose safe parameters;
 - fabrication-focused intent maps to stricter validation/component/routing
   policy, but external manufacturer acceptance remains a downstream
   fabrication-readiness concern.
