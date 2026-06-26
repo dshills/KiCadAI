@@ -71,6 +71,7 @@ func Plan(request Request) PlanResult {
 	workflow := designworkflow.NormalizeRequest(builder.workflow)
 	builder.plan.GeneratedRequest = &workflow
 	builder.plan.Issues = append(builder.plan.Issues, designworkflow.ValidateRequest(workflow)...)
+	builder.finalizeSynthesisTrace()
 	return NormalizePlan(builder.plan)
 }
 

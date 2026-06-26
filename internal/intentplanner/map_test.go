@@ -38,6 +38,15 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
 		t.Fatalf("generated request validation issues = %#v", issues)
 	}
+	if !hasSynthesisDecisionType(plan, "topology") || !hasSynthesisDecisionType(plan, "bus_resolution") {
+		t.Fatalf("missing synthesis decisions: %#v", plan.Synthesis.Decisions)
+	}
+	if !hasSynthesisConstraintKind(plan, "voltage") || !hasSynthesisConstraintKind(plan, "confidence") {
+		t.Fatalf("missing synthesis constraints: %#v", plan.Synthesis.Constraints)
+	}
+	if !hasSynthesisCalculationKind(plan, "i2c_pullup") || !hasSynthesisCalculationKind(plan, "regulator_headroom") {
+		t.Fatalf("missing synthesis calculations: %#v", plan.Synthesis.Calculations)
+	}
 }
 
 func TestPlanMapsMCUAndProtectionBlocks(t *testing.T) {
@@ -109,6 +118,9 @@ func TestPlanReportsExternalClockTopologyLimitation(t *testing.T) {
 	}
 	if !hasKnownGap(plan, "mcu.clock.topology_unsupported.clock") {
 		t.Fatalf("missing topology limitation: %#v", plan.KnownGaps)
+	}
+	if !hasSynthesisGapCategory(plan, "unsupported_peripheral") {
+		t.Fatalf("missing synthesis clock gap: %#v", plan.Synthesis.Gaps)
 	}
 	if hasConnection(*plan.GeneratedRequest, "clock.XTAL1", "mcu.XTAL1") || hasConnection(*plan.GeneratedRequest, "clock.CLK_OUT", "mcu.XTAL1") {
 		t.Fatalf("unexpected clock connection: %#v", plan.GeneratedRequest.Connections)
@@ -560,6 +572,42 @@ func hasConnectionWithNet(request designworkflow.Request, from string, to string
 func hasKnownGap(plan PlanResult, id string) bool {
 	for _, gap := range plan.KnownGaps {
 		if gap.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSynthesisDecisionType(plan PlanResult, kind string) bool {
+	for _, decision := range plan.Synthesis.Decisions {
+		if decision.Type == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSynthesisConstraintKind(plan PlanResult, kind string) bool {
+	for _, constraint := range plan.Synthesis.Constraints {
+		if constraint.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSynthesisCalculationKind(plan PlanResult, kind string) bool {
+	for _, calculation := range plan.Synthesis.Calculations {
+		if calculation.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSynthesisGapCategory(plan PlanResult, category string) bool {
+	for _, gap := range plan.Synthesis.Gaps {
+		if gap.Category == category {
 			return true
 		}
 	}
