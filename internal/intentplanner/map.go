@@ -53,6 +53,10 @@ func Plan(request Request) PlanResult {
 		supportTargets:   map[string]semanticSupportIntent{},
 		i2cBuses:         map[string]string{},
 		i2cMCUBus:        map[string]string{},
+		instanceReqIDs:   map[string]string{},
+		instanceSupplies: map[string]string{},
+		railAliasVoltage: map[string]string{},
+		requirementIndex: map[string]int{},
 	}
 	builder.applyBoardDefaults()
 	builder.applyPolicyDefaults()
@@ -86,6 +90,10 @@ type planBuilder struct {
 	supportTargets     map[string]semanticSupportIntent
 	i2cBuses           map[string]string
 	i2cMCUBus          map[string]string
+	instanceReqIDs     map[string]string
+	instanceSupplies   map[string]string
+	railAliasVoltage   map[string]string
+	requirementIndex   map[string]int
 	i2cDefaultNoted    bool
 	i2cMultiBusBlocked bool
 	usbPowerIDs        []string
@@ -284,6 +292,15 @@ func (builder *planBuilder) mapPower() {
 		if rail.Voltage == "" {
 			continue
 		}
+		if rail.Name != "" {
+			builder.railAliasVoltage[normalizeToken(rail.Name)] = rail.Voltage
+		}
+		if rail.Alias != "" {
+			builder.railAliasVoltage[normalizeToken(rail.Alias)] = rail.Voltage
+		}
+		for _, target := range rail.Supplies {
+			builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: reqID + ".supplies." + firstNonEmpty(target.ID, target.Role), Path: fmt.Sprintf("power.rails[%d].supplies", index), Message: "rail " + rail.Name + " explicitly supplies target " + firstNonEmpty(target.ID, target.Role)})
+		}
 		if needsRegulator(builder.request.Power.Inputs, rail) {
 			params := map[string]any{"output_voltage": rail.Voltage}
 			source, sourceOK, ambiguous := builder.powerSourceForRail(rail.Voltage)
@@ -330,12 +347,15 @@ func (builder *planBuilder) mapFunctions() {
 				id := builder.addBlock(reqID, "sensor", "i2c_sensor", function.Params, "I2C sensor block implements requested sensor function")
 				builder.sensorIDs = appendIfNotEmpty(builder.sensorIDs, id)
 				builder.recordI2CBus(id, function.Bus)
+				builder.recordInstanceSupply(id, function.Supply)
 			case "mcu":
 				id := builder.addBlock(reqID, "mcu", "mcu_minimal", function.Params, "MCU minimal system implements requested controller")
 				builder.mcuIDs = appendIfNotEmpty(builder.mcuIDs, id)
+				builder.recordInstanceSupply(id, function.Supply)
 			case "amplifier":
 				id := builder.addBlock(reqID, "amplifier", "opamp_gain_stage", function.Params, "op-amp gain stage implements requested amplifier")
 				builder.amplifierIDs = appendIfNotEmpty(builder.amplifierIDs, id)
+				builder.recordInstanceSupply(id, function.Supply)
 			case "regulator", "power":
 				id := builder.addBlock(reqID, "regulator", "voltage_regulator", function.Params, "regulator block implements requested power conversion")
 				builder.regulatorIDs = appendIfNotEmpty(builder.regulatorIDs, id)
@@ -347,6 +367,7 @@ func (builder *planBuilder) mapFunctions() {
 				id := builder.addBlock(reqID, "clock", blockID, function.Params, "clock block implements requested timing source")
 				builder.clockIDs = appendIfNotEmpty(builder.clockIDs, id)
 				builder.recordSupportTarget(id, reqID, fmt.Sprintf("functions[%d].target", index), function.Target, function.Strength)
+				builder.recordInstanceSupply(id, function.Supply)
 				if blockID == "canned_oscillator" {
 					builder.poweredClockIDs = appendIfNotEmpty(builder.poweredClockIDs, id)
 				}
@@ -444,7 +465,10 @@ func (builder *planBuilder) connectPowerAndSignals() {
 			continue
 		}
 		if supplySource != "" && target.id != "" {
-			builder.addConnection(supplySource+"."+supplyPort, target.id+"."+target.port, builder.supplyNetAlias(supplySource), "supply rail feeds "+target.id)
+			netAlias := builder.supplyNetAlias(supplySource)
+			builder.addConnection(supplySource+"."+supplyPort, target.id+"."+target.port, netAlias, "supply rail feeds "+target.id)
+			builder.appendRequirementEvidenceForInstance(target.id, "supply:"+supplySource+"."+supplyPort)
+			builder.appendRequirementEvidenceForInstance(target.id, "net:"+netAlias)
 		} else if target.id != "" && builder.targetSupplyVoltage(target.id) != "" {
 			builder.addIssue("blocks."+target.id+".supply_voltage", "no compatible supply source found for "+target.id, "add a matching rail, regulator, or power input")
 		} else if target.id != "" {
@@ -834,6 +858,15 @@ func (builder *planBuilder) busNetAlias(bus string, signal string) string {
 }
 
 func (builder *planBuilder) targetSupplyVoltage(targetID string) string {
+	if supply := builder.instanceSupplies[targetID]; supply != "" {
+		if voltage := builder.railAliasVoltage[supply]; voltage != "" {
+			return voltage
+		}
+		if _, ok := parseVoltage(supply); ok {
+			return supply
+		}
+		return ""
+	}
 	return builder.paramString(targetID, "supply_voltage")
 }
 
@@ -941,6 +974,7 @@ func (builder *planBuilder) addBlock(reqID string, prefix string, blockID string
 	clonedParams := cloneParams(params)
 	builder.instanceBlockIDs[id] = blockID
 	builder.instanceParams[id] = clonedParams
+	builder.instanceReqIDs[id] = reqID
 	builder.workflow.Blocks = append(builder.workflow.Blocks, designworkflow.BlockInstanceSpec{ID: id, BlockID: blockID, Params: clonedParams})
 	record := SelectedBlockRecord{
 		RequirementIDs: []string{reqID},
@@ -965,7 +999,29 @@ func (builder *planBuilder) addBlock(reqID string, prefix string, blockID string
 }
 
 func (builder *planBuilder) addRequirement(record RequirementRecord) {
+	builder.requirementIndex[record.ID] = len(builder.plan.Requirements)
 	builder.plan.Requirements = append(builder.plan.Requirements, record)
+}
+
+func (builder *planBuilder) appendRequirementEvidenceForInstance(instanceID string, evidence string) {
+	reqID := builder.instanceReqIDs[instanceID]
+	if reqID == "" || evidence == "" {
+		return
+	}
+	index, ok := builder.requirementIndex[reqID]
+	if !ok || index < 0 || index >= len(builder.plan.Requirements) {
+		return
+	}
+	builder.plan.Requirements[index].Evidence = appendUniqueString(builder.plan.Requirements[index].Evidence, evidence)
+}
+
+func (builder *planBuilder) recordInstanceSupply(instanceID string, supply string) {
+	if instanceID == "" {
+		return
+	}
+	if supply = normalizeToken(supply); supply != "" {
+		builder.instanceSupplies[instanceID] = supply
+	}
 }
 
 func (builder *planBuilder) addConnection(from string, to string, net string, rationale string) {
@@ -1050,6 +1106,15 @@ func appendIfNotEmpty(values []string, value string) []string {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return values
+	}
+	return append(values, value)
+}
+
+func appendUniqueString(values []string, value string) []string {
+	for _, existing := range values {
+		if existing == value {
+			return values
+		}
 	}
 	return append(values, value)
 }

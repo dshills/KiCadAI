@@ -117,5 +117,9 @@ func newTestPlanBuilder() planBuilder {
 		supportTargets:   map[string]semanticSupportIntent{},
 		i2cBuses:         map[string]string{},
 		i2cMCUBus:        map[string]string{},
+		instanceReqIDs:   map[string]string{},
+		instanceSupplies: map[string]string{},
+		railAliasVoltage: map[string]string{},
+		requirementIndex: map[string]int{},
 	}
 }

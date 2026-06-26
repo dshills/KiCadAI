@@ -209,6 +209,77 @@ func TestPlanBlocksMultipleI2CBusesOnSingleMCU(t *testing.T) {
 	}
 }
 
+func TestPlanRecordsVoltageDomainEvidence(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "voltage_domain",
+		Kind:    IntentSensorNode,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: "3v3"}},
+		},
+		Functions: []FunctionIntent{
+			{Kind: "sensor", Family: "i2c_sensor", Supply: "3v3"},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	requirement, ok := requirementByID(plan, "function.1")
+	if !ok {
+		t.Fatalf("missing function requirement: %#v", plan.Requirements)
+	}
+	for _, evidence := range []string{"supply:regulator.VOUT", "net:VCC_3v3v"} {
+		if !containsString(requirement.Evidence, evidence) {
+			t.Fatalf("missing evidence %s in %#v", evidence, requirement.Evidence)
+		}
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "regulator.VOUT", "sensor.VCC", "VCC_3v3v") {
+		t.Fatalf("missing sensor supply connection: %#v", plan.GeneratedRequest.Connections)
+	}
+}
+
+func TestPlanResolvesSupplyByRailNameAndBlocksUnknownSupply(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "rail_name_supply",
+		Kind:    IntentSensorNode,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V"}},
+		},
+		Functions: []FunctionIntent{{Kind: "sensor", Family: "i2c_sensor", Supply: "vcc"}},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "regulator.VOUT", "sensor.VCC", "VCC_3v3v") {
+		t.Fatalf("missing rail-name supply connection: %#v", plan.GeneratedRequest.Connections)
+	}
+
+	blocked := Plan(Request{
+		Version: "0.1.0",
+		Name:    "bad_supply",
+		Kind:    IntentSensorNode,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{{
+			Kind:   "sensor",
+			Family: "i2c_sensor",
+			Supply: "unknown_rail",
+			Params: map[string]any{"supply_voltage": "5V"},
+		}},
+	})
+	if blocked.Status == PlanStatusBlocked {
+		t.Fatalf("plan should remain partial/ready with known gap, got blocked: %#v", blocked.Issues)
+	}
+	if len(blocked.KnownGaps) == 0 {
+		t.Fatalf("missing known gap for unknown supply: %#v", blocked)
+	}
+	if hasConnection(*blocked.GeneratedRequest, "power_header.VIN", "sensor.VCC") {
+		t.Fatalf("unexpected fallback supply connection: %#v", blocked.GeneratedRequest.Connections)
+	}
+}
+
 func TestPlanBlocksUnsupportedRequiredFunction(t *testing.T) {
 	plan := Plan(Request{
 		Version:   "0.1.0",
@@ -489,6 +560,24 @@ func hasConnectionWithNet(request designworkflow.Request, from string, to string
 func hasKnownGap(plan PlanResult, id string) bool {
 	for _, gap := range plan.KnownGaps {
 		if gap.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func requirementByID(plan PlanResult, id string) (RequirementRecord, bool) {
+	for _, requirement := range plan.Requirements {
+		if requirement.ID == id {
+			return requirement, true
+		}
+	}
+	return RequirementRecord{}, false
+}
+
+func containsString(values []string, value string) bool {
+	for _, existing := range values {
+		if existing == value {
 			return true
 		}
 	}
