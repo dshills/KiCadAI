@@ -189,6 +189,7 @@ kicadai --json --request ./examples/routing/simple_request.json route request
 kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
 kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
 kicadai --json --request ./examples/intent/sensor_breakout.json intent explain
+kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent rationale
 kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
 kicadai --json --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 kicadai --json --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
@@ -562,6 +563,10 @@ Commands:
 - `intent explain`: returns a compact AI-facing summary of requirements,
   selected blocks, assumptions, gaps, and blocking issues to stdout; with
   `--text` or `--file` before `intent`, it drafts prose first.
+- `intent rationale`: returns a consolidated `design-rationale.json`-shaped
+  report with source evidence, interpreted intent, planner decisions,
+  assumptions, clarifications, known limits, validation summary, artifact
+  references, and next actions.
 - `intent create`: plans intent, refuses ambiguous or blocking plans, runs
   `design create`, and writes planner artifacts under the generated project's
   `.kicadai/` directory.
@@ -573,6 +578,7 @@ Natural-language intake is CLI-first and deterministic:
 ```sh
 kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent draft
 kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent explain
+kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
 kicadai --json --text "battery powered sensor" --strict intent draft
 ```
 
@@ -587,13 +593,30 @@ first, refuses blocking clarifications, then runs the existing planner and
 design workflow. Generated projects from prose persist the draft artifacts
 under `.kicadai/`.
 
+`intent rationale` accepts exactly one source mode:
+
+```sh
+kicadai --json --request ./examples/intent/sensor_breakout.json intent rationale
+kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent rationale
+kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
+kicadai --json --target ./out/intent_sensor intent rationale
+```
+
+With `--output`, request/text/file modes write `design-rationale.json` in that
+output directory. With `--target`, the command reads existing generated
+metadata under `.kicadai/` and writes `.kicadai/design-rationale.json` without
+modifying KiCad schematic, PCB, or project files. Blocking clarifications
+produce `status: "needs_clarification"` and next actions instead of guessed
+designs.
+
 When `--output` is passed to `intent plan`, the planner writes
 standalone preview artifacts, `intent-plan.json` and
 `generated-request.json`, directly in that output directory so the plan can be
 inspected without creating project metadata. When
 `intent create` succeeds, it writes the generated KiCad project plus
-`.kicadai/intent-plan.json` and `.kicadai/generated-request.json` inside the
-project output directory. The `.kicadai/` paths are the persistent
+`.kicadai/intent-plan.json`, `.kicadai/generated-request.json`,
+`.kicadai/workflow-result.json`, and `.kicadai/design-rationale.json` inside
+the project output directory. The `.kicadai/` paths are the persistent
 project-relative metadata locations once a KiCad project exists.
 
 `--output` is used for new generated content, including intent planning and
@@ -645,6 +668,8 @@ Current intent-planner gaps:
   yet derive alternate functions from arbitrary KiCad symbols;
 - external MCU clock generation is still blocked until the MCU block can emit a
   safe non-internal clock topology;
+- design rationale reports explain current decisions and blockers, but they do
+  not create new synthesis capability by themselves;
 - fabrication-focused intent maps to stricter validation/component/routing
   policy, but external manufacturer acceptance remains a downstream
   fabrication-readiness concern.

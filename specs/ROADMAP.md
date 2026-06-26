@@ -137,6 +137,8 @@ loop confidence:
   yet guarantee complete manufacturer acceptance;
 - structured intent planning now exists, but natural-language parsing and
   broader semantic design synthesis are not yet first-class pipelines.
+  Deterministic rationale reports now explain supported planner decisions and
+  blockers, but they do not replace broader synthesis.
 
 ## Roadmap Principles
 
@@ -605,6 +607,11 @@ The `intent` command family now adds a structured planning layer above
 - `intent create` plans intent, refuses blocking or clarification-required
   plans, runs `design create`, and persists planner artifacts under
   `.kicadai/` in the generated project.
+- `intent rationale` builds a consolidated AI-facing rationale report from a
+  structured request, natural-language draft, text file, or generated target.
+  It explains source evidence, interpreted intent, selected blocks/components,
+  connections, assumptions, clarifications, known limits, validation summary,
+  artifact references, and next actions.
 
 Golden fixtures in `examples/intent/` cover sensor breakout, MCU programmer,
 power module, amplifier module, and fabrication-oriented sensor requests.
@@ -636,6 +643,9 @@ intent:
 - `--text/--file ... intent create` drafts first, refuses blocking
   clarifications, runs the existing design workflow, and persists draft/source
   artifacts under `.kicadai/`.
+- `intent create` now persists `.kicadai/workflow-result.json` and
+  `.kicadai/design-rationale.json` alongside planner artifacts so generated
+  targets can be explained after creation.
 
 ### Remaining Work
 
@@ -646,10 +656,10 @@ intent:
   safe external-clock topology generation.
 - Select more blocks and parts from verified catalogs as coverage grows.
 - Calculate values and check ratings.
-- Produce a design rationale and known-limit report.
 - Connect bounded placement-routing retry, validation repair, and future
   fabrication checks into a higher-level generate/validate/repair loop.
-- Store all decisions, assumptions, and validation evidence in artifacts.
+- Store deeper part, footprint, routing, repair, and fabrication decision
+  evidence in rationale artifacts as those stages expose richer provenance.
 
 ### Acceptance Gates
 
