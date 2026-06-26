@@ -263,7 +263,7 @@ func evidenceFromSynthesis(trace intentplanner.SynthesisTrace) []EvidenceRecord 
 			Kind:    "component_evidence",
 			Path:    calculation.Path,
 			Summary: synthesisCalculationSummary(calculation),
-			Notes:   append([]string(nil), calculation.Assumptions...),
+			Notes:   synthesisCalculationNotes(calculation),
 		})
 	}
 	return out
@@ -317,14 +317,37 @@ func synthesisGapCategory(value string) string {
 }
 
 func synthesisCalculationSummary(calculation intentplanner.SynthesisCalculation) string {
+	status := calculation.Status
+	if status == "" {
+		status = "recorded"
+	}
 	if len(calculation.Result) == 0 {
-		return calculation.Kind + " deferred"
+		return calculation.Kind + " " + status
 	}
 	var parts []string
 	for _, key := range sortedStringMapKeys(calculation.Result) {
 		parts = append(parts, key+"="+calculation.Result[key])
 	}
-	return calculation.Kind + ": " + strings.Join(parts, ", ")
+	return calculation.Kind + " " + status + ": " + strings.Join(parts, ", ")
+}
+
+func synthesisCalculationNotes(calculation intentplanner.SynthesisCalculation) []string {
+	notes := make([]string, 0, len(calculation.Assumptions)+len(calculation.Applied)+len(calculation.Requirements)+len(calculation.Issues))
+	notes = append(notes, calculation.Assumptions...)
+	for _, applied := range calculation.Applied {
+		notes = append(notes, strings.Join(compactStrings([]string{"applied", applied.Path + "=" + applied.Value}), " "))
+	}
+	for _, requirement := range calculation.Requirements {
+		unit := requirement.Unit
+		if unit != "" && strings.HasSuffix(requirement.Value, unit) {
+			unit = ""
+		}
+		notes = append(notes, strings.Join(compactStrings([]string{"requires", requirement.Subject, requirement.Kind, requirement.Operator, requirement.Value, unit}), " "))
+	}
+	for _, issue := range calculation.Issues {
+		notes = append(notes, strings.Join(compactStrings([]string{string(issue.Code), issue.Path, issue.Message}), " "))
+	}
+	return compactStrings(notes)
 }
 
 func confidenceStringToFloat(value string) float64 {

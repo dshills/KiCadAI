@@ -121,6 +121,28 @@ func TestBuildFromPlanMapsSynthesisTrace(t *testing.T) {
 	}
 }
 
+func TestBuildFromPlanReportsAppliedCalculationDetails(t *testing.T) {
+	plan := intentplanner.Plan(intentplanner.Request{
+		Version: intentplanner.RequestVersion,
+		Name:    "led_calc",
+		Kind:    intentplanner.IntentBreakout,
+		Power:   intentplanner.PowerIntent{Inputs: []intentplanner.PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []intentplanner.FunctionIntent{
+			{Kind: "indicator", Params: map[string]any{"supply_voltage": "5V", "led_forward_voltage": "2V", "led_current": "10mA"}},
+		},
+	})
+	report := BuildFromPlan(plan, SourceSummary{Mode: "request"})
+	if !hasEvidenceSummary(report, "led_resistor applied") {
+		t.Fatalf("missing applied calculation summary: %#v", report.Evidence)
+	}
+	if !hasEvidenceNote(report, "applied blocks.indicator.params.resistor_value=300") {
+		t.Fatalf("missing applied calculation note: %#v", report.Evidence)
+	}
+	if !hasEvidenceNote(report, "requires resistor power") {
+		t.Fatalf("missing calculated requirement note: %#v", report.Evidence)
+	}
+}
+
 func TestLoadFromTarget(t *testing.T) {
 	dir := t.TempDir()
 	meta := filepath.Join(dir, MetadataDirName)
@@ -163,6 +185,17 @@ func hasEvidenceSummary(report Report, text string) bool {
 	for _, evidence := range report.Evidence {
 		if strings.Contains(evidence.Summary, text) {
 			return true
+		}
+	}
+	return false
+}
+
+func hasEvidenceNote(report Report, text string) bool {
+	for _, evidence := range report.Evidence {
+		for _, note := range evidence.Notes {
+			if strings.Contains(note, text) {
+				return true
+			}
 		}
 	}
 	return false
