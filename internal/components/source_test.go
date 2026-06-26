@@ -28,6 +28,16 @@ func TestLoadSourcesValidFixture(t *testing.T) {
 	}
 }
 
+func TestSourceFindNormalizesMPNPunctuation(t *testing.T) {
+	sources, err := LoadSources(context.Background(), SourceLoadOptions{SourceDir: sourceFixtureDir("valid")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := sources.Find("Diodes Incorporated", "AP2112K 3.3"); !ok {
+		t.Fatal("missing AP2112K source record with punctuation-insensitive MPN lookup")
+	}
+}
+
 func TestLoadSourcesInvalidStatus(t *testing.T) {
 	sources, err := LoadSources(context.Background(), SourceLoadOptions{SourceDir: sourceFixtureDir("invalid_status")})
 	if err != nil {

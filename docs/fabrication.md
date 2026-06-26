@@ -15,12 +15,21 @@ structured-command usage error instead of a human summary.
 kicadai --json export preview ./project
 kicadai --json export bom ./project
 kicadai --json export fabrication ./project
+kicadai --json --source-dir ./data/component-sources export bom ./project
 ```
 
 Fabrication reports now include explicit assembly evidence:
 
 - BOM rows carry component identity status, source, package, component class,
   lifecycle, confidence, and issue/blocking counts.
+- When `--source-dir` is supplied, BOM rows are enriched with local
+  procurement snapshot fields: `ProcurementSourceID`, `LifecycleSourceDate`,
+  `LifecycleFresh`, `AvailabilityStatus`, `AvailabilitySourceDate`,
+  `AvailabilityFresh`, and `ProcurementOutcome`. These columns are appended to
+  `bom.csv` after the existing readiness columns for backward compatibility.
+  Lifecycle values are `active`, `mature`, `nrnd`, `eol`, `obsolete`, or
+  `unknown`. Availability values are `in_stock`, `limited`, `backorder`,
+  `unavailable`, `unknown`, or `not_checked`.
 - CPL rows carry BOM linkage, component identity, normalized side, raw layer,
   raw rotation, normalized rotation, and placement readiness notes.
 - BOM/CPL consistency checks block mismatched references, duplicate
@@ -87,6 +96,12 @@ name and boolean. In the output workflow result, partial readiness status
 also exposes a compact `physical_rules` summary with status, blocker count,
 warning count, active physical-rule/manufacturer profile, and report path
 relative to the project root when available.
+
+Lifecycle and availability evidence in fabrication exports is local snapshot
+evidence. Unknown, not-checked, backorder, unavailable, or stale availability
+appears as review evidence; KiCadAI does not call live distributor APIs or
+claim live stock. Use a current, reviewed source snapshot before treating BOM
+procurement fields as fabrication release evidence.
 
 This is still not a manufacturer acceptance guarantee. KiCadAI validates the
 presence, identity consistency, and local profile compatibility of modeled

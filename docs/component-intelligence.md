@@ -72,6 +72,70 @@ Validate the catalog:
 kicadai --json component validate
 ```
 
+Validate a local lifecycle/availability source snapshot alongside the catalog:
+
+```sh
+kicadai --json --source-dir ./data/component-sources component validate
+kicadai --json --source-dir ./data/component-sources component coverage
+```
+
+Select with local procurement evidence:
+
+```sh
+kicadai --json --source-dir ./data/component-sources \
+  --request examples/components/select_regulator.json \
+  component select
+```
+
+`--source-dir` loads local JSON snapshots only. It does not query live
+distributors, scrape websites, or imply real-time stock, pricing, lead time, or
+manufacturer approval.
+
+## Lifecycle And Availability Source Snapshots
+
+Source files are provider-neutral JSON files under a caller-selected directory.
+Every `*.json` file is loaded in sorted order and validated deterministically.
+
+```json
+{
+  "schema": "kicadai.component.source.v1",
+  "source_id": "curated_seed_procurement",
+  "generated_at": "2026-06-26",
+  "records": [
+    {
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2112K-3.3",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    }
+  ]
+}
+```
+
+Lifecycle statuses are `active`, `mature`, `nrnd`, `eol`, `obsolete`, and
+`unknown`. Availability statuses are `in_stock`, `limited`, `backorder`,
+`unavailable`, `unknown`, and `not_checked`. Confidence values are `curated`,
+`provider_snapshot`, `manual_review`, `not_checked`, and `unknown`.
+
+Selection joins source records by normalized manufacturer and MPN. By default,
+explicit EOL/obsolete lifecycle blocks connectivity and stronger selection,
+stale lifecycle warns for connectivity and blocks fabrication-candidate
+selection, and availability is advisory unless policy explicitly requires it.
+Selected component output includes a `procurement` object with source ID,
+lifecycle/availability status, source dates, freshness booleans, and policy
+outcome. Rejected candidates include procurement issue codes when source
+evidence blocks selection.
+
 ## Design Workflow Integration
 
 `design create` runs a `component_selection` stage after block planning and
@@ -86,6 +150,11 @@ Request JSON can include `component_policy`:
 {
   "component_policy": {
     "catalog_dir": "data/components",
+    "source_dir": "data/component-sources",
+    "procurement_policy": {
+      "require_lifecycle": true,
+      "require_availability": false
+    },
     "minimum_confidence": "rule_inferred",
     "acceptance": "connectivity",
     "package_preferences": {
@@ -161,8 +230,9 @@ part-specific stability and derating evidence.
 - The seed catalog is intentionally small and biased toward built-in blocks and
   examples.
 - Many active components are placeholders and only allowed for draft output.
-- Full manufacturer part selection, lifecycle checks, availability, cost, and
-  derating are not implemented.
+- Lifecycle and availability evidence is local snapshot evidence only; live
+  distributor availability, pricing, alternates, cost ranking, and provider
+  imports are not implemented.
 - Component selection rewrites transaction symbol/footprint metadata, but many
   block generators still carry local schematic values and pin placement hints.
 - Resolver-backed evidence is available through package APIs, but broader

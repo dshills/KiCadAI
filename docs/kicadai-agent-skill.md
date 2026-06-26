@@ -165,6 +165,8 @@ evidence:
 
 ```sh
 kicadai --json component validate
+kicadai --json --source-dir ./data/component-sources component validate
+kicadai --json --source-dir ./data/component-sources component coverage
 kicadai --json component show resistor.generic.0805
 kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
 kicadai --json pinmap validate ./out/project
@@ -177,9 +179,13 @@ For generated intent workflows, inspect:
 - rejected candidates;
 - missing or insufficient ratings;
 - resolver/pinmap evidence;
+- procurement evidence when a local source snapshot is supplied;
 - placeholder or inferred-confidence warnings.
 
 Stop if a fabrication-candidate request lacks verified component evidence.
+When lifecycle or availability matters, provide `--source-dir` and inspect the
+selected `procurement` object. Treat source evidence as a local snapshot only;
+do not claim live stock, price, lead time, or distributor approval.
 
 For regulator-backed power rails, include `power.rails[].current_ma` whenever
 the expected load is known. Then inspect

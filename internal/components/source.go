@@ -355,9 +355,22 @@ func parseSourceDate(value string) (time.Time, error) {
 }
 
 func normalizeSourceKey(manufacturer string, mpn string) sourceKey {
-	return sourceKey{Manufacturer: normalizeSourcePart(manufacturer), MPN: normalizeSourcePart(mpn)}
+	return sourceKey{Manufacturer: normalizeSourceManufacturer(manufacturer), MPN: normalizeSourceMPN(mpn)}
 }
 
-func normalizeSourcePart(value string) string {
-	return strings.ToLower(strings.Join(strings.Fields(strings.TrimSpace(value)), " "))
+func normalizeSourceManufacturer(value string) string {
+	return strings.ToLower(strings.Join(strings.Fields(value), " "))
+}
+
+func normalizeSourceMPN(value string) string {
+	var builder strings.Builder
+	for _, char := range value {
+		switch {
+		case char >= 'a' && char <= 'z':
+			builder.WriteRune(char - ('a' - 'A'))
+		case char >= 'A' && char <= 'Z' || char >= '0' && char <= '9':
+			builder.WriteRune(char)
+		}
+	}
+	return builder.String()
 }

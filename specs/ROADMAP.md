@@ -179,6 +179,10 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
 - stronger evidence validation for required pin-to-pad mappings and polarity;
 - workflow component-selection output with manufacturer, MPN, confidence,
   pinmap evidence, companions, and rejected alternatives;
+- local lifecycle/availability source snapshots through `--source-dir`,
+  with deterministic validation, component selection gates, workflow
+  procurement summaries, rationale evidence, and BOM/fabrication snapshot
+  reporting;
 - verified regulator-path coverage that connects fixed 3.3 V linear regulator
   blocks to catalog-backed AMS1117 SOT-223 and AP2112K SOT-23-5 selection,
   capacitor selection, rating requirements, generated request overrides,
@@ -192,8 +196,8 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
   and AP2112K LDO slices, including additional voltages, adjustable/BYP
   networks, exported enable control, and part-specific capacitor stability
   evidence.
-- Add availability/lifecycle source integration when a trusted local or remote
-  source is chosen.
+- Add trusted provider importers or remote snapshot adapters once a source is
+  selected; current support is local snapshot JSON only.
 - Replace remaining structural placeholders where verified concrete parts are
   needed.
 - Improve MCU function names from generic GPIO placeholders to datasheet port
@@ -561,8 +565,10 @@ generate and validate KiCad-CLI-backed Gerber/drill artifacts, emit
 classes, solder mask/paste pad policy, Edge.Cuts containment, courtyard
 presence/overlap, silkscreen board clearance, and mounting-hole
 geometry/edge clearance, expose optional or required KiCad CLI evidence policy,
-and optionally apply the built-in `generic_assembly` manufacturer profile
-through `--manufacturer-profile`.
+optionally apply the built-in `generic_assembly` manufacturer profile through
+`--manufacturer-profile`, and enrich BOM rows with local procurement snapshot
+fields when `--source-dir` is supplied. Snapshot evidence is explicitly local
+and does not claim live stock, price, or supplier acceptance.
 `design create` treats `validation.acceptance: fabrication-candidate` as a
 request to prove fabrication readiness; partial readiness status (`candidate`
 or `blocked`) downgrades achieved acceptance and leaves
@@ -577,6 +583,8 @@ report path where available.
   impedance constraints, panelization, board finish, and fabrication notes.
 - Add richer manufacturer profile presets and profile import once specific
   fabricator rule sources are selected.
+- Add live or provider-backed procurement import once a trusted source and
+  cache/update policy are selected.
 - Compare physical-rule evidence with optional KiCad DRC categories and
   manufacturer outputs where those tools expose machine-readable findings.
 
