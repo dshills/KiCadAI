@@ -80,7 +80,14 @@ writing KiCad files directly.
 The intent planner now provides the first higher-level AI orchestration layer.
 It accepts structured intent requests, derives requirements and constraints,
 maps supported goals to circuit blocks, emits assumptions and known gaps, and
-can hand the generated request to `design create` for project generation.
+can hand the generated request to `design create` for project generation. The
+planner also applies supported calculated values into generated block
+parameters: LED resistor values, I2C pull-up policy values, and crystal load
+capacitor values are written when those blocks expose safe parameters. Regulator
+headroom and op-amp gain remain explicit requirement evidence unless a block
+supports direct mutation. Calculated component ratings are threaded through
+component policy overrides where the local catalog already models the rating,
+such as LED current, LED resistor power, and op-amp supply voltage.
 
 ## Requirements
 
@@ -629,7 +636,9 @@ project-relative metadata locations once a KiCad project exists.
   and fabrication constraints.
 - `calculations`: policy-level value evidence for LED resistors, I2C pull-ups,
   regulator headroom, crystal load capacitors, and op-amp gain where inputs are
-  known.
+  known. Each calculation records whether it was `applied`, `deferred`, or
+  `blocked`, any block params that were written, and calculated requirements
+  that inform component selection or rationale output.
 - `gaps`: unsupported peripherals, voltage-domain problems, target ambiguity,
   and other fail-closed synthesis limits.
 
@@ -687,9 +696,10 @@ Current intent-planner gaps:
   safe non-internal clock topology;
 - design rationale reports explain current decisions and blockers, but they do
   not create new schematic/PCB topology beyond the deterministic planner;
-- synthesis calculations are planner-visible policy evidence first; exact
-  block-level component value mutation remains limited to blocks that already
-  expose safe parameters;
+- synthesis calculations now apply supported values to LED, I2C pull-up, and
+  crystal blocks. Broader analog synthesis remains limited to explicit
+  requirement evidence until blocks expose safe parameters and catalog ratings
+  cover the target checks;
 - fabrication-focused intent maps to stricter validation/component/routing
   policy, but external manufacturer acceptance remains a downstream
   fabrication-readiness concern.

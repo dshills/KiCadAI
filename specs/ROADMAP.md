@@ -650,7 +650,13 @@ intent:
   targets can be explained after creation.
 - `intent-plan.json` now includes `synthesis`, a deterministic trace with
   topology decisions, bus/target/voltage-domain evidence, component policy
-  constraints, value-calculation records, and fail-closed synthesis gaps.
+  constraints, value-calculation records, applied/deferred/blocked calculation
+  status, and fail-closed synthesis gaps.
+- Supported value calculations now mutate generated block parameters for LED
+  resistors, I2C pull-ups, and crystal load capacitors. Regulator headroom and
+  op-amp gain are retained as explicit calculated requirements. Component
+  rating overrides are emitted where the checked-in catalog models the rating,
+  including LED current, LED resistor power, and op-amp supply voltage.
 - Semantic synthesis fixtures cover explicit MCU/I2C supply domains, UART
   programming topology, blocked unknown supply aliases, and blocked external
   clock topology.
@@ -663,9 +669,9 @@ intent:
   resolver-backed MCU alternate functions, additional bus peripherals,
   supported GPIO assignment, and safe external-clock topology generation.
 - Select more blocks and parts from verified catalogs as coverage grows.
-- Convert planner-visible value calculations into safe block/component value
-  mutation where block support exists, then check selected ratings against the
-  calculated requirements.
+- Expand calculated rating enforcement as the component catalog gains broader
+  voltage, capacitance, power, current, and tolerance metadata across more
+  families.
 - Connect bounded placement-routing retry, validation repair, and future
   fabrication checks into a higher-level generate/validate/repair loop.
 - Store deeper part, footprint, routing, repair, and fabrication decision
