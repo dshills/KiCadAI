@@ -1,0 +1,42 @@
+{
+  "schema": "kicadai.component.source.v1",
+  "source_id": "curated_seed_procurement",
+  "generated_at": "2026-06-26",
+  "records": [
+    {
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2112K-3.3",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      },
+      "notes": [
+        "No live availability is implied by this curated record."
+      ]
+    },
+    {
+      "manufacturer": "Advanced Monolithic Systems",
+      "mpn": "AMS1117-3.3",
+      "lifecycle": {
+        "status": "mature",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "unknown",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "kicadai.component.source.v1",
+  "source_id": "partial_fixture",
+  "generated_at": "2026-06-26",
+  "records": [
+    {
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2112K-3.3",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      }
+    },
+    {
+      "manufacturer": "Example Semiconductor",
+      "mpn": "BAD-1",
+      "lifecycle": {
+        "status": "great",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      }
+    }
+  ]
+}

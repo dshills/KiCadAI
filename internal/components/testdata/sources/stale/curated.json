@@ -1,0 +1,24 @@
+{
+  "schema": "kicadai.component.source.v1",
+  "source_id": "stale_fixture",
+  "generated_at": "2021-01-01",
+  "records": [
+    {
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2112K-3.3",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2021-01-01",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "in_stock",
+        "source": "snapshot",
+        "source_date": "2021-01-01",
+        "confidence": "provider_snapshot",
+        "quantity": 1200
+      }
+    }
+  ]
+}

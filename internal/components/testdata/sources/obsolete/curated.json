@@ -1,0 +1,23 @@
+{
+  "schema": "kicadai.component.source.v1",
+  "source_id": "obsolete_fixture",
+  "generated_at": "2026-06-26",
+  "records": [
+    {
+      "manufacturer": "Example Semiconductor",
+      "mpn": "OLD-123",
+      "lifecycle": {
+        "status": "obsolete",
+        "source": "manual",
+        "source_date": "2026-06-01",
+        "confidence": "manual_review"
+      },
+      "availability": {
+        "status": "unavailable",
+        "source": "manual",
+        "source_date": "2026-06-01",
+        "confidence": "manual_review"
+      }
+    }
+  ]
+}
