@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "name": "mcu_isp_programmer",
+  "summary": "MCU target with explicit AVR ISP programming support.",
+  "kind": "mcu_minimal",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 55,
+    "height_mm": 38,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "5V", "current_ma": 300}
+    ]
+  },
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "5V", "programming_header": "isp"}},
+    {"kind": "reset_programming", "target": {"role": "mcu"}, "params": {"programming_interface": "isp"}}
+  ]
+}

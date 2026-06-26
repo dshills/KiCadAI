@@ -1,0 +1,22 @@
+{
+  "version": "0.1.0",
+  "name": "multi_mcu_ambiguous_support",
+  "summary": "Two MCUs with one untargeted programming support block; planner must not guess.",
+  "kind": "custom_structured",
+  "acceptance": "structural",
+  "board": {
+    "width_mm": 80,
+    "height_mm": 50,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "5V", "current_ma": 500}
+    ]
+  },
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "5V"}},
+    {"kind": "mcu", "params": {"supply_voltage": "5V"}},
+    {"kind": "reset_programming", "params": {"programming_interface": "isp"}}
+  ]
+}

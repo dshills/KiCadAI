@@ -1,0 +1,27 @@
+{
+  "version": "0.1.0",
+  "name": "mcu_i2c_sensor",
+  "summary": "MCU with one I2C sensor and an external I2C connector on a named 3.3 V bus.",
+  "kind": "sensor_node",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 60,
+    "height_mm": 40,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "5V", "current_ma": 500}
+    ],
+    "rails": [
+      {"name": "VCC", "alias": "3v3", "voltage": "3.3V", "current_ma": 150}
+    ]
+  },
+  "interfaces": [
+    {"kind": "i2c", "voltage": "3.3V", "bus": "i2c1", "target": {"role": "mcu"}}
+  ],
+  "functions": [
+    {"kind": "mcu", "supply": "3v3", "params": {"supply_voltage": "3.3V"}},
+    {"kind": "sensor", "family": "i2c_sensor", "interface": "i2c", "bus": "i2c1", "supply": "3v3"}
+  ]
+}

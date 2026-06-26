@@ -1,0 +1,21 @@
+{
+  "version": "0.1.0",
+  "name": "mcu_external_clock_limited",
+  "summary": "MCU with external crystal intent; planner should report the current unsupported topology.",
+  "kind": "mcu_minimal",
+  "acceptance": "structural",
+  "board": {
+    "width_mm": 55,
+    "height_mm": 38,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "5V", "current_ma": 300}
+    ]
+  },
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "5V"}},
+    {"kind": "clock", "family": "crystal_oscillator", "target": {"role": "mcu"}}
+  ]
+}

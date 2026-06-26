@@ -231,6 +231,39 @@ func TestRunIntentCreateReportsBlockedPlan(t *testing.T) {
 	}
 }
 
+func TestRunIntentExplainReportsSemanticEvidence(t *testing.T) {
+	requestPath := filepath.Join("..", "..", "examples", "intent", "mcu_i2c_sensor.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--json", "--request", requestPath, "intent", "explain"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{"I2C1_SDA", "supply:regulator.VOUT"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("expected output to contain %q", want)
+		}
+	}
+}
+
+func TestRunIntentCreateBlocksAmbiguousSemanticTarget(t *testing.T) {
+	requestPath := filepath.Join("..", "..", "examples", "intent", "multi_mcu_ambiguous_support.json")
+	output := filepath.Join(t.TempDir(), "ambiguous")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected blocked intent create")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || !strings.Contains(stdout.String(), "multiple compatible mcu targets") {
+		t.Fatalf("result = %#v\n%s", result, stdout.String())
+	}
+}
+
 func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
 	tests := []struct {
 		name          string

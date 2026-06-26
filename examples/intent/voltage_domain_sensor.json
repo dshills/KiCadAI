@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "name": "voltage_domain_sensor",
+  "summary": "Sensor intent with an explicit named 3.3 V voltage domain.",
+  "kind": "sensor_node",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "5V", "current_ma": 300}
+    ],
+    "rails": [
+      {"name": "VCC", "alias": "3v3", "voltage": "3.3V", "current_ma": 100, "supplies": [{"role": "sensor"}]}
+    ]
+  },
+  "functions": [
+    {"kind": "sensor", "family": "i2c_sensor", "supply": "3v3"}
+  ]
+}
