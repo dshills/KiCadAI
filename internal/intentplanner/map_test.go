@@ -155,6 +155,9 @@ func TestPlanMapsUARTProgrammingIntent(t *testing.T) {
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
 		t.Fatalf("generated request validation issues = %#v", issues)
 	}
+	if !hasSynthesisDecisionSelected(plan, "mcu.UART_TX -> programming.UART_RX") {
+		t.Fatalf("missing UART synthesis decision: %#v", plan.Synthesis.Decisions)
+	}
 }
 
 func TestPlanMapsMCUI2CBus(t *testing.T) {
@@ -194,6 +197,28 @@ func TestPlanMapsMCUI2CBus(t *testing.T) {
 	}
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
 		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanBlocksTargetedGPIOAssignment(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "targeted_gpio",
+		Kind:    IntentMCUMinimal,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "5V"}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "gpio", Voltage: "5V", Target: TargetRef{Role: "mcu"}}},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasIssuePath(plan.Issues, "interfaces[0].target") {
+		t.Fatalf("missing GPIO target issue: %#v", plan.Issues)
+	}
+	if !hasSynthesisGapCategory(plan, "target_resolution") {
+		t.Fatalf("missing synthesis target gap: %#v", plan.Synthesis.Gaps)
 	}
 }
 
@@ -608,6 +633,15 @@ func hasKnownGap(plan PlanResult, id string) bool {
 func hasSynthesisDecisionType(plan PlanResult, kind string) bool {
 	for _, decision := range plan.Synthesis.Decisions {
 		if decision.Type == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSynthesisDecisionSelected(plan PlanResult, selected string) bool {
+	for _, decision := range plan.Synthesis.Decisions {
+		if decision.Selected == selected {
 			return true
 		}
 	}

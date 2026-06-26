@@ -233,7 +233,8 @@ func (builder *planBuilder) recordBlockTrace() {
 func (builder *planBuilder) recordConnectionTrace() {
 	for index, connection := range builder.plan.Connections {
 		decisionType := "topology"
-		if strings.Contains(strings.ToLower(connection.Rationale), "i2c") {
+		rationale := strings.ToLower(connection.Rationale + " " + connection.NetAlias)
+		if strings.Contains(rationale, "i2c") || strings.Contains(rationale, "uart") || strings.Contains(rationale, "isp") || strings.Contains(rationale, "spi") || strings.Contains(rationale, "gpio") {
 			decisionType = "bus_resolution"
 		}
 		builder.recordSynthesisDecision(SynthesisDecision{

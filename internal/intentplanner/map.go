@@ -407,6 +407,9 @@ func (builder *planBuilder) mapInterfaces() {
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
 				builder.gpioConnectorIDs = appendIfNotEmpty(builder.gpioConnectorIDs, id)
 				builder.signalConnectorIDs = appendIfNotEmpty(builder.signalConnectorIDs, id)
+				if iface.Kind == "gpio" && (iface.Target.ID != "" || iface.Target.Role != "") {
+					builder.unsupportedRequirement(reqID+".target", fmt.Sprintf("interfaces[%d].target", index), "GPIO target pin assignment is not safely synthesized yet", iface.Strength, "omit target metadata for a generic connector or add a verified GPIO assignment model")
+				}
 			case "power":
 				id := builder.addConnector(reqID, "power_connector", []string{"VCC", "GND"}, iface.Strength)
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
