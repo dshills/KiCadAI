@@ -38,6 +38,7 @@ import (
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/pinmap"
 	"kicadai/internal/placement"
+	"kicadai/internal/rationale"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
@@ -2393,9 +2394,10 @@ func runDesign(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 }
 
 type intentCreateResult struct {
-	Plan     intentplanner.PlanResult      `json:"plan"`
-	Workflow designworkflow.WorkflowResult `json:"workflow,omitempty"`
-	Draft    *intentDraftOutput            `json:"draft,omitempty"`
+	Plan      intentplanner.PlanResult      `json:"plan"`
+	Workflow  designworkflow.WorkflowResult `json:"workflow,omitempty"`
+	Draft     *intentDraftOutput            `json:"draft,omitempty"`
+	Rationale *rationale.Report             `json:"rationale,omitempty"`
 }
 
 func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -2407,6 +2409,8 @@ func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return runIntentDraft(opts, stdout)
 	case "plan", "explain":
 		return runIntentPlan(ctx, opts, stdout, opts.commandArgs[0])
+	case "rationale":
+		return runIntentRationale(ctx, opts, stdout)
 	case "create":
 		return runIntentCreate(ctx, opts, stdout)
 	default:
@@ -2533,6 +2537,182 @@ type intentExplainResult struct {
 	Draft          *intentDraftOutput                  `json:"draft,omitempty"`
 }
 
+func runIntentRationale(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if !opts.jsonOutput {
+		return fmt.Errorf("intent rationale requires --json")
+	}
+	report, issues, artifacts, err := buildIntentRationale(ctx, opts)
+	if err != nil {
+		return err
+	}
+	result := reports.ResultWithIssues("intent", report, issues, artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("intent rationale reported issues")
+	}
+	return nil
+}
+
+func buildIntentRationale(ctx context.Context, opts cliOptions) (rationale.Report, []reports.Issue, []reports.Artifact, error) {
+	if err := ctx.Err(); err != nil {
+		return rationale.Report{}, nil, nil, err
+	}
+	mode, issue := intentRationaleMode(opts)
+	if issue != nil {
+		report := rationale.Build(rationale.BuildOptions{Source: rationale.SourceSummary{Mode: "invalid"}})
+		return report, []reports.Issue{*issue}, nil, nil
+	}
+	switch mode {
+	case "target":
+		loaded := rationale.LoadFromTarget(opts.target)
+		artifact, writeIssue := rationale.WriteArtifact(rationale.ReportPathForTarget(opts.target), loaded.Report)
+		issues := append([]reports.Issue(nil), loaded.Issues...)
+		var artifacts []reports.Artifact
+		if writeIssue != nil {
+			issues = append(issues, *writeIssue)
+		} else {
+			artifact.Path = filepath.Join(rationale.MetadataDirName, rationale.ArtifactName)
+			artifacts = append(artifacts, artifact)
+		}
+		return loaded.Report, issues, artifacts, nil
+	case "request":
+		plan, issues, err := loadIntentPlan(opts)
+		if err != nil {
+			return rationale.Report{}, nil, nil, err
+		}
+		source := rationale.SourceSummary{Mode: "request", Path: opts.requestPath}
+		report := rationale.BuildFromPlan(plan, source)
+		return writeOptionalRationaleOutput(opts, report, issues)
+	case "text", "file":
+		text, sourceType, sourceID, inputIssues := loadIntentDraftText(opts)
+		if len(inputIssues) > 0 {
+			report := rationale.Build(rationale.BuildOptions{Source: rationale.SourceSummary{Mode: mode, Path: sourceID}})
+			return report, inputIssues, nil, nil
+		}
+		draft := intentdraft.Draft(text, intentdraft.Options{SourceType: sourceType, SourceID: sourceID, AcceptanceOverride: parseIntentAcceptance(opts.componentAcceptance), Strict: false})
+		source := rationale.SourceSummary{Mode: sourceType, Path: sourceID, SourceHash: draft.Extraction.SourceHash, Summary: draft.Extraction.Summary}
+		var plan intentplanner.PlanResult
+		if !intentdraft.BlockingClarifications(draft.Clarifications) {
+			plan = intentplanner.Plan(draft.Request)
+		} else {
+			plan = intentplanner.PlanResult{
+				Schema: intentplanner.PlanSchema,
+				Status: intentplanner.PlanStatusNeedsClarification,
+				Intent: intentplanner.PlanIntentSummary{
+					Name:       draft.Request.Name,
+					Kind:       draft.Request.Kind,
+					Acceptance: draft.Request.Acceptance,
+					Summary:    draft.Request.Summary,
+				},
+			}
+		}
+		report := rationale.BuildFromDraftAndPlan(draft, plan, source)
+		issues := append([]reports.Issue(nil), draft.Issues...)
+		issues = append(issues, plan.Issues...)
+		for _, clarification := range draft.Clarifications {
+			if clarification.Severity == intentdraft.ClarificationBlocking {
+				issues = append(issues, clarification.Issue())
+			}
+		}
+		return writeOptionalRationaleOutput(opts, report, issues)
+	default:
+		return rationale.Report{}, nil, nil, fmt.Errorf("unsupported rationale mode %q", mode)
+	}
+}
+
+func intentRationaleMode(opts cliOptions) (string, *reports.Issue) {
+	var modes []string
+	if strings.TrimSpace(opts.requestPath) != "" {
+		modes = append(modes, "request")
+	}
+	if strings.TrimSpace(opts.intentText) != "" {
+		modes = append(modes, "text")
+	}
+	if strings.TrimSpace(opts.intentFile) != "" {
+		modes = append(modes, "file")
+	}
+	if strings.TrimSpace(opts.target) != "" {
+		modes = append(modes, "target")
+	}
+	if len(modes) != 1 {
+		issue := reports.Issue{
+			Code:       reports.CodeInvalidArgument,
+			Severity:   reports.SeverityError,
+			Path:       "source",
+			Message:    "provide exactly one of --request, --text, --file, or --target",
+			Suggestion: "choose one rationale source mode",
+		}
+		return "", &issue
+	}
+	return modes[0], nil
+}
+
+func writeOptionalRationaleOutput(opts cliOptions, report rationale.Report, issues []reports.Issue) (rationale.Report, []reports.Issue, []reports.Artifact, error) {
+	var artifacts []reports.Artifact
+	if strings.TrimSpace(opts.output) == "" {
+		return report, issues, artifacts, nil
+	}
+	path := filepath.Join(opts.output, rationale.ArtifactName)
+	artifact, writeIssue := rationale.WriteArtifact(path, report)
+	if writeIssue != nil {
+		issues = append(issues, *writeIssue)
+	} else {
+		artifacts = append(artifacts, artifact)
+	}
+	return report, issues, artifacts, nil
+}
+
+func persistCreateRationale(output string, plan intentplanner.PlanResult, draft *intentDraftOutput, workflow *designworkflow.WorkflowResult) (rationale.Report, []reports.Issue, []reports.Artifact) {
+	source := rationale.SourceSummary{Mode: "request"}
+	var draftResult *intentdraft.Result
+	var request *intentplanner.Request
+	if draft != nil {
+		source.Mode = draft.Extraction.SourceType
+		source.Path = draft.Extraction.SourceID
+		source.SourceHash = draft.Extraction.SourceHash
+		source.Summary = draft.Extraction.Summary
+		d := intentdraft.Result{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}
+		draftResult = &d
+		request = &draft.Request
+	}
+	normalizedPlan := intentplanner.NormalizePlan(plan)
+	report := rationale.Build(rationale.BuildOptions{
+		Source:   source,
+		Request:  request,
+		Draft:    draftResult,
+		Plan:     &normalizedPlan,
+		Workflow: workflow,
+	})
+	if strings.TrimSpace(output) == "" {
+		return report, nil, nil
+	}
+	artifact, issue := rationale.WriteArtifact(rationale.ReportPathForTarget(output), report)
+	if issue != nil {
+		return report, []reports.Issue{*issue}, nil
+	}
+	artifact.Path = filepath.Join(rationale.MetadataDirName, rationale.ArtifactName)
+	return report, nil, []reports.Artifact{artifact}
+}
+
+func writeWorkflowResultArtifact(outputDir string, workflow designworkflow.WorkflowResult) []reports.Issue {
+	if strings.TrimSpace(outputDir) == "" {
+		return nil
+	}
+	data, err := json.MarshalIndent(workflow, "", "  ")
+	if err != nil {
+		return []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "workflow-result.json", Message: err.Error()}}
+	}
+	if issue := writeLocalArtifact(filepath.Join(outputDir, "workflow-result.json"), append(data, '\n'), true); issue != nil {
+		return []reports.Issue{*issue}
+	}
+	return nil
+}
+
 func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("intent create requires --json")
@@ -2551,7 +2731,11 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if reports.HasBlockingIssue(issues) || reports.HasBlockingIssue(plan.Issues) || plan.GeneratedRequest == nil || plan.Status == intentplanner.PlanStatusBlocked || plan.Status == intentplanner.PlanStatusNeedsClarification {
 		allIssues := append([]reports.Issue(nil), issues...)
 		allIssues = append(allIssues, plan.Issues...)
-		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Draft: draft}, allIssues, plan.Artifacts)
+		report, rationaleIssues, rationaleArtifacts := persistCreateRationale(opts.output, plan, draft, nil)
+		allIssues = append(allIssues, rationaleIssues...)
+		artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
+		artifacts = append(artifacts, rationaleArtifacts...)
+		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Draft: draft, Rationale: &report}, allIssues, artifacts)
 		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
 			return writeErr
 		}
@@ -2571,13 +2755,17 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if draft != nil {
 		artifactIssues = append(artifactIssues, writeIntentDraftArtifacts(artifactDir, sourceText, intentdraft.Result{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}, true)...)
 	}
+	artifactIssues = append(artifactIssues, writeWorkflowResultArtifact(artifactDir, workflow)...)
+	rationaleReport, rationaleIssues, rationaleArtifacts := persistCreateRationale(opts.output, plan, draft, &workflow)
 	allIssues := append([]reports.Issue(nil), issues...)
 	allIssues = append(allIssues, plan.Issues...)
 	allIssues = append(allIssues, artifactIssues...)
+	allIssues = append(allIssues, rationaleIssues...)
 	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
 	artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
-	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow, Draft: draft}, allIssues, artifacts)
+	artifacts = append(artifacts, rationaleArtifacts...)
+	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow, Draft: draft, Rationale: &rationaleReport}, allIssues, artifacts)
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}

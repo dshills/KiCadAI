@@ -281,7 +281,7 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected downstream workflow validation to report issues for this draft")
 	}
-	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json"} {
+	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json", "workflow-result.json", "design-rationale.json"} {
 		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
 			t.Fatalf("missing artifact %s: %v", name, err)
 		}
@@ -340,6 +340,95 @@ func TestRunIntentExplainTextBlocksClarification(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), "battery_voltage_missing") {
 		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestRunIntentRationaleFromText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a 3.3V I2C temperature sensor breakout", "intent", "rationale"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{`"schema": "kicadai.design.rationale.v1"`, `"source_hash"`, `"decisions"`, `"evidence"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in output:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunIntentRationaleTextBlocksClarification(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "battery powered sensor", "intent", "rationale"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected clarification error")
+	}
+	for _, want := range []string{`"status": "needs_clarification"`, "battery chemistry"} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("expected %q in output:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunIntentRationaleWritesOutput(t *testing.T) {
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "intent.json")
+	output := filepath.Join(dir, "out")
+	request := `{
+  "version": "0.1.0",
+  "name": "rationale_cli",
+  "kind": "breakout",
+  "board": {"width_mm": 40, "height_mm": 25, "layers": 2},
+  "power": {"inputs": [{"kind": "usb_c", "voltage": "5V"}], "rails": [{"name": "VCC", "voltage": "3.3V"}]},
+  "interfaces": [{"kind": "i2c", "voltage": "3.3V"}],
+  "functions": [{"kind": "sensor", "family": "i2c_sensor"}]
+}`
+	if err := os.WriteFile(requestPath, []byte(request), 0o644); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--json", "--request", requestPath, "--output", output, "intent", "rationale"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(output, "design-rationale.json")); err != nil {
+		t.Fatalf("missing rationale artifact: %v", err)
+	}
+}
+
+func TestRunIntentRationaleRejectsSourceConflict(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", "request.json", "--text", "make a board", "intent", "rationale"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected source conflict error")
+	}
+	if !strings.Contains(stdout.String(), "provide exactly one") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestRunIntentRationaleFromTarget(t *testing.T) {
+	dir := t.TempDir()
+	meta := filepath.Join(dir, ".kicadai")
+	if err := os.MkdirAll(meta, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	requestPath := filepath.Join("..", "..", "examples", "intent", "sensor_breakout.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--json", "--request", requestPath, "--output", meta, "--overwrite", "intent", "plan"}, &stdout, &stderr); err != nil {
+		t.Fatalf("plan returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	stdout.Reset()
+	stderr.Reset()
+	if err := run([]string{"--json", "--target", dir, "intent", "rationale"}, &stdout, &stderr); err != nil {
+		t.Fatalf("rationale returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if _, err := os.Stat(filepath.Join(meta, "design-rationale.json")); err != nil {
+		t.Fatalf("missing target rationale artifact: %v", err)
 	}
 }
 
