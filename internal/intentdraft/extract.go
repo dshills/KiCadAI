@@ -216,6 +216,22 @@ func findKindEvidence(source string, normalized string) ExtractedField {
 	return findFirstPhrase(source, []string{"amplifier", "op amp", "op-amp", "gain stage", "headphone", "power module", "power supply", "regulator", "ldo", "buck", "mcu", "microcontroller", "atmega", "arduino", "programmer", "programming", "sensor", "temperature", "humidity", "pressure", "breakout", "adapter", "connector"})
 }
 
+type phraseFinder struct {
+	source string
+}
+
+func newPhraseFinder(source string) phraseFinder {
+	return phraseFinder{source: source}
+}
+
+func (finder phraseFinder) findPhrase(phrase string) ExtractedField {
+	return findPhrase(finder.source, phrase)
+}
+
+func (finder phraseFinder) findFirstPhrase(phrases []string) ExtractedField {
+	return findFirstPhrase(finder.source, phrases)
+}
+
 func findFirstPhrase(source string, phrases []string) ExtractedField {
 	for _, phrase := range phrases {
 		field := findPhrase(source, phrase)

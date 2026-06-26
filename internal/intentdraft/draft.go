@@ -112,11 +112,20 @@ func Draft(text string, options Options) Result {
 	}
 	request = intentplanner.NormalizeRequest(request)
 	extraction.Confidence = summarizeConfidence(extraction.Fields)
+	clarifications := clarifyDraft(sourceText, normalized, request, extraction)
+	if options.Strict {
+		for _, clarification := range clarifications {
+			if clarification.Severity == "blocking" {
+				issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: clarification.Path, Message: clarification.Question, Suggestion: clarification.Suggestion})
+			}
+		}
+	}
 	issues = append(issues, intentplanner.ValidateRequest(request)...)
 	return Result{
-		Request:    request,
-		Extraction: extraction,
-		Issues:     issues,
+		Request:        request,
+		Extraction:     extraction,
+		Clarifications: clarifications,
+		Issues:         issues,
 	}
 }
 

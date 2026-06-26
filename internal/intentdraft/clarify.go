@@ -1,0 +1,80 @@
+package intentdraft
+
+import "kicadai/internal/intentplanner"
+
+func clarifyDraft(source string, normalized string, request intentplanner.Request, extraction ExtractionReport) []Clarification {
+	var clarifications []Clarification
+	finder := newPhraseFinder(source)
+	if containsAny(normalized, "battery") && !powerInputHasVoltage(request, "battery") {
+		clarifications = append(clarifications, Clarification{
+			ID:         "intent.power.battery_voltage_missing",
+			Path:       "power.inputs",
+			Severity:   "blocking",
+			Question:   "What battery chemistry or input voltage should be used?",
+			Options:    []string{"3.7V Li-ion", "2xAA", "external regulated input"},
+			Evidence:   []ExtractedField{finder.findPhrase("battery")},
+			Suggestion: "Specify the battery voltage or chemistry.",
+		})
+	}
+	if containsAny(normalized, "can", "ethernet", "usb data") {
+		clarifications = append(clarifications, Clarification{
+			ID:         "intent.interface.kind_unsupported",
+			Path:       "interfaces",
+			Severity:   "blocking",
+			Question:   "The requested interface is not supported by the current intent planner. Which supported interface should be used?",
+			Options:    []string{"i2c", "uart", "spi", "gpio"},
+			Evidence:   []ExtractedField{finder.findFirstPhrase([]string{"can", "ethernet", "usb data"})},
+			Suggestion: "Use a supported interface or wait for a block that implements this interface.",
+		})
+	}
+	if containsAny(normalized, "headphone") {
+		clarifications = append(clarifications, Clarification{
+			ID:         "intent.function.headphone_amplifier_unverified",
+			Path:       "functions",
+			Severity:   "blocking",
+			Question:   "Headphone amplifier output-stage safety is not verified yet. Should this be treated as an op-amp gain-stage draft instead?",
+			Options:    []string{"op-amp gain stage draft", "block until headphone amplifier block exists"},
+			Evidence:   []ExtractedField{finder.findPhrase("headphone")},
+			Suggestion: "Use an explicitly supported amplifier topology.",
+		})
+	}
+	if containsAny(normalized, "fabrication", "fab ready", "manufacturable") {
+		clarifications = append(clarifications, Clarification{
+			ID:         "intent.acceptance.fabrication_requested_without_evidence",
+			Path:       "manufacturing.fabrication_candidate",
+			Severity:   "warning",
+			Question:   "Fabrication readiness still depends on downstream validation and local KiCad CLI evidence.",
+			Evidence:   []ExtractedField{finder.findFirstPhrase([]string{"fabrication", "fab ready", "manufacturable"})},
+			Suggestion: "Review fabrication readiness output before ordering boards.",
+		})
+	}
+	if extraction.Confidence.Fields == 0 && source != "" {
+		clarifications = append(clarifications, Clarification{
+			ID:         "intent.function.family_ambiguous",
+			Path:       "intent",
+			Severity:   "blocking",
+			Question:   "What supported design family should be generated?",
+			Options:    []string{"sensor breakout", "mcu minimal", "power module", "amplifier", "connector breakout"},
+			Suggestion: "Name one supported circuit family and the required voltage/interface.",
+		})
+	}
+	return clarifications
+}
+
+func BlockingClarifications(values []Clarification) bool {
+	for _, value := range values {
+		if value.Severity == "blocking" {
+			return true
+		}
+	}
+	return false
+}
+
+func powerInputHasVoltage(request intentplanner.Request, kind string) bool {
+	for _, input := range request.Power.Inputs {
+		if input.Kind == kind && input.Voltage != "" {
+			return true
+		}
+	}
+	return false
+}
