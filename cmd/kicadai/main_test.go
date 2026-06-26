@@ -288,6 +288,33 @@ func TestRunIntentExplainReportsSemanticEvidence(t *testing.T) {
 	}
 }
 
+func TestRunIntentExplainFromText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a 3.3V I2C temperature sensor breakout", "intent", "explain"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{`"draft"`, `"selected_blocks"`, `"i2c_sensor"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in output:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunIntentExplainTextBlocksClarification(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "battery powered sensor", "intent", "explain"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected clarification error")
+	}
+	if !strings.Contains(stdout.String(), "battery_voltage_missing") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
 func TestRunIntentCreateBlocksAmbiguousSemanticTarget(t *testing.T) {
 	requestPath := filepath.Join("..", "..", "examples", "intent", "multi_mcu_ambiguous_support.json")
 	output := filepath.Join(t.TempDir(), "ambiguous")

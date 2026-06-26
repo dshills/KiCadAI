@@ -2529,6 +2529,7 @@ type intentExplainResult struct {
 	Assumptions    []intentplanner.PlanNote            `json:"assumptions"`
 	Clarifications []intentplanner.PlanNote            `json:"clarifications"`
 	KnownGaps      []intentplanner.PlanNote            `json:"known_gaps"`
+	Draft          *intentDraftOutput                  `json:"draft,omitempty"`
 }
 
 func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -2605,6 +2606,12 @@ func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subco
 	if !opts.jsonOutput {
 		return fmt.Errorf("intent plan requires --json")
 	}
+	if subcommand == "explain" && (strings.TrimSpace(opts.intentText) != "" || strings.TrimSpace(opts.intentFile) != "") {
+		if strings.TrimSpace(opts.requestPath) != "" {
+			return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "use either --request or --text/--file for intent explain, not both"})
+		}
+		return runIntentExplainDraft(ctx, opts, stdout)
+	}
 	if strings.TrimSpace(opts.requestPath) == "" {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "--request is required"})
 	}
@@ -2649,6 +2656,55 @@ func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subco
 	}
 	if !result.OK {
 		return errors.New("intent plan reported issues")
+	}
+	return nil
+}
+
+func runIntentExplainDraft(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	text, sourceType, sourceID, inputIssues := loadIntentDraftText(opts)
+	if len(inputIssues) > 0 {
+		result := reports.ResultWithIssues("intent", nil, inputIssues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		return errors.New("intent explain reported input issues")
+	}
+	draft := intentdraft.Draft(text, intentdraft.Options{SourceType: sourceType, SourceID: sourceID, AcceptanceOverride: parseIntentAcceptance(opts.componentAcceptance), Strict: false})
+	draftOutput := intentDraftOutput{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}
+	if intentdraft.BlockingClarifications(draft.Clarifications) {
+		result := reports.ResultWithIssues("intent", intentExplainResult{Status: intentplanner.PlanStatusNeedsClarification, Draft: &draftOutput}, draft.Issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		return errors.New("intent explain needs clarification")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	plan := intentplanner.Plan(draft.Request)
+	data := intentExplainResult{
+		Status:         plan.Status,
+		Score:          plan.Score,
+		Intent:         plan.Intent,
+		Requirements:   plan.Requirements,
+		SelectedBlocks: plan.SelectedBlocks,
+		Connections:    plan.Connections,
+		Assumptions:    plan.Assumptions,
+		Clarifications: plan.Clarifications,
+		KnownGaps:      plan.KnownGaps,
+		Draft:          &draftOutput,
+	}
+	issues := append([]reports.Issue(nil), draft.Issues...)
+	issues = append(issues, plan.Issues...)
+	result := reports.ResultWithIssues("intent", data, issues, plan.Artifacts)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("intent explain reported issues")
 	}
 	return nil
 }
