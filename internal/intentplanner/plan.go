@@ -12,6 +12,7 @@ import (
 )
 
 const PlanSchema = "kicadai.intent.plan.v1"
+const SynthesisSchema = "kicadai.intent.synthesis.v1"
 
 type PlanStatus string
 
@@ -35,6 +36,7 @@ type PlanResult struct {
 	Assumptions        []PlanNote                `json:"assumptions"`
 	Clarifications     []PlanNote                `json:"clarifications"`
 	KnownGaps          []PlanNote                `json:"known_gaps"`
+	Synthesis          SynthesisTrace            `json:"synthesis"`
 	Issues             []reports.Issue           `json:"issues"`
 	Artifacts          []reports.Artifact        `json:"artifacts"`
 }
@@ -96,6 +98,70 @@ type PlanNote struct {
 	Suggestion string           `json:"suggestion,omitempty"`
 }
 
+type SynthesisTrace struct {
+	Schema       string                 `json:"schema"`
+	Status       PlanStatus             `json:"status"`
+	Decisions    []SynthesisDecision    `json:"decisions,omitempty"`
+	Evidence     []SynthesisEvidence    `json:"evidence,omitempty"`
+	Constraints  []SynthesisConstraint  `json:"constraints,omitempty"`
+	Calculations []SynthesisCalculation `json:"calculations,omitempty"`
+	Gaps         []SynthesisGap         `json:"gaps,omitempty"`
+}
+
+type SynthesisDecision struct {
+	ID             string   `json:"id"`
+	Type           string   `json:"type"`
+	Path           string   `json:"path,omitempty"`
+	Selected       string   `json:"selected"`
+	Rationale      string   `json:"rationale"`
+	RequirementIDs []string `json:"requirement_ids,omitempty"`
+	EvidenceIDs    []string `json:"evidence_ids,omitempty"`
+	Confidence     string   `json:"confidence,omitempty"`
+}
+
+type SynthesisEvidence struct {
+	ID         string   `json:"id"`
+	Kind       string   `json:"kind"`
+	Path       string   `json:"path,omitempty"`
+	Summary    string   `json:"summary"`
+	Source     string   `json:"source,omitempty"`
+	Confidence string   `json:"confidence,omitempty"`
+	Refs       []string `json:"refs,omitempty"`
+}
+
+type SynthesisConstraint struct {
+	ID            string `json:"id"`
+	Path          string `json:"path,omitempty"`
+	Kind          string `json:"kind"`
+	Subject       string `json:"subject"`
+	Operator      string `json:"operator,omitempty"`
+	Value         string `json:"value,omitempty"`
+	Source        string `json:"source,omitempty"`
+	RequirementID string `json:"requirement_id,omitempty"`
+}
+
+type SynthesisCalculation struct {
+	ID          string            `json:"id"`
+	Kind        string            `json:"kind"`
+	Path        string            `json:"path,omitempty"`
+	Inputs      map[string]string `json:"inputs,omitempty"`
+	Result      map[string]string `json:"result,omitempty"`
+	Formula     string            `json:"formula,omitempty"`
+	Assumptions []string          `json:"assumptions,omitempty"`
+	Confidence  string            `json:"confidence,omitempty"`
+}
+
+type SynthesisGap struct {
+	ID             string           `json:"id"`
+	Category       string           `json:"category"`
+	Path           string           `json:"path,omitempty"`
+	Message        string           `json:"message"`
+	Severity       reports.Severity `json:"severity,omitempty"`
+	Suggestion     string           `json:"suggestion,omitempty"`
+	RequirementIDs []string         `json:"requirement_ids,omitempty"`
+	EvidenceIDs    []string         `json:"evidence_ids,omitempty"`
+}
+
 type ArtifactOptions struct {
 	OutputDir string
 	Overwrite bool
@@ -130,6 +196,7 @@ func NormalizePlan(plan PlanResult) PlanResult {
 	plan.Assumptions = cloneNotes(plan.Assumptions)
 	plan.Clarifications = cloneNotes(plan.Clarifications)
 	plan.KnownGaps = cloneNotes(plan.KnownGaps)
+	plan.Synthesis = normalizeSynthesisTrace(plan.Synthesis, plan)
 	plan.Issues = append([]reports.Issue(nil), plan.Issues...)
 	plan.Artifacts = append([]reports.Artifact(nil), plan.Artifacts...)
 	slices.SortFunc(plan.Requirements, compareRequirements)
@@ -143,6 +210,7 @@ func NormalizePlan(plan PlanResult) PlanResult {
 	slices.SortFunc(plan.Artifacts, compareArtifacts)
 	plan.Status = calculatePlanStatus(plan)
 	plan.Score = calculatePlanScore(plan)
+	plan.Synthesis.Status = synthesisStatus(plan)
 	if plan.Requirements == nil {
 		plan.Requirements = []RequirementRecord{}
 	}
@@ -320,6 +388,101 @@ func cloneNotes(values []PlanNote) []PlanNote {
 	return append([]PlanNote(nil), values...)
 }
 
+func normalizeSynthesisTrace(trace SynthesisTrace, plan PlanResult) SynthesisTrace {
+	if strings.TrimSpace(trace.Schema) == "" {
+		trace.Schema = SynthesisSchema
+	}
+	trace.Decisions = cloneSynthesisDecisions(trace.Decisions)
+	trace.Evidence = cloneSynthesisEvidence(trace.Evidence)
+	trace.Constraints = cloneSynthesisConstraints(trace.Constraints)
+	trace.Calculations = cloneSynthesisCalculations(trace.Calculations)
+	trace.Gaps = cloneSynthesisGaps(trace.Gaps)
+	slices.SortFunc(trace.Decisions, compareSynthesisDecisions)
+	slices.SortFunc(trace.Evidence, compareSynthesisEvidence)
+	slices.SortFunc(trace.Constraints, compareSynthesisConstraints)
+	slices.SortFunc(trace.Calculations, compareSynthesisCalculations)
+	slices.SortFunc(trace.Gaps, compareSynthesisGaps)
+	trace.Status = synthesisStatus(PlanResult{
+		Status:         plan.Status,
+		Issues:         plan.Issues,
+		Clarifications: plan.Clarifications,
+		KnownGaps:      plan.KnownGaps,
+		Synthesis:      trace,
+	})
+	if trace.Decisions == nil {
+		trace.Decisions = []SynthesisDecision{}
+	}
+	if trace.Evidence == nil {
+		trace.Evidence = []SynthesisEvidence{}
+	}
+	if trace.Constraints == nil {
+		trace.Constraints = []SynthesisConstraint{}
+	}
+	if trace.Calculations == nil {
+		trace.Calculations = []SynthesisCalculation{}
+	}
+	if trace.Gaps == nil {
+		trace.Gaps = []SynthesisGap{}
+	}
+	return trace
+}
+
+func synthesisStatus(plan PlanResult) PlanStatus {
+	parent := calculatePlanStatus(plan)
+	if parent == PlanStatusBlocked || parent == PlanStatusNeedsClarification {
+		return parent
+	}
+	for _, gap := range plan.Synthesis.Gaps {
+		if gap.Severity == reports.SeverityError || gap.Severity == reports.SeverityBlocked {
+			return PlanStatusBlocked
+		}
+	}
+	if len(plan.Synthesis.Gaps) > 0 || parent == PlanStatusPartial {
+		return PlanStatusPartial
+	}
+	return PlanStatusReady
+}
+
+func cloneSynthesisDecisions(values []SynthesisDecision) []SynthesisDecision {
+	out := append([]SynthesisDecision(nil), values...)
+	for i := range out {
+		out[i].RequirementIDs = append([]string(nil), out[i].RequirementIDs...)
+		out[i].EvidenceIDs = append([]string(nil), out[i].EvidenceIDs...)
+	}
+	return out
+}
+
+func cloneSynthesisEvidence(values []SynthesisEvidence) []SynthesisEvidence {
+	out := append([]SynthesisEvidence(nil), values...)
+	for i := range out {
+		out[i].Refs = append([]string(nil), out[i].Refs...)
+	}
+	return out
+}
+
+func cloneSynthesisConstraints(values []SynthesisConstraint) []SynthesisConstraint {
+	return append([]SynthesisConstraint(nil), values...)
+}
+
+func cloneSynthesisCalculations(values []SynthesisCalculation) []SynthesisCalculation {
+	out := append([]SynthesisCalculation(nil), values...)
+	for i := range out {
+		out[i].Inputs = cloneStringMap(out[i].Inputs)
+		out[i].Result = cloneStringMap(out[i].Result)
+		out[i].Assumptions = append([]string(nil), out[i].Assumptions...)
+	}
+	return out
+}
+
+func cloneSynthesisGaps(values []SynthesisGap) []SynthesisGap {
+	out := append([]SynthesisGap(nil), values...)
+	for i := range out {
+		out[i].RequirementIDs = append([]string(nil), out[i].RequirementIDs...)
+		out[i].EvidenceIDs = append([]string(nil), out[i].EvidenceIDs...)
+	}
+	return out
+}
+
 func compareRequirements(a, b RequirementRecord) int {
 	if a.ID != b.ID {
 		return strings.Compare(a.ID, b.ID)
@@ -361,6 +524,56 @@ func compareNotes(a, b PlanNote) int {
 func compareArtifacts(a, b reports.Artifact) int {
 	if a.Kind != b.Kind {
 		return strings.Compare(string(a.Kind), string(b.Kind))
+	}
+	return strings.Compare(a.Path, b.Path)
+}
+
+func compareSynthesisDecisions(a, b SynthesisDecision) int {
+	if a.ID != b.ID {
+		return strings.Compare(a.ID, b.ID)
+	}
+	if a.Type != b.Type {
+		return strings.Compare(a.Type, b.Type)
+	}
+	return strings.Compare(a.Path, b.Path)
+}
+
+func compareSynthesisEvidence(a, b SynthesisEvidence) int {
+	if a.ID != b.ID {
+		return strings.Compare(a.ID, b.ID)
+	}
+	if a.Kind != b.Kind {
+		return strings.Compare(a.Kind, b.Kind)
+	}
+	return strings.Compare(a.Path, b.Path)
+}
+
+func compareSynthesisConstraints(a, b SynthesisConstraint) int {
+	if a.ID != b.ID {
+		return strings.Compare(a.ID, b.ID)
+	}
+	if a.Kind != b.Kind {
+		return strings.Compare(a.Kind, b.Kind)
+	}
+	return strings.Compare(a.Subject, b.Subject)
+}
+
+func compareSynthesisCalculations(a, b SynthesisCalculation) int {
+	if a.ID != b.ID {
+		return strings.Compare(a.ID, b.ID)
+	}
+	if a.Kind != b.Kind {
+		return strings.Compare(a.Kind, b.Kind)
+	}
+	return strings.Compare(a.Path, b.Path)
+}
+
+func compareSynthesisGaps(a, b SynthesisGap) int {
+	if a.ID != b.ID {
+		return strings.Compare(a.ID, b.ID)
+	}
+	if a.Category != b.Category {
+		return strings.Compare(a.Category, b.Category)
 	}
 	return strings.Compare(a.Path, b.Path)
 }

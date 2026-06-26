@@ -35,6 +35,16 @@ func TestNormalizePlanSortsAndInitializesCollections(t *testing.T) {
 			{InstanceID: "a", BlockID: "connector_breakout"},
 		},
 		Assumptions: []PlanNote{{ID: "z"}, {ID: "a"}},
+		Synthesis: SynthesisTrace{
+			Decisions: []SynthesisDecision{{ID: "z"}, {ID: "a"}},
+			Evidence:  []SynthesisEvidence{{ID: "z"}, {ID: "a"}},
+			Constraints: []SynthesisConstraint{
+				{ID: "z", Kind: "voltage", Subject: "z"},
+				{ID: "a", Kind: "voltage", Subject: "a"},
+			},
+			Calculations: []SynthesisCalculation{{ID: "z"}, {ID: "a"}},
+			Gaps:         []SynthesisGap{{ID: "z"}, {ID: "a"}},
+		},
 		Issues: []reports.Issue{
 			{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "z", Message: "z"},
 			{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "a", Message: "a"},
@@ -48,6 +58,9 @@ func TestNormalizePlanSortsAndInitializesCollections(t *testing.T) {
 	}
 	if plan.Connections == nil || plan.Artifacts == nil || plan.KnownGaps == nil {
 		t.Fatalf("collections should be initialized: %#v", plan)
+	}
+	if plan.Synthesis.Schema != SynthesisSchema || plan.Synthesis.Decisions[0].ID != "a" || plan.Synthesis.Evidence[0].ID != "a" || plan.Synthesis.Constraints[0].ID != "a" || plan.Synthesis.Calculations[0].ID != "a" || plan.Synthesis.Gaps[0].ID != "a" {
+		t.Fatalf("synthesis trace not normalized: %#v", plan.Synthesis)
 	}
 	if plan.Status != PlanStatusPartial {
 		t.Fatalf("status = %s, want partial for warning issue", plan.Status)
