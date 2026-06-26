@@ -19,6 +19,7 @@ const (
 	CodeComponentVariantMissing   reports.Code = "COMPONENT_VARIANT_MISSING"
 	CodeComponentConcreteRequired reports.Code = "COMPONENT_CONCRETE_REQUIRED"
 	CodeComponentCompanionMissing reports.Code = "COMPONENT_COMPANION_MISSING"
+	CodeComponentReviewRequired   reports.Code = "COMPONENT_REVIEW_REQUIRED"
 )
 
 type Query struct {
@@ -198,8 +199,23 @@ func selectionCandidateIssues(record ComponentRecord, candidate Candidate, reque
 	if request.RequireCompanions && !recordHasRequiredCompanions(record) {
 		issues = append(issues, NewIssue(CodeComponentCompanionMissing, reports.SeverityBlocked, "component."+record.ID+".companions", "component requires explicit companion component metadata"))
 	}
+	if request.Acceptance == AcceptanceFabricationCandidate {
+		issues = append(issues, fabricationCandidateReviewIssues(record)...)
+	}
 	if !candidateAllowedForAcceptance(record, candidate, request.Acceptance) {
 		issues = append(issues, NewIssue(CodeComponentUnsafe, reports.SeverityBlocked, "component."+candidate.ComponentID, fmt.Sprintf("component confidence %s is not allowed for %s acceptance", candidate.Confidence, request.Acceptance)))
+	}
+	return issues
+}
+
+func fabricationCandidateReviewIssues(record ComponentRecord) []reports.Issue {
+	var issues []reports.Issue
+	for _, rule := range record.DeratingRules {
+		switch rule.Kind {
+		case "thermal", "capacitor_stability":
+			message := "component requires unresolved " + strings.ReplaceAll(rule.Kind, "_", " ") + " evidence before fabrication-candidate selection"
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, reports.SeverityBlocked, "component."+record.ID+".derating_rules."+rule.Kind, message))
+		}
 	}
 	return issues
 }

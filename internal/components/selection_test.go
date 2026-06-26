@@ -203,6 +203,92 @@ func TestSelectVerifiedRegulatorRequiresCompanions(t *testing.T) {
 	}
 }
 
+func TestSelectAP2112KRegulatorVariant(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "5", Unit: "V"},
+			{Kind: "output_current", Value: "100", Unit: "mA"},
+			{Kind: "enable_voltage", Value: "5", Unit: "V"},
+		},
+		RequiredFunctions: []string{"VIN", "GND", "EN", "NC", "VOUT"},
+	})
+	if !result.OK {
+		t.Fatalf("select AP2112K failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "regulator.linear.ap2112k_3v3.sot23_5" {
+		t.Fatalf("unexpected regulator selection: %+v", selection.Candidate)
+	}
+	for _, kind := range []string{"thermal", "enable_voltage", "capacitor_stability"} {
+		if !componentHasDeratingRule(selection.Component, kind) {
+			t.Fatalf("selected AP2112K missing derating rule %s: %+v", kind, selection.Component.DeratingRules)
+		}
+	}
+}
+
+func TestSelectAP2112KRejectsInsufficientInputHeadroom(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "3.6", Unit: "V"},
+			{Kind: "output_current", Value: "100", Unit: "mA"},
+		},
+	})
+	if result.OK {
+		t.Fatal("expected AP2112K low-input request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectAP2112KRejectsOverCurrent(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "5", Unit: "V"},
+			{Kind: "output_current", Value: "700", Unit: "mA"},
+		},
+	})
+	if result.OK {
+		t.Fatal("expected AP2112K over-current request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectRegulatorRejectsUnsupportedOutputVoltage(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "regulator", ValueKind: "output_voltage", Value: "5"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	assertIssueCode(t, result.Issues, CodeComponentNotFound)
+}
+
+func TestSelectAP2112KBlocksFabricationCandidateReviewGaps(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:        AcceptanceFabricationCandidate,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "5", Unit: "V"},
+			{Kind: "output_current", Value: "100", Unit: "mA"},
+		},
+	})
+	if result.OK {
+		t.Fatal("expected AP2112K fabrication-candidate selection to block on review evidence")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
+}
+
 func TestSelectRejectsRegulatorOverCurrent(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{
@@ -528,6 +614,15 @@ func componentHasFunction(record ComponentRecord, function string) bool {
 func componentHasRequiredCompanionRole(record ComponentRecord, role string) bool {
 	for _, companion := range record.Companions {
 		if companion.Role == role && companion.Required {
+			return true
+		}
+	}
+	return false
+}
+
+func componentHasDeratingRule(record ComponentRecord, kind string) bool {
+	for _, rule := range record.DeratingRules {
+		if rule.Kind == kind {
 			return true
 		}
 	}
