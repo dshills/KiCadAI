@@ -172,6 +172,16 @@ project-relative metadata locations once a KiCad project exists.
 - `gaps`: unsupported peripherals, voltage-domain problems, target ambiguity,
   and other fail-closed synthesis limits.
 
+For power rails that synthesize a voltage regulator, include `current_ma` when
+the load current is known. The planner maps that value into the generated
+component policy as a regulator `output_current` requirement and records the
+input/output capacitor voltage classes needed for the selected input and output
+rails. Those overrides are persisted in `.kicadai/generated-request.json`, and
+the selected regulator/capacitor evidence is persisted in
+`.kicadai/workflow-result.json`. This is the preferred audit path for agents
+checking that a generated 3.3 V breakout selected a real regulator rather than a
+placeholder.
+
 `--output` is used for new generated content, including intent planning and
 project creation. `--target` is reserved for commands that inspect or repair an
 existing generated project; after `intent create` or `design create`, pass that
@@ -227,7 +237,9 @@ Current intent-planner gaps:
 - design rationale reports explain current decisions and blockers, but they do
   not create new schematic/PCB topology beyond the deterministic planner;
 - synthesis calculations now apply supported values to LED, I2C pull-up, and
-  crystal blocks. Broader analog synthesis remains limited to explicit
+  crystal blocks, and now map regulator current and capacitor voltage
+  requirements into generated component policy for the verified
+  linear-regulator slice. Broader analog synthesis remains limited to explicit
   requirement evidence until blocks expose safe parameters and catalog ratings
   cover the target checks;
 - fabrication-focused intent maps to stricter validation/component/routing

@@ -108,6 +108,44 @@ Override keys are checked in this order:
 - `<block_id>.<component_role>`;
 - `<component_role>`.
 
+## Verified Regulator Slice
+
+The checked-in catalog and workflow now include a concrete 5 V to 3.3 V linear
+regulator selection path for common breakout-style designs:
+
+- `regulator.linear.ams1117_3v3.sot223` for the regulator role;
+- `capacitor.ceramic.0805` for regulator input and output capacitor roles;
+- nominal-value matching for capacitor capacitance plus rating-aware checks for
+  regulator input voltage, regulator output current, and capacitor voltage;
+- workflow evidence in the `component_selection` stage and persisted
+  `.kicadai/workflow-result.json` output.
+
+When an intent power rail includes `current_ma`, the planner converts that value
+into an `output_current` requirement for the regulator role. Input and output
+capacitor voltage ratings are selected from the next common voltage class after
+a 25 percent design margin against the nominal rail voltage currently modeled
+by the planner. For example, a nominal 5 V input rail requires at least a 6.3 V
+capacitor rating. Source tolerance, surge, and derating beyond the nominal rail
+are not modeled yet. This is the current minimum automated selection rule, not
+a professional MLCC derating recommendation; fabrication-candidate designs
+should use explicit component policy overrides for higher voltage classes such
+as 10 V or 16 V on 5 V ceramic-capacitor rails unless part-specific DC-bias
+evidence proves the lower class is acceptable.
+
+The generated request also persists these requirements in
+`.kicadai/generated-request.json` under `component_policy.overrides`, so agents
+can audit why a selected regulator or capacitor was accepted. Missing or
+insufficient ratings remain blocking for connectivity-oriented acceptance.
+
+This is not yet an analog-stability proof. The current selector checks catalog
+ratings and KiCad-resolvable bindings; it does not model LDO output-capacitor
+ESR windows, MLCC DC-bias capacitance loss, thermal dissipation, or transient
+response. In particular, manually verify linear-regulator power dissipation
+with `Pd = (Vin - Vout) * Iout` and confirm the selected package and PCB copper
+can handle it. Treat generated regulator designs as structurally and
+connectivity-oriented evidence until a block or catalog record carries
+part-specific stability and derating evidence.
+
 ## Current Limitations
 
 - The seed catalog is intentionally small and biased toward built-in blocks and

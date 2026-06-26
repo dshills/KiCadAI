@@ -195,6 +195,21 @@ newer protection and timing blocks remain structural/partial: they use verified
 seed records and checked-in verification manifests, but need more variants and
 stronger KiCad-backed layout evidence before fabrication-readiness claims.
 
+The `voltage_regulator` block is tied into verified component selection for the
+current fixed 3.3 V LDO catalog slice. Its regulator, input-capacitor, and
+output-capacitor component roles derive selection requirements from block
+parameters such as `output_voltage`, `input_capacitance`, `output_capacitance`,
+and package preferences. Capacitance parameters use the same parsed value
+strings as the catalog and examples, such as `10u`, `100n`, or explicit SI
+farad values. Today, `output_voltage` acts as a selection constraint:
+requests outside the verified 3.3 V catalog coverage must block for
+connectivity-oriented acceptance instead of pretending another fixed voltage is
+proven.
+Optional power-LED roles are active only when `include_power_led` is true, so
+omitted indicator LEDs do not force unnecessary component selection. The
+resulting selections are written into the generated transaction and reported in
+workflow evidence.
+
 The generated block examples are structural schematic/project outputs; they are
 not yet fabrication-ready PCB designs. See
 [docs/circuit-block-library.md](circuit-block-library.md) for request

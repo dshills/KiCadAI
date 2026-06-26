@@ -181,6 +181,19 @@ For generated intent workflows, inspect:
 
 Stop if a fabrication-candidate request lacks verified component evidence.
 
+For regulator-backed power rails, include `power.rails[].current_ma` whenever
+the expected load is known. Then inspect
+`.kicadai/generated-request.json` for `component_policy.overrides` and
+`.kicadai/workflow-result.json` for the selected `component_selection` evidence.
+The supported verified slice currently covers a fixed 3.3 V AMS1117-style LDO
+with 0805 ceramic input and output capacitors. Broader regulator families and
+exact capacitor part-number selection are still catalog expansion work. Do not
+treat that slice as regulator stability proof: ESR, MLCC DC-bias derating,
+thermal dissipation, and transient response still require part-specific
+evidence or human review. For AMS1117-style parts, verify the exact selected
+LDO is stable with ceramic output capacitors or choose a catalog record that
+models the required output-capacitor ESR.
+
 ## Intent Planning Guidance
 
 Prefer structured intent fields:
@@ -221,6 +234,8 @@ Known supported calculated value application:
   block-owned;
 - crystal load capacitors into
   `crystal_oscillator.params.load_capacitor_value`.
+- regulator output-current and capacitor-voltage requirements into generated
+  component policy overrides for the verified linear-regulator path.
 
 Known requirement-only calculations:
 

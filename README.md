@@ -10,7 +10,7 @@ The near-term goal is to let agents build and review KiCad-native projects from 
 
 ## Status
 
-The direct-file workflow is the main functional path today. KiCadAI can generate KiCad project directories, write root schematics and PCBs, inspect and evaluate projects, run writer and board validation, select catalog-backed components, perform block-aware placement/routing, run optional KiCad ERC/DRC checks, and produce deterministic intent plans and rationale reports.
+The direct-file workflow is the main functional path today. KiCadAI can generate KiCad project directories, write root schematics and PCBs, inspect and evaluate projects, run writer and board validation, select catalog-backed components with rating evidence, perform block-aware placement/routing, run optional KiCad ERC/DRC checks, and produce deterministic intent plans and rationale reports.
 
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 
@@ -109,7 +109,7 @@ kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 
 The intent planner is the higher-level AI orchestration layer. It accepts structured intent requests, derives requirements and constraints, maps supported goals to circuit blocks, emits assumptions and known gaps, and can hand the generated request to `design create` for project generation.
 
-Planner synthesis traces include topology decisions, bus and voltage-domain evidence, component policy constraints, value calculations, applied/deferred/blocked calculation status, and fail-closed gaps. Supported calculations can now write safe generated block parameters for LED resistors, I2C pull-ups, and crystal load capacitors. Regulator headroom and op-amp gain remain explicit requirement evidence unless a block exposes safe direct mutation.
+Planner synthesis traces include topology decisions, bus and voltage-domain evidence, component policy constraints, value calculations, applied/deferred/blocked calculation status, and fail-closed gaps. Supported calculations can now write safe generated block parameters for LED resistors, I2C pull-ups, and crystal load capacitors, and can map regulator current and capacitor voltage requirements into component policy for the verified 3.3 V linear-regulator path. Regulator headroom and op-amp gain remain explicit requirement evidence unless a block exposes safe direct mutation.
 
 See [Intent Planning And AI Workflow](docs/intent-planning.md) for details.
 
