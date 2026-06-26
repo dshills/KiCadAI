@@ -623,6 +623,12 @@ func TestPlanDerivesPackagePreferencesAndRatings(t *testing.T) {
 	if got := plan.GeneratedRequest.Components.PackagePreferences["resistor"]; got != "0603" {
 		t.Fatalf("package preference = %q", got)
 	}
+	if !hasSynthesisConstraintSubject(plan, "resistor", "package", "0603") {
+		t.Fatalf("missing package synthesis constraint: %#v", plan.Synthesis.Constraints)
+	}
+	if !hasSynthesisConstraintKind(plan, "current") {
+		t.Fatalf("missing current/rating synthesis constraint: %#v", plan.Synthesis.Constraints)
+	}
 	note, ok := noteByID(plan.Assumptions, "constraints.component_policy")
 	if !ok || !strings.Contains(note.Message, "input_voltage:5V") || !strings.Contains(note.Message, "rail_current:100mA") {
 		t.Fatalf("component policy note = %#v", note)
@@ -686,6 +692,15 @@ func hasSynthesisDecisionSelected(plan PlanResult, selected string) bool {
 func hasSynthesisConstraintKind(plan PlanResult, kind string) bool {
 	for _, constraint := range plan.Synthesis.Constraints {
 		if constraint.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSynthesisConstraintSubject(plan PlanResult, subject string, kind string, value string) bool {
+	for _, constraint := range plan.Synthesis.Constraints {
+		if constraint.Subject == subject && constraint.Kind == kind && constraint.Value == value {
 			return true
 		}
 	}
