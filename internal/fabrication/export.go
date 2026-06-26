@@ -37,6 +37,7 @@ func ExportBOM(ctx context.Context, targetPath string, opts Options) Result {
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "bom", Message: err.Error()})
 		return exportReadiness(ctx, targetPath, opts, result, nil, nil, false)
 	}
+	reportData = ApplyProcurementSnapshots(ctx, reportData, opts)
 	result.Issues = append(result.Issues, reportData.Issues...)
 	applyReportEvidence(&result, reportData, opts)
 	bomCSV, err := MarshalBOMCSV(reportData.BOM)
@@ -54,6 +55,7 @@ func ExportPackage(ctx context.Context, targetPath string, opts Options) Result 
 		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "package", Message: err.Error()})
 		return exportReadiness(ctx, targetPath, opts, result, nil, nil, true)
 	}
+	reportData = ApplyProcurementSnapshots(ctx, reportData, opts)
 	result.Issues = append(result.Issues, reportData.Issues...)
 	applyReportEvidence(&result, reportData, opts)
 	bomCSV, err := MarshalBOMCSV(reportData.BOM)

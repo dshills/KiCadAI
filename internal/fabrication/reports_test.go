@@ -2,11 +2,14 @@ package fabrication
 
 import (
 	"bytes"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
+	"kicadai/internal/components"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kicadfiles"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
@@ -213,16 +216,24 @@ func TestValidateBOMCPLConsistencyBlocksDuplicatesMismatchAndPlacementEvidence(t
 }
 
 func TestReportCSVSerializationEscapesFields(t *testing.T) {
+	fresh := true
 	bom, err := MarshalBOMCSV([]BOMRow{{
-		References:    []string{"R1"},
-		Quantity:      1,
-		Value:         "10k, 1%",
-		SymbolID:      "Device:R",
-		FootprintID:   "Resistor:R_0603",
-		Manufacturer:  "Example",
-		MPN:           "ABC-1",
-		Confidence:    "high",
-		ReadinessNote: "quoted \"note\"",
+		References:             []string{"R1"},
+		Quantity:               1,
+		Value:                  "10k, 1%",
+		SymbolID:               "Device:R",
+		FootprintID:            "Resistor:R_0603",
+		Manufacturer:           "Example",
+		MPN:                    "ABC-1",
+		ProcurementSourceID:    "curated",
+		LifecycleSourceDate:    "2026-06-26",
+		LifecycleFresh:         &fresh,
+		AvailabilityStatus:     "not_checked",
+		AvailabilitySourceDate: "2026-06-26",
+		AvailabilityFresh:      &fresh,
+		ProcurementOutcome:     "snapshot",
+		Confidence:             "high",
+		ReadinessNote:          "quoted \"note\"",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -231,8 +242,11 @@ func TestReportCSVSerializationEscapesFields(t *testing.T) {
 	if !strings.Contains(text, `"10k, 1%"`) || !strings.Contains(text, `"quoted ""note"""`) {
 		t.Fatalf("BOM CSV not escaped correctly:\n%s", text)
 	}
-	if !strings.Contains(text, "Package,ComponentClass,Lifecycle,Confidence,IdentityStatus,IdentitySource,IdentityIssueCount,IdentityBlockingCount") {
+	if !strings.Contains(text, "Package,ComponentClass,Lifecycle,Confidence,IdentityStatus,IdentitySource,IdentityIssueCount,IdentityBlockingCount,ReadinessNote") {
 		t.Fatalf("BOM CSV missing identity columns:\n%s", text)
+	}
+	if !strings.Contains(text, "ReadinessNote,ProcurementSourceID,LifecycleSourceDate,LifecycleFresh,AvailabilityStatus,AvailabilitySourceDate,AvailabilityFresh,ProcurementOutcome") {
+		t.Fatalf("BOM CSV missing appended procurement columns:\n%s", text)
 	}
 	cpl, err := MarshalCPLCSV([]CPLRow{{Reference: "U1", Footprint: "Package:QFN", ComponentID: "ic.example", XMM: "1", YMM: "2", RotationDegrees: "90.000", Layer: "top", NormalizedSide: "top", RawLayer: "F.Cu", RawRotationDegrees: "450.000", NormalizedRotationDegrees: "90.000", BOMLinkageStatus: "linked", PlacementSource: "pcb"}})
 	if err != nil {
@@ -241,6 +255,52 @@ func TestReportCSVSerializationEscapesFields(t *testing.T) {
 	if !strings.Contains(string(cpl), "Reference,Footprint,ComponentID") || !strings.Contains(string(cpl), "U1,Package:QFN,ic.example") || !strings.Contains(string(cpl), "NormalizedRotation,BOMLinkageStatus") {
 		t.Fatalf("CPL CSV unexpected:\n%s", cpl)
 	}
+}
+
+func TestEnrichBOMRowsWithProcurementSnapshots(t *testing.T) {
+	sources := loadFabricationSourceFixture(t, "valid")
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
+	rows, issues := EnrichBOMRowsWithProcurement([]BOMRow{{
+		References:   []string{"U1"},
+		Manufacturer: "Diodes Incorporated",
+		MPN:          "AP2112K-3.3",
+	}}, sources, components.ProcurementPolicy{Now: &now})
+	if len(rows) != 1 {
+		t.Fatalf("rows = %#v", rows)
+	}
+	row := rows[0]
+	if row.ProcurementSourceID != "curated_seed_procurement" || row.Lifecycle != "active" || row.AvailabilityStatus != "not_checked" || row.ProcurementOutcome != "snapshot" {
+		t.Fatalf("row = %#v", row)
+	}
+	if row.LifecycleFresh == nil || !*row.LifecycleFresh {
+		t.Fatalf("lifecycle freshness missing: %#v", row)
+	}
+	if !hasIssuePath(issues, "bom.U1.availability") || reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v, want advisory availability warning only", issues)
+	}
+}
+
+func TestEnrichBOMRowsWithProcurementRequiredAvailabilityBlocks(t *testing.T) {
+	sources := loadFabricationSourceFixture(t, "valid")
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
+	_, issues := EnrichBOMRowsWithProcurement([]BOMRow{{
+		References:   []string{"U1"},
+		Manufacturer: "Diodes Incorporated",
+		MPN:          "AP2112K-3.3",
+	}}, sources, components.ProcurementPolicy{RequireAvailability: true, Now: &now})
+	if !reports.HasBlockingIssue(issues) || !hasIssuePath(issues, "bom.U1.availability") {
+		t.Fatalf("issues = %#v, want required availability blocker", issues)
+	}
+}
+
+func loadFabricationSourceFixture(t *testing.T, name string) *components.SourceCollection {
+	t.Helper()
+	dir := filepath.Join("..", "components", "testdata", "sources", name)
+	sources, err := components.LoadSources(context.Background(), components.SourceLoadOptions{SourceDir: dir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return sources
 }
 
 func TestSummaryFilePathResolvesRelativePaths(t *testing.T) {

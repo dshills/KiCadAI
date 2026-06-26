@@ -1959,6 +1959,25 @@ func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		KiCadCLI:            opts.kicadCLI,
 		CLIPolicy:           exportCLIPolicy(opts),
 		ManufacturerProfile: opts.manufacturerProfile,
+		SourceDir:           opts.sourceDir,
+	}
+	if strings.TrimSpace(opts.sourceDir) != "" {
+		sources, err := components.LoadSources(ctx, components.SourceLoadOptions{SourceDir: opts.sourceDir})
+		if err != nil {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.source_dir", Message: err.Error()}
+			if err := writeReportJSON(stdout, reports.ErrorResult("export", issue)); err != nil {
+				return err
+			}
+			return fmt.Errorf("load component sources: %w", err)
+		}
+		if sources == nil {
+			issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.source_dir", Message: "component source loader returned nil collection"}
+			if err := writeReportJSON(stdout, reports.ErrorResult("export", issue)); err != nil {
+				return err
+			}
+			return errors.New(issue.Message)
+		}
+		options.Sources = sources
 	}
 	target := opts.commandArgs[1]
 	var data fabrication.Result

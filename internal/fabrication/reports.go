@@ -20,23 +20,30 @@ import (
 )
 
 type BOMRow struct {
-	References            []string       `json:"references"`
-	Quantity              int            `json:"quantity"`
-	Value                 string         `json:"value"`
-	SymbolID              string         `json:"symbol_id,omitempty"`
-	FootprintID           string         `json:"footprint_id,omitempty"`
-	ComponentID           string         `json:"component_id,omitempty"`
-	Manufacturer          string         `json:"manufacturer,omitempty"`
-	MPN                   string         `json:"mpn,omitempty"`
-	Package               string         `json:"package,omitempty"`
-	ComponentClass        string         `json:"component_class,omitempty"`
-	Lifecycle             string         `json:"lifecycle,omitempty"`
-	Confidence            string         `json:"confidence"`
-	IdentityStatus        IdentityStatus `json:"identity_status,omitempty"`
-	IdentitySource        IdentitySource `json:"identity_source,omitempty"`
-	IdentityIssueCount    int            `json:"identity_issue_count,omitempty"`
-	IdentityBlockingCount int            `json:"identity_blocking_count,omitempty"`
-	ReadinessNote         string         `json:"readiness_note,omitempty"`
+	References             []string       `json:"references"`
+	Quantity               int            `json:"quantity"`
+	Value                  string         `json:"value"`
+	SymbolID               string         `json:"symbol_id,omitempty"`
+	FootprintID            string         `json:"footprint_id,omitempty"`
+	ComponentID            string         `json:"component_id,omitempty"`
+	Manufacturer           string         `json:"manufacturer,omitempty"`
+	MPN                    string         `json:"mpn,omitempty"`
+	Package                string         `json:"package,omitempty"`
+	ComponentClass         string         `json:"component_class,omitempty"`
+	Lifecycle              string         `json:"lifecycle,omitempty"`
+	ProcurementSourceID    string         `json:"procurement_source_id,omitempty"`
+	LifecycleSourceDate    string         `json:"lifecycle_source_date,omitempty"`
+	LifecycleFresh         *bool          `json:"lifecycle_fresh,omitempty"`
+	AvailabilityStatus     string         `json:"availability_status,omitempty"`
+	AvailabilitySourceDate string         `json:"availability_source_date,omitempty"`
+	AvailabilityFresh      *bool          `json:"availability_fresh,omitempty"`
+	ProcurementOutcome     string         `json:"procurement_outcome,omitempty"`
+	Confidence             string         `json:"confidence"`
+	IdentityStatus         IdentityStatus `json:"identity_status,omitempty"`
+	IdentitySource         IdentitySource `json:"identity_source,omitempty"`
+	IdentityIssueCount     int            `json:"identity_issue_count,omitempty"`
+	IdentityBlockingCount  int            `json:"identity_blocking_count,omitempty"`
+	ReadinessNote          string         `json:"readiness_note,omitempty"`
 }
 
 type CPLRow struct {
@@ -491,7 +498,7 @@ func ValidateBOMCPLConsistency(bom []BOMRow, cpl []CPLRow) (ConsistencySummary, 
 func MarshalBOMCSV(rows []BOMRow) ([]byte, error) {
 	var buf bytes.Buffer
 	writer := csv.NewWriter(&buf)
-	if err := writer.Write([]string{"References", "Quantity", "Value", "SymbolID", "FootprintID", "ComponentID", "Manufacturer", "MPN", "Package", "ComponentClass", "Lifecycle", "Confidence", "IdentityStatus", "IdentitySource", "IdentityIssueCount", "IdentityBlockingCount", "ReadinessNote"}); err != nil {
+	if err := writer.Write([]string{"References", "Quantity", "Value", "SymbolID", "FootprintID", "ComponentID", "Manufacturer", "MPN", "Package", "ComponentClass", "Lifecycle", "Confidence", "IdentityStatus", "IdentitySource", "IdentityIssueCount", "IdentityBlockingCount", "ReadinessNote", "ProcurementSourceID", "LifecycleSourceDate", "LifecycleFresh", "AvailabilityStatus", "AvailabilitySourceDate", "AvailabilityFresh", "ProcurementOutcome"}); err != nil {
 		return nil, err
 	}
 	for _, row := range rows {
@@ -513,6 +520,13 @@ func MarshalBOMCSV(rows []BOMRow) ([]byte, error) {
 			strconv.Itoa(row.IdentityIssueCount),
 			strconv.Itoa(row.IdentityBlockingCount),
 			row.ReadinessNote,
+			row.ProcurementSourceID,
+			row.LifecycleSourceDate,
+			boolPtrCSV(row.LifecycleFresh),
+			row.AvailabilityStatus,
+			row.AvailabilitySourceDate,
+			boolPtrCSV(row.AvailabilityFresh),
+			row.ProcurementOutcome,
 		}); err != nil {
 			return nil, err
 		}
@@ -836,6 +850,13 @@ func boolPtrValue(value *bool, fallback bool) bool {
 		return fallback
 	}
 	return *value
+}
+
+func boolPtrCSV(value *bool) string {
+	if value == nil {
+		return ""
+	}
+	return strconv.FormatBool(*value)
 }
 
 func firstNonEmpty(values ...string) string {
