@@ -307,6 +307,9 @@ func (builder *planBuilder) mapPower() {
 		}
 		if needsRegulator(builder.request.Power.Inputs, rail) {
 			params := map[string]any{"output_voltage": rail.Voltage}
+			if rail.CurrentMA > 0 {
+				params["output_current"] = formatScaledLiteral(rail.CurrentMA/1000.0) + "A"
+			}
 			source, sourceOK, ambiguous := builder.powerSourceForRail(rail.Voltage)
 			if sourceOK {
 				params["input_voltage"] = source.voltage

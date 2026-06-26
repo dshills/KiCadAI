@@ -17,7 +17,7 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 		Board:      BoardIntent{WidthMM: 50, HeightMM: 30, Layers: 2},
 		Power: PowerIntent{
 			Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}},
-			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 250}},
 		},
 		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V"}},
 		Functions:  []FunctionIntent{{Kind: "sensor", Family: "i2c_sensor"}},
@@ -47,6 +47,21 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 	}
 	if !hasSynthesisCalculationKind(plan, "i2c_pullup") || !hasSynthesisCalculationKind(plan, "regulator_headroom") {
 		t.Fatalf("missing synthesis calculations: %#v", plan.Synthesis.Calculations)
+	}
+	for _, check := range []struct {
+		key   string
+		kind  string
+		value string
+		unit  string
+	}{
+		{key: "regulator.regulator", kind: "input_voltage", value: "5", unit: "V"},
+		{key: "regulator.regulator", kind: "output_current", value: "0.25", unit: "A"},
+		{key: "regulator.input_capacitor", kind: "voltage", value: "6.3", unit: "V"},
+		{key: "regulator.output_capacitor", kind: "voltage", value: "6.3", unit: "V"},
+	} {
+		if !workflowRequiredRatingValue(*plan.GeneratedRequest, check.key, check.kind, check.value, check.unit) {
+			t.Fatalf("missing required rating %s on %s: %#v", check.kind, check.key, plan.GeneratedRequest.Components.Overrides)
+		}
 	}
 }
 
@@ -885,6 +900,19 @@ func workflowRequiredRating(request designworkflow.Request, key string, kind str
 	}
 	for _, rating := range override.RequiredRatings {
 		if rating.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func workflowRequiredRatingValue(request designworkflow.Request, key string, kind string, value string, unit string) bool {
+	override, ok := request.Components.Overrides[key]
+	if !ok {
+		return false
+	}
+	for _, rating := range override.RequiredRatings {
+		if rating.Kind == kind && rating.Value == value && rating.Unit == unit {
 			return true
 		}
 	}

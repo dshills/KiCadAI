@@ -84,3 +84,31 @@ func TestParseFloatStringRejectsTrailingJunk(t *testing.T) {
 		t.Fatalf("parseFloatString = %v, %v; want 1.2, true", got, ok)
 	}
 }
+
+func TestParseCurrentA(t *testing.T) {
+	for _, tc := range []struct {
+		value string
+		want  float64
+	}{
+		{value: "100uA", want: 0.0001},
+		{value: "250µA", want: 0.00025},
+		{value: "250μA", want: 0.00025},
+		{value: "250mA", want: 0.25},
+		{value: "0.5A", want: 0.5},
+		{value: "1", want: 1},
+	} {
+		got, ok := parseCurrentA(tc.value)
+		if !ok || got != tc.want {
+			t.Fatalf("parseCurrentA(%q) = %v, %v; want %v, true", tc.value, got, ok, tc.want)
+		}
+	}
+	if _, ok := parseCurrentA("bad"); ok {
+		t.Fatal("parseCurrentA accepted malformed value")
+	}
+}
+
+func TestCapacitorVoltageRatingUsesMagnitude(t *testing.T) {
+	if got := capacitorVoltageRating(-5); got != 6.3 {
+		t.Fatalf("capacitorVoltageRating(-5) = %v, want 6.3", got)
+	}
+}

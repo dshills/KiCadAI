@@ -236,6 +236,9 @@ func (builder *planBuilder) applyCalculatedRatingOverrides() {
 	for _, instanceID := range builder.ledIDs {
 		builder.applyLEDRatingOverrides(instanceID)
 	}
+	for _, instanceID := range builder.regulatorIDs {
+		builder.applyRegulatorRatingOverrides(instanceID)
+	}
 	for _, instanceID := range builder.amplifierIDs {
 		builder.applyOpAmpRatingOverrides(instanceID)
 	}
@@ -268,6 +271,50 @@ func (builder *planBuilder) applyOpAmpRatingOverrides(instanceID string) {
 		return
 	}
 	builder.appendComponentRequiredRating(instanceID, "opamp", components.RequiredRating{Kind: "supply_voltage", Value: formatScaledLiteral(voltage), Unit: "V"})
+}
+
+func (builder *planBuilder) applyRegulatorRatingOverrides(instanceID string) {
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		return
+	}
+	if inputVoltage, ok := parseVoltage(paramValue(params, "input_voltage")); ok {
+		builder.appendComponentRequiredRating(instanceID, "regulator", components.RequiredRating{Kind: "input_voltage", Value: formatScaledLiteral(inputVoltage), Unit: "V"})
+		builder.appendComponentRequiredRating(instanceID, "input_capacitor", components.RequiredRating{Kind: "voltage", Value: formatScaledLiteral(capacitorVoltageRating(inputVoltage)), Unit: "V"})
+	}
+	if outputVoltage, ok := parseVoltage(paramValue(params, "output_voltage")); ok {
+		builder.appendComponentRequiredRating(instanceID, "output_capacitor", components.RequiredRating{Kind: "voltage", Value: formatScaledLiteral(capacitorVoltageRating(outputVoltage)), Unit: "V"})
+	}
+	if outputCurrent, ok := parseCurrentA(paramValue(params, "output_current")); ok {
+		builder.appendComponentRequiredRating(instanceID, "regulator", components.RequiredRating{Kind: "output_current", Value: formatScaledLiteral(outputCurrent), Unit: "A"})
+	}
+}
+
+func capacitorVoltageRating(operatingVoltage float64) float64 {
+	target := math.Abs(operatingVoltage) * 1.25
+	for _, rating := range []float64{4, 6.3, 10, 16, 25, 50, 100} {
+		if target <= rating {
+			return rating
+		}
+	}
+	return target
+}
+
+func parseCurrentA(value string) (float64, bool) {
+	lower := strings.TrimSpace(strings.ToLower(strings.NewReplacer("µ", "u", "μ", "u").Replace(value)))
+	switch {
+	case strings.HasSuffix(lower, "ua"):
+		trimmed := strings.TrimSuffix(lower, "ua")
+		parsed, ok := parseFloatString(strings.TrimSpace(trimmed))
+		return parsed / 1_000_000, ok
+	case strings.HasSuffix(lower, "ma"):
+		parsed, ok := parseFloatString(strings.TrimSpace(strings.TrimSuffix(lower, "ma")))
+		return parsed / 1000, ok
+	case strings.HasSuffix(lower, "a"):
+		return parseFloatString(strings.TrimSpace(strings.TrimSuffix(lower, "a")))
+	default:
+		return parseFloatString(lower)
+	}
 }
 
 func (builder *planBuilder) appendComponentRequiredRating(instanceID string, role string, rating components.RequiredRating) {
