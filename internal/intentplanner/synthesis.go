@@ -318,11 +318,17 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				ID:          "calc.i2c_pullup." + block.InstanceID,
 				Kind:        "i2c_pullup",
 				Path:        "blocks." + block.InstanceID,
-				Inputs:      paramsToStringMap(block.Params, "supply_voltage", "bus_speed_hz", "pullup_ohms"),
+				Inputs:      paramsToStringMap(block.Params, "supply_voltage", "bus_speed_hz", "pullup_ohms", "pullup_value", "include_pullups"),
 				Result:      i2cPullupResult(block.Params),
 				Formula:     "default low-speed I2C pull-up policy",
 				Assumptions: []string{"exact pull-up value remains block/component policy unless explicitly requested"},
 				Confidence:  "policy",
+				Status:      i2cPullupCalculationStatus(block),
+				Applied:     i2cPullupAppliedValues(block),
+				Requirements: []CalculatedRequirement{
+					i2cPullupResistanceRequirement(block),
+					i2cPullupVoltageRequirement(block),
+				},
 			})
 		case "voltage_regulator":
 			builder.recordSynthesisCalculation(SynthesisCalculation{
@@ -520,14 +526,63 @@ func ledResistorPowerRequirement(block SelectedBlockRecord) CalculatedRequiremen
 }
 
 func i2cPullupResult(params map[string]any) map[string]string {
-	if explicit := paramValue(params, "pullup_ohms"); explicit != "" {
+	if explicit := firstNonEmpty(paramValue(params, "pullup_value"), paramValue(params, "pullup_ohms")); explicit != "" {
 		return map[string]string{"pullup_ohms": explicit}
 	}
 	speed, speedOK := parseFloatParam(params, "bus_speed_hz")
 	if speedOK && speed > 100000 {
-		return map[string]string{"recommended_range_ohms": "2200-4700"}
+		return map[string]string{"recommended_range_ohms": i2cPullupRangeFast}
 	}
-	return map[string]string{"recommended_range_ohms": "4700-10000"}
+	return map[string]string{"recommended_range_ohms": i2cPullupRangeDefault}
+}
+
+func i2cPullupCalculationStatus(block SelectedBlockRecord) string {
+	if !boolParamDefault(block.Params, "include_pullups", true) {
+		return "deferred"
+	}
+	rule, _ := valueApplicationRuleFor(block.BlockID, "i2c_pullup")
+	if rule.Param != "" && paramValue(block.Params, rule.Param) != "" {
+		return "applied"
+	}
+	return "deferred"
+}
+
+func i2cPullupAppliedValues(block SelectedBlockRecord) []AppliedValue {
+	if !boolParamDefault(block.Params, "include_pullups", true) {
+		return nil
+	}
+	rule, _ := valueApplicationRuleFor(block.BlockID, "i2c_pullup")
+	param := firstNonEmpty(rule.Param, "pullup_value")
+	value := paramValue(block.Params, param)
+	if value == "" {
+		return nil
+	}
+	return []AppliedValue{appliedBlockValue(block.InstanceID, param, value, "ohm", "policy")}
+}
+
+func i2cPullupResistanceRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	value := paramValue(block.Params, "pullup_value")
+	if value == "" {
+		if result := i2cPullupResult(block.Params); result != nil {
+			value = i2cPullupConcreteValue(result)
+		}
+	}
+	if value == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("i2c_pullup", "resistance", "=", value, "ohm", "i2c_pullup")
+}
+
+func i2cPullupVoltageRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	voltage := paramValue(block.Params, "supply_voltage")
+	if voltage == "" {
+		return CalculatedRequirement{}
+	}
+	parsed, ok := parseVoltage(voltage)
+	if !ok {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("i2c_pullup", "voltage", "=", formatScaledLiteral(parsed), "V", "i2c_pullup")
 }
 
 func regulatorHeadroomResult(params map[string]any) map[string]string {

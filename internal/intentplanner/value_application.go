@@ -18,6 +18,11 @@ type valueApplicationRule struct {
 	Method          string
 }
 
+const (
+	i2cPullupRangeFast    = "2200-4700"
+	i2cPullupRangeDefault = "4700-10000"
+)
+
 var valueApplicationRules = []valueApplicationRule{
 	{BlockID: "led_indicator", CalculationKind: "led_resistor", ResultKey: "resistance_ohms", Param: "resistor_value", Unit: "ohm", Method: "calculated"},
 	{BlockID: "i2c_sensor", CalculationKind: "i2c_pullup", ResultKey: "pullup_ohms", Param: "pullup_value", Unit: "ohm", Method: "policy"},
@@ -27,6 +32,9 @@ var valueApplicationRules = []valueApplicationRule{
 func (builder *planBuilder) applyCalculatedValueApplications() {
 	for _, instanceID := range builder.ledIDs {
 		builder.applyLEDResistorValue(instanceID)
+	}
+	for _, instanceID := range builder.sensorIDs {
+		builder.applyI2CPullupValue(instanceID)
 	}
 }
 
@@ -88,6 +96,80 @@ func normalizeLEDCurrentParam(params map[string]any) {
 
 func ledCalculationWasExplicit(params map[string]any) bool {
 	return paramValue(params, "supply_voltage") != "" || paramValue(params, "led_forward_voltage") != "" || paramValue(params, "led_current") != "" || paramValue(params, "led_current_ma") != ""
+}
+
+func (builder *planBuilder) applyI2CPullupValue(instanceID string) {
+	blockID := builder.instanceBlockIDs[instanceID]
+	if blockID != "i2c_sensor" {
+		return
+	}
+	params := builder.instanceParams[instanceID]
+	if params == nil || !boolParamDefault(params, "include_pullups", true) {
+		return
+	}
+	result := i2cPullupResult(params)
+	if result == nil {
+		return
+	}
+	value := i2cPullupConcreteValue(result)
+	if value == "" {
+		return
+	}
+	rule, ok := valueApplicationRuleFor(blockID, "i2c_pullup")
+	if !ok || !builder.blockSupportsParam(blockID, rule.Param) {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+			ID:         "calc.i2c_pullup." + instanceID + ".deferred",
+			Path:       "blocks." + instanceID,
+			Message:    "I2C pull-up calculation could not be applied because the block does not expose a compatible parameter",
+			Severity:   reports.SeverityWarning,
+			Suggestion: "add a supported pullup_value parameter to the I2C sensor block",
+		})
+		return
+	}
+	params[rule.Param] = value
+	builder.updateSelectedBlockParam(instanceID, rule.Param, value)
+}
+
+func boolParamDefault(params map[string]any, key string, fallback bool) bool {
+	value, ok := params[key]
+	if !ok || value == nil {
+		return fallback
+	}
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case int:
+		return typed != 0
+	case int64:
+		return typed != 0
+	case float64:
+		return typed != 0
+	case string:
+		switch strings.ToLower(strings.TrimSpace(typed)) {
+		case "true", "yes", "1":
+			return true
+		case "false", "no", "0":
+			return false
+		}
+	}
+	return fallback
+}
+
+func i2cPullupConcreteValue(result map[string]string) string {
+	if explicit := strings.TrimSpace(result["pullup_ohms"]); explicit != "" {
+		if ohms, ok := parseFloatString(explicit); ok {
+			return formatResistanceLiteral(ohms)
+		}
+		return explicit
+	}
+	switch strings.TrimSpace(result["recommended_range_ohms"]) {
+	case i2cPullupRangeFast:
+		return "2.2k"
+	case i2cPullupRangeDefault:
+		return "4.7k"
+	default:
+		return ""
+	}
 }
 
 func (builder *planBuilder) blockSupportsParam(blockID string, param string) bool {

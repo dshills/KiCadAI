@@ -299,6 +299,53 @@ func TestPlanPreservesFractionalLEDResistance(t *testing.T) {
 	}
 }
 
+func TestPlanAppliesI2CPullupValue(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "i2c_pullups",
+		Kind:    IntentSensorNode,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "3.3V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "sensor", Family: "i2c_sensor", Params: map[string]any{"supply_voltage": "3.3V", "bus_speed_hz": 400000}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V"}},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "i2c_sensor", "pullup_value"); got != "2.2k" {
+		t.Fatalf("pullup_value = %q; blocks=%#v", got, plan.GeneratedRequest.Blocks)
+	}
+	if status := synthesisCalculationStatus(plan, "i2c_pullup"); status != "applied" {
+		t.Fatalf("I2C pull-up status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+	if !synthesisCalculationRequirement(plan, "i2c_pullup", "i2c_pullup", "voltage") {
+		t.Fatalf("missing I2C voltage requirement: %#v", plan.Synthesis.Calculations)
+	}
+}
+
+func TestPlanDefersExternalI2CPullups(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "external_i2c_pullups",
+		Kind:    IntentSensorNode,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "3.3V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "sensor", Family: "i2c_sensor", Params: map[string]any{"supply_voltage": "3.3V", "include_pullups": false}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V"}},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "i2c_sensor", "pullup_value"); got != "" {
+		t.Fatalf("pullup_value = %q, want deferred empty", got)
+	}
+	if status := synthesisCalculationStatus(plan, "i2c_pullup"); status != "deferred" {
+		t.Fatalf("I2C pull-up status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+}
+
 func synthesisCalculationResult(plan PlanResult, kind string, key string) string {
 	for _, calculation := range plan.Synthesis.Calculations {
 		if calculation.Kind == kind {
