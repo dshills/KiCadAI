@@ -313,6 +313,9 @@ func (builder *planBuilder) mapPower() {
 			source, sourceOK, ambiguous := builder.powerSourceForRail(rail.Voltage)
 			if sourceOK {
 				params["input_voltage"] = source.voltage
+				for key, value := range regulatorVariantParams(source.voltage, rail.Voltage, rail.CurrentMA) {
+					params[key] = value
+				}
 				if ambiguous {
 					builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: reqID + ".input_voltage.selected", Path: "power.inputs", Message: "selected the nearest compatible declared power input voltage for regulator input"})
 				}
@@ -327,6 +330,35 @@ func (builder *planBuilder) mapPower() {
 			}
 		}
 	}
+}
+
+func regulatorVariantParams(inputVoltage string, outputVoltage string, currentMA float64) map[string]any {
+	input, inputOK := parseVoltage(inputVoltage)
+	output, outputOK := parseVoltage(outputVoltage)
+	if !inputOK || !outputOK {
+		return nil
+	}
+	currentA := currentMA / 1000.0
+	if currentA <= 0 {
+		currentA = 0.25
+	}
+	if almostEqualVoltage(output, 3.3) && input <= 6.0 && currentA <= 0.6 {
+		return map[string]any{
+			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+			"input_voltage_min":   inputVoltage,
+			"input_voltage_max":   inputVoltage,
+			"enable_mode":         "tied_input",
+		}
+	}
+	return nil
+}
+
+func almostEqualVoltage(a float64, b float64) bool {
+	if a > b {
+		return a-b < 0.001
+	}
+	return b-a < 0.001
 }
 
 func (builder *planBuilder) mapFunctions() {

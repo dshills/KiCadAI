@@ -332,19 +332,25 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 			})
 		case "voltage_regulator":
 			builder.recordSynthesisCalculation(SynthesisCalculation{
-				ID:         "calc.regulator_headroom." + block.InstanceID,
-				Kind:       "regulator_headroom",
-				Path:       "blocks." + block.InstanceID,
-				Inputs:     paramsToStringMap(block.Params, "input_voltage", "output_voltage"),
-				Result:     regulatorHeadroomResult(block.Params),
-				Formula:    "Vin must exceed Vout plus regulator dropout",
-				Confidence: "policy",
-				Status:     regulatorHeadroomStatus(block),
+				ID:          "calc.regulator_headroom." + block.InstanceID,
+				Kind:        "regulator_headroom",
+				Path:        "blocks." + block.InstanceID,
+				Inputs:      paramsToStringMap(block.Params, "input_voltage", "output_voltage", "output_current", "regulator_symbol", "regulator_footprint", "enable_mode"),
+				Result:      regulatorHeadroomResult(block.Params),
+				Formula:     "Vin must exceed Vout plus regulator dropout and safety margin",
+				Assumptions: regulatorReviewAssumptions(block),
+				Confidence:  "policy",
+				Status:      regulatorHeadroomStatus(block),
 				Requirements: []CalculatedRequirement{
 					regulatorVoltageRequirement(block, "input_voltage"),
 					regulatorVoltageRequirement(block, "output_voltage"),
 					regulatorCurrentRequirement(block),
 					regulatorHeadroomRequirement(block),
+					regulatorDropoutRequirement(block),
+					regulatorCapacitorPolicyRequirement(block, "input_capacitor", "input_voltage"),
+					regulatorCapacitorPolicyRequirement(block, "output_capacitor", "output_voltage"),
+					regulatorThermalReviewRequirement(block),
+					regulatorStabilityReviewRequirement(block),
 				},
 			})
 		case "crystal_oscillator":
@@ -608,7 +614,19 @@ func regulatorHeadroomResult(params map[string]any) map[string]string {
 	if !inputOK || !outputOK {
 		return nil
 	}
-	return map[string]string{"headroom_v": fmt.Sprintf("%.2f", input-output)}
+	result := map[string]string{
+		"headroom_v":               fmt.Sprintf("%.2f", input-output),
+		"variant":                  regulatorVariantName(params),
+		"dropout_margin_required":  regulatorDropoutMargin(params),
+		"capacitor_voltage_policy": "minimum_125_percent_operating_voltage",
+	}
+	if thermal := regulatorThermalReview(params); thermal != "" {
+		result["thermal_review"] = thermal
+	}
+	if stability := regulatorStabilityReview(params); stability != "" {
+		result["stability_review"] = stability
+	}
+	return result
 }
 
 func regulatorHeadroomStatus(block SelectedBlockRecord) string {
@@ -649,6 +667,86 @@ func regulatorHeadroomRequirement(block SelectedBlockRecord) CalculatedRequireme
 		return CalculatedRequirement{}
 	}
 	return calculatedRequirement("regulator", "headroom", ">", "0", "V", "regulator_headroom")
+}
+
+func regulatorDropoutRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	margin := regulatorDropoutMargin(block.Params)
+	if margin == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator", "dropout_margin", ">=", margin, "V", "regulator_headroom")
+}
+
+func regulatorCapacitorPolicyRequirement(block SelectedBlockRecord, subject string, voltageKey string) CalculatedRequirement {
+	voltage, ok := parseVoltage(paramValue(block.Params, voltageKey))
+	if !ok {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator."+subject, "voltage_policy", ">=", formatScaledLiteral(capacitorVoltageRating(voltage)), "V", "minimum_125_percent_operating_voltage")
+}
+
+func regulatorThermalReviewRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	review := regulatorThermalReview(block.Params)
+	if review == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator", "thermal_review", "requires", review, "", "regulator_profile")
+}
+
+func regulatorStabilityReviewRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	review := regulatorStabilityReview(block.Params)
+	if review == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator", "stability_review", "requires", review, "", "regulator_profile")
+}
+
+func regulatorReviewAssumptions(block SelectedBlockRecord) []string {
+	return compactTraceStrings([]string{
+		"capacitor voltage policy is minimum automated class, not MLCC DC-bias proof",
+		regulatorThermalReview(block.Params),
+		regulatorStabilityReview(block.Params),
+	})
+}
+
+func regulatorVariantName(params map[string]any) string {
+	switch paramValue(params, "regulator_symbol") {
+	case "Regulator_Linear:AP2112K-3.3":
+		return "ap2112k_3v3_sot23_5"
+	case "":
+		return "default_fixed_linear_regulator"
+	case "Regulator_Linear:AMS1117-3.3":
+		return "ams1117_3v3_sot223"
+	default:
+		return normalizeToken(paramValue(params, "regulator_symbol"))
+	}
+}
+
+func regulatorDropoutMargin(params map[string]any) string {
+	switch regulatorVariantName(params) {
+	case "ap2112k_3v3_sot23_5":
+		return "0.5"
+	default:
+		return "1.3"
+	}
+}
+
+func regulatorThermalReview(params map[string]any) string {
+	switch regulatorVariantName(params) {
+	case "ap2112k_3v3_sot23_5":
+		return "review SOT-23-5 dissipation against board copper and ambient temperature"
+	default:
+		return "review SOT-223 dissipation against board copper and ambient temperature"
+	}
+}
+
+func regulatorStabilityReview(params map[string]any) string {
+	switch regulatorVariantName(params) {
+	case "ap2112k_3v3_sot23_5":
+		return "verify AP2112K input/output capacitor effective capacitance and ESR"
+	default:
+		return "verify selected regulator input/output capacitor effective capacitance and ESR"
+	}
 }
 
 func crystalLoadResult(params map[string]any) map[string]string {

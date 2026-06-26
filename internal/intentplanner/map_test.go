@@ -48,6 +48,26 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 	if !hasSynthesisCalculationKind(plan, "i2c_pullup") || !hasSynthesisCalculationKind(plan, "regulator_headroom") {
 		t.Fatalf("missing synthesis calculations: %#v", plan.Synthesis.Calculations)
 	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "voltage_regulator", "regulator_symbol"); got != "Regulator_Linear:AP2112K-3.3" {
+		t.Fatalf("regulator_symbol = %q; blocks=%#v", got, plan.GeneratedRequest.Blocks)
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "voltage_regulator", "enable_mode"); got != "tied_input" {
+		t.Fatalf("enable_mode = %q; blocks=%#v", got, plan.GeneratedRequest.Blocks)
+	}
+	if got := synthesisCalculationResult(plan, "regulator_headroom", "variant"); got != "ap2112k_3v3_sot23_5" {
+		t.Fatalf("regulator variant = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+	if got := synthesisCalculationResult(plan, "regulator_headroom", "dropout_margin_required"); got != "0.5" {
+		t.Fatalf("dropout margin = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+	if got := synthesisCalculationResult(plan, "regulator_headroom", "capacitor_voltage_policy"); got != "minimum_125_percent_operating_voltage" {
+		t.Fatalf("capacitor policy = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+	if !synthesisCalculationRequirement(plan, "regulator_headroom", "regulator", "thermal_review") ||
+		!synthesisCalculationRequirement(plan, "regulator_headroom", "regulator", "stability_review") ||
+		!synthesisCalculationRequirement(plan, "regulator_headroom", "regulator.output_capacitor", "voltage_policy") {
+		t.Fatalf("missing regulator review requirements: %#v", plan.Synthesis.Calculations)
+	}
 	for _, check := range []struct {
 		key   string
 		kind  string
@@ -62,6 +82,25 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 		if !workflowRequiredRatingValue(*plan.GeneratedRequest, check.key, check.kind, check.value, check.unit) {
 			t.Fatalf("missing required rating %s on %s: %#v", check.kind, check.key, plan.GeneratedRequest.Components.Overrides)
 		}
+	}
+}
+
+func TestPlanDoesNotSelectAP2112KAboveModeledCurrent(t *testing.T) {
+	plan := Plan(Request{
+		Version:    "0.1.0",
+		Name:       "high_current_rail",
+		Kind:       IntentPowerModule,
+		Acceptance: designworkflow.AcceptanceConnectivity,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 900}},
+		},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing")
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "voltage_regulator", "regulator_symbol"); got == "Regulator_Linear:AP2112K-3.3" {
+		t.Fatalf("unexpected AP2112K selection for high-current rail")
 	}
 }
 
