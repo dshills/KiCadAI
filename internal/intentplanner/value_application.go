@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/reports"
 )
 
 type valueApplicationRule struct {
@@ -23,6 +24,48 @@ var valueApplicationRules = []valueApplicationRule{
 	{BlockID: "crystal_oscillator", CalculationKind: "crystal_load_cap", ResultKey: "capacitor_pf_each", Param: "load_capacitor_value", Unit: "pF", Method: "calculated"},
 }
 
+func (builder *planBuilder) applyCalculatedValueApplications() {
+	for _, instanceID := range builder.ledIDs {
+		builder.applyLEDResistorValue(instanceID)
+	}
+}
+
+func (builder *planBuilder) applyLEDResistorValue(instanceID string) {
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		return
+	}
+	normalizeLEDCurrentParam(params)
+	if value := paramValue(params, "led_current"); value != "" {
+		builder.updateSelectedBlockParam(instanceID, "led_current", value)
+	}
+	ohms, ok := ledResistorOhms(params)
+	if !ok {
+		if ledCalculationWasExplicit(params) {
+			builder.addIssue("blocks."+instanceID+".params.resistor_value", "could not calculate LED resistor value from supplied voltage/current parameters", "ensure supply_voltage is above led_forward_voltage and led_current is positive")
+		}
+		return
+	}
+	literal := formatResistanceLiteral(ohms)
+	if literal == "INVALID" {
+		builder.addIssue("blocks."+instanceID+".params.resistor_value", "calculated LED resistor value is invalid", "adjust LED voltage and current inputs")
+		return
+	}
+	rule, ok := valueApplicationRuleFor("led_indicator", "led_resistor")
+	if !ok || !builder.blockSupportsParam("led_indicator", rule.Param) {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+			ID:         "calc.led_resistor." + instanceID + ".deferred",
+			Path:       "blocks." + instanceID,
+			Message:    "LED resistor calculation could not be applied because the block does not expose a compatible parameter",
+			Severity:   reports.SeverityWarning,
+			Suggestion: "add a supported resistor_value parameter to the LED block",
+		})
+		return
+	}
+	params[rule.Param] = literal
+	builder.updateSelectedBlockParam(instanceID, rule.Param, literal)
+}
+
 func valueApplicationRuleFor(blockID string, kind string) (valueApplicationRule, bool) {
 	for _, rule := range valueApplicationRules {
 		if rule.BlockID == blockID && rule.CalculationKind == kind {
@@ -30,6 +73,21 @@ func valueApplicationRuleFor(blockID string, kind string) (valueApplicationRule,
 		}
 	}
 	return valueApplicationRule{}, false
+}
+
+func normalizeLEDCurrentParam(params map[string]any) {
+	if params == nil || paramValue(params, "led_current") != "" {
+		return
+	}
+	currentMA, ok := parseFloatParam(params, "led_current_ma")
+	if !ok {
+		return
+	}
+	params["led_current"] = formatScaledLiteral(currentMA) + "mA"
+}
+
+func ledCalculationWasExplicit(params map[string]any) bool {
+	return paramValue(params, "supply_voltage") != "" || paramValue(params, "led_forward_voltage") != "" || paramValue(params, "led_current") != "" || paramValue(params, "led_current_ma") != ""
 }
 
 func (builder *planBuilder) blockSupportsParam(blockID string, param string) bool {
@@ -113,5 +171,5 @@ func formatScaledLiteral(value float64) string {
 	if value >= 0.999995 && value < 1 {
 		return "1"
 	}
-	return strconv.FormatFloat(value, 'g', -1, 64)
+	return strconv.FormatFloat(value, 'g', 6, 64)
 }

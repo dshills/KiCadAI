@@ -1,6 +1,7 @@
 package intentplanner
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -243,8 +244,58 @@ func TestPlanRecordsValueCalculationResults(t *testing.T) {
 	if got := synthesisCalculationResult(plan, "led_resistor", "resistance_ohms"); got != "300" {
 		t.Fatalf("LED resistor result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
 	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "led_indicator", "resistor_value"); got != "300" {
+		t.Fatalf("generated LED resistor param = %q; blocks=%#v", got, plan.GeneratedRequest.Blocks)
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "led_indicator", "led_current"); got != "10mA" {
+		t.Fatalf("generated LED current param = %q; blocks=%#v", got, plan.GeneratedRequest.Blocks)
+	}
+	if status := synthesisCalculationStatus(plan, "led_resistor"); status != "applied" {
+		t.Fatalf("LED resistor status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+	if !synthesisCalculationAppliedPath(plan, "led_resistor", "blocks.indicator.params.resistor_value") {
+		t.Fatalf("missing LED applied value: %#v", plan.Synthesis.Calculations)
+	}
+	if !synthesisCalculationRequirement(plan, "led_resistor", "resistor", "power") {
+		t.Fatalf("missing LED resistor power requirement: %#v", plan.Synthesis.Calculations)
+	}
 	if got := synthesisCalculationResult(plan, "opamp_gain", "rf_over_rg"); got != "10.00" {
 		t.Fatalf("opamp gain result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+}
+
+func TestPlanBlocksInvalidExplicitLEDCalculation(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "bad_led",
+		Kind:    IntentBreakout,
+		Functions: []FunctionIntent{
+			{Kind: "indicator", Params: map[string]any{"supply_voltage": "2V", "led_forward_voltage": "3V", "led_current": "5mA"}},
+		},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if status := synthesisCalculationStatus(plan, "led_resistor"); status != "blocked" {
+		t.Fatalf("LED resistor status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+}
+
+func TestPlanPreservesFractionalLEDResistance(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "low_resistance_led",
+		Kind:    IntentBreakout,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "3.3V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "indicator", Params: map[string]any{"supply_voltage": "3.3V", "led_forward_voltage": "3.244V", "led_current": "10mA"}},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if got := synthesisCalculationResult(plan, "led_resistor", "resistance_ohms"); got != "5.6" {
+		t.Fatalf("LED resistor result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
 	}
 }
 
@@ -255,6 +306,43 @@ func synthesisCalculationResult(plan PlanResult, kind string, key string) string
 		}
 	}
 	return ""
+}
+
+func synthesisCalculationStatus(plan PlanResult, kind string) string {
+	for _, calculation := range plan.Synthesis.Calculations {
+		if calculation.Kind == kind {
+			return calculation.Status
+		}
+	}
+	return ""
+}
+
+func synthesisCalculationAppliedPath(plan PlanResult, kind string, path string) bool {
+	for _, calculation := range plan.Synthesis.Calculations {
+		if calculation.Kind != kind {
+			continue
+		}
+		for _, applied := range calculation.Applied {
+			if applied.Path == path {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func synthesisCalculationRequirement(plan PlanResult, kind string, subject string, requirementKind string) bool {
+	for _, calculation := range plan.Synthesis.Calculations {
+		if calculation.Kind != kind {
+			continue
+		}
+		for _, requirement := range calculation.Requirements {
+			if requirement.Subject == subject && requirement.Kind == requirementKind {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func TestPlanBlocksMultipleI2CBusesOnSingleMCU(t *testing.T) {
@@ -642,6 +730,18 @@ func hasWorkflowBlock(request designworkflow.Request, blockID string) bool {
 		}
 	}
 	return false
+}
+
+func workflowBlockParam(request designworkflow.Request, blockID string, key string) string {
+	for _, block := range request.Blocks {
+		if block.BlockID != blockID {
+			continue
+		}
+		if value, ok := block.Params[key]; ok {
+			return strings.TrimSpace(fmt.Sprint(value))
+		}
+	}
+	return ""
 }
 
 func hasConnection(request designworkflow.Request, from string, to string) bool {

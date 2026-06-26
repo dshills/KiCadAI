@@ -42,21 +42,22 @@ func Plan(request Request) PlanResult {
 				Acceptance: normalized.Acceptance,
 			},
 		},
-		ids:              map[string]int{},
-		usedIDs:          map[string]bool{},
-		instanceBlockIDs: map[string]string{},
-		instanceParams:   map[string]map[string]any{},
-		instanceVoltages: map[string]string{},
-		regulatorSources: map[string]powerSource{},
-		protectedSources: map[string]string{},
-		semantic:         newSemanticIndex(),
-		supportTargets:   map[string]semanticSupportIntent{},
-		i2cBuses:         map[string]string{},
-		i2cMCUBus:        map[string]string{},
-		instanceReqIDs:   map[string]string{},
-		instanceSupplies: map[string]string{},
-		railAliasVoltage: map[string]string{},
-		requirementIndex: map[string]int{},
+		ids:                map[string]int{},
+		usedIDs:            map[string]bool{},
+		instanceBlockIDs:   map[string]string{},
+		instanceParams:     map[string]map[string]any{},
+		instanceVoltages:   map[string]string{},
+		regulatorSources:   map[string]powerSource{},
+		protectedSources:   map[string]string{},
+		semantic:           newSemanticIndex(),
+		supportTargets:     map[string]semanticSupportIntent{},
+		i2cBuses:           map[string]string{},
+		i2cMCUBus:          map[string]string{},
+		instanceReqIDs:     map[string]string{},
+		instanceSupplies:   map[string]string{},
+		railAliasVoltage:   map[string]string{},
+		requirementIndex:   map[string]int{},
+		selectedBlockIndex: map[string]int{},
 	}
 	builder.applyBoardDefaults()
 	builder.applyPolicyDefaults()
@@ -65,6 +66,7 @@ func Plan(request Request) PlanResult {
 	builder.mapInterfaces()
 	builder.mapProtection()
 	builder.connectPowerAndSignals()
+	builder.applyCalculatedValueApplications()
 	if len(builder.workflow.Blocks) == 0 && !reports.HasBlockingIssue(builder.plan.Issues) {
 		builder.addIssue("intent", "intent did not map to any supported circuit blocks", "choose a supported function, interface, power input, or protection requirement")
 	}
@@ -95,6 +97,7 @@ type planBuilder struct {
 	instanceSupplies   map[string]string
 	railAliasVoltage   map[string]string
 	requirementIndex   map[string]int
+	selectedBlockIndex map[string]int
 	i2cDefaultNoted    bool
 	i2cMultiBusBlocked bool
 	usbPowerIDs        []string
@@ -1004,9 +1007,24 @@ func (builder *planBuilder) addBlock(reqID string, prefix string, blockID string
 			record.KnownGaps = append(record.KnownGaps, rule.ID)
 		}
 	}
+	if builder.selectedBlockIndex == nil {
+		builder.selectedBlockIndex = map[string]int{}
+	}
+	builder.selectedBlockIndex[id] = len(builder.plan.SelectedBlocks)
 	builder.plan.SelectedBlocks = append(builder.plan.SelectedBlocks, record)
 	builder.semantic.addInstance(id, prefix, blockID, clonedParams, definition)
 	return id
+}
+
+func (builder *planBuilder) updateSelectedBlockParam(instanceID string, key string, value any) {
+	index, ok := builder.selectedBlockIndex[instanceID]
+	if !ok || index < 0 || index >= len(builder.plan.SelectedBlocks) {
+		return
+	}
+	if builder.plan.SelectedBlocks[index].Params == nil {
+		builder.plan.SelectedBlocks[index].Params = map[string]any{}
+	}
+	builder.plan.SelectedBlocks[index].Params[key] = value
 }
 
 func (builder *planBuilder) addRequirement(record RequirementRecord) {

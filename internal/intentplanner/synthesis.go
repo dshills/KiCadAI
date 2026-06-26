@@ -2,6 +2,7 @@ package intentplanner
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/designworkflow"
@@ -66,6 +67,7 @@ func (builder *planBuilder) recordSynthesisCalculation(record SynthesisCalculati
 	if record.ID == "" || record.Kind == "" {
 		return
 	}
+	record.Requirements = compactCalculatedRequirements(record.Requirements)
 	builder.plan.Synthesis.Calculations = append(builder.plan.Synthesis.Calculations, record)
 }
 
@@ -298,11 +300,18 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				ID:          "calc.led_resistor." + block.InstanceID,
 				Kind:        "led_resistor",
 				Path:        "blocks." + block.InstanceID,
-				Inputs:      paramsToStringMap(block.Params, "supply_voltage", "led_forward_voltage", "led_current_ma"),
+				Inputs:      paramsToStringMap(block.Params, "supply_voltage", "led_forward_voltage", "led_current", "led_current_ma"),
 				Result:      ledResistorResult(block.Params),
 				Formula:     "(Vsupply - Vf) / Iled",
 				Assumptions: []string{"uses block defaults when request omits LED voltage or current"},
 				Confidence:  "policy",
+				Status:      ledResistorCalculationStatus(block),
+				Applied:     ledResistorAppliedValues(block),
+				Requirements: []CalculatedRequirement{
+					ledResistorRequirement(block),
+					ledCurrentRequirement(block),
+					ledResistorPowerRequirement(block),
+				},
 			})
 		case "i2c_sensor":
 			builder.recordSynthesisCalculation(SynthesisCalculation{
@@ -390,6 +399,17 @@ func compactTraceStrings(values []string) []string {
 	return out
 }
 
+func compactCalculatedRequirements(values []CalculatedRequirement) []CalculatedRequirement {
+	var out []CalculatedRequirement
+	for _, value := range values {
+		if value.Subject == "" || value.Kind == "" || value.Value == "" {
+			continue
+		}
+		out = append(out, value)
+	}
+	return out
+}
+
 func paramsToStringMap(params map[string]any, keys ...string) map[string]string {
 	out := map[string]string{}
 	for _, key := range keys {
@@ -404,14 +424,99 @@ func paramsToStringMap(params map[string]any, keys ...string) map[string]string 
 }
 
 func ledResistorResult(params map[string]any) map[string]string {
-	supply, supplyOK := parseVoltage(paramValue(params, "supply_voltage"))
-	forward, forwardOK := parseVoltage(paramValue(params, "led_forward_voltage"))
-	currentMA, currentOK := parseFloatParam(params, "led_current_ma")
-	if !supplyOK || !forwardOK || !currentOK || currentMA <= 0 || supply <= forward {
+	ohms, ok := ledResistorOhms(params)
+	if !ok {
 		return nil
 	}
+	return map[string]string{"resistance_ohms": formatScaledLiteral(ohms)}
+}
+
+func ledResistorOhms(params map[string]any) (float64, bool) {
+	supply, supplyOK := parseVoltage(paramValue(params, "supply_voltage"))
+	forward, forwardOK := parseVoltage(paramValue(params, "led_forward_voltage"))
+	currentMA, currentOK := ledCurrentMA(params)
+	if !supplyOK || !forwardOK || !currentOK || currentMA <= 0 || supply <= forward {
+		return 0, false
+	}
 	ohms := (supply - forward) / (currentMA / 1000)
-	return map[string]string{"resistance_ohms": fmt.Sprintf("%.0f", ohms)}
+	return ohms, true
+}
+
+func ledCurrentMA(params map[string]any) (float64, bool) {
+	if currentMA, ok := parseFloatParam(params, "led_current_ma"); ok {
+		return currentMA, true
+	}
+	current := paramValue(params, "led_current")
+	if current == "" {
+		return 0, false
+	}
+	lower := strings.TrimSpace(strings.ToLower(current))
+	switch {
+	case strings.HasSuffix(lower, "ma"):
+		return parseFloatString(strings.TrimSuffix(lower, "ma"))
+	case strings.HasSuffix(lower, "a"):
+		amps, ok := parseFloatString(strings.TrimSuffix(lower, "a"))
+		return amps * 1000, ok
+	default:
+		return parseFloatString(lower)
+	}
+}
+
+func parseFloatString(value string) (float64, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0, false
+	}
+	parsed, err := strconv.ParseFloat(value, 64)
+	if err != nil {
+		return 0, false
+	}
+	return parsed, true
+}
+
+func ledResistorCalculationStatus(block SelectedBlockRecord) string {
+	if paramValue(block.Params, "resistor_value") != "" && ledResistorResult(block.Params) != nil {
+		return "applied"
+	}
+	if ledCalculationWasExplicit(block.Params) && ledResistorResult(block.Params) == nil {
+		return "blocked"
+	}
+	return "deferred"
+}
+
+func ledResistorAppliedValues(block SelectedBlockRecord) []AppliedValue {
+	value := paramValue(block.Params, "resistor_value")
+	if value == "" || ledResistorResult(block.Params) == nil {
+		return nil
+	}
+	return []AppliedValue{appliedBlockValue(block.InstanceID, "resistor_value", value, "ohm", "calculated")}
+}
+
+func ledResistorRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	value := paramValue(block.Params, "resistor_value")
+	if value == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("resistor", "resistance", "=", value, "ohm", "led_resistor")
+}
+
+func ledCurrentRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	currentMA, ok := ledCurrentMA(block.Params)
+	if !ok || currentMA <= 0 {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("led", "forward_current", ">=", formatScaledLiteral(currentMA), "mA", "led_resistor")
+}
+
+func ledResistorPowerRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	supply, supplyOK := parseVoltage(paramValue(block.Params, "supply_voltage"))
+	forward, forwardOK := parseVoltage(paramValue(block.Params, "led_forward_voltage"))
+	currentMA, currentOK := ledCurrentMA(block.Params)
+	if !supplyOK || !forwardOK || !currentOK || currentMA <= 0 || supply <= forward {
+		return CalculatedRequirement{}
+	}
+	powerW := (supply - forward) * (currentMA / 1000)
+	return calculatedRequirement("resistor", "power", ">=", formatScaledLiteral(powerW), "W", "led_resistor")
 }
 
 func i2cPullupResult(params map[string]any) map[string]string {

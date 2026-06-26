@@ -75,3 +75,12 @@ func TestValueLiteralFormatting(t *testing.T) {
 		t.Fatalf("formatCapacitancePFLiteral = %q", got)
 	}
 }
+
+func TestParseFloatStringRejectsTrailingJunk(t *testing.T) {
+	if _, ok := parseFloatString("1.2.3"); ok {
+		t.Fatalf("parseFloatString accepted malformed value")
+	}
+	if got, ok := parseFloatString("1.2"); !ok || got != 1.2 {
+		t.Fatalf("parseFloatString = %v, %v; want 1.2, true", got, ok)
+	}
+}
