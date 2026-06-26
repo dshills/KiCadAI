@@ -984,6 +984,55 @@ func TestRunComponentSelectRegulatorRequestJSON(t *testing.T) {
 	}
 }
 
+func TestRunComponentSelectWithSourceEvidence(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "regulator-select.json")
+	writeTestFile(t, requestPath, `{
+  "query": {
+    "family": "regulator",
+    "package": "sot23_5",
+    "value_kind": "output_voltage",
+    "value": "3.3"
+  },
+  "acceptance": "connectivity",
+  "required_ratings": [
+    {"kind": "input_voltage", "value": "5", "unit": "V"}
+  ]
+}`)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--source-dir", componentSourceFixtureDir(t, "valid"), "--request", requestPath, "component", "select"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"lifecycle_status": "active"`) || !strings.Contains(stdout.String(), `"source_id": "curated_seed_procurement"`) {
+		t.Fatalf("missing procurement evidence: %s", stdout.String())
+	}
+}
+
+func TestRunComponentValidateWithSourceDir(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--source-dir", componentSourceFixtureDir(t, "valid"), "component", "validate"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"source_record_count": 2`) {
+		t.Fatalf("missing source count: %s", stdout.String())
+	}
+}
+
+func TestRunComponentCoverageWithSourceDir(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--source-dir", componentSourceFixtureDir(t, "valid"), "component", "coverage"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if !strings.Contains(stdout.String(), `"lifecycle_evidence_records"`) || !strings.Contains(stdout.String(), `"availability_evidence_records"`) {
+		t.Fatalf("missing source coverage: %s", stdout.String())
+	}
+}
+
 type componentSelectCompanion struct {
 	Role string `json:"role"`
 }
@@ -1170,6 +1219,15 @@ func testUnsafeComponentCatalogDir(t *testing.T) string {
 	dir := filepath.Join(testProjectRoot(t), "internal", "components", "testdata", "catalog", "unsafe_placeholder")
 	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
 		t.Fatalf("unsafe component catalog fixture not found: %s", dir)
+	}
+	return dir
+}
+
+func componentSourceFixtureDir(t *testing.T, name string) string {
+	t.Helper()
+	dir := filepath.Join(testProjectRoot(t), "internal", "components", "testdata", "sources", name)
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		t.Fatalf("component source fixture not found: %s", dir)
 	}
 	return dir
 }

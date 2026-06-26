@@ -236,6 +236,7 @@ type cliOptions struct {
 	libraryCache                string
 	refreshLibraryCache         bool
 	catalogDir                  string
+	sourceDir                   string
 	componentFamily             string
 	componentPackage            string
 	componentValueKind          string
@@ -424,6 +425,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.libraryCache, "library-cache", os.Getenv(libraryresolver.EnvLibraryCache), "library resolver cache file path")
 	flags.BoolVar(&opts.refreshLibraryCache, "refresh-library-cache", false, "rebuild library resolver cache")
 	flags.StringVar(&opts.catalogDir, "catalog-dir", components.DefaultCatalogDir, "component catalog directory")
+	flags.StringVar(&opts.sourceDir, "source-dir", "", "component lifecycle/availability source directory")
 	flags.StringVar(&opts.componentFamily, "family", "", "component family filter")
 	flags.StringVar(&opts.componentPackage, "package", "", "component package filter")
 	flags.StringVar(&opts.componentValueKind, "value-kind", "", "component value kind filter")
@@ -1598,6 +1600,14 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 		})
 	}
 	subcommand := opts.commandArgs[0]
+	var sources *components.SourceCollection
+	var sourceIssues []reports.Issue
+	if componentSubcommandUsesSources(subcommand) {
+		sources, sourceIssues, err = loadComponentSources(ctx, opts.sourceDir)
+		if err != nil {
+			return writeReportFailure(stdout, "component", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "source-dir", Message: err.Error()})
+		}
+	}
 	switch subcommand {
 	case "list":
 		return writeComponentResult(stdout, map[string]any{
@@ -1624,16 +1634,33 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 		if err != nil {
 			return writeReportFailure(stdout, "component", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: err.Error()})
 		}
+		request.Sources = sources
 		selection, result := components.Select(ctx, catalog, request)
 		if result.OK {
 			result.Data = selection
 		}
+		result.Issues = append(sourceIssues, result.Issues...)
 		return writeComponentReport(stdout, result)
 	case "validate":
 		result := components.ValidateCatalog(catalog)
+		if sources != nil {
+			result.Issues = append(sourceIssues, result.Issues...)
+			data := map[string]any{
+				"family_count": len(catalog.Families),
+				"record_count": len(catalog.Records),
+			}
+			if existing, ok := result.Data.(map[string]any); ok {
+				for key, value := range existing {
+					data[key] = value
+				}
+			}
+			data["source_record_count"] = len(sources.Records)
+			result.Data = data
+		}
 		return writeComponentReport(stdout, result)
 	case "coverage":
-		_, result := components.ComponentCoverage(catalog, components.CoverageOptions{})
+		_, result := components.ComponentCoverage(catalog, components.CoverageOptions{Sources: sources})
+		result.Issues = append(sourceIssues, result.Issues...)
 		return writeComponentReport(stdout, result)
 	default:
 		return writeReportFailure(stdout, "component", reports.Issue{
@@ -1642,6 +1669,15 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 			Path:     "component." + subcommand,
 			Message:  "unsupported component subcommand " + subcommand,
 		})
+	}
+}
+
+func componentSubcommandUsesSources(subcommand string) bool {
+	switch subcommand {
+	case "select", "validate", "coverage":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -1654,6 +1690,20 @@ func minimumConfidenceForAcceptance(level components.AcceptanceLevel) components
 	default:
 		return ""
 	}
+}
+
+func loadComponentSources(ctx context.Context, sourceDir string) (*components.SourceCollection, []reports.Issue, error) {
+	if strings.TrimSpace(sourceDir) == "" {
+		return nil, nil, nil
+	}
+	sources, err := components.LoadSources(ctx, components.SourceLoadOptions{SourceDir: sourceDir})
+	if err != nil {
+		return nil, nil, err
+	}
+	if sources == nil {
+		return nil, nil, fmt.Errorf("component source loader returned nil collection")
+	}
+	return sources, append([]reports.Issue(nil), sources.Diagnostics...), nil
 }
 
 func componentQueryFromOptions(opts cliOptions) components.Query {

@@ -13,15 +13,25 @@ const (
 )
 
 type CoverageOptions struct {
-	RequiredFamilies []string `json:"required_families,omitempty"`
+	RequiredFamilies []string          `json:"required_families,omitempty"`
+	Sources          *SourceCollection `json:"-"`
 }
 
 type CoverageReport struct {
 	RecordCount      int              `json:"record_count"`
 	FamilyCount      int              `json:"family_count"`
 	ConfidenceCounts map[string]int   `json:"confidence_counts"`
+	SourceCoverage   *SourceCoverage  `json:"source_coverage,omitempty"`
 	Families         []FamilyCoverage `json:"families"`
 	Issues           []reports.Issue  `json:"issues,omitempty"`
+}
+
+type SourceCoverage struct {
+	ConcreteRecords               int `json:"concrete_records"`
+	LifecycleEvidenceRecords      int `json:"lifecycle_evidence_records"`
+	AvailabilityEvidenceRecords   int `json:"availability_evidence_records"`
+	UnknownAvailabilityRecords    int `json:"unknown_availability_records"`
+	NotCheckedAvailabilityRecords int `json:"not_checked_availability_records"`
 }
 
 type FamilyCoverage struct {
@@ -53,6 +63,9 @@ func ComponentCoverage(catalog *Catalog, opts CoverageOptions) (CoverageReport, 
 		FamilyCount:      len(catalog.Families),
 		ConfidenceCounts: emptyConfidenceCounts(),
 	}
+	if opts.Sources != nil {
+		report.SourceCoverage = &SourceCoverage{}
+	}
 	defined := map[string]bool{}
 	byFamily := map[string]*FamilyCoverage{}
 	for _, family := range catalog.Families {
@@ -64,7 +77,8 @@ func ComponentCoverage(catalog *Catalog, opts CoverageOptions) (CoverageReport, 
 		coverage := ensureFamilyCoverage(byFamily, id)
 		coverage.Defined = true
 	}
-	for _, record := range catalog.Records {
+	for i := range catalog.Records {
+		record := &catalog.Records[i]
 		family := normalizeCoverageFamily(record.Family)
 		if family == "" {
 			family = "unknown"
@@ -92,9 +106,10 @@ func ComponentCoverage(catalog *Catalog, opts CoverageOptions) (CoverageReport, 
 		if !record.Verification.ResolverChecked {
 			coverage.MissingResolverEvidence = append(coverage.MissingResolverEvidence, record.ID)
 		}
-		if !record.Verification.PinMapChecked && record.Verification.Confidence == ConfidenceVerified && !passiveRuleInferred(record) {
+		if !record.Verification.PinMapChecked && record.Verification.Confidence == ConfidenceVerified && !passiveRuleInferred(*record) {
 			coverage.MissingPinmapEvidence = append(coverage.MissingPinmapEvidence, record.ID)
 		}
+		updateSourceCoverage(report.SourceCoverage, record, opts.Sources)
 	}
 	for _, requiredFamily := range required {
 		family := normalizeCoverageFamily(requiredFamily)
@@ -131,6 +146,40 @@ func ensureFamilyCoverage(byFamily map[string]*FamilyCoverage, family string) *F
 	coverage := &FamilyCoverage{Family: family}
 	byFamily[family] = coverage
 	return coverage
+}
+
+func updateSourceCoverage(coverage *SourceCoverage, record *ComponentRecord, sources *SourceCollection) {
+	if coverage == nil {
+		return
+	}
+	if record == nil {
+		return
+	}
+	manufacturer := strings.TrimSpace(record.Manufacturer)
+	mpn := strings.TrimSpace(record.MPN)
+	if record.Generic || manufacturer == "" || mpn == "" {
+		return
+	}
+	coverage.ConcreteRecords++
+	if sources == nil {
+		return
+	}
+	source, ok := sources.Find(manufacturer, mpn)
+	if !ok {
+		return
+	}
+	if source.Lifecycle != nil {
+		coverage.LifecycleEvidenceRecords++
+	}
+	if source.Availability != nil {
+		coverage.AvailabilityEvidenceRecords++
+		switch source.Availability.Status {
+		case AvailabilityUnknown:
+			coverage.UnknownAvailabilityRecords++
+		case AvailabilityNotChecked:
+			coverage.NotCheckedAvailabilityRecords++
+		}
+	}
 }
 
 func normalizeCoverageFamily(family string) string {
