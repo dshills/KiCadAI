@@ -169,7 +169,9 @@ func Build(options BuildOptions) Report {
 			report.Intent = intentFromPlan(plan)
 		}
 		report.Evidence = append(report.Evidence, evidenceFromRequirements(plan.Requirements)...)
+		report.Evidence = append(report.Evidence, evidenceFromSynthesis(plan.Synthesis)...)
 		report.Decisions = append(report.Decisions, decisionsFromPlan(plan)...)
+		report.Decisions = append(report.Decisions, decisionsFromSynthesis(plan.Synthesis)...)
 		report.Assumptions = append(report.Assumptions, notesFromPlan(plan.Assumptions, nil)...)
 		report.Clarifications = append(report.Clarifications, notesFromPlan(plan.Clarifications, nil)...)
 		report.KnownLimits = append(report.KnownLimits, limitsFromPlan(plan)...)

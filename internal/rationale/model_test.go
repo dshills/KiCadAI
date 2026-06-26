@@ -98,6 +98,29 @@ func TestBuildWithWorkflowSummary(t *testing.T) {
 	}
 }
 
+func TestBuildFromPlanMapsSynthesisTrace(t *testing.T) {
+	plan := intentplanner.Plan(intentplanner.Request{
+		Version: intentplanner.RequestVersion,
+		Name:    "external_clock",
+		Kind:    intentplanner.IntentMCUMinimal,
+		Power:   intentplanner.PowerIntent{Inputs: []intentplanner.PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []intentplanner.FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "5V"}},
+			{Kind: "clock", Family: "crystal_oscillator", Params: map[string]any{"load_cap_pf": 18}},
+		},
+	})
+	report := BuildFromPlan(plan, SourceSummary{Mode: "request"})
+	if !hasDecisionType(report, "known_gap") {
+		t.Fatalf("missing synthesis known-gap decision: %#v", report.Decisions)
+	}
+	if !hasEvidenceSummary(report, "crystal_load_cap") {
+		t.Fatalf("missing synthesis calculation evidence: %#v", report.Evidence)
+	}
+	if !hasKnownLimitCategory(report, "unsupported_intent") {
+		t.Fatalf("missing synthesis known limit: %#v", report.KnownLimits)
+	}
+}
+
 func TestLoadFromTarget(t *testing.T) {
 	dir := t.TempDir()
 	meta := filepath.Join(dir, MetadataDirName)
@@ -125,4 +148,31 @@ func writeJSON(t *testing.T, path string, value any) {
 	if err := os.WriteFile(path, append(data, '\n'), 0o644); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func hasDecisionType(report Report, kind string) bool {
+	for _, decision := range report.Decisions {
+		if decision.Type == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEvidenceSummary(report Report, text string) bool {
+	for _, evidence := range report.Evidence {
+		if strings.Contains(evidence.Summary, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasKnownLimitCategory(report Report, category string) bool {
+	for _, limit := range report.KnownLimits {
+		if limit.Category == category {
+			return true
+		}
+	}
+	return false
 }

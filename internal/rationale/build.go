@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"kicadai/internal/designworkflow"
@@ -169,6 +170,24 @@ func decisionsFromPlan(plan intentplanner.PlanResult) []Decision {
 	return out
 }
 
+func decisionsFromSynthesis(trace intentplanner.SynthesisTrace) []Decision {
+	out := make([]Decision, 0, len(trace.Decisions))
+	for _, decision := range trace.Decisions {
+		out = append(out, Decision{
+			ID:             "synthesis:" + decision.ID,
+			Type:           synthesisDecisionType(decision.Type),
+			Path:           decision.Path,
+			Selected:       decision.Selected,
+			Rationale:      decision.Rationale,
+			RequirementIDs: append([]string(nil), decision.RequirementIDs...),
+			EvidenceIDs:    append([]string(nil), decision.EvidenceIDs...),
+			Confidence:     decision.Confidence,
+			Status:         string(trace.Status),
+		})
+	}
+	return out
+}
+
 func notesFromPlan(notes []intentplanner.PlanNote, evidenceIDs []string) []RationaleNote {
 	out := make([]RationaleNote, 0, len(notes))
 	for _, note := range notes {
@@ -199,7 +218,137 @@ func limitsFromPlan(plan intentplanner.PlanResult) []KnownLimit {
 	for index, issue := range plan.Issues {
 		out = append(out, limitFromIssue(fmt.Sprintf("plan_issue:%03d", index+1), "", issue))
 	}
+	for _, gap := range plan.Synthesis.Gaps {
+		out = append(out, KnownLimit{
+			ID:          "synthesis:" + gap.ID,
+			Category:    synthesisGapCategory(gap.Category),
+			Severity:    severityString(gap.Severity),
+			Path:        gap.Path,
+			Message:     gap.Message,
+			Suggestion:  gap.Suggestion,
+			EvidenceIDs: append([]string(nil), gap.EvidenceIDs...),
+		})
+	}
 	return out
+}
+
+func evidenceFromSynthesis(trace intentplanner.SynthesisTrace) []EvidenceRecord {
+	var out []EvidenceRecord
+	for _, evidence := range trace.Evidence {
+		out = append(out, EvidenceRecord{
+			ID:         "synthesis:" + evidence.ID,
+			Kind:       synthesisEvidenceKind(evidence.Kind),
+			Path:       evidence.Path,
+			Summary:    evidence.Summary,
+			Confidence: confidenceStringToFloat(evidence.Confidence),
+			Notes:      append([]string(nil), evidence.Refs...),
+		})
+	}
+	for _, constraint := range trace.Constraints {
+		summary := strings.TrimSpace(constraint.Subject + " " + constraint.Operator + " " + constraint.Value)
+		if summary == "" {
+			summary = constraint.Kind
+		}
+		out = append(out, EvidenceRecord{
+			ID:      "synthesis_constraint:" + constraint.ID,
+			Kind:    "component_evidence",
+			Path:    constraint.Path,
+			Summary: summary,
+			Notes:   compactStrings([]string{constraint.Kind, constraint.Source, constraint.RequirementID}),
+		})
+	}
+	for _, calculation := range trace.Calculations {
+		out = append(out, EvidenceRecord{
+			ID:      "synthesis_calc:" + calculation.ID,
+			Kind:    "component_evidence",
+			Path:    calculation.Path,
+			Summary: synthesisCalculationSummary(calculation),
+			Notes:   append([]string(nil), calculation.Assumptions...),
+		})
+	}
+	return out
+}
+
+func synthesisDecisionType(value string) string {
+	switch value {
+	case "topology":
+		return "connection"
+	case "target_resolution", "bus_resolution", "voltage_domain":
+		return value
+	case "component_constraint", "value_calculation":
+		return "component_selection"
+	case "validation_policy":
+		return "validation_policy"
+	case "unsupported_gap":
+		return "known_gap"
+	default:
+		return "known_gap"
+	}
+}
+
+func synthesisEvidenceKind(value string) string {
+	switch value {
+	case "intent_field":
+		return "planner_requirement"
+	case "semantic_port", "block_capability":
+		return "block_verification"
+	case "component_policy", "component_rating", "calculation_input":
+		return "component_evidence"
+	case "workflow_policy":
+		return "workflow_stage"
+	case "known_gap":
+		return "validation_issue"
+	default:
+		return "artifact"
+	}
+}
+
+func synthesisGapCategory(value string) string {
+	switch value {
+	case "voltage_domain":
+		return "validation_blocked"
+	case "component_constraint":
+		return "missing_component_evidence"
+	case "target_resolution", "bus_resolution", "unsupported_peripheral":
+		return "unsupported_intent"
+	default:
+		return categoryForPath(value, value)
+	}
+}
+
+func synthesisCalculationSummary(calculation intentplanner.SynthesisCalculation) string {
+	if len(calculation.Result) == 0 {
+		return calculation.Kind + " deferred"
+	}
+	var parts []string
+	for _, key := range sortedStringMapKeys(calculation.Result) {
+		parts = append(parts, key+"="+calculation.Result[key])
+	}
+	return calculation.Kind + ": " + strings.Join(parts, ", ")
+}
+
+func confidenceStringToFloat(value string) float64 {
+	switch value {
+	case "verified":
+		return 1
+	case "library_derived":
+		return 0.8
+	case "rule_inferred", "policy":
+		return 0.6
+	case "placeholder":
+		return 0.2
+	default:
+		return 0
+	}
+}
+
+func sortedStringMapKeys(values map[string]string) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func applyDraft(report *Report, draft intentdraft.Result) {
