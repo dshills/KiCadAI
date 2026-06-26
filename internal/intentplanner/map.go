@@ -120,6 +120,15 @@ type planBuilder struct {
 	reversePolarityIDs []string
 }
 
+const (
+	ap2112kPlannerOutputVoltage = 3.3
+	ap2112kPlannerMaxInputV     = 6.0
+	ap2112kPlannerMaxCurrentA   = 0.15
+	defaultRegulatorCurrentA    = 0.25
+	voltageComparisonEpsilon    = 0.001
+	currentComparisonEpsilon    = 1e-9
+)
+
 type powerSource struct {
 	id      string
 	port    string
@@ -340,9 +349,11 @@ func regulatorVariantParams(inputVoltage string, outputVoltage string, currentMA
 	}
 	currentA := currentMA / 1000.0
 	if currentA <= 0 {
-		currentA = 0.25
+		currentA = defaultRegulatorCurrentA
 	}
-	if almostEqualVoltage(output, 3.3) && input <= 6.0 && currentA <= 0.6 {
+	if almostEqualVoltage(output, ap2112kPlannerOutputVoltage) &&
+		input <= ap2112kPlannerMaxInputV+voltageComparisonEpsilon &&
+		currentA <= ap2112kPlannerMaxCurrentA+currentComparisonEpsilon {
 		return map[string]any{
 			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
 			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
@@ -356,9 +367,9 @@ func regulatorVariantParams(inputVoltage string, outputVoltage string, currentMA
 
 func almostEqualVoltage(a float64, b float64) bool {
 	if a > b {
-		return a-b < 0.001
+		return a-b < voltageComparisonEpsilon
 	}
-	return b-a < 0.001
+	return b-a < voltageComparisonEpsilon
 }
 
 func (builder *planBuilder) mapFunctions() {

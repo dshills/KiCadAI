@@ -176,11 +176,25 @@ For power rails that synthesize a voltage regulator, include `current_ma` when
 the load current is known. The planner maps that value into the generated
 component policy as a regulator `output_current` requirement and records the
 input/output capacitor voltage classes needed for the selected input and output
-rails. Those overrides are persisted in `.kicadai/generated-request.json`, and
-the selected regulator/capacitor evidence is persisted in
+rails. For a 3.3 V rail supplied from an input at or below 6 V and a load at or
+below 150 mA, the planner selects the AP2112K SOT-23-5 profile and writes
+`regulator_symbol`, `regulator_footprint`, `input_voltage_min`,
+`input_voltage_max`, and `enable_mode: tied_input` into the generated
+`voltage_regulator` block params. Higher-current rails fall back to the default
+fixed-linear-regulator path and must still satisfy catalog selection and
+workflow validation. The AP2112K catalog record carries a higher electrical
+current rating, but the planner uses the lower automatic threshold until
+package thermal evidence is modeled.
+
+Regulator synthesis calculations now record the selected variant, modeled
+dropout margin, headroom, minimum capacitor voltage policy, and explicit
+thermal/stability review requirements. Insufficient modeled headroom blocks the
+plan. These overrides and calculations are persisted in
+`.kicadai/generated-request.json` and `.kicadai/intent-plan.json`, and the
+selected regulator/capacitor evidence is persisted in
 `.kicadai/workflow-result.json`. This is the preferred audit path for agents
-checking that a generated 3.3 V breakout selected a real regulator rather than a
-placeholder.
+checking that a generated 3.3 V breakout selected a real regulator rather than
+a placeholder.
 
 `--output` is used for new generated content, including intent planning and
 project creation. `--target` is reserved for commands that inspect or repair an
@@ -192,8 +206,10 @@ commands. Commands that write to an existing output directory require
 Structured JSON examples live in `examples/intent/` and cover sensor breakout,
 MCU programmer, power module, amplifier module, fabrication-oriented sensor
 requests, MCU plus I2C sensor, MCU ISP programming, external-clock limitation,
-multi-MCU ambiguity, and explicit voltage-domain supply examples. Natural
-language text examples live in `examples/intent_text/`.
+multi-MCU ambiguity, explicit voltage-domain supply examples, AP2112K
+regulator evidence, high-current regulator fallback, and an intentionally
+blocked insufficient-headroom regulator case. Natural language text examples
+live in `examples/intent_text/`.
 Semantic synthesis fixtures are prefixed with `synthesis_` and cover explicit
 MCU/I2C supply domains, UART programming, blocked unknown supply aliases, and
 blocked external-clock topology.

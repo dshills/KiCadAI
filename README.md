@@ -109,7 +109,7 @@ kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 
 The intent planner is the higher-level AI orchestration layer. It accepts structured intent requests, derives requirements and constraints, maps supported goals to circuit blocks, emits assumptions and known gaps, and can hand the generated request to `design create` for project generation.
 
-Planner synthesis traces include topology decisions, bus and voltage-domain evidence, component policy constraints, value calculations, applied/deferred/blocked calculation status, and fail-closed gaps. Supported calculations can now write safe generated block parameters for LED resistors, I2C pull-ups, and crystal load capacitors, and can map regulator current and capacitor voltage requirements into component policy for the verified 3.3 V linear-regulator path. Regulator headroom and op-amp gain remain explicit requirement evidence unless a block exposes safe direct mutation.
+Planner synthesis traces include topology decisions, bus and voltage-domain evidence, component policy constraints, value calculations, applied/deferred/blocked calculation status, and fail-closed gaps. Supported calculations can now write safe generated block parameters for LED resistors, I2C pull-ups, crystal load capacitors, and the verified AP2112K 3.3 V LDO slice. Regulator current, capacitor voltage policy, dropout/headroom, thermal review, and stability review evidence are persisted in generated planner artifacts; op-amp gain remains explicit requirement evidence unless a block exposes safe direct mutation.
 
 See [Intent Planning And AI Workflow](docs/intent-planning.md) for details.
 

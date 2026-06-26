@@ -198,13 +198,29 @@ stronger KiCad-backed layout evidence before fabrication-readiness claims.
 The `voltage_regulator` block is tied into verified component selection for the
 current fixed 3.3 V LDO catalog slice. Its regulator, input-capacitor, and
 output-capacitor component roles derive selection requirements from block
-parameters such as `output_voltage`, `input_capacitance`, `output_capacitance`,
-and package preferences. Capacitance parameters use the same parsed value
-strings as the catalog and examples, such as `10u`, `100n`, or explicit SI
-farad values. Today, `output_voltage` acts as a selection constraint:
-requests outside the verified 3.3 V catalog coverage must block for
-connectivity-oriented acceptance instead of pretending another fixed voltage is
-proven.
+parameters such as `output_voltage`, `input_voltage`, `output_current`,
+`input_voltage_min`, `input_voltage_max`, `input_capacitance`,
+`output_capacitance`, `enable_mode`, and package
+preferences. Capacitance parameters use the same parsed value strings as the
+catalog and examples, such as `10u`, `100n`, or explicit SI farad values.
+Today, `output_voltage` acts as a selection constraint: requests outside the
+verified 3.3 V catalog coverage must block for connectivity-oriented
+acceptance instead of pretending another fixed voltage is proven.
+
+Supported regulator profiles are intentionally narrow:
+
+- AMS1117-family fixed 3.3 V SOT-223 with VIN/VOUT/GND pins.
+- AP2112K-3.3 SOT-23-5 with VIN, VOUT, GND, EN tied to VIN, and NC marked with
+  an explicit KiCad no-connect marker.
+
+AP2112K is selected by the intent planner only for 3.3 V rails fed from inputs
+at or below 6 V and at or below 150 mA. This conservative automatic-selection
+limit is lower than the part's catalog current rating because the current
+planner does not yet prove SOT-23-5 thermal dissipation against copper area and
+ambient temperature. `enable_mode: tied_input` is required
+for the AP2112K block profile until exported enable-control ports are modeled.
+`enable_mode: none`, ADJ variants, BYP variants, and manufacturer
+do-not-connect pins without explicit evidence block rather than guessing.
 Optional power-LED roles are active only when `include_power_led` is true, so
 omitted indicator LEDs do not force unnecessary component selection. The
 resulting selections are written into the generated transaction and reported in

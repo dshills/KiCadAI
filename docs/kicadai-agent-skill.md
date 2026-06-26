@@ -185,13 +185,17 @@ For regulator-backed power rails, include `power.rails[].current_ma` whenever
 the expected load is known. Then inspect
 `.kicadai/generated-request.json` for `component_policy.overrides` and
 `.kicadai/workflow-result.json` for the selected `component_selection` evidence.
-The supported verified slice currently covers a fixed 3.3 V AMS1117-style LDO
-with 0805 ceramic input and output capacitors. Broader regulator families and
-exact capacitor part-number selection are still catalog expansion work. Do not
-treat that slice as regulator stability proof: ESR, MLCC DC-bias derating,
+The supported verified slice currently covers fixed 3.3 V AMS1117-style
+SOT-223 and AP2112K SOT-23-5 LDO paths with ceramic input and output
+capacitors. The AP2112K path is limited to 3.3 V rails from inputs at or below
+6 V and at or below 150 mA for automatic planner selection; generated
+connectivity ties `EN` to VIN and emits
+an explicit KiCad no-connect marker for the NC pin. Broader regulator families
+and exact capacitor part-number selection are still catalog expansion work. Do
+not treat this slice as regulator stability proof: ESR, MLCC DC-bias derating,
 thermal dissipation, and transient response still require part-specific
-evidence or human review. For AMS1117-style parts, verify the exact selected
-LDO is stable with ceramic output capacitors or choose a catalog record that
+evidence or human review. For any LDO, verify the exact selected part is stable
+with the generated ceramic output capacitors or choose a catalog record that
 models the required output-capacitor ESR.
 
 ## Intent Planning Guidance

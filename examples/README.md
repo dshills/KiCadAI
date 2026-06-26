@@ -27,6 +27,12 @@ Structured intent examples live under `examples/intent/`. Files prefixed with
   alias fixture.
 - `synthesis_external_clock_blocked.json`: intentional external-clock topology
   limitation fixture.
+- `regulator_ap2112k_sensor.json`: USB-powered 3.3 V sensor breakout that
+  exercises the AP2112K SOT-23-5 regulator path.
+- `regulator_high_current_fallback.json`: high-current 3.3 V rail fixture that
+  must not select AP2112K.
+- `regulator_insufficient_headroom_blocked.json`: intentional blocked regulator
+  headroom fixture.
 
 Round-trip validation for the Go-generated LED schematic, Go-generated LED PCB,
 checked-in LED schematic fixture, and checked-in generated PCB fixture is

@@ -17,7 +17,7 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 		Board:      BoardIntent{WidthMM: 50, HeightMM: 30, Layers: 2},
 		Power: PowerIntent{
 			Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}},
-			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 250}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 100}},
 		},
 		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V"}},
 		Functions:  []FunctionIntent{{Kind: "sensor", Family: "i2c_sensor"}},
@@ -75,7 +75,7 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 		unit  string
 	}{
 		{key: "regulator.regulator", kind: "input_voltage", value: "5", unit: "V"},
-		{key: "regulator.regulator", kind: "output_current", value: "0.25", unit: "A"},
+		{key: "regulator.regulator", kind: "output_current", value: "0.1", unit: "A"},
 		{key: "regulator.input_capacitor", kind: "voltage", value: "6.3", unit: "V"},
 		{key: "regulator.output_capacitor", kind: "voltage", value: "6.3", unit: "V"},
 	} {

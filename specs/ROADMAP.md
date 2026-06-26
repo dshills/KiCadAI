@@ -179,16 +179,19 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
 - stronger evidence validation for required pin-to-pad mappings and polarity;
 - workflow component-selection output with manufacturer, MPN, confidence,
   pinmap evidence, companions, and rejected alternatives;
-- verified regulator-path coverage that connects a fixed 3.3 V linear regulator
-  block to catalog-backed regulator and 0805 capacitor selection, rating
-  requirements, generated request overrides, and persisted workflow evidence;
+- verified regulator-path coverage that connects fixed 3.3 V linear regulator
+  blocks to catalog-backed AMS1117 SOT-223 and AP2112K SOT-23-5 selection,
+  capacitor selection, rating requirements, generated request overrides,
+  AP2112K EN/NC handling, headroom blocking, and persisted workflow evidence;
 - golden coverage and representative selection snapshots.
 
 ### Remaining Work
 
 - Expand from seed records to larger verified families and real alternatives.
-- Broaden the verified regulator path beyond the current AMS1117-style 3.3 V
-  LDO and generic 0805 capacitor slice.
+- Broaden the verified regulator path beyond the current 3.3 V AMS1117-style
+  and AP2112K LDO slices, including additional voltages, adjustable/BYP
+  networks, exported enable control, and part-specific capacitor stability
+  evidence.
 - Add availability/lifecycle source integration when a trusted local or remote
   source is chosen.
 - Replace remaining structural placeholders where verified concrete parts are
