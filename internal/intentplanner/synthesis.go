@@ -339,6 +339,13 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Result:     regulatorHeadroomResult(block.Params),
 				Formula:    "Vin must exceed Vout plus regulator dropout",
 				Confidence: "policy",
+				Status:     regulatorHeadroomStatus(block),
+				Requirements: []CalculatedRequirement{
+					regulatorVoltageRequirement(block, "input_voltage"),
+					regulatorVoltageRequirement(block, "output_voltage"),
+					regulatorCurrentRequirement(block),
+					regulatorHeadroomRequirement(block),
+				},
 			})
 		case "crystal_oscillator":
 			builder.recordSynthesisCalculation(SynthesisCalculation{
@@ -350,6 +357,11 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Formula:     "Cload caps derived from crystal CL and estimated stray capacitance",
 				Assumptions: []string{"blocked from MCU wiring until external-clock topology is supported"},
 				Confidence:  "policy",
+				Status:      crystalLoadStatus(block),
+				Applied:     crystalLoadAppliedValues(block),
+				Requirements: []CalculatedRequirement{
+					crystalLoadCapRequirement(block),
+				},
 			})
 		case "opamp_gain_stage":
 			builder.recordSynthesisCalculation(SynthesisCalculation{
@@ -360,6 +372,11 @@ func (builder *planBuilder) recordValueCalculationTrace() {
 				Result:     opampGainResult(block.Params),
 				Formula:    "non-inverting gain = 1 + Rf/Rg",
 				Confidence: "policy",
+				Status:     opampGainStatus(block),
+				Requirements: []CalculatedRequirement{
+					opampGainRequirement(block),
+					opampSupplyRequirement(block),
+				},
 			})
 		}
 	}
@@ -594,6 +611,46 @@ func regulatorHeadroomResult(params map[string]any) map[string]string {
 	return map[string]string{"headroom_v": fmt.Sprintf("%.2f", input-output)}
 }
 
+func regulatorHeadroomStatus(block SelectedBlockRecord) string {
+	result := regulatorHeadroomResult(block.Params)
+	if result == nil {
+		return "deferred"
+	}
+	headroom, ok := parseFloatString(result["headroom_v"])
+	if !ok || headroom <= 0 {
+		return "blocked"
+	}
+	return "deferred"
+}
+
+func regulatorVoltageRequirement(block SelectedBlockRecord, key string) CalculatedRequirement {
+	value := paramValue(block.Params, key)
+	if value == "" {
+		return CalculatedRequirement{}
+	}
+	parsed, ok := parseVoltage(value)
+	if !ok {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator", key, "=", formatScaledLiteral(parsed), "V", "regulator_headroom")
+}
+
+func regulatorCurrentRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	current := paramValue(block.Params, "output_current")
+	if current == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator", "output_current", ">=", current, "", "regulator_headroom")
+}
+
+func regulatorHeadroomRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	result := regulatorHeadroomResult(block.Params)
+	if result == nil || result["headroom_v"] == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("regulator", "headroom", ">", "0", "V", "regulator_headroom")
+}
+
 func crystalLoadResult(params map[string]any) map[string]string {
 	loadPF, loadOK := parseFloatParam(params, "load_cap_pf")
 	if !loadOK {
@@ -610,12 +667,77 @@ func crystalLoadResult(params map[string]any) map[string]string {
 	return map[string]string{"capacitor_pf_each": fmt.Sprintf("%.1f", capPF)}
 }
 
+func crystalLoadStatus(block SelectedBlockRecord) string {
+	param := crystalLoadParam(block)
+	if paramValue(block.Params, param) != "" && crystalLoadResult(block.Params) != nil {
+		return "applied"
+	}
+	if crystalLoadResult(block.Params) != nil {
+		return "deferred"
+	}
+	return "blocked"
+}
+
+func crystalLoadAppliedValues(block SelectedBlockRecord) []AppliedValue {
+	param := crystalLoadParam(block)
+	value := paramValue(block.Params, param)
+	if value == "" || crystalLoadResult(block.Params) == nil {
+		return nil
+	}
+	return []AppliedValue{appliedBlockValue(block.InstanceID, param, value, "pF", "calculated")}
+}
+
+func crystalLoadCapRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	value := paramValue(block.Params, crystalLoadParam(block))
+	if value == "" {
+		if result := crystalLoadResult(block.Params); result != nil {
+			value = result["capacitor_pf_each"]
+		}
+	}
+	if value == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("crystal_load_capacitor", "capacitance", "=", value, "pF", "crystal_load_cap")
+}
+
+func crystalLoadParam(block SelectedBlockRecord) string {
+	rule, _ := valueApplicationRuleFor(block.BlockID, "crystal_load_cap")
+	return firstNonEmpty(rule.Param, "load_capacitor_value")
+}
+
 func opampGainResult(params map[string]any) map[string]string {
 	gain, ok := parseFloatParam(params, "gain")
-	if !ok || gain <= 1 {
+	if !ok || gain < 1 {
 		return nil
 	}
 	return map[string]string{"rf_over_rg": fmt.Sprintf("%.2f", gain-1)}
+}
+
+func opampGainStatus(block SelectedBlockRecord) string {
+	if opampGainResult(block.Params) == nil {
+		return "blocked"
+	}
+	return "deferred"
+}
+
+func opampGainRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	gain := paramValue(block.Params, "gain")
+	if gain == "" {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("opamp_feedback", "gain", "=", gain, "", "opamp_gain")
+}
+
+func opampSupplyRequirement(block SelectedBlockRecord) CalculatedRequirement {
+	voltage := paramValue(block.Params, "supply_voltage")
+	if voltage == "" {
+		return CalculatedRequirement{}
+	}
+	parsed, ok := parseVoltage(voltage)
+	if !ok {
+		return CalculatedRequirement{}
+	}
+	return calculatedRequirement("opamp", "supply_voltage", "=", formatScaledLiteral(parsed), "V", "opamp_gain")
 }
 
 func paramValue(params map[string]any, key string) string {

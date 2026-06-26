@@ -346,6 +346,84 @@ func TestPlanDefersExternalI2CPullups(t *testing.T) {
 	}
 }
 
+func TestPlanAppliesCrystalLoadCapacitorValue(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "crystal_load",
+		Kind:    IntentMCUMinimal,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "5V"}},
+			{Kind: "clock", Family: "crystal_oscillator", Params: map[string]any{"frequency": "16MHz", "load_cap_pf": 18, "stray_cap_pf": 2}},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "crystal_oscillator", "load_capacitor_value"); got != "32pF" {
+		t.Fatalf("load_capacitor_value = %q; blocks=%#v", got, plan.GeneratedRequest.Blocks)
+	}
+	if status := synthesisCalculationStatus(plan, "crystal_load_cap"); status != "applied" {
+		t.Fatalf("crystal status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+}
+
+func TestPlanBlocksInvalidRegulatorHeadroom(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "bad_regulator",
+		Kind:    IntentPowerModule,
+		Functions: []FunctionIntent{
+			{Kind: "regulator", Params: map[string]any{"input_voltage": "3.3V", "output_voltage": "5V"}},
+		},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if status := synthesisCalculationStatus(plan, "regulator_headroom"); status != "blocked" {
+		t.Fatalf("regulator status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+}
+
+func TestPlanRecordsDeferredOpAmpGainRequirements(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "opamp_requirements",
+		Kind:    IntentAmplifier,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "amplifier", Params: map[string]any{"gain": 4, "supply_voltage": "5V"}},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if status := synthesisCalculationStatus(plan, "opamp_gain"); status != "deferred" {
+		t.Fatalf("opamp status = %q; calculations=%#v", status, plan.Synthesis.Calculations)
+	}
+	if !synthesisCalculationRequirement(plan, "opamp_gain", "opamp_feedback", "gain") {
+		t.Fatalf("missing opamp gain requirement: %#v", plan.Synthesis.Calculations)
+	}
+}
+
+func TestPlanAllowsUnityGainOpAmp(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "unity_buffer",
+		Kind:    IntentAmplifier,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "amplifier", Params: map[string]any{"gain": 1}},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if got := synthesisCalculationResult(plan, "opamp_gain", "rf_over_rg"); got != "0.00" {
+		t.Fatalf("opamp gain result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
+	}
+}
+
 func synthesisCalculationResult(plan PlanResult, kind string, key string) string {
 	for _, calculation := range plan.Synthesis.Calculations {
 		if calculation.Kind == kind {

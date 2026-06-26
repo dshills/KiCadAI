@@ -36,6 +36,12 @@ func (builder *planBuilder) applyCalculatedValueApplications() {
 	for _, instanceID := range builder.sensorIDs {
 		builder.applyI2CPullupValue(instanceID)
 	}
+	for _, instanceID := range builder.clockIDs {
+		builder.applyCrystalLoadCapValue(instanceID)
+	}
+	for _, instanceID := range builder.regulatorIDs {
+		builder.validateRegulatorHeadroom(instanceID)
+	}
 }
 
 func (builder *planBuilder) applyLEDResistorValue(instanceID string) {
@@ -169,6 +175,57 @@ func i2cPullupConcreteValue(result map[string]string) string {
 		return "4.7k"
 	default:
 		return ""
+	}
+}
+
+func (builder *planBuilder) applyCrystalLoadCapValue(instanceID string) {
+	blockID := builder.instanceBlockIDs[instanceID]
+	if blockID != "crystal_oscillator" {
+		return
+	}
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		return
+	}
+	result := crystalLoadResult(params)
+	if result == nil {
+		return
+	}
+	capPF, ok := parseFloatString(result["capacitor_pf_each"])
+	if !ok {
+		return
+	}
+	literal := formatCapacitancePFLiteral(capPF)
+	if literal == "INVALID" {
+		return
+	}
+	rule, ok := valueApplicationRuleFor(blockID, "crystal_load_cap")
+	if !ok || !builder.blockSupportsParam(blockID, rule.Param) {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+			ID:         "calc.crystal_load." + instanceID + ".deferred",
+			Path:       "blocks." + instanceID,
+			Message:    "crystal load calculation could not be applied because the block does not expose a compatible parameter",
+			Severity:   reports.SeverityWarning,
+			Suggestion: "add a supported load_capacitor_value parameter to the crystal block",
+		})
+		return
+	}
+	params[rule.Param] = literal
+	builder.updateSelectedBlockParam(instanceID, rule.Param, literal)
+}
+
+func (builder *planBuilder) validateRegulatorHeadroom(instanceID string) {
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		return
+	}
+	result := regulatorHeadroomResult(params)
+	if result == nil {
+		return
+	}
+	headroom, ok := parseFloatString(result["headroom_v"])
+	if !ok || headroom <= 0 {
+		builder.addIssue("blocks."+instanceID+".params.input_voltage", "regulator input voltage must exceed output voltage", "raise the regulator input voltage or lower the requested output rail")
 	}
 }
 
