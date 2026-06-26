@@ -146,6 +146,48 @@ func TestRunIntentPlanMissingRequest(t *testing.T) {
 	}
 }
 
+func TestRunIntentDraftFromText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a 3.3V I2C temperature sensor breakout", "intent", "draft"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{`"kind": "sensor_node"`, `"i2c"`, `"source_hash"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in output:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunIntentDraftWritesArtifacts(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "draft")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "USB-C 5V to 3.3V regulator module", "--output", output, "intent", "draft"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json"} {
+		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
+			t.Fatalf("missing artifact %s: %v", name, err)
+		}
+	}
+}
+
+func TestRunIntentDraftStrictBlocksClarification(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--strict", "--text", "battery powered sensor", "intent", "draft"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected strict clarification error")
+	}
+	if !strings.Contains(stdout.String(), "battery chemistry") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
 func TestRunIntentPlanWritesArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	requestPath := filepath.Join(dir, "intent.json")

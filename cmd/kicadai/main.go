@@ -27,6 +27,7 @@ import (
 	"kicadai/internal/fabrication"
 	breakoutgen "kicadai/internal/generate"
 	"kicadai/internal/inspect"
+	"kicadai/internal/intentdraft"
 	"kicadai/internal/intentplanner"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
@@ -95,6 +96,10 @@ Global flags:
   --output string        Output project directory for generation commands
   --target string        Project, schematic, or PCB target for repair commands
   --request string       Structured request JSON path for generator commands
+  --text string          Natural-language intent text
+  --file string          Natural-language intent text file
+  --format string        Output format for supported commands (default json)
+  --strict              Treat blocking draft clarifications as command errors
   --name string          Project/design name for generation commands
   --seed string          Deterministic seed for generation commands
   --lib-vcc string      VCC symbol library ID for LED demo (default: {{defaultLibraryIDVCC}})
@@ -189,6 +194,10 @@ type cliOptions struct {
 	output                      string
 	target                      string
 	requestPath                 string
+	intentText                  string
+	intentFile                  string
+	outputFormat                string
+	strictDraft                 bool
 	name                        string
 	seed                        string
 	libVCC                      string
@@ -373,6 +382,10 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.output, "output", "", "output project directory")
 	flags.StringVar(&opts.target, "target", "", "repair target project or file")
 	flags.StringVar(&opts.requestPath, "request", "", "structured request JSON path")
+	flags.StringVar(&opts.intentText, "text", "", "natural-language intent text")
+	flags.StringVar(&opts.intentFile, "file", "", "natural-language intent text file")
+	flags.StringVar(&opts.outputFormat, "format", "json", "output format")
+	flags.BoolVar(&opts.strictDraft, "strict", false, "treat blocking draft clarifications as command errors")
 	flags.StringVar(&opts.name, "name", "", "project/design name")
 	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
 	flags.StringVar(&opts.libVCC, "lib-vcc", defaultLibraryIDVCC, "VCC symbol library ID")
@@ -2389,6 +2402,8 @@ func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent", Message: "intent requires subcommand: plan or explain"})
 	}
 	switch opts.commandArgs[0] {
+	case "draft":
+		return runIntentDraft(opts, stdout)
 	case "plan", "explain":
 		return runIntentPlan(ctx, opts, stdout, opts.commandArgs[0])
 	case "create":
@@ -2396,6 +2411,112 @@ func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	default:
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "intent." + opts.commandArgs[0], Message: "unsupported intent subcommand " + opts.commandArgs[0]})
 	}
+}
+
+type intentDraftOutput struct {
+	Request        intentplanner.Request        `json:"request"`
+	Extraction     intentdraft.ExtractionReport `json:"extraction"`
+	Clarifications []intentdraft.Clarification  `json:"clarifications,omitempty"`
+}
+
+func runIntentDraft(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("intent draft requires --json")
+	}
+	if opts.outputFormat != "json" {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "format", Message: "intent draft only supports --format json"})
+	}
+	text, sourceType, sourceID, inputIssues := loadIntentDraftText(opts)
+	if len(inputIssues) > 0 {
+		result := reports.ResultWithIssues("intent", nil, inputIssues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		return errors.New("intent draft reported input issues")
+	}
+	draft := intentdraft.Draft(text, intentdraft.Options{SourceType: sourceType, SourceID: sourceID, AcceptanceOverride: parseIntentAcceptance(opts.componentAcceptance), Strict: opts.strictDraft})
+	artifactIssues := writeIntentDraftArtifacts(opts.output, text, draft, opts.overwrite)
+	issues := append([]reports.Issue(nil), draft.Issues...)
+	issues = append(issues, artifactIssues...)
+	output := intentDraftOutput{Request: draft.Request, Extraction: draft.Extraction, Clarifications: draft.Clarifications}
+	result := reports.ResultWithIssues("intent", output, issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("intent draft reported issues")
+	}
+	return nil
+}
+
+func loadIntentDraftText(opts cliOptions) (string, string, string, []reports.Issue) {
+	hasText := strings.TrimSpace(opts.intentText) != ""
+	hasFile := strings.TrimSpace(opts.intentFile) != ""
+	if hasText == hasFile {
+		return "", "", "", []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "text", Message: "provide exactly one of --text or --file"}}
+	}
+	if hasText {
+		return opts.intentText, intentdraft.SourceTypeText, "text", nil
+	}
+	data, err := os.ReadFile(opts.intentFile)
+	if err != nil {
+		return "", "", "", []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.intentFile, Message: err.Error()}}
+	}
+	return string(data), intentdraft.SourceTypeFile, opts.intentFile, nil
+}
+
+func writeIntentDraftArtifacts(outputDir string, source string, draft intentdraft.Result, overwrite bool) []reports.Issue {
+	if strings.TrimSpace(outputDir) == "" {
+		return nil
+	}
+	if err := os.MkdirAll(outputDir, 0o755); err != nil {
+		return []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: err.Error()}}
+	}
+	files := []struct {
+		name string
+		data any
+	}{
+		{name: "intent-draft.json", data: draft.Request},
+		{name: "intent-extraction.json", data: draft.Extraction},
+		{name: "intent-clarifications.json", data: draft.Clarifications},
+	}
+	var issues []reports.Issue
+	if issue := writeLocalArtifact(filepath.Join(outputDir, "intent-source.txt"), []byte(source+"\n"), overwrite); issue != nil {
+		issues = append(issues, *issue)
+	}
+	for _, file := range files {
+		data, err := json.MarshalIndent(file.data, "", "  ")
+		if err != nil {
+			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: file.name, Message: err.Error()})
+			continue
+		}
+		if issue := writeLocalArtifact(filepath.Join(outputDir, file.name), append(data, '\n'), overwrite); issue != nil {
+			issues = append(issues, *issue)
+		}
+	}
+	return issues
+}
+
+func writeLocalArtifact(path string, data []byte, overwrite bool) *reports.Issue {
+	flags := os.O_WRONLY | os.O_CREATE
+	if overwrite {
+		flags |= os.O_TRUNC
+	} else {
+		flags |= os.O_EXCL
+	}
+	file, err := os.OpenFile(path, flags, 0o644)
+	if err != nil {
+		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: path, Message: err.Error()}
+	}
+	defer file.Close()
+	if _, err := file.Write(data); err != nil {
+		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: path, Message: err.Error()}
+	}
+	return nil
+}
+
+func parseIntentAcceptance(value string) designworkflow.AcceptanceLevel {
+	return designworkflow.AcceptanceLevel(strings.TrimSpace(value))
 }
 
 type intentExplainResult struct {
