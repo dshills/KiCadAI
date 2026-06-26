@@ -5,21 +5,27 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"kicadai/internal/reports"
 )
 
 const (
-	CodeComponentNotFound         reports.Code = "COMPONENT_NOT_FOUND"
-	CodeComponentAmbiguous        reports.Code = "COMPONENT_AMBIGUOUS"
-	CodeComponentUnsafe           reports.Code = "COMPONENT_UNSAFE_CONFIDENCE"
-	CodeComponentRatingTooLow     reports.Code = "COMPONENT_RATING_TOO_LOW"
-	CodeComponentRatingMissing    reports.Code = "COMPONENT_RATING_MISSING"
-	CodeComponentFunctionMissing  reports.Code = "COMPONENT_FUNCTION_MISSING"
-	CodeComponentVariantMissing   reports.Code = "COMPONENT_VARIANT_MISSING"
-	CodeComponentConcreteRequired reports.Code = "COMPONENT_CONCRETE_REQUIRED"
-	CodeComponentCompanionMissing reports.Code = "COMPONENT_COMPANION_MISSING"
-	CodeComponentReviewRequired   reports.Code = "COMPONENT_REVIEW_REQUIRED"
+	CodeComponentNotFound            reports.Code = "COMPONENT_NOT_FOUND"
+	CodeComponentAmbiguous           reports.Code = "COMPONENT_AMBIGUOUS"
+	CodeComponentUnsafe              reports.Code = "COMPONENT_UNSAFE_CONFIDENCE"
+	CodeComponentRatingTooLow        reports.Code = "COMPONENT_RATING_TOO_LOW"
+	CodeComponentRatingMissing       reports.Code = "COMPONENT_RATING_MISSING"
+	CodeComponentFunctionMissing     reports.Code = "COMPONENT_FUNCTION_MISSING"
+	CodeComponentVariantMissing      reports.Code = "COMPONENT_VARIANT_MISSING"
+	CodeComponentConcreteRequired    reports.Code = "COMPONENT_CONCRETE_REQUIRED"
+	CodeComponentCompanionMissing    reports.Code = "COMPONENT_COMPANION_MISSING"
+	CodeComponentReviewRequired      reports.Code = "COMPONENT_REVIEW_REQUIRED"
+	CodeComponentLifecycleBlocked    reports.Code = "COMPONENT_LIFECYCLE_BLOCKED"
+	CodeComponentLifecycleStale      reports.Code = "COMPONENT_LIFECYCLE_STALE"
+	CodeComponentAvailabilityBlocked reports.Code = "COMPONENT_AVAILABILITY_BLOCKED"
+	CodeComponentAvailabilityStale   reports.Code = "COMPONENT_AVAILABILITY_STALE"
+	CodeComponentSourceMissing       reports.Code = "COMPONENT_SOURCE_MISSING"
 )
 
 type Query struct {
@@ -33,13 +39,15 @@ type Query struct {
 }
 
 type SelectionRequest struct {
-	Query             Query            `json:"query"`
-	Acceptance        AcceptanceLevel  `json:"acceptance,omitempty"`
-	AllowAlternatives bool             `json:"allow_alternatives,omitempty"`
-	RequiredRatings   []RequiredRating `json:"required_ratings,omitempty"`
-	RequiredFunctions []string         `json:"required_functions,omitempty"`
-	RequireConcrete   bool             `json:"require_concrete,omitempty"`
-	RequireCompanions bool             `json:"require_companions,omitempty"`
+	Query             Query             `json:"query"`
+	Acceptance        AcceptanceLevel   `json:"acceptance,omitempty"`
+	AllowAlternatives bool              `json:"allow_alternatives,omitempty"`
+	RequiredRatings   []RequiredRating  `json:"required_ratings,omitempty"`
+	RequiredFunctions []string          `json:"required_functions,omitempty"`
+	RequireConcrete   bool              `json:"require_concrete,omitempty"`
+	RequireCompanions bool              `json:"require_companions,omitempty"`
+	Procurement       ProcurementPolicy `json:"procurement_policy,omitempty"`
+	Sources           *SourceCollection `json:"-"`
 }
 
 type RequiredRating struct {
@@ -60,11 +68,37 @@ type Candidate struct {
 }
 
 type Selection struct {
-	Candidate Candidate            `json:"candidate"`
-	Component ComponentRecord      `json:"component"`
-	Variant   PackageVariant       `json:"variant"`
-	Warnings  []reports.Issue      `json:"warnings,omitempty"`
-	Rejected  []CandidateRejection `json:"rejected,omitempty"`
+	Candidate   Candidate            `json:"candidate"`
+	Component   ComponentRecord      `json:"component"`
+	Variant     PackageVariant       `json:"variant"`
+	Procurement *ProcurementEvidence `json:"procurement,omitempty"`
+	Warnings    []reports.Issue      `json:"warnings,omitempty"`
+	Rejected    []CandidateRejection `json:"rejected,omitempty"`
+}
+
+type ProcurementPolicy struct {
+	RequireLifecycle       bool              `json:"require_lifecycle,omitempty"`
+	RequireAvailability    bool              `json:"require_availability,omitempty"`
+	AllowLifecycle         []LifecycleStatus `json:"allow_lifecycle,omitempty"`
+	WarnLifecycle          []LifecycleStatus `json:"warn_lifecycle,omitempty"`
+	BlockLifecycle         []LifecycleStatus `json:"block_lifecycle,omitempty"`
+	MaxLifecycleAgeDays    int               `json:"max_lifecycle_age_days,omitempty"`
+	MaxAvailabilityAgeDays int               `json:"max_availability_age_days,omitempty"`
+	AllowUnknownLifecycle  bool              `json:"allow_unknown_lifecycle,omitempty"`
+	Now                    *time.Time        `json:"-"`
+}
+
+type ProcurementEvidence struct {
+	Manufacturer           string             `json:"manufacturer,omitempty"`
+	MPN                    string             `json:"mpn,omitempty"`
+	SourceID               string             `json:"source_id,omitempty"`
+	LifecycleStatus        LifecycleStatus    `json:"lifecycle_status,omitempty"`
+	LifecycleSourceDate    string             `json:"lifecycle_source_date,omitempty"`
+	LifecycleFresh         *bool              `json:"lifecycle_fresh,omitempty"`
+	AvailabilityStatus     AvailabilityStatus `json:"availability_status,omitempty"`
+	AvailabilitySourceDate string             `json:"availability_source_date,omitempty"`
+	AvailabilityFresh      *bool              `json:"availability_fresh,omitempty"`
+	Outcome                string             `json:"outcome,omitempty"`
 }
 
 type CandidateRejection struct {
@@ -166,6 +200,11 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 	}
 	record, variant, _ := findRecordVariant(catalog, filtered[0].ComponentID, filtered[0].VariantID)
 	selection := Selection{Candidate: filtered[0], Component: record, Variant: variant, Rejected: rejected}
+	procurement, procurementWarnings := evaluateProcurement(record, request, false)
+	if procurement != nil {
+		selection.Procurement = procurement
+	}
+	selection.Warnings = append(selection.Warnings, procurementWarnings...)
 	if filtered[0].Confidence == ConfidencePlaceholder {
 		selection.Warnings = append(selection.Warnings, NewIssue(CodeComponentUnsafe, reports.SeverityWarning, "component."+filtered[0].ComponentID, "placeholder component selected for draft output"))
 	}
@@ -202,10 +241,176 @@ func selectionCandidateIssues(record ComponentRecord, candidate Candidate, reque
 	if request.Acceptance == AcceptanceFabricationCandidate {
 		issues = append(issues, fabricationCandidateReviewIssues(record)...)
 	}
+	_, procurementIssues := evaluateProcurement(record, request, true)
+	issues = append(issues, procurementIssues...)
 	if !candidateAllowedForAcceptance(record, candidate, request.Acceptance) {
 		issues = append(issues, NewIssue(CodeComponentUnsafe, reports.SeverityBlocked, "component."+candidate.ComponentID, fmt.Sprintf("component confidence %s is not allowed for %s acceptance", candidate.Confidence, request.Acceptance)))
 	}
 	return issues
+}
+
+func evaluateProcurement(record ComponentRecord, request SelectionRequest, candidateGate bool) (*ProcurementEvidence, []reports.Issue) {
+	policy := defaultProcurementPolicy(request.Acceptance, request.Procurement)
+	if request.Sources == nil && !policy.RequireLifecycle && !policy.RequireAvailability {
+		return nil, nil
+	}
+	now := time.Now().UTC()
+	if policy.Now != nil {
+		now = policy.Now.UTC()
+	}
+	evidence := &ProcurementEvidence{Manufacturer: record.Manufacturer, MPN: record.MPN, Outcome: "not_required"}
+	if strings.TrimSpace(record.Manufacturer) == "" || strings.TrimSpace(record.MPN) == "" {
+		if request.Acceptance == AcceptanceFabricationCandidate || policy.RequireLifecycle || policy.RequireAvailability {
+			evidence.Outcome = "blocked"
+			return evidence, []reports.Issue{NewIssue(CodeComponentSourceMissing, reports.SeverityBlocked, "component."+record.ID+".source", "component source evidence requires manufacturer and MPN")}
+		}
+		if request.Acceptance == AcceptanceConnectivity || request.Acceptance == AcceptanceERCDRC {
+			evidence.Outcome = "warning"
+			return evidence, []reports.Issue{NewIssue(CodeComponentSourceMissing, reports.SeverityWarning, "component."+record.ID+".source", "component source evidence requires manufacturer and MPN")}
+		}
+		return evidence, nil
+	}
+	source, found := SourceRecord{}, false
+	if request.Sources != nil {
+		source, found = request.Sources.Find(record.Manufacturer, record.MPN)
+	}
+	if !found {
+		if policy.RequireLifecycle || (request.Sources != nil && request.Acceptance == AcceptanceFabricationCandidate) {
+			evidence.Outcome = "blocked"
+			return evidence, []reports.Issue{NewIssue(CodeComponentSourceMissing, reports.SeverityBlocked, "component."+record.ID+".source", "fresh lifecycle source evidence is required")}
+		}
+		if request.Acceptance == AcceptanceConnectivity || request.Acceptance == AcceptanceERCDRC {
+			evidence.Outcome = "warning"
+			return evidence, []reports.Issue{NewIssue(CodeComponentSourceMissing, reports.SeverityWarning, "component."+record.ID+".source", "component lifecycle source evidence is missing")}
+		}
+		return evidence, nil
+	}
+	evidence.SourceID = source.SourceID
+	var issues []reports.Issue
+	if source.Lifecycle != nil {
+		evidence.LifecycleStatus = source.Lifecycle.Status
+		evidence.LifecycleSourceDate = source.Lifecycle.SourceDate
+		fresh := evidenceFresh(source.Lifecycle.SourceDate, now, policy.MaxLifecycleAgeDays)
+		evidence.LifecycleFresh = &fresh
+		issues = append(issues, lifecyclePolicyIssues(record.ID, source.Lifecycle.Status, fresh, policy, request.Acceptance)...)
+	} else if policy.RequireLifecycle || request.Acceptance == AcceptanceFabricationCandidate {
+		issues = append(issues, NewIssue(CodeComponentSourceMissing, reports.SeverityBlocked, "component."+record.ID+".lifecycle", "lifecycle source evidence is required"))
+	}
+	if source.Availability != nil {
+		evidence.AvailabilityStatus = source.Availability.Status
+		evidence.AvailabilitySourceDate = source.Availability.SourceDate
+		fresh := evidenceFresh(source.Availability.SourceDate, now, policy.MaxAvailabilityAgeDays)
+		evidence.AvailabilityFresh = &fresh
+		issues = append(issues, availabilityPolicyIssues(record.ID, source.Availability.Status, fresh, policy)...)
+	} else if policy.RequireAvailability {
+		issues = append(issues, NewIssue(CodeComponentSourceMissing, reports.SeverityBlocked, "component."+record.ID+".availability", "availability source evidence is required"))
+	}
+	if len(issues) == 0 {
+		evidence.Outcome = "accepted"
+	} else if reports.HasBlockingIssue(issues) {
+		evidence.Outcome = "blocked"
+	} else {
+		evidence.Outcome = "warning"
+	}
+	if candidateGate {
+		return evidence, blockingIssues(issues)
+	}
+	return evidence, nonBlockingIssues(issues)
+}
+
+func defaultProcurementPolicy(acceptance AcceptanceLevel, policy ProcurementPolicy) ProcurementPolicy {
+	if policy.MaxLifecycleAgeDays == 0 {
+		policy.MaxLifecycleAgeDays = 730
+	}
+	if policy.MaxAvailabilityAgeDays == 0 {
+		policy.MaxAvailabilityAgeDays = 30
+	}
+	if len(policy.BlockLifecycle) == 0 {
+		policy.BlockLifecycle = []LifecycleStatus{LifecycleEOL, LifecycleObsolete}
+	}
+	if len(policy.WarnLifecycle) == 0 {
+		policy.WarnLifecycle = []LifecycleStatus{LifecycleNRND, LifecycleUnknown}
+	}
+	if len(policy.AllowLifecycle) == 0 {
+		policy.AllowLifecycle = []LifecycleStatus{LifecycleActive, LifecycleMature}
+	}
+	return policy
+}
+
+func lifecyclePolicyIssues(componentID string, status LifecycleStatus, fresh bool, policy ProcurementPolicy, acceptance AcceptanceLevel) []reports.Issue {
+	path := "component." + componentID + ".lifecycle"
+	if !fresh {
+		severity := reports.SeverityWarning
+		if acceptance == AcceptanceFabricationCandidate || policy.RequireLifecycle {
+			severity = reports.SeverityBlocked
+		}
+		return []reports.Issue{NewIssue(CodeComponentLifecycleStale, severity, path, "component lifecycle source evidence is stale")}
+	}
+	if containsLifecycle(policy.BlockLifecycle, status) {
+		return []reports.Issue{NewIssue(CodeComponentLifecycleBlocked, reports.SeverityBlocked, path, "component lifecycle status is blocked: "+string(status))}
+	}
+	if (status == LifecycleNRND || status == LifecycleUnknown) && acceptance == AcceptanceFabricationCandidate && !policy.AllowUnknownLifecycle {
+		return []reports.Issue{NewIssue(CodeComponentLifecycleBlocked, reports.SeverityBlocked, path, "component lifecycle status is not allowed for fabrication-candidate: "+string(status))}
+	}
+	if containsLifecycle(policy.WarnLifecycle, status) {
+		return []reports.Issue{NewIssue(CodeComponentLifecycleBlocked, reports.SeverityWarning, path, "component lifecycle status requires review: "+string(status))}
+	}
+	return nil
+}
+
+func availabilityPolicyIssues(componentID string, status AvailabilityStatus, fresh bool, policy ProcurementPolicy) []reports.Issue {
+	path := "component." + componentID + ".availability"
+	if !fresh {
+		severity := reports.SeverityWarning
+		if policy.RequireAvailability {
+			severity = reports.SeverityBlocked
+		}
+		return []reports.Issue{NewIssue(CodeComponentAvailabilityStale, severity, path, "component availability source evidence is stale")}
+	}
+	if status == AvailabilityUnavailable && policy.RequireAvailability {
+		return []reports.Issue{NewIssue(CodeComponentAvailabilityBlocked, reports.SeverityBlocked, path, "component availability is unavailable")}
+	}
+	return nil
+}
+
+func evidenceFresh(sourceDate string, now time.Time, maxAgeDays int) bool {
+	parsed, err := parseSourceDate(sourceDate)
+	if err != nil {
+		return false
+	}
+	if maxAgeDays <= 0 {
+		return true
+	}
+	return !parsed.Before(now.AddDate(0, 0, -maxAgeDays))
+}
+
+func containsLifecycle(values []LifecycleStatus, status LifecycleStatus) bool {
+	for _, value := range values {
+		if value == status {
+			return true
+		}
+	}
+	return false
+}
+
+func nonBlockingIssues(issues []reports.Issue) []reports.Issue {
+	var out []reports.Issue
+	for _, issue := range issues {
+		if issue.Severity != reports.SeverityBlocked {
+			out = append(out, issue)
+		}
+	}
+	return out
+}
+
+func blockingIssues(issues []reports.Issue) []reports.Issue {
+	var out []reports.Issue
+	for _, issue := range issues {
+		if issue.Severity == reports.SeverityBlocked {
+			out = append(out, issue)
+		}
+	}
+	return out
 }
 
 func fabricationCandidateReviewIssues(record ComponentRecord) []reports.Issue {

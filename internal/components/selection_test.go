@@ -4,6 +4,7 @@ import (
 	"context"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestSelectGenericResistorByPackageAndValue(t *testing.T) {
@@ -23,6 +24,79 @@ func TestSelectGenericResistorByPackageAndValue(t *testing.T) {
 	if selection.Component.ID != "resistor.generic.0805" {
 		t.Fatalf("selected %s", selection.Component.ID)
 	}
+}
+
+func TestSelectIncludesActiveProcurementEvidence(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	sources, err := LoadSources(context.Background(), SourceLoadOptions{SourceDir: sourceFixtureDir("valid")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:      AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{Kind: "input_voltage", Value: "5", Unit: "V"}},
+		Sources:         sources,
+	})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if selection.Procurement == nil || selection.Procurement.LifecycleStatus != LifecycleActive || selection.Procurement.Outcome != "accepted" {
+		t.Fatalf("procurement = %#v", selection.Procurement)
+	}
+}
+
+func TestSelectBlocksObsoleteLifecycle(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
+	sources := sourceCollectionFor(SourceRecord{
+		Manufacturer: "Advanced Monolithic Systems",
+		MPN:          "AMS1117-3.3",
+		SourceID:     "test",
+		Lifecycle:    &LifecycleEvidence{Status: LifecycleObsolete, Source: "manual", SourceDate: "2026-06-26", Confidence: SourceConfidenceManualReview},
+	})
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:       Query{Family: "regulator", Package: "sot223", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:  AcceptanceConnectivity,
+		Sources:     sources,
+		Procurement: ProcurementPolicy{Now: &now},
+	})
+	assertIssueCode(t, result.Issues, CodeComponentLifecycleBlocked)
+}
+
+func TestSelectBlocksStaleLifecycleForFabricationCandidate(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
+	sources, err := LoadSources(context.Background(), SourceLoadOptions{SourceDir: sourceFixtureDir("stale")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:       Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:  AcceptanceFabricationCandidate,
+		Sources:     sources,
+		Procurement: ProcurementPolicy{Now: &now},
+	})
+	assertIssueCode(t, result.Issues, CodeComponentLifecycleStale)
+}
+
+func TestSelectBlocksRequiredUnavailableAvailability(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	now := time.Date(2026, 6, 26, 0, 0, 0, 0, time.UTC)
+	sources := sourceCollectionFor(SourceRecord{
+		Manufacturer: "Diodes Incorporated",
+		MPN:          "AP2112K-3.3",
+		SourceID:     "test",
+		Lifecycle:    &LifecycleEvidence{Status: LifecycleActive, Source: "manual", SourceDate: "2026-06-26", Confidence: SourceConfidenceManualReview},
+		Availability: &AvailabilityEvidence{Status: AvailabilityUnavailable, Source: "manual", SourceDate: "2026-06-26", Confidence: SourceConfidenceManualReview},
+	})
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:       Query{Family: "regulator", Package: "sot23_5", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:  AcceptanceConnectivity,
+		Sources:     sources,
+		Procurement: ProcurementPolicy{RequireAvailability: true, Now: &now},
+	})
+	assertIssueCode(t, result.Issues, CodeComponentAvailabilityBlocked)
 }
 
 func TestSelectRejectsCapacitorBelowVoltageRating(t *testing.T) {
@@ -627,6 +701,12 @@ func componentHasDeratingRule(record ComponentRecord, kind string) bool {
 		}
 	}
 	return false
+}
+
+func sourceCollectionFor(records ...SourceRecord) *SourceCollection {
+	collection := &SourceCollection{Records: records}
+	collection.rebuildIndex()
+	return collection
 }
 
 func testSelectableResistor(id string) ComponentRecord {
