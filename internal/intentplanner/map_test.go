@@ -281,14 +281,41 @@ func TestPlanResolvesSupplyByRailNameAndBlocksUnknownSupply(t *testing.T) {
 			Params: map[string]any{"supply_voltage": "5V"},
 		}},
 	})
-	if blocked.Status == PlanStatusBlocked {
-		t.Fatalf("plan should remain partial/ready with known gap, got blocked: %#v", blocked.Issues)
+	if blocked.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked for unknown explicit supply; issues=%#v", blocked.Status, blocked.Issues)
 	}
-	if len(blocked.KnownGaps) == 0 {
-		t.Fatalf("missing known gap for unknown supply: %#v", blocked)
+	if !hasSynthesisGapCategory(blocked, "voltage_domain") {
+		t.Fatalf("missing synthesis voltage-domain gap: %#v", blocked.Synthesis.Gaps)
 	}
 	if hasConnection(*blocked.GeneratedRequest, "power_header.VIN", "sensor.VCC") {
 		t.Fatalf("unexpected fallback supply connection: %#v", blocked.GeneratedRequest.Connections)
+	}
+}
+
+func TestPlanBlocksConflictingSupplyAliasVoltage(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "bad_supply_voltage",
+		Kind:    IntentSensorNode,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: "3v3"}},
+		},
+		Functions: []FunctionIntent{{
+			Kind:   "sensor",
+			Family: "i2c_sensor",
+			Supply: "3v3",
+			Params: map[string]any{"supply_voltage": "5V"},
+		}},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasIssuePath(plan.Issues, "blocks.sensor.supply_voltage") {
+		t.Fatalf("missing conflict issue: %#v", plan.Issues)
+	}
+	if !hasSynthesisGapCategory(plan, "voltage_domain") {
+		t.Fatalf("missing synthesis voltage-domain gap: %#v", plan.Synthesis.Gaps)
 	}
 }
 

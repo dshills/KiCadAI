@@ -1022,6 +1022,38 @@ func (builder *planBuilder) recordInstanceSupply(instanceID string, supply strin
 	}
 	if supply = normalizeToken(supply); supply != "" {
 		builder.instanceSupplies[instanceID] = supply
+		builder.validateInstanceSupply(instanceID, supply)
+	}
+}
+
+func (builder *planBuilder) validateInstanceSupply(instanceID string, supply string) {
+	if _, ok := parseVoltage(supply); ok {
+		return
+	}
+	voltage := builder.railAliasVoltage[supply]
+	if voltage == "" {
+		builder.addIssue("blocks."+instanceID+".supply", "unknown supply alias "+supply+" for "+instanceID, "define a matching power.rails alias/name or use an explicit voltage")
+		builder.recordSynthesisGap(SynthesisGap{
+			ID:         "supply.unknown." + instanceID,
+			Category:   "voltage_domain",
+			Path:       "blocks." + instanceID + ".supply",
+			Message:    "unknown supply alias " + supply + " for " + instanceID,
+			Severity:   reports.SeverityError,
+			Suggestion: "define a matching power.rails alias/name or use an explicit voltage",
+		})
+		return
+	}
+	explicit := builder.paramString(instanceID, "supply_voltage")
+	if explicit != "" && !voltagesEquivalent(explicit, voltage) {
+		builder.addIssue("blocks."+instanceID+".supply_voltage", "supply alias "+supply+" resolves to "+voltage+" but "+instanceID+" requested "+explicit, "make the function supply and block supply_voltage agree")
+		builder.recordSynthesisGap(SynthesisGap{
+			ID:         "supply.conflict." + instanceID,
+			Category:   "voltage_domain",
+			Path:       "blocks." + instanceID + ".supply_voltage",
+			Message:    "supply alias " + supply + " resolves to " + voltage + " but " + instanceID + " requested " + explicit,
+			Severity:   reports.SeverityError,
+			Suggestion: "make the function supply and block supply_voltage agree",
+		})
 	}
 }
 
