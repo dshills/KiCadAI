@@ -499,8 +499,78 @@ func (builder *planBuilder) connectMCUSupportBlocks() {
 		if !ok {
 			continue
 		}
-		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.programming.pin_assignment." + normalizeToken(programmingID), Path: builder.supportTargetPath(programmingID), Message: "MCU programming wiring for " + target.ID + " is deferred until MCU block metadata exposes debug/programming target ports"})
+		builder.connectProgrammingSupport(programmingID, target)
 	}
+}
+
+func (builder *planBuilder) connectProgrammingSupport(programmingID string, target semanticInstance) {
+	support, ok := builder.semantic.instance(programmingID)
+	if !ok {
+		builder.addIssue(builder.supportTargetPath(programmingID), "programming support block "+programmingID+" is missing semantic metadata", "rebuild the plan with a supported programming block")
+		return
+	}
+	mode := builder.programmingMode(programmingID)
+	switch mode {
+	case "isp":
+		for _, pair := range []struct {
+			targetRole  string
+			supportRole string
+			net         string
+		}{
+			{targetRole: "mcu.reset", supportRole: "mcu.reset", net: "ISP_RESET"},
+			{targetRole: "mcu.spi.mosi", supportRole: "mcu.spi.mosi", net: "ISP_MOSI"},
+			{targetRole: "mcu.spi.miso", supportRole: "mcu.spi.miso", net: "ISP_MISO"},
+			{targetRole: "mcu.spi.sck", supportRole: "mcu.spi.sck", net: "ISP_SCK"},
+			{targetRole: "power.vcc", supportRole: "power.vcc", net: builder.supplyNetAlias(target.ID)},
+			{targetRole: "power.gnd", supportRole: "power.gnd", net: "GND"},
+		} {
+			builder.addSemanticProgrammingConnection(target, support, pair.targetRole, pair.supportRole, builder.programmingNetAlias(target.ID, programmingID, pair.targetRole, pair.net), "ISP programming connects "+programmingID+" to target "+target.ID)
+		}
+	case "uart":
+		for _, pair := range []struct {
+			targetRole  string
+			supportRole string
+			net         string
+		}{
+			{targetRole: "mcu.uart.tx", supportRole: "mcu.uart.rx", net: "UART_TX"},
+			{targetRole: "mcu.uart.rx", supportRole: "mcu.uart.tx", net: "UART_RX"},
+			{targetRole: "power.vcc", supportRole: "power.vcc", net: builder.supplyNetAlias(target.ID)},
+			{targetRole: "power.gnd", supportRole: "power.gnd", net: "GND"},
+		} {
+			builder.addSemanticProgrammingConnection(target, support, pair.targetRole, pair.supportRole, builder.programmingNetAlias(target.ID, programmingID, pair.targetRole, pair.net), "UART programming connects "+programmingID+" to target "+target.ID)
+		}
+	default:
+		builder.addIssue(builder.supportTargetPath(programmingID)+".programming_interface", "unsupported programming interface "+mode, "use isp or uart")
+	}
+}
+
+func (builder *planBuilder) addSemanticProgrammingConnection(target semanticInstance, support semanticInstance, targetRole string, supportRole string, net string, rationale string) {
+	targetPort, targetOK := target.portByRole(targetRole)
+	supportPort, supportOK := support.portByRole(supportRole)
+	if !targetOK {
+		builder.addIssue(builder.supportTargetPath(support.ID), "target "+target.ID+" is missing programming role "+targetRole, "select a compatible MCU target")
+		return
+	}
+	if !supportOK {
+		builder.addIssue(builder.supportTargetPath(support.ID), "support block "+support.ID+" is missing programming role "+supportRole, "select a compatible programming support block")
+		return
+	}
+	builder.addConnection(target.ID+"."+targetPort.Name, support.ID+"."+supportPort.Name, net, rationale)
+}
+
+func (builder *planBuilder) programmingNetAlias(targetID string, programmingID string, targetRole string, net string) string {
+	if targetRole == "power.vcc" || targetRole == "power.gnd" {
+		return net
+	}
+	return strings.ToUpper(normalizeToken(targetID) + "_" + normalizeToken(programmingID) + "_" + net)
+}
+
+func (builder *planBuilder) programmingMode(programmingID string) string {
+	mode := normalizeToken(firstNonEmpty(builder.paramString(programmingID, "programming_interface"), builder.paramString(programmingID, "programming_mode"), builder.paramString(programmingID, "programming_header")))
+	if mode == "" {
+		return "isp"
+	}
+	return mode
 }
 
 func (builder *planBuilder) connectI2CBuses() {

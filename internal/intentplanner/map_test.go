@@ -72,8 +72,51 @@ func TestPlanMapsMCUAndProtectionBlocks(t *testing.T) {
 	if !hasKnownGap(plan, "mcu.clock.pin_assignment.clock") {
 		t.Fatalf("missing MCU clock known gap: %#v", plan.KnownGaps)
 	}
-	if !hasKnownGap(plan, "mcu.programming.pin_assignment.programming") {
-		t.Fatalf("missing MCU programming known gap: %#v", plan.KnownGaps)
+	if hasKnownGap(plan, "mcu.programming.pin_assignment.programming") {
+		t.Fatalf("unexpected MCU programming known gap: %#v", plan.KnownGaps)
+	}
+	for _, connection := range []struct {
+		from string
+		to   string
+	}{
+		{from: "mcu.MOSI", to: "programming.MOSI"},
+		{from: "mcu.MISO", to: "programming.MISO"},
+		{from: "mcu.SCK", to: "programming.SCK"},
+		{from: "mcu.RESET", to: "programming.RESET"},
+	} {
+		if !hasConnection(*plan.GeneratedRequest, connection.from, connection.to) {
+			t.Fatalf("missing programming connection %s -> %s: %#v", connection.from, connection.to, plan.GeneratedRequest.Connections)
+		}
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanMapsUARTProgrammingIntent(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "uart_programming",
+		Kind:    IntentMCUMinimal,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "5V", "programming_header": "uart"}},
+			{Kind: "reset_programming", Params: map[string]any{"programming_interface": "uart"}},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	for _, connection := range []struct {
+		from string
+		to   string
+	}{
+		{from: "mcu.UART_TX", to: "programming.UART_RX"},
+		{from: "mcu.UART_RX", to: "programming.UART_TX"},
+	} {
+		if !hasConnection(*plan.GeneratedRequest, connection.from, connection.to) {
+			t.Fatalf("missing UART programming connection %s -> %s: %#v", connection.from, connection.to, plan.GeneratedRequest.Connections)
+		}
 	}
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
 		t.Fatalf("generated request validation issues = %#v", issues)
