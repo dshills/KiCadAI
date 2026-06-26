@@ -51,6 +51,8 @@ func Plan(request Request) PlanResult {
 		protectedSources: map[string]string{},
 		semantic:         newSemanticIndex(),
 		supportTargets:   map[string]semanticSupportIntent{},
+		i2cBuses:         map[string]string{},
+		i2cMCUBus:        map[string]string{},
 	}
 	builder.applyBoardDefaults()
 	builder.applyPolicyDefaults()
@@ -82,6 +84,10 @@ type planBuilder struct {
 	protectedSources   map[string]string
 	semantic           *semanticIndex
 	supportTargets     map[string]semanticSupportIntent
+	i2cBuses           map[string]string
+	i2cMCUBus          map[string]string
+	i2cDefaultNoted    bool
+	i2cMultiBusBlocked bool
 	usbPowerIDs        []string
 	regulatorIDs       []string
 	sensorIDs          []string
@@ -323,6 +329,7 @@ func (builder *planBuilder) mapFunctions() {
 			case "sensor":
 				id := builder.addBlock(reqID, "sensor", "i2c_sensor", function.Params, "I2C sensor block implements requested sensor function")
 				builder.sensorIDs = appendIfNotEmpty(builder.sensorIDs, id)
+				builder.recordI2CBus(id, function.Bus)
 			case "mcu":
 				id := builder.addBlock(reqID, "mcu", "mcu_minimal", function.Params, "MCU minimal system implements requested controller")
 				builder.mcuIDs = appendIfNotEmpty(builder.mcuIDs, id)
@@ -371,6 +378,7 @@ func (builder *planBuilder) mapInterfaces() {
 				id := builder.addConnector(reqID, "i2c_connector", []string{"SDA", "SCL", "VCC", "GND"}, iface.Strength)
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
 				builder.i2cConnectorIDs = appendIfNotEmpty(builder.i2cConnectorIDs, id)
+				builder.recordI2CBus(id, iface.Bus)
 			case "gpio", "connector":
 				pins := []string{"SIG", "VCC", "GND"}
 				id := builder.addConnector(reqID, "connector", pins, iface.Strength)
@@ -449,16 +457,7 @@ func (builder *planBuilder) connectPowerAndSignals() {
 			builder.addConnection(groundSource+".GND", target+".GND", "GND", "shared ground")
 		}
 	}
-	for index, sensorID := range builder.sensorIDs {
-		i2cConnectorID := builder.i2cConnectorAt(index)
-		if i2cConnectorID != "" {
-			builder.addConnection(i2cConnectorID+".SDA", sensorID+".SDA", builder.busNetAlias(i2cConnectorID, "SDA"), "I2C data connects sensor to breakout connector")
-			builder.addConnection(i2cConnectorID+".SCL", sensorID+".SCL", builder.busNetAlias(i2cConnectorID, "SCL"), "I2C clock connects sensor to breakout connector")
-		}
-	}
-	if len(builder.mcuIDs) > 0 && len(builder.i2cConnectorIDs) > 0 {
-		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.i2c.pin_assignment", Path: "functions", Message: "MCU I2C bus wiring is deferred until the MCU block exposes distinct SDA/SCL-capable ports"})
-	}
+	builder.connectI2CBuses()
 	for index, ledID := range builder.ledIDs {
 		if gpioConnectorID := builder.signalConnectorAt(index); gpioConnectorID != "" {
 			builder.addConnection(gpioConnectorID+".SIG", ledID+".IN", signalNetAlias("LED_SIG", ledID), "connector signal drives LED indicator")
@@ -502,6 +501,98 @@ func (builder *planBuilder) connectMCUSupportBlocks() {
 		}
 		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.programming.pin_assignment." + normalizeToken(programmingID), Path: builder.supportTargetPath(programmingID), Message: "MCU programming wiring for " + target.ID + " is deferred until MCU block metadata exposes debug/programming target ports"})
 	}
+}
+
+func (builder *planBuilder) connectI2CBuses() {
+	if len(builder.sensorIDs) == 0 && len(builder.i2cConnectorIDs) == 0 {
+		return
+	}
+	buses := map[string]struct{}{}
+	for _, id := range append(append([]string{}, builder.sensorIDs...), builder.i2cConnectorIDs...) {
+		buses[builder.i2cBusFor(id)] = struct{}{}
+	}
+	for _, bus := range sortedSetKeys(buses) {
+		sdaNet := builder.busNetAlias(bus, "SDA")
+		sclNet := builder.busNetAlias(bus, "SCL")
+		mcuID, hasMCU := builder.i2cMCUTarget(bus)
+		for _, sensorID := range builder.instancesOnI2CBus(builder.sensorIDs, bus) {
+			if hasMCU {
+				builder.addConnection(mcuID+".SDA", sensorID+".SDA", sdaNet, "I2C data connects MCU to sensor on "+bus)
+				builder.addConnection(mcuID+".SCL", sensorID+".SCL", sclNet, "I2C clock connects MCU to sensor on "+bus)
+			}
+			for _, connectorID := range builder.instancesOnI2CBus(builder.i2cConnectorIDs, bus) {
+				builder.addConnection(connectorID+".SDA", sensorID+".SDA", sdaNet, "I2C data connects sensor to breakout connector on "+bus)
+				builder.addConnection(connectorID+".SCL", sensorID+".SCL", sclNet, "I2C clock connects sensor to breakout connector on "+bus)
+			}
+		}
+		if hasMCU {
+			for _, connectorID := range builder.instancesOnI2CBus(builder.i2cConnectorIDs, bus) {
+				if len(builder.instancesOnI2CBus(builder.sensorIDs, bus)) == 0 {
+					builder.addConnection(mcuID+".SDA", connectorID+".SDA", sdaNet, "I2C data connects MCU to breakout connector on "+bus)
+					builder.addConnection(mcuID+".SCL", connectorID+".SCL", sclNet, "I2C clock connects MCU to breakout connector on "+bus)
+				}
+			}
+		}
+	}
+}
+
+func sortedSetKeys(values map[string]struct{}) []string {
+	keys := make([]string, 0, len(values))
+	for key := range values {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
+}
+
+func (builder *planBuilder) recordI2CBus(instanceID string, bus string) {
+	instanceID = strings.TrimSpace(instanceID)
+	if instanceID == "" {
+		return
+	}
+	builder.i2cBuses[instanceID] = normalizeToken(bus)
+}
+
+func (builder *planBuilder) i2cBusFor(instanceID string) string {
+	if bus := normalizeToken(builder.i2cBuses[instanceID]); bus != "" {
+		return bus
+	}
+	if !builder.i2cDefaultNoted {
+		builder.i2cDefaultNoted = true
+		builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: "semantic.bus.i2c.default", Path: "interfaces", Message: "defaulted unnamed I2C bus to i2c1"})
+	}
+	return "i2c1"
+}
+
+func (builder *planBuilder) instancesOnI2CBus(ids []string, bus string) []string {
+	var out []string
+	for _, id := range ids {
+		if builder.i2cBusFor(id) == bus {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+func (builder *planBuilder) i2cMCUTarget(bus string) (string, bool) {
+	candidates := builder.semantic.withPortRole("mcu.i2c.sda")
+	candidates = filterSemanticCandidates(candidates, "mcu", "mcu.i2c.scl")
+	if len(candidates) == 0 {
+		return "", false
+	}
+	if len(candidates) > 1 {
+		builder.semanticTargetIssue("interfaces."+bus, "multiple compatible MCU I2C targets require explicit target metadata", "set target.id for the I2C interface or split buses by target", StrengthRequired)
+		return "", false
+	}
+	if assigned := builder.i2cMCUBus[candidates[0].ID]; assigned != "" && assigned != bus {
+		if !builder.i2cMultiBusBlocked {
+			builder.i2cMultiBusBlocked = true
+			builder.semanticTargetIssue("interfaces."+bus, "the selected MCU I2C pins are already assigned to "+assigned+" and cannot safely satisfy "+bus, "use one I2C bus or add an MCU template with distinct I2C peripherals", StrengthRequired)
+		}
+		return "", false
+	}
+	builder.i2cMCUBus[candidates[0].ID] = bus
+	return candidates[0].ID, true
 }
 
 func (builder *planBuilder) recordSupportTarget(instanceID string, reqID string, path string, target TargetRef, strength Strength) {
@@ -654,11 +745,13 @@ func (builder *planBuilder) i2cConnectorAt(index int) string {
 	return strings.TrimSpace(builder.i2cConnectorIDs[index%len(builder.i2cConnectorIDs)])
 }
 
-func (builder *planBuilder) busNetAlias(connectorID string, signal string) string {
-	if len(builder.i2cConnectorIDs) <= 1 {
+func (builder *planBuilder) busNetAlias(bus string, signal string) string {
+	bus = normalizeToken(bus)
+	signal = strings.ToUpper(strings.TrimSpace(signal))
+	if bus == "" {
 		return signal
 	}
-	return normalizeToken(connectorID) + "_" + signal
+	return strings.ToUpper(strings.ReplaceAll(bus, "-", "_")) + "_" + signal
 }
 
 func (builder *planBuilder) targetSupplyVoltage(targetID string) string {

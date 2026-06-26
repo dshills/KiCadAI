@@ -20,6 +20,8 @@ type mcuPinRoleMap struct {
 	MISO   string
 	SCK    string
 	GPIO   string
+	SDA    string
+	SCL    string
 	UARTTX string
 	UARTRX string
 }
@@ -41,6 +43,8 @@ var atmega328PAU = mcuPinRoleMap{
 	MISO:   "16",
 	SCK:    "17",
 	GPIO:   "12",
+	SDA:    "27",
+	SCL:    "28",
 	UARTTX: "31",
 	UARTRX: "30",
 }
@@ -190,6 +194,8 @@ func instantiateMCUMinimal(definition BlockDefinition, request BlockRequest, par
 	misoNet := InstanceNetName(request.InstanceID, "miso")
 	sckNet := InstanceNetName(request.InstanceID, "sck")
 	gpioNet := InstanceNetName(request.InstanceID, "gpio")
+	sdaNet := InstanceNetName(request.InstanceID, "sda")
+	sclNet := InstanceNetName(request.InstanceID, "scl")
 	uartTXNet := InstanceNetName(request.InstanceID, "uart_tx")
 	uartRXNet := InstanceNetName(request.InstanceID, "uart_rx")
 	programmingMode := stringParam(params, "programming_header")
@@ -204,9 +210,11 @@ func instantiateMCUMinimal(definition BlockDefinition, request BlockRequest, par
 	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "RESET", mcuRef, roleMap.RESET, resetNet)
 	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "AREF", mcuRef, roleMap.AREF, arefNet)
 	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "GPIO", mcuRef, roleMap.GPIO, gpioNet)
+	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SDA", mcuRef, roleMap.SDA, sdaNet)
+	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SCL", mcuRef, roleMap.SCL, sclNet)
 
 	refs := []string{mcuRef}
-	nets := []string{vccNet, gndNet, resetNet, arefNet, gpioNet}
+	nets := []string{vccNet, gndNet, resetNet, arefNet, gpioNet, sdaNet, sclNet}
 	if programmingMode == "isp" {
 		appendConnectOperation(&operations, &issuesOut, request.InstanceID, "MOSI", mcuRef, roleMap.MOSI, mosiNet)
 		appendConnectOperation(&operations, &issuesOut, mcuRef, roleMap.MISO, request.InstanceID, "MISO", misoNet)
@@ -338,6 +346,8 @@ func validateMCUTemplate(path string, template mcuTemplate) []reports.Issue {
 		{name: "MISO", pin: roleMap.MISO},
 		{name: "SCK", pin: roleMap.SCK},
 		{name: "GPIO", pin: roleMap.GPIO},
+		{name: "SDA", pin: roleMap.SDA},
+		{name: "SCL", pin: roleMap.SCL},
 		{name: "UARTTX", pin: roleMap.UARTTX},
 		{name: "UARTRX", pin: roleMap.UARTRX},
 	} {

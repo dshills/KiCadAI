@@ -80,6 +80,70 @@ func TestPlanMapsMCUAndProtectionBlocks(t *testing.T) {
 	}
 }
 
+func TestPlanMapsMCUI2CBus(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "mcu_i2c",
+		Kind:    IntentSensorNode,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V"}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V", Bus: "i2c1"}},
+		Functions: []FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "3.3V"}},
+			{Kind: "sensor", Family: "i2c_sensor", Bus: "i2c1"},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	for _, connection := range []struct {
+		from string
+		to   string
+		net  string
+	}{
+		{from: "mcu.SDA", to: "sensor.SDA", net: "I2C1_SDA"},
+		{from: "mcu.SCL", to: "sensor.SCL", net: "I2C1_SCL"},
+		{from: "i2c_connector.SDA", to: "sensor.SDA", net: "I2C1_SDA"},
+		{from: "i2c_connector.SCL", to: "sensor.SCL", net: "I2C1_SCL"},
+	} {
+		if !hasConnectionWithNet(*plan.GeneratedRequest, connection.from, connection.to, connection.net) {
+			t.Fatalf("missing connection %s -> %s net %s: %#v", connection.from, connection.to, connection.net, plan.GeneratedRequest.Connections)
+		}
+	}
+	if hasKnownGap(plan, "mcu.i2c.pin_assignment") {
+		t.Fatalf("unexpected old I2C known gap: %#v", plan.KnownGaps)
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanBlocksMultipleI2CBusesOnSingleMCU(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "mcu_two_i2c",
+		Kind:    IntentSensorNode,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Interfaces: []InterfaceIntent{
+			{Kind: "i2c", Voltage: "5V", Bus: "i2c1"},
+			{Kind: "i2c", Voltage: "5V", Bus: "i2c2"},
+		},
+		Functions: []FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "5V"}},
+			{Kind: "sensor", Family: "i2c_sensor", Bus: "i2c1", Params: map[string]any{"supply_voltage": "5V"}},
+			{Kind: "sensor", Family: "i2c_sensor", Bus: "i2c2", Params: map[string]any{"supply_voltage": "5V"}},
+		},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasIssuePath(plan.Issues, "interfaces.i2c2") {
+		t.Fatalf("issues = %#v", plan.Issues)
+	}
+}
+
 func TestPlanBlocksUnsupportedRequiredFunction(t *testing.T) {
 	plan := Plan(Request{
 		Version:   "0.1.0",
@@ -342,6 +406,15 @@ func hasWorkflowBlock(request designworkflow.Request, blockID string) bool {
 func hasConnection(request designworkflow.Request, from string, to string) bool {
 	for _, connection := range request.Connections {
 		if connection.From == from && connection.To == to {
+			return true
+		}
+	}
+	return false
+}
+
+func hasConnectionWithNet(request designworkflow.Request, from string, to string, net string) bool {
+	for _, connection := range request.Connections {
+		if connection.From == from && connection.To == to && connection.NetAlias == net {
 			return true
 		}
 	}

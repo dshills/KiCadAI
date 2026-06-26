@@ -274,6 +274,8 @@ func mcuSemanticPorts(params map[string]any, definition blocks.BlockDefinition) 
 		"RESET":   "mcu.reset",
 		"AREF":    "mcu.aref",
 		"GPIO":    "mcu.gpio",
+		"SDA":     "mcu.i2c.sda",
+		"SCL":     "mcu.i2c.scl",
 		"MOSI":    "mcu.spi.mosi",
 		"MISO":    "mcu.spi.miso",
 		"SCK":     "mcu.spi.sck",
@@ -281,12 +283,6 @@ func mcuSemanticPorts(params map[string]any, definition blocks.BlockDefinition) 
 		"UART_RX": "mcu.uart.rx",
 	}
 	ports = applyPortRoles(ports, roles)
-	if _, ok := findSemanticPort(ports, "mcu.i2c.sda"); !ok {
-		ports = append(ports, semanticPort{Name: "SDA", Role: "mcu.i2c.sda", Direction: blocks.PortBidirectional, Voltage: semanticSupplyVoltage(params, definition), Bus: "i2c"})
-	}
-	if _, ok := findSemanticPort(ports, "mcu.i2c.scl"); !ok {
-		ports = append(ports, semanticPort{Name: "SCL", Role: "mcu.i2c.scl", Direction: blocks.PortBidirectional, Voltage: semanticSupplyVoltage(params, definition), Bus: "i2c"})
-	}
 	if _, ok := findSemanticPort(ports, "mcu.clock.xtal1"); !ok {
 		ports = append(ports, semanticPort{Name: "XTAL1", Role: "mcu.clock.xtal1", Direction: blocks.PortInput})
 	}

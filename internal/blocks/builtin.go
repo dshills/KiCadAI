@@ -147,6 +147,8 @@ func mcuMinimalDefinition() BlockDefinition {
 			{Name: "RESET", Direction: PortInput, Description: "Reset signal."},
 			{Name: "AREF", Direction: PortPassive, Description: "Analog reference node with local decoupling."},
 			{Name: "GPIO", Direction: PortBidirectional, Description: "General-purpose PB0 application pin."},
+			{Name: "SDA", Direction: PortBidirectional, Voltage: "supply_voltage", Description: "I2C data pin for the supported ATmega328P-A template."},
+			{Name: "SCL", Direction: PortBidirectional, Voltage: "supply_voltage", Description: "I2C clock pin for the supported ATmega328P-A template."},
 			{Name: "MOSI", Direction: PortBidirectional, Description: "SPI programming data from programmer."},
 			{Name: "MISO", Direction: PortBidirectional, Description: "SPI programming data to programmer."},
 			{Name: "SCK", Direction: PortInput, Description: "SPI programming clock."},

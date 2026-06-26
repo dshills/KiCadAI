@@ -115,5 +115,7 @@ func newTestPlanBuilder() planBuilder {
 		protectedSources: map[string]string{},
 		semantic:         newSemanticIndex(),
 		supportTargets:   map[string]semanticSupportIntent{},
+		i2cBuses:         map[string]string{},
+		i2cMCUBus:        map[string]string{},
 	}
 }
