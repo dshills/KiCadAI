@@ -49,6 +49,7 @@ func Plan(request Request) PlanResult {
 		instanceVoltages: map[string]string{},
 		regulatorSources: map[string]powerSource{},
 		protectedSources: map[string]string{},
+		semantic:         newSemanticIndex(),
 	}
 	builder.applyBoardDefaults()
 	builder.applyPolicyDefaults()
@@ -78,6 +79,7 @@ type planBuilder struct {
 	instanceVoltages   map[string]string
 	regulatorSources   map[string]powerSource
 	protectedSources   map[string]string
+	semantic           *semanticIndex
 	usbPowerIDs        []string
 	regulatorIDs       []string
 	sensorIDs          []string
@@ -768,6 +770,7 @@ func (builder *planBuilder) addBlock(reqID string, prefix string, blockID string
 		}
 	}
 	builder.plan.SelectedBlocks = append(builder.plan.SelectedBlocks, record)
+	builder.semantic.addInstance(id, prefix, blockID, clonedParams, definition)
 	return id
 }
 
