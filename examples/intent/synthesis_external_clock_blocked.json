@@ -1,0 +1,13 @@
+{
+  "version": "0.1.0",
+  "name": "synthesis_external_clock_blocked",
+  "summary": "Intentional partial fixture for unsupported external MCU clock topology",
+  "kind": "mcu_minimal",
+  "power": {
+    "inputs": [{"kind": "external", "voltage": "5V"}]
+  },
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "5V"}},
+    {"kind": "clock", "family": "crystal_oscillator", "params": {"frequency": "16MHz", "load_cap_pf": 18}}
+  ]
+}

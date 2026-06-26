@@ -17,6 +17,17 @@ rewritten until dedicated generators exist for them.
 
 Open each directory in KiCad by opening its `.kicad_pro` file.
 
+Structured intent examples live under `examples/intent/`. Files prefixed with
+`synthesis_` exercise the semantic design synthesis trace:
+
+- `synthesis_mcu_i2c_explicit_supply.json`: MCU, I2C sensor, connector, and an
+  explicit 3.3V voltage domain.
+- `synthesis_uart_programming.json`: UART programming topology evidence.
+- `synthesis_unknown_supply_blocked.json`: intentional blocked unknown supply
+  alias fixture.
+- `synthesis_external_clock_blocked.json`: intentional external-clock topology
+  limitation fixture.
+
 Round-trip validation for the Go-generated LED schematic, Go-generated LED PCB,
 checked-in LED schematic fixture, and checked-in generated PCB fixture is
 available as an opt-in integration test. Run this command from the repository

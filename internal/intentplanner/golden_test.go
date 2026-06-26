@@ -14,13 +14,16 @@ var intentFixtureExpectations = map[string]struct {
 	KnownGapID string
 	IssuePath  string
 }{
-	"amplifier_module.json":            {Status: PlanStatusPartial},
-	"fabrication_sensor.json":          {Status: PlanStatusPartial},
-	"multi_mcu_ambiguous_support.json": {Status: PlanStatusBlocked, IssuePath: "functions[2].target"},
-	"mcu_external_clock_limited.json":  {Status: PlanStatusPartial, KnownGapID: "mcu.clock.topology_unsupported.clock"},
-	"mcu_isp_programmer.json":          {Status: PlanStatusPartial},
-	"mcu_programmer.json":              {Status: PlanStatusPartial},
-	"power_module.json":                {Status: PlanStatusPartial},
+	"amplifier_module.json":                 {Status: PlanStatusPartial},
+	"fabrication_sensor.json":               {Status: PlanStatusPartial},
+	"multi_mcu_ambiguous_support.json":      {Status: PlanStatusBlocked, IssuePath: "functions[2].target"},
+	"mcu_external_clock_limited.json":       {Status: PlanStatusPartial, KnownGapID: "mcu.clock.topology_unsupported.clock"},
+	"mcu_isp_programmer.json":               {Status: PlanStatusPartial},
+	"mcu_programmer.json":                   {Status: PlanStatusPartial},
+	"power_module.json":                     {Status: PlanStatusPartial},
+	"synthesis_external_clock_blocked.json": {Status: PlanStatusPartial, KnownGapID: "mcu.clock.topology_unsupported.clock"},
+	"synthesis_uart_programming.json":       {Status: PlanStatusPartial},
+	"synthesis_unknown_supply_blocked.json": {Status: PlanStatusBlocked, IssuePath: "blocks.sensor.supply"},
 }
 
 func TestIntentFixturesPlan(t *testing.T) {

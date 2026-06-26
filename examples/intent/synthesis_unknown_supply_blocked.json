@@ -1,0 +1,17 @@
+{
+  "version": "0.1.0",
+  "name": "synthesis_unknown_supply_blocked",
+  "summary": "Intentional blocked fixture for unknown supply alias evidence",
+  "kind": "sensor_node",
+  "power": {
+    "inputs": [{"kind": "external", "voltage": "5V"}]
+  },
+  "functions": [
+    {
+      "kind": "sensor",
+      "family": "i2c_sensor",
+      "supply": "missing_rail",
+      "params": {"supply_voltage": "5V"}
+    }
+  ]
+}

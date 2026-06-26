@@ -1,0 +1,14 @@
+{
+  "version": "0.1.0",
+  "name": "synthesis_uart_programming",
+  "summary": "MCU minimal system with UART programming header",
+  "kind": "mcu_minimal",
+  "acceptance": "connectivity",
+  "power": {
+    "inputs": [{"kind": "external", "voltage": "5V"}]
+  },
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "5V", "programming_header": "uart"}},
+    {"kind": "reset_programming", "params": {"programming_interface": "uart"}}
+  ]
+}

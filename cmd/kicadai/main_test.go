@@ -223,6 +223,37 @@ func TestRunIntentPlanWritesArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunIntentPlanIncludesSynthesisTrace(t *testing.T) {
+	requestPath := filepath.Join("..", "..", "examples", "intent", "synthesis_mcu_i2c_explicit_supply.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	if err := run([]string{"--json", "--request", requestPath, "intent", "plan"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	output := stdout.String()
+	for _, want := range []string{`"synthesis"`, `"voltage_domain"`, `"bus_resolution"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in output:\n%s", want, output)
+		}
+	}
+}
+
+func TestRunIntentPlanReportsSynthesisBlockedSupply(t *testing.T) {
+	requestPath := filepath.Join("..", "..", "examples", "intent", "synthesis_unknown_supply_blocked.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", requestPath, "intent", "plan"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected blocked supply error")
+	}
+	output := stdout.String()
+	for _, want := range []string{`"status": "blocked"`, "unknown supply alias", `"voltage_domain"`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("expected %q in output:\n%s", want, output)
+		}
+	}
+}
+
 func TestRunIntentCreateRequiresOutput(t *testing.T) {
 	dir := t.TempDir()
 	requestPath := filepath.Join(dir, "intent.json")

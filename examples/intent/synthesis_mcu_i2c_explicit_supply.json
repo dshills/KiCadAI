@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "name": "synthesis_mcu_i2c_explicit_supply",
+  "summary": "MCU plus I2C sensor breakout on an explicit 3.3V rail",
+  "kind": "sensor_node",
+  "acceptance": "connectivity",
+  "power": {
+    "inputs": [{"kind": "external", "voltage": "5V"}],
+    "rails": [{"name": "VCC", "alias": "3v3", "voltage": "3.3V"}]
+  },
+  "interfaces": [{"kind": "i2c", "voltage": "3.3V", "bus": "i2c1"}],
+  "functions": [
+    {"kind": "mcu", "params": {"supply_voltage": "3.3V"}, "supply": "3v3"},
+    {"kind": "sensor", "family": "i2c_sensor", "bus": "i2c1", "supply": "3v3"}
+  ]
+}
