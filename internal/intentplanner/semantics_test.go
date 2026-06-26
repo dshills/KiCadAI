@@ -51,6 +51,58 @@ func TestSemanticIndexFindsCapability(t *testing.T) {
 	}
 }
 
+func TestResolveSemanticTargetInfersSingleMCU(t *testing.T) {
+	builder := newTestPlanBuilder()
+	mcuID := builder.addBlock("function.1", "mcu", "mcu_minimal", nil, "test")
+	clockID := builder.addBlock("function.2", "clock", "canned_oscillator", nil, "test")
+	builder.recordSupportTarget(clockID, "function.2", "functions[1].target", TargetRef{}, StrengthRequired)
+	target, ok := builder.resolveMCUSupportTarget(clockID, "mcu.clock.xtal1")
+	if !ok || target.ID != mcuID {
+		t.Fatalf("target = %#v ok=%v", target, ok)
+	}
+	if len(builder.plan.Issues) != 0 {
+		t.Fatalf("issues = %#v", builder.plan.Issues)
+	}
+}
+
+func TestResolveSemanticTargetHonorsExplicitID(t *testing.T) {
+	builder := newTestPlanBuilder()
+	builder.addBlock("function.1", "mcu", "mcu_minimal", nil, "test")
+	mcuID := builder.addBlock("function.2", "mcu", "mcu_minimal", nil, "test")
+	clockID := builder.addBlock("function.3", "clock", "canned_oscillator", nil, "test")
+	builder.recordSupportTarget(clockID, "function.3", "functions[2].target", TargetRef{ID: mcuID}, StrengthRequired)
+	target, ok := builder.resolveMCUSupportTarget(clockID, "mcu.clock.xtal1")
+	if !ok || target.ID != mcuID {
+		t.Fatalf("target = %#v ok=%v", target, ok)
+	}
+}
+
+func TestResolveSemanticTargetReportsMissingExplicitID(t *testing.T) {
+	builder := newTestPlanBuilder()
+	clockID := builder.addBlock("function.1", "clock", "canned_oscillator", nil, "test")
+	builder.recordSupportTarget(clockID, "function.1", "functions[0].target", TargetRef{ID: "missing"}, StrengthRequired)
+	if _, ok := builder.resolveMCUSupportTarget(clockID, "mcu.clock.xtal1"); ok {
+		t.Fatal("target resolved unexpectedly")
+	}
+	if !hasIssuePath(builder.plan.Issues, "functions[0].target.id") {
+		t.Fatalf("issues = %#v", builder.plan.Issues)
+	}
+}
+
+func TestResolveSemanticTargetReportsAmbiguousMCU(t *testing.T) {
+	builder := newTestPlanBuilder()
+	builder.addBlock("function.1", "mcu", "mcu_minimal", nil, "test")
+	builder.addBlock("function.2", "mcu", "mcu_minimal", nil, "test")
+	clockID := builder.addBlock("function.3", "clock", "canned_oscillator", nil, "test")
+	builder.recordSupportTarget(clockID, "function.3", "functions[2].target", TargetRef{}, StrengthRequired)
+	if _, ok := builder.resolveMCUSupportTarget(clockID, "mcu.clock.xtal1"); ok {
+		t.Fatal("target resolved unexpectedly")
+	}
+	if !hasIssuePath(builder.plan.Issues, "functions[2].target") {
+		t.Fatalf("issues = %#v", builder.plan.Issues)
+	}
+}
+
 func newTestPlanBuilder() planBuilder {
 	return planBuilder{
 		registry:         builtinIntentRegistry,
@@ -62,5 +114,6 @@ func newTestPlanBuilder() planBuilder {
 		regulatorSources: map[string]powerSource{},
 		protectedSources: map[string]string{},
 		semantic:         newSemanticIndex(),
+		supportTargets:   map[string]semanticSupportIntent{},
 	}
 }

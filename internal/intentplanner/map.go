@@ -50,6 +50,7 @@ func Plan(request Request) PlanResult {
 		regulatorSources: map[string]powerSource{},
 		protectedSources: map[string]string{},
 		semantic:         newSemanticIndex(),
+		supportTargets:   map[string]semanticSupportIntent{},
 	}
 	builder.applyBoardDefaults()
 	builder.applyPolicyDefaults()
@@ -80,6 +81,7 @@ type planBuilder struct {
 	regulatorSources   map[string]powerSource
 	protectedSources   map[string]string
 	semantic           *semanticIndex
+	supportTargets     map[string]semanticSupportIntent
 	usbPowerIDs        []string
 	regulatorIDs       []string
 	sensorIDs          []string
@@ -337,12 +339,14 @@ func (builder *planBuilder) mapFunctions() {
 				}
 				id := builder.addBlock(reqID, "clock", blockID, function.Params, "clock block implements requested timing source")
 				builder.clockIDs = appendIfNotEmpty(builder.clockIDs, id)
+				builder.recordSupportTarget(id, reqID, fmt.Sprintf("functions[%d].target", index), function.Target, function.Strength)
 				if blockID == "canned_oscillator" {
 					builder.poweredClockIDs = appendIfNotEmpty(builder.poweredClockIDs, id)
 				}
 			case "reset_programming":
 				id := builder.addBlock(reqID, "programming", "reset_programming_header", function.Params, "reset/programming block implements requested debug interface")
 				builder.programmingIDs = appendIfNotEmpty(builder.programmingIDs, id)
+				builder.recordSupportTarget(id, reqID, fmt.Sprintf("functions[%d].target", index), function.Target, function.Strength)
 			case "connector":
 				id := builder.addConnector(reqID, "connector", []string{"SIG", "VCC", "GND"}, function.Strength)
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
@@ -469,11 +473,7 @@ func (builder *planBuilder) connectPowerAndSignals() {
 			builder.signalConnectorGap(amplifierID)
 		}
 	}
-	if builder.supportTargetingIsAmbiguous() {
-		builder.addIssue("functions", "multiple MCUs require explicit clock/programming target mapping before support blocks can be wired", "split the design into one MCU per request or add explicit target metadata")
-	} else {
-		builder.connectMCUSupportBlocks()
-	}
+	builder.connectMCUSupportBlocks()
 	for index, esdID := range builder.esdIDs {
 		if gpioConnectorID := builder.signalConnectorAt(index); gpioConnectorID != "" {
 			builder.addConnection(gpioConnectorID+".SIG", esdID+".SIGNAL", signalNetAlias("PROTECTED_SIG", esdID), "ESD protector shunts exposed connector signal")
@@ -487,17 +487,35 @@ func (builder *planBuilder) signalConnectorGap(instanceID string) {
 	builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "signal_connector." + normalizeToken(instanceID), Path: "interfaces", Message: "signal consumer " + instanceID + " was not connected because no compatible SIG connector was available"})
 }
 
-func (builder *planBuilder) supportTargetingIsAmbiguous() bool {
-	return len(builder.mcuIDs) > 1 && (len(builder.clockIDs) > 0 || len(builder.programmingIDs) > 0)
+func (builder *planBuilder) connectMCUSupportBlocks() {
+	for _, clockID := range builder.clockIDs {
+		target, ok := builder.resolveMCUSupportTarget(clockID, "mcu.clock.xtal1")
+		if !ok {
+			continue
+		}
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.clock.pin_assignment." + normalizeToken(clockID), Path: builder.supportTargetPath(clockID), Message: "MCU clock wiring for " + target.ID + " is deferred until MCU block metadata exposes clock-capable target ports"})
+	}
+	for _, programmingID := range builder.programmingIDs {
+		target, ok := builder.resolveMCUSupportTarget(programmingID, "mcu.reset")
+		if !ok {
+			continue
+		}
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.programming.pin_assignment." + normalizeToken(programmingID), Path: builder.supportTargetPath(programmingID), Message: "MCU programming wiring for " + target.ID + " is deferred until MCU block metadata exposes debug/programming target ports"})
+	}
 }
 
-func (builder *planBuilder) connectMCUSupportBlocks() {
-	if len(builder.clockIDs) > 0 && len(builder.mcuIDs) > 0 {
-		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.clock.pin_assignment", Path: "functions", Message: "MCU clock wiring is deferred until MCU block metadata exposes clock-capable target ports"})
+func (builder *planBuilder) recordSupportTarget(instanceID string, reqID string, path string, target TargetRef, strength Strength) {
+	if strings.TrimSpace(instanceID) == "" {
+		return
 	}
-	if len(builder.programmingIDs) > 0 && len(builder.mcuIDs) > 0 {
-		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.programming.pin_assignment", Path: "functions", Message: "MCU programming wiring is deferred until MCU block metadata exposes debug/programming target ports"})
+	builder.supportTargets[instanceID] = semanticSupportIntent{RequirementID: reqID, Path: path, Target: target, Strength: strength}
+}
+
+func (builder *planBuilder) supportTargetPath(instanceID string) string {
+	if intent, ok := builder.supportTargets[instanceID]; ok && intent.Path != "" {
+		return intent.Path
 	}
+	return "functions"
 }
 
 func (builder *planBuilder) powerSourceForRail(railVoltage string) (powerSource, bool, bool) {

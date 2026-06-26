@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/reports"
 )
 
 type semanticIndex struct {
@@ -27,6 +28,18 @@ type semanticPort struct {
 	Direction blocks.PortDirection
 	Voltage   string
 	Bus       string
+}
+
+type semanticSupportIntent struct {
+	RequirementID string
+	Path          string
+	Target        TargetRef
+	Strength      Strength
+}
+
+type semanticTargetResult struct {
+	Instance semanticInstance
+	OK       bool
 }
 
 func newSemanticIndex() *semanticIndex {
@@ -90,6 +103,78 @@ func (index *semanticIndex) withPortRole(role string) []semanticInstance {
 	}
 	sortSemanticInstances(out)
 	return out
+}
+
+func (builder *planBuilder) resolveMCUSupportTarget(supportID string, requiredPortRole string) (semanticInstance, bool) {
+	intent := builder.supportTargets[supportID]
+	target, ok := builder.resolveSemanticTarget(intent, "mcu", requiredPortRole)
+	if ok {
+		builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{
+			ID:      "semantic.target." + normalizeToken(supportID),
+			Path:    firstNonEmpty(intent.Path, "functions"),
+			Message: "resolved support block " + supportID + " to target " + target.ID,
+		})
+	}
+	return target, ok
+}
+
+func (builder *planBuilder) resolveSemanticTarget(intent semanticSupportIntent, role string, requiredPortRole string) (semanticInstance, bool) {
+	path := firstNonEmpty(intent.Path, "functions")
+	targetRef := normalizeTargetRef(intent.Target)
+	var candidates []semanticInstance
+	if targetRef.ID != "" {
+		instance, ok := builder.semantic.instance(targetRef.ID)
+		if !ok {
+			builder.semanticTargetIssue(path+".id", "target "+targetRef.ID+" does not exist", "choose one of the generated target IDs or target by role", intent.Strength)
+			return semanticInstance{}, false
+		}
+		candidates = []semanticInstance{instance}
+	} else if targetRef.Role != "" {
+		candidates = builder.semantic.byRole(targetRef.Role)
+		if len(candidates) == 0 {
+			builder.semanticTargetIssue(path+".role", "no target with role "+targetRef.Role+" exists", "choose a supported target role", intent.Strength)
+			return semanticInstance{}, false
+		}
+	} else {
+		candidates = builder.semantic.byRole(role)
+	}
+	candidates = filterSemanticCandidates(candidates, role, requiredPortRole)
+	if len(candidates) == 0 {
+		builder.semanticTargetIssue(path, "no compatible "+role+" target exposes "+requiredPortRole, "add a compatible target or remove the support requirement", intent.Strength)
+		return semanticInstance{}, false
+	}
+	if len(candidates) > 1 {
+		builder.semanticTargetIssue(path, "multiple compatible "+role+" targets require explicit target metadata", "set target.id or target.role to a single compatible instance", intent.Strength)
+		return semanticInstance{}, false
+	}
+	return candidates[0], true
+}
+
+func filterSemanticCandidates(candidates []semanticInstance, role string, requiredPortRole string) []semanticInstance {
+	role = normalizeToken(role)
+	requiredPortRole = normalizeToken(requiredPortRole)
+	var out []semanticInstance
+	for _, candidate := range candidates {
+		if role != "" && candidate.Role != role {
+			continue
+		}
+		if requiredPortRole != "" && !candidate.hasPortRole(requiredPortRole) {
+			continue
+		}
+		out = append(out, candidate)
+	}
+	sortSemanticInstances(out)
+	return out
+}
+
+func (builder *planBuilder) semanticTargetIssue(path string, message string, suggestion string, strength Strength) {
+	note := PlanNote{ID: "semantic.target." + normalizeToken(strings.ReplaceAll(path, ".", "_")), Path: path, Message: message, Severity: reports.SeverityWarning, Suggestion: suggestion}
+	if strength == StrengthRequired || strength == "" {
+		builder.plan.Clarifications = append(builder.plan.Clarifications, note)
+		builder.addIssue(path, message, suggestion)
+		return
+	}
+	builder.plan.KnownGaps = append(builder.plan.KnownGaps, note)
 }
 
 func (instance semanticInstance) hasPortRole(role string) bool {

@@ -69,10 +69,10 @@ func TestPlanMapsMCUAndProtectionBlocks(t *testing.T) {
 			t.Fatalf("missing connection %s -> %s: %#v", connection.from, connection.to, plan.GeneratedRequest.Connections)
 		}
 	}
-	if !hasKnownGap(plan, "mcu.clock.pin_assignment") {
+	if !hasKnownGap(plan, "mcu.clock.pin_assignment.clock") {
 		t.Fatalf("missing MCU clock known gap: %#v", plan.KnownGaps)
 	}
-	if !hasKnownGap(plan, "mcu.programming.pin_assignment") {
+	if !hasKnownGap(plan, "mcu.programming.pin_assignment.programming") {
 		t.Fatalf("missing MCU programming known gap: %#v", plan.KnownGaps)
 	}
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
