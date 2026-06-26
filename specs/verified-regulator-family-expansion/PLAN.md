@@ -128,8 +128,8 @@ Tasks:
 - Add regulator pin-role behavior for five-pin LDOs:
   - tie `EN` to VIN by default unless an explicit supported enable control is
     provided, but only after validating VIN is within the modeled `EN` maximum
-    rating using `input_voltage + 0.5 V` when no request-specific transient
-    maximum is known;
+    recommended range using `input_voltage + 0.5 V` when no request-specific
+    transient maximum is known;
   - emit explicit KiCad schematic no-connect flags for `NC` pins or block if
     the schematic model cannot represent them safely;
   - distinguish generic `NC` pins from manufacturer do-not-connect/internal

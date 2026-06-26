@@ -74,17 +74,19 @@ Required catalog evidence:
 - manufacturer: Diodes Incorporated
 - MPN: `AP2112K-3.3`
 - output voltage: 3.3 V
-- input voltage: 3.8 V minimum, 6 V maximum
+- input voltage rating for this fixed-output record: 3.8 V minimum, 6 V
+  maximum. The AP2112 silicon family supports lower inputs for lower-voltage
+  outputs, but this 3.3 V record is constrained by dropout/headroom.
 - output current: 600 mA maximum
 - dropout voltage: record 400 mV maximum at 600 mA in `values[]` with
   `kind: "dropout_voltage"` for initial headroom modeling, plus a
   component-specific 100 mV safety margin so the selector accepts the
   datasheet-supported 3.8 V minimum input for a 3.3 V output at full load
 - symbol functions: `VIN`, `GND`, `EN`, `NC`, `VOUT`
-- EN voltage: model EN absolute maximum separately from recommended operating
-  input voltage and require `input_voltage + 0.5 V <= enable_voltage.abs_max`
-  before tying EN directly to VIN when no request-specific transient maximum is
-  known
+- EN voltage: model the recommended EN voltage range and require
+  normal operation to stay within `enable_voltage.max`; also require
+  `input_voltage + 0.5 V <= enable_voltage_abs_max.max` before tying EN
+  directly to VIN when no request-specific transient maximum is known
 - output capacitor ESR: record stability as a review requirement until a
   concrete capacitor ESR range and capacitor part are modeled
 - package: `Package_TO_SOT_SMD:SOT-23-5`

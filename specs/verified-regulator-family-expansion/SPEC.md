@@ -137,6 +137,7 @@ Component selection must support regulator requests that constrain:
 - `input_voltage`;
 - `output_current`;
 - `enable_voltage`;
+- `enable_voltage_abs_max`;
 - `output_capacitor_esr`;
 - package preference;
 - minimum confidence;
@@ -213,7 +214,8 @@ Generated connectivity must handle non-power regulator pins explicitly:
 
 - `EN` defaults to VIN unless a verified external enable control is requested;
 - tying `EN` to VIN is allowed only when the selected record proves that the
-  expected maximum enable voltage does not exceed the `EN` pin maximum rating.
+  normal operation stays within the modeled recommended `EN` voltage range and
+  the expected transient maximum stays below the modeled `EN` absolute maximum.
   If the request does not model transients, use `input_voltage + 0.5 V` as the
   initial expected maximum for generated low-voltage LDO designs;
 - `NC` pins must receive explicit KiCad schematic no-connect flags so ERC does
@@ -294,7 +296,8 @@ The implementation must make these limits visible:
   `P = ((Vin - Vout) * Iout) + (Vin * Ignd)` when ground-current metadata is
   available, or `P = (Vin - Vout) * Iout` plus a missing-ground-current warning
   when it is not, and compare it against a conservative package
-  threshold when available. For AP2112K SOT-23-5, use 150 mW as an initial
+  threshold when available. For AP2112K SOT-23-5, encode that threshold as
+  `power_dissipation_max` and use 250 mW as an initial
   conservative free-air threshold until package thermal metadata is modeled;
 - LDO stability with ceramic output capacitors is not automatically proven;
 - ceramic capacitor effective capacitance under DC bias is not automatically

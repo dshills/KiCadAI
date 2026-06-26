@@ -93,6 +93,27 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireSymbolFunctions(t, regulator, "Regulator_Linear:AMS1117-3.3", []string{"GND", "VOUT", "VIN"})
 	requirePackagePads(t, regulator, "sot223", []string{"GND", "VOUT", "VIN"})
 
+	ap2112 := requireCatalogRecord(t, catalog, "regulator.linear.ap2112k_3v3.sot23_5")
+	if ap2112.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("AP2112K confidence = %q", ap2112.Verification.Confidence)
+	}
+	requireRatingMinMax(t, ap2112, "input_voltage", "3.8", "6", "V")
+	requireRatingMax(t, ap2112, "output_current", "600", "mA")
+	requireRatingMax(t, ap2112, "enable_voltage", "6", "V")
+	requireRatingMax(t, ap2112, "enable_voltage_abs_max", "6.5", "V")
+	requireRatingMax(t, ap2112, "power_dissipation_max", "250", "mW")
+	requireValueTyp(t, ap2112, "output_voltage", "3.3", "V")
+	requireValueMax(t, ap2112, "dropout_voltage", "400", "mV")
+	requireValueTyp(t, ap2112, "headroom_margin", "100", "mV")
+	for _, role := range []string{"input_capacitor", "output_capacitor"} {
+		requireCompanionRole(t, ap2112, role)
+	}
+	requireSymbolFunctions(t, ap2112, "Regulator_Linear:AP2112K-3.3", []string{"VIN", "GND", "EN", "NC", "VOUT"})
+	requirePackagePads(t, ap2112, "sot23_5", []string{"VIN", "GND", "EN", "NC", "VOUT"})
+	requireDeratingRule(t, ap2112, "thermal")
+	requireDeratingRule(t, ap2112, "enable_voltage")
+	requireDeratingRule(t, ap2112, "capacitor_stability")
+
 	capacitor := requireCatalogRecord(t, catalog, "capacitor.ceramic.0805")
 	if capacitor.Verification.Confidence != ConfidenceRuleInferred {
 		t.Fatalf("capacitor confidence = %q", capacitor.Verification.Confidence)
@@ -134,6 +155,16 @@ func requireRatingMax(t *testing.T, record *ComponentRecord, kind, max, unit str
 	t.Fatalf("%s missing max rating %s=%s%s: %+v", record.ID, kind, max, unit, record.Ratings)
 }
 
+func requireRatingMinMax(t *testing.T, record *ComponentRecord, kind, min, max, unit string) {
+	t.Helper()
+	for _, rating := range record.Ratings {
+		if rating.Kind == kind && rating.Unit == unit && rating.Min == min && rating.Max == max {
+			return
+		}
+	}
+	t.Fatalf("%s missing min/max rating %s=%s..%s%s: %+v", record.ID, kind, min, max, unit, record.Ratings)
+}
+
 func requireValueTyp(t *testing.T, record *ComponentRecord, kind, typ, unit string) {
 	t.Helper()
 	for _, value := range record.Values {
@@ -172,6 +203,16 @@ func requireCompanionRole(t *testing.T, record *ComponentRecord, role string) {
 		}
 	}
 	t.Fatalf("%s missing required companion role %s: %+v", record.ID, role, record.Companions)
+}
+
+func requireDeratingRule(t *testing.T, record *ComponentRecord, kind string) {
+	t.Helper()
+	for _, rule := range record.DeratingRules {
+		if rule.Kind == kind {
+			return
+		}
+	}
+	t.Fatalf("%s missing derating rule %s: %+v", record.ID, kind, record.DeratingRules)
 }
 
 func requireSymbolFunctions(t *testing.T, record *ComponentRecord, symbolID string, functions []string) {

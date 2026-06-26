@@ -61,6 +61,77 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Regulator_Linear:AMS1117-3.3"], "pinmap_checked": true, "notes": ["Thermal dissipation and exact manufacturer datasheet constraints still require fabrication-stage checks."]}
     },
     {
+      "id": "regulator.linear.ap2112k_3v3.sot23_5",
+      "family": "regulator",
+      "name": "Diodes AP2112K-3.3 SOT-23-5 linear regulator",
+      "description": "Concrete AP2112K-3.3 SOT-23-5 600 mA low-dropout regulator record for generated 3.3 V rails with enable/no-connect pin evidence.",
+      "generic": false,
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "AP2112K-3.3",
+      "lifecycle": "active",
+      "tags": ["power", "linear_regulator", "ldo", "3v3", "sot23_5", "enable"],
+      "values": [
+        {"kind": "output_voltage", "typ": "3.3", "unit": "V"},
+        {"kind": "dropout_voltage", "max": "400", "unit": "mV"},
+        {"kind": "headroom_margin", "typ": "100", "unit": "mV"}
+      ],
+      "ratings": [
+        {"kind": "input_voltage", "min": "3.8", "max": "6", "unit": "V"},
+        {"kind": "output_current", "max": "600", "unit": "mA"},
+        {"kind": "enable_voltage", "max": "6", "unit": "V"},
+        {"kind": "enable_voltage_abs_max", "max": "6.5", "unit": "V"},
+        {"kind": "power_dissipation_max", "max": "250", "unit": "mW"}
+      ],
+      "temperature": {"min": "-40", "max": "85", "unit": "C"},
+      "companions": [
+        {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "description": "Input bypass capacitor placed near VIN and GND."},
+        {"id": "regulator.output_capacitor", "family": "capacitor", "role": "output_capacitor", "required": true, "description": "Output capacitor selected against AP2112 stability and ceramic derating requirements."}
+      ],
+      "derating_rules": [
+        {"kind": "thermal", "description": "Use power_dissipation_max for conservative free-air SOT-23-5 screening until package/copper thermal metadata is modeled."},
+        {"kind": "enable_voltage", "description": "Tie EN to VIN only when normal operation stays within enable_voltage and the expected transient maximum stays below enable_voltage_abs_max."},
+        {"kind": "capacitor_stability", "description": "Output capacitor ESR and MLCC DC-bias derating are review requirements until a concrete capacitor part carries stability evidence."}
+      ],
+      "placement_hints": [
+        {"kind": "near", "target": "input_capacitor", "value": "2", "unit": "mm"},
+        {"kind": "near", "target": "output_capacitor", "value": "2", "unit": "mm"}
+      ],
+      "routing_hints": [
+        {"kind": "net_class", "net_role": "power", "value": "0.3", "unit": "mm"},
+        {"kind": "tie", "net_role": "enable", "description": "Tie EN to VIN by default only after enable voltage validation."},
+        {"kind": "no_connect", "net_role": "nc", "description": "Emit an explicit KiCad no-connect flag for NC."}
+      ],
+      "symbols": [{
+        "symbol_id": "Regulator_Linear:AP2112K-3.3",
+        "function_pins": [
+          {"function": "VIN", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "GND", "symbol_pin": "2", "electrical": "power_in", "required": true},
+          {"function": "EN", "symbol_pin": "3", "electrical": "input", "required": true},
+          {"function": "NC", "symbol_pin": "4", "electrical": "no_connect", "required": true},
+          {"function": "VOUT", "symbol_pin": "5", "electrical": "power_out", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Regulator_Linear:AP2112K-3.3", "builtin_pinmap:Regulator_Linear:AP2112K-3.3"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot23_5",
+        "name": "SOT-23-5",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+        "package_type": "sot23_5",
+        "mpn": "AP2112K-3.3",
+        "lifecycle": "active",
+        "pinmap_id": "Regulator_Linear:AP2112K-3.3|Package_TO_SOT_SMD:SOT-23-5",
+        "pad_functions": [
+          {"function": "VIN", "pad": "1"},
+          {"function": "GND", "pad": "2"},
+          {"function": "EN", "pad": "3"},
+          {"function": "NC", "pad": "4"},
+          {"function": "VOUT", "pad": "5"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Regulator_Linear:AP2112K-3.3"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "kicad-symbols:Regulator_Linear:AP2112K-3.3", "builtin_pinmap:Regulator_Linear:AP2112K-3.3"], "pinmap_checked": true, "notes": ["Thermal dissipation, EN transient margin, output-capacitor ESR, and ceramic DC-bias derating remain explicit review requirements before fabrication readiness."]}
+    },
+    {
       "id": "opamp.generic.single.lmv321",
       "family": "opamp",
       "name": "Generic single op-amp LMV321-style",
