@@ -319,6 +319,111 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "sensor_breakout")
+	requestPath := filepath.Join("..", "..", "examples", "intent", "sensor_breakout.json")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "--skip-routing", "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected downstream workflow validation to report issues for this fixture")
+	}
+	if !strings.Contains(err.Error(), "intent create reported issues") {
+		t.Fatalf("unexpected intent create error: %v\nstdout_bytes=%d\nstderr=%s", err, stdout.Len(), stderr.String())
+	}
+	t.Logf("intent create returned expected error: %v; stdout_bytes=%d; stderr=%s", err, stdout.Len(), stderr.String())
+
+	workflowPath := filepath.Join(output, ".kicadai", "workflow-result.json")
+	var workflow struct {
+		Stages []workflowEvidenceStage `json:"stages"`
+	}
+	readJSONFile(t, workflowPath, &workflow)
+	if !workflowSelectedComponent(workflow.Stages, "regulator", "regulator", "regulator.linear.ams1117_3v3.sot223") {
+		t.Fatalf("workflow missing regulator selection: %#v", workflow.Stages)
+	}
+	if !workflowSelectedComponent(workflow.Stages, "regulator", "input_capacitor", "capacitor.ceramic.0805") {
+		t.Fatalf("workflow missing input capacitor selection: %#v", workflow.Stages)
+	}
+	if !workflowSelectedComponent(workflow.Stages, "regulator", "output_capacitor", "capacitor.ceramic.0805") {
+		t.Fatalf("workflow missing output capacitor selection: %#v", workflow.Stages)
+	}
+
+	generatedPath := filepath.Join(output, ".kicadai", "generated-request.json")
+	var generated struct {
+		ComponentPolicy struct {
+			Overrides map[string]componentEvidenceOverride `json:"overrides"`
+		} `json:"component_policy"`
+	}
+	readJSONFile(t, generatedPath, &generated)
+	if !generatedRequiredRating(generated.ComponentPolicy.Overrides, "regulator.regulator", "output_current", "0.1", "A") {
+		t.Fatalf("generated request missing regulator current rating: %#v", generated.ComponentPolicy.Overrides)
+	}
+	if !generatedRequiredRating(generated.ComponentPolicy.Overrides, "regulator.input_capacitor", "voltage", "6.3", "V") {
+		t.Fatalf("generated request missing input capacitor voltage rating: %#v", generated.ComponentPolicy.Overrides)
+	}
+}
+
+func readJSONFile(t *testing.T, path string, target any) {
+	t.Helper()
+	body, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read %s: %v", path, err)
+	}
+	if err := json.Unmarshal(body, target); err != nil {
+		t.Fatalf("parse %s: %v\n%s", path, err, string(body))
+	}
+}
+
+type workflowEvidenceStage struct {
+	Name    string         `json:"name"`
+	Summary map[string]any `json:"summary"`
+}
+
+type componentEvidenceOverride struct {
+	RequiredRatings []componentEvidenceRating `json:"required_ratings"`
+}
+
+type componentEvidenceRating struct {
+	Kind  string `json:"kind"`
+	Value string `json:"value"`
+	Unit  string `json:"unit"`
+}
+
+func workflowSelectedComponent(stages []workflowEvidenceStage, instanceID string, role string, componentID string) bool {
+	for _, stage := range stages {
+		if stage.Name != "component_selection" {
+			continue
+		}
+		selected, ok := stage.Summary["selected_components"].([]any)
+		if !ok {
+			continue
+		}
+		for _, item := range selected {
+			entry, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if entry["instance_id"] == instanceID && entry["role"] == role && entry["component_id"] == componentID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func generatedRequiredRating(overrides map[string]componentEvidenceOverride, key string, kind string, value string, unit string) bool {
+	override, ok := overrides[key]
+	if !ok {
+		return false
+	}
+	for _, rating := range override.RequiredRatings {
+		if rating.Kind == kind && rating.Value == value && rating.Unit == unit {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRunIntentCreateTextBlocksClarification(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "project")
 	var stdout bytes.Buffer
