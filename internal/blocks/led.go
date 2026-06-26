@@ -135,6 +135,14 @@ func appendConnectOperation(operations *[]transactions.Operation, issues *[]repo
 	}
 }
 
+func appendNoConnectOperation(operations *[]transactions.Operation, issues *[]reports.Issue, ref string, pin string) {
+	noConnect, noConnectIssues := NoConnectOperation(ref, pin)
+	*issues = append(*issues, noConnectIssues...)
+	if len(noConnectIssues) == 0 {
+		*operations = append(*operations, noConnect)
+	}
+}
+
 func stringParam(params map[string]any, name string) string {
 	value, _ := params[name].(string)
 	return value

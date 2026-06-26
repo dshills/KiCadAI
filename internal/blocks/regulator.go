@@ -11,10 +11,26 @@ import (
 const (
 	defaultRegulatorSymbol     = "Regulator_Linear:AMS1117-3.3"
 	ams1117DropoutWarningVolts = 1.3
+	ap2112kDropoutWarningVolts = 0.5
 	sot223DissipationWarningW  = 1.0
+	sot23DissipationWarningW   = 0.25
 	powerLEDForwardVolts       = 2.0
 	powerLEDCurrentAmps        = 0.002
 )
+
+type regulatorProfile struct {
+	Name                string
+	Symbol              string
+	Footprint           string
+	Pins                []transactions.PinSpec
+	VINPin              string
+	VOUTPin             string
+	GNDPin              string
+	EnablePin           string
+	NoConnectPins       []string
+	DropoutWarningVolts float64
+	DissipationWarningW float64
+}
 
 func instantiateVoltageRegulator(definition BlockDefinition, request BlockRequest, params map[string]any, issues []reports.Issue) BlockOutput {
 	if hasBlockingIssues(issues) {
@@ -59,40 +75,36 @@ func instantiateVoltageRegulator(definition BlockDefinition, request BlockReques
 	if regulatorSymbol == "" {
 		issues = append(issues, blockIssue("params.regulator_symbol", "regulator_symbol is required"))
 	}
-	if regulatorSymbol != "" && !isSupportedAMS1117Symbol(regulatorSymbol) {
+	regulatorFootprint := stringParam(params, "regulator_footprint")
+	if regulatorFootprint == "" {
+		issues = append(issues, blockIssue("params.regulator_footprint", "regulator_footprint is required"))
+	}
+	profile, profileOK := regulatorProfileFor(regulatorSymbol, regulatorFootprint)
+	if regulatorSymbol != "" && !profileOK {
 		issues = append(issues, reports.Issue{
 			Code:       reports.CodeUnsupportedOperation,
 			Severity:   reports.SeverityBlocked,
 			Path:       "params.regulator_symbol",
-			Message:    "voltage_regulator currently supports only AMS1117-family fixed three-pin regulator symbols",
-			Suggestion: "use an AMS1117-family symbol or wait for regulator pin-role map support",
+			Message:    "voltage_regulator requires a supported regulator profile with symbol, footprint, and pin-role evidence",
+			Suggestion: "use AMS1117 SOT-223 or AP2112K-3.3 SOT-23-5 profile values",
 		})
-	}
-	regulatorFootprint := stringParam(params, "regulator_footprint")
-	if regulatorFootprint == "" {
-		issues = append(issues, blockIssue("params.regulator_footprint", "regulator_footprint is required"))
 	}
 	capacitorFootprint := stringParam(params, "capacitor_footprint")
 	if capacitorFootprint == "" {
 		issues = append(issues, blockIssue("params.capacitor_footprint", "capacitor_footprint is required"))
 	}
-	if enableMode := stringParam(params, "enable_mode"); enableMode != "" && enableMode != "none" {
-		issues = append(issues, reports.Issue{
-			Code:       reports.CodeUnsupportedOperation,
-			Severity:   reports.SeverityBlocked,
-			Path:       "params.enable_mode",
-			Message:    "enable_mode requires regulator pin-role metadata and is not implemented for fixed three-pin regulators",
-			Suggestion: "use enable_mode none or select a future regulator profile with an enable pin map",
-		})
+	enableMode := stringParam(params, "enable_mode")
+	if profileOK {
+		issues = append(issues, validateRegulatorEnableMode(profile, enableMode)...)
 	}
 	if hasBlockingIssues(issues) {
 		return dryRunBlockOutput(definition, request, nil, issues)
 	}
-	if inputMinOK && outputOK && inputMin-outputVoltage < ams1117DropoutWarningVolts {
-		issues = append(issues, regulatorWarning("params.input_voltage_min", "input_voltage_min is within 1.3 V of output_voltage; dropout margin may be insufficient"))
+	if inputMinOK && outputOK && inputMin-outputVoltage < profile.DropoutWarningVolts {
+		issues = append(issues, regulatorWarning("params.input_voltage_min", fmt.Sprintf("input_voltage_min is within %.1f V of output_voltage; dropout margin may be insufficient", profile.DropoutWarningVolts)))
 	}
-	if inputNominalOK && outputOK && currentOK && inputNominal > outputVoltage && (inputNominal-outputVoltage)*outputCurrent > sot223DissipationWarningW {
-		issues = append(issues, regulatorWarning("params.output_current", "linear regulator dissipation exceeds 1 W at nominal input"))
+	if inputNominalOK && outputOK && currentOK && inputNominal > outputVoltage && (inputNominal-outputVoltage)*outputCurrent > profile.DissipationWarningW {
+		issues = append(issues, regulatorWarning("params.output_current", fmt.Sprintf("linear regulator dissipation exceeds %.2g W at nominal input", profile.DissipationWarningW)))
 	}
 
 	allocator := NewInstanceReferenceAllocator(request.InstanceID)
@@ -105,7 +117,7 @@ func instantiateVoltageRegulator(definition BlockDefinition, request BlockReques
 		Value:       fmt.Sprintf("LDO %s", stringParam(params, "output_voltage")),
 		SymbolID:    regulatorSymbol,
 		FootprintID: regulatorFootprint,
-		Pins:        fixedRegulatorPins(),
+		Pins:        profile.Pins,
 	}
 	inputCap := BlockComponent{
 		Role:        "input_capacitor",
@@ -137,13 +149,19 @@ func instantiateVoltageRegulator(definition BlockDefinition, request BlockReques
 	vinNet := InstanceNetName(request.InstanceID, "vin")
 	voutNet := InstanceNetName(request.InstanceID, "vout")
 	gndNet := InstanceNetName(request.InstanceID, "gnd")
-	appendConnectOperation(&operations, &issues, request.InstanceID, "VIN", regulatorRef, "3", vinNet)
-	appendConnectOperation(&operations, &issues, regulatorRef, "2", request.InstanceID, "VOUT", voutNet)
-	appendConnectOperation(&operations, &issues, regulatorRef, "1", request.InstanceID, "GND", gndNet)
-	appendConnectOperation(&operations, &issues, inputCapRef, "1", regulatorRef, "3", vinNet)
-	appendConnectOperation(&operations, &issues, outputCapRef, "1", regulatorRef, "2", voutNet)
-	appendConnectOperation(&operations, &issues, regulatorRef, "1", inputCapRef, "2", gndNet)
+	appendConnectOperation(&operations, &issues, request.InstanceID, "VIN", regulatorRef, profile.VINPin, vinNet)
+	appendConnectOperation(&operations, &issues, regulatorRef, profile.VOUTPin, request.InstanceID, "VOUT", voutNet)
+	appendConnectOperation(&operations, &issues, regulatorRef, profile.GNDPin, request.InstanceID, "GND", gndNet)
+	appendConnectOperation(&operations, &issues, inputCapRef, "1", regulatorRef, profile.VINPin, vinNet)
+	appendConnectOperation(&operations, &issues, outputCapRef, "1", regulatorRef, profile.VOUTPin, voutNet)
+	appendConnectOperation(&operations, &issues, regulatorRef, profile.GNDPin, inputCapRef, "2", gndNet)
 	appendConnectOperation(&operations, &issues, inputCapRef, "2", outputCapRef, "2", gndNet)
+	if profile.EnablePin != "" && (enableMode == "" || enableMode == "tied_input") {
+		appendConnectOperation(&operations, &issues, regulatorRef, profile.EnablePin, regulatorRef, profile.VINPin, vinNet)
+	}
+	for _, pin := range profile.NoConnectPins {
+		appendNoConnectOperation(&operations, &issues, regulatorRef, pin)
+	}
 
 	refs := []string{regulatorRef, inputCapRef, outputCapRef}
 	nets := []string{vinNet, voutNet, gndNet}
@@ -165,11 +183,97 @@ func isSupportedAMS1117Symbol(symbol string) bool {
 	return symbol == defaultRegulatorSymbol || strings.HasPrefix(symbol, "Regulator_Linear:AMS1117")
 }
 
+func regulatorProfileFor(symbol string, footprint string) (regulatorProfile, bool) {
+	switch {
+	case isSupportedAMS1117Symbol(symbol) && footprint == "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
+		return regulatorProfile{
+			Name:                "ams1117_sot223",
+			Symbol:              symbol,
+			Footprint:           footprint,
+			Pins:                fixedRegulatorPins(),
+			VINPin:              "3",
+			VOUTPin:             "2",
+			GNDPin:              "1",
+			DropoutWarningVolts: ams1117DropoutWarningVolts,
+			DissipationWarningW: sot223DissipationWarningW,
+		}, true
+	case symbol == "Regulator_Linear:AP2112K-3.3" && footprint == "Package_TO_SOT_SMD:SOT-23-5":
+		return regulatorProfile{
+			Name:                "ap2112k_3v3_sot23_5",
+			Symbol:              symbol,
+			Footprint:           footprint,
+			Pins:                ap2112kRegulatorPins(),
+			VINPin:              "1",
+			GNDPin:              "2",
+			EnablePin:           "3",
+			NoConnectPins:       []string{"4"},
+			VOUTPin:             "5",
+			DropoutWarningVolts: ap2112kDropoutWarningVolts,
+			DissipationWarningW: sot23DissipationWarningW,
+		}, true
+	default:
+		return regulatorProfile{}, false
+	}
+}
+
+func validateRegulatorEnableMode(profile regulatorProfile, enableMode string) []reports.Issue {
+	if profile.EnablePin == "" {
+		if enableMode == "" || enableMode == "none" {
+			return nil
+		}
+		return []reports.Issue{{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityBlocked,
+			Path:       "params.enable_mode",
+			Message:    "enable_mode is not supported by the selected three-pin regulator profile",
+			Suggestion: "use enable_mode none or select a regulator profile with an enable pin map",
+		}}
+	}
+	if enableMode == "" || enableMode == "tied_input" {
+		return nil
+	}
+	if enableMode == "none" {
+		return []reports.Issue{{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityBlocked,
+			Path:       "params.enable_mode",
+			Message:    "selected regulator has an enable pin that must be handled",
+			Suggestion: "use enable_mode tied_input so the regulator is enabled from VIN",
+		}}
+	}
+	if enableMode == "export" {
+		return []reports.Issue{{
+			Code:       reports.CodeUnsupportedOperation,
+			Severity:   reports.SeverityBlocked,
+			Path:       "params.enable_mode",
+			Message:    "external enable export is not implemented for voltage_regulator",
+			Suggestion: "use enable_mode tied_input so the regulator is enabled from VIN",
+		}}
+	}
+	return []reports.Issue{{
+		Code:       reports.CodeUnsupportedOperation,
+		Severity:   reports.SeverityBlocked,
+		Path:       "params.enable_mode",
+		Message:    "enable_mode must be none, tied_input, or export",
+		Suggestion: "use tied_input for supported enable-pin regulators",
+	}}
+}
+
 func fixedRegulatorPins() []transactions.PinSpec {
 	return []transactions.PinSpec{
 		{Number: "1", XMM: -2.54, YMM: 2.54},
 		{Number: "2", XMM: 2.54, YMM: 0},
 		{Number: "3", XMM: -2.54, YMM: -2.54},
+	}
+}
+
+func ap2112kRegulatorPins() []transactions.PinSpec {
+	return []transactions.PinSpec{
+		{Number: "1", XMM: -2.54, YMM: -2.54},
+		{Number: "2", XMM: 0, YMM: 2.54},
+		{Number: "3", XMM: -2.54, YMM: 0},
+		{Number: "4", XMM: 2.54, YMM: 0},
+		{Number: "5", XMM: 2.54, YMM: -2.54},
 	}
 }
 

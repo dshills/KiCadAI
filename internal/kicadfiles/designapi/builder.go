@@ -298,6 +298,24 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	return nil
 }
 
+func (builder *Builder) AddNoConnect(endpoint Endpoint) error {
+	if builder == nil {
+		return fmt.Errorf("builder required")
+	}
+	anchor, err := builder.pinAnchor(endpoint)
+	if err != nil {
+		return err
+	}
+	if hasNoConnect(builder.design.Schematic.NoConnects, anchor) {
+		return nil
+	}
+	builder.design.Schematic.NoConnects = append(builder.design.Schematic.NoConnects, schematic.NewNoConnect(
+		builder.generator.New("root.schematic.no_connect", endpoint.Reference, endpoint.Pin),
+		anchor,
+	))
+	return nil
+}
+
 func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, start, end kicadfiles.Point) {
 	if builder == nil || hasSchematicWire(builder.design.Schematic.Wires, start, end) {
 		return
@@ -308,6 +326,15 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 		start,
 		end,
 	))
+}
+
+func hasNoConnect(noConnects []schematic.NoConnect, position kicadfiles.Point) bool {
+	for _, noConnect := range noConnects {
+		if noConnect.Position == position {
+			return true
+		}
+	}
+	return false
 }
 
 func hasSchematicWire(wires []schematic.Wire, start, end kicadfiles.Point) bool {

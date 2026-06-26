@@ -145,6 +145,20 @@ func ConnectOperation(fromRef string, fromPin string, toRef string, toPin string
 	return operation, nil
 }
 
+func NoConnectOperation(ref string, pin string) (transactions.Operation, []reports.Issue) {
+	if ref == "" || pin == "" {
+		return transactions.Operation{}, []reports.Issue{blockIssue("no_connect", "no-connect operation requires ref and pin")}
+	}
+	operation, err := wrapOperation(transactions.OpAddNoConnect, transactions.AddNoConnectOperation{
+		Op:       transactions.OpAddNoConnect,
+		Endpoint: transactions.Endpoint{Ref: ref, Pin: pin},
+	})
+	if err != nil {
+		return transactions.Operation{}, []reports.Issue{blockIssue("no_connect", err.Error())}
+	}
+	return operation, nil
+}
+
 func dryRunBlockOutput(definition BlockDefinition, request BlockRequest, operations []transactions.Operation, issues []reports.Issue) BlockOutput {
 	params := ApplyParameterDefaults(definition, request.Params)
 	return BlockOutput{
@@ -208,6 +222,8 @@ func operationRef(payload any) string {
 		return value.Ref
 	case transactions.PlaceFootprintOperation:
 		return value.Ref
+	case transactions.AddNoConnectOperation:
+		return value.Endpoint.Ref
 	default:
 		return ""
 	}

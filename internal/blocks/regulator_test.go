@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,6 +58,75 @@ func TestVoltageRegulatorRejectsInvalidEnableMode(t *testing.T) {
 		InstanceID: "rail3v3",
 		Params: map[string]any{
 			"enable_mode": "export",
+		},
+	})
+	if len(issues) != 1 || issues[0].Severity != reports.SeverityBlocked || issues[0].Path != "params.enable_mode" {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestVoltageRegulatorAP2112KConnectsEnableAndNoConnect(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "voltage_regulator",
+		InstanceID: "rail3v3",
+		Params: map[string]any{
+			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+			"input_voltage_min":   "3.8V",
+			"input_voltage_max":   "6V",
+			"input_voltage":       "5V",
+			"output_current":      "100mA",
+			"enable_mode":         "tied_input",
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(output.Operations) != 18 {
+		t.Fatalf("operations = %#v", output.Operations)
+	}
+	regulatorRef := output.Instance.Refs[0]
+	if !hasAddSymbolPins(output.Operations, regulatorRef, "1", "2", "3", "4", "5") {
+		t.Fatalf("expected AP2112K five-pin add_symbol operation for %s", regulatorRef)
+	}
+	if !hasConnect(output.Operations, regulatorRef, "3", regulatorRef, "1", "rail3v3_vin") {
+		t.Fatalf("expected AP2112K EN pin tied to VIN")
+	}
+	if !hasNoConnect(output.Operations, regulatorRef, "4") {
+		t.Fatalf("expected AP2112K NC pin marker")
+	}
+	validation := transactions.Validate(transactions.Transaction{Operations: output.Operations})
+	if len(validation.Issues) != 0 {
+		t.Fatalf("transaction validation issues = %#v", validation.Issues)
+	}
+}
+
+func TestVoltageRegulatorAP2112KRejectsExternalEnableExport(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	_, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "voltage_regulator",
+		InstanceID: "rail3v3",
+		Params: map[string]any{
+			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+			"enable_mode":         "export",
+		},
+	})
+	if len(issues) != 1 || issues[0].Severity != reports.SeverityBlocked || issues[0].Path != "params.enable_mode" {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestVoltageRegulatorAP2112KRejectsUnhandledEnablePin(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	_, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "voltage_regulator",
+		InstanceID: "rail3v3",
+		Params: map[string]any{
+			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+			"enable_mode":         "none",
 		},
 	})
 	if len(issues) != 1 || issues[0].Severity != reports.SeverityBlocked || issues[0].Path != "params.enable_mode" {
@@ -142,4 +212,95 @@ func TestVoltageRegulatorProjectTransactionApplies(t *testing.T) {
 			t.Fatalf("expected %s: %v", name, err)
 		}
 	}
+}
+
+func TestVoltageRegulatorAP2112KProjectTransactionWritesNoConnect(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "voltage_regulator",
+		InstanceID: "rail3v3",
+		Params: map[string]any{
+			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+			"input_voltage_min":   "3.8V",
+			"input_voltage_max":   "6V",
+			"enable_mode":         "tied_input",
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	tx, err := ProjectTransactionForBlockOutput("rail3v3", output, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDir := filepath.Join(t.TempDir(), "rail3v3")
+	result := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir})
+	if len(result.Issues) != 0 {
+		t.Fatalf("apply issues = %#v", result.Issues)
+	}
+	data, err := os.ReadFile(filepath.Join(outputDir, "rail3v3.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "(no_connect") {
+		t.Fatalf("expected no_connect marker in generated schematic")
+	}
+}
+
+func hasAddSymbolPins(operations []transactions.Operation, ref string, pins ...string) bool {
+	for _, op := range operations {
+		if op.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(op.Raw, &payload); err != nil || payload.Ref != ref {
+			continue
+		}
+		found := map[string]bool{}
+		for _, pin := range payload.Pins {
+			found[pin.Number] = true
+		}
+		for _, pin := range pins {
+			if !found[pin] {
+				return false
+			}
+		}
+		return true
+	}
+	return false
+}
+
+func hasConnect(operations []transactions.Operation, fromRef string, fromPin string, toRef string, toPin string, netName string) bool {
+	for _, op := range operations {
+		if op.Op != transactions.OpConnect {
+			continue
+		}
+		var payload transactions.ConnectOperation
+		if err := json.Unmarshal(op.Raw, &payload); err != nil {
+			continue
+		}
+		if payload.NetName == netName &&
+			payload.From.Ref == fromRef && payload.From.Pin == fromPin &&
+			payload.To.Ref == toRef && payload.To.Pin == toPin {
+			return true
+		}
+	}
+	return false
+}
+
+func hasNoConnect(operations []transactions.Operation, ref string, pin string) bool {
+	for _, op := range operations {
+		if op.Op != transactions.OpAddNoConnect {
+			continue
+		}
+		var payload transactions.AddNoConnectOperation
+		if err := json.Unmarshal(op.Raw, &payload); err != nil {
+			continue
+		}
+		if payload.Endpoint.Ref == ref && payload.Endpoint.Pin == pin {
+			return true
+		}
+	}
+	return false
 }

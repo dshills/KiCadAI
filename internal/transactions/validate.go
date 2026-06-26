@@ -86,6 +86,11 @@ func plannedOperationIdentity(op Operation) PlannedOperation {
 			addRef(&planned, payload.To.Ref)
 			addNet(&planned, payload.NetName)
 		}
+	case OpAddNoConnect:
+		var payload AddNoConnectOperation
+		if decodeRaw(op, &payload) == nil {
+			addRef(&planned, payload.Endpoint.Ref)
+		}
 	case OpAssignFootprint:
 		var payload AssignFootprintOperation
 		if decodeRaw(op, &payload) == nil {
@@ -170,6 +175,11 @@ func validateOperation(op Operation) []reports.Issue {
 			issues = append(issues, validateEndpoint(path+".to", payload.To)...)
 			issues = append(issues, requireNonEmpty(path+".net_name", "net_name", payload.NetName)...)
 			return issues
+		})
+	case OpAddNoConnect:
+		var payload AddNoConnectOperation
+		return validateDecoded(op, &payload, func() []reports.Issue {
+			return validateEndpoint(path+".endpoint", payload.Endpoint)
 		})
 	case OpAssignFootprint:
 		var payload AssignFootprintOperation

@@ -191,7 +191,7 @@ func enrichPlannedOperationWithLibrary(index libraryresolver.LibraryIndex, plann
 
 func supportedExistingPlanOperation(kind OperationKind) bool {
 	switch kind {
-	case OpAddSymbol, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpWriteProject:
+	case OpAddSymbol, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
 		return true
 	default:
 		return false
@@ -200,7 +200,7 @@ func supportedExistingPlanOperation(kind OperationKind) bool {
 
 func supportedPlanOperation(kind OperationKind) bool {
 	switch kind {
-	case OpCreateProject, OpSetBoardOutline, OpAddSymbol, OpConnect, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpWriteProject:
+	case OpCreateProject, OpSetBoardOutline, OpAddSymbol, OpConnect, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
 		return true
 	default:
 		return false

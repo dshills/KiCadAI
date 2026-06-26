@@ -13,6 +13,7 @@ const (
 	OpPlaceFootprint  OperationKind = "place_footprint"
 	OpRoute           OperationKind = "route"
 	OpAddZone         OperationKind = "add_zone"
+	OpAddNoConnect    OperationKind = "add_no_connect"
 	OpWriteProject    OperationKind = "write_project"
 	OpRemoveSymbol    OperationKind = "remove_symbol"
 )
@@ -174,6 +175,11 @@ type ConnectOperation struct {
 	From    Endpoint      `json:"from"`
 	To      Endpoint      `json:"to"`
 	NetName string        `json:"net_name"`
+}
+
+type AddNoConnectOperation struct {
+	Op       OperationKind `json:"op"`
+	Endpoint Endpoint      `json:"endpoint"`
 }
 
 type AssignFootprintOperation struct {

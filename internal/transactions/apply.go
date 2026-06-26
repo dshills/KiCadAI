@@ -197,6 +197,25 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				return result
 			}
 			schematicDirty = true
+		case OpAddNoConnect:
+			if design.Schematic == nil {
+				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("root schematic required")))
+				return result
+			}
+			var payload AddNoConnectOperation
+			if err := decodeRaw(op, &payload); err != nil {
+				result.Issues = append(result.Issues, applyIssue(i, err))
+				return result
+			}
+			anchor, err := symbolPinAnchor(design.Schematic, payload.Endpoint.Ref, payload.Endpoint.Pin)
+			if err != nil {
+				result.Issues = append(result.Issues, applyIssue(i, err))
+				return result
+			}
+			if !schematicHasNoConnect(design.Schematic.NoConnects, anchor) {
+				design.Schematic.NoConnects = append(design.Schematic.NoConnects, schematic.NewNoConnect(generator.New("imported.schematic.no_connect", payload.Endpoint.Ref, payload.Endpoint.Pin, fmt.Sprintf("%d", i)), anchor))
+			}
+			schematicDirty = true
 		case OpPlaceFootprint:
 			if design.PCB == nil {
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("PCB required")))
@@ -467,6 +486,12 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			return nil, err
 		}
 		return nil, builder.Connect(endpoint(payload.From), endpoint(payload.To), payload.NetName)
+	case OpAddNoConnect:
+		var payload AddNoConnectOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return nil, err
+		}
+		return nil, builder.AddNoConnect(endpoint(payload.Endpoint))
 	case OpAssignFootprint:
 		var payload AssignFootprintOperation
 		if err := decodeRaw(op, &payload); err != nil {
@@ -1179,6 +1204,38 @@ func point(xMM, yMM float64) kicadfiles.Point {
 
 func addPoints(a kicadfiles.Point, b kicadfiles.Point) kicadfiles.Point {
 	return kicadfiles.Point{X: a.X + b.X, Y: a.Y + b.Y}
+}
+
+func symbolPinAnchor(schematicFile *schematic.SchematicFile, ref string, pin string) (kicadfiles.Point, error) {
+	if schematicFile == nil {
+		return kicadfiles.Point{}, fmt.Errorf("root schematic required")
+	}
+	ref = strings.TrimSpace(ref)
+	pin = strings.TrimSpace(pin)
+	for _, symbol := range schematicFile.Symbols {
+		if symbol.Reference != ref {
+			continue
+		}
+		if len(symbol.Pins) != len(symbol.PinAnchors) {
+			return kicadfiles.Point{}, fmt.Errorf("symbol %s has mismatched pins and pin anchors", ref)
+		}
+		for index, symbolPin := range symbol.Pins {
+			if symbolPin.Number == pin {
+				return symbol.PinAnchors[index], nil
+			}
+		}
+		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", ref, pin)
+	}
+	return kicadfiles.Point{}, fmt.Errorf("symbol %s not found", ref)
+}
+
+func schematicHasNoConnect(noConnects []schematic.NoConnect, position kicadfiles.Point) bool {
+	for _, noConnect := range noConnects {
+		if noConnect.Position == position {
+			return true
+		}
+	}
+	return false
 }
 
 func pointSeed(point kicadfiles.Point) string {
