@@ -122,6 +122,9 @@ func TestPlanReportsExternalClockTopologyLimitation(t *testing.T) {
 	if !hasSynthesisGapCategory(plan, "unsupported_peripheral") {
 		t.Fatalf("missing synthesis clock gap: %#v", plan.Synthesis.Gaps)
 	}
+	if !hasSynthesisDecisionSelected(plan, "external_clock_blocked") {
+		t.Fatalf("missing external clock topology gate: %#v", plan.Synthesis.Decisions)
+	}
 	if hasConnection(*plan.GeneratedRequest, "clock.XTAL1", "mcu.XTAL1") || hasConnection(*plan.GeneratedRequest, "clock.CLK_OUT", "mcu.XTAL1") {
 		t.Fatalf("unexpected clock connection: %#v", plan.GeneratedRequest.Connections)
 	}

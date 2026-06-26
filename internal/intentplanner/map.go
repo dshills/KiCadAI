@@ -532,6 +532,13 @@ func (builder *planBuilder) connectMCUSupportBlocks() {
 }
 
 func (builder *planBuilder) reportClockSupportLimitation(clockID string, target semanticInstance) {
+	builder.recordSynthesisDecision(SynthesisDecision{
+		ID:        "mcu.clock.topology." + normalizeToken(clockID),
+		Type:      "unsupported_gap",
+		Path:      builder.supportTargetPath(clockID),
+		Selected:  "external_clock_blocked",
+		Rationale: "clock target ports are known for " + target.ID + ", but the selected MCU block currently supports only internal clock topology",
+	})
 	builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
 		ID:         "mcu.clock.topology_unsupported." + normalizeToken(clockID),
 		Path:       builder.supportTargetPath(clockID),
