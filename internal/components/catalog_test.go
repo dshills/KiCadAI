@@ -74,6 +74,36 @@ func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+
+	regulator := requireCatalogRecord(t, catalog, "regulator.linear.ams1117_3v3.sot223")
+	if regulator.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("regulator confidence = %q", regulator.Verification.Confidence)
+	}
+	requireRatingMax(t, regulator, "input_voltage", "12", "V")
+	requireRatingMax(t, regulator, "output_current", "800", "mA")
+	requireValueTyp(t, regulator, "output_voltage", "3.3", "V")
+	for _, role := range []string{"input_capacitor", "output_capacitor"} {
+		requireCompanionRole(t, regulator, role)
+	}
+	requireSymbolFunctions(t, regulator, "Regulator_Linear:AMS1117-3.3", []string{"GND", "VOUT", "VIN"})
+	requirePackagePads(t, regulator, "sot223", []string{"GND", "VOUT", "VIN"})
+
+	capacitor := requireCatalogRecord(t, catalog, "capacitor.ceramic.0805")
+	if capacitor.Verification.Confidence != ConfidenceRuleInferred {
+		t.Fatalf("capacitor confidence = %q", capacitor.Verification.Confidence)
+	}
+	requireValueMax(t, capacitor, "capacitance", "100u", "F")
+	requireRatingMax(t, capacitor, "voltage", "25", "V")
+	requireToleranceMax(t, capacitor, "capacitance", "20", "%")
+	requireSymbolFunctions(t, capacitor, "Device:C", []string{"A", "B"})
+	requirePackagePads(t, capacitor, "0805", []string{"A", "B"})
+}
+
 func checkedInCatalogDir(t *testing.T) string {
 	t.Helper()
 	_, sourceFile, _, ok := runtime.Caller(0)
@@ -81,6 +111,117 @@ func checkedInCatalogDir(t *testing.T) string {
 		t.Fatal("locate test source file")
 	}
 	return filepath.Join(filepath.Dir(sourceFile), "..", "..", "data", "components")
+}
+
+func requireCatalogRecord(t *testing.T, catalog *Catalog, id string) *ComponentRecord {
+	t.Helper()
+	for index := range catalog.Records {
+		if catalog.Records[index].ID == id {
+			return &catalog.Records[index]
+		}
+	}
+	t.Fatalf("catalog missing record %s", id)
+	return nil
+}
+
+func requireRatingMax(t *testing.T, record *ComponentRecord, kind, max, unit string) {
+	t.Helper()
+	for _, rating := range record.Ratings {
+		if rating.Kind == kind && rating.Unit == unit && rating.Max == max {
+			return
+		}
+	}
+	t.Fatalf("%s missing max rating %s=%s%s: %+v", record.ID, kind, max, unit, record.Ratings)
+}
+
+func requireValueTyp(t *testing.T, record *ComponentRecord, kind, typ, unit string) {
+	t.Helper()
+	for _, value := range record.Values {
+		if value.Kind == kind && value.Unit == unit && value.Typ == typ {
+			return
+		}
+	}
+	t.Fatalf("%s missing typ value %s=%s%s: %+v", record.ID, kind, typ, unit, record.Values)
+}
+
+func requireValueMax(t *testing.T, record *ComponentRecord, kind, max, unit string) {
+	t.Helper()
+	for _, value := range record.Values {
+		if value.Kind == kind && value.Unit == unit && value.Max == max {
+			return
+		}
+	}
+	t.Fatalf("%s missing max value %s=%s%s: %+v", record.ID, kind, max, unit, record.Values)
+}
+
+func requireToleranceMax(t *testing.T, record *ComponentRecord, kind, max, unit string) {
+	t.Helper()
+	for _, tolerance := range record.Tolerances {
+		if tolerance.Kind == kind && tolerance.Unit == unit && tolerance.Max == max {
+			return
+		}
+	}
+	t.Fatalf("%s missing max tolerance %s=%s%s: %+v", record.ID, kind, max, unit, record.Tolerances)
+}
+
+func requireCompanionRole(t *testing.T, record *ComponentRecord, role string) {
+	t.Helper()
+	for _, companion := range record.Companions {
+		if companion.Role == role && companion.Required {
+			return
+		}
+	}
+	t.Fatalf("%s missing required companion role %s: %+v", record.ID, role, record.Companions)
+}
+
+func requireSymbolFunctions(t *testing.T, record *ComponentRecord, symbolID string, functions []string) {
+	t.Helper()
+	for _, symbol := range record.Symbols {
+		if symbol.SymbolID != symbolID {
+			continue
+		}
+		for _, function := range functions {
+			if !symbolHasFunction(symbol, function) {
+				t.Fatalf("%s symbol %s missing function %s: %+v", record.ID, symbolID, function, symbol.FunctionPins)
+			}
+		}
+		return
+	}
+	t.Fatalf("%s missing symbol %s", record.ID, symbolID)
+}
+
+func requirePackagePads(t *testing.T, record *ComponentRecord, packageID string, functions []string) {
+	t.Helper()
+	for _, pkg := range record.Packages {
+		if pkg.ID != packageID {
+			continue
+		}
+		for _, function := range functions {
+			if !packageHasPadFunction(pkg, function) {
+				t.Fatalf("%s package %s missing pad function %s: %+v", record.ID, packageID, function, pkg.PadFunctions)
+			}
+		}
+		return
+	}
+	t.Fatalf("%s missing package %s", record.ID, packageID)
+}
+
+func symbolHasFunction(symbol SymbolBinding, function string) bool {
+	for _, pin := range symbol.FunctionPins {
+		if pin.Function == function && pin.SymbolPin != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func packageHasPadFunction(pkg PackageVariant, function string) bool {
+	for _, pad := range pkg.PadFunctions {
+		if pad.Function == function && pad.Pad != "" {
+			return true
+		}
+	}
+	return false
 }
 
 func TestValidateCatalogDuplicateID(t *testing.T) {
