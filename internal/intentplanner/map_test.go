@@ -259,6 +259,12 @@ func TestPlanRecordsValueCalculationResults(t *testing.T) {
 	if !synthesisCalculationRequirement(plan, "led_resistor", "resistor", "power") {
 		t.Fatalf("missing LED resistor power requirement: %#v", plan.Synthesis.Calculations)
 	}
+	if !workflowRequiredRating(*plan.GeneratedRequest, "indicator.resistor", "power") {
+		t.Fatalf("missing LED resistor power rating override: %#v", plan.GeneratedRequest.Components.Overrides)
+	}
+	if !workflowRequiredRating(*plan.GeneratedRequest, "indicator.led", "current") {
+		t.Fatalf("missing LED current rating override: %#v", plan.GeneratedRequest.Components.Overrides)
+	}
 	if got := synthesisCalculationResult(plan, "opamp_gain", "rf_over_rg"); got != "10.00" {
 		t.Fatalf("opamp gain result = %q; calculations=%#v", got, plan.Synthesis.Calculations)
 	}
@@ -403,6 +409,9 @@ func TestPlanRecordsDeferredOpAmpGainRequirements(t *testing.T) {
 	}
 	if !synthesisCalculationRequirement(plan, "opamp_gain", "opamp_feedback", "gain") {
 		t.Fatalf("missing opamp gain requirement: %#v", plan.Synthesis.Calculations)
+	}
+	if !workflowRequiredRating(*plan.GeneratedRequest, "amplifier.opamp", "supply_voltage") {
+		t.Fatalf("missing opamp supply voltage rating override: %#v", plan.GeneratedRequest.Components.Overrides)
 	}
 }
 
@@ -867,6 +876,19 @@ func workflowBlockParam(request designworkflow.Request, blockID string, key stri
 		}
 	}
 	return ""
+}
+
+func workflowRequiredRating(request designworkflow.Request, key string, kind string) bool {
+	override, ok := request.Components.Overrides[key]
+	if !ok {
+		return false
+	}
+	for _, rating := range override.RequiredRatings {
+		if rating.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func hasConnection(request designworkflow.Request, from string, to string) bool {

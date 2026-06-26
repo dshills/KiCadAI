@@ -6,6 +6,8 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/components"
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
 )
 
@@ -42,6 +44,7 @@ func (builder *planBuilder) applyCalculatedValueApplications() {
 	for _, instanceID := range builder.regulatorIDs {
 		builder.validateRegulatorHeadroom(instanceID)
 	}
+	builder.applyCalculatedRatingOverrides()
 }
 
 func (builder *planBuilder) applyLEDResistorValue(instanceID string) {
@@ -227,6 +230,62 @@ func (builder *planBuilder) validateRegulatorHeadroom(instanceID string) {
 	if !ok || headroom <= 0 {
 		builder.addIssue("blocks."+instanceID+".params.input_voltage", "regulator input voltage must exceed output voltage", "raise the regulator input voltage or lower the requested output rail")
 	}
+}
+
+func (builder *planBuilder) applyCalculatedRatingOverrides() {
+	for _, instanceID := range builder.ledIDs {
+		builder.applyLEDRatingOverrides(instanceID)
+	}
+	for _, instanceID := range builder.amplifierIDs {
+		builder.applyOpAmpRatingOverrides(instanceID)
+	}
+}
+
+func (builder *planBuilder) applyLEDRatingOverrides(instanceID string) {
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		return
+	}
+	supply, supplyOK := parseVoltage(paramValue(params, "supply_voltage"))
+	forward, forwardOK := parseVoltage(paramValue(params, "led_forward_voltage"))
+	currentMA, currentOK := ledCurrentMA(params)
+	if supplyOK && forwardOK && currentOK && currentMA > 0 && supply > forward {
+		powerW := (supply - forward) * (currentMA / 1000)
+		builder.appendComponentRequiredRating(instanceID, "resistor", components.RequiredRating{Kind: "power", Value: formatScaledLiteral(powerW), Unit: "W"})
+	}
+	if currentOK && currentMA > 0 {
+		builder.appendComponentRequiredRating(instanceID, "led", components.RequiredRating{Kind: "current", Value: formatScaledLiteral(currentMA / 1000), Unit: "A"})
+	}
+}
+
+func (builder *planBuilder) applyOpAmpRatingOverrides(instanceID string) {
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		return
+	}
+	voltage, ok := parseVoltage(paramValue(params, "supply_voltage"))
+	if !ok {
+		return
+	}
+	builder.appendComponentRequiredRating(instanceID, "opamp", components.RequiredRating{Kind: "supply_voltage", Value: formatScaledLiteral(voltage), Unit: "V"})
+}
+
+func (builder *planBuilder) appendComponentRequiredRating(instanceID string, role string, rating components.RequiredRating) {
+	if rating.Kind == "" || rating.Value == "" {
+		return
+	}
+	if builder.workflow.Components.Overrides == nil {
+		builder.workflow.Components.Overrides = map[string]designworkflow.ComponentOverrideSpec{}
+	}
+	key := instanceID + "." + role
+	override := builder.workflow.Components.Overrides[key]
+	for _, existing := range override.RequiredRatings {
+		if existing.Kind == rating.Kind && existing.Value == rating.Value && existing.Unit == rating.Unit {
+			return
+		}
+	}
+	override.RequiredRatings = append(override.RequiredRatings, rating)
+	builder.workflow.Components.Overrides[key] = override
 }
 
 func (builder *planBuilder) blockSupportsParam(blockID string, param string) bool {
