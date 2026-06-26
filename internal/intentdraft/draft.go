@@ -77,6 +77,7 @@ type Clarification struct {
 
 func Draft(text string, options Options) Result {
 	sourceText := strings.TrimSpace(text)
+	normalized := normalizedText(sourceText)
 	extraction := ExtractionReport{
 		SourceID:   strings.TrimSpace(options.SourceID),
 		SourceType: normalizeSourceType(options.SourceType),
@@ -93,6 +94,9 @@ func Draft(text string, options Options) Result {
 		Summary: extraction.Summary,
 		Kind:    intentplanner.IntentCustomStructured,
 	}
+	if sourceText != "" {
+		extractStructuredIntent(sourceText, normalized, &request, &extraction)
+	}
 	if options.AcceptanceOverride != "" {
 		request.Acceptance = options.AcceptanceOverride
 	}
@@ -107,6 +111,7 @@ func Draft(text string, options Options) Result {
 		})
 	}
 	request = intentplanner.NormalizeRequest(request)
+	extraction.Confidence = summarizeConfidence(extraction.Fields)
 	issues = append(issues, intentplanner.ValidateRequest(request)...)
 	return Result{
 		Request:    request,
