@@ -1,261 +1,277 @@
 # Verified Coverage Expansion Specification
 
-## Objective
+Date: 2026-06-26
 
-Expand KiCadAI's verified component and circuit-block coverage so AI-generated
-designs can use more real, evidence-backed building blocks without falling back
-to placeholder active parts or unsupported block gaps.
+## Summary
 
-This project is the next roadmap item after fabrication identity evidence. It
-does not introduce natural-language intent planning yet. It strengthens the
-verified design vocabulary that a future intent planner will depend on.
+KiCadAI can already generate, validate, and explain a meaningful set of
+structured-intent designs, but autonomous generation remains constrained by the
+small verified component catalog and limited verified block variants. The next
+step is to expand coverage deliberately: add parts and block variants only when
+they carry enough symbol, footprint, pinmap, rating, and validation evidence for
+agents to rely on them.
 
-## Roadmap Context
+This project defines the expansion workflow for verified component and circuit
+block coverage. It is not a request to add random catalog entries. Every new
+entry must increase supported design intent while preserving deterministic
+selection, fail-closed validation, and rationale evidence.
 
-`specs/ROADMAP.md` now recommends:
+## Goals
 
-1. Expand verified component and block coverage alongside each new block family.
-2. Add deeper fabrication checks.
-3. Add intent-level planning after the evidence gates are reliable.
+- Expand the checked-in component catalog with verified, KiCad-resolvable parts
+  for high-value AI generation workflows.
+- Add block variants that use those parts through explicit symbols,
+  footprints, pinmaps, component roles, placement intent, and local route
+  expectations.
+- Improve planner coverage by allowing structured intent to select new verified
+  blocks or variants without guessing.
+- Ensure each added part and block variant has machine-readable evidence for
+  component selection, rationale reports, validation, and repair workflows.
+- Keep fabrication-candidate behavior conservative: missing evidence must block
+  rather than degrade into placeholders.
 
-This specification covers item 1.
+## Non-Goals
 
-## Current Foundation
+- Do not add live distributor sourcing, price, stock, or lifecycle scraping.
+- Do not add unverified catalog entries just to broaden search results.
+- Do not implement arbitrary analog or digital design synthesis.
+- Do not change KiCad file format writers except where a new verified block
+  exposes an existing writer gap.
+- Do not claim production readiness solely because a part is in the catalog.
+- Do not bypass resolver or pinmap evidence for active parts.
 
-The repository already has:
+## Candidate Coverage Areas
 
-- component catalog loading, validation, selection, coverage reports, and
-  selection goldens in `internal/components`;
-- seed component data under `data/components`;
-- verified or policy-allowed records for common passives, pin headers, LEDs,
-  diodes, one regulator, one op-amp, one MCU, an I2C sensor, USB-C power-only,
-  and a protection part;
-- block inventory, block realization, block verification corpus, and workflow
-  evidence in `internal/blocks`;
-- existing blocks for LED indicator, connector breakout, voltage regulator,
-  MCU minimal, USB-C power, I2C sensor, and op-amp gain stage;
-- placement/routing hints, local-route evidence, validation, repair, and
-  fabrication-readiness gates.
+The first expansion wave should prioritize parts and blocks that unlock common
+board requests:
 
-The remaining gap is breadth. KiCadAI needs additional verified families and
-variants before an AI can compose useful boards without hitting unsupported or
-placeholder boundaries.
+- power:
+  - 3.3 V and 5 V LDO variants;
+  - buck regulator placeholder only if verified symbol, footprint, and required
+    companion components are modeled;
+  - input/output capacitor families with voltage and capacitance ratings;
+  - ferrite bead and fuse/polyfuse families where protection blocks need them.
+- connectivity:
+  - common 2.54 mm and JST connectors;
+  - USB-C sink connector variants with CC role evidence;
+  - test pads and programming headers.
+- digital:
+  - additional MCU seed templates only when symbol pins, package pads, power
+    pins, reset, programming, and core bus roles are mapped;
+  - I2C sensor concrete candidates with address, supply, SDA/SCL, interrupt,
+    and decoupling evidence.
+- analog:
+  - op-amp variants with supply range and package evidence;
+  - feedback resistor/capacitor families with value and tolerance metadata.
+- protection:
+  - ESD diode variants;
+  - reverse-polarity diode/MOSFET variants;
+  - TVS and input protection families with working-voltage/current ratings.
 
-## Scope
+## Family-Specific Evidence Reference
 
-### In Scope
+Follow-on expansion slices must retain the family requirements that drove the
+original coverage backlog:
 
-- Add verified component records for the next seed families:
-  - crystal or ceramic resonator oscillator support;
-  - standalone reset/programming header support;
-  - ESD protection for external connectors;
-  - reverse-polarity or input protection;
-  - additional regulator variant or package where needed by the new blocks.
-- Add corresponding circuit blocks or block variants:
-  - `crystal_oscillator`;
-  - `reset_programming`;
-  - `esd_protection`;
-  - `reverse_polarity_protection`.
-- Add block inventory entries, parameters, ports, electrical rules, PCB
-  constraints, required route metadata, and known gaps.
-- Add schematic and PCB realization fragments where the existing block
-  framework can support them.
-- Add resolver/pinmap checks for every concrete active, polarized, connector,
-  and protection record.
-- Add golden tests for catalog coverage, selection behavior, block inventory,
-  block realization, and workflow evidence.
-- Integrate selected component properties into generated schematic symbols when
-  existing writer APIs support those properties.
-- Keep fabrication-candidate behavior conservative: new blocks may be usable in
-  design workflows, but fabrication readiness should remain blocked when
-  exact-part, pinmap, local-route, ERC/DRC, or fabrication evidence is missing.
+- clock sources need frequency, load-capacitance, package, drive-level,
+  stability metadata, `XTAL1`/`XTAL2`/`GND` port roles, crystal or resonator
+  symbol pin evidence, footprint pad evidence, and companion load-capacitor
+  policy;
+- reset/programming support needs reset pull-up policy, reset switch or header
+  evidence, and programming roles such as `MISO`, `MOSI`, `SCK`, `RESET`,
+  `SWDIO`, `SWCLK`, `UART_TX`, and `UART_RX` where the selected MCU family
+  supports them;
+- protection blocks need entry-side and protected-side roles, polarity or
+  bidirectional behavior, working-voltage/current ratings, package pad evidence,
+  and placement evidence near the board entry point;
+- USB-C sink variants need CC role evidence, VBUS/GND pad aggregation policy,
+  optional shield treatment, and explicit no-connect or unsupported-data-lane
+  handling.
 
-### Out Of Scope
+## Component Evidence Requirements
 
-- Live distributor availability, pricing, or lifecycle API calls.
-- Full datasheet parsing.
-- SPICE or oscillator startup simulation.
-- USB compliance certification.
-- ESD surge compliance guarantees.
-- Thermal modeling beyond encoded ratings and notes.
-- Natural-language intent planning.
-- Imported-project mutation.
-- Manufacturer acceptance guarantees.
+Every new component record must include:
 
-## Evidence Policy
+- `id`, `family`, `name`, and package variant identifiers;
+- KiCad symbol binding with function pins;
+- footprint binding with pad functions;
+- confidence level and verification metadata;
+- ratings relevant to safe use, such as voltage, current, power, capacitance,
+  tolerance, supply voltage, working voltage, drive level, or frequency
+  stability;
+- value constraints for passives;
+- companion requirements when the part cannot be used safely alone;
+- placement/routing hints when the part affects layout quality;
+- tags or functions that make selection explainable.
 
-Every new verified component record must provide deterministic local evidence:
+Active and connector parts must have resolver/pinmap evidence. Passive
+rule-inferred records may remain narrower, but fabrication-candidate flows must
+still see enough value/rating evidence to avoid unsafe selection.
 
-- stable component ID;
-- concrete manufacturer and MPN when the part is not a generic symmetric
-  passive;
-- lifecycle status when known;
-- symbol library ID;
-- footprint library ID;
-- package;
-- component class;
-- ratings relevant to selection;
-- source or evidence note;
-- pinmap evidence for all non-symmetric or active parts;
-- acceptance/confidence level.
+## Block Variant Requirements
 
-Every new block must provide deterministic block evidence:
+Every new or expanded block variant must define:
 
-- block ID and version;
-- declared ports and port roles;
-- parameter schema and defaults;
-- required component roles;
-- selected component IDs or selection criteria;
-- schematic nets and exported nets;
-- PCB constraints and placement hints;
-- local-route expectations where applicable;
-- validation rules;
-- known gaps;
-- verification level.
+- supported parameters and defaults;
+- explicit component roles and component queries or IDs;
+- symbol and footprint requirements;
+- port definitions and voltage-domain behavior;
+- local nets and role-based connectivity expectations;
+- PCB realization where available, including placements, groups, local routes,
+  constraints, and validation expectations;
+- unsupported behaviors and readiness level;
+- verification fixture coverage.
 
-## Target Families
+Blocks must not silently choose a component variant when several electrically
+different choices exist. Ambiguity must become a planner clarification, known
+gap, or blocked issue.
+
+## Planner Integration
+
+Structured intent should gain new coverage only through explicit mapping rules:
+
+- function family or block family selection;
+- component policy defaults and overrides;
+- target/bus/supply metadata;
+- acceptance-level gates;
+- calculated value and rating requirements where available.
+
+Planner output must explain:
+
+- why a block or variant was selected;
+- which catalog component satisfied each role;
+- which evidence was verified;
+- which ratings were checked;
+- which gaps or unsupported behaviors remain.
+
+## Validation And Acceptance
+
+Each expansion slice must pass:
+
+- component catalog validation;
+- catalog evidence validation where resolver data is available;
+- component selection tests for positive and negative cases;
+- block registry validation;
+- block instantiation tests;
+- workflow tests that verify generated request and component-selection output;
+- writer correctness and board validation for generated fixtures where PCB
+  realization exists;
+- optional KiCad ERC/DRC fixtures when the block claims those evidence levels.
+
+No expansion is accepted if it only adds JSON without tests proving selection,
+mapping, and validation behavior.
+
+## CLI And Artifacts
+
+Existing commands should remain the public interface:
+
+- `kicadai --json component validate`
+- `kicadai --json component coverage`
+- `kicadai --json component find`
+- `kicadai --json component select`
+- `kicadai --json block list`
+- `kicadai --json block show`
+- `kicadai --json block verify`
+- `kicadai --json --request request.json intent plan`
+- `kicadai --json --request request.json intent create`
+- `kicadai --json --request request.json --output ./out design create`
+
+New coverage must surface in existing JSON artifacts:
+
+- component coverage reports;
+- component selection stage output;
+- block readiness and verification output;
+- intent synthesis trace;
+- design rationale report.
+
+## Success Criteria
+
+- At least one high-value design family gains verified component and block
+  coverage beyond current seed examples.
+- New parts are selectable through catalog queries and rejected when ratings or
+  functions are insufficient.
+- New block variants instantiate deterministically and validate with existing
+  writer and board gates.
+- Intent planning can select the new coverage from structured requests without
+  guessing.
+- Rationale output explains selected parts, ratings, and remaining gaps.
+- Full `go test ./...` passes without requiring network access.
+
+## Appendix: Deferred Coverage Backlog
+
+The current implementation slice is the verified regulator path, but these
+deferred families remain part of the verified coverage backlog. They are kept
+here so narrowing the first slice does not remove the concrete requirements
+needed for later phases.
 
 ### Crystal Or Oscillator Support
 
-Add a block for an MCU clock source that can be connected to a minimal MCU
-system.
-
 Required component coverage:
 
-- one crystal or resonator record with package/footprint evidence;
+- one crystal or ceramic resonator record with package and footprint evidence;
 - two load capacitor records or parameterized generic capacitors;
-- optional series resistor or damping resistor policy if needed;
-- pinmap evidence for the crystal or resonator footprint.
+- optional series or damping resistor policy when required by the selected
+  clock source;
+- pinmap evidence for the crystal or resonator footprint;
+- frequency, load-capacitance, package, lifecycle, drive-level, and stability
+  metadata where available.
 
 Required block behavior:
 
 - exported ports for `XTAL1`, `XTAL2`, and `GND`;
-- parameterized frequency;
-- load capacitance metadata;
+- parameterized frequency and load capacitance;
 - placement hint near MCU oscillator pins;
 - local-route expectation for the crystal loop;
 - explicit warning that oscillator startup and layout quality are not simulated.
 
 ### Reset And Programming Support
 
-Add a block for reset pull-up, reset button, and programming/debug header.
-
 Required component coverage:
 
 - tactile switch or reset button record;
 - pull-up resistor policy;
-- 1x03, 1x04, 1x05, or 2x03 programming header record as appropriate;
-- connector pin-number evidence.
+- 1x03, 1x04, 1x05, 2x03, or other programming header record as appropriate;
+- connector pin-number evidence and role evidence.
 
 Required block behavior:
 
 - exported ports for `RESET`, `VCC`, `GND`, and programming signals such as
   `MOSI`, `MISO`, `SCK`, `TX`, `RX`, `SWDIO`, or `SWCLK` depending on variant;
-- variant policy for AVR ISP, UART, or SWD, with unsupported variants
-  reported as gaps;
-- edge/accessible placement hint for programming connectors;
+- variant policy for AVR ISP, UART, or SWD, with unsupported variants reported
+  as structured gaps;
+- edge or accessible placement hints for programming connectors;
 - reset net validation rules.
 
 ### ESD Protection Support
 
-Add a block for connector-facing ESD protection.
-
 Required component coverage:
 
-- one concrete TVS or ESD diode array record;
-- package/footprint evidence;
+- one concrete TVS or ESD diode-array record;
+- package and footprint evidence;
 - pinmap and polarity evidence;
-- ratings metadata such as working voltage and channel count.
+- working-voltage, channel-count, and clamp/current metadata where available.
 
 Required block behavior:
 
 - exported protected and unprotected signal ports;
-- GND port;
-- proximity constraint to connector;
+- `GND` port;
+- proximity constraint to the connector;
 - local route from connector to protection to protected net;
 - explicit unsupported gaps for high-speed impedance and compliance.
 
 ### Reverse-Polarity Or Input Protection
 
-Add a block for simple power-input protection.
-
 Required component coverage:
 
-- one Schottky diode, ideal-diode controller placeholder explicitly blocked, or
-  P-channel MOSFET record if evidence is available;
-- package/footprint/pinmap evidence;
-- voltage/current/rating metadata.
+- one Schottky diode, P-channel MOSFET, or explicitly blocked ideal-diode
+  controller placeholder when evidence is incomplete;
+- package, footprint, and pinmap evidence;
+- voltage, current, topology, and thermal rating metadata.
 
 Required block behavior:
 
 - exported `VIN_RAW`, `VIN_PROTECTED`, and `GND` ports;
 - selected topology metadata;
-- route-width/current policy;
-- placement hint near power input connector;
+- route-width and current policy;
+- placement hint near the power input connector;
 - rating checks against requested input current and voltage when available.
-
-## Data Model Expectations
-
-Prefer extending existing models over inventing parallel structures.
-
-Component data should remain under `data/components` unless a phase introduces a
-clear reason to split files. Block metadata should use existing block registry,
-inventory, realization, and verification structures.
-
-New fields should be added only when they support an executable gate or an
-AI-facing explanation. Avoid broad free-form blobs that cannot be validated.
-
-## CLI And Workflow Expectations
-
-The existing commands should expose new coverage naturally:
-
-- `component coverage` should include new family and acceptance data.
-- `component find/select/validate` should handle new records.
-- `block inventory` should show new blocks and known gaps.
-- `block verify --builtins` should cover new block manifests.
-- `design create` should be able to use new block IDs when requested through
-  structured block intent.
-
-No new top-level command is required for this project.
-
-## Validation Requirements
-
-Required tests:
-
-- catalog validation for every new record;
-- coverage golden updates;
-- selection goldens for safe and blocked cases;
-- pinmap/resolver evidence tests for non-passive records;
-- block inventory tests;
-- block realization tests;
-- block verification corpus updates;
-- design workflow evidence test for at least one new block;
-- regression tests proving unsupported variants produce structured issues.
-
-External KiCad CLI evidence may remain optional, but the new records and blocks
-must not make existing hermetic tests depend on a local KiCad install.
-
-## Acceptance Criteria
-
-This project is complete when:
-
-- the new target families appear in component coverage;
-- each new concrete active/polarized/connector/protection record has
-  manufacturer/MPN, package, symbol, footprint, and pinmap evidence;
-- each new block appears in block inventory with readiness, rules, ports, PCB
-  constraints, and known gaps;
-- supported variants can emit schematic and PCB realization fragments;
-- unsupported variants fail with structured, AI-actionable issues;
-- existing `go test ./...` passes;
-- documentation and roadmap status are updated.
-
-## Risks
-
-- Incorrect pinmaps are worse than missing pinmaps. Treat uncertain pinmaps as
-  blocked.
-- Oscillator and ESD layout quality can look simple but carry real electrical
-  risk. Keep claims narrow and evidence-specific.
-- Adding too many fields without executable checks will create false
-  confidence. Prefer small verified records over broad unverified catalogs.
-- New blocks can increase placement/routing complexity. Start with constrained
-  local-route expectations and explicit gaps.

@@ -1,10 +1,6 @@
 # Verified Coverage Expansion Implementation Plan
 
-## Objective
-
-Implement the next roadmap item: expand verified component and block coverage
-with new evidence-backed families that can be used by structured AI design
-requests.
+Date: 2026-06-26
 
 ## Implementation Rules
 
@@ -15,278 +11,246 @@ requests.
 - Add small verified records before broad placeholder catalogs.
 - Prefer existing `internal/components`, `internal/blocks`,
   `internal/pinmap`, and workflow evidence patterns.
-- Run focused tests after each phase and `go test ./...` before the final
-  documentation commit.
+- Run focused tests after each implementation phase and `go test ./...` before
+  final closeout.
+- Treat `prism review staged` as the required project review gate for each
+  commit in this plan.
 
-## Phase 1: Coverage Baseline And Gap Fixtures
+## Rollback Strategy
 
-### Goal
+Each phase must be independently revertible because the work is committed in
+small slices:
 
-Create a checked baseline for the new target families before adding records.
+- If catalog changes introduce validation or selection regressions, revert the
+  catalog/test commit and keep the Phase 1 audit as the record of the intended
+  slice.
+- If block or planner integration breaks existing workflows, revert only that
+  integration commit and leave the lower-level component coverage in place.
+- If generated workflow evidence exposes a writer or routing regression, keep
+  the failing fixture only when it is marked as a known gap; otherwise revert
+  the fixture and associated workflow assertions.
+- If final compatibility fails after several commits, use the latest passing
+  phase commit as the recovery point and file the failing behavior as a new
+  gap before continuing.
 
-### Work
+## Phase 1: Coverage Audit And Priority Matrix
 
-- Add or extend coverage tests that identify the target expansion families:
-  - crystal/oscillator;
-  - reset/programming;
-  - ESD protection;
-  - reverse-polarity/input protection.
-- Add explicit unsupported-gap expectations where current block inventory lacks
-  these families.
-- Add a small helper or test fixture if needed to make family coverage
-  assertions readable.
-- Keep current behavior unchanged except for clearer gap reporting.
+Status: completed by `COVERAGE_AUDIT.md`.
 
-### Tests
+Objective: identify the smallest coverage expansion that materially improves
+AI-generated designs.
 
-- Component coverage reports current gaps deterministically.
-- Block inventory reports current unsupported target families explicitly.
+Tasks:
 
-### Acceptance
+- Generate or inspect current component coverage by family, confidence, rating
+  metadata, symbol evidence, footprint evidence, and pinmap evidence.
+- Generate or inspect current block coverage by readiness level, component
+  roles, PCB realization, and verification fixtures.
+- Build a priority matrix for candidate families:
+  - design value;
+  - required catalog data;
+  - required block changes;
+  - validation evidence available locally;
+  - risk of unsafe inference.
+- Finalize the first expansion slice in `COVERAGE_AUDIT.md`; the selected
+  slice is concrete LDO/regulator and capacitor coverage.
+- Preserve the remaining candidate families as follow-on coverage targets.
 
-- The repository has executable tests documenting the current missing coverage.
+Review:
 
-### Commit
+- Verify the slice is small enough for deterministic tests.
+- Confirm it improves at least one intent workflow.
 
-```text
-Add verified coverage expansion gap fixtures
-```
+Commit:
 
-## Phase 2: Crystal/Oscillator Component Records
+- Commit audit/spec updates separately if they change repository files.
 
-### Goal
+## Phase 2: Catalog Schema And Evidence Fixtures
 
-Add verified component records and pinmap evidence for the first clock-source
-family.
+Objective: add the component records needed by the selected slice.
 
-### Work
+Tasks:
 
-- Add one concrete crystal or resonator component record.
-- Add required passive companion policy for load capacitors.
-- Add symbol/footprint/pinmap evidence.
-- Add ratings/metadata for frequency, load capacitance, package, and lifecycle
-  where known.
-- Add selection and validation behavior for frequency and package constraints.
+- Add or update JSON records under `data/components/`.
+- Include families, values, ratings, symbol bindings, package variants,
+  function pins, pad functions, verification metadata, and companion
+  requirements.
+- Add negative cases where a part should fail selection due to missing rating,
+  insufficient rating, missing function, unsafe confidence, or missing
+  companion metadata.
+- Add tests for deterministic catalog loading, sorting, validation, and
+  evidence validation.
+- Update component coverage expectations if coverage reports are asserted.
 
-### Tests
+Review:
 
-- Catalog validation accepts the new record.
-- Component coverage includes oscillator family coverage.
-- Selection succeeds for a supported frequency/package request.
-- Selection blocks unsupported or under-evidenced oscillator requests.
-- Pinmap/resolver evidence is checked.
+- `go test ./internal/components`
+- `prism review staged`
 
-### Acceptance
+Commit:
 
-- KiCadAI can select a concrete oscillator record with enough evidence to feed
-  a block.
+- Commit with a message like `Expand verified component catalog coverage`.
 
-### Commit
+## Phase 3: Component Selection Integration
 
-```text
-Add verified oscillator component coverage
-```
+Objective: prove the new components are selected and rejected through the
+existing selection API.
 
-## Phase 3: Crystal/Oscillator Block
+Tasks:
 
-### Goal
+- Add component `find` and `select` fixture requests where appropriate.
+- Add selection tests for:
+  - exact family/package/value match;
+  - required rating pass;
+  - required rating failure;
+  - required function pass/failure;
+  - concrete-part requirement pass/failure;
+  - companion requirement pass/failure where modeled.
+- Ensure rejected candidate diagnostics remain actionable.
+- Ensure acceptance-level gates continue to block unsafe placeholder or
+  low-confidence selections.
 
-Add a reusable oscillator block that can connect to MCU clock pins.
+Review:
 
-### Work
+- `go test ./internal/components ./cmd/kicadai`
+- `prism review staged`
 
-- Add `crystal_oscillator` block metadata.
-- Define parameters for frequency, load capacitance, and package.
-- Define ports for `XTAL1`, `XTAL2`, and `GND`.
-- Emit schematic symbols/nets for crystal/resonator and load capacitors.
-- Add PCB placement hints near the target MCU.
-- Add local-route expectations for the crystal loop.
-- Add known-gap notes for startup simulation and high-quality oscillator
-  layout.
+Commit:
 
-### Tests
+- Commit with a message like `Add verified component selection coverage`.
 
-- Block inventory includes `crystal_oscillator`.
-- Block realization emits expected components, ports, nets, constraints, and
-  route metadata.
-- Block verification corpus covers the new block.
-- Unsupported frequency/package combinations produce structured issues.
+## Phase 4: Block Variant Or Role Integration
 
-### Acceptance
+Objective: connect the new catalog coverage to one or more circuit blocks.
 
-- Structured requests can instantiate an oscillator block with deterministic
-  schematic and PCB fragment evidence.
+Tasks:
 
-### Commit
+- Update relevant block definitions or block component queries.
+- Add new parameters only when they are safe and validated.
+- Add or update component roles, required libraries, validation rules,
+  unsupported behavior notes, and verification level.
+- For PCB-capable blocks, add or update PCB realization placements, groups,
+  local routes, and validation expectations.
+- Ensure block metadata exposes enough information for `block show`, planner
+  rationale, and workflow evidence.
 
-```text
-Add crystal oscillator circuit block
-```
+Review:
 
-## Phase 4: Reset And Programming Support
+- `go test ./internal/blocks`
+- `prism review staged`
 
-### Goal
+Commit:
 
-Add verified reset/programming component records and a block variant usable by
-MCU designs.
+- Commit with a message like `Connect verified components to block variants`.
 
-### Work
+## Phase 5: Intent Planner Mapping
 
-- Add or verify records for reset switch, pull-up resistor policy, and one
-  programming/debug connector.
-- Add connector pin-number and orientation evidence.
-- Add `reset_programming` block metadata and realization.
-- Support at least one concrete variant, such as AVR ISP or UART programming.
-- Mark SWD or other unsupported variants as explicit gaps if not implemented.
-- Add placement hint for accessible connector edge placement.
+Objective: make structured intent able to use the new verified coverage without
+guessing.
 
-### Tests
+Tasks:
 
-- Catalog validation and coverage include reset/programming components.
-- Component selection rejects unsupported programming variants.
-- Block inventory and realization cover supported reset/programming variant.
-- Workflow evidence exposes selected programming block and unsupported gaps.
+- Add explicit mapping rules for the selected function, interface, protection,
+  power, or block family.
+- Add target/bus/supply handling where the new slice needs it.
+- Add component policy defaults or rating requirements only where catalog
+  metadata supports enforcement.
+- Add planner tests for:
+  - successful selection;
+  - ambiguous intent requiring clarification;
+  - unsupported variant becoming a known gap or blocker;
+  - generated request shape;
+  - synthesis trace and rationale evidence.
 
-### Acceptance
+Review:
 
-- An MCU design can request reset/programming support and receive deterministic
-  components, nets, ports, and placement constraints.
+- `go test ./internal/intentplanner ./internal/rationale`
+- `prism review staged`
 
-### Commit
+Commit:
 
-```text
-Add reset programming coverage
-```
+- Commit with a message like `Map verified coverage into intent planning`.
 
-## Phase 5: ESD Protection Support
+## Phase 6: Workflow And Generated Project Evidence
 
-### Goal
+Objective: prove the expanded coverage works through generated projects.
 
-Add connector-facing ESD protection component and block coverage.
+Tasks:
 
-### Work
+- Add or update `examples/intent/` or `examples/design/` request fixtures.
+- Run generated workflows in tests or focused golden fixtures.
+- Assert component-selection stage output includes the expected component IDs,
+  variants, ratings, and evidence.
+- For PCB-realized blocks, assert writer correctness and board validation
+  evidence where local tests can do so without requiring KiCad.
+- Add optional KiCad-backed fixture metadata only if the block claims ERC/DRC
+  confidence.
 
-- Add one concrete ESD/TVS diode or diode-array record with package and pinmap
-  evidence.
-- Add voltage/channel metadata.
-- Add `esd_protection` block metadata and realization.
-- Define protected/unprotected signal ports and GND.
-- Add proximity and local-route constraints from connector to protection to
-  protected net.
-- Document unsupported high-speed impedance and compliance claims.
+Review:
 
-### Tests
+- `go test ./internal/designworkflow ./cmd/kicadai`
+- `prism review staged`
 
-- Catalog validation and coverage include ESD protection.
-- Selection checks working voltage and channel count when requested.
-- Block realization emits expected ports, components, constraints, and route
-  metadata.
-- Unsupported high-speed/compliance requests produce structured gaps.
+Commit:
 
-### Acceptance
+- Commit with a message like `Add generated workflow coverage for verified parts`.
 
-- Connector-facing blocks can request ESD protection and receive deterministic
-  local protection fragments.
+## Phase 7: Documentation And Agent Skill Updates
 
-### Commit
+Objective: keep human and agent guidance aligned with the new coverage.
 
-```text
-Add ESD protection block coverage
-```
+Tasks:
 
-## Phase 6: Reverse-Polarity/Input Protection Support
+- Update `README.md` only if quick-start or status changes.
+- Update focused docs:
+  - `docs/component-intelligence.md`;
+  - `docs/circuit-blocks.md`;
+  - `docs/intent-planning.md`;
+  - `docs/kicadai-agent-skill.md`.
+- Update `specs/ROADMAP.md` with completed coverage and remaining gaps.
+- Document any new request examples and validation expectations.
+- Keep examples using the compiled `kicadai` binary.
 
-### Goal
+Review:
 
-Add simple power-input protection coverage.
+- Run local Markdown link check.
+- `rg -n "go run ./cmd/kicadai|go run" README.md docs`
+- `prism review staged`
 
-### Work
+Commit:
 
-- Add a concrete Schottky diode or MOSFET-based protection record only if
-  package/pinmap/rating evidence is available.
-- Add `reverse_polarity_protection` block metadata and realization.
-- Define ports for `VIN_RAW`, `VIN_PROTECTED`, and `GND`.
-- Add topology metadata and route-width/current policy.
-- Add placement hint near the power input connector.
-- Add rating checks against requested input voltage/current where existing
-  selection model supports them.
+- Commit with a message like `Document verified coverage expansion`.
 
-### Tests
+## Phase 8: Final Compatibility Sweep
 
-- Catalog validation and coverage include input protection.
-- Selection blocks over-current or over-voltage requests.
-- Block realization emits deterministic schematic/PCB fragment evidence.
-- Unsupported ideal-diode-controller requests remain blocked unless a verified
-  record is added.
+Objective: ensure the expansion does not weaken existing generation behavior.
 
-### Acceptance
+Tasks:
 
-- Power-input designs can add a simple verified protection block without
-  claiming unsupported ideal-diode or high-reliability behavior.
-
-### Commit
-
-```text
-Add input protection block coverage
-```
-
-## Phase 7: Design Workflow Integration
-
-### Goal
-
-Expose the new blocks and records through existing structured design workflows.
-
-### Work
-
-- Ensure `design create` can accept the new block IDs in structured requests.
-- Ensure selected component evidence appears in workflow output.
-- Ensure unsupported variants produce stage issues rather than panics or silent
-  omissions.
-- Add one representative generated design fixture that combines at least two
-  new blocks with an existing MCU or connector block.
-
-### Tests
-
-- Design workflow test for one supported combined design.
-- Design workflow test for one unsupported variant.
-- CLI or golden output updates where needed.
-
-### Acceptance
-
-- AI callers can discover and use the new verified coverage through the same
-  workflow surface as existing blocks.
-
-### Commit
-
-```text
-Integrate expanded coverage into design workflow
-```
-
-## Phase 8: Documentation And Roadmap Update
-
-### Goal
-
-Document the new verified coverage and update the roadmap status.
-
-### Work
-
-- Update `README.md` with the new blocks and caveats.
-- Update `specs/ROADMAP.md` to reflect implemented coverage.
-- Add example request documentation if a representative fixture is added.
 - Run `go test ./...`.
+- Run focused CLI fixtures for component selection, block inspection, intent
+  planning, and generated design workflows.
+- Confirm no new network or KiCad dependency is required by default tests.
+- Inspect generated JSON for deterministic ordering and stable issue paths.
+- Confirm fabrication-candidate workflows still fail closed on missing
+  evidence.
 
-### Tests
+Review:
 
-- Full `go test ./...`.
-- Prism review staged documentation and code.
+- `go test ./...`
+- `prism review staged` if any final files changed.
 
-### Acceptance
+Commit:
 
-- Documentation accurately describes supported families, gaps, and verification
-  boundaries.
+- Commit any final compatibility fixes with a message like
+  `Harden verified coverage expansion`.
 
-### Commit
+## Completion Criteria
 
-```text
-Document verified coverage expansion
-```
+- The selected expansion slice is represented in catalog records, block
+  metadata, planner mappings, generated workflow evidence, and docs.
+- Positive and negative component selection tests prove rating/function/confidence
+  behavior.
+- Generated design workflows can use the new coverage without hidden guesses.
+- Rationale reports explain the selected parts and remaining gaps.
+- Full tests pass.
