@@ -90,6 +90,32 @@ func TestMarshalPlanJSONStable(t *testing.T) {
 	}
 }
 
+func TestNormalizePlanClonesCalculationTraceDetails(t *testing.T) {
+	applied := []AppliedValue{{Target: "block", Path: "blocks.led.params.resistor_value", Value: "260"}, {Target: "block", Path: "a", Value: "1"}}
+	requirements := []CalculatedRequirement{{Subject: "resistor", Kind: "power", Value: "0.01", Unit: "W"}, {Subject: "led", Kind: "forward_current", Value: "5", Unit: "mA"}}
+	issues := []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "z", Message: "z"}, {Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Path: "a", Message: "a"}}
+	plan := NormalizePlan(PlanResult{Synthesis: SynthesisTrace{Calculations: []SynthesisCalculation{{
+		ID:           "calc",
+		Kind:         "led_resistor",
+		Applied:      applied,
+		Requirements: requirements,
+		Issues:       issues,
+	}}}})
+	applied[0].Value = "changed"
+	requirements[0].Value = "changed"
+	issues[0].Message = "changed"
+	calc := plan.Synthesis.Calculations[0]
+	if calc.Applied[0].Path != "a" || calc.Applied[0].Value != "1" {
+		t.Fatalf("applied values not cloned/sorted: %#v", calc.Applied)
+	}
+	if calc.Requirements[0].Subject != "led" || calc.Requirements[0].Value != "5" {
+		t.Fatalf("requirements not cloned/sorted: %#v", calc.Requirements)
+	}
+	if calc.Issues[0].Path != "a" || calc.Issues[0].Message != "a" {
+		t.Fatalf("issues not cloned/sorted: %#v", calc.Issues)
+	}
+}
+
 func TestWriteArtifactsWritesPlanAndBlocksOverwrite(t *testing.T) {
 	root := t.TempDir()
 	plan := NormalizePlan(PlanResult{Intent: PlanIntentSummary{Name: "demo", Kind: IntentBreakout}})

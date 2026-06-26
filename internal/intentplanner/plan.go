@@ -141,14 +141,35 @@ type SynthesisConstraint struct {
 }
 
 type SynthesisCalculation struct {
-	ID          string            `json:"id"`
-	Kind        string            `json:"kind"`
-	Path        string            `json:"path,omitempty"`
-	Inputs      map[string]string `json:"inputs,omitempty"`
-	Result      map[string]string `json:"result,omitempty"`
-	Formula     string            `json:"formula,omitempty"`
-	Assumptions []string          `json:"assumptions,omitempty"`
-	Confidence  string            `json:"confidence,omitempty"`
+	ID           string                  `json:"id"`
+	Kind         string                  `json:"kind"`
+	Path         string                  `json:"path,omitempty"`
+	Inputs       map[string]string       `json:"inputs,omitempty"`
+	Result       map[string]string       `json:"result,omitempty"`
+	Formula      string                  `json:"formula,omitempty"`
+	Assumptions  []string                `json:"assumptions,omitempty"`
+	Confidence   string                  `json:"confidence,omitempty"`
+	Status       string                  `json:"status,omitempty"`
+	Applied      []AppliedValue          `json:"applied,omitempty"`
+	Requirements []CalculatedRequirement `json:"requirements,omitempty"`
+	Issues       []reports.Issue         `json:"issues,omitempty"`
+}
+
+type AppliedValue struct {
+	Target string `json:"target"`
+	Path   string `json:"path"`
+	Value  string `json:"value"`
+	Unit   string `json:"unit,omitempty"`
+	Method string `json:"method,omitempty"`
+}
+
+type CalculatedRequirement struct {
+	Subject  string `json:"subject"`
+	Kind     string `json:"kind"`
+	Operator string `json:"operator,omitempty"`
+	Value    string `json:"value"`
+	Unit     string `json:"unit,omitempty"`
+	Source   string `json:"source,omitempty"`
 }
 
 type SynthesisGap struct {
@@ -470,6 +491,12 @@ func cloneSynthesisCalculations(values []SynthesisCalculation) []SynthesisCalcul
 		out[i].Inputs = cloneStringMap(out[i].Inputs)
 		out[i].Result = cloneStringMap(out[i].Result)
 		out[i].Assumptions = append([]string(nil), out[i].Assumptions...)
+		out[i].Applied = append([]AppliedValue(nil), out[i].Applied...)
+		out[i].Requirements = append([]CalculatedRequirement(nil), out[i].Requirements...)
+		out[i].Issues = append([]reports.Issue(nil), out[i].Issues...)
+		slices.SortFunc(out[i].Applied, compareAppliedValues)
+		slices.SortFunc(out[i].Requirements, compareCalculatedRequirements)
+		slices.SortFunc(out[i].Issues, compareIssues)
 	}
 	return out
 }
@@ -566,6 +593,29 @@ func compareSynthesisCalculations(a, b SynthesisCalculation) int {
 		return strings.Compare(a.Kind, b.Kind)
 	}
 	return strings.Compare(a.Path, b.Path)
+}
+
+func compareAppliedValues(a, b AppliedValue) int {
+	if a.Target != b.Target {
+		return strings.Compare(a.Target, b.Target)
+	}
+	if a.Path != b.Path {
+		return strings.Compare(a.Path, b.Path)
+	}
+	return strings.Compare(a.Value, b.Value)
+}
+
+func compareCalculatedRequirements(a, b CalculatedRequirement) int {
+	if a.Subject != b.Subject {
+		return strings.Compare(a.Subject, b.Subject)
+	}
+	if a.Kind != b.Kind {
+		return strings.Compare(a.Kind, b.Kind)
+	}
+	if a.Value != b.Value {
+		return strings.Compare(a.Value, b.Value)
+	}
+	return strings.Compare(a.Unit, b.Unit)
 }
 
 func compareSynthesisGaps(a, b SynthesisGap) int {
