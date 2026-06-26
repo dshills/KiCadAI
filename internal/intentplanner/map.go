@@ -492,7 +492,7 @@ func (builder *planBuilder) connectMCUSupportBlocks() {
 		if !ok {
 			continue
 		}
-		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "mcu.clock.pin_assignment." + normalizeToken(clockID), Path: builder.supportTargetPath(clockID), Message: "MCU clock wiring for " + target.ID + " is deferred until MCU block metadata exposes clock-capable target ports"})
+		builder.reportClockSupportLimitation(clockID, target)
 	}
 	for _, programmingID := range builder.programmingIDs {
 		target, ok := builder.resolveMCUSupportTarget(programmingID, "mcu.reset")
@@ -501,6 +501,15 @@ func (builder *planBuilder) connectMCUSupportBlocks() {
 		}
 		builder.connectProgrammingSupport(programmingID, target)
 	}
+}
+
+func (builder *planBuilder) reportClockSupportLimitation(clockID string, target semanticInstance) {
+	builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+		ID:         "mcu.clock.topology_unsupported." + normalizeToken(clockID),
+		Path:       builder.supportTargetPath(clockID),
+		Message:    "clock target ports are known for " + target.ID + ", but the selected MCU block currently supports only internal clock topology",
+		Suggestion: "keep clock_mode internal or add external-clock support to the MCU block before wiring this clock source",
+	})
 }
 
 func (builder *planBuilder) connectProgrammingSupport(programmingID string, target semanticInstance) {

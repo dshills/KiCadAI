@@ -69,7 +69,7 @@ func TestPlanMapsMCUAndProtectionBlocks(t *testing.T) {
 			t.Fatalf("missing connection %s -> %s: %#v", connection.from, connection.to, plan.GeneratedRequest.Connections)
 		}
 	}
-	if !hasKnownGap(plan, "mcu.clock.pin_assignment.clock") {
+	if !hasKnownGap(plan, "mcu.clock.topology_unsupported.clock") {
 		t.Fatalf("missing MCU clock known gap: %#v", plan.KnownGaps)
 	}
 	if hasKnownGap(plan, "mcu.programming.pin_assignment.programming") {
@@ -90,6 +90,28 @@ func TestPlanMapsMCUAndProtectionBlocks(t *testing.T) {
 	}
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
 		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanReportsExternalClockTopologyLimitation(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "external_clock",
+		Kind:    IntentMCUMinimal,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "mcu", Params: map[string]any{"supply_voltage": "5V"}},
+			{Kind: "clock", Family: "crystal_oscillator"},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if !hasKnownGap(plan, "mcu.clock.topology_unsupported.clock") {
+		t.Fatalf("missing topology limitation: %#v", plan.KnownGaps)
+	}
+	if hasConnection(*plan.GeneratedRequest, "clock.XTAL1", "mcu.XTAL1") || hasConnection(*plan.GeneratedRequest, "clock.CLK_OUT", "mcu.XTAL1") {
+		t.Fatalf("unexpected clock connection: %#v", plan.GeneratedRequest.Connections)
 	}
 }
 
