@@ -229,6 +229,11 @@ func (builder *planBuilder) validateRegulatorHeadroom(instanceID string) {
 	headroom, ok := parseFloatString(result["headroom_v"])
 	if !ok || headroom <= 0 {
 		builder.addIssue("blocks."+instanceID+".params.input_voltage", "regulator input voltage must exceed output voltage", "raise the regulator input voltage or lower the requested output rail")
+		return
+	}
+	required, requiredOK := parseFloatString(result["dropout_margin_required"])
+	if requiredOK && headroom < required {
+		builder.addIssue("blocks."+instanceID+".params.input_voltage", "regulator input voltage lacks modeled dropout margin", "raise the regulator input voltage or choose a regulator profile with lower dropout")
 	}
 }
 

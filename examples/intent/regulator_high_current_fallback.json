@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "name": "regulator_high_current_fallback",
+  "summary": "3.3 V rail above the AP2112K modeled current slice; planner must not choose AP2112K.",
+  "kind": "power_module",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 55,
+    "height_mm": 35,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "5V", "current_ma": 1200}
+    ],
+    "rails": [
+      {"name": "VCC", "voltage": "3.3V", "current_ma": 900}
+    ]
+  },
+  "interfaces": [
+    {"kind": "power", "voltage": "3.3V"}
+  ]
+}

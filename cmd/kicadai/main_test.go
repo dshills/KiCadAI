@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -338,7 +339,7 @@ func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
 		Stages []workflowEvidenceStage `json:"stages"`
 	}
 	readJSONFile(t, workflowPath, &workflow)
-	if !workflowSelectedComponent(workflow.Stages, "regulator", "regulator", "regulator.linear.ams1117_3v3.sot223") {
+	if !workflowSelectedComponent(workflow.Stages, "regulator", "regulator", "regulator.linear.ap2112k_3v3.sot23_5") {
 		t.Fatalf("workflow missing regulator selection: %#v", workflow.Stages)
 	}
 	if !workflowSelectedComponent(workflow.Stages, "regulator", "input_capacitor", "capacitor.ceramic.0805") {
@@ -350,16 +351,83 @@ func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
 
 	generatedPath := filepath.Join(output, ".kicadai", "generated-request.json")
 	var generated struct {
+		Blocks          []generatedBlockEvidence `json:"blocks"`
 		ComponentPolicy struct {
 			Overrides map[string]componentEvidenceOverride `json:"overrides"`
 		} `json:"component_policy"`
 	}
 	readJSONFile(t, generatedPath, &generated)
+	if got := generatedBlockParam(generated.Blocks, "voltage_regulator", "regulator_symbol"); got != "Regulator_Linear:AP2112K-3.3" {
+		t.Fatalf("generated request regulator_symbol = %q; blocks=%#v", got, generated.Blocks)
+	}
+	if got := generatedBlockParam(generated.Blocks, "voltage_regulator", "enable_mode"); got != "tied_input" {
+		t.Fatalf("generated request enable_mode = %q; blocks=%#v", got, generated.Blocks)
+	}
 	if !generatedRequiredRating(generated.ComponentPolicy.Overrides, "regulator.regulator", "output_current", "0.1", "A") {
 		t.Fatalf("generated request missing regulator current rating: %#v", generated.ComponentPolicy.Overrides)
 	}
 	if !generatedRequiredRating(generated.ComponentPolicy.Overrides, "regulator.input_capacitor", "voltage", "6.3", "V") {
 		t.Fatalf("generated request missing input capacitor voltage rating: %#v", generated.ComponentPolicy.Overrides)
+	}
+}
+
+func TestRunIntentPlanRegulatorEvidenceFixtures(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		path       string
+		wantStatus string
+		want       string
+		wantAbsent string
+	}{
+		{
+			name:       "ap2112k",
+			path:       filepath.Join("..", "..", "examples", "intent", "regulator_ap2112k_sensor.json"),
+			wantStatus: "ready",
+			want:       "ap2112k_3v3_sot23_5",
+		},
+		{
+			name:       "high_current_fallback",
+			path:       filepath.Join("..", "..", "examples", "intent", "regulator_high_current_fallback.json"),
+			wantStatus: "partial",
+			wantAbsent: "Regulator_Linear:AP2112K-3.3",
+		},
+		{
+			name:       "insufficient_headroom",
+			path:       filepath.Join("..", "..", "examples", "intent", "regulator_insufficient_headroom_blocked.json"),
+			wantStatus: "blocked",
+			want:       "regulator input voltage lacks modeled dropout margin",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			err := run([]string{"--json", "--request", tc.path, "intent", "plan"}, &stdout, &stderr)
+			if tc.wantStatus == "blocked" {
+				if err == nil {
+					t.Fatal("expected blocked fixture to return an error")
+				}
+			} else if err != nil {
+				t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+			}
+			output := stdout.String()
+			var payload struct {
+				Data struct {
+					Status string `json:"status"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+				t.Fatalf("parse output: %v\nstdout=%s", err, output)
+			}
+			if payload.Data.Status != tc.wantStatus {
+				t.Fatalf("status = %q, want %q; output=%s", payload.Data.Status, tc.wantStatus, output)
+			}
+			if tc.want != "" && !strings.Contains(output, tc.want) {
+				t.Fatalf("missing %q in output=%s", tc.want, output)
+			}
+			if tc.wantAbsent != "" && strings.Contains(output, tc.wantAbsent) {
+				t.Fatalf("unexpected %q in output=%s", tc.wantAbsent, output)
+			}
+		})
 	}
 }
 
@@ -387,6 +455,12 @@ type componentEvidenceRating struct {
 	Kind  string `json:"kind"`
 	Value string `json:"value"`
 	Unit  string `json:"unit"`
+}
+
+type generatedBlockEvidence struct {
+	ID      string         `json:"id"`
+	BlockID string         `json:"block_id"`
+	Params  map[string]any `json:"params"`
 }
 
 func workflowSelectedComponent(stages []workflowEvidenceStage, instanceID string, role string, componentID string) bool {
@@ -422,6 +496,18 @@ func generatedRequiredRating(overrides map[string]componentEvidenceOverride, key
 		}
 	}
 	return false
+}
+
+func generatedBlockParam(blocks []generatedBlockEvidence, blockID string, key string) string {
+	for _, block := range blocks {
+		if block.BlockID != blockID {
+			continue
+		}
+		if value, ok := block.Params[key]; ok {
+			return strings.TrimSpace(fmt.Sprint(value))
+		}
+	}
+	return ""
 }
 
 func TestRunIntentCreateTextBlocksClarification(t *testing.T) {

@@ -638,6 +638,10 @@ func regulatorHeadroomStatus(block SelectedBlockRecord) string {
 	if !ok || headroom <= 0 {
 		return "blocked"
 	}
+	required, requiredOK := parseFloatString(result["dropout_margin_required"])
+	if requiredOK && headroom < required {
+		return "blocked"
+	}
 	return "deferred"
 }
 

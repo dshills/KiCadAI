@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "name": "regulator_insufficient_headroom_blocked",
+  "summary": "3.6 V input to 3.3 V rail intentionally lacks AP2112K dropout margin and should block.",
+  "kind": "power_module",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "3.6V", "current_ma": 500}
+    ],
+    "rails": [
+      {"name": "VCC", "voltage": "3.3V", "current_ma": 100}
+    ]
+  },
+  "interfaces": [
+    {"kind": "power", "voltage": "3.3V"}
+  ]
+}

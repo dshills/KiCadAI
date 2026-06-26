@@ -1,0 +1,31 @@
+{
+  "version": "0.1.0",
+  "name": "regulator_ap2112k_sensor",
+  "summary": "USB-powered 3.3 V sensor breakout that exercises the verified AP2112K regulator path.",
+  "kind": "breakout",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "usb_c", "voltage": "5V", "current_ma": 500}
+    ],
+    "rails": [
+      {"name": "VCC", "voltage": "3.3V", "current_ma": 100}
+    ]
+  },
+  "interfaces": [
+    {"kind": "i2c", "voltage": "3.3V"}
+  ],
+  "functions": [
+    {"kind": "sensor", "family": "i2c_sensor", "params": {"i2c_address": "0x76"}}
+  ],
+  "constraints": {
+    "package_preferences": {"resistor": "0603", "capacitor": "0603"},
+    "route_width_mm": 0.2,
+    "clearance_mm": 0.18
+  }
+}
