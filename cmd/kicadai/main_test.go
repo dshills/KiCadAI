@@ -743,6 +743,69 @@ func TestRunComponentSelectBlocksUnsafePlaceholder(t *testing.T) {
 	}
 }
 
+func TestRunComponentSelectRegulatorRequestJSON(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "regulator-select.json")
+	if err := os.WriteFile(requestPath, []byte(`{
+  "query": {
+    "family": "regulator",
+    "package": "sot223",
+    "value_kind": "output_voltage",
+    "value": "3.3"
+  },
+  "acceptance": "connectivity",
+  "require_concrete": true,
+  "require_companions": true,
+  "required_ratings": [
+    {"kind": "input_voltage", "value": "5", "unit": "V"},
+    {"kind": "output_current", "value": "250", "unit": "mA"}
+  ]
+}`), 0o600); err != nil {
+		t.Fatalf("write request: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--request", requestPath, "component", "select"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var payload struct {
+		Data struct {
+			Candidate struct {
+				ComponentID string `json:"component_id"`
+			} `json:"candidate"`
+			Component struct {
+				Companions []componentSelectCompanion `json:"companions"`
+			} `json:"component"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatalf("parse output: %v\nstdout=%s", err, stdout.String())
+	}
+	if payload.Data.Candidate.ComponentID != "regulator.linear.ams1117_3v3.sot223" {
+		t.Fatalf("selected component ID = %q", payload.Data.Candidate.ComponentID)
+	}
+	if !cliCompanionsIncludeRole(payload.Data.Component.Companions, "input_capacitor") {
+		t.Fatalf("missing input capacitor companion: %+v", payload.Data.Component.Companions)
+	}
+	if !cliCompanionsIncludeRole(payload.Data.Component.Companions, "output_capacitor") {
+		t.Fatalf("missing output capacitor companion: %+v", payload.Data.Component.Companions)
+	}
+}
+
+type componentSelectCompanion struct {
+	Role string `json:"role"`
+}
+
+func cliCompanionsIncludeRole(companions []componentSelectCompanion, role string) bool {
+	for _, companion := range companions {
+		if companion.Role == role {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRunComponentValidateJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -64,6 +64,30 @@ func TestSelectGeneric0603CapacitorByPackage(t *testing.T) {
 	}
 }
 
+func TestSelectRegulatorCompanionCapacitorWithRatings(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "capacitor",
+			Package:   "0805",
+			ValueKind: "capacitance",
+			Value:     "10u",
+		},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "voltage",
+			Value: "5",
+			Unit:  "V",
+		}},
+	})
+	if !result.OK {
+		t.Fatalf("select regulator capacitor failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "capacitor.ceramic.0805" || selection.Candidate.Confidence != ConfidenceRuleInferred {
+		t.Fatalf("unexpected capacitor selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+}
+
 func TestFindConnectorByPinCountAndPackage(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	candidates, result := Find(context.Background(), catalog, Query{
@@ -151,6 +175,31 @@ func TestSelectVerifiedRegulatorForPowerRequest(t *testing.T) {
 	}
 	if len(selection.Component.Companions) < 2 {
 		t.Fatalf("expected regulator companion requirements: %+v", selection.Component.Companions)
+	}
+}
+
+func TestSelectVerifiedRegulatorRequiresCompanions(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "regulator", Package: "sot223", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "5", Unit: "V"},
+			{Kind: "output_current", Value: "250", Unit: "mA"},
+		},
+	})
+	if !result.OK {
+		t.Fatalf("select regulator with companions failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "regulator.linear.ams1117_3v3.sot223" {
+		t.Fatalf("unexpected regulator selection: got ID %q, want %q", selection.Component.ID, "regulator.linear.ams1117_3v3.sot223")
+	}
+	for _, role := range []string{"input_capacitor", "output_capacitor"} {
+		if !componentHasRequiredCompanionRole(selection.Component, role) {
+			t.Fatalf("selected regulator missing companion role %s: %+v", role, selection.Component.Companions)
+		}
 	}
 }
 
@@ -471,6 +520,15 @@ func componentHasFunction(record ComponentRecord, function string) bool {
 			if pin.Function == function {
 				return true
 			}
+		}
+	}
+	return false
+}
+
+func componentHasRequiredCompanionRole(record ComponentRecord, role string) bool {
+	for _, companion := range record.Companions {
+		if companion.Role == role && companion.Required {
+			return true
 		}
 	}
 	return false
