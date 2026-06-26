@@ -75,26 +75,39 @@ type PowerInputIntent struct {
 }
 
 type PowerRailIntent struct {
-	Name      string   `json:"name"`
-	Voltage   string   `json:"voltage,omitempty"`
-	CurrentMA float64  `json:"current_ma,omitempty"`
-	Strength  Strength `json:"strength,omitempty"`
+	Name      string      `json:"name"`
+	Voltage   string      `json:"voltage,omitempty"`
+	CurrentMA float64     `json:"current_ma,omitempty"`
+	Strength  Strength    `json:"strength,omitempty"`
+	Supplies  []TargetRef `json:"supplies,omitempty"`
+	Alias     string      `json:"alias,omitempty"`
 }
 
 type InterfaceIntent struct {
-	Kind      string   `json:"kind"`
-	Voltage   string   `json:"voltage,omitempty"`
-	Connector string   `json:"connector,omitempty"`
-	Quantity  int      `json:"quantity,omitempty"`
-	Strength  Strength `json:"strength,omitempty"`
+	Kind      string    `json:"kind"`
+	Voltage   string    `json:"voltage,omitempty"`
+	Connector string    `json:"connector,omitempty"`
+	Quantity  int       `json:"quantity,omitempty"`
+	Strength  Strength  `json:"strength,omitempty"`
+	Target    TargetRef `json:"target,omitempty"`
+	Bus       string    `json:"bus,omitempty"`
 }
 
 type FunctionIntent struct {
-	Kind     string         `json:"kind"`
-	Family   string         `json:"family,omitempty"`
-	Quantity int            `json:"quantity,omitempty"`
-	Params   map[string]any `json:"params,omitempty"`
-	Strength Strength       `json:"strength,omitempty"`
+	Kind      string         `json:"kind"`
+	Family    string         `json:"family,omitempty"`
+	Quantity  int            `json:"quantity,omitempty"`
+	Params    map[string]any `json:"params,omitempty"`
+	Strength  Strength       `json:"strength,omitempty"`
+	Target    TargetRef      `json:"target,omitempty"`
+	Interface string         `json:"interface,omitempty"`
+	Bus       string         `json:"bus,omitempty"`
+	Supply    string         `json:"supply,omitempty"`
+}
+
+type TargetRef struct {
+	ID   string `json:"id,omitempty"`
+	Role string `json:"role,omitempty"`
 }
 
 type ProtectionIntent struct {
@@ -182,6 +195,8 @@ func normalizePowerRails(values []PowerRailIntent) []PowerRailIntent {
 		out[i].Name = strings.TrimSpace(out[i].Name)
 		out[i].Voltage = strings.TrimSpace(out[i].Voltage)
 		out[i].Strength = normalizeStrength(out[i].Strength, StrengthRequired)
+		out[i].Alias = normalizeToken(out[i].Alias)
+		out[i].Supplies = normalizeTargetRefs(out[i].Supplies)
 	}
 	return out
 }
@@ -192,6 +207,8 @@ func normalizeInterfaces(values []InterfaceIntent) []InterfaceIntent {
 		out[i].Kind = normalizeToken(out[i].Kind)
 		out[i].Voltage = strings.TrimSpace(out[i].Voltage)
 		out[i].Connector = normalizeToken(out[i].Connector)
+		out[i].Target = normalizeTargetRef(out[i].Target)
+		out[i].Bus = normalizeToken(out[i].Bus)
 		if out[i].Quantity == 0 {
 			out[i].Quantity = 1
 		}
@@ -205,6 +222,10 @@ func normalizeFunctions(values []FunctionIntent) []FunctionIntent {
 	for i := range out {
 		out[i].Kind = normalizeToken(out[i].Kind)
 		out[i].Family = normalizeToken(out[i].Family)
+		out[i].Target = normalizeTargetRef(out[i].Target)
+		out[i].Interface = normalizeToken(out[i].Interface)
+		out[i].Bus = normalizeToken(out[i].Bus)
+		out[i].Supply = normalizeToken(out[i].Supply)
 		if out[i].Quantity == 0 {
 			out[i].Quantity = 1
 		}
@@ -283,6 +304,10 @@ func validatePower(power PowerIntent) []reports.Issue {
 		if !validStrength(rail.Strength) {
 			issues = append(issues, issue(path+".strength", "unsupported requirement strength "+string(rail.Strength)))
 		}
+		if rail.Alias != "" && !validSemanticToken(rail.Alias) {
+			issues = append(issues, issue(path+".alias", "power rail alias must be a simple token"))
+		}
+		issues = append(issues, validateTargetRefs(path+".supplies", rail.Supplies)...)
 	}
 	return issues
 }
@@ -303,6 +328,10 @@ func validateInterfaces(values []InterfaceIntent) []reports.Issue {
 		if !validStrength(iface.Strength) {
 			issues = append(issues, issue(path+".strength", "unsupported requirement strength "+string(iface.Strength)))
 		}
+		if iface.Bus != "" && !validSemanticToken(iface.Bus) {
+			issues = append(issues, issue(path+".bus", "interface bus must be a simple token"))
+		}
+		issues = append(issues, validateTargetRef(path+".target", iface.Target)...)
 	}
 	return issues
 }
@@ -322,6 +351,16 @@ func validateFunctions(values []FunctionIntent) []reports.Issue {
 		if !validStrength(function.Strength) {
 			issues = append(issues, issue(path+".strength", "unsupported requirement strength "+string(function.Strength)))
 		}
+		if function.Interface != "" && !validSemanticInterface(function.Interface) {
+			issues = append(issues, issue(path+".interface", "unsupported semantic interface "+function.Interface))
+		}
+		if function.Bus != "" && !validSemanticToken(function.Bus) {
+			issues = append(issues, issue(path+".bus", "function bus must be a simple token"))
+		}
+		if function.Supply != "" && !validSemanticToken(function.Supply) {
+			issues = append(issues, issue(path+".supply", "function supply must be a simple token"))
+		}
+		issues = append(issues, validateTargetRef(path+".target", function.Target)...)
 	}
 	return issues
 }
@@ -422,6 +461,22 @@ func validFunctionKind(kind string) bool {
 	}
 }
 
+func validSemanticInterface(value string) bool {
+	switch value {
+	case "i2c", "gpio", "uart", "spi", "clock", "programming":
+		return true
+	default:
+		return false
+	}
+}
+
+func validSemanticToken(value string) bool {
+	value = normalizeToken(value)
+	return value == "" || strings.IndexFunc(value, func(r rune) bool {
+		return !(r >= 'a' && r <= 'z' || r >= '0' && r <= '9' || r == '_' || r == '-')
+	}) == -1
+}
+
 func normalizeProjectName(name string) string {
 	name = strings.TrimSpace(name)
 	name = projectNamePattern.ReplaceAllString(name, "_")
@@ -434,6 +489,40 @@ func normalizeProjectName(name string) string {
 
 func normalizeToken(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func normalizeTargetRef(value TargetRef) TargetRef {
+	return TargetRef{ID: normalizeToken(value.ID), Role: normalizeToken(value.Role)}
+}
+
+func normalizeTargetRefs(values []TargetRef) []TargetRef {
+	if len(values) == 0 {
+		return nil
+	}
+	out := append([]TargetRef(nil), values...)
+	for i := range out {
+		out[i] = normalizeTargetRef(out[i])
+	}
+	return out
+}
+
+func validateTargetRef(path string, target TargetRef) []reports.Issue {
+	var issues []reports.Issue
+	if target.ID != "" && !validSemanticToken(target.ID) {
+		issues = append(issues, issue(path+".id", "target id must be a simple token"))
+	}
+	if target.Role != "" && !validSemanticToken(target.Role) {
+		issues = append(issues, issue(path+".role", "target role must be a simple token"))
+	}
+	return issues
+}
+
+func validateTargetRefs(path string, targets []TargetRef) []reports.Issue {
+	var issues []reports.Issue
+	for index, target := range targets {
+		issues = append(issues, validateTargetRef(fmt.Sprintf("%s[%d]", path, index), target)...)
+	}
+	return issues
 }
 
 func normalizeStringMap(values map[string]string) map[string]string {
