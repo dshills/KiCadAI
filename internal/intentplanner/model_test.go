@@ -99,7 +99,7 @@ func TestNormalizeRequestCopiesMutableFields(t *testing.T) {
 			Params:    map[string]any{"address": "0x48", "nested": map[string]any{"mode": "fast"}},
 		}},
 		Interfaces:  []InterfaceIntent{{Kind: " I2C ", Target: TargetRef{Role: " MCU "}, Bus: " I2C_MAIN "}},
-		Power:       PowerIntent{Rails: []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: " 3V3 ", Supplies: []TargetRef{{ID: " SENSOR_1 "}}}}},
+		Power:       PowerIntent{Rails: []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: " 3V3 ", SuppliedTargets: []TargetRef{{ID: " SENSOR_1 "}}}}},
 		Constraints: ConstraintIntent{PackagePreferences: map[string]string{" sensor ": " qfn "}},
 	}
 	normalized := NormalizeRequest(request)
@@ -127,7 +127,7 @@ func TestNormalizeRequestCopiesMutableFields(t *testing.T) {
 	if normalized.Interfaces[0].Target.Role != "mcu" || normalized.Interfaces[0].Bus != "i2c_main" {
 		t.Fatalf("interface semantic fields not normalized: %#v", normalized.Interfaces[0])
 	}
-	if normalized.Power.Rails[0].Alias != "3v3" || normalized.Power.Rails[0].Supplies[0].ID != "sensor_1" {
+	if normalized.Power.Rails[0].Alias != "3v3" || normalized.Power.Rails[0].SuppliedTargets[0].ID != "sensor_1" {
 		t.Fatalf("power rail semantic fields not normalized: %#v", normalized.Power.Rails[0])
 	}
 }
@@ -153,7 +153,7 @@ func TestDecodeRequestStrictAcceptsSemanticFields(t *testing.T) {
 	  "kind": "sensor_node",
 	  "power": {
 	    "inputs": [{"kind": "external", "voltage": "5V"}],
-	    "rails": [{"name": "VCC", "voltage": "3.3V", "alias": "3v3", "supplies": [{"role": "sensor"}]}]
+	    "rails": [{"name": "VCC", "voltage": "3.3V", "alias": "3v3", "supplied_targets": [{"role": "sensor"}]}]
 	  },
 	  "interfaces": [{"kind": "i2c", "voltage": "3.3V", "bus": "i2c1", "target": {"role": "mcu"}}],
 	  "functions": [{"kind": "sensor", "family": "i2c_sensor", "interface": "i2c", "bus": "i2c1", "supply": "3v3", "target": {"id": "mcu_1"}}]
@@ -162,8 +162,8 @@ func TestDecodeRequestStrictAcceptsSemanticFields(t *testing.T) {
 		t.Fatalf("issues = %#v", issues)
 	}
 	normalized := NormalizeRequest(request)
-	if normalized.Power.Rails[0].Supplies[0].Role != "sensor" {
-		t.Fatalf("supplies = %#v", normalized.Power.Rails[0].Supplies)
+	if normalized.Power.Rails[0].SuppliedTargets[0].Role != "sensor" {
+		t.Fatalf("supplied targets = %#v", normalized.Power.Rails[0].SuppliedTargets)
 	}
 	if normalized.Interfaces[0].Target.Role != "mcu" {
 		t.Fatalf("interface target = %#v", normalized.Interfaces[0].Target)
@@ -180,7 +180,7 @@ func TestValidateRequestReportsInvalidSemanticFields(t *testing.T) {
 		Kind:    IntentSensorNode,
 		Power: PowerIntent{
 			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}},
-			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: "bad alias", Supplies: []TargetRef{{ID: "sensor one"}}}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: "bad alias", SuppliedTargets: []TargetRef{{ID: "sensor one"}}}},
 		},
 		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V", Bus: "bad bus", Target: TargetRef{Role: "mcu main"}}},
 		Functions: []FunctionIntent{{
@@ -199,11 +199,25 @@ func TestValidateRequestReportsInvalidSemanticFields(t *testing.T) {
 		"interfaces[0].bus",
 		"interfaces[0].target.role",
 		"power.rails[0].alias",
-		"power.rails[0].supplies[0].id",
+		"power.rails[0].supplied_targets[0].id",
 	} {
 		if !hasIssuePath(issues, path) {
 			t.Fatalf("missing issue path %s in %#v", path, issues)
 		}
+	}
+}
+
+func TestNormalizeRequestAcceptsLegacyPowerRailSupplies(t *testing.T) {
+	normalized := NormalizeRequest(Request{
+		Version: RequestVersion,
+		Name:    "legacy",
+		Power:   PowerIntent{Rails: []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Supplies: []TargetRef{{Role: " SENSOR "}}}}},
+	})
+	if normalized.Power.Rails[0].SuppliedTargets[0].Role != "sensor" {
+		t.Fatalf("legacy supplies did not normalize into supplied_targets: %#v", normalized.Power.Rails[0])
+	}
+	if normalized.Power.Rails[0].Supplies[0].Role != "sensor" {
+		t.Fatalf("legacy supplies alias not preserved: %#v", normalized.Power.Rails[0])
 	}
 }
 

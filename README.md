@@ -582,15 +582,45 @@ commands. Commands that write to an existing output directory require
 `--overwrite`.
 
 Examples live in `examples/intent/` and cover sensor breakout, MCU programmer,
-power module, amplifier module, and fabrication-oriented sensor requests.
+power module, amplifier module, fabrication-oriented sensor requests, MCU plus
+I2C sensor, MCU ISP programming, external-clock limitation, multi-MCU ambiguity,
+and explicit voltage-domain supply examples.
+
+Structured intent supports semantic target, bus, and supply fields:
+
+- `functions[].target` and `interfaces[].target`: constrain support blocks or
+  interfaces to a target role or instance when inference would be ambiguous.
+- `functions[].interface` and `functions[].bus`: describe functional bus
+  intent such as I2C.
+- `interfaces[].bus`: groups connectors and devices onto the same logical bus.
+- `functions[].supply`, `power.rails[].alias`, and
+  `power.rails[].supplied_targets`:
+  bind blocks to named voltage domains and emit plan evidence for selected
+  supply sources. Legacy `power.rails[].supplies` input is still accepted as an
+  alias.
+
+Implemented semantic mappings:
+
+- MCU plus I2C sensor/connector plans now connect SDA/SCL through the supported
+  ATmega328P-A seed MCU template when exactly one compatible MCU target exists.
+- Reset/programming support can connect ISP or UART headers to a resolved MCU
+  target using semantic port roles and target-scoped signal nets.
+- Voltage-domain planning records selected source/net evidence on affected
+  requirements and refuses to silently fall back when an explicit supply alias
+  is unknown.
+- Multiple compatible MCU targets require explicit target metadata rather than
+  guessed support wiring.
+- External MCU clock intent now reports a precise topology limitation: target
+  clock ports are known, but the current generated MCU block still only emits
+  internal-clock topology.
 
 Current intent-planner gaps:
 
 - input is structured JSON, not free-form natural language;
-- MCU peripheral, clock, programming, and I2C support remain conservative known
-  gaps unless represented by verified block metadata;
-- some block supply-voltage metadata is still partial, so unsupported voltage
-  compatibility evidence is reported instead of guessed;
+- MCU semantic support is limited to the verified seed template and does not
+  yet derive alternate functions from arbitrary KiCad symbols;
+- external MCU clock generation is still blocked until the MCU block can emit a
+  safe non-internal clock topology;
 - fabrication-focused intent maps to stricter validation/component/routing
   policy, but external manufacturer acceptance remains a downstream
   fabrication-readiness concern.

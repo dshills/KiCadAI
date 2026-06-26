@@ -75,12 +75,13 @@ type PowerInputIntent struct {
 }
 
 type PowerRailIntent struct {
-	Name      string      `json:"name"`
-	Voltage   string      `json:"voltage,omitempty"`
-	CurrentMA float64     `json:"current_ma,omitempty"`
-	Strength  Strength    `json:"strength,omitempty"`
-	Supplies  []TargetRef `json:"supplies,omitempty"`
-	Alias     string      `json:"alias,omitempty"`
+	Name            string      `json:"name"`
+	Voltage         string      `json:"voltage,omitempty"`
+	CurrentMA       float64     `json:"current_ma,omitempty"`
+	Strength        Strength    `json:"strength,omitempty"`
+	SuppliedTargets []TargetRef `json:"supplied_targets,omitempty"`
+	Supplies        []TargetRef `json:"supplies,omitempty"`
+	Alias           string      `json:"alias,omitempty"`
 }
 
 type InterfaceIntent struct {
@@ -196,7 +197,10 @@ func normalizePowerRails(values []PowerRailIntent) []PowerRailIntent {
 		out[i].Voltage = strings.TrimSpace(out[i].Voltage)
 		out[i].Strength = normalizeStrength(out[i].Strength, StrengthRequired)
 		out[i].Alias = normalizeToken(out[i].Alias)
+		out[i].SuppliedTargets = normalizeTargetRefs(out[i].SuppliedTargets)
 		out[i].Supplies = normalizeTargetRefs(out[i].Supplies)
+		out[i].SuppliedTargets = mergeTargetRefs(out[i].SuppliedTargets, out[i].Supplies)
+		out[i].Supplies = append([]TargetRef(nil), out[i].SuppliedTargets...)
 	}
 	return out
 }
@@ -307,6 +311,7 @@ func validatePower(power PowerIntent) []reports.Issue {
 		if rail.Alias != "" && !validSemanticToken(rail.Alias) {
 			issues = append(issues, issue(path+".alias", "power rail alias must be a simple token"))
 		}
+		issues = append(issues, validateTargetRefs(path+".supplied_targets", rail.SuppliedTargets)...)
 		issues = append(issues, validateTargetRefs(path+".supplies", rail.Supplies)...)
 	}
 	return issues
@@ -506,6 +511,26 @@ func normalizeTargetRefs(values []TargetRef) []TargetRef {
 	return out
 }
 
+func mergeTargetRefs(primary []TargetRef, aliases []TargetRef) []TargetRef {
+	out := make([]TargetRef, 0, len(primary)+len(aliases))
+	seen := map[TargetRef]bool{}
+	for _, target := range primary {
+		if seen[target] {
+			continue
+		}
+		out = append(out, target)
+		seen[target] = true
+	}
+	for _, target := range aliases {
+		if seen[target] {
+			continue
+		}
+		out = append(out, target)
+		seen[target] = true
+	}
+	return out
+}
+
 func validateTargetRef(path string, target TargetRef) []reports.Issue {
 	var issues []reports.Issue
 	if target.ID != "" && !validSemanticToken(target.ID) {
@@ -520,7 +545,12 @@ func validateTargetRef(path string, target TargetRef) []reports.Issue {
 func validateTargetRefs(path string, targets []TargetRef) []reports.Issue {
 	var issues []reports.Issue
 	for index, target := range targets {
-		issues = append(issues, validateTargetRef(fmt.Sprintf("%s[%d]", path, index), target)...)
+		itemPath := fmt.Sprintf("%s[%d]", path, index)
+		if target.ID == "" && target.Role == "" {
+			issues = append(issues, issue(itemPath, "target reference must include id or role"))
+			continue
+		}
+		issues = append(issues, validateTargetRef(itemPath, target)...)
 	}
 	return issues
 }

@@ -14,7 +14,7 @@
       {"kind": "external", "voltage": "5V", "current_ma": 300}
     ],
     "rails": [
-      {"name": "VCC", "alias": "3v3", "voltage": "3.3V", "current_ma": 100, "supplies": [{"role": "sensor"}]}
+      {"name": "VCC", "alias": "3v3", "voltage": "3.3V", "current_ma": 100, "supplied_targets": [{"role": "sensor"}]}
     ]
   },
   "functions": [

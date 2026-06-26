@@ -298,8 +298,8 @@ func (builder *planBuilder) mapPower() {
 		if rail.Alias != "" {
 			builder.railAliasVoltage[normalizeToken(rail.Alias)] = rail.Voltage
 		}
-		for _, target := range rail.Supplies {
-			builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: reqID + ".supplies." + firstNonEmpty(target.ID, target.Role), Path: fmt.Sprintf("power.rails[%d].supplies", index), Message: "rail " + rail.Name + " explicitly supplies target " + firstNonEmpty(target.ID, target.Role)})
+		for _, target := range rail.SuppliedTargets {
+			builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{ID: reqID + ".supplied_targets." + firstNonEmpty(target.ID, target.Role), Path: fmt.Sprintf("power.rails[%d].supplied_targets", index), Message: "rail " + rail.Name + " explicitly supplies target " + firstNonEmpty(target.ID, target.Role)})
 		}
 		if needsRegulator(builder.request.Power.Inputs, rail) {
 			params := map[string]any{"output_voltage": rail.Voltage}

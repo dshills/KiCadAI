@@ -612,12 +612,31 @@ Planning status is conservative: unsupported families, unsafe ambiguity, and
 missing proof become structured issues or known gaps instead of guessed design
 decisions.
 
+Structured semantic mapping is now implemented for target, bus, and supply
+intent:
+
+- request fields can identify support targets, logical buses, and named supply
+  domains;
+- the supported ATmega328P-A seed MCU exposes planner-visible I2C,
+  programming, UART, reset, power, and clock-capable roles;
+- MCU/I2C sensor/connector intent produces concrete SDA/SCL connections when a
+  compatible target is unambiguous;
+- reset/programming support maps ISP and UART connections through semantic port
+  roles with target-scoped signal nets;
+- voltage-domain planning records selected supply source/net evidence and fails
+  closed on unknown explicit supply aliases;
+- external MCU clock intent reports a precise non-internal-clock topology
+  limitation instead of a vague missing pin-assignment gap;
+- golden fixtures cover supported semantic plans, partial known-gap plans, and
+  intentionally blocked multi-MCU ambiguity.
+
 ### Remaining Work
 
 - Add a natural-language-to-intent adapter that produces the current structured
   request schema with source attribution and confidence.
-- Expand semantic mapping for MCU peripheral roles, clock/programming support,
-  I2C buses, voltage-domain proof, and block supply requirements.
+- Expand semantic mapping beyond the seed MCU template, especially
+  resolver-backed MCU alternate functions, additional bus peripherals, and
+  safe external-clock topology generation.
 - Select more blocks and parts from verified catalogs as coverage grows.
 - Calculate values and check ratings.
 - Produce a design rationale and known-limit report.
