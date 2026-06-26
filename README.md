@@ -170,3 +170,8 @@ make install
 ```
 
 See [Development Reference](docs/development.md) for package details, test coverage notes, protobuf maintenance, current limitations, troubleshooting, and design direction.
+
+## License
+
+KiCadAI is licensed under the [MIT License](LICENSE). Vendored KiCad API
+materials under `third_party/kicad/` retain their upstream licenses.
