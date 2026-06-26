@@ -68,11 +68,28 @@ type ConfidenceSummary struct {
 type Clarification struct {
 	ID         string           `json:"id"`
 	Path       string           `json:"path,omitempty"`
-	Severity   string           `json:"severity"`
+	Severity   Severity         `json:"severity"`
 	Question   string           `json:"question"`
 	Options    []string         `json:"options,omitempty"`
 	Evidence   []ExtractedField `json:"evidence,omitempty"`
 	Suggestion string           `json:"suggestion,omitempty"`
+}
+
+type Severity string
+
+const (
+	ClarificationBlocking Severity = "blocking"
+	ClarificationWarning  Severity = "warning"
+)
+
+func (clarification Clarification) Issue() reports.Issue {
+	return reports.Issue{
+		Code:       reports.CodeInvalidArgument,
+		Severity:   reports.SeverityError,
+		Path:       clarification.Path,
+		Message:    clarification.Question,
+		Suggestion: clarification.Suggestion,
+	}
 }
 
 func Draft(text string, options Options) Result {
@@ -115,8 +132,8 @@ func Draft(text string, options Options) Result {
 	clarifications := clarifyDraft(sourceText, normalized, request, extraction)
 	if options.Strict {
 		for _, clarification := range clarifications {
-			if clarification.Severity == "blocking" {
-				issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: clarification.Path, Message: clarification.Question, Suggestion: clarification.Suggestion})
+			if clarification.Severity == ClarificationBlocking {
+				issues = append(issues, clarification.Issue())
 			}
 		}
 	}

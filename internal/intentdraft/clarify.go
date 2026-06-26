@@ -9,7 +9,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.power.battery_voltage_missing",
 			Path:       "power.inputs",
-			Severity:   "blocking",
+			Severity:   ClarificationBlocking,
 			Question:   "What battery chemistry or input voltage should be used?",
 			Options:    []string{"3.7V Li-ion", "2xAA", "external regulated input"},
 			Evidence:   []ExtractedField{finder.findPhrase("battery")},
@@ -20,7 +20,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.interface.kind_unsupported",
 			Path:       "interfaces",
-			Severity:   "blocking",
+			Severity:   ClarificationBlocking,
 			Question:   "The requested interface is not supported by the current intent planner. Which supported interface should be used?",
 			Options:    []string{"i2c", "uart", "spi", "gpio"},
 			Evidence:   []ExtractedField{finder.findFirstPhrase([]string{"can", "ethernet", "usb data"})},
@@ -31,7 +31,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.function.headphone_amplifier_unverified",
 			Path:       "functions",
-			Severity:   "blocking",
+			Severity:   ClarificationBlocking,
 			Question:   "Headphone amplifier output-stage safety is not verified yet. Should this be treated as an op-amp gain-stage draft instead?",
 			Options:    []string{"op-amp gain stage draft", "block until headphone amplifier block exists"},
 			Evidence:   []ExtractedField{finder.findPhrase("headphone")},
@@ -42,7 +42,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.acceptance.fabrication_requested_without_evidence",
 			Path:       "manufacturing.fabrication_candidate",
-			Severity:   "warning",
+			Severity:   ClarificationWarning,
 			Question:   "Fabrication readiness still depends on downstream validation and local KiCad CLI evidence.",
 			Evidence:   []ExtractedField{finder.findFirstPhrase([]string{"fabrication", "fab ready", "manufacturable"})},
 			Suggestion: "Review fabrication readiness output before ordering boards.",
@@ -52,7 +52,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.function.family_ambiguous",
 			Path:       "intent",
-			Severity:   "blocking",
+			Severity:   ClarificationBlocking,
 			Question:   "What supported design family should be generated?",
 			Options:    []string{"sensor breakout", "mcu minimal", "power module", "amplifier", "connector breakout"},
 			Suggestion: "Name one supported circuit family and the required voltage/interface.",
@@ -63,7 +63,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 
 func BlockingClarifications(values []Clarification) bool {
 	for _, value := range values {
-		if value.Severity == "blocking" {
+		if value.Severity == ClarificationBlocking {
 			return true
 		}
 	}

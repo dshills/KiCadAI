@@ -2605,8 +2605,8 @@ func loadIntentPlanForCreate(opts cliOptions) (intentplanner.PlanResult, []repor
 	if intentdraft.BlockingClarifications(draft.Clarifications) {
 		issues := append([]reports.Issue(nil), draft.Issues...)
 		for _, clarification := range draft.Clarifications {
-			if clarification.Severity == "blocking" {
-				issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: clarification.Path, Message: clarification.Question, Suggestion: clarification.Suggestion})
+			if clarification.Severity == intentdraft.ClarificationBlocking {
+				issues = append(issues, clarification.Issue())
 			}
 		}
 		return intentplanner.PlanResult{Status: intentplanner.PlanStatusNeedsClarification}, issues, draftOutput, text, nil
