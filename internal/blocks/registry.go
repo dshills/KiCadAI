@@ -180,6 +180,7 @@ func cloneBlockDefinition(definition BlockDefinition) BlockDefinition {
 		definition.Components[i].Pins = append([]transactions.PinSpec(nil), definition.Components[i].Pins...)
 		definition.Components[i].Properties = cloneStringMap(definition.Components[i].Properties)
 		definition.Components[i].Alternatives = append([]string(nil), definition.Components[i].Alternatives...)
+		definition.Components[i].When = cloneRealizationWhen(definition.Components[i].When)
 	}
 	definition.Nets = append([]BlockNet(nil), definition.Nets...)
 	for i := range definition.Nets {

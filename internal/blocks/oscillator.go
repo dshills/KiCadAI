@@ -8,7 +8,7 @@ import (
 	"kicadai/internal/transactions"
 )
 
-var footprintPackageQueryIDs = []string{"01005", "0201", "0402", "0603", "0805", "1206", "1210", "1812"}
+var footprintPackageQueryIDs = []string{"01005", "0201", "0402", "0603", "0805", "1206", "1210", "1812", "sot223"}
 
 var capacitanceQuerySuffixes = []struct {
 	suffix string
@@ -263,6 +263,9 @@ func normalizeCapacitanceQueryValue(value any) string {
 
 func packageQueryFromFootprint(footprint string) string {
 	footprint = strings.ToLower(footprint)
+	if strings.Contains(footprint, "sot-223") || strings.Contains(footprint, "sot223") {
+		return "sot223"
+	}
 	for _, packageID := range footprintPackageQueryIDs {
 		if footprintContainsPackageID(footprint, packageID) {
 			return packageID

@@ -118,21 +118,24 @@ type LibraryRequirement struct {
 }
 
 type BlockComponent struct {
-	Role              string                     `json:"role"`
-	RefPrefix         string                     `json:"ref_prefix"`
-	Value             string                     `json:"value,omitempty"`
-	SymbolID          string                     `json:"symbol_id"`
-	FootprintID       string                     `json:"footprint_id,omitempty"`
-	Pins              []transactions.PinSpec     `json:"pins,omitempty"`
-	Properties        map[string]string          `json:"properties,omitempty"`
-	PinmapRequired    bool                       `json:"pinmap_required,omitempty"`
-	PlacementGroup    string                     `json:"placement_group,omitempty"`
-	Alternatives      []string                   `json:"alternatives,omitempty"`
-	ComponentID       string                     `json:"component_id,omitempty"`
-	ComponentQuery    *components.Query          `json:"component_query,omitempty"`
-	ComponentVariant  string                     `json:"component_variant,omitempty"`
-	MinimumConfidence components.ConfidenceLevel `json:"minimum_confidence,omitempty"`
-	Acceptance        components.AcceptanceLevel `json:"acceptance,omitempty"`
+	Role                  string                     `json:"role"`
+	RefPrefix             string                     `json:"ref_prefix"`
+	Value                 string                     `json:"value,omitempty"`
+	SymbolID              string                     `json:"symbol_id"`
+	FootprintID           string                     `json:"footprint_id,omitempty"`
+	Pins                  []transactions.PinSpec     `json:"pins,omitempty"`
+	Properties            map[string]string          `json:"properties,omitempty"`
+	PinmapRequired        bool                       `json:"pinmap_required,omitempty"`
+	PlacementGroup        string                     `json:"placement_group,omitempty"`
+	Alternatives          []string                   `json:"alternatives,omitempty"`
+	ComponentID           string                     `json:"component_id,omitempty"`
+	ComponentQuery        *components.Query          `json:"component_query,omitempty"`
+	ComponentVariant      string                     `json:"component_variant,omitempty"`
+	ComponentValueParam   string                     `json:"component_value_param,omitempty"`
+	ComponentPackageParam string                     `json:"component_package_param,omitempty"`
+	MinimumConfidence     components.ConfidenceLevel `json:"minimum_confidence,omitempty"`
+	Acceptance            components.AcceptanceLevel `json:"acceptance,omitempty"`
+	When                  RealizationWhen            `json:"when,omitempty"`
 }
 
 type BlockNet struct {

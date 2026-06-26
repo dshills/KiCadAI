@@ -62,13 +62,26 @@ func connectorBreakoutPCBRealization() *PCBRealization {
 	}
 }
 
-func voltageRegulatorComponents() []BlockComponent {
+type voltageRegulatorComponentDefaults struct {
+	OutputVoltage      string
+	RegulatorSymbol    string
+	RegulatorFootprint string
+	InputCapacitance   string
+	OutputCapacitance  string
+	CapacitorFootprint string
+	PowerLEDResistor   string
+}
+
+func voltageRegulatorComponents(defaults voltageRegulatorComponentDefaults) []BlockComponent {
+	powerLEDResistorQuery := normalizeUnitLiteral(defaults.PowerLEDResistor, "Ω", resistanceMultipliers())
+	powerLEDResistorFootprint := "Resistor_SMD:R_0805_2012Metric"
+	powerLEDFootprint := "LED_SMD:LED_0805_2012Metric"
 	return []BlockComponent{
-		{Role: "regulator", RefPrefix: "U", Value: "LDO", SymbolID: defaultRegulatorSymbol, FootprintID: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Pins: fixedRegulatorPins()},
-		{Role: "input_capacitor", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "output_capacitor", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "power_led_resistor", RefPrefix: "R", Value: "1k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "power_led", RefPrefix: "D", Value: "POWER LED", SymbolID: "Device:LED", FootprintID: "LED_SMD:LED_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
+		{Role: "regulator", RefPrefix: "U", Value: "LDO " + defaults.OutputVoltage, SymbolID: defaults.RegulatorSymbol, FootprintID: defaults.RegulatorFootprint, Pins: fixedRegulatorPins(), ComponentQuery: &components.Query{Family: "regulator", ValueKind: "output_voltage"}, ComponentValueParam: "output_voltage", ComponentPackageParam: "regulator_footprint", MinimumConfidence: components.ConfidenceVerified, Acceptance: components.AcceptanceConnectivity},
+		{Role: "input_capacitor", RefPrefix: "C", Value: defaults.InputCapacitance, SymbolID: "Device:C", FootprintID: defaults.CapacitorFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "input_capacitance", ComponentPackageParam: "capacitor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
+		{Role: "output_capacitor", RefPrefix: "C", Value: defaults.OutputCapacitance, SymbolID: "Device:C", FootprintID: defaults.CapacitorFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "output_capacitance", ComponentPackageParam: "capacitor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
+		{Role: "power_led_resistor", RefPrefix: "R", Value: defaults.PowerLEDResistor, SymbolID: "Device:R", FootprintID: powerLEDResistorFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "resistor", Package: packageQueryFromFootprint(powerLEDResistorFootprint), ValueKind: "resistance", Value: powerLEDResistorQuery}, MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, When: RealizationWhen{Params: map[string]any{"include_power_led": true}}},
+		{Role: "power_led", RefPrefix: "D", Value: "POWER LED", SymbolID: "Device:LED", FootprintID: powerLEDFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "led", Package: packageQueryFromFootprint(powerLEDFootprint)}, MinimumConfidence: components.ConfidenceVerified, Acceptance: components.AcceptanceConnectivity, When: RealizationWhen{Params: map[string]any{"include_power_led": true}}},
 	}
 }
 

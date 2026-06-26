@@ -77,8 +77,12 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 			issues = append(issues, reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityBlocked, Path: "blocks[" + strconv.Itoa(index) + "].block_id", Message: "block not found: " + instance.BlockID})
 			continue
 		}
+		params := blocks.ApplyParameterDefaults(definition, instance.Params)
 		for _, blockComponent := range definition.Components {
-			request, ok := blocks.SelectionRequestForComponent(blockComponent, acceptance)
+			if !blocks.ComponentActiveForParams(blockComponent, params) {
+				continue
+			}
+			request, ok := blocks.SelectionRequestForComponentWithParams(blockComponent, acceptance, params)
 			if !ok {
 				issues = append(issues, reports.Issue{
 					Code:     reports.CodeValidationFailed,

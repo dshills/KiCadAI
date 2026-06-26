@@ -1,5 +1,7 @@
 package blocks
 
+import "fmt"
+
 const (
 	defaultConnectorSymbol    = "Connector_Generic:Conn_01x02"
 	defaultConnectorFootprint = "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical"
@@ -72,26 +74,27 @@ func ledIndicatorDefinition() BlockDefinition {
 }
 
 func voltageRegulatorDefinition() BlockDefinition {
+	parameters := []BlockParameter{
+		{Name: "input_voltage_min", Type: ParameterVoltage, Default: "4.5V", Description: "Minimum expected input rail."},
+		{Name: "input_voltage_max", Type: ParameterVoltage, Default: "12V", Description: "Maximum expected input rail."},
+		{Name: "input_voltage", Type: ParameterVoltage, Default: "5V", Description: "Nominal input rail."},
+		{Name: "output_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "Regulated output rail."},
+		{Name: "output_current", Type: ParameterCurrent, Default: "250mA", Description: "Expected output current."},
+		{Name: "regulator_symbol", Type: ParameterSymbolID, Default: defaultRegulatorSymbol, Description: "KiCad symbol ID for the supported fixed three-pin regulator template."},
+		{Name: "regulator_footprint", Type: ParameterFootprintID, Default: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Description: "KiCad footprint ID for the regulator."},
+		{Name: "input_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Input bypass capacitor value."},
+		{Name: "output_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Output bypass capacitor value."},
+		{Name: "capacitor_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Default capacitor footprint ID."},
+		{Name: "enable_mode", Type: ParameterEnum, Default: "none", Allowed: []any{"none", "tied_input", "export"}, Description: "Enable-pin handling when a regulator pin-role map is available."},
+		{Name: "include_power_led", Type: ParameterBool, Default: false, Description: "Include a downstream power indicator."},
+	}
 	return BlockDefinition{
 		ID:          "voltage_regulator",
 		Name:        "Voltage Regulator",
 		Description: "Fixed-output linear regulator with input and output capacitors.",
 		Version:     "0.1.0",
 		Category:    "power",
-		Parameters: []BlockParameter{
-			{Name: "input_voltage_min", Type: ParameterVoltage, Default: "4.5V", Description: "Minimum expected input rail."},
-			{Name: "input_voltage_max", Type: ParameterVoltage, Default: "12V", Description: "Maximum expected input rail."},
-			{Name: "input_voltage", Type: ParameterVoltage, Default: "5V", Description: "Nominal input rail."},
-			{Name: "output_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "Regulated output rail."},
-			{Name: "output_current", Type: ParameterCurrent, Default: "250mA", Description: "Expected output current."},
-			{Name: "regulator_symbol", Type: ParameterSymbolID, Default: defaultRegulatorSymbol, Description: "KiCad symbol ID for the supported fixed three-pin regulator template."},
-			{Name: "regulator_footprint", Type: ParameterFootprintID, Default: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Description: "KiCad footprint ID for the regulator."},
-			{Name: "input_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Input bypass capacitor value."},
-			{Name: "output_capacitance", Type: ParameterCapacitance, Default: "10uF", Description: "Output bypass capacitor value."},
-			{Name: "capacitor_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Default capacitor footprint ID."},
-			{Name: "enable_mode", Type: ParameterEnum, Default: "none", Allowed: []any{"none", "tied_input", "export"}, Description: "Enable-pin handling when a regulator pin-role map is available."},
-			{Name: "include_power_led", Type: ParameterBool, Default: false, Description: "Include a downstream power indicator."},
-		},
+		Parameters:  parameters,
 		Ports: []BlockPort{
 			{Name: "VIN", Direction: PortPower, Voltage: "input_voltage", Description: "Unregulated input."},
 			{Name: "VOUT", Direction: PortPower, Voltage: "output_voltage", Description: "Regulated output."},
@@ -103,7 +106,15 @@ func voltageRegulatorDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "Package_TO_SOT_SMD:SOT-223-3_TabPin2", Required: true, Description: "Default regulator footprint."},
 			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: true, Description: "Default capacitor footprint."},
 		},
-		Components:     voltageRegulatorComponents(),
+		Components: voltageRegulatorComponents(voltageRegulatorComponentDefaults{
+			OutputVoltage:      defaultParameterValue(parameters, "output_voltage"),
+			RegulatorSymbol:    defaultParameterValue(parameters, "regulator_symbol"),
+			RegulatorFootprint: defaultParameterValue(parameters, "regulator_footprint"),
+			InputCapacitance:   defaultParameterValue(parameters, "input_capacitance"),
+			OutputCapacitance:  defaultParameterValue(parameters, "output_capacitance"),
+			CapacitorFootprint: defaultParameterValue(parameters, "capacitor_footprint"),
+			PowerLEDResistor:   "1k",
+		}),
 		PCBRealization: voltageRegulatorPCBRealization(),
 		ValidationRules: []BlockValidationRule{
 			{ID: "regulator.rail.input_above_output", Severity: BlockValidationSeverityBlocked, Description: "Input voltage must remain above the requested output voltage."},
@@ -229,6 +240,22 @@ func usbCPowerDefinition() BlockDefinition {
 			Notes: []string{"Implements USB-C sink power-only wiring with CC pull-downs; USB2 data and no-connect marker emission remain explicit gaps."},
 		},
 	}
+}
+
+func defaultParameterValue(parameters []BlockParameter, name string) string {
+	for _, parameter := range parameters {
+		if parameter.Name == name {
+			switch value := parameter.Default.(type) {
+			case string:
+				return value
+			case fmt.Stringer:
+				return value.String()
+			default:
+				return fmt.Sprint(value)
+			}
+		}
+	}
+	panic(fmt.Sprintf("missing block parameter default %q", name))
 }
 
 func i2cSensorDefinition() BlockDefinition {
