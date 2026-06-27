@@ -1,0 +1,30 @@
+{
+  "id": "i2c_sensor_breakout_candidate",
+  "request": "i2c_sensor_breakout_candidate.json",
+  "tier": "block-composition",
+  "readiness": "expected_fail",
+  "acceptance": "erc-drc",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [
+    ".kicadai/workflow-result.json",
+    ".kicadai/manifest.json"
+  ],
+  "expected_stages": [
+    "block_planning",
+    "component_selection",
+    "schematic",
+    "pcb_realization",
+    "placement",
+    "project_write",
+    "writer_correctness",
+    "validation",
+    "kicad_checks"
+  ],
+  "known_gaps": [
+    "Generic I2C sensor plus connector PCB realization is tracked as a design-level expected-fail until pad-net correctness, routing, and KiCad DRC evidence are stable.",
+    "Routing is intentionally skipped so the fixture documents the current writer correctness blocker before broader sensor breakout layout proof."
+  ],
+  "notes": "Tracks the richer sensor breakout scenario that should eventually graduate into a default KiCad-backed design example."
+}

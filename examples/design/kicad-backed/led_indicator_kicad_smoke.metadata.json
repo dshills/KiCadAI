@@ -4,8 +4,8 @@
   "tier": "smoke",
   "readiness": "expected_fail",
   "acceptance": "erc-drc",
-  "requires_erc": true,
-  "requires_drc": true,
+  "require_erc": true,
+  "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
     ".kicadai/workflow-result.json",
@@ -17,7 +17,6 @@
     "schematic",
     "pcb_realization",
     "placement",
-    "routing",
     "project_write",
     "writer_correctness",
     "validation",

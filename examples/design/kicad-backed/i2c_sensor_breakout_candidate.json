@@ -1,0 +1,45 @@
+{
+  "version": "0.1.0",
+  "name": "i2c_sensor_breakout_candidate",
+  "intent": {
+    "summary": "A simple I2C sensor breakout candidate with VCC, GND, SDA, and SCL on a connector.",
+    "category": "sensor"
+  },
+  "board": {
+    "width_mm": 55,
+    "height_mm": 35,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "sensor",
+      "block_id": "i2c_sensor",
+      "params": {
+        "i2c_address": "0x48",
+        "include_pullups": true,
+        "supply_voltage": "3.3V",
+        "pullup_value": "4k7"
+      }
+    },
+    {
+      "id": "io",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_count": 4,
+        "pin_names": ["VCC", "GND", "SDA", "SCL"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": "sensor.VCC", "to": "io.VCC", "net_alias": "VCC"},
+    {"from": "sensor.GND", "to": "io.GND", "net_alias": "GND"},
+    {"from": "sensor.SDA", "to": "io.SDA", "net_alias": "SDA"},
+    {"from": "sensor.SCL", "to": "io.SCL", "net_alias": "SCL"}
+  ],
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true,
+    "skip_routing": true
+  }
+}

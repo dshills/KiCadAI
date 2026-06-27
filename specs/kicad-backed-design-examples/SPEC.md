@@ -110,8 +110,8 @@ Each optional example must include adjacent metadata:
   "tier": "smoke",
   "readiness": "candidate",
   "acceptance": "erc-drc",
-  "requires_erc": true,
-  "requires_drc": true,
+  "require_erc": true,
+  "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
     ".kicadai/workflow-result.json",
@@ -125,7 +125,6 @@ Each optional example must include adjacent metadata:
     "schematic",
     "pcb_realization",
     "placement",
-    "routing",
     "project_write",
     "writer_correctness",
     "validation",
@@ -143,8 +142,8 @@ Each optional example must include adjacent metadata:
 - `tier`: one of `smoke`, `block-composition`, `routing`, `fabrication`.
 - `readiness`: one of `candidate`, `pass`, `expected_fail`, `blocked`.
 - `acceptance`: requested workflow acceptance level.
-- `requires_erc`: true when schematic ERC evidence is required.
-- `requires_drc`: true when board DRC evidence is required.
+- `require_erc`: true when schematic ERC evidence is required.
+- `require_drc`: true when board DRC evidence is required.
 - `expected_stages`: workflow stages that must appear.
 - `known_gaps`: explicit reasons a candidate is not promoted to pass.
 

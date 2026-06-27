@@ -28,8 +28,8 @@ type designExampleMetadata struct {
 	Tier              string          `json:"tier"`
 	Readiness         string          `json:"readiness"`
 	Acceptance        AcceptanceLevel `json:"acceptance"`
-	RequiresERC       *bool           `json:"requires_erc"`
-	RequiresDRC       *bool           `json:"requires_drc"`
+	RequireERC        *bool           `json:"require_erc"`
+	RequireDRC        *bool           `json:"require_drc"`
 	Allowlists        []string        `json:"allowlists,omitempty"`
 	ExpectedArtifacts []string        `json:"expected_artifacts,omitempty"`
 	ExpectedStages    []StageName     `json:"expected_stages"`
@@ -228,8 +228,8 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 				KiCadChecks: KiCadCheckOptions{
 					KiCadCLI:      cliPath,
 					Timeout:       createTimeout,
-					RequireERC:    requiredDesignExampleBool(t, metadata.ID, "requires_erc", metadata.RequiresERC),
-					RequireDRC:    requiredDesignExampleBool(t, metadata.ID, "requires_drc", metadata.RequiresDRC),
+					RequireERC:    requiredDesignExampleBool(t, metadata.ID, "require_erc", metadata.RequireERC),
+					RequireDRC:    requiredDesignExampleBool(t, metadata.ID, "require_drc", metadata.RequireDRC),
 					KeepArtifacts: true,
 					ArtifactDir:   filepath.Join(outputDir, ".kicadai", "checks"),
 				},
@@ -267,8 +267,8 @@ func TestDesignExampleMetadataValidation(t *testing.T) {
 		Tier:           "smoke",
 		Readiness:      "candidate",
 		Acceptance:     AcceptanceERCDRC,
-		RequiresERC:    designExampleBool(true),
-		RequiresDRC:    designExampleBool(true),
+		RequireERC:     designExampleBool(true),
+		RequireDRC:     designExampleBool(true),
 		ExpectedStages: []StageName{StageBlockPlanning, StageKiCadChecks},
 		KnownGaps:      []string{},
 	}
@@ -307,8 +307,15 @@ func TestDesignExampleMetadataRejectsMissingRequiredFields(t *testing.T) {
 	}
 	path = writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
 	_, err = loadDesignExampleMetadataPath(path)
-	if err == nil || !strings.Contains(err.Error(), "requires_erc is required") {
-		t.Fatalf("missing requires_erc error = %v, want requires_erc is required", err)
+	if err == nil || !strings.Contains(err.Error(), "require_erc is required") {
+		t.Fatalf("missing require_erc error = %v, want require_erc is required", err)
+	}
+	metadata.RequireERC = designExampleBool(false)
+	metadata.RequireDRC = nil
+	path = writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err = loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "require_drc is required") {
+		t.Fatalf("missing require_drc error = %v, want require_drc is required", err)
 	}
 }
 
@@ -445,11 +452,11 @@ func validateDesignExampleMetadata(dir string, metadata designExampleMetadata) e
 		}
 		return fmt.Errorf("unsupported acceptance %q", metadata.Acceptance)
 	}
-	if metadata.RequiresERC == nil {
-		return fmt.Errorf("requires_erc is required")
+	if metadata.RequireERC == nil {
+		return fmt.Errorf("require_erc is required")
 	}
-	if metadata.RequiresDRC == nil {
-		return fmt.Errorf("requires_drc is required")
+	if metadata.RequireDRC == nil {
+		return fmt.Errorf("require_drc is required")
 	}
 	if len(metadata.ExpectedStages) == 0 {
 		return fmt.Errorf("expected_stages must not be empty")

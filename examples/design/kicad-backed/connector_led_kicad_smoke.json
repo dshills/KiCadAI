@@ -1,0 +1,43 @@
+{
+  "version": "0.1.0",
+  "name": "connector_led_kicad_smoke",
+  "intent": {
+    "summary": "A connector-controlled LED indicator used to track multi-block KiCad-backed design readiness.",
+    "category": "indicator"
+  },
+  "board": {
+    "width_mm": 45,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "header",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_count": 2,
+        "pin_names": ["SIG", "GND"]
+      }
+    },
+    {
+      "id": "status",
+      "block_id": "led_indicator",
+      "params": {
+        "color": "green",
+        "supply_voltage": "3.3V",
+        "led_forward_voltage": "2.0V",
+        "resistor_value": "270R"
+      }
+    }
+  ],
+  "connections": [
+    {"from": "header.SIG", "to": "status.IN", "net_alias": "LED_EN"},
+    {"from": "header.GND", "to": "status.GND", "net_alias": "GND"}
+  ],
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true,
+    "skip_routing": true
+  }
+}

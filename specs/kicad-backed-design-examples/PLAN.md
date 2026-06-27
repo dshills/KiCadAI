@@ -17,8 +17,8 @@ Tasks:
   - `tier`;
   - `readiness`;
   - `acceptance`;
-  - `requires_erc`;
-  - `requires_drc`;
+  - `require_erc`;
+  - `require_drc`;
   - `expected_stages`;
   - `known_gaps`.
 - Reject metadata whose `request` escapes the fixture directory or does not
@@ -45,7 +45,7 @@ Tasks:
 - Update `TestDesignExamplesOptionalKiCadBackedTier` to enumerate metadata
   files rather than raw request files.
 - Load each request through the metadata's `request` field.
-- Apply `requires_erc` and `requires_drc` to `KiCadCheckOptions`.
+- Apply `require_erc` and `require_drc` to `KiCadCheckOptions`.
 - Skip `readiness: blocked` fixtures with their known gaps.
 - For `candidate`, `pass`, and `expected_fail` fixtures:
   - run `designworkflow.Create`;
