@@ -6,10 +6,12 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/componentprops"
 	"kicadai/internal/components"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kicadfiles"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 )
 
@@ -42,6 +44,13 @@ func TestCreateWritesWorkflowResult(t *testing.T) {
 	}
 	if got := componentStage.Summary["selection_count"]; got != 2 {
 		t.Fatalf("component selection count = %#v, want 2", got)
+	}
+	schematicFile, err := schematic.ReadFile(filepath.Join(output, "status_board.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := countSymbolsWithProperty(schematicFile.Symbols, componentprops.PropertyComponentID); got < 2 {
+		t.Fatalf("component identity properties not propagated to schematic: %#v", schematicFile.Symbols)
 	}
 }
 
@@ -153,6 +162,19 @@ func hasStage(result WorkflowResult, name StageName) bool {
 		}
 	}
 	return false
+}
+
+func countSymbolsWithProperty(symbols []schematic.SchematicSymbol, name string) int {
+	count := 0
+	for _, symbol := range symbols {
+		for _, property := range symbol.Properties {
+			if property.Name == name && property.Value != "" {
+				count++
+				break
+			}
+		}
+	}
+	return count
 }
 
 func stageByName(result WorkflowResult, name StageName) (StageResult, bool) {

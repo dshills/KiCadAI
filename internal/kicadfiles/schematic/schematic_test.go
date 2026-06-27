@@ -523,6 +523,47 @@ func TestWriterDerivedSymbolPropertiesIncludeRoundTripDefaults(t *testing.T) {
 	}
 }
 
+func TestReadWritePreservesHiddenIdentityProperties(t *testing.T) {
+	showName := false
+	doNotAutoplace := true
+	schematic := minimalSchematic()
+	symbol := NewSymbol(
+		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		"Device:R",
+		"R1",
+		"1k",
+		kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+	)
+	symbol.Properties = []Property{{
+		Name:           "KiCadAI Component ID",
+		Value:          "resistor.generic.0603",
+		Hidden:         true,
+		ShowName:       &showName,
+		DoNotAutoplace: &doNotAutoplace,
+		Position:       kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20)},
+	}}
+	schematic.Symbols = []SchematicSymbol{symbol}
+
+	var first bytes.Buffer
+	if err := Write(&first, schematic); err != nil {
+		t.Fatal(err)
+	}
+	read, err := Read(first.Bytes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var second bytes.Buffer
+	if err := Write(&second, read); err != nil {
+		t.Fatal(err)
+	}
+	output := second.String()
+	for _, want := range []string{`"KiCadAI Component ID"`, `"resistor.generic.0603"`, `(hide yes)`, `(do_not_autoplace yes)`} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("round-trip output missing %s:\n%s", want, output)
+		}
+	}
+}
+
 func TestWriterDerivedSymbolPropertiesPreserveExplicitDefaults(t *testing.T) {
 	symbol := NewSymbol(
 		kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),

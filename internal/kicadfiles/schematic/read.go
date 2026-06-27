@@ -95,7 +95,10 @@ func readSheet(node sexpr.ParsedNode) Sheet {
 		if len(property.Children) < 3 {
 			continue
 		}
-		prop := Property{Name: property.ListValue(1), Value: property.ListValue(2), Position: readAtPoint(property)}
+		prop := readProperty(property)
+		if prop.Name == "" {
+			continue
+		}
 		sheet.Properties = append(sheet.Properties, prop)
 		switch prop.Name {
 		case "Sheetname":
@@ -193,7 +196,10 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 		symbol.Mirror = SymbolMirror(mirror.ListValue(1))
 	}
 	for _, prop := range node.ChildrenByHead("property") {
-		property := Property{Name: prop.ListValue(1), Value: prop.ListValue(2), Position: readAtPoint(prop)}
+		property := readProperty(prop)
+		if property.Name == "" {
+			continue
+		}
 		symbol.Properties = append(symbol.Properties, property)
 		switch property.Name {
 		case "Reference":
@@ -230,13 +236,101 @@ func readUUID(node sexpr.ParsedNode) kicadfiles.UUID {
 }
 
 func readAtPoint(node sexpr.ParsedNode) kicadfiles.Point {
-	at, ok := node.Child("at")
+	point, _, ok := readAt(node)
 	if !ok {
 		return kicadfiles.Point{}
 	}
+	return point
+}
+
+func readAt(node sexpr.ParsedNode) (kicadfiles.Point, kicadfiles.Angle, bool) {
+	at, ok := node.Child("at")
+	if !ok {
+		return kicadfiles.Point{}, 0, false
+	}
 	x, _ := at.FloatValue(1)
 	y, _ := at.FloatValue(2)
-	return kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+	var rotation float64
+	if len(at.Children) > 3 {
+		rotation, _ = at.FloatValue(3)
+	}
+	return kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}, kicadfiles.Angle(rotation), true
+}
+
+func readProperty(node sexpr.ParsedNode) Property {
+	if len(node.Children) < 2 {
+		return Property{}
+	}
+	nameIndex := 1
+	private := false
+	if strings.EqualFold(node.ListValue(1), "private") {
+		if len(node.Children) < 4 {
+			return Property{}
+		}
+		nameIndex = 2
+		private = true
+	} else if len(node.Children) < 3 {
+		return Property{}
+	}
+	valueIndex := nameIndex + 1
+	if node.Children[nameIndex].IsList || node.Children[valueIndex].IsList {
+		return Property{}
+	}
+	position, rotation, _ := readAt(node)
+	property := Property{Private: private, Name: node.ListValue(nameIndex), Value: node.ListValue(valueIndex), Position: position, Rotation: rotation}
+	readPropertyFlags(node, &property)
+	return property
+}
+
+func readPropertyFlags(node sexpr.ParsedNode, property *Property) {
+	if readPropertyHidden(node) {
+		property.Hidden = true
+	}
+	if showName, ok := readOptionalBoolProperty(node, "show_name"); ok {
+		property.ShowName = &showName
+	}
+	if doNotAutoplace, ok := readOptionalBoolProperty(node, "do_not_autoplace"); ok {
+		property.DoNotAutoplace = &doNotAutoplace
+	}
+}
+
+func readPropertyHidden(node sexpr.ParsedNode) bool {
+	if hide, ok := node.Child("hide"); ok {
+		return readKiCadFlag(hide)
+	}
+	if effects, ok := node.Child("effects"); ok {
+		for _, child := range effects.Children {
+			if !child.IsList && strings.EqualFold(child.Value(), "hide") {
+				return true
+			}
+			if strings.EqualFold(child.Head(), "hide") {
+				return readKiCadFlag(child)
+			}
+		}
+	}
+	return false
+}
+
+func readKiCadFlag(node sexpr.ParsedNode) bool {
+	// ParsedNode.Children includes a list node's head at index 0.
+	if !node.IsList {
+		return node.Value() != "" && !strings.EqualFold(node.Value(), "no")
+	}
+	if len(node.Children) == 1 {
+		return true
+	}
+	if len(node.Children) > 1 {
+		return !strings.EqualFold(node.Children[1].Value(), "no")
+	}
+	return false
+}
+
+func readOptionalBoolProperty(node sexpr.ParsedNode, head string) (bool, bool) {
+	child, ok := node.Child(head)
+	if !ok {
+		return false, false
+	}
+	return readKiCadFlag(child), true
 }
 
 func readPoints(node sexpr.ParsedNode) []kicadfiles.Point {

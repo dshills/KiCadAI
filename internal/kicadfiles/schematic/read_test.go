@@ -183,6 +183,49 @@ func TestReadWriteSchematicReadsSheetSizePinsAndInstances(t *testing.T) {
 	}
 }
 
+func TestReadSymbolPropertyFlagsAndMalformedProperties(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (lib_symbols)`,
+		`  (symbol`,
+		`    (lib_id "Device:R")`,
+		`    (at 10 20 0)`,
+		`    (unit 1)`,
+		`    (body_style 1)`,
+		`    (uuid "22222222-2222-5222-8222-222222222222")`,
+		`    (property "Reference" "R1" (at 10 20 0))`,
+		`    (property "KiCadAI Component ID" "resistor.generic.0603" (at 10 20 0) (show_name no) (do_not_autoplace yes) (effects (font (size 1.27 1.27)) hide))`,
+		`    (property "Malformed" (at 0 0 0))`,
+		`  )`,
+		`  (sheet_instances (path "/" (page "1")))`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 {
+		t.Fatalf("symbols = %#v", read.Symbols)
+	}
+	var found Property
+	for _, property := range read.Symbols[0].Properties {
+		if property.Name == "KiCadAI Component ID" {
+			found = property
+		}
+		if property.Name == "Malformed" {
+			t.Fatalf("malformed property was parsed: %#v", property)
+		}
+	}
+	if found.Value != "resistor.generic.0603" || !found.Hidden || found.DoNotAutoplace == nil || !*found.DoNotAutoplace {
+		t.Fatalf("identity property flags not parsed: %#v", found)
+	}
+}
+
 func TestReadWriteSchematicKeepsRawTextInItemOrder(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,
