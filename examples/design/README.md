@@ -44,3 +44,13 @@ example right now because the current generic sensor/connector realization can
 lead to unsatisfiable placement constraints or project-write failures. It
 should return once the sensor symbol/footprint model and connector PCB
 realization are hardened enough for a default runnable fixture.
+
+## Optional KiCad-Backed Examples
+
+Optional fixtures live under `examples/design/kicad-backed/`. They require
+`KICADAI_KICAD_CLI` for local test runs and currently document expected-fail
+evidence for richer generated boards that block before stable KiCad ERC/DRC
+proof.
+
+See `examples/design/kicad-backed/README.md` for the fixture list and command
+shape.

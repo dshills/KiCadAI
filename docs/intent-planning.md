@@ -56,6 +56,14 @@ Examples live in `examples/design/`:
 - `active_low_led.json`: structural acceptance, routing skipped, active-low
   LED parameter path.
 
+Optional KiCad-backed design examples live in
+`examples/design/kicad-backed/`. They are run only when `KICADAI_KICAD_CLI` is
+configured. The current fixtures serve as `expected_fail` cases for richer
+boards that encounter blockers before KiCad ERC/DRC verification can complete;
+do not report them as passing designs unless the optional test or manual
+command produced successful KiCad report artifacts and the fixture readiness is
+`pass` or `candidate`.
+
 The multi-block I2C sensor breakout is currently covered by block and intent
 fixtures rather than a default `examples/design` request because the generic
 sensor/connector PCB realization still needs more hardening before it is a

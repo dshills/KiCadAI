@@ -36,6 +36,10 @@ the workflow evidence explicitly supports that claim.
   expected to succeed.
 - Treat `kicad-cli` checks as optional unless the request or acceptance policy
   requires ERC/DRC evidence.
+- Treat `examples/design/kicad-backed/` as an opt-in evidence tier. Do not
+  claim those fixtures pass unless `KICADAI_KICAD_CLI` was configured and
+  KiCad report artifacts were produced; current fixtures intentionally record
+  `expected_fail` blockers.
 - Preserve request JSON, generated artifacts, `.kicadai/` metadata, and
   validation outputs with any final answer or handoff.
 - Only mutate generated projects unless the command explicitly supports safe
