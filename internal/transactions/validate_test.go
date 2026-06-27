@@ -57,6 +57,27 @@ func TestValidateValidTransaction(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsInvalidSymbolProperties(t *testing.T) {
+	result := Validate(mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0},"properties":[
+	    {"name":"","value":"missing"},
+	    {"name":"Manufacturer","value":"A"},
+	    {"name":"manufacturer","value":"B"}
+	  ]}
+	]}`))
+	if len(result.Issues) != 2 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	for _, want := range []string{
+		"operations[0].properties[0].name",
+		"operations[0].properties[2].name",
+	} {
+		if !hasIssuePath(result.Issues, want) {
+			t.Fatalf("missing issue path %s in %#v", want, result.Issues)
+		}
+	}
+}
+
 func TestValidateRejectsEmptyOperations(t *testing.T) {
 	result := Validate(mustParse(t, `{"operations":[]}`))
 	if len(result.Issues) != 1 || result.Issues[0].Path != "operations" {
@@ -194,4 +215,13 @@ func mustParse(t *testing.T, input string) Transaction {
 		t.Fatalf("Parse returned error: %v", err)
 	}
 	return tx
+}
+
+func hasIssuePath(issues []reports.Issue, path string) bool {
+	for _, issue := range issues {
+		if issue.Path == path {
+			return true
+		}
+	}
+	return false
 }

@@ -57,11 +57,13 @@ type BoardOutlineHandle struct {
 }
 
 type SymbolOptions struct {
-	Reference string
-	Value     string
-	LibraryID string
-	Position  kicadfiles.Point
-	Pins      []PinSpec
+	Reference  string
+	Value      string
+	LibraryID  string
+	Position   kicadfiles.Point
+	Rotation   kicadfiles.Angle
+	Pins       []PinSpec
+	Properties []schematic.Property
 }
 
 type PinSpec struct {
@@ -219,7 +221,9 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		value = reference
 	}
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", key), libraryID, reference, value, options.Position)
+	symbol.Rotation = options.Rotation
 	symbol.Path = "root.component." + key
+	symbol.Properties = schematic.MergeProperties(symbol.Properties, options.Properties)
 	symbol.Pins = make([]schematic.SymbolPin, 0, len(options.Pins))
 	pins := make(map[string]kicadfiles.Point, len(options.Pins))
 	pinNets := make(map[string]string, len(options.Pins))
@@ -1295,7 +1299,7 @@ func cloneSexprNode(source sexpr.Node) sexpr.Node {
 
 func cloneSchematicSymbol(source schematic.SchematicSymbol) schematic.SchematicSymbol {
 	clone := source
-	clone.Properties = append([]schematic.Property(nil), source.Properties...)
+	clone.Properties = schematic.CloneProperties(source.Properties)
 	clone.Fields = append([]schematic.Field(nil), source.Fields...)
 	clone.Pins = append([]schematic.SymbolPin(nil), source.Pins...)
 	clone.PinAnchors = append([]kicadfiles.Point(nil), source.PinAnchors...)

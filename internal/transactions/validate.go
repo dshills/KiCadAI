@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 )
 
@@ -159,12 +160,16 @@ func validateOperation(op Operation) []reports.Issue {
 			issues = append(issues, requireNonEmpty(path+".ref", "reference", payload.Ref)...)
 			issues = append(issues, requireLibraryID(path+".library_id", payload.LibraryID)...)
 			issues = append(issues, validatePoint(path+".at", payload.At)...)
+			if !finite(payload.Rotation) {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".rotation_deg", "rotation must be finite"))
+			}
 			for pinIndex, pin := range payload.Pins {
 				if strings.TrimSpace(pin.Number) == "" {
 					issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s.pins[%d].number", path, pinIndex), "pin number is required"))
 				}
 				issues = append(issues, validatePoint(fmt.Sprintf("%s.pins[%d]", path, pinIndex), Point{XMM: pin.XMM, YMM: pin.YMM})...)
 			}
+			issues = append(issues, validateSymbolProperties(path+".properties", payload.Properties)...)
 			return issues
 		})
 	case OpConnect:
@@ -308,6 +313,31 @@ func validatePoint(path string, point Point) []reports.Issue {
 	}
 	if !finite(point.YMM) {
 		issues = append(issues, issue(reports.CodeInvalidArgument, path+".y_mm", "y coordinate must be finite"))
+	}
+	return issues
+}
+
+func validateSymbolProperties(path string, properties []SymbolProperty) []reports.Issue {
+	var issues []reports.Issue
+	seen := map[string]struct{}{}
+	for index, property := range properties {
+		propertyPath := fmt.Sprintf("%s[%d]", path, index)
+		name := strings.TrimSpace(property.Name)
+		if name == "" {
+			issues = append(issues, issue(reports.CodeInvalidArgument, propertyPath+".name", "property name is required"))
+			continue
+		}
+		key := schematic.NormalizePropertyName(name)
+		if _, ok := seen[key]; ok {
+			issues = append(issues, issue(reports.CodeInvalidArgument, propertyPath+".name", "duplicate property "+name))
+		}
+		seen[key] = struct{}{}
+		if property.At != nil {
+			issues = append(issues, validatePoint(propertyPath+".at", *property.At)...)
+		}
+		if property.Rotation != nil && !finite(*property.Rotation) {
+			issues = append(issues, issue(reports.CodeInvalidArgument, propertyPath+".rotation_deg", "rotation must be finite"))
+		}
 	}
 	return issues
 }

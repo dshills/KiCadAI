@@ -161,13 +161,26 @@ type SetBoardOutlineOperation struct {
 }
 
 type AddSymbolOperation struct {
-	Op        OperationKind `json:"op"`
-	Ref       string        `json:"ref"`
-	Role      string        `json:"role,omitempty"`
-	Value     string        `json:"value,omitempty"`
-	LibraryID string        `json:"library_id"`
-	At        Point         `json:"at"`
-	Pins      []PinSpec     `json:"pins,omitempty"`
+	Op         OperationKind    `json:"op"`
+	Ref        string           `json:"ref"`
+	Role       string           `json:"role,omitempty"`
+	Value      string           `json:"value,omitempty"`
+	LibraryID  string           `json:"library_id"`
+	At         Point            `json:"at"`
+	Rotation   float64          `json:"rotation_deg,omitempty"`
+	Pins       []PinSpec        `json:"pins,omitempty"`
+	Properties []SymbolProperty `json:"properties,omitempty"`
+}
+
+type SymbolProperty struct {
+	Name           string   `json:"name"`
+	Value          string   `json:"value"`
+	Private        bool     `json:"private,omitempty"`
+	Hidden         bool     `json:"hidden,omitempty"`
+	ShowName       *bool    `json:"show_name,omitempty"`
+	DoNotAutoplace *bool    `json:"do_not_autoplace,omitempty"`
+	At             *Point   `json:"at,omitempty"`
+	Rotation       *float64 `json:"rotation_deg,omitempty"`
 }
 
 type ConnectOperation struct {

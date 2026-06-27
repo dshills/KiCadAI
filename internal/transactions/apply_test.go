@@ -177,6 +177,65 @@ func TestApplyUsesResolverSymbolPinsForGeneratedSchematic(t *testing.T) {
 	}
 }
 
+func TestApplyWritesAddSymbolProperties(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10},"properties":[
+	    {"name":"KiCadAI Component ID","value":"resistor.generic.0805","hidden":true,"show_name":false,"do_not_autoplace":true},
+	    {"name":"Manufacturer","value":"Yageo","hidden":true,"at":{"x_mm":11,"y_mm":12},"rotation_deg":90}
+	  ]},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"},
+	  {"op":"place_footprint","ref":"R1","at":{"x_mm":20,"y_mm":20}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "demo.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(output, "demo.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties := propertyValues(file.Symbols[0].Properties)
+	if properties["KiCadAI Component ID"] != "resistor.generic.0805" || properties["Manufacturer"] != "Yageo" {
+		t.Fatalf("properties not written: %#v", file.Symbols[0].Properties)
+	}
+	for _, property := range file.Symbols[0].Properties {
+		if property.Name == "Manufacturer" && property.Position.X != kicadfiles.MM(11) {
+			t.Fatalf("manufacturer property position not preserved: %#v", property)
+		}
+	}
+	text := string(data)
+	if !strings.Contains(text, `"Manufacturer"`) || !strings.Contains(text, `"Yageo"`) || !strings.Contains(text, `(at 11.0 12.0 90)`) || !strings.Contains(text, `(hide yes)`) {
+		t.Fatalf("written schematic missing property flags:\n%s", text)
+	}
+}
+
+func TestSchematicPropertiesFromPayloadOffsetsVisibleProperties(t *testing.T) {
+	properties := schematicPropertiesFromPayload([]SymbolProperty{
+		{Name: "KiCadAI Component ID", Value: "resistor.generic.0805", Hidden: true},
+		{Name: "Assembly Note", Value: "visible"},
+	}, point(10, 20), 180, 2)
+	if len(properties) != 2 {
+		t.Fatalf("properties = %#v", properties)
+	}
+	if properties[0].Position != point(10, 20) {
+		t.Fatalf("hidden property position = %#v, want symbol position", properties[0].Position)
+	}
+	if properties[0].Rotation != 180 || properties[1].Rotation != 180 {
+		t.Fatalf("property rotations = %#v, want default symbol rotation", properties)
+	}
+	wantVisible := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(20 + 2.54*3)}
+	if properties[1].Position != wantVisible {
+		t.Fatalf("visible property position = %#v, want %#v", properties[1].Position, wantVisible)
+	}
+}
+
 func TestApplyBlocksResolverMultiUnitSymbol(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "demo")
 	index := applyResolverFixture()
@@ -871,6 +930,14 @@ func containsBoardLayer(layers []kicadfiles.BoardLayer, want kicadfiles.BoardLay
 		}
 	}
 	return false
+}
+
+func propertyValues(properties []schematic.Property) map[string]string {
+	values := map[string]string{}
+	for _, property := range properties {
+		values[property.Name] = property.Value
+	}
+	return values
 }
 
 func writeImportedApplyProject(t *testing.T, schematicContents string, pcbContents string) string {

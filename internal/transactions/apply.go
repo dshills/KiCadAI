@@ -172,6 +172,10 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				result.Issues = append(result.Issues, applyIssue(i, err))
 				return result
 			}
+			if err := validateSymbolPropertyPayload(payload.Properties); err != nil {
+				result.Issues = append(result.Issues, applyIssue(i, err))
+				return result
+			}
 			opIndex := fmt.Sprintf("%d", i)
 			pins, err := resolveSymbolPins(payload.Pins, opts.LibraryIndex, payload.LibraryID)
 			if err != nil {
@@ -180,6 +184,8 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			payload.Pins = pins
 			symbol := schematic.NewSymbol(generator.New("imported.schematic.symbol", payload.Ref, opIndex), payload.LibraryID, payload.Ref, firstNonEmpty(payload.Value, payload.Ref), point(payload.At.XMM, payload.At.YMM))
+			symbol.Rotation = kicadfiles.Angle(payload.Rotation)
+			symbol.Properties = schematic.MergeProperties(symbol.Properties, schematicPropertiesFromPayload(payload.Properties, symbol.Position, symbol.Rotation, 2))
 			for _, pin := range payload.Pins {
 				symbol.Pins = append(symbol.Pins, schematic.SymbolPin{Number: pin.Number, UUID: generator.New("imported.schematic.symbol.pin", payload.Ref, opIndex, pin.Number)})
 				symbol.PinAnchors = append(symbol.PinAnchors, addPoints(symbol.Position, point(pin.XMM, pin.YMM)))
@@ -463,6 +469,9 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := decodeRaw(op, &payload); err != nil {
 			return nil, err
 		}
+		if err := validateSymbolPropertyPayload(payload.Properties); err != nil {
+			return nil, err
+		}
 		resolverPins, err := resolveSymbolPins(payload.Pins, opts.LibraryIndex, payload.LibraryID)
 		if err != nil {
 			return nil, err
@@ -473,11 +482,13 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			pins = append(pins, designapi.PinSpec{Number: pin.Number, Offset: point(pin.XMM, pin.YMM)})
 		}
 		_, err = builder.AddSymbol(designapi.SymbolOptions{
-			Reference: payload.Ref,
-			Value:     payload.Value,
-			LibraryID: payload.LibraryID,
-			Position:  point(payload.At.XMM, payload.At.YMM),
-			Pins:      pins,
+			Reference:  payload.Ref,
+			Value:      payload.Value,
+			LibraryID:  payload.LibraryID,
+			Position:   point(payload.At.XMM, payload.At.YMM),
+			Rotation:   kicadfiles.Angle(payload.Rotation),
+			Pins:       pins,
+			Properties: schematicPropertiesFromPayload(payload.Properties, point(payload.At.XMM, payload.At.YMM), kicadfiles.Angle(payload.Rotation), 2),
 		})
 		return nil, err
 	case OpConnect:
@@ -1196,6 +1207,53 @@ func applyIssue(index int, err error) reports.Issue {
 
 func endpoint(value Endpoint) designapi.Endpoint {
 	return designapi.Endpoint{Reference: value.Ref, Pin: value.Pin}
+}
+
+func schematicPropertiesFromPayload(properties []SymbolProperty, defaultPosition kicadfiles.Point, defaultRotation kicadfiles.Angle, visibleBaseIndex int) []schematic.Property {
+	if len(properties) == 0 {
+		return nil
+	}
+	out := make([]schematic.Property, 0, len(properties))
+	visibleIndex := 0
+	for _, property := range properties {
+		position := defaultPosition
+		if property.At != nil {
+			position = point(property.At.XMM, property.At.YMM)
+		} else if !property.Hidden {
+			position = visiblePropertyDefaultPosition(defaultPosition, visibleBaseIndex+visibleIndex)
+			visibleIndex++
+		}
+		rotation := defaultRotation
+		if property.Rotation != nil {
+			rotation = kicadfiles.Angle(*property.Rotation)
+		}
+		out = append(out, schematic.Property{
+			Name:           strings.TrimSpace(property.Name),
+			Value:          property.Value,
+			Private:        property.Private,
+			Hidden:         property.Hidden,
+			ShowName:       schematic.CloneBool(property.ShowName),
+			DoNotAutoplace: schematic.CloneBool(property.DoNotAutoplace),
+			Position:       position,
+			Rotation:       rotation,
+		})
+	}
+	return out
+}
+
+func visiblePropertyDefaultPosition(symbolPosition kicadfiles.Point, index int) kicadfiles.Point {
+	return kicadfiles.Point{
+		X: symbolPosition.X,
+		Y: symbolPosition.Y + kicadfiles.MM(2.54*float64(index+1)),
+	}
+}
+
+func validateSymbolPropertyPayload(properties []SymbolProperty) error {
+	issues := validateSymbolProperties("properties", properties)
+	if len(issues) == 0 {
+		return nil
+	}
+	return fmt.Errorf("%s: %s", issues[0].Path, issues[0].Message)
 }
 
 func point(xMM, yMM float64) kicadfiles.Point {

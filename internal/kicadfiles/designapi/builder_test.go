@@ -9,6 +9,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/routing"
 )
 
@@ -407,6 +408,34 @@ func TestBuilderDesignReturnsMutationSafeSnapshot(t *testing.T) {
 	}
 	if fresh.KnownSymbolLibraries[0] != "Device" {
 		t.Fatalf("known symbol libraries mutated to %+v", fresh.KnownSymbolLibraries)
+	}
+}
+
+func TestBuilderAddSymbolClonesInputProperties(t *testing.T) {
+	builder := newTestBuilder(t)
+	showName := false
+	properties := []schematic.Property{{
+		Name:     "Manufacturer",
+		Value:    "Yageo",
+		Hidden:   true,
+		ShowName: &showName,
+	}}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference:  "R1",
+		Value:      "10k",
+		LibraryID:  "Device:R",
+		Position:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		Properties: properties,
+	}); err != nil {
+		t.Fatalf("AddSymbol returned error: %v", err)
+	}
+	properties[0].Value = "BROKEN"
+	*properties[0].ShowName = true
+
+	fresh := builder.Design()
+	got := fresh.Schematic.Symbols[0].Properties[0]
+	if got.Value != "Yageo" || got.ShowName == nil || *got.ShowName {
+		t.Fatalf("symbol property shares input backing data: %#v", got)
 	}
 }
 
