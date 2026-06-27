@@ -102,9 +102,12 @@ from validation feedback to safe automatic repair.
   regression tests that strict-decode each request, run `design create`, verify
   generated project artifacts, read back generated schematic/PCB files, and
   check generated schematic component identity properties. An optional
-  `examples/design/kicad-backed/*.json` tier is reserved for future fixtures
-  that require explicit `KICADAI_KICAD_CLI` ERC/DRC evidence without making the
-  default test suite depend on KiCad.
+  `examples/design/kicad-backed/` tier now validates metadata-backed fixtures
+  only when `KICADAI_KICAD_CLI` is configured. The initial fixtures are
+  `expected_fail` cases that keep richer generated boards visible without
+  making the default test suite depend on KiCad. `KICADAI_KICAD_CLI` supplies
+  the executable path for design workflow checks; `KICADAI_RUN_KICAD_CLI=1`
+  remains the separate boolean opt-in used by lower-level block smoke tests.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready
@@ -148,10 +151,12 @@ loop confidence:
   narrow, and broader topology synthesis is still intentionally limited.
   Deterministic rationale reports now explain supported planner decisions and
   blockers, but they do not replace broader synthesis.
-- the default design examples are intentionally small LED workflows. Multi-block
-  I2C sensor/connector scenarios remain covered by block and intent fixtures
-  until generic sensor/connector PCB realization and KiCad-backed proof are
-  strong enough for default artifact-generation examples.
+- the default design examples are intentionally small LED workflows.
+  Multi-block connector/LED and I2C sensor breakout scenarios now exist as
+  optional KiCad-backed `expected_fail` fixtures. They currently document that
+  incomplete pad/copper net assignment evidence can trigger internal
+  post-write validation errors, preventing those generated boards from reaching
+  KiCad ERC/DRC checks.
 
 ## Roadmap Principles
 
@@ -295,6 +300,15 @@ Implemented foundation.
 - A local opt-in block smoke test runs selected manifests through real
   `kicad-cli` only when `KICADAI_RUN_KICAD_CLI=1` is set; normal `go test
   ./...` remains KiCad-independent.
+- Optional `design create` fixtures under `examples/design/kicad-backed/` now
+  exercise full generated-design workflows with metadata-declared readiness,
+  expected stages, expected artifacts, and required ERC/DRC policy. Current
+  readiness:
+  - `expected_fail`: `led_indicator_kicad_smoke`,
+    `connector_led_kicad_smoke`, and `i2c_sensor_breakout_candidate`;
+  - `candidate`: none yet;
+  - `pass`: none yet;
+  - `blocked`: none yet.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -313,6 +327,12 @@ Implemented foundation.
   optional `skip` candidates to required `pass` candidates as generated PCB
   quality improves, and broaden DRC-clean evidence beyond the initial smoke
   tier.
+- Promote optional design examples from `expected_fail` to `candidate` and then
+  `pass` by closing the generated PCB pad/copper net assignment blocker, adding
+  resolved pad hints or equivalent net assignment evidence, and enabling routed
+  KiCad-clean layouts. The `i2c_sensor_breakout_candidate` name identifies it
+  as a promotion candidate even though its current readiness is
+  `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
@@ -662,8 +682,10 @@ Public `examples/design/*.json` requests are now executable regression fixtures
 for `design create`. The default set exercises supported LED workflows and
 proves that checked-in examples remain aligned with the current request schema,
 block contracts, project writer, schematic/PCB readers, and component identity
-property propagation. Richer KiCad-backed design examples should be added under
-`examples/design/kicad-backed/` once their ERC/DRC expectations are stable.
+property propagation. Optional KiCad-backed design examples now live under
+`examples/design/kicad-backed/`; the current set records `expected_fail`
+evidence for richer generated boards until writer correctness and KiCad ERC/DRC
+artifacts can be produced reliably.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
