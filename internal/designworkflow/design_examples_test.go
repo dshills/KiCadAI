@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/componentprops"
+	"kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 )
 
@@ -90,6 +93,60 @@ func TestDesignExampleValidationReportsContractDrift(t *testing.T) {
 	}
 }
 
+func TestDesignExamplesGenerateReadableProjectArtifacts(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	createTimeout := designExampleCreateTimeout(t)
+	for _, name := range designExampleRequestFiles(t, repoRoot) {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			request, issues := loadDesignExampleRequest(t, repoRoot, name)
+			if len(issues) != 0 {
+				t.Fatalf("decode %s issues:\n%s", name, formatDesignExampleIssues(issues))
+			}
+			projectName := NormalizeProjectName(request.Name)
+			outputDir := filepath.Join(t.TempDir(), projectName)
+			if err := os.MkdirAll(outputDir, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), createTimeout)
+			defer cancel()
+			result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+			if result.Acceptance.Achieved == "" {
+				t.Fatalf("%s did not achieve an acceptance level:\n%s", name, formatDesignExampleStages(result.Stages))
+			}
+			projectWrite, ok := designExampleStageByName(result, StageProjectWrite)
+			if !ok {
+				t.Fatalf("%s missing project_write stage:\n%s", name, formatDesignExampleStages(result.Stages))
+			}
+			if projectWrite.Status != StageStatusOK {
+				t.Fatalf("%s project_write status = %q, want %q:\n%s", name, projectWrite.Status, StageStatusOK, formatDesignExampleIssues(projectWrite.Issues))
+			}
+			projectPath := filepath.Join(outputDir, projectName+".kicad_pro")
+			schematicPath := filepath.Join(outputDir, projectName+".kicad_sch")
+			pcbPath := filepath.Join(outputDir, projectName+".kicad_pcb")
+			transactionPath := filepath.Join(outputDir, ".kicadai", "transaction.json")
+			manifestPath := filepath.Join(outputDir, ".kicadai", "manifest.json")
+			requiredArtifacts := []string{projectPath, schematicPath, pcbPath, transactionPath, manifestPath}
+			for _, path := range requiredArtifacts {
+				if _, err := os.Stat(path); err != nil {
+					t.Fatalf("%s missing generated artifact %s: %v", name, path, err)
+				}
+			}
+			schematicFile, err := schematic.ReadFile(schematicPath)
+			if err != nil {
+				t.Fatalf("%s generated schematic is not readable: %v", name, err)
+			}
+			if got := countDesignExampleSymbolsWithProperty(schematicFile.Symbols, componentprops.PropertyComponentID); got == 0 {
+				t.Fatalf("%s generated schematic has no %q properties", name, componentprops.PropertyComponentID)
+			}
+			if _, err := pcb.ReadFile(pcbPath); err != nil {
+				t.Fatalf("%s generated PCB is not readable: %v", name, err)
+			}
+		})
+	}
+}
+
 func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 	planResult := PlanBlocks(ctx, blocks.NewBuiltinRegistry(), request)
 	return planResult.Stage
@@ -151,6 +208,19 @@ func hasDesignExampleIssue(issues []reports.Issue, path, message string) bool {
 	return false
 }
 
+func countDesignExampleSymbolsWithProperty(symbols []schematic.SchematicSymbol, name string) int {
+	count := 0
+	for _, symbol := range symbols {
+		for _, property := range symbol.Properties {
+			if property.Name == name {
+				count++
+				break
+			}
+		}
+	}
+	return count
+}
+
 func formatDesignExampleIssues(issues []reports.Issue) string {
 	if len(issues) == 0 {
 		return "(none)"
@@ -172,4 +242,54 @@ func formatDesignExampleIssues(issues []reports.Issue) string {
 		builder.WriteString(issue.Message)
 	}
 	return builder.String()
+}
+
+func designExampleStageByName(result WorkflowResult, name StageName) (StageResult, bool) {
+	for _, stage := range result.Stages {
+		if stage.Name == name {
+			return stage, true
+		}
+	}
+	return StageResult{}, false
+}
+
+func formatDesignExampleStages(stages []StageResult) string {
+	if len(stages) == 0 {
+		return "(none)"
+	}
+	var builder strings.Builder
+	for _, stage := range stages {
+		if builder.Len() > 0 {
+			builder.WriteByte('\n')
+		}
+		builder.WriteString("- ")
+		builder.WriteString(string(stage.Name))
+		builder.WriteString(": ")
+		builder.WriteString(string(stage.Status))
+		if len(stage.Issues) != 0 {
+			builder.WriteString("\n")
+			builder.WriteString(indentDesignExampleText(formatDesignExampleIssues(stage.Issues), "  "))
+		}
+	}
+	return builder.String()
+}
+
+func designExampleCreateTimeout(t *testing.T) time.Duration {
+	t.Helper()
+	if value := strings.TrimSpace(os.Getenv("KICADAI_EXAMPLE_TEST_TIMEOUT")); value != "" {
+		duration, err := time.ParseDuration(value)
+		if err != nil {
+			t.Fatalf("KICADAI_EXAMPLE_TEST_TIMEOUT=%q is not a valid duration: %v", value, err)
+		}
+		return duration
+	}
+	return time.Minute
+}
+
+func indentDesignExampleText(text, prefix string) string {
+	if text == "" {
+		return text
+	}
+	trimmed := strings.TrimSuffix(text, "\n")
+	return prefix + strings.ReplaceAll(trimmed, "\n", "\n"+prefix)
 }
