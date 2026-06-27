@@ -10,13 +10,17 @@ quickest path for a user or AI agent to understand whether structured
 block-based generation is working, so they must be treated as regression
 fixtures rather than static documentation.
 
-The immediate trigger for this work is that both current design examples have
+The immediate trigger for this work was that earlier design examples had
 drifted from the active workflow:
 
-- `examples/design/led_indicator.json` uses the old `resistor_ohms` parameter,
-  which the current `led_indicator` block rejects.
-- `examples/design/sensor_breakout.json` connects `sensor.INT`, but the current
-  generated planning path blocks on that port in the example workflow.
+- the LED indicator fixture used an obsolete numeric resistor parameter, which
+  the current `led_indicator` block rejects. The runnable example now uses the
+  current resistance literal parameter.
+- an earlier multi-block sensor design exposed generic sensor/connector
+  realization gaps that are not suitable for default runnable examples.
+
+The current default design examples are `led_indicator.json` and
+`active_low_led.json`.
 
 The goal is to make every checked-in design example load, validate, generate
 KiCad files, and expose useful workflow evidence without requiring a running
@@ -228,9 +232,9 @@ should be diagnosable from structured data without opening KiCad manually.
 
 - `examples/design/led_indicator.json` runs successfully through
   `design create` under its declared acceptance level.
-- `examples/design/sensor_breakout.json` runs successfully through
-  `design create` under its declared acceptance level, or its acceptance level
-  is intentionally adjusted and documented with a non-blocking rationale.
+- all default `examples/design/*.json` requests run successfully through
+  `design create` far enough to write project, schematic, PCB, and `.kicadai`
+  metadata artifacts under their declared acceptance level.
 - A Go regression test enumerates all `examples/design/*.json` files and runs
   them through strict decode, request validation, workflow generation, and
   artifact checks.
@@ -248,4 +252,3 @@ should be diagnosable from structured data without opening KiCad manually.
   unless explicitly marked optional.
 - If examples are only validated by docs snippets, they will drift again.
   Automated regression coverage is required.
-

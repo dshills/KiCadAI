@@ -14,10 +14,10 @@ Tasks:
 - Validate each request against `blocks.NewBuiltinRegistry`.
 - Report all blocking request and block-planning issues with request path,
   issue path, and issue message.
-- Confirm the current expected failures:
-  - `led_indicator.json` rejects `params.resistor_ohms`;
-  - `sensor_breakout.json` rejects or blocks an endpoint involving
-    `sensor.INT` or equivalent drift.
+- Confirm the historical expected failures before refreshing fixtures:
+  - LED fixture rejects an obsolete resistor parameter;
+  - sensor fixture rejects or blocks an unsupported interrupt endpoint or
+    equivalent drift.
 
 Review:
 
@@ -51,7 +51,7 @@ Tasks:
     limitation.
 - Run each example manually through:
   - `kicadai --request examples/design/led_indicator.json --output <tmp> --overwrite design create`
-  - `kicadai --request examples/design/sensor_breakout.json --output <tmp> --overwrite design create`
+  - `kicadai --request examples/design/active_low_led.json --output <tmp> --overwrite design create`
 
 Review:
 
@@ -210,4 +210,3 @@ Commit:
 - Docs use compiled `kicadai` commands and describe realistic current behavior.
 - Optional KiCad-backed checks remain optional.
 - `go test ./...` passes.
-

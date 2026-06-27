@@ -1,6 +1,10 @@
 {
   "version": "0.1.0",
   "name": "led_indicator",
+  "intent": {
+    "summary": "An active-high green LED indicator with a fixed current-limiting resistor.",
+    "category": "indicator"
+  },
   "board": {
     "width_mm": 40,
     "height_mm": 25,
@@ -12,7 +16,9 @@
       "block_id": "led_indicator",
       "params": {
         "color": "green",
-        "resistor_value": "1k"
+        "supply_voltage": "3.3V",
+        "led_forward_voltage": "2.0V",
+        "resistor_value": "270Ω"
       }
     }
   ],

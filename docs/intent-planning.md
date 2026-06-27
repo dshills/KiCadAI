@@ -53,8 +53,13 @@ Useful flags:
 Examples live in `examples/design/`:
 
 - `led_indicator.json`: structural acceptance, routing skipped.
-- `sensor_breakout.json`: connectivity-oriented request that may produce
-  actionable routing/validation feedback as the workflow matures.
+- `active_low_led.json`: structural acceptance, routing skipped, active-low
+  LED parameter path.
+
+The multi-block I2C sensor breakout is currently covered by block and intent
+fixtures rather than a default `examples/design` request because the generic
+sensor/connector PCB realization still needs more hardening before it is a
+reliable artifact-generation example.
 
 The top-level JSON result uses requested acceptance as the success contract. A
 request for `structural` acceptance can return `ok: true` while still including

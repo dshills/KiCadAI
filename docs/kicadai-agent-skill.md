@@ -207,9 +207,9 @@ Important property names:
 Recommended evidence check:
 
 ```sh
-kicadai --request examples/design/sensor_breakout.json --output ./out/i2c_sensor_breakout --overwrite design create
-kicadai inspect schematic ./out/i2c_sensor_breakout/i2c_sensor_breakout.kicad_sch
-kicadai export bom ./out/i2c_sensor_breakout
+kicadai --request examples/design/led_indicator.json --output ./out/led_indicator --overwrite design create
+kicadai inspect schematic ./out/led_indicator/led_indicator.kicad_sch
+kicadai export bom ./out/led_indicator
 ```
 
 Treat conflicts between schematic properties, workflow component-selection
