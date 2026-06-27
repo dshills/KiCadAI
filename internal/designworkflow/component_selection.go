@@ -3,16 +3,26 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/componentprops"
 	"kicadai/internal/components"
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
+
+const componentSelectionIUPerMM = 1_000_000
+
+// Skip KiCad's derived Reference, Value, Footprint, and Datasheet rows when
+// assigning fallback positions for visible custom properties.
+const componentSelectionDerivedVisiblePropertySlots = 4
 
 type ComponentSelectionOptions struct {
 	CatalogDir string
@@ -36,9 +46,11 @@ type ComponentSelectionEntry struct {
 	VariantID       string                            `json:"variant_id"`
 	Manufacturer    string                            `json:"manufacturer,omitempty"`
 	MPN             string                            `json:"mpn,omitempty"`
+	ComponentClass  string                            `json:"component_class,omitempty"`
 	SymbolID        string                            `json:"symbol_id,omitempty"`
 	Value           string                            `json:"value,omitempty"`
 	FootprintID     string                            `json:"footprint_id,omitempty"`
+	PinMapID        string                            `json:"pinmap_id,omitempty"`
 	Confidence      components.ConfidenceLevel        `json:"confidence"`
 	ResolverChecked bool                              `json:"resolver_checked,omitempty"`
 	PinMapChecked   bool                              `json:"pinmap_checked,omitempty"`
@@ -134,8 +146,10 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 					VariantID:       selection.Candidate.VariantID,
 					Manufacturer:    selection.Component.Manufacturer,
 					MPN:             selectedMPN(selection),
+					ComponentClass:  selection.Candidate.Family,
 					SymbolID:        firstSelectedSymbolID(selection),
 					FootprintID:     selection.Candidate.FootprintID,
+					PinMapID:        selectedPinMapID(selection),
 					Confidence:      selection.Candidate.Confidence,
 					ResolverChecked: selectedResolverChecked(selection),
 					PinMapChecked:   selectedPinMapChecked(selection),
@@ -156,19 +170,21 @@ func ApplyComponentSelectionsToPlan(plan *BlockPlanResult, registry blocks.Regis
 	if plan == nil || registry == nil || len(selections) == 0 {
 		return nil
 	}
-	byRef, issues := componentSelectionsByRef(registry, *plan, selections)
+	selectionsBySchematicRef, issues := componentSelectionsBySchematicRef(registry, *plan, selections)
 	if reports.HasBlockingIssue(issues) {
 		return issues
 	}
 	operations := append([]transactions.Operation(nil), plan.Output.Operations...)
 	for index, operation := range operations {
-		selection, ok := byRef[operation.Ref]
+		selection, ok := selectionsBySchematicRef[operation.Ref]
 		if !ok {
 			continue
 		}
-		updated, changed, issue := operationWithComponentSelection(operation, selection)
-		if issue != nil {
-			issues = append(issues, *issue)
+		updated, changed, opIssues := operationWithComponentSelection(operation, selection)
+		if len(opIssues) > 0 {
+			issues = append(issues, opIssues...)
+		}
+		if reports.HasBlockingIssue(opIssues) {
 			continue
 		}
 		if changed {
@@ -181,7 +197,7 @@ func ApplyComponentSelectionsToPlan(plan *BlockPlanResult, registry blocks.Regis
 	return issues
 }
 
-func componentSelectionsByRef(registry blocks.Registry, plan BlockPlanResult, selections []ComponentSelectionEntry) (map[string]ComponentSelectionEntry, []reports.Issue) {
+func componentSelectionsBySchematicRef(registry blocks.Registry, plan BlockPlanResult, selections []ComponentSelectionEntry) (map[string]ComponentSelectionEntry, []reports.Issue) {
 	byKey := map[string]ComponentSelectionEntry{}
 	for _, selection := range selections {
 		byKey[selection.InstanceID+"."+selection.Role] = selection
@@ -191,6 +207,7 @@ func componentSelectionsByRef(registry blocks.Registry, plan BlockPlanResult, se
 	for _, instance := range plan.Output.Instances {
 		instances[instance.InstanceID] = instance
 	}
+	// Resolve instance/role selections to generated schematic references.
 	byRef := map[string]ComponentSelectionEntry{}
 	for _, spec := range plan.Request.Blocks {
 		definition, ok := registry.GetBlock(spec.BlockID)
@@ -357,12 +374,12 @@ func componentAcceptanceForRequest(request Request) components.AcceptanceLevel {
 	}
 }
 
-func operationWithComponentSelection(operation transactions.Operation, selection ComponentSelectionEntry) (transactions.Operation, bool, *reports.Issue) {
+func operationWithComponentSelection(operation transactions.Operation, selection ComponentSelectionEntry) (transactions.Operation, bool, []reports.Issue) {
 	switch operation.Op {
 	case transactions.OpAddSymbol:
 		var payload transactions.AddSymbolOperation
 		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
-			return operation, false, componentSelectionRewriteIssue(operation.Ref, "decode add_symbol: "+err.Error())
+			return operation, false, []reports.Issue{componentSelectionRewriteIssue(operation.Ref, "decode add_symbol: "+err.Error())}
 		}
 		if selection.SymbolID != "" {
 			payload.LibraryID = selection.SymbolID
@@ -370,23 +387,25 @@ func operationWithComponentSelection(operation transactions.Operation, selection
 		if selection.Value != "" {
 			payload.Value = selection.Value
 		}
+		merged, mergeIssues := componentSelectionSymbolProperties(payload, selection)
+		payload.Properties = merged
 		updated, err := wrapWorkflowOperation(transactions.OpAddSymbol, payload)
 		if err != nil {
-			return operation, false, componentSelectionRewriteIssue(operation.Ref, "encode add_symbol: "+err.Error())
+			return operation, false, []reports.Issue{componentSelectionRewriteIssue(operation.Ref, "encode add_symbol: "+err.Error())}
 		}
-		return updated, true, nil
+		return updated, true, mergeIssues
 	case transactions.OpAssignFootprint:
 		if selection.FootprintID == "" {
 			return operation, false, nil
 		}
 		var payload transactions.AssignFootprintOperation
 		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
-			return operation, false, componentSelectionRewriteIssue(operation.Ref, "decode assign_footprint: "+err.Error())
+			return operation, false, []reports.Issue{componentSelectionRewriteIssue(operation.Ref, "decode assign_footprint: "+err.Error())}
 		}
 		payload.FootprintID = selection.FootprintID
 		updated, err := wrapWorkflowOperation(transactions.OpAssignFootprint, payload)
 		if err != nil {
-			return operation, false, componentSelectionRewriteIssue(operation.Ref, "encode assign_footprint: "+err.Error())
+			return operation, false, []reports.Issue{componentSelectionRewriteIssue(operation.Ref, "encode assign_footprint: "+err.Error())}
 		}
 		return updated, true, nil
 	case transactions.OpPlaceFootprint:
@@ -395,7 +414,7 @@ func operationWithComponentSelection(operation transactions.Operation, selection
 		}
 		var payload transactions.PlaceFootprintOperation
 		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
-			return operation, false, componentSelectionRewriteIssue(operation.Ref, "decode place_footprint: "+err.Error())
+			return operation, false, []reports.Issue{componentSelectionRewriteIssue(operation.Ref, "decode place_footprint: "+err.Error())}
 		}
 		payload.FootprintID = selection.FootprintID
 		if selection.Value != "" {
@@ -403,12 +422,132 @@ func operationWithComponentSelection(operation transactions.Operation, selection
 		}
 		updated, err := wrapWorkflowOperation(transactions.OpPlaceFootprint, payload)
 		if err != nil {
-			return operation, false, componentSelectionRewriteIssue(operation.Ref, "encode place_footprint: "+err.Error())
+			return operation, false, []reports.Issue{componentSelectionRewriteIssue(operation.Ref, "encode place_footprint: "+err.Error())}
 		}
 		return updated, true, nil
 	default:
 		return operation, false, nil
 	}
+}
+
+func componentSelectionSymbolProperties(payload transactions.AddSymbolOperation, selection ComponentSelectionEntry) ([]transactions.SymbolProperty, []reports.Issue) {
+	position := pointFromTransactionMM(payload.At)
+	properties, issues := componentprops.MergeIdentityProperties(
+		schematicPropertiesFromTransaction(payload.Properties, position, kicadfiles.Angle(payload.Rotation)),
+		componentSelectionEvidence(selection),
+		componentprops.MergeOptions{
+			Policy:   componentprops.PolicyGeneratedReplace,
+			Ref:      payload.Ref,
+			Position: position,
+			Rotation: kicadfiles.Angle(payload.Rotation),
+			Path:     "component_selection." + payload.Ref,
+		},
+	)
+	return transactionPropertiesFromSchematic(properties), issues
+}
+
+func pointFromTransactionMM(point transactions.Point) kicadfiles.Point {
+	return kicadfiles.Point{
+		X: kicadfiles.IU(math.Round(point.XMM * componentSelectionIUPerMM)),
+		Y: kicadfiles.IU(math.Round(point.YMM * componentSelectionIUPerMM)),
+	}
+}
+
+func componentSelectionVisiblePropertyPosition(symbolPosition kicadfiles.Point, index int, rotation kicadfiles.Angle) kicadfiles.Point {
+	slot := componentSelectionDerivedVisiblePropertySlots + index
+	offset := 2.54 * float64(slot) * componentSelectionIUPerMM
+	radians := float64(rotation) * math.Pi / 180
+	sin, cos := math.Sincos(radians)
+	return kicadfiles.Point{
+		X: symbolPosition.X + kicadfiles.IU(math.Round(-offset*sin)),
+		Y: symbolPosition.Y + kicadfiles.IU(math.Round(offset*cos)),
+	}
+}
+
+func componentSelectionEvidence(selection ComponentSelectionEntry) componentprops.Evidence {
+	evidence := componentprops.Evidence{
+		ComponentID:         selection.ComponentID,
+		VariantID:           selection.VariantID,
+		ComponentRole:       selection.Role,
+		BlockID:             strings.TrimSpace(selection.BlockID),
+		Manufacturer:        selection.Manufacturer,
+		MPN:                 selection.MPN,
+		ComponentClass:      selection.ComponentClass,
+		ComponentConfidence: string(selection.Confidence),
+		ComponentSource:     componentSelectionSource(selection),
+		PinmapID:            selection.PinMapID,
+	}
+	if selection.Procurement != nil {
+		evidence.LifecycleStatus = string(selection.Procurement.LifecycleStatus)
+		evidence.AvailabilityStatus = string(selection.Procurement.AvailabilityStatus)
+	}
+	return evidence
+}
+
+func componentSelectionSource(selection ComponentSelectionEntry) string {
+	if selection.Procurement != nil {
+		return componentprops.SourceCatalogSnapshot
+	}
+	if selection.Manufacturer != "" || selection.MPN != "" || selection.VariantID != "" {
+		return componentprops.SourceCatalog
+	}
+	switch selection.Confidence {
+	case components.ConfidenceRuleInferred:
+		return componentprops.SourcePolicyAllowed
+	default:
+		return componentprops.SourceGeneric
+	}
+}
+
+func schematicPropertiesFromTransaction(properties []transactions.SymbolProperty, position kicadfiles.Point, rotation kicadfiles.Angle) []schematic.Property {
+	out := make([]schematic.Property, 0, len(properties))
+	visibleIndex := 0
+	for _, property := range properties {
+		propertyPosition := position
+		if property.At != nil {
+			propertyPosition = pointFromTransactionMM(*property.At)
+		} else if !property.Hidden {
+			propertyPosition = componentSelectionVisiblePropertyPosition(position, visibleIndex, rotation)
+			visibleIndex++
+		}
+		propertyRotation := kicadfiles.Angle(0)
+		if property.Rotation != nil {
+			propertyRotation = kicadfiles.Angle(*property.Rotation)
+		}
+		out = append(out, schematic.Property{
+			Name:           strings.TrimSpace(property.Name),
+			Value:          property.Value,
+			Private:        property.Private,
+			Hidden:         property.Hidden,
+			ShowName:       schematic.CloneBool(property.ShowName),
+			DoNotAutoplace: schematic.CloneBool(property.DoNotAutoplace),
+			Position:       propertyPosition,
+			Rotation:       propertyRotation,
+		})
+	}
+	return out
+}
+
+func transactionPropertiesFromSchematic(properties []schematic.Property) []transactions.SymbolProperty {
+	out := make([]transactions.SymbolProperty, 0, len(properties))
+	for _, property := range properties {
+		rotation := float64(property.Rotation)
+		out = append(out, transactions.SymbolProperty{
+			Name:           property.Name,
+			Value:          property.Value,
+			Private:        property.Private,
+			Hidden:         property.Hidden,
+			ShowName:       schematic.CloneBool(property.ShowName),
+			DoNotAutoplace: schematic.CloneBool(property.DoNotAutoplace),
+			At:             &transactions.Point{XMM: iuToMM(property.Position.X), YMM: iuToMM(property.Position.Y)},
+			Rotation:       &rotation,
+		})
+	}
+	return out
+}
+
+func iuToMM(value kicadfiles.IU) float64 {
+	return float64(value) / componentSelectionIUPerMM
 }
 
 func wrapWorkflowOperation(kind transactions.OperationKind, payload any) (transactions.Operation, error) {
@@ -432,8 +571,8 @@ func operationReference(payload any) string {
 	}
 }
 
-func componentSelectionRewriteIssue(ref string, message string) *reports.Issue {
-	return &reports.Issue{
+func componentSelectionRewriteIssue(ref string, message string) reports.Issue {
+	return reports.Issue{
 		Code:     reports.CodeValidationFailed,
 		Severity: reports.SeverityBlocked,
 		Path:     "component_selection." + ref,
@@ -467,6 +606,19 @@ func selectedPinMapChecked(selection components.Selection) bool {
 		return true
 	}
 	return selection.Variant.ID != "" && selection.Variant.Verification.PinMapChecked
+}
+
+func selectedPinMapID(selection components.Selection) string {
+	if selection.Variant.PinMapID != "" {
+		return selection.Variant.PinMapID
+	}
+	symbolID := firstSelectedSymbolID(selection)
+	for _, binding := range selection.Component.Symbols {
+		if binding.SymbolID == symbolID && binding.PinMapID != "" {
+			return binding.PinMapID
+		}
+	}
+	return ""
 }
 
 func applyComponentPolicy(request *components.SelectionRequest, policy ComponentPolicySpec, blockID string, instanceID string, role string) []reports.Issue {
