@@ -329,7 +329,7 @@ func validateSymbolProperties(path string, properties []SymbolProperty) []report
 		}
 		key := schematic.NormalizePropertyName(name)
 		if _, ok := seen[key]; ok {
-			issues = append(issues, issue(reports.CodeInvalidArgument, propertyPath+".name", "duplicate property "+name))
+			issues = append(issues, warning(reports.CodeInvalidArgument, propertyPath+".name", fmt.Sprintf("duplicate property %s will use the last value", name)))
 		}
 		seen[key] = struct{}{}
 		if property.At != nil {
@@ -363,6 +363,10 @@ func requireNonEmpty(path, label, value string) []reports.Issue {
 
 func issue(code reports.Code, path string, message string) reports.Issue {
 	return reports.Issue{Code: code, Severity: reports.SeverityError, Path: path, Message: message}
+}
+
+func warning(code reports.Code, path string, message string) reports.Issue {
+	return reports.Issue{Code: code, Severity: reports.SeverityWarning, Path: path, Message: message}
 }
 
 func finite(value float64) bool {

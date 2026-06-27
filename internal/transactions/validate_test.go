@@ -57,7 +57,7 @@ func TestValidateValidTransaction(t *testing.T) {
 	}
 }
 
-func TestValidateRejectsInvalidSymbolProperties(t *testing.T) {
+func TestValidateReportsInvalidAndDuplicateSymbolProperties(t *testing.T) {
 	result := Validate(mustParse(t, `{"operations":[
 	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":0,"y_mm":0},"properties":[
 	    {"name":"","value":"missing"},
@@ -68,13 +68,11 @@ func TestValidateRejectsInvalidSymbolProperties(t *testing.T) {
 	if len(result.Issues) != 2 {
 		t.Fatalf("issues = %#v", result.Issues)
 	}
-	for _, want := range []string{
-		"operations[0].properties[0].name",
-		"operations[0].properties[2].name",
-	} {
-		if !hasIssuePath(result.Issues, want) {
-			t.Fatalf("missing issue path %s in %#v", want, result.Issues)
-		}
+	if !hasIssuePath(result.Issues, "operations[0].properties[0].name") || result.Issues[0].Severity != reports.SeverityError {
+		t.Fatalf("missing blocking invalid-name issue: %#v", result.Issues)
+	}
+	if !hasIssuePath(result.Issues, "operations[0].properties[2].name") || result.Issues[1].Severity != reports.SeverityWarning {
+		t.Fatalf("missing duplicate-name warning: %#v", result.Issues)
 	}
 }
 

@@ -1250,10 +1250,12 @@ func visiblePropertyDefaultPosition(symbolPosition kicadfiles.Point, index int) 
 
 func validateSymbolPropertyPayload(properties []SymbolProperty) error {
 	issues := validateSymbolProperties("properties", properties)
-	if len(issues) == 0 {
-		return nil
+	for _, issue := range issues {
+		if issue.Blocking() {
+			return fmt.Errorf("%s: %s", issue.Path, issue.Message)
+		}
 	}
-	return fmt.Errorf("%s: %s", issues[0].Path, issues[0].Message)
+	return nil
 }
 
 func point(xMM, yMM float64) kicadfiles.Point {

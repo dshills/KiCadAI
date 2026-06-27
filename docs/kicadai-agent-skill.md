@@ -184,6 +184,39 @@ For generated intent workflows, inspect:
 - procurement evidence when a local source snapshot is supplied;
 - placeholder or inferred-confidence warnings.
 
+Generated schematic symbols carry hidden component identity properties when
+selection evidence exists. Before claiming a generated part identity, inspect
+the schematic properties and compare them with
+`.kicadai/workflow-result.json`.
+
+Important property names:
+
+- `KiCadAI Component ID`
+- `KiCadAI Variant ID`
+- `KiCadAI Component Role`
+- `KiCadAI Block ID`
+- `Manufacturer`
+- `MPN`
+- `Component Class`
+- `Component Confidence`
+- `Component Source`
+- `Lifecycle Status`
+- `Availability Status`
+- `Pinmap ID`
+
+Recommended evidence check:
+
+```sh
+kicadai --request examples/design/sensor_breakout.json --output ./out/i2c_sensor_breakout --overwrite design create
+kicadai inspect schematic ./out/i2c_sensor_breakout/i2c_sensor_breakout.kicad_sch
+kicadai export bom ./out/i2c_sensor_breakout
+```
+
+Treat conflicts between schematic properties, workflow component-selection
+evidence, and BOM/fabrication output as blockers for imported projects and as
+warnings that require explanation for generated projects. Do not infer
+manufacturer or MPN values when these properties are absent.
+
 The checked-in catalog includes a small verified alternatives slice for a 10
 kOhm 0805 resistor, 100 nF 0805 capacitor, green 0805 LED, and 1x04 2.54 mm
 header. Connectivity and stronger selection should prefer concrete records

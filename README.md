@@ -10,7 +10,7 @@ The near-term goal is to let agents build and review KiCad-native projects from 
 
 ## Status
 
-The direct-file workflow is the main functional path today. KiCadAI can generate KiCad project directories, write root schematics and PCBs, inspect and evaluate projects, run writer and board validation, select catalog-backed components with rating evidence, perform block-aware placement/routing, run optional KiCad ERC/DRC checks, and produce deterministic intent plans and rationale reports.
+The direct-file workflow is the main functional path today. KiCadAI can generate KiCad project directories, write root schematics and PCBs, inspect and evaluate projects, run writer and board validation, select catalog-backed components with rating evidence, write selected component identity properties into generated schematic symbols, perform block-aware placement/routing, run optional KiCad ERC/DRC checks, and produce deterministic intent plans and rationale reports.
 
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 
@@ -89,6 +89,26 @@ kicadai --request examples/components/select_concrete_resistor.json component se
 kicadai component validate
 kicadai --source-dir ./data/component-sources component coverage
 ```
+
+Generated schematic symbols include hidden KiCadAI component identity
+properties when selected evidence is available, including component IDs,
+variant IDs, roles, block IDs, manufacturer/MPN, class, confidence, source,
+lifecycle, availability, and pinmap evidence. BOM and fabrication exports
+consume those schematic properties first, with legacy property names retained
+as fallback. The full property contract is documented in
+`specs/component-symbol-properties/SPEC.md`.
+
+Inspect generated identity evidence:
+
+```sh
+kicadai --request examples/design/sensor_breakout.json --output ./out/i2c_sensor_breakout --overwrite design create
+kicadai inspect schematic ./out/i2c_sensor_breakout/i2c_sensor_breakout.kicad_sch
+kicadai export bom ./out/i2c_sensor_breakout
+```
+
+KiCadAI normalizes the request `name` to a safe basename inside the output
+directory when choosing generated KiCad filenames, with fallback naming for
+invalid or empty names.
 
 Plan or create from structured intent:
 

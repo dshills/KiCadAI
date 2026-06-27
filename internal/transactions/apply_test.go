@@ -216,6 +216,32 @@ func TestApplyWritesAddSymbolProperties(t *testing.T) {
 	}
 }
 
+func TestApplyUsesLastDuplicateAddSymbolProperty(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10},"properties":[
+	    {"name":"Manufacturer","value":"First","hidden":true},
+	    {"name":"manufacturer","value":"Last","hidden":true}
+	  ]},
+	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"},
+	  {"op":"place_footprint","ref":"R1","at":{"x_mm":20,"y_mm":20}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 1 || result.Issues[0].Severity != reports.SeverityWarning {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "demo.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	properties := propertyValues(file.Symbols[0].Properties)
+	if properties["Manufacturer"] != "Last" {
+		t.Fatalf("duplicate property was not resolved with last value: %#v", file.Symbols[0].Properties)
+	}
+}
+
 func TestSchematicPropertiesFromPayloadOffsetsVisibleProperties(t *testing.T) {
 	properties := schematicPropertiesFromPayload([]SymbolProperty{
 		{Name: "KiCadAI Component ID", Value: "resistor.generic.0805", Hidden: true},

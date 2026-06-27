@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-25
+Date: 2026-06-27
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -192,6 +192,12 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
   blocks to catalog-backed AMS1117 SOT-223 and AP2112K SOT-23-5 selection,
   capacitor selection, rating requirements, generated request overrides,
   AP2112K EN/NC handling, headroom blocking, and persisted workflow evidence;
+- selected component identity propagation into generated schematic symbol
+  properties, including component ID, variant ID, role, block ID,
+  manufacturer, MPN, confidence, source, lifecycle, availability, and pinmap
+  evidence where known;
+- BOM/fabrication identity extraction that prefers the generated schematic
+  identity properties while retaining legacy property-name fallbacks;
 - golden coverage and representative selection snapshots.
 
 ### Remaining Work
@@ -208,8 +214,6 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
   needed.
 - Improve MCU function names from generic GPIO placeholders to datasheet port
   and peripheral roles.
-- Emit selected component properties into generated schematic symbols when the
-  transaction/writer model supports arbitrary symbol properties.
 - Convert component placement/routing hints into downstream rule enforcement.
 - Add KiCad-library-backed evidence runs for the full checked-in catalog when
   external library roots are configured.
