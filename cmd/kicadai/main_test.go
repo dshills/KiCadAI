@@ -1016,8 +1016,16 @@ func TestRunComponentValidateWithSourceDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 	}
-	if !strings.Contains(stdout.String(), `"source_record_count": 2`) {
-		t.Fatalf("missing source count: %s", stdout.String())
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("result data = %#v", result.Data)
+	}
+	if got, ok := data["source_record_count"].(float64); !ok || got != 6 {
+		t.Fatalf("source_record_count = %#v in %#v", data["source_record_count"], data)
 	}
 }
 
@@ -1030,6 +1038,23 @@ func TestRunComponentCoverageWithSourceDir(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"lifecycle_evidence_records"`) || !strings.Contains(stdout.String(), `"availability_evidence_records"`) {
 		t.Fatalf("missing source coverage: %s", stdout.String())
+	}
+	var result reports.Result
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode coverage result: %v\n%s", err, stdout.String())
+	}
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("coverage data = %#v", result.Data)
+	}
+	alternativeCoverage, ok := data["alternative_coverage"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing alternative coverage: %#v", data)
+	}
+	for _, field := range []string{"concrete_records", "generic_fallback_records", "equivalence_groups"} {
+		if _, ok := alternativeCoverage[field]; !ok {
+			t.Errorf("missing alternative coverage field %s: %#v", field, alternativeCoverage)
+		}
 	}
 }
 

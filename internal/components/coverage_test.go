@@ -59,6 +59,51 @@ func TestComponentCoverageReportsPlaceholderOnlyFamily(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeComponentCoveragePlaceholder)
 }
 
+func TestComponentCoverageReportsAlternativeMetrics(t *testing.T) {
+	catalog := validCatalog()
+	concrete := catalog.Records[0]
+	concrete.ID = "resistor.concrete.0805"
+	concrete.Generic = false
+	concrete.Manufacturer = "Example"
+	concrete.MPN = "EX-10K"
+	concrete.Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+	missingMPN := concrete
+	missingMPN.ID = "resistor.concrete.no_mpn"
+	missingMPN.MPN = ""
+	missingMPN.Equivalence = &EquivalenceMetadata{Group: "resistor.no_mpn.0805", Role: EquivalenceAlternate}
+	duplicatePreferred := concrete
+	duplicatePreferred.ID = "resistor.concrete.duplicate_preferred"
+	duplicatePreferred.Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+	catalog.Records = append(catalog.Records, concrete, missingMPN, duplicatePreferred)
+
+	report, result := ComponentCoverage(&catalog, CoverageOptions{RequiredFamilies: []string{"resistor"}})
+	if !result.OK {
+		t.Fatalf("coverage failed: %+v", result.Issues)
+	}
+	if report.AlternativeCoverage.ConcreteRecords != 3 || report.AlternativeCoverage.GenericFallbackRecords != 1 {
+		t.Fatalf("alternative counts = %+v", report.AlternativeCoverage)
+	}
+	if report.AlternativeCoverage.EquivalenceGroups != 2 {
+		t.Fatalf("equivalence groups = %+v", report.AlternativeCoverage)
+	}
+	if !slices.Contains(report.AlternativeCoverage.GroupsMissingPreferred, "resistor:resistor.no_mpn.0805") {
+		t.Fatalf("missing preferred groups = %+v", report.AlternativeCoverage.GroupsMissingPreferred)
+	}
+	if !slices.Contains(report.AlternativeCoverage.GroupsWithDuplicatePreferred, "resistor:resistor.10k.0805") {
+		t.Fatalf("duplicate preferred groups = %+v", report.AlternativeCoverage.GroupsWithDuplicatePreferred)
+	}
+	if !slices.Contains(report.AlternativeCoverage.ConcreteRecordsMissingMPN, "resistor.concrete.no_mpn") {
+		t.Fatalf("missing MPN records = %+v", report.AlternativeCoverage.ConcreteRecordsMissingMPN)
+	}
+	family, ok := familyCoverageByID(report, "resistor")
+	if !ok {
+		t.Fatal("missing resistor coverage")
+	}
+	if family.ConcreteRecords != 3 || family.GenericFallbackRecords != 1 || family.EquivalenceGroups != 2 {
+		t.Fatalf("family alternative counts = %+v", family)
+	}
+}
+
 func TestCheckedInCatalogCoverageIsDeterministic(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {
