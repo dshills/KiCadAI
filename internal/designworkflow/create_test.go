@@ -164,6 +164,27 @@ func stageByName(result WorkflowResult, name StageName) (StageResult, bool) {
 	return StageResult{}, false
 }
 
+func requireSelectedProcurement(t *testing.T, selected []map[string]any, role string, manufacturer string, mpn string) {
+	t.Helper()
+	for _, item := range selected {
+		if item["role"] != role {
+			continue
+		}
+		if item["manufacturer"] != manufacturer || item["mpn"] != mpn {
+			t.Fatalf("selected %s identity = %#v", role, item)
+		}
+		procurement, ok := item["procurement"].(*components.ProcurementEvidence)
+		if !ok {
+			t.Fatalf("selected %s procurement evidence missing: %#v", role, item)
+		}
+		if procurement.LifecycleStatus != components.LifecycleActive || procurement.AvailabilityStatus != components.AvailabilityNotChecked {
+			t.Fatalf("selected %s procurement = %#v", role, procurement)
+		}
+		return
+	}
+	t.Fatalf("selected role %s missing from %#v", role, selected)
+}
+
 func hasIssueCode(issues []reports.Issue, code reports.Code) bool {
 	for _, issue := range issues {
 		if issue.Code == code {
@@ -355,6 +376,37 @@ func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
 	if !found {
 		t.Fatalf("AP2112 selection missing from %#v", selected)
 	}
+}
+
+func TestCreateComponentSelectionUsesConcreteAlternatives(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "sourced_reset",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "prog",
+			BlockID: "reset_programming_header",
+		}},
+		Validation: ValidationSpec{Acceptance: AcceptanceConnectivity, SkipRouting: true},
+	}
+	result := Create(context.Background(), request, CreateOptions{
+		OutputDir: filepath.Join(t.TempDir(), "sourced_reset"),
+		Components: ComponentSelectionOptions{
+			SourceDir: componentSourceFixtureDir(t, "valid"),
+		},
+	})
+	stage, ok := stageByName(result, StageComponentSelection)
+	if !ok {
+		t.Fatalf("component selection stage missing: %#v", result.Stages)
+	}
+	if stage.Status == StageStatusBlocked {
+		t.Fatalf("component selection blocked: %#v", stage)
+	}
+	selected, ok := stage.Summary["selected_components"].([]map[string]any)
+	if !ok {
+		t.Fatalf("selected components type = %T", stage.Summary["selected_components"])
+	}
+	requireSelectedProcurement(t, selected, "reset_pullup", "Yageo", "RC0805FR-0710KL")
 }
 
 func TestCreateComponentSelectionStaleLifecycleWarnsForConnectivity(t *testing.T) {

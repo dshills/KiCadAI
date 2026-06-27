@@ -264,18 +264,24 @@ func TestEnrichBOMRowsWithProcurementSnapshots(t *testing.T) {
 		References:   []string{"U1"},
 		Manufacturer: "Diodes Incorporated",
 		MPN:          "AP2112K-3.3",
+	}, {
+		References:   []string{"R1"},
+		ComponentID:  "resistor.yageo.rc0805fr_0710kl.0805",
+		Manufacturer: "Yageo",
+		MPN:          "RC0805FR-0710KL",
 	}}, sources, components.ProcurementPolicy{Now: &now})
-	if len(rows) != 1 {
+	if len(rows) != 2 {
 		t.Fatalf("rows = %#v", rows)
 	}
-	row := rows[0]
-	if row.ProcurementSourceID != "curated_seed_procurement" || row.Lifecycle != "active" || row.AvailabilityStatus != "not_checked" || row.ProcurementOutcome != "snapshot" {
-		t.Fatalf("row = %#v", row)
+	for _, row := range rows {
+		if row.ProcurementSourceID != "curated_seed_procurement" || row.Lifecycle != "active" || row.AvailabilityStatus != "not_checked" || row.ProcurementOutcome != "snapshot" {
+			t.Fatalf("row = %#v", row)
+		}
+		if row.LifecycleFresh == nil || !*row.LifecycleFresh {
+			t.Fatalf("lifecycle freshness missing: %#v", row)
+		}
 	}
-	if row.LifecycleFresh == nil || !*row.LifecycleFresh {
-		t.Fatalf("lifecycle freshness missing: %#v", row)
-	}
-	if !hasIssuePath(issues, "bom.U1.availability") || reports.HasBlockingIssue(issues) {
+	if !hasIssuePath(issues, "bom.U1.availability") || !hasIssuePath(issues, "bom.R1.availability") || reports.HasBlockingIssue(issues) {
 		t.Fatalf("issues = %#v, want advisory availability warning only", issues)
 	}
 }
