@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -235,8 +236,15 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 				},
 			})
 			assertDesignExampleExpectedStages(t, metadata, result, outputDir)
+			assertDesignExampleExpectedArtifacts(t, metadata, result, outputDir)
 			kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 			if !ok {
+				if metadata.Readiness == "expected_fail" && designExampleHasBlockedStage(result) {
+					if !designExampleHasBlockedIssue(result) {
+						t.Fatalf("%s expected at least one blocked issue:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+					}
+					return
+				}
 				t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleStages(result.Stages))
 			}
 			switch metadata.Readiness {
@@ -244,9 +252,13 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 				if kicadChecks.Status != StageStatusOK {
 					t.Fatalf("%s kicad_checks status = %q, want %q:\n%s", metadata.ID, kicadChecks.Status, StageStatusOK, formatDesignExampleRun(metadata, outputDir, result))
 				}
+				assertDesignExampleKiCadArtifacts(t, metadata, outputDir, kicadChecks)
 			case "expected_fail":
 				if kicadChecks.Status == StageStatusOK || !designExampleHasBlockedStage(result) {
 					t.Fatalf("%s expected blocked evidence, got kicad_checks=%q:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+				}
+				if !designExampleHasBlockedIssue(result) {
+					t.Fatalf("%s expected at least one blocked issue:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 				}
 			default:
 				t.Fatalf("%s unsupported readiness %q", metadata.ID, metadata.Readiness)
@@ -590,9 +602,65 @@ func assertDesignExampleExpectedStages(t *testing.T, metadata designExampleMetad
 	}
 }
 
+func assertDesignExampleExpectedArtifacts(t *testing.T, metadata designExampleMetadata, result WorkflowResult, outputDir string) {
+	t.Helper()
+	if metadata.Readiness == "expected_fail" {
+		projectWrite, ok := designExampleStageByName(result, StageProjectWrite)
+		if !ok || projectWrite.Status != StageStatusOK {
+			return
+		}
+	}
+	for _, relative := range metadata.ExpectedArtifacts {
+		path := designExampleArtifactPath(outputDir, relative)
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("%s missing expected artifact %s:\n%s", metadata.ID, path, err)
+		}
+	}
+}
+
+func assertDesignExampleKiCadArtifacts(t *testing.T, metadata designExampleMetadata, outputDir string, stage StageResult) {
+	t.Helper()
+	if requiredDesignExampleBool(t, metadata.ID, "require_erc", metadata.RequireERC) && !designExampleStageHasArtifact(t, outputDir, stage, reports.ArtifactERCReport) {
+		t.Fatalf("%s missing ERC report artifact:\n%s", metadata.ID, formatDesignExampleStageArtifacts(stage, outputDir))
+	}
+	if requiredDesignExampleBool(t, metadata.ID, "require_drc", metadata.RequireDRC) && !designExampleStageHasArtifact(t, outputDir, stage, reports.ArtifactDRCReport) {
+		t.Fatalf("%s missing DRC report artifact:\n%s", metadata.ID, formatDesignExampleStageArtifacts(stage, outputDir))
+	}
+}
+
+func designExampleStageHasArtifact(t *testing.T, outputDir string, stage StageResult, kind reports.ArtifactKind) bool {
+	t.Helper()
+	for _, artifact := range stage.Artifacts {
+		if artifact.Kind == kind && strings.TrimSpace(artifact.Path) != "" {
+			if _, err := os.Stat(designExampleArtifactPath(outputDir, artifact.Path)); err == nil {
+				return true
+			} else if !errors.Is(err, os.ErrNotExist) {
+				t.Fatalf("stat %s artifact %s: %v", kind, artifact.Path, err)
+			}
+		}
+	}
+	return false
+}
+
+func designExampleArtifactPath(outputDir, path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(outputDir, filepath.FromSlash(path))
+}
+
 func designExampleHasBlockedStage(result WorkflowResult) bool {
 	for _, stage := range result.Stages {
 		if stage.Status == StageStatusBlocked {
+			return true
+		}
+	}
+	return false
+}
+
+func designExampleHasBlockedIssue(result WorkflowResult) bool {
+	for _, stage := range result.Stages {
+		if reports.HasBlockingIssue(stage.Issues) {
 			return true
 		}
 	}
@@ -675,6 +743,23 @@ func formatDesignExampleRun(metadata designExampleMetadata, outputDir string, re
 	builder.WriteString(outputDir)
 	builder.WriteString("\nstages:\n")
 	builder.WriteString(indentDesignExampleText(formatDesignExampleStages(result.Stages), "  "))
+	return builder.String()
+}
+
+func formatDesignExampleStageArtifacts(stage StageResult, outputDir string) string {
+	if len(stage.Artifacts) == 0 {
+		return "output: " + outputDir + "\nartifacts: (none)"
+	}
+	var builder strings.Builder
+	builder.WriteString("output: ")
+	builder.WriteString(outputDir)
+	builder.WriteString("\nartifacts:")
+	for _, artifact := range stage.Artifacts {
+		builder.WriteString("\n  - ")
+		builder.WriteString(string(artifact.Kind))
+		builder.WriteString(": ")
+		builder.WriteString(artifact.Path)
+	}
 	return builder.String()
 }
 

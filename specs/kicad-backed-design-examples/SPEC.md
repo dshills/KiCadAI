@@ -114,7 +114,7 @@ Each optional example must include adjacent metadata:
   "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
-    ".kicadai/workflow-result.json",
+    ".kicadai/transaction.json",
     ".kicadai/manifest.json",
     ".kicadai/checks/erc.json",
     ".kicadai/checks/drc.json"
@@ -207,7 +207,11 @@ The optional test tier must:
 - fail if required stages are missing;
 - fail if required stages are blocked unexpectedly;
 - read generated schematic and PCB files back with internal readers;
+- assert direct workflow artifacts such as `.kicadai/transaction.json` and
+  `.kicadai/manifest.json` exist;
 - assert KiCad check artifacts exist when checks pass;
+- when examples are run through the CLI, expect `.kicadai/workflow-result.json`
+  to be written by the CLI artifact layer;
 - print stage, issue, artifact, and metadata diagnostics when a fixture fails.
 
 Default `go test ./...` must remain green on systems without KiCad.

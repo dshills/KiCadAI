@@ -8,7 +8,7 @@
   "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
-    ".kicadai/workflow-result.json",
+    ".kicadai/transaction.json",
     ".kicadai/manifest.json"
   ],
   "expected_stages": [
