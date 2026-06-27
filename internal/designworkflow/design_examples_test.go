@@ -195,34 +195,61 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 		t.Skipf("set %s to run optional KiCad-backed design examples", checks.EnvKiCadCLI)
 	}
 	repoRoot := designExampleRepoRoot(t)
-	paths := optionalDesignExampleRequestFiles(t, repoRoot)
-	if len(paths) == 0 {
+	metadataPaths := optionalDesignExampleMetadataFiles(t, repoRoot)
+	if len(metadataPaths) == 0 {
 		t.Skip("no optional KiCad-backed design examples found under examples/design/kicad-backed")
 	}
 	createTimeout := designExampleCreateTimeout(t)
-	for _, path := range paths {
-		path := path
-		name := filepath.Base(path)
-		t.Run(name, func(t *testing.T) {
-			request, issues := loadDesignExampleRequestPath(t, path)
+	for _, metadataPath := range metadataPaths {
+		metadataPath := metadataPath
+		t.Run(strings.TrimSuffix(filepath.Base(metadataPath), ".metadata.json"), func(t *testing.T) {
+			metadata, err := loadDesignExampleMetadataPath(metadataPath)
+			if err != nil {
+				t.Fatalf("load %s: %v", metadataPath, err)
+			}
+			if metadata.Readiness == "blocked" {
+				t.Skipf("%s blocked: %s", metadata.ID, strings.Join(metadata.KnownGaps, "; "))
+			}
+			requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+			if err != nil {
+				t.Fatalf("%s request path: %v", metadata.ID, err)
+			}
+			request, issues := loadDesignExampleRequestPath(t, requestPath)
 			if len(issues) != 0 {
-				t.Fatalf("decode %s issues:\n%s", path, formatDesignExampleIssues(issues))
+				t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
 			}
 			projectName := NormalizeProjectName(request.Name)
-			outputDir := filepath.Join(t.TempDir(), projectName)
+			outputDir := designExamplePersistentOutputDir(t, projectName)
 			ctx, cancel := context.WithTimeout(context.Background(), createTimeout*2)
 			defer cancel()
 			result := Create(ctx, request, CreateOptions{
-				OutputDir:   outputDir,
-				Overwrite:   true,
-				KiCadChecks: KiCadCheckOptions{KiCadCLI: cliPath, Timeout: createTimeout, RequireERC: true, RequireDRC: true, KeepArtifacts: true, ArtifactDir: filepath.Join(outputDir, ".kicadai", "checks")},
+				OutputDir: outputDir,
+				Overwrite: true,
+				KiCadChecks: KiCadCheckOptions{
+					KiCadCLI:      cliPath,
+					Timeout:       createTimeout,
+					RequireERC:    requiredDesignExampleBool(t, metadata.ID, "requires_erc", metadata.RequiresERC),
+					RequireDRC:    requiredDesignExampleBool(t, metadata.ID, "requires_drc", metadata.RequiresDRC),
+					KeepArtifacts: true,
+					ArtifactDir:   filepath.Join(outputDir, ".kicadai", "checks"),
+				},
 			})
+			assertDesignExampleExpectedStages(t, metadata, result, outputDir)
 			kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 			if !ok {
-				t.Fatalf("%s missing kicad_checks stage:\n%s", name, formatDesignExampleStages(result.Stages))
+				t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleStages(result.Stages))
 			}
-			if kicadChecks.Status != StageStatusOK {
-				t.Fatalf("%s kicad_checks status = %q, want %q:\n%s", name, kicadChecks.Status, StageStatusOK, formatDesignExampleIssues(kicadChecks.Issues))
+			switch metadata.Readiness {
+			case "pass", "candidate":
+				if kicadChecks.Status != StageStatusOK {
+					t.Fatalf("%s kicad_checks status = %q, want %q:\n%s", metadata.ID, kicadChecks.Status, StageStatusOK, formatDesignExampleRun(metadata, outputDir, result))
+				}
+			case "expected_fail":
+				if kicadChecks.Status == StageStatusOK || kicadChecks.Status == StageStatusSkipped || !designExampleHasBlockedStage(result) {
+					t.Fatalf("%s expected blocked evidence, got kicad_checks=%q:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+				}
+			default:
+				t.Fatalf("%s unsupported readiness %q", metadata.ID, metadata.Readiness)
 			}
 		})
 	}
@@ -437,6 +464,33 @@ func designExampleBool(value bool) *bool {
 	return &value
 }
 
+func requiredDesignExampleBool(t *testing.T, id, field string, value *bool) bool {
+	t.Helper()
+	if value == nil {
+		t.Fatalf("%s metadata missing %s", id, field)
+	}
+	return *value
+}
+
+func designExamplePersistentOutputDir(t *testing.T, projectName string) string {
+	t.Helper()
+	dir, err := os.MkdirTemp("", "kicadai-design-example-*")
+	if err != nil {
+		t.Fatal(err)
+	}
+	outputDir := filepath.Join(dir, projectName)
+	t.Cleanup(func() {
+		if t.Failed() {
+			t.Logf("preserved design example output at %s", outputDir)
+			return
+		}
+		if err := os.RemoveAll(dir); err != nil {
+			t.Logf("remove design example temp dir %s: %v", dir, err)
+		}
+	})
+	return outputDir
+}
+
 func writeDesignExampleMetadataFixture(t *testing.T, dir, name string, metadata designExampleMetadata) string {
 	t.Helper()
 	data, err := json.Marshal(metadata)
@@ -468,15 +522,25 @@ func designExampleRequestFiles(t *testing.T, repoRoot string) []string {
 	return names
 }
 
-func optionalDesignExampleRequestFiles(t *testing.T, repoRoot string) []string {
+func optionalDesignExampleMetadataFiles(t *testing.T, repoRoot string) []string {
 	t.Helper()
-	pattern := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "*.json")
+	pattern := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "*.metadata.json")
 	matches, err := filepath.Glob(pattern)
 	if err != nil {
 		t.Fatal(err)
 	}
 	sort.Strings(matches)
 	return matches
+}
+
+func designExampleRequestPathForMetadata(metadataPath string, metadata designExampleMetadata) (string, error) {
+	baseDir := filepath.Clean(filepath.Dir(metadataPath))
+	requestPath := filepath.Clean(filepath.Join(baseDir, metadata.Request))
+	expectedPath := filepath.Clean(filepath.Join(baseDir, filepath.Base(requestPath)))
+	if requestPath != expectedPath {
+		return "", fmt.Errorf("request %q must stay in metadata directory", metadata.Request)
+	}
+	return requestPath, nil
 }
 
 func designExampleRepoRoot(t *testing.T) string {
@@ -500,6 +564,28 @@ func designExampleRepoRoot(t *testing.T) string {
 func hasDesignExampleIssue(issues []reports.Issue, path, message string) bool {
 	for _, issue := range issues {
 		if issue.Path == path && strings.Contains(issue.Message, message) {
+			return true
+		}
+	}
+	return false
+}
+
+func assertDesignExampleExpectedStages(t *testing.T, metadata designExampleMetadata, result WorkflowResult, outputDir string) {
+	t.Helper()
+	for _, name := range metadata.ExpectedStages {
+		stage, ok := designExampleStageByName(result, name)
+		if !ok {
+			t.Fatalf("%s missing expected stage %q:\n%s", metadata.ID, name, formatDesignExampleRun(metadata, outputDir, result))
+		}
+		if metadata.Readiness != "expected_fail" && stage.Status == StageStatusBlocked {
+			t.Fatalf("%s stage %q blocked unexpectedly:\n%s", metadata.ID, name, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	}
+}
+
+func designExampleHasBlockedStage(result WorkflowResult) bool {
+	for _, stage := range result.Stages {
+		if stage.Status == StageStatusBlocked {
 			return true
 		}
 	}
@@ -569,6 +655,19 @@ func formatDesignExampleStages(stages []StageResult) string {
 			builder.WriteString(indentDesignExampleText(formatDesignExampleIssues(stage.Issues), "  "))
 		}
 	}
+	return builder.String()
+}
+
+func formatDesignExampleRun(metadata designExampleMetadata, outputDir string, result WorkflowResult) string {
+	var builder strings.Builder
+	builder.WriteString("fixture: ")
+	builder.WriteString(metadata.ID)
+	builder.WriteString("\nreadiness: ")
+	builder.WriteString(metadata.Readiness)
+	builder.WriteString("\noutput: ")
+	builder.WriteString(outputDir)
+	builder.WriteString("\nstages:\n")
+	builder.WriteString(indentDesignExampleText(formatDesignExampleStages(result.Stages), "  "))
 	return builder.String()
 }
 
