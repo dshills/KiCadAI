@@ -57,14 +57,17 @@ type RequiredRating struct {
 }
 
 type Candidate struct {
-	ComponentID string          `json:"component_id"`
-	VariantID   string          `json:"variant_id"`
-	Family      string          `json:"family"`
-	Name        string          `json:"name"`
-	FootprintID string          `json:"footprint_id,omitempty"`
-	Confidence  ConfidenceLevel `json:"confidence"`
-	Score       int             `json:"score"`
-	Reasons     []string        `json:"reasons,omitempty"`
+	ComponentID      string          `json:"component_id"`
+	VariantID        string          `json:"variant_id"`
+	Family           string          `json:"family"`
+	Name             string          `json:"name"`
+	FootprintID      string          `json:"footprint_id,omitempty"`
+	Confidence       ConfidenceLevel `json:"confidence"`
+	Score            int             `json:"score"`
+	Generic          bool            `json:"generic,omitempty"`
+	EquivalenceGroup string          `json:"equivalence_group,omitempty"`
+	EquivalenceRole  EquivalenceRole `json:"equivalence_role,omitempty"`
+	Reasons          []string        `json:"reasons,omitempty"`
 }
 
 type Selection struct {
@@ -135,6 +138,7 @@ func Find(ctx context.Context, catalog *Catalog, query Query) ([]Candidate, repo
 		if !recordMatchesQuery(record, query) {
 			continue
 		}
+		group, role := candidateEquivalence(record)
 		for _, variant := range record.Packages {
 			if !variantMatchesQuery(variant, query) {
 				continue
@@ -145,14 +149,17 @@ func Find(ctx context.Context, catalog *Catalog, query Query) ([]Candidate, repo
 			}
 			score := scoreCandidate(record, variant, query)
 			candidates = append(candidates, Candidate{
-				ComponentID: record.ID,
-				VariantID:   variant.ID,
-				Family:      record.Family,
-				Name:        record.Name,
-				FootprintID: variant.FootprintID,
-				Confidence:  confidence,
-				Score:       score,
-				Reasons:     candidateReasons(record, variant, query),
+				ComponentID:      record.ID,
+				VariantID:        variant.ID,
+				Family:           record.Family,
+				Name:             record.Name,
+				FootprintID:      variant.FootprintID,
+				Confidence:       confidence,
+				Score:            score,
+				Generic:          record.Generic,
+				EquivalenceGroup: group,
+				EquivalenceRole:  role,
+				Reasons:          candidateReasons(record, variant, query),
 			})
 		}
 	}
@@ -189,14 +196,14 @@ func Select(ctx context.Context, catalog *Catalog, request SelectionRequest) (Se
 		}
 		filtered = append(filtered, acceptedCandidate{Candidate: candidate, Warnings: candidateIssues})
 	}
-	sortAcceptedCandidates(filtered)
+	sortAcceptedCandidates(filtered, request.Acceptance)
 	if len(filtered) == 0 {
 		issues = append(issues, dedupeRejectedIssues(rejected)...)
 		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": candidates}, issues, nil)
 	}
-	if len(filtered) > 1 && !request.AllowAlternatives && filtered[0].Candidate.Score == filtered[1].Candidate.Score && filtered[0].Candidate.Confidence == filtered[1].Candidate.Confidence {
+	if ambiguous, pair := ambiguousTopTie(filtered); ambiguous && !request.AllowAlternatives {
 		issues = append(issues, NewIssue(CodeComponentAmbiguous, reports.SeverityBlocked, "component.select", "multiple components matched with equal score and confidence"))
-		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": firstCandidates(filtered, 2)}, issues, nil)
+		return Selection{}, reports.ResultWithIssues("component select", map[string]any{"candidates": pair}, issues, nil)
 	}
 	selected := filtered[0]
 	record, variant, _ := findRecordVariant(catalog, selected.Candidate.ComponentID, selected.Candidate.VariantID)
@@ -218,21 +225,81 @@ type acceptedCandidate struct {
 	Warnings  []reports.Issue
 }
 
-func sortAcceptedCandidates(candidates []acceptedCandidate) {
+func sortAcceptedCandidates(candidates []acceptedCandidate, acceptance AcceptanceLevel) {
+	strongAcceptance := CompareAcceptance(acceptance, AcceptanceConnectivity) >= 0
 	sort.Slice(candidates, func(i, j int) bool {
-		left := candidates[i].Candidate
-		right := candidates[j].Candidate
-		if left.Score != right.Score {
-			return left.Score > right.Score
-		}
-		if left.Confidence != right.Confidence {
-			return confidenceRank(left.Confidence) > confidenceRank(right.Confidence)
-		}
-		if left.ComponentID != right.ComponentID {
-			return left.ComponentID < right.ComponentID
-		}
-		return left.VariantID < right.VariantID
+		return acceptedCandidateLess(candidates[i], candidates[j], strongAcceptance)
 	})
+}
+
+func acceptedCandidateLess(leftAccepted acceptedCandidate, rightAccepted acceptedCandidate, strongAcceptance bool) bool {
+	left := leftAccepted.Candidate
+	right := rightAccepted.Candidate
+	if left.Score != right.Score {
+		return left.Score > right.Score
+	}
+	if left.Confidence != right.Confidence {
+		return confidenceRank(left.Confidence) > confidenceRank(right.Confidence)
+	}
+	if left.Generic != right.Generic {
+		if strongAcceptance {
+			return !left.Generic
+		}
+		return left.Generic
+	}
+	if equivalentCandidate(left, right) && left.EquivalenceRole != right.EquivalenceRole {
+		return equivalenceRoleRank(left.EquivalenceRole) > equivalenceRoleRank(right.EquivalenceRole)
+	}
+	if left.ComponentID != right.ComponentID {
+		return left.ComponentID < right.ComponentID
+	}
+	return left.VariantID < right.VariantID
+}
+
+func ambiguousTopTie(candidates []acceptedCandidate) (bool, []Candidate) {
+	if len(candidates) < 2 {
+		return false, nil
+	}
+	selected := candidates[0].Candidate
+	for _, candidate := range candidates[1:] {
+		current := candidate.Candidate
+		if current.Score != selected.Score || current.Confidence != selected.Confidence {
+			break
+		}
+		if equivalentCandidate(selected, current) || hasExplicitSelectionPreference(selected, current) {
+			continue
+		}
+		return true, []Candidate{selected, current}
+	}
+	return false, nil
+}
+
+func equivalentCandidate(left Candidate, right Candidate) bool {
+	return left.EquivalenceGroup != "" && left.EquivalenceGroup == right.EquivalenceGroup
+}
+
+func hasExplicitSelectionPreference(left Candidate, right Candidate) bool {
+	return left.Generic != right.Generic
+}
+
+func candidateEquivalence(record ComponentRecord) (string, EquivalenceRole) {
+	if record.Equivalence == nil {
+		return "", ""
+	}
+	return normalizeMetadata(record.Equivalence.Group), record.Equivalence.Role
+}
+
+func equivalenceRoleRank(role EquivalenceRole) int {
+	switch role {
+	case EquivalencePreferred:
+		return 3
+	case EquivalenceAlternate:
+		return 2
+	case EquivalenceFallback:
+		return 1
+	default:
+		return 0
+	}
 }
 
 func firstCandidates(candidates []acceptedCandidate, limit int) []Candidate {

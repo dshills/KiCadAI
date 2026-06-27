@@ -6,6 +6,7 @@
   "footprint_id": "Resistor_SMD:R_0805_2012Metric",
   "confidence": "rule_inferred",
   "score": 335,
+  "generic": true,
   "reasons": [
     "family",
     "package",

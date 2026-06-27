@@ -415,6 +415,72 @@ func TestSelectAllowsPlaceholderForDraft(t *testing.T) {
 	}
 }
 
+func TestSelectPrefersEquivalentConcreteForConnectivity(t *testing.T) {
+	catalog := validCatalog()
+	concrete := cloneSelectionTestRecord(catalog.Records[0])
+	concrete.ID = "resistor.yageo.rc0805.10k"
+	concrete.Name = "Yageo 10k 0805 resistor"
+	concrete.Generic = false
+	concrete.Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+	catalog.Records[0].ID = "resistor.generic.10k.0805"
+	catalog.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceFallback}
+	catalog.Records = append(catalog.Records, concrete)
+
+	selection, result := Select(context.Background(), &catalog, SelectionRequest{
+		Query:      Query{Family: "resistor", Package: "0805", ValueKind: "resistance", Value: "10k"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if !result.OK {
+		t.Fatalf("select equivalent concrete failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "resistor.yageo.rc0805.10k" {
+		t.Fatalf("selected %s", selection.Component.ID)
+	}
+	if selection.Candidate.EquivalenceGroup != "resistor.10k.0805" || selection.Candidate.EquivalenceRole != EquivalencePreferred {
+		t.Fatalf("missing equivalence candidate metadata: %+v", selection.Candidate)
+	}
+}
+
+func TestSelectKeepsGenericFallbackForDraft(t *testing.T) {
+	catalog := validCatalog()
+	concrete := cloneSelectionTestRecord(catalog.Records[0])
+	concrete.ID = "resistor.aaa_concrete.10k.0805"
+	concrete.Name = "Yageo 10k 0805 resistor"
+	concrete.Generic = false
+	concrete.Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+	catalog.Records[0].ID = "resistor.generic.10k.0805"
+	catalog.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceFallback}
+	catalog.Records = append(catalog.Records, concrete)
+
+	selection, result := Select(context.Background(), &catalog, SelectionRequest{
+		Query:      Query{Family: "resistor", Package: "0805", ValueKind: "resistance", Value: "10k"},
+		Acceptance: AcceptanceDraft,
+	})
+	if !result.OK {
+		t.Fatalf("select draft fallback failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "resistor.generic.10k.0805" {
+		t.Fatalf("selected %s", selection.Component.ID)
+	}
+}
+
+func TestSelectPreservesAmbiguityForNonEquivalentTie(t *testing.T) {
+	catalog := validCatalog()
+	alternate := cloneSelectionTestRecord(catalog.Records[0])
+	catalog.Records[0].ID = "resistor.alpha.0805"
+	alternate.ID = "resistor.beta.0805"
+	catalog.Records = append(catalog.Records, alternate)
+
+	_, result := Select(context.Background(), &catalog, SelectionRequest{
+		Query:      Query{Family: "resistor", Package: "0805", ValueKind: "resistance", Value: "10k"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if result.OK {
+		t.Fatal("expected non-equivalent tie to remain ambiguous")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentAmbiguous)
+}
+
 func TestSelectVerifiedOpAmpBySupplyRange(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
@@ -432,6 +498,27 @@ func TestSelectVerifiedOpAmpBySupplyRange(t *testing.T) {
 	if selection.Component.ID != "opamp.ti.lmv321.sot23_5" {
 		t.Fatalf("unexpected opamp selection: %+v", selection.Candidate)
 	}
+}
+
+func cloneSelectionTestRecord(record ComponentRecord) ComponentRecord {
+	clone := record
+	clone.Values = append([]ValueConstraint(nil), record.Values...)
+	clone.Ratings = append([]RatingConstraint(nil), record.Ratings...)
+	clone.Tolerances = append([]ToleranceConstraint(nil), record.Tolerances...)
+	clone.Symbols = append([]SymbolBinding(nil), record.Symbols...)
+	for i := range clone.Symbols {
+		clone.Symbols[i].FunctionPins = append([]FunctionPin(nil), record.Symbols[i].FunctionPins...)
+	}
+	clone.Packages = append([]PackageVariant(nil), record.Packages...)
+	for i := range clone.Packages {
+		clone.Packages[i].PadFunctions = append([]PadFunction(nil), record.Packages[i].PadFunctions...)
+	}
+	if record.Equivalence != nil {
+		equivalence := *record.Equivalence
+		equivalence.Notes = append([]string(nil), record.Equivalence.Notes...)
+		clone.Equivalence = &equivalence
+	}
+	return clone
 }
 
 func TestSelectRejectsOpAmpOutsideSupplyRange(t *testing.T) {
