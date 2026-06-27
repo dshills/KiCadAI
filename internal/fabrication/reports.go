@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/componentprops"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kicadfiles"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
@@ -228,13 +229,14 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 		fields := fieldMap(symbol.Fields)
 		value := firstNonEmpty(strings.TrimSpace(symbol.Value), lookup(properties, "Value"), lookup(fields, "Value"))
 		footprint := firstNonEmpty(lookup(properties, "Footprint"), lookup(fields, "Footprint"))
-		manufacturer := firstNonEmpty(lookup(properties, "Manufacturer"), lookup(fields, "Manufacturer"))
-		mpn := firstNonEmpty(lookup(properties, "MPN"), lookup(properties, "Manufacturer Part Number"), lookup(fields, "MPN"))
-		componentID := firstNonEmpty(lookup(properties, "Component ID"), lookup(fields, "Component ID"))
+		manufacturer := firstNonEmpty(lookup(properties, componentprops.PropertyManufacturer), lookup(properties, "Manufacturer"), lookup(fields, "Manufacturer"))
+		mpn := firstNonEmpty(lookup(properties, componentprops.PropertyMPN), lookup(properties, "MPN"), lookup(properties, "Manufacturer Part Number"), lookup(fields, "MPN"))
+		componentID := firstNonEmpty(lookup(properties, componentprops.PropertyComponentID), lookup(properties, "Component ID"), lookup(fields, "Component ID"))
 		packageName := firstNonEmpty(lookup(properties, "Package"), lookup(fields, "Package"))
-		componentClass := firstNonEmpty(lookup(properties, "Component Class"), lookup(fields, "Component Class"))
-		lifecycle := firstNonEmpty(lookup(properties, "Lifecycle"), lookup(fields, "Lifecycle"))
-		confidence := firstNonEmpty(lookup(properties, "Confidence"), lookup(fields, "Confidence"), "partial")
+		componentClass := firstNonEmpty(lookup(properties, componentprops.PropertyComponentClass), lookup(properties, "Component Class"), lookup(fields, "Component Class"))
+		lifecycle := firstNonEmpty(lookup(properties, componentprops.PropertyLifecycleStatus), lookup(properties, "Lifecycle"), lookup(fields, "Lifecycle"))
+		availability := strings.ToLower(firstNonEmpty(lookup(properties, componentprops.PropertyAvailabilityStatus), lookup(properties, "Availability"), lookup(fields, "Availability")))
+		confidence := firstNonEmpty(lookup(properties, componentprops.PropertyComponentConfidence), lookup(properties, "Confidence"), lookup(fields, "Confidence"), "partial")
 		identity := NormalizeComponentIdentity(ComponentIdentity{
 			Reference:      ref,
 			ComponentID:    componentID,
@@ -271,6 +273,7 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 				Package:               identity.Package,
 				ComponentClass:        identity.ComponentClass,
 				Lifecycle:             identity.Lifecycle,
+				AvailabilityStatus:    availability,
 				Confidence:            identity.Confidence,
 				IdentityStatus:        identity.Status,
 				IdentitySource:        identity.Source,

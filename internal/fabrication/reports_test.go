@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"kicadai/internal/componentprops"
 	"kicadai/internal/components"
 	"kicadai/internal/inspect"
 	"kicadai/internal/kicadfiles"
@@ -71,13 +72,14 @@ func TestBuildBOMRowsHydratesIdentityEvidence(t *testing.T) {
 		LibraryID: "MCU:ATmega328P",
 		Properties: []schematicfiles.Property{
 			{Name: "Footprint", Value: "Package_QFP:TQFP-32"},
-			{Name: "Component ID", Value: "mcu.atmega328p-au"},
-			{Name: "Manufacturer Part Number", Value: "ATMEGA328P-AU"},
-			{Name: "Manufacturer", Value: "Microchip"},
+			{Name: componentprops.PropertyComponentID, Value: "mcu.atmega328p-au"},
+			{Name: componentprops.PropertyMPN, Value: "ATMEGA328P-AU"},
+			{Name: componentprops.PropertyManufacturer, Value: "Microchip"},
 			{Name: "Package", Value: "TQFP-32"},
-			{Name: "Component Class", Value: "Active"},
-			{Name: "Lifecycle", Value: "active"},
-			{Name: "Confidence", Value: "verified"},
+			{Name: componentprops.PropertyComponentClass, Value: "Active"},
+			{Name: componentprops.PropertyLifecycleStatus, Value: "active"},
+			{Name: componentprops.PropertyAvailabilityStatus, Value: "in_stock"},
+			{Name: componentprops.PropertyComponentConfidence, Value: "verified"},
 		},
 	}}})
 	if len(issues) != 0 {
@@ -87,7 +89,7 @@ func TestBuildBOMRowsHydratesIdentityEvidence(t *testing.T) {
 		t.Fatalf("rows = %#v", rows)
 	}
 	row := rows[0]
-	if row.ComponentID != "mcu.atmega328p-au" || row.Package != "TQFP-32" || row.ComponentClass != "active" || row.Lifecycle != "active" {
+	if row.ComponentID != "mcu.atmega328p-au" || row.Package != "TQFP-32" || row.ComponentClass != "active" || row.Lifecycle != "active" || row.AvailabilityStatus != "in_stock" {
 		t.Fatalf("identity row = %#v", row)
 	}
 	if row.IdentityStatus != IdentityPass || row.IdentitySource != IdentitySourceSchematicProperty {
