@@ -16,7 +16,7 @@ func TestLoadSourcesValidFixture(t *testing.T) {
 	if len(sources.Diagnostics) != 0 {
 		t.Fatalf("diagnostics = %#v", sources.Diagnostics)
 	}
-	if len(sources.Records) != 2 {
+	if len(sources.Records) < 6 {
 		t.Fatalf("records = %#v", sources.Records)
 	}
 	record, ok := sources.Find("diodes incorporated", "AP2112K-3.3")

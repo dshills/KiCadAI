@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func TestSelectGenericResistorByPackageAndValue(t *testing.T) {
+func TestSelectConcreteResistorByPackageAndValue(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query: Query{
@@ -21,8 +21,11 @@ func TestSelectGenericResistorByPackageAndValue(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("select resistor failed: %+v", result.Issues)
 	}
-	if selection.Component.ID != "resistor.generic.0805" {
-		t.Fatalf("selected %s", selection.Component.ID)
+	if selection.Component.Generic {
+		t.Fatalf("selected generic resistor: %+v", selection.Component)
+	}
+	if selection.Component.Manufacturer != "Yageo" || selection.Component.MPN != "RC0805FR-0710KL" {
+		t.Fatalf("selected resistor missing procurement identity: %+v", selection.Component)
 	}
 }
 
@@ -109,7 +112,7 @@ func TestSelectRejectsCapacitorBelowVoltageRating(t *testing.T) {
 		Acceptance: AcceptanceConnectivity,
 		RequiredRatings: []RequiredRating{{
 			Kind:  "voltage",
-			Value: "50",
+			Value: "100",
 			Unit:  "V",
 		}},
 	})
@@ -173,7 +176,11 @@ func TestFindConnectorByPinCountAndPackage(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("find connector failed: %+v", result.Issues)
 	}
-	if len(candidates) != 1 || candidates[0].ComponentID != "connector.pinheader.1x04.2_54mm" {
+	found := map[string]bool{}
+	for _, candidate := range candidates {
+		found[candidate.ComponentID] = true
+	}
+	if len(candidates) != 2 || !found["connector.pinheader.1x04.2_54mm"] || !found["connector.samtec.tsw_104_07_l_s.1x04"] {
 		t.Fatalf("unexpected candidates: %+v", candidates)
 	}
 }
@@ -599,17 +606,29 @@ func TestSelectRequiresFunction(t *testing.T) {
 
 func TestSelectRequiresConcreteAndCompanions(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
-	_, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:           Query{Family: "resistor", Package: "0805"},
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "resistor", Package: "0805", ValueKind: "resistance", Value: "10k"},
+		Acceptance:      AcceptanceConnectivity,
+		RequireConcrete: true,
+	})
+	if !result.OK {
+		t.Fatalf("expected concrete resistor to satisfy concrete requirement: %+v", result.Issues)
+	}
+	if selection.Component.Generic {
+		t.Fatalf("expected concrete resistor, got %+v", selection.Component)
+	}
+
+	_, result = Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "capacitor", Package: "0603"},
 		Acceptance:      AcceptanceConnectivity,
 		RequireConcrete: true,
 	})
 	if result.OK {
-		t.Fatal("expected generic resistor to fail concrete requirement")
+		t.Fatal("expected generic-only capacitor to fail concrete requirement")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentConcreteRequired)
 
-	selection, result := Select(context.Background(), catalog, SelectionRequest{
+	selection, result = Select(context.Background(), catalog, SelectionRequest{
 		Query:             Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
 		Acceptance:        AcceptanceConnectivity,
 		RequireConcrete:   true,

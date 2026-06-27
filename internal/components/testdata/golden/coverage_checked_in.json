@@ -1,19 +1,19 @@
 {
-  "record_count": 25,
+  "record_count": 29,
   "family_count": 12,
   "confidence_counts": {
     "blocked": 0,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 4,
-    "verified": 17
+    "verified": 21
   },
   "families": [
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 3,
-      "verified_records": 0,
+      "record_count": 4,
+      "verified_records": 1,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 1,
@@ -21,19 +21,21 @@
       "missing_resolver_evidence": [
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
-        "capacitor.electrolytic.radial"
+        "capacitor.electrolytic.radial",
+        "capacitor.murata.grm21br71h104ka01l.0805"
       ],
       "record_ids": [
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
-        "capacitor.electrolytic.radial"
+        "capacitor.electrolytic.radial",
+        "capacitor.murata.grm21br71h104ka01l.0805"
       ]
     },
     {
       "family": "connector",
       "defined": true,
-      "record_count": 4,
-      "verified_records": 4,
+      "record_count": 5,
+      "verified_records": 5,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -42,13 +44,15 @@
         "connector.pinheader.1x02.2_54mm",
         "connector.pinheader.1x03.2_54mm",
         "connector.pinheader.1x04.2_54mm",
-        "connector.pinheader.1x05.2_54mm"
+        "connector.pinheader.1x05.2_54mm",
+        "connector.samtec.tsw_104_07_l_s.1x04"
       ],
       "record_ids": [
         "connector.pinheader.1x02.2_54mm",
         "connector.pinheader.1x03.2_54mm",
         "connector.pinheader.1x04.2_54mm",
-        "connector.pinheader.1x05.2_54mm"
+        "connector.pinheader.1x05.2_54mm",
+        "connector.samtec.tsw_104_07_l_s.1x04"
       ]
     },
     {
@@ -92,17 +96,19 @@
     {
       "family": "led",
       "defined": true,
-      "record_count": 1,
-      "verified_records": 1,
+      "record_count": 2,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
-        "led.generic.0805"
+        "led.generic.0805",
+        "led.liteon.ltst_c170kgkt.0805"
       ],
       "record_ids": [
-        "led.generic.0805"
+        "led.generic.0805",
+        "led.liteon.ltst_c170kgkt.0805"
       ]
     },
     {
@@ -178,19 +184,21 @@
     {
       "family": "resistor",
       "defined": true,
-      "record_count": 2,
-      "verified_records": 0,
+      "record_count": 3,
+      "verified_records": 1,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
         "resistor.generic.0603",
-        "resistor.generic.0805"
+        "resistor.generic.0805",
+        "resistor.yageo.rc0805fr_0710kl.0805"
       ],
       "record_ids": [
         "resistor.generic.0603",
-        "resistor.generic.0805"
+        "resistor.generic.0805",
+        "resistor.yageo.rc0805fr_0710kl.0805"
       ]
     },
     {

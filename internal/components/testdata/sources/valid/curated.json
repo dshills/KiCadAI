@@ -37,6 +37,70 @@
         "source_date": "2026-06-26",
         "confidence": "not_checked"
       }
+    },
+    {
+      "manufacturer": "Yageo",
+      "mpn": "RC0805FR-0710KL",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Murata",
+      "mpn": "GRM21BR71H104KA01L",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Lite-On",
+      "mpn": "LTST-C170KGKT",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Samtec",
+      "mpn": "TSW-104-07-L-S",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
     }
   ]
 }
