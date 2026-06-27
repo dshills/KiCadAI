@@ -2,8 +2,11 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -18,6 +21,43 @@ import (
 )
 
 const designExamplePlanningTimeout = 15 * time.Second
+
+type designExampleMetadata struct {
+	ID                string          `json:"id"`
+	Request           string          `json:"request"`
+	Tier              string          `json:"tier"`
+	Readiness         string          `json:"readiness"`
+	Acceptance        AcceptanceLevel `json:"acceptance"`
+	RequiresERC       *bool           `json:"requires_erc"`
+	RequiresDRC       *bool           `json:"requires_drc"`
+	Allowlists        []string        `json:"allowlists,omitempty"`
+	ExpectedArtifacts []string        `json:"expected_artifacts,omitempty"`
+	ExpectedStages    []StageName     `json:"expected_stages"`
+	KnownGaps         []string        `json:"known_gaps"`
+	Notes             string          `json:"notes,omitempty"`
+}
+
+var designExampleMetadataTiers = map[string]struct{}{
+	"smoke":             {},
+	"block-composition": {},
+	"routing":           {},
+	"fabrication":       {},
+}
+
+var designExampleMetadataReadiness = map[string]struct{}{
+	"candidate":     {},
+	"pass":          {},
+	"expected_fail": {},
+	"blocked":       {},
+}
+
+var designExampleMetadataAcceptance = map[AcceptanceLevel]struct{}{
+	AcceptanceDraft:                {},
+	AcceptanceStructural:           {},
+	AcceptanceConnectivity:         {},
+	AcceptanceERCDRC:               {},
+	AcceptanceFabricationCandidate: {},
+}
 
 func TestDesignExamplesPassBlockPlanning(t *testing.T) {
 	repoRoot := designExampleRepoRoot(t)
@@ -188,6 +228,102 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 	}
 }
 
+func TestDesignExampleMetadataValidation(t *testing.T) {
+	dir := t.TempDir()
+	requestPath := filepath.Join(dir, "led_indicator_kicad_smoke.json")
+	if err := os.WriteFile(requestPath, []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:             "led_indicator_kicad_smoke",
+		Request:        "led_indicator_kicad_smoke.json",
+		Tier:           "smoke",
+		Readiness:      "candidate",
+		Acceptance:     AcceptanceERCDRC,
+		RequiresERC:    designExampleBool(true),
+		RequiresDRC:    designExampleBool(true),
+		ExpectedStages: []StageName{StageBlockPlanning, StageKiCadChecks},
+		KnownGaps:      []string{},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "led_indicator_kicad_smoke.metadata.json", metadata)
+	loaded, err := loadDesignExampleMetadataPath(path)
+	if err != nil {
+		t.Fatalf("valid metadata rejected: %v", err)
+	}
+	if !reflect.DeepEqual(loaded, metadata) {
+		t.Fatalf("loaded metadata = %#v, want %#v", loaded, metadata)
+	}
+}
+
+func TestDesignExampleMetadataRejectsMissingRequiredFields(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, "fixture.metadata.json")
+	if err := os.WriteFile(path, []byte(`{"id":"fixture","request":"fixture.json","tier":"smoke","readiness":"candidate"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "acceptance is required") {
+		t.Fatalf("missing acceptance error = %v, want acceptance is required", err)
+	}
+
+	metadata := designExampleMetadata{
+		ID:             "fixture",
+		Request:        "fixture.json",
+		Tier:           "smoke",
+		Readiness:      "candidate",
+		Acceptance:     AcceptanceStructural,
+		ExpectedStages: []StageName{StageBlockPlanning},
+		KnownGaps:      []string{},
+	}
+	path = writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err = loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "requires_erc is required") {
+		t.Fatalf("missing requires_erc error = %v, want requires_erc is required", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsInvalidEnums(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:             "fixture",
+		Request:        "fixture.json",
+		Tier:           "slow",
+		Readiness:      "candidate",
+		Acceptance:     AcceptanceStructural,
+		ExpectedStages: []StageName{StageBlockPlanning},
+		KnownGaps:      []string{},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "unsupported tier") {
+		t.Fatalf("invalid enum error = %v, want unsupported tier", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsRequestPathTraversal(t *testing.T) {
+	dir := t.TempDir()
+	metadata := designExampleMetadata{
+		ID:             "fixture",
+		Request:        "../fixture.json",
+		Tier:           "smoke",
+		Readiness:      "candidate",
+		Acceptance:     AcceptanceStructural,
+		ExpectedStages: []StageName{StageBlockPlanning},
+		KnownGaps:      []string{},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "request must be a local JSON filename") {
+		t.Fatalf("path traversal error = %v, want local filename rejection", err)
+	}
+}
+
 func TestFormatDesignExampleStagesGroupsIssuesUnderStage(t *testing.T) {
 	got := formatDesignExampleStages([]StageResult{{
 		Name:   StageProjectWrite,
@@ -229,6 +365,89 @@ func loadDesignExampleRequestPath(t *testing.T, path string) (Request, []reports
 	defer file.Close()
 	request, issues := DecodeRequestStrict(file)
 	return request, issues
+}
+
+func loadDesignExampleMetadataPath(path string) (designExampleMetadata, error) {
+	var metadata designExampleMetadata
+	file, err := os.Open(path)
+	if err != nil {
+		return metadata, err
+	}
+	defer file.Close()
+	decoder := json.NewDecoder(file)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&metadata); err != nil {
+		return designExampleMetadata{}, err
+	}
+	if err := validateDesignExampleMetadata(filepath.Dir(path), metadata); err != nil {
+		return designExampleMetadata{}, err
+	}
+	return metadata, nil
+}
+
+func validateDesignExampleMetadata(dir string, metadata designExampleMetadata) error {
+	if strings.TrimSpace(metadata.ID) == "" {
+		return fmt.Errorf("id is required")
+	}
+	if strings.TrimSpace(metadata.Request) == "" {
+		return fmt.Errorf("request is required")
+	}
+	if filepath.Base(metadata.Request) != metadata.Request || filepath.Ext(metadata.Request) != ".json" || strings.HasSuffix(metadata.Request, ".metadata.json") {
+		return fmt.Errorf("request must be a local JSON filename")
+	}
+	if strings.TrimSuffix(filepath.Base(metadata.Request), ".json") != metadata.ID {
+		return fmt.Errorf("id must match request basename")
+	}
+	requestPath := filepath.Join(dir, metadata.Request)
+	info, err := os.Stat(requestPath)
+	if err != nil {
+		return fmt.Errorf("request %s: %w", metadata.Request, err)
+	}
+	if info.IsDir() {
+		return fmt.Errorf("request %s must be a file", metadata.Request)
+	}
+	if _, ok := designExampleMetadataTiers[metadata.Tier]; !ok {
+		return fmt.Errorf("unsupported tier %q", metadata.Tier)
+	}
+	if _, ok := designExampleMetadataReadiness[metadata.Readiness]; !ok {
+		return fmt.Errorf("unsupported readiness %q", metadata.Readiness)
+	}
+	if _, ok := designExampleMetadataAcceptance[metadata.Acceptance]; !ok {
+		if metadata.Acceptance == "" {
+			return fmt.Errorf("acceptance is required")
+		}
+		return fmt.Errorf("unsupported acceptance %q", metadata.Acceptance)
+	}
+	if metadata.RequiresERC == nil {
+		return fmt.Errorf("requires_erc is required")
+	}
+	if metadata.RequiresDRC == nil {
+		return fmt.Errorf("requires_drc is required")
+	}
+	if len(metadata.ExpectedStages) == 0 {
+		return fmt.Errorf("expected_stages must not be empty")
+	}
+	if metadata.KnownGaps == nil {
+		return fmt.Errorf("known_gaps is required")
+	}
+	return nil
+}
+
+func designExampleBool(value bool) *bool {
+	return &value
+}
+
+func writeDesignExampleMetadataFixture(t *testing.T, dir, name string, metadata designExampleMetadata) string {
+	t.Helper()
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(dir, name)
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
 }
 
 func designExampleRequestFiles(t *testing.T, repoRoot string) []string {
