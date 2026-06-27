@@ -169,6 +169,7 @@ kicadai --json --source-dir ./data/component-sources component validate
 kicadai --json --source-dir ./data/component-sources component coverage
 kicadai --json component show resistor.generic.0805
 kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --json --request examples/components/select_concrete_resistor.json component select
 kicadai --json pinmap validate ./out/project
 ```
 
@@ -181,6 +182,13 @@ For generated intent workflows, inspect:
 - resolver/pinmap evidence;
 - procurement evidence when a local source snapshot is supplied;
 - placeholder or inferred-confidence warnings.
+
+The checked-in catalog includes a small verified alternatives slice for a 10
+kOhm 0805 resistor, 100 nF 0805 capacitor, green 0805 LED, and 1x04 2.54 mm
+header. Connectivity and stronger selection should prefer concrete records
+when they satisfy the request; draft and structural workflows may still use
+generic fallback records. Inspect `alternative_coverage` in `component coverage`
+when judging catalog breadth.
 
 Stop if a fabrication-candidate request lacks verified component evidence.
 When lifecycle or availability matters, provide `--source-dir` and inspect the

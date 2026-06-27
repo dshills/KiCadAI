@@ -29,9 +29,16 @@ Examples:
 kicadai --json component list
 kicadai --json component show resistor.generic.0805
 kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-kicadai --json --request ./examples/components/select_resistor.json component select
+kicadai --json --request examples/components/select_resistor.json component select
+kicadai --json --request examples/components/select_concrete_resistor.json component select
 kicadai --json component validate
 ```
+
+The catalog includes a small verified alternative slice for common generated
+parts: a Yageo 10 kOhm 0805 resistor, Murata 100 nF 0805 capacitor, Lite-On
+green 0805 LED, and Samtec 1x04 2.54 mm header. Connectivity and stronger
+selection prefers concrete alternatives when they satisfy the request; draft and
+structural selection can still use generic fallbacks.
 
 `design create` includes a `component_selection` stage after block planning and
 before schematic or PCB writes. Request JSON can include `component_policy` to

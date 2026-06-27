@@ -183,6 +183,11 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
   with deterministic validation, component selection gates, workflow
   procurement summaries, rationale evidence, and BOM/fabrication snapshot
   reporting;
+- verified concrete alternatives for a seed 10 kOhm 0805 resistor, 100 nF
+  0805 capacitor, green 0805 LED, and 1x04 2.54 mm header, with deterministic
+  concrete-vs-generic selection, equivalence metadata validation, alternative
+  coverage reporting, workflow procurement evidence, and BOM procurement
+  snapshot propagation;
 - verified regulator-path coverage that connects fixed 3.3 V linear regulator
   blocks to catalog-backed AMS1117 SOT-223 and AP2112K SOT-23-5 selection,
   capacitor selection, rating requirements, generated request overrides,
@@ -191,7 +196,8 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
 
 ### Remaining Work
 
-- Expand from seed records to larger verified families and real alternatives.
+- Expand from the first verified alternative slice to larger verified families,
+  more values/packages, and real second-source alternates.
 - Broaden the verified regulator path beyond the current 3.3 V AMS1117-style
   and AP2112K LDO slices, including additional voltages, adjustable/BYP
   networks, exported enable control, and part-specific capacitor stability

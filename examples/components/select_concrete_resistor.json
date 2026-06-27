@@ -1,0 +1,10 @@
+{
+  "query": {
+    "family": "resistor",
+    "package": "0805",
+    "value_kind": "resistance",
+    "value": "10k"
+  },
+  "acceptance": "connectivity",
+  "require_concrete": true
+}

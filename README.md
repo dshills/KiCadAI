@@ -86,6 +86,7 @@ Use component intelligence:
 kicadai --json component list
 kicadai --json component show resistor.generic.0805
 kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --json --request examples/components/select_concrete_resistor.json component select
 kicadai --json component validate
 kicadai --json --source-dir ./data/component-sources component coverage
 ```

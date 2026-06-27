@@ -64,6 +64,7 @@ Select from a request file:
 
 ```sh
 kicadai --json --request examples/components/select_resistor.json component select
+kicadai --json --request examples/components/select_concrete_resistor.json component select
 ```
 
 Validate the catalog:
@@ -75,14 +76,14 @@ kicadai --json component validate
 Validate a local lifecycle/availability source snapshot alongside the catalog:
 
 ```sh
-kicadai --json --source-dir ./data/component-sources component validate
-kicadai --json --source-dir ./data/component-sources component coverage
+kicadai --json --source-dir data/component-sources component validate
+kicadai --json --source-dir data/component-sources component coverage
 ```
 
 Select with local procurement evidence:
 
 ```sh
-kicadai --json --source-dir ./data/component-sources \
+kicadai --json --source-dir data/component-sources \
   --request examples/components/select_regulator.json \
   component select
 ```
@@ -90,6 +91,66 @@ kicadai --json --source-dir ./data/component-sources \
 `--source-dir` loads local JSON snapshots only. It does not query live
 distributors, scrape websites, or imply real-time stock, pricing, lead time, or
 manufacturer approval.
+
+## Verified Alternatives
+
+The checked-in catalog now includes a small verified alternative slice for
+common generated-design parts:
+
+- `resistor.yageo.rc0805fr_0710kl.0805` for 10 kOhm 0805 pull-up and
+  current-limiting roles;
+- `capacitor.murata.grm21br71h104ka01l.0805` for 100 nF 0805 decoupling and
+  filter roles;
+- `led.liteon.ltst_c170kgkt.0805` for green 0805 indicator LEDs;
+- `connector.samtec.tsw_104_07_l_s.1x04` for 1x04 2.54 mm vertical pin
+  headers.
+
+Concrete records carry manufacturer, MPN, lifecycle status, symbol bindings,
+footprints, pad-function mappings, and rating/value metadata. Generic records
+remain available for draft and structural workflows where a design needs shape
+or connectivity scaffolding before choosing an exact part.
+
+Records can include optional `equivalence` metadata:
+
+```json
+{
+  "equivalence": {
+    "group": "resistor.10k.0805",
+    "role": "preferred"
+  }
+}
+```
+
+Supported roles are `preferred`, `alternate`, and `fallback`. Catalog
+validation rejects invalid roles, duplicate preferred records in a family/group
+scope, groups without a preferred record, and group members with incompatible
+family, package, value, footprint, or pad-function metadata. Differing ratings
+or tolerances are acceptable only when each group member still satisfies the
+same required selection gates; weaker records belong in a separate group.
+Coverage still reports group-health fields so custom or partially migrated
+catalogs can be diagnosed before those catalogs are accepted for normal use.
+
+Selection is deterministic:
+
+- connectivity and stronger acceptance prefer concrete records over generic
+  fallbacks when both pass safety gates;
+- draft and structural acceptance preserve generic fallback behavior;
+- equivalence roles order otherwise equivalent records;
+- non-equivalent candidates that remain tied after explicit preference signals
+  still block as ambiguous unless `allow_alternatives` is set.
+
+`component coverage` reports alternative breadth through `alternative_coverage`.
+Per-family coverage includes:
+
+- `concrete_records`;
+- `generic_fallback_records`;
+- `equivalence_groups`.
+
+Aggregate group-health fields include:
+
+- `groups_missing_preferred`;
+- `groups_with_duplicate_preferred`;
+- `concrete_records_missing_mpn`.
 
 ## Lifecycle And Availability Source Snapshots
 
