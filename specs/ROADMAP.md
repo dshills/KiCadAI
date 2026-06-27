@@ -98,6 +98,13 @@ from validation feedback to safe automatic repair.
   built-in generic assembly manufacturer profile checks, and `design create`
   fabrication-candidate acceptance integration.
 - `design create` workflow for structured block-based design requests.
+- Runnable `examples/design/*.json` requests are now covered by automated
+  regression tests that strict-decode each request, run `design create`, verify
+  generated project artifacts, read back generated schematic/PCB files, and
+  check generated schematic component identity properties. An optional
+  `examples/design/kicad-backed/*.json` tier is reserved for future fixtures
+  that require explicit `KICADAI_KICAD_CLI` ERC/DRC evidence without making the
+  default test suite depend on KiCad.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready
@@ -141,6 +148,10 @@ loop confidence:
   narrow, and broader topology synthesis is still intentionally limited.
   Deterministic rationale reports now explain supported planner decisions and
   blockers, but they do not replace broader synthesis.
+- the default design examples are intentionally small LED workflows. Multi-block
+  I2C sensor/connector scenarios remain covered by block and intent fixtures
+  until generic sensor/connector PCB realization and KiCad-backed proof are
+  strong enough for default artifact-generation examples.
 
 ## Roadmap Principles
 
@@ -646,6 +657,13 @@ power module, amplifier module, and fabrication-oriented sensor requests.
 Planning status is conservative: unsupported families, unsafe ambiguity, and
 missing proof become structured issues or known gaps instead of guessed design
 decisions.
+
+Public `examples/design/*.json` requests are now executable regression fixtures
+for `design create`. The default set exercises supported LED workflows and
+proves that checked-in examples remain aligned with the current request schema,
+block contracts, project writer, schematic/PCB readers, and component identity
+property propagation. Richer KiCad-backed design examples should be added under
+`examples/design/kicad-backed/` once their ERC/DRC expectations are stable.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
