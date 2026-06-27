@@ -147,6 +147,28 @@ func TestDesignExamplesGenerateReadableProjectArtifacts(t *testing.T) {
 	}
 }
 
+func TestFormatDesignExampleStagesGroupsIssuesUnderStage(t *testing.T) {
+	got := formatDesignExampleStages([]StageResult{{
+		Name:   StageProjectWrite,
+		Status: StageStatusBlocked,
+		Issues: []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Path:     "operations[0]",
+			Message:  "example failure",
+		}, {
+			Code:     reports.CodeMissingFootprint,
+			Severity: reports.SeverityWarning,
+			Path:     "components.R1",
+			Message:  "missing footprint evidence",
+		}},
+	}})
+	want := "- project_write: blocked\n  - error VALIDATION_FAILED at operations[0]: example failure\n  - warning MISSING_FOOTPRINT at components.R1: missing footprint evidence"
+	if got != want {
+		t.Fatalf("formatted stages:\n%q\nwant:\n%q", got, want)
+	}
+}
+
 func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 	planResult := PlanBlocks(ctx, blocks.NewBuiltinRegistry(), request)
 	return planResult.Stage
