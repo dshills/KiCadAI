@@ -1,0 +1,31 @@
+{
+  "version": "0.1.0",
+  "name": "led_indicator_kicad_smoke",
+  "intent": {
+    "summary": "A small active-high LED indicator used as the first optional KiCad-backed design smoke fixture.",
+    "category": "indicator"
+  },
+  "board": {
+    "width_mm": 40,
+    "height_mm": 25,
+    "layers": 2
+  },
+  "blocks": [
+    {
+      "id": "status",
+      "block_id": "led_indicator",
+      "params": {
+        "color": "green",
+        "supply_voltage": "3.3V",
+        "led_forward_voltage": "2.0V",
+        "resistor_value": "270R"
+      }
+    }
+  ],
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true,
+    "skip_routing": true
+  }
+}

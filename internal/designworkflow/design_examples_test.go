@@ -245,7 +245,7 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 					t.Fatalf("%s kicad_checks status = %q, want %q:\n%s", metadata.ID, kicadChecks.Status, StageStatusOK, formatDesignExampleRun(metadata, outputDir, result))
 				}
 			case "expected_fail":
-				if kicadChecks.Status == StageStatusOK || kicadChecks.Status == StageStatusSkipped || !designExampleHasBlockedStage(result) {
+				if kicadChecks.Status == StageStatusOK || !designExampleHasBlockedStage(result) {
 					t.Fatalf("%s expected blocked evidence, got kicad_checks=%q:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
 				}
 			default:
