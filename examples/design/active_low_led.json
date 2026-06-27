@@ -1,6 +1,9 @@
 {
   "version": "0.1.0",
-  "name": "led_indicator",
+  "name": "active_low_led",
+  "intent": {
+    "summary": "An active-low amber LED indicator with a fixed current-limiting resistor."
+  },
   "board": {
     "width_mm": 40,
     "height_mm": 25,
@@ -11,7 +14,10 @@
       "id": "status",
       "block_id": "led_indicator",
       "params": {
-        "color": "green",
+        "color": "amber",
+        "active_high": false,
+        "supply_voltage": "3.3V",
+        "led_forward_voltage": "2.0V",
         "resistor_value": "1k"
       }
     }
