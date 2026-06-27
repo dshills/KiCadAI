@@ -10,7 +10,6 @@ kicadai \
   --name led_indicator \
   --seed demo \
   --with-pcb \
-  --json \
   generate-led-demo
 ```
 

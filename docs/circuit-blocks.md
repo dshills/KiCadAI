@@ -18,10 +18,10 @@ readiness gaps. `design create` includes that block readiness in its
 required local routes, and known limitations before writing a project.
 
 ```sh
-kicadai --json block list
-kicadai --json block show led_indicator
-kicadai --json --request ./examples/blocks/requests/led_indicator.json block instantiate led_indicator
-kicadai --json --request ./examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
+kicadai block list
+kicadai block show led_indicator
+kicadai --request ./examples/blocks/requests/led_indicator.json block instantiate led_indicator
+kicadai --request ./examples/blocks/requests/led_indicator.json block realize-pcb led_indicator
 ```
 
 `block realize-pcb` returns:
@@ -120,10 +120,10 @@ with finite numeric `x_mm` and `y_mm` values and `net_name` is a non-empty
 string.
 
 ```sh
-kicadai --json --builtins block verify
-kicadai --json --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json block verify
-kicadai --json --suite ./internal/blocks/testdata/verification --output ./out/block-verification --overwrite block verify
-kicadai --json --builtins --kicad-corpus --kicad-corpus-tier smoke block verify
+kicadai --builtins block verify
+kicadai --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json block verify
+kicadai --suite ./internal/blocks/testdata/verification --output ./out/block-verification --overwrite block verify
+kicadai --builtins --kicad-corpus --kicad-corpus-tier smoke block verify
 ```
 
 KiCad-backed checks are skipped unless a manifest or flag requires them. Use
@@ -165,17 +165,15 @@ schematic generation. Blocks declare parameters, ports, required libraries, and
 verification levels.
 
 ```sh
-kicadai --json block list
-kicadai --json block show led_indicator
+kicadai block list
+kicadai block show led_indicator
 kicadai \
-  --json \
   --request examples/blocks/requests/led_indicator.json \
   --output ./out/led_indicator \
   --name led_indicator \
   --overwrite \
   block instantiate led_indicator
 kicadai \
-  --json \
   --request examples/blocks/requests/composed_sensor_breakout.json \
   --output ./out/composed_sensor_breakout \
   --name composed_sensor_breakout \

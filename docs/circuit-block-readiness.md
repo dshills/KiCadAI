@@ -41,7 +41,7 @@ find examples/blocks -mindepth 1 -maxdepth 1 -type d \
   ! -name reports \
   -print0 |
 while IFS= read -r -d '' d; do
-  /tmp/kicadai --json inspect project "$d" >/dev/null
+  /tmp/kicadai inspect project "$d" >/dev/null
 done
 ```
 

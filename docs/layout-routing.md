@@ -10,7 +10,6 @@ operations for successful placements.
 
 ```sh
 kicadai \
-  --json \
   --request ./examples/placement/simple_request.json \
   place request
 ```
@@ -87,7 +86,6 @@ Run routing from JSON:
 
 ```sh
 kicadai \
-  --json \
   --request ./examples/routing/simple_request.json \
   --mode single_layer \
   --grid 1 \

@@ -17,7 +17,7 @@ The current readiness review and gap matrix are tracked in
 Use `block list` to see the registry:
 
 ```sh
-kicadai --json block list
+kicadai block list
 ```
 
 Current built-in blocks:
@@ -35,7 +35,7 @@ Current built-in blocks:
 Inspect one block:
 
 ```sh
-kicadai --json block show led_indicator
+kicadai block show led_indicator
 ```
 
 `block show` returns parameters, ports, required libraries, and verification
@@ -95,7 +95,6 @@ Generate a KiCad project:
 
 ```sh
 kicadai \
-  --json \
   --request examples/blocks/requests/led_indicator.json \
   --output ./out/led_indicator \
   --name led_indicator \
@@ -129,7 +128,6 @@ Generate it:
 
 ```sh
 kicadai \
-  --json \
   --request examples/blocks/requests/connector_breakout.json \
   --output ./out/connector_breakout \
   --name connector_breakout \
@@ -197,7 +195,6 @@ Generate the composed project:
 
 ```sh
 kicadai \
-  --json \
   --request examples/blocks/requests/composed_sensor_breakout.json \
   --output ./out/composed_sensor_breakout \
   --name composed_sensor_breakout \
@@ -218,8 +215,8 @@ ref/pin-based nets rather than routed schematic artwork.
 Checked-in examples live under `examples/blocks/`.
 
 ```sh
-kicadai --json inspect project examples/blocks/led_indicator
-kicadai --json inspect project examples/blocks/composed_sensor_breakout
+kicadai inspect project examples/blocks/led_indicator
+kicadai inspect project examples/blocks/composed_sensor_breakout
 ```
 
 The example directories include:
@@ -244,7 +241,7 @@ export KICADAI_SYMBOLS_ROOT=/path/to/kicad-symbols
 export KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints
 export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
 
-kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
+kicadai library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
 ```
 
 Resolver-backed validation is needed before agents should treat generated
@@ -255,7 +252,7 @@ Pinmap validation checks whether schematic symbol-to-footprint assignments have
 verified pin mappings:
 
 ```sh
-kicadai --json pinmap validate examples/blocks/led_indicator
+kicadai pinmap validate examples/blocks/led_indicator
 ```
 
 ## AI Usage Pattern

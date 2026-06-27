@@ -40,7 +40,17 @@ func TestRunDefaultsToHelp(t *testing.T) {
 	}
 }
 
-func TestRunConfigJSON(t *testing.T) {
+func TestRunRejectsInvalidFormatWithoutCommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"--format", "yaml"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), `invalid --format "yaml"`) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+func TestRunConfigDefaultsToJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -49,7 +59,6 @@ func TestRunConfigJSON(t *testing.T) {
 		"--token", "secret-token",
 		"--client-name", "test-client",
 		"--timeout-ms", "3000",
-		"--json",
 		"config",
 	}, &stdout, &stderr)
 	if err != nil {
@@ -82,6 +91,7 @@ func TestRunConfigTextRedactsToken(t *testing.T) {
 		"--socket", "ipc:///tmp/kicad/api.sock",
 		"--token", "secret-token",
 		"--client-name", "test-client",
+		"--format", "text",
 		"config",
 	}, &stdout, &stderr)
 	if err != nil {
@@ -103,6 +113,59 @@ func TestRunConfigTextRedactsToken(t *testing.T) {
 	}
 }
 
+func TestRunJSONFlagOverridesFormatText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--format", "text",
+		"--json",
+		"config",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), `"socket_path": "ipc:///tmp/kicad/api.sock"`) {
+		t.Fatalf("expected JSON output, got %s", stdout.String())
+	}
+}
+
+func TestRunJSONFalseDoesNotOverrideFormatText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--format", "text",
+		"--json=false",
+		"config",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "socket_path: ipc:///tmp/kicad/api.sock") {
+		t.Fatalf("expected text output, got %s", stdout.String())
+	}
+}
+
+func TestRunJSONFalseDefaultsToText(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{
+		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--json=false",
+		"config",
+	}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "socket_path: ipc:///tmp/kicad/api.sock") {
+		t.Fatalf("expected text output, got %s", stdout.String())
+	}
+}
+
 func TestRunDesignCreateMissingRequest(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -120,13 +183,20 @@ func TestRunDesignCreateMissingRequest(t *testing.T) {
 	}
 }
 
-func TestRunIntentPlanRequiresJSON(t *testing.T) {
+func TestRunIntentPlanDefaultsToJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	err := run([]string{"--request", "request.json", "intent", "plan"}, &stdout, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "requires --json") {
-		t.Fatalf("err = %v", err)
+	err := run([]string{"intent", "plan"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing request error")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || len(result.Issues) != 1 || result.Issues[0].Path != "request" {
+		t.Fatalf("result = %#v", result)
 	}
 }
 
@@ -1383,11 +1453,11 @@ func TestRunUnknownCommandReturnsUsage(t *testing.T) {
 	}
 }
 
-func TestRunLibraryRequiresJSON(t *testing.T) {
+func TestRunLibraryFormatTextUnsupported(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
-	err := run([]string{"library", "index"}, &stdout, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "library requires --json") {
+	err := run([]string{"--format", "text", "library", "index"}, &stdout, &stderr)
+	if err == nil || !strings.Contains(err.Error(), "library requires --format json") {
 		t.Fatalf("err = %v", err)
 	}
 }
@@ -1906,7 +1976,7 @@ func TestRunHelpIncludesStructuredCommandFamilies(t *testing.T) {
 	}
 }
 
-func TestRunStructuredCommandRequiresJSON(t *testing.T) {
+func TestRunStructuredCommandDefaultsToJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
@@ -1914,21 +1984,29 @@ func TestRunStructuredCommandRequiresJSON(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(err.Error(), "inspect requires --json") {
-		t.Fatalf("error = %v", err)
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
 	}
-	if stdout.Len() != 0 {
-		t.Fatalf("expected no stdout, got %s", stdout.String())
+	if result.Command != "inspect" {
+		t.Fatalf("result command = %q", result.Command)
 	}
 }
 
-func TestRunBlockRequiresJSON(t *testing.T) {
+func TestRunBlockDefaultsToJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
 	err := run([]string{"block", "list"}, &stdout, &stderr)
-	if err == nil || !strings.Contains(err.Error(), "block requires --json") {
+	if err != nil {
 		t.Fatalf("err = %v stdout=%s", err, stdout.String())
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.Command != "block" {
+		t.Fatalf("result command = %q", result.Command)
 	}
 }
 
@@ -3507,6 +3585,7 @@ func TestRunPingTextConnectFailureDoesNotWriteJSON(t *testing.T) {
 
 	err := app.run([]string{
 		"--socket", "ipc:///tmp/kicad/api.sock",
+		"--format", "text",
 		"ping",
 	}, &stdout, &stderr)
 	if !errors.Is(err, want) {
@@ -3778,6 +3857,7 @@ func TestRunPlanLEDDemoTextOutput(t *testing.T) {
 
 	err := run([]string{
 		"--document", "/",
+		"--format", "text",
 		"plan-led-demo",
 	}, &stdout, &stderr)
 	if err != nil {

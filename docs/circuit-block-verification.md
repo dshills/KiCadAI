@@ -69,8 +69,8 @@ Blocking realization issues are fatal generator or metadata problems that make
 the requested PCB fragment unsafe to trust, such as missing realized components,
 unresolved route endpoints, or invalid conditional realization metadata. Local
 route and timing fixture IDs come from the block's PCB realization metadata and
-can be discovered with `kicadai --json --builtins block show <block_id>` or by
-inspecting a successful `kicadai --json --builtins block realize-pcb <block_id>`
+can be discovered with `kicadai --builtins block show <block_id>` or by
+inspecting a successful `kicadai --builtins block realize-pcb <block_id>`
 result.
 
 Common timing finding IDs include:
@@ -255,13 +255,13 @@ DFM, surge, thermal, or fabrication-readiness proof by itself.
 Run all built-in manifests:
 
 ```sh
-kicadai --json --builtins block verify
+kicadai --builtins block verify
 ```
 
 Run one manifest:
 
 ```sh
-kicadai --json \
+kicadai \
   --case ./internal/blocks/testdata/verification/led_indicator_default/manifest.json \
   block verify
 ```
@@ -269,7 +269,7 @@ kicadai --json \
 Run a suite and retain generated projects:
 
 ```sh
-kicadai --json \
+kicadai \
   --suite ./internal/blocks/testdata/verification \
   --output ./out/block-verification \
   --overwrite \
@@ -279,7 +279,7 @@ kicadai --json \
 Require KiCad evidence:
 
 ```sh
-kicadai --json \
+kicadai \
   --builtins \
   --output ./out/block-verification \
   --overwrite \
@@ -292,13 +292,13 @@ kicadai --json \
 Run the opt-in KiCad corpus:
 
 ```sh
-kicadai --json --builtins --kicad-corpus block verify
+kicadai --builtins --kicad-corpus block verify
 ```
 
 Run only the smoke tier and retain corpus artifacts:
 
 ```sh
-kicadai --json \
+kicadai \
   --builtins \
   --kicad-corpus \
   --kicad-corpus-tier smoke \
@@ -310,7 +310,7 @@ kicadai --json \
 Require local KiCad DRC evidence for selected corpus cases:
 
 ```sh
-kicadai --json \
+kicadai \
   --builtins \
   --kicad-corpus \
   --kicad-corpus-tier smoke \

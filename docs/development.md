@@ -131,7 +131,6 @@ Direct real ERC/DRC CLI smoke checks:
 
 ```sh
 kicadai \
-  --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   --keep-artifacts \
   --artifact-dir ./examples/check_artifacts \

@@ -7,15 +7,15 @@ Fabrication readiness gates, BOM/CPL evidence, and safe KiCad fabrication export
 The `export` command family evaluates whether a project has enough evidence to
 claim fabrication readiness and can produce deterministic package metadata,
 BOM, CPL, Gerber, and drill reports. These commands are intended for
-machine-to-machine workflows today, so they are dry-run by default and require
-`--json`. If `--json` is omitted, the CLI returns the standard
-structured-command usage error instead of a human summary.
+machine-to-machine workflows today, so they are dry-run by default and return
+JSON by default. Use `--format text` only with command families that expose a
+human-readable summary.
 
 ```sh
-kicadai --json export preview ./project
-kicadai --json export bom ./project
-kicadai --json export fabrication ./project
-kicadai --json --source-dir ./data/component-sources export bom ./project
+kicadai export preview ./project
+kicadai export bom ./project
+kicadai export fabrication ./project
+kicadai --source-dir ./data/component-sources export bom ./project
 ```
 
 Fabrication reports now include explicit assembly evidence:
@@ -44,7 +44,6 @@ files. KiCad CLI is required for Gerber and drill generation:
 
 ```sh
 kicadai \
-  --json \
   --execute \
   --overwrite \
   --manufacturer-profile generic_assembly \

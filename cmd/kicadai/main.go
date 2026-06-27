@@ -99,7 +99,7 @@ Global flags:
   --request string       Structured request JSON path for generator commands
   --text string          Natural-language intent text
   --file string          Natural-language intent text file
-  --format string        Output format for supported commands (default json)
+  --format string        Output format for supported commands: json or text (default json)
   --strict              Treat blocking draft clarifications as command errors
   --name string          Project/design name for generation commands
   --seed string          Deterministic seed for generation commands
@@ -110,7 +110,7 @@ Global flags:
   --execute             Required for mutation commands
   --with-pcb            Include PCB output for generation commands
   --overwrite           Allow generation commands to replace an existing project directory
-  --json                Print command output as JSON when supported
+  --json                Compatibility alias for --format json
   --kicad-cli string    KiCad CLI executable path for KiCad-backed checks and fabrication plotting
   --manufacturer-profile string Local fabrication manufacturer profile ID, for example generic_assembly
   --keep-artifacts      Keep KiCad-backed artifact workspaces
@@ -369,6 +369,7 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 
 func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	var opts cliOptions
+	var jsonFlag bool
 	flags := flag.NewFlagSet("kicadai", flag.ContinueOnError)
 	flags.SetOutput(stderr)
 	flags.Usage = func() {}
@@ -386,7 +387,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.requestPath, "request", "", "structured request JSON path")
 	flags.StringVar(&opts.intentText, "text", "", "natural-language intent text")
 	flags.StringVar(&opts.intentFile, "file", "", "natural-language intent text file")
-	flags.StringVar(&opts.outputFormat, "format", "json", "output format")
+	flags.StringVar(&opts.outputFormat, "format", "json", "output format: json or text")
 	flags.BoolVar(&opts.strictDraft, "strict", false, "treat blocking draft clarifications as command errors")
 	flags.StringVar(&opts.name, "name", "", "project/design name")
 	flags.StringVar(&opts.seed, "seed", "", "deterministic generation seed")
@@ -397,7 +398,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.execute, "execute", false, "execute mutation command")
 	flags.BoolVar(&opts.withPCB, "with-pcb", false, "include PCB output")
 	flags.BoolVar(&opts.overwrite, "overwrite", false, "overwrite existing project directory")
-	flags.BoolVar(&opts.jsonOutput, "json", false, "print JSON output when supported")
+	flags.BoolVar(&jsonFlag, "json", false, "compatibility alias for --format json")
 	flags.StringVar(&opts.kicadCLI, "kicad-cli", "", "KiCad CLI executable path")
 	flags.StringVar(&opts.manufacturerProfile, "manufacturer-profile", "", "local fabrication manufacturer profile ID")
 	flags.BoolVar(&opts.keepArtifacts, "keep-artifacts", false, "keep round-trip artifact workspaces")
@@ -458,18 +459,43 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 		return cliOptions{}, "", err
 	}
 
+	formatFlagSet := false
+	jsonFlagSet := false
+	jsonFlagVisited := false
+	flags.Visit(func(f *flag.Flag) {
+		if f.Name == "allow-partial" {
+			opts.routeAllowPartialSet = true
+		}
+		if f.Name == "format" {
+			formatFlagSet = true
+		}
+		if f.Name == "json" {
+			jsonFlagVisited = true
+			if jsonFlag {
+				jsonFlagSet = true
+			}
+		}
+	})
+	opts.outputFormat = strings.ToLower(strings.TrimSpace(opts.outputFormat))
+	if jsonFlagSet {
+		opts.outputFormat = "json"
+	} else if jsonFlagVisited && !formatFlagSet {
+		opts.outputFormat = "text"
+	}
+	switch opts.outputFormat {
+	case "json":
+		opts.jsonOutput = true
+	case "text":
+		opts.jsonOutput = false
+	default:
+		return opts, "", fmt.Errorf("invalid --format %q: must be json or text", opts.outputFormat)
+	}
 	if err := validatePlacementFeedbackOptions(opts); err != nil {
 		return opts, "", err
 	}
 	if flags.NArg() == 0 {
 		return opts, "help", nil
 	}
-
-	flags.Visit(func(flag *flag.Flag) {
-		if flag.Name == "allow-partial" {
-			opts.routeAllowPartialSet = true
-		}
-	})
 	if opts.repairApply {
 		opts.repairEnabled = true
 	}
@@ -513,7 +539,7 @@ func nonNegativeFiniteFloat(value float64) bool {
 
 func runStructuredCommandSkeleton(opts cliOptions, command string, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("%s requires --json in this implementation phase", command)
+		return fmt.Errorf("%s requires --format json", command)
 	}
 	if issue, ok := validateStructuredCommandArgs(command, opts.commandArgs); !ok {
 		return writeReportFailure(stdout, command, issue)
@@ -528,7 +554,7 @@ func runStructuredCommandSkeleton(opts cliOptions, command string, stdout io.Wri
 
 func runGenerate(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("generate requires --json in this implementation phase")
+		return fmt.Errorf("generate requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("generate", opts.commandArgs); !ok {
 		return writeReportFailure(stdout, "generate", issue)
@@ -589,7 +615,7 @@ func runGenerateBreakout(opts cliOptions, stdout io.Writer) error {
 
 func runBlock(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("block requires --json in this implementation phase")
+		return fmt.Errorf("block requires --format json")
 	}
 	if len(opts.commandArgs) == 0 {
 		return writeBlockFailure(stdout, reports.Issue{
@@ -1377,7 +1403,7 @@ type libraryIndexData struct {
 
 func runLibrary(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("library requires --json in this implementation phase")
+		return fmt.Errorf("library requires --format json")
 	}
 	if len(opts.commandArgs) == 0 {
 		return writeLibraryFailure(stdout, reports.Issue{
@@ -1580,7 +1606,7 @@ func writeLibraryResult(stdout io.Writer, data any, issues []reports.Issue) erro
 
 func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("component requires --json in this implementation phase")
+		return fmt.Errorf("component requires --format json")
 	}
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "component", reports.Issue{
@@ -1811,7 +1837,7 @@ func libraryRootsFromOptions(opts cliOptions) libraryresolver.LibraryRoots {
 
 func runInspect(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("inspect requires --json in this implementation phase")
+		return fmt.Errorf("inspect requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("inspect", opts.commandArgs); !ok {
 		return writeReportFailure(stdout, "inspect", issue)
@@ -1862,7 +1888,7 @@ func runInspect(opts cliOptions, stdout io.Writer) error {
 
 func runEvaluate(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("evaluate requires --json in this implementation phase")
+		return fmt.Errorf("evaluate requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("evaluate", opts.commandArgs); !ok {
 		if err := writeReportJSON(stdout, reports.ErrorResult("evaluate", issue)); err != nil {
@@ -1931,7 +1957,7 @@ func runEvaluate(opts cliOptions, stdout io.Writer) error {
 
 func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("export requires --json in this implementation phase")
+		return fmt.Errorf("export requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("export", opts.commandArgs); !ok {
 		if err := writeReportJSON(stdout, reports.ErrorResult("export", issue)); err != nil {
@@ -2022,7 +2048,7 @@ func exportCLIPolicy(opts cliOptions) fabrication.CLIPolicy {
 
 func runPinmap(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("pinmap requires --json in this implementation phase")
+		return fmt.Errorf("pinmap requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("pinmap", opts.commandArgs); !ok {
 		if err := writeReportJSON(stdout, reports.ErrorResult("pinmap", issue)); err != nil {
@@ -2085,7 +2111,7 @@ func pinmapShouldUseLibraryResolver(opts cliOptions) bool {
 
 func runPlace(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("place requires --json in this implementation phase")
+		return fmt.Errorf("place requires --format json")
 	}
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "place", reports.Issue{
@@ -2140,7 +2166,7 @@ func runPlace(opts cliOptions, stdout io.Writer) error {
 
 func runRoute(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("route requires --json in this implementation phase")
+		return fmt.Errorf("route requires --format json")
 	}
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "route", reports.Issue{
@@ -2234,7 +2260,7 @@ type checkCommandReport struct {
 
 func runCheckCommand(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("check requires --json in this implementation phase")
+		return fmt.Errorf("check requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("check", opts.commandArgs); !ok {
 		return writeReportFailure(stdout, "check", issue)
@@ -2495,10 +2521,7 @@ type intentDraftOutput struct {
 
 func runIntentDraft(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("intent draft requires --json")
-	}
-	if opts.outputFormat != "json" {
-		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "format", Message: "intent draft only supports --format json"})
+		return fmt.Errorf("intent draft requires --format json")
 	}
 	text, sourceType, sourceID, inputIssues := loadIntentDraftText(opts)
 	if len(inputIssues) > 0 {
@@ -2611,7 +2634,7 @@ func runIntentRationale(ctx context.Context, opts cliOptions, stdout io.Writer) 
 		return err
 	}
 	if !opts.jsonOutput {
-		return fmt.Errorf("intent rationale requires --json")
+		return fmt.Errorf("intent rationale requires --format json")
 	}
 	report, issues, artifacts, err := buildIntentRationale(ctx, opts)
 	if err != nil {
@@ -2784,7 +2807,7 @@ func writeWorkflowResultArtifact(outputDir string, workflow designworkflow.Workf
 
 func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("intent create requires --json")
+		return fmt.Errorf("intent create requires --format json")
 	}
 	if strings.TrimSpace(opts.output) == "" {
 		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "--output is required"}
@@ -2893,7 +2916,7 @@ func loadIntentPlan(opts cliOptions) (intentplanner.PlanResult, []reports.Issue,
 func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subcommand string) error {
 	_ = ctx
 	if !opts.jsonOutput {
-		return fmt.Errorf("intent plan requires --json")
+		return fmt.Errorf("intent plan requires --format json")
 	}
 	if subcommand == "explain" && (strings.TrimSpace(opts.intentText) != "" || strings.TrimSpace(opts.intentFile) != "") {
 		if strings.TrimSpace(opts.requestPath) != "" {
@@ -3000,7 +3023,7 @@ func runIntentExplainDraft(ctx context.Context, opts cliOptions, stdout io.Write
 
 func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("design create requires --json")
+		return fmt.Errorf("design create requires --format json")
 	}
 	if strings.TrimSpace(opts.requestPath) == "" {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "--request is required"})
@@ -3307,7 +3330,7 @@ type roundTripCheck struct {
 
 func runRoundTrip(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("roundtrip requires --json in this implementation phase")
+		return fmt.Errorf("roundtrip requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("roundtrip", opts.commandArgs); !ok {
 		if err := writeReportJSON(stdout, reports.ErrorResult("roundtrip", issue)); err != nil {
@@ -3424,7 +3447,7 @@ func runRoundTrip(opts cliOptions, stdout io.Writer) error {
 
 func runTransaction(opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
-		return fmt.Errorf("transaction requires --json in this implementation phase")
+		return fmt.Errorf("transaction requires --format json")
 	}
 	if issue, ok := validateStructuredCommandArgs("transaction", opts.commandArgs); !ok {
 		if err := writeReportJSON(stdout, reports.ErrorResult("transaction", issue)); err != nil {

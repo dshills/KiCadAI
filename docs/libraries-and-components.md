@@ -26,12 +26,12 @@ allowed passive rule-inferred records.
 Examples:
 
 ```sh
-kicadai --json component list
-kicadai --json component show resistor.generic.0805
-kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-kicadai --json --request examples/components/select_resistor.json component select
-kicadai --json --request examples/components/select_concrete_resistor.json component select
-kicadai --json component validate
+kicadai component list
+kicadai component show resistor.generic.0805
+kicadai component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --request examples/components/select_resistor.json component select
+kicadai --request examples/components/select_concrete_resistor.json component select
+kicadai component validate
 ```
 
 The catalog includes a small verified alternative slice for common generated
@@ -55,13 +55,13 @@ human-verified pin mappings before fabrication readiness is claimed.
 List built-in pinmaps:
 
 ```sh
-kicadai --json pinmap list
+kicadai pinmap list
 ```
 
 Validate a project:
 
 ```sh
-kicadai --json pinmap validate ./examples/01_led_indicator
+kicadai pinmap validate ./examples/01_led_indicator
 ```
 
 Current built-in mappings include common resistors, capacitors, LEDs, simple
@@ -81,21 +81,21 @@ export KICADAI_SYMBOLS_ROOT=/path/to/kicad-symbols
 export KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints
 export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
 
-kicadai --json library symbol Device:R
-kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
-kicadai --json library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
-kicadai --json library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
-kicadai --json library templates
+kicadai library symbol Device:R
+kicadai library footprint Resistor_SMD:R_0805_2012Metric
+kicadai library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
+kicadai library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
+kicadai library templates
 ```
 
 Hardened symbol inspection commands expose resolver evidence without requiring
 agents to read raw `.kicad_sym` files:
 
 ```sh
-kicadai --json library symbols list
-kicadai --json library symbols show Device:R
-kicadai --json library symbols pins Device:R
-kicadai --json library symbols validate Device:R
+kicadai library symbols list
+kicadai library symbols show Device:R
+kicadai library symbols pins Device:R
+kicadai library symbols validate Device:R
 ```
 
 These commands report parsed units, common pins, electrical types, power-symbol

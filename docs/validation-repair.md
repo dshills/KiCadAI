@@ -36,12 +36,12 @@ The repair request is provided to the existing `--request` flag as a bundle
 file; `repair plan` does not create a bundle from stage issues by itself:
 
 ```sh
-kicadai --json \
+kicadai \
   --target ./out/project \
   --request ./path/to/generated-repair-bundle.json \
   repair plan
 
-kicadai --json --execute --overwrite \
+kicadai --execute --overwrite \
   --target ./out/project \
   --request ./path/to/generated-repair-bundle.json \
   repair apply
@@ -56,7 +56,7 @@ plan report; it does not create the repair bundle required by target-based
 persisted apply:
 
 ```sh
-kicadai --json \
+kicadai \
   --request ./examples/repair/missing_footprint_stage_issues.json \
   repair plan
 ```
@@ -65,7 +65,7 @@ Legacy stage-issue apply mode is intentionally gated and reports the
 transaction-level repair result without selecting a project target:
 
 ```sh
-kicadai --json --execute \
+kicadai --execute \
   --request ./examples/repair/missing_footprint_stage_issues.json \
   repair apply
 ```

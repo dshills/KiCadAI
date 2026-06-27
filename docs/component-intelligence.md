@@ -21,7 +21,7 @@ verification metadata.
 Use a custom catalog with:
 
 ```sh
-kicadai --json --catalog-dir ./my-components component validate
+kicadai --catalog-dir ./my-components component validate
 ```
 
 ## Confidence Levels
@@ -45,45 +45,45 @@ verified evidence except for narrowly allowed passive rule-inferred records.
 List records:
 
 ```sh
-kicadai --json component list
+kicadai component list
 ```
 
 Show one record:
 
 ```sh
-kicadai --json component show resistor.generic.0805
+kicadai component show resistor.generic.0805
 ```
 
 Find candidates:
 
 ```sh
-kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai component find --family resistor --package 0805 --value-kind resistance --value 10k
 ```
 
 Select from a request file:
 
 ```sh
-kicadai --json --request examples/components/select_resistor.json component select
-kicadai --json --request examples/components/select_concrete_resistor.json component select
+kicadai --request examples/components/select_resistor.json component select
+kicadai --request examples/components/select_concrete_resistor.json component select
 ```
 
 Validate the catalog:
 
 ```sh
-kicadai --json component validate
+kicadai component validate
 ```
 
 Validate a local lifecycle/availability source snapshot alongside the catalog:
 
 ```sh
-kicadai --json --source-dir data/component-sources component validate
-kicadai --json --source-dir data/component-sources component coverage
+kicadai --source-dir data/component-sources component validate
+kicadai --source-dir data/component-sources component coverage
 ```
 
 Select with local procurement evidence:
 
 ```sh
-kicadai --json --source-dir data/component-sources \
+kicadai --source-dir data/component-sources \
   --request examples/components/select_regulator.json \
   component select
 ```

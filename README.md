@@ -49,7 +49,6 @@ Generate a simple LED project without contacting KiCad:
 
 ```sh
 kicadai \
-  --json \
   --output /tmp/led_indicator \
   --name led_indicator \
   --seed demo \
@@ -64,47 +63,47 @@ Open `/tmp/led_indicator/led_indicator.kicad_pro` in KiCad.
 Probe a running KiCad instance:
 
 ```sh
-kicadai --json config
-kicadai --json ping
-kicadai --json version
-kicadai --json documents
-kicadai --json capabilities
+kicadai config
+kicadai ping
+kicadai version
+kicadai documents
+kicadai capabilities
 ```
 
 Inspect and validate generated projects:
 
 ```sh
-kicadai --json inspect project ./examples/07_generated_pcb
-kicadai --json evaluate project ./examples/07_generated_pcb
-kicadai --json writer check ./examples/07_generated_pcb
-kicadai --json validate board ./examples/07_generated_pcb
+kicadai inspect project ./examples/07_generated_pcb
+kicadai evaluate project ./examples/07_generated_pcb
+kicadai writer check ./examples/07_generated_pcb
+kicadai validate board ./examples/07_generated_pcb
 ```
 
 Use component intelligence:
 
 ```sh
-kicadai --json component list
-kicadai --json component show resistor.generic.0805
-kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-kicadai --json --request examples/components/select_concrete_resistor.json component select
-kicadai --json component validate
-kicadai --json --source-dir ./data/component-sources component coverage
+kicadai component list
+kicadai component show resistor.generic.0805
+kicadai component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --request examples/components/select_concrete_resistor.json component select
+kicadai component validate
+kicadai --source-dir ./data/component-sources component coverage
 ```
 
 Plan or create from structured intent:
 
 ```sh
-kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
-kicadai --json --request ./examples/intent/sensor_breakout.json intent explain
-kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent rationale
-kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
+kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
+kicadai --request ./examples/intent/sensor_breakout.json intent explain
+kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
+kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
 ```
 
 Run KiCad-backed checks when `kicad-cli` is available:
 
 ```sh
-kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
-kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
+kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 ```
 
 ## Intent Planning

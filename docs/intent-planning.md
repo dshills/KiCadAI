@@ -12,7 +12,6 @@ returns stage-by-stage feedback.
 
 ```sh
 kicadai \
-  --json \
   --request ./examples/design/led_indicator.json \
   --output ./out/led_indicator \
   --overwrite \
@@ -73,19 +72,16 @@ exact block IDs, validation defaults, or generated workflow request shape.
 
 ```sh
 kicadai \
-  --json \
   --request ./examples/intent/sensor_breakout.json \
   --output ./out/intent_plan \
   --overwrite \
   intent plan
 
 kicadai \
-  --json \
   --request ./examples/intent/sensor_breakout.json \
   intent explain
 
 kicadai \
-  --json \
   --request ./examples/intent/sensor_breakout.json \
   --output ./out/intent_sensor \
   --overwrite \
@@ -113,10 +109,10 @@ Commands:
 Natural-language intake is CLI-first and deterministic:
 
 ```sh
-kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent draft
-kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent explain
-kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
-kicadai --json --text "battery powered sensor" --strict intent draft
+kicadai --text "make a 3.3V I2C temperature sensor breakout" intent draft
+kicadai --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent explain
+kicadai --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
+kicadai --text "battery powered sensor" --strict intent draft
 ```
 
 Flags are global in the current CLI and must appear before `intent`.
@@ -133,10 +129,10 @@ under `.kicadai/`.
 `intent rationale` accepts exactly one source mode:
 
 ```sh
-kicadai --json --request ./examples/intent/sensor_breakout.json intent rationale
-kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent rationale
-kicadai --json --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
-kicadai --json --target ./out/intent_sensor intent rationale
+kicadai --request ./examples/intent/sensor_breakout.json intent rationale
+kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
+kicadai --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
+kicadai --target ./out/intent_sensor intent rationale
 ```
 
 With `--output`, request/text/file modes write `design-rationale.json` in that

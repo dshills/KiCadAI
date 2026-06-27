@@ -30,7 +30,8 @@ the workflow evidence explicitly supports that claim.
 
 - Use the compiled `kicadai` binary. Do not document or suggest source-tree
   invocation patterns for normal agent workflows.
-- Prefer `--json` for all agent-consumed commands.
+- JSON is the default output for agent-consumed commands. Use `--format json`
+  only when you need to make that default explicit.
 - Prefer structured request files over freeform text when project generation is
   expected to succeed.
 - Treat `kicad-cli` checks as optional unless the request or acceptance policy
@@ -84,19 +85,19 @@ When asked to create a project from intent:
 Minimum command sequence:
 
 ```sh
-kicadai --json --request request.json --output ./out/plan --overwrite intent plan
-kicadai --json --request request.json --output ./out/project --overwrite intent create
-kicadai --json writer check ./out/project
-kicadai --json validate board ./out/project
-kicadai --json --target ./out/project intent rationale
+kicadai --request request.json --output ./out/plan --overwrite intent plan
+kicadai --request request.json --output ./out/project --overwrite intent create
+kicadai writer check ./out/project
+kicadai validate board ./out/project
+kicadai --target ./out/project intent rationale
 ```
 
 For direct design workflow requests:
 
 ```sh
-kicadai --json --request request.json --output ./out/project --overwrite design create
-kicadai --json writer check ./out/project
-kicadai --json validate board ./out/project
+kicadai --request request.json --output ./out/project --overwrite design create
+kicadai writer check ./out/project
+kicadai validate board ./out/project
 ```
 
 ## Existing Project Review Workflow
@@ -115,17 +116,17 @@ When asked to review or evaluate an existing KiCad project:
 Commands:
 
 ```sh
-kicadai --json inspect project ./project
-kicadai --json evaluate project ./project
-kicadai --json validate board ./project
-kicadai --json check erc ./project/project.kicad_sch
-kicadai --json check drc ./project/project.kicad_pcb
+kicadai inspect project ./project
+kicadai evaluate project ./project
+kicadai validate board ./project
+kicadai check erc ./project/project.kicad_sch
+kicadai check drc ./project/project.kicad_pcb
 ```
 
 Use `writer check` for generated projects:
 
 ```sh
-kicadai --json writer check ./project
+kicadai writer check ./project
 ```
 
 ## Repair Workflow
@@ -137,13 +138,13 @@ flags.
 Plan from stage issues:
 
 ```sh
-kicadai --json --request stage-issues.json repair plan
+kicadai --request stage-issues.json repair plan
 ```
 
 Apply an existing generated repair bundle to a generated project:
 
 ```sh
-kicadai --json --execute --overwrite \
+kicadai --execute --overwrite \
   --target ./out/project \
   --request ./out/project/.kicadai/repair-bundle.json \
   repair apply
@@ -152,8 +153,8 @@ kicadai --json --execute --overwrite \
 After repair apply, rerun validation:
 
 ```sh
-kicadai --json writer check ./out/project
-kicadai --json validate board ./out/project
+kicadai writer check ./out/project
+kicadai validate board ./out/project
 ```
 
 Never report a repair as complete without post-repair validation evidence.
@@ -164,13 +165,13 @@ Before claiming a selected component is safe, inspect catalog and resolver
 evidence:
 
 ```sh
-kicadai --json component validate
-kicadai --json --source-dir ./data/component-sources component validate
-kicadai --json --source-dir ./data/component-sources component coverage
-kicadai --json component show resistor.generic.0805
-kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-kicadai --json --request examples/components/select_concrete_resistor.json component select
-kicadai --json pinmap validate ./out/project
+kicadai component validate
+kicadai --source-dir ./data/component-sources component validate
+kicadai --source-dir ./data/component-sources component coverage
+kicadai component show resistor.generic.0805
+kicadai component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai --request examples/components/select_concrete_resistor.json component select
+kicadai pinmap validate ./out/project
 ```
 
 For generated intent workflows, inspect:
@@ -265,15 +266,15 @@ Known requirement-only calculations:
 For generated projects, run at least:
 
 ```sh
-kicadai --json writer check ./out/project
-kicadai --json validate board ./out/project
+kicadai writer check ./out/project
+kicadai validate board ./out/project
 ```
 
 When ERC/DRC evidence is required:
 
 ```sh
-kicadai --json check erc ./out/project/project.kicad_sch
-kicadai --json check drc ./out/project/project.kicad_pcb
+kicadai check erc ./out/project/project.kicad_sch
+kicadai check drc ./out/project/project.kicad_pcb
 ```
 
 Success requires:
@@ -321,19 +322,19 @@ correctness, board validation, and required ERC/DRC evidence all support it.
 ## Common Safe Commands
 
 ```sh
-kicadai --json --help
-kicadai --json config
-kicadai --json ping
-kicadai --json capabilities
-kicadai --json component validate
-kicadai --json block list
-kicadai --json inspect project ./project
-kicadai --json evaluate project ./project
-kicadai --json writer check ./project
-kicadai --json validate board ./project
-kicadai --json --request request.json intent plan
-kicadai --json --request request.json --output ./out/project --overwrite intent create
-kicadai --json --target ./out/project intent rationale
+kicadai --help
+kicadai config
+kicadai ping
+kicadai capabilities
+kicadai component validate
+kicadai block list
+kicadai inspect project ./project
+kicadai evaluate project ./project
+kicadai writer check ./project
+kicadai validate board ./project
+kicadai --request request.json intent plan
+kicadai --request request.json --output ./out/project --overwrite intent create
+kicadai --target ./out/project intent rationale
 ```
 
 ## Preferred References

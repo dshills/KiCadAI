@@ -11,7 +11,6 @@ evidence, and optional KiCad DRC evidence into one JSON result.
 
 ```sh
 kicadai \
-  --json \
   validate board ./examples/07_generated_pcb
 ```
 
@@ -99,8 +98,8 @@ schematic-to-PCB transfer, footprint pad net assignments, copper net
 references, zone references, and optional KiCad round-trip stability.
 
 ```sh
-kicadai --json writer check ./examples/07_generated_pcb/generated_pcb.kicad_pcb
-kicadai --json writer check --strict-diffs --allow-unrouted ./examples/07_generated_pcb
+kicadai writer check ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai writer check --strict-diffs --allow-unrouted ./examples/07_generated_pcb
 ```
 
 The command accepts a project directory, `.kicad_pro`, `.kicad_sch`, or
@@ -147,9 +146,9 @@ Current limits:
 Inspect KiCad projects and files:
 
 ```sh
-kicadai --json inspect project ./examples/07_generated_pcb
-kicadai --json inspect schematic ./examples/01_led_indicator/led_indicator.kicad_sch
-kicadai --json inspect pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai inspect project ./examples/07_generated_pcb
+kicadai inspect schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+kicadai inspect pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
 ```
 
 Inspection reports summarize discovered files, symbol counts, footprint counts,
@@ -161,9 +160,9 @@ and reader issues.
 Evaluate projects and files for generated-output readiness:
 
 ```sh
-kicadai --json evaluate project ./examples/07_generated_pcb
-kicadai --json evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
-kicadai --json evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai evaluate project ./examples/07_generated_pcb
+kicadai evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+kicadai evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
 ```
 
 Current evaluation includes checks for missing files, duplicate references,
@@ -180,9 +179,9 @@ summaries with stable IDs, and apply annotates operation-scoped failures with
 the same IDs where attribution is safe.
 
 ```sh
-kicadai --json transaction validate ./tx.json
-kicadai --json transaction plan ./out/project ./tx.json
-kicadai --json --overwrite transaction apply ./out/project ./tx.json
+kicadai transaction validate ./tx.json
+kicadai transaction plan ./out/project ./tx.json
+kicadai --overwrite transaction apply ./out/project ./tx.json
 ```
 
 For AI repair loops, add `--feedback` to validation or planning. The command
@@ -190,8 +189,8 @@ keeps the raw issue list and also returns a grouped `feedback` object keyed by
 stable operation IDs.
 
 ```sh
-kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
-kicadai --json --feedback transaction plan ./out/invalid_feedback ./examples/transactions/invalid_feedback.json
+kicadai --feedback transaction validate ./examples/transactions/invalid_feedback.json
+kicadai --feedback transaction plan ./out/invalid_feedback ./examples/transactions/invalid_feedback.json
 ```
 
 Each transaction operation summary includes an `id`, and operation-scoped
@@ -277,12 +276,11 @@ result:
 
 ```sh
 kicadai \
-  --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   roundtrip schematic ./examples/01_led_indicator/led_indicator.kicad_sch
 
-kicadai --json roundtrip pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
-kicadai --json roundtrip project ./examples/07_generated_pcb
+kicadai roundtrip pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+kicadai roundtrip project ./examples/07_generated_pcb
 ```
 
 Useful flags:
@@ -303,12 +301,11 @@ report, and return structured findings for AI repair loops:
 
 ```sh
 kicadai \
-  --json \
   --kicad-cli /Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli \
   check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 
-kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
-kicadai --json check project ./examples/checks/drc_pass
+kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai check project ./examples/checks/drc_pass
 ```
 
 Useful flags:

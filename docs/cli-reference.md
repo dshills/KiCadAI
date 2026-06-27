@@ -8,11 +8,11 @@ Live IPC commands require KiCad to be running with the API enabled. Open the
 project/editor you want to inspect, then run:
 
 ```sh
-kicadai --json config
-kicadai --json ping
-kicadai --json version
-kicadai --json documents
-kicadai --json capabilities
+kicadai config
+kicadai ping
+kicadai version
+kicadai documents
+kicadai capabilities
 ```
 
 Connection flags:
@@ -22,7 +22,7 @@ kicadai \
   --socket ipc:///tmp/kicad/api.sock \
   --token "$KICAD_API_TOKEN" \
   --timeout-ms 5000 \
-  --json ping
+  ping
 ```
 
 Environment variables:
@@ -41,40 +41,42 @@ captures KiCad's returned token in memory for that process only.
 
 ## CLI Overview
 
-All structured project-analysis and generation commands currently require
-`--json`.
+Structured project-analysis and generation commands return JSON by default.
+Use `--format text` only for commands that expose a human-readable summary.
+The legacy `--json` flag remains accepted as a compatibility alias for
+`--format json`.
 
 ```sh
-kicadai --json config
-kicadai --json ping
-kicadai --json version
-kicadai --json documents
-kicadai --json capabilities
-kicadai --json inspect project ./examples/07_generated_pcb
-kicadai --json evaluate project ./examples/07_generated_pcb
-kicadai --json writer check ./examples/07_generated_pcb
-kicadai --json validate board ./examples/07_generated_pcb
-kicadai --json check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
-kicadai --json check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
-kicadai --json component find --family resistor --package 0805 --value-kind resistance --value 10k
-kicadai --json pinmap list
-kicadai --json pinmap validate ./examples/01_led_indicator
-kicadai --json --request ./examples/placement/simple_request.json place request
-kicadai --json --request ./examples/routing/simple_request.json route request
-kicadai --json --request ./examples/repair/missing_footprint_stage_issues.json repair plan
-kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
-kicadai --json --request ./examples/intent/sensor_breakout.json intent explain
-kicadai --json --text "make a 3.3V I2C temperature sensor breakout" intent rationale
-kicadai --json --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
-kicadai --json --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
-kicadai --json --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
+kicadai config
+kicadai ping
+kicadai version
+kicadai documents
+kicadai capabilities
+kicadai inspect project ./examples/07_generated_pcb
+kicadai evaluate project ./examples/07_generated_pcb
+kicadai writer check ./examples/07_generated_pcb
+kicadai validate board ./examples/07_generated_pcb
+kicadai check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
+kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai component find --family resistor --package 0805 --value-kind resistance --value 10k
+kicadai pinmap list
+kicadai pinmap validate ./examples/01_led_indicator
+kicadai --request ./examples/placement/simple_request.json place request
+kicadai --request ./examples/routing/simple_request.json route request
+kicadai --request ./examples/repair/missing_footprint_stage_issues.json repair plan
+kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
+kicadai --request ./examples/intent/sensor_breakout.json intent explain
+kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
+kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
+kicadai --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
+kicadai --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 # For integrations that already produce a generated repair bundle:
-kicadai --json --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
+kicadai --execute --overwrite --target ./out/project --request ./path/to/generated-repair-bundle.json repair apply
 # Generate/apply a repair bundle during design create, then replay that saved
 # bundle later for reproducible target-apply validation:
-kicadai --json --request ./examples/design/led_indicator.json --output ./out/led_indicator --overwrite --repair-apply --skip-routing design create
-kicadai --json --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
-kicadai --json --feedback transaction validate ./examples/transactions/invalid_feedback.json
+kicadai --request ./examples/design/led_indicator.json --output ./out/led_indicator --overwrite --repair-apply --skip-routing design create
+kicadai --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
+kicadai --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
 
 ### Live IPC Commands
@@ -160,13 +162,11 @@ stage issues against a generated target:
 
 ```sh
 kicadai \
-  --json \
   --target ./out/led_indicator \
   --request ./examples/repair/missing_footprint_stage_issues.json \
   repair export-bundle
 
 kicadai \
-  --json \
   --execute \
   --overwrite \
   --target ./out/led_indicator \
@@ -185,7 +185,6 @@ LED generation:
 
 ```sh
 kicadai \
-  --json \
   --output ./out/led_indicator \
   --name led_indicator \
   --with-pcb \
@@ -212,7 +211,6 @@ Run it:
 
 ```sh
 kicadai \
-  --json \
   --request ./request.json \
   --output ./out/sensor_breakout \
   --overwrite \
@@ -257,7 +255,6 @@ Runnable example:
 
 ```sh
 kicadai \
-  --json \
   --request ./examples/design_retry/placement_routing_retry.json \
   --output ./out/placement_routing_retry_demo \
   --overwrite \

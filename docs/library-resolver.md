@@ -19,7 +19,7 @@ export KICADAI_TEMPLATES_ROOT=/path/to/kicad-templates
 Equivalent flags:
 
 ```sh
-kicadai --json \
+kicadai \
   --klc-root /path/to/klc \
   --symbols-root /path/to/kicad-symbols \
   --footprints-root /path/to/kicad-footprints \
@@ -32,23 +32,23 @@ kicadai --json \
 Index summary:
 
 ```sh
-kicadai --json library index
+kicadai library index
 ```
 
 Resolve records:
 
 ```sh
-kicadai --json library symbol Device:R
-kicadai --json library footprint Resistor_SMD:R_0805_2012Metric
+kicadai library symbol Device:R
+kicadai library footprint Resistor_SMD:R_0805_2012Metric
 ```
 
 Inspect hardened symbol evidence:
 
 ```sh
-kicadai --json library symbols list
-kicadai --json library symbols show Device:R
-kicadai --json library symbols pins Device:R
-kicadai --json library symbols validate Device:R
+kicadai library symbols list
+kicadai library symbols show Device:R
+kicadai library symbols pins Device:R
+kicadai library symbols validate Device:R
 ```
 
 The nested `library symbols` commands return stable JSON for AI agents and
@@ -62,35 +62,35 @@ diagnostics.
 Search:
 
 ```sh
-kicadai --json library search-symbols resistor
-kicadai --json library search-footprints 0805
+kicadai library search-symbols resistor
+kicadai library search-footprints 0805
 ```
 
 Compatibility and pinmap candidate generation:
 
 ```sh
-kicadai --json \
+kicadai \
   library validate-assignment Device:R Resistor_SMD:R_0805_2012Metric
 
-kicadai --json \
+kicadai \
   library compatible-footprints Device:R
 
-kicadai --json \
+kicadai \
   library pinmap-candidate Device:R Resistor_SMD:R_0805_2012Metric
 ```
 
 KLC checks:
 
 ```sh
-kicadai --json library klc-symbol Device:R
-kicadai --json library klc-footprint Resistor_SMD:R_0805_2012Metric
+kicadai library klc-symbol Device:R
+kicadai library klc-footprint Resistor_SMD:R_0805_2012Metric
 ```
 
 Templates:
 
 ```sh
-kicadai --json library templates
-kicadai --json library template Arduino_Nano
+kicadai library templates
+kicadai library template Arduino_Nano
 ```
 
 ## Cache
@@ -99,7 +99,7 @@ Large KiCad libraries are expensive to parse repeatedly. Enable the optional
 cache with either a flag or `KICADAI_LIBRARY_CACHE`:
 
 ```sh
-kicadai --json \
+kicadai \
   --library-cache .kicadai/library-index.json \
   library index
 ```
