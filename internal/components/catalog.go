@@ -117,6 +117,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		families[family.ID] = struct{}{}
 	}
 	seen := map[string]int{}
+	equivalenceGroups := map[string][]equivalenceMember{}
 	for i, record := range catalog.Records {
 		path := fmt.Sprintf("records[%d]", i)
 		if strings.TrimSpace(record.ID) == "" {
@@ -152,12 +153,30 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
 		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
 		issues = append(issues, validateSchematicProperties(path+".properties", record.Properties)...)
+		issues = append(issues, validateEquivalenceMetadata(path+".equivalence", record.Equivalence)...)
+		if record.Equivalence != nil && strings.TrimSpace(record.Equivalence.Group) != "" {
+			group := normalizeMetadata(record.Equivalence.Group)
+			equivalenceGroups[group] = append(equivalenceGroups[group], equivalenceMember{
+				path:      path,
+				recordID:  record.ID,
+				role:      record.Equivalence.Role,
+				signature: equivalenceSignatureForRecord(record),
+			})
+		}
 	}
+	issues = append(issues, validateEquivalenceGroups(equivalenceGroups)...)
 	sortIssues(issues)
 	return reports.ResultWithIssues("component validate", map[string]any{
 		"family_count": len(catalog.Families),
 		"record_count": len(catalog.Records),
 	}, issues, nil)
+}
+
+type equivalenceMember struct {
+	path      string
+	recordID  string
+	role      EquivalenceRole
+	signature string
 }
 
 func readCatalogFile(path string) (catalogFile, []reports.Issue) {
@@ -400,6 +419,227 @@ func validateSchematicProperties(path string, properties []SchematicProperty) []
 		}
 	}
 	return issues
+}
+
+func validateEquivalenceMetadata(path string, equivalence *EquivalenceMetadata) []reports.Issue {
+	if equivalence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	if issue, ok := validateTrimmedMetadata(path+".group", equivalence.Group, "equivalence group"); ok {
+		issues = append(issues, issue)
+	}
+	if issue, ok := validateTrimmedMetadata(path+".role", string(equivalence.Role), "equivalence role"); ok {
+		issues = append(issues, issue)
+	}
+	if strings.TrimSpace(equivalence.Group) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".group", "equivalence group is required when equivalence metadata is present"))
+	}
+	if !isValidEquivalenceRole(equivalence.Role) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".role", "equivalence role must be preferred, alternate, or fallback"))
+	}
+	for i, note := range equivalence.Notes {
+		notePath := fmt.Sprintf("%s.notes[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(notePath, note, "equivalence note"); ok {
+			issues = append(issues, issue)
+		}
+	}
+	return issues
+}
+
+func validateEquivalenceGroups(groups map[string][]equivalenceMember) []reports.Issue {
+	var issues []reports.Issue
+	groupNames := make([]string, 0, len(groups))
+	for group := range groups {
+		groupNames = append(groupNames, group)
+	}
+	sort.Strings(groupNames)
+	for _, group := range groupNames {
+		members := groups[group]
+		sort.Slice(members, func(i, j int) bool {
+			if members[i].path != members[j].path {
+				return members[i].path < members[j].path
+			}
+			return members[i].recordID < members[j].recordID
+		})
+		preferredPath := ""
+		preferredSignature := ""
+		for _, member := range members {
+			if member.role == EquivalencePreferred {
+				if preferredPath != "" {
+					issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, member.path+".equivalence.role", "equivalence group "+group+" has multiple preferred records"))
+					continue
+				}
+				preferredPath = member.path
+				preferredSignature = member.signature
+			}
+		}
+		if preferredPath == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, members[0].path+".equivalence.role", "equivalence group "+group+" requires one preferred record"))
+			preferredSignature = members[0].signature
+		}
+		for _, member := range members {
+			if member.path == preferredPath {
+				continue
+			}
+			if member.signature != preferredSignature {
+				issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, member.path+".equivalence.group", "equivalence group "+group+" contains incompatible family, package, or value metadata"))
+			}
+		}
+	}
+	return issues
+}
+
+func isValidEquivalenceRole(role EquivalenceRole) bool {
+	switch role {
+	case EquivalencePreferred, EquivalenceAlternate, EquivalenceFallback:
+		return true
+	default:
+		return false
+	}
+}
+
+func equivalenceSignatureForRecord(record ComponentRecord) string {
+	type equivalencePadSignature struct {
+		Function string `json:"function"`
+		Pad      string `json:"pad"`
+		Polarity string `json:"polarity,omitempty"`
+		Aliases  string `json:"aliases,omitempty"`
+	}
+	type equivalencePackageSignature struct {
+		ID          string                    `json:"id"`
+		PackageType string                    `json:"package_type"`
+		FootprintID string                    `json:"footprint_id"`
+		PadMap      []equivalencePadSignature `json:"pad_map"`
+	}
+	var packages []equivalencePackageSignature
+	for _, pkg := range record.Packages {
+		padMap := make([]equivalencePadSignature, 0, len(pkg.PadFunctions))
+		for _, pad := range pkg.PadFunctions {
+			aliases := append([]string(nil), pad.Aliases...)
+			for i := range aliases {
+				aliases[i] = normalizeMetadata(aliases[i])
+			}
+			sort.Strings(aliases)
+			padMap = append(padMap, equivalencePadSignature{
+				Function: normalizeMetadata(pad.Function),
+				Pad:      normalizeMetadata(pad.Pad),
+				Polarity: normalizeMetadata(pad.Polarity),
+				Aliases:  strings.Join(aliases, "\x00"),
+			})
+		}
+		sort.Slice(padMap, func(i, j int) bool {
+			if padMap[i].Function != padMap[j].Function {
+				return padMap[i].Function < padMap[j].Function
+			}
+			if padMap[i].Pad != padMap[j].Pad {
+				return padMap[i].Pad < padMap[j].Pad
+			}
+			if padMap[i].Polarity != padMap[j].Polarity {
+				return padMap[i].Polarity < padMap[j].Polarity
+			}
+			return padMap[i].Aliases < padMap[j].Aliases
+		})
+		packages = append(packages, equivalencePackageSignature{
+			ID:          normalizeMetadata(pkg.ID),
+			PackageType: normalizeMetadata(pkg.PackageType),
+			FootprintID: normalizeMetadata(pkg.FootprintID),
+			PadMap:      padMap,
+		})
+	}
+	sort.Slice(packages, func(i, j int) bool {
+		if packages[i].ID != packages[j].ID {
+			return packages[i].ID < packages[j].ID
+		}
+		if packages[i].PackageType != packages[j].PackageType {
+			return packages[i].PackageType < packages[j].PackageType
+		}
+		return packages[i].FootprintID < packages[j].FootprintID
+	})
+	type equivalenceValueSignature struct {
+		Kind string `json:"kind"`
+		Typ  string `json:"typ"`
+		Min  string `json:"min"`
+		Max  string `json:"max"`
+		Unit string `json:"unit"`
+	}
+	var values []equivalenceValueSignature
+	for _, value := range record.Values {
+		values = append(values, equivalenceValueSignature{
+			Kind: normalizeMetadata(value.Kind),
+			Typ:  normalizeMetadata(value.Typ),
+			Min:  normalizeMetadata(value.Min),
+			Max:  normalizeMetadata(value.Max),
+			Unit: normalizeMetadata(value.Unit),
+		})
+	}
+	sort.Slice(values, func(i, j int) bool {
+		if values[i].Kind != values[j].Kind {
+			return values[i].Kind < values[j].Kind
+		}
+		if values[i].Typ != values[j].Typ {
+			return values[i].Typ < values[j].Typ
+		}
+		if values[i].Min != values[j].Min {
+			return values[i].Min < values[j].Min
+		}
+		if values[i].Max != values[j].Max {
+			return values[i].Max < values[j].Max
+		}
+		return values[i].Unit < values[j].Unit
+	})
+	type equivalenceRatingSignature struct {
+		Kind string `json:"kind"`
+		Typ  string `json:"typ"`
+		Min  string `json:"min"`
+		Max  string `json:"max"`
+		Unit string `json:"unit"`
+	}
+	var ratings []equivalenceRatingSignature
+	for _, rating := range record.Ratings {
+		ratings = append(ratings, equivalenceRatingSignature{
+			Kind: normalizeMetadata(rating.Kind),
+			Typ:  normalizeMetadata(rating.Typ),
+			Min:  normalizeMetadata(rating.Min),
+			Max:  normalizeMetadata(rating.Max),
+			Unit: normalizeMetadata(rating.Unit),
+		})
+	}
+	sort.Slice(ratings, func(i, j int) bool {
+		if ratings[i].Kind != ratings[j].Kind {
+			return ratings[i].Kind < ratings[j].Kind
+		}
+		if ratings[i].Typ != ratings[j].Typ {
+			return ratings[i].Typ < ratings[j].Typ
+		}
+		if ratings[i].Min != ratings[j].Min {
+			return ratings[i].Min < ratings[j].Min
+		}
+		if ratings[i].Max != ratings[j].Max {
+			return ratings[i].Max < ratings[j].Max
+		}
+		return ratings[i].Unit < ratings[j].Unit
+	})
+	signature := struct {
+		Family   string                        `json:"family"`
+		Packages []equivalencePackageSignature `json:"packages"`
+		Values   []equivalenceValueSignature   `json:"values"`
+		Ratings  []equivalenceRatingSignature  `json:"ratings"`
+	}{
+		Family:   normalizeMetadata(record.Family),
+		Packages: packages,
+		Values:   values,
+		Ratings:  ratings,
+	}
+	body, err := json.Marshal(signature)
+	if err != nil {
+		return ""
+	}
+	return string(body)
+}
+
+func normalizeMetadata(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
 }
 
 func validateTrimmedMetadata(path string, value string, label string) (reports.Issue, bool) {

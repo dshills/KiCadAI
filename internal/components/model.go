@@ -35,6 +35,14 @@ const (
 	AcceptanceFabricationCandidate AcceptanceLevel = "fabrication_candidate"
 )
 
+type EquivalenceRole string
+
+const (
+	EquivalencePreferred EquivalenceRole = "preferred"
+	EquivalenceAlternate EquivalenceRole = "alternate"
+	EquivalenceFallback  EquivalenceRole = "fallback"
+)
+
 const (
 	CodeInvalidConfidence reports.Code = "COMPONENT_INVALID_CONFIDENCE"
 	CodeInvalidAcceptance reports.Code = "COMPONENT_INVALID_ACCEPTANCE"
@@ -72,6 +80,7 @@ type ComponentRecord struct {
 	Manufacturer    string                 `json:"manufacturer,omitempty"`
 	MPN             string                 `json:"mpn,omitempty"`
 	Lifecycle       string                 `json:"lifecycle,omitempty"`
+	Equivalence     *EquivalenceMetadata   `json:"equivalence,omitempty"`
 	Tags            []string               `json:"tags,omitempty"`
 	Values          []ValueConstraint      `json:"values,omitempty"`
 	Ratings         []RatingConstraint     `json:"ratings,omitempty"`
@@ -88,6 +97,12 @@ type ComponentRecord struct {
 	SelectionRules  []SelectionRule        `json:"selection_rules,omitempty"`
 	Verification    VerificationRecord     `json:"verification"`
 	SearchText      string                 `json:"-"`
+}
+
+type EquivalenceMetadata struct {
+	Group string          `json:"group,omitempty"`
+	Role  EquivalenceRole `json:"role,omitempty"`
+	Notes []string        `json:"notes,omitempty"`
 }
 
 type PackageVariant struct {

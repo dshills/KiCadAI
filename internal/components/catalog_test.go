@@ -428,6 +428,126 @@ func TestValidateCatalogInvalidExtendedMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateCatalogEquivalenceMetadata(t *testing.T) {
+	catalog := validCatalog()
+	catalog.Records = append(catalog.Records, catalog.Records[0])
+	catalog.Records[0].ID = "resistor.yageo.10k.0805"
+	catalog.Records[0].Generic = false
+	catalog.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+	catalog.Records[1].ID = "resistor.generic.10k.0805"
+	catalog.Records[1].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceFallback}
+
+	result := ValidateCatalog(&catalog)
+	if !result.OK {
+		t.Fatalf("expected equivalence metadata to validate: %+v", result.Issues)
+	}
+}
+
+func TestValidateCatalogInvalidEquivalenceMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Catalog)
+	}{
+		{
+			name: "missing group",
+			mutate: func(c *Catalog) {
+				c.Records[0].Equivalence = &EquivalenceMetadata{Role: EquivalencePreferred}
+			},
+		},
+		{
+			name: "invalid role",
+			mutate: func(c *Catalog) {
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: "maybe"}
+			},
+		},
+		{
+			name: "multiple preferred",
+			mutate: func(c *Catalog) {
+				c.Records = append(c.Records, c.Records[0])
+				c.Records[0].ID = "resistor.a.0805"
+				c.Records[1].ID = "resistor.b.0805"
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+				c.Records[1].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+			},
+		},
+		{
+			name: "missing preferred",
+			mutate: func(c *Catalog) {
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceAlternate}
+			},
+		},
+		{
+			name: "incompatible values",
+			mutate: func(c *Catalog) {
+				c.Records = append(c.Records, c.Records[0])
+				c.Records[0].ID = "resistor.10k.0805"
+				c.Records[1].ID = "resistor.1k.0805"
+				c.Records[1].Values = []ValueConstraint{{Kind: "resistance", Typ: "1k", Unit: "ohm"}}
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+				c.Records[1].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceAlternate}
+			},
+		},
+		{
+			name: "incompatible package",
+			mutate: func(c *Catalog) {
+				c.Records = append(c.Records, c.Records[0])
+				c.Records[0].ID = "resistor.0805"
+				c.Records[1].ID = "resistor.0603"
+				c.Records[1].Packages = []PackageVariant{{
+					ID:          "0603",
+					Name:        "0603",
+					FootprintID: "Resistor_SMD:R_0603_1608Metric",
+					PadFunctions: []PadFunction{
+						{Function: "A", Pad: "1"},
+						{Function: "B", Pad: "2"},
+					},
+					Verification: VerificationRecord{Confidence: ConfidenceRuleInferred},
+				}}
+				c.Records[1].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceAlternate}
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+			},
+		},
+		{
+			name: "incompatible pad map",
+			mutate: func(c *Catalog) {
+				c.Records = append(c.Records, c.Records[0])
+				c.Records[0].ID = "resistor.a.0805"
+				c.Records[1].ID = "resistor.b.0805"
+				c.Records[1].Packages = []PackageVariant{c.Records[1].Packages[0]}
+				c.Records[1].Packages[0].PadFunctions = []PadFunction{
+					{Function: "A", Pad: "2"},
+					{Function: "B", Pad: "1"},
+				}
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+				c.Records[1].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceAlternate}
+			},
+		},
+		{
+			name: "incompatible rating",
+			mutate: func(c *Catalog) {
+				c.Records = append(c.Records, c.Records[0])
+				c.Records[0].ID = "resistor.a.0805"
+				c.Records[1].ID = "resistor.b.0805"
+				c.Records[0].Ratings = []RatingConstraint{{Kind: "power", Max: "125", Unit: "mW"}}
+				c.Records[1].Ratings = []RatingConstraint{{Kind: "power", Max: "63", Unit: "mW"}}
+				c.Records[0].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalencePreferred}
+				c.Records[1].Equivalence = &EquivalenceMetadata{Group: "resistor.10k.0805", Role: EquivalenceAlternate}
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			tt.mutate(&catalog)
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected validation to fail")
+			}
+			assertIssueCode(t, result.Issues, CodeInvalidMetadata)
+		})
+	}
+}
+
 func TestValidateCatalogTemperaturePath(t *testing.T) {
 	catalog := validCatalog()
 	catalog.Records[0].Temperature = &TemperatureRange{Min: "cold", Max: "85", Unit: "C"}
