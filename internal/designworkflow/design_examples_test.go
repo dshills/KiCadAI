@@ -4,12 +4,14 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
@@ -147,6 +149,45 @@ func TestDesignExamplesGenerateReadableProjectArtifacts(t *testing.T) {
 	}
 }
 
+func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
+	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
+	if cliPath == "" {
+		t.Skipf("set %s to run optional KiCad-backed design examples", checks.EnvKiCadCLI)
+	}
+	repoRoot := designExampleRepoRoot(t)
+	paths := optionalDesignExampleRequestFiles(t, repoRoot)
+	if len(paths) == 0 {
+		t.Skip("no optional KiCad-backed design examples found under examples/design/kicad-backed")
+	}
+	createTimeout := designExampleCreateTimeout(t)
+	for _, path := range paths {
+		path := path
+		name := filepath.Base(path)
+		t.Run(name, func(t *testing.T) {
+			request, issues := loadDesignExampleRequestPath(t, path)
+			if len(issues) != 0 {
+				t.Fatalf("decode %s issues:\n%s", path, formatDesignExampleIssues(issues))
+			}
+			projectName := NormalizeProjectName(request.Name)
+			outputDir := filepath.Join(t.TempDir(), projectName)
+			ctx, cancel := context.WithTimeout(context.Background(), createTimeout*2)
+			defer cancel()
+			result := Create(ctx, request, CreateOptions{
+				OutputDir:   outputDir,
+				Overwrite:   true,
+				KiCadChecks: KiCadCheckOptions{KiCadCLI: cliPath, Timeout: createTimeout, RequireERC: true, RequireDRC: true, KeepArtifacts: true, ArtifactDir: filepath.Join(outputDir, ".kicadai", "checks")},
+			})
+			kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
+			if !ok {
+				t.Fatalf("%s missing kicad_checks stage:\n%s", name, formatDesignExampleStages(result.Stages))
+			}
+			if kicadChecks.Status != StageStatusOK {
+				t.Fatalf("%s kicad_checks status = %q, want %q:\n%s", name, kicadChecks.Status, StageStatusOK, formatDesignExampleIssues(kicadChecks.Issues))
+			}
+		})
+	}
+}
+
 func TestFormatDesignExampleStagesGroupsIssuesUnderStage(t *testing.T) {
 	got := formatDesignExampleStages([]StageResult{{
 		Name:   StageProjectWrite,
@@ -176,7 +217,11 @@ func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 
 func loadDesignExampleRequest(t *testing.T, repoRoot, name string) (Request, []reports.Issue) {
 	t.Helper()
-	path := filepath.Join(repoRoot, "examples", "design", name)
+	return loadDesignExampleRequestPath(t, filepath.Join(repoRoot, "examples", "design", name))
+}
+
+func loadDesignExampleRequestPath(t *testing.T, path string) (Request, []reports.Issue) {
+	t.Helper()
 	file, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
@@ -200,7 +245,19 @@ func designExampleRequestFiles(t *testing.T, repoRoot string) []string {
 	for _, match := range matches {
 		names = append(names, filepath.Base(match))
 	}
+	sort.Strings(names)
 	return names
+}
+
+func optionalDesignExampleRequestFiles(t *testing.T, repoRoot string) []string {
+	t.Helper()
+	pattern := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "*.json")
+	matches, err := filepath.Glob(pattern)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(matches)
+	return matches
 }
 
 func designExampleRepoRoot(t *testing.T) string {
