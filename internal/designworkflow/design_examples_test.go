@@ -294,6 +294,25 @@ func TestDesignExampleMetadataValidation(t *testing.T) {
 	}
 }
 
+func TestDesignExampleOptionalMetadataFilesAreValid(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	metadataPaths := optionalDesignExampleMetadataFiles(t, repoRoot)
+	if len(metadataPaths) == 0 {
+		t.Fatal("no optional KiCad-backed metadata files found")
+	}
+	for _, metadataPath := range metadataPaths {
+		t.Run(strings.TrimSuffix(filepath.Base(metadataPath), ".metadata.json"), func(t *testing.T) {
+			metadata, err := loadDesignExampleMetadataPath(metadataPath)
+			if err != nil {
+				t.Fatalf("load %s: %v", metadataPath, err)
+			}
+			if _, err := designExampleRequestPathForMetadata(metadataPath, metadata); err != nil {
+				t.Fatalf("%s request path: %v", metadata.ID, err)
+			}
+		})
+	}
+}
+
 func TestDesignExampleMetadataRejectsMissingRequiredFields(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {

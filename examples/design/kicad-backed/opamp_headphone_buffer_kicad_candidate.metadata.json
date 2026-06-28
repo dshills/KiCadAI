@@ -1,0 +1,21 @@
+{
+  "id": "opamp_headphone_buffer_kicad_candidate",
+  "request": "opamp_headphone_buffer_kicad_candidate.json",
+  "tier": "fabrication",
+  "readiness": "expected_fail",
+  "acceptance": "fabrication-candidate",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [],
+  "expected_stages": [
+    "block_planning",
+    "component_selection"
+  ],
+  "known_gaps": [
+    "The op-amp headphone buffer seed has placeholder connector protection for required output DC blocking and protection.",
+    "Fabrication-candidate component evidence is intentionally unavailable for the amplifier seed, so optional KiCad-backed runs must fail closed before claiming ERC/DRC-ready analog output.",
+    "Amplifier-specific layout proof for feedback proximity, supply decoupling, high-current output width, thermal placement, and headphone load safety remains future work."
+  ],
+  "notes": "Optional amplifier fixture that documents the expected fabrication-candidate blockers for real kicad-cli validation promotion."
+}
