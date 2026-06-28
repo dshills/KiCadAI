@@ -12,22 +12,96 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 		got = append(got, family.ID)
 	}
 	want := []string{
+		"amplifier_input_stage",
+		"amplifier_power_entry",
+		"amplifier_stability_network",
 		"canned_oscillator",
+		"class_a_output_stage",
+		"class_ab_output_stage",
 		"connector_breakout",
 		"crystal_oscillator",
 		"esd_protection",
+		"headphone_output_connector",
 		"i2c_sensor",
 		"led_indicator",
 		"mcu_minimal",
 		"opamp_gain_stage",
 		"reset_programming_header",
 		"reverse_polarity_protection",
+		"speaker_output_connector",
 		"usb_c_power",
 		"voltage_regulator",
 	}
+	slices.Sort(got)
 	if !slices.Equal(got, want) {
 		t.Fatalf("families = %#v, want %#v", got, want)
 	}
+}
+
+func TestAmplifierInventoryDeclaresUnsupportedGaps(t *testing.T) {
+	inventory := NewBuiltinRegistry().Inventory()
+	ids := unsupportedAmplifierRoadmapIDs()
+	if len(ids) == 0 {
+		t.Fatal("no amplifier roadmap IDs found")
+	}
+	for _, id := range ids {
+		family, ok := inventoryFamily(inventory, id)
+		if !ok {
+			t.Fatalf("missing amplifier inventory family %s", id)
+		}
+		if family.Implemented {
+			t.Fatalf("%s should be explicit unsupported gap, got implemented family %#v", id, family)
+		}
+		if family.Readiness != BlockReadinessUnsupported {
+			t.Fatalf("%s readiness = %q", id, family.Readiness)
+		}
+		if len(family.Gaps) == 0 {
+			t.Fatalf("%s missing unsupported gap detail", id)
+		}
+	}
+}
+
+func unsupportedAmplifierRoadmapIDs() []string {
+	var ids []string
+	for _, family := range roadmapBlockFamilies {
+		if len(family.Gaps) == 0 {
+			continue
+		}
+		if slices.Contains(family.Tags, "amplifier") {
+			ids = append(ids, family.ID)
+		}
+	}
+	slices.Sort(ids)
+	return ids
+}
+
+func TestOpAmpGainStageInventoryCarriesAnalogRules(t *testing.T) {
+	inventory := NewBuiltinRegistry().Inventory()
+	opamp, ok := inventoryFamily(inventory, "opamp_gain_stage")
+	if !ok {
+		t.Fatalf("missing opamp inventory")
+	}
+	if opamp.Readiness != BlockReadinessPartial {
+		t.Fatalf("opamp readiness = %q", opamp.Readiness)
+	}
+	if !slices.Contains(opamp.ExportedPorts, "IN") || !slices.Contains(opamp.ExportedPorts, "OUT") {
+		t.Fatalf("opamp ports = %#v", opamp.ExportedPorts)
+	}
+	if !slices.Contains(opamp.ElectricalRules, opampFeedbackProximityRuleID) {
+		t.Fatalf("opamp electrical rules = %#v", opamp.ElectricalRules)
+	}
+	if len(opamp.PCBRules) == 0 {
+		t.Fatalf("opamp missing PCB rules: %#v", opamp)
+	}
+}
+
+func inventoryFamily(inventory BlockLibraryInventory, id string) (BlockFamilyInventory, bool) {
+	for _, family := range inventory.Families {
+		if family.ID == id {
+			return family, true
+		}
+	}
+	return BlockFamilyInventory{}, false
 }
 
 func TestBuiltinInventorySummarizesImplementedBlockRules(t *testing.T) {

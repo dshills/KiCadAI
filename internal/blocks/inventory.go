@@ -39,6 +39,7 @@ type roadmapBlockFamily struct {
 	ID       string
 	Name     string
 	Category string
+	Tags     []string
 	Gaps     []string
 }
 
@@ -48,8 +49,85 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 	{ID: "mcu_minimal", Name: "MCU Minimal System", Category: "digital"},
 	{ID: "usb_c_power", Name: "USB-C Power Input", Category: "power"},
 	{ID: "i2c_sensor", Name: "I2C Sensor", Category: "sensor"},
-	{ID: "opamp_gain_stage", Name: "Op-Amp Gain Stage", Category: "analog"},
+	{ID: "opamp_gain_stage", Name: "Op-Amp Gain Stage", Category: "analog", Tags: []string{"amplifier"}},
 	{ID: "connector_breakout", Name: "Connector Breakout", Category: "interconnect"},
+	{
+		ID:       "amplifier_input_stage",
+		Name:     "Amplifier Input Stage",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires audio input impedance and coupling policy",
+			"Requires noise and source-impedance assumptions",
+			"Requires PCB input shielding and separation constraints",
+		},
+	},
+	{
+		ID:       "class_a_output_stage",
+		Name:     "Class A Output Stage",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires quiescent-current and thermal verification",
+			"Requires headphone or speaker load-drive model",
+			"Requires placement rules for heat dissipation and output device pairing",
+		},
+	},
+	{
+		ID:       "class_ab_output_stage",
+		Name:     "Class AB Output Stage",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires complementary output-device bias verification",
+			"Requires crossover distortion and stability review",
+			"Requires high-current output routing constraints",
+		},
+	},
+	{
+		ID:       "headphone_output_connector",
+		Name:     "Headphone Output Connector",
+		Category: "interconnect",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires TRS/TRRS pinout library mapping",
+			"Requires load, sleeve, and optional detect-switch semantics",
+			"Requires output protection and jack placement constraints",
+		},
+	},
+	{
+		ID:       "speaker_output_connector",
+		Name:     "Speaker Output Connector",
+		Category: "interconnect",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires high-current connector and terminal-block selection",
+			"Requires polarity labeling and net-class policy",
+			"Requires clearance and creepage policy for requested output power",
+		},
+	},
+	{
+		ID:       "amplifier_stability_network",
+		Name:     "Amplifier Stability Network",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires topology-specific Zobel/snubber synthesis",
+			"Requires load-capacitance and phase-margin assumptions",
+			"Requires local-route and placement verification",
+		},
+	},
+	{
+		ID:       "amplifier_power_entry",
+		Name:     "Amplifier Power Entry",
+		Category: "power",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires rail-current and inrush assumptions",
+			"Requires bulk and local decoupling sizing",
+			"Requires high-current supply routing and thermal constraints",
+		},
+	},
 	{
 		ID:       "crystal_oscillator",
 		Name:     "Crystal And Oscillator",

@@ -346,8 +346,8 @@ func opampGainStageDefinition() BlockDefinition {
 			{ID: "opamp.gain.valid", Severity: BlockValidationSeverityBlocked, Description: "Requested gain must be positive and representable by selected resistor values."},
 			{ID: "opamp.supply.compatible", Severity: BlockValidationSeverityBlocked, Description: "Selected op-amp must support the requested supply mode and voltage."},
 			{ID: "opamp.bias.required", Severity: BlockValidationSeverityBlocked, Description: "Single-supply AC-coupled operation requires a bias/reference network."},
-			{ID: "opamp.feedback.proximity", Severity: BlockValidationSeverityBlocked, Description: "Feedback components must be placed close to the op-amp input and output pins."},
-			{ID: "opamp.feedback.route.required", Severity: BlockValidationSeverityBlocked, Description: "PCB realization must include the local feedback route."},
+			{ID: opampFeedbackProximityRuleID, Severity: BlockValidationSeverityBlocked, Description: "Feedback components must be placed close to the op-amp input and output pins."},
+			{ID: opampFeedbackRouteRuleID, Severity: BlockValidationSeverityBlocked, Description: "PCB realization must include the local feedback route."},
 		},
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
