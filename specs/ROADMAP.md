@@ -314,6 +314,10 @@ Implemented foundation.
   - `candidate`: none yet;
   - `pass`: none yet;
   - `blocked`: none yet.
+- `connector_led_kicad_smoke` now has routing-enabled regression coverage for
+  promoted inter-block route candidates and partial connector-to-LED route
+  evidence; it remains `expected_fail` until endpoint-contact completion and
+  DRC-clean promotion are proven.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
