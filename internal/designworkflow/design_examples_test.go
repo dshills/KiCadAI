@@ -392,7 +392,7 @@ func TestFormatDesignExampleStagesGroupsIssuesUnderStage(t *testing.T) {
 	}
 }
 
-func TestKiCadBackedLEDExampleClearsWriterNetAssignment(t *testing.T) {
+func TestKiCadBackedLEDExampleClearsWriterNetAssignmentAndBindsLocalRoute(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping design workflow integration test in short mode")
 	}
@@ -418,11 +418,45 @@ func TestKiCadBackedLEDExampleClearsWriterNetAssignment(t *testing.T) {
 			t.Fatalf("unexpected writer net-assignment issue after generated net assignment:\n%s", formatDesignExampleIssues(writer.Issues))
 		}
 	}
+	routingStage, ok := designExampleStageByName(result, StageRouting)
+	if !ok {
+		t.Fatalf("missing routing stage:\n%s", formatDesignExampleStages(result.Stages))
+	}
+	connectivityValue, exists := routingStage.Summary["route_connectivity"]
+	if !exists {
+		t.Fatalf("missing route_connectivity summary key; summary keys=%v", sortedSummaryKeys(routingStage.Summary))
+	}
+	connectivity, ok := connectivityValue.(LocalRouteConnectivitySummary)
+	if !ok {
+		t.Fatalf("route_connectivity summary has type %T, want %T", connectivityValue, LocalRouteConnectivitySummary{})
+	}
+	const minLEDLocalRouteEndpoints = 2
+	if connectivity.RoutesAttempted == 0 {
+		t.Fatalf("route connectivity summary = %#v, want at least one attempted LED local route", connectivity)
+	}
+	if connectivity.RoutesBound == 0 {
+		t.Fatalf("route connectivity summary = %#v, want at least one bound LED local route", connectivity)
+	}
+	if connectivity.EndpointsResolved < minLEDLocalRouteEndpoints {
+		t.Fatalf("route connectivity summary = %#v, want at least %d resolved LED local-route endpoints", connectivity, minLEDLocalRouteEndpoints)
+	}
+	if connectivity.EndpointContactsProven < minLEDLocalRouteEndpoints {
+		t.Fatalf("route connectivity summary = %#v, want at least %d proven LED local-route endpoint contacts", connectivity, minLEDLocalRouteEndpoints)
+	}
 }
 
 func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 	planResult := PlanBlocks(ctx, blocks.NewBuiltinRegistry(), request)
 	return planResult.Stage
+}
+
+func sortedSummaryKeys(summary map[string]any) []string {
+	keys := make([]string, 0, len(summary))
+	for key := range summary {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func loadDesignExampleRequest(t *testing.T, repoRoot, name string) (Request, []reports.Issue) {

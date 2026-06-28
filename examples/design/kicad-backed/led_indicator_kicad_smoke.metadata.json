@@ -23,8 +23,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Generated LED PCB pad and copper net codes now clear writer correctness, exposing the next blocker: local route endpoints are not yet physically connected to same-net pads.",
-    "Routing is intentionally skipped for the first KiCad-backed smoke fixture until connectivity/routing can be promoted to a passing optional example."
+    "Generated LED PCB pad and copper net codes clear writer correctness, and local route endpoint binding now emits same-net copper from physical pad anchors.",
+    "The fixture remains expected_fail until full internal validation plus optional KiCad ERC/DRC evidence proves the generated schematic and PCB are clean."
   ],
-  "notes": "Smallest optional design-create fixture for local real kicad-cli smoke runs; currently tracks the post-net-assignment connectivity and KiCad ERC/DRC blockers."
+  "notes": "Smallest optional design-create fixture for local real kicad-cli smoke runs; currently tracks post-endpoint-binding validation and KiCad ERC/DRC blockers."
 }
