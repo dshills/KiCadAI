@@ -23,8 +23,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Inter-block connector-to-LED routing is partially complete; full endpoint-contact completion and DRC-clean validation are still in progress.",
+    "Inter-block connector-to-LED routing now emits evidence-of-contact diagnostics; the supported LED_EN path remains partial until all required contacts are graph-connected.",
     "This KiCad-backed fixture still keeps routing skipped until endpoint-contact route completion validates cleanly."
   ],
-  "notes": "Design-level multi-block PCB output carries pad/copper net code evidence, local LED block routes bind to physical same-net pad anchors, and separate routing-enabled regression coverage emits inter-block connector-to-LED candidate and partial route evidence."
+  "notes": "Design-level multi-block PCB output carries pad/copper net code evidence, local LED block routes bind to physical same-net pad anchors, and separate routing-enabled regression coverage emits inter-block connector-to-LED contact-miss evidence instead of treating route emission as completion."
 }

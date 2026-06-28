@@ -281,12 +281,17 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 		}
 	}
 	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeDisconnectedPad)
+	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeRouteContactMiss)
 	interBlock := requireInterBlockRouteSummary(t, result.Stage)
 	if interBlock.Candidates == 0 || interBlock.RoutesAttempted == 0 {
 		t.Fatalf("inter-block summary = %#v, want attempted candidate", interBlock)
 	}
 	if interBlock.RoutesCompleted != 0 || interBlock.PartialNets == 0 || interBlock.EmittedSegments == 0 || interBlock.IssueCount == 0 {
 		t.Fatalf("inter-block summary = %#v, want partial routed evidence for LED_EN", interBlock)
+	}
+	contacts := requireInterBlockContactSummary(t, result.Stage)
+	if contacts.ContactsRequired == 0 || contacts.ContactsFailed == 0 || contacts.ContactMisses == 0 {
+		t.Fatalf("inter-block contact summary = %#v, want explicit contact miss evidence", contacts)
 	}
 }
 
@@ -418,13 +423,30 @@ func stageUsableForRoutingTest(stage StageResult) bool {
 
 func requireInterBlockRouteSummary(t *testing.T, stage StageResult) InterBlockRouteCompletionSummary {
 	t.Helper()
-	value, exists := stage.Summary["inter_block_routing"]
+	return requireStageSummary[InterBlockRouteCompletionSummary](t, stage, "inter_block_routing")
+}
+
+func requireInterBlockContactSummary(t *testing.T, stage StageResult) InterBlockContactSummary {
+	t.Helper()
+	return requireStageSummary[InterBlockContactSummary](t, stage, "inter_block_contacts")
+}
+
+func requireStageSummary[T any](t *testing.T, stage StageResult, key string) T {
+	t.Helper()
+	var zero T
+	value, exists := stage.Summary[key]
 	if !exists {
-		t.Fatalf("missing inter_block_routing summary: %#v", stage.Summary)
+		t.Fatalf("missing %s summary: %#v", key, stage.Summary)
 	}
-	summary, ok := value.(InterBlockRouteCompletionSummary)
+	summary, ok := value.(T)
 	if !ok {
-		t.Fatalf("inter_block_routing summary has type %T, want %T", value, InterBlockRouteCompletionSummary{})
+		data, err := json.Marshal(value)
+		if err != nil {
+			t.Fatalf("%s summary has type %T and could not be marshaled: %v", key, value, err)
+		}
+		if err := json.Unmarshal(data, &summary); err != nil {
+			t.Fatalf("%s summary has type %T and could not be decoded into %T: %v", key, value, zero, err)
+		}
 	}
 	return summary
 }
