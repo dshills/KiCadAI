@@ -38,7 +38,7 @@ kicadai \
 | Fixture | Readiness | Purpose |
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `expected_fail` | Tracks the smallest design-level KiCad-backed smoke path after pad/copper net-code assignment and physical local-route endpoint binding; current blocker is full validation plus KiCad ERC/DRC-clean evidence. |
-| `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition after local route endpoint binding and routing-enabled inter-block partial evidence; current blocker is endpoint-contact route completion and DRC-clean promotion. |
+| `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition after local route endpoint binding and routing-enabled inter-block contact evidence; current blocker is graph-connected route completion for all required contacts plus DRC-clean promotion. |
 | `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after VCC/GND/SDA/SCL inter-block candidate and contact-evidence promotion; current blocker is routed same-net completion and DRC-clean promotion. |
 
 ## Interpreting Results
@@ -61,4 +61,4 @@ encounter the documented blockers. That is not the same as an ERC/DRC-clean
 generated design. These fixtures now document that generated design-level PCBs
 can progress past writer correctness net-code assignment and block-local route
 endpoint binding. The next layout-quality blockers are full inter-block routing
-and KiCad ERC/DRC-clean evidence.
+coverage for richer boards and KiCad ERC/DRC-clean evidence.

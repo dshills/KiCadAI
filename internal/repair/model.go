@@ -148,6 +148,12 @@ func Classify(issue reports.Issue) Classification {
 			return repairable(CategoryUnroutedNet)
 		}
 		return repairable(CategoryDisconnectedPad)
+	case reports.CodeRouteContactMiss, reports.CodeRouteContactMissingTarget, reports.CodeRouteContactLayerMismatch, reports.CodeRouteGraphIncomplete, reports.CodeRouteCompletionPartial:
+		return repairable(CategoryUnroutedNet)
+	case reports.CodeRouteContactNetMismatch:
+		return repairable(CategoryInvalidNetAssignment)
+	case reports.CodeRouteContactAmbiguous, reports.CodeRouteContactUnsupported:
+		return blocked(CategoryUnsupportedObject, "route contact geometry is not deterministically repairable")
 	case reports.CodeMissingBoardOutline:
 		return repairable(CategoryMissingBoardOutline)
 	case reports.CodePlacementCollision:

@@ -159,9 +159,11 @@ loop confidence:
   optional KiCad-backed `expected_fail` fixtures. They now progress past the
   previous writer-correctness pad/copper net-code blocker. LED and
   connector/LED fixtures also prove block-local route endpoint binding to
-  physical same-net pad anchors. The remaining layout-quality blockers are full
-  inter-block routing, richer generated-board validation, and KiCad
-  ERC/DRC-clean evidence.
+  physical same-net pad anchors. Generated inter-block routing now reports
+  endpoint-contact evidence and counts completion only when a same-net contact
+  graph connects the required endpoints. The remaining layout-quality blockers
+  are broader inter-block route coverage, richer generated-board validation,
+  and KiCad ERC/DRC-clean evidence.
 
 ## Roadmap Principles
 
@@ -315,9 +317,9 @@ Implemented foundation.
   - `pass`: none yet;
   - `blocked`: none yet.
 - `connector_led_kicad_smoke` now has routing-enabled regression coverage for
-  promoted inter-block route candidates and partial connector-to-LED route
-  evidence; it remains `expected_fail` until endpoint-contact completion and
-  DRC-clean promotion are proven.
+  promoted inter-block route candidates, endpoint-contact diagnostics, and
+  same-net contact graph completion semantics; it remains `expected_fail` until
+  all required contacts graph-connect and DRC-clean promotion are proven.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -342,8 +344,8 @@ Implemented foundation.
   assignment now has workflow evidence and no longer blocks the LED smoke
   fixture at writer correctness. Generated block-local route endpoints now bind
   to physical same-net pad anchors for LED and connector/LED smoke fixtures.
-  Connector/LED has partial inter-block route evidence, and I2C sensor breakout
-  now has promoted VCC/GND/SDA/SCL inter-block candidate evidence. The
+  Connector/LED has inter-block contact-miss evidence, and I2C sensor breakout
+  now has promoted VCC/GND/SDA/SCL inter-block candidate and contact evidence. The
   `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
   even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
@@ -514,6 +516,9 @@ Routing hardening foundation is implemented. The engine now includes:
   and repair diagnostic counts;
 - routing diagnostics mapped to placement retry hints for spacing, fanout,
   distance, edge, unsupported, and rule-only failures;
+- generated inter-block route contact targets, endpoint-contact proofs,
+  contact summaries, same-net contact graph completion semantics, and repair
+  classification for route-contact diagnostics;
 - opt-in bounded placement-routing retry summaries in `design create`;
 - golden route corpus coverage for straight routes, keepout detours, via
   routes, length-policy blockers, and zone-policy blockers.

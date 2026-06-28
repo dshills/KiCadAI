@@ -71,13 +71,16 @@ hard-constraint preservation under retry adjustment. Generated inter-block
 connections are promoted into placement nets for connector/LED and I2C breakout
 workflows, and routing summaries now expose `inter_block_routing` evidence for
 candidate, attempted, partial, unrouted, and completed generated inter-block
-nets.
+nets. The companion `inter_block_contacts` summary reports required contacts,
+proven contacts, failed contacts, contact misses, net/layer mismatches, and
+missing targets. `routes_completed` now means same-net contact graph completion,
+not merely route operation emission.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,
 not thermal simulation, impedance calculation, or routed length matching.
-Endpoint-contact completion for generated inter-block routes, larger-board
-convergence, spatial acceleration for large hard-rule sets, and final KiCad
-DRC-backed layout proof remain future work.
+Larger-board convergence, spatial acceleration for large hard-rule sets, richer
+contact repair execution, and final KiCad DRC-backed layout proof remain future
+work.
 
 
 ### Routing

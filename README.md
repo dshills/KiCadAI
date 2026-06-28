@@ -21,9 +21,11 @@ workflow. The current KiCad-backed expected-fail examples have moved past the
 old missing net-code writer-correctness blocker. Generated block-local routes
 now bind to physical same-net pad anchors and report route-connectivity
 evidence. Generated inter-block route candidates now promote connector/LED and
-I2C breakout request connections into placement/routing evidence, with partial
-connector-to-LED route evidence reported in `design create`; the next blocker is
-endpoint-contact route completion plus KiCad ERC/DRC-clean layout proof.
+I2C breakout request connections into placement/routing evidence. Routing
+summaries now distinguish candidates, attempted routes, endpoint-contact
+evidence, graph-connected routes, partial routes, and unrouted nets. The next
+blocker is promoting richer generated boards to KiCad ERC/DRC-clean layout
+proof.
 
 KiCadAI is not yet a general autonomous "make me any board" system. It works best with supported structured intent, verified circuit blocks, and catalog-backed components. Broader component coverage, topology synthesis, validation feedback, and production layout proof are still active roadmap areas.
 
