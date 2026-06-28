@@ -295,6 +295,69 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 	}
 }
 
+func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "i2c_sensor_breakout_candidate",
+		Board:   BoardSpec{WidthMM: 90, HeightMM: 60, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"i2c_address": "0x48", "include_pullups": true}},
+			{ID: "io", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 4, "pin_names": []string{"VCC", "GND", "SDA", "SCL"}}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "sensor.VCC", To: "io.VCC", NetAlias: "VCC"},
+			{From: "sensor.GND", To: "io.GND", NetAlias: "GND"},
+			{From: "sensor.SDA", To: "io.SDA", NetAlias: "SDA"},
+			{From: "sensor.SCL", To: "io.SCL", NetAlias: "SCL"},
+		},
+		RoutingRetry: RoutingRetryPolicySpec{Enabled: true},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(ctx, registry, request)
+	if !stageUsableForRoutingTest(plan.Stage) {
+		t.Fatalf("planning failed: %#v", plan.Stage.Issues)
+	}
+	fragments := RealizePCBFragments(ctx, registry, plan)
+	if !stageUsableForRoutingTest(fragments.Stage) {
+		t.Fatalf("PCB realization failed: %#v", fragments.Stage.Issues)
+	}
+	placed := PlaceFragments(ctx, request, fragments, PlacementOptions{})
+	if !stageUsableForRoutingTest(placed.Stage) {
+		t.Fatalf("placement failed: %#v", placed.Stage.Issues)
+	}
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	expectedNets := len(request.Connections)
+	expectedEndpoints := 0
+	for _, connection := range request.Connections {
+		netName := connection.NetAlias
+		candidate, ok := interBlockCandidateByNetForRoutingTest(candidates, netName)
+		if !ok || candidate.Status != InterBlockRouteCandidateRoutable || len(candidate.Endpoints) < 2 {
+			t.Fatalf("candidate %s = %#v, ok=%v", netName, candidate, ok)
+		}
+		expectedEndpoints += len(candidate.Endpoints)
+	}
+
+	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	for _, connection := range request.Connections {
+		if !routingRequestHasNet(result.Request, connection.NetAlias) {
+			t.Fatalf("routing request is missing net %s; nets=%#v", connection.NetAlias, result.Request.Nets)
+		}
+	}
+	interBlock := requireInterBlockRouteSummary(t, result.Stage)
+	if interBlock.Candidates != expectedNets || interBlock.EndpointsResolved != expectedEndpoints {
+		t.Fatalf("inter-block summary counts = candidates %d endpoints %d, want %d and %d", interBlock.Candidates, interBlock.EndpointsResolved, expectedNets, expectedEndpoints)
+	}
+	contacts := requireInterBlockContactSummary(t, result.Stage)
+	if contacts.ContactsRequired != expectedEndpoints || contacts.ContactsProven+contacts.ContactsFailed != expectedEndpoints {
+		t.Fatalf("inter-block contact counts = required %d resolved %d, want %d", contacts.ContactsRequired, contacts.ContactsProven+contacts.ContactsFailed, expectedEndpoints)
+	}
+}
+
 // requireRouteOperationsForNet decodes every transaction route operation for a
 // net so tests can inspect multi-segment routing evidence without relying on
 // the first matching operation.
