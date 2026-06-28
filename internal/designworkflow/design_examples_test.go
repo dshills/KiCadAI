@@ -420,16 +420,9 @@ func TestKiCadBackedLEDExampleClearsWriterNetAssignmentAndBindsLocalRoute(t *tes
 	}
 	routingStage, ok := designExampleStageByName(result, StageRouting)
 	if !ok {
-		t.Fatalf("missing routing stage:\n%s", formatDesignExampleStages(result.Stages))
+		t.Fatalf("missing routing stage:\nissues:\n%s\nstages:\n%s", formatDesignExampleIssues(resultIssues(result)), formatDesignExampleStages(result.Stages))
 	}
-	connectivityValue, exists := routingStage.Summary["route_connectivity"]
-	if !exists {
-		t.Fatalf("missing route_connectivity summary key; summary keys=%v", sortedSummaryKeys(routingStage.Summary))
-	}
-	connectivity, ok := connectivityValue.(LocalRouteConnectivitySummary)
-	if !ok {
-		t.Fatalf("route_connectivity summary has type %T, want %T", connectivityValue, LocalRouteConnectivitySummary{})
-	}
+	connectivity := requireRouteConnectivitySummary(t, routingStage)
 	const minLEDLocalRouteEndpoints = 2
 	if connectivity.RoutesAttempted == 0 {
 		t.Fatalf("route connectivity summary = %#v, want at least one attempted LED local route", connectivity)
@@ -445,9 +438,52 @@ func TestKiCadBackedLEDExampleClearsWriterNetAssignmentAndBindsLocalRoute(t *tes
 	}
 }
 
+func TestKiCadBackedConnectorLEDExampleBindsLocalRoute(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping design workflow integration test in short mode")
+	}
+	repoRoot := designExampleRepoRoot(t)
+	requestName := "kicad-backed/connector_led_kicad_smoke.json"
+	request, issues := loadDesignExampleRequest(t, repoRoot, requestName)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestName, formatDesignExampleIssues(issues))
+	}
+	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(request.Name))
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+	routingStage, ok := designExampleStageByName(result, StageRouting)
+	if !ok {
+		t.Fatalf("missing routing stage:\nissues:\n%s\nstages:\n%s", formatDesignExampleIssues(resultIssues(result)), formatDesignExampleStages(result.Stages))
+	}
+	connectivity := requireRouteConnectivitySummary(t, routingStage)
+	if connectivity.RoutesAttempted == 0 {
+		t.Fatalf("route connectivity summary = %#v, want attempted connector/LED local route", connectivity)
+	}
+	if connectivity.RoutesBound == 0 {
+		t.Fatalf("route connectivity summary = %#v, want bound connector/LED local route", connectivity)
+	}
+	if connectivity.EndpointsUnresolved != 0 || connectivity.EndpointNetMismatches != 0 {
+		t.Fatalf("route connectivity summary = %#v, want no local route endpoint blockers", connectivity)
+	}
+}
+
 func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 	planResult := PlanBlocks(ctx, blocks.NewBuiltinRegistry(), request)
 	return planResult.Stage
+}
+
+func requireRouteConnectivitySummary(t *testing.T, stage StageResult) LocalRouteConnectivitySummary {
+	t.Helper()
+	connectivityValue, exists := stage.Summary["route_connectivity"]
+	if !exists {
+		t.Fatalf("missing route_connectivity summary key; summary keys=%v", sortedSummaryKeys(stage.Summary))
+	}
+	connectivity, ok := connectivityValue.(LocalRouteConnectivitySummary)
+	if !ok {
+		t.Fatalf("route_connectivity summary has type %T, want %T", connectivityValue, LocalRouteConnectivitySummary{})
+	}
+	return connectivity
 }
 
 func sortedSummaryKeys(summary map[string]any) []string {
@@ -457,6 +493,14 @@ func sortedSummaryKeys(summary map[string]any) []string {
 	}
 	sort.Strings(keys)
 	return keys
+}
+
+func resultIssues(result WorkflowResult) []reports.Issue {
+	var issues []reports.Issue
+	for _, stage := range result.Stages {
+		issues = append(issues, stage.Issues...)
+	}
+	return issues
 }
 
 func loadDesignExampleRequest(t *testing.T, repoRoot, name string) (Request, []reports.Issue) {

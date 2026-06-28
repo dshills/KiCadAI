@@ -38,7 +38,7 @@ kicadai \
 | Fixture | Readiness | Purpose |
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `expected_fail` | Tracks the smallest design-level KiCad-backed smoke path after pad/copper net-code assignment and physical local-route endpoint binding; current blocker is full validation plus KiCad ERC/DRC-clean evidence. |
-| `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition before routed DRC-clean promotion. |
+| `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition after local route endpoint binding; current blocker is full inter-block routing and DRC-clean promotion. |
 | `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate that should eventually become a passing KiCad-backed design example. |
 
 ## Interpreting Results

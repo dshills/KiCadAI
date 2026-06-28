@@ -23,8 +23,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Design-level multi-block PCB output now carries pad/copper net code evidence, but still needs routed same-net connectivity before KiCad DRC-clean promotion.",
-    "Routing is intentionally skipped until this fixture can be promoted to a routed KiCad-backed pass candidate."
+    "Design-level multi-block PCB output carries pad/copper net code evidence, and local LED block routes now bind to physical same-net pad anchors.",
+    "Full inter-block connector-to-LED routing is intentionally skipped until this fixture can be promoted to a routed KiCad-backed pass candidate."
   ],
-  "notes": "Tracks connector-to-LED composition readiness for optional KiCad-backed design examples."
+  "notes": "Tracks connector-to-LED composition readiness for optional KiCad-backed design examples after local route endpoint binding."
 }
