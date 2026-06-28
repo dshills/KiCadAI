@@ -99,12 +99,17 @@ func padSpecs(pads []PadSummary) []transactions.PadSpec {
 	}
 	specs := make([]transactions.PadSpec, 0, len(pads))
 	for _, pad := range pads {
+		var net *string
+		if value := strings.TrimSpace(pad.Net); value != "" {
+			net = &value
+		}
 		specs = append(specs, transactions.PadSpec{
 			Name:     pad.Name,
 			XMM:      pad.XMM,
 			YMM:      pad.YMM,
 			WidthMM:  pad.WidthMM,
 			HeightMM: pad.HeightMM,
+			Net:      net,
 		})
 	}
 	return specs

@@ -38,10 +38,7 @@ func TestPlacementOperationPayload(t *testing.T) {
 	}
 }
 
-func TestPlacementOperationAuditPadNetEvidenceDropped(t *testing.T) {
-	// This documents the Phase 1 blocker from
-	// specs/generated-design-net-assignment/PLAN.md: placement pads carry net
-	// evidence, but the transaction payload currently drops it.
+func TestPlacementOperationPreservesPadNetEvidence(t *testing.T) {
 	component := Component{
 		Ref:         "D1",
 		Value:       "LED",
@@ -70,9 +67,13 @@ func TestPlacementOperationAuditPadNetEvidenceDropped(t *testing.T) {
 	if len(payload.Pads) != len(component.Pads) {
 		t.Fatalf("payload pads = %d, want %d", len(payload.Pads), len(component.Pads))
 	}
-	for index, pad := range payload.Pads {
-		if pad.Net != nil {
-			t.Errorf("pad %d %q expected current placement operation to drop pad net evidence, got %q", index, pad.Name, *pad.Net)
+	wantNets := []string{"LED_K", "LED_A"}
+	if len(payload.Pads) != len(wantNets) {
+		t.Fatalf("payload pads = %d, want %d net assertions", len(payload.Pads), len(wantNets))
+	}
+	for index, want := range wantNets {
+		if payload.Pads[index].Net == nil || *payload.Pads[index].Net != want {
+			t.Errorf("pad %d net = %v, want %q", index, payload.Pads[index].Net, want)
 		}
 	}
 }
