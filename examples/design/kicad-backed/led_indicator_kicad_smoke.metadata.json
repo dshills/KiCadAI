@@ -23,8 +23,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Writer correctness currently blocks before KiCad DRC because generated LED PCB pads and copper can miss net codes when no library pad hints are available.",
-    "Routing is intentionally skipped for the first KiCad-backed smoke fixture until pad-net correctness is promoted to a passing optional example."
+    "Generated LED PCB pad and copper net codes now clear writer correctness, exposing the next blocker: local route endpoints are not yet physically connected to same-net pads.",
+    "Routing is intentionally skipped for the first KiCad-backed smoke fixture until connectivity/routing can be promoted to a passing optional example."
   ],
-  "notes": "Smallest optional design-create fixture for local real kicad-cli smoke runs; currently tracks the pad-net writer correctness blocker."
+  "notes": "Smallest optional design-create fixture for local real kicad-cli smoke runs; currently tracks the post-net-assignment connectivity and KiCad ERC/DRC blockers."
 }

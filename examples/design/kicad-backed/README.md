@@ -37,7 +37,7 @@ kicadai \
 
 | Fixture | Readiness | Purpose |
 | --- | --- | --- |
-| `led_indicator_kicad_smoke` | `expected_fail` | Tracks the smallest design-level KiCad-backed smoke path and the current pad/copper net-code writer-correctness blocker. |
+| `led_indicator_kicad_smoke` | `expected_fail` | Tracks the smallest design-level KiCad-backed smoke path after pad/copper net-code assignment; current blocker is routed same-net connectivity and KiCad ERC/DRC. |
 | `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition before routed DRC-clean promotion. |
 | `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate that should eventually become a passing KiCad-backed design example. |
 
@@ -58,6 +58,6 @@ as `led_indicator_kicad_smoke.metadata.json`.
 
 Tests for `expected_fail` fixtures are considered successful only when they
 encounter the documented blockers. That is not the same as an ERC/DRC-clean
-generated design. These fixtures primarily document that generated design-level
-PCBs can block writer correctness before KiCad checks when pad/copper net-code
-evidence is incomplete without resolved pad hints.
+generated design. These fixtures now document that generated design-level PCBs
+can progress past writer correctness net-code assignment and expose the next
+layout-quality blockers in routed same-net connectivity and KiCad ERC/DRC.
