@@ -1,0 +1,4 @@
+Create a Class AB headphone amplifier with a 9 V external input, op-amp gain
+stage, complementary output pair, diode bias, input connector, and 32 ohm
+headphone output connector. Keep it at connectivity-level readiness until the
+output-stage bias, stability, and KiCad validation evidence are complete.

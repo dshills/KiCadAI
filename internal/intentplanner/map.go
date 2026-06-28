@@ -388,6 +388,13 @@ func (builder *planBuilder) mapFunctions() {
 			builder.unsupportedRequirement(reqID, fmt.Sprintf("functions[%d].family", index), "unsupported clock family "+function.Family, function.Strength, "use crystal_oscillator or canned_oscillator")
 			continue
 		}
+		if function.Kind == "amplifier" && !supportedAmplifierFamily(function.Family) {
+			builder.unsupportedRequirement(reqID, fmt.Sprintf("functions[%d].family", index), "unsupported amplifier family "+function.Family, function.Strength, "use op_amp_gain_stage, opamp_gain_stage, class_a_headphone, class_ab_headphone, or opamp_buffer_headphone")
+			continue
+		}
+		if function.Kind == "amplifier" {
+			builder.recordAmplifierFamilyGap(reqID, fmt.Sprintf("functions[%d].family", index), function.Family)
+		}
 		for count := 0; count < function.Quantity; count++ {
 			switch function.Kind {
 			case "indicator":
@@ -406,6 +413,7 @@ func (builder *planBuilder) mapFunctions() {
 				id := builder.addBlock(reqID, "amplifier", "opamp_gain_stage", function.Params, "op-amp gain stage implements requested amplifier")
 				builder.amplifierIDs = appendIfNotEmpty(builder.amplifierIDs, id)
 				builder.recordInstanceSupply(id, function.Supply)
+				builder.recordAmplifierInstanceGap(reqID, id)
 			case "regulator", "power":
 				id := builder.addBlock(reqID, "regulator", "voltage_regulator", function.Params, "regulator block implements requested power conversion")
 				builder.regulatorIDs = appendIfNotEmpty(builder.regulatorIDs, id)
@@ -440,7 +448,7 @@ func (builder *planBuilder) mapInterfaces() {
 		reqID := fmt.Sprintf("interface.%d", index+1)
 		builder.addRequirement(RequirementRecord{ID: reqID, Path: fmt.Sprintf("interfaces[%d]", index), Type: "interface", Strength: iface.Strength, Value: iface.Kind})
 		if !supportedInterfaceKind(iface.Kind) {
-			builder.unsupportedRequirement(reqID, fmt.Sprintf("interfaces[%d].kind", index), "unsupported interface kind "+iface.Kind, iface.Strength, "use i2c, gpio, connector, or power")
+			builder.unsupportedRequirement(reqID, fmt.Sprintf("interfaces[%d].kind", index), "unsupported interface kind "+iface.Kind, iface.Strength, "use i2c, gpio, analog, connector, or power")
 			continue
 		}
 		for count := 0; count < iface.Quantity; count++ {
@@ -450,17 +458,27 @@ func (builder *planBuilder) mapInterfaces() {
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
 				builder.i2cConnectorIDs = appendIfNotEmpty(builder.i2cConnectorIDs, id)
 				builder.recordI2CBus(id, iface.Bus)
-			case "gpio", "connector":
-				pins := []string{"SIG", "VCC", "GND"}
-				id := builder.addConnector(reqID, "connector", pins, iface.Strength)
+			case "analog":
+				pins := interfaceSignalConnectorPins(iface)
+				id := builder.addInterfaceConnector(reqID, "connector", pins, iface)
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
-				builder.gpioConnectorIDs = appendIfNotEmpty(builder.gpioConnectorIDs, id)
+				builder.signalConnectorIDs = appendIfNotEmpty(builder.signalConnectorIDs, id)
+			case "gpio", "connector":
+				pins := interfaceSignalConnectorPins(iface)
+				if iface.Kind == "gpio" && len(pins) == 2 {
+					pins = []string{"SIG", "VCC", "GND"}
+				}
+				id := builder.addInterfaceConnector(reqID, "connector", pins, iface)
+				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
+				if iface.Kind == "gpio" {
+					builder.gpioConnectorIDs = appendIfNotEmpty(builder.gpioConnectorIDs, id)
+				}
 				builder.signalConnectorIDs = appendIfNotEmpty(builder.signalConnectorIDs, id)
 				if iface.Kind == "gpio" && (iface.Target.ID != "" || iface.Target.Role != "") {
 					builder.unsupportedRequirement(reqID+".target", fmt.Sprintf("interfaces[%d].target", index), "GPIO target pin assignment is not safely synthesized yet", iface.Strength, "omit target metadata for a generic connector or add a verified GPIO assignment model")
 				}
 			case "power":
-				id := builder.addConnector(reqID, "power_connector", []string{"VCC", "GND"}, iface.Strength)
+				id := builder.addInterfaceConnector(reqID, "power_connector", []string{"VCC", "GND"}, iface)
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
 				builder.powerConnectorIDs = appendIfNotEmpty(builder.powerConnectorIDs, id)
 			}
@@ -561,6 +579,68 @@ func (builder *planBuilder) connectPowerAndSignals() {
 
 func (builder *planBuilder) signalConnectorGap(instanceID string) {
 	builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: "signal_connector." + normalizeToken(instanceID), Path: "interfaces", Message: "signal consumer " + instanceID + " was not connected because no compatible SIG connector was available"})
+}
+
+type amplifierFamilyMetadata struct {
+	GapSuffix  string
+	Message    string
+	Suggestion string
+}
+
+var amplifierFamilies = map[string]amplifierFamilyMetadata{
+	"":                  {},
+	"op_amp_gain_stage": {},
+	"opamp_gain_stage":  {},
+	"class_a_headphone": {
+		GapSuffix:  "class_a_output_stage_unverified",
+		Message:    "Class A headphone amplifier request maps to the current op-amp gain-stage foundation; quiescent bias, thermal behavior, and Class A output-stage realization are not yet verified",
+		Suggestion: "use checked-in example fixtures for evaluation until Class A circuit blocks and PCB constraints are verified",
+	},
+	"class_ab_headphone": {
+		GapSuffix:  "class_ab_output_stage_unverified",
+		Message:    "Class AB headphone amplifier request maps to the current op-amp gain-stage foundation; complementary output-stage bias, stability, and load-drive behavior are not yet verified",
+		Suggestion: "use checked-in example fixtures for evaluation until Class AB output-stage blocks and PCB constraints are verified",
+	},
+	"opamp_buffer_headphone": {
+		GapSuffix:  "headphone_buffer_unverified",
+		Message:    "op-amp headphone buffer request maps to the current op-amp gain-stage foundation; headphone load drive and output protection are not yet verified",
+		Suggestion: "keep acceptance at structural or connectivity until load-drive and PCB evidence are available",
+	},
+}
+
+func supportedAmplifierFamily(family string) bool {
+	_, ok := amplifierFamilies[normalizeToken(family)]
+	return ok
+}
+
+func (builder *planBuilder) recordAmplifierFamilyGap(reqID string, path string, family string) {
+	metadata, ok := amplifierFamilies[normalizeToken(family)]
+	if !ok {
+		return
+	}
+	if metadata.GapSuffix != "" {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+			ID:         reqID + "." + metadata.GapSuffix,
+			Path:       path,
+			Message:    metadata.Message,
+			Suggestion: metadata.Suggestion,
+		})
+		if builder.request.Manufacturing.FabricationCandidate || builder.request.Acceptance == designworkflow.AcceptanceFabricationCandidate {
+			builder.addIssue(path, "amplifier family "+normalizeToken(family)+" cannot be promoted to fabrication-candidate output yet", "complete verified circuit blocks, thermal constraints, and KiCad ERC/DRC evidence before requesting fabrication-candidate output")
+		}
+	}
+}
+
+func (builder *planBuilder) recordAmplifierInstanceGap(reqID string, instanceID string) {
+	if instanceID == "" {
+		return
+	}
+	builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+		ID:         reqID + "." + normalizeToken(instanceID) + ".opamp_gain_stage_layout_unverified",
+		Path:       "blocks." + instanceID,
+		Message:    "op-amp gain-stage schematic intent is supported, but analog layout, feedback stability, and ERC/DRC evidence remain unverified",
+		Suggestion: "review generated artifacts and run KiCad-backed validation before treating output as fabrication-ready",
+	})
 }
 
 func (builder *planBuilder) connectMCUSupportBlocks() {
@@ -1024,6 +1104,39 @@ func (builder *planBuilder) addConnector(reqID string, prefix string, pins []str
 	return builder.addBlock(reqID, prefix, "connector_breakout", map[string]any{"pin_names": pins}, "connector breakout exposes requested interface")
 }
 
+func (builder *planBuilder) addInterfaceConnector(reqID string, prefix string, pins []string, iface InterfaceIntent) string {
+	if iface.Strength == StrengthForbidden {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{ID: reqID + ".forbidden", Path: reqID, Message: "connector requirement was forbidden and omitted"})
+		return ""
+	}
+	params := map[string]any{"pin_names": pins}
+	if iface.Kind != "" {
+		params["interface_kind"] = iface.Kind
+	}
+	if iface.Connector != "" {
+		params["connector"] = iface.Connector
+	}
+	if iface.Voltage != "" {
+		params["voltage"] = iface.Voltage
+	}
+	if iface.Bus != "" {
+		params["bus"] = iface.Bus
+	}
+	return builder.addBlock(reqID, prefix, "connector_breakout", params, "connector breakout exposes requested interface")
+}
+
+func interfaceSignalConnectorPins(iface InterfaceIntent) []string {
+	if iface.Kind == "analog" {
+		return []string{"SIG", "GND"}
+	}
+	switch normalizeToken(iface.Connector) {
+	case "audio_input", "headphone_output", "speaker_output":
+		return []string{"SIG", "GND"}
+	default:
+		return []string{"SIG", "VCC", "GND"}
+	}
+}
+
 func (builder *planBuilder) addBlock(reqID string, prefix string, blockID string, params map[string]any, rationale string) string {
 	definition, ok := builder.registry.GetBlock(blockID)
 	if !ok {
@@ -1202,7 +1315,7 @@ func supportedFunctionKind(kind string) bool {
 
 func supportedInterfaceKind(kind string) bool {
 	switch kind {
-	case "i2c", "gpio", "connector", "power":
+	case "i2c", "gpio", "analog", "connector", "power":
 		return true
 	default:
 		return false

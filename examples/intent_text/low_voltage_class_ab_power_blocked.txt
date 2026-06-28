@@ -1,0 +1,4 @@
+Create a 12 V low-voltage Class AB speaker power amplifier for an 8 ohm load
+and roughly 5 W output. This topology is intentionally unsupported for now and
+should fail closed with blockers for output-stage realization, thermal design,
+and power routing evidence instead of producing a fabrication-ready board.

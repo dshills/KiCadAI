@@ -1,0 +1,34 @@
+{
+  "version": "0.1.0",
+  "name": "amplifier_low_voltage_power_blocked",
+  "summary": "Intentional blocked fixture for a low-voltage Class AB speaker power amplifier topology that is not yet supported.",
+  "kind": "amplifier",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 90,
+    "height_mm": 60,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "12V", "current_ma": 2000}
+    ]
+  },
+  "interfaces": [
+    {"kind": "analog", "connector": "audio_input", "voltage": "2V"},
+    {"kind": "connector", "connector": "speaker_output", "voltage": "6V"}
+  ],
+  "functions": [
+    {
+      "kind": "amplifier",
+      "family": "class_ab_power",
+      "strength": "required",
+      "params": {
+        "topology": "class_ab",
+        "load_ohms": 8,
+        "target_power_w": 5,
+        "requires_thermal_review": true
+      }
+    }
+  ]
+}

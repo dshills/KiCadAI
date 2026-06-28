@@ -39,6 +39,12 @@ Structured intent examples live under `examples/intent/`. Files prefixed with
   must not select AP2112K.
 - `regulator_insufficient_headroom_blocked.json`: intentional blocked regulator
   headroom fixture.
+- `amplifier_class_a_headphone.json`: Class A headphone amplifier intent that
+  remains partial until output-stage, thermal, and PCB evidence are verified.
+- `amplifier_class_ab_headphone.json`: Class AB headphone amplifier intent that
+  remains partial until bias, stability, and load-drive evidence are verified.
+- `amplifier_low_voltage_power_blocked.json`: intentional blocked low-voltage
+  power amplifier topology fixture.
 
 Round-trip validation for the Go-generated LED schematic, Go-generated LED PCB,
 checked-in LED schematic fixture, and checked-in generated PCB fixture is

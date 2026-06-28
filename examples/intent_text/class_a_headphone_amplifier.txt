@@ -1,0 +1,4 @@
+Create a Class A headphone amplifier board with a 12 V external input, 32 ohm
+headphone output, about 2x gain, explicit quiescent bias, and enough space for
+thermal review. Treat the result as connectivity-level only until the Class A
+output stage, heat, and PCB constraints have been verified.

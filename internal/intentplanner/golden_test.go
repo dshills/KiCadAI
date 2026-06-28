@@ -15,6 +15,9 @@ var intentFixtureExpectations = map[string]struct {
 	IssuePath  string
 }{
 	"amplifier_module.json":                        {Status: PlanStatusPartial},
+	"amplifier_class_a_headphone.json":             {Status: PlanStatusPartial, KnownGapID: "function.1.class_a_output_stage_unverified"},
+	"amplifier_class_ab_headphone.json":            {Status: PlanStatusPartial, KnownGapID: "function.1.class_ab_output_stage_unverified"},
+	"amplifier_low_voltage_power_blocked.json":     {Status: PlanStatusBlocked, IssuePath: "functions[0].family"},
 	"fabrication_sensor.json":                      {Status: PlanStatusPartial},
 	"multi_mcu_ambiguous_support.json":             {Status: PlanStatusBlocked, IssuePath: "functions[2].target"},
 	"mcu_external_clock_limited.json":              {Status: PlanStatusPartial, KnownGapID: "mcu.clock.topology_unsupported.clock"},

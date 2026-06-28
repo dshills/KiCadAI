@@ -1,0 +1,38 @@
+{
+  "version": "0.1.0",
+  "name": "amplifier_class_ab_headphone",
+  "summary": "Class AB headphone amplifier request with complementary output-stage verification gaps.",
+  "kind": "amplifier",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 70,
+    "height_mm": 45,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "9V", "current_ma": 500}
+    ],
+    "rails": [
+      {"name": "VCC", "voltage": "9V", "current_ma": 250, "alias": "vcc"}
+    ]
+  },
+  "interfaces": [
+    {"kind": "analog", "connector": "audio_input", "voltage": "2V"},
+    {"kind": "connector", "connector": "headphone_output", "voltage": "6V"}
+  ],
+  "functions": [
+    {
+      "kind": "amplifier",
+      "family": "class_ab_headphone",
+      "supply": "vcc",
+      "params": {
+        "gain": 3,
+        "topology": "class_ab",
+        "load_ohms": 32,
+        "bias": "diode_pair",
+        "requires_stability_review": true
+      }
+    }
+  ]
+}

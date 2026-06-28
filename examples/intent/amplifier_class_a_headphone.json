@@ -1,0 +1,38 @@
+{
+  "version": "0.1.0",
+  "name": "amplifier_class_a_headphone",
+  "summary": "Class A headphone amplifier request with explicit quiescent-bias and thermal verification gaps.",
+  "kind": "amplifier",
+  "acceptance": "connectivity",
+  "board": {
+    "width_mm": 70,
+    "height_mm": 45,
+    "layers": 2
+  },
+  "power": {
+    "inputs": [
+      {"kind": "external", "voltage": "12V", "current_ma": 750}
+    ],
+    "rails": [
+      {"name": "VCC", "voltage": "12V", "current_ma": 300, "alias": "vcc"}
+    ]
+  },
+  "interfaces": [
+    {"kind": "analog", "connector": "audio_input", "voltage": "2V"},
+    {"kind": "connector", "connector": "headphone_output", "voltage": "4V"}
+  ],
+  "functions": [
+    {
+      "kind": "amplifier",
+      "family": "class_a_headphone",
+      "supply": "vcc",
+      "params": {
+        "gain": 2,
+        "topology": "class_a",
+        "load_ohms": 32,
+        "quiescent_current_ma": 80,
+        "requires_thermal_review": true
+      }
+    }
+  ]
+}
