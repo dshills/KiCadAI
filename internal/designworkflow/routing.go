@@ -38,6 +38,19 @@ type LocalRouteConnectivitySummary struct {
 	IssueCount             int `json:"issue_count"`
 }
 
+type InterBlockRouteCompletionSummary struct {
+	NetsConsidered      int `json:"nets_considered"`
+	Candidates          int `json:"candidates"`
+	RoutesAttempted     int `json:"routes_attempted"`
+	RoutesCompleted     int `json:"routes_completed"`
+	EndpointsResolved   int `json:"endpoints_resolved"`
+	EndpointsUnresolved int `json:"endpoints_unresolved"`
+	PartialNets         int `json:"partial_nets"`
+	UnroutedNets        int `json:"unrouted_nets"`
+	EmittedSegments     int `json:"emitted_segments"`
+	IssueCount          int `json:"issue_count"`
+}
+
 func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, opts RoutingOptions) RoutingStageResult {
 	normalized := NormalizeRequest(request)
 	if ctx == nil {
@@ -51,14 +64,17 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		}})}
 	}
 	localOperations, localRouteIssues, localRouteConnectivity := localRouteOperations(fragments, &placed)
+	interBlockCandidates, interBlockCandidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
 	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
 	if opts.Skip || normalized.Validation.SkipRouting {
 		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
 			"reason":               "routing skipped",
 			"local_route_mobility": localRouteMobility,
 			"route_connectivity":   localRouteConnectivity,
+			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...)),
 		}}
 		stage.Issues = append(stage.Issues, localRouteIssues...)
+		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
 		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
@@ -68,8 +84,10 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "placement did not complete",
 			"local_route_mobility": localRouteMobility,
 			"route_connectivity":   localRouteConnectivity,
+			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...)),
 		}}
 		stage.Issues = append(stage.Issues, localRouteIssues...)
+		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
 		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
@@ -78,6 +96,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
 	issues = append(issues, localRouteIssues...)
+	issues = append(issues, interBlockCandidateIssues...)
 	issues = append(issues, anchorIssues...)
 	applyRoutingOptions(normalized, opts, &routingRequest)
 	result := routing.Result{Status: routing.StatusBlocked}
@@ -89,6 +108,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	operations := append(localOperations, anchorOperations...)
 	operations = append(operations, routeOperations...)
 	stage := NewStageResult(StageRouting, issues)
+	stage.Issues = cloneIssues(issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
 	stage.Summary = map[string]any{
 		"local_route_operations": len(localOperations),
@@ -99,6 +119,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"repair_diagnostics":     len(routeDiagnostics),
 		"local_route_mobility":   localRouteMobility,
 		"route_connectivity":     localRouteConnectivity,
+		"inter_block_routing":    summarizeInterBlockRouteCompletion(interBlockCandidates, routeOperations, issues),
 	}
 	if len(anchorOperations) > 0 {
 		stage.Summary["anchor_binding_route_operations"] = len(anchorOperations)
@@ -203,6 +224,58 @@ func localRouteOperations(fragments PCBFragmentResult, placed *PlacementStageRes
 	issues = append(issues, bindIssues...)
 	summary.IssueCount = len(issues)
 	return operations, issues, summary
+}
+
+func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, operations []transactions.Operation, issues []reports.Issue) InterBlockRouteCompletionSummary {
+	summary := InterBlockRouteCompletionSummary{
+		NetsConsidered:  len(candidates),
+		Candidates:      len(candidates),
+		RoutesAttempted: len(candidates),
+	}
+	routeSegmentsByNet := routeSegmentCountsByNet(operations)
+	issueCountsByNet := issueCountsByNet(issues)
+	for _, candidate := range candidates {
+		summary.EndpointsResolved += len(candidate.Endpoints)
+		summary.EndpointsUnresolved += candidate.Unresolved
+		segments := routeSegmentsByNet[candidate.NetName]
+		summary.EmittedSegments += segments
+		netIssueCount := issueCountsByNet[candidate.NetName]
+		summary.IssueCount += netIssueCount
+		switch {
+		case segments > 0 && netIssueCount == 0:
+			summary.RoutesCompleted++
+		case segments > 0:
+			summary.PartialNets++
+		default:
+			summary.UnroutedNets++
+		}
+	}
+	return summary
+}
+
+func routeSegmentCountsByNet(operations []transactions.Operation) map[string]int {
+	counts := map[string]int{}
+	for _, operation := range operations {
+		net := strings.TrimSpace(operation.Net)
+		if operation.Op != transactions.OpRoute || net == "" {
+			continue
+		}
+		counts[net]++
+	}
+	return counts
+}
+
+func issueCountsByNet(issues []reports.Issue) map[string]int {
+	counts := map[string]int{}
+	for _, issue := range issues {
+		for _, net := range issue.Nets {
+			net = strings.TrimSpace(net)
+			if net != "" {
+				counts[net]++
+			}
+		}
+	}
+	return counts
 }
 
 func preservedLocalRouteOperations(fragments PCBFragmentResult) []transactions.Operation {

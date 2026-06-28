@@ -21,6 +21,7 @@ type InterBlockRouteCandidate struct {
 	Endpoints   []InterBlockRouteEndpoint `json:"endpoints"`
 	InstanceIDs []string                  `json:"instance_ids,omitempty"`
 	BlockIDs    []string                  `json:"block_ids,omitempty"`
+	Unresolved  int                       `json:"unresolved,omitempty"`
 }
 
 type InterBlockRouteEndpoint struct {
@@ -48,6 +49,7 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex 
 	instanceSet := map[string]struct{}{}
 	blockSet := map[string]struct{}{}
 	var endpoints []InterBlockRouteEndpoint
+	var unresolved int
 	var issues []reports.Issue
 	for endpointIndex, endpoint := range net.Endpoints {
 		ref := strings.TrimSpace(endpoint.Ref)
@@ -63,7 +65,9 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex 
 				Path:     fmt.Sprintf("design.inter_block_routing.nets[%d].endpoints[%d]", index, endpointIndex),
 				Message:  "net endpoint does not belong to a generated block component",
 				Refs:     []string{ref},
+				Nets:     []string{net.Name},
 			})
+			unresolved++
 			continue
 		}
 		endpoints = append(endpoints, InterBlockRouteEndpoint{
@@ -84,6 +88,7 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex 
 		Endpoints:   endpoints,
 		InstanceIDs: sortedStringSet(instanceSet),
 		BlockIDs:    sortedStringSet(blockSet),
+		Unresolved:  unresolved,
 	}, issues, true
 }
 

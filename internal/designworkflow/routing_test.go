@@ -270,6 +270,13 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 		t.Fatalf("operations = %#v, want LED_EN route operation", result.Operations)
 	}
 	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeDisconnectedPad)
+	interBlock := requireInterBlockRouteSummary(t, result.Stage)
+	if interBlock.Candidates == 0 || interBlock.RoutesAttempted == 0 {
+		t.Fatalf("inter-block summary = %#v, want attempted candidate", interBlock)
+	}
+	if interBlock.RoutesCompleted != 0 || interBlock.PartialNets == 0 || interBlock.EmittedSegments == 0 || interBlock.IssueCount == 0 {
+		t.Fatalf("inter-block summary = %#v, want partial routed evidence for LED_EN", interBlock)
+	}
 }
 
 func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {
@@ -287,6 +294,29 @@ func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {
 	}
 	if result.Request.Rules.PreferLayer != "B.Cu" {
 		t.Fatalf("prefer layer = %q", result.Request.Rules.PreferLayer)
+	}
+}
+
+func TestInterBlockRouteCompletionSummaryJSONStable(t *testing.T) {
+	summary := InterBlockRouteCompletionSummary{
+		NetsConsidered:      1,
+		Candidates:          1,
+		RoutesAttempted:     1,
+		RoutesCompleted:     0,
+		EndpointsResolved:   2,
+		EndpointsUnresolved: 0,
+		PartialNets:         1,
+		UnroutedNets:        0,
+		EmittedSegments:     1,
+		IssueCount:          1,
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"nets_considered":1,"candidates":1,"routes_attempted":1,"routes_completed":0,"endpoints_resolved":2,"endpoints_unresolved":0,"partial_nets":1,"unrouted_nets":0,"emitted_segments":1,"issue_count":1}`
+	if string(data) != want {
+		t.Fatalf("summary JSON = %q, want %q", data, want)
 	}
 }
 
@@ -334,6 +364,19 @@ func assertNetHasIssueCode(t *testing.T, issues []reports.Issue, net string, cod
 
 func stageUsableForRoutingTest(stage StageResult) bool {
 	return stage.Status == StageStatusOK || stage.Status == StageStatusWarning
+}
+
+func requireInterBlockRouteSummary(t *testing.T, stage StageResult) InterBlockRouteCompletionSummary {
+	t.Helper()
+	value, exists := stage.Summary["inter_block_routing"]
+	if !exists {
+		t.Fatalf("missing inter_block_routing summary: %#v", stage.Summary)
+	}
+	summary, ok := value.(InterBlockRouteCompletionSummary)
+	if !ok {
+		t.Fatalf("inter_block_routing summary has type %T, want %T", value, InterBlockRouteCompletionSummary{})
+	}
+	return summary
 }
 
 func TestRoutePlacementReportsUnroutableSignal(t *testing.T) {
