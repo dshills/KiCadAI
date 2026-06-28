@@ -164,6 +164,69 @@ func TestValidateInterBlockRouteEndpointContactsReportsMissingRouteOperation(t *
 	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactMissingTarget)
 }
 
+func TestInterBlockConnectedNetsRequiresSameRouteGraph(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	connectedOperation := mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 15, YMM: 10},
+	)
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, []transactions.Operation{connectedOperation}, &placed)
+	connected := interBlockConnectedNets(evidence, []transactions.Operation{connectedOperation})
+	if !connected["SIG"] {
+		t.Fatalf("connected nets = %#v, want SIG connected", connected)
+	}
+
+	disconnectedOperations := []transactions.Operation{
+		mustContactRouteOperation(t, "SIG", "F.Cu", transactions.Point{XMM: 5, YMM: 10}, transactions.Point{XMM: 7, YMM: 10}),
+		mustContactRouteOperation(t, "SIG", "F.Cu", transactions.Point{XMM: 13, YMM: 10}, transactions.Point{XMM: 15, YMM: 10}),
+	}
+	evidence = ValidateInterBlockRouteEndpointContacts(candidates, disconnectedOperations, &placed)
+	connected = interBlockConnectedNets(evidence, disconnectedOperations)
+	if connected["SIG"] {
+		t.Fatalf("connected nets = %#v, want SIG disconnected", connected)
+	}
+
+	touchingOperations := []transactions.Operation{
+		mustContactRouteOperation(t, "SIG", "F.Cu", transactions.Point{XMM: 5, YMM: 10}, transactions.Point{XMM: 10, YMM: 10}),
+		mustContactRouteOperation(t, "SIG", "F.Cu", transactions.Point{XMM: 10, YMM: 10}, transactions.Point{XMM: 15, YMM: 10}),
+	}
+	evidence = ValidateInterBlockRouteEndpointContacts(candidates, touchingOperations, &placed)
+	connected = interBlockConnectedNets(evidence, touchingOperations)
+	if !connected["SIG"] {
+		t.Fatalf("connected nets = %#v, want touching operations to connect SIG", connected)
+	}
+}
+
+func TestInterBlockRouteCompletionUsesContactGraph(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operation := mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 15, YMM: 10},
+	)
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, []transactions.Operation{operation}, &placed)
+
+	summary := summarizeInterBlockRouteCompletion(candidates, []transactions.Operation{operation}, nil, evidence)
+	if summary.RoutesCompleted != 1 || summary.PartialNets != 0 {
+		t.Fatalf("summary = %#v, want connected route completion", summary)
+	}
+}
+
 func interBlockContactPlaced(firstNet string, secondNet string) PlacementStageResult {
 	return PlacementStageResult{
 		Request: placement.Request{

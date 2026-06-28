@@ -205,6 +205,158 @@ func SummarizeInterBlockContacts(evidence InterBlockContactEvidence) InterBlockC
 	return summary
 }
 
+func interBlockConnectedNets(evidence InterBlockContactEvidence, operations []transactions.Operation) map[string]bool {
+	connected := map[string]bool{}
+	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
+	if len(targetsByNet) == 0 {
+		return connected
+	}
+	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
+	if len(operationIssues) != 0 {
+		return connected
+	}
+	for netName, targets := range targetsByNet {
+		if len(targets) < 2 {
+			continue
+		}
+		graph := newInterBlockContactGraph(operationsByNet[netName])
+		if graph.connectedTargets(targets) {
+			connected[netName] = true
+		}
+	}
+	return connected
+}
+
+type interBlockContactGraph struct {
+	parent []int
+	rank   []int
+	nodes  []interBlockContactGraphNode
+	byKey  map[interBlockContactGraphKey][]int
+}
+
+type interBlockContactGraphNode struct {
+	Point transactions.Point
+	Layer string
+}
+
+type interBlockContactGraphKey struct {
+	layer string
+	x     int64
+	y     int64
+}
+
+func newInterBlockContactGraph(operations []decodedContactRouteOperation) interBlockContactGraph {
+	graph := interBlockContactGraph{byKey: map[interBlockContactGraphKey][]int{}}
+	for _, operation := range operations {
+		previous := -1
+		layer := normalizeContactLayer(operation.Layer)
+		for _, point := range operation.Points {
+			node := graph.add(point, layer)
+			if previous != -1 {
+				graph.union(previous, node)
+			}
+			previous = node
+		}
+	}
+	return graph
+}
+
+func (graph *interBlockContactGraph) add(point transactions.Point, layer string) int {
+	if existing, ok := graph.nearbyNode(point, layer); ok {
+		return existing
+	}
+	index := len(graph.nodes)
+	graph.nodes = append(graph.nodes, interBlockContactGraphNode{Point: point, Layer: layer})
+	graph.parent = append(graph.parent, index)
+	graph.rank = append(graph.rank, 0)
+	key := contactGraphKey(point, layer)
+	graph.byKey[key] = append(graph.byKey[key], index)
+	return index
+}
+
+func (graph *interBlockContactGraph) connectedTargets(targets []InterBlockContactTarget) bool {
+	root := -1
+	for _, target := range targets {
+		node, ok := graph.findTargetNode(target)
+		if !ok {
+			return false
+		}
+		nodeRoot := graph.find(node)
+		if root == -1 {
+			root = nodeRoot
+			continue
+		}
+		if root != nodeRoot {
+			return false
+		}
+	}
+	return root != -1
+}
+
+func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarget) (int, bool) {
+	return graph.nearbyNode(target.Point, normalizeContactLayer(target.Layer))
+}
+
+func (graph *interBlockContactGraph) nearbyNode(point transactions.Point, layer string) (int, bool) {
+	key := contactGraphKey(point, layer)
+	best := -1
+	bestDistance := math.Inf(1)
+	// Bucket size equals the contact tolerance, so any point within tolerance
+	// can only live in the same bucket or one of the eight neighboring buckets.
+	for dx := int64(-1); dx <= 1; dx++ {
+		for dy := int64(-1); dy <= 1; dy++ {
+			candidateKey := interBlockContactGraphKey{layer: key.layer, x: key.x + dx, y: key.y + dy}
+			for _, index := range graph.byKey[candidateKey] {
+				node := graph.nodes[index]
+				distance := pointDistanceMM(node.Point, point)
+				if distance < bestDistance {
+					bestDistance = distance
+					best = index
+				}
+			}
+		}
+	}
+	return best, best != -1 && bestDistance <= interBlockContactToleranceMM
+}
+
+func (graph *interBlockContactGraph) find(index int) int {
+	for graph.parent[index] != index {
+		graph.parent[index] = graph.parent[graph.parent[index]]
+		index = graph.parent[index]
+	}
+	return index
+}
+
+func (graph *interBlockContactGraph) union(left int, right int) {
+	leftRoot := graph.find(left)
+	rightRoot := graph.find(right)
+	if leftRoot == rightRoot {
+		return
+	}
+	if graph.rank[leftRoot] < graph.rank[rightRoot] {
+		graph.parent[leftRoot] = rightRoot
+		return
+	}
+	if graph.rank[leftRoot] > graph.rank[rightRoot] {
+		graph.parent[rightRoot] = leftRoot
+		return
+	}
+	graph.parent[rightRoot] = leftRoot
+	graph.rank[leftRoot]++
+}
+
+func contactGraphKey(point transactions.Point, layer string) interBlockContactGraphKey {
+	return interBlockContactGraphKey{
+		layer: layer,
+		x:     int64(math.Round(point.XMM / interBlockContactToleranceMM)),
+		y:     int64(math.Round(point.YMM / interBlockContactToleranceMM)),
+	}
+}
+
+func normalizeContactLayer(layer string) string {
+	return strings.ToUpper(strings.TrimSpace(layer))
+}
+
 func interBlockContactTarget(path string, netName string, endpoint InterBlockRouteEndpoint, resolver *PlacedPadEndpointResolver) (InterBlockContactTarget, bool, *reports.Issue) {
 	ref := strings.TrimSpace(endpoint.Ref)
 	pin := strings.TrimSpace(endpoint.Pin)

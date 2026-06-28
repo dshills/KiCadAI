@@ -71,7 +71,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "routing skipped",
 			"local_route_mobility": localRouteMobility,
 			"route_connectivity":   localRouteConnectivity,
-			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...)),
+			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...), InterBlockContactEvidence{}),
 		}}
 		stage.Issues = append(stage.Issues, localRouteIssues...)
 		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
@@ -84,7 +84,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "placement did not complete",
 			"local_route_mobility": localRouteMobility,
 			"route_connectivity":   localRouteConnectivity,
-			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...)),
+			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...), InterBlockContactEvidence{}),
 		}}
 		stage.Issues = append(stage.Issues, localRouteIssues...)
 		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
@@ -121,7 +121,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"repair_diagnostics":     len(routeDiagnostics),
 		"local_route_mobility":   localRouteMobility,
 		"route_connectivity":     localRouteConnectivity,
-		"inter_block_routing":    summarizeInterBlockRouteCompletion(interBlockCandidates, routeOperations, issues),
+		"inter_block_routing":    summarizeInterBlockRouteCompletion(interBlockCandidates, routeOperations, issues, interBlockContactEvidence),
 		"inter_block_contacts":   SummarizeInterBlockContacts(interBlockContactEvidence),
 	}
 	if len(anchorOperations) > 0 {
@@ -229,7 +229,7 @@ func localRouteOperations(fragments PCBFragmentResult, placed *PlacementStageRes
 	return operations, issues, summary
 }
 
-func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, operations []transactions.Operation, issues []reports.Issue) InterBlockRouteCompletionSummary {
+func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, operations []transactions.Operation, issues []reports.Issue, contactEvidence InterBlockContactEvidence) InterBlockRouteCompletionSummary {
 	summary := InterBlockRouteCompletionSummary{
 		NetsConsidered:  len(candidates),
 		Candidates:      len(candidates),
@@ -237,6 +237,7 @@ func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, o
 	}
 	routeSegmentsByNet := routeSegmentCountsByNet(operations)
 	issueCountsByNet := issueCountsByNet(issues)
+	connectedNets := interBlockConnectedNets(contactEvidence, operations)
 	for _, candidate := range candidates {
 		summary.EndpointsResolved += len(candidate.Endpoints)
 		summary.EndpointsUnresolved += candidate.Unresolved
@@ -245,7 +246,7 @@ func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, o
 		netIssueCount := issueCountsByNet[candidate.NetName]
 		summary.IssueCount += netIssueCount
 		switch {
-		case segments > 0 && netIssueCount == 0:
+		case connectedNets[candidate.NetName] && netIssueCount == 0:
 			summary.RoutesCompleted++
 		case segments > 0:
 			summary.PartialNets++
