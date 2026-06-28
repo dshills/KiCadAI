@@ -181,6 +181,10 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 		Constraints: []PCBConstraint{
 			{ID: "opamp_feedback_proximity", Kind: "proximity", NetTemplate: "feedback", AppliesTo: []string{"opamp", "feedback", "gain_to_ground"}, MaxLengthMM: 6, Description: "Feedback network should remain close to the op-amp inverting input."},
 			{ID: "opamp_supply_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"opamp", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Supply decoupling capacitor should remain close to the op-amp supply pins."},
+			{ID: "opamp_input_output_separation", Kind: "analog_separation", AppliesTo: []string{"opamp", "feedback", "output_resistor"}, ClearanceMM: 3, Description: "Keep input and feedback nodes separated from output copper where placement permits."},
+			{ID: "opamp_output_resistor_pairing", Kind: "output_pairing", NetTemplate: "out", AppliesTo: []string{"opamp", "output_resistor"}, MaxLengthMM: 6, Description: "Place the optional output resistor as the first output-side element after the op-amp pin."},
+			{ID: "opamp_output_min_width", Kind: "high_current_width", NetTemplate: "out", AppliesTo: []string{"output_resistor"}, MinWidthMM: 0.5, Description: "Classify headphone/output paths for wider copper until load-current evidence proves a smaller width."},
+			{ID: "opamp_thermal_edge_preference", Kind: "thermal_region", AppliesTo: []string{"opamp", "output_resistor"}, Description: "Prefer output-drive heat sources near board edge or copper-spread regions for later thermal review."},
 		},
 		Validation: PCBValidationExpectations{RequiredNets: []string{"in", "out", "feedback", "vcc", "gnd"}, RequiredRoutes: []string{"feedback_output", "feedback_loop", "gain_reference", "gain_ground", "supply_decoupling"}},
 	}

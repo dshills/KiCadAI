@@ -151,7 +151,14 @@ func TestOpAmpGainStageDefinitionDeclaresAnalogRules(t *testing.T) {
 		}
 	}
 	constraints := pcbConstraintIDs(definition.PCBRealization)
-	for _, id := range []string{"opamp_feedback_proximity", "opamp_supply_decoupling_proximity"} {
+	for _, id := range []string{
+		"opamp_feedback_proximity",
+		"opamp_supply_decoupling_proximity",
+		"opamp_input_output_separation",
+		"opamp_output_resistor_pairing",
+		"opamp_output_min_width",
+		"opamp_thermal_edge_preference",
+	} {
 		if !slices.Contains(constraints, id) {
 			t.Errorf("op-amp PCB constraints = %#v, missing %s", constraints, id)
 		}
