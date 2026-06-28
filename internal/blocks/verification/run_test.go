@@ -40,7 +40,7 @@ func TestRunCaseOmitsERCDRCStageWhenNotRequested(t *testing.T) {
 	}
 }
 
-func TestRunCaseWriterRequiredReportsKnownPadNetGap(t *testing.T) {
+func TestRunCaseWriterRequiredPassesGeneratedPadNets(t *testing.T) {
 	manifest, issues := LoadManifest(filepath.Join("..", "testdata", "verification", "connector_breakout_4pin", "manifest.json"))
 	if len(issues) != 0 {
 		t.Fatalf("load issues = %#v", issues)
@@ -51,7 +51,7 @@ func TestRunCaseWriterRequiredReportsKnownPadNetGap(t *testing.T) {
 		OutputDir: t.TempDir(),
 		Overwrite: true,
 	})
-	if result.Status != StatusBlocked || !hasStage(result.Stages, "writer_correctness") || len(result.Artifacts) == 0 || !hasIssue(result.Issues, "PCB pad references missing net code") {
+	if result.Status == StatusBlocked || !hasStage(result.Stages, "writer_correctness") || len(result.Artifacts) == 0 || hasIssue(result.Issues, "PCB pad references missing net code") {
 		t.Fatalf("result = %#v", result)
 	}
 }
@@ -707,7 +707,7 @@ func TestRunCaseBoardValidationCatchesGeneratedProjectNetAssignments(t *testing.
 		Overwrite: true,
 	})
 	stage, ok := findStage(result.Stages, "board_validation")
-	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || len(result.Artifacts) == 0 || !hasIssue(result.Issues, "uses unknown net code") {
+	if result.Status != StatusBlocked || !ok || stage.Status != StatusBlocked || len(result.Artifacts) == 0 || !hasIssue(result.Issues, "disconnected from net") {
 		t.Fatalf("result = %#v", result)
 	}
 }

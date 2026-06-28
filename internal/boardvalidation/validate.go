@@ -160,6 +160,7 @@ func validateNetToPad(board *pcbfiles.PCBFile) []reports.Issue {
 	for _, net := range board.Nets {
 		netNames[net.Code] = net.Name
 	}
+	netNames[0] = ""
 	var issues []reports.Issue
 	for footprintIndex := range board.Footprints {
 		footprint := &board.Footprints[footprintIndex]

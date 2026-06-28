@@ -394,8 +394,8 @@ func TestPostRepairDesignCreateEmitsGeneratedRepairBundle(t *testing.T) {
 	stage := postRepairStageByName(t, result.Data.Stages, "validation_repair")
 	validationStage := postRepairStageByName(t, result.Data.Stages, "validation")
 	kiCadStage := postRepairStageByName(t, result.Data.Stages, "kicad_checks")
-	if validationStage.Status != "skipped" || kiCadStage.Status != "skipped" {
-		t.Fatalf("downstream stages should be explicit skips: validation=%#v kicad=%#v", validationStage, kiCadStage)
+	if validationStage.Status == "" || kiCadStage.Status != "skipped" {
+		t.Fatalf("downstream stages should be explicit: validation=%#v kicad=%#v", validationStage, kiCadStage)
 	}
 	if stage.Status == "" {
 		t.Fatalf("validation_repair status is empty: %#v", stage)

@@ -190,6 +190,7 @@ func validateFootprintPads(board kpcb.PCBFile, path string) []reports.Issue {
 	for _, net := range board.Nets {
 		validNetCodes[net.Code] = net.Name
 	}
+	validNetCodes[0] = ""
 	seenRefs := map[string]struct{}{}
 	var issues []reports.Issue
 	for _, footprint := range board.Footprints {

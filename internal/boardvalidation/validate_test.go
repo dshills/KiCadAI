@@ -38,6 +38,18 @@ func TestValidateBoardUnknownPadNet(t *testing.T) {
 	}
 }
 
+func TestValidateBoardAllowsNoNetPad(t *testing.T) {
+	board := twoPadBoard(t)
+	board.Footprints[0].Pads[0].NetCode = 0
+	board.Footprints[0].Pads[0].NetName = ""
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	for _, issue := range result.Issues {
+		if issue.Code == reports.CodeInvalidNetAssignment && strings.Contains(issue.Path, "footprints.0.pads.0") {
+			t.Fatalf("unexpected invalid net assignment for no-net pad: %#v", result.Issues)
+		}
+	}
+}
+
 func TestValidateBoardUnroutedNet(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Tracks = nil

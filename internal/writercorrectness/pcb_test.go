@@ -58,6 +58,27 @@ func TestCheckPCBFootprintPadsReportsWrongPadNet(t *testing.T) {
 	assertCheckIssueContains(t, checks, "missing net code")
 }
 
+func TestCheckPCBFootprintPadsAllowsNoNetPad(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_pcb")
+	writeFile(t, path, pcbFixture(`(net 1 "SIG")`, `
+  (footprint "Connector_Test:TH_1x01" (layer "F.Cu") (at 10 10)
+    (uuid "11111111-1111-1111-1111-111111111111")
+    (path "/11111111-1111-1111-1111-111111111111")
+    (property "Reference" "J1" (at 0 0 0) (layer "F.SilkS") (uuid "11111111-1111-1111-1111-111111111112"))
+    (property "Value" "IN" (at 0 1 0) (layer "F.Fab") (uuid "11111111-1111-1111-1111-111111111113"))
+    (pad "1" thru_hole circle (at 0 0) (size 1.5 1.5) (drill 0.8) (layers "*.Cu" "*.Mask") (uuid "11111111-1111-1111-1111-111111111114"))
+  )
+`))
+
+	_, checks := CheckPCBFootprintPads(Target{PCBPath: path})
+	for _, check := range checks {
+		if check.Status == CheckFail {
+			t.Fatalf("check failed for no-net pad: %#v", checks)
+		}
+	}
+}
+
 func TestCheckPCBFootprintPadsReportsDuplicateFootprintRef(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demo.kicad_pcb")

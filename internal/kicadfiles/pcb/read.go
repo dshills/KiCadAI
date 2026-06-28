@@ -3,6 +3,7 @@ package pcb
 import (
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -393,17 +394,26 @@ func readZoneFill(node sexpr.ParsedNode) ZoneFillSettings {
 }
 
 func resolvePCBNetReferences(board *PCBFile) {
+	if board == nil {
+		return
+	}
+	addMissingNamedNetReferences(board)
 	namesByCode := make(map[int]string, len(board.Nets))
 	codesByName := make(map[string]int, len(board.Nets))
 	for _, net := range board.Nets {
-		namesByCode[net.Code] = net.Name
-		codesByName[net.Name] = net.Code
+		name := strings.TrimSpace(net.Name)
+		namesByCode[net.Code] = name
+		codesByName[name] = net.Code
 	}
 	resolve := func(code *int, name *string) {
 		trimmedName := strings.TrimSpace(*name)
+		if trimmedName != *name {
+			*name = trimmedName
+		}
 		if *code == 0 && trimmedName != "" {
-			if resolved, ok := codesByName[*name]; ok {
+			if resolved, ok := codesByName[trimmedName]; ok {
 				*code = resolved
+				*name = trimmedName
 			}
 		}
 		if trimmedName == "" {
@@ -429,6 +439,67 @@ func resolvePCBNetReferences(board *PCBFile) {
 	}
 	for i := range board.Drawings {
 		resolve(&board.Drawings[i].NetCode, &board.Drawings[i].NetName)
+	}
+}
+
+func addMissingNamedNetReferences(board *PCBFile) {
+	if board == nil {
+		return
+	}
+	existingNames := map[string]struct{}{}
+	maxCode := 0
+	for _, net := range board.Nets {
+		name := strings.TrimSpace(net.Name)
+		existingNames[name] = struct{}{}
+		if net.Code > maxCode {
+			maxCode = net.Code
+		}
+	}
+	missing := map[string]struct{}{}
+	add := func(code int, name string) {
+		if code > maxCode {
+			maxCode = code
+		}
+		if code != 0 || name == "" {
+			return
+		}
+		trimmed := strings.TrimSpace(name)
+		if trimmed == "" {
+			return
+		}
+		if _, ok := existingNames[trimmed]; ok {
+			return
+		}
+		missing[trimmed] = struct{}{}
+	}
+	for _, footprint := range board.Footprints {
+		for _, pad := range footprint.Pads {
+			add(pad.NetCode, pad.NetName)
+		}
+	}
+	for _, track := range board.Tracks {
+		add(track.NetCode, track.NetName)
+	}
+	for _, arc := range board.TrackArcs {
+		add(arc.NetCode, arc.NetName)
+	}
+	for _, via := range board.Vias {
+		add(via.NetCode, via.NetName)
+	}
+	for _, zone := range board.Zones {
+		add(zone.NetCode, zone.NetName)
+	}
+	for _, drawing := range board.Drawings {
+		add(drawing.NetCode, drawing.NetName)
+	}
+	names := make([]string, 0, len(missing))
+	for name := range missing {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		maxCode++
+		board.Nets = append(board.Nets, Net{Code: maxCode, Name: name})
 	}
 }
 
