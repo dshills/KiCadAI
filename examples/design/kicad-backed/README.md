@@ -59,5 +59,6 @@ as `led_indicator_kicad_smoke.metadata.json`.
 Tests for `expected_fail` fixtures are considered successful only when they
 encounter the documented blockers. That is not the same as an ERC/DRC-clean
 generated design. These fixtures now document that generated design-level PCBs
-can progress past writer correctness net-code assignment and expose the next
-layout-quality blockers in routed same-net connectivity and KiCad ERC/DRC.
+can progress past writer correctness net-code assignment and block-local route
+endpoint binding. The next layout-quality blockers are full inter-block routing
+and KiCad ERC/DRC-clean evidence.

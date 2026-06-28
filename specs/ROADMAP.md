@@ -157,9 +157,11 @@ loop confidence:
 - the default design examples are intentionally small LED workflows.
   Multi-block connector/LED and I2C sensor breakout scenarios now exist as
   optional KiCad-backed `expected_fail` fixtures. They now progress past the
-  previous writer-correctness pad/copper net-code blocker and document the next
-  layout-quality blockers: routed same-net connectivity and KiCad ERC/DRC-clean
-  evidence.
+  previous writer-correctness pad/copper net-code blocker. LED and
+  connector/LED fixtures also prove block-local route endpoint binding to
+  physical same-net pad anchors. The remaining layout-quality blockers are full
+  inter-block routing, richer generated-board validation, and KiCad
+  ERC/DRC-clean evidence.
 
 ## Roadmap Principles
 
@@ -331,11 +333,13 @@ Implemented foundation.
   quality improves, and broaden DRC-clean evidence beyond the initial smoke
   tier.
 - Promote optional design examples from `expected_fail` to `candidate` and then
-  `pass` by closing routed same-net connectivity, route endpoint placement, and
-  KiCad-clean layout blockers. Generated PCB pad/copper net assignment now has
-  workflow evidence and no longer blocks the LED smoke fixture at writer
-  correctness. The `i2c_sensor_breakout_candidate` name identifies it as a
-  promotion candidate even though its current readiness is `expected_fail`.
+  `pass` by closing full inter-block routing, richer route-completion
+  validation, and KiCad-clean layout blockers. Generated PCB pad/copper net
+  assignment now has workflow evidence and no longer blocks the LED smoke
+  fixture at writer correctness. Generated block-local route endpoints now bind
+  to physical same-net pad anchors for LED and connector/LED smoke fixtures.
+  The `i2c_sensor_breakout_candidate` name identifies it as a promotion
+  candidate even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.

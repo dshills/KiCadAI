@@ -129,6 +129,27 @@ func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 	}
 }
 
+func TestLocalRouteConnectivitySummaryJSONStable(t *testing.T) {
+	summary := LocalRouteConnectivitySummary{
+		RoutesAttempted:        1,
+		RoutesBound:            1,
+		EndpointsResolved:      2,
+		EndpointsUnresolved:    0,
+		EndpointContactsProven: 2,
+		EndpointNetMismatches:  0,
+		EmittedTrackSegments:   1,
+		IssueCount:             0,
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"routes_attempted":1,"routes_bound":1,"endpoints_resolved":2,"endpoints_unresolved":0,"endpoint_contacts_proven":2,"endpoint_net_mismatches":0,"emitted_track_segments":1,"issue_count":0}`
+	if string(data) != want {
+		t.Fatalf("summary JSON = %q, want %q", data, want)
+	}
+}
+
 func TestRoutePlacementAddsAnchorBindingRoutes(t *testing.T) {
 	request := Request{Version: RequestVersion, Name: "anchor", Board: BoardSpec{WidthMM: 30, HeightMM: 20, Layers: 1}}
 	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{

@@ -18,8 +18,10 @@ Generated design PCB net assignment now propagates pad and copper net names
 through placement/project write, resolves KiCad 10 name-only net references
 during PCB readback, and reports net-assignment evidence in the `design create`
 workflow. The current KiCad-backed expected-fail examples have moved past the
-old missing net-code writer-correctness blocker; the next blocker is routed
-same-net connectivity and KiCad ERC/DRC-clean layout proof.
+old missing net-code writer-correctness blocker. Generated block-local routes
+now bind to physical same-net pad anchors and report route-connectivity
+evidence; the next blocker is full inter-block routing plus KiCad
+ERC/DRC-clean layout proof.
 
 KiCadAI is not yet a general autonomous "make me any board" system. It works best with supported structured intent, verified circuit blocks, and catalog-backed components. Broader component coverage, topology synthesis, validation feedback, and production layout proof are still active roadmap areas.
 
