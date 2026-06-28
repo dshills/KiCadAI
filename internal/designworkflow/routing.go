@@ -2,7 +2,9 @@ package designworkflow
 
 import (
 	"context"
+	"strings"
 
+	"kicadai/internal/blocks"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/routingadapters"
@@ -37,13 +39,14 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			Message:  err.Error(),
 		}})}
 	}
-	localOperations := localRouteOperations(fragments)
+	localOperations, localRouteIssues := localRouteOperations(fragments, &placed)
 	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
 	if opts.Skip || normalized.Validation.SkipRouting {
 		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
 			"reason":               "routing skipped",
 			"local_route_mobility": localRouteMobility,
 		}}
+		stage.Issues = append(stage.Issues, localRouteIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
 		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
@@ -53,6 +56,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"reason":               "placement did not complete",
 			"local_route_mobility": localRouteMobility,
 		}}
+		stage.Issues = append(stage.Issues, localRouteIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
 		reportAnchorDiagnostics(&stage, anchorSummary, anchorIssues)
 		return RoutingStageResult{Operations: localOperations, Stage: stage}
@@ -60,6 +64,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	anchorBindings, anchorOperations, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, true, opts)
 
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
+	issues = append(issues, localRouteIssues...)
 	issues = append(issues, anchorIssues...)
 	applyRoutingOptions(normalized, opts, &routingRequest)
 	result := routing.Result{Status: routing.StatusBlocked}
@@ -169,16 +174,153 @@ func applyRoutingOptions(request Request, opts RoutingOptions, routingRequest *r
 	}
 }
 
-func localRouteOperations(fragments PCBFragmentResult) []transactions.Operation {
+func localRouteOperations(fragments PCBFragmentResult, placed *PlacementStageResult) ([]transactions.Operation, []reports.Issue) {
+	if placed == nil || placed.Stage.Status == StageStatusBlocked || len(placed.Request.Components) == 0 {
+		return preservedLocalRouteOperations(fragments), nil
+	}
+	table, tableIssues := BuildGeneratedNetTable(placed, nil)
+	resolver := NewPlacedPadEndpointResolver(placed, table)
+	operations, bindIssues := bindLocalRouteOperations(fragments, resolver)
+	operations = append(preservedUnmodeledFragmentOperations(fragments), operations...)
+	issues := append([]reports.Issue(nil), tableIssues...)
+	issues = append(issues, resolver.Issues()...)
+	issues = append(issues, bindIssues...)
+	return operations, issues
+}
+
+func preservedLocalRouteOperations(fragments PCBFragmentResult) []transactions.Operation {
 	operations := []transactions.Operation{}
 	for _, fragment := range fragments.Fragments {
 		for _, operation := range fragment.Realization.Operations {
-			if operation.Op == transactions.OpRoute {
+			if preserveFragmentOperationDuringRouting(operation) {
 				operations = append(operations, operation)
 			}
 		}
 	}
 	return operations
+}
+
+func preservedUnmodeledFragmentOperations(fragments PCBFragmentResult) []transactions.Operation {
+	operations := []transactions.Operation{}
+	for _, fragment := range fragments.Fragments {
+		localRouteNets := localRouteNetKeysForFragment(fragment)
+		for _, operation := range fragment.Realization.Operations {
+			if !preserveFragmentOperationDuringRouting(operation) {
+				continue
+			}
+			if operation.Op != transactions.OpRoute {
+				operations = append(operations, operation)
+				continue
+			}
+			if _, modeled := localRouteNets[strings.ToUpper(routeOperationCachedNetName(operation))]; modeled {
+				continue
+			}
+			operations = append(operations, operation)
+		}
+	}
+	return operations
+}
+
+func localRouteNetKeysForFragment(fragment BlockFragment) map[string]struct{} {
+	keys := map[string]struct{}{}
+	for _, route := range fragment.Realization.LocalRoutes {
+		if netName := strings.TrimSpace(route.NetName); netName != "" {
+			keys[strings.ToUpper(netName)] = struct{}{}
+		}
+	}
+	return keys
+}
+
+func preserveFragmentOperationDuringRouting(operation transactions.Operation) bool {
+	return operation.Op != transactions.OpPlaceFootprint
+}
+
+func routeOperationCachedNetName(operation transactions.Operation) string {
+	return strings.TrimSpace(operation.Net)
+}
+
+func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEndpointResolver) ([]transactions.Operation, []reports.Issue) {
+	operations := []transactions.Operation{}
+	var issues []reports.Issue
+	for _, fragment := range fragments.Fragments {
+		for _, route := range fragment.Realization.LocalRoutes {
+			operation, routeIssues, ok := bindLocalRouteOperation(fragment, route, resolver)
+			issues = append(issues, routeIssues...)
+			if ok {
+				operations = append(operations, operation)
+			}
+		}
+	}
+	return operations, issues
+}
+
+func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver) (transactions.Operation, []reports.Issue, bool) {
+	var issues []reports.Issue
+	netName := strings.TrimSpace(route.NetName)
+	path := "routes." + firstNonEmpty(fragment.InstanceID, fragment.BlockID, "fragment") + "." + firstNonEmpty(route.ID, netName, "unnamed")
+	if netName == "" {
+		return transactions.Operation{}, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route net name is required", nil)}, false
+	}
+	from, fromIssues, fromOK := resolveLocalRouteEndpoint(path+".from", netName, route.From, resolver)
+	to, toIssues, toOK := resolveLocalRouteEndpoint(path+".to", netName, route.To, resolver)
+	issues = append(issues, fromIssues...)
+	issues = append(issues, toIssues...)
+	if !fromOK || !toOK {
+		return transactions.Operation{}, issues, false
+	}
+	layer := firstNonEmpty(route.Layer, from.Layer, to.Layer, "F.Cu")
+	if !strings.EqualFold(layer, from.Layer) || !strings.EqualFold(layer, to.Layer) {
+		issues = append(issues, localRouteBindingIssue(path+".layer", "local route layer "+layer+" does not match endpoint layers "+from.Layer+" and "+to.Layer, []string{from.Ref, to.Ref}))
+		return transactions.Operation{}, issues, false
+	}
+	operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: netName,
+		Layer:   layer,
+		WidthMM: route.WidthMM,
+		Points: []transactions.Point{
+			from.Point,
+			to.Point,
+		},
+	})
+	if err != nil {
+		issues = append(issues, localRouteBindingIssue(path, err.Error(), []string{from.Ref, to.Ref}))
+		return transactions.Operation{}, issues, false
+	}
+	return operation, issues, true
+}
+
+func resolveLocalRouteEndpoint(path string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool) {
+	ref := strings.TrimSpace(endpoint.Ref)
+	pin := strings.TrimSpace(endpoint.Pin)
+	if ref == "" || pin == "" {
+		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(path, "local route endpoint requires ref and pin", nil)}, false
+	}
+	resolved, ok := resolver.ResolveNormalized(strings.ToUpper(ref), strings.ToUpper(pin))
+	if !ok {
+		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(path, "local route endpoint does not resolve to a placed pad", []string{ref, ref + "." + pin})}, false
+	}
+	if !resolved.NetCodeResolved {
+		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_code", "local route endpoint pad net code is unresolved", []string{ref})}, false
+	}
+	padNet := strings.TrimSpace(resolved.NetName)
+	if padNet == "" {
+		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route endpoint pad has no assigned net", []string{ref})}, false
+	}
+	if !strings.EqualFold(padNet, netName) {
+		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route endpoint pad net "+padNet+" does not match route net "+netName, []string{ref})}, false
+	}
+	return resolved, nil, true
+}
+
+func localRouteBindingIssue(path string, message string, refs []string) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityBlocked,
+		Path:     "design.route_connectivity." + strings.Trim(path, "."),
+		Message:  message,
+		Refs:     append([]string(nil), refs...),
+	}
 }
 
 func preferredSingleLayer(request *routing.Request) string {

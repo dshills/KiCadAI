@@ -76,6 +76,56 @@ func TestRoutePlacementAuditShowsNamedLocalRouteCanStillMissPhysicalPads(t *test
 	}
 }
 
+func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
+	extraRoute := mustGeneratedNetAssignmentRouteOperation(t, "EXTRA")
+	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "status",
+		BlockID:    "led_indicator",
+		Realization: blocks.BlockPCBRealizationResult{
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{
+				ID:      "series",
+				NetName: "SIG",
+				From:    transactions.Endpoint{Ref: "R1", Pin: "2"},
+				To:      transactions.Endpoint{Ref: "D1", Pin: "1"},
+				Layer:   "F.Cu",
+				WidthMM: 0.25,
+			}},
+			Operations: []transactions.Operation{extraRoute},
+		},
+	}}}
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Components: []placement.Component{
+				{Ref: "R1", FootprintID: "Test:R", Pads: []placement.PadSummary{{Name: "2", Net: "SIG", XMM: 1, YMM: 0}}},
+				{Ref: "D1", FootprintID: "Test:D", Pads: []placement.PadSummary{{Name: "1", Net: "SIG", XMM: -1, YMM: 0}}},
+			},
+			Nets: []placement.Net{{Name: "SIG", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "1"}}}},
+		},
+		Result: placement.Result{Status: placement.StatusPlaced, Placements: []placement.PlacementResult{
+			{Ref: "R1", FootprintID: "Test:R", Position: placement.Placement{XMM: 10, YMM: 5, Layer: "F.Cu"}},
+			{Ref: "D1", FootprintID: "Test:D", Position: placement.Placement{XMM: 20, YMM: 5, Layer: "F.Cu"}},
+		}},
+		Stage: NewStageResult(StagePlacement, nil),
+	}
+
+	operations, issues := localRouteOperations(fragments, &placed)
+	if len(issues) != 0 {
+		t.Fatalf("local route binding issues = %#v", issues)
+	}
+	if len(operations) != 2 {
+		t.Fatalf("operations = %#v, want preserved extra route and one bound route", operations)
+	}
+	var route transactions.RouteOperation
+	if err := json.Unmarshal(operations[1].Raw, &route); err != nil {
+		t.Fatal(err)
+	}
+	if len(route.Points) != 2 ||
+		route.Points[0].XMM != 11 || route.Points[0].YMM != 5 ||
+		route.Points[1].XMM != 19 || route.Points[1].YMM != 5 {
+		t.Fatalf("route points = %#v, want physical pad centers", route.Points)
+	}
+}
+
 func TestRoutePlacementAddsAnchorBindingRoutes(t *testing.T) {
 	request := Request{Version: RequestVersion, Name: "anchor", Board: BoardSpec{WidthMM: 30, HeightMM: 20, Layers: 1}}
 	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
