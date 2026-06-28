@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"testing"
 	"time"
 
@@ -266,8 +267,18 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 	if !routingRequestHasNet(result.Request, "LED_EN") {
 		t.Fatalf("routing request nets = %#v, want LED_EN", result.Request.Nets)
 	}
-	if !routeOperationsContainNet(result.Operations, "LED_EN") {
-		t.Fatalf("operations = %#v, want LED_EN route operation", result.Operations)
+	routes := requireRouteOperationsForNet(t, result.Operations, "LED_EN")
+	for _, route := range routes {
+		if len(route.Points) < 2 {
+			t.Fatalf("LED_EN route has %d points, want at least 2", len(route.Points))
+		}
+		for pointIndex := 0; pointIndex < len(route.Points)-1; pointIndex++ {
+			current := route.Points[pointIndex]
+			next := route.Points[pointIndex+1]
+			if pointsNearlyEqual(current, next) {
+				t.Fatalf("LED_EN route has degenerate segment at point %d: (%.9f, %.9f) -> (%.9f, %.9f)", pointIndex, current.XMM, current.YMM, next.XMM, next.YMM)
+			}
+		}
 	}
 	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeDisconnectedPad)
 	interBlock := requireInterBlockRouteSummary(t, result.Stage)
@@ -277,6 +288,45 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 	if interBlock.RoutesCompleted != 0 || interBlock.PartialNets == 0 || interBlock.EmittedSegments == 0 || interBlock.IssueCount == 0 {
 		t.Fatalf("inter-block summary = %#v, want partial routed evidence for LED_EN", interBlock)
 	}
+}
+
+// requireRouteOperationsForNet decodes every transaction route operation for a
+// net so tests can inspect multi-segment routing evidence without relying on
+// the first matching operation.
+func requireRouteOperationsForNet(t *testing.T, operations []transactions.Operation, name string) []transactions.RouteOperation {
+	t.Helper()
+	var routes []transactions.RouteOperation
+	for _, operation := range operations {
+		if operation.Op != transactions.OpRoute || operation.Net != name {
+			continue
+		}
+		var route transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &route); err != nil {
+			t.Fatalf("route operation raw = %s: %v", operation.Raw, err)
+		}
+		routes = append(routes, route)
+	}
+	if len(routes) == 0 {
+		t.Fatalf("route operation nets = %#v, want route operation for net %s", routeOperationNets(operations), name)
+	}
+	return routes
+}
+
+// routeOperationNets returns the net names carried by route transactions for
+// compact failure output.
+func routeOperationNets(operations []transactions.Operation) []string {
+	var nets []string
+	for _, operation := range operations {
+		if operation.Op == transactions.OpRoute {
+			nets = append(nets, operation.Net)
+		}
+	}
+	return nets
+}
+
+func pointsNearlyEqual(left transactions.Point, right transactions.Point) bool {
+	const tolerance = 1e-6
+	return math.Abs(left.XMM-right.XMM) <= tolerance && math.Abs(left.YMM-right.YMM) <= tolerance
 }
 
 func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {
