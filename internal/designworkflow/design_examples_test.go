@@ -392,6 +392,34 @@ func TestFormatDesignExampleStagesGroupsIssuesUnderStage(t *testing.T) {
 	}
 }
 
+func TestKiCadBackedLEDExampleClearsWriterNetAssignment(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping design workflow integration test in short mode")
+	}
+	repoRoot := designExampleRepoRoot(t)
+	requestPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "led_indicator_kicad_smoke.json")
+	request, issues := loadDesignExampleRequestPath(t, requestPath)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
+	}
+	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(request.Name))
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+	writer, ok := designExampleStageByName(result, StageWriterCorrect)
+	if !ok {
+		t.Fatalf("missing writer correctness stage:\n%s", formatDesignExampleStages(result.Stages))
+	}
+	if writer.Status != StageStatusOK && writer.Status != StageStatusWarning {
+		t.Fatalf("writer correctness status = %q, want ok or warning:\n%s", writer.Status, formatDesignExampleStages(result.Stages))
+	}
+	for _, issue := range writer.Issues {
+		if issue.Code == reports.CodeInvalidNetAssignment {
+			t.Fatalf("unexpected writer net-assignment issue after generated net assignment:\n%s", formatDesignExampleIssues(writer.Issues))
+		}
+	}
+}
+
 func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 	planResult := PlanBlocks(ctx, blocks.NewBuiltinRegistry(), request)
 	return planResult.Stage

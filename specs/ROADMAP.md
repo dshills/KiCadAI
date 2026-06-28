@@ -105,9 +105,12 @@ from validation feedback to safe automatic repair.
   `examples/design/kicad-backed/` tier now validates metadata-backed fixtures
   only when `KICADAI_KICAD_CLI` is configured. The initial fixtures are
   `expected_fail` cases that keep richer generated boards visible without
-  making the default test suite depend on KiCad. `KICADAI_KICAD_CLI` supplies
-  the executable path for design workflow checks; `KICADAI_RUN_KICAD_CLI=1`
-  remains the separate boolean opt-in used by lower-level block smoke tests.
+  making the default test suite depend on KiCad. Generated design PCB net
+  assignment now propagates pad/copper net names through placement operations,
+  resolves KiCad 10 name-only net references during readback, and exposes
+  workflow net-assignment evidence. `KICADAI_KICAD_CLI` supplies the executable
+  path for design workflow checks; `KICADAI_RUN_KICAD_CLI=1` remains the
+  separate boolean opt-in used by lower-level block smoke tests.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready
@@ -153,10 +156,10 @@ loop confidence:
   blockers, but they do not replace broader synthesis.
 - the default design examples are intentionally small LED workflows.
   Multi-block connector/LED and I2C sensor breakout scenarios now exist as
-  optional KiCad-backed `expected_fail` fixtures. They currently document that
-  incomplete pad/copper net assignment evidence can trigger internal
-  post-write validation errors, preventing those generated boards from reaching
-  KiCad ERC/DRC checks.
+  optional KiCad-backed `expected_fail` fixtures. They now progress past the
+  previous writer-correctness pad/copper net-code blocker and document the next
+  layout-quality blockers: routed same-net connectivity and KiCad ERC/DRC-clean
+  evidence.
 
 ## Roadmap Principles
 
@@ -328,11 +331,11 @@ Implemented foundation.
   quality improves, and broaden DRC-clean evidence beyond the initial smoke
   tier.
 - Promote optional design examples from `expected_fail` to `candidate` and then
-  `pass` by closing the generated PCB pad/copper net assignment blocker, adding
-  resolved pad hints or equivalent net assignment evidence, and enabling routed
-  KiCad-clean layouts. The `i2c_sensor_breakout_candidate` name identifies it
-  as a promotion candidate even though its current readiness is
-  `expected_fail`.
+  `pass` by closing routed same-net connectivity, route endpoint placement, and
+  KiCad-clean layout blockers. Generated PCB pad/copper net assignment now has
+  workflow evidence and no longer blocks the LED smoke fixture at writer
+  correctness. The `i2c_sensor_breakout_candidate` name identifies it as a
+  promotion candidate even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
