@@ -144,6 +144,46 @@ func TestPlaceFragmentsPromotesRequestConnectionsToPlacementNets(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsPromotesI2CSensorBreakoutConnections(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "i2c_sensor_breakout",
+		Board:   BoardSpec{WidthMM: 55, HeightMM: 35, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"i2c_address": "0x48", "include_pullups": true}},
+			{ID: "io", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 4, "pin_names": []string{"VCC", "GND", "SDA", "SCL"}}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "sensor.VCC", To: "io.VCC", NetAlias: "VCC"},
+			{From: "sensor.GND", To: "io.GND", NetAlias: "GND"},
+			{From: "sensor.SDA", To: "io.SDA", NetAlias: "SDA"},
+			{From: "sensor.SCL", To: "io.SCL", NetAlias: "SCL"},
+		},
+		RoutingRetry: RoutingRetryPolicySpec{Enabled: true},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, result)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	for _, netName := range []string{"VCC", "GND", "SDA", "SCL"} {
+		candidate, ok := interBlockCandidateByNet(candidates, netName)
+		if !ok {
+			t.Fatalf("candidates = %#v, want %s", candidates, netName)
+		}
+		if candidate.Status != InterBlockRouteCandidateRoutable || len(candidate.Endpoints) < 2 {
+			t.Fatalf("%s candidate = %#v, want routable endpoint evidence", netName, candidate)
+		}
+	}
+}
+
 func TestPlaceFragmentsReportsUnresolvedRequestConnectionEndpoint(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

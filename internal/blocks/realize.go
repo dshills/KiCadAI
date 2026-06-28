@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"math"
 	"reflect"
+	"regexp"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -122,6 +124,8 @@ const (
 	degreesToRadians             = math.Pi / 180
 	routeCoordinateSnapEpsilonMM = 1e-9
 )
+
+var connectorPinMatrixPattern = regexp.MustCompile(`(?i)(?:^|[_:-])([0-9]+)x([0-9]+)(?:[_\.-]|$)`)
 
 func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRealizationOptions) BlockPCBRealizationResult {
 	result := BlockPCBRealizationResult{
@@ -586,7 +590,8 @@ func roleRefsFromOutput(definition BlockDefinition, output BlockOutput, facts ma
 		if _, exists := roleRefs[role]; exists {
 			continue
 		}
-		if ref := matchingRefForComponent(component, refs, facts, used); ref != "" {
+		matchComponent := componentForRoleMatching(component, output.Instance.Params)
+		if ref := matchingRefForComponent(matchComponent, refs, facts, used); ref != "" {
 			roleRefs[role] = ref
 			used[ref] = struct{}{}
 			continue
@@ -595,12 +600,35 @@ func roleRefsFromOutput(definition BlockDefinition, output BlockOutput, facts ma
 	return roleRefs
 }
 
+func componentForRoleMatching(component BlockComponent, params map[string]any) BlockComponent {
+	if component.Role != "connector" {
+		return component
+	}
+	out := component
+	if symbol, ok := params["connector_symbol"].(string); ok && strings.TrimSpace(symbol) != "" {
+		out.SymbolID = strings.TrimSpace(symbol)
+	}
+	if footprint, ok := params["connector_footprint"].(string); ok && strings.TrimSpace(footprint) != "" {
+		out.FootprintID = strings.TrimSpace(footprint)
+	}
+	return out
+}
+
 func matchingRefForComponent(component BlockComponent, refs []string, facts map[string]emittedComponentFact, used map[string]struct{}) string {
 	for _, ref := range refs {
 		if _, exists := used[ref]; exists {
 			continue
 		}
-		fact := facts[ref]
+		fact, ok := facts[ref]
+		if !ok {
+			continue
+		}
+		if component.Role == "connector" {
+			if connectorComponentFactCompatible(component, fact) {
+				return ref
+			}
+			continue
+		}
 		if component.SymbolID != "" && fact.SymbolID != component.SymbolID {
 			continue
 		}
@@ -610,6 +638,71 @@ func matchingRefForComponent(component BlockComponent, refs []string, facts map[
 		return ref
 	}
 	return ""
+}
+
+func connectorComponentFactCompatible(component BlockComponent, fact emittedComponentFact) bool {
+	if component.SymbolID == "" && component.FootprintID == "" && !connectorFactLooksLikeConnector(fact) {
+		return false
+	}
+	if component.SymbolID != "" && fact.SymbolID != component.SymbolID && !sameConnectorSymbolFamily(component.SymbolID, fact.SymbolID) {
+		return false
+	}
+	if component.FootprintID != "" && fact.FootprintID != component.FootprintID && !sameConnectorFootprintFamily(component.FootprintID, fact.FootprintID) {
+		return false
+	}
+	return fact.SymbolID != "" || fact.FootprintID != ""
+}
+
+func connectorFactLooksLikeConnector(fact emittedComponentFact) bool {
+	return strings.Contains(strings.ToLower(fact.SymbolID), "connector") ||
+		strings.Contains(strings.ToLower(fact.FootprintID), "connector")
+}
+
+func sameConnectorSymbolFamily(expected string, actual string) bool {
+	if !connectorSymbolNameHasPinCount(expected) || !connectorSymbolNameHasPinCount(actual) {
+		return false
+	}
+	return connectorPinCountMatches(expected, actual)
+}
+
+func sameConnectorFootprintFamily(expected string, actual string) bool {
+	if !connectorFootprintNameHasPinCount(expected) || !connectorFootprintNameHasPinCount(actual) {
+		return false
+	}
+	return connectorPinCountMatches(expected, actual)
+}
+
+func connectorPinCountMatches(expected string, actual string) bool {
+	expectedCount, expectedOK := parseConnectorPinCount(expected)
+	actualCount, actualOK := parseConnectorPinCount(actual)
+	if !expectedOK || !actualOK {
+		return false
+	}
+	return actualCount == expectedCount
+}
+
+func connectorSymbolNameHasPinCount(value string) bool {
+	_, ok := parseConnectorPinCount(value)
+	return ok
+}
+
+func connectorFootprintNameHasPinCount(value string) bool {
+	_, ok := parseConnectorPinCount(value)
+	return ok
+}
+
+func parseConnectorPinCount(value string) (int, bool) {
+	matches := connectorPinMatrixPattern.FindAllStringSubmatch(value, -1)
+	if len(matches) == 0 {
+		return 0, false
+	}
+	match := matches[len(matches)-1]
+	rows, rowErr := strconv.Atoi(match[1])
+	columns, columnErr := strconv.Atoi(match[2])
+	if rowErr != nil || columnErr != nil || rows <= 0 || columns <= 0 {
+		return 0, false
+	}
+	return rows * columns, true
 }
 
 func resolveRealizationFootprint(component PCBComponentRealization, params map[string]any) string {

@@ -342,8 +342,10 @@ Implemented foundation.
   assignment now has workflow evidence and no longer blocks the LED smoke
   fixture at writer correctness. Generated block-local route endpoints now bind
   to physical same-net pad anchors for LED and connector/LED smoke fixtures.
-  The `i2c_sensor_breakout_candidate` name identifies it as a promotion
-  candidate even though its current readiness is `expected_fail`.
+  Connector/LED has partial inter-block route evidence, and I2C sensor breakout
+  now has promoted VCC/GND/SDA/SCL inter-block candidate evidence. The
+  `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
+  even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
