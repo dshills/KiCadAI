@@ -67,12 +67,17 @@ unsupported skip behavior, selected stop conditions, CLI output, and pad-backed
 full-board seed evidence. Generated full-board boundary coverage now includes
 hydrated-pad retry evidence for LED and multi-block sensor/header workflows,
 generated placement mobility summaries, local-route mobility summaries, and
-hard-constraint preservation under retry adjustment.
+hard-constraint preservation under retry adjustment. Generated inter-block
+connections are promoted into placement nets for connector/LED and I2C breakout
+workflows, and routing summaries now expose `inter_block_routing` evidence for
+candidate, attempted, partial, unrouted, and completed generated inter-block
+nets.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,
 not thermal simulation, impedance calculation, or routed length matching.
-Larger-board convergence, spatial acceleration for large hard-rule sets, and
-final KiCad DRC-backed layout proof remain future work.
+Endpoint-contact completion for generated inter-block routes, larger-board
+convergence, spatial acceleration for large hard-rule sets, and final KiCad
+DRC-backed layout proof remain future work.
 
 
 ### Routing
