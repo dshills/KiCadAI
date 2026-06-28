@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"testing"
+	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/placement"
@@ -36,6 +37,43 @@ func TestRoutePlacementUsesGeneratedPadSummariesForLocalRoutes(t *testing.T) {
 		t.Fatalf("local route mobility summary = %#v", result.Stage.Summary["local_route_mobility"])
 	}
 	assertIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
+}
+
+func TestRoutePlacementAuditShowsNamedLocalRouteCanStillMissPhysicalPads(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "status_board",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(ctx, registry, request)
+	if plan.Stage.Status == StageStatusBlocked {
+		t.Fatalf("planning failed: %#v", plan.Stage.Issues)
+	}
+	fragments := RealizePCBFragments(ctx, registry, plan)
+	if fragments.Stage.Status == StageStatusBlocked {
+		t.Fatalf("PCB realization failed: %#v", fragments.Stage.Issues)
+	}
+	placed := PlaceFragments(ctx, request, fragments, PlacementOptions{})
+	if placed.Stage.Status == StageStatusBlocked {
+		t.Fatalf("placement failed: %#v", placed.Stage.Issues)
+	}
+	routed := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	netAssignment := SummarizeGeneratedNetAssignment(&placed, &routed)
+
+	if netAssignment.AssignedCopperObjects == 0 {
+		t.Fatalf("net assignment = %#v, want assigned local-route copper", netAssignment)
+	}
+	if routed.Stage.Status != StageStatusBlocked {
+		t.Fatalf("routing stage = %#v, want blocked by physical route endpoint miss", routed.Stage)
+	}
+	assertIssueCode(t, routed.Stage.Issues, reports.CodeDisconnectedPad)
+	if countTransactionOps(routed.Operations, transactions.OpRoute) == 0 {
+		t.Fatalf("operations = %#v, want named local route operation", routed.Operations)
+	}
 }
 
 func TestRoutePlacementAddsAnchorBindingRoutes(t *testing.T) {
