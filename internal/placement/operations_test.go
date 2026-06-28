@@ -38,6 +38,45 @@ func TestPlacementOperationPayload(t *testing.T) {
 	}
 }
 
+func TestPlacementOperationAuditPadNetEvidenceDropped(t *testing.T) {
+	// This documents the Phase 1 blocker from
+	// specs/generated-design-net-assignment/PLAN.md: placement pads carry net
+	// evidence, but the transaction payload currently drops it.
+	component := Component{
+		Ref:         "D1",
+		Value:       "LED",
+		FootprintID: "LED_SMD:LED_0805_2012Metric",
+		Pads: []PadSummary{
+			{Name: "1", Net: "LED_K", XMM: -0.6, WidthMM: 0.7, HeightMM: 0.8},
+			{Name: "2", Net: "LED_A", XMM: 0.6, WidthMM: 0.7, HeightMM: 0.8},
+		},
+	}
+	placement := PlacementResult{
+		Ref:      "D1",
+		Position: Placement{XMM: 12, YMM: 7, Layer: "F.Cu"},
+	}
+
+	operation, err := PlacementOperation(component, placement)
+	if err != nil {
+		t.Fatalf("PlacementOperation returned error: %v", err)
+	}
+	var payload transactions.PlaceFootprintOperation
+	if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+		t.Fatalf("unmarshal operation payload: %v", err)
+	}
+	if payload.Ref != component.Ref || payload.At.XMM != placement.Position.XMM || payload.At.YMM != placement.Position.YMM || payload.Layer != placement.Position.Layer {
+		t.Fatalf("payload identity/placement = %#v", payload)
+	}
+	if len(payload.Pads) != len(component.Pads) {
+		t.Fatalf("payload pads = %d, want %d", len(payload.Pads), len(component.Pads))
+	}
+	for index, pad := range payload.Pads {
+		if pad.Net != nil {
+			t.Errorf("pad %d %q expected current placement operation to drop pad net evidence, got %q", index, pad.Name, *pad.Net)
+		}
+	}
+}
+
 func TestPlaceEmitsOperationsForSuccessfulPlacements(t *testing.T) {
 	req := minimalRequest()
 
