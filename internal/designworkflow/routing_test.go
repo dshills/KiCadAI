@@ -108,9 +108,12 @@ func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 		Stage: NewStageResult(StagePlacement, nil),
 	}
 
-	operations, issues := localRouteOperations(fragments, &placed)
+	operations, issues, summary := localRouteOperations(fragments, &placed)
 	if len(issues) != 0 {
 		t.Fatalf("local route binding issues = %#v", issues)
+	}
+	if summary.RoutesAttempted != 1 || summary.RoutesBound != 1 || summary.EndpointsResolved != 2 || summary.EndpointContactsProven != 2 || summary.EmittedTrackSegments != 1 {
+		t.Fatalf("route connectivity summary = %#v", summary)
 	}
 	if len(operations) != 2 {
 		t.Fatalf("operations = %#v, want preserved extra route and one bound route", operations)
