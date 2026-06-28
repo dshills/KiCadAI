@@ -50,15 +50,15 @@ func TestRoutePlacementAuditShowsNamedLocalRouteCanStillMissPhysicalPads(t *test
 	}
 	registry := blocks.NewBuiltinRegistry()
 	plan := PlanBlocks(ctx, registry, request)
-	if plan.Stage.Status == StageStatusBlocked {
+	if !stageUsableForRoutingTest(plan.Stage) {
 		t.Fatalf("planning failed: %#v", plan.Stage.Issues)
 	}
 	fragments := RealizePCBFragments(ctx, registry, plan)
-	if fragments.Stage.Status == StageStatusBlocked {
+	if !stageUsableForRoutingTest(fragments.Stage) {
 		t.Fatalf("PCB realization failed: %#v", fragments.Stage.Issues)
 	}
 	placed := PlaceFragments(ctx, request, fragments, PlacementOptions{})
-	if placed.Stage.Status == StageStatusBlocked {
+	if !stageUsableForRoutingTest(placed.Stage) {
 		t.Fatalf("placement failed: %#v", placed.Stage.Issues)
 	}
 	routed := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
@@ -225,6 +225,53 @@ func TestRoutePlacementRoutesSimpleSignalWithPads(t *testing.T) {
 	}
 }
 
+func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompletion(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "connector_led",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "header", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 2, "pin_names": []string{"SIG", "GND"}}},
+			{ID: "status", BlockID: "led_indicator"},
+		},
+		Connections: []ConnectionSpec{{From: "header.SIG", To: "status.IN", NetAlias: "LED_EN"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(ctx, registry, request)
+	if !stageUsableForRoutingTest(plan.Stage) {
+		t.Fatalf("planning failed: %#v", plan.Stage.Issues)
+	}
+	fragments := RealizePCBFragments(ctx, registry, plan)
+	if !stageUsableForRoutingTest(fragments.Stage) {
+		t.Fatalf("PCB realization failed: %#v", fragments.Stage.Issues)
+	}
+	placed := PlaceFragments(ctx, request, fragments, PlacementOptions{})
+	if !stageUsableForRoutingTest(placed.Stage) {
+		t.Fatalf("placement failed: %#v", placed.Stage.Issues)
+	}
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	if _, ok := interBlockCandidateByNetForRoutingTest(candidates, "LED_EN"); !ok {
+		t.Fatalf("candidates = %#v, want LED_EN", candidates)
+	}
+
+	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	if result.Stage.Status != StageStatusBlocked {
+		t.Fatalf("routing status = %s, want blocked pending route-completion evidence; issues=%#v", result.Stage.Status, result.Stage.Issues)
+	}
+	if !routingRequestHasNet(result.Request, "LED_EN") {
+		t.Fatalf("routing request nets = %#v, want LED_EN", result.Request.Nets)
+	}
+	if !routeOperationsContainNet(result.Operations, "LED_EN") {
+		t.Fatalf("operations = %#v, want LED_EN route operation", result.Operations)
+	}
+	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeDisconnectedPad)
+}
+
 func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {
 	placed := simplePlacedPads()
 	placed.Result.Placements[0].Position.Layer = "B.Cu"
@@ -241,6 +288,52 @@ func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {
 	if result.Request.Rules.PreferLayer != "B.Cu" {
 		t.Fatalf("prefer layer = %q", result.Request.Rules.PreferLayer)
 	}
+}
+
+func routingRequestHasNet(request routing.Request, name string) bool {
+	for _, net := range request.Nets {
+		if net.Name == name {
+			return true
+		}
+	}
+	return false
+}
+
+func routeOperationsContainNet(operations []transactions.Operation, name string) bool {
+	for _, operation := range operations {
+		if operation.Op == transactions.OpRoute && operation.Net == name {
+			return true
+		}
+	}
+	return false
+}
+
+func interBlockCandidateByNetForRoutingTest(candidates []InterBlockRouteCandidate, name string) (InterBlockRouteCandidate, bool) {
+	for _, candidate := range candidates {
+		if candidate.NetName == name {
+			return candidate, true
+		}
+	}
+	return InterBlockRouteCandidate{}, false
+}
+
+func assertNetHasIssueCode(t *testing.T, issues []reports.Issue, net string, code reports.Code) {
+	t.Helper()
+	for _, issue := range issues {
+		if issue.Code != code {
+			continue
+		}
+		for _, issueNet := range issue.Nets {
+			if issueNet == net {
+				return
+			}
+		}
+	}
+	t.Fatalf("issues = %#v, want issue code %s for net %s", issues, code, net)
+}
+
+func stageUsableForRoutingTest(stage StageResult) bool {
+	return stage.Status == StageStatusOK || stage.Status == StageStatusWarning
 }
 
 func TestRoutePlacementReportsUnroutableSignal(t *testing.T) {
