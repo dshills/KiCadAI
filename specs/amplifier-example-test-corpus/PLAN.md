@@ -8,6 +8,12 @@ Add amplifier-focused examples and tests that make KiCadAI better at reading,
 evaluating, and eventually generating Class A and Class AB headphone and power
 amplifier designs.
 
+## Implementation Status
+
+Phases 1 through 9 have been implemented and committed. See
+`specs/amplifier-example-test-corpus/SPEC.md` for the current corpus status,
+remaining blockers, and next recommended amplifier milestone.
+
 The plan starts with schematic fixtures and semantic checks, then moves into
 structured intent, circuit blocks, PCB constraints, and optional KiCad-backed
 promotion evidence.
@@ -170,7 +176,7 @@ promotion evidence.
 - Add the first generated amplifier design request using only supported blocks.
 - Prefer an op-amp gain/headphone-buffer style fixture if it can reuse existing
   verified op-amp and connector foundations.
-- If a fully generated schematic/PCB is not yet possible, add an expected-fail
+- If a fully generated schematic/PCB is not yet possible, add an `expected_fail`
   fixture with precise blockers.
 - Ensure generated artifacts include:
   - component identity where available;
@@ -267,7 +273,7 @@ promotion evidence.
 ### Acceptance
 
 - Documentation reflects which amplifier examples are schematic-only,
-  generated, optional KiCad-backed, expected-fail, candidate, or pass.
+  generated, optional KiCad-backed, `expected_fail`, candidate, or pass.
 - ROADMAP names the next amplifier-specific blocker.
 - `go test ./...` passes.
 - Prism review is clean or any accepted findings are documented in the final

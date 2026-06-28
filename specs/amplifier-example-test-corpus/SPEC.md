@@ -31,6 +31,26 @@ The repository already contains useful amplifier-related starting points:
 - Existing placement/routing summaries, contact evidence, and validation
   feedback.
 
+Implementation status as of 2026-06-28:
+
+- `examples/06_class_ab_headphone_amp/`,
+  `examples/09_class_a_headphone_amp/`, and
+  `examples/10_opamp_buffer_headphone_amp/` are checked-in schematic fixtures
+  with amplifier semantic coverage.
+- `internal/amplifiers` contains schematic landmark checks and PCB
+  constraint/routing evidence checks.
+- `examples/intent/` and `examples/intent_text/` include Class A, Class AB, and
+  low-voltage power-amplifier intent fixtures that fail closed or expose known
+  gaps.
+- `examples/design/amplifier/opamp_headphone_buffer.json` is the first draft
+  generated amplifier design request.
+- `examples/design/kicad-backed/opamp_headphone_buffer_kicad_candidate.*`
+  documents the optional KiCad-backed fabrication-candidate `expected_fail`
+  path.
+
+These assets are not production analog-design proof. They are fixtures that
+prevent regressions and make unsupported amplifier gaps explicit.
+
 This project should expand those foundations with amplifier-specific examples
 and tests without forcing unsupported production-layout claims.
 
@@ -199,7 +219,7 @@ declare expected landmarks and tests should assert them.
 ## Circuit Block Model
 
 Add amplifier-oriented block definitions gradually. Initial blocks may be
-structural and expected-fail for PCB realization until verified parts and layout
+structural and `expected_fail` for PCB realization until verified parts and layout
 proof mature.
 
 Recommended block families:
@@ -291,7 +311,7 @@ Default tests should verify:
 Optional KiCad-backed tests should verify:
 
 - examples load through KiCad CLI when configured;
-- generated amplifier fixtures record ERC/DRC status or expected-fail evidence;
+- generated amplifier fixtures record ERC/DRC status or `expected_fail` evidence;
 - any candidate/pass promotion is backed by artifacts.
 
 ## Acceptance Criteria
@@ -306,8 +326,17 @@ Optional KiCad-backed tests should verify:
   fixtures.
 - Circuit-block inventory reports amplifier block support and gaps.
 - Documentation explains which amplifier examples are schematic-only,
-  generated, optional KiCad-backed, candidate, or expected-fail.
+  generated, optional KiCad-backed, candidate, or `expected_fail`.
 - Normal `go test ./...` remains independent of local KiCad.
+
+## Current Completion Notes
+
+The initial corpus phases are implemented through optional KiCad-backed
+metadata. The next amplifier-specific milestone should be a verified headphone
+output/protection block that realizes a real output DC-blocking or split-rail
+policy, output isolation/protection, load-drive component evidence, and local
+PCB constraints. Until that exists, generated amplifier designs must remain
+draft or `expected_fail` evidence fixtures.
 
 ## Open Questions
 

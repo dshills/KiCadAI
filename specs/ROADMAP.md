@@ -98,6 +98,13 @@ from validation feedback to safe automatic repair.
   built-in generic assembly manufacturer profile checks, and `design create`
   fabrication-candidate acceptance integration.
 - `design create` workflow for structured block-based design requests.
+- Amplifier example/test corpus foundation with checked-in Class AB, Class A,
+  and op-amp headphone-buffer schematic fixtures; amplifier semantic landmark
+  checks; structured intent and text fixtures; explicit block inventory gaps;
+  a draft generated op-amp headphone-buffer design request; op-amp PCB
+  constraint/routing evidence checks for feedback, decoupling, input/output
+  separation, high-current output width, and thermal review; and an optional
+  KiCad-backed `expected_fail` fabrication-candidate amplifier fixture.
 - Runnable `examples/design/*.json` requests are now covered by automated
   regression tests that strict-decode each request, run `design create`, verify
   generated project artifacts, read back generated schematic/PCB files, and
@@ -156,7 +163,8 @@ loop confidence:
   blockers, but they do not replace broader synthesis.
 - the default design examples are intentionally small LED workflows.
   Multi-block connector/LED and I2C sensor breakout scenarios now exist as
-  optional KiCad-backed `expected_fail` fixtures. They now progress past the
+  optional KiCad-backed `expected_fail` fixtures, joined by an amplifier
+  fabrication-candidate `expected_fail` fixture. They now progress past the
   previous writer-correctness pad/copper net-code blocker. LED and
   connector/LED fixtures also prove block-local route endpoint binding to
   physical same-net pad anchors. Generated inter-block routing now reports
@@ -164,6 +172,12 @@ loop confidence:
   graph connects the required endpoints. The remaining layout-quality blockers
   are broader inter-block route coverage, richer generated-board validation,
   and KiCad ERC/DRC-clean evidence.
+- amplifier generation is currently evidence-oriented rather than
+  fabrication-ready. The draft op-amp headphone-buffer request uses supported
+  blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
+  stability networks, verified output-device selection, load-drive limits,
+  thermal/current layout proof, and optional KiCad ERC/DRC-clean promotion are
+  still open blockers.
 
 ## Roadmap Principles
 

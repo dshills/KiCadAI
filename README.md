@@ -17,7 +17,7 @@ Live KiCad IPC support is useful for connection probes, version checks, document
 Generated design PCB net assignment now propagates pad and copper net names
 through placement/project write, resolves KiCad 10 name-only net references
 during PCB readback, and reports net-assignment evidence in the `design create`
-workflow. The current KiCad-backed expected-fail examples have moved past the
+workflow. The current KiCad-backed `expected_fail` examples have moved past the
 old missing net-code writer-correctness blocker. Generated block-local routes
 now bind to physical same-net pad anchors and report route-connectivity
 evidence. Generated inter-block route candidates now promote connector/LED and
@@ -28,6 +28,15 @@ blocker is promoting richer generated boards to KiCad ERC/DRC-clean layout
 proof.
 
 KiCadAI is not yet a general autonomous "make me any board" system. It works best with supported structured intent, verified circuit blocks, and catalog-backed components. Broader component coverage, topology synthesis, validation feedback, and production layout proof are still active roadmap areas.
+
+Amplifier-focused coverage now includes checked-in Class AB, Class A, and
+op-amp headphone-buffer schematic fixtures, amplifier semantic tests, structured
+intent fixtures, a draft generated op-amp headphone-buffer design request, and
+an optional KiCad-backed `expected_fail` fabrication-candidate fixture. These
+fixtures are regression and evidence tools only. Generated amplifier designs
+are not fabrication-ready until verified output protection/DC blocking,
+load-drive component evidence, analog stability/layout rules, and KiCad
+ERC/DRC-clean proof are available.
 
 ## Requirements
 
@@ -144,6 +153,11 @@ kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
 The intent planner is the higher-level AI orchestration layer. It accepts structured intent requests, derives requirements and constraints, maps supported goals to circuit blocks, emits assumptions and known gaps, and can hand the generated request to `design create` for project generation.
 
 Planner synthesis traces include topology decisions, bus and voltage-domain evidence, component policy constraints, value calculations, applied/deferred/blocked calculation status, and fail-closed gaps. Supported calculations can now write safe generated block parameters for LED resistors, I2C pull-ups, crystal load capacitors, and the verified AP2112K 3.3 V LDO slice. Regulator current, capacitor voltage policy, dropout/headroom, thermal review, and stability review evidence are persisted in generated planner artifacts; op-amp gain remains explicit requirement evidence unless a block exposes safe direct mutation.
+
+Amplifier intents currently produce explicit partial or blocked evidence unless
+they map to the draft op-amp gain-stage seed. Class A, Class AB output stages,
+headphone protection/DC blocking, stability networks, and power-amplifier
+thermal/current proof remain roadmap work.
 
 See [Intent Planning And AI Workflow](docs/intent-planning.md) for details.
 

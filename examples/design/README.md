@@ -66,7 +66,7 @@ realization are hardened enough for a default runnable fixture.
 ## Optional KiCad-Backed Examples
 
 Optional fixtures live under `examples/design/kicad-backed/`. They require
-`KICADAI_KICAD_CLI` for local test runs and currently document expected-fail
+`KICADAI_KICAD_CLI` for local test runs and currently document `expected_fail`
 evidence for richer generated boards that block before stable KiCad ERC/DRC
 proof.
 

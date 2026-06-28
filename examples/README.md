@@ -46,6 +46,15 @@ Structured intent examples live under `examples/intent/`. Files prefixed with
 - `amplifier_low_voltage_power_blocked.json`: intentional blocked low-voltage
   power amplifier topology fixture.
 
+Generated design requests live under `examples/design/`. The amplifier seed is
+`examples/design/amplifier/opamp_headphone_buffer.json`; it is draft-only and
+uses supported op-amp/connector blocks plus an explicit
+`output_dc_block_pending` placeholder. Optional KiCad-backed amplifier metadata
+lives under `examples/design/kicad-backed/` as
+`opamp_headphone_buffer_kicad_candidate`, marked `expected_fail` until verified
+component evidence, output protection/DC blocking, analog layout proof, and
+ERC/DRC-clean evidence exist.
+
 Round-trip validation for the Go-generated LED schematic, Go-generated LED PCB,
 checked-in LED schematic fixture, and checked-in generated PCB fixture is
 available as an opt-in integration test. Run this command from the repository
