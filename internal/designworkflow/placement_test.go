@@ -2,6 +2,8 @@ package designworkflow
 
 import (
 	"context"
+	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -90,6 +92,80 @@ func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsPromotesRequestConnectionsToPlacementNets(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "connector_led",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "header", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 2, "pin_names": []any{"SIG", "GND"}}},
+			{ID: "status", BlockID: "led_indicator"},
+		},
+		Connections: []ConnectionSpec{
+			{From: "header.SIG", To: "status.IN", NetAlias: "LED_EN"},
+			{From: "header.GND", To: "status.GND", NetAlias: "GND"},
+		},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	ledNet, ok := placementNetByName(result.Request.Nets, "LED_EN")
+	if !ok {
+		t.Fatalf("placement nets = %#v, want LED_EN", result.Request.Nets)
+	}
+	if !placementNetHasEndpointPrefix(ledNet, "J", "1") || !placementNetHasEndpointPrefix(ledNet, "R", "1") {
+		t.Fatalf("LED_EN endpoints = %#v, want connector pad and LED input resistor pad", ledNet.Endpoints)
+	}
+	gndNet, ok := placementNetByName(result.Request.Nets, "GND")
+	if !ok {
+		t.Fatalf("placement nets = %#v, want GND", result.Request.Nets)
+	}
+	if !placementNetHasEndpointPrefix(gndNet, "J", "2") || !placementNetHasEndpointPrefix(gndNet, "D", "2") {
+		t.Fatalf("GND endpoints = %#v, want connector ground and LED ground pad", gndNet.Endpoints)
+	}
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, result)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	ledCandidate, ok := interBlockCandidateByNet(candidates, "LED_EN")
+	if !ok {
+		t.Fatalf("candidates = %#v, want LED_EN inter-block candidate", candidates)
+	}
+	if ledCandidate.Status != InterBlockRouteCandidateRoutable {
+		t.Fatalf("LED_EN candidate = %#v, want routable", ledCandidate)
+	}
+	if !slices.Contains(ledCandidate.InstanceIDs, "header") || !slices.Contains(ledCandidate.InstanceIDs, "status") {
+		t.Fatalf("LED_EN candidate instances = %#v, want header and status", ledCandidate.InstanceIDs)
+	}
+}
+
+func TestPlaceFragmentsReportsUnresolvedRequestConnectionEndpoint(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "connector_led",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "header", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 1, "pin_names": []any{"SIG"}}},
+			{ID: "status", BlockID: "led_indicator"},
+		},
+		Connections: []ConnectionSpec{{From: "header.NOPE", To: "status.IN", NetAlias: "LED_EN"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v, want unresolved endpoint warning without blocking placement", result.Stage.Issues)
+	}
+	assertIssueCode(t, result.Stage.Issues, reports.CodeValidationFailed)
+}
+
 func TestPlaceFragmentsSummarizesCandidateScoring(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
@@ -111,6 +187,33 @@ func TestPlaceFragmentsSummarizesCandidateScoring(t *testing.T) {
 	if !summary.Enabled || summary.WinningCount == 0 || summary.ScoreVersion == "" {
 		t.Fatalf("candidate scoring summary incomplete: %#v", summary)
 	}
+}
+
+func placementNetByName(nets []placement.Net, name string) (placement.Net, bool) {
+	for _, net := range nets {
+		if strings.EqualFold(net.Name, name) {
+			return net, true
+		}
+	}
+	return placement.Net{}, false
+}
+
+func placementNetHasEndpointPrefix(net placement.Net, refPrefix string, pin string) bool {
+	for _, endpoint := range net.Endpoints {
+		if strings.HasPrefix(strings.ToUpper(endpoint.Ref), strings.ToUpper(refPrefix)) && strings.EqualFold(endpoint.Pin, pin) {
+			return true
+		}
+	}
+	return false
+}
+
+func interBlockCandidateByNet(candidates []InterBlockRouteCandidate, name string) (InterBlockRouteCandidate, bool) {
+	for _, candidate := range candidates {
+		if strings.EqualFold(candidate.NetName, name) {
+			return candidate, true
+		}
+	}
+	return InterBlockRouteCandidate{}, false
 }
 
 func TestPlacementCandidateScoringSummaryIncludesAdvancedRules(t *testing.T) {

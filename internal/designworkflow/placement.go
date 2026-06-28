@@ -95,6 +95,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 			addPlacementRouteNet(&placementRequest, netIndexes, route)
 		}
 	}
+	issues = append(issues, addPlacementConnectionNets(&placementRequest, netIndexes, normalized, fragments)...)
 	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
 	issues = append(issues, padIssues...)
 	placementRequest = placement.NormalizeRequest(placementRequest)
@@ -290,15 +291,26 @@ func addPlacementRouteNet(request *placement.Request, indexes map[string]int, ro
 	if name == "" {
 		return
 	}
-	key := strings.ToUpper(name)
 	endpoints := []placement.Endpoint{
 		{Ref: route.From.Ref, Pin: route.From.Pin},
 		{Ref: route.To.Ref, Pin: route.To.Pin},
 	}
+	addPlacementNet(request, indexes, name, netRoleFromName(name), 10, endpoints...)
+}
+
+func addPlacementNet(request *placement.Request, indexes map[string]int, name string, role placement.NetRole, weight int, endpoints ...placement.Endpoint) {
+	name = strings.TrimSpace(name)
+	if request == nil || name == "" {
+		return
+	}
+	key := strings.ToUpper(name)
 	if index, ok := indexes[key]; ok {
 		request.Nets[index].Endpoints = appendUniquePlacementEndpoints(request.Nets[index].Endpoints, endpoints...)
-		if request.Nets[index].Weight < 10 {
-			request.Nets[index].Weight = 10
+		if request.Nets[index].Weight < weight {
+			request.Nets[index].Weight = weight
+		}
+		if request.Nets[index].Role == "" || request.Nets[index].Role == placement.NetUnknown {
+			request.Nets[index].Role = role
 		}
 		return
 	}
@@ -306,9 +318,82 @@ func addPlacementRouteNet(request *placement.Request, indexes map[string]int, ro
 	request.Nets = append(request.Nets, placement.Net{
 		Name:      name,
 		Endpoints: endpoints,
-		Role:      netRoleFromName(name),
-		Weight:    10,
+		Role:      role,
+		Weight:    weight,
 	})
+}
+
+func addPlacementNetWithEndpointMerges(request *placement.Request, indexes map[string]int, name string, role placement.NetRole, weight int, endpoints ...placement.Endpoint) {
+	name = strings.TrimSpace(name)
+	if request == nil || name == "" {
+		return
+	}
+	merged := appendUniquePlacementEndpoints(make([]placement.Endpoint, 0, len(endpoints)), endpoints...)
+	mergedKeys := placementEndpointKeySet(merged)
+	remaining := append([]placement.Net(nil), request.Nets...)
+	for {
+		changed := false
+		kept := make([]placement.Net, 0, len(remaining))
+		for _, net := range remaining {
+			if strings.EqualFold(net.Name, name) || placementNetSharesEndpointKeys(net, mergedKeys) {
+				merged = appendUniquePlacementEndpoints(merged, net.Endpoints...)
+				for _, endpoint := range net.Endpoints {
+					if key := placementEndpointKey(endpoint); key != "" {
+						mergedKeys[key] = struct{}{}
+					}
+				}
+				changed = true
+				continue
+			}
+			kept = append(kept, net)
+		}
+		remaining = kept
+		if !changed {
+			break
+		}
+	}
+	request.Nets = remaining
+	rebuildPlacementNetIndexes(indexes, request.Nets)
+	addPlacementNet(request, indexes, name, role, weight, merged...)
+}
+
+func placementNetSharesEndpointKeys(net placement.Net, keys map[string]struct{}) bool {
+	for _, endpoint := range net.Endpoints {
+		if _, ok := keys[placementEndpointKey(endpoint)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func placementEndpointKeySet(endpoints []placement.Endpoint) map[string]struct{} {
+	keys := map[string]struct{}{}
+	for _, endpoint := range endpoints {
+		if key := placementEndpointKey(endpoint); key != "" {
+			keys[key] = struct{}{}
+		}
+	}
+	return keys
+}
+
+func placementEndpointKey(endpoint placement.Endpoint) string {
+	ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+	pin := strings.ToUpper(strings.TrimSpace(endpoint.Pin))
+	if ref == "" || pin == "" {
+		return ""
+	}
+	return ref + "|" + pin
+}
+
+func rebuildPlacementNetIndexes(indexes map[string]int, nets []placement.Net) {
+	clear(indexes)
+	for index, net := range nets {
+		name := strings.TrimSpace(net.Name)
+		if name == "" {
+			continue
+		}
+		indexes[strings.ToUpper(name)] = index
+	}
 }
 
 func appendUniquePlacementEndpoints(existing []placement.Endpoint, incoming ...placement.Endpoint) []placement.Endpoint {

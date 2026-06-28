@@ -31,7 +31,7 @@ func TestFullBoardRetryGeneratedMultiBlockBoundaryEvidence(t *testing.T) {
 		t.Fatalf("pad hydration = %#v metadata=%#v", padSummary, metadata)
 	}
 	if placementStage.Status != StageStatusOK {
-		t.Fatalf("placement status = %s, want ok", placementStage.Status)
+		t.Fatalf("placement status = %s, want ok; issues=%#v", placementStage.Status, placementStage.Issues)
 	}
 	mobility, ok := placementStage.Summary["mobility"].(placement.MobilitySummary)
 	if !ok {
