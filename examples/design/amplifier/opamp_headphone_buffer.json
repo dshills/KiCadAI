@@ -1,0 +1,72 @@
+{
+  "version": "0.1.0",
+  "name": "opamp_headphone_buffer",
+  "intent": {
+    "summary": "Structural op-amp headphone buffer seed with explicit audio input, output, and power connectors. This fixture is not fabrication-ready.",
+    "category": "amplifier"
+  },
+  "board": {
+    "width_mm": 70,
+    "height_mm": 45,
+    "layers": 2
+  },
+  "component_policy": {
+    "minimum_confidence": "placeholder",
+    "acceptance": "draft"
+  },
+  "blocks": [
+    {
+      "id": "input",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["SIG", "GND"]
+      }
+    },
+    {
+      "id": "amp",
+      "block_id": "opamp_gain_stage",
+      "params": {
+        "topology": "non_inverting",
+        "gain": 2,
+        "single_supply": true,
+        "input_coupling": "ac",
+        "include_output_resistor": true
+      }
+    },
+    {
+      "id": "headphones",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["SIG", "GND"]
+      }
+    },
+    {
+      "id": "output_dc_block_pending",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["IN", "OUT", "GND"]
+      }
+    },
+    {
+      "id": "power",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["VCC", "GND"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": "input.SIG", "to": "amp.IN", "net_alias": "AUDIO_IN"},
+    {"from": "amp.OUT", "to": "output_dc_block_pending.IN", "net_alias": "AMP_OUT"},
+    {"from": "output_dc_block_pending.OUT", "to": "headphones.SIG", "net_alias": "HP_OUT_DC_BLOCK_REQ"},
+    {"from": "output_dc_block_pending.GND", "to": "amp.GND", "net_alias": "GND"},
+    {"from": "power.VCC", "to": "amp.VCC", "net_alias": "VCC"},
+    {"from": "power.GND", "to": "amp.GND", "net_alias": "GND"},
+    {"from": "input.GND", "to": "amp.GND", "net_alias": "GND"},
+    {"from": "headphones.GND", "to": "amp.GND", "net_alias": "GND"}
+  ],
+  "validation": {
+    "acceptance": "draft",
+    "skip_routing": true
+  }
+}

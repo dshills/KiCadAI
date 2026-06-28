@@ -25,6 +25,24 @@ kicadai --request examples/design/active_low_led.json --output ./out/active_low_
 This structural example exercises the active-low LED path and explicit voltage,
 LED forward-voltage, and resistor parameters. Routing is skipped intentionally.
 
+## Op-Amp Headphone Buffer
+
+```sh
+kicadai --request examples/design/amplifier/opamp_headphone_buffer.json --output ./out/opamp_headphone_buffer --overwrite design create
+```
+
+This draft amplifier seed uses the supported `opamp_gain_stage`
+block plus audio input, headphone output, and power connector breakouts. Routing
+is skipped intentionally and placeholder component confidence is allowed. The
+signal path includes an `output_dc_block_pending` placeholder connector and
+`HP_OUT_DC_BLOCK_REQ` net alias to mark where a real series output
+DC-blocking/protection block belongs. Known gaps remain: headphone load-drive
+behavior, analog stability/layout, output DC blocking, output protection, and
+connector pinout mapping are not verified, so this example must not be treated
+as fabrication-ready. The input path requests the op-amp block's AC-coupled
+single-supply bias network; practical output offset management is still future
+work.
+
 Generated artifacts include:
 
 - `<output>/<name>.kicad_pro`
