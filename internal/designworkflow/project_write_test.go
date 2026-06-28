@@ -41,6 +41,13 @@ func TestWriteProjectGeneratesInspectablePCBProject(t *testing.T) {
 	if result.Inspection.PCB.FootprintCount != 2 {
 		t.Fatalf("pcb footprint count = %d", result.Inspection.PCB.FootprintCount)
 	}
+	netAssignment, ok := result.Stage.Summary["net_assignment"].(GeneratedNetAssignmentSummary)
+	if !ok {
+		t.Fatalf("project_write net assignment summary missing: %#v", result.Stage.Summary)
+	}
+	if netAssignment.NetCount == 0 || netAssignment.AssignedPads == 0 || netAssignment.AssignedCopperObjects == 0 {
+		t.Fatalf("net assignment summary = %#v, want assigned nets, pads, and copper", netAssignment)
+	}
 }
 
 func TestProjectTransactionIncludesOutlinePlacementAndRoutesBeforeWrite(t *testing.T) {

@@ -34,6 +34,15 @@ type GeneratedNetTable struct {
 	ByName map[string]int           `json:"-"`
 }
 
+type GeneratedNetAssignmentSummary struct {
+	NetCount                int `json:"net_count"`
+	AssignedPads            int `json:"assigned_pads"`
+	UnassignedPads          int `json:"unassigned_pads"`
+	AssignedCopperObjects   int `json:"assigned_copper_objects"`
+	UnassignedCopperObjects int `json:"unassigned_copper_objects"`
+	IssueCount              int `json:"issue_count,omitempty"`
+}
+
 type generatedNetCollector struct {
 	sources map[string]map[GeneratedNetAssignmentSource]struct{}
 	issues  []reports.Issue
@@ -75,6 +84,41 @@ func BuildGeneratedNetTable(placed *PlacementStageResult, routed *RoutingStageRe
 		}
 	}
 	return collector.table(), collector.issues
+}
+
+func SummarizeGeneratedNetAssignment(placed *PlacementStageResult, routed *RoutingStageResult) GeneratedNetAssignmentSummary {
+	table, issues := BuildGeneratedNetTable(placed, routed)
+	summary := GeneratedNetAssignmentSummary{NetCount: len(table.Nets), IssueCount: len(issues)}
+	if placed != nil {
+		for _, component := range placed.Request.Components {
+			for _, pad := range component.Pads {
+				if strings.TrimSpace(pad.Net) == "" {
+					summary.UnassignedPads++
+				} else {
+					summary.AssignedPads++
+				}
+			}
+		}
+	}
+	if routed != nil {
+		for _, operation := range routed.Operations {
+			switch operation.Op {
+			case transactions.OpRoute:
+				if strings.TrimSpace(operation.Net) == "" {
+					summary.UnassignedCopperObjects++
+				} else {
+					summary.AssignedCopperObjects++
+				}
+			case transactions.OpAddZone:
+				if strings.TrimSpace(operation.Net) == "" {
+					summary.UnassignedCopperObjects++
+				} else {
+					summary.AssignedCopperObjects++
+				}
+			}
+		}
+	}
+	return summary
 }
 
 func (collector *generatedNetCollector) add(path string, name string, source GeneratedNetAssignmentSource) {

@@ -77,17 +77,24 @@ func (op Operation) MarshalJSON() ([]byte, error) {
 // include the same "op" field that would be present after unmarshalling a
 // transaction file.
 func NewOperation(kind OperationKind, raw json.RawMessage) Operation {
-	operation := NewOperationWithRef(kind, raw, "")
 	metadata := operationMetadataFromRaw(raw)
-	operation.Ref = metadata.Ref
-	operation.Net = metadata.NetName
-	return operation
+	return newOperationWithMetadata(kind, raw, metadata.Ref, metadata.NetName)
 }
 
 // NewOperationWithRef wraps a complete operation JSON object and attaches
 // already-known reference metadata for callers that constructed the payload.
 func NewOperationWithRef(kind OperationKind, raw json.RawMessage, ref string) Operation {
-	return Operation{Op: kind, Raw: append([]byte(nil), raw...), Ref: ref}
+	return newOperationWithMetadata(kind, raw, ref, "")
+}
+
+// NewOperationWithMetadata wraps a complete operation JSON object and attaches
+// already-known metadata for callers that constructed the payload.
+func NewOperationWithMetadata(kind OperationKind, raw json.RawMessage, ref string, netName string) Operation {
+	return newOperationWithMetadata(kind, raw, ref, netName)
+}
+
+func newOperationWithMetadata(kind OperationKind, raw json.RawMessage, ref string, netName string) Operation {
+	return Operation{Op: kind, Raw: append([]byte(nil), raw...), Ref: ref, Net: netName}
 }
 
 func operationRefFromRawValue(raw json.RawMessage) string {

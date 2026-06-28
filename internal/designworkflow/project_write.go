@@ -62,9 +62,13 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 	tx, issues := ProjectTransaction(request, plan, placed, routed, opts.Overwrite)
 	validation := transactions.Validate(tx)
 	issues = append(issues, validation.Issues...)
+	netAssignment := SummarizeGeneratedNetAssignment(placed, routed)
 	if reports.HasBlockingIssue(issues) {
 		stage := NewStageResult(StageProjectWrite, issues)
-		stage.Summary = map[string]any{"operation_count": len(tx.Operations)}
+		stage.Summary = map[string]any{
+			"operation_count": len(tx.Operations),
+			"net_assignment":  netAssignment,
+		}
 		return ProjectWriteResult{Transaction: tx, Validation: validation, Stage: stage}
 	}
 	if err := ctx.Err(); err != nil {
@@ -96,6 +100,7 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 	stage.Summary = map[string]any{
 		"operation_count": len(tx.Operations),
 		"artifact_count":  len(applyResult.Artifacts),
+		"net_assignment":  netAssignment,
 	}
 	return ProjectWriteResult{Transaction: tx, Validation: validation, ApplyResult: applyResult, Inspection: inspection, Stage: stage}
 }

@@ -165,7 +165,7 @@ func mustComponentSelectionOperation(t *testing.T, kind transactions.OperationKi
 	if err != nil {
 		t.Fatal(err)
 	}
-	return transactions.NewOperationWithRef(kind, data, operationReference(payload))
+	return transactions.NewOperation(kind, data)
 }
 
 func decodeAddSymbolOperation(t *testing.T, operation transactions.Operation) transactions.AddSymbolOperation {

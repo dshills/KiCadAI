@@ -555,7 +555,7 @@ func wrapWorkflowOperation(kind transactions.OperationKind, payload any) (transa
 	if err != nil {
 		return transactions.Operation{}, err
 	}
-	return transactions.NewOperationWithRef(kind, data, operationReference(payload)), nil
+	return transactions.NewOperationWithMetadata(kind, data, operationReference(payload), ""), nil
 }
 
 func operationReference(payload any) string {

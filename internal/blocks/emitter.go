@@ -211,7 +211,7 @@ func wrapOperation(kind transactions.OperationKind, payload any) (transactions.O
 	if err != nil {
 		return transactions.Operation{}, err
 	}
-	return transactions.NewOperationWithRef(kind, data, operationRef(payload)), nil
+	return transactions.NewOperationWithMetadata(kind, data, operationRef(payload), operationNetName(payload)), nil
 }
 
 func operationRef(payload any) string {
@@ -227,6 +227,32 @@ func operationRef(payload any) string {
 	default:
 		return ""
 	}
+}
+
+func operationNetName(payload any) string {
+	switch value := payload.(type) {
+	case transactions.ConnectOperation:
+		return value.NetName
+	case *transactions.ConnectOperation:
+		if value != nil {
+			return value.NetName
+		}
+	case transactions.RouteOperation:
+		return value.NetName
+	case *transactions.RouteOperation:
+		if value != nil {
+			return value.NetName
+		}
+	case transactions.AddZoneOperation:
+		if value.NetName != nil {
+			return *value.NetName
+		}
+	case *transactions.AddZoneOperation:
+		if value != nil && value.NetName != nil {
+			return *value.NetName
+		}
+	}
+	return ""
 }
 
 func sanitizeNetPart(value string) string {

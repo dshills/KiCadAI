@@ -23,7 +23,7 @@ func PlacementOperation(component Component, placement PlacementResult) (transac
 	if err != nil {
 		return transactions.Operation{}, err
 	}
-	return transactions.NewOperationWithRef(transactions.OpPlaceFootprint, raw, payload.Ref), nil
+	return transactions.NewOperationWithMetadata(transactions.OpPlaceFootprint, raw, payload.Ref, ""), nil
 }
 
 func PlacementOperations(request Request, placements []PlacementResult) ([]transactions.Operation, []reports.Issue) {
