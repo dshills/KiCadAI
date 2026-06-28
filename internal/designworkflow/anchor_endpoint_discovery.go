@@ -39,7 +39,7 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 		})
 		return endpoints, issues
 	}
-	positions := placementPositions(placed)
+	positions := placementPositions(&placed)
 	netRoles := placementNetRoles(placed.Request.Nets)
 	frame := endpointBoardFrame(placed.Request, opts.Board)
 	edgeThresholdMM := derivedBoardEdgeEndpointThreshold(placed.Request, opts.Board)
@@ -371,8 +371,11 @@ func endpointIDText(value string) string {
 	return value
 }
 
-func placementPositions(placed PlacementStageResult) map[string]placement.Placement {
+func placementPositions(placed *PlacementStageResult) map[string]placement.Placement {
 	positions := map[string]placement.Placement{}
+	if placed == nil {
+		return positions
+	}
 	for _, result := range placed.Result.Placements {
 		ref := strings.ToUpper(strings.TrimSpace(result.Ref))
 		if ref == "" || result.Reason != "" {
