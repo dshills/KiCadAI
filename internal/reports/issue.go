@@ -36,6 +36,14 @@ const (
 	CodePinmapUnverified          Code = "PINMAP_UNVERIFIED"
 	CodePlacementCollision        Code = "PLACEMENT_COLLISION"
 	CodePlacementOutsideBoard     Code = "PLACEMENT_OUTSIDE_BOARD"
+	CodeRouteContactMissingTarget Code = "ROUTE_CONTACT_MISSING_TARGET"
+	CodeRouteContactNetMismatch   Code = "ROUTE_CONTACT_NET_MISMATCH"
+	CodeRouteContactLayerMismatch Code = "ROUTE_CONTACT_LAYER_MISMATCH"
+	CodeRouteContactMiss          Code = "ROUTE_CONTACT_MISS"
+	CodeRouteContactAmbiguous     Code = "ROUTE_CONTACT_AMBIGUOUS"
+	CodeRouteContactUnsupported   Code = "ROUTE_CONTACT_UNSUPPORTED_GEOMETRY"
+	CodeRouteGraphIncomplete      Code = "ROUTE_GRAPH_INCOMPLETE"
+	CodeRouteCompletionPartial    Code = "ROUTE_COMPLETION_PARTIAL"
 )
 
 type Issue struct {

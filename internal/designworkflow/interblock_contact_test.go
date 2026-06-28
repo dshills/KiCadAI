@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"kicadai/internal/placement"
+	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestBuildInterBlockContactTargetsResolvesPlacedPad(t *testing.T) {
@@ -84,6 +86,84 @@ func TestInterBlockContactProofJSONStable(t *testing.T) {
 	}
 }
 
+func TestValidateInterBlockRouteEndpointContactsProvesDirectHit(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operations := []transactions.Operation{mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 15, YMM: 10},
+	)}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Issues) != 0 {
+		t.Fatalf("issues = %#v", evidence.Issues)
+	}
+	summary := SummarizeInterBlockContacts(evidence)
+	if summary.ContactsRequired != 2 || summary.ContactsProven != 2 || summary.ContactsFailed != 0 {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestValidateInterBlockRouteEndpointContactsReportsMiss(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName:   "SIG",
+		Status:    InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{{Ref: "J1", Pin: "1", InstanceID: "header"}},
+	}}
+	operations := []transactions.Operation{mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 6, YMM: 10},
+		transactions.Point{XMM: 8, YMM: 10},
+	)}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Proofs) != 1 || evidence.Proofs[0].Status != InterBlockContactMiss {
+		t.Fatalf("proofs = %#v, want miss", evidence.Proofs)
+	}
+	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactMiss)
+}
+
+func TestValidateInterBlockRouteEndpointContactsReportsLayerMismatch(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName:   "SIG",
+		Status:    InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{{Ref: "J1", Pin: "1", InstanceID: "header"}},
+	}}
+	operations := []transactions.Operation{mustContactRouteOperation(t, "SIG", "B.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 8, YMM: 10},
+	)}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Proofs) != 1 || evidence.Proofs[0].Status != InterBlockContactLayerMismatch {
+		t.Fatalf("proofs = %#v, want layer mismatch", evidence.Proofs)
+	}
+	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactLayerMismatch)
+}
+
+func TestValidateInterBlockRouteEndpointContactsReportsMissingRouteOperation(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName:   "SIG",
+		Status:    InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{{Ref: "J1", Pin: "1", InstanceID: "header"}},
+	}}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, nil, &placed)
+	if len(evidence.Proofs) != 1 || evidence.Proofs[0].Status != InterBlockContactMissingTarget {
+		t.Fatalf("proofs = %#v, want missing target", evidence.Proofs)
+	}
+	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactMissingTarget)
+}
+
 func interBlockContactPlaced(firstNet string, secondNet string) PlacementStageResult {
 	return PlacementStageResult{
 		Request: placement.Request{
@@ -113,4 +193,29 @@ func interBlockContactPlaced(firstNet string, secondNet string) PlacementStageRe
 		},
 		Stage: NewStageResult(StagePlacement, nil),
 	}
+}
+
+func mustContactRouteOperation(t *testing.T, netName string, layer string, points ...transactions.Point) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: netName,
+		Layer:   layer,
+		WidthMM: 0.25,
+		Points:  points,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions.NewOperation(transactions.OpRoute, raw)
+}
+
+func assertContactIssueCode(t *testing.T, issues []reports.Issue, code reports.Code) {
+	t.Helper()
+	for _, issue := range issues {
+		if issue.Code == code {
+			return
+		}
+	}
+	t.Fatalf("issues = %#v, want code %s", issues, code)
 }

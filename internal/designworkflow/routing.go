@@ -105,6 +105,8 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		issues = append(issues, result.Issues...)
 	}
 	routeOperations := transactionRouteOperations(result.Operations)
+	interBlockContactEvidence := ValidateInterBlockRouteEndpointContacts(interBlockCandidates, routeOperations, &placed)
+	issues = append(issues, interBlockContactEvidence.Issues...)
 	operations := append(localOperations, anchorOperations...)
 	operations = append(operations, routeOperations...)
 	stage := NewStageResult(StageRouting, issues)
@@ -120,6 +122,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"local_route_mobility":   localRouteMobility,
 		"route_connectivity":     localRouteConnectivity,
 		"inter_block_routing":    summarizeInterBlockRouteCompletion(interBlockCandidates, routeOperations, issues),
+		"inter_block_contacts":   SummarizeInterBlockContacts(interBlockContactEvidence),
 	}
 	if len(anchorOperations) > 0 {
 		stage.Summary["anchor_binding_route_operations"] = len(anchorOperations)

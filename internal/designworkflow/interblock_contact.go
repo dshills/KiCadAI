@@ -1,7 +1,9 @@
 package designworkflow
 
 import (
+	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
 
 	"kicadai/internal/placement"
@@ -91,6 +93,17 @@ type InterBlockContactEvidence struct {
 	Issues  []reports.Issue           `json:"issues,omitempty"`
 }
 
+type InterBlockContactSummary struct {
+	ContactsRequired int `json:"contacts_required"`
+	ContactsProven   int `json:"contacts_proven"`
+	ContactsFailed   int `json:"contacts_failed"`
+	ContactMisses    int `json:"contact_misses"`
+	NetMismatches    int `json:"net_mismatches"`
+	LayerMismatches  int `json:"layer_mismatches"`
+	MissingTargets   int `json:"missing_targets"`
+	IssueCount       int `json:"issue_count"`
+}
+
 // interBlockContactToleranceMM is a geometry-proof tolerance for generated
 // endpoint contact, not a manufacturing clearance. It allows writer/reader
 // coordinate rounding while still requiring the route to terminate at the
@@ -138,6 +151,58 @@ func BuildInterBlockContactTargets(candidates []InterBlockRouteCandidate, placed
 		}
 	}
 	return evidence
+}
+
+func ValidateInterBlockRouteEndpointContacts(candidates []InterBlockRouteCandidate, operations []transactions.Operation, placed *PlacementStageResult) InterBlockContactEvidence {
+	evidence := BuildInterBlockContactTargets(candidates, placed)
+	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
+	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
+	evidence.Issues = append(evidence.Issues, operationIssues...)
+	for netName, targets := range targetsByNet {
+		routeOperations := operationsByNet[netName]
+		if len(routeOperations) == 0 {
+			for _, target := range targets {
+				proof := contactProofForTarget(target, InterBlockContactMissingTarget, "emit an inter-block route operation for this target net")
+				proof.EndpointSide = "target"
+				evidence.Proofs = append(evidence.Proofs, proof)
+				evidence.Issues = append(evidence.Issues, interBlockContactProofIssue(proof, reports.CodeRouteContactMissingTarget, "inter-block contact target has no emitted route operation"))
+			}
+			continue
+		}
+		for _, target := range targets {
+			proof := proveContactTarget(target, routeOperations)
+			evidence.Proofs = append(evidence.Proofs, proof)
+			if proof.Status != InterBlockContactProven {
+				evidence.Issues = append(evidence.Issues, interBlockContactProofIssue(proof, contactIssueCode(proof.Status), contactIssueMessage(proof.Status)))
+			}
+		}
+	}
+	return evidence
+}
+
+func SummarizeInterBlockContacts(evidence InterBlockContactEvidence) InterBlockContactSummary {
+	summary := InterBlockContactSummary{ContactsRequired: len(evidence.Targets), IssueCount: len(evidence.Issues)}
+	for _, proof := range evidence.Proofs {
+		switch proof.Status {
+		case InterBlockContactProven:
+			summary.ContactsProven++
+		case InterBlockContactMiss:
+			summary.ContactsFailed++
+			summary.ContactMisses++
+		case InterBlockContactNetMismatch:
+			summary.ContactsFailed++
+			summary.NetMismatches++
+		case InterBlockContactLayerMismatch:
+			summary.ContactsFailed++
+			summary.LayerMismatches++
+		case InterBlockContactMissingTarget:
+			summary.ContactsFailed++
+			summary.MissingTargets++
+		default:
+			summary.ContactsFailed++
+		}
+	}
+	return summary
 }
 
 func interBlockContactTarget(path string, netName string, endpoint InterBlockRouteEndpoint, resolver *PlacedPadEndpointResolver) (InterBlockContactTarget, bool, *reports.Issue) {
@@ -205,6 +270,208 @@ func contactProofForTarget(target InterBlockContactTarget, status InterBlockCont
 		Blocking:    status != InterBlockContactProven,
 		Suggestion:  suggestion,
 	}
+}
+
+type decodedContactRouteOperation struct {
+	OperationID string
+	NetName     string
+	Layer       string
+	Points      []transactions.Point
+}
+
+func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[string][]decodedContactRouteOperation, []reports.Issue) {
+	byNet := map[string][]decodedContactRouteOperation{}
+	var issues []reports.Issue
+	for index, operation := range operations {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var payload transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			issues = append(issues, reports.Issue{
+				Code:        reports.CodeRouteContactUnsupported,
+				Severity:    reports.SeverityBlocked,
+				Path:        fmt.Sprintf("design.inter_block_contact.operations[%d]", index),
+				Message:     "route operation could not be decoded for contact validation: " + err.Error(),
+				OperationID: contactOperationID(operation),
+			})
+			continue
+		}
+		netName := strings.TrimSpace(operation.Net)
+		if netName == "" {
+			netName = strings.TrimSpace(payload.NetName)
+		}
+		if netName == "" {
+			issues = append(issues, reports.Issue{
+				Code:        reports.CodeRouteContactNetMismatch,
+				Severity:    reports.SeverityBlocked,
+				Path:        fmt.Sprintf("design.inter_block_contact.operations[%d].net_name", index),
+				Message:     "route operation has no net name for contact validation",
+				OperationID: contactOperationID(operation),
+			})
+			continue
+		}
+		payloadNet := strings.TrimSpace(payload.NetName)
+		if payloadNet != "" && payloadNet != netName {
+			issues = append(issues, reports.Issue{
+				Code:        reports.CodeRouteContactNetMismatch,
+				Severity:    reports.SeverityBlocked,
+				Path:        fmt.Sprintf("design.inter_block_contact.operations[%d].net_name", index),
+				Message:     fmt.Sprintf("route operation cached net %q does not match payload net %q", netName, payloadNet),
+				Nets:        []string{netName, payloadNet},
+				OperationID: contactOperationID(operation),
+			})
+			continue
+		}
+		if len(payload.Points) == 0 {
+			issues = append(issues, reports.Issue{
+				Code:        reports.CodeRouteContactMissingTarget,
+				Severity:    reports.SeverityBlocked,
+				Path:        fmt.Sprintf("design.inter_block_contact.operations[%d].points", index),
+				Message:     "route operation has no points for contact validation",
+				Nets:        []string{netName},
+				OperationID: contactOperationID(operation),
+			})
+			continue
+		}
+		byNet[netName] = append(byNet[netName], decodedContactRouteOperation{
+			OperationID: contactOperationID(operation),
+			NetName:     netName,
+			Layer:       strings.TrimSpace(payload.Layer),
+			Points:      append([]transactions.Point(nil), payload.Points...),
+		})
+	}
+	return byNet, issues
+}
+
+func proveContactTarget(target InterBlockContactTarget, operations []decodedContactRouteOperation) InterBlockContactProof {
+	best := InterBlockContactProof{
+		RouteClass:  "inter_block",
+		NetName:     target.NetName,
+		NetCode:     target.NetCode,
+		EndpointSide: "target",
+		Target:      target,
+		ToleranceMM: target.ToleranceMM,
+		Status:      InterBlockContactMiss,
+		Blocking:    true,
+		Suggestion:  "snap the route endpoint to the resolved contact target",
+	}
+	bestDistance := math.Inf(1)
+	layerCoordinateMatch := false
+	for _, operation := range operations {
+		if operation.NetName != target.NetName {
+			continue
+		}
+		if len(operation.Points) == 0 {
+			continue
+		}
+		endpoints := []struct {
+			side  string
+			point transactions.Point
+		}{
+			{side: "start", point: operation.Points[0]},
+			{side: "end", point: operation.Points[len(operation.Points)-1]},
+		}
+		for _, endpoint := range endpoints {
+			distance := pointDistanceMM(endpoint.point, target.Point)
+			if distance <= target.ToleranceMM && !sameLayer(operation.Layer, target.Layer) {
+				layerCoordinateMatch = true
+			}
+			if distance < bestDistance {
+				bestDistance = distance
+				point := endpoint.point
+				best.OperationID = operation.OperationID
+				best.EndpointSide = endpoint.side
+				best.EmittedPoint = &point
+				best.Layer = operation.Layer
+				best.DistanceMM = distance
+			}
+			if distance <= target.ToleranceMM && sameLayer(operation.Layer, target.Layer) {
+				point := endpoint.point
+				return InterBlockContactProof{
+					OperationID:  operation.OperationID,
+					RouteClass:   "inter_block",
+					NetName:      target.NetName,
+					NetCode:      target.NetCode,
+					EndpointSide: endpoint.side,
+					EmittedPoint: &point,
+					Layer:        operation.Layer,
+					Target:       target,
+					DistanceMM:   distance,
+					ToleranceMM:  target.ToleranceMM,
+					Status:       InterBlockContactProven,
+				}
+			}
+		}
+	}
+	if layerCoordinateMatch {
+		best.Status = InterBlockContactLayerMismatch
+		best.Suggestion = "route to the contact target on the target copper layer or insert a validated via"
+	}
+	return best
+}
+
+func interBlockContactTargetsByNet(targets []InterBlockContactTarget) map[string][]InterBlockContactTarget {
+	byNet := map[string][]InterBlockContactTarget{}
+	for _, target := range targets {
+		byNet[target.NetName] = append(byNet[target.NetName], target)
+	}
+	return byNet
+}
+
+func interBlockContactProofIssue(proof InterBlockContactProof, code reports.Code, message string) reports.Issue {
+	path := proof.Target.Path
+	if proof.EndpointSide != "" {
+		path += "." + proof.EndpointSide
+	}
+	return reports.Issue{
+		Code:        code,
+		Severity:    reports.SeverityBlocked,
+		Path:        path,
+		Message:     message,
+		Refs:        compactContactStrings([]string{proof.Target.Ref}),
+		Nets:        compactContactStrings([]string{proof.NetName}),
+		Suggestion:  proof.Suggestion,
+		OperationID: proof.OperationID,
+	}
+}
+
+func contactIssueCode(status InterBlockContactProofStatus) reports.Code {
+	switch status {
+	case InterBlockContactNetMismatch:
+		return reports.CodeRouteContactNetMismatch
+	case InterBlockContactLayerMismatch:
+		return reports.CodeRouteContactLayerMismatch
+	case InterBlockContactMissingTarget:
+		return reports.CodeRouteContactMissingTarget
+	case InterBlockContactUnsupportedGeometry:
+		return reports.CodeRouteContactUnsupported
+	case InterBlockContactAmbiguous:
+		return reports.CodeRouteContactAmbiguous
+	default:
+		return reports.CodeRouteContactMiss
+	}
+}
+
+func contactIssueMessage(status InterBlockContactProofStatus) string {
+	switch status {
+	case InterBlockContactLayerMismatch:
+		return "route endpoint reaches the contact coordinate on the wrong layer"
+	case InterBlockContactMissingTarget:
+		return "route endpoint contact target is missing"
+	case InterBlockContactNetMismatch:
+		return "route endpoint net does not match contact target net"
+	default:
+		return "route endpoint does not contact the required same-net target"
+	}
+}
+
+func sameLayer(left string, right string) bool {
+	return strings.EqualFold(strings.TrimSpace(left), strings.TrimSpace(right))
+}
+
+func contactOperationID(operation transactions.Operation) string {
+	return fmt.Sprintf("route:%d", operation.Index)
 }
 
 func compactContactStrings(values []string) []string {
