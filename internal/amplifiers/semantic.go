@@ -75,8 +75,8 @@ func ValidateSchematicLandmarks(file *schematic.SchematicFile, landmarks Schemat
 	}
 }
 
-// ClassABHeadphoneAmpLandmarks returns the required landmarks for the checked
-// in Class AB headphone amplifier example.
+// ClassABHeadphoneAmpLandmarks returns the required landmarks for the
+// checked-in Class AB headphone amplifier example.
 func ClassABHeadphoneAmpLandmarks() SchematicLandmarks {
 	return SchematicLandmarks{
 		Labels: []string{
@@ -95,16 +95,70 @@ func ClassABHeadphoneAmpLandmarks() SchematicLandmarks {
 			"1u",
 			"220u",
 		},
-		LibraryIDs: []string{
-			"Connector:Conn_01x03_Pin",
-			"Simulation_SPICE:OPAMP",
-			"Transistor_BJT:Q_NPN_BCE",
-			"Transistor_BJT:Q_PNP_BCE",
-			"Device:C",
-			"power:GND",
-			"power:VCC",
-			"power:VEE",
+		LibraryIDs: commonHeadphoneAmpLibraryIDs(),
+	}
+}
+
+// ClassAHeadphoneAmpLandmarks returns the required landmarks for the checked-in
+// Class A headphone amplifier example.
+func ClassAHeadphoneAmpLandmarks() SchematicLandmarks {
+	return SchematicLandmarks{
+		Labels: []string{
+			"AUDIO_IN",
+			"CLASS_A_FEEDBACK",
+			"CLASS_A_BIAS",
+			"QUIESCENT_BIAS",
+			"CLASS_A_OUT",
+			"HP_OUT",
 		},
+		SymbolValues: []string{
+			"CLASS_A_OPAMP",
+			"CLASS_A_DRIVER",
+			"ACTIVE_LOAD",
+			"32R LOAD",
+			"1u",
+			"220u",
+		},
+		LibraryIDs: commonHeadphoneAmpLibraryIDs(),
+	}
+}
+
+// OpAmpBufferHeadphoneAmpLandmarks returns the required landmarks for the
+// checked-in op-amp buffer headphone amplifier example.
+func OpAmpBufferHeadphoneAmpLandmarks() SchematicLandmarks {
+	return SchematicLandmarks{
+		Labels: []string{
+			"AUDIO_IN",
+			"BUFFER_FEEDBACK",
+			"BUFFER_BIAS_REF",
+			"BUFFER_RETURN",
+			"BUFFER_OUT",
+			"HP_OUT",
+		},
+		SymbolValues: []string{
+			"BUFFER_OPAMP",
+			"OUTPUT_NPN",
+			"OUTPUT_PNP",
+			"32R LOAD",
+			"1u",
+			"220u",
+		},
+		LibraryIDs: commonHeadphoneAmpLibraryIDs(),
+	}
+}
+
+func commonHeadphoneAmpLibraryIDs() []string {
+	return []string{
+		"Connector:Conn_01x03_Pin",
+		"Simulation_SPICE:OPAMP",
+		"Transistor_BJT:Q_NPN_BCE",
+		"Transistor_BJT:Q_PNP_BCE",
+		"Device:R",
+		"Device:D",
+		"Device:C",
+		"power:GND",
+		"power:VCC",
+		"power:VEE",
 	}
 }
 

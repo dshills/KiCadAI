@@ -14,8 +14,14 @@ rewritten until dedicated generators exist for them.
 | `04_555_timer` | Medium-complexity timer oscillator schematic. |
 | `05_sensor_node` | Hierarchical project with power, MCU, and sensor sheets. |
 | `06_class_ab_headphone_amp` | Op-amp gain stage with diode-biased class AB headphone output. |
+| `09_class_a_headphone_amp` | Class A headphone amplifier fixture with bias, feedback, and output-load landmarks. |
+| `10_opamp_buffer_headphone_amp` | Op-amp headphone buffer fixture with buffer feedback and output-stage landmarks. |
 
 Open each directory in KiCad by opening its `.kicad_pro` file.
+
+Fixture UUIDs are deterministic so parser, round-trip, and semantic tests stay
+stable. Treat each example directory as a standalone project; do not merge the
+fixtures into one KiCad project without regenerating UUIDs.
 
 Structured intent examples live under `examples/intent/`. Files prefixed with
 `synthesis_` exercise the semantic design synthesis trace:

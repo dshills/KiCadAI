@@ -8,18 +8,44 @@ import (
 	"kicadai/internal/kicadfiles/design"
 )
 
-func TestExistingClassABHeadphoneAmpFixtureParses(t *testing.T) {
-	root := repoPath(t, "examples", "06_class_ab_headphone_amp")
-	project, err := design.ReadProjectDirectory(root)
-	if err != nil {
-		t.Fatalf("read amplifier project: %v", err)
+func TestAmplifierExampleFixturesParseAndMatchLandmarks(t *testing.T) {
+	tests := []struct {
+		name      string
+		directory string
+		landmarks SchematicLandmarks
+	}{
+		{
+			name:      "class AB headphone amplifier",
+			directory: "06_class_ab_headphone_amp",
+			landmarks: ClassABHeadphoneAmpLandmarks(),
+		},
+		{
+			name:      "class A headphone amplifier",
+			directory: "09_class_a_headphone_amp",
+			landmarks: ClassAHeadphoneAmpLandmarks(),
+		},
+		{
+			name:      "op-amp buffer headphone amplifier",
+			directory: "10_opamp_buffer_headphone_amp",
+			landmarks: OpAmpBufferHeadphoneAmpLandmarks(),
+		},
 	}
-	schematicFile := project.Schematic
-	if schematicFile == nil {
-		t.Fatalf("schematic missing")
-	}
-	if validation := ValidateSchematicLandmarks(schematicFile, ClassABHeadphoneAmpLandmarks()); !validation.OK() {
-		t.Fatalf("%s", validation)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := repoPath(t, "examples", tt.directory)
+			project, err := design.ReadProjectDirectory(root)
+			if err != nil {
+				t.Fatalf("read amplifier project: %v", err)
+			}
+			schematicFile := project.Schematic
+			if schematicFile == nil {
+				t.Fatalf("schematic missing")
+			}
+			if validation := ValidateSchematicLandmarks(schematicFile, tt.landmarks); !validation.OK() {
+				t.Fatalf("%s", validation)
+			}
+		})
 	}
 }
 
