@@ -18,17 +18,9 @@ func TestExistingClassABHeadphoneAmpFixtureParses(t *testing.T) {
 	if schematicFile == nil {
 		t.Fatalf("schematic missing")
 	}
-	labels := make(map[string]bool, len(schematicFile.Labels))
-	for _, label := range schematicFile.Labels {
-		labels[label.Text] = true
+	if validation := ValidateSchematicLandmarks(schematicFile, ClassABHeadphoneAmpLandmarks()); !validation.OK() {
+		t.Fatalf("%s", validation)
 	}
-	requireSetContains(t, "schematic labels", labels, "AUDIO_IN", "GAIN_FEEDBACK", "BIAS_N", "BIAS_P", "AMP_OUT", "HP_OUT")
-
-	symbolValues := make(map[string]bool, len(schematicFile.Symbols))
-	for _, symbol := range schematicFile.Symbols {
-		symbolValues[symbol.Value] = true
-	}
-	requireSetContains(t, "schematic symbol values", symbolValues, "OPAMP", "NPN", "PNP", "32R LOAD")
 }
 
 func repoPath(t *testing.T, parts ...string) string {
@@ -61,17 +53,4 @@ func repoPath(t *testing.T, parts ...string) string {
 	}
 	items := append([]string{root}, parts...)
 	return filepath.Join(items...)
-}
-
-func requireSetContains(t *testing.T, name string, seen map[string]bool, want ...string) {
-	t.Helper()
-	var missing []string
-	for _, item := range want {
-		if !seen[item] {
-			missing = append(missing, item)
-		}
-	}
-	if len(missing) > 0 {
-		t.Fatalf("%s missing: %q", name, missing)
-	}
 }
