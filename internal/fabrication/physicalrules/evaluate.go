@@ -15,6 +15,7 @@ const outlineToleranceMM = 0.001
 const maxReportedObjects = 100
 
 func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, opts Options) Report {
+	opts = NormalizeOptions(opts)
 	if board == nil {
 		return NewReport(opts.ProfileID, BoardRef{}, []Check{{
 			ID:         "physical.board.present",
@@ -29,6 +30,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks := []Check{}
 	checks = append(checks, evaluateStackup(board)...)
 	checks = append(checks, evaluateNetClasses(board, project)...)
+	checks = append(checks, evaluateAnnularRings(board, opts)...)
 	checks = append(checks, evaluateMaskPaste(board)...)
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
@@ -131,6 +133,171 @@ func evaluateMaskPaste(board *pcbfiles.PCBFile) []Check {
 		})
 	}
 	return checks
+}
+
+func evaluateAnnularRings(board *pcbfiles.PCBFile, opts Options) []Check {
+	padCheck := evaluatePlatedPadAnnularRings(board, opts)
+	viaCheck := evaluateViaAnnularRings(board, opts)
+	return []Check{
+		{
+			ID:       CheckAnnularRingProfile,
+			Category: CategoryAnnularRing,
+			Status:   StatusPass,
+			Message:  "annular ring thresholds are defined by the active physical-rule profile",
+			Measurements: []Measurement{
+				{Name: "min_plated_pad_annular_ring", Value: opts.MinPlatedPadAnnularRingMM, Unit: "mm"},
+				{Name: "min_via_annular_ring", Value: opts.MinViaRingMM, Unit: "mm"},
+			},
+			Source: SourceProfile,
+		},
+		padCheck,
+		viaCheck,
+	}
+}
+
+func evaluatePlatedPadAnnularRings(board *pcbfiles.PCBFile, opts Options) Check {
+	checked := 0
+	violations := 0
+	missing := 0
+	var objects []string
+	refs := map[string]struct{}{}
+	minRing := math.MaxFloat64
+	for _, footprint := range board.Footprints {
+		footprintSuggestsHole := mountingHoleFootprintCandidate(footprint)
+		for _, pad := range footprint.Pads {
+			if !isPlatedThroughHolePad(pad, footprintSuggestsHole) {
+				continue
+			}
+			checked++
+			outer := minPositiveIU(pad.Size.X, pad.Size.Y)
+			if outer <= 0 || pad.Drill <= 0 {
+				missing++
+				addRef(refs, footprint.Reference)
+				objects = appendLimited(objects, string(pad.UUID))
+				continue
+			}
+			ring := iuToMM(outer-pad.Drill) / 2
+			if ring < minRing {
+				minRing = ring
+			}
+			if pad.Drill >= outer || ring < opts.MinPlatedPadAnnularRingMM {
+				violations++
+				addRef(refs, footprint.Reference)
+				objects = appendLimited(objects, string(pad.UUID))
+			}
+		}
+	}
+	if checked == 0 {
+		return Check{ID: CheckAnnularRingPlatedPad, Category: CategoryAnnularRing, Status: StatusSkipped, Message: "no plated through-hole pads were found for annular ring checks", Source: SourceParser}
+	}
+	measurements := []Measurement{
+		{Name: "checked_count", Value: float64(checked), Unit: "count"},
+		{Name: "min_required_annular_ring", Value: opts.MinPlatedPadAnnularRingMM, Unit: "mm"},
+	}
+	if minRing != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_annular_ring", Value: minRing, Unit: "mm"})
+	}
+	if violations > 0 {
+		measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+		return Check{
+			ID:           CheckAnnularRingPlatedPad,
+			Category:     CategoryAnnularRing,
+			Status:       StatusBlocked,
+			Message:      "one or more plated through-hole pads have insufficient annular ring",
+			Suggestion:   "increase pad diameter, reduce drill diameter, or select a manufacturer profile that supports the modeled geometry",
+			IssuePath:    "physical.annular_ring.plated_pad",
+			References:   sortedMapKeys(refs),
+			Objects:      objects,
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	if missing > 0 {
+		measurements = append(measurements, Measurement{Name: "missing_geometry_count", Value: float64(missing), Unit: "count"})
+		return Check{
+			ID:           CheckAnnularRingPlatedPad,
+			Category:     CategoryAnnularRing,
+			Status:       StatusWarning,
+			Message:      "one or more likely plated pads are missing drill or outer diameter evidence",
+			Suggestion:   "hydrate pad geometry before treating annular ring evidence as fabrication-ready",
+			IssuePath:    "physical.annular_ring.plated_pad",
+			References:   sortedMapKeys(refs),
+			Objects:      objects,
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	return Check{ID: CheckAnnularRingPlatedPad, Category: CategoryAnnularRing, Status: StatusPass, Message: "plated through-hole pad annular rings meet the active profile threshold", Measurements: measurements, Source: SourceParser}
+}
+
+func evaluateViaAnnularRings(board *pcbfiles.PCBFile, opts Options) Check {
+	if len(board.Vias) == 0 {
+		return Check{ID: CheckAnnularRingVia, Category: CategoryAnnularRing, Status: StatusSkipped, Message: "no vias were found for annular ring checks", Source: SourceParser}
+	}
+	violations := 0
+	missing := 0
+	var objects []string
+	nets := map[string]struct{}{}
+	minRing := math.MaxFloat64
+	for _, via := range board.Vias {
+		if via.Size <= 0 || via.Drill <= 0 {
+			missing++
+			objects = appendLimited(objects, string(via.UUID))
+			if strings.TrimSpace(via.NetName) != "" {
+				nets[via.NetName] = struct{}{}
+			}
+			continue
+		}
+		ring := iuToMM(via.Size-via.Drill) / 2
+		if ring < minRing {
+			minRing = ring
+		}
+		if via.Drill >= via.Size || ring < opts.MinViaRingMM {
+			violations++
+			objects = appendLimited(objects, string(via.UUID))
+			if strings.TrimSpace(via.NetName) != "" {
+				nets[via.NetName] = struct{}{}
+			}
+		}
+	}
+	measurements := []Measurement{
+		{Name: "checked_count", Value: float64(len(board.Vias)), Unit: "count"},
+		{Name: "min_required_annular_ring", Value: opts.MinViaRingMM, Unit: "mm"},
+	}
+	if minRing != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_annular_ring", Value: minRing, Unit: "mm"})
+	}
+	if violations > 0 {
+		measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+		return Check{
+			ID:           CheckAnnularRingVia,
+			Category:     CategoryAnnularRing,
+			Status:       StatusBlocked,
+			Message:      "one or more vias have insufficient annular ring",
+			Suggestion:   "increase via diameter, reduce via drill, or select a manufacturer profile that supports the modeled geometry",
+			IssuePath:    "physical.annular_ring.via",
+			Objects:      objects,
+			Nets:         sortedMapKeys(nets),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	if missing > 0 {
+		measurements = append(measurements, Measurement{Name: "missing_geometry_count", Value: float64(missing), Unit: "count"})
+		return Check{
+			ID:           CheckAnnularRingVia,
+			Category:     CategoryAnnularRing,
+			Status:       StatusWarning,
+			Message:      "one or more vias are missing drill or diameter evidence",
+			Suggestion:   "hydrate via geometry before treating annular ring evidence as fabrication-ready",
+			IssuePath:    "physical.annular_ring.via",
+			Objects:      objects,
+			Nets:         sortedMapKeys(nets),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	return Check{ID: CheckAnnularRingVia, Category: CategoryAnnularRing, Status: StatusPass, Message: "via annular rings meet the active profile threshold", Measurements: measurements, Source: SourceParser}
 }
 
 func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []Check {
@@ -398,6 +565,26 @@ func (summary padLayerSummary) hasRequiredMask() bool {
 
 func padRequiresPaste(pad pcbfiles.Pad) bool {
 	return strings.EqualFold(pad.Type, "smd")
+}
+
+func isPlatedThroughHolePad(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
+	if strings.EqualFold(pad.Type, "np_thru_hole") || isMountingHole(pad, footprintSuggestsHole) {
+		return false
+	}
+	return strings.EqualFold(pad.Type, "thru_hole")
+}
+
+func minPositiveIU(a, b kicadfiles.IU) kicadfiles.IU {
+	switch {
+	case a > 0 && b > 0 && a < b:
+		return a
+	case a > 0 && b > 0:
+		return b
+	case a > 0:
+		return a
+	default:
+		return b
+	}
 }
 
 func (summary padLayerSummary) hasRequiredPaste() bool {

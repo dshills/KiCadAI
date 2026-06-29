@@ -79,6 +79,88 @@ func TestEvaluateBoardBlocksInvalidNetClassAndNarrowTrack(t *testing.T) {
 	assertCheckStatus(t, report, CheckNetClassDefault, StatusBlocked)
 }
 
+func TestEvaluateBoardChecksAnnularRings(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000002"),
+		Name:     "2",
+		Type:     "thru_hole",
+		Position: point(1, 0),
+		Size:     point(1.0, 1.0),
+		Drill:    kicadfiles.MM(0.6),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask},
+	})
+	board.Vias = []pcbfiles.Via{{
+		UUID:     kicadfiles.UUID("41000000-0000-4000-8000-000000000001"),
+		Position: point(6, 5),
+		Size:     kicadfiles.MM(0.6),
+		Drill:    kicadfiles.MM(0.3),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckAnnularRingProfile, StatusPass)
+	assertCheckStatus(t, report, CheckAnnularRingPlatedPad, StatusPass)
+	assertCheckStatus(t, report, CheckAnnularRingVia, StatusPass)
+}
+
+func TestEvaluateBoardBlocksSmallAnnularRings(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000003"),
+		Name:     "2",
+		Type:     "thru_hole",
+		Position: point(1, 0),
+		Size:     point(0.8, 0.8),
+		Drill:    kicadfiles.MM(0.7),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask},
+	})
+	board.Vias = []pcbfiles.Via{{
+		UUID:     kicadfiles.UUID("41000000-0000-4000-8000-000000000002"),
+		Position: point(6, 5),
+		Size:     kicadfiles.MM(0.42),
+		Drill:    kicadfiles.MM(0.30),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckAnnularRingPlatedPad, StatusBlocked)
+	assertCheckStatus(t, report, CheckAnnularRingVia, StatusBlocked)
+	if report.Status != StatusBlocked {
+		t.Fatalf("status = %q want blocked", report.Status)
+	}
+}
+
+func TestEvaluateBoardSkipsNPTHForAnnularRing(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads = []pcbfiles.Pad{{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000004"),
+		Name:     "MH",
+		Type:     "np_thru_hole",
+		Position: point(0, 0),
+		Size:     point(1.0, 1.0),
+		Drill:    kicadfiles.MM(0.9),
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckAnnularRingPlatedPad, StatusSkipped)
+}
+
 func TestEvaluateBoardWarnsOnOpenLineOutlineAndBlocksOutsideObject(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Drawings = []pcbfiles.Drawing{
