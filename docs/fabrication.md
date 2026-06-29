@@ -79,10 +79,14 @@ files, and records generated file lists in `package-manifest.json`. Missing
 `ready`. Physical fabrication checks now run during `export preview`,
 `export fabrication` without `--execute`, and `export fabrication` execution.
 The generated
-`physical-rules.json` report covers stackup, net classes, solder mask/paste pad
-policy, Edge.Cuts containment, courtyard overlap/presence, silkscreen board
-clearance, and mounting-hole geometry/edge clearance. Physical-rule blockers are
-included in readiness status and package manifests. With `--require-drc`,
+`physical-rules.json` report covers stackup, net classes, solder-mask/paste pad
+policy, solder-mask web estimates, annular rings, copper feature widths,
+Edge.Cuts containment, courtyard overlap/presence, silkscreen board clearance,
+mounting-hole geometry/edge clearance, edge-plating/castellation policy,
+controlled-impedance and differential-pair evidence gaps, and fabrication
+metadata for board finish, panelization, and fabrication notes. Physical-rule
+blockers are included in readiness status and package manifests. With
+`--require-drc`,
 missing or failing external fabrication evidence is blocking. `design create`
 now runs a dry-run fabrication preview only when the input request JSON sets
 `validation.acceptance` to
@@ -104,6 +108,6 @@ procurement fields as fabrication release evidence.
 
 This is still not a manufacturer acceptance guarantee. KiCadAI validates the
 presence, identity consistency, and local profile compatibility of modeled
-fabrication outputs, but broader DFM checks such as manufacturer-specific
-annular ring policy, solder mask slivers, impedance, panelization, assembly notes,
-live part availability, and procurement readiness remain separate gates.
+fabrication outputs, but manufacturer-specific DFM interpretation, exact
+polygonal copper/mask sliver proof, field-solver impedance proof, live part
+availability, and procurement readiness remain separate gates.

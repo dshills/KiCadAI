@@ -42,6 +42,12 @@ evidence, graph-connected routes, partial routes, and unrouted nets. The next
 blocker is promoting richer generated boards to KiCad ERC/DRC-clean layout
 proof.
 
+Fabrication readiness now includes expanded deterministic physical-rule
+evidence for annular rings, copper feature widths, solder-mask web estimates,
+edge-plating/castellation policy, impedance/differential-pair evidence gaps,
+and basic fabrication metadata. These checks improve local DFM visibility, but
+they are still conservative evidence, not manufacturer acceptance.
+
 KiCadAI is not yet a general autonomous "make me any board" system. It works best with supported structured intent, verified circuit blocks, and catalog-backed components. Broader component coverage, topology synthesis, validation feedback, and production layout proof are still active roadmap areas.
 
 Amplifier-focused coverage now includes checked-in Class AB, Class A, and

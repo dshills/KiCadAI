@@ -648,13 +648,17 @@ rotation evidence, validate BOM/CPL consistency, enforce safe
 dry-run/execute/overwrite behavior, emit package manifests/readiness reports,
 generate and validate KiCad-CLI-backed Gerber/drill artifacts, emit
 `physical-rules.json`, run modeled physical fabrication checks for stackup, net
-classes, solder mask/paste pad policy, Edge.Cuts containment, courtyard
-presence/overlap, silkscreen board clearance, and mounting-hole
-geometry/edge clearance, expose optional or required KiCad CLI evidence policy,
-optionally apply the built-in `generic_assembly` manufacturer profile through
-`--manufacturer-profile`, and enrich BOM rows with local procurement snapshot
-fields when `--source-dir` is supplied. Snapshot evidence is explicitly local
-and does not claim live stock, price, or supplier acceptance.
+classes, solder-mask/paste pad policy, solder-mask web estimates, annular
+rings, copper feature widths, Edge.Cuts containment, courtyard
+presence/overlap, silkscreen board clearance, mounting-hole geometry/edge
+clearance, edge-plating/castellation policy, and controlled-impedance and
+differential-pair evidence gaps. It also includes fabrication metadata evidence
+for board finish, panelization, and fabrication notes, exposes optional or
+required KiCad CLI evidence policy, optionally applies the built-in `generic_assembly`
+manufacturer profile through `--manufacturer-profile`, and enriches BOM rows
+with local procurement snapshot fields when `--source-dir` is supplied.
+Snapshot evidence is explicitly local and does not claim live stock, price, or
+supplier acceptance.
 `design create` treats `validation.acceptance: fabrication-candidate` as a
 request to prove fabrication readiness; partial readiness status (`candidate`
 or `blocked`) downgrades achieved acceptance and leaves
@@ -664,9 +668,9 @@ report path where available.
 
 ### Remaining Work
 
-- Expand physical DFM coverage beyond currently modeled checks, especially
-  annular ring policy, copper slivers, solder mask slivers, castellations,
-  impedance constraints, panelization, board finish, and fabrication notes.
+- Expand physical DFM coverage beyond the current conservative checks,
+  especially exact polygonal copper/mask sliver proof, richer board-house
+  profiles, deeper edge-plating evidence, and solver-grade impedance proof.
 - Add richer manufacturer profile presets and profile import once specific
   fabricator rule sources are selected.
 - Add live or provider-backed procurement import once a trusted source and
