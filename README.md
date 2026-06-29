@@ -19,10 +19,15 @@ foundation includes deterministic role/stage/lane classification, conservative
 component placement rules, orthogonal schematic routing, label fallback for
 long/shared nets, geometry overlap diagnostics, and workflow summary metrics.
 The first generator improvements also spread the op-amp gain-stage block and
-prevent design API schematic connections from being emitted as diagonal wires.
-This is a foundation, not a full schematic editor: imported schematic mutation,
-automatic hierarchy/page splitting, exact KiCad text justification geometry,
-and broad example regeneration remain future work.
+prevent design API schematic connections from being emitted as diagonal-wire
+segments.
+Checked-in simple schematic examples now have standard readability regression
+gates, and the Class AB, Class A, and op-amp headphone-buffer examples have
+strict amplifier readability gates for left-to-right signal flow, feedback
+placement, rail/return placement, and orthogonal wiring. This is a foundation,
+not a full schematic editor. Future work still includes imported schematic
+mutation, automatic hierarchy/page splitting, exact KiCad text justification
+geometry, and broader example regeneration.
 
 Generated design PCB net assignment now propagates pad and copper net names
 through placement/project write, resolves KiCad 10 name-only net references

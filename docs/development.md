@@ -16,11 +16,45 @@ Checked-in examples live under `examples/`:
 | `06_class_ab_headphone_amp` | Op-amp gain stage with diode-biased class AB headphone output. |
 | `07_generated_pcb` | Generated schematic and PCB fixture. |
 | `08_pcb_object_correctness` | PCB object correctness fixture. |
+| `09_class_a_headphone_amp` | Class A headphone amplifier schematic fixture. |
+| `10_opamp_buffer_headphone_amp` | Op-amp headphone-buffer schematic fixture. |
 | `checks` | ERC/DRC fixture projects and report samples for KiCad-backed validation. |
 | `blocks` | Circuit block library request files and generated schematic/project examples. |
 | `transactions` | Transaction fixtures, including an invalid feedback example for AI repair loops. |
 
 Open each KiCad project by opening the `.kicad_pro` file in its directory.
+
+## Schematic Readability Gates
+
+`internal/schematiclayout` provides deterministic readability checks for
+generated and checked-in schematic examples.
+
+- Standard example gates cover `01_led_indicator` through `05_sensor_node`.
+  They require orthogonal wires, usable sheet placement, and no blocking
+  standard readability diagnostics. Current parser geometry has known
+  conservative symbol-body approximations, so tests keep the unavoidable
+  pin-entry overlap exceptions scoped to individual examples.
+- Strict amplifier gates cover `06_class_ab_headphone_amp`,
+  `09_class_a_headphone_amp`, and `10_opamp_buffer_headphone_amp`. They enforce
+  left-to-right signal flow, feedback above the active stage, positive rails
+  above the signal lane, return/load symbols lower on the page, and no diagonal
+  schematic wires.
+- Workflow readability summaries are emitted by `design create` planning paths
+  and include profile, pass/fail, component/routed-net counts, diagonal-wire
+  count, stage-order violations, power-placement violations, diagnostic counts,
+  decode errors, and generated role evidence.
+
+Useful focused commands:
+
+```sh
+go test ./internal/schematiclayout
+go test ./internal/designworkflow -run Readability
+```
+
+When a readability test fails, inspect the diagnostic code first. `diagonal_wire`
+and amplifier-specific codes are layout failures. `symbol_overlap` and
+`wire_symbol_overlap` can still be parser-geometry artifacts for imported
+fixtures until exact KiCad text and symbol extents are modeled.
 
 
 ## Go Packages

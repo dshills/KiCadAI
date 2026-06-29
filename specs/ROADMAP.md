@@ -86,7 +86,10 @@ from validation feedback to safe automatic repair.
   schematic wire routing, label fallback for long/shared nets, overlap and
   diagonal-wire diagnostics, design workflow readability evidence, wider
   op-amp gain-stage block coordinates, and design API orthogonal schematic
-  connection emission.
+  connection emission. Checked-in simple examples now have standard readability
+  gates, amplifier examples have strict signal-flow/rail/feedback/orthogonal
+  wiring gates, and generated LED/op-amp workflow paths have summary regression
+  coverage.
 - Closed-loop validation repair foundation with planning, executors, persisted
   generated-project apply, target-based CLI support, workflow integration, and
   repair goldens.
@@ -156,9 +159,10 @@ loop confidence:
   treated as production layout quality;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
-- schematic readability now has a foundation and workflow evidence, but still
-  needs broader example regeneration, exact KiCad text-justification geometry,
-  hierarchy/page splitting, and safe imported-schematic layout mutation;
+- schematic readability now has checked-in simple/amplifier example gates and
+  generated workflow evidence, but still needs broader example regeneration,
+  exact KiCad text-justification geometry, hierarchy/page splitting, and safe
+  imported-schematic layout mutation;
 - repair can persist generated-project changes, but imported-project mutation
   remains blocked by preservation safety;
 - fabrication export now provides conservative readiness gates with BOM/CPL
