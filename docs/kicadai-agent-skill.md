@@ -318,6 +318,10 @@ Success requires:
 
 - command result reports OK/success;
 - no blocking issues;
+- generated schematic connectivity evidence is present and clean for generated
+  projects that emit schematic files;
+- generated schematic power policy is `not_required`, intentionally `driven`,
+  or explicitly accepted as externally driven for a non-standalone module;
 - generated files exist;
 - validation artifacts exist when requested;
 - rationale or plan explains assumptions and gaps;

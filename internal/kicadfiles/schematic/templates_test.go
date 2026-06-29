@@ -9,7 +9,23 @@ import (
 )
 
 func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
-	tests := []string{"Device:R", "Device:C", "Device:D", "Device:LED", "power:GND", "power:VCC"}
+	tests := []string{
+		"Device:R",
+		"Device:C",
+		"Device:D",
+		"Device:LED",
+		"power:GND",
+		"power:VCC",
+		"power:+3.3V",
+		"power:+3V3",
+		"power:+5V",
+		"power:+12V",
+		"power:-12V",
+		"power:PWR_FLAG",
+		"power:VDD",
+		"power:VEE",
+		"power:VSS",
+	}
 	for _, libraryID := range tests {
 		t.Run(libraryID, func(t *testing.T) {
 			template, ok := EmbeddedSymbolTemplate(libraryID)
@@ -65,6 +81,14 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	powerPins, ok := EmbeddedSymbolPinOffsets("power:VCC")
 	if !ok || len(powerPins) != 1 || powerPins[0].Number != "1" || powerPins[0].Offset.X != kicadfiles.MM(5.08) {
 		t.Fatalf("unexpected power offsets: %#v ok=%v", powerPins, ok)
+	}
+	negativePowerPins, ok := EmbeddedSymbolPinOffsets("power:VSS")
+	if !ok || len(negativePowerPins) != 1 || negativePowerPins[0].Number != "1" || negativePowerPins[0].Offset.X != kicadfiles.MM(-5.08) {
+		t.Fatalf("unexpected negative power offsets: %#v ok=%v", negativePowerPins, ok)
+	}
+	powerFlagPins, ok := EmbeddedSymbolPinOffsets("power:PWR_FLAG")
+	if !ok || len(powerFlagPins) != 1 || powerFlagPins[0].Number != "1" || powerFlagPins[0].Offset.X != 0 {
+		t.Fatalf("unexpected PWR_FLAG offsets: %#v ok=%v", powerFlagPins, ok)
 	}
 	if _, ok := EmbeddedSymbolPinOffsets("Custom:Block"); ok {
 		t.Fatal("unexpected custom block template pins")

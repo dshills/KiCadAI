@@ -18,6 +18,9 @@ Generated schematic workflows now emit schematic readability evidence. The
 foundation includes deterministic role/stage/lane classification, conservative
 component placement rules, orthogonal schematic routing, label fallback for
 long/shared nets, geometry overlap diagnostics, and workflow summary metrics.
+Generated schematic connectivity checks also expose structured semantic
+evidence for pin anchors, wire/label/no-connect attachment, and power-driver
+policy before optional KiCad ERC runs.
 The first generator improvements also spread the op-amp gain-stage block and
 prevent design API schematic connections from being emitted as diagonal-wire
 segments.

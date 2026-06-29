@@ -74,6 +74,53 @@ Use promotion reports for fixture readiness and AI workflow gating. Use
 `validate board`, `writer check`, and KiCad ERC/DRC reports for the underlying
 technical evidence.
 
+### Generated Schematic Semantic Checks
+
+Generated schematics have an in-process semantic connectivity gate before any
+KiCad ERC command is required. The Go API is
+`schematic.InspectGeneratedConnectivity(schematic.SchematicFile)`, with
+`schematic.ValidateGeneratedConnectivity` retained as the blocking error path.
+The report is intended for generator tests, writer checks, and AI-facing
+feedback when a schematic is structurally wrong even if it still parses.
+
+The report includes:
+
+- `status`: `clean` or `blocked`;
+- symbol, wire, label, no-connect, and symbol-pin-anchor counts;
+- `power_symbol_count` and `power_flag_count`;
+- `power_policy`: `not_required`, `requires_driver`, or `driven`;
+- report-local model paths such as `wires[0].points[1]` or
+  `symbols[2].pin_anchors[0]`;
+- repair-oriented issue messages.
+
+`power_policy=requires_driver` means the schematic uses KiCad `power:*`
+symbols but does not express explicit driver intent. Add a real driving source
+or an intentional `power:PWR_FLAG` symbol before treating the schematic as
+ERC-ready. For non-standalone subcircuits, `requires_driver` can be acceptable
+when the external driver requirement is explicit in the surrounding design
+contract. `power_policy=driven` means a case-insensitive `power:PWR_FLAG`
+library reference or a schematic symbol value equal to `PWR_FLAG` after
+trimming whitespace was present; it is design intent evidence, not proof of
+KiCad electrical pin typing or proof that KiCad ERC has passed.
+
+The design API now embeds seed symbol bodies and derives default pin anchors
+for the supported seed set: `Device:R`, `Device:C`, `Device:D`, `Device:LED`,
+`power:GND`, `power:VCC`, `power:+3.3V`, `power:+3V3`, `power:+5V`,
+`power:+12V`, `power:-12V`, `power:PWR_FLAG`, `power:VDD`, `power:VEE`, and
+`power:VSS`. Common KiCad variants such as `Device:R_Small`, inductors,
+transistors, and IC symbols still require explicit pin anchors or
+resolver-backed metadata if callers expect generated-connectivity checks to
+prove connections. This conservative default avoids pretending an unsupported
+library symbol has known electrical anchors.
+
+Current KiCad-backed caveat: the optional block-corpus KiCad smoke tests still
+record expected failures for richer ERC/DRC proof. The generated LED schematic
+now has better local pin-anchor alignment, but current optional KiCad CLI smoke
+fixtures may still report symbol-body mismatch warnings plus remaining pin/wire
+ERC findings, and the test runner can observe a nonzero external-check failure
+code while preserving its report path. Treat the semantic report as a fast
+pre-ERC gate, not a replacement for promoted KiCad ERC/DRC evidence.
+
 ### Connectivity-First Board Validation
 
 `validate board` is the current board-readiness gate for generated PCBs. It

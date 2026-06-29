@@ -21,12 +21,27 @@ type embeddedTemplate struct {
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
-	"device:c":   {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:d":   {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:led": {bodyName: "LED", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:r":   {bodyName: "R", pinType: "passive", pins: twoPinTemplatePins()},
-	"power:gnd":  {bodyName: "GND", pinType: "power_in", pinX: -5.08, power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: 0}}}},
-	"power:vcc":  {bodyName: "VCC", pinType: "power_in", pinX: 5.08, power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: 0}}}},
+	"device:c":    {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:d":    {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:led":  {bodyName: "LED", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:r":    {bodyName: "R", pinType: "passive", pins: twoPinTemplatePins()},
+	"power:+3.3v": powerTemplate("+3.3V", 5.08),
+	"power:+3v3":  powerTemplate("+3V3", 5.08),
+	"power:+5v":   powerTemplate("+5V", 5.08),
+	"power:+12v":  powerTemplate("+12V", 5.08),
+	"power:-12v":  powerTemplate("-12V", -5.08),
+	"power:gnd":   powerTemplate("GND", -5.08),
+	"power:pwr_flag": {
+		bodyName: "PWR_FLAG",
+		pinType:  "power_out",
+		pinX:     0,
+		power:    true,
+		pins:     []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}},
+	},
+	"power:vcc": powerTemplate("VCC", 5.08),
+	"power:vdd": powerTemplate("VDD", 5.08),
+	"power:vee": powerTemplate("VEE", -5.08),
+	"power:vss": powerTemplate("VSS", -5.08),
 }
 
 // EmbeddedSymbolTemplate returns a KiCad-native embedded lib symbol body for
@@ -54,6 +69,19 @@ func twoPinTemplatePins() []TemplatePin {
 	return []TemplatePin{
 		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: 0}},
 		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: 0}},
+	}
+}
+
+func powerTemplate(bodyName string, pinX float64) embeddedTemplate {
+	return embeddedTemplate{
+		bodyName: bodyName,
+		pinType:  "power_in",
+		pinX:     pinX,
+		power:    true,
+		pins: []TemplatePin{{
+			Number: "1",
+			Offset: kicadfiles.Point{X: kicadfiles.MM(pinX), Y: 0},
+		}},
 	}
 }
 
