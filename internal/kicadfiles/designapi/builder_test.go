@@ -84,6 +84,33 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	assertPadNet(t, design.PCB.Footprints, "D1", "1", "LED_OUT")
 }
 
+func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(32)})
+
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+	if got := len(builder.design.Schematic.Wires); got != 3 {
+		t.Fatalf("wire count = %d, want 3 orthogonal segments", got)
+	}
+	for wireIndex, wire := range builder.design.Schematic.Wires {
+		if len(wire.Points) != 2 {
+			t.Fatalf("wire %d points = %#v, want 2-point KiCad segment", wireIndex, wire.Points)
+		}
+		if wire.Points[0].X != wire.Points[1].X && wire.Points[0].Y != wire.Points[1].Y {
+			t.Fatalf("wire %d is diagonal: %#v", wireIndex, wire.Points)
+		}
+	}
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG"); err != nil {
+		t.Fatalf("duplicate Connect returned error: %v", err)
+	}
+	if got := len(builder.design.Schematic.Wires); got != 3 {
+		t.Fatalf("duplicate connect added wire count = %d, want 3", got)
+	}
+}
+
 func TestBuilderDefaultPaperNamePreservesCustomSize(t *testing.T) {
 	builder, err := New(Options{
 		Name:     "custom_paper",

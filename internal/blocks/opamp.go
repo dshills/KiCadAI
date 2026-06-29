@@ -69,10 +69,10 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 		ref       string
 		at        transactions.Point
 	}{
-		{opamp, opampRef, transactions.Point{XMM: 15, YMM: 0}},
-		{rg, rgRef, transactions.Point{XMM: 0, YMM: 15}},
-		{rf, rfRef, transactions.Point{XMM: 15, YMM: -15}},
-		{decoupling, decouplingRef, transactions.Point{XMM: 30, YMM: -10}},
+		{opamp, opampRef, transactions.Point{XMM: 45, YMM: 25}},
+		{rg, rgRef, transactions.Point{XMM: 30, YMM: 48}},
+		{rf, rfRef, transactions.Point{XMM: 45, YMM: 7}},
+		{decoupling, decouplingRef, transactions.Point{XMM: 65, YMM: 8}},
 	} {
 		componentOps, componentIssues := ComponentOperations(item.component, item.ref, item.at)
 		issuesOut = append(issuesOut, componentIssues...)
@@ -106,7 +106,7 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 	if boolParam(params, "include_output_resistor", false) {
 		outRef := allocator.Next("R")
 		component := BlockComponent{Role: "output_resistor", RefPrefix: "R", Value: "100", SymbolID: "Device:R", FootprintID: feedbackFootprint, Pins: twoTerminalHorizontalPins()}
-		componentOps, componentIssues := ComponentOperations(component, outRef, transactions.Point{XMM: 35, YMM: 0})
+		componentOps, componentIssues := ComponentOperations(component, outRef, transactions.Point{XMM: 72, YMM: 25})
 		issuesOut = append(issuesOut, componentIssues...)
 		operations = append(operations, componentOps...)
 		seriesNet := InstanceNetName(request.InstanceID, "out_series")
@@ -142,9 +142,9 @@ func appendOpAmpBiasNetwork(instanceID string, allocator *ReferenceAllocator, fo
 		ref       string
 		at        transactions.Point
 	}{
-		{BlockComponent{Role: "bias_top", RefPrefix: "R", Value: "100k", SymbolID: "Device:R", FootprintID: footprint, Pins: twoTerminalHorizontalPins()}, biasTopRef, transactions.Point{XMM: -15, YMM: -10}},
-		{BlockComponent{Role: "bias_bottom", RefPrefix: "R", Value: "100k", SymbolID: "Device:R", FootprintID: footprint, Pins: twoTerminalHorizontalPins()}, biasBottomRef, transactions.Point{XMM: -15, YMM: 10}},
-		{BlockComponent{Role: "input_coupling", RefPrefix: "C", Value: "1uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()}, couplingRef, transactions.Point{XMM: -30, YMM: 0}},
+		{BlockComponent{Role: "bias_top", RefPrefix: "R", Value: "100k", SymbolID: "Device:R", FootprintID: footprint, Pins: twoTerminalHorizontalPins()}, biasTopRef, transactions.Point{XMM: 18, YMM: 16}},
+		{BlockComponent{Role: "bias_bottom", RefPrefix: "R", Value: "100k", SymbolID: "Device:R", FootprintID: footprint, Pins: twoTerminalHorizontalPins()}, biasBottomRef, transactions.Point{XMM: 18, YMM: 42}},
+		{BlockComponent{Role: "input_coupling", RefPrefix: "C", Value: "1uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()}, couplingRef, transactions.Point{XMM: 5, YMM: 25}},
 	} {
 		componentOps, componentIssues := ComponentOperations(item.component, item.ref, item.at)
 		*issues = append(*issues, componentIssues...)

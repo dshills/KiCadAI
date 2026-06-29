@@ -321,15 +321,21 @@ func (builder *Builder) AddNoConnect(endpoint Endpoint) error {
 }
 
 func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, start, end kicadfiles.Point) {
-	if builder == nil || hasSchematicWire(builder.design.Schematic.Wires, start, end) {
+	if builder == nil {
 		return
 	}
-	wireOffset := len(builder.design.Schematic.Wires)
-	builder.design.Schematic.Wires = append(builder.design.Schematic.Wires, schematic.NewWire(
-		builder.generator.New("root.schematic.wire", netName, fmt.Sprintf("%d", wireOffset), from.Reference, from.Pin, to.Reference, to.Pin),
-		start,
-		end,
-	))
+	points := orthogonalSchematicWirePoints(start, end)
+	for index := 0; index < len(points)-1; index++ {
+		if samePoint(points[index], points[index+1]) || hasSchematicWire(builder.design.Schematic.Wires, points[index], points[index+1]) {
+			continue
+		}
+		wireOffset := len(builder.design.Schematic.Wires)
+		builder.design.Schematic.Wires = append(builder.design.Schematic.Wires, schematic.NewWire(
+			builder.generator.New("root.schematic.wire", netName, fmt.Sprintf("%d", wireOffset), fmt.Sprintf("%d", index), from.Reference, from.Pin, to.Reference, to.Pin),
+			points[index],
+			points[index+1],
+		))
+	}
 }
 
 func hasNoConnect(noConnects []schematic.NoConnect, position kicadfiles.Point) bool {
@@ -343,14 +349,18 @@ func hasNoConnect(noConnects []schematic.NoConnect, position kicadfiles.Point) b
 
 func hasSchematicWire(wires []schematic.Wire, start, end kicadfiles.Point) bool {
 	for _, wire := range wires {
-		if len(wire.Points) != 2 {
+		if len(wire.Points) < 2 {
 			continue
 		}
-		if samePoint(wire.Points[0], start) && samePoint(wire.Points[1], end) {
-			return true
-		}
-		if samePoint(wire.Points[0], end) && samePoint(wire.Points[1], start) {
-			return true
+		for index := 0; index < len(wire.Points)-1; index++ {
+			wireStart := wire.Points[index]
+			wireEnd := wire.Points[index+1]
+			if samePoint(wireStart, start) && samePoint(wireEnd, end) {
+				return true
+			}
+			if samePoint(wireStart, end) && samePoint(wireEnd, start) {
+				return true
+			}
 		}
 	}
 	return false
@@ -360,6 +370,19 @@ func samePoint(first, second kicadfiles.Point) bool {
 	// KiCad file coordinates are normalized to integer internal units before
 	// they reach the design builder, so exact comparison is intentional here.
 	return first.X == second.X && first.Y == second.Y
+}
+
+func orthogonalSchematicWirePoints(start, end kicadfiles.Point) []kicadfiles.Point {
+	if start.X == end.X || start.Y == end.Y {
+		return []kicadfiles.Point{start, end}
+	}
+	midX := start.X + (end.X-start.X)/2
+	return []kicadfiles.Point{
+		start,
+		{X: midX, Y: start.Y},
+		{X: midX, Y: end.Y},
+		end,
+	}
 }
 
 func (builder *Builder) mergeNet(oldName, newName string) {

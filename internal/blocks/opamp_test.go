@@ -71,6 +71,40 @@ func TestOpAmpGainStageACCouplingAddsBiasNetwork(t *testing.T) {
 	}
 }
 
+func TestOpAmpGainStageSchematicLayoutIsReadable(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "opamp_gain_stage",
+		InstanceID: "amp",
+		Params: map[string]any{
+			"input_coupling":          "ac",
+			"include_output_resistor": true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	positions := addSymbolPositionsByRole(t, output.Operations)
+	wantRoles := []string{"input_coupling", "bias_top", "bias_bottom", "feedback", "opamp", "gain_to_ground", "decoupling_capacitor", "output_resistor"}
+	for _, role := range wantRoles {
+		if _, ok := positions[role]; !ok {
+			t.Fatalf("missing role %s in positions %#v", role, positions)
+		}
+	}
+	if !(positions["input_coupling"].XMM < positions["opamp"].XMM && positions["opamp"].XMM < positions["output_resistor"].XMM) {
+		t.Fatalf("expected left-to-right signal flow, positions=%#v", positions)
+	}
+	if !(positions["feedback"].YMM < positions["opamp"].YMM && positions["decoupling_capacitor"].YMM < positions["opamp"].YMM) {
+		t.Fatalf("expected feedback and decoupling above op-amp, positions=%#v", positions)
+	}
+	if !(positions["gain_to_ground"].YMM > positions["opamp"].YMM && positions["bias_bottom"].YMM > positions["bias_top"].YMM) {
+		t.Fatalf("expected ground/reference elements lower on page, positions=%#v", positions)
+	}
+	if spread := positions["output_resistor"].XMM - positions["input_coupling"].XMM; spread < 60 {
+		t.Fatalf("schematic spread = %g mm, want at least 60 mm", spread)
+	}
+}
+
 func TestOpAmpGainStageDualSupplyWarnsAndBlocksACBias(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	_, issues := registry.Instantiate(context.Background(), BlockRequest{
@@ -115,6 +149,22 @@ func TestOpAmpGainStageOptionalOutputResistor(t *testing.T) {
 
 func feedbackRatioClose(gain float64, rfOhms float64, rgOhms float64) bool {
 	return math.Abs(gain-(1+rfOhms/rgOhms)) < 1e-9
+}
+
+func addSymbolPositionsByRole(t *testing.T, operations []transactions.Operation) map[string]transactions.Point {
+	t.Helper()
+	positions := map[string]transactions.Point{}
+	for index, operation := range operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			t.Fatalf("decode add_symbol operation %d: %v", index, err)
+		}
+		positions[payload.Role] = payload.At
+	}
+	return positions
 }
 
 func TestOpAmpGainStageProjectTransactionApplies(t *testing.T) {
