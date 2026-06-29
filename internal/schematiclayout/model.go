@@ -379,6 +379,9 @@ func normalizeRules(rules Rules) Rules {
 	if rules.MaxDiagnostics < 0 {
 		rules.MaxDiagnostics = defaults.MaxDiagnostics
 	}
+	if rules.Profile != ProfileOff {
+		rules.LabelFallbackEnabled = true
+	}
 	return rules
 }
 
