@@ -247,6 +247,84 @@ func TestEvaluateBoardIgnoresNonCopperZoneForCopperSlivers(t *testing.T) {
 	assertCheckStatus(t, report, CheckCopperSliverZoneMinWidth, StatusSkipped)
 }
 
+func TestEvaluateBoardChecksSolderMaskWeb(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000005"),
+		Name:     "2",
+		Type:     "smd",
+		Position: point(2, 0),
+		Size:     point(1, 1),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskWebWidth, StatusPass)
+}
+
+func TestEvaluateBoardBlocksNarrowSolderMaskWeb(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000006"),
+		Name:     "2",
+		Type:     "smd",
+		Position: point(1.04, 0),
+		Size:     point(1, 1),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskWebWidth, StatusBlocked)
+}
+
+func TestEvaluateBoardDoesNotCompareOppositeSideMaskWeb(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerBMask, kicadfiles.LayerBPaste}
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000007"),
+		Name:     "2",
+		Type:     "smd",
+		Position: point(0.5, 0),
+		Size:     point(1, 1),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskWebWidth, StatusPass)
+}
+
+func TestEvaluateBoardWarnsOnRotatedPadMaskWebGeometry(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads[0].Rotation = 45
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000008"),
+		Name:     "2",
+		Type:     "smd",
+		Position: point(0.9, 0),
+		Size:     point(1, 1),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskUnsupported, StatusWarning)
+}
+
 func TestEvaluateBoardWarnsOnOpenLineOutlineAndBlocksOutsideObject(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Drawings = []pcbfiles.Drawing{

@@ -32,7 +32,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateNetClasses(board, project)...)
 	checks = append(checks, evaluateAnnularRings(board, opts)...)
 	checks = append(checks, evaluateCopperSlivers(board, opts)...)
-	checks = append(checks, evaluateMaskPaste(board)...)
+	checks = append(checks, evaluateMaskPaste(board, opts)...)
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
@@ -41,7 +41,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	return NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
 }
 
-func evaluateMaskPaste(board *pcbfiles.PCBFile) []Check {
+func evaluateMaskPaste(board *pcbfiles.PCBFile, opts Options) []Check {
 	var maskObjects []string
 	var maskRefs = map[string]struct{}{}
 	var pasteObjects []string
@@ -133,7 +133,113 @@ func evaluateMaskPaste(board *pcbfiles.PCBFile) []Check {
 			Source: SourceParser,
 		})
 	}
+	checks = append(checks, evaluateSolderMaskWeb(board, opts))
 	return checks
+}
+
+func evaluateSolderMaskWeb(board *pcbfiles.PCBFile, opts Options) Check {
+	pads := maskWebPads(board)
+	if len(pads) < 2 {
+		return Check{ID: CheckSolderMaskWebWidth, Category: CategorySolderMask, Status: StatusSkipped, Message: "not enough same-side exposed pads were found for solder mask web checks", Source: SourceParser}
+	}
+	expansion := board.Setup.PadToMaskClearance
+	if expansion < 0 {
+		expansion = 0
+	}
+	threshold := opts.MinSolderMaskWebMM
+	expansionMM := iuToMM(expansion) * 2
+	searchRadius := kicadfiles.MM(threshold + expansionMM)
+	slices.SortFunc(pads, func(a, b maskWebPad) int {
+		if a.Side != b.Side {
+			return strings.Compare(string(a.Side), string(b.Side))
+		}
+		if a.Bounds.MinX < b.Bounds.MinX {
+			return -1
+		}
+		if a.Bounds.MinX > b.Bounds.MinX {
+			return 1
+		}
+		return strings.Compare(a.UUID, b.UUID)
+	})
+	violations := 0
+	unknown := 0
+	compared := 0
+	var objects []string
+	refs := map[string]struct{}{}
+	minObserved := math.MaxFloat64
+	for i := 0; i < len(pads); i++ {
+		for j := i + 1; j < len(pads); j++ {
+			a := pads[i]
+			b := pads[j]
+			if a.Side != b.Side {
+				break
+			}
+			if a.Bounds.Valid && b.Bounds.Valid && b.Bounds.MinX-a.Bounds.MaxX > searchRadius {
+				break
+			}
+			if !a.Bounds.Valid || !b.Bounds.Valid || a.Rotated || b.Rotated {
+				unknown++
+				addRef(refs, a.Reference)
+				addRef(refs, b.Reference)
+				objects = appendLimited(objects, a.UUID)
+				objects = appendLimited(objects, b.UUID)
+				continue
+			}
+			compared++
+			spacing := rectSpacingMM(a.Bounds, b.Bounds)
+			web := spacing - expansionMM
+			if web < minObserved {
+				minObserved = web
+			}
+			if web < threshold {
+				violations++
+				addRef(refs, a.Reference)
+				addRef(refs, b.Reference)
+				objects = appendLimited(objects, a.UUID)
+				objects = appendLimited(objects, b.UUID)
+			}
+		}
+	}
+	measurements := []Measurement{
+		{Name: "candidate_pad_count", Value: float64(len(pads)), Unit: "count"},
+		{Name: "compared_pair_count", Value: float64(compared), Unit: "count"},
+		{Name: "min_required_solder_mask_web", Value: threshold, Unit: "mm"},
+		{Name: "pad_to_mask_clearance", Value: iuToMM(expansion), Unit: "mm"},
+	}
+	if minObserved != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_solder_mask_web", Value: minObserved, Unit: "mm"})
+	}
+	if violations > 0 {
+		measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+		return Check{
+			ID:           CheckSolderMaskWebWidth,
+			Category:     CategorySolderMask,
+			Status:       StatusBlocked,
+			Message:      "one or more same-side exposed pads leave less solder mask web than the active profile threshold",
+			Suggestion:   "increase pad spacing, reduce mask expansion where appropriate, or select a manufacturer profile that supports the modeled mask web",
+			IssuePath:    "physical.solder_mask.web_width",
+			References:   sortedMapKeys(refs),
+			Objects:      objects,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		}
+	}
+	if unknown > 0 {
+		measurements = append(measurements, Measurement{Name: "unknown_geometry_count", Value: float64(unknown), Unit: "count"})
+		return Check{
+			ID:           CheckSolderMaskUnsupported,
+			Category:     CategorySolderMask,
+			Status:       StatusWarning,
+			Message:      "one or more exposed pads lack enough geometry for deterministic solder mask web checks",
+			Suggestion:   "hydrate pad geometry or use KiCad/manufacturer DFM evidence before treating mask web checks as complete",
+			IssuePath:    "physical.solder_mask.unsupported_geometry",
+			References:   sortedMapKeys(refs),
+			Objects:      objects,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		}
+	}
+	return Check{ID: CheckSolderMaskWebWidth, Category: CategorySolderMask, Status: StatusPass, Message: "same-side exposed pad spacing leaves enough estimated solder mask web", Measurements: measurements, Source: SourceHeuristic}
 }
 
 func evaluateAnnularRings(board *pcbfiles.PCBFile, opts Options) []Check {
@@ -679,6 +785,14 @@ type padLayerSummary struct {
 	BPaste  bool
 }
 
+type maskWebPad struct {
+	Reference string
+	UUID      string
+	Side      kicadfiles.BoardLayer
+	Bounds    rectBounds
+	Rotated   bool
+}
+
 func summarizePadLayers(pad pcbfiles.Pad) padLayerSummary {
 	var summary padLayerSummary
 	for _, layer := range pad.Layers {
@@ -728,6 +842,85 @@ func (summary padLayerSummary) hasRequiredMask() bool {
 
 func padRequiresPaste(pad pcbfiles.Pad) bool {
 	return strings.EqualFold(pad.Type, "smd")
+}
+
+func maskWebPads(board *pcbfiles.PCBFile) []maskWebPad {
+	var pads []maskWebPad
+	for _, footprint := range board.Footprints {
+		transform := footprintTransform(footprint)
+		for _, pad := range footprint.Pads {
+			layers := summarizePadLayers(pad)
+			bounds := transformedPadBounds(footprint, transform, pad)
+			rotated := nonOrthogonalPadRotation(footprint, pad)
+			if layers.FCu && layers.FMask {
+				pads = append(pads, maskWebPad{Reference: footprint.Reference, UUID: string(pad.UUID), Side: kicadfiles.LayerFCu, Bounds: bounds, Rotated: rotated})
+			}
+			if layers.BCu && layers.BMask {
+				pads = append(pads, maskWebPad{Reference: footprint.Reference, UUID: string(pad.UUID), Side: kicadfiles.LayerBCu, Bounds: bounds, Rotated: rotated})
+			}
+		}
+	}
+	return pads
+}
+
+func nonOrthogonalPadRotation(footprint pcbfiles.Footprint, pad pcbfiles.Pad) bool {
+	rotation := int(math.Round(float64(footprint.Rotation + pad.Rotation)))
+	rotation %= 90
+	if rotation < 0 {
+		rotation += 90
+	}
+	return rotation != 0
+}
+
+func transformedPadBounds(footprint pcbfiles.Footprint, transform transform2D, pad pcbfiles.Pad) rectBounds {
+	var bounds rectBounds
+	if pad.Size.X <= 0 || pad.Size.Y <= 0 {
+		return bounds
+	}
+	halfX := float64(pad.Size.X) / 2
+	halfY := float64(pad.Size.Y) / 2
+	padRadians := float64(pad.Rotation) * math.Pi / 180
+	padCosine := math.Cos(padRadians)
+	padSine := math.Sin(padRadians)
+	for _, corner := range []struct{ x, y float64 }{
+		{-halfX, -halfY},
+		{-halfX, halfY},
+		{halfX, -halfY},
+		{halfX, halfY},
+	} {
+		rotatedX := corner.x*padCosine - corner.y*padSine
+		rotatedY := corner.x*padSine + corner.y*padCosine
+		local := kicadfiles.Point{
+			X: pad.Position.X + kicadfiles.IU(math.Round(rotatedX)),
+			Y: pad.Position.Y + kicadfiles.IU(math.Round(rotatedY)),
+		}
+		bounds = includeRectPoint(bounds, transformFootprintPointWith(footprint, transform, local))
+	}
+	return bounds
+}
+
+func rectSpacingMM(a, b rectBounds) float64 {
+	dx := kicadfiles.IU(0)
+	switch {
+	case a.MaxX < b.MinX:
+		dx = b.MinX - a.MaxX
+	case b.MaxX < a.MinX:
+		dx = a.MinX - b.MaxX
+	}
+	dy := kicadfiles.IU(0)
+	switch {
+	case a.MaxY < b.MinY:
+		dy = b.MinY - a.MaxY
+	case b.MaxY < a.MinY:
+		dy = a.MinY - b.MaxY
+	}
+	if dx == 0 {
+		return iuToMM(dy)
+	}
+	if dy == 0 {
+		return iuToMM(dx)
+	}
+	return math.Hypot(iuToMM(dx), iuToMM(dy))
 }
 
 func isPlatedThroughHolePad(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
