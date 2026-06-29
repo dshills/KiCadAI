@@ -35,6 +35,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateMaskPaste(board, opts)...)
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
+	checks = append(checks, evaluateEdgePlating(board, outline.Bounds, opts)...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
 	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds)...)
 	checks = append(checks, evaluateMountingHoles(board, outline.Bounds, opts)...)
@@ -923,6 +924,51 @@ func rectSpacingMM(a, b rectBounds) float64 {
 	return math.Hypot(iuToMM(dx), iuToMM(dy))
 }
 
+func rectDistanceToBoardEdgeMM(bounds boardBounds, rect rectBounds) float64 {
+	if !bounds.Valid || !rect.Valid {
+		return math.MaxFloat64
+	}
+	if rect.MaxX < bounds.MinX || rect.MinX > bounds.MaxX || rect.MaxY < bounds.MinY || rect.MinY > bounds.MaxY {
+		return math.MaxFloat64
+	}
+	distances := []kicadfiles.IU{
+		rect.MinX - bounds.MinX,
+		bounds.MaxX - rect.MaxX,
+		rect.MinY - bounds.MinY,
+		bounds.MaxY - rect.MaxY,
+	}
+	minDistance := distances[0]
+	for _, distance := range distances[1:] {
+		if absIU(distance) < absIU(minDistance) {
+			minDistance = distance
+		}
+	}
+	return math.Abs(iuToMM(minDistance))
+}
+
+func footprintSuggestsEdgePlating(footprint pcbfiles.Footprint) bool {
+	text := strings.ToLower(strings.Join([]string{
+		footprint.LibraryID,
+		footprint.Value,
+		footprint.Description,
+		footprint.Tags,
+	}, " "))
+	return strings.Contains(text, "castell") ||
+		strings.Contains(text, "edge_plat") ||
+		strings.Contains(text, "edge plat")
+}
+
+func isPotentialEdgePlatedPad(pad pcbfiles.Pad, footprintSuggestsEdgePlating bool) bool {
+	if !footprintSuggestsEdgePlating && !strings.EqualFold(pad.Type, "thru_hole") {
+		return false
+	}
+	if strings.EqualFold(pad.Type, "np_thru_hole") {
+		return false
+	}
+	layers := summarizePadLayers(pad)
+	return layers.FCu || layers.BCu || layers.AllCu
+}
+
 func isPlatedThroughHolePad(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
 	if strings.EqualFold(pad.Type, "np_thru_hole") || isMountingHole(pad, footprintSuggestsHole) {
 		return false
@@ -1301,6 +1347,119 @@ func evaluateEdgeCuts(board *pcbfiles.PCBFile) edgeCutResult {
 		}
 	}
 	return edgeCutResult{Checks: []Check{check}, Bounds: bounds}
+}
+
+func evaluateEdgePlating(board *pcbfiles.PCBFile, bounds boardBounds, opts Options) []Check {
+	features := edgePlatingFeatures(board, bounds)
+	if len(features.Objects) == 0 {
+		return []Check{
+			{ID: CheckEdgePlatingCastellation, Category: CategoryEdgePlating, Status: StatusSkipped, Message: "no likely castellated or edge-plated features were detected", Source: SourceHeuristic},
+			{ID: CheckEdgePlatingProfile, Category: CategoryEdgePlating, Status: StatusSkipped, Message: "edge-plating profile support not required because no edge-plated features were detected", Source: SourceProfile},
+			{ID: CheckEdgePlatingContact, Category: CategoryEdgePlating, Status: StatusSkipped, Message: "edge-contact evidence not required because no edge-plated features were detected", Source: SourceHeuristic},
+		}
+	}
+	status := StatusWarning
+	severity := reports.SeverityWarning
+	message := "likely castellated or edge-plated features require manufacturer profile confirmation"
+	suggestion := "confirm that the selected manufacturer profile allows castellations or edge plating before fabrication export"
+	switch opts.EdgePlatingPolicy {
+	case PolicyAllow:
+		status = StatusPass
+		severity = ""
+		message = "likely castellated or edge-plated features are allowed by the active profile"
+		suggestion = ""
+	case PolicyBlock:
+		status = StatusBlocked
+		severity = reports.SeverityError
+		message = "likely castellated or edge-plated features are not allowed by the active profile"
+		suggestion = "remove edge-plated features or select a profile that explicitly allows castellations"
+	}
+	measurements := []Measurement{{Name: "feature_count", Value: float64(len(features.Objects)), Unit: "count"}}
+	if features.MinEdgeDistanceMM != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_edge_distance", Value: features.MinEdgeDistanceMM, Unit: "mm"})
+	}
+	checks := []Check{
+		{
+			ID:           CheckEdgePlatingCastellation,
+			Category:     CategoryEdgePlating,
+			Status:       StatusWarning,
+			Message:      "likely castellated or edge-plated features were detected",
+			Suggestion:   "review edge-plating requirements and fabrication notes before release",
+			IssuePath:    "physical.edge_plating.castellation_detected",
+			References:   sortedMapKeys(features.Refs),
+			Objects:      features.Objects,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		},
+		{
+			ID:           CheckEdgePlatingProfile,
+			Category:     CategoryEdgePlating,
+			Status:       status,
+			Severity:     severity,
+			Message:      message,
+			Suggestion:   suggestion,
+			IssuePath:    "physical.edge_plating.profile_support",
+			References:   sortedMapKeys(features.Refs),
+			Objects:      features.Objects,
+			Measurements: measurements,
+			Source:       SourceProfile,
+		},
+		{
+			ID:           CheckEdgePlatingContact,
+			Category:     CategoryEdgePlating,
+			Status:       StatusWarning,
+			Message:      "edge contact was inferred from conservative board-bound proximity",
+			Suggestion:   "use KiCad/manufacturer DFM evidence for exact plated-edge geometry",
+			IssuePath:    "physical.edge_plating.edge_contact",
+			References:   sortedMapKeys(features.Refs),
+			Objects:      features.Objects,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		},
+	}
+	if opts.EdgePlatingPolicy == PolicyAllow {
+		checks[0].Status = StatusPass
+		checks[2].Status = StatusPass
+		checks[2].Message = "edge contact evidence is accepted by the active profile"
+		checks[2].Suggestion = ""
+	}
+	return checks
+}
+
+type edgePlatingFeatureSet struct {
+	Objects           []string
+	Refs              map[string]struct{}
+	MinEdgeDistanceMM float64
+}
+
+func edgePlatingFeatures(board *pcbfiles.PCBFile, bounds boardBounds) edgePlatingFeatureSet {
+	features := edgePlatingFeatureSet{Refs: map[string]struct{}{}, MinEdgeDistanceMM: math.MaxFloat64}
+	if !bounds.Valid {
+		return features
+	}
+	const edgeContactToleranceMM = 0.25
+	for _, footprint := range board.Footprints {
+		nameSuggestsEdgePlating := footprintSuggestsEdgePlating(footprint)
+		transform := footprintTransform(footprint)
+		for _, pad := range footprint.Pads {
+			if !isPotentialEdgePlatedPad(pad, nameSuggestsEdgePlating) {
+				continue
+			}
+			padBounds := transformedPadBounds(footprint, transform, pad)
+			if !padBounds.Valid {
+				continue
+			}
+			distanceMM := rectDistanceToBoardEdgeMM(bounds, padBounds)
+			if nameSuggestsEdgePlating || distanceMM <= edgeContactToleranceMM {
+				features.Objects = appendLimited(features.Objects, string(pad.UUID))
+				addRef(features.Refs, footprint.Reference)
+				if distanceMM < features.MinEdgeDistanceMM {
+					features.MinEdgeDistanceMM = distanceMM
+				}
+			}
+		}
+	}
+	return features
 }
 
 func evaluateBoardContainment(board *pcbfiles.PCBFile, bounds boardBounds) []Check {

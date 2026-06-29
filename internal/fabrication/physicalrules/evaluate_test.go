@@ -325,6 +325,54 @@ func TestEvaluateBoardWarnsOnRotatedPadMaskWebGeometry(t *testing.T) {
 	assertCheckStatus(t, report, CheckSolderMaskUnsupported, StatusWarning)
 }
 
+func TestEvaluateBoardWarnsOnLikelyEdgePlatingByDefault(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].LibraryID = "Connector:Castellated_Module"
+	board.Footprints[0].Position = point(0.25, 5)
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Size = point(1, 1)
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.5)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckEdgePlatingCastellation, StatusWarning)
+	assertCheckStatus(t, report, CheckEdgePlatingProfile, StatusWarning)
+	assertCheckStatus(t, report, CheckEdgePlatingContact, StatusWarning)
+}
+
+func TestEvaluateBoardAllowsOrBlocksEdgePlatingByPolicy(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].LibraryID = "Connector:Castellated_Module"
+	board.Footprints[0].Position = point(0.25, 5)
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Size = point(1, 1)
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.5)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{EdgePlatingPolicy: PolicyAllow})
+	assertCheckStatus(t, report, CheckEdgePlatingProfile, StatusPass)
+
+	report = EvaluateBoard(&board, &project, Options{EdgePlatingPolicy: PolicyBlock})
+	assertCheckStatus(t, report, CheckEdgePlatingProfile, StatusBlocked)
+}
+
+func TestEvaluateBoardDoesNotTreatFarOutsidePadAsEdgePlating(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Position = point(100, 100)
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Size = point(1, 1)
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.5)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckEdgePlatingCastellation, StatusSkipped)
+}
+
 func TestEvaluateBoardWarnsOnOpenLineOutlineAndBlocksOutsideObject(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Drawings = []pcbfiles.Drawing{
