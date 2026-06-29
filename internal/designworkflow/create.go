@@ -382,6 +382,7 @@ func schematicStageFromPlan(plan BlockPlanResult) StageResult {
 		"symbol_count":     countPlanOperations(plan.Output.Operations, transactions.OpAddSymbol),
 		"connection_count": countPlanOperations(plan.Output.Operations, transactions.OpConnect),
 	}
+	stage.Summary["readability"] = schematicReadabilitySummary(plan.Output.Operations)
 	return stage
 }
 
