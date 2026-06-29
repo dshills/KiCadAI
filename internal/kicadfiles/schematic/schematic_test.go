@@ -958,6 +958,10 @@ func TestValidateGeneratedConnectivityAcceptsKnownAnchors(t *testing.T) {
 	if err := ValidateGeneratedConnectivity(schematic); err != nil {
 		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)
 	}
+	report := InspectGeneratedConnectivity(schematic)
+	if report.Status != GeneratedConnectivityClean || report.IssueCount != 0 || report.SymbolPinAnchorCount != 0 || report.WireCount != 1 {
+		t.Fatalf("report = %#v, want clean connectivity evidence", report)
+	}
 }
 
 func TestValidateGeneratedConnectivityAcceptsSymbolPinAnchors(t *testing.T) {
@@ -986,6 +990,10 @@ func TestValidateGeneratedConnectivityAcceptsSymbolPinAnchors(t *testing.T) {
 	if err := ValidateGeneratedConnectivity(schematic); err != nil {
 		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)
 	}
+	report := InspectGeneratedConnectivity(schematic)
+	if report.Status != GeneratedConnectivityClean || report.IssueCount != 0 || report.SymbolPinAnchorCount != 1 || report.WireCount != 1 {
+		t.Fatalf("report = %#v, want clean symbol pin anchor evidence", report)
+	}
 }
 
 func TestValidateGeneratedConnectivityRejectsOpenEndpointAndNearMiss(t *testing.T) {
@@ -1012,6 +1020,13 @@ func TestValidateGeneratedConnectivityRejectsOpenEndpointAndNearMiss(t *testing.
 		if !strings.Contains(err.Error(), want) {
 			t.Fatalf("error missing %s: %v", want, err)
 		}
+	}
+	report := InspectGeneratedConnectivity(schematic)
+	if report.Status != GeneratedConnectivityBlocked || report.IssueCount != 3 {
+		t.Fatalf("report = %#v, want three blocked issues", report)
+	}
+	if report.Issues[0].Path == "" || report.Issues[0].Message == "" {
+		t.Fatalf("report issue missing path/message: %#v", report.Issues)
 	}
 }
 

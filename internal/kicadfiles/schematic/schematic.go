@@ -260,6 +260,40 @@ type RawSchematicItem struct {
 	Body sexpr.Raw
 }
 
+// GeneratedConnectivityStatus summarizes whether generated schematic
+// connectivity evidence is clean enough to proceed toward ERC.
+type GeneratedConnectivityStatus string
+
+const (
+	// GeneratedConnectivityClean means all generated wires, labels, junctions,
+	// no-connects, sheet pins, and symbol pin anchors have known connections.
+	GeneratedConnectivityClean GeneratedConnectivityStatus = "clean"
+	// GeneratedConnectivityBlocked means generated connectivity has structural
+	// issues that should be repaired before relying on KiCad ERC.
+	GeneratedConnectivityBlocked GeneratedConnectivityStatus = "blocked"
+)
+
+// GeneratedConnectivityIssue is a structured schematic semantic issue with a
+// stable model path and repair-oriented message.
+type GeneratedConnectivityIssue struct {
+	Path    string `json:"path"`
+	Message string `json:"message"`
+}
+
+// GeneratedConnectivityReport records schematic semantic evidence before KiCad
+// ERC runs, allowing generated designs to fail on structural connectivity
+// issues without requiring a KiCad CLI invocation.
+type GeneratedConnectivityReport struct {
+	Status               GeneratedConnectivityStatus  `json:"status"`
+	SymbolCount          int                          `json:"symbol_count"`
+	WireCount            int                          `json:"wire_count"`
+	LabelCount           int                          `json:"label_count"`
+	NoConnectCount       int                          `json:"no_connect_count"`
+	SymbolPinAnchorCount int                          `json:"symbol_pin_anchor_count"`
+	IssueCount           int                          `json:"issue_count"`
+	Issues               []GeneratedConnectivityIssue `json:"issues,omitempty"`
+}
+
 type RawSchematicItemKind string
 
 const (
@@ -417,8 +451,34 @@ func Validate(schematic SchematicFile) error {
 }
 
 func ValidateGeneratedConnectivity(schematic SchematicFile) error {
+	return validateGeneratedConnectivityErrors(schematic).Err()
+}
+
+func InspectGeneratedConnectivity(schematic SchematicFile) GeneratedConnectivityReport {
+	report := GeneratedConnectivityReport{
+		Status:               GeneratedConnectivityClean,
+		SymbolCount:          len(schematic.Symbols),
+		WireCount:            len(schematic.Wires),
+		LabelCount:           len(schematic.Labels),
+		NoConnectCount:       len(schematic.NoConnects),
+		SymbolPinAnchorCount: countSymbolPinAnchors(schematic),
+	}
+	for _, err := range validateGeneratedConnectivityErrors(schematic) {
+		report.Issues = append(report.Issues, GeneratedConnectivityIssue{Path: strings.Trim(strings.TrimPrefix(err.Section+"."+err.Field, "."), "."), Message: err.Message})
+	}
+	report.IssueCount = len(report.Issues)
+	if report.IssueCount > 0 {
+		report.Status = GeneratedConnectivityBlocked
+	}
+	return report
+}
+
+func validateGeneratedConnectivityErrors(schematic SchematicFile) kicadfiles.ValidationErrors {
 	if err := Validate(schematic); err != nil {
-		return err
+		if errs, ok := err.(kicadfiles.ValidationErrors); ok {
+			return errs
+		}
+		return kicadfiles.ValidationErrors{fieldError("", err.Error())}
 	}
 	anchors := schematicConnectivityAnchors(schematic)
 	anchorIndex := newAnchorIndex(anchors)
@@ -469,7 +529,15 @@ func ValidateGeneratedConnectivity(schematic SchematicFile) error {
 			}
 		}
 	}
-	return errs.Err()
+	return errs
+}
+
+func countSymbolPinAnchors(schematic SchematicFile) int {
+	count := 0
+	for _, symbol := range schematic.Symbols {
+		count += len(symbol.PinAnchors)
+	}
+	return count
 }
 
 func schematicSymbolPinAnchorSet(schematic SchematicFile) map[kicadfiles.Point]struct{} {
