@@ -83,4 +83,67 @@ func TestSchematicStageIncludesReadabilitySummary(t *testing.T) {
 	if readability["profile"] == "" || readability["diagonal_wire_count"] == nil {
 		t.Fatalf("readability summary = %#v", readability)
 	}
+	if got := summaryInt(t, readability, "diagonal_wire_count"); got != 0 {
+		t.Fatalf("diagonal_wire_count = %d, want 0; summary=%#v", got, readability)
+	}
+	if got := summaryInt(t, readability, "decode_error_count"); got != 0 {
+		t.Fatalf("decode_error_count = %d, want 0; summary=%#v", got, readability)
+	}
+}
+
+func TestSchematicStageOpAmpReadabilitySummaryIsClean(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "readable_opamp",
+		Board:   BoardSpec{WidthMM: 60, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "amp",
+			BlockID: "opamp_gain_stage",
+			Params: map[string]any{
+				"input_coupling":          "ac",
+				"include_output_resistor": true,
+			},
+		}},
+	}
+	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+	}
+	stage := schematicStageFromPlan(plan)
+	readability, ok := stage.Summary["readability"].(map[string]any)
+	if !ok {
+		t.Fatalf("readability summary missing: %#v", stage.Summary)
+	}
+	if got := summaryInt(t, readability, "diagonal_wire_count"); got != 0 {
+		t.Fatalf("diagonal_wire_count = %d, want 0; summary=%#v", got, readability)
+	}
+	if got := summaryInt(t, readability, "stage_order_violation_count"); got != 0 {
+		t.Fatalf("stage_order_violation_count = %d, want 0; summary=%#v", got, readability)
+	}
+	if got := summaryInt(t, readability, "power_placement_violation_count"); got != 0 {
+		t.Fatalf("power_placement_violation_count = %d, want 0; summary=%#v", got, readability)
+	}
+	roles, ok := readability["roles"].(map[string]string)
+	if !ok || len(roles) == 0 {
+		t.Fatalf("roles missing from readability summary: %#v", readability)
+	}
+}
+
+func summaryInt(t *testing.T, summary map[string]any, key string) int {
+	t.Helper()
+	value, ok := summary[key]
+	if !ok {
+		t.Fatalf("summary[%s] missing from %#v", key, summary)
+	}
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	default:
+		t.Fatalf("summary[%s] = %#v, want numeric", key, value)
+	}
+	return 0
 }
