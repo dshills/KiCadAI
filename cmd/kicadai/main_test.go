@@ -15,6 +15,7 @@ import (
 	"testing"
 
 	"kicadai/internal/config"
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
@@ -867,6 +868,39 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	}
 }
 
+func TestRunDesignCreateWritesPromotionReport(t *testing.T) {
+	requestPath := filepath.Join("..", "..", "internal", "designworkflow", "testdata", "retry", "disabled", "request.json")
+	output := filepath.Join(t.TempDir(), "promotion")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	if err := run([]string{"--json", "--request", requestPath, "--output", output, "--overwrite", "design", "create"}, &stdout, &stderr); err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result struct {
+		Data struct {
+			Promotion *designworkflow.PromotionSummary `json:"promotion,omitempty"`
+		} `json:"data"`
+		Artifacts []reports.Artifact `json:"artifacts"`
+	}
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.Data.Promotion == nil {
+		t.Fatalf("missing promotion summary in %s", stdout.String())
+	}
+	if result.Data.Promotion.ReportPath != designworkflow.PromotionReportArtifactPath {
+		t.Fatalf("promotion report path = %q, want %q", result.Data.Promotion.ReportPath, designworkflow.PromotionReportArtifactPath)
+	}
+	promotionPath := filepath.Join(output, filepath.FromSlash(designworkflow.PromotionReportArtifactPath))
+	if _, err := os.Stat(promotionPath); err != nil {
+		t.Fatalf("missing promotion report artifact: %v", err)
+	}
+	if !hasCLIArtifact(result.Artifacts, reports.ArtifactPromotionReport, designworkflow.PromotionReportArtifactPath) {
+		t.Fatalf("promotion artifact missing from result artifacts: %#v", result.Artifacts)
+	}
+}
+
 func assertCLINestedSummaryNumber(t *testing.T, stage cliRetryStageSnapshot, summaryKey string, field string, want float64) {
 	t.Helper()
 	raw, ok := stage.Summary[summaryKey]
@@ -962,6 +996,15 @@ func cliRetryStageByName(t *testing.T, stages []cliRetryStageSnapshot, name stri
 func cliRetryStageHasIssue(stage cliRetryStageSnapshot, text string) bool {
 	for _, issue := range stage.Issues {
 		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasCLIArtifact(artifacts []reports.Artifact, kind reports.ArtifactKind, path string) bool {
+	for _, artifact := range artifacts {
+		if artifact.Kind == kind && artifact.Path == path {
 			return true
 		}
 	}

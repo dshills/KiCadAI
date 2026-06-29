@@ -9,6 +9,7 @@ const (
 	ArtifactSymbolLibraryTable    ArtifactKind = "symbol_library_table"
 	ArtifactFootprintLibraryTable ArtifactKind = "footprint_library_table"
 	ArtifactValidationReport      ArtifactKind = "validation_report"
+	ArtifactPromotionReport       ArtifactKind = "promotion_report"
 	ArtifactRoundTripReport       ArtifactKind = "roundtrip_report"
 	ArtifactDRCReport             ArtifactKind = "drc_report"
 	ArtifactERCReport             ArtifactKind = "erc_report"

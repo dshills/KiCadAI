@@ -3,6 +3,8 @@ package designworkflow
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -107,6 +109,17 @@ type PromotionArtifact struct {
 	Kind        reports.ArtifactKind `json:"kind,omitempty"`
 	Description string               `json:"description,omitempty"`
 	Required    bool                 `json:"required,omitempty"`
+}
+
+const PromotionReportArtifactPath = ".kicadai/design-promotion.json"
+
+// PromotionSummary is the compact workflow/CLI view of a full promotion report.
+type PromotionSummary struct {
+	Status             PromotionStatus    `json:"status"`
+	DeclaredReadiness  PromotionReadiness `json:"declared_readiness"`
+	AchievedReadiness  PromotionReadiness `json:"achieved_readiness"`
+	MatchesExpectation bool               `json:"matches_expectation"`
+	ReportPath         string             `json:"report_path,omitempty"`
 }
 
 // Validate checks the promotion report schema before it is serialized.
@@ -385,6 +398,52 @@ func MarshalPromotionReportJSON(report PromotionReport) ([]byte, error) {
 	return json.MarshalIndent(normalized, "", "  ")
 }
 
+func PromotionSummaryFromReport(report PromotionReport, reportPath string) PromotionSummary {
+	return PromotionSummary{
+		Status:             report.Status,
+		DeclaredReadiness:  report.DeclaredReadiness,
+		AchievedReadiness:  report.AchievedReadiness,
+		MatchesExpectation: report.MatchesExpectation,
+		ReportPath:         filepath.ToSlash(reportPath),
+	}
+}
+
+func WritePromotionReportArtifact(outputRoot string, report PromotionReport, overwrite bool) (reports.Artifact, *reports.Issue) {
+	if strings.TrimSpace(outputRoot) == "" {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "output root is required"}
+	}
+	data, err := MarshalPromotionReportJSON(report)
+	if err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: PromotionReportArtifactPath, Message: err.Error()}
+	}
+	path := filepath.Join(outputRoot, filepath.FromSlash(PromotionReportArtifactPath))
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: PromotionReportArtifactPath, Message: err.Error()}
+	}
+	flags := os.O_WRONLY | os.O_CREATE
+	if overwrite {
+		flags |= os.O_TRUNC
+	} else {
+		flags |= os.O_EXCL
+	}
+	file, err := os.OpenFile(path, flags, 0o644)
+	if err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: PromotionReportArtifactPath, Message: err.Error()}
+	}
+	if _, err := file.Write(data); err != nil {
+		_ = file.Close()
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: PromotionReportArtifactPath, Message: err.Error()}
+	}
+	if _, err := file.Write([]byte{'\n'}); err != nil {
+		_ = file.Close()
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: PromotionReportArtifactPath, Message: err.Error()}
+	}
+	if err := file.Close(); err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: PromotionReportArtifactPath, Message: err.Error()}
+	}
+	return reports.Artifact{Kind: reports.ArtifactPromotionReport, Path: PromotionReportArtifactPath, Description: "KiCad-backed design promotion report"}, nil
+}
+
 func validPromotionReadiness(readiness PromotionReadiness) bool {
 	switch readiness {
 	case PromotionReadinessExpectedFail, PromotionReadinessCandidate, PromotionReadinessPass, PromotionReadinessBlocked:
@@ -432,7 +491,7 @@ func validPromotionStageName(stage StageName) bool {
 
 func validPromotionArtifactKind(kind reports.ArtifactKind) bool {
 	switch kind {
-	case reports.ArtifactKiCadProject, reports.ArtifactSchematic, reports.ArtifactPCB, reports.ArtifactSymbolLibraryTable, reports.ArtifactFootprintLibraryTable, reports.ArtifactValidationReport, reports.ArtifactRoundTripReport, reports.ArtifactDRCReport, reports.ArtifactERCReport, reports.ArtifactPreview, reports.ArtifactBOM, reports.ArtifactCPL, reports.ArtifactGerber, reports.ArtifactDrill, reports.ArtifactFabricationPackage:
+	case reports.ArtifactKiCadProject, reports.ArtifactSchematic, reports.ArtifactPCB, reports.ArtifactSymbolLibraryTable, reports.ArtifactFootprintLibraryTable, reports.ArtifactValidationReport, reports.ArtifactPromotionReport, reports.ArtifactRoundTripReport, reports.ArtifactDRCReport, reports.ArtifactERCReport, reports.ArtifactPreview, reports.ArtifactBOM, reports.ArtifactCPL, reports.ArtifactGerber, reports.ArtifactDrill, reports.ArtifactFabricationPackage:
 		return true
 	default:
 		return false

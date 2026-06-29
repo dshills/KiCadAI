@@ -238,6 +238,17 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 			})
 			assertDesignExampleExpectedStages(t, metadata, result, outputDir)
 			assertDesignExampleExpectedArtifacts(t, metadata, result, outputDir)
+			promotion := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+			promotionArtifact, promotionIssue := WritePromotionReportArtifact(outputDir, promotion, true)
+			if promotionIssue != nil {
+				t.Fatalf("%s write promotion report: %s", metadata.ID, promotionIssue.Message)
+			}
+			if promotionArtifact.Kind != reports.ArtifactPromotionReport {
+				t.Fatalf("%s promotion artifact = %#v", metadata.ID, promotionArtifact)
+			}
+			if _, err := os.Stat(designExampleArtifactPath(outputDir, PromotionReportArtifactPath)); err != nil {
+				t.Fatalf("%s missing promotion report artifact: %v", metadata.ID, err)
+			}
 			kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 			if !ok {
 				if metadata.Readiness == "expected_fail" && designExampleHasBlockedStage(result) {
@@ -265,6 +276,47 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 				t.Fatalf("%s unsupported readiness %q", metadata.ID, metadata.Readiness)
 			}
 		})
+	}
+}
+
+func TestDesignExamplePromotionReportArtifactWrite(t *testing.T) {
+	metadata := designExampleMetadata{
+		ID:                "promotion_fixture",
+		Request:           "promotion_fixture.json",
+		Tier:              "smoke",
+		Readiness:         "candidate",
+		Acceptance:        AcceptanceStructural,
+		RequireERC:        designExampleBool(false),
+		RequireDRC:        designExampleBool(false),
+		ExpectedArtifacts: []string{PromotionReportArtifactPath},
+		ExpectedStages:    []StageName{StageBlockPlanning},
+		KnownGaps:         []string{},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "promotion_fixture"}, AcceptanceStructural, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK, Artifacts: []reports.Artifact{{
+			Kind: reports.ArtifactPromotionReport,
+			Path: PromotionReportArtifactPath,
+		}}},
+	})
+	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+	outputDir := t.TempDir()
+	artifact, issue := WritePromotionReportArtifact(outputDir, report, true)
+	if issue != nil {
+		t.Fatalf("write promotion report: %#v", issue)
+	}
+	if artifact.Path != PromotionReportArtifactPath || artifact.Kind != reports.ArtifactPromotionReport {
+		t.Fatalf("artifact = %#v", artifact)
+	}
+	var decoded PromotionReport
+	data, err := os.ReadFile(designExampleArtifactPath(outputDir, PromotionReportArtifactPath))
+	if err != nil {
+		t.Fatalf("read promotion report: %v", err)
+	}
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		t.Fatalf("decode promotion report: %v", err)
+	}
+	if decoded.ID != metadata.ID || decoded.Status == "" {
+		t.Fatalf("decoded promotion report = %#v", decoded)
 	}
 }
 
@@ -807,6 +859,21 @@ func requiredDesignExampleBool(t *testing.T, id, field string, value *bool) bool
 		t.Fatalf("%s metadata missing %s", id, field)
 	}
 	return *value
+}
+
+func promotionFixtureFromDesignExampleMetadata(metadata designExampleMetadata) PromotionFixture {
+	return PromotionFixture{
+		ID:                metadata.ID,
+		Request:           metadata.Request,
+		Tier:              metadata.Tier,
+		DeclaredReadiness: PromotionReadiness(metadata.Readiness),
+		Acceptance:        metadata.Acceptance,
+		RequireERC:        metadata.RequireERC != nil && *metadata.RequireERC,
+		RequireDRC:        metadata.RequireDRC != nil && *metadata.RequireDRC,
+		ExpectedArtifacts: append([]string(nil), metadata.ExpectedArtifacts...),
+		ExpectedStages:    append([]StageName(nil), metadata.ExpectedStages...),
+		KnownGaps:         append([]string(nil), metadata.KnownGaps...),
+	}
 }
 
 func designExamplePersistentOutputDir(t *testing.T, projectName string) string {

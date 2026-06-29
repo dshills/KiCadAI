@@ -3053,7 +3053,17 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
 	workflow := designworkflow.Create(ctx, request, createOpts)
-	result := designWorkflowReport(workflow)
+	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
+	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
+	var artifactIssues []reports.Issue
+	var promotionArtifacts []reports.Artifact
+	if promotionIssue != nil {
+		artifactIssues = append(artifactIssues, *promotionIssue)
+	} else {
+		workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
+		promotionArtifacts = append(promotionArtifacts, promotionArtifact)
+	}
+	result := designWorkflowReport(workflow, artifactIssues, promotionArtifacts)
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}
@@ -3070,9 +3080,11 @@ func writeDesignFailure(stdout io.Writer, issue reports.Issue) error {
 	return errors.New(issue.Message)
 }
 
-func designWorkflowReport(workflow designworkflow.WorkflowResult) reports.Result {
+func designWorkflowReport(workflow designworkflow.WorkflowResult, extraIssues []reports.Issue, extraArtifacts []reports.Artifact) reports.Result {
 	issues := designworkflow.WorkflowIssues(workflow)
 	artifacts := designworkflow.WorkflowArtifacts(workflow)
+	issues = append(issues, extraIssues...)
+	artifacts = append(artifacts, extraArtifacts...)
 	if issues == nil {
 		issues = []reports.Issue{}
 	}
@@ -3087,6 +3099,37 @@ func designWorkflowReport(workflow designworkflow.WorkflowResult) reports.Result
 		Issues:    issues,
 		Artifacts: artifacts,
 	}
+}
+
+func designPromotionFixture(opts cliOptions, request designworkflow.Request, workflow designworkflow.WorkflowResult) designworkflow.PromotionFixture {
+	requestName := filepath.Base(opts.requestPath)
+	readiness := designworkflow.PromotionReadinessCandidate
+	if designworkflow.AcceptanceSatisfied(request.Validation.Acceptance, workflow.Acceptance.Achieved) && designworkflow.AcceptanceSatisfied(designworkflow.AcceptanceFabricationCandidate, workflow.Acceptance.Achieved) {
+		readiness = designworkflow.PromotionReadinessPass
+	}
+	return designworkflow.PromotionFixture{
+		ID:                designworkflow.NormalizeProjectName(request.Name),
+		Request:           requestName,
+		Tier:              "cli",
+		DeclaredReadiness: readiness,
+		Acceptance:        workflow.Acceptance.Requested,
+		RequireERC:        request.Validation.RequireERC,
+		RequireDRC:        request.Validation.RequireDRC,
+		ExpectedArtifacts: []string{".kicadai/transaction.json", ".kicadai/manifest.json"},
+		ExpectedStages:    designPromotionExpectedStages(workflow),
+	}
+}
+
+func designPromotionExpectedStages(workflow designworkflow.WorkflowResult) []designworkflow.StageName {
+	stages := make([]designworkflow.StageName, 0, len(workflow.Stages))
+	for _, stage := range workflow.Stages {
+		stages = append(stages, stage.Name)
+	}
+	return stages
+}
+
+func promotionSummaryPointer(summary designworkflow.PromotionSummary) *designworkflow.PromotionSummary {
+	return &summary
 }
 
 func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkflow.CreateOptions, error) {

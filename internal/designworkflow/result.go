@@ -49,10 +49,11 @@ const (
 )
 
 type WorkflowResult struct {
-	Project    ProjectSummary   `json:"project"`
-	Acceptance AcceptanceResult `json:"acceptance"`
-	Stages     []StageResult    `json:"stages"`
-	Feedback   Feedback         `json:"feedback"`
+	Project    ProjectSummary    `json:"project"`
+	Acceptance AcceptanceResult  `json:"acceptance"`
+	Stages     []StageResult     `json:"stages"`
+	Feedback   Feedback          `json:"feedback"`
+	Promotion  *PromotionSummary `json:"promotion,omitempty"`
 }
 
 type ProjectSummary struct {
