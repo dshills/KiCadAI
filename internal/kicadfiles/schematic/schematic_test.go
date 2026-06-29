@@ -996,6 +996,43 @@ func TestValidateGeneratedConnectivityAcceptsSymbolPinAnchors(t *testing.T) {
 	}
 }
 
+func TestInspectGeneratedConnectivityReportsPowerPolicy(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:      kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		LibraryID: "power:VCC",
+		Reference: "#PWR01",
+		Value:     "VCC",
+	}}
+	report := InspectGeneratedConnectivity(schematic)
+	if report.PowerPolicy != GeneratedPowerPolicyRequiresDriver || report.PowerSymbolCount != 1 || report.PowerFlagCount != 0 {
+		t.Fatalf("report = %#v, want power driver required", report)
+	}
+	schematic.Symbols = append(schematic.Symbols, SchematicSymbol{
+		UUID:      kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		LibraryID: "power:PWR_FLAG",
+		Reference: "#FLG01",
+		Value:     "PWR_FLAG",
+	})
+	report = InspectGeneratedConnectivity(schematic)
+	if report.PowerPolicy != GeneratedPowerPolicyDriven || report.PowerFlagCount != 1 {
+		t.Fatalf("report = %#v, want driven power policy", report)
+	}
+	schematic.Symbols[1].LibraryID = "Device:R"
+	schematic.Symbols[1].Value = "VCC_PWR_FLAG_NET"
+	report = InspectGeneratedConnectivity(schematic)
+	if report.PowerPolicy != GeneratedPowerPolicyRequiresDriver || report.PowerFlagCount != 0 {
+		t.Fatalf("report = %#v, want net-like PWR_FLAG value ignored", report)
+	}
+	schematic.Symbols = schematic.Symbols[1:]
+	schematic.Symbols[0].LibraryID = "power:PWR_FLAG"
+	schematic.Symbols[0].Value = "PWR_FLAG"
+	report = InspectGeneratedConnectivity(schematic)
+	if report.PowerPolicy != GeneratedPowerPolicyDriven || report.PowerSymbolCount != 1 || report.PowerFlagCount != 1 {
+		t.Fatalf("report = %#v, want standalone PWR_FLAG driven policy", report)
+	}
+}
+
 func TestValidateGeneratedConnectivityRejectsOpenEndpointAndNearMiss(t *testing.T) {
 	schematic := minimalSchematic()
 	schematic.Wires = []Wire{{

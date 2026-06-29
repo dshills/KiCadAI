@@ -273,6 +273,16 @@ const (
 	GeneratedConnectivityBlocked GeneratedConnectivityStatus = "blocked"
 )
 
+// GeneratedPowerPolicyStatus records whether schematic power symbols appear to
+// have explicit ERC driver intent.
+type GeneratedPowerPolicyStatus string
+
+const (
+	GeneratedPowerPolicyNotRequired    GeneratedPowerPolicyStatus = "not_required"
+	GeneratedPowerPolicyRequiresDriver GeneratedPowerPolicyStatus = "requires_driver"
+	GeneratedPowerPolicyDriven         GeneratedPowerPolicyStatus = "driven"
+)
+
 // GeneratedConnectivityIssue is a structured schematic semantic issue with a
 // stable model path and repair-oriented message.
 type GeneratedConnectivityIssue struct {
@@ -290,6 +300,9 @@ type GeneratedConnectivityReport struct {
 	LabelCount           int                          `json:"label_count"`
 	NoConnectCount       int                          `json:"no_connect_count"`
 	SymbolPinAnchorCount int                          `json:"symbol_pin_anchor_count"`
+	PowerSymbolCount     int                          `json:"power_symbol_count"`
+	PowerFlagCount       int                          `json:"power_flag_count"`
+	PowerPolicy          GeneratedPowerPolicyStatus   `json:"power_policy"`
 	IssueCount           int                          `json:"issue_count"`
 	Issues               []GeneratedConnectivityIssue `json:"issues,omitempty"`
 }
@@ -463,6 +476,8 @@ func InspectGeneratedConnectivity(schematic SchematicFile) GeneratedConnectivity
 		NoConnectCount:       len(schematic.NoConnects),
 		SymbolPinAnchorCount: countSymbolPinAnchors(schematic),
 	}
+	report.PowerSymbolCount, report.PowerFlagCount = countPowerSymbols(schematic)
+	report.PowerPolicy = generatedPowerPolicyStatus(report.PowerSymbolCount, report.PowerFlagCount)
 	for _, err := range validateGeneratedConnectivityErrors(schematic) {
 		report.Issues = append(report.Issues, GeneratedConnectivityIssue{Path: strings.Trim(strings.TrimPrefix(err.Section+"."+err.Field, "."), "."), Message: err.Message})
 	}
@@ -538,6 +553,35 @@ func countSymbolPinAnchors(schematic SchematicFile) int {
 		count += len(symbol.PinAnchors)
 	}
 	return count
+}
+
+func countPowerSymbols(schematic SchematicFile) (powerSymbols int, powerFlags int) {
+	for _, symbol := range schematic.Symbols {
+		libraryID := strings.TrimSpace(symbol.LibraryID)
+		value := strings.TrimSpace(symbol.Value)
+		if strings.EqualFold(libraryID, "power:PWR_FLAG") || strings.EqualFold(value, "PWR_FLAG") {
+			powerFlags++
+		}
+		if hasPowerLibraryID(libraryID) {
+			powerSymbols++
+		}
+	}
+	return powerSymbols, powerFlags
+}
+
+func hasPowerLibraryID(libraryID string) bool {
+	index := strings.IndexByte(libraryID, ':')
+	return index > 0 && strings.EqualFold(libraryID[:index], "power")
+}
+
+func generatedPowerPolicyStatus(powerSymbols int, powerFlags int) GeneratedPowerPolicyStatus {
+	if powerFlags > 0 {
+		return GeneratedPowerPolicyDriven
+	}
+	if powerSymbols == 0 {
+		return GeneratedPowerPolicyNotRequired
+	}
+	return GeneratedPowerPolicyRequiresDriver
 }
 
 func schematicSymbolPinAnchorSet(schematic SchematicFile) map[kicadfiles.Point]struct{} {
