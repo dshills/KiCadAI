@@ -18,6 +18,7 @@ This directory holds the detailed reference material that used to live in the pr
 - [Development Reference](development.md): examples, Go packages, testing, protobuf maintenance, limitations, troubleshooting, and design direction.
 - [KiCad Direct File Writers](kicad-file-writers.md): lower-level writer behavior.
 - [Component Intelligence](component-intelligence.md): focused component catalog reference.
+- [AI Readiness Matrix](ai-readiness.md): machine-readable AI-agent guidance for component, block, layout, validation, and documentation gaps. This complements the human narrative in circuit block readiness docs.
 - [Circuit Block Library](circuit-block-library.md): focused block-library reference.
 - [Circuit Block Readiness](circuit-block-readiness.md): readiness review and gaps.
 - [Circuit Block Verification](circuit-block-verification.md): verification corpus and workflow evidence.

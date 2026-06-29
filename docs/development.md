@@ -86,10 +86,15 @@ Key packages:
 - `internal/workflows`: AI-facing named workflow registry.
 - `internal/writercorrectness`: generated writer correctness gate used by the
   CLI and AI design workflow.
+- `internal/aireadiness`: machine-readable AI generation readiness matrix
+  loader, validator, and coverage summaries.
 
 Generated protobuf packages under `internal/kiapi/gen/**` should not be used as
 the AI workflow boundary. Prefer `internal/workflows`, `internal/transactions`,
 or `internal/kicadfiles/designapi`.
+
+AI generation coverage gaps are tracked in `data/ai-readiness/`; see
+[AI Readiness Matrix](ai-readiness.md).
 
 
 ## Testing
