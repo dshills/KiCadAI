@@ -81,6 +81,7 @@ func (builder *promotionReportBuilder) collectWorkflowIssues() {
 				Stage:    stage.Name,
 				Message:  issue.Message,
 				Path:     issue.Path,
+				Repair:   promotionRepairForWorkflowIssue(stage.Name, issue),
 				Refs:     append([]string(nil), issue.Refs...),
 				Nets:     append([]string(nil), issue.Nets...),
 			}
@@ -422,6 +423,7 @@ func (builder *promotionReportBuilder) addSyntheticIssue(code string, severity r
 		Severity: severity,
 		Stage:    stage,
 		Message:  message,
+		Repair:   promotionRepairForSyntheticIssue(code, stage),
 	}
 	return code
 }
@@ -697,6 +699,26 @@ func promotionUniqueIssueCode(existing map[string]PromotionIssue, base string) s
 			return candidate
 		}
 	}
+}
+
+func promotionRepairForWorkflowIssue(stage StageName, issue reports.Issue) string {
+	return firstNonEmpty(issue.Suggestion, defaultRepairAction(stage, issue))
+}
+
+func promotionRepairForSyntheticIssue(code string, stage StageName) string {
+	switch {
+	case code == "metadata_missing_id" || code == "metadata_missing_request":
+		return "repair the KiCad-backed fixture metadata and rerun promotion"
+	case strings.HasPrefix(code, "stage_missing_"):
+		return "run the workflow path that produces the expected stage or update fixture expected_stages"
+	case strings.HasPrefix(code, "artifact_missing_path"):
+		return "declare a non-empty expected artifact path in fixture metadata"
+	case strings.HasPrefix(code, "artifact_not_produced_"):
+		return "produce the expected artifact or remove it from fixture metadata until supported"
+	case code == "kicad_checks_missing", code == "kicad_erc_missing", code == "kicad_drc_missing":
+		return "configure kicad-cli and preserve the required ERC/DRC report evidence"
+	}
+	return defaultRepairAction(stage, reports.Issue{Code: reports.CodeValidationFailed})
 }
 
 func indexPromotionStages(stages []StageResult) map[StageName]StageResult {

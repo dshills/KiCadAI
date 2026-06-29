@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"strings"
 	"testing"
 
 	"kicadai/internal/kicadfiles/checks"
@@ -164,6 +165,56 @@ func TestPromotionBuilderKeepsDuplicateWorkflowIssues(t *testing.T) {
 	report := BuildInternalPromotionReport(fixture, result)
 	if got := len(report.Issues); got != 2 {
 		t.Fatalf("issue count = %d, want duplicate issues preserved", got)
+	}
+}
+
+func TestPromotionBuilderAddsRepairGuidance(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "repair",
+		Request:           "repair.json",
+		Tier:              "smoke",
+		DeclaredReadiness: PromotionReadinessExpectedFail,
+		Acceptance:        AcceptanceConnectivity,
+		ExpectedStages:    []StageName{StageValidation},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "repair"}, AcceptanceConnectivity, []StageResult{
+		{Name: StageValidation, Status: StageStatusBlocked, Issues: []reports.Issue{{
+			Code:       reports.CodeDisconnectedPad,
+			Severity:   reports.SeverityError,
+			Message:    "pad is disconnected",
+			Suggestion: "connect pad 1",
+		}, {
+			Code:     reports.CodeInvalidNetAssignment,
+			Severity: reports.SeverityError,
+			Message:  "net mismatch",
+		}}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	if !promotionReportHasRepair(report, "connect pad 1") {
+		t.Fatalf("missing explicit repair in %#v", report.Issues)
+	}
+	if !promotionReportHasRepair(report, "repair net-to-pad assignments") {
+		t.Fatalf("missing default repair in %#v", report.Issues)
+	}
+}
+
+func TestPromotionBuilderAddsSyntheticRepairGuidance(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "requires_kicad",
+		Request:           "requires_kicad.json",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceERCDRC,
+		RequireERC:        true,
+		RequireDRC:        true,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageKiCadChecks},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "requires_kicad"}, AcceptanceERCDRC, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	if !promotionReportHasRepair(report, "configure kicad-cli") {
+		t.Fatalf("missing KiCad synthetic repair in %#v", report.Issues)
 	}
 }
 
@@ -424,6 +475,15 @@ func promotionGateByID(t *testing.T, report PromotionReport, id string) Promotio
 func containsPromotionIssueCode(codes []string, want string) bool {
 	for _, code := range codes {
 		if code == want {
+			return true
+		}
+	}
+	return false
+}
+
+func promotionReportHasRepair(report PromotionReport, text string) bool {
+	for _, issue := range report.Issues {
+		if strings.Contains(issue.Repair, text) {
 			return true
 		}
 	}
