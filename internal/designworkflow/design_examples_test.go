@@ -236,8 +236,6 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 					ArtifactDir:   filepath.Join(outputDir, ".kicadai", "checks"),
 				},
 			})
-			assertDesignExampleExpectedStages(t, metadata, result, outputDir)
-			assertDesignExampleExpectedArtifacts(t, metadata, result, outputDir)
 			promotion := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
 			promotionArtifact, promotionIssue := WritePromotionReportArtifact(outputDir, promotion, true)
 			if promotionIssue != nil {
@@ -249,6 +247,8 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 			if _, err := os.Stat(designExampleArtifactPath(outputDir, PromotionReportArtifactPath)); err != nil {
 				t.Fatalf("%s missing promotion report artifact: %v", metadata.ID, err)
 			}
+			assertDesignExampleExpectedStages(t, metadata, result, outputDir)
+			assertDesignExampleExpectedArtifacts(t, metadata, result, outputDir)
 			assertDesignExamplePromotionMatchesMetadata(t, metadata, promotion, outputDir, result)
 			kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 			if !ok {
@@ -385,15 +385,16 @@ func TestDesignExampleMetadataValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	metadata := designExampleMetadata{
-		ID:             "led_indicator_kicad_smoke",
-		Request:        "led_indicator_kicad_smoke.json",
-		Tier:           "smoke",
-		Readiness:      "candidate",
-		Acceptance:     AcceptanceERCDRC,
-		RequireERC:     designExampleBool(true),
-		RequireDRC:     designExampleBool(true),
-		ExpectedStages: []StageName{StageBlockPlanning, StageKiCadChecks},
-		KnownGaps:      []string{},
+		ID:                "led_indicator_kicad_smoke",
+		Request:           "led_indicator_kicad_smoke.json",
+		Tier:              "smoke",
+		Readiness:         "candidate",
+		Acceptance:        AcceptanceERCDRC,
+		RequireERC:        designExampleBool(true),
+		RequireDRC:        designExampleBool(true),
+		ExpectedArtifacts: []string{PromotionReportArtifactPath},
+		ExpectedStages:    []StageName{StageBlockPlanning, StageKiCadChecks},
+		KnownGaps:         []string{},
 	}
 	path := writeDesignExampleMetadataFixture(t, dir, "led_indicator_kicad_smoke.metadata.json", metadata)
 	loaded, err := loadDesignExampleMetadataPath(path)
@@ -525,6 +526,76 @@ func TestDesignExampleMetadataRejectsBlockedWithoutNotes(t *testing.T) {
 	_, err := loadDesignExampleMetadataPath(path)
 	if err == nil || !strings.Contains(err.Error(), "notes must describe blocked") {
 		t.Fatalf("blocked notes error = %v, want notes must describe blocked", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsCandidateWithoutRequiredEvidencePolicy(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:                "fixture",
+		Request:           "fixture.json",
+		Tier:              "smoke",
+		Readiness:         "candidate",
+		Acceptance:        AcceptanceERCDRC,
+		RequireERC:        designExampleBool(false),
+		RequireDRC:        designExampleBool(true),
+		ExpectedArtifacts: []string{PromotionReportArtifactPath},
+		ExpectedStages:    []StageName{StageBlockPlanning, StagePCBRealization},
+		KnownGaps:         []string{},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), `fixture readiness "candidate" must require ERC`) {
+		t.Fatalf("candidate ERC error = %v, want require ERC", err)
+	}
+	metadata.RequireERC = designExampleBool(true)
+	metadata.RequireDRC = designExampleBool(false)
+	path = writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err = loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), `PCB fixture readiness "candidate" must require DRC`) {
+		t.Fatalf("candidate DRC error = %v, want require DRC", err)
+	}
+	metadata.RequireDRC = designExampleBool(true)
+	metadata.ExpectedArtifacts = nil
+	path = writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err = loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), `fixture readiness "candidate" must expect promotion report artifact`) {
+		t.Fatalf("candidate promotion artifact error = %v, want promotion artifact", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsPassWithGapsOrAllowlists(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:                "fixture",
+		Request:           "fixture.json",
+		Tier:              "smoke",
+		Readiness:         "pass",
+		Acceptance:        AcceptanceERCDRC,
+		RequireERC:        designExampleBool(true),
+		RequireDRC:        designExampleBool(true),
+		Allowlists:        []string{"known_false_positive"},
+		ExpectedArtifacts: []string{PromotionReportArtifactPath},
+		ExpectedStages:    []StageName{StageBlockPlanning, StagePCBRealization},
+		KnownGaps:         []string{},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "pass fixtures must not use allowlists") {
+		t.Fatalf("pass allowlist error = %v, want no allowlists", err)
+	}
+	metadata.Allowlists = nil
+	metadata.KnownGaps = []string{"still missing evidence"}
+	path = writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err = loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "pass fixtures must not have known_gaps") {
+		t.Fatalf("pass gaps error = %v, want no known_gaps", err)
 	}
 }
 
@@ -858,7 +929,49 @@ func validateDesignExampleMetadata(dir string, metadata designExampleMetadata) e
 	if err := validateDesignExampleArtifactPaths(metadata.ExpectedArtifacts); err != nil {
 		return err
 	}
+	if err := validateDesignExampleProgressionPolicy(metadata); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateDesignExampleProgressionPolicy(metadata designExampleMetadata) error {
+	switch metadata.Readiness {
+	case "candidate", "pass":
+		if metadata.RequireERC == nil || !*metadata.RequireERC {
+			return fmt.Errorf("fixture readiness %q must require ERC", metadata.Readiness)
+		}
+		if designExampleMetadataExpectsPCB(metadata) && (metadata.RequireDRC == nil || !*metadata.RequireDRC) {
+			return fmt.Errorf("PCB fixture readiness %q must require DRC", metadata.Readiness)
+		}
+		if !containsDesignExampleString(metadata.ExpectedArtifacts, PromotionReportArtifactPath) {
+			return fmt.Errorf("fixture readiness %q must expect promotion report artifact %q", metadata.Readiness, PromotionReportArtifactPath)
+		}
+	}
+	if metadata.Readiness == "pass" {
+		if len(metadata.KnownGaps) != 0 {
+			return fmt.Errorf("pass fixtures must not have known_gaps")
+		}
+		if len(metadata.Allowlists) != 0 {
+			return fmt.Errorf("pass fixtures must not use allowlists")
+		}
+	}
+	return nil
+}
+
+func designExampleMetadataExpectsPCB(metadata designExampleMetadata) bool {
+	for _, stage := range metadata.ExpectedStages {
+		switch stage {
+		case StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageFabricationReady:
+			return true
+		}
+	}
+	for _, artifact := range metadata.ExpectedArtifacts {
+		if strings.HasSuffix(strings.ToLower(artifact), ".kicad_pcb") {
+			return true
+		}
+	}
+	return false
 }
 
 func validateDesignExampleArtifactPaths(paths []string) error {
@@ -883,6 +996,15 @@ func validateDesignExampleArtifactPaths(paths []string) error {
 func hasNonEmptyString(values []string) bool {
 	for _, value := range values {
 		if strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func containsDesignExampleString(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
 			return true
 		}
 	}
