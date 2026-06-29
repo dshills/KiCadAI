@@ -2,6 +2,78 @@
 
 Project inspection, evaluation, writer correctness, transactions, round-trip validation, and KiCad ERC/DRC checks.
 
+### Promotion Reports
+
+Generated design workflows emit `<output>/.kicadai/design-promotion.json` when
+`design create` can write project metadata in the requested output directory.
+The report is a normalized gate summary for KiCad-backed promotion, separate
+from the command's requested acceptance result.
+
+Promotion gates currently cover:
+
+- Fixture metadata;
+- Workflow stages;
+- Writer correctness;
+- Connectivity;
+- KiCad ERC/DRC evidence;
+- Route completion;
+- Physical-rule evidence;
+- Expected artifacts.
+
+Each report includes declared and achieved readiness, gate statuses, referenced
+artifacts, machine-readable issue codes, and repair guidance. Required KiCad
+ERC/DRC checks are optional to run in environments without `kicad-cli`, but
+they must produce evidence before a fixture can reach `candidate` or `pass`.
+Missing `kicad-cli` is visible as skipped external evidence and blocks
+promotion when those checks are required.
+
+Readiness values are `expected_fail`, `candidate`, `pass`, and `blocked`.
+Promotion statuses include `pass`, `warn`, `failed`, `expected_fail`,
+`unexpected_pass`, `blocked`, `skipped`, `error`, and `not_run`.
+Issue severities are `info`, `warning`, `error`, and `blocked`. In issue
+objects, `stage` is the workflow stage that produced or owns the issue; it is
+not a promotion gate ID, although a gate such as `kicad_checks` can intentionally
+wrap evidence from the workflow stage with the same name. Status uses `warn`
+and severity uses `warning` because those are the current JSON enum values.
+
+Minimal report shape:
+
+```json
+{
+  "id": "led_indicator_kicad_smoke",
+  "declared_readiness": "expected_fail",
+  "achieved_readiness": "expected_fail",
+  "status": "expected_fail",
+  "gates": [
+    {
+      "id": "kicad_checks",
+      "status": "skipped",
+      "required_for": ["candidate", "pass"],
+      "issue_codes": ["kicad_checks_missing"]
+    }
+  ],
+  "artifacts": [
+    {
+      "path": ".kicadai/design-promotion.json",
+      "kind": "promotion_report",
+      "required": true
+    }
+  ],
+  "issues": [
+    {
+      "code": "kicad_checks_missing",
+      "severity": "blocked",
+      "stage": "kicad_checks",
+      "repair": "configure kicad-cli and preserve the required ERC/DRC report evidence"
+    }
+  ]
+}
+```
+
+Use promotion reports for fixture readiness and AI workflow gating. Use
+`validate board`, `writer check`, and KiCad ERC/DRC reports for the underlying
+technical evidence.
+
 ### Connectivity-First Board Validation
 
 `validate board` is the current board-readiness gate for generated PCBs. It

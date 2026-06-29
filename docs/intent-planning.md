@@ -76,6 +76,16 @@ in `issues[]` and grouped under `data.feedback.repairs[]` so an agent can decide
 whether to revise the request, adjust placement/routing, or ask for external
 tooling.
 
+`design create` writes `<output>/.kicadai/design-promotion.json` when project
+metadata can be written and includes a compact `data.promotion` summary when
+that report artifact is written. Promotion is stricter than requested
+acceptance: it evaluates fixture metadata,
+workflow stages, writer correctness, connectivity, optional KiCad ERC/DRC
+evidence, route completion, physical-rule evidence, and expected artifacts.
+Agents should use the promotion report when deciding whether a generated
+project can be treated as a promoted KiCad-backed fixture. A skipped KiCad gate
+means external evidence was not produced; it is not proof of ERC/DRC success.
+
 
 ### Intent Planner
 

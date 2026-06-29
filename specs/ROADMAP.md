@@ -127,6 +127,14 @@ from validation feedback to safe automatic repair.
   workflow net-assignment evidence. `KICADAI_KICAD_CLI` supplies the executable
   path for design workflow checks; `KICADAI_RUN_KICAD_CLI=1` remains the
   separate boolean opt-in used by lower-level block smoke tests.
+- KiCad-backed design promotion reports now exist for generated design
+  workflows and optional fixture runs. `.kicadai/design-promotion.json`
+  records declared vs achieved readiness, metadata/stage/writer/connectivity/
+  KiCad/route/physical/artifact gates, referenced artifacts, issue codes, and
+  repair guidance. `design create` includes a compact `data.promotion` summary
+  when the report artifact is written. Current KiCad-backed fixtures are
+  classified as `expected_fail` with explicit promotion blockers rather than
+  silently skipped or accidentally promoted.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready
@@ -158,7 +166,10 @@ loop confidence:
   still needs broader real KiCad DRC-clean layout proof before it can be
   treated as production layout quality;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
-  broader golden evidence and richer parser-to-repair category mapping;
+  broader golden evidence and richer parser-to-repair category mapping.
+  Promotion reports now make missing or failed evidence explicit, but the
+  current optional fixtures still need real ERC/DRC-clean runs before they can
+  be promoted to `candidate` or `pass`;
 - schematic readability now has checked-in simple/amplifier example gates and
   generated workflow evidence, but still needs broader example regeneration,
   exact KiCad text-justification geometry, hierarchy/page splitting, and safe

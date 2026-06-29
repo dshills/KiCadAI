@@ -14,6 +14,12 @@ go test -v ./internal/designworkflow -run TestDesignExamplesOptionalKiCadBackedT
 `KICADAI_KICAD_CLI` must point to the `kicad-cli` executable, not the KiCad
 application bundle or install directory.
 
+The optional tier now writes a normalized promotion report at
+`.kicadai/design-promotion.json` for each generated fixture. The report records
+declared readiness, achieved readiness, gates, stage evidence, artifacts,
+issues, and repair guidance. The compact promotion summary is also available in
+`data.promotion` from `design create`.
+
 Manual command shape:
 
 This assumes the compiled `kicadai` binary is available on `PATH`.
@@ -63,3 +69,11 @@ generated design. These fixtures now document that generated design-level PCBs
 can progress past writer correctness net-code assignment and block-local route
 endpoint binding. The next layout-quality blockers are full inter-block routing
 coverage for richer boards and KiCad ERC/DRC-clean evidence.
+
+Promotion gates currently include metadata, stages, writer correctness,
+connectivity, KiCad checks, route completion, physical rules, and artifacts.
+Missing `kicad-cli` evidence is recorded as skipped external evidence, but it
+still blocks candidate/pass readiness when ERC or DRC is required. The current
+fixtures remain `expected_fail`; do not treat a generated board as promoted
+until the promotion report achieves `candidate` or `pass` and the configured
+KiCad ERC/DRC evidence gates pass.
