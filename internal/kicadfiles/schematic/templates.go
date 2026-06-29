@@ -3,23 +3,30 @@ package schematic
 import (
 	"strings"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/sexpr"
 )
+
+type TemplatePin struct {
+	Number string
+	Offset kicadfiles.Point
+}
 
 type embeddedTemplate struct {
 	bodyName string
 	pinType  string
 	pinX     float64
 	power    bool
+	pins     []TemplatePin
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
-	"device:c":   {bodyName: "C", pinType: "passive"},
-	"device:d":   {bodyName: "D", pinType: "passive"},
-	"device:led": {bodyName: "LED", pinType: "passive"},
-	"device:r":   {bodyName: "R", pinType: "passive"},
-	"power:gnd":  {bodyName: "GND", pinType: "power_in", pinX: -5.08, power: true},
-	"power:vcc":  {bodyName: "VCC", pinType: "power_in", pinX: 5.08, power: true},
+	"device:c":   {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:d":   {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:led": {bodyName: "LED", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:r":   {bodyName: "R", pinType: "passive", pins: twoPinTemplatePins()},
+	"power:gnd":  {bodyName: "GND", pinType: "power_in", pinX: -5.08, power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: 0}}}},
+	"power:vcc":  {bodyName: "VCC", pinType: "power_in", pinX: 5.08, power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: 0}}}},
 }
 
 // EmbeddedSymbolTemplate returns a KiCad-native embedded lib symbol body for
@@ -31,6 +38,32 @@ func EmbeddedSymbolTemplate(libraryID string) (EmbeddedSymbol, bool) {
 		return EmbeddedSymbol{}, false
 	}
 	return embeddedSymbolFromTemplate(libraryID, template), true
+}
+
+// EmbeddedSymbolPinOffsets returns template pin anchors relative to the symbol
+// origin for supported seed symbols.
+func EmbeddedSymbolPinOffsets(libraryID string) ([]TemplatePin, bool) {
+	template, ok := embeddedSymbolTemplates[strings.ToLower(strings.TrimSpace(libraryID))]
+	if !ok {
+		return nil, false
+	}
+	return cloneTemplatePins(template.pins), true
+}
+
+func twoPinTemplatePins() []TemplatePin {
+	return []TemplatePin{
+		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: 0}},
+		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: 0}},
+	}
+}
+
+func cloneTemplatePins(source []TemplatePin) []TemplatePin {
+	if source == nil {
+		return nil
+	}
+	clone := make([]TemplatePin, len(source))
+	copy(clone, source)
+	return clone
 }
 
 func embeddedSymbolFromTemplate(libraryID string, template embeddedTemplate) EmbeddedSymbol {

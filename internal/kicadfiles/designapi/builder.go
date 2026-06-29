@@ -224,11 +224,12 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	symbol.Rotation = options.Rotation
 	symbol.Path = "root.component." + key
 	symbol.Properties = schematic.MergeProperties(symbol.Properties, options.Properties)
-	symbol.Pins = make([]schematic.SymbolPin, 0, len(options.Pins))
-	pins := make(map[string]kicadfiles.Point, len(options.Pins))
-	pinNets := make(map[string]string, len(options.Pins))
-	pinOrder := make([]string, 0, len(options.Pins))
-	for _, pin := range options.Pins {
+	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
+	symbol.Pins = make([]schematic.SymbolPin, 0, len(pinSpecs))
+	pins := make(map[string]kicadfiles.Point, len(pinSpecs))
+	pinNets := make(map[string]string, len(pinSpecs))
+	pinOrder := make([]string, 0, len(pinSpecs))
+	for _, pin := range pinSpecs {
 		number := strings.TrimSpace(pin.Number)
 		if number == "" {
 			return SymbolHandle{}, fmt.Errorf("pin number required")
@@ -256,6 +257,21 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	builder.addKnownSymbolLibrary(libraryID)
 	schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID)
 	return SymbolHandle{Reference: reference}, nil
+}
+
+func symbolPinSpecs(libraryID string, explicit []PinSpec) []PinSpec {
+	if len(explicit) > 0 {
+		return explicit
+	}
+	templatePins, ok := schematic.EmbeddedSymbolPinOffsets(libraryID)
+	if !ok {
+		return nil
+	}
+	pins := make([]PinSpec, 0, len(templatePins))
+	for _, pin := range templatePins {
+		pins = append(pins, PinSpec{Number: pin.Number, Offset: pin.Offset})
+	}
+	return pins
 }
 
 func (builder *Builder) Connect(from, to Endpoint, netName string) error {

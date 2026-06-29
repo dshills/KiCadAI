@@ -488,6 +488,39 @@ func TestBuilderAddSymbolEmbedsSupportedSymbolTemplates(t *testing.T) {
 	}
 }
 
+func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
+	builder := newTestBuilder(t)
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "R1",
+		LibraryID: "Device:R",
+		Value:     "1k",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+	}); err != nil {
+		t.Fatalf("AddSymbol R1 returned error: %v", err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "C1",
+		LibraryID: "Device:C",
+		Value:     "100n",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(20)},
+	}); err != nil {
+		t.Fatalf("AddSymbol C1 returned error: %v", err)
+	}
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "C1", Pin: "1"}, "FILTER"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Symbols[0].Pins) != 2 || len(design.Schematic.Symbols[1].Pins) != 2 {
+		t.Fatalf("template pins not rendered: %#v", design.Schematic.Symbols)
+	}
+	if len(design.Schematic.Wires) != 1 {
+		t.Fatalf("wires = %d, want 1", len(design.Schematic.Wires))
+	}
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "R1", Pin: "2"}, "FILTER")
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "C1", Pin: "1"}, "FILTER")
+}
+
 func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	builder := newTestBuilder(t)
 	points := []kicadfiles.Point{
@@ -776,6 +809,13 @@ func addTwoPinSymbol(t *testing.T, builder *Builder, reference, libraryID, value
 		},
 	}); err != nil {
 		t.Fatalf("AddSymbol %s returned error: %v", reference, err)
+	}
+}
+
+func assertSchematicPinNet(t *testing.T, builder *Builder, endpoint Endpoint, netName string) {
+	t.Helper()
+	if net := builder.assignedPinNet(endpoint); net != netName {
+		t.Fatalf("%s pin %s net = %q, want %q", endpoint.Reference, endpoint.Pin, net, netName)
 	}
 }
 

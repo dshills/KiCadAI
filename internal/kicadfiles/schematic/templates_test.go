@@ -49,6 +49,28 @@ func TestEnsureEmbeddedSymbolIsIdempotentAndPreservesUnsupportedLibraries(t *tes
 	}
 }
 
+func TestEmbeddedSymbolPinOffsets(t *testing.T) {
+	pins, ok := EmbeddedSymbolPinOffsets("Device:R")
+	if !ok || len(pins) != 2 {
+		t.Fatalf("Device:R pins = %#v ok=%v, want two pins", pins, ok)
+	}
+	if pins[0].Number != "1" || pins[0].Offset.X != kicadfiles.MM(-5.08) || pins[1].Number != "2" || pins[1].Offset.X != kicadfiles.MM(5.08) {
+		t.Fatalf("unexpected two-pin offsets: %#v", pins)
+	}
+	pins[0].Number = "BROKEN"
+	freshPins, ok := EmbeddedSymbolPinOffsets("Device:R")
+	if !ok || freshPins[0].Number != "1" {
+		t.Fatalf("template pins share mutable backing data: %#v ok=%v", freshPins, ok)
+	}
+	powerPins, ok := EmbeddedSymbolPinOffsets("power:VCC")
+	if !ok || len(powerPins) != 1 || powerPins[0].Number != "1" || powerPins[0].Offset.X != kicadfiles.MM(5.08) {
+		t.Fatalf("unexpected power offsets: %#v ok=%v", powerPins, ok)
+	}
+	if _, ok := EmbeddedSymbolPinOffsets("Custom:Block"); ok {
+		t.Fatal("unexpected custom block template pins")
+	}
+}
+
 func TestLEDIndicatorSchematicEmbedsCustomLibraryIDs(t *testing.T) {
 	schematic, err := LEDIndicatorSchematic(LEDIndicatorInput{
 		Name:            "custom_led",
