@@ -270,7 +270,7 @@ func copyProjectContext(workspace ArtifactWorkspace, projectDir string, rootName
 
 func shouldSkipProjectDir(name string) bool {
 	switch strings.ToLower(name) {
-	case ".git", "reports", "fabrication", "gerbers", "plot", "plots", "shapes3d", "backup", "backups":
+	case ".git", ".kicadai", "reports", "fabrication", "gerbers", "plot", "plots", "shapes3d", "backup", "backups":
 		return true
 	default:
 		return false

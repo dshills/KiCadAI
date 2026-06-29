@@ -89,6 +89,11 @@ func readLayers(node sexpr.ParsedNode) []LayerDefinition {
 
 func readFootprint(node sexpr.ParsedNode) Footprint {
 	fp := Footprint{Raw: strings.TrimSpace(node.Raw), LibraryID: node.ListValue(1), UUID: readPCBUUID(node), Position: readPCBAtPoint(node)}
+	if at, ok := node.Child("at"); ok {
+		if rotation, ok := at.FloatValue(3); ok {
+			fp.Rotation = kicadfiles.Angle(rotation)
+		}
+	}
 	if layer, ok := node.Child("layer"); ok {
 		fp.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
 	}

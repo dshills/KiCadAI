@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
 	"strings"
 
 	"kicadai/internal/blocks"
@@ -74,8 +75,27 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 	if err := ctx.Err(); err != nil {
 		return canceledProjectWriteResult(err, tx, validation, transactions.ApplyResult{}, issues)
 	}
+	outputDir := opts.OutputDir
+	if strings.TrimSpace(outputDir) == "" {
+		return ProjectWriteResult{Transaction: tx, Validation: validation, Stage: NewStageResult(StageProjectWrite, append(issues, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityBlocked,
+			Path:     "output",
+			Message:  "output directory is required",
+		}))}
+	}
+	absolute, err := filepath.Abs(outputDir)
+	if err != nil {
+		return ProjectWriteResult{Transaction: tx, Validation: validation, Stage: NewStageResult(StageProjectWrite, append(issues, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityBlocked,
+			Path:     "output",
+			Message:  "resolve output directory: " + err.Error(),
+		}))}
+	}
+	outputDir = absolute
 	applyResult := transactions.Apply(tx, transactions.ApplyOptions{
-		OutputDir: opts.OutputDir,
+		OutputDir: outputDir,
 		Overwrite: opts.Overwrite,
 		Seed:      opts.Seed,
 	})
@@ -83,7 +103,7 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 	var inspection inspect.ProjectSummary
 	if !reports.HasBlockingIssue(applyResult.Issues) {
 		var err error
-		inspection, err = inspect.Project(opts.OutputDir)
+		inspection, err = inspect.Project(outputDir)
 		if err != nil {
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodeValidationFailed,

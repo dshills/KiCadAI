@@ -30,13 +30,13 @@ func TestValidateProjectSkipsAfterWriteFailure(t *testing.T) {
 	}
 }
 
-func TestValidateProjectStrictUnroutedCanBlockConnectivity(t *testing.T) {
+func TestValidateProjectStrictUnroutedAcceptsRoutedFixture(t *testing.T) {
 	request, write := writeValidationFixture(t)
 	request.Validation.StrictUnrouted = true
 
 	result := ValidateProject(context.Background(), &request, &write, ValidationOptions{})
-	if result.Stage.Status != StageStatusBlocked {
-		t.Fatalf("stage = %#v, want blocked strict validation", result.Stage)
+	if result.Stage.Status == StageStatusBlocked {
+		t.Fatalf("stage = %#v, want non-blocking strict validation for routed fixture", result.Stage)
 	}
 }
 

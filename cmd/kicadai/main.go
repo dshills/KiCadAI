@@ -3163,6 +3163,9 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 			StrictZones:    opts.strictZones,
 			StrictUnrouted: opts.strictUnrouted,
 			RequireDRC:     opts.requireDRC,
+			KiCadCLI:       checkOpts.KiCadCLI,
+			KeepArtifacts:  checkOpts.KeepArtifacts,
+			ArtifactDir:    checkOpts.ArtifactDir,
 		},
 		KiCadChecks: designworkflow.KiCadCheckOptions{
 			KiCadCLI:      checkOpts.KiCadCLI,

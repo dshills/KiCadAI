@@ -85,18 +85,38 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 	var ercArtifacts []reports.Artifact
 	var drcArtifacts []reports.Artifact
 	if opts.RequireERC {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			ercResult, ercIssues, ercArtifacts = runWorkflowERC(ctx, cli, schematicPathFromWrite(write), checkOpts)
-		}()
+		target := kicadCheckTargetFromWrite(write, checks.CheckKindERC)
+		if target == "" {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeMissingFile,
+				Severity: reports.SeverityBlocked,
+				Path:     "schematic",
+				Message:  "schematic path or project root is required for ERC",
+			})
+		} else {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				ercResult, ercIssues, ercArtifacts = runWorkflowERC(ctx, cli, target, checkOpts)
+			}()
+		}
 	}
 	if opts.RequireDRC {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			drcResult, drcIssues, drcArtifacts = runWorkflowDRC(ctx, cli, pcbPathFromWrite(write), checkOpts)
-		}()
+		target := kicadCheckTargetFromWrite(write, checks.CheckKindDRC)
+		if target == "" {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeMissingFile,
+				Severity: reports.SeverityBlocked,
+				Path:     "pcb",
+				Message:  "PCB path or project root is required for DRC",
+			})
+		} else {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				drcResult, drcIssues, drcArtifacts = runWorkflowDRC(ctx, cli, target, checkOpts)
+			}()
+		}
 	}
 	wg.Wait()
 	result.ERC = ercResult
@@ -120,6 +140,22 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 	}
 	result.Stage = stage
 	return result
+}
+
+// kicadCheckTargetFromWrite prefers the project root because checks.RunERC and
+// checks.RunDRC intentionally accept project directories, copy project context,
+// discover the matching .kicad_sch/.kicad_pcb, then pass that file to KiCad.
+func kicadCheckTargetFromWrite(write *ProjectWriteResult, kind checks.CheckKind) string {
+	if write == nil {
+		return ""
+	}
+	if root := strings.TrimSpace(write.Inspection.Root); root != "" {
+		return root
+	}
+	if kind == checks.CheckKindDRC {
+		return pcbPathFromWrite(write)
+	}
+	return schematicPathFromWrite(write)
 }
 
 func schematicPathFromWrite(write *ProjectWriteResult) string {

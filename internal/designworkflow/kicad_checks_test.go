@@ -6,6 +6,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+
+	"kicadai/internal/inspect"
+	"kicadai/internal/kicadfiles/checks"
 )
 
 func TestRunKiCadChecksSkipsWhenNotRequired(t *testing.T) {
@@ -46,6 +49,24 @@ func TestRunKiCadChecksWithFakeCLIPasses(t *testing.T) {
 	}
 	if len(result.Stage.Artifacts) != 2 {
 		t.Fatalf("artifacts = %#v", result.Stage.Artifacts)
+	}
+	if result.ERC.ProjectContext != "full" || result.DRC.ProjectContext != "full" {
+		t.Fatalf("checks did not use project context: ERC=%q DRC=%q", result.ERC.ProjectContext, result.DRC.ProjectContext)
+	}
+}
+
+func TestKiCadCheckTargetPrefersProjectRoot(t *testing.T) {
+	write := ProjectWriteResult{Inspection: inspect.ProjectSummary{
+		Root:      "/tmp/demo",
+		Schematic: &inspect.SchematicSummary{Path: "/tmp/demo/demo.kicad_sch"},
+		PCB:       &inspect.PCBSummary{Path: "/tmp/demo/demo.kicad_pcb"},
+	}}
+
+	if got := kicadCheckTargetFromWrite(&write, checks.CheckKindERC); got != "/tmp/demo" {
+		t.Fatalf("ERC target = %q, want project root", got)
+	}
+	if got := kicadCheckTargetFromWrite(&write, checks.CheckKindDRC); got != "/tmp/demo" {
+		t.Fatalf("DRC target = %q, want project root", got)
 	}
 }
 

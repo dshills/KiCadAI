@@ -14,6 +14,9 @@ type ValidationOptions struct {
 	StrictZones    bool
 	StrictUnrouted bool
 	RequireDRC     bool
+	KiCadCLI       string
+	KeepArtifacts  bool
+	ArtifactDir    string
 }
 
 type ValidationStageResult struct {
@@ -132,5 +135,8 @@ func boardValidationOptions(request *Request, opts ValidationOptions) boardvalid
 		StrictZones:    opts.StrictZones,
 		StrictUnrouted: opts.StrictUnrouted,
 		RequireDRC:     opts.RequireDRC,
+		KiCadCLI:       opts.KiCadCLI,
+		KeepArtifacts:  opts.KeepArtifacts,
+		ArtifactDir:    opts.ArtifactDir,
 	}
 }

@@ -64,12 +64,16 @@ func TestRunDRCProjectCopiesContext(t *testing.T) {
 	writeCheckTestFile(t, filepath.Join(dir, "demo.kicad_pcb"), "(kicad_pcb)")
 	writeCheckTestFile(t, filepath.Join(dir, "demo.kicad_sch"), "(kicad_sch)")
 	writeCheckTestFile(t, filepath.Join(dir, "sym-lib-table"), "(sym_lib_table)")
+	writeCheckTestFile(t, filepath.Join(dir, ".kicadai", "checks", "old", "demo.kicad_pcb"), "(kicad_pcb)")
 	runner := fakeRunner{
 		version: "10.0.3",
 		run: func(_ context.Context, workingDir string, _ string, args ...string) CommandResult {
 			input := args[len(args)-1]
 			if !strings.Contains(filepath.ToSlash(input), "kicadai-check-drc") || filepath.Dir(input) != workingDir {
 				t.Fatalf("input = %q workingDir = %q, want copied artifact input", input, workingDir)
+			}
+			if strings.Contains(filepath.ToSlash(input), "/.kicadai/") {
+				t.Fatalf("input copied nested KiCadAI artifact context: %q", input)
 			}
 			report := argAfter(args, "--output")
 			if err := os.WriteFile(report, []byte(`{"coordinate_units":"mm","violations":[]}`), 0o644); err != nil {
