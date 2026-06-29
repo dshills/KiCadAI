@@ -24,6 +24,7 @@
   ],
   "known_gaps": [
     "Generic I2C sensor plus connector PCB realization now has regression coverage for promoted VCC/GND/SDA/SCL inter-block route candidates and contact evidence, but routed same-net completion and KiCad DRC evidence are still in progress.",
+    "Promotion route_completion and kicad_checks gates are expected to block until routed same-net completion and real ERC/DRC report artifacts are available.",
     "Routing is intentionally skipped so the fixture documents the current connectivity/layout blocker before broader sensor breakout layout proof."
   ],
   "notes": "Tracks the richer sensor breakout scenario that should eventually graduate into a default KiCad-backed design example."

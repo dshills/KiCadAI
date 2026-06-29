@@ -249,6 +249,7 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 			if _, err := os.Stat(designExampleArtifactPath(outputDir, PromotionReportArtifactPath)); err != nil {
 				t.Fatalf("%s missing promotion report artifact: %v", metadata.ID, err)
 			}
+			assertDesignExamplePromotionMatchesMetadata(t, metadata, promotion, outputDir, result)
 			kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 			if !ok {
 				if metadata.Readiness == "expected_fail" && designExampleHasBlockedStage(result) {
@@ -317,6 +318,63 @@ func TestDesignExamplePromotionReportArtifactWrite(t *testing.T) {
 	}
 	if decoded.ID != metadata.ID || decoded.Status == "" {
 		t.Fatalf("decoded promotion report = %#v", decoded)
+	}
+}
+
+func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping design workflow classification integration test in short mode")
+	}
+	if strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) != "" {
+		t.Skipf("set %s: promotion classification is covered by TestDesignExamplesOptionalKiCadBackedTier", checks.EnvKiCadCLI)
+	}
+	repoRoot := designExampleRepoRoot(t)
+	createTimeout := designExampleCreateTimeout(t)
+	for _, metadataPath := range optionalDesignExampleMetadataFiles(t, repoRoot) {
+		metadataPath := metadataPath
+		t.Run(strings.TrimSuffix(filepath.Base(metadataPath), ".metadata.json"), func(t *testing.T) {
+			t.Parallel()
+			metadata, err := loadDesignExampleMetadataPath(metadataPath)
+			if err != nil {
+				t.Fatalf("load %s: %v", metadataPath, err)
+			}
+			if metadata.Readiness == "blocked" {
+				t.Skipf("%s blocked: %s", metadata.ID, strings.Join(metadata.KnownGaps, "; "))
+			}
+			requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+			if err != nil {
+				t.Fatalf("%s request path: %v", metadata.ID, err)
+			}
+			request, issues := loadDesignExampleRequestPath(t, requestPath)
+			if len(issues) != 0 {
+				if metadata.Readiness != "expected_fail" {
+					t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
+				}
+			}
+			projectName := metadata.ID
+			outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(projectName))
+			ctx, cancel := context.WithTimeout(context.Background(), createTimeout)
+			defer cancel()
+			var result WorkflowResult
+			if len(issues) != 0 {
+				result = BuildWorkflowResult(ProjectSummary{Name: projectName, OutputDir: outputDir}, metadata.Acceptance, []StageResult{{
+					Name:   StageParseRequest,
+					Status: StageStatusBlocked,
+					Issues: issues,
+				}})
+			} else {
+				result = Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+			}
+			report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+			reportJSON, err := MarshalPromotionReportJSON(report)
+			if err != nil {
+				t.Fatalf("%s invalid promotion report: %v", metadata.ID, err)
+			}
+			if len(reportJSON) == 0 {
+				t.Fatalf("%s promotion report JSON is empty", metadata.ID)
+			}
+			assertDesignExamplePromotionMatchesMetadata(t, metadata, report, outputDir, result)
+		})
 	}
 }
 
@@ -873,6 +931,26 @@ func promotionFixtureFromDesignExampleMetadata(metadata designExampleMetadata) P
 		ExpectedArtifacts: append([]string(nil), metadata.ExpectedArtifacts...),
 		ExpectedStages:    append([]StageName(nil), metadata.ExpectedStages...),
 		KnownGaps:         append([]string(nil), metadata.KnownGaps...),
+	}
+}
+
+func assertDesignExamplePromotionMatchesMetadata(t *testing.T, metadata designExampleMetadata, report PromotionReport, outputDir string, result WorkflowResult) {
+	t.Helper()
+	switch metadata.Readiness {
+	case "expected_fail":
+		if report.Status != PromotionStatusExpectedFail || !report.MatchesExpectation {
+			t.Fatalf("%s promotion status=%q achieved=%q matches=%v, want expected_fail match\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	case "candidate":
+		if report.AchievedReadiness != PromotionReadinessCandidate && report.AchievedReadiness != PromotionReadinessPass {
+			t.Fatalf("%s promotion achieved=%q, want candidate or pass\n%s", metadata.ID, report.AchievedReadiness, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	case "pass":
+		if report.AchievedReadiness != PromotionReadinessPass {
+			t.Fatalf("%s promotion achieved=%q, want pass\n%s", metadata.ID, report.AchievedReadiness, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	default:
+		t.Fatalf("%s unsupported readiness %q", metadata.ID, metadata.Readiness)
 	}
 }
 

@@ -13,6 +13,7 @@
     "component_selection"
   ],
   "known_gaps": [
+    "Promotion parse_request currently records COMPONENT_INVALID_ACCEPTANCE because component_policy.acceptance does not support fabrication-candidate.",
     "The op-amp headphone buffer seed has placeholder connector protection for required output DC blocking and protection.",
     "Fabrication-candidate component evidence is intentionally unavailable for the amplifier seed, so optional KiCad-backed runs must fail closed before claiming ERC/DRC-ready analog output.",
     "Amplifier-specific layout proof for feedback proximity, supply decoupling, high-current output width, thermal placement, and headphone load safety remains future work."

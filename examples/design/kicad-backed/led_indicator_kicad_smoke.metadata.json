@@ -24,6 +24,7 @@
   ],
   "known_gaps": [
     "Generated LED PCB pad and copper net codes clear writer correctness, and local route endpoint binding now emits same-net copper from physical pad anchors.",
+    "Promotion gates still fail closed on kicad_checks_missing when no real kicad-cli ERC/DRC evidence is configured.",
     "The fixture remains expected_fail until full internal validation plus optional KiCad ERC/DRC evidence proves the generated schematic and PCB are clean."
   ],
   "notes": "Smallest optional design-create fixture for local real kicad-cli smoke runs; currently tracks post-endpoint-binding validation and KiCad ERC/DRC blockers."

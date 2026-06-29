@@ -24,6 +24,7 @@
   ],
   "known_gaps": [
     "Inter-block connector-to-LED routing now emits evidence-of-contact diagnostics; the supported LED_EN path remains partial until all required contacts are graph-connected.",
+    "Promotion route_completion and kicad_checks gates are expected to block until the connector-to-LED route has complete endpoint-contact evidence and real ERC/DRC reports.",
     "This KiCad-backed fixture still keeps routing skipped until endpoint-contact route completion validates cleanly."
   ],
   "notes": "Design-level multi-block PCB output carries pad/copper net code evidence, local LED block routes bind to physical same-net pad anchors, and separate routing-enabled regression coverage emits inter-block connector-to-LED contact-miss evidence instead of treating route emission as completion."
