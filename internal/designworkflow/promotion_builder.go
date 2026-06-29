@@ -1,0 +1,536 @@
+package designworkflow
+
+import (
+	"fmt"
+	"hash"
+	"hash/fnv"
+	"sort"
+	"strings"
+
+	"kicadai/internal/reports"
+)
+
+var promotionCodeReplacer = strings.NewReplacer("/", "_", "\\", "_", ".", "_", "-", "_", " ", "_")
+
+type PromotionFixture struct {
+	ID                string
+	Request           string
+	Tier              string
+	DeclaredReadiness PromotionReadiness
+	Acceptance        AcceptanceLevel
+	RequireERC        bool
+	RequireDRC        bool
+	ExpectedArtifacts []string
+	ExpectedStages    []StageName
+	KnownGaps         []string
+}
+
+func BuildInternalPromotionReport(fixture PromotionFixture, result WorkflowResult) PromotionReport {
+	builder := promotionReportBuilder{
+		fixture: fixture,
+		result:  result,
+		issues:  map[string]PromotionIssue{},
+		byStage: map[StageName][]string{},
+		stages:  indexPromotionStages(result.Stages),
+	}
+	builder.collectWorkflowIssues()
+	builder.addMetadataGate()
+	builder.addStageGate()
+	builder.addWriterGate()
+	builder.addConnectivityGate()
+	builder.addRouteGate()
+	builder.addPhysicalGate()
+	builder.addArtifactGate()
+	return builder.report()
+}
+
+type promotionReportBuilder struct {
+	fixture  PromotionFixture
+	result   WorkflowResult
+	gates    []PromotionGate
+	issues   map[string]PromotionIssue
+	byStage  map[StageName][]string
+	stages   map[StageName]StageResult
+	blocking []string
+}
+
+func (builder *promotionReportBuilder) collectWorkflowIssues() {
+	if builder.byStage == nil {
+		builder.byStage = map[StageName][]string{}
+	}
+	for _, stage := range builder.result.Stages {
+		for _, issue := range stage.Issues {
+			code := promotionIssueCode(stage.Name, issue)
+			if _, exists := builder.issues[code]; exists {
+				code = promotionUniqueIssueCode(builder.issues, code)
+			}
+			builder.byStage[stage.Name] = append(builder.byStage[stage.Name], code)
+			if issue.Blocking() {
+				builder.blocking = append(builder.blocking, code)
+			}
+			builder.issues[code] = PromotionIssue{
+				Code:     code,
+				Severity: issue.Severity,
+				Stage:    stage.Name,
+				Message:  issue.Message,
+				Path:     issue.Path,
+				Refs:     append([]string(nil), issue.Refs...),
+				Nets:     append([]string(nil), issue.Nets...),
+			}
+		}
+	}
+}
+
+func (builder *promotionReportBuilder) addMetadataGate() {
+	status := PromotionGateStatusPass
+	var issueCodes []string
+	if strings.TrimSpace(builder.fixture.ID) == "" {
+		status = PromotionGateStatusFailed
+		issueCodes = append(issueCodes, builder.addSyntheticIssue("metadata_missing_id", reports.SeverityError, "", "fixture id is required"))
+	}
+	if strings.TrimSpace(builder.fixture.Request) == "" {
+		status = PromotionGateStatusFailed
+		issueCodes = append(issueCodes, builder.addSyntheticIssue("metadata_missing_request", reports.SeverityError, "", "fixture request is required"))
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "metadata",
+		Status:      status,
+		RequiredFor: []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass},
+		IssueCodes:  issueCodes,
+	})
+}
+
+func (builder *promotionReportBuilder) addStageGate() {
+	reached := builder.reachedStages()
+	status := PromotionGateStatusPass
+	var issueCodes []string
+	for _, expected := range builder.fixture.ExpectedStages {
+		if !reached[expected] {
+			status = PromotionGateStatusFailed
+			issueCodes = append(issueCodes, builder.addSyntheticIssue("stage_missing_"+sanitizePromotionCode(string(expected)), reports.SeverityError, expected, "expected stage "+string(expected)+" was not reached"))
+		}
+	}
+	if builder.hasBlockedStage() {
+		status = PromotionGateStatusFailed
+		issueCodes = append(issueCodes, builder.blockingIssueCodes()...)
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "stages",
+		Status:      status,
+		RequiredFor: []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass},
+		IssueCodes:  issueCodes,
+	})
+}
+
+func (builder *promotionReportBuilder) addWriterGate() {
+	builder.addStageStatusGate("writer_correctness", StageWriterCorrect, []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass})
+}
+
+func (builder *promotionReportBuilder) addConnectivityGate() {
+	builder.addStageStatusGate("connectivity", StageValidation, []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass})
+}
+
+func (builder *promotionReportBuilder) addRouteGate() {
+	stage, ok := builder.stages[StageRouting]
+	if !ok {
+		builder.gates = append(builder.gates, PromotionGate{
+			ID:          "route_completion",
+			Status:      PromotionGateStatusNotRun,
+			RequiredFor: builder.requiredForStage(StageRouting),
+		})
+		return
+	}
+	status := promotionGateStatusForStage(stage)
+	if status == PromotionGateStatusPass {
+		if summary, ok := promotionRouteConnectivitySummary(stage); ok {
+			if summary.RoutesAttempted > summary.EndpointContactsProven {
+				status = PromotionGateStatusWarn
+			}
+		}
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "route_completion",
+		Status:      status,
+		RequiredFor: builder.requiredForStage(StageRouting),
+		IssueCodes:  builder.issueCodesForStage(StageRouting),
+	})
+}
+
+func (builder *promotionReportBuilder) addPhysicalGate() {
+	status := PromotionGateStatusNotRun
+	if stage, ok := builder.stages[StageFabricationReady]; ok {
+		status = promotionGateStatusForStage(stage)
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "physical_rules",
+		Status:      status,
+		RequiredFor: builder.requiredForStage(StageFabricationReady),
+		IssueCodes:  builder.issueCodesForStage(StageFabricationReady),
+	})
+}
+
+func (builder *promotionReportBuilder) addArtifactGate() {
+	status := PromotionGateStatusPass
+	var issueCodes []string
+	produced := builder.producedArtifactPaths()
+	for _, rawPath := range builder.fixture.ExpectedArtifacts {
+		path := strings.TrimSpace(rawPath)
+		if path == "" {
+			status = PromotionGateStatusFailed
+			issueCodes = append(issueCodes, builder.addSyntheticIssue("artifact_missing_path", reports.SeverityError, "", "expected artifact path is empty"))
+			continue
+		}
+		if !produced[path] {
+			status = PromotionGateStatusFailed
+			issueCodes = append(issueCodes, builder.addSyntheticIssue("artifact_not_produced_"+sanitizePromotionCode(path), reports.SeverityError, "", "expected artifact "+path+" was not produced"))
+		}
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "artifacts",
+		Status:      status,
+		RequiredFor: []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass},
+		IssueCodes:  issueCodes,
+		Artifacts:   normalizedExpectedArtifacts(builder.fixture.ExpectedArtifacts),
+	})
+}
+
+func (builder *promotionReportBuilder) addStageStatusGate(id string, stageName StageName, required []PromotionReadiness) {
+	if !builder.stageRelevant(stageName) {
+		required = nil
+	}
+	stage, ok := builder.stages[stageName]
+	if !ok {
+		builder.gates = append(builder.gates, PromotionGate{ID: id, Status: PromotionGateStatusNotRun, RequiredFor: required})
+		return
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          id,
+		Status:      promotionGateStatusForStage(stage),
+		RequiredFor: required,
+		IssueCodes:  builder.issueCodesForStage(stageName),
+	})
+}
+
+func (builder *promotionReportBuilder) report() PromotionReport {
+	artifacts := builder.promotionArtifacts()
+	issues := make([]PromotionIssue, 0, len(builder.issues))
+	for _, issue := range builder.issues {
+		issues = append(issues, issue)
+	}
+	sort.Slice(issues, func(i, j int) bool {
+		return issues[i].Code < issues[j].Code
+	})
+	achieved := builder.achievedReadiness()
+	status := builder.statusForAchieved(achieved)
+	return NormalizePromotionReport(PromotionReport{
+		ID:                 builder.fixture.ID,
+		Request:            builder.fixture.Request,
+		Tier:               builder.fixture.Tier,
+		DeclaredReadiness:  builder.fixture.DeclaredReadiness,
+		AchievedReadiness:  achieved,
+		Acceptance:         builder.fixture.Acceptance,
+		Status:             status,
+		MatchesExpectation: achieved == builder.fixture.DeclaredReadiness,
+		Summary:            promotionSummary(status, achieved),
+		Gates:              builder.gates,
+		Stages: PromotionStageReport{
+			Expected:  append([]StageName(nil), builder.fixture.ExpectedStages...),
+			Reached:   builder.reachedStageList(),
+			StoppedAt: builder.stoppedStage(),
+		},
+		Issues:    issues,
+		Artifacts: artifacts,
+	})
+}
+
+func (builder *promotionReportBuilder) achievedReadiness() PromotionReadiness {
+	if builder.fixture.DeclaredReadiness == PromotionReadinessBlocked {
+		return PromotionReadinessBlocked
+	}
+	passAchieved := builder.gatesAllowReadiness(PromotionReadinessPass)
+	candidateAchieved := builder.gatesAllowReadiness(PromotionReadinessCandidate)
+	if !passAchieved && !candidateAchieved {
+		if builder.fixture.DeclaredReadiness == PromotionReadinessExpectedFail {
+			return PromotionReadinessExpectedFail
+		}
+		return PromotionReadinessBlocked
+	}
+	if passAchieved {
+		return PromotionReadinessPass
+	}
+	return PromotionReadinessCandidate
+}
+
+func (builder *promotionReportBuilder) gatesAllowReadiness(readiness PromotionReadiness) bool {
+	for _, gate := range builder.gates {
+		if !gateRequiresReadiness(gate, readiness) {
+			continue
+		}
+		switch readiness {
+		case PromotionReadinessPass:
+			if gate.Status != PromotionGateStatusPass {
+				return false
+			}
+		case PromotionReadinessCandidate:
+			if gate.Status != PromotionGateStatusPass && gate.Status != PromotionGateStatusWarn {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func (builder *promotionReportBuilder) statusForAchieved(achieved PromotionReadiness) PromotionStatus {
+	if builder.fixture.DeclaredReadiness == PromotionReadinessExpectedFail && (achieved == PromotionReadinessCandidate || achieved == PromotionReadinessPass) {
+		return PromotionStatusUnexpectedPass
+	}
+	switch achieved {
+	case PromotionReadinessPass:
+		return PromotionStatusPass
+	case PromotionReadinessCandidate:
+		for _, gate := range builder.gates {
+			if gate.Status == PromotionGateStatusWarn {
+				return PromotionStatusWarn
+			}
+		}
+		return PromotionStatusPass
+	case PromotionReadinessExpectedFail:
+		return PromotionStatusExpectedFail
+	case PromotionReadinessBlocked:
+		if builder.fixture.DeclaredReadiness == PromotionReadinessBlocked {
+			return PromotionStatusBlocked
+		}
+		return PromotionStatusFailed
+	default:
+		return PromotionStatusError
+	}
+}
+
+func (builder *promotionReportBuilder) reachedStages() map[StageName]bool {
+	reached := map[StageName]bool{}
+	for _, stage := range builder.result.Stages {
+		reached[stage.Name] = true
+	}
+	return reached
+}
+
+func (builder *promotionReportBuilder) reachedStageList() []StageName {
+	reached := make([]StageName, 0, len(builder.result.Stages))
+	for _, stage := range builder.result.Stages {
+		reached = append(reached, stage.Name)
+	}
+	return reached
+}
+
+func (builder *promotionReportBuilder) stoppedStage() StageName {
+	for i := len(builder.result.Stages) - 1; i >= 0; i-- {
+		stage := builder.result.Stages[i]
+		if stage.Status == StageStatusBlocked || reports.HasBlockingIssue(stage.Issues) {
+			return stage.Name
+		}
+	}
+	if len(builder.result.Stages) != 0 {
+		return builder.result.Stages[len(builder.result.Stages)-1].Name
+	}
+	return ""
+}
+
+func (builder *promotionReportBuilder) hasBlockedStage() bool {
+	for _, stage := range builder.result.Stages {
+		if stage.Status == StageStatusBlocked || reports.HasBlockingIssue(stage.Issues) {
+			return true
+		}
+	}
+	return false
+}
+
+func (builder *promotionReportBuilder) blockingIssueCodes() []string {
+	return append([]string(nil), builder.blocking...)
+}
+
+func (builder *promotionReportBuilder) requiredForStage(stageName StageName) []PromotionReadiness {
+	if !builder.stageRelevant(stageName) {
+		return nil
+	}
+	return []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass}
+}
+
+func (builder *promotionReportBuilder) stageRelevant(stageName StageName) bool {
+	for _, expected := range builder.fixture.ExpectedStages {
+		if expected == stageName {
+			return true
+		}
+	}
+	_, reached := builder.stages[stageName]
+	return reached
+}
+
+func (builder *promotionReportBuilder) issueCodesForStage(stageName StageName) []string {
+	return append([]string(nil), builder.byStage[stageName]...)
+}
+
+func (builder *promotionReportBuilder) addSyntheticIssue(code string, severity reports.Severity, stage StageName, message string) string {
+	if _, exists := builder.issues[code]; exists {
+		code = promotionUniqueIssueCode(builder.issues, code)
+	}
+	builder.issues[code] = PromotionIssue{
+		Code:     code,
+		Severity: severity,
+		Stage:    stage,
+		Message:  message,
+	}
+	return code
+}
+
+func (builder *promotionReportBuilder) promotionArtifacts() []PromotionArtifact {
+	expected := map[string]bool{}
+	for _, rawPath := range builder.fixture.ExpectedArtifacts {
+		path := strings.TrimSpace(rawPath)
+		if path != "" {
+			expected[path] = true
+		}
+	}
+	seen := map[string]struct{}{}
+	var artifacts []PromotionArtifact
+	for _, stage := range builder.result.Stages {
+		for _, artifact := range stage.Artifacts {
+			path := strings.TrimSpace(artifact.Path)
+			if path == "" {
+				continue
+			}
+			if _, exists := seen[path]; exists {
+				continue
+			}
+			seen[path] = struct{}{}
+			artifacts = append(artifacts, PromotionArtifact{
+				Path:        path,
+				Kind:        artifact.Kind,
+				Description: artifact.Description,
+				Required:    expected[path],
+			})
+		}
+	}
+	for _, rawPath := range builder.fixture.ExpectedArtifacts {
+		path := strings.TrimSpace(rawPath)
+		if path == "" {
+			continue
+		}
+		if _, exists := seen[path]; exists {
+			continue
+		}
+		artifacts = append(artifacts, PromotionArtifact{Path: path, Required: true})
+	}
+	return artifacts
+}
+
+func (builder *promotionReportBuilder) producedArtifactPaths() map[string]bool {
+	produced := map[string]bool{}
+	for _, stage := range builder.result.Stages {
+		for _, artifact := range stage.Artifacts {
+			if path := strings.TrimSpace(artifact.Path); path != "" {
+				produced[path] = true
+			}
+		}
+	}
+	return produced
+}
+
+func promotionGateStatusForStage(stage StageResult) PromotionGateStatus {
+	switch stage.Status {
+	case StageStatusOK:
+		return PromotionGateStatusPass
+	case StageStatusWarning:
+		return PromotionGateStatusWarn
+	case StageStatusBlocked:
+		return PromotionGateStatusFailed
+	case StageStatusSkipped:
+		return PromotionGateStatusSkipped
+	default:
+		if reports.HasBlockingIssue(stage.Issues) {
+			return PromotionGateStatusFailed
+		}
+		if len(stage.Issues) != 0 {
+			return PromotionGateStatusWarn
+		}
+		return PromotionGateStatusNotRun
+	}
+}
+
+func promotionRouteConnectivitySummary(stage StageResult) (LocalRouteConnectivitySummary, bool) {
+	if stage.Summary == nil {
+		return LocalRouteConnectivitySummary{}, false
+	}
+	value, exists := stage.Summary["route_connectivity"]
+	if !exists {
+		return LocalRouteConnectivitySummary{}, false
+	}
+	switch summary := value.(type) {
+	case LocalRouteConnectivitySummary:
+		return summary, true
+	case *LocalRouteConnectivitySummary:
+		if summary == nil {
+			return LocalRouteConnectivitySummary{}, false
+		}
+		return *summary, true
+	default:
+		return LocalRouteConnectivitySummary{}, false
+	}
+}
+
+func promotionIssueCode(stage StageName, issue reports.Issue) string {
+	code := strings.TrimSpace(string(issue.Code))
+	if code == "" {
+		code = "issue"
+	}
+	hash := fnv.New64a()
+	_, _ = hash.Write([]byte(string(stage)))
+	_, _ = hash.Write([]byte{0})
+	_, _ = hash.Write([]byte(code))
+	_, _ = hash.Write([]byte{0})
+	writePromotionHashStrings(hash, issue.Refs)
+	_, _ = hash.Write([]byte{0})
+	writePromotionHashStrings(hash, issue.Nets)
+	return fmt.Sprintf("%s_%s_%016x", sanitizePromotionCode(string(stage)), sanitizePromotionCode(code), hash.Sum64())
+}
+
+func writePromotionHashStrings(hash hash.Hash64, values []string) {
+	for _, value := range values {
+		_, _ = hash.Write([]byte{0xff})
+		_, _ = hash.Write([]byte(value))
+	}
+}
+
+func promotionUniqueIssueCode(existing map[string]PromotionIssue, base string) string {
+	for i := 2; ; i++ {
+		candidate := fmt.Sprintf("%s_%d", base, i)
+		if _, exists := existing[candidate]; !exists {
+			return candidate
+		}
+	}
+}
+
+func indexPromotionStages(stages []StageResult) map[StageName]StageResult {
+	indexed := make(map[StageName]StageResult, len(stages))
+	for _, stage := range stages {
+		indexed[stage.Name] = stage
+	}
+	return indexed
+}
+
+func promotionSummary(status PromotionStatus, readiness PromotionReadiness) string {
+	return "promotion " + string(status) + " with achieved readiness " + string(readiness)
+}
+
+func sanitizePromotionCode(value string) string {
+	return strings.ToLower(promotionCodeReplacer.Replace(value))
+}
+
+func normalizedExpectedArtifacts(paths []string) []string {
+	var normalized []string
+	for _, path := range paths {
+		if trimmed := strings.TrimSpace(path); trimmed != "" {
+			normalized = append(normalized, trimmed)
+		}
+	}
+	return normalized
+}
