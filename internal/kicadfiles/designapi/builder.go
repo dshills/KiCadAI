@@ -254,6 +254,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	}
 	builder.symbolKeys[key] = reference
 	builder.addKnownSymbolLibrary(libraryID)
+	schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID)
 	return SymbolHandle{Reference: reference}, nil
 }
 

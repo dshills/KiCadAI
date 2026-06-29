@@ -2,7 +2,6 @@ package schematic
 
 import (
 	"kicadai/internal/kicadfiles"
-	"kicadai/internal/kicadfiles/sexpr"
 )
 
 func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
@@ -40,7 +39,7 @@ func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
 	ledRight := offsetX(led.Position, kicadfiles.MM(5.08))
 	gndPin := offsetX(powerGND.Position, -kicadfiles.MM(5.08))
 
-	return SchematicFile{
+	schematic := SchematicFile{
 		Filename:         input.Name + ".kicad_sch",
 		Version:          kicadfiles.KiCadFormatV20260306,
 		Generator:        "eeschema",
@@ -49,12 +48,6 @@ func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
 		Paper:            kicadfiles.Paper{Name: "A4"},
 		TitleBlock: kicadfiles.TitleBlock{
 			Title: "LED Indicator",
-		},
-		LibSymbols: []EmbeddedSymbol{
-			{LibraryID: input.LibraryLED, Body: twoPinSymbolBody(input.LibraryLED, "LED", "passive")},
-			{LibraryID: input.LibraryResistor, Body: twoPinSymbolBody(input.LibraryResistor, "R", "passive")},
-			{LibraryID: input.LibraryGND, Body: powerSymbolBody(input.LibraryGND, "GND", "power_in", -5.08)},
-			{LibraryID: input.LibraryVCC, Body: powerSymbolBody(input.LibraryVCC, "VCC", "power_out", 5.08)},
 		},
 		Symbols: []SchematicSymbol{powerVCC, resistor, led, powerGND},
 		Wires: []Wire{
@@ -79,7 +72,12 @@ func LEDIndicatorSchematic(input LEDIndicatorInput) (SchematicFile, error) {
 			{Path: led.Path, Reference: led.Reference, Unit: 1, Value: led.Value},
 			{Path: powerGND.Path, Reference: powerGND.Reference, Unit: 1, Value: powerGND.Value},
 		},
-	}, nil
+	}
+	EnsureEmbeddedTwoPinSymbol(&schematic, input.LibraryLED, "LED", "passive")
+	EnsureEmbeddedTwoPinSymbol(&schematic, input.LibraryResistor, "R", "passive")
+	EnsureEmbeddedPowerSymbol(&schematic, input.LibraryGND, "GND", "power_in", -5.08)
+	EnsureEmbeddedPowerSymbol(&schematic, input.LibraryVCC, "VCC", "power_in", 5.08)
+	return schematic, nil
 }
 
 func symbol(generator kicadfiles.IDGenerator, key, libraryID, reference, value string, position kicadfiles.Point, pinNumbers ...string) SchematicSymbol {
@@ -111,76 +109,4 @@ func wire(generator kicadfiles.IDGenerator, key string, start, end kicadfiles.Po
 
 func offsetX(point kicadfiles.Point, offset kicadfiles.IU) kicadfiles.Point {
 	return kicadfiles.Point{X: point.X + offset, Y: point.Y}
-}
-
-func twoPinSymbolBody(libraryID, bodyName, pinType string) sexpr.List {
-	nodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(libraryID)}
-	nodes = append(nodes, embeddedSymbolDefaults()...)
-	nodes = append(nodes,
-		sexpr.L(
-			sexpr.A("symbol"),
-			sexpr.S(bodyName+"_1_1"),
-			embeddedPin(pinType, -5.08, 0, "~", "1"),
-			embeddedPin(pinType, 5.08, 180, "~", "2"),
-		),
-		// KiCad 10.0.3 writes embedded_fonts inside each embedded lib symbol.
-		sexpr.L(sexpr.A("embedded_fonts"), sexpr.A("no")),
-	)
-	return sexpr.L(nodes...)
-}
-
-func powerSymbolBody(libraryID, bodyName, pinType string, pinX float64) sexpr.List {
-	nodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(libraryID)}
-	nodes = append(nodes, embeddedSymbolDefaults()...)
-	nodes = append(nodes,
-		sexpr.L(
-			sexpr.A("symbol"),
-			sexpr.S(bodyName+"_1_1"),
-			// Match KiCad's save output for these generated power symbols.
-			embeddedPin(pinType, pinX, 180, libraryID, "1"),
-		),
-		// KiCad 10.0.3 writes embedded_fonts inside each embedded lib symbol.
-		sexpr.L(sexpr.A("embedded_fonts"), sexpr.A("no")),
-	)
-	return sexpr.L(nodes...)
-}
-
-func embeddedSymbolDefaults() []sexpr.Node {
-	return []sexpr.Node{
-		sexpr.L(sexpr.A("exclude_from_sim"), sexpr.A("no")),
-		sexpr.L(sexpr.A("in_bom"), sexpr.A("yes")),
-		sexpr.L(sexpr.A("on_board"), sexpr.A("yes")),
-		sexpr.L(sexpr.A("in_pos_files"), sexpr.A("yes")),
-		sexpr.L(sexpr.A("duplicate_pin_numbers_are_jumpers"), sexpr.A("no")),
-		embeddedLibraryProperty("Reference", "", false),
-		embeddedLibraryProperty("Value", "", false),
-		embeddedLibraryProperty("Footprint", "", true),
-		embeddedLibraryProperty("Datasheet", "", true),
-		embeddedLibraryProperty("Description", "", true),
-	}
-}
-
-func embeddedLibraryProperty(name, value string, hidden bool) sexpr.List {
-	return sexpr.L(
-		sexpr.A("property"),
-		sexpr.S(name),
-		sexpr.S(value),
-		sexpr.L(sexpr.A("at"), sexpr.I(0), sexpr.I(0), sexpr.I(0)),
-		sexpr.L(sexpr.A("show_name"), sexpr.A("no")),
-		sexpr.L(sexpr.A("do_not_autoplace"), sexpr.A("no")),
-		sexpr.OmitIf(!hidden, sexpr.L(sexpr.A("hide"), sexpr.A("yes"))),
-		renderEffects(false),
-	)
-}
-
-func embeddedPin(pinType string, pinX float64, rotation int64, name string, number string) sexpr.List {
-	return sexpr.L(
-		sexpr.A("pin"),
-		sexpr.A(pinType),
-		sexpr.A("line"),
-		sexpr.L(sexpr.A("at"), sexpr.F(pinX), sexpr.I(0), sexpr.I(rotation)),
-		sexpr.L(sexpr.A("length"), sexpr.X("2.54")),
-		sexpr.L(sexpr.A("name"), sexpr.S(name), renderEffects(false)),
-		sexpr.L(sexpr.A("number"), sexpr.S(number), renderEffects(false)),
-	)
 }
