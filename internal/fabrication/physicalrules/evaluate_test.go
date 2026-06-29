@@ -161,6 +161,92 @@ func TestEvaluateBoardSkipsNPTHForAnnularRing(t *testing.T) {
 	assertCheckStatus(t, report, CheckAnnularRingPlatedPad, StatusSkipped)
 }
 
+func TestEvaluateBoardBlocksNarrowCopperFeatures(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Tracks[0].Width = kicadfiles.MM(0.05)
+	board.TrackArcs = []pcbfiles.TrackArc{{
+		UUID:    kicadfiles.UUID("42000000-0000-4000-8000-000000000001"),
+		Start:   point(4, 4),
+		Mid:     point(5, 3),
+		End:     point(6, 4),
+		Width:   kicadfiles.MM(0.05),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "VCC",
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCopperSliverTrackWidth, StatusBlocked)
+}
+
+func TestEvaluateBoardChecksZoneCopperMinimumWidth(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Zones = []pcbfiles.Zone{{
+		UUID:         kicadfiles.UUID("43000000-0000-4000-8000-000000000001"),
+		NetCode:      1,
+		NetName:      "VCC",
+		Layers:       []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		MinThickness: kicadfiles.MM(0.05),
+		Polygons: [][]kicadfiles.Point{{
+			point(1, 1),
+			point(9, 1),
+			point(9, 9),
+			point(1, 9),
+			point(1, 1),
+		}},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCopperSliverZoneMinWidth, StatusBlocked)
+}
+
+func TestEvaluateBoardBlocksZeroThicknessCopperZone(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Zones = []pcbfiles.Zone{{
+		UUID:    kicadfiles.UUID("43000000-0000-4000-8000-000000000002"),
+		NetCode: 1,
+		NetName: "VCC",
+		Layers:  []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		Polygons: [][]kicadfiles.Point{{
+			point(1, 1),
+			point(9, 1),
+			point(9, 9),
+			point(1, 9),
+			point(1, 1),
+		}},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCopperSliverZoneMinWidth, StatusBlocked)
+}
+
+func TestEvaluateBoardIgnoresNonCopperZoneForCopperSlivers(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Zones = []pcbfiles.Zone{{
+		UUID:         kicadfiles.UUID("43000000-0000-4000-8000-000000000003"),
+		Layers:       []kicadfiles.BoardLayer{kicadfiles.LayerFSilkS},
+		MinThickness: kicadfiles.MM(0.05),
+		Polygons: [][]kicadfiles.Point{{
+			point(1, 1),
+			point(9, 1),
+			point(9, 9),
+			point(1, 9),
+			point(1, 1),
+		}},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCopperSliverZoneMinWidth, StatusSkipped)
+}
+
 func TestEvaluateBoardWarnsOnOpenLineOutlineAndBlocksOutsideObject(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Drawings = []pcbfiles.Drawing{

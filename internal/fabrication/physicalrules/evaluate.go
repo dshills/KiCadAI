@@ -31,6 +31,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateStackup(board)...)
 	checks = append(checks, evaluateNetClasses(board, project)...)
 	checks = append(checks, evaluateAnnularRings(board, opts)...)
+	checks = append(checks, evaluateCopperSlivers(board, opts)...)
 	checks = append(checks, evaluateMaskPaste(board)...)
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
@@ -153,6 +154,168 @@ func evaluateAnnularRings(board *pcbfiles.PCBFile, opts Options) []Check {
 		padCheck,
 		viaCheck,
 	}
+}
+
+func evaluateCopperSlivers(board *pcbfiles.PCBFile, opts Options) []Check {
+	return []Check{
+		evaluateCopperTrackWidths(board, opts),
+		evaluateCopperZoneWidths(board, opts),
+		evaluateUnsupportedCopperGeometry(board),
+	}
+}
+
+func evaluateCopperTrackWidths(board *pcbfiles.PCBFile, opts Options) Check {
+	checked := 0
+	violations := 0
+	var objects []string
+	nets := map[string]struct{}{}
+	minObserved := math.MaxFloat64
+	checkWidth := func(uuid kicadfiles.UUID, width kicadfiles.IU, netName string) {
+		checked++
+		widthMM := iuToMM(width)
+		if widthMM < minObserved {
+			minObserved = widthMM
+		}
+		if width <= 0 || widthMM < opts.MinCopperFeatureMM {
+			violations++
+			objects = appendLimited(objects, string(uuid))
+			if strings.TrimSpace(netName) != "" {
+				nets[netName] = struct{}{}
+			}
+		}
+	}
+	for _, track := range board.Tracks {
+		checkWidth(track.UUID, track.Width, track.NetName)
+	}
+	for _, arc := range board.TrackArcs {
+		checkWidth(arc.UUID, arc.Width, arc.NetName)
+	}
+	for _, drawing := range board.Drawings {
+		if !isCopperLayer(drawing.Layer) {
+			continue
+		}
+		width, ok := drawingStrokeWidth(drawing)
+		if !ok {
+			continue
+		}
+		checkWidth(drawing.UUID, width, drawing.NetName)
+	}
+	if checked == 0 {
+		return Check{ID: CheckCopperSliverTrackWidth, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no explicit copper feature widths were found for sliver checks", Source: SourceParser}
+	}
+	measurements := []Measurement{
+		{Name: "checked_count", Value: float64(checked), Unit: "count"},
+		{Name: "min_required_copper_feature", Value: opts.MinCopperFeatureMM, Unit: "mm"},
+	}
+	if minObserved != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_copper_width", Value: minObserved, Unit: "mm"})
+	}
+	if violations == 0 {
+		return Check{ID: CheckCopperSliverTrackWidth, Category: CategoryCopperSliver, Status: StatusPass, Message: "explicit copper feature widths meet the active profile threshold", Measurements: measurements, Source: SourceParser}
+	}
+	measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+	return Check{
+		ID:           CheckCopperSliverTrackWidth,
+		Category:     CategoryCopperSliver,
+		Status:       StatusBlocked,
+		Message:      "one or more explicit copper features are narrower than the active profile threshold",
+		Suggestion:   "increase track/arc/copper drawing width or select a manufacturer profile that supports the modeled feature width",
+		IssuePath:    "physical.copper_sliver.track_width",
+		Objects:      objects,
+		Nets:         sortedMapKeys(nets),
+		Measurements: measurements,
+		Source:       SourceParser,
+	}
+}
+
+func evaluateCopperZoneWidths(board *pcbfiles.PCBFile, opts Options) Check {
+	checked := 0
+	violations := 0
+	var objects []string
+	nets := map[string]struct{}{}
+	minObserved := math.MaxFloat64
+	for _, zone := range board.Zones {
+		if !zoneTouchesCopper(zone) {
+			continue
+		}
+		checked++
+		widthMM := iuToMM(zone.MinThickness)
+		if widthMM < minObserved {
+			minObserved = widthMM
+		}
+		if widthMM < opts.MinCopperFeatureMM {
+			violations++
+			objects = appendLimited(objects, string(zone.UUID))
+			if strings.TrimSpace(zone.NetName) != "" {
+				nets[zone.NetName] = struct{}{}
+			}
+		}
+	}
+	if checked == 0 {
+		return Check{ID: CheckCopperSliverZoneMinWidth, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no zone minimum-thickness evidence was found for copper sliver checks", Source: SourceParser}
+	}
+	measurements := []Measurement{
+		{Name: "checked_count", Value: float64(checked), Unit: "count"},
+		{Name: "min_required_copper_feature", Value: opts.MinCopperFeatureMM, Unit: "mm"},
+	}
+	if minObserved != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_zone_width", Value: minObserved, Unit: "mm"})
+	}
+	if violations == 0 {
+		return Check{ID: CheckCopperSliverZoneMinWidth, Category: CategoryCopperSliver, Status: StatusPass, Message: "zone minimum-thickness evidence meets the active profile threshold", Measurements: measurements, Source: SourceParser}
+	}
+	measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+	return Check{
+		ID:           CheckCopperSliverZoneMinWidth,
+		Category:     CategoryCopperSliver,
+		Status:       StatusBlocked,
+		Message:      "one or more zones allow copper narrower than the active profile threshold",
+		Suggestion:   "increase zone minimum thickness or verify the zone with KiCad/manufacturer DFM before fabrication export",
+		IssuePath:    "physical.copper_sliver.zone_min_width",
+		Objects:      objects,
+		Nets:         sortedMapKeys(nets),
+		Measurements: measurements,
+		Source:       SourceParser,
+	}
+}
+
+func evaluateUnsupportedCopperGeometry(board *pcbfiles.PCBFile) Check {
+	unsupported := 0
+	var objects []string
+	for _, zone := range board.Zones {
+		if !zoneTouchesCopper(zone) {
+			continue
+		}
+		if strings.TrimSpace(zone.Raw) != "" && len(zone.Polygons) == 0 && len(zone.FilledPolygons) == 0 {
+			unsupported++
+			objects = appendLimited(objects, string(zone.UUID))
+		}
+	}
+	if unsupported == 0 {
+		return Check{ID: CheckCopperSliverUnsupported, Category: CategoryCopperSliver, Status: StatusPass, Message: "no unsupported copper geometry prevented sliver checks", Source: SourceParser}
+	}
+	return Check{
+		ID:         CheckCopperSliverUnsupported,
+		Category:   CategoryCopperSliver,
+		Status:     StatusWarning,
+		Message:    "one or more copper zones lack minimum-width evidence for deterministic sliver checks",
+		Suggestion: "run KiCad DRC or add parsed zone minimum-thickness evidence before treating copper sliver checks as complete",
+		IssuePath:  "physical.copper_sliver.unsupported_geometry",
+		Objects:    objects,
+		Measurements: []Measurement{
+			{Name: "unsupported_count", Value: float64(unsupported), Unit: "count"},
+		},
+		Source: SourceHeuristic,
+	}
+}
+
+func zoneTouchesCopper(zone pcbfiles.Zone) bool {
+	for _, layer := range zone.Layers {
+		if isCopperLayer(layer) {
+			return true
+		}
+	}
+	return false
 }
 
 func evaluatePlatedPadAnnularRings(board *pcbfiles.PCBFile, opts Options) Check {
@@ -1168,6 +1331,25 @@ func drawingPoints(drawing pcbfiles.Drawing) []kicadfiles.Point {
 		return slices.Clone(drawing.Poly.Points)
 	default:
 		return nil
+	}
+}
+
+func drawingStrokeWidth(drawing pcbfiles.Drawing) (kicadfiles.IU, bool) {
+	switch {
+	case drawing.Line != nil:
+		return drawing.Line.Width, true
+	case drawing.Rect != nil:
+		return drawing.Rect.Width, true
+	case drawing.Circle != nil:
+		return drawing.Circle.Width, true
+	case drawing.Arc != nil:
+		return drawing.Arc.Width, true
+	case drawing.Poly != nil:
+		return drawing.Poly.Width, true
+	case drawing.Curve != nil:
+		return drawing.Curve.Width, true
+	default:
+		return 0, false
 	}
 }
 
