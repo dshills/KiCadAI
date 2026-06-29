@@ -38,6 +38,7 @@ func TestMarshalJSONIsDeterministic(t *testing.T) {
 	report := Report{Checks: []Check{
 		{ID: CheckMountingHolePresence, Category: CategoryMountingHole, Status: StatusSkipped, Message: "not required"},
 		{ID: CheckStackupThickness, Category: CategoryStackup, Status: StatusPass, Message: "thickness is valid"},
+		{ID: CheckAnnularRingVia, Category: CategoryAnnularRing, Status: StatusPass, Message: "via rings are valid"},
 	}}
 	data, err := MarshalReportJSON(report)
 	if err != nil {
@@ -47,12 +48,48 @@ func TestMarshalJSONIsDeterministic(t *testing.T) {
 	for _, want := range []string{
 		`"schema": "kicadai.fabrication.physical_rules.v1"`,
 		`"status": "pass"`,
+		`"annular_ring": "pass"`,
 		`"mounting_hole": "skipped"`,
 		`"stackup": "pass"`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("JSON missing %s:\n%s", want, text)
 		}
+	}
+}
+
+func TestNormalizeOptionsAppliesDFMDefaults(t *testing.T) {
+	opts := NormalizeOptions(Options{})
+	if opts.MinPlatedPadAnnularRingMM != defaultMinPlatedPadRingMM {
+		t.Fatalf("MinPlatedPadAnnularRingMM = %g", opts.MinPlatedPadAnnularRingMM)
+	}
+	if opts.MinViaRingMM != defaultMinViaRingMM {
+		t.Fatalf("MinViaRingMM = %g", opts.MinViaRingMM)
+	}
+	if opts.MinCopperFeatureMM != defaultMinCopperFeatureMM {
+		t.Fatalf("MinCopperFeatureMM = %g", opts.MinCopperFeatureMM)
+	}
+	if opts.MinSolderMaskWebMM != defaultMinSolderMaskWebMM {
+		t.Fatalf("MinSolderMaskWebMM = %g", opts.MinSolderMaskWebMM)
+	}
+	if opts.EdgePlatingPolicy != PolicyWarn || opts.ImpedancePolicy != PolicyWarn || opts.PanelizationPolicy != PolicyWarn {
+		t.Fatalf("policies = %#v", opts)
+	}
+
+	opts = NormalizeOptions(Options{
+		MinPlatedPadAnnularRingMM: 0.20,
+		MinViaRingMM:              0.12,
+		MinCopperFeatureMM:        0.15,
+		MinSolderMaskWebMM:        0.09,
+		EdgePlatingPolicy:         PolicyBlock,
+		ImpedancePolicy:           PolicyIgnore,
+		PanelizationPolicy:        PolicyBlock,
+	})
+	if opts.MinPlatedPadAnnularRingMM != 0.20 || opts.MinViaRingMM != 0.12 || opts.MinCopperFeatureMM != 0.15 || opts.MinSolderMaskWebMM != 0.09 {
+		t.Fatalf("overrides not preserved: %#v", opts)
+	}
+	if opts.EdgePlatingPolicy != PolicyBlock || opts.ImpedancePolicy != PolicyIgnore || opts.PanelizationPolicy != PolicyBlock {
+		t.Fatalf("policy overrides not preserved: %#v", opts)
 	}
 }
 

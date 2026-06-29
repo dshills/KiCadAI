@@ -23,14 +23,20 @@ const (
 type Category string
 
 const (
-	CategoryStackup      Category = "stackup"
-	CategoryNetClass     Category = "net_class"
-	CategorySolderMask   Category = "solder_mask"
-	CategorySolderPaste  Category = "solder_paste"
-	CategoryEdgeCuts     Category = "edge_cuts"
-	CategoryCourtyard    Category = "courtyard"
-	CategorySilkscreen   Category = "silkscreen"
-	CategoryMountingHole Category = "mounting_hole"
+	CategoryStackup          Category = "stackup"
+	CategoryNetClass         Category = "net_class"
+	CategorySolderMask       Category = "solder_mask"
+	CategorySolderPaste      Category = "solder_paste"
+	CategoryEdgeCuts         Category = "edge_cuts"
+	CategoryCourtyard        Category = "courtyard"
+	CategoryAnnularRing      Category = "annular_ring"
+	CategoryCopperSliver     Category = "copper_sliver"
+	CategoryEdgePlating      Category = "edge_plating"
+	CategoryImpedance        Category = "impedance"
+	CategoryDifferentialPair Category = "differential_pair"
+	CategoryFabMetadata      Category = "fabrication_metadata"
+	CategorySilkscreen       Category = "silkscreen"
+	CategoryMountingHole     Category = "mounting_hole"
 )
 
 type Source string
@@ -74,6 +80,33 @@ const (
 	CheckMountingHolePresence       = "physical.mounting_hole.presence"
 	CheckMountingHoleGeometry       = "physical.mounting_hole.geometry"
 	CheckMountingHoleEdgeClearance  = "physical.mounting_hole.edge_clearance"
+	CheckAnnularRingPlatedPad       = "physical.annular_ring.plated_pad"
+	CheckAnnularRingVia             = "physical.annular_ring.via"
+	CheckAnnularRingProfile         = "physical.annular_ring.profile_threshold"
+	CheckCopperSliverTrackWidth     = "physical.copper_sliver.track_width"
+	CheckCopperSliverZoneMinWidth   = "physical.copper_sliver.zone_min_width"
+	CheckCopperSliverUnsupported    = "physical.copper_sliver.unsupported_geometry"
+	CheckSolderMaskWebWidth         = "physical.solder_mask.web_width"
+	CheckSolderMaskPadExpansion     = "physical.solder_mask.pad_expansion"
+	CheckSolderMaskUnsupported      = "physical.solder_mask.unsupported_geometry"
+	CheckEdgePlatingCastellation    = "physical.edge_plating.castellation_detected"
+	CheckEdgePlatingProfile         = "physical.edge_plating.profile_support"
+	CheckEdgePlatingContact         = "physical.edge_plating.edge_contact"
+	CheckImpedanceStackupEvidence   = "physical.impedance.stackup_evidence"
+	CheckImpedanceWidthGapEvidence  = "physical.impedance.width_gap_evidence"
+	CheckDiffPairFabrication        = "physical.differential_pair.fabrication_evidence"
+	CheckFabMetadataBoardFinish     = "physical.fabrication_metadata.board_finish"
+	CheckFabMetadataPanelization    = "physical.fabrication_metadata.panelization"
+	CheckFabMetadataNotes           = "physical.fabrication_metadata.fabrication_notes"
+)
+
+type Policy string
+
+const (
+	PolicyIgnore Policy = "ignore"
+	PolicyWarn   Policy = "warn"
+	PolicyBlock  Policy = "block"
+	PolicyAllow  Policy = "allow"
 )
 
 type BoardRef struct {
@@ -132,15 +165,61 @@ type Report struct {
 }
 
 type Options struct {
-	ProfileID              string  `json:"profile_id,omitempty"`
-	Strict                 bool    `json:"strict,omitempty"`
-	RequireCourtyard       bool    `json:"require_courtyard,omitempty"`
-	RequireMountingHoles   bool    `json:"require_mounting_holes,omitempty"`
-	MinCopperEdgeMM        float64 `json:"min_copper_edge_mm,omitempty"`
-	MinHoleEdgeMM          float64 `json:"min_hole_edge_mm,omitempty"`
-	MinCourtyardSpacingMM  float64 `json:"min_courtyard_spacing_mm,omitempty"`
-	MinSilkPadClearanceMM  float64 `json:"min_silk_pad_clearance_mm,omitempty"`
-	MinSilkEdgeClearanceMM float64 `json:"min_silk_edge_clearance_mm,omitempty"`
+	ProfileID                 string  `json:"profile_id,omitempty"`
+	Strict                    bool    `json:"strict,omitempty"`
+	RequireCourtyard          bool    `json:"require_courtyard,omitempty"`
+	RequireMountingHoles      bool    `json:"require_mounting_holes,omitempty"`
+	MinCopperEdgeMM           float64 `json:"min_copper_edge_mm,omitempty"`
+	MinHoleEdgeMM             float64 `json:"min_hole_edge_mm,omitempty"`
+	MinCourtyardSpacingMM     float64 `json:"min_courtyard_spacing_mm,omitempty"`
+	MinSilkPadClearanceMM     float64 `json:"min_silk_pad_clearance_mm,omitempty"`
+	MinSilkEdgeClearanceMM    float64 `json:"min_silk_edge_clearance_mm,omitempty"`
+	MinPlatedPadAnnularRingMM float64 `json:"min_plated_pad_annular_ring_mm,omitempty"`
+	MinViaRingMM              float64 `json:"min_via_annular_ring_mm,omitempty"`
+	MinCopperFeatureMM        float64 `json:"min_copper_feature_mm,omitempty"`
+	MinSolderMaskWebMM        float64 `json:"min_solder_mask_web_mm,omitempty"`
+	EdgePlatingPolicy         Policy  `json:"edge_plating_policy,omitempty"`
+	RequireBoardFinish        bool    `json:"require_board_finish,omitempty"`
+	RequireFabricationNotes   bool    `json:"require_fabrication_notes,omitempty"`
+	ImpedancePolicy           Policy  `json:"controlled_impedance_policy,omitempty"`
+	PanelizationPolicy        Policy  `json:"panelization_policy,omitempty"`
+}
+
+const (
+	defaultMinPlatedPadRingMM = 0.15
+	defaultMinViaRingMM       = 0.10
+	defaultMinCopperFeatureMM = 0.127
+	defaultMinSolderMaskWebMM = 0.10
+)
+
+func NormalizeOptions(opts Options) Options {
+	// Thresholds use zero as "unset"; use the related Policy fields to disable
+	// optional checks instead of expressing a zero physical minimum.
+	if opts.MinPlatedPadAnnularRingMM <= 0 {
+		opts.MinPlatedPadAnnularRingMM = defaultMinPlatedPadRingMM
+	}
+	if opts.MinViaRingMM <= 0 {
+		opts.MinViaRingMM = defaultMinViaRingMM
+	}
+	if opts.MinCopperFeatureMM <= 0 {
+		opts.MinCopperFeatureMM = defaultMinCopperFeatureMM
+	}
+	if opts.MinSolderMaskWebMM <= 0 {
+		opts.MinSolderMaskWebMM = defaultMinSolderMaskWebMM
+	}
+	opts.EdgePlatingPolicy = normalizePolicy(opts.EdgePlatingPolicy, PolicyWarn)
+	opts.ImpedancePolicy = normalizePolicy(opts.ImpedancePolicy, PolicyWarn)
+	opts.PanelizationPolicy = normalizePolicy(opts.PanelizationPolicy, PolicyWarn)
+	return opts
+}
+
+func normalizePolicy(policy Policy, fallback Policy) Policy {
+	switch policy {
+	case PolicyIgnore, PolicyWarn, PolicyBlock, PolicyAllow:
+		return policy
+	default:
+		return fallback
+	}
 }
 
 func NewReport(profile string, board BoardRef, checks []Check) Report {
