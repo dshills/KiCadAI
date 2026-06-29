@@ -20,3 +20,4 @@ coverage.out
 *.kicad_prl
 ~*.kicad_*.lck
 examples/roundtrip_artifacts/
+examples/promotion_artifacts/
