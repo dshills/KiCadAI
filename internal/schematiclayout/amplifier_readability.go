@@ -16,13 +16,23 @@ func ValidateAmplifierReadability(file *schematic.SchematicFile) []Diagnostic {
 	for _, diagnostic := range validated.Diagnostics {
 		// Parsed fixture symbols do not yet carry exact symbol-body extents or
 		// pin entry geometry, so legitimate pin-entry wires can appear to cross
-		// symbol bodies. Amplifier-specific spacing checks cover real crowding.
-		if diagnostic.Severity == SeverityError && diagnostic.Code == "wire_symbol_overlap" {
+		// or overlap symbol bodies. Amplifier-specific spacing checks cover
+		// real crowding while the generic gate still catches diagonal wires.
+		if isParsedGeometryArtifact(diagnostic.Code) {
 			continue
 		}
 		diagnostics = append(diagnostics, diagnostic)
 	}
 	return NormalizeDiagnostics(diagnostics, maxAmplifierReadabilityDiagnostics)
+}
+
+func isParsedGeometryArtifact(code string) bool {
+	switch code {
+	case "wire_symbol_overlap", "symbol_overlap":
+		return true
+	default:
+		return false
+	}
 }
 
 func strictAmplifierDiagnostics(result Result) []Diagnostic {

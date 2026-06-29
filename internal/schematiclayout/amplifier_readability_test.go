@@ -84,7 +84,7 @@ func TestAmplifierReadabilityMatchesCompoundLabels(t *testing.T) {
 	}
 }
 
-func TestAmplifierExamplesCurrentlyExposeStrictReadabilityFailures(t *testing.T) {
+func TestAmplifierExamplesPassStrictReadability(t *testing.T) {
 	examples := []string{
 		"06_class_ab_headphone_amp",
 		"09_class_a_headphone_amp",
@@ -93,11 +93,20 @@ func TestAmplifierExamplesCurrentlyExposeStrictReadabilityFailures(t *testing.T)
 	for _, example := range examples {
 		t.Run(example, func(t *testing.T) {
 			file := readExampleSchematic(t, example)
-			if !hasDiagnostic(ValidateAmplifierReadability(file), "diagonal_wire", SeverityError) {
-				t.Fatalf("expected baseline diagonal wire failure for %s", example)
+			if diagnostics := ValidateAmplifierReadability(file); hasSeverity(diagnostics, SeverityError) {
+				t.Fatalf("strict amplifier readability diagnostics for %s = %#v", example, diagnostics)
 			}
 		})
 	}
+}
+
+func hasSeverity(diagnostics []Diagnostic, severity Severity) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == severity {
+			return true
+		}
+	}
+	return false
 }
 
 func syntheticAmplifierSchematic(diagonal bool) *schematic.SchematicFile {
