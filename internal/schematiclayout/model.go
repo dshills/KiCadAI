@@ -157,6 +157,7 @@ type Diagnostic struct {
 	Ref      string   `json:"ref,omitempty"`
 	NetName  string   `json:"net_name,omitempty"`
 	Message  string   `json:"message"`
+	Repair   string   `json:"repair,omitempty"`
 }
 
 type Report struct {
@@ -281,13 +282,35 @@ func NormalizeResult(result Result, rules Rules) Result {
 }
 
 func NormalizeDiagnostics(diagnostics []Diagnostic, limit int) []Diagnostic {
+	diagnostics = append([]Diagnostic(nil), diagnostics...)
+	diagnostics = enrichDiagnosticRepairs(diagnostics)
 	sort.SliceStable(diagnostics, func(i, j int) bool {
 		return compareDiagnostics(diagnostics[i], diagnostics[j]) < 0
 	})
 	if limit > 0 && len(diagnostics) > limit {
 		return append([]Diagnostic(nil), diagnostics[:limit]...)
 	}
-	return append([]Diagnostic(nil), diagnostics...)
+	return diagnostics
+}
+
+func enrichDiagnosticRepairs(diagnostics []Diagnostic) []Diagnostic {
+	repairs := map[string]string{}
+	for index := range diagnostics {
+		if diagnostics[index].Repair != "" {
+			continue
+		}
+		if repair, ok := repairs[diagnostics[index].Code]; ok {
+			diagnostics[index].Repair = repair
+			continue
+		}
+		repair := ""
+		if rule, ok := RuleForDiagnostic(diagnostics[index].Code); ok {
+			repair = rule.Repair
+		}
+		repairs[diagnostics[index].Code] = repair
+		diagnostics[index].Repair = repair
+	}
+	return diagnostics
 }
 
 func BuildReport(result Result, profile Profile) Report {
@@ -470,6 +493,9 @@ func compareDiagnostics(first, second Diagnostic) int {
 		return cmp
 	}
 	if cmp := strings.Compare(first.Message, second.Message); cmp != 0 {
+		return cmp
+	}
+	if cmp := strings.Compare(first.Repair, second.Repair); cmp != 0 {
 		return cmp
 	}
 	return 0

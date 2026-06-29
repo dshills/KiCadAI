@@ -24,8 +24,12 @@ func TestValidateAmplifierReadabilityRejectsDiagonalSynthetic(t *testing.T) {
 func TestValidateAmplifierReadabilityRejectsBadSignalFlow(t *testing.T) {
 	file := syntheticAmplifierSchematic(false)
 	file.Labels[0].Position = pointMM(90, 45)
-	if !hasDiagnostic(ValidateAmplifierReadability(file), "amplifier_input_flow", SeverityError) {
+	diagnostics := ValidateAmplifierReadability(file)
+	if !hasDiagnostic(diagnostics, "amplifier_input_flow", SeverityError) {
 		t.Fatalf("expected input flow diagnostic")
+	}
+	if !hasDiagnosticRepair(diagnostics, "amplifier_input_flow") {
+		t.Fatalf("expected input flow repair guidance: %#v", diagnostics)
 	}
 }
 
@@ -103,6 +107,15 @@ func TestAmplifierExamplesPassStrictReadability(t *testing.T) {
 func hasSeverity(diagnostics []Diagnostic, severity Severity) bool {
 	for _, diagnostic := range diagnostics {
 		if diagnostic.Severity == severity {
+			return true
+		}
+	}
+	return false
+}
+
+func hasDiagnosticRepair(diagnostics []Diagnostic, code string) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Code == code && diagnostic.Repair != "" {
 			return true
 		}
 	}

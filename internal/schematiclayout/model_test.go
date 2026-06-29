@@ -77,3 +77,41 @@ func TestNormalizeDiagnosticsSortsAndBounds(t *testing.T) {
 		t.Fatalf("unexpected diagnostic order = %#v", got)
 	}
 }
+
+func TestNormalizeDiagnosticsAddsRuleRepairGuidance(t *testing.T) {
+	got := NormalizeDiagnostics([]Diagnostic{{
+		Severity: SeverityError,
+		Code:     "diagonal_wire",
+		Message:  "wire is diagonal",
+	}}, 0)
+	if len(got) != 1 {
+		t.Fatalf("diagnostic count = %d, want 1", len(got))
+	}
+	if got[0].Repair != "reroute the net with horizontal and vertical wire segments" {
+		t.Fatalf("repair = %q", got[0].Repair)
+	}
+}
+
+func TestNormalizeDiagnosticsPreservesExplicitRepairGuidance(t *testing.T) {
+	got := NormalizeDiagnostics([]Diagnostic{{
+		Severity: SeverityError,
+		Code:     "diagonal_wire",
+		Message:  "wire is diagonal",
+		Repair:   "custom repair",
+	}}, 0)
+	if got[0].Repair != "custom repair" {
+		t.Fatalf("repair = %q, want custom repair", got[0].Repair)
+	}
+}
+
+func TestNormalizeDiagnosticsDoesNotMutateInput(t *testing.T) {
+	diagnostics := []Diagnostic{{
+		Severity: SeverityError,
+		Code:     "diagonal_wire",
+		Message:  "wire is diagonal",
+	}}
+	_ = NormalizeDiagnostics(diagnostics, 0)
+	if diagnostics[0].Repair != "" {
+		t.Fatalf("input repair mutated to %q", diagnostics[0].Repair)
+	}
+}
