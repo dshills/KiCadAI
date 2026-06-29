@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	pathpkg "path"
 	"path/filepath"
 	"reflect"
 	"sort"
@@ -371,6 +372,140 @@ func TestDesignExampleMetadataRejectsInvalidEnums(t *testing.T) {
 	}
 }
 
+func TestDesignExampleMetadataRejectsExpectedFailWithoutKnownGaps(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:             "fixture",
+		Request:        "fixture.json",
+		Tier:           "smoke",
+		Readiness:      "expected_fail",
+		Acceptance:     AcceptanceERCDRC,
+		RequireERC:     designExampleBool(true),
+		RequireDRC:     designExampleBool(true),
+		ExpectedStages: []StageName{StageBlockPlanning},
+		KnownGaps:      []string{"   "},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "known_gaps must describe") {
+		t.Fatalf("expected_fail known_gaps error = %v, want known_gaps must describe", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsBlockedWithoutNotes(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:             "fixture",
+		Request:        "fixture.json",
+		Tier:           "smoke",
+		Readiness:      "blocked",
+		Acceptance:     AcceptanceStructural,
+		RequireERC:     designExampleBool(false),
+		RequireDRC:     designExampleBool(false),
+		ExpectedStages: []StageName{StageBlockPlanning},
+		KnownGaps:      []string{"unsupported topology"},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "notes must describe blocked") {
+		t.Fatalf("blocked notes error = %v, want notes must describe blocked", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsUnsafeArtifactPaths(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name     string
+		artifact string
+		want     string
+	}{
+		{name: "absolute", artifact: "/tmp/artifact.json", want: "must be relative"},
+		{name: "parent", artifact: "../artifact.json", want: "must stay in output directory"},
+		{name: "empty", artifact: " ", want: "must not contain empty paths"},
+		{name: "windows absolute", artifact: `C:\tmp\artifact.json`, want: "slash-separated"},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			metadata := designExampleMetadata{
+				ID:                "fixture",
+				Request:           "fixture.json",
+				Tier:              "smoke",
+				Readiness:         "candidate",
+				Acceptance:        AcceptanceStructural,
+				RequireERC:        designExampleBool(false),
+				RequireDRC:        designExampleBool(false),
+				ExpectedStages:    []StageName{StageBlockPlanning},
+				KnownGaps:         []string{},
+				ExpectedArtifacts: []string{test.artifact},
+			}
+			path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+			_, err := loadDesignExampleMetadataPath(path)
+			if err == nil || !strings.Contains(err.Error(), test.want) {
+				t.Fatalf("artifact error = %v, want %q", err, test.want)
+			}
+		})
+	}
+}
+
+func TestDesignExampleMetadataRejectsDotID(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, ".json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	metadata := designExampleMetadata{
+		ID:             ".",
+		Request:        ".json",
+		Tier:           "smoke",
+		Readiness:      "candidate",
+		Acceptance:     AcceptanceStructural,
+		RequireERC:     designExampleBool(false),
+		RequireDRC:     designExampleBool(false),
+		ExpectedStages: []StageName{StageBlockPlanning},
+		KnownGaps:      []string{},
+	}
+	path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+	_, err := loadDesignExampleMetadataPath(path)
+	if err == nil || !strings.Contains(err.Error(), "id must be a local fixture identifier") {
+		t.Fatalf("dot id error = %v, want local fixture identifier", err)
+	}
+}
+
+func TestDesignExampleMetadataRejectsUnsafeIDCharacters(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fixture.json"), []byte(`{"version":"1"}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range []string{"bad:name", "CON", "lpt1", "CLOCK$", "fixture."} {
+		t.Run(id, func(t *testing.T) {
+			metadata := designExampleMetadata{
+				ID:             id,
+				Request:        "fixture.json",
+				Tier:           "smoke",
+				Readiness:      "candidate",
+				Acceptance:     AcceptanceStructural,
+				RequireERC:     designExampleBool(false),
+				RequireDRC:     designExampleBool(false),
+				ExpectedStages: []StageName{StageBlockPlanning},
+				KnownGaps:      []string{},
+			}
+			path := writeDesignExampleMetadataFixture(t, dir, "fixture.metadata.json", metadata)
+			_, err := loadDesignExampleMetadataPath(path)
+			if err == nil || !strings.Contains(err.Error(), "id must be a local fixture identifier") {
+				t.Fatalf("unsafe id error = %v, want local fixture identifier", err)
+			}
+		})
+	}
+}
+
 func TestDesignExampleMetadataRejectsRequestPathTraversal(t *testing.T) {
 	dir := t.TempDir()
 	metadata := designExampleMetadata{
@@ -560,6 +695,9 @@ func validateDesignExampleMetadata(dir string, metadata designExampleMetadata) e
 	if strings.TrimSpace(metadata.ID) == "" {
 		return fmt.Errorf("id is required")
 	}
+	if metadata.ID != strings.TrimSpace(metadata.ID) || metadata.ID != strings.TrimRight(metadata.ID, ". ") || metadata.ID == "." || strings.ContainsAny(metadata.ID, `/\:*?"<>|`) || strings.Contains(metadata.ID, "..") || isWindowsReservedFilename(metadata.ID) {
+		return fmt.Errorf("id must be a local fixture identifier")
+	}
 	if strings.TrimSpace(metadata.Request) == "" {
 		return fmt.Errorf("request is required")
 	}
@@ -601,7 +739,62 @@ func validateDesignExampleMetadata(dir string, metadata designExampleMetadata) e
 	if metadata.KnownGaps == nil {
 		return fmt.Errorf("known_gaps is required")
 	}
+	if (metadata.Readiness == "expected_fail" || metadata.Readiness == "blocked") && !hasNonEmptyString(metadata.KnownGaps) {
+		return fmt.Errorf("known_gaps must describe expected_fail or blocked fixtures")
+	}
+	if metadata.Readiness == "blocked" && strings.TrimSpace(metadata.Notes) == "" {
+		return fmt.Errorf("notes must describe blocked fixtures")
+	}
+	if err := validateDesignExampleArtifactPaths(metadata.ExpectedArtifacts); err != nil {
+		return err
+	}
 	return nil
+}
+
+func validateDesignExampleArtifactPaths(paths []string) error {
+	for _, artifactPath := range paths {
+		if strings.TrimSpace(artifactPath) == "" {
+			return fmt.Errorf("expected_artifacts must not contain empty paths")
+		}
+		if strings.ContainsAny(artifactPath, `\:*?"<>|`) {
+			return fmt.Errorf("expected artifact %q must use relative slash-separated paths", artifactPath)
+		}
+		if pathpkg.IsAbs(artifactPath) {
+			return fmt.Errorf("expected artifact %q must be relative", artifactPath)
+		}
+		cleaned := pathpkg.Clean(artifactPath)
+		if cleaned == "." || strings.HasPrefix(cleaned, "../") || cleaned == ".." {
+			return fmt.Errorf("expected artifact %q must stay in output directory", artifactPath)
+		}
+	}
+	return nil
+}
+
+func hasNonEmptyString(values []string) bool {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func isWindowsReservedFilename(name string) bool {
+	base := strings.ToUpper(name)
+	if dot := strings.IndexByte(base, '.'); dot >= 0 {
+		base = base[:dot]
+	}
+	base = strings.TrimRight(base, ". ")
+	switch base {
+	case "CON", "PRN", "AUX", "NUL", "CLOCK$":
+		return true
+	}
+	if len(base) == 4 {
+		prefix := base[:3]
+		suffix := base[3]
+		return (prefix == "COM" || prefix == "LPT") && suffix >= '1' && suffix <= '9'
+	}
+	return false
 }
 
 func designExampleBool(value bool) *bool {
