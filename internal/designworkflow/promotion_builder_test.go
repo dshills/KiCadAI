@@ -79,6 +79,12 @@ func TestBuildInternalPromotionReportExpectedFail(t *testing.T) {
 	if _, err := MarshalPromotionReportJSON(report); err != nil {
 		t.Fatalf("promotion report validation failed: %v", err)
 	}
+	if len(report.NextActions) == 0 {
+		t.Fatalf("expected next actions for blocked promotion report")
+	}
+	if !promotionReportHasNextAction(report, "stages", "resolve the stage blockers") {
+		t.Fatalf("missing stage next action in %#v", report.NextActions)
+	}
 }
 
 func TestBuildInternalPromotionReportMissingExpectedArtifact(t *testing.T) {
@@ -107,6 +113,9 @@ func TestBuildInternalPromotionReportMissingExpectedArtifact(t *testing.T) {
 	}
 	if artifactGate.Status != PromotionGateStatusFailed {
 		t.Fatalf("artifact gate status = %q, want failed", artifactGate.Status)
+	}
+	if !promotionReportHasNextAction(report, "artifacts", "missing required promotion artifacts") {
+		t.Fatalf("missing artifact next action in %#v", report.NextActions)
 	}
 }
 
@@ -215,6 +224,9 @@ func TestPromotionBuilderAddsSyntheticRepairGuidance(t *testing.T) {
 	report := BuildInternalPromotionReport(fixture, result)
 	if !promotionReportHasRepair(report, "configure kicad-cli") {
 		t.Fatalf("missing KiCad synthetic repair in %#v", report.Issues)
+	}
+	if !promotionReportHasNextAction(report, "kicad_checks", "run required KiCad ERC/DRC checks") {
+		t.Fatalf("missing KiCad next action in %#v", report.NextActions)
 	}
 }
 
@@ -484,6 +496,15 @@ func containsPromotionIssueCode(codes []string, want string) bool {
 func promotionReportHasRepair(report PromotionReport, text string) bool {
 	for _, issue := range report.Issues {
 		if strings.Contains(issue.Repair, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func promotionReportHasNextAction(report PromotionReport, gate string, text string) bool {
+	for _, action := range report.NextActions {
+		if action.Gate == gate && strings.Contains(action.Action, text) {
 			return true
 		}
 	}

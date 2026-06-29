@@ -455,3 +455,78 @@ func TestPromotionReportValidationRejectsDuplicateGateReferences(t *testing.T) {
 		t.Fatalf("duplicate artifact error = %v, want duplicate artifact", err)
 	}
 }
+
+func TestPromotionReportValidationRejectsInvalidNextActionReferences(t *testing.T) {
+	base := PromotionReport{
+		ID:                "fixture",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		AchievedReadiness: PromotionReadinessCandidate,
+		Status:            PromotionStatusPass,
+		Gates: []PromotionGate{{
+			ID:     "metadata",
+			Status: PromotionGateStatusPass,
+		}},
+	}
+	missingGate := base
+	missingGate.NextActions = []PromotionNextAction{{
+		Gate:     "missing",
+		Severity: reports.SeverityWarning,
+		Summary:  "missing gate",
+		Action:   "fix the missing gate",
+	}}
+	if _, err := MarshalPromotionReportJSON(missingGate); err == nil || !strings.Contains(err.Error(), "references missing gate") {
+		t.Fatalf("missing next-action gate error = %v, want references missing gate", err)
+	}
+	missingIssue := base
+	missingIssue.NextActions = []PromotionNextAction{{
+		Gate:       "metadata",
+		Severity:   reports.SeverityWarning,
+		Summary:    "missing issue",
+		Action:     "fix the missing issue",
+		IssueCodes: []string{"missing_issue"},
+	}}
+	if _, err := MarshalPromotionReportJSON(missingIssue); err == nil || !strings.Contains(err.Error(), "references missing issue code") {
+		t.Fatalf("missing next-action issue error = %v, want references missing issue code", err)
+	}
+}
+
+func TestPromotionReportValidationRejectsDuplicateNextActionsIgnoringReferenceOrder(t *testing.T) {
+	report := PromotionReport{
+		ID:                "fixture",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		AchievedReadiness: PromotionReadinessCandidate,
+		Status:            PromotionStatusPass,
+		Gates: []PromotionGate{{
+			ID:     "metadata",
+			Status: PromotionGateStatusPass,
+		}},
+		Issues: []PromotionIssue{{
+			Code:     "a",
+			Severity: reports.SeverityWarning,
+			Message:  "a",
+		}, {
+			Code:     "b",
+			Severity: reports.SeverityWarning,
+			Message:  "b",
+		}},
+		Artifacts: []PromotionArtifact{{Path: "a.json"}, {Path: "b.json"}},
+		NextActions: []PromotionNextAction{{
+			Gate:       "metadata",
+			Severity:   reports.SeverityWarning,
+			Summary:    "same",
+			Action:     "same action",
+			IssueCodes: []string{"a", "b"},
+			Artifacts:  []string{"a.json", "b.json"},
+		}, {
+			Gate:       "metadata",
+			Severity:   reports.SeverityWarning,
+			Summary:    "same",
+			Action:     "same action",
+			IssueCodes: []string{"b", "a"},
+			Artifacts:  []string{"b.json", "a.json"},
+		}},
+	}
+	if _, err := MarshalPromotionReportJSON(report); err == nil || !strings.Contains(err.Error(), "duplicate promotion next action") {
+		t.Fatalf("duplicate next-action error = %v, want duplicate promotion next action", err)
+	}
+}

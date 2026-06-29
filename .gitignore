@@ -6,6 +6,7 @@
 .gocache/
 .gomodcache/
 .cache/
+.tmp/
 .coverage/
 *.test
 coverage.out

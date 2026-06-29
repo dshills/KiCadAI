@@ -276,9 +276,28 @@ func (builder *promotionReportBuilder) report() PromotionReport {
 			Reached:   builder.reachedStageList(),
 			StoppedAt: builder.stoppedStage(),
 		},
-		Issues:    issues,
-		Artifacts: artifacts,
+		Issues:      issues,
+		NextActions: builder.nextActions(),
+		Artifacts:   artifacts,
 	})
+}
+
+func (builder *promotionReportBuilder) nextActions() []PromotionNextAction {
+	var actions []PromotionNextAction
+	for _, gate := range builder.gates {
+		if !promotionGateNeedsAction(gate) {
+			continue
+		}
+		actions = append(actions, PromotionNextAction{
+			Gate:       gate.ID,
+			Severity:   promotionActionSeverity(gate.Status),
+			Summary:    promotionActionSummary(gate),
+			Action:     promotionActionText(gate),
+			IssueCodes: append([]string(nil), gate.IssueCodes...),
+			Artifacts:  append([]string(nil), gate.Artifacts...),
+		})
+	}
+	return actions
 }
 
 func (builder *promotionReportBuilder) achievedReadiness() PromotionReadiness {
@@ -517,6 +536,66 @@ func promotionGateStatusForStage(stage StageResult) PromotionGateStatus {
 			return PromotionGateStatusWarn
 		}
 		return PromotionGateStatusNotRun
+	}
+}
+
+func promotionGateNeedsAction(gate PromotionGate) bool {
+	switch gate.Status {
+	case PromotionGateStatusPass:
+		return false
+	case PromotionGateStatusSkipped, PromotionGateStatusNotRun:
+		return len(gate.RequiredFor) != 0
+	default:
+		return true
+	}
+}
+
+func promotionActionSeverity(status PromotionGateStatus) reports.Severity {
+	switch status {
+	case PromotionGateStatusFailed:
+		return reports.SeverityError
+	case PromotionGateStatusSkipped, PromotionGateStatusNotRun:
+		return reports.SeverityError
+	default:
+		return reports.SeverityWarning
+	}
+}
+
+func promotionActionSummary(gate PromotionGate) string {
+	switch gate.Status {
+	case PromotionGateStatusFailed:
+		return "promotion gate " + gate.ID + " failed"
+	case PromotionGateStatusWarn:
+		return "promotion gate " + gate.ID + " needs review"
+	case PromotionGateStatusSkipped:
+		return "promotion gate " + gate.ID + " was skipped"
+	case PromotionGateStatusNotRun:
+		return "promotion gate " + gate.ID + " did not run"
+	default:
+		return "promotion gate " + gate.ID + " needs follow-up"
+	}
+}
+
+func promotionActionText(gate PromotionGate) string {
+	switch gate.ID {
+	case "metadata":
+		return "fix fixture metadata before rerunning promotion"
+	case "stages":
+		return "run the expected design workflow stages and resolve the stage blockers"
+	case "writer_correctness":
+		return "fix writer correctness blockers and regenerate the project"
+	case "connectivity":
+		return "repair board connectivity, net assignment, or route completion blockers"
+	case "kicad_checks":
+		return "run required KiCad ERC/DRC checks and resolve or document every finding"
+	case "route_completion":
+		return "complete same-net route endpoint contacts or adjust placement/routing constraints"
+	case "physical_rules":
+		return "satisfy fabrication, physical-rule, and package evidence gates"
+	case "artifacts":
+		return "produce the missing required promotion artifacts"
+	default:
+		return "inspect the gate issues and rerun promotion after repair"
 	}
 }
 

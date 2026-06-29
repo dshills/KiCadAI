@@ -55,22 +55,23 @@ const (
 
 // PromotionReport is the normalized report emitted for a KiCad-backed design fixture.
 type PromotionReport struct {
-	ID                 string               `json:"id"`
-	Request            string               `json:"request,omitempty"`
-	Tier               string               `json:"tier,omitempty"`
-	DeclaredReadiness  PromotionReadiness   `json:"declared_readiness"`
-	AchievedReadiness  PromotionReadiness   `json:"achieved_readiness"`
-	Acceptance         AcceptanceLevel      `json:"acceptance,omitempty"`
-	Status             PromotionStatus      `json:"status"`
-	MatchesExpectation bool                 `json:"matches_expectation"`
-	Summary            string               `json:"summary,omitempty"`
-	Gates              []PromotionGate      `json:"gates"`
-	Stages             PromotionStageReport `json:"stages,omitempty"`
-	Issues             []PromotionIssue     `json:"issues,omitempty"`
-	Artifacts          []PromotionArtifact  `json:"artifacts,omitempty"`
-	KiCadVersion       string               `json:"kicad_version,omitempty"`
-	ExternalEvidence   string               `json:"external_evidence,omitempty"`
-	GeneratedAt        string               `json:"generated_at,omitempty"`
+	ID                 string                `json:"id"`
+	Request            string                `json:"request,omitempty"`
+	Tier               string                `json:"tier,omitempty"`
+	DeclaredReadiness  PromotionReadiness    `json:"declared_readiness"`
+	AchievedReadiness  PromotionReadiness    `json:"achieved_readiness"`
+	Acceptance         AcceptanceLevel       `json:"acceptance,omitempty"`
+	Status             PromotionStatus       `json:"status"`
+	MatchesExpectation bool                  `json:"matches_expectation"`
+	Summary            string                `json:"summary,omitempty"`
+	Gates              []PromotionGate       `json:"gates"`
+	Stages             PromotionStageReport  `json:"stages,omitempty"`
+	Issues             []PromotionIssue      `json:"issues,omitempty"`
+	NextActions        []PromotionNextAction `json:"next_actions,omitempty"`
+	Artifacts          []PromotionArtifact   `json:"artifacts,omitempty"`
+	KiCadVersion       string                `json:"kicad_version,omitempty"`
+	ExternalEvidence   string                `json:"external_evidence,omitempty"`
+	GeneratedAt        string                `json:"generated_at,omitempty"`
 }
 
 // PromotionGate records one promotion check and the readiness levels it affects.
@@ -101,6 +102,16 @@ type PromotionIssue struct {
 	Refs     []string         `json:"refs,omitempty"`
 	Nets     []string         `json:"nets,omitempty"`
 	Artifact string           `json:"artifact,omitempty"`
+}
+
+// PromotionNextAction records the next contributor or AI repair action for a non-passing gate.
+type PromotionNextAction struct {
+	Gate       string           `json:"gate"`
+	Severity   reports.Severity `json:"severity"`
+	Summary    string           `json:"summary"`
+	Action     string           `json:"action"`
+	IssueCodes []string         `json:"issue_codes,omitempty"`
+	Artifacts  []string         `json:"artifacts,omitempty"`
 }
 
 // PromotionArtifact records an artifact referenced by promotion evidence.
@@ -291,6 +302,49 @@ func (report PromotionReport) Validate() error {
 			}
 		}
 	}
+	actionKeys := map[string]struct{}{}
+	for _, action := range report.NextActions {
+		if strings.TrimSpace(action.Gate) == "" {
+			return fmt.Errorf("promotion next action gate is required")
+		}
+		if _, exists := gateIDs[action.Gate]; !exists {
+			return fmt.Errorf("promotion next action references missing gate %q", action.Gate)
+		}
+		if !validPromotionIssueSeverity(action.Severity) {
+			return fmt.Errorf("unsupported promotion next action severity %q", action.Severity)
+		}
+		if strings.TrimSpace(action.Summary) == "" {
+			return fmt.Errorf("promotion next action summary is required")
+		}
+		if strings.TrimSpace(action.Action) == "" {
+			return fmt.Errorf("promotion next action action is required")
+		}
+		if hasDuplicates(action.IssueCodes) {
+			return fmt.Errorf("promotion next action %q has duplicate issue code references", action.Gate)
+		}
+		if hasDuplicates(action.Artifacts) {
+			return fmt.Errorf("promotion next action %q has duplicate artifact references", action.Gate)
+		}
+		for _, code := range action.IssueCodes {
+			if _, exists := issueCodes[code]; !exists {
+				return fmt.Errorf("promotion next action %q references missing issue code %q", action.Gate, code)
+			}
+		}
+		for _, path := range action.Artifacts {
+			if _, exists := artifactPaths[path]; !exists {
+				return fmt.Errorf("promotion next action %q references missing artifact %q", action.Gate, path)
+			}
+		}
+		keyIssueCodes := slices.Clone(action.IssueCodes)
+		keyArtifacts := slices.Clone(action.Artifacts)
+		sort.Strings(keyIssueCodes)
+		sort.Strings(keyArtifacts)
+		key := action.Gate + "\x01" + strings.Join(keyIssueCodes, "\x00") + "\x02" + strings.Join(keyArtifacts, "\x00") + "\x03" + action.Action
+		if _, exists := actionKeys[key]; exists {
+			return fmt.Errorf("duplicate promotion next action for gate %q", action.Gate)
+		}
+		actionKeys[key] = struct{}{}
+	}
 	return nil
 }
 
@@ -352,6 +406,35 @@ func NormalizePromotionReport(report PromotionReport) PromotionReport {
 			return cmp < 0
 		}
 		return slices.Compare(normalized.Issues[i].Nets, normalized.Issues[j].Nets) < 0
+	})
+	normalized.NextActions = slices.Clone(report.NextActions)
+	for i := range normalized.NextActions {
+		normalized.NextActions[i].IssueCodes = slices.Clone(report.NextActions[i].IssueCodes)
+		normalized.NextActions[i].Artifacts = slices.Clone(report.NextActions[i].Artifacts)
+		sort.Strings(normalized.NextActions[i].IssueCodes)
+		normalized.NextActions[i].IssueCodes = slices.Compact(normalized.NextActions[i].IssueCodes)
+		sort.Strings(normalized.NextActions[i].Artifacts)
+		normalized.NextActions[i].Artifacts = slices.Compact(normalized.NextActions[i].Artifacts)
+	}
+	sort.Slice(normalized.NextActions, func(i, j int) bool {
+		if normalized.NextActions[i].Gate != normalized.NextActions[j].Gate {
+			return normalized.NextActions[i].Gate < normalized.NextActions[j].Gate
+		}
+		if normalized.NextActions[i].Severity != normalized.NextActions[j].Severity {
+			return normalized.NextActions[i].Severity < normalized.NextActions[j].Severity
+		}
+		if normalized.NextActions[i].Summary != normalized.NextActions[j].Summary {
+			return normalized.NextActions[i].Summary < normalized.NextActions[j].Summary
+		}
+		if normalized.NextActions[i].Action != normalized.NextActions[j].Action {
+			return normalized.NextActions[i].Action < normalized.NextActions[j].Action
+		}
+		leftIssueCodes := normalized.NextActions[i].IssueCodes
+		rightIssueCodes := normalized.NextActions[j].IssueCodes
+		if cmp := slices.Compare(leftIssueCodes, rightIssueCodes); cmp != 0 {
+			return cmp < 0
+		}
+		return slices.Compare(normalized.NextActions[i].Artifacts, normalized.NextActions[j].Artifacts) < 0
 	})
 	normalized.Artifacts = slices.Clone(report.Artifacts)
 	sort.Slice(normalized.Artifacts, func(i, j int) bool {
