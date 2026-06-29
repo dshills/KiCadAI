@@ -209,7 +209,7 @@ func NormalizeOptions(opts Options) Options {
 	}
 	opts.EdgePlatingPolicy = normalizePolicy(opts.EdgePlatingPolicy, PolicyWarn)
 	opts.ImpedancePolicy = normalizePolicy(opts.ImpedancePolicy, PolicyWarn)
-	opts.PanelizationPolicy = normalizePolicy(opts.PanelizationPolicy, PolicyWarn)
+	opts.PanelizationPolicy = normalizePolicy(opts.PanelizationPolicy, PolicyIgnore)
 	return opts
 }
 

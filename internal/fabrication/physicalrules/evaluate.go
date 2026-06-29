@@ -14,6 +14,8 @@ import (
 const outlineToleranceMM = 0.001
 const maxReportedObjects = 100
 
+var metadataKeyReplacer = strings.NewReplacer("-", "_", " ", "_")
+
 func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, opts Options) Report {
 	opts = NormalizeOptions(opts)
 	if board == nil {
@@ -36,7 +38,9 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateMaskPaste(board, opts)...)
 	outline := evaluateEdgeCuts(board)
 	checks = append(checks, outline.Checks...)
-	checks = append(checks, evaluateEdgePlating(board, outline.Bounds, opts)...)
+	edgePlating := edgePlatingFeatures(board, outline.Bounds)
+	checks = append(checks, evaluateEdgePlating(edgePlating, opts)...)
+	checks = append(checks, evaluateFabricationMetadata(project, edgePlating, opts)...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
 	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds)...)
 	checks = append(checks, evaluateMountingHoles(board, outline.Bounds, opts)...)
@@ -1462,8 +1466,7 @@ func evaluateEdgeCuts(board *pcbfiles.PCBFile) edgeCutResult {
 	return edgeCutResult{Checks: []Check{check}, Bounds: bounds}
 }
 
-func evaluateEdgePlating(board *pcbfiles.PCBFile, bounds boardBounds, opts Options) []Check {
-	features := edgePlatingFeatures(board, bounds)
+func evaluateEdgePlating(features edgePlatingFeatureSet, opts Options) []Check {
 	if len(features.Objects) == 0 {
 		return []Check{
 			{ID: CheckEdgePlatingCastellation, Category: CategoryEdgePlating, Status: StatusSkipped, Message: "no likely castellated or edge-plated features were detected", Source: SourceHeuristic},
@@ -1537,6 +1540,112 @@ func evaluateEdgePlating(board *pcbfiles.PCBFile, bounds boardBounds, opts Optio
 		checks[2].Suggestion = ""
 	}
 	return checks
+}
+
+func evaluateFabricationMetadata(project *projectfiles.ProjectFile, features edgePlatingFeatureSet, opts Options) []Check {
+	metadata := projectFabricationMetadata(project)
+	boardFinish := strings.TrimSpace(firstMetadataValue(metadata, "board_finish", "finish", "surface_finish"))
+	panelization := strings.TrimSpace(firstMetadataValue(metadata, "panelization", "panel"))
+	notes := strings.TrimSpace(firstMetadataValue(metadata, "fabrication_notes", "fab_notes", "fabrication_note", "notes"))
+	checks := []Check{
+		fabricationMetadataCheck(
+			CheckFabMetadataBoardFinish,
+			"physical.fabrication_metadata.board_finish",
+			"board finish",
+			boardFinish,
+			opts.RequireBoardFinish,
+			opts.Strict,
+		),
+	}
+	panelRequired := opts.PanelizationPolicy == PolicyWarn || opts.PanelizationPolicy == PolicyBlock
+	checks = append(checks, fabricationMetadataCheck(
+		CheckFabMetadataPanelization,
+		"physical.fabrication_metadata.panelization",
+		"panelization",
+		panelization,
+		panelRequired,
+		opts.PanelizationPolicy == PolicyBlock,
+	))
+	notesRequired := opts.RequireFabricationNotes || len(features.Objects) > 0 || opts.ImpedancePolicy == PolicyBlock
+	noteCheck := fabricationMetadataCheck(
+		CheckFabMetadataNotes,
+		"physical.fabrication_metadata.fabrication_notes",
+		"fabrication notes",
+		notes,
+		notesRequired,
+		opts.Strict || opts.RequireFabricationNotes && opts.EdgePlatingPolicy == PolicyBlock,
+	)
+	if len(features.Objects) > 0 {
+		noteCheck.Objects = features.Objects
+		noteCheck.References = sortedMapKeys(features.Refs)
+		noteCheck.Measurements = append(noteCheck.Measurements, Measurement{Name: "edge_plating_feature_count", Value: float64(len(features.Objects)), Unit: "count"})
+	}
+	checks = append(checks, noteCheck)
+	return checks
+}
+
+func projectFabricationMetadata(project *projectfiles.ProjectFile) map[string]string {
+	metadata := map[string]string{}
+	if project == nil {
+		return metadata
+	}
+	for key, value := range project.TextVariables {
+		metadata[normalizeMetadataKey(key)] = strings.TrimSpace(value)
+	}
+	return metadata
+}
+
+func normalizeMetadataKey(key string) string {
+	key = strings.ToLower(strings.TrimSpace(key))
+	return metadataKeyReplacer.Replace(key)
+}
+
+func firstMetadataValue(metadata map[string]string, keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(metadata[normalizeMetadataKey(key)]); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func fabricationMetadataCheck(id, path, label, value string, required, blockMissing bool) Check {
+	if strings.TrimSpace(value) != "" {
+		return Check{
+			ID:        id,
+			Category:  CategoryFabMetadata,
+			Status:    StatusPass,
+			Message:   label + " metadata is present",
+			IssuePath: path,
+			Evidence:  []Evidence{{Kind: "project_text_variable", Note: value}},
+			Source:    SourceParser,
+			Measurements: []Measurement{
+				{Name: "metadata_present", Value: 1, Unit: "bool"},
+			},
+		}
+	}
+	if !required {
+		return Check{ID: id, Category: CategoryFabMetadata, Status: StatusSkipped, Message: label + " metadata is not required by the active profile", IssuePath: path, Source: SourceProfile}
+	}
+	status := StatusWarning
+	severity := reports.SeverityWarning
+	if blockMissing {
+		status = StatusBlocked
+		severity = reports.SeverityError
+	}
+	return Check{
+		ID:         id,
+		Category:   CategoryFabMetadata,
+		Status:     status,
+		Severity:   severity,
+		Message:    label + " metadata is required but missing",
+		Suggestion: "add KiCadAI-managed project metadata or project text variables before claiming fabrication readiness",
+		IssuePath:  path,
+		Source:     SourceProfile,
+		Measurements: []Measurement{
+			{Name: "metadata_present", Value: 0, Unit: "bool"},
+		},
+	}
 }
 
 type edgePlatingFeatureSet struct {

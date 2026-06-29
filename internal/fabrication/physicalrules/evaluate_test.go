@@ -409,6 +409,41 @@ func TestEvaluateBoardDoesNotTreatFarOutsidePadAsEdgePlating(t *testing.T) {
 	assertCheckStatus(t, report, CheckEdgePlatingCastellation, StatusSkipped)
 }
 
+func TestEvaluateBoardChecksFabricationMetadata(t *testing.T) {
+	board := physicalRuleTestBoard()
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{RequireBoardFinish: true, PanelizationPolicy: PolicyWarn})
+	assertCheckStatus(t, report, CheckFabMetadataBoardFinish, StatusWarning)
+	assertCheckStatus(t, report, CheckFabMetadataPanelization, StatusWarning)
+
+	project.TextVariables = map[string]string{
+		"board_finish": "ENIG",
+		"panelization": "single-board",
+	}
+	report = EvaluateBoard(&board, &project, Options{RequireBoardFinish: true, PanelizationPolicy: PolicyWarn})
+	assertCheckStatus(t, report, CheckFabMetadataBoardFinish, StatusPass)
+	assertCheckStatus(t, report, CheckFabMetadataPanelization, StatusPass)
+}
+
+func TestEvaluateBoardRequiresFabricationNotesForEdgePlating(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].LibraryID = "Connector:Castellated_Module"
+	board.Footprints[0].Position = point(0.25, 5)
+	board.Footprints[0].Pads[0].Type = "thru_hole"
+	board.Footprints[0].Pads[0].Size = point(1, 1)
+	board.Footprints[0].Pads[0].Drill = kicadfiles.MM(0.5)
+	board.Footprints[0].Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+	assertCheckStatus(t, report, CheckFabMetadataNotes, StatusWarning)
+
+	project.TextVariables = map[string]string{"fabrication_notes": "Castellated module edge pads require edge plating."}
+	report = EvaluateBoard(&board, &project, Options{})
+	assertCheckStatus(t, report, CheckFabMetadataNotes, StatusPass)
+}
+
 func TestEvaluateBoardWarnsOnOpenLineOutlineAndBlocksOutsideObject(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Drawings = []pcbfiles.Drawing{

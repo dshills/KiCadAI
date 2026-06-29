@@ -72,7 +72,7 @@ func TestNormalizeOptionsAppliesDFMDefaults(t *testing.T) {
 	if opts.MinSolderMaskWebMM != defaultMinSolderMaskWebMM {
 		t.Fatalf("MinSolderMaskWebMM = %g", opts.MinSolderMaskWebMM)
 	}
-	if opts.EdgePlatingPolicy != PolicyWarn || opts.ImpedancePolicy != PolicyWarn || opts.PanelizationPolicy != PolicyWarn {
+	if opts.EdgePlatingPolicy != PolicyWarn || opts.ImpedancePolicy != PolicyWarn || opts.PanelizationPolicy != PolicyIgnore {
 		t.Fatalf("policies = %#v", opts)
 	}
 
