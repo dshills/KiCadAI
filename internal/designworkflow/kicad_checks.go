@@ -112,6 +112,12 @@ func RunKiCadChecks(ctx context.Context, request *Request, write *ProjectWriteRe
 		"drc_required":   opts.RequireDRC,
 		"artifact_count": len(artifacts),
 	}
+	if opts.RequireERC {
+		stage.Summary[promotionKiCadERCSummaryKey] = result.ERC
+	}
+	if opts.RequireDRC {
+		stage.Summary[promotionKiCadDRCSummaryKey] = result.DRC
+	}
 	result.Stage = stage
 	return result
 }

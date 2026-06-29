@@ -7,10 +7,16 @@ import (
 	"sort"
 	"strings"
 
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
 var promotionCodeReplacer = strings.NewReplacer("/", "_", "\\", "_", ".", "_", "-", "_", " ", "_")
+
+const (
+	promotionKiCadERCSummaryKey = "erc"
+	promotionKiCadDRCSummaryKey = "drc"
+)
 
 type PromotionFixture struct {
 	ID                string
@@ -38,6 +44,7 @@ func BuildInternalPromotionReport(fixture PromotionFixture, result WorkflowResul
 	builder.addStageGate()
 	builder.addWriterGate()
 	builder.addConnectivityGate()
+	builder.addKiCadGate()
 	builder.addRouteGate()
 	builder.addPhysicalGate()
 	builder.addArtifactGate()
@@ -128,6 +135,36 @@ func (builder *promotionReportBuilder) addWriterGate() {
 
 func (builder *promotionReportBuilder) addConnectivityGate() {
 	builder.addStageStatusGate("connectivity", StageValidation, []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass})
+}
+
+func (builder *promotionReportBuilder) addKiCadGate() {
+	required := builder.requiredForKiCadChecks()
+	stage, ok := builder.stages[StageKiCadChecks]
+	if !ok {
+		builder.gates = append(builder.gates, PromotionGate{
+			ID:          "kicad_checks",
+			Status:      PromotionGateStatusSkipped,
+			RequiredFor: required,
+			IssueCodes:  builder.missingKiCadIssueCodes(required),
+		})
+		return
+	}
+	status := promotionGateStatusForKiCadStage(stage)
+	issueCodes := builder.issueCodesForStage(StageKiCadChecks)
+	if status != PromotionGateStatusSkipped {
+		missingCodes := builder.missingRequiredKiCadCheckIssueCodes(stage)
+		if len(missingCodes) != 0 {
+			status = PromotionGateStatusFailed
+			issueCodes = append(issueCodes, missingCodes...)
+		}
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "kicad_checks",
+		Status:      status,
+		RequiredFor: required,
+		IssueCodes:  issueCodes,
+		Artifacts:   promotionStageArtifactPaths(stage),
+	})
 }
 
 func (builder *promotionReportBuilder) addRouteGate() {
@@ -355,6 +392,13 @@ func (builder *promotionReportBuilder) requiredForStage(stageName StageName) []P
 	return []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass}
 }
 
+func (builder *promotionReportBuilder) requiredForKiCadChecks() []PromotionReadiness {
+	if builder.fixture.RequireERC || builder.fixture.RequireDRC || builder.stageRelevant(StageKiCadChecks) {
+		return []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass}
+	}
+	return nil
+}
+
 func (builder *promotionReportBuilder) stageRelevant(stageName StageName) bool {
 	for _, expected := range builder.fixture.ExpectedStages {
 		if expected == stageName {
@@ -380,6 +424,24 @@ func (builder *promotionReportBuilder) addSyntheticIssue(code string, severity r
 		Message:  message,
 	}
 	return code
+}
+
+func (builder *promotionReportBuilder) missingKiCadIssueCodes(required []PromotionReadiness) []string {
+	if len(required) == 0 {
+		return nil
+	}
+	return []string{builder.addSyntheticIssue("kicad_checks_missing", reports.SeverityBlocked, StageKiCadChecks, "required KiCad ERC/DRC evidence was not produced")}
+}
+
+func (builder *promotionReportBuilder) missingRequiredKiCadCheckIssueCodes(stage StageResult) []string {
+	var issueCodes []string
+	if builder.fixture.RequireERC && !kiCadCheckSummaryPresent(stage, promotionKiCadERCSummaryKey) {
+		issueCodes = append(issueCodes, builder.addSyntheticIssue("kicad_erc_missing", reports.SeverityBlocked, StageKiCadChecks, "required KiCad ERC evidence was not produced"))
+	}
+	if builder.fixture.RequireDRC && !kiCadCheckSummaryPresent(stage, promotionKiCadDRCSummaryKey) {
+		issueCodes = append(issueCodes, builder.addSyntheticIssue("kicad_drc_missing", reports.SeverityBlocked, StageKiCadChecks, "required KiCad DRC evidence was not produced"))
+	}
+	return issueCodes
 }
 
 func (builder *promotionReportBuilder) promotionArtifacts() []PromotionArtifact {
@@ -456,6 +518,134 @@ func promotionGateStatusForStage(stage StageResult) PromotionGateStatus {
 	}
 }
 
+func promotionGateStatusForKiCadStage(stage StageResult) PromotionGateStatus {
+	if stage.Status == StageStatusSkipped || stageHasIssueCode(stage, reports.CodeSkippedExternalTool) {
+		return PromotionGateStatusSkipped
+	}
+	if status, ok := promotionKiCadSummaryStatus(stage); ok && status != PromotionGateStatusPass {
+		return status
+	}
+	return promotionGateStatusForStage(stage)
+}
+
+func promotionKiCadSummaryStatus(stage StageResult) (PromotionGateStatus, bool) {
+	if stage.Summary == nil {
+		return "", false
+	}
+	found := false
+	status := PromotionGateStatusPass
+	for _, key := range []string{promotionKiCadERCSummaryKey, promotionKiCadDRCSummaryKey} {
+		result, ok := stage.Summary[key]
+		if !ok {
+			continue
+		}
+		found = true
+		next, ok := promotionCheckResultStatus(result)
+		if !ok {
+			status = promotionWorseGateStatus(status, PromotionGateStatusFailed)
+			continue
+		}
+		status = promotionWorseGateStatus(status, next)
+	}
+	return status, found
+}
+
+func kiCadCheckSummaryPresent(stage StageResult, key string) bool {
+	if stage.Summary == nil {
+		return false
+	}
+	value, ok := stage.Summary[key]
+	if !ok {
+		return false
+	}
+	status, valid := promotionCheckResultStatus(value)
+	return valid && status != PromotionGateStatusNotRun
+}
+
+func promotionWorseGateStatus(current PromotionGateStatus, next PromotionGateStatus) PromotionGateStatus {
+	if promotionGateSeverityRank(next) > promotionGateSeverityRank(current) {
+		return next
+	}
+	return current
+}
+
+func promotionGateSeverityRank(status PromotionGateStatus) int {
+	switch status {
+	case PromotionGateStatusFailed:
+		return 4
+	case PromotionGateStatusSkipped:
+		return 3
+	case PromotionGateStatusNotRun:
+		return 2
+	case PromotionGateStatusWarn:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func promotionCheckResultStatus(result any) (PromotionGateStatus, bool) {
+	switch value := result.(type) {
+	case nil:
+		return PromotionGateStatusNotRun, true
+	case checks.CheckResult:
+		return checkResultStatusToPromotionStatus(value.Status), true
+	case *checks.CheckResult:
+		if value == nil {
+			return PromotionGateStatusNotRun, true
+		}
+		return checkResultStatusToPromotionStatus(value.Status), true
+	case checks.CheckStatus:
+		return checkResultStatusToPromotionStatus(value), true
+	case string:
+		status, ok := parsePromotionCheckStatus(value)
+		if !ok {
+			return PromotionGateStatusFailed, true
+		}
+		return checkResultStatusToPromotionStatus(status), true
+	default:
+		return "", false
+	}
+}
+
+func parsePromotionCheckStatus(value string) (checks.CheckStatus, bool) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case string(checks.CheckStatusPass):
+		return checks.CheckStatusPass, true
+	case string(checks.CheckStatusFail):
+		return checks.CheckStatusFail, true
+	case string(checks.CheckStatusSkipped):
+		return checks.CheckStatusSkipped, true
+	case string(checks.CheckStatusError):
+		return checks.CheckStatusError, true
+	default:
+		return "", false
+	}
+}
+
+func stageHasIssueCode(stage StageResult, code reports.Code) bool {
+	for _, issue := range stage.Issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func promotionStageArtifactPaths(stage StageResult) []string {
+	var paths []string
+	for _, artifact := range stage.Artifacts {
+		switch artifact.Kind {
+		case reports.ArtifactERCReport, reports.ArtifactDRCReport:
+			if path := strings.TrimSpace(artifact.Path); path != "" {
+				paths = append(paths, path)
+			}
+		}
+	}
+	sort.Strings(paths)
+	return paths
+}
+
 func promotionRouteConnectivitySummary(stage StageResult) (LocalRouteConnectivitySummary, bool) {
 	if stage.Summary == nil {
 		return LocalRouteConnectivitySummary{}, false
@@ -519,6 +709,21 @@ func indexPromotionStages(stages []StageResult) map[StageName]StageResult {
 
 func promotionSummary(status PromotionStatus, readiness PromotionReadiness) string {
 	return "promotion " + string(status) + " with achieved readiness " + string(readiness)
+}
+
+func checkResultStatusToPromotionStatus(status checks.CheckStatus) PromotionGateStatus {
+	switch status {
+	case checks.CheckStatusPass:
+		return PromotionGateStatusPass
+	case checks.CheckStatusFail:
+		return PromotionGateStatusFailed
+	case checks.CheckStatusSkipped:
+		return PromotionGateStatusSkipped
+	case checks.CheckStatusError:
+		return PromotionGateStatusFailed
+	default:
+		return PromotionGateStatusNotRun
+	}
 }
 
 func sanitizePromotionCode(value string) string {

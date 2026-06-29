@@ -38,6 +38,12 @@ func TestRunKiCadChecksWithFakeCLIPasses(t *testing.T) {
 	if result.ERC.Status == "" || result.DRC.Status == "" {
 		t.Fatalf("checks did not run: %#v", result)
 	}
+	if _, ok := result.Stage.Summary[promotionKiCadERCSummaryKey]; !ok {
+		t.Fatalf("ERC result missing from stage summary: %#v", result.Stage.Summary)
+	}
+	if _, ok := result.Stage.Summary[promotionKiCadDRCSummaryKey]; !ok {
+		t.Fatalf("DRC result missing from stage summary: %#v", result.Stage.Summary)
+	}
 	if len(result.Stage.Artifacts) != 2 {
 		t.Fatalf("artifacts = %#v", result.Stage.Artifacts)
 	}
