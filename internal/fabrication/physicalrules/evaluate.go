@@ -30,6 +30,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks := []Check{}
 	checks = append(checks, evaluateStackup(board)...)
 	checks = append(checks, evaluateNetClasses(board, project)...)
+	checks = append(checks, evaluateImpedanceEvidence(board, project, opts)...)
 	checks = append(checks, evaluateAnnularRings(board, opts)...)
 	checks = append(checks, evaluateCopperSlivers(board, opts)...)
 	checks = append(checks, evaluateMaskPaste(board, opts)...)
@@ -1207,6 +1208,118 @@ func evaluateNetClasses(board *pcbfiles.PCBFile, project *projectfiles.ProjectFi
 		}
 	}
 	return checks
+}
+
+func evaluateImpedanceEvidence(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, opts Options) []Check {
+	if project == nil {
+		return []Check{
+			{ID: CheckImpedanceStackupEvidence, Category: CategoryImpedance, Status: StatusSkipped, Message: "controlled-impedance evidence skipped because project net classes are unavailable", Source: SourceParser},
+			{ID: CheckImpedanceWidthGapEvidence, Category: CategoryImpedance, Status: StatusSkipped, Message: "controlled-impedance width/gap evidence skipped because project net classes are unavailable", Source: SourceParser},
+			{ID: CheckDiffPairFabrication, Category: CategoryDifferentialPair, Status: StatusSkipped, Message: "differential-pair fabrication evidence skipped because project net classes are unavailable", Source: SourceParser},
+		}
+	}
+	impedanceClasses, diffClasses := impedanceIntentClasses(project.NetClasses)
+	if len(impedanceClasses) == 0 && len(diffClasses) == 0 {
+		return []Check{
+			{ID: CheckImpedanceStackupEvidence, Category: CategoryImpedance, Status: StatusSkipped, Message: "no controlled-impedance net-class intent was detected", Source: SourceParser},
+			{ID: CheckImpedanceWidthGapEvidence, Category: CategoryImpedance, Status: StatusSkipped, Message: "no controlled-impedance width/gap intent was detected", Source: SourceParser},
+			{ID: CheckDiffPairFabrication, Category: CategoryDifferentialPair, Status: StatusSkipped, Message: "no differential-pair net-class intent was detected", Source: SourceParser},
+		}
+	}
+	status := policyStatus(opts.ImpedancePolicy)
+	severity := reports.SeverityWarning
+	if status == StatusBlocked {
+		severity = reports.SeverityError
+	}
+	stackupStatus := status
+	stackupMessage := "controlled-impedance intent lacks solver-grade stackup/material evidence"
+	if opts.ImpedancePolicy == PolicyIgnore {
+		stackupStatus = StatusSkipped
+		stackupMessage = "controlled-impedance stackup evidence ignored by active profile policy"
+		severity = ""
+	}
+	widthStatus := status
+	widthMessage := "controlled-impedance intent has trace-width evidence but no solver-grade width/gap proof"
+	if opts.ImpedancePolicy == PolicyIgnore {
+		widthStatus = StatusSkipped
+		widthMessage = "controlled-impedance width/gap evidence ignored by active profile policy"
+	}
+	diffStatus := status
+	diffMessage := "differential-pair intent lacks solver-grade pair spacing and length-match fabrication evidence"
+	if opts.ImpedancePolicy == PolicyIgnore {
+		diffStatus = StatusSkipped
+		diffMessage = "differential-pair fabrication evidence ignored by active profile policy"
+	}
+	measurements := []Measurement{
+		{Name: "copper_layer_count", Value: float64(copperLayerCount(board)), Unit: "count"},
+		{Name: "controlled_impedance_class_count", Value: float64(len(impedanceClasses)), Unit: "count"},
+		{Name: "differential_pair_class_count", Value: float64(len(diffClasses)), Unit: "count"},
+	}
+	return []Check{
+		{
+			ID:           CheckImpedanceStackupEvidence,
+			Category:     CategoryImpedance,
+			Status:       stackupStatus,
+			Severity:     severity,
+			Message:      stackupMessage,
+			Suggestion:   "add explicit stackup/material/impedance proof or keep the board below fabrication-ready status",
+			IssuePath:    "physical.impedance.stackup_evidence",
+			Objects:      impedanceClasses,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		},
+		{
+			ID:           CheckImpedanceWidthGapEvidence,
+			Category:     CategoryImpedance,
+			Status:       widthStatus,
+			Severity:     severity,
+			Message:      widthMessage,
+			Suggestion:   "provide modeled impedance width/gap evidence or defer to manufacturer/KiCad DRC evidence",
+			IssuePath:    "physical.impedance.width_gap_evidence",
+			Objects:      impedanceClasses,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		},
+		{
+			ID:           CheckDiffPairFabrication,
+			Category:     CategoryDifferentialPair,
+			Status:       diffStatus,
+			Severity:     severity,
+			Message:      diffMessage,
+			Suggestion:   "provide explicit pair width, gap, skew, and stackup evidence before claiming differential-pair fabrication readiness",
+			IssuePath:    "physical.differential_pair.fabrication_evidence",
+			Objects:      diffClasses,
+			Measurements: measurements,
+			Source:       SourceHeuristic,
+		},
+	}
+}
+
+func impedanceIntentClasses(classes []projectfiles.NetClass) ([]string, []string) {
+	var impedance []string
+	var differential []string
+	for _, class := range classes {
+		name := strings.ToLower(strings.TrimSpace(class.Name))
+		switch {
+		case strings.Contains(name, "diff") || strings.Contains(name, "differential"):
+			differential = append(differential, class.Name)
+			impedance = append(impedance, class.Name)
+		case strings.Contains(name, "impedance") || strings.Contains(name, "controlled") || strings.Contains(name, "usb") || strings.Contains(name, "clock"):
+			impedance = append(impedance, class.Name)
+		}
+	}
+	return cleanStrings(impedance), cleanStrings(differential)
+}
+
+func policyStatus(policy Policy) Status {
+	switch policy {
+	case PolicyBlock:
+		return StatusBlocked
+	case PolicyIgnore:
+		return StatusSkipped
+	default:
+		return StatusWarning
+	}
 }
 
 func evaluateTrackWidths(board *pcbfiles.PCBFile, class projectfiles.NetClass, blocking bool) []Check {

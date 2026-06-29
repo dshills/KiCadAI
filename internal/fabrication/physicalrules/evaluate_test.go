@@ -359,6 +359,42 @@ func TestEvaluateBoardAllowsOrBlocksEdgePlatingByPolicy(t *testing.T) {
 	assertCheckStatus(t, report, CheckEdgePlatingProfile, StatusBlocked)
 }
 
+func TestEvaluateBoardSkipsImpedanceWhenNoIntent(t *testing.T) {
+	board := physicalRuleTestBoard()
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckImpedanceStackupEvidence, StatusSkipped)
+	assertCheckStatus(t, report, CheckImpedanceWidthGapEvidence, StatusSkipped)
+	assertCheckStatus(t, report, CheckDiffPairFabrication, StatusSkipped)
+}
+
+func TestEvaluateBoardWarnsOrBlocksImpedanceIntentByPolicy(t *testing.T) {
+	board := physicalRuleTestBoard()
+	project := physicalRuleTestProject()
+	project.NetClasses = append(project.NetClasses, projectfiles.NetClass{
+		Name:        "USB_Differential_90ohm",
+		Clearance:   kicadfiles.MM(0.15),
+		TrackWidth:  kicadfiles.MM(0.15),
+		ViaDiameter: kicadfiles.MM(0.45),
+		ViaDrill:    kicadfiles.MM(0.2),
+	})
+
+	report := EvaluateBoard(&board, &project, Options{})
+	assertCheckStatus(t, report, CheckImpedanceStackupEvidence, StatusWarning)
+	assertCheckStatus(t, report, CheckImpedanceWidthGapEvidence, StatusWarning)
+	assertCheckStatus(t, report, CheckDiffPairFabrication, StatusWarning)
+
+	report = EvaluateBoard(&board, &project, Options{ImpedancePolicy: PolicyBlock})
+	assertCheckStatus(t, report, CheckImpedanceStackupEvidence, StatusBlocked)
+	assertCheckStatus(t, report, CheckDiffPairFabrication, StatusBlocked)
+
+	report = EvaluateBoard(&board, &project, Options{ImpedancePolicy: PolicyIgnore})
+	assertCheckStatus(t, report, CheckImpedanceStackupEvidence, StatusSkipped)
+	assertCheckStatus(t, report, CheckDiffPairFabrication, StatusSkipped)
+}
+
 func TestEvaluateBoardDoesNotTreatFarOutsidePadAsEdgePlating(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Footprints[0].Position = point(100, 100)
