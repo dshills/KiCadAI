@@ -66,6 +66,7 @@ func TestParseCheckedInReportSamples(t *testing.T) {
 		want int
 	}{
 		{path: "erc_fail_kicad10.json", kind: CheckKindERC, want: 4},
+		{path: "erc_generated_led_writer_semantics_kicad10.json", kind: CheckKindERC, want: 5},
 		{path: "drc_fail_kicad10.json", kind: CheckKindDRC, want: 1},
 		{path: "pass_kicad10.json", kind: CheckKindDRC, want: 0},
 	}
@@ -121,6 +122,54 @@ func TestEmptyAllowlistEntryDoesNotMatchEverything(t *testing.T) {
 	}
 	if len(remaining) != len(findings) {
 		t.Fatalf("remaining = %d, want %d", len(remaining), len(findings))
+	}
+}
+
+func TestClassifyGeneratedLEDWriterSemanticsERCReport(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "erc_generated_led_writer_semantics_kicad10.json"))
+	if err != nil {
+		t.Fatalf("read sample: %v", err)
+	}
+	findings, issues, _ := ParseReport(CheckKindERC, data)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	summary := ClassifyERCFindings(findings)
+	if summary.Total != 5 {
+		t.Fatalf("summary.Total = %d, want 5", summary.Total)
+	}
+	if summary.BySource[ERCFailureSourceWriterSemantics] != 5 {
+		t.Fatalf("writer semantics count = %d, want 5; summary = %#v", summary.BySource[ERCFailureSourceWriterSemantics], summary)
+	}
+	if summary.ByStage[ERCFailureStageSymbolResolution] != 2 {
+		t.Fatalf("symbol resolution count = %d, want 2; summary = %#v", summary.ByStage[ERCFailureStageSymbolResolution], summary)
+	}
+	if summary.ByStage[ERCFailureStageSchematicConnectivity] != 3 {
+		t.Fatalf("schematic connectivity count = %d, want 3; summary = %#v", summary.ByStage[ERCFailureStageSchematicConnectivity], summary)
+	}
+	if summary.ByRule["pin_not_connected"] != 2 || summary.ByRule["wire_dangling"] != 1 || summary.ByRule["unconnected_wire_endpoint"] != 2 {
+		t.Fatalf("unexpected rule counts: %#v", summary.ByRule)
+	}
+	for _, item := range summary.Items {
+		if item.Signature == "" || item.Reason == "" {
+			t.Fatalf("classification missing signature or reason: %#v", item)
+		}
+	}
+}
+
+func TestClassifyOrdinaryERCFindingAsElectricalDesign(t *testing.T) {
+	finding := CheckFinding{
+		Kind:           CheckKindERC,
+		Severity:       "error",
+		Rule:           "pin_not_connected",
+		Message:        "Pin not connected",
+		RepairCategory: RepairConnectivity,
+		Location:       &CheckLocation{X: 42, Y: 17, Units: "mm"},
+		Objects:        []CheckObject{{Type: "Symbol", Reference: "U1", Pad: "3"}},
+	}
+	classification := ClassifyERCFinding(finding)
+	if classification.Source != ERCFailureSourceElectrical || classification.Stage != ERCFailureStageSchematicConnectivity {
+		t.Fatalf("classification = %#v, want electrical schematic connectivity", classification)
 	}
 }
 
