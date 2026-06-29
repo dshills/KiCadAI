@@ -61,6 +61,18 @@ func TestRulesForProfileSeparatesStandardAndAmplifierRules(t *testing.T) {
 	}
 }
 
+func TestRuleCountAndLayoutProfileMapping(t *testing.T) {
+	if got := RuleProfileForLayoutProfile(ProfileStrict); got != RuleProfileStandard {
+		t.Fatalf("strict layout profile maps to %q, want standard", got)
+	}
+	if got, want := RuleCountForProfile(RuleProfileStandard), len(RulesForProfile(RuleProfileStandard)); got != want {
+		t.Fatalf("standard rule count = %d, want %d", got, want)
+	}
+	if got := RuleCountForProfile("missing"); got != 0 {
+		t.Fatalf("missing rule count = %d, want 0", got)
+	}
+}
+
 func hasRuleCode(rules []RuleMetadata, code string) bool {
 	for _, rule := range rules {
 		if rule.Code == code {

@@ -42,7 +42,12 @@ generated and checked-in schematic examples.
 - Workflow readability summaries are emitted by `design create` planning paths
   and include profile, pass/fail, component/routed-net counts, diagonal-wire
   count, stage-order violations, power-placement violations, diagnostic counts,
-  decode errors, and generated role evidence.
+  decode errors, generated role evidence, `rule_profile`, `rule_count`,
+  `repair_guidance_available`, and `repair_guidance_count`.
+- Readability diagnostics now carry `repair` guidance when the diagnostic code
+  maps to a known rule. The stable rule inventory is exposed by
+  `internal/schematiclayout.RuleProfiles`, `ReadabilityRules`, `RuleByID`, and
+  `RuleForDiagnostic`.
 
 Useful focused commands:
 
@@ -54,7 +59,9 @@ go test ./internal/designworkflow -run Readability
 When a readability test fails, inspect the diagnostic code first. `diagonal_wire`
 and amplifier-specific codes are layout failures. `symbol_overlap` and
 `wire_symbol_overlap` can still be parser-geometry artifacts for imported
-fixtures until exact KiCad text and symbol extents are modeled.
+fixtures until exact KiCad text and symbol extents are modeled. Use the
+diagnostic `repair` text as the first repair hint before changing schematic
+writer geometry.
 
 
 ## Go Packages

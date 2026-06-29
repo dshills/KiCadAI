@@ -102,6 +102,22 @@ func RulesForProfile(profile RuleProfile) []RuleMetadata {
 	return rules
 }
 
+// RuleCountForProfile returns the number of rules associated with a reader-facing profile.
+func RuleCountForProfile(profile RuleProfile) int {
+	count := 0
+	for _, rule := range readabilityRules {
+		if ruleAppliesToProfile(rule, profile) {
+			count++
+		}
+	}
+	return count
+}
+
+// RuleProfileForLayoutProfile maps layout execution profiles to reader-facing rule profiles.
+func RuleProfileForLayoutProfile(profile Profile) RuleProfile {
+	return RuleProfileStandard
+}
+
 func ruleMetadata(id string, code string, severity Severity, description string, repair string, profiles ...RuleProfile) RuleMetadata {
 	return RuleMetadata{
 		ID:          id,

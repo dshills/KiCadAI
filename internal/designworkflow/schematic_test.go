@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematiclayout"
 )
 
 func TestApplySchematicWritesProject(t *testing.T) {
@@ -82,6 +83,18 @@ func TestSchematicStageIncludesReadabilitySummary(t *testing.T) {
 	}
 	if readability["profile"] == "" || readability["diagonal_wire_count"] == nil {
 		t.Fatalf("readability summary = %#v", readability)
+	}
+	if readability["rule_profile"] != schematiclayout.RuleProfileStandard {
+		t.Fatalf("rule_profile = %#v, want standard; summary=%#v", readability["rule_profile"], readability)
+	}
+	if got := summaryInt(t, readability, "rule_count"); got == 0 {
+		t.Fatalf("rule_count = %d, want nonzero; summary=%#v", got, readability)
+	}
+	if readability["repair_guidance_available"] != true {
+		t.Fatalf("repair_guidance_available = %#v, want true; summary=%#v", readability["repair_guidance_available"], readability)
+	}
+	if got := summaryInt(t, readability, "repair_guidance_count"); got == 0 {
+		t.Fatalf("repair_guidance_count = %d, want nonzero repairable diagnostics; summary=%#v", got, readability)
 	}
 	if got := summaryInt(t, readability, "diagonal_wire_count"); got != 0 {
 		t.Fatalf("diagonal_wire_count = %d, want 0; summary=%#v", got, readability)

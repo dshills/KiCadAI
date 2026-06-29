@@ -50,8 +50,15 @@ func schematicReadabilitySummary(operations []transactions.Operation) map[string
 		}
 	}
 	result := schematiclayout.Layout(request)
+	ruleProfile := schematiclayout.RuleProfileForLayoutProfile(result.Report.Profile)
+	ruleCount := schematiclayout.RuleCountForProfile(ruleProfile)
+	repairGuidanceCount := schematicReadabilityRepairGuidanceCount(result.Diagnostics)
 	return map[string]any{
 		"profile":                         result.Report.Profile,
+		"rule_profile":                    ruleProfile,
+		"rule_count":                      ruleCount,
+		"repair_guidance_available":       ruleCount > 0,
+		"repair_guidance_count":           repairGuidanceCount,
 		"passed":                          result.Report.Passed,
 		"component_count":                 result.Report.ComponentCount,
 		"routed_net_count":                result.Report.RoutedNetCount,
@@ -65,6 +72,16 @@ func schematicReadabilitySummary(operations []transactions.Operation) map[string
 		"decode_error_count":              decodeErrors,
 		"roles":                           refRoles,
 	}
+}
+
+func schematicReadabilityRepairGuidanceCount(diagnostics []schematiclayout.Diagnostic) int {
+	count := 0
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Repair != "" {
+			count++
+		}
+	}
+	return count
 }
 
 func pointFromTransaction(point transactions.Point) kicadfiles.Point {
