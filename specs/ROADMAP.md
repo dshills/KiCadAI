@@ -81,6 +81,12 @@ from validation feedback to safe automatic repair.
 - Writer correctness closeout foundation with project, schematic, PCB,
   transfer, pad-net, copper-net, zone-net, and optional KiCad round-trip gates.
 - Schematic round-trip compatibility foundation.
+- Schematic layout readability foundation with deterministic role/stage/lane
+  classification, conservative readable schematic placement, orthogonal
+  schematic wire routing, label fallback for long/shared nets, overlap and
+  diagonal-wire diagnostics, design workflow readability evidence, wider
+  op-amp gain-stage block coordinates, and design API orthogonal schematic
+  connection emission.
 - Closed-loop validation repair foundation with planning, executors, persisted
   generated-project apply, target-based CLI support, workflow integration, and
   repair goldens.
@@ -150,6 +156,9 @@ loop confidence:
   treated as production layout quality;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping;
+- schematic readability now has a foundation and workflow evidence, but still
+  needs broader example regeneration, exact KiCad text-justification geometry,
+  hierarchy/page splitting, and safe imported-schematic layout mutation;
 - repair can persist generated-project changes, but imported-project mutation
   remains blocked by preservation safety;
 - fabrication export now provides conservative readiness gates with BOM/CPL

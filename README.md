@@ -14,6 +14,16 @@ The direct-file workflow is the main functional path today. KiCadAI can generate
 
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 
+Generated schematic workflows now emit schematic readability evidence. The
+foundation includes deterministic role/stage/lane classification, conservative
+component placement rules, orthogonal schematic routing, label fallback for
+long/shared nets, geometry overlap diagnostics, and workflow summary metrics.
+The first generator improvements also spread the op-amp gain-stage block and
+prevent design API schematic connections from being emitted as diagonal wires.
+This is a foundation, not a full schematic editor: imported schematic mutation,
+automatic hierarchy/page splitting, exact KiCad text justification geometry,
+and broad example regeneration remain future work.
+
 Generated design PCB net assignment now propagates pad and copper net names
 through placement/project write, resolves KiCad 10 name-only net references
 during PCB readback, and reports net-assignment evidence in the `design create`
@@ -185,6 +195,7 @@ Focused subsystem docs also live in `docs/`, including direct file writers, comp
 - `internal/blocks`: reusable circuit block registry and realization logic.
 - `internal/components`: component catalog, selection, ratings, and evidence checks.
 - `internal/kicadfiles`: project, schematic, PCB, and lower-level KiCad file writers.
+- `internal/schematiclayout`: schematic readability classification, placement, routing, and diagnostics.
 - `internal/placement` and `internal/routing`: layout and routing engines.
 - `internal/boardvalidation`, `internal/writercorrectness`, and `internal/repair`: validation and deterministic repair foundations.
 - `data/components`: checked-in component catalog.
