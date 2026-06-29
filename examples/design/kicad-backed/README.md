@@ -77,3 +77,18 @@ still blocks candidate/pass readiness when ERC or DRC is required. The current
 fixtures remain `expected_fail`; do not treat a generated board as promoted
 until the promotion report achieves `candidate` or `pass` and the configured
 KiCad ERC/DRC evidence gates pass.
+
+## Promotion Policy
+
+Fixture metadata is validated as a promotion queue:
+
+- `expected_fail` and `blocked` fixtures must describe their known blockers.
+- `candidate` fixtures must require ERC, must require DRC when PCB layout stages
+  are expected, and must expect `.kicadai/design-promotion.json`.
+- `pass` fixtures must meet the candidate evidence requirements with no
+  `known_gaps` and no allowlists.
+
+The `internal/designworkflow.SummarizePromotionFixtures` helper groups fixtures
+by declared readiness and preserves tier, acceptance, required ERC/DRC evidence,
+and known-gap counts. Use that summary shape for future CLI or documentation
+views of the promotion queue.
