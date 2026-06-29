@@ -1,0 +1,86 @@
+{
+  "version": "0.1.0",
+  "records": [
+    {
+      "id": "amplifier.component.opamp_drive",
+      "category": "component",
+      "domain": "amplifier",
+      "title": "Verified op-amp drive and stability choices",
+      "readiness": "draft",
+      "blocker": "Existing op-amp record is placeholder-level and lacks output-drive, load, bandwidth, and stability evidence for headphone or power-amplifier front ends.",
+      "evidence_needed": ["datasheet-backed output current and load limits", "verified symbol-footprint pinmap", "stability and bandwidth constraints", "KiCad-resolvable symbol and footprint"],
+      "next_task": "add_component"
+    },
+    {
+      "id": "amplifier.component.output_transistor",
+      "category": "component",
+      "domain": "amplifier",
+      "title": "Class A/Class AB output devices",
+      "readiness": "missing",
+      "blocker": "No verified BJT or MOSFET output-device records with SOA, current, dissipation, pinmap, and footprint evidence.",
+      "evidence_needed": ["datasheet-backed current and power ratings", "package thermal evidence", "symbol-footprint pinmap", "safe operating area review"],
+      "next_task": "add_component"
+    },
+    {
+      "id": "amplifier.block.bias_network",
+      "category": "block",
+      "domain": "amplifier",
+      "title": "Class AB bias network",
+      "readiness": "missing",
+      "blocker": "No reusable diode or Vbe-multiplier bias block exists with temperature, quiescent-current, and adjustment evidence.",
+      "evidence_needed": ["bias topology generator", "component ratings", "quiescent-current calculation", "thermal coupling/layout constraints"],
+      "next_task": "add_block"
+    },
+    {
+      "id": "amplifier.block.output_protection",
+      "category": "block",
+      "domain": "amplifier",
+      "title": "Headphone DC blocking and output protection",
+      "readiness": "draft",
+      "blocker": "Amplifier fixtures only document placeholder protection; they do not realize verified DC blocking, load safety, or output fault protection.",
+      "evidence_needed": ["DC blocking capacitor policy", "bleed/load resistor policy", "output connector safety constraints", "fault/protection component evidence"],
+      "next_task": "add_block"
+    },
+    {
+      "id": "amplifier.layout.thermal_current",
+      "category": "layout",
+      "domain": "amplifier",
+      "title": "Thermal and high-current layout constraints",
+      "readiness": "draft",
+      "blocker": "Layout rules exist as evidence hooks but are not proven on amplifier output stages with real KiCad DRC-clean boards.",
+      "evidence_needed": ["net-class width checks", "current-role routing rules", "thermal placement metadata", "KiCad DRC artifact with semantic hash or git object ID"],
+      "next_task": "verify_layout"
+    },
+    {
+      "id": "amplifier.layout.stability_feedback",
+      "category": "layout",
+      "domain": "amplifier",
+      "title": "Feedback, decoupling, and stability layout",
+      "readiness": "draft",
+      "blocker": "Op-amp feedback and decoupling evidence exists in tests, but broader analog stability placement and routing constraints are not promoted.",
+      "evidence_needed": ["feedback-loop proximity rules", "supply decoupling placement proof", "input/output separation evidence", "KiCad-backed layout fixture"],
+      "next_task": "verify_layout"
+    },
+    {
+      "id": "amplifier.validation.kicad_promotion",
+      "category": "validation",
+      "domain": "amplifier",
+      "title": "KiCad-backed amplifier promotion",
+      "readiness": "missing",
+      "blocker": "Amplifier KiCad-backed fixture is expected_fail and blocks before fabrication-candidate evidence.",
+      "evidence_needed": ["real KiCad ERC report", "real KiCad DRC report", "promotion report candidate/pass status", "repair guidance for remaining blockers"],
+      "next_task": "capture_kicad_evidence"
+    },
+    {
+      "id": "amplifier.documentation.design_limits",
+      "category": "documentation",
+      "domain": "amplifier",
+      "title": "Amplifier design limits for AI generation",
+      "readiness": "draft",
+      "blocker": "AI-facing amplifier limits are scattered across specs, examples, and README notes.",
+      "evidence_needed": ["supported topologies", "unsupported load/power ranges", "required validation gates", "safe request examples"],
+      "next_task": "write_docs"
+    }
+  ]
+}
+

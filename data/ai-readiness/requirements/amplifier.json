@@ -1,0 +1,16 @@
+{
+  "version": "0.1.0",
+  "domain": "amplifier",
+  "required_categories": ["component", "block", "layout", "validation", "documentation"],
+  "required_record_ids": [
+    "amplifier.component.opamp_drive",
+    "amplifier.component.output_transistor",
+    "amplifier.block.bias_network",
+    "amplifier.block.output_protection",
+    "amplifier.layout.thermal_current",
+    "amplifier.layout.stability_feedback",
+    "amplifier.validation.kicad_promotion",
+    "amplifier.documentation.design_limits"
+  ]
+}
+
