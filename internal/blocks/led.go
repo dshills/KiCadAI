@@ -122,8 +122,8 @@ func twoTerminalHorizontalPins() []transactions.PinSpec {
 	// These are schematic symbol anchors only. Footprint pad geometry is
 	// resolved separately by the PCB/library writer.
 	return []transactions.PinSpec{
-		{Number: "1", XMM: -2.54, YMM: 0},
-		{Number: "2", XMM: 2.54, YMM: 0},
+		{Number: "1", XMM: -5.08, YMM: 0},
+		{Number: "2", XMM: 5.08, YMM: 0},
 	}
 }
 
