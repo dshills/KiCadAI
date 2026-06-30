@@ -1,0 +1,31 @@
+{
+  "schema": "kicadai.fabrication.profile.v1",
+  "id": "local_standard",
+  "name": "Local Standard",
+  "version": "2026-06",
+  "source": {
+    "kind": "local"
+  },
+  "units": "mm",
+  "stackup": {
+    "min_layers": 2,
+    "max_layers": 4,
+    "allowed_layer_counts": [2, 4],
+    "default_board_thickness_mm": 1.6
+  },
+  "copper": {
+    "min_trace_width_mm": 0.15,
+    "min_spacing_mm": 0.15,
+    "min_copper_sliver_mm": 0.127
+  },
+  "drill": {
+    "min_drill_mm": 0.3,
+    "min_via_drill_mm": 0.3,
+    "min_pad_annular_ring_mm": 0.15,
+    "min_via_annular_ring_mm": 0.1
+  },
+  "solder_mask": {
+    "min_solder_mask_web_mm": 0.1,
+    "paste_required_for_smd": true
+  }
+}
