@@ -87,12 +87,15 @@ const (
 
 // Options configures schematic electrical rule evaluation.
 type Options struct {
-	Acceptance            Acceptance  `json:"acceptance,omitempty"`
-	Scope                 Scope       `json:"scope,omitempty"`
-	RequireConfidence     bool        `json:"require_confidence,omitempty"`
-	AcceptedExternalRails []string    `json:"accepted_external_rails,omitempty"`
-	PinIntents            []PinIntent `json:"pin_intents,omitempty"`
-	PowerRails            []PowerRail `json:"power_rails,omitempty"`
+	Acceptance            Acceptance              `json:"acceptance,omitempty"`
+	Scope                 Scope                   `json:"scope,omitempty"`
+	RequireConfidence     bool                    `json:"require_confidence,omitempty"`
+	AcceptedExternalRails []string                `json:"accepted_external_rails,omitempty"`
+	PinIntents            []PinIntent             `json:"pin_intents,omitempty"`
+	PowerRails            []PowerRail             `json:"power_rails,omitempty"`
+	Decoupling            []DecouplingRequirement `json:"decoupling,omitempty"`
+	ValueChecks           []ValueCheck            `json:"value_checks,omitempty"`
+	RatingChecks          []RatingCheck           `json:"rating_checks,omitempty"`
 }
 
 // PinIntentKind describes expected electrical treatment for a known symbol pin.
@@ -129,6 +132,39 @@ type PowerRail struct {
 	ExternalDriver bool     `json:"external_driver,omitempty"`
 }
 
+// DecouplingRequirement records schematic-level bypass capacitor evidence.
+type DecouplingRequirement struct {
+	ID            string   `json:"id,omitempty"`
+	Reference     string   `json:"reference,omitempty"`
+	Rail          string   `json:"rail,omitempty"`
+	CapacitorRefs []string `json:"capacitor_refs,omitempty"`
+	ExpectedValue string   `json:"expected_value,omitempty"`
+	ActualValue   string   `json:"actual_value,omitempty"`
+	ExpectedRail  string   `json:"expected_rail,omitempty"`
+	ActualRail    string   `json:"actual_rail,omitempty"`
+	Deferred      bool     `json:"deferred,omitempty"`
+}
+
+// ValueCheck records local schematic value sanity evidence.
+type ValueCheck struct {
+	Reference   string `json:"reference,omitempty"`
+	Value       string `json:"value,omitempty"`
+	Required    bool   `json:"required,omitempty"`
+	ParseOK     bool   `json:"parse_ok,omitempty"`
+	OutOfPolicy bool   `json:"out_of_policy,omitempty"`
+}
+
+// RatingCheck records selected component rating evidence for a known use.
+type RatingCheck struct {
+	Reference   string  `json:"reference,omitempty"`
+	Kind        string  `json:"kind,omitempty"`
+	Unit        string  `json:"unit,omitempty"`
+	Required    float64 `json:"required,omitempty"`
+	Actual      float64 `json:"actual,omitempty"`
+	ActualKnown bool    `json:"actual_known,omitempty"`
+	Evidence    bool    `json:"evidence,omitempty"`
+}
+
 // Finding is one schematic electrical rule result.
 type Finding struct {
 	RuleID    RuleID           `json:"rule_id"`
@@ -150,6 +186,8 @@ type Report struct {
 	CheckedPowerRails             int       `json:"checked_power_rails"`
 	CheckedRequiredPins           int       `json:"checked_required_pins"`
 	CheckedDecouplingRequirements int       `json:"checked_decoupling_requirements"`
+	CheckedValueChecks            int       `json:"checked_value_checks"`
+	CheckedRatingChecks           int       `json:"checked_rating_checks"`
 	FindingCount                  int       `json:"finding_count"`
 	Findings                      []Finding `json:"findings,omitempty"`
 }

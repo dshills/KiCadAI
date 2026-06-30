@@ -453,6 +453,173 @@ func TestInspectConnectedPowerFlagPasses(t *testing.T) {
 	}
 }
 
+func TestInspectDecouplingRequirementMissingBlocks(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{Reference: "U1", Rail: "VCC"}}})
+	if !hasRule(report, RuleDecouplingMissing) || report.CheckedDecouplingRequirements != 1 {
+		t.Fatalf("report missing decoupling blocker: %#v", report)
+	}
+}
+
+func TestInspectDecouplingIgnoresEmptyPlaceholders(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{}}})
+	if hasRule(report, RuleDecouplingMissing) || report.CheckedDecouplingRequirements != 0 {
+		t.Fatalf("empty decoupling placeholder should not produce findings or counts: %#v", report)
+	}
+}
+
+func TestInspectDecouplingRequirementSatisfiedPasses(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{Reference: "U1", Rail: "VCC", CapacitorRefs: []string{"C1"}}}})
+	if hasRule(report, RuleDecouplingMissing) {
+		t.Fatalf("satisfied decoupling should pass: %#v", report.Findings)
+	}
+}
+
+func TestInspectDecouplingValueAndRailMismatch(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{
+		Reference:     "U1",
+		CapacitorRefs: []string{"C1"},
+		ExpectedValue: "100n",
+		ActualValue:   "10n",
+		ExpectedRail:  "VCC",
+		ActualRail:    "GND",
+	}}})
+	if !hasRule(report, RuleDecouplingValueMismatch) || !hasRule(report, RuleDecouplingRailMismatch) {
+		t.Fatalf("report missing decoupling mismatch findings: %#v", report.Findings)
+	}
+}
+
+func TestInspectDecouplingEquivalentValuesPass(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{
+		Reference:     "U1",
+		CapacitorRefs: []string{"C1"},
+		ExpectedValue: "100n",
+		ActualValue:   "0.1uF",
+	}}})
+	if hasRule(report, RuleDecouplingValueMismatch) {
+		t.Fatalf("equivalent decoupling values should pass: %#v", report.Findings)
+	}
+}
+
+func TestInspectDecouplingMicroSymbolValuePasses(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{
+		Reference:     "U1",
+		CapacitorRefs: []string{"C1"},
+		ExpectedValue: "1µF",
+		ActualValue:   "1000n",
+	}}})
+	if hasRule(report, RuleDecouplingValueMismatch) {
+		t.Fatalf("micro symbol decoupling value should parse: %#v", report.Findings)
+	}
+}
+
+func TestInspectDecouplingGreekMuValuePasses(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{
+		Reference:     "U1",
+		CapacitorRefs: []string{"C1"},
+		ExpectedValue: "1μF",
+		ActualValue:   "1000n",
+	}}})
+	if hasRule(report, RuleDecouplingValueMismatch) {
+		t.Fatalf("greek mu decoupling value should parse: %#v", report.Findings)
+	}
+}
+
+func TestInspectDecouplingEmbeddedUnitValuePasses(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{
+		Reference:     "U1",
+		CapacitorRefs: []string{"C1"},
+		ExpectedValue: "4n7",
+		ActualValue:   "4700pF",
+	}}})
+	if hasRule(report, RuleDecouplingValueMismatch) {
+		t.Fatalf("embedded unit decoupling value should parse: %#v", report.Findings)
+	}
+}
+
+func TestInspectDecouplingLeadingUnitValuePasses(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{Decoupling: []DecouplingRequirement{{
+		Reference:     "U1",
+		CapacitorRefs: []string{"C1"},
+		ExpectedValue: "u1",
+		ActualValue:   "100n",
+	}}})
+	if hasRule(report, RuleDecouplingValueMismatch) {
+		t.Fatalf("leading unit decoupling value should parse: %#v", report.Findings)
+	}
+}
+
+func TestInspectValueChecks(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{ValueChecks: []ValueCheck{
+		{Reference: "R1", Required: true},
+		{Reference: "C1", Value: "abc", ParseOK: false},
+		{Reference: "R2", Value: "999M", ParseOK: true, OutOfPolicy: true},
+	}})
+	if report.CheckedValueChecks != 3 {
+		t.Fatalf("CheckedValueChecks = %d, want 3", report.CheckedValueChecks)
+	}
+	for _, rule := range []RuleID{RuleValueMissing, RuleValueParseFailed, RuleValueOutOfPolicy} {
+		if !hasRule(report, rule) {
+			t.Fatalf("report missing %s: %#v", rule, report.Findings)
+		}
+	}
+}
+
+func TestInspectRatingChecks(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{
+		Acceptance: AcceptanceFabricationCandidate,
+		RatingChecks: []RatingCheck{
+			{Reference: "C1", Kind: "voltage", Required: 10, Actual: 6.3, ActualKnown: true, Unit: "V", Evidence: true},
+			{Reference: "R1", Kind: "power", Required: 0.125, Unit: "W", Evidence: false},
+		},
+	})
+	if report.CheckedRatingChecks != 2 {
+		t.Fatalf("CheckedRatingChecks = %d, want 2", report.CheckedRatingChecks)
+	}
+	if !hasRule(report, RuleRatingInsufficient) || !hasRule(report, RuleRatingEvidenceMissing) {
+		t.Fatalf("report missing rating findings: %#v", report.Findings)
+	}
+}
+
+func TestInspectRatingZeroActualIsInsufficient(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{RatingChecks: []RatingCheck{{Reference: "C1", Kind: "voltage", Required: 10, Actual: 0, ActualKnown: true, Unit: "V", Evidence: true}}})
+	if !hasRule(report, RuleRatingInsufficient) {
+		t.Fatalf("zero actual rating should be insufficient: %#v", report.Findings)
+	}
+}
+
+func TestInspectRatingUnknownActualDoesNotCompare(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{RatingChecks: []RatingCheck{{Reference: "C1", Kind: "voltage", Required: 10, Evidence: true}}})
+	if hasRule(report, RuleRatingInsufficient) {
+		t.Fatalf("unknown actual rating should not be compared: %#v", report.Findings)
+	}
+}
+
 func TestIntentCoordinateConversionPreservesInternalUnits(t *testing.T) {
 	value := int64(kicadfiles.MM(123.456))
 	if got := int64(iuFromIntentCoordinate(value)); got != value {

@@ -1,6 +1,7 @@
 package schematicrules
 
 import (
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,12 +34,18 @@ func Inspect(file schematic.SchematicFile, opts Options) Report {
 	inspector.inspectNoConnects()
 	inspector.inspectPinIntents()
 	inspector.inspectPowerRails()
+	inspector.inspectDecoupling()
+	inspector.inspectValues()
+	inspector.inspectRatings()
 	report := Report{
-		CheckedSymbols:      len(file.Symbols),
-		CheckedNets:         len(inspector.connectedComponents),
-		CheckedPowerRails:   len(opts.PowerRails),
-		CheckedRequiredPins: countRequiredPinIntents(opts.PinIntents),
-		Findings:            inspector.findings,
+		CheckedSymbols:                len(file.Symbols),
+		CheckedNets:                   len(inspector.connectedComponents),
+		CheckedPowerRails:             len(opts.PowerRails),
+		CheckedRequiredPins:           countRequiredPinIntents(opts.PinIntents),
+		CheckedDecouplingRequirements: countDecouplingRequirements(opts.Decoupling),
+		CheckedValueChecks:            len(opts.ValueChecks),
+		CheckedRatingChecks:           len(opts.RatingChecks),
+		Findings:                      inspector.findings,
 	}
 	return NewReport(report)
 }
@@ -55,6 +62,16 @@ type fileInspector struct {
 	connectedComponents [][]kicadfiles.Point
 	acceptedExternal    map[string]struct{}
 	findings            []Finding
+}
+
+var capacitanceUnits = []struct {
+	prefix     string
+	multiplier float64
+}{
+	{prefix: "p", multiplier: 1e-12},
+	{prefix: "n", multiplier: 1e-9},
+	{prefix: "u", multiplier: 1e-6},
+	{prefix: "m", multiplier: 1e-3},
 }
 
 type indexedLabel struct {
@@ -368,6 +385,215 @@ func (inspector *fileInspector) inspectPowerFlags() {
 			Repair:    "move PWR_FLAG onto the intended powered net or remove the unused flag",
 		})
 	}
+}
+
+func (inspector *fileInspector) inspectDecoupling() {
+	for index, requirement := range inspector.opts.Decoupling {
+		if decouplingRequirementEmpty(requirement) {
+			continue
+		}
+		path := "decoupling[" + strconv.Itoa(index) + "]"
+		reference := strings.TrimSpace(requirement.Reference)
+		rail := firstNonBlank(requirement.ExpectedRail, requirement.Rail)
+		expectedValue := strings.TrimSpace(requirement.ExpectedValue)
+		actualValue := strings.TrimSpace(requirement.ActualValue)
+		expectedRail := strings.TrimSpace(requirement.ExpectedRail)
+		actualRail := strings.TrimSpace(requirement.ActualRail)
+		if requirement.Deferred {
+			inspector.add(Finding{
+				RuleID:    RuleDecouplingEvidenceDeferred,
+				Severity:  reports.SeverityWarning,
+				Category:  CategoryDecoupling,
+				Path:      path,
+				Reference: reference,
+				Net:       rail,
+				Message:   "decoupling requirement is deferred because schematic evidence is incomplete",
+				Repair:    "provide block or component decoupling evidence before claiming ERC/DRC or fabrication readiness",
+			})
+			continue
+		}
+		if countNonEmptyStrings(requirement.CapacitorRefs) == 0 {
+			inspector.add(Finding{
+				RuleID:    RuleDecouplingMissing,
+				Severity:  reports.SeverityBlocked,
+				Category:  CategoryDecoupling,
+				Path:      path,
+				Reference: reference,
+				Net:       rail,
+				Message:   "modeled active component lacks required decoupling capacitor evidence",
+				Repair:    "add the required decoupling capacitor and connect it to the modeled supply rail and return",
+			})
+		}
+		if expectedValue != "" && actualValue != "" && !equivalentElectricalValue(expectedValue, actualValue) {
+			inspector.add(Finding{
+				RuleID:    RuleDecouplingValueMismatch,
+				Severity:  reports.SeverityWarning,
+				Category:  CategoryDecoupling,
+				Path:      path + ".actual_value",
+				Reference: reference,
+				Net:       rail,
+				Message:   "decoupling capacitor value does not match the modeled requirement",
+				Repair:    "select the modeled decoupling value or update the block/component requirement",
+			})
+		}
+		if expectedRail != "" && actualRail != "" && !strings.EqualFold(expectedRail, actualRail) {
+			inspector.add(Finding{
+				RuleID:    RuleDecouplingRailMismatch,
+				Severity:  reports.SeverityError,
+				Category:  CategoryDecoupling,
+				Path:      path + ".actual_rail",
+				Reference: reference,
+				Net:       actualRail,
+				Message:   "decoupling capacitor is assigned to the wrong rail",
+				Repair:    "connect the decoupling capacitor to the supply rail it is meant to bypass",
+			})
+		}
+	}
+}
+
+func decouplingRequirementEmpty(requirement DecouplingRequirement) bool {
+	return strings.TrimSpace(requirement.ID) == "" &&
+		strings.TrimSpace(requirement.Reference) == "" &&
+		strings.TrimSpace(requirement.Rail) == "" &&
+		strings.TrimSpace(requirement.ExpectedValue) == "" &&
+		strings.TrimSpace(requirement.ActualValue) == "" &&
+		strings.TrimSpace(requirement.ExpectedRail) == "" &&
+		strings.TrimSpace(requirement.ActualRail) == "" &&
+		countNonEmptyStrings(requirement.CapacitorRefs) == 0 &&
+		!requirement.Deferred
+}
+
+func countDecouplingRequirements(requirements []DecouplingRequirement) int {
+	count := 0
+	for _, requirement := range requirements {
+		if !decouplingRequirementEmpty(requirement) {
+			count++
+		}
+	}
+	return count
+}
+
+func (inspector *fileInspector) inspectValues() {
+	for index, check := range inspector.opts.ValueChecks {
+		path := "value_checks[" + strconv.Itoa(index) + "]"
+		reference := strings.TrimSpace(check.Reference)
+		value := strings.TrimSpace(check.Value)
+		switch {
+		case check.Required && value == "":
+			inspector.add(Finding{RuleID: RuleValueMissing, Severity: reports.SeverityError, Category: CategoryValue, Path: path + ".value", Reference: reference, Message: "required schematic value is missing", Repair: "assign a value that satisfies the generated block or component policy"})
+		case value != "" && !check.ParseOK:
+			inspector.add(Finding{RuleID: RuleValueParseFailed, Severity: reports.SeverityError, Category: CategoryValue, Path: path + ".value", Reference: reference, Message: "schematic value could not be parsed", Repair: "use a supported numeric value and unit format"})
+		case check.OutOfPolicy:
+			inspector.add(Finding{RuleID: RuleValueOutOfPolicy, Severity: reports.SeverityWarning, Category: CategoryValue, Path: path + ".value", Reference: reference, Message: "schematic value is outside the modeled policy", Repair: "choose a value within the block or component policy or record explicit design rationale"})
+		}
+	}
+}
+
+func (inspector *fileInspector) inspectRatings() {
+	for index, check := range inspector.opts.RatingChecks {
+		path := "rating_checks[" + strconv.Itoa(index) + "]"
+		reference := strings.TrimSpace(check.Reference)
+		if !check.Evidence {
+			inspector.add(Finding{
+				RuleID:    RuleRatingEvidenceMissing,
+				Severity:  metadataMissingSeverity(inspector.opts),
+				Category:  CategoryRating,
+				Path:      path,
+				Reference: reference,
+				Message:   "component rating evidence is missing",
+				Repair:    "select a catalog-backed component with rating evidence for this use",
+			})
+		}
+		if check.Required > 0 && check.ActualKnown && check.Actual < check.Required {
+			inspector.add(Finding{
+				RuleID:    RuleRatingInsufficient,
+				Severity:  reports.SeverityBlocked,
+				Category:  CategoryRating,
+				Path:      path,
+				Reference: reference,
+				Message:   "component rating is below the modeled requirement",
+				Repair:    "select a component with sufficient " + strings.TrimSpace(check.Kind) + " rating",
+			})
+		}
+	}
+}
+
+func firstNonBlank(values ...string) string {
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			return strings.TrimSpace(value)
+		}
+	}
+	return ""
+}
+
+func equivalentElectricalValue(a string, b string) bool {
+	a = strings.TrimSpace(a)
+	b = strings.TrimSpace(b)
+	if strings.EqualFold(a, b) {
+		return true
+	}
+	parsedA, okA := parseCapacitanceFarads(a)
+	parsedB, okB := parseCapacitanceFarads(b)
+	if !okA || !okB {
+		return false
+	}
+	return math.Abs(parsedA-parsedB) <= math.Max(math.Abs(parsedA), math.Abs(parsedB))*1e-6
+}
+
+func parseCapacitanceFarads(value string) (float64, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "μ", "u")
+	normalized = strings.ReplaceAll(normalized, "µ", "u")
+	normalized = strings.TrimSuffix(normalized, "f")
+	if normalized == "" {
+		return 0, false
+	}
+	if parsed, ok := parseEmbeddedCapacitanceUnit(normalized); ok {
+		return parsed, true
+	}
+	multiplier := 1.0
+	switch {
+	case strings.HasSuffix(normalized, "p"):
+		multiplier = 1e-12
+		normalized = strings.TrimSuffix(normalized, "p")
+	case strings.HasSuffix(normalized, "n"):
+		multiplier = 1e-9
+		normalized = strings.TrimSuffix(normalized, "n")
+	case strings.HasSuffix(normalized, "u"):
+		multiplier = 1e-6
+		normalized = strings.TrimSuffix(normalized, "u")
+	case strings.HasSuffix(normalized, "m"):
+		multiplier = 1e-3
+		normalized = strings.TrimSuffix(normalized, "m")
+	}
+	number, err := strconv.ParseFloat(strings.TrimSpace(normalized), 64)
+	if err != nil {
+		return 0, false
+	}
+	return number * multiplier, true
+}
+
+func parseEmbeddedCapacitanceUnit(value string) (float64, bool) {
+	for _, unit := range capacitanceUnits {
+		index := strings.Index(value, unit.prefix)
+		if index < 0 || index >= len(value)-len(unit.prefix) {
+			continue
+		}
+		numberText := value[:index] + "." + value[index+len(unit.prefix):]
+		if index == 0 {
+			numberText = "0." + value[len(unit.prefix):]
+		}
+		if numberText == "." {
+			return 0, false
+		}
+		number, err := strconv.ParseFloat(strings.TrimSpace(numberText), 64)
+		if err != nil {
+			return 0, false
+		}
+		return number * unit.multiplier, true
+	}
+	return 0, false
 }
 
 func isPowerFlagSymbol(symbol *schematic.SchematicSymbol) bool {

@@ -80,6 +80,8 @@ func TestReportJSONShape(t *testing.T) {
 		CheckedPowerRails:             2,
 		CheckedRequiredPins:           14,
 		CheckedDecouplingRequirements: 3,
+		CheckedValueChecks:            4,
+		CheckedRatingChecks:           5,
 		Findings: []Finding{{
 			RuleID:    RulePowerSourceMissing,
 			Severity:  reports.SeverityBlocked,
@@ -100,6 +102,8 @@ func TestReportJSONShape(t *testing.T) {
 	for _, want := range []string{
 		`"status":"blocked"`,
 		`"checked_symbols":8`,
+		`"checked_value_checks":4`,
+		`"checked_rating_checks":5`,
 		`"finding_count":1`,
 		`"rule_id":"SCH_POWER_SOURCE_MISSING"`,
 		`"severity":"blocked"`,
