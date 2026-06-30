@@ -133,11 +133,14 @@ func TestSchematicEvaluationUsesReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Schematic returned error: %v", err)
 	}
-	if len(report.Checks) != 1 {
+	if len(report.Checks) != 2 {
 		t.Fatalf("checks = %#v", report.Checks)
 	}
 	if report.Checks[0].Name != "schematic_validation" || report.Checks[0].Status != CheckPassed {
 		t.Fatalf("unexpected schematic check: %#v", report.Checks[0])
+	}
+	if report.Checks[1].Name != "schematic_electrical" || report.Checks[1].Status != CheckPassed {
+		t.Fatalf("unexpected schematic electrical check: %#v", report.Checks[1])
 	}
 }
 
@@ -155,6 +158,26 @@ func TestSchematicEvaluationReportsDuplicateReference(t *testing.T) {
 	}
 	if len(report.Issues) == 0 || report.Issues[0].Code != reports.CodeDuplicateReference {
 		t.Fatalf("expected duplicate reference issue, got %#v", report.Issues)
+	}
+}
+
+func TestSchematicEvaluationReportsElectricalFindings(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "floating_label.kicad_sch")
+	writeFile(t, path, `(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (label "SIG" (at 10 10 0) (uuid "11111111-1111-5111-8111-111111111111"))
+)`)
+	report, err := Schematic(path)
+	if err != nil {
+		t.Fatalf("Schematic returned error: %v", err)
+	}
+	check := findCheck(report.Checks, "schematic_electrical")
+	if check.Status != CheckFailed {
+		t.Fatalf("schematic_electrical check = %#v", check)
+	}
+	if len(check.Issues) == 0 || check.Issues[0].Code != reports.CodeValidationFailed {
+		t.Fatalf("expected schematic electrical issue, got %#v", check.Issues)
 	}
 }
 
@@ -217,4 +240,13 @@ func writeFile(t *testing.T, path string, contents string) {
 	if err := os.WriteFile(path, []byte(contents), 0o644); err != nil {
 		t.Fatalf("write %s: %v", path, err)
 	}
+}
+
+func findCheck(checks []CheckResult, name string) CheckResult {
+	for _, check := range checks {
+		if check.Name == name {
+			return check
+		}
+	}
+	return CheckResult{}
 }

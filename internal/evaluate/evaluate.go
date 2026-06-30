@@ -12,6 +12,7 @@ import (
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	schematicfiles "kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicrules"
 )
 
 type CodedError struct {
@@ -154,11 +155,14 @@ func PCB(path string) (Report, error) {
 
 func checksForSchematicSummary(summary inspect.SchematicSummary) []CheckResult {
 	issues := append([]reports.Issue{}, summary.Issues...)
+	var electricalCheck *CheckResult
 	file, err := schematicfiles.ReadFile(summary.Path)
 	if err != nil {
 		issues = append(issues, IssueFromError(err, summary.Path))
 	} else {
 		issues = append(issues, schematicSemanticIssues(file)...)
+		check := schematicElectricalCheck(file)
+		electricalCheck = &check
 	}
 	for _, unsupported := range summary.Unsupported {
 		issues = append(issues, reports.Issue{
@@ -168,7 +172,47 @@ func checksForSchematicSummary(summary inspect.SchematicSummary) []CheckResult {
 			Message:  fmt.Sprintf("unsupported schematic node %q appears %d time(s)", unsupported.Kind, unsupported.Count),
 		})
 	}
-	return []CheckResult{{Name: "schematic_validation", Status: statusForIssues(issues), Required: true, Issues: issues}}
+	checks := []CheckResult{{Name: "schematic_validation", Status: statusForIssues(issues), Required: true, Issues: issues}}
+	if electricalCheck != nil {
+		checks = append(checks, *electricalCheck)
+	}
+	return checks
+}
+
+func schematicElectricalCheck(file schematicfiles.SchematicFile) CheckResult {
+	report := schematicrules.Inspect(file, schematicrules.Options{Scope: schematicrules.ScopeImported, Acceptance: schematicrules.AcceptanceStructural})
+	issues := schematicElectricalIssues(report)
+	return CheckResult{Name: "schematic_electrical", Status: statusForIssues(issues), Required: true, Issues: issues}
+}
+
+func schematicElectricalIssues(report schematicrules.Report) []reports.Issue {
+	issues := make([]reports.Issue, 0, len(report.Findings))
+	for _, finding := range report.Findings {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   finding.Severity,
+			Path:       finding.Path,
+			Message:    string(finding.RuleID) + ": " + finding.Message,
+			Refs:       schematicElectricalFindingRefs(finding),
+			Nets:       schematicElectricalFindingNets(finding),
+			Suggestion: finding.Repair,
+		})
+	}
+	return issues
+}
+
+func schematicElectricalFindingRefs(finding schematicrules.Finding) []string {
+	if strings.TrimSpace(finding.Reference) == "" {
+		return nil
+	}
+	return []string{strings.TrimSpace(finding.Reference)}
+}
+
+func schematicElectricalFindingNets(finding schematicrules.Finding) []string {
+	if strings.TrimSpace(finding.Net) == "" {
+		return nil
+	}
+	return []string{strings.TrimSpace(finding.Net)}
 }
 
 func checksForPCBSummary(summary inspect.PCBSummary) []CheckResult {

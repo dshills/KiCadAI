@@ -2310,6 +2310,31 @@ func TestParseManufacturerProfileFlag(t *testing.T) {
 	}
 }
 
+func TestRunEvaluateSchematicJSONIncludesElectricalCheck(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
+	if err := os.WriteFile(path, []byte(`(kicad_sch (version 20260306) (generator "kicadai"))`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "evaluate", "schematic", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		`"command": "evaluate"`,
+		`"name": "schematic_validation"`,
+		`"name": "schematic_electrical"`,
+		`"status": "passed"`,
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %q:\n%s", want, output)
+		}
+	}
+}
+
 func TestRunEvaluatePCBJSON(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "board.kicad_pcb")
 	if err := os.WriteFile(path, []byte(`(kicad_pcb (gr_rect (layer "Edge.Cuts")) (footprint "Test:One" (pad "1" smd rect (layers "F.Cu"))))`), 0o644); err != nil {
