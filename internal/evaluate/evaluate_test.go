@@ -98,11 +98,9 @@ func TestPCBEvaluationReportsCorpusHealth(t *testing.T) {
 	if err != nil {
 		t.Fatalf("PCB returned error: %v", err)
 	}
-	if len(report.Checks) != 1 {
-		t.Fatalf("checks = %#v", report.Checks)
-	}
-	if report.Checks[0].Name != "pcb_validation" || report.Checks[0].Status != CheckPassed {
-		t.Fatalf("unexpected PCB check: %#v", report.Checks[0])
+	check := findCheck(report.Checks, "pcb_validation")
+	if check.Name == "" || check.Status != CheckPassed {
+		t.Fatalf("unexpected PCB check: %#v", report.Checks)
 	}
 	if !report.FabricationReady {
 		t.Fatalf("PCB should be fabrication ready when required checks pass: %#v", report)
@@ -133,14 +131,13 @@ func TestSchematicEvaluationUsesReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Schematic returned error: %v", err)
 	}
-	if len(report.Checks) != 2 {
-		t.Fatalf("checks = %#v", report.Checks)
+	check := findCheck(report.Checks, "schematic_validation")
+	if check.Name == "" || check.Status != CheckPassed {
+		t.Fatalf("unexpected schematic check: %#v", report.Checks)
 	}
-	if report.Checks[0].Name != "schematic_validation" || report.Checks[0].Status != CheckPassed {
-		t.Fatalf("unexpected schematic check: %#v", report.Checks[0])
-	}
-	if report.Checks[1].Name != "schematic_electrical" || report.Checks[1].Status != CheckPassed {
-		t.Fatalf("unexpected schematic electrical check: %#v", report.Checks[1])
+	electrical := findCheck(report.Checks, "schematic_electrical")
+	if electrical.Name == "" || electrical.Status != CheckPassed {
+		t.Fatalf("unexpected schematic electrical check: %#v", report.Checks)
 	}
 }
 
@@ -158,6 +155,48 @@ func TestSchematicEvaluationReportsDuplicateReference(t *testing.T) {
 	}
 	if len(report.Issues) == 0 || report.Issues[0].Code != reports.CodeDuplicateReference {
 		t.Fatalf("expected duplicate reference issue, got %#v", report.Issues)
+	}
+}
+
+func TestSchematicEvaluationIncludesPreservationCheck(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "preserved.kicad_sch")
+	writeFile(t, path, `(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (rule_area (uuid "22222222-2222-5222-8222-222222222222"))
+)`)
+	report, err := Schematic(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := findCheck(report.Checks, "imported_preservation")
+	if check.Name == "" || check.Status != CheckPassed || len(check.Issues) == 0 {
+		t.Fatalf("unexpected preservation check: %#v", check)
+	}
+	if report.Preservation == nil || report.Preservation.Summary.PreservationOnly != 1 {
+		t.Fatalf("missing preservation report: %#v", report.Preservation)
+	}
+}
+
+func TestProjectEvaluationPreservationWarningDoesNotBlockReadiness(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "demo.kicad_pro"), "{}")
+	writeFile(t, filepath.Join(root, "demo.kicad_sch"), `(kicad_sch (version 20260306) (generator "kicadai") (rule_area (uuid "22222222-2222-5222-8222-222222222222")))`)
+	writeFile(t, filepath.Join(root, "demo.kicad_pcb"), `(kicad_pcb (version 20260206) (generator "pcbnew") (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user)) (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts")))`)
+
+	report, err := Project(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	check := findCheck(report.Checks, "imported_preservation")
+	if check.Name == "" || check.Status != CheckPassed || len(check.Issues) == 0 {
+		t.Fatalf("unexpected preservation check: %#v", check)
+	}
+	if !report.FabricationReady {
+		t.Fatalf("preservation-only warning should not block read-only evaluation: %#v", report)
 	}
 }
 

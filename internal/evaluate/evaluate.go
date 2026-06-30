@@ -11,6 +11,7 @@ import (
 	"kicadai/internal/inspect"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	schematicfiles "kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/preservation"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicrules"
 )
@@ -61,6 +62,7 @@ func ProjectContext(ctx context.Context, path string) (Report, error) {
 	}
 	report := newReport(summary.Root)
 	report.InspectionSummaryPresent = true
+	report.addPreservation(summary.Preservation)
 	if summary.Manifest.Present {
 		status := CheckPassed
 		issues := []reports.Issue{}
@@ -133,6 +135,7 @@ func Schematic(path string) (Report, error) {
 	}
 	report := newReport(path)
 	report.InspectionSummaryPresent = true
+	report.addPreservation(summary.Preservation)
 	report.mergeChecks(checksForSchematicSummary(summary)...)
 	report.finish()
 	return report, nil
@@ -148,9 +151,46 @@ func PCB(path string) (Report, error) {
 	}
 	report := newReport(path)
 	report.InspectionSummaryPresent = true
+	report.addPreservation(summary.Preservation)
 	report.mergeChecks(checksForPCBSummary(summary)...)
 	report.finish()
 	return report, nil
+}
+
+func preservationCheck(report *preservation.Report) CheckResult {
+	if report == nil {
+		return CheckResult{Name: "imported_preservation", Status: CheckSkipped, Required: true}
+	}
+	status := CheckPassed
+	switch report.Status {
+	case preservation.StatusBlocked:
+		status = CheckBlocked
+	case preservation.StatusWarning, preservation.StatusClean:
+		status = CheckPassed
+	default:
+		issues := append([]reports.Issue(nil), report.Issues...)
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityBlocked,
+			Path:     "preservation.status",
+			Message:  "unsupported preservation status " + string(report.Status),
+		})
+		return CheckResult{Name: "imported_preservation", Status: CheckBlocked, Required: true, Issues: issues}
+	}
+	issues := append([]reports.Issue(nil), report.Issues...)
+	if report.Summary.PreservationOnly > 0 {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodePreservationConflict,
+			Severity:   reports.SeverityWarning,
+			Path:       "preservation",
+			Message:    "project contains preservation-only KiCad content; evaluation is read-only and mutation must use preservation-aware transactions",
+			Suggestion: "inspect the preservation report before planning edits",
+		})
+	}
+	if report.HasBlockedOperation() {
+		status = CheckBlocked
+	}
+	return CheckResult{Name: "imported_preservation", Status: status, Required: true, Issues: issues}
 }
 
 func checksForSchematicSummary(summary inspect.SchematicSummary) []CheckResult {
@@ -373,6 +413,14 @@ func (report *Report) addCheck(check CheckResult) {
 	}
 	report.Checks = append(report.Checks, check)
 	report.Issues = append(report.Issues, check.Issues...)
+}
+
+func (report *Report) addPreservation(preservationReport *preservation.Report) {
+	if preservationReport == nil {
+		return
+	}
+	report.Preservation = preservationReport
+	report.addCheck(preservationCheck(preservationReport))
 }
 
 func (report *Report) mergeChecks(checks ...CheckResult) {
