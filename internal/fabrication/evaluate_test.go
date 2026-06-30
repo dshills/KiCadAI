@@ -2,10 +2,12 @@ package fabrication
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
 
+	fabricationprofiles "kicadai/internal/fabrication/profiles"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 )
@@ -20,6 +22,76 @@ func TestEvaluateMissingTargetBlocks(t *testing.T) {
 	}
 	if len(result.Issues) == 0 || result.Issues[0].Code != reports.CodeInvalidArgument {
 		t.Fatalf("issues = %#v, want invalid target issue", result.Issues)
+	}
+}
+
+func TestPhysicalRuleOptionsUseDefaultFabricationProfile(t *testing.T) {
+	opts, issues := physicalRuleOptions(EvaluateOptions{})
+	if len(issues) != 0 {
+		t.Fatalf("physicalRuleOptions issues = %#v", issues)
+	}
+	if opts.ProfileID != fabricationprofiles.DefaultProfileID {
+		t.Fatalf("ProfileID = %q", opts.ProfileID)
+	}
+	if opts.ProfileDetails == nil || opts.ProfileDetails.Hash == "" || opts.ProfileDetails.SourceKind != string(fabricationprofiles.SourceBuiltin) {
+		t.Fatalf("ProfileDetails = %#v", opts.ProfileDetails)
+	}
+	if opts.MinPlatedPadAnnularRingMM != 0.15 || opts.MinViaRingMM != 0.10 || opts.MinCopperFeatureMM != 0.127 || opts.MinSolderMaskWebMM != 0.10 {
+		t.Fatalf("thresholds = %#v", opts)
+	}
+}
+
+func TestPhysicalRuleOptionsUseLocalFabricationProfile(t *testing.T) {
+	dir := t.TempDir()
+	writeEvaluateProfileFixture(t, filepath.Join(dir, "local.json"), fabricationprofiles.Profile{
+		Schema:  fabricationprofiles.SchemaV1,
+		ID:      "local_rules",
+		Name:    "Local Rules",
+		Version: "2026-06",
+		Units:   "mm",
+		Stackup: fabricationprofiles.Stackup{
+			MinLayers:               2,
+			MaxLayers:               2,
+			AllowedLayerCounts:      []int{2},
+			MinBoardThicknessMM:     1.0,
+			MaxBoardThicknessMM:     1.6,
+			DefaultBoardThicknessMM: 1.6,
+		},
+		Copper: fabricationprofiles.Copper{
+			MinCopperToEdgeMM: 0.42,
+			MinCopperSliverMM: 0.21,
+		},
+		Drill: fabricationprofiles.Drill{
+			MinHoleToEdgeMM:     0.77,
+			MinPadAnnularRingMM: 0.22,
+			MinViaAnnularRingMM: 0.11,
+		},
+		SolderMask: fabricationprofiles.SolderMask{MinSolderMaskWebMM: 0.16},
+		Assembly:   fabricationprofiles.Assembly{RequireCourtyards: true},
+		Metadata:   fabricationprofiles.Metadata{RequireBoardFinish: true, RequireFabricationNotes: true, RequirePanelization: true},
+	})
+	opts, issues := physicalRuleOptions(EvaluateOptions{ManufacturerProfile: "local_rules", ManufacturerProfileDir: dir})
+	if len(issues) != 0 {
+		t.Fatalf("physicalRuleOptions issues = %#v", issues)
+	}
+	if opts.ProfileID != "local_rules" || opts.ProfileDetails == nil || opts.ProfileDetails.SourceKind != string(fabricationprofiles.SourceLocal) {
+		t.Fatalf("profile = %#v details=%#v", opts.ProfileID, opts.ProfileDetails)
+	}
+	if opts.MinCopperEdgeMM != 0.42 || opts.MinHoleEdgeMM != 0.77 || opts.MinPlatedPadAnnularRingMM != 0.22 || opts.MinViaRingMM != 0.11 || opts.MinCopperFeatureMM != 0.21 || opts.MinSolderMaskWebMM != 0.16 {
+		t.Fatalf("thresholds = %#v", opts)
+	}
+	if !opts.RequireCourtyard || !opts.RequireBoardFinish || !opts.RequireFabricationNotes {
+		t.Fatalf("requirements = %#v", opts)
+	}
+}
+
+func TestPhysicalRuleOptionsReportUnknownProfile(t *testing.T) {
+	opts, issues := physicalRuleOptions(EvaluateOptions{ManufacturerProfile: "missing"})
+	if len(issues) == 0 || !hasIssuePath(issues, "fabrication_profile.id") {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if opts.ProfileID != "missing" {
+		t.Fatalf("ProfileID = %q", opts.ProfileID)
 	}
 }
 
@@ -48,6 +120,17 @@ func TestEvaluateGeneratedProjectReportsProvenanceAndMissingCoreFiles(t *testing
 	}
 	if !hasIssueCode(result.Issues, reports.CodeMissingFile) {
 		t.Fatalf("issues = %#v, want missing core file issue", result.Issues)
+	}
+}
+
+func writeEvaluateProfileFixture(t *testing.T, path string, profile fabricationprofiles.Profile) {
+	t.Helper()
+	data, err := json.MarshalIndent(profile, "", "  ")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatal(err)
 	}
 }
 

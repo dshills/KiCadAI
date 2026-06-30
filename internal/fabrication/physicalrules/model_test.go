@@ -13,9 +13,18 @@ func TestNormalizeAggregatesStatusAndIssues(t *testing.T) {
 		{ID: CheckCourtyardPresence, Category: CategoryCourtyard, Status: StatusWarning, Message: "missing courtyard", References: []string{"U1"}, Suggestion: "hydrate the footprint courtyard"},
 		{ID: CheckEdgeCutsOutline, Category: CategoryEdgeCuts, Status: StatusBlocked, Message: "missing outline", IssueCode: reports.CodeMissingBoardOutline},
 	})
+	report.ProfileDetails = &ProfileInfo{ID: " generic_assembly ", Name: " Generic Assembly ", Version: " 2026-06 ", Hash: " abc "}
+	report = Normalize(report)
 
 	if report.Schema != ReportSchema || report.Profile != "generic_assembly" {
 		t.Fatalf("report identity = %#v", report)
+	}
+	if report.ProfileDetails == nil || report.ProfileDetails.ID != "generic_assembly" || report.ProfileDetails.Hash != "abc" {
+		t.Fatalf("profile details = %#v", report.ProfileDetails)
+	}
+	mismatched := Normalize(Report{Profile: "placeholder", ProfileDetails: &ProfileInfo{ID: "resolved_profile"}, Checks: []Check{{ID: CheckStackupCopperLayers, Category: CategoryStackup, Status: StatusPass, Message: "ok"}}})
+	if mismatched.Profile != "resolved_profile" {
+		t.Fatalf("normalized profile = %q", mismatched.Profile)
 	}
 	if report.Status != StatusBlocked {
 		t.Fatalf("status = %q, want blocked", report.Status)

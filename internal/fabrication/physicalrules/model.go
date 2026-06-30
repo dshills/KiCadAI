@@ -134,6 +134,15 @@ type Evidence struct {
 	Note string `json:"note,omitempty"`
 }
 
+type ProfileInfo struct {
+	ID         string `json:"id,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Version    string `json:"version,omitempty"`
+	SourceKind string `json:"source_kind,omitempty"`
+	SourcePath string `json:"source_path,omitempty"`
+	Hash       string `json:"hash,omitempty"`
+}
+
 type Check struct {
 	ID           string           `json:"id"`
 	Category     Category         `json:"category"`
@@ -154,35 +163,37 @@ type Check struct {
 }
 
 type Report struct {
-	Schema   string          `json:"schema"`
-	Status   Status          `json:"status"`
-	Profile  string          `json:"profile,omitempty"`
-	Board    BoardRef        `json:"board,omitempty"`
-	Summary  Summary         `json:"summary"`
-	Checks   []Check         `json:"checks"`
-	Issues   []reports.Issue `json:"issues,omitempty"`
-	Evidence []Evidence      `json:"evidence,omitempty"`
+	Schema         string          `json:"schema"`
+	Status         Status          `json:"status"`
+	Profile        string          `json:"profile,omitempty"`
+	ProfileDetails *ProfileInfo    `json:"profile_details,omitempty"`
+	Board          BoardRef        `json:"board,omitempty"`
+	Summary        Summary         `json:"summary"`
+	Checks         []Check         `json:"checks"`
+	Issues         []reports.Issue `json:"issues,omitempty"`
+	Evidence       []Evidence      `json:"evidence,omitempty"`
 }
 
 type Options struct {
-	ProfileID                 string  `json:"profile_id,omitempty"`
-	Strict                    bool    `json:"strict,omitempty"`
-	RequireCourtyard          bool    `json:"require_courtyard,omitempty"`
-	RequireMountingHoles      bool    `json:"require_mounting_holes,omitempty"`
-	MinCopperEdgeMM           float64 `json:"min_copper_edge_mm,omitempty"`
-	MinHoleEdgeMM             float64 `json:"min_hole_edge_mm,omitempty"`
-	MinCourtyardSpacingMM     float64 `json:"min_courtyard_spacing_mm,omitempty"`
-	MinSilkPadClearanceMM     float64 `json:"min_silk_pad_clearance_mm,omitempty"`
-	MinSilkEdgeClearanceMM    float64 `json:"min_silk_edge_clearance_mm,omitempty"`
-	MinPlatedPadAnnularRingMM float64 `json:"min_plated_pad_annular_ring_mm,omitempty"`
-	MinViaRingMM              float64 `json:"min_via_annular_ring_mm,omitempty"`
-	MinCopperFeatureMM        float64 `json:"min_copper_feature_mm,omitempty"`
-	MinSolderMaskWebMM        float64 `json:"min_solder_mask_web_mm,omitempty"`
-	EdgePlatingPolicy         Policy  `json:"edge_plating_policy,omitempty"`
-	RequireBoardFinish        bool    `json:"require_board_finish,omitempty"`
-	RequireFabricationNotes   bool    `json:"require_fabrication_notes,omitempty"`
-	ImpedancePolicy           Policy  `json:"controlled_impedance_policy,omitempty"`
-	PanelizationPolicy        Policy  `json:"panelization_policy,omitempty"`
+	ProfileID                 string       `json:"profile_id,omitempty"`
+	ProfileDetails            *ProfileInfo `json:"profile_details,omitempty"`
+	Strict                    bool         `json:"strict,omitempty"`
+	RequireCourtyard          bool         `json:"require_courtyard,omitempty"`
+	RequireMountingHoles      bool         `json:"require_mounting_holes,omitempty"`
+	MinCopperEdgeMM           float64      `json:"min_copper_edge_mm,omitempty"`
+	MinHoleEdgeMM             float64      `json:"min_hole_edge_mm,omitempty"`
+	MinCourtyardSpacingMM     float64      `json:"min_courtyard_spacing_mm,omitempty"`
+	MinSilkPadClearanceMM     float64      `json:"min_silk_pad_clearance_mm,omitempty"`
+	MinSilkEdgeClearanceMM    float64      `json:"min_silk_edge_clearance_mm,omitempty"`
+	MinPlatedPadAnnularRingMM float64      `json:"min_plated_pad_annular_ring_mm,omitempty"`
+	MinViaRingMM              float64      `json:"min_via_annular_ring_mm,omitempty"`
+	MinCopperFeatureMM        float64      `json:"min_copper_feature_mm,omitempty"`
+	MinSolderMaskWebMM        float64      `json:"min_solder_mask_web_mm,omitempty"`
+	EdgePlatingPolicy         Policy       `json:"edge_plating_policy,omitempty"`
+	RequireBoardFinish        bool         `json:"require_board_finish,omitempty"`
+	RequireFabricationNotes   bool         `json:"require_fabrication_notes,omitempty"`
+	ImpedancePolicy           Policy       `json:"controlled_impedance_policy,omitempty"`
+	PanelizationPolicy        Policy       `json:"panelization_policy,omitempty"`
 }
 
 const (
@@ -237,6 +248,19 @@ func Normalize(report Report) Report {
 		report.Schema = ReportSchema
 	}
 	report.Profile = strings.TrimSpace(report.Profile)
+	if report.ProfileDetails != nil {
+		details := *report.ProfileDetails
+		details.ID = strings.TrimSpace(details.ID)
+		details.Name = strings.TrimSpace(details.Name)
+		details.Version = strings.TrimSpace(details.Version)
+		details.SourceKind = strings.TrimSpace(details.SourceKind)
+		details.SourcePath = strings.TrimSpace(details.SourcePath)
+		details.Hash = strings.TrimSpace(details.Hash)
+		report.ProfileDetails = &details
+		if details.ID != "" {
+			report.Profile = details.ID
+		}
+	}
 	report.Checks = slices.Clone(report.Checks)
 	report.Evidence = slices.Clone(report.Evidence)
 	issues := slices.Clone(report.Issues)

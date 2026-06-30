@@ -19,7 +19,7 @@ var metadataKeyReplacer = strings.NewReplacer("-", "_", " ", "_")
 func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, opts Options) Report {
 	opts = NormalizeOptions(opts)
 	if board == nil {
-		return NewReport(opts.ProfileID, BoardRef{}, []Check{{
+		report := NewReport(opts.ProfileID, BoardRef{}, []Check{{
 			ID:         "physical.board.present",
 			Category:   CategoryStackup,
 			Status:     StatusBlocked,
@@ -28,6 +28,9 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 			IssuePath:  "physical.board",
 			Source:     SourceParser,
 		}})
+		report.ProfileDetails = opts.ProfileDetails
+		report.Evidence = appendProfileEvidence(report.Evidence, opts.ProfileDetails)
+		return Normalize(report)
 	}
 	checks := []Check{}
 	checks = append(checks, evaluateStackup(board)...)
@@ -44,7 +47,21 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
 	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds)...)
 	checks = append(checks, evaluateMountingHoles(board, outline.Bounds, opts)...)
-	return NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
+	report := NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
+	report.ProfileDetails = opts.ProfileDetails
+	report.Evidence = appendProfileEvidence(report.Evidence, opts.ProfileDetails)
+	return Normalize(report)
+}
+
+func appendProfileEvidence(evidence []Evidence, profile *ProfileInfo) []Evidence {
+	if profile == nil || strings.TrimSpace(profile.ID) == "" {
+		return evidence
+	}
+	return append(evidence, Evidence{
+		Kind: "manufacturer_profile",
+		Path: profile.SourcePath,
+		Note: profile.ID + "@" + profile.Version,
+	})
 }
 
 func evaluateMaskPaste(board *pcbfiles.PCBFile, opts Options) []Check {

@@ -11,6 +11,7 @@ import (
 
 	"kicadai/internal/boardvalidation"
 	"kicadai/internal/fabrication/physicalrules"
+	fabricationprofiles "kicadai/internal/fabrication/profiles"
 	"kicadai/internal/inspect"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	projectfiles "kicadai/internal/kicadfiles/project"
@@ -19,10 +20,11 @@ import (
 )
 
 type EvaluateOptions struct {
-	KiCadCLI            string
-	DryRun              bool
-	CLIPolicy           CLIPolicy
-	ManufacturerProfile string
+	KiCadCLI               string
+	DryRun                 bool
+	CLIPolicy              CLIPolicy
+	ManufacturerProfile    string
+	ManufacturerProfileDir string
 }
 
 func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Result {
@@ -107,21 +109,24 @@ type evaluationTarget struct {
 }
 
 func evaluatePhysicalRules(target evaluationTarget, opts EvaluateOptions) physicalrules.Report {
+	ruleOptions, optionIssues := physicalRuleOptions(opts)
 	pcbPath, pcbIssue := discoverPlotPCBPath(target.Root, target.Name)
 	if pcbIssue != nil {
-		report := physicalrules.EvaluateBoard(nil, nil, physicalRuleOptions(opts))
+		report := physicalrules.EvaluateBoard(nil, nil, ruleOptions)
 		report.Issues = append(report.Issues, *pcbIssue)
+		report.Issues = append(report.Issues, optionIssues...)
 		return physicalrules.Normalize(report)
 	}
 	board, err := pcbfiles.ReadFile(pcbPath)
 	if err != nil {
-		report := physicalrules.EvaluateBoard(nil, nil, physicalRuleOptions(opts))
+		report := physicalrules.EvaluateBoard(nil, nil, ruleOptions)
 		report.Issues = append(report.Issues, reports.Issue{
 			Code:     reports.CodeValidationFailed,
 			Severity: reports.SeverityError,
 			Path:     filepath.ToSlash(pcbPath),
 			Message:  err.Error(),
 		})
+		report.Issues = append(report.Issues, optionIssues...)
 		return physicalrules.Normalize(report)
 	}
 	var projectPtr *projectfiles.ProjectFile
@@ -140,14 +145,82 @@ func evaluatePhysicalRules(target evaluationTarget, opts EvaluateOptions) physic
 			})
 		}
 	}
-	report := physicalrules.EvaluateBoard(&board, projectPtr, physicalRuleOptions(opts))
+	report := physicalrules.EvaluateBoard(&board, projectPtr, ruleOptions)
 	report.Board.Path = filepath.ToSlash(pcbPath)
 	report.Issues = append(report.Issues, projectIssues...)
+	report.Issues = append(report.Issues, optionIssues...)
 	return physicalrules.Normalize(report)
 }
 
-func physicalRuleOptions(opts EvaluateOptions) physicalrules.Options {
-	return physicalrules.Options{ProfileID: strings.TrimSpace(opts.ManufacturerProfile)}
+func physicalRuleOptions(opts EvaluateOptions) (physicalrules.Options, []reports.Issue) {
+	registry, issues := fabricationprofiles.LoadRegistry(fabricationprofiles.LoadOptions{ProfileDir: opts.ManufacturerProfileDir})
+	profileID := strings.TrimSpace(opts.ManufacturerProfile)
+	if profileID == "" {
+		profileID = fabricationprofiles.DefaultProfileID
+	}
+	profile, resolveIssues := registry.Resolve(profileID)
+	issues = append(issues, resolveIssues...)
+	if len(resolveIssues) > 0 {
+		return physicalrules.Options{ProfileID: profileID}, issues
+	}
+	summary := fabricationprofiles.Summarize(profile)
+	ruleOptions := physicalrules.Options{
+		ProfileID:                 profile.ID,
+		ProfileDetails:            profileInfo(summary),
+		RequireCourtyard:          profile.Assembly.RequireCourtyards,
+		MinCopperEdgeMM:           profile.Copper.MinCopperToEdgeMM,
+		MinHoleEdgeMM:             profile.Drill.MinHoleToEdgeMM,
+		MinPlatedPadAnnularRingMM: profile.Drill.MinPadAnnularRingMM,
+		MinViaRingMM:              profile.Drill.MinViaAnnularRingMM,
+		MinCopperFeatureMM:        profile.Copper.MinCopperSliverMM,
+		MinSolderMaskWebMM:        profile.SolderMask.MinSolderMaskWebMM,
+		EdgePlatingPolicy:         edgePlatingPolicy(profile),
+		RequireBoardFinish:        profile.Metadata.RequireBoardFinish,
+		RequireFabricationNotes:   profile.Metadata.RequireFabricationNotes || profile.EdgePlating.RequiresEdgePlatingNotes,
+		ImpedancePolicy:           impedancePolicy(profile),
+		PanelizationPolicy:        panelizationPolicy(profile),
+	}
+	return ruleOptions, issues
+}
+
+func profileInfo(summary fabricationprofiles.Summary) *physicalrules.ProfileInfo {
+	return &physicalrules.ProfileInfo{
+		ID:         summary.ID,
+		Name:       summary.Name,
+		Version:    summary.Version,
+		SourceKind: string(summary.Source.Kind),
+		SourcePath: summary.Source.Path,
+		Hash:       summary.Hash,
+	}
+}
+
+func edgePlatingPolicy(profile fabricationprofiles.Profile) physicalrules.Policy {
+	if profile.EdgePlating.AllowCastellations || profile.EdgePlating.AllowEdgePlating {
+		return physicalrules.PolicyAllow
+	}
+	if profile.EdgePlating.RequiresManualReview || profile.EdgePlating.RequiresEdgePlatingNotes {
+		return physicalrules.PolicyWarn
+	}
+	return physicalrules.PolicyWarn
+}
+
+func impedancePolicy(profile fabricationprofiles.Profile) physicalrules.Policy {
+	if profile.Impedance.AllowClaimsWithoutSolver {
+		return physicalrules.PolicyAllow
+	}
+	if profile.Impedance.RequireStackupForImpedance ||
+		profile.Impedance.RequireDiffPairWidthGapEvidence ||
+		profile.Impedance.RequireDiffPairSkewEvidence {
+		return physicalrules.PolicyWarn
+	}
+	return physicalrules.PolicyIgnore
+}
+
+func panelizationPolicy(profile fabricationprofiles.Profile) physicalrules.Policy {
+	if profile.Metadata.RequirePanelization {
+		return physicalrules.PolicyWarn
+	}
+	return physicalrules.PolicyIgnore
 }
 
 func physicalStatusEvidence(status physicalrules.Status) EvidenceStatus {

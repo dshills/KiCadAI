@@ -1988,14 +1988,15 @@ func runExport(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return errors.New(issue.Message)
 	}
 	options := fabrication.Options{
-		Command:             "export " + opts.commandArgs[0],
-		Execute:             opts.execute,
-		Overwrite:           opts.overwrite,
-		Output:              opts.output,
-		KiCadCLI:            opts.kicadCLI,
-		CLIPolicy:           exportCLIPolicy(opts),
-		ManufacturerProfile: opts.manufacturerProfile,
-		SourceDir:           opts.sourceDir,
+		Command:                "export " + opts.commandArgs[0],
+		Execute:                opts.execute,
+		Overwrite:              opts.overwrite,
+		Output:                 opts.output,
+		KiCadCLI:               opts.kicadCLI,
+		CLIPolicy:              exportCLIPolicy(opts),
+		ManufacturerProfile:    opts.manufacturerProfile,
+		ManufacturerProfileDir: opts.manufacturerProfileDir,
+		SourceDir:              opts.sourceDir,
 	}
 	if strings.TrimSpace(opts.sourceDir) != "" {
 		sources, err := components.LoadSources(ctx, components.SourceLoadOptions{SourceDir: opts.sourceDir})

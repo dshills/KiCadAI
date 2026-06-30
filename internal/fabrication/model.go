@@ -113,16 +113,17 @@ type Summary struct {
 }
 
 type Options struct {
-	Command             string                       `json:"command,omitempty"`
-	Execute             bool                         `json:"execute"`
-	Overwrite           bool                         `json:"overwrite"`
-	Output              string                       `json:"output,omitempty"`
-	KiCadCLI            string                       `json:"kicad_cli,omitempty"`
-	CLIPolicy           CLIPolicy                    `json:"cli_policy,omitempty"`
-	ManufacturerProfile string                       `json:"manufacturer_profile,omitempty"`
-	SourceDir           string                       `json:"source_dir,omitempty"`
-	PlotRunner          PlotRunner                   `json:"-"`
-	Sources             *components.SourceCollection `json:"-"`
+	Command                string                       `json:"command,omitempty"`
+	Execute                bool                         `json:"execute"`
+	Overwrite              bool                         `json:"overwrite"`
+	Output                 string                       `json:"output,omitempty"`
+	KiCadCLI               string                       `json:"kicad_cli,omitempty"`
+	CLIPolicy              CLIPolicy                    `json:"cli_policy,omitempty"`
+	ManufacturerProfile    string                       `json:"manufacturer_profile,omitempty"`
+	ManufacturerProfileDir string                       `json:"manufacturer_profile_dir,omitempty"`
+	SourceDir              string                       `json:"source_dir,omitempty"`
+	PlotRunner             PlotRunner                   `json:"-"`
+	Sources                *components.SourceCollection `json:"-"`
 }
 
 type Manifest struct {
