@@ -13,6 +13,7 @@ import (
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	schematicfiles "kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/manifest"
+	"kicadai/internal/preservation"
 	"kicadai/internal/reports"
 )
 
@@ -110,6 +111,8 @@ func ProjectContextWithProjectPath(ctx context.Context, path string, projectPath
 			summary.Issues = append(summary.Issues, issueFromError(err, "schematic"))
 		} else {
 			summary.Schematic = &schematicSummary
+			summary.Unsupported = mergeUnsupported(summary.Unsupported, schematicSummary.Unsupported)
+			summary.PreservationOnly = mergeUnsupported(summary.PreservationOnly, schematicSummary.PreservationOnly)
 		}
 	}
 	if pcbExists {
@@ -121,10 +124,12 @@ func ProjectContextWithProjectPath(ctx context.Context, path string, projectPath
 			summary.Issues = append(summary.Issues, issueFromError(err, "pcb"))
 		} else {
 			summary.PCB = &pcbSummary
-			summary.Unsupported = pcbSummary.Unsupported
-			summary.PreservationOnly = pcbSummary.PreservationOnly
+			summary.Unsupported = mergeUnsupported(summary.Unsupported, pcbSummary.Unsupported)
+			summary.PreservationOnly = mergeUnsupported(summary.PreservationOnly, pcbSummary.PreservationOnly)
 		}
 	}
+	preservationReport := preservationForProject(summary)
+	summary.Preservation = &preservationReport
 	return summary, nil
 }
 
@@ -158,7 +163,7 @@ func PCBContext(ctx context.Context, path string) (PCBSummary, error) {
 	}
 	layerUsage := map[string]int{}
 	unsupported := pcbUnsupported(board.Preserved)
-	preservationOnly := []UnsupportedNode{}
+	preservationOnly := pcbUnsupported(board.Preserved)
 	objectCounts := map[string]int{
 		"footprint": len(board.Footprints),
 		"segment":   len(board.Tracks) + len(board.TrackArcs),
@@ -203,6 +208,8 @@ func PCBContext(ctx context.Context, path string) (PCBSummary, error) {
 		PreservationOnly: preservationOnly,
 		Issues:           []reports.Issue{},
 	}
+	preservationReport := preservationForPCB(summary)
+	summary.Preservation = &preservationReport
 	if !summary.HasBoardOutline {
 		summary.Issues = append(summary.Issues, reports.Issue{
 			Code:     reports.CodeMissingBoardOutline,
@@ -245,22 +252,25 @@ func SchematicContext(ctx context.Context, path string) (SchematicSummary, error
 		"sheet_symbol": len(file.SheetInstances),
 	}
 	summary := SchematicSummary{
-		Path:            path,
-		FormatVersion:   string(file.Version),
-		Generator:       file.Generator,
-		SymbolCount:     len(file.Symbols),
-		WireCount:       len(file.Wires),
-		LabelCount:      len(file.Labels),
-		JunctionCount:   len(file.Junctions),
-		NoConnectCount:  len(file.NoConnects),
-		SheetCount:      len(file.Sheets),
-		Symbols:         symbols,
-		Truncated:       truncated,
-		ObjectCounts:    objectCounts,
-		InspectionDepth: "structured",
-		Unsupported:     schematicUnsupported(file.RawItems),
-		Issues:          []reports.Issue{},
+		Path:             path,
+		FormatVersion:    string(file.Version),
+		Generator:        file.Generator,
+		SymbolCount:      len(file.Symbols),
+		WireCount:        len(file.Wires),
+		LabelCount:       len(file.Labels),
+		JunctionCount:    len(file.Junctions),
+		NoConnectCount:   len(file.NoConnects),
+		SheetCount:       len(file.Sheets),
+		Symbols:          symbols,
+		Truncated:        truncated,
+		ObjectCounts:     objectCounts,
+		InspectionDepth:  "structured",
+		Unsupported:      schematicUnsupported(file.RawItems),
+		PreservationOnly: schematicUnsupported(file.RawItems),
+		Issues:           []reports.Issue{},
 	}
+	preservationReport := preservationForSchematic(summary)
+	summary.Preservation = &preservationReport
 	return summary, nil
 }
 
@@ -424,6 +434,98 @@ func unsupportedNodes(counts map[string]int) []UnsupportedNode {
 	}
 	sort.Slice(nodes, func(i, j int) bool { return nodes[i].Kind < nodes[j].Kind })
 	return nodes
+}
+
+func mergeUnsupported(left []UnsupportedNode, right []UnsupportedNode) []UnsupportedNode {
+	counts := map[string]int{}
+	for _, node := range left {
+		counts[node.Kind] += node.Count
+	}
+	for _, node := range right {
+		counts[node.Kind] += node.Count
+	}
+	return unsupportedNodes(counts)
+}
+
+func preservationForProject(summary ProjectSummary) preservation.Report {
+	scope := preservation.ScopeImported
+	if summary.Manifest.Present && !summary.Manifest.Stale {
+		scope = preservation.ScopeGenerated
+	}
+	report := preservation.New(scope)
+	for _, file := range summary.Files {
+		if !file.Exists {
+			continue
+		}
+		kind := file.Kind
+		mutability := preservation.MutabilityReadOnly
+		ownership := preservation.OwnershipImportedUser
+		if scope == preservation.ScopeGenerated {
+			ownership = preservation.OwnershipGeneratedOwned
+			mutability = preservation.MutabilitySafeAdd
+		}
+		report.Files = append(report.Files, preservation.File{
+			Path:       filepath.ToSlash(file.Path),
+			Kind:       kind,
+			Ownership:  ownership,
+			Mutability: mutability,
+		})
+	}
+	if summary.Schematic != nil {
+		report.Objects = append(report.Objects, preservationObjectsFromNodes(summary.Schematic.Path, summary.Schematic.PreservationOnly, preservation.OwnershipPreservationOnly)...)
+	}
+	if summary.PCB != nil {
+		report.Objects = append(report.Objects, preservationObjectsFromNodes(summary.PCB.Path, summary.PCB.PreservationOnly, preservation.OwnershipPreservationOnly)...)
+	}
+	report.Normalize()
+	return report
+}
+
+func preservationForSchematic(summary SchematicSummary) preservation.Report {
+	report := preservation.New(preservation.ScopeImported)
+	report.Files = append(report.Files, preservation.File{
+		Path:       filepath.ToSlash(summary.Path),
+		Kind:       "schematic",
+		Ownership:  preservation.OwnershipImportedUser,
+		Mutability: preservation.MutabilityReadOnly,
+	})
+	report.Objects = append(report.Objects, preservationObjectsFromNodes(summary.Path, summary.PreservationOnly, preservation.OwnershipPreservationOnly)...)
+	report.Normalize()
+	return report
+}
+
+func preservationForPCB(summary PCBSummary) preservation.Report {
+	report := preservation.New(preservation.ScopeImported)
+	report.Files = append(report.Files, preservation.File{
+		Path:       filepath.ToSlash(summary.Path),
+		Kind:       "pcb",
+		Ownership:  preservation.OwnershipImportedUser,
+		Mutability: preservation.MutabilityReadOnly,
+	})
+	report.Objects = append(report.Objects, preservationObjectsFromNodes(summary.Path, summary.PreservationOnly, preservation.OwnershipPreservationOnly)...)
+	report.Normalize()
+	return report
+}
+
+func preservationObjectsFromNodes(path string, nodes []UnsupportedNode, ownership preservation.Ownership) []preservation.Object {
+	objects := make([]preservation.Object, 0, len(nodes))
+	for _, node := range nodes {
+		mutability := preservation.MutabilityReadOnly
+		message := "preserved KiCad content is read-only"
+		if ownership == preservation.OwnershipUnknown {
+			mutability = preservation.MutabilityUnsafe
+			message = "unsupported KiCad content blocks mutation until modeled or explicitly preserved"
+		}
+		objects = append(objects, preservation.Object{
+			Path:       filepath.ToSlash(path),
+			Kind:       node.Kind,
+			Count:      node.Count,
+			Ownership:  ownership,
+			Mutability: mutability,
+			Message:    message,
+		})
+	}
+	return objects
 }
 
 type schematicScan struct {

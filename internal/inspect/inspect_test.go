@@ -177,6 +177,9 @@ func TestPCBSummaryUsesReader(t *testing.T) {
 	if len(summary.Unsupported) != 1 || summary.Unsupported[0].Kind != "future_widget" {
 		t.Fatalf("unexpected unsupported nodes: %#v", summary.Unsupported)
 	}
+	if summary.Preservation == nil || summary.Preservation.Summary.PreservationOnly != 1 {
+		t.Fatalf("expected PCB preservation report, got %#v", summary.Preservation)
+	}
 	if len(summary.Issues) != 1 || summary.Issues[0].Code != reports.CodeMissingBoardOutline {
 		t.Fatalf("expected missing board outline warning, got %#v", summary.Issues)
 	}
@@ -307,6 +310,36 @@ func TestSchematicSummaryReportsUnsupportedAndTruncates(t *testing.T) {
 	}
 	if len(summary.Unsupported) != 1 || summary.Unsupported[0].Kind != "rule_area" {
 		t.Fatalf("expected unsupported rule_area, got %#v", summary.Unsupported)
+	}
+	if len(summary.PreservationOnly) != 1 || summary.PreservationOnly[0].Kind != "rule_area" {
+		t.Fatalf("expected preservation-only rule_area, got %#v", summary.PreservationOnly)
+	}
+	if summary.Preservation == nil || summary.Preservation.Summary.PreservationOnly != 1 {
+		t.Fatalf("expected schematic preservation report, got %#v", summary.Preservation)
+	}
+}
+
+func TestProjectIncludesPreservationReport(t *testing.T) {
+	root := filepath.Join(t.TempDir(), "demo")
+	if err := os.Mkdir(root, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(root, "demo.kicad_pro"), "{}")
+	writeFile(t, filepath.Join(root, "demo.kicad_sch"), `(kicad_sch (version 20260306) (generator "kicadai") (rule_area (uuid "22222222-2222-5222-8222-222222222222")))`)
+	writeFile(t, filepath.Join(root, "demo.kicad_pcb"), `(kicad_pcb (version 20260206) (generator "pcbnew") (layers (0 "F.Cu" signal)) (future_widget))`)
+
+	summary, err := Project(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if summary.Preservation == nil {
+		t.Fatalf("project preservation report missing: %#v", summary)
+	}
+	if summary.Preservation.Scope != "imported" || summary.Preservation.Summary.Files != 3 || summary.Preservation.Summary.PreservationOnly != 2 {
+		t.Fatalf("unexpected project preservation report: %#v", summary.Preservation)
+	}
+	if len(summary.PreservationOnly) != 2 {
+		t.Fatalf("expected aggregated preservation-only nodes, got %#v", summary.PreservationOnly)
 	}
 }
 
