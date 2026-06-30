@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"unicode"
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/schematic"
@@ -31,9 +32,11 @@ func Inspect(file schematic.SchematicFile, opts Options) Report {
 	inspector.inspectLabels()
 	inspector.inspectNoConnects()
 	inspector.inspectPinIntents()
+	inspector.inspectPowerRails()
 	report := Report{
 		CheckedSymbols:      len(file.Symbols),
 		CheckedNets:         len(inspector.connectedComponents),
+		CheckedPowerRails:   len(opts.PowerRails),
 		CheckedRequiredPins: countRequiredPinIntents(opts.PinIntents),
 		Findings:            inspector.findings,
 	}
@@ -294,6 +297,101 @@ func (inspector *fileInspector) inspectPinIntents() {
 			inspector.add(pinIntentFinding(RulePinMetadataMissing, metadataMissingSeverity(inspector.opts), path, intent, "pin intent kind is unknown", "use required, optional, external, or no_connect pin intent"))
 		}
 	}
+}
+
+func (inspector *fileInspector) inspectPowerRails() {
+	for index, rail := range inspector.opts.PowerRails {
+		path := "power_rails[" + strconv.Itoa(index) + "]"
+		name := strings.TrimSpace(rail.Name)
+		normalized := normalizeLabelText(name)
+		sourceCount := countNonEmptyStrings(rail.SourceRefs)
+		sinkCount := countNonEmptyStrings(rail.SinkRefs)
+		externalAccepted := rail.ExternalDriver || inspector.externalNetAccepted(normalized)
+		switch {
+		case normalized == "" && (sourceCount > 0 || sinkCount > 0):
+			inspector.add(Finding{
+				RuleID:   RulePowerMetadataMissing,
+				Severity: metadataMissingSeverity(inspector.opts),
+				Category: CategoryPower,
+				Path:     path + ".name",
+				Message:  "power rail name is missing",
+				Repair:   "name the generated power rail before evaluating schematic power policy",
+			})
+		case sinkCount > 0 && sourceCount == 0 && !externalAccepted:
+			inspector.add(Finding{
+				RuleID:   RulePowerSourceMissing,
+				Severity: reports.SeverityBlocked,
+				Category: CategoryPower,
+				Path:     path,
+				Net:      name,
+				Message:  "power rail " + name + " has sinks but no modeled source or accepted external driver",
+				Repair:   "add a regulator, connector power input, battery source, or explicit external-driver policy",
+			})
+		case sourceCount > 0 && sinkCount == 0:
+			inspector.add(Finding{
+				RuleID:   RulePowerSinkMissing,
+				Severity: reports.SeverityWarning,
+				Category: CategoryPower,
+				Path:     path,
+				Net:      name,
+				Message:  "power rail " + name + " has a modeled source but no modeled sinks",
+				Repair:   "connect the rail to intended loads or remove unused power generation",
+			})
+		}
+	}
+	inspector.inspectPowerFlags()
+}
+
+func (inspector *fileInspector) inspectPowerFlags() {
+	for index := range inspector.file.Symbols {
+		symbol := &inspector.file.Symbols[index]
+		if !isPowerFlagSymbol(symbol) {
+			continue
+		}
+		connected := false
+		for _, point := range symbol.PinAnchors {
+			if inspector.pinConnected(point) {
+				connected = true
+				break
+			}
+		}
+		if connected {
+			continue
+		}
+		inspector.add(Finding{
+			RuleID:    RulePowerFlagWithoutRail,
+			Severity:  reports.SeverityError,
+			Category:  CategoryPower,
+			Path:      "symbols[" + strconv.Itoa(index) + "]",
+			Reference: strings.TrimSpace(symbol.Reference),
+			Message:   "PWR_FLAG is not attached to a modeled rail",
+			Repair:    "move PWR_FLAG onto the intended powered net or remove the unused flag",
+		})
+	}
+}
+
+func isPowerFlagSymbol(symbol *schematic.SchematicSymbol) bool {
+	return strings.EqualFold(strings.TrimSpace(symbol.LibraryID), "power:PWR_FLAG") ||
+		strings.EqualFold(strings.TrimSpace(symbol.Value), "PWR_FLAG")
+}
+
+func countNonEmptyStrings(values []string) int {
+	count := 0
+	for _, value := range values {
+		if hasNonSpace(value) {
+			count++
+		}
+	}
+	return count
+}
+
+func hasNonSpace(value string) bool {
+	for _, r := range value {
+		if !unicode.IsSpace(r) {
+			return true
+		}
+	}
+	return false
 }
 
 func (inspector *fileInspector) pinConnected(point kicadfiles.Point) bool {

@@ -365,6 +365,94 @@ func TestInspectPinIntentsMissingMetadataBlocksWhenRequired(t *testing.T) {
 	}
 }
 
+func TestInspectPowerRailSinkWithoutSourceBlocks(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{PowerRails: []PowerRail{{Name: "VCC", SinkRefs: []string{"U1"}}}})
+	if !hasRule(report, RulePowerSourceMissing) || report.CheckedPowerRails != 1 {
+		t.Fatalf("report missing power source blocker: %#v", report)
+	}
+}
+
+func TestInspectPowerRailMissingNameTakesPrecedence(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{PowerRails: []PowerRail{{SinkRefs: []string{"U1"}}}})
+	if !hasRule(report, RulePowerMetadataMissing) || hasRule(report, RulePowerSourceMissing) {
+		t.Fatalf("missing rail name should report metadata first: %#v", report.Findings)
+	}
+}
+
+func TestInspectPowerRailDoesNotMutateInputRefs(t *testing.T) {
+	file := ruleTestSchematic()
+	rails := []PowerRail{{Name: "VCC", SourceRefs: []string{"", "U1"}, SinkRefs: []string{"", "U2"}}}
+
+	_ = Inspect(file, Options{PowerRails: rails})
+	if len(rails[0].SourceRefs) != 2 || rails[0].SourceRefs[0] != "" || rails[0].SourceRefs[1] != "U1" {
+		t.Fatalf("source refs mutated: %#v", rails[0].SourceRefs)
+	}
+	if len(rails[0].SinkRefs) != 2 || rails[0].SinkRefs[0] != "" || rails[0].SinkRefs[1] != "U2" {
+		t.Fatalf("sink refs mutated: %#v", rails[0].SinkRefs)
+	}
+}
+
+func TestInspectPowerRailExternalAcceptedPasses(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{
+		AcceptedExternalRails: []string{"vcc"},
+		PowerRails:            []PowerRail{{Name: "VCC", SinkRefs: []string{"U1"}}},
+	})
+	if hasRule(report, RulePowerSourceMissing) {
+		t.Fatalf("accepted external rail should pass: %#v", report.Findings)
+	}
+}
+
+func TestInspectPowerRailSourceWithoutSinkWarns(t *testing.T) {
+	file := ruleTestSchematic()
+
+	report := Inspect(file, Options{PowerRails: []PowerRail{{Name: "VCC", SourceRefs: []string{"U1"}}}})
+	if !hasRule(report, RulePowerSinkMissing) || report.Status != StatusWarning {
+		t.Fatalf("report missing power sink warning: %#v", report)
+	}
+}
+
+func TestInspectPowerFlagWithoutRailBlocks(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Symbols = []schematic.SchematicSymbol{{
+		UUID:       kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		LibraryID:  "power:PWR_FLAG",
+		Reference:  "#FLG01",
+		Value:      "PWR_FLAG",
+		Position:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		PinAnchors: []kicadfiles.Point{{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}},
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RulePowerFlagWithoutRail) {
+		t.Fatalf("report missing floating PWR_FLAG finding: %#v", report.Findings)
+	}
+}
+
+func TestInspectConnectedPowerFlagPasses(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{{
+		UUID:       kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		LibraryID:  "power:PWR_FLAG",
+		Reference:  "#FLG01",
+		Value:      "PWR_FLAG",
+		Position:   anchor,
+		PinAnchors: []kicadfiles.Point{anchor},
+	}}
+	file.Labels = []schematic.Label{{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Text: "VCC", Kind: schematic.LabelLocal, Position: anchor}}
+
+	report := Inspect(file, Options{})
+	if hasRule(report, RulePowerFlagWithoutRail) {
+		t.Fatalf("connected PWR_FLAG should pass: %#v", report.Findings)
+	}
+}
+
 func TestIntentCoordinateConversionPreservesInternalUnits(t *testing.T) {
 	value := int64(kicadfiles.MM(123.456))
 	if got := int64(iuFromIntentCoordinate(value)); got != value {

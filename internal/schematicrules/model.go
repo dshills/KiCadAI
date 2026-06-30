@@ -92,6 +92,7 @@ type Options struct {
 	RequireConfidence     bool        `json:"require_confidence,omitempty"`
 	AcceptedExternalRails []string    `json:"accepted_external_rails,omitempty"`
 	PinIntents            []PinIntent `json:"pin_intents,omitempty"`
+	PowerRails            []PowerRail `json:"power_rails,omitempty"`
 }
 
 // PinIntentKind describes expected electrical treatment for a known symbol pin.
@@ -118,6 +119,14 @@ type PinIntent struct {
 type Point struct {
 	X int64 `json:"x"`
 	Y int64 `json:"y"`
+}
+
+// PowerRail records modeled source/sink evidence for one schematic rail.
+type PowerRail struct {
+	Name           string   `json:"name"`
+	SourceRefs     []string `json:"source_refs,omitempty"`
+	SinkRefs       []string `json:"sink_refs,omitempty"`
+	ExternalDriver bool     `json:"external_driver,omitempty"`
 }
 
 // Finding is one schematic electrical rule result.
