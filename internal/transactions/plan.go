@@ -36,6 +36,7 @@ type PlanOptions struct {
 	LibraryIndex             *libraryresolver.LibraryIndex `json:"-"`
 	LibraryIssues            []reports.Issue               `json:"-"`
 	RequireLibraryValidation bool                          `json:"-"`
+	AllowGeneratedOverwrite  bool                          `json:"-"`
 }
 
 func PlanTransaction(target string, tx Transaction) Plan {
@@ -63,7 +64,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 	if projectName == "" {
 		projectName = "generated_design"
 	}
-	existingProject := existingProjectTarget(target)
+	existingProject := existingProjectTarget(target) && !(opts.AllowGeneratedOverwrite && firstOperationKind(tx) == OpCreateProject)
 	var existing *kicaddesign.Design
 	if existingProject {
 		loaded, err := kicaddesign.ReadProjectDirectory(target)
@@ -313,6 +314,13 @@ func projectNameFromTransaction(tx Transaction) string {
 		return strings.TrimSpace(tx.Name)
 	}
 	return ""
+}
+
+func firstOperationKind(tx Transaction) OperationKind {
+	if len(tx.Operations) == 0 {
+		return ""
+	}
+	return tx.Operations[0].Op
 }
 
 func existingProjectTarget(target string) bool {

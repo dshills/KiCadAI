@@ -110,6 +110,7 @@ Global flags:
   --execute             Required for mutation commands
   --with-pcb            Include PCB output for generation commands
   --overwrite           Allow generation commands to replace an existing project directory
+  --allow-imported-apply Explicitly allow transaction apply to mutate an existing imported project
   --json                Compatibility alias for --format json
   --kicad-cli string    KiCad CLI executable path for KiCad-backed checks and fabrication plotting
   --manufacturer-profile string Local fabrication manufacturer profile ID, for example generic_assembly
@@ -208,6 +209,7 @@ type cliOptions struct {
 	execute                     bool
 	withPCB                     bool
 	overwrite                   bool
+	allowImportedApply          bool
 	jsonOutput                  bool
 	kicadCLI                    string
 	manufacturerProfile         string
@@ -398,6 +400,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&opts.execute, "execute", false, "execute mutation command")
 	flags.BoolVar(&opts.withPCB, "with-pcb", false, "include PCB output")
 	flags.BoolVar(&opts.overwrite, "overwrite", false, "overwrite existing project directory")
+	flags.BoolVar(&opts.allowImportedApply, "allow-imported-apply", false, "allow transaction apply to mutate an existing imported project")
 	flags.BoolVar(&jsonFlag, "json", false, "compatibility alias for --format json")
 	flags.StringVar(&opts.kicadCLI, "kicad-cli", "", "KiCad CLI executable path")
 	flags.StringVar(&opts.manufacturerProfile, "manufacturer-profile", "", "local fabrication manufacturer profile ID")
@@ -3643,7 +3646,7 @@ func runTransaction(opts cliOptions, stdout io.Writer) error {
 			}
 			return errors.New(issue.Message)
 		}
-		applyOptions := transactions.ApplyOptions{OutputDir: outputDir, Overwrite: opts.overwrite, Seed: opts.seed}
+		applyOptions := transactions.ApplyOptions{OutputDir: outputDir, Overwrite: opts.overwrite, Seed: opts.seed, AllowImportedMutation: opts.allowImportedApply}
 		if transactionShouldUseLibraryResolver(opts) {
 			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 			index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{

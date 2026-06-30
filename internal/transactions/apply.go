@@ -26,11 +26,12 @@ const transactionProvenanceSchema = "kicadai.transaction.provenance.v1"
 const transactionProvenancePath = ".kicadai/transaction.json"
 
 type ApplyOptions struct {
-	OutputDir     string
-	Overwrite     bool
-	Seed          string
-	LibraryIndex  *libraryresolver.LibraryIndex
-	LibraryIssues []reports.Issue
+	OutputDir             string
+	Overwrite             bool
+	Seed                  string
+	AllowImportedMutation bool
+	LibraryIndex          *libraryresolver.LibraryIndex
+	LibraryIssues         []reports.Issue
 }
 
 type ApplyResult struct {
@@ -56,7 +57,11 @@ type transactionProvenanceSource struct {
 }
 
 func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
-	plan := PlanTransaction(opts.OutputDir, tx)
+	plan := PlanTransactionWithOptions(opts.OutputDir, tx, PlanOptions{
+		LibraryIndex:            opts.LibraryIndex,
+		LibraryIssues:           opts.LibraryIssues,
+		AllowGeneratedOverwrite: generatedOverwriteApply(tx, opts),
+	})
 	result = ApplyResult{Plan: plan, Artifacts: []reports.Artifact{}, Issues: append([]reports.Issue{}, plan.Issues...)}
 	// Keep every early return annotated with operation IDs from the plan.
 	defer annotateApplyResultIssueOperationIDs(&result)
@@ -64,7 +69,17 @@ func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 	if reports.HasBlockingIssue(result.Issues) {
 		return result
 	}
-	if existingProjectTarget(opts.OutputDir) {
+	if existingProjectTarget(opts.OutputDir) && !generatedOverwriteApply(tx, opts) {
+		if !opts.AllowImportedMutation {
+			result.Issues = append(result.Issues, reports.Issue{
+				Code:       reports.CodePreservationConflict,
+				Severity:   reports.SeverityBlocked,
+				Path:       "transaction.apply.imported",
+				Message:    "imported project apply is disabled by default",
+				Suggestion: "rerun with explicit imported mutation approval after reviewing the transaction preservation report",
+			})
+			return result
+		}
 		return applyImported(tx, opts, result)
 	}
 	if len(tx.Operations) == 0 || tx.Operations[0].Op != OpCreateProject {
@@ -101,6 +116,10 @@ func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 		result.Artifacts = append(result.Artifacts, metadataArtifacts...)
 	}
 	return result
+}
+
+func generatedOverwriteApply(tx Transaction, opts ApplyOptions) bool {
+	return opts.Overwrite && firstOperationKind(tx) == OpCreateProject
 }
 
 func annotateApplyResultIssueOperationIDs(result *ApplyResult) {

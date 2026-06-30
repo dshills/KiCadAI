@@ -386,6 +386,22 @@ func TestApplyRequiresCreateProject(t *testing.T) {
 	}
 }
 
+func TestApplyGeneratedOverwriteDoesNotRequireImportedApproval(t *testing.T) {
+	output := t.TempDir()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"write_project","overwrite":true}
+	]}`)
+	first := Apply(tx, ApplyOptions{OutputDir: output, Overwrite: true})
+	if len(first.Issues) != 0 {
+		t.Fatalf("initial apply issues: %#v", first.Issues)
+	}
+	second := Apply(tx, ApplyOptions{OutputDir: output, Overwrite: true})
+	if len(second.Issues) != 0 {
+		t.Fatalf("overwrite apply should not require imported approval: %#v", second.Issues)
+	}
+}
+
 func TestApplyRejectsLateCreateProject(t *testing.T) {
 	tx := mustParse(t, `{"operations":[{"op":"write_project"},{"op":"create_project","name":"demo"}]}`)
 	result := Apply(tx, ApplyOptions{OutputDir: t.TempDir()})
@@ -440,7 +456,7 @@ func TestApplyImportedAddsSymbolAndAssignsFootprint(t *testing.T) {
 	  {"op":"assign_footprint","ref":"R1","footprint_id":"Resistor_SMD:R_0805_2012Metric"},
 	  {"op":"write_project"}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
@@ -456,6 +472,36 @@ func TestApplyImportedAddsSymbolAndAssignsFootprint(t *testing.T) {
 	}
 }
 
+func TestApplyImportedRequiresExplicitApproval(t *testing.T) {
+	dir := writeImportedApplyProject(t, `(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (uuid "11111111-1111-5111-8111-111111111111")
+  (paper A4)
+)`, `(kicad_pcb (version 20260206) (generator "pcbnew") (paper "A4") (layers (0 "F.Cu" signal)) (setup))`)
+	schematicPath := filepath.Join(dir, "demo.kicad_sch")
+	before, err := os.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tx := mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","value":"10k","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	if len(result.Issues) == 0 || result.Issues[0].Code != reports.CodePreservationConflict ||
+		!strings.Contains(result.Issues[0].Message, "disabled by default") {
+		t.Fatalf("expected default imported apply gate: %#v", result.Issues)
+	}
+	after, err := os.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(before) != string(after) {
+		t.Fatalf("blocked imported apply changed schematic:\nbefore=%s\nafter=%s", before, after)
+	}
+}
+
 func TestApplyImportedDuplicateRefsGetUniqueUUIDs(t *testing.T) {
 	dir := writeImportedApplyProject(t, `(kicad_sch
   (version 20260306)
@@ -468,7 +514,7 @@ func TestApplyImportedDuplicateRefsGetUniqueUUIDs(t *testing.T) {
 	  {"op":"add_symbol","ref":"U1","unit":2,"library_id":"Device:R","at":{"x_mm":20,"y_mm":10}},
 	  {"op":"write_project"}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
@@ -535,7 +581,7 @@ func TestApplyImportedPlacesFootprintAndRoute(t *testing.T) {
 	  {"op":"route","net_name":"SIG","points":[{"x_mm":5,"y_mm":5},{"x_mm":8,"y_mm":5}]},
 	  {"op":"write_project"}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
@@ -568,7 +614,7 @@ func TestApplyImportedBlocksUnsafeMutationWithoutWriting(t *testing.T) {
 	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
 	  {"op":"write_project"}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) == 0 || result.Issues[0].Code != reports.CodePreservationConflict {
 		t.Fatalf("expected preservation conflict: %#v", result.Issues)
 	}
@@ -597,7 +643,7 @@ func TestApplyImportedRejectsMutationAfterWriteProject(t *testing.T) {
 	  {"op":"write_project"},
 	  {"op":"add_symbol","ref":"R1","value":"10k","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) == 0 || result.Issues[0].Code != reports.CodeInvalidArgument {
 		t.Fatalf("expected invalid argument: %#v", result.Issues)
 	}
@@ -624,7 +670,7 @@ func TestApplyImportedRejectsExistingApplyLock(t *testing.T) {
 	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
 	  {"op":"write_project"}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) == 0 || !strings.Contains(result.Issues[0].Message, "apply lock already exists") {
 		t.Fatalf("expected lock issue: %#v", result.Issues)
 	}
@@ -644,7 +690,7 @@ func TestApplyImportedRemovesStaleApplyLock(t *testing.T) {
 	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
 	  {"op":"write_project"}
 	]}`)
-	result := Apply(tx, ApplyOptions{OutputDir: dir})
+	result := Apply(tx, ApplyOptions{OutputDir: dir, AllowImportedMutation: true})
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
