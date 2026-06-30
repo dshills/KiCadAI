@@ -170,13 +170,23 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 	}
 	schematicDirty := false
 	pcbDirty := false
+	importedReadbackRequired := false
+	importedReadbackIndex := -1
+	lastDirtyIndex := -1
 	for i, op := range tx.Operations {
 		switch op.Op {
 		case OpWriteProject:
+			wroteImportedFiles := schematicDirty || pcbDirty
 			artifacts, err := writeImportedProject(opts.OutputDir, projectBase, design, schematicDirty, pcbDirty)
 			if err != nil {
 				result.Issues = append(result.Issues, applyIssue(i, err))
 				return result
+			}
+			if wroteImportedFiles {
+				importedReadbackRequired = true
+				importedReadbackIndex = i
+			} else if importedReadbackRequired {
+				importedReadbackIndex = i
 			}
 			result.Artifacts = append(result.Artifacts, artifacts...)
 			schematicDirty = false
@@ -211,6 +221,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			design.Schematic.Symbols = append(design.Schematic.Symbols, symbol)
 			schematicDirty = true
+			lastDirtyIndex = i
 		case OpAssignFootprint:
 			var payload AssignFootprintOperation
 			if err := decodeRaw(op, &payload); err != nil {
@@ -222,6 +233,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				return result
 			}
 			schematicDirty = true
+			lastDirtyIndex = i
 		case OpAddNoConnect:
 			if design.Schematic == nil {
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("root schematic required")))
@@ -239,8 +251,9 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			if !schematicHasNoConnect(design.Schematic.NoConnects, anchor) {
 				design.Schematic.NoConnects = append(design.Schematic.NoConnects, schematic.NewNoConnect(generator.New("imported.schematic.no_connect", payload.Endpoint.Ref, payload.Endpoint.Pin, fmt.Sprintf("%d", i)), anchor))
+				schematicDirty = true
+				lastDirtyIndex = i
 			}
-			schematicDirty = true
 		case OpPlaceFootprint:
 			if design.PCB == nil {
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("PCB required")))
@@ -257,6 +270,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			upsertImportedFootprintWithLibrary(design.PCB, generator, payload, opts.LibraryIndex)
 			pcbDirty = true
+			lastDirtyIndex = i
 		case OpRoute:
 			if design.PCB == nil {
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("PCB required")))
@@ -296,6 +310,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				})
 			}
 			pcbDirty = true
+			lastDirtyIndex = i
 		case OpAddZone:
 			if design.PCB == nil {
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("PCB required")))
@@ -324,15 +339,30 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			zone.Polygons = [][]kicadfiles.Point{polygon}
 			design.PCB.Zones = append(design.PCB.Zones, zone)
 			pcbDirty = true
+			lastDirtyIndex = i
 		default:
 			result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("operation %s is not supported by imported apply", op.Op)))
 			return result
 		}
 	}
 	if schematicDirty || pcbDirty {
-		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "operations", Message: "write_project operation is required to write imported project changes"})
+		result.Issues = append(result.Issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "operations[" + strconv.Itoa(lastDirtyIndex) + "]", Message: "write_project operation is required after imported project changes"})
+	}
+	if importedReadbackRequired {
+		// The readback validates the final written state; imported mutation
+		// after write_project is rejected before apply reaches this point.
+		if err := validateImportedProjectReadback(opts.OutputDir); err != nil {
+			result.Issues = append(result.Issues, applyIssue(importedReadbackIndex, err))
+		}
 	}
 	return result
+}
+
+func validateImportedProjectReadback(root string) error {
+	if _, err := kicaddesign.ReadProjectDirectory(root); err != nil {
+		return fmt.Errorf("imported project readback failed after write: %w", err)
+	}
+	return nil
 }
 
 func writeManifestForApply(outputDir string, tx Transaction, artifacts []reports.Artifact) ([]reports.Artifact, error) {
