@@ -9,13 +9,15 @@ import (
 
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/preservation"
 	"kicadai/internal/reports"
 )
 
 type Plan struct {
-	Target     string             `json:"target"`
-	Operations []PlannedOperation `json:"operations"`
-	Issues     []reports.Issue    `json:"issues"`
+	Target       string               `json:"target"`
+	Operations   []PlannedOperation   `json:"operations"`
+	Preservation *preservation.Report `json:"preservation,omitempty"`
+	Issues       []reports.Issue      `json:"issues"`
 }
 
 type PlannedOperation struct {
@@ -111,6 +113,9 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 		}
 	}
 	annotatePlanIssueOperationIDs(&plan)
+	if existingProject {
+		plan.Preservation = preservationReportForPlan(&plan)
+	}
 	return plan
 }
 
@@ -388,6 +393,69 @@ func hasUnsupportedImportedContent(design kicaddesign.Design) bool {
 		return true
 	}
 	return false
+}
+
+func preservationReportForPlan(plan *Plan) *preservation.Report {
+	report := preservation.New(preservation.ScopeImported)
+	report.Files = append(report.Files, preservation.File{
+		Path:       filepath.ToSlash(plan.Target),
+		Kind:       "project",
+		Ownership:  preservation.OwnershipImportedUser,
+		Mutability: preservation.MutabilityPlanOnly,
+	})
+	issuesByOperationID := map[string][]reports.Issue{}
+	for _, issue := range plan.Issues {
+		operationID := strings.TrimSpace(issue.OperationID)
+		if operationID == "" {
+			continue
+		}
+		issuesByOperationID[operationID] = append(issuesByOperationID[operationID], issue)
+	}
+	for _, operation := range plan.Operations {
+		operationID := strings.TrimSpace(operation.ID)
+		issues := issuesByOperationID[operationID]
+		mutability := importedPlanMutability(operation, issues)
+		reason := importedPlanMutabilityReason(operation, mutability, issues)
+		report.OperationReviews = append(report.OperationReviews, preservation.OperationReviewFor(
+			operation.Index,
+			string(operation.Op),
+			operationID,
+			mutability,
+			reason,
+			issues,
+		))
+	}
+	report.Normalize()
+	return &report
+}
+
+func importedPlanMutability(operation PlannedOperation, issues []reports.Issue) preservation.Mutability {
+	if !operation.Supported || reports.HasBlockingIssue(issues) {
+		return preservation.MutabilityUnsafe
+	}
+	switch operation.Op {
+	case OpAddSymbol, OpAddNoConnect:
+		return preservation.MutabilitySafeAdd
+	default:
+		return preservation.MutabilityPlanOnly
+	}
+}
+
+func importedPlanMutabilityReason(operation PlannedOperation, mutability preservation.Mutability, issues []reports.Issue) string {
+	if !operation.Supported {
+		return "operation is not supported for imported project planning"
+	}
+	if reports.HasBlockingIssue(issues) {
+		return "operation is blocked by imported-project safety checks"
+	}
+	switch mutability {
+	case preservation.MutabilitySafeAdd:
+		return "operation adds isolated generated content without modifying existing KiCad objects"
+	case preservation.MutabilityPlanOnly:
+		return "operation requires preservation-aware apply review before writing an imported project"
+	default:
+		return "operation mutability is unsafe for imported projects"
+	}
 }
 
 func refIssues(design kicaddesign.Design, index int, ref string, addedRefs map[string]struct{}) []reports.Issue {

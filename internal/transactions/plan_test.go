@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/preservation"
 	"kicadai/internal/reports"
 )
 
@@ -170,6 +171,11 @@ func TestPlanExistingProjectAllowsSafeAddSymbol(t *testing.T) {
 	if len(plan.Issues) != 0 || !plan.Operations[0].Supported {
 		t.Fatalf("unexpected plan: %#v", plan)
 	}
+	if plan.Preservation == nil || len(plan.Preservation.OperationReviews) != 1 ||
+		plan.Preservation.OperationReviews[0].Mutability != preservation.MutabilitySafeAdd ||
+		plan.Preservation.OperationReviews[0].Status != preservation.StatusClean {
+		t.Fatalf("unexpected preservation review: %#v", plan.Preservation)
+	}
 }
 
 func TestPlanExistingProjectBlocksUnsupportedRawContent(t *testing.T) {
@@ -178,6 +184,11 @@ func TestPlanExistingProjectBlocksUnsupportedRawContent(t *testing.T) {
 	plan := PlanTransaction(dir, tx)
 	if len(plan.Issues) == 0 || plan.Issues[0].Code != reports.CodePreservationConflict {
 		t.Fatalf("expected preservation conflict: %#v", plan.Issues)
+	}
+	if plan.Preservation == nil || len(plan.Preservation.OperationReviews) != 1 ||
+		plan.Preservation.OperationReviews[0].Mutability != preservation.MutabilityUnsafe ||
+		plan.Preservation.OperationReviews[0].Status != preservation.StatusBlocked {
+		t.Fatalf("unexpected preservation review: %#v", plan.Preservation)
 	}
 }
 
