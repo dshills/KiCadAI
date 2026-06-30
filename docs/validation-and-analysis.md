@@ -286,8 +286,35 @@ kicadai evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
 
 Current evaluation includes checks for missing files, duplicate references,
 missing footprints, missing board outlines, disconnected pads, invalid net
-assignments, and preservation conflicts. Reports include a
-`fabrication_ready` field when applicable.
+assignments, preservation conflicts, and schematic electrical rule findings.
+Reports include a `fabrication_ready` field when applicable.
+
+For schematics, `evaluate schematic` and project evaluation include:
+
+- `schematic_validation`: parser, unsupported-node, and basic semantic checks.
+- `schematic_electrical`: deterministic electrical-readiness checks for
+  generated or imported schematics.
+
+Current `schematic_electrical` rule families include duplicate/empty
+references, floating or conflicting labels, no-connect marker misuse, required
+pin intent, power-rail source/sink evidence, PWR_FLAG placement, decoupling
+evidence hooks, value sanity hooks, and component rating evidence hooks. Rule IDs
+are returned in issue messages, for example `SCH_PIN_REQUIRED_OPEN`,
+`SCH_POWER_SOURCE_MISSING`, `SCH_DECOUPLING_MISSING`, and
+`SCH_RATING_INSUFFICIENT`.
+
+Troubleshooting examples:
+
+- Required pin finding: connect the named pin, mark it as intentional
+  no-connect only when the block policy allows that, or fix the generated symbol
+  pin map.
+- Power source finding: add a regulator, battery/input connector, accepted
+  external driver, or correct the modeled rail metadata.
+- Decoupling finding: add the required bypass capacitor between the modeled rail
+  and return, or update the block/component requirement if the design intent is
+  different.
+- Rating finding: select a catalog-backed component with sufficient voltage,
+  current, power, or other modeled rating evidence.
 
 
 ### Transactions

@@ -54,6 +54,7 @@ kicadai documents
 kicadai capabilities
 kicadai inspect project ./examples/07_generated_pcb
 kicadai evaluate project ./examples/07_generated_pcb
+kicadai evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
 kicadai writer check ./examples/07_generated_pcb
 kicadai validate board ./examples/07_generated_pcb
 kicadai check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
@@ -78,6 +79,22 @@ kicadai --request ./examples/design/led_indicator.json --output ./out/led_indica
 kicadai --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
 kicadai --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
+
+### Evaluation Commands
+
+Use evaluation commands for read-only readiness checks. Schematic and project
+evaluation include `schematic_validation` and `schematic_electrical` checks when
+a root schematic is available.
+
+```sh
+kicadai evaluate project ./examples/07_generated_pcb
+kicadai evaluate schematic ./examples/01_led_indicator/led_indicator.kicad_sch
+kicadai evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
+```
+
+Use `evaluate pcb` for read-only PCB file readiness checks. Use
+`validate board` for generated-board electrical connectivity validation on a
+project directory.
 
 ### Live IPC Commands
 
@@ -118,6 +135,15 @@ kicadai --feedback transaction validate ./examples/transactions/invalid_feedback
   generated KiCad writer and can run built-in post-repair validators for writer
   correctness, board validation, ERC/DRC, and round-trip evidence when the
   corresponding validation flags are enabled.
+
+Example:
+
+```sh
+kicadai --request ./examples/design/led_indicator.json --output ./out/led_indicator --overwrite design create
+```
+
+The resulting workflow JSON includes a `schematic_electrical` stage before PCB
+realization.
 
 Results for the `repair apply` command include:
 

@@ -14,13 +14,17 @@ The direct-file workflow is the main functional path today. KiCadAI can generate
 
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 
-Generated schematic workflows now emit schematic readability evidence. The
-foundation includes deterministic role/stage/lane classification, conservative
-component placement rules, orthogonal schematic routing, label fallback for
-long/shared nets, geometry overlap diagnostics, and workflow summary metrics.
-Generated schematic connectivity checks also expose structured semantic
-evidence for pin anchors, wire/label/no-connect attachment, and power-driver
-policy before optional KiCad ERC runs.
+Generated schematic workflows now emit schematic readability and electrical-rule
+evidence. The foundation includes deterministic role/stage/lane classification,
+conservative component placement rules, orthogonal schematic routing, label
+fallback for long/shared nets, geometry overlap diagnostics, and workflow
+summary metrics. Generated schematic checks also expose structured evidence for
+duplicate refs, floating/conflicting labels, required/no-connect pins, power
+rails, decoupling/value/rating policy hooks, pin anchors,
+wire/label/no-connect attachment, and power-driver policy before optional KiCad
+ERC runs. `design create` includes a `schematic_electrical` stage, and
+`evaluate schematic` / `evaluate project` include a `schematic_electrical`
+check.
 The first generator improvements also spread the op-amp gain-stage block and
 prevent design API schematic connections from being emitted as diagonal-wire
 segments.

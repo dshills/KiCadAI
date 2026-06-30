@@ -595,16 +595,21 @@ Make schematic generation and evaluation closer to KiCad/ERC expectations.
 ### Current Foundation
 
 Schematic writer, parser, generated connectivity checks, symbol resolver
-foundation, and schematic round-trip compatibility exist.
+foundation, schematic round-trip compatibility, and deterministic schematic
+electrical rules exist. `design create` now emits a `schematic_electrical`
+workflow stage before PCB realization, promotion reports include a matching
+gate, and `evaluate schematic` / `evaluate project` expose a
+`schematic_electrical` check. Current rule coverage includes references, labels,
+no-connect markers, required pin intent, power rail source/sink metadata,
+PWR_FLAG attachment, and decoupling/value/rating evidence hooks.
 
 ### Remaining Work
 
 - Expand `.kicad_sym` handling as real libraries expose unsupported constructs.
 - Add stronger policies for multi-unit symbols, hidden pins, power symbols, and
   alternate bodies.
-- Add schematic-level checks for required pins, power nets, decoupling,
-  duplicate refs across hierarchy, label consistency, no-connect markers, and
-  value/rating sanity.
+- Expand schematic-level checks across hierarchy and feed richer block/component
+  metadata into decoupling, power, value, and rating policies.
 - Support richer hierarchical sheets and cross-sheet connectivity.
 - Keep schematic round-trip preservation growing with real KiCad projects.
 

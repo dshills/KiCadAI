@@ -110,11 +110,14 @@ When asked to review or evaluate an existing KiCad project:
 
 1. Inspect project structure.
 2. Evaluate project-level issues.
-3. Run writer correctness only when the project is generated or intended to
+3. Inspect `schematic_electrical` findings from `evaluate project` or
+   `evaluate schematic`; treat error/blocked findings as stop conditions before
+   PCB generation or fabrication claims.
+4. Run writer correctness only when the project is generated or intended to
    match KiCadAI writer expectations.
-4. Run board validation for PCB electrical meaning.
-5. Run KiCad ERC/DRC if available and relevant.
-6. Summarize findings with issue codes, paths, severity, and suggested next
+5. Run board validation for PCB electrical meaning.
+6. Run KiCad ERC/DRC if available and relevant.
+7. Summarize findings with issue codes, paths, severity, and suggested next
    actions.
 
 Commands:
@@ -181,6 +184,7 @@ kicadai pinmap validate ./out/project
 For generated intent workflows, inspect:
 
 - `component_selection` stage output;
+- `schematic_electrical` stage status and findings;
 - component IDs and variants;
 - rejected candidates;
 - missing or insufficient ratings;
