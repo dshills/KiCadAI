@@ -58,8 +58,11 @@ proof.
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, solder-mask web estimates,
 edge-plating/castellation policy, impedance/differential-pair evidence gaps,
-and basic fabrication metadata. These checks improve local DFM visibility, but
-they are still conservative evidence, not manufacturer acceptance.
+and basic fabrication metadata. Physical-rule thresholds can now come from
+built-in or local fabrication profiles, with profile provenance recorded in
+readiness reports and package manifests. These checks improve local DFM
+visibility, but they are still conservative evidence, not manufacturer
+acceptance.
 
 KiCadAI is not yet a general autonomous "make me any board" system. It works best with supported structured intent, verified circuit blocks, and catalog-backed components. Broader component coverage, topology synthesis, validation feedback, and production layout proof are still active roadmap areas.
 
@@ -168,6 +171,19 @@ kicadai --request examples/design/led_indicator.json --output ./out/led_indicato
 kicadai inspect schematic ./out/led_indicator/led_indicator.kicad_sch
 kicadai export bom ./out/led_indicator
 ```
+
+Inspect fabrication profiles:
+
+```sh
+kicadai fabrication profile list
+kicadai fabrication profile show generic_assembly
+kicadai fabrication profile validate ./profiles/my-board-house.json
+```
+
+Use `--manufacturer-profile` to select a built-in or local physical-rule
+profile, and `--manufacturer-profile-dir` or
+`KICADAI_FABRICATION_PROFILE_DIR` to load trusted local JSON profile
+snapshots.
 
 KiCadAI normalizes the request `name` to a safe basename inside the output
 directory when choosing generated KiCad filenames, with fallback naming for

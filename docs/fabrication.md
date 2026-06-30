@@ -38,6 +38,17 @@ Fabrication reports now include explicit assembly evidence:
 - Optional manufacturer profiles add local assembly policy checks. The built-in
   `generic_assembly` profile requires exact manufacturer/MPN evidence for
   assembly-critical rows while allowing generic passives.
+- Physical-rule fabrication profiles now drive local DFM thresholds for
+  annular rings, copper edge clearance, copper feature widths, solder-mask web
+  estimates, edge-plating policy, impedance evidence policy, and fabrication
+  metadata requirements. Built-in profiles include `generic_assembly`,
+  `generic_2layer_economy`, `generic_2layer_standard`,
+  `generic_4layer_standard`, and `generic_castellated_review`.
+- Local physical-rule profiles can be loaded from trusted JSON snapshots with
+  `--manufacturer-profile-dir` or `KICADAI_FABRICATION_PROFILE_DIR`.
+  Explicit flags override the environment directory. Local profiles may not
+  shadow built-ins, and malformed or duplicate profile IDs are reported as
+  structured issues.
 
 Use `--execute` to write files and `--overwrite` to replace existing package
 files. KiCad CLI is required for Gerber and drill generation:
@@ -47,9 +58,25 @@ kicadai \
   --execute \
   --overwrite \
   --manufacturer-profile generic_assembly \
+  --manufacturer-profile-dir ./profiles \
   --kicad-cli /path/to/kicad-cli \
   export fabrication ./project
 ```
+
+Profile discovery and validation are available through the `fabrication`
+command family:
+
+```sh
+kicadai fabrication profile list
+kicadai fabrication profile show generic_assembly
+kicadai fabrication profile validate ./profiles/my-board-house.json
+```
+
+Profile command output includes the profile ID, name, version, source, hash,
+selected thresholds, and validation issues. Fabrication readiness reports and
+`package-manifest.json` include top-level `manufacturer_profile` provenance
+with the resolved profile ID, version, source, and hash, plus
+`physical_rules.profile_details` in `physical-rules.json`.
 
 Default package paths are under `<project>/fabrication/`:
 

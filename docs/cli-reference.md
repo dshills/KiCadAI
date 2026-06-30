@@ -59,6 +59,9 @@ kicadai writer check ./examples/07_generated_pcb
 kicadai validate board ./examples/07_generated_pcb
 kicadai check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai fabrication profile list
+kicadai fabrication profile show generic_assembly
+kicadai fabrication profile validate ./profiles/my-board-house.json
 kicadai component find --family resistor --package 0805 --value-kind resistance --value 10k
 kicadai pinmap list
 kicadai pinmap validate ./examples/01_led_indicator
@@ -95,6 +98,32 @@ kicadai evaluate pcb ./examples/07_generated_pcb/generated_pcb.kicad_pcb
 Use `evaluate pcb` for read-only PCB file readiness checks. Use
 `validate board` for generated-board electrical connectivity validation on a
 project directory.
+
+### Fabrication Profile Commands
+
+Fabrication profile commands return JSON by default and are intended for
+agent/tooling discovery:
+
+```sh
+kicadai fabrication profile list
+kicadai fabrication profile show generic_assembly
+kicadai fabrication profile validate ./profiles/my-board-house.json
+```
+
+Built-in physical-rule profiles are `generic_assembly`,
+`generic_2layer_economy`, `generic_2layer_standard`,
+`generic_4layer_standard`, and `generic_castellated_review`. Load trusted
+local JSON profiles with:
+
+```sh
+kicadai --manufacturer-profile-dir ./profiles fabrication profile list
+KICADAI_FABRICATION_PROFILE_DIR=./profiles kicadai fabrication profile list
+```
+
+Use `--manufacturer-profile <id>` with `export preview` or
+`export fabrication` to select the active physical-rule profile. Exported
+readiness reports, `physical-rules.json`, and `package-manifest.json` record
+the resolved profile ID, version, source, and hash.
 
 ### Live IPC Commands
 

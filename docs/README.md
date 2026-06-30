@@ -10,7 +10,7 @@ This directory holds the detailed reference material that used to live in the pr
 - [Circuit Blocks](circuit-blocks.md): reusable block workflows and block-library commands.
 - [Placement And Routing](layout-routing.md): placement quality, routing policy, route diagnostics, and retry-related evidence.
 - [Validation And Analysis](validation-and-analysis.md): inspection, evaluation, writer correctness, transactions, round-trip validation, and ERC/DRC checks.
-- [Fabrication Export And Readiness](fabrication.md): readiness gates, BOM/CPL evidence, manufacturer profiles, and export commands.
+- [Fabrication Export And Readiness](fabrication.md): readiness gates, BOM/CPL evidence, physical-rule fabrication profiles, provenance, and export commands.
 
 ## Libraries And Internals
 

@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-27
+Date: 2026-06-30
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -104,8 +104,12 @@ from validation feedback to safe automatic repair.
   manifest serialization, project evaluation, deterministic BOM/CPL reports,
   safe dry-run/execute export service, CLI wiring, KiCad CLI evidence policy,
   BOM/CPL identity and placement evidence, BOM/CPL consistency validation,
-  built-in generic assembly manufacturer profile checks, and `design create`
-  fabrication-candidate acceptance integration.
+  built-in generic assembly manufacturer profile checks, physical-rule
+  fabrication profile schema/validation, built-in physical-rule profile
+  registry, local JSON profile loading, profile discovery/validation CLI,
+  physical-rule threshold integration, profile provenance in readiness reports
+  and package manifests, and `design create` fabrication-candidate acceptance
+  integration.
 - `design create` workflow for structured block-based design requests.
 - Amplifier example/test corpus foundation with checked-in Class AB, Class A,
   and op-amp headphone-buffer schematic fixtures; amplifier semantic landmark
@@ -177,7 +181,8 @@ loop confidence:
 - repair can persist generated-project changes, but imported-project mutation
   remains blocked by preservation safety;
 - fabrication export now provides conservative readiness gates with BOM/CPL
-  identity, consistency, and local manufacturer-profile evidence, but does not
+  identity, consistency, local assembly manufacturer-profile evidence, and
+  physical-rule fabrication-profile threshold/provenance evidence, but does not
   yet guarantee complete manufacturer acceptance;
 - structured intent planning now exists, and the first semantic design
   synthesis trace records topology, bus, voltage-domain, component-policy, and
@@ -676,9 +681,12 @@ presence/overlap, silkscreen board clearance, mounting-hole geometry/edge
 clearance, edge-plating/castellation policy, and controlled-impedance and
 differential-pair evidence gaps. It also includes fabrication metadata evidence
 for board finish, panelization, and fabrication notes, exposes optional or
-required KiCad CLI evidence policy, optionally applies the built-in `generic_assembly`
-manufacturer profile through `--manufacturer-profile`, and enriches BOM rows
-with local procurement snapshot fields when `--source-dir` is supplied.
+required KiCad CLI evidence policy, applies built-in or local physical-rule
+fabrication profiles through `--manufacturer-profile` and
+`--manufacturer-profile-dir`, records profile hash/source provenance in
+readiness reports and package manifests, optionally applies the built-in
+`generic_assembly` assembly manufacturer profile evidence, and enriches BOM
+rows with local procurement snapshot fields when `--source-dir` is supplied.
 Snapshot evidence is explicitly local and does not claim live stock, price, or
 supplier acceptance.
 `design create` treats `validation.acceptance: fabrication-candidate` as a
@@ -691,10 +699,12 @@ report path where available.
 ### Remaining Work
 
 - Expand physical DFM coverage beyond the current conservative checks,
-  especially exact polygonal copper/mask sliver proof, richer board-house
-  profiles, deeper edge-plating evidence, and solver-grade impedance proof.
-- Add richer manufacturer profile presets and profile import once specific
-  fabricator rule sources are selected.
+  especially exact polygonal copper/mask sliver proof, specific board-house
+  rule source curation, deeper edge-plating evidence, and solver-grade
+  impedance proof.
+- Add reviewed board-house profile snapshots once specific fabricator rule
+  sources are selected, and keep them clearly labeled as local constraints
+  rather than manufacturer acceptance guarantees.
 - Add live or provider-backed procurement import once a trusted source and
   cache/update policy are selected.
 - Compare physical-rule evidence with optional KiCad DRC categories and
