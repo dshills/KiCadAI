@@ -96,6 +96,7 @@ type Source struct {
 }
 
 type Profile struct {
+	// Keep cloneProfile in builtin.go updated when adding reference-typed fields.
 	Schema      string     `json:"schema"`
 	ID          string     `json:"id"`
 	Name        string     `json:"name"`
