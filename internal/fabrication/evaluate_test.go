@@ -95,6 +95,21 @@ func TestPhysicalRuleOptionsReportUnknownProfile(t *testing.T) {
 	}
 }
 
+func TestEvaluateIncludesManufacturerProfileProvenance(t *testing.T) {
+	root := testFabricationProject(t)
+	writeTestPCB(t, root, "demo.kicad_pcb")
+	result := Evaluate(context.Background(), root, EvaluateOptions{})
+	if result.ManufacturerProfile == nil {
+		t.Fatalf("ManufacturerProfile = nil")
+	}
+	if result.ManufacturerProfile.ID != fabricationprofiles.DefaultProfileID || result.ManufacturerProfile.Hash == "" {
+		t.Fatalf("ManufacturerProfile = %#v", result.ManufacturerProfile)
+	}
+	if result.Summary.ManufacturerProfile != EvidencePass {
+		t.Fatalf("manufacturer profile evidence = %s", result.Summary.ManufacturerProfile)
+	}
+}
+
 func TestEvaluateGeneratedProjectReportsProvenanceAndMissingCoreFiles(t *testing.T) {
 	root := t.TempDir()
 	projectPath := filepath.Join(root, "demo.kicad_pro")

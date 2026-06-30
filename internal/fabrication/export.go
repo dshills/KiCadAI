@@ -161,14 +161,15 @@ func exportReadiness(ctx context.Context, targetPath string, opts Options, resul
 	}
 	result = finalizeExportResult(result)
 	manifest := Manifest{
-		Project:   ProjectRef{Name: target.Name, Root: filepath.ToSlash(target.Root)},
-		Status:    result.Status,
-		Score:     result.Score,
-		Generated: result.Summary.Generated,
-		Artifacts: slices.Clone(result.Artifacts),
-		Evidence:  summaryEvidence(result.Summary),
-		Issues:    slices.Clone(result.Issues),
-		Options:   opts,
+		Project:             ProjectRef{Name: target.Name, Root: filepath.ToSlash(target.Root)},
+		Status:              result.Status,
+		Score:               result.Score,
+		Generated:           result.Summary.Generated,
+		ManufacturerProfile: result.ManufacturerProfile,
+		Artifacts:           slices.Clone(result.Artifacts),
+		Evidence:            summaryEvidence(result.Summary),
+		Issues:              slices.Clone(result.Issues),
+		Options:             opts,
 	}
 	readinessJSON, err := MarshalResultJSON(result)
 	if err != nil {

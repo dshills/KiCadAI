@@ -85,6 +85,15 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 	evidence["physical_rules"] = physicalStatusEvidence(physical.Status)
 	resultSummary.PhysicalRules = evidence["physical_rules"]
 	issues = append(issues, physical.Issues...)
+	var manufacturerProfile *physicalrules.ProfileInfo
+	if physical.ProfileDetails != nil && strings.TrimSpace(physical.ProfileDetails.ID) != "" && strings.TrimSpace(physical.ProfileDetails.Hash) != "" {
+		profile := *physical.ProfileDetails
+		manufacturerProfile = &profile
+		if resultSummary.ManufacturerProfile == "" || resultSummary.ManufacturerProfile == EvidenceSkipped {
+			resultSummary.ManufacturerProfile = EvidencePass
+			evidence["manufacturer_profile"] = EvidencePass
+		}
+	}
 	addERCEvidence(summary, opts, evidence, &resultSummary, &issues)
 	addMissingExternalEvidence(opts, evidence, &resultSummary, &issues)
 
@@ -92,13 +101,14 @@ func Evaluate(ctx context.Context, targetPath string, opts EvaluateOptions) Resu
 	slices.SortFunc(issues, compareIssues)
 	status := CalculateStatus(issues, evidence)
 	return Result{
-		Status:        status,
-		Score:         Score(evidence),
-		Summary:       resultSummary,
-		Issues:        issues,
-		Artifacts:     artifacts,
-		PhysicalRules: &physical,
-		DryRun:        opts.DryRun,
+		Status:              status,
+		Score:               Score(evidence),
+		Summary:             resultSummary,
+		Issues:              issues,
+		Artifacts:           artifacts,
+		ManufacturerProfile: manufacturerProfile,
+		PhysicalRules:       &physical,
+		DryRun:              opts.DryRun,
 	}
 }
 

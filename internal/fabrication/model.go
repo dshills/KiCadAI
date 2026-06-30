@@ -127,27 +127,29 @@ type Options struct {
 }
 
 type Manifest struct {
-	Schema    string                    `json:"schema"`
-	Project   ProjectRef                `json:"project"`
-	Status    ReadinessStatus           `json:"status"`
-	Score     int                       `json:"score"`
-	Generated bool                      `json:"generated"`
-	CreatedBy Generator                 `json:"created_by"`
-	Artifacts []Artifact                `json:"artifacts"`
-	Evidence  map[string]EvidenceStatus `json:"evidence"`
-	Issues    []reports.Issue           `json:"issues"`
-	Options   Options                   `json:"options,omitempty"`
+	Schema              string                     `json:"schema"`
+	Project             ProjectRef                 `json:"project"`
+	Status              ReadinessStatus            `json:"status"`
+	Score               int                        `json:"score"`
+	Generated           bool                       `json:"generated"`
+	CreatedBy           Generator                  `json:"created_by"`
+	ManufacturerProfile *physicalrules.ProfileInfo `json:"manufacturer_profile,omitempty"`
+	Artifacts           []Artifact                 `json:"artifacts"`
+	Evidence            map[string]EvidenceStatus  `json:"evidence"`
+	Issues              []reports.Issue            `json:"issues"`
+	Options             Options                    `json:"options,omitempty"`
 }
 
 type Result struct {
-	Status        ReadinessStatus       `json:"status"`
-	Score         int                   `json:"score"`
-	Summary       Summary               `json:"summary"`
-	Issues        []reports.Issue       `json:"issues"`
-	Artifacts     []Artifact            `json:"artifacts"`
-	PhysicalRules *physicalrules.Report `json:"physical_rules,omitempty"`
-	ManifestPath  string                `json:"manifest_path,omitempty"`
-	DryRun        bool                  `json:"dry_run"`
+	Status              ReadinessStatus            `json:"status"`
+	Score               int                        `json:"score"`
+	Summary             Summary                    `json:"summary"`
+	ManufacturerProfile *physicalrules.ProfileInfo `json:"manufacturer_profile,omitempty"`
+	Issues              []reports.Issue            `json:"issues"`
+	Artifacts           []Artifact                 `json:"artifacts"`
+	PhysicalRules       *physicalrules.Report      `json:"physical_rules,omitempty"`
+	ManifestPath        string                     `json:"manifest_path,omitempty"`
+	DryRun              bool                       `json:"dry_run"`
 }
 
 func CalculateStatus(issues []reports.Issue, evidence map[string]EvidenceStatus) ReadinessStatus {
@@ -203,6 +205,10 @@ func NormalizeManifest(manifest Manifest) Manifest {
 	}
 	if strings.TrimSpace(manifest.Schema) == "" {
 		manifest.Schema = ManifestSchema
+	}
+	if manifest.ManufacturerProfile != nil {
+		profile := *manifest.ManufacturerProfile
+		manifest.ManufacturerProfile = &profile
 	}
 	if strings.TrimSpace(string(manifest.CreatedBy)) == "" {
 		manifest.CreatedBy = GeneratorKiCadAI

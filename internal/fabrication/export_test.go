@@ -60,6 +60,12 @@ func TestExportPackageManifestsPhysicalRulesReport(t *testing.T) {
 	if manifest.Evidence["physical_rules"] == "" {
 		t.Fatalf("manifest evidence missing physical_rules: %#v", manifest.Evidence)
 	}
+	if result.ManufacturerProfile == nil || result.ManufacturerProfile.ID == "" {
+		t.Fatalf("result manufacturer profile = %#v", result.ManufacturerProfile)
+	}
+	if manifest.ManufacturerProfile == nil || manifest.ManufacturerProfile.ID != result.ManufacturerProfile.ID || manifest.ManufacturerProfile.Hash == "" {
+		t.Fatalf("manifest manufacturer profile = %#v result=%#v", manifest.ManufacturerProfile, result.ManufacturerProfile)
+	}
 	if artifact := manifestArtifact(manifest.Artifacts, ArtifactPhysicalRules); artifact.Path != "fabrication/physical-rules.json" {
 		t.Fatalf("physical rules manifest artifact = %#v, want physical-rules.json", artifact)
 	}
