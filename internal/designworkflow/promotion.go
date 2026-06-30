@@ -565,7 +565,7 @@ func validPromotionAcceptance(acceptance AcceptanceLevel) bool {
 
 func validPromotionStageName(stage StageName) bool {
 	switch stage {
-	case StageParseRequest, StageLibraryContext, StageBlockPlanning, StageComponentSelection, StageSchematic, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageValidationRepair, StageKiCadChecks, StageFabricationReady, StageFeedback:
+	case StageParseRequest, StageLibraryContext, StageBlockPlanning, StageComponentSelection, StageSchematic, StageSchematicElectrical, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageValidationRepair, StageKiCadChecks, StageFabricationReady, StageFeedback:
 		return true
 	default:
 		return false

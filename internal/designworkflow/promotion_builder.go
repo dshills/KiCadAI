@@ -42,6 +42,7 @@ func BuildInternalPromotionReport(fixture PromotionFixture, result WorkflowResul
 	builder.collectWorkflowIssues()
 	builder.addMetadataGate()
 	builder.addStageGate()
+	builder.addSchematicElectricalGate()
 	builder.addWriterGate()
 	builder.addConnectivityGate()
 	builder.addKiCadGate()
@@ -136,6 +137,10 @@ func (builder *promotionReportBuilder) addWriterGate() {
 
 func (builder *promotionReportBuilder) addConnectivityGate() {
 	builder.addStageStatusGate("connectivity", StageValidation, []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass})
+}
+
+func (builder *promotionReportBuilder) addSchematicElectricalGate() {
+	builder.addStageStatusGate("schematic_electrical", StageSchematicElectrical, []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass})
 }
 
 func (builder *promotionReportBuilder) addKiCadGate() {

@@ -87,6 +87,34 @@ func TestBuildInternalPromotionReportExpectedFail(t *testing.T) {
 	}
 }
 
+func TestBuildPromotionReportIncludesSchematicElectricalGate(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "schematic_electrical",
+		Request:           "bad schematic",
+		Tier:              "generated",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceConnectivity,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageSchematic, StageSchematicElectrical},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "bad"}, AcceptanceConnectivity, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{Name: StageSchematic, Status: StageStatusOK},
+		{Name: StageSchematicElectrical, Status: StageStatusBlocked, Issues: []reports.Issue{{
+			Code:     reports.CodeValidationFailed,
+			Severity: reports.SeverityError,
+			Message:  "schematic electrical rule failed",
+		}}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "schematic_electrical")
+	if gate.Status != PromotionGateStatusFailed {
+		t.Fatalf("schematic electrical gate = %#v", gate)
+	}
+	if report.AchievedReadiness != PromotionReadinessBlocked {
+		t.Fatalf("readiness = %q", report.AchievedReadiness)
+	}
+}
+
 func TestBuildInternalPromotionReportMissingExpectedArtifact(t *testing.T) {
 	fixture := PromotionFixture{
 		ID:                "led_indicator_kicad_smoke",

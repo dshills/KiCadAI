@@ -10,22 +10,23 @@ import (
 type StageName string
 
 const (
-	StageParseRequest       StageName = "parse_request"
-	StageLibraryContext     StageName = "library_context"
-	StageBlockPlanning      StageName = "block_planning"
-	StageComponentSelection StageName = "component_selection"
-	StageSchematic          StageName = "schematic"
-	StagePCBRealization     StageName = "pcb_realization"
-	StageSchematicToPCB     StageName = "schematic_to_pcb"
-	StagePlacement          StageName = "placement"
-	StageRouting            StageName = "routing"
-	StageProjectWrite       StageName = "project_write"
-	StageWriterCorrect      StageName = "writer_correctness"
-	StageValidation         StageName = "validation"
-	StageValidationRepair   StageName = "validation_repair"
-	StageKiCadChecks        StageName = "kicad_checks"
-	StageFabricationReady   StageName = "fabrication_readiness"
-	StageFeedback           StageName = "feedback"
+	StageParseRequest        StageName = "parse_request"
+	StageLibraryContext      StageName = "library_context"
+	StageBlockPlanning       StageName = "block_planning"
+	StageComponentSelection  StageName = "component_selection"
+	StageSchematic           StageName = "schematic"
+	StageSchematicElectrical StageName = "schematic_electrical"
+	StagePCBRealization      StageName = "pcb_realization"
+	StageSchematicToPCB      StageName = "schematic_to_pcb"
+	StagePlacement           StageName = "placement"
+	StageRouting             StageName = "routing"
+	StageProjectWrite        StageName = "project_write"
+	StageWriterCorrect       StageName = "writer_correctness"
+	StageValidation          StageName = "validation"
+	StageValidationRepair    StageName = "validation_repair"
+	StageKiCadChecks         StageName = "kicad_checks"
+	StageFabricationReady    StageName = "fabrication_readiness"
+	StageFeedback            StageName = "feedback"
 )
 
 type StageStatus string
@@ -202,7 +203,7 @@ func AchievedAcceptance(requested AcceptanceLevel, stages []StageResult) Accepta
 		return ""
 	case missingAny(completed, StageSchematic):
 		return AcceptanceDraft
-	case hasAnyBlocked(blocked, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageWriterCorrect, StageValidation):
+	case hasAnyBlocked(blocked, StageSchematicElectrical, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageWriterCorrect, StageValidation):
 		return AcceptanceStructural
 	case hasAnyBlocked(blocked, StageKiCadChecks):
 		return AcceptanceConnectivity
@@ -239,7 +240,7 @@ func RetryScopeForStage(stage StageName, issue reports.Issue) RetryScope {
 		return RetryScopePlacement
 	case StageRouting:
 		return RetryScopeRouting
-	case StageProjectWrite, StageSchematic, StageSchematicToPCB:
+	case StageProjectWrite, StageSchematic, StageSchematicElectrical, StageSchematicToPCB:
 		return RetryScopeWriter
 	case StageLibraryContext, StageKiCadChecks, StageFabricationReady, StageValidation:
 		if issue.Code == reports.CodeKiCadCLIFailed || issue.Code == reports.CodeSkippedExternalTool {

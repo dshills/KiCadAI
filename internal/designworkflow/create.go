@@ -39,7 +39,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	plan := PlanBlocks(ctx, opts.BlockRegistry, normalized)
 	stages := []StageResult{plan.Stage}
 	if workflowStageBlocked(plan.Stage) {
-		stages = append(stages, skippedWorkflowStages("block planning did not complete", StageComponentSelection, StageSchematic, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = append(stages, skippedWorkflowStages("block planning did not complete", StageComponentSelection, StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
 	componentSelections := SelectWorkflowComponents(ctx, opts.BlockRegistry, plan, opts.Components)
@@ -52,11 +52,21 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	}
 	stages = append(stages, componentSelections.Stage)
 	if workflowStageBlocked(componentSelections.Stage) {
-		stages = append(stages, skippedWorkflowStages("component selection did not complete", StageSchematic, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		stages = append(stages, skippedWorkflowStages("component selection did not complete", StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
 	schematicStage := schematicStageFromPlan(plan)
 	stages = append(stages, schematicStage)
+	if workflowStageBlocked(schematicStage) {
+		stages = append(stages, skippedWorkflowStages("schematic generation did not complete", StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+	}
+	schematicElectricalStage := SchematicElectricalStage(plan)
+	stages = append(stages, schematicElectricalStage)
+	if workflowStageBlocked(schematicElectricalStage) {
+		stages = append(stages, skippedWorkflowStages("schematic electrical rules did not pass", StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+	}
 	fragments := RealizePCBFragments(ctx, opts.BlockRegistry, plan)
 	stages = append(stages, fragments.Stage)
 	if workflowStageBlocked(fragments.Stage) {

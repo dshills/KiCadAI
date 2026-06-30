@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
 	"kicadai/internal/components"
 	"kicadai/internal/inspect"
@@ -13,6 +14,7 @@ import (
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestCreateWritesWorkflowResult(t *testing.T) {
@@ -38,6 +40,9 @@ func TestCreateWritesWorkflowResult(t *testing.T) {
 	if !hasStage(result, StageWriterCorrect) {
 		t.Fatalf("writer correctness stage missing: %#v", result.Stages)
 	}
+	if !hasStage(result, StageSchematicElectrical) {
+		t.Fatalf("schematic electrical stage missing: %#v", result.Stages)
+	}
 	componentStage, ok := stageByName(result, StageComponentSelection)
 	if !ok {
 		t.Fatalf("component selection stage missing: %#v", result.Stages)
@@ -51,6 +56,57 @@ func TestCreateWritesWorkflowResult(t *testing.T) {
 	}
 	if got := countSymbolsWithProperty(schematicFile.Symbols, componentprops.PropertyComponentID); got < 2 {
 		t.Fatalf("component identity properties not propagated to schematic: %#v", schematicFile.Symbols)
+	}
+}
+
+func TestSchematicElectricalStageBlocksInvalidGeneratedSchematic(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"R1","value":"10k","library_id":"Device:R","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"},{"number":"2"}]}`))
+	plan := BlockPlanResult{
+		Request:     Request{Name: "bad_schematic"},
+		Composition: blocks.CompositionRequest{ProjectName: "bad_schematic"},
+		Output: blocks.CompositionOutput{
+			Instances: []blocks.BlockInstance{
+				{InstanceID: "a", Refs: []string{"R1"}},
+				{InstanceID: "b", Refs: []string{"R1"}},
+			},
+			Operations: []transactions.Operation{operation},
+		},
+		Stage: NewStageResult(StageBlockPlanning, nil),
+	}
+
+	stage := SchematicElectricalStage(plan)
+
+	if stage.Status != StageStatusBlocked {
+		t.Fatalf("stage status = %q, want blocked: %#v", stage.Status, stage)
+	}
+	if stage.Summary["status"] != "blocked" {
+		t.Fatalf("summary = %#v", stage.Summary)
+	}
+	if !hasIssueCode(stage.Issues, reports.CodeValidationFailed) {
+		t.Fatalf("expected validation issue: %#v", stage.Issues)
+	}
+}
+
+func TestSchematicElectricalStageBlocksUnresolvedEndpoint(t *testing.T) {
+	addSymbol := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"R1","value":"10k","library_id":"Device:R","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"},{"number":"2"}]}`))
+	connect := transactions.NewOperation(transactions.OpConnect, []byte(`{"op":"connect","from":{"ref":"R1","pin":"1"},"to":{"ref":"R2","pin":"1"},"net_name":"SIG"}`))
+	plan := BlockPlanResult{
+		Request:     Request{Name: "bad_endpoint"},
+		Composition: blocks.CompositionRequest{ProjectName: "bad_endpoint"},
+		Output: blocks.CompositionOutput{
+			Instances:  []blocks.BlockInstance{{InstanceID: "a", Refs: []string{"R1", "R2"}}},
+			Operations: []transactions.Operation{addSymbol, connect},
+		},
+		Stage: NewStageResult(StageBlockPlanning, nil),
+	}
+
+	stage := SchematicElectricalStage(plan)
+
+	if stage.Status != StageStatusBlocked {
+		t.Fatalf("stage status = %q, want blocked: %#v", stage.Status, stage)
+	}
+	if len(stage.Issues) != 1 || stage.Issues[0].Path != "operations[2].to" {
+		t.Fatalf("unexpected endpoint issues: %#v", stage.Issues)
 	}
 }
 
