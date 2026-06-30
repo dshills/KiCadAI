@@ -192,6 +192,35 @@ func TestPlanExistingProjectBlocksUnsupportedRawContent(t *testing.T) {
 	}
 }
 
+func TestPlanExistingProjectBlocksAddSymbolExistingReference(t *testing.T) {
+	dir := writeExistingProject(t, `(kicad_sch (version 20260306) (generator "kicadai")
+	  (symbol (property "Reference" "R1") (uuid "11111111-1111-5111-8111-111111111111"))
+	)`, `(kicad_pcb (version 20260206) (generator "pcbnew") (layers (0 "F.Cu" signal)))`)
+	tx := mustParse(t, `{"operations":[{"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}}]}`)
+	plan := PlanTransaction(dir, tx)
+	if len(plan.Issues) == 0 || plan.Issues[0].Code != reports.CodeDuplicateReference {
+		t.Fatalf("expected duplicate reference issue: %#v", plan.Issues)
+	}
+	if plan.Preservation == nil || plan.Preservation.OperationReviews[0].Mutability != preservation.MutabilityUnsafe {
+		t.Fatalf("expected unsafe preservation review: %#v", plan.Preservation)
+	}
+}
+
+func TestPlanExistingProjectBlocksDuplicateAddSymbolWithoutUnit(t *testing.T) {
+	dir := writeExistingProject(t, `(kicad_sch (version 20260306) (generator "kicadai"))`, `(kicad_pcb (version 20260206) (generator "pcbnew") (layers (0 "F.Cu" signal)))`)
+	tx := mustParse(t, `{"operations":[
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":20,"y_mm":10}}
+	]}`)
+	plan := PlanTransaction(dir, tx)
+	if len(plan.Issues) == 0 || plan.Issues[0].Code != reports.CodeDuplicateReference {
+		t.Fatalf("expected duplicate transaction reference issue: %#v", plan.Issues)
+	}
+	if plan.Preservation == nil || plan.Preservation.OperationReviews[1].Mutability != preservation.MutabilityUnsafe {
+		t.Fatalf("expected unsafe second operation review: %#v", plan.Preservation)
+	}
+}
+
 func TestPlanExistingProjectBlocksUnsafeRemove(t *testing.T) {
 	dir := writeExistingProject(t, `(kicad_sch (version 20260306) (generator "kicadai") (symbol (property "Reference" "R1") (uuid "11111111-1111-5111-8111-111111111111")))`, `(kicad_pcb (version 20260206) (generator "pcbnew") (layers (0 "F.Cu" signal)))`)
 	tx := mustParse(t, `{"operations":[{"op":"remove_symbol","ref":"R1"}]}`)

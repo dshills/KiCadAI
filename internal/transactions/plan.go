@@ -66,6 +66,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 	}
 	existingProject := existingProjectTarget(target) && !(opts.AllowGeneratedOverwrite && firstOperationKind(tx) == OpCreateProject)
 	var existing *kicaddesign.Design
+	existingSymbolRefs := map[string]struct{}{}
 	if existingProject {
 		loaded, err := kicaddesign.ReadProjectDirectory(target)
 		if err != nil {
@@ -77,9 +78,11 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 			})
 		} else {
 			existing = &loaded
+			existingSymbolRefs = existingSchematicRefs(loaded)
 		}
 	}
 	addedRefs := map[string]struct{}{}
+	addedSymbolKeys := map[string]struct{}{}
 	operationIDs := map[string]struct{}{}
 	operationIDCounts := map[string]int{}
 	for i, op := range tx.Operations {
@@ -91,7 +94,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 		plan.Issues = append(plan.Issues, populatePlanFields(&planned, op, target, projectName)...)
 		planned.ID = uniquePlannedOperationID(plannedOperationID(planned, op), operationIDs, operationIDCounts)
 		if existing != nil {
-			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, op, addedRefs)...)
+			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, existingSymbolRefs, op, addedRefs, addedSymbolKeys)...)
 		}
 		if opts.LibraryIndex != nil {
 			plan.Issues = append(plan.Issues, transactionLibraryIssues(*opts.LibraryIndex, op)...)
@@ -110,6 +113,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 			var payload AddSymbolOperation
 			if decodeRaw(op, &payload) == nil && strings.TrimSpace(payload.Ref) != "" {
 				addedRefs[strings.TrimSpace(payload.Ref)] = struct{}{}
+				addedSymbolKeys[addSymbolKey(payload.Ref, payload.Unit)] = struct{}{}
 			}
 		}
 	}
@@ -339,7 +343,7 @@ func existingProjectTarget(target string) bool {
 	return false
 }
 
-func existingProjectIssues(design kicaddesign.Design, op Operation, addedRefs map[string]struct{}) []reports.Issue {
+func existingProjectIssues(design kicaddesign.Design, existingSymbolRefs map[string]struct{}, op Operation, addedRefs map[string]struct{}, addedSymbolKeys map[string]struct{}) []reports.Issue {
 	var issues []reports.Issue
 	if touchesDesign(op.Op) && hasUnsupportedImportedContent(design) {
 		issues = append(issues, reports.Issue{
@@ -357,6 +361,20 @@ func existingProjectIssues(design kicaddesign.Design, op Operation, addedRefs ma
 			Path:     "operations[" + strconv.Itoa(op.Index) + "]",
 			Message:  "removing symbols from imported projects is unsafe until dependency analysis is implemented",
 		})
+	case OpAddSymbol:
+		var payload AddSymbolOperation
+		if decodeRaw(op, &payload) == nil {
+			if _, exists := addedSymbolKeys[addSymbolKey(payload.Ref, payload.Unit)]; exists {
+				issues = append(issues, reports.Issue{
+					Code:     reports.CodeDuplicateReference,
+					Severity: reports.SeverityBlocked,
+					Path:     "operations[" + strconv.Itoa(op.Index) + "].ref",
+					Message:  "reference " + strings.TrimSpace(payload.Ref) + " is already introduced by this imported-project transaction",
+					Refs:     []string{strings.TrimSpace(payload.Ref)},
+				})
+			}
+			issues = append(issues, addSymbolRefIssues(existingSymbolRefs, op.Index, payload.Ref)...)
+		}
 	case OpAssignFootprint:
 		var payload AssignFootprintOperation
 		if decodeRaw(op, &payload) == nil {
@@ -382,6 +400,45 @@ func existingProjectIssues(design kicaddesign.Design, op Operation, addedRefs ma
 		}
 	}
 	return issues
+}
+
+func existingSchematicRefs(design kicaddesign.Design) map[string]struct{} {
+	refs := map[string]struct{}{}
+	if design.Schematic == nil {
+		return refs
+	}
+	for _, symbol := range design.Schematic.Symbols {
+		ref := strings.TrimSpace(symbol.Reference)
+		if ref != "" {
+			refs[ref] = struct{}{}
+		}
+	}
+	return refs
+}
+
+func addSymbolRefIssues(existingSymbolRefs map[string]struct{}, index int, ref string) []reports.Issue {
+	ref = strings.TrimSpace(ref)
+	if ref == "" {
+		return nil
+	}
+	if _, exists := existingSymbolRefs[ref]; exists {
+		return []reports.Issue{{
+			Code:     reports.CodeDuplicateReference,
+			Severity: reports.SeverityBlocked,
+			Path:     "operations[" + strconv.Itoa(index) + "].ref",
+			Message:  "reference " + ref + " already exists in imported schematic",
+			Refs:     []string{ref},
+		}}
+	}
+	return nil
+}
+
+func addSymbolKey(ref string, unit int) string {
+	ref = strings.TrimSpace(ref)
+	if unit <= 0 {
+		return ref
+	}
+	return ref + "#unit=" + strconv.Itoa(unit)
 }
 
 func touchesDesign(kind OperationKind) bool {

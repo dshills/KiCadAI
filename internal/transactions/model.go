@@ -170,6 +170,7 @@ type SetBoardOutlineOperation struct {
 type AddSymbolOperation struct {
 	Op         OperationKind    `json:"op"`
 	Ref        string           `json:"ref"`
+	Unit       int              `json:"unit,omitempty"`
 	Role       string           `json:"role,omitempty"`
 	Value      string           `json:"value,omitempty"`
 	LibraryID  string           `json:"library_id"`
