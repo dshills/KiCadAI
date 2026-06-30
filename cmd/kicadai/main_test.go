@@ -2310,6 +2310,27 @@ func TestParseManufacturerProfileFlag(t *testing.T) {
 	}
 }
 
+func TestParseManufacturerProfileDirFlagAndEnvironment(t *testing.T) {
+	t.Setenv("KICADAI_FABRICATION_PROFILE_DIR", "/tmp/env-profiles")
+	var stderr bytes.Buffer
+	opts, command, err := parse([]string{"export", "preview", "."}, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command != "export" || opts.manufacturerProfileDir != "/tmp/env-profiles" {
+		t.Fatalf("command=%q manufacturerProfileDir=%q", command, opts.manufacturerProfileDir)
+	}
+
+	stderr.Reset()
+	opts, command, err = parse([]string{"--manufacturer-profile-dir", "/tmp/flag-profiles", "export", "preview", "."}, &stderr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if command != "export" || opts.manufacturerProfileDir != "/tmp/flag-profiles" {
+		t.Fatalf("command=%q manufacturerProfileDir=%q", command, opts.manufacturerProfileDir)
+	}
+}
+
 func TestRunEvaluateSchematicJSONIncludesElectricalCheck(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
 	if err := os.WriteFile(path, []byte(`(kicad_sch (version 20260306) (generator "kicadai"))`), 0o644); err != nil {

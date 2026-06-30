@@ -274,3 +274,14 @@ func cloneProfile(profile Profile) Profile {
 	cloned.Metadata.WarningOnlyFields = slices.Clone(profile.Metadata.WarningOnlyFields)
 	return cloned
 }
+
+func (registry Registry) mutableCopy() Registry {
+	cloned := Registry{
+		profiles: make(map[string]Profile, len(registry.profiles)),
+		order:    slices.Clone(registry.order),
+	}
+	for id, profile := range registry.profiles {
+		cloned.profiles[id] = cloneProfile(profile)
+	}
+	return cloned
+}

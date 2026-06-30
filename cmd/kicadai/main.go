@@ -25,6 +25,7 @@ import (
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/evaluate"
 	"kicadai/internal/fabrication"
+	fabricationprofiles "kicadai/internal/fabrication/profiles"
 	breakoutgen "kicadai/internal/generate"
 	"kicadai/internal/inspect"
 	"kicadai/internal/intentdraft"
@@ -114,6 +115,7 @@ Global flags:
   --json                Compatibility alias for --format json
   --kicad-cli string    KiCad CLI executable path for KiCad-backed checks and fabrication plotting
   --manufacturer-profile string Local fabrication manufacturer profile ID, for example generic_assembly
+  --manufacturer-profile-dir string Directory of local fabrication profile JSON snapshots
   --keep-artifacts      Keep KiCad-backed artifact workspaces
   --artifact-dir string Directory for retained KiCad-backed artifacts
   --timeout duration    KiCad CLI timeout, for example 10s or 2m
@@ -213,6 +215,7 @@ type cliOptions struct {
 	jsonOutput                  bool
 	kicadCLI                    string
 	manufacturerProfile         string
+	manufacturerProfileDir      string
 	keepArtifacts               bool
 	artifactDir                 string
 	roundTimeout                string
@@ -404,6 +407,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.BoolVar(&jsonFlag, "json", false, "compatibility alias for --format json")
 	flags.StringVar(&opts.kicadCLI, "kicad-cli", "", "KiCad CLI executable path")
 	flags.StringVar(&opts.manufacturerProfile, "manufacturer-profile", "", "local fabrication manufacturer profile ID")
+	flags.StringVar(&opts.manufacturerProfileDir, "manufacturer-profile-dir", os.Getenv(fabricationprofiles.EnvProfileDir), "local fabrication profile directory")
 	flags.BoolVar(&opts.keepArtifacts, "keep-artifacts", false, "keep round-trip artifact workspaces")
 	flags.StringVar(&opts.artifactDir, "artifact-dir", "", "round-trip artifact directory")
 	flags.StringVar(&opts.roundTimeout, "timeout", "", "round-trip timeout")
