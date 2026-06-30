@@ -1,0 +1,287 @@
+package schematicrules
+
+import (
+	"testing"
+
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
+)
+
+func TestInspectDetectsDuplicateNonPowerReferences(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Symbols = []schematic.SchematicSymbol{
+		ruleTestSymbol("R1", kicadfiles.MM(10), kicadfiles.MM(10)),
+		ruleTestSymbol("r1", kicadfiles.MM(20), kicadfiles.MM(10)),
+		ruleTestSymbol("#PWR01", kicadfiles.MM(30), kicadfiles.MM(10)),
+		ruleTestSymbol("#PWR01", kicadfiles.MM(40), kicadfiles.MM(10)),
+	}
+
+	report := Inspect(file, Options{Scope: ScopeGenerated})
+	if !hasRule(report, RuleReferenceDuplicate) {
+		t.Fatalf("report missing duplicate reference: %#v", report.Findings)
+	}
+	if countRule(report, RuleReferenceDuplicate) != 2 {
+		t.Fatalf("duplicate reference count = %d", countRule(report, RuleReferenceDuplicate))
+	}
+}
+
+func TestInspectIgnoresVirtualReferenceDuplicates(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Symbols = []schematic.SchematicSymbol{
+		ruleTestSymbol("#SYM01", kicadfiles.MM(10), kicadfiles.MM(10)),
+		ruleTestSymbol("#SYM01", kicadfiles.MM(20), kicadfiles.MM(10)),
+	}
+
+	report := Inspect(file, Options{Scope: ScopeGenerated})
+	if hasRule(report, RuleReferenceDuplicate) {
+		t.Fatalf("virtual references should not produce duplicate findings: %#v", report.Findings)
+	}
+}
+
+func TestInspectIgnoresUnannotatedReferenceDuplicates(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Symbols = []schematic.SchematicSymbol{
+		ruleTestSymbol("R?", kicadfiles.MM(10), kicadfiles.MM(10)),
+		ruleTestSymbol("R?", kicadfiles.MM(20), kicadfiles.MM(10)),
+	}
+
+	report := Inspect(file, Options{Scope: ScopeImported})
+	if hasRule(report, RuleReferenceDuplicate) {
+		t.Fatalf("unannotated references should not produce duplicate findings: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsFloatingAndEmptyLabels(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Text:     "  ",
+		Kind:     schematic.LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelEmpty) || !hasRule(report, RuleLabelFloating) {
+		t.Fatalf("report missing label findings: %#v", report.Findings)
+	}
+}
+
+func TestInspectTreatsJunctionOnlyLabelAsFloating(t *testing.T) {
+	file := ruleTestSchematic()
+	point := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Junctions = []schematic.Junction{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Position: point,
+	}}
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:     "NET",
+		Kind:     schematic.LabelLocal,
+		Position: point,
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelFloating) {
+		t.Fatalf("junction-only label should be floating: %#v", report.Findings)
+	}
+}
+
+func TestInspectTreatsLabelOnWireSegmentAsAnchored(t *testing.T) {
+	file := ruleTestSchematic()
+	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	mid := kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)}
+	end := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	file.Wires = []schematic.Wire{{
+		UUID:   kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Points: []kicadfiles.Point{start, end},
+	}}
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:     "NET",
+		Kind:     schematic.LabelLocal,
+		Position: mid,
+	}}
+
+	report := Inspect(file, Options{})
+	if hasRule(report, RuleLabelFloating) {
+		t.Fatalf("label on wire segment should be anchored: %#v", report.Findings)
+	}
+}
+
+func TestInspectTreatsLabelOnDiagonalWireSegmentAsAnchored(t *testing.T) {
+	file := ruleTestSchematic()
+	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	mid := kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(15)}
+	end := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}
+	file.Wires = []schematic.Wire{{
+		UUID:   kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Points: []kicadfiles.Point{start, end},
+	}}
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:     "NET",
+		Kind:     schematic.LabelLocal,
+		Position: mid,
+	}}
+
+	report := Inspect(file, Options{})
+	if hasRule(report, RuleLabelFloating) {
+		t.Fatalf("label on diagonal wire segment should be anchored: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsConnectedLabelConflict(t *testing.T) {
+	file := ruleTestSchematic()
+	a := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	b := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	file.Wires = []schematic.Wire{{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Points: []kicadfiles.Point{a, b}}}
+	file.Labels = []schematic.Label{
+		{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Text: "SDA", Kind: schematic.LabelLocal, Position: a},
+		{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Text: "SCL", Kind: schematic.LabelLocal, Position: b},
+	}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelConflict) {
+		t.Fatalf("report missing label conflict: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsSegmentConnectedLabelConflict(t *testing.T) {
+	file := ruleTestSchematic()
+	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	mid := kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)}
+	end := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	file.Wires = []schematic.Wire{{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Points: []kicadfiles.Point{start, end}}}
+	file.Labels = []schematic.Label{
+		{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Text: "SDA", Kind: schematic.LabelLocal, Position: mid},
+		{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Text: "SCL", Kind: schematic.LabelLocal, Position: end},
+	}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelConflict) {
+		t.Fatalf("report missing segment-connected label conflict: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsSameAnchorLabelConflictWithoutWire(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+	file.Labels = []schematic.Label{
+		{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Text: "VCC", Kind: schematic.LabelLocal, Position: anchor},
+		{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Text: "GND", Kind: schematic.LabelLocal, Position: anchor},
+	}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelConflict) {
+		t.Fatalf("report missing same-anchor label conflict: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsLabelNormalizationCollision(t *testing.T) {
+	file := ruleTestSchematic()
+	a := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	b := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	file.Wires = []schematic.Wire{
+		{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Points: []kicadfiles.Point{a, {X: kicadfiles.MM(15), Y: kicadfiles.MM(10)}}},
+		{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Points: []kicadfiles.Point{b, {X: kicadfiles.MM(25), Y: kicadfiles.MM(10)}}},
+	}
+	file.Labels = []schematic.Label{
+		{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Text: "Net  1", Kind: schematic.LabelLocal, Position: a},
+		{UUID: kicadfiles.UUID("44444444-4444-4444-8444-444444444444"), Text: "net 1", Kind: schematic.LabelLocal, Position: b},
+	}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelNormalizationCollision) {
+		t.Fatalf("report missing normalization collision: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsNoConnectAwayFromPin(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("R1", kicadfiles.MM(10), kicadfiles.MM(10))}
+	file.NoConnects = []schematic.NoConnect{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(10)},
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RulePinNoConnectMissing) {
+		t.Fatalf("report missing no-connect finding: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsNoConnectOnConnectedPin(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("R1", anchor.X, anchor.Y)}
+	file.NoConnects = []schematic.NoConnect{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Position: anchor,
+	}}
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:     "NET",
+		Kind:     schematic.LabelLocal,
+		Position: anchor,
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RulePinNoConnectOnRequired) {
+		t.Fatalf("report missing connected no-connect finding: %#v", report.Findings)
+	}
+}
+
+func TestInspectDetectsNoConnectOnPinConnectedByWireSegment(t *testing.T) {
+	file := ruleTestSchematic()
+	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	anchor := kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)}
+	end := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("R1", anchor.X, anchor.Y)}
+	file.Wires = []schematic.Wire{{UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"), Points: []kicadfiles.Point{start, end}}}
+	file.NoConnects = []schematic.NoConnect{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Position: anchor,
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RulePinNoConnectOnRequired) {
+		t.Fatalf("report missing wire-segment connected no-connect finding: %#v", report.Findings)
+	}
+}
+
+func ruleTestSchematic() schematic.SchematicFile {
+	return schematic.SchematicFile{
+		Version:          "20250114",
+		Generator:        "kicadai-test",
+		GeneratorVersion: "test",
+		UUID:             kicadfiles.UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"),
+		Paper:            kicadfiles.Paper{Name: "A4"},
+	}
+}
+
+func ruleTestSymbol(reference string, x kicadfiles.IU, y kicadfiles.IU) schematic.SchematicSymbol {
+	point := kicadfiles.Point{X: x, Y: y}
+	return schematic.SchematicSymbol{
+		UUID:       kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"),
+		LibraryID:  "Device:R",
+		Reference:  reference,
+		Value:      "1k",
+		Position:   point,
+		PinAnchors: []kicadfiles.Point{point},
+	}
+}
+
+func hasRule(report Report, rule RuleID) bool {
+	return countRule(report, rule) > 0
+}
+
+func countRule(report Report, rule RuleID) int {
+	count := 0
+	for _, finding := range report.Findings {
+		if finding.RuleID == rule {
+			count++
+		}
+	}
+	return count
+}
