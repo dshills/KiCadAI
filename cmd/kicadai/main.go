@@ -64,6 +64,7 @@ Commands:
   generate-project  Generate a direct-file LED indicator KiCad project
   generate      Generate projects from structured requests
   block         List, inspect, and validate built-in circuit blocks
+  fabrication   List, show, and validate fabrication profiles
   component     List, inspect, select, validate, and report component catalog records
   check         Run KiCad CLI ERC/DRC checks
   design        Create AI design workflow projects
@@ -357,6 +358,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runTransaction(opts, stdout)
 	case "export":
 		return runExport(ctx, opts, stdout)
+	case "fabrication":
+		return runFabrication(opts, stdout)
 	case "generate":
 		return runGenerate(opts, stdout)
 	case "block":
@@ -2051,6 +2054,162 @@ func exportCLIPolicy(opts cliOptions) fabrication.CLIPolicy {
 		return fabrication.CLIPolicyOptional
 	}
 	return fabrication.CLIPolicyDisabled
+}
+
+type fabricationProfileListResult struct {
+	Profiles []fabricationProfileSummary `json:"profiles"`
+}
+
+type fabricationProfileSummary struct {
+	ID         string                       `json:"id"`
+	Name       string                       `json:"name"`
+	Version    string                       `json:"version"`
+	Source     fabricationprofiles.Source   `json:"source,omitempty"`
+	Hash       string                       `json:"hash"`
+	Thresholds fabricationProfileThresholds `json:"thresholds"`
+	Issues     []reports.Issue              `json:"issues,omitempty"`
+}
+
+type fabricationProfileShowResult struct {
+	Summary fabricationProfileSummary   `json:"summary"`
+	Profile fabricationprofiles.Profile `json:"profile"`
+}
+
+type fabricationProfileValidateResult struct {
+	Path    string                      `json:"path"`
+	Summary fabricationProfileSummary   `json:"summary"`
+	Profile fabricationprofiles.Profile `json:"profile,omitempty"`
+}
+
+type fabricationProfileThresholds struct {
+	LayerCounts             []int   `json:"layer_counts,omitempty"`
+	MinTraceWidthMM         float64 `json:"min_trace_width_mm,omitempty"`
+	MinSpacingMM            float64 `json:"min_spacing_mm,omitempty"`
+	MinCopperToEdgeMM       float64 `json:"min_copper_to_edge_mm,omitempty"`
+	MinPadAnnularRingMM     float64 `json:"min_pad_annular_ring_mm,omitempty"`
+	MinViaAnnularRingMM     float64 `json:"min_via_annular_ring_mm,omitempty"`
+	MinSolderMaskWebMM      float64 `json:"min_solder_mask_web_mm,omitempty"`
+	RequireCourtyards       bool    `json:"require_courtyards"`
+	RequireFabricationNotes bool    `json:"require_fabrication_notes"`
+	AllowCastellations      bool    `json:"allow_castellations"`
+	RequiresManualReview    bool    `json:"requires_manual_review"`
+}
+
+func runFabrication(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("fabrication requires --format json")
+	}
+	if len(opts.commandArgs) < 2 || opts.commandArgs[0] != "profile" {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "fabrication.profile",
+			Message:  "fabrication requires a profile subcommand: list, show, or validate",
+		}
+		return writeReportFailure(stdout, "fabrication", issue)
+	}
+	switch opts.commandArgs[1] {
+	case "list":
+		if len(opts.commandArgs) != 2 {
+			return writeReportFailure(stdout, "fabrication", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.profile.list", Message: "fabrication profile list does not accept positional arguments"})
+		}
+		registry, issues := fabricationprofiles.LoadRegistry(fabricationprofiles.LoadOptions{ProfileDir: opts.manufacturerProfileDir})
+		data := fabricationProfileListResult{Profiles: profileSummaries(registry)}
+		result := reports.ResultWithIssues("fabrication", data, issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if !result.OK {
+			return errors.New("fabrication profile list reported blocking issues")
+		}
+		return nil
+	case "show":
+		if len(opts.commandArgs) != 3 {
+			return writeReportFailure(stdout, "fabrication", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.profile.show", Message: "fabrication profile show requires exactly one profile ID"})
+		}
+		registry, loadIssues := fabricationprofiles.LoadRegistry(fabricationprofiles.LoadOptions{ProfileDir: opts.manufacturerProfileDir})
+		profile, resolveIssues := registry.Resolve(opts.commandArgs[2])
+		issues := append(loadIssues, resolveIssues...)
+		data := fabricationProfileShowResult{Summary: profileSummary(fabricationprofiles.Summarize(profile), profile), Profile: profile}
+		result := reports.ResultWithIssues("fabrication", data, issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if !result.OK {
+			return errors.New("fabrication profile show reported blocking issues")
+		}
+		return nil
+	case "validate":
+		if len(opts.commandArgs) != 3 {
+			return writeReportFailure(stdout, "fabrication", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.profile.validate", Message: "fabrication profile validate requires exactly one profile JSON path"})
+		}
+		data, issues := validateFabricationProfilePath(opts.commandArgs[2])
+		result := reports.ResultWithIssues("fabrication", data, issues, nil)
+		if err := writeReportJSON(stdout, result); err != nil {
+			return err
+		}
+		if !result.OK {
+			return errors.New("fabrication profile validate reported blocking issues")
+		}
+		return nil
+	default:
+		return writeReportFailure(stdout, "fabrication", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.profile." + opts.commandArgs[1], Message: "unsupported fabrication profile subcommand " + opts.commandArgs[1]})
+	}
+}
+
+func profileSummaries(registry fabricationprofiles.Registry) []fabricationProfileSummary {
+	summaries := registry.List()
+	out := make([]fabricationProfileSummary, 0, len(summaries))
+	for _, summary := range summaries {
+		profile, resolveIssues := registry.Resolve(summary.ID)
+		item := profileSummary(summary, profile)
+		item.Issues = append(item.Issues, resolveIssues...)
+		out = append(out, item)
+	}
+	return out
+}
+
+func profileSummary(summary fabricationprofiles.Summary, profile fabricationprofiles.Profile) fabricationProfileSummary {
+	return fabricationProfileSummary{
+		ID:      summary.ID,
+		Name:    summary.Name,
+		Version: summary.Version,
+		Source:  summary.Source,
+		Hash:    summary.Hash,
+		Thresholds: fabricationProfileThresholds{
+			LayerCounts:             slices.Clone(profile.Stackup.AllowedLayerCounts),
+			MinTraceWidthMM:         profile.Copper.MinTraceWidthMM,
+			MinSpacingMM:            profile.Copper.MinSpacingMM,
+			MinCopperToEdgeMM:       profile.Copper.MinCopperToEdgeMM,
+			MinPadAnnularRingMM:     profile.Drill.MinPadAnnularRingMM,
+			MinViaAnnularRingMM:     profile.Drill.MinViaAnnularRingMM,
+			MinSolderMaskWebMM:      profile.SolderMask.MinSolderMaskWebMM,
+			RequireCourtyards:       profile.Assembly.RequireCourtyards,
+			RequireFabricationNotes: profile.Metadata.RequireFabricationNotes,
+			AllowCastellations:      profile.EdgePlating.AllowCastellations,
+			RequiresManualReview:    profile.EdgePlating.RequiresManualReview,
+		},
+		Issues: summary.Issues,
+	}
+}
+
+func validateFabricationProfilePath(path string) (fabricationProfileValidateResult, []reports.Issue) {
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return fabricationProfileValidateResult{Path: path}, []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.profile.validate", Message: err.Error()}}
+	}
+	data, err := os.ReadFile(absolute)
+	if err != nil {
+		return fabricationProfileValidateResult{Path: filepath.ToSlash(absolute)}, []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "fabrication.profile.validate", Message: err.Error()}}
+	}
+	var profile fabricationprofiles.Profile
+	if err := json.Unmarshal(data, &profile); err != nil {
+		return fabricationProfileValidateResult{Path: filepath.ToSlash(absolute)}, []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "fabrication.profile.validate", Message: "invalid fabrication profile JSON: " + err.Error()}}
+	}
+	profile.Source.Kind = fabricationprofiles.SourceLocal
+	profile.Source.Path = filepath.ToSlash(absolute)
+	summary := fabricationprofiles.Summarize(profile)
+	return fabricationProfileValidateResult{Path: filepath.ToSlash(absolute), Summary: profileSummary(summary, profile), Profile: profile}, summary.Issues
 }
 
 func runPinmap(opts cliOptions, stdout io.Writer) error {

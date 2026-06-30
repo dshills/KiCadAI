@@ -2331,6 +2331,136 @@ func TestParseManufacturerProfileDirFlagAndEnvironment(t *testing.T) {
 	}
 }
 
+func TestRunFabricationProfileListJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"fabrication", "profile", "list"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{
+		`"command": "fabrication"`,
+		`"id": "generic_assembly"`,
+		`"thresholds":`,
+		`"hash":`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunFabricationProfileShowJSON(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"fabrication", "profile", "show", "generic_assembly"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{
+		`"command": "fabrication"`,
+		`"id": "generic_assembly"`,
+		`"profile":`,
+		`"min_pad_annular_ring_mm": 0.15`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunFabricationProfileValidateJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profile.json")
+	writeTestFabricationProfile(t, path, "local_cli_profile", true)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"fabrication", "profile", "validate", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\n%s", err, stdout.String())
+	}
+	for _, want := range []string{
+		`"command": "fabrication"`,
+		`"id": "local_cli_profile"`,
+		`"ok": true`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunFabricationProfileValidateInvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "profile.json")
+	writeTestFabricationProfile(t, path, "bad local id", false)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"fabrication", "profile", "validate", path}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("expected validation error:\n%s", stdout.String())
+	}
+	for _, want := range []string{
+		`"ok": false`,
+		`"path": "fabrication_profile.id"`,
+	} {
+		if !strings.Contains(stdout.String(), want) {
+			t.Fatalf("output missing %q:\n%s", want, stdout.String())
+		}
+	}
+}
+
+func TestRunFabricationProfileRejectsUnknownSubcommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"fabrication", "profile", "delete", "generic_assembly"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatalf("expected unsupported subcommand error:\n%s", stdout.String())
+	}
+	if !strings.Contains(stdout.String(), `"path": "fabrication.profile.delete"`) {
+		t.Fatalf("unexpected output:\n%s", stdout.String())
+	}
+}
+
+func writeTestFabricationProfile(t *testing.T, path string, id string, valid bool) {
+	t.Helper()
+	version := "2026-06"
+	units := "mm"
+	if !valid {
+		version = "bad version"
+		units = "mil"
+	}
+	data := fmt.Sprintf(`{
+  "schema": "kicadai.fabrication.profile.v1",
+  "id": %q,
+  "name": "CLI Test Profile",
+  "version": %q,
+  "units": %q,
+  "stackup": {
+    "min_layers": 2,
+    "max_layers": 2,
+    "allowed_layer_counts": [2],
+    "min_board_thickness_mm": 1.0,
+    "max_board_thickness_mm": 1.6,
+    "default_board_thickness_mm": 1.6
+  },
+  "copper": {
+    "min_trace_width_mm": 0.2,
+    "min_spacing_mm": 0.2
+  },
+  "drill": {
+    "min_drill_mm": 0.35,
+    "min_pad_annular_ring_mm": 0.18
+  },
+  "solder_mask": {
+    "min_solder_mask_web_mm": 0.12
+  }
+}`, id, version, units)
+	if err := os.WriteFile(path, []byte(data), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestRunEvaluateSchematicJSONIncludesElectricalCheck(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "demo.kicad_sch")
 	if err := os.WriteFile(path, []byte(`(kicad_sch (version 20260306) (generator "kicadai"))`), 0o644); err != nil {
