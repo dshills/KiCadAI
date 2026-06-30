@@ -26,12 +26,14 @@ const transactionProvenanceSchema = "kicadai.transaction.provenance.v1"
 const transactionProvenancePath = ".kicadai/transaction.json"
 
 type ApplyOptions struct {
-	OutputDir             string
-	Overwrite             bool
-	Seed                  string
-	AllowImportedMutation bool
-	LibraryIndex          *libraryresolver.LibraryIndex
-	LibraryIssues         []reports.Issue
+	OutputDir                       string
+	Overwrite                       bool
+	Seed                            string
+	AllowImportedMutation           bool
+	SuppressPinmapWarnings          bool
+	SuppressExplicitPinSymbolErrors bool
+	LibraryIndex                    *libraryresolver.LibraryIndex
+	LibraryIssues                   []reports.Issue
 }
 
 type ApplyResult struct {
@@ -58,9 +60,11 @@ type transactionProvenanceSource struct {
 
 func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 	plan := PlanTransactionWithOptions(opts.OutputDir, tx, PlanOptions{
-		LibraryIndex:            opts.LibraryIndex,
-		LibraryIssues:           opts.LibraryIssues,
-		AllowGeneratedOverwrite: generatedOverwriteApply(tx, opts),
+		LibraryIndex:                    opts.LibraryIndex,
+		LibraryIssues:                   opts.LibraryIssues,
+		AllowGeneratedOverwrite:         generatedOverwriteApply(tx, opts),
+		SuppressPinmapWarnings:          opts.SuppressPinmapWarnings,
+		SuppressExplicitPinSymbolErrors: opts.SuppressExplicitPinSymbolErrors,
 	})
 	result = ApplyResult{Plan: plan, Artifacts: []reports.Artifact{}, Issues: append([]reports.Issue{}, plan.Issues...)}
 	// Keep every early return annotated with operation IDs from the plan.

@@ -110,14 +110,18 @@ When asked to review or evaluate an existing KiCad project:
 
 1. Inspect project structure.
 2. Evaluate project-level issues.
-3. Inspect `schematic_electrical` findings from `evaluate project` or
+3. Inspect `preservation` and `imported_preservation` output. Treat
+   preservation-only content as read-only unless a transaction plan marks the
+   requested operation `safe_add` and the user explicitly approves imported
+   apply.
+4. Inspect `schematic_electrical` findings from `evaluate project` or
    `evaluate schematic`; treat error/blocked findings as stop conditions before
    PCB generation or fabrication claims.
-4. Run writer correctness only when the project is generated or intended to
+5. Run writer correctness only when the project is generated or intended to
    match KiCadAI writer expectations.
-5. Run board validation for PCB electrical meaning.
-6. Run KiCad ERC/DRC if available and relevant.
-7. Summarize findings with issue codes, paths, severity, and suggested next
+6. Run board validation for PCB electrical meaning.
+7. Run KiCad ERC/DRC if available and relevant.
+8. Summarize findings with issue codes, paths, severity, and suggested next
    actions.
 
 Commands:
@@ -344,7 +348,9 @@ Stop and report blockers when:
   unrouted required nets, invalid net assignments, or zone problems;
 - request requires unsupported topology, arbitrary GPIO assignment, unknown MCU
   alternate function mapping, or external-clock generation;
-- command output says imported project mutation is blocked.
+- command output says imported project mutation is blocked;
+- transaction planning reports a preservation operation review with
+  `mutability: "unsafe"`.
 
 Do not work around blockers by editing KiCad files manually unless the user
 explicitly asks for low-level writer changes.

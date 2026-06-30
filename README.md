@@ -14,6 +14,12 @@ The direct-file workflow is the main functional path today. KiCadAI can generate
 
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 
+Imported project review is now read-only by default and includes structured
+preservation evidence. `inspect` and `evaluate` report preservation-only KiCad
+content, transaction planning returns operation-level preservation reviews, and
+`transaction apply` blocks existing-project writes unless `--allow-imported-apply`
+is explicitly supplied after reviewing the plan.
+
 Generated schematic workflows now emit schematic readability and electrical-rule
 evidence. The foundation includes deterministic role/stage/lane classification,
 conservative component placement rules, orthogonal schematic routing, label
@@ -127,6 +133,13 @@ kicadai inspect project ./examples/07_generated_pcb
 kicadai evaluate project ./examples/07_generated_pcb
 kicadai writer check ./examples/07_generated_pcb
 kicadai validate board ./examples/07_generated_pcb
+```
+
+Plan imported-project edits before applying them:
+
+```sh
+kicadai transaction plan ./project ./tx.json
+kicadai --allow-imported-apply transaction apply ./project ./tx.json
 ```
 
 Use component intelligence:

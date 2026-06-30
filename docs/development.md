@@ -250,7 +250,10 @@ make test
 - `draw-led-demo --execute` blocked by capabilities: expected when schematic
   write commands are unavailable in the generated API.
 - `transaction apply` blocked by preservation conflict: the imported file
-  contains KiCad constructs the writer does not model safely yet.
+  contains KiCad constructs the writer does not model safely yet, or the target
+  is an existing imported project and `--allow-imported-apply` was not supplied.
+  Always run `transaction plan` first and inspect `data.preservation` before
+  opting into imported writes.
 - `transaction validate --feedback` returns a nonzero exit for invalid example
   transactions by design. Inspect `data.feedback.operations[]` and
   `issues[].operation_id` to identify the operation to edit.

@@ -330,6 +330,17 @@ kicadai transaction plan ./out/project ./tx.json
 kicadai --overwrite transaction apply ./out/project ./tx.json
 ```
 
+Existing KiCad projects are treated as imported targets. `transaction plan`
+adds a `preservation` report with file ownership, preservation-only content,
+and per-operation reviews. Reviews classify operations as `safe_add`,
+`plan_only`, or `unsafe`; unsafe reviews carry operation-scoped issues.
+`transaction apply` refuses imported-project writes by default. After reviewing
+the plan and preservation report, explicitly opt in with:
+
+```sh
+kicadai --allow-imported-apply transaction apply ./project ./tx.json
+```
+
 For AI repair loops, add `--feedback` to validation or planning. The command
 keeps the raw issue list and also returns a grouped `feedback` object keyed by
 stable operation IDs.
@@ -412,7 +423,8 @@ assigning footprints, placing or moving footprints, adding simple routes and
 zones, and writing the project. It blocks unsupported raw content, unsafe
 removals, arbitrary hierarchy refactors, and operations that could damage
 unknown KiCad constructs. Imported writes use a project lock, atomic file
-replacement, permission preservation, and fsync before rename.
+replacement, permission preservation, fsync before rename, and post-write
+readback validation.
 
 
 ### Round-Trip Validation

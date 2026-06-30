@@ -630,21 +630,27 @@ Allow safe AI review and eventually safe edits of user-authored KiCad projects.
 ### Current Foundation
 
 Readers preserve many known structures, unsupported content is detected, and
-repair apply blocks imported or preservation-only targets.
+inspection/evaluation now expose structured preservation reports. Transaction
+planning adds operation-level preservation reviews for imported targets, default
+imported apply is fail-closed, and explicit imported apply uses locking, atomic
+writes, and post-write readback validation. Fixture coverage exercises clean,
+schematic-preserved, and PCB-preserved imported projects.
 
 ### Remaining Work
 
 - Preserve unknown schematic and PCB nodes across read/write.
 - Preserve ordering-sensitive sections and user-authored local libraries.
-- Track ownership of generated vs user-authored objects.
-- Add safe edit transactions for imported projects with explicit scope.
+- Expand ownership tracking beyond file/object summaries into individual
+  schematic and PCB elements.
+- Broaden safe edit transactions beyond isolated add/write cases.
 - Add conflict reports when requested edits touch unsupported objects.
+- Preserve more ordering-sensitive local library and project-table content.
 
 ### Acceptance Gates
 
 - AI can evaluate imported projects without changing files.
 - Any imported-project write is blocked unless ownership and preservation are
-  proven.
+  proven and explicit imported apply approval is supplied.
 - Round-trip diffs are acceptable or explicitly allowlisted.
 
 ## Priority 8: Fabrication Readiness

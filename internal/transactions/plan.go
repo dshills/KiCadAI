@@ -33,10 +33,12 @@ type PlannedOperation struct {
 }
 
 type PlanOptions struct {
-	LibraryIndex             *libraryresolver.LibraryIndex `json:"-"`
-	LibraryIssues            []reports.Issue               `json:"-"`
-	RequireLibraryValidation bool                          `json:"-"`
-	AllowGeneratedOverwrite  bool                          `json:"-"`
+	LibraryIndex                    *libraryresolver.LibraryIndex `json:"-"`
+	LibraryIssues                   []reports.Issue               `json:"-"`
+	RequireLibraryValidation        bool                          `json:"-"`
+	AllowGeneratedOverwrite         bool                          `json:"-"`
+	SuppressPinmapWarnings          bool                          `json:"-"`
+	SuppressExplicitPinSymbolErrors bool                          `json:"-"`
 }
 
 func PlanTransaction(target string, tx Transaction) Plan {
@@ -97,7 +99,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 			plan.Issues = append(plan.Issues, existingProjectIssues(*existing, existingSymbolRefs, op, addedRefs, addedSymbolKeys)...)
 		}
 		if opts.LibraryIndex != nil {
-			plan.Issues = append(plan.Issues, transactionLibraryIssues(*opts.LibraryIndex, op)...)
+			plan.Issues = append(plan.Issues, transactionLibraryIssues(*opts.LibraryIndex, op, opts)...)
 			enrichPlannedOperationWithLibrary(*opts.LibraryIndex, &planned, op)
 		}
 		if !planned.Supported {
@@ -124,7 +126,7 @@ func PlanTransactionWithOptions(target string, tx Transaction, opts PlanOptions)
 	return plan
 }
 
-func transactionLibraryIssues(index libraryresolver.LibraryIndex, op Operation) []reports.Issue {
+func transactionLibraryIssues(index libraryresolver.LibraryIndex, op Operation, opts PlanOptions) []reports.Issue {
 	switch op.Op {
 	case OpAddSymbol:
 		var payload AddSymbolOperation
@@ -132,6 +134,9 @@ func transactionLibraryIssues(index libraryresolver.LibraryIndex, op Operation) 
 			return nil
 		}
 		if _, ok := libraryresolver.ResolveSymbol(index, payload.LibraryID); !ok {
+			if len(payload.Pins) > 0 && opts.SuppressExplicitPinSymbolErrors {
+				return nil
+			}
 			return []reports.Issue{missingTransactionLibraryIssue(op.Index, "library_id", "symbol library record not found: "+payload.LibraryID)}
 		}
 	case OpAssignFootprint:
@@ -153,6 +158,9 @@ func transactionLibraryIssues(index libraryresolver.LibraryIndex, op Operation) 
 	case OpConnect:
 		var payload ConnectOperation
 		if decodeRaw(op, &payload) != nil {
+			return nil
+		}
+		if opts.SuppressPinmapWarnings {
 			return nil
 		}
 		return []reports.Issue{{

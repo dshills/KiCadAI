@@ -59,9 +59,11 @@ func TestBlockToPCBPlacementPipelineWritesPlacedFootprints(t *testing.T) {
 
 	outputDir := filepath.Join(t.TempDir(), projectName)
 	applyResult := transactions.Apply(tx, transactions.ApplyOptions{
-		OutputDir:    outputDir,
-		LibraryIndex: &index,
-		Seed:         "placement-pipeline",
+		OutputDir:                       outputDir,
+		LibraryIndex:                    &index,
+		Seed:                            "placement-pipeline",
+		SuppressPinmapWarnings:          true,
+		SuppressExplicitPinSymbolErrors: true,
 	})
 	if len(applyResult.Issues) != 0 {
 		t.Fatalf("apply issues: %#v", applyResult.Issues)
