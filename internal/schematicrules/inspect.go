@@ -14,22 +14,28 @@ import (
 // block or component catalog context.
 func Inspect(file schematic.SchematicFile, opts Options) Report {
 	wireIndex := newWireSegmentIndex(file.Wires)
+	pinAnchors, pinAnchorCounts := symbolPinAnchorMetadata(file)
 	inspector := fileInspector{
 		file:                file,
 		opts:                opts,
-		pinAnchors:          symbolPinAnchorSet(file),
-		anchorCounts:        schematicAnchorCounts(file, wireIndex),
+		pinAnchors:          pinAnchors,
+		pinAnchorCounts:     pinAnchorCounts,
+		noConnectCounts:     noConnectPositionCounts(file),
+		pinConnectionCounts: pinConnectionCounts(file, wireIndex, pinAnchors),
 		labelAnchorCounts:   labelAnchorCounts(file, wireIndex),
 		connectedComponents: wireConnectedComponents(file, wireIndex),
 		pointLabels:         map[kicadfiles.Point][]indexedLabel{},
+		acceptedExternal:    acceptedExternalRailSet(opts),
 	}
 	inspector.inspectReferences()
 	inspector.inspectLabels()
 	inspector.inspectNoConnects()
+	inspector.inspectPinIntents()
 	report := Report{
-		CheckedSymbols: len(file.Symbols),
-		CheckedNets:    len(inspector.connectedComponents),
-		Findings:       inspector.findings,
+		CheckedSymbols:      len(file.Symbols),
+		CheckedNets:         len(inspector.connectedComponents),
+		CheckedRequiredPins: countRequiredPinIntents(opts.PinIntents),
+		Findings:            inspector.findings,
 	}
 	return NewReport(report)
 }
@@ -38,10 +44,13 @@ type fileInspector struct {
 	file                schematic.SchematicFile
 	opts                Options
 	pinAnchors          map[kicadfiles.Point]struct{}
-	anchorCounts        map[kicadfiles.Point]int
+	pinAnchorCounts     map[kicadfiles.Point]int
+	noConnectCounts     map[kicadfiles.Point]int
+	pinConnectionCounts map[kicadfiles.Point]int
 	labelAnchorCounts   map[kicadfiles.Point]int
 	pointLabels         map[kicadfiles.Point][]indexedLabel
 	connectedComponents [][]kicadfiles.Point
+	acceptedExternal    map[string]struct{}
 	findings            []Finding
 }
 
@@ -90,7 +99,7 @@ func (inspector *fileInspector) inspectReferences() {
 }
 
 func (inspector *fileInspector) inspectLabels() {
-	for index, label := range inspector.file.Labels {
+	for index, label := range allSchematicLabels(inspector.file) {
 		text := strings.TrimSpace(label.Text)
 		path := "labels[" + strconv.Itoa(index) + "]"
 		if text == "" {
@@ -122,7 +131,7 @@ func (inspector *fileInspector) inspectLabels() {
 
 func (inspector *fileInspector) inspectLabelNormalizationCollisions() {
 	byNormalized := map[string]map[string][]string{}
-	for index, label := range inspector.file.Labels {
+	for index, label := range allSchematicLabels(inspector.file) {
 		raw := strings.TrimSpace(label.Text)
 		if raw == "" {
 			continue
@@ -214,9 +223,9 @@ func (inspector *fileInspector) inspectNoConnects() {
 			})
 			continue
 		}
-		if inspector.anchorCounts[noConnect.Position] > 2 {
+		if inspector.pinConnected(noConnect.Position) {
 			inspector.add(Finding{
-				RuleID:   RulePinNoConnectOnRequired,
+				RuleID:   RulePinNoConnectViolated,
 				Severity: reports.SeverityError,
 				Category: CategoryPin,
 				Path:     path,
@@ -227,8 +236,156 @@ func (inspector *fileInspector) inspectNoConnects() {
 	}
 }
 
+func (inspector *fileInspector) inspectPinIntents() {
+	if len(inspector.opts.PinIntents) == 0 {
+		if inspector.opts.RequireConfidence && len(inspector.file.Symbols) > 0 {
+			inspector.add(Finding{
+				RuleID:   RulePinMetadataMissing,
+				Severity: reports.SeverityBlocked,
+				Category: CategoryPin,
+				Message:  "schematic pin intent metadata is required but missing",
+				Repair:   "provide block or resolver pin intent before claiming schematic electrical confidence",
+			})
+		}
+		return
+	}
+	for index, intent := range inspector.opts.PinIntents {
+		path := "pin_intents[" + strconv.Itoa(index) + "]"
+		point := pointFromIntent(intent.Position)
+		if _, ok := inspector.pinAnchors[point]; !ok {
+			inspector.add(Finding{
+				RuleID:    RulePinMetadataMissing,
+				Severity:  metadataMissingSeverity(inspector.opts),
+				Category:  CategoryPin,
+				Path:      path + ".position",
+				Reference: strings.TrimSpace(intent.Reference),
+				Pin:       strings.TrimSpace(intent.Pin),
+				Net:       strings.TrimSpace(intent.Net),
+				Message:   "pin intent does not match a known schematic symbol pin anchor",
+				Repair:    "derive pin intent from resolver-backed symbol metadata or update the generated pin anchor",
+			})
+			continue
+		}
+		hasNoConnect := inspector.noConnectCounts[point] > 0
+		connected := inspector.pinConnected(point)
+		switch intent.Kind {
+		case PinIntentRequired:
+			if hasNoConnect {
+				inspector.add(pinIntentFinding(RulePinNoConnectOnRequired, reports.SeverityError, path, intent, "required pin has an explicit no-connect marker", "remove the no-connect marker or change the pin intent if it is truly unused"))
+			} else if !connected {
+				inspector.add(pinIntentFinding(RulePinRequiredOpen, reports.SeverityBlocked, path, intent, "required pin is not connected", "connect the required pin to its intended net or represent it as an accepted external port"))
+			}
+		case PinIntentOptional:
+			if !connected && !hasNoConnect {
+				inspector.add(pinIntentFinding(RulePinOptionalOpen, reports.SeverityWarning, path, intent, "optional pin is open without no-connect evidence", "add a no-connect marker or document why this optional pin may float"))
+			}
+		case PinIntentNoConnect:
+			if connected {
+				inspector.add(pinIntentFinding(RulePinNoConnectViolated, reports.SeverityError, path, intent, "pin intended as no-connect is connected", "remove the connection or change the pin intent"))
+			}
+			if !hasNoConnect {
+				inspector.add(pinIntentFinding(RulePinNoConnectMissing, reports.SeverityError, path, intent, "pin intended as no-connect lacks a no-connect marker", "place a no-connect marker on the intentionally unused pin"))
+			}
+		case PinIntentExternal:
+			if !connected && !intent.AcceptedExternal && !inspector.externalNetAccepted(intent.Net) {
+				inspector.add(pinIntentFinding(RulePinRequiredOpen, reports.SeverityBlocked, path, intent, "external pin is open without accepted external policy", "attach the external pin to a connector, label, sheet pin, or explicit external-driver policy"))
+			}
+		default:
+			inspector.add(pinIntentFinding(RulePinMetadataMissing, metadataMissingSeverity(inspector.opts), path, intent, "pin intent kind is unknown", "use required, optional, external, or no_connect pin intent"))
+		}
+	}
+}
+
+func (inspector *fileInspector) pinConnected(point kicadfiles.Point) bool {
+	return inspector.pinConnectionCounts[point] > 0 || inspector.pinAnchorCounts[point] > 1
+}
+
+func pinIntentFinding(rule RuleID, severity reports.Severity, path string, intent PinIntent, message string, repair string) Finding {
+	return Finding{
+		RuleID:    rule,
+		Severity:  severity,
+		Category:  CategoryPin,
+		Path:      path,
+		Reference: strings.TrimSpace(intent.Reference),
+		Pin:       strings.TrimSpace(intent.Pin),
+		Net:       strings.TrimSpace(intent.Net),
+		Message:   message,
+		Repair:    repair,
+	}
+}
+
+func metadataMissingSeverity(opts Options) reports.Severity {
+	if opts.RequireConfidence || acceptanceRequiresConfidence(opts.Acceptance) {
+		return reports.SeverityBlocked
+	}
+	return reports.SeverityWarning
+}
+
+func acceptanceRequiresConfidence(acceptance Acceptance) bool {
+	switch acceptance {
+	case AcceptanceERCDRC, AcceptanceFabricationCandidate:
+		return true
+	default:
+		return false
+	}
+}
+
+func (inspector *fileInspector) externalNetAccepted(net string) bool {
+	net = normalizeLabelText(net)
+	if net == "" {
+		return false
+	}
+	_, ok := inspector.acceptedExternal[net]
+	return ok
+}
+
+func acceptedExternalRailSet(opts Options) map[string]struct{} {
+	accepted := map[string]struct{}{}
+	for _, rail := range opts.AcceptedExternalRails {
+		normalized := normalizeLabelText(rail)
+		if normalized != "" {
+			accepted[normalized] = struct{}{}
+		}
+	}
+	return accepted
+}
+
+func noConnectPositionCounts(file schematic.SchematicFile) map[kicadfiles.Point]int {
+	positions := map[kicadfiles.Point]int{}
+	for _, noConnect := range file.NoConnects {
+		positions[noConnect.Position]++
+	}
+	return positions
+}
+
+func pointFromIntent(point Point) kicadfiles.Point {
+	return kicadfiles.Point{X: iuFromIntentCoordinate(point.X), Y: iuFromIntentCoordinate(point.Y)}
+}
+
+func iuFromIntentCoordinate(value int64) kicadfiles.IU {
+	// kicadfiles.IU is int64 in this repository; keep the conversion in one
+	// place so any future IU representation change has a single audit point.
+	return kicadfiles.IU(value)
+}
+
+func countRequiredPinIntents(intents []PinIntent) int {
+	count := 0
+	for _, intent := range intents {
+		if intent.Kind == PinIntentRequired || intent.Kind == PinIntentExternal {
+			count++
+		}
+	}
+	return count
+}
+
 func normalizeLabelText(text string) string {
 	return strings.ToLower(strings.Join(strings.Fields(text), " "))
+}
+
+func allSchematicLabels(file schematic.SchematicFile) []schematic.Label {
+	// The schematic model stores local, global, hierarchical, and directive
+	// labels in one slice. The KiCad label node is represented by Label.Kind.
+	return file.Labels
 }
 
 func (inspector *fileInspector) add(finding Finding) {
@@ -243,85 +400,45 @@ func isUnannotatedReference(reference string) bool {
 	return strings.HasSuffix(reference, "?")
 }
 
-func symbolPinAnchorSet(file schematic.SchematicFile) map[kicadfiles.Point]struct{} {
+func symbolPinAnchorMetadata(file schematic.SchematicFile) (map[kicadfiles.Point]struct{}, map[kicadfiles.Point]int) {
 	anchors := map[kicadfiles.Point]struct{}{}
+	counts := map[kicadfiles.Point]int{}
 	for _, symbol := range file.Symbols {
 		for _, point := range symbol.PinAnchors {
 			anchors[point] = struct{}{}
+			counts[point]++
 		}
 	}
-	return anchors
+	return anchors, counts
 }
 
-func schematicAnchorCounts(file schematic.SchematicFile, wireIndex wireSegmentIndex) map[kicadfiles.Point]int {
-	anchors := map[kicadfiles.Point]int{}
-	seen := map[kicadfiles.Point]struct{}{}
-	wireVertices := map[kicadfiles.Point]struct{}{}
-	addUniqueWirePoints := func(points []kicadfiles.Point) {
-		clear(seen)
-		for _, point := range points {
-			seen[point] = struct{}{}
-		}
-		for point := range seen {
-			anchors[point]++
-			wireVertices[point] = struct{}{}
-		}
-	}
-	for _, wire := range file.Wires {
-		addUniqueWirePoints(wire.Points)
-	}
-	for _, label := range file.Labels {
-		anchors[label.Position]++
-	}
-	for _, junction := range file.Junctions {
-		anchors[junction.Position]++
+func pinConnectionCounts(file schematic.SchematicFile, wireIndex wireSegmentIndex, pinAnchors map[kicadfiles.Point]struct{}) map[kicadfiles.Point]int {
+	counts := map[kicadfiles.Point]int{}
+	candidatePins := map[kicadfiles.Point]struct{}{}
+	for point := range pinAnchors {
+		candidatePins[point] = struct{}{}
 	}
 	for _, noConnect := range file.NoConnects {
-		anchors[noConnect.Position]++
+		candidatePins[noConnect.Position] = struct{}{}
 	}
-	for _, symbol := range file.Symbols {
-		for _, point := range symbol.PinAnchors {
-			anchors[point]++
-		}
-	}
-	for _, sheet := range file.Sheets {
-		for _, pin := range sheet.Pins {
-			anchors[pin.Position]++
-		}
-	}
-	for point := range schematicNonWireAnchorPoints(file) {
-		if _, ok := wireVertices[point]; ok {
-			continue
-		}
+	for point := range candidatePins {
 		if wireIndex.contains(point) {
-			anchors[point]++
+			counts[point]++
 		}
 	}
-	return anchors
-}
-
-func schematicNonWireAnchorPoints(file schematic.SchematicFile) map[kicadfiles.Point]struct{} {
-	points := map[kicadfiles.Point]struct{}{}
-	for _, label := range file.Labels {
-		points[label.Position] = struct{}{}
-	}
-	for _, junction := range file.Junctions {
-		points[junction.Position] = struct{}{}
-	}
-	for _, noConnect := range file.NoConnects {
-		points[noConnect.Position] = struct{}{}
-	}
-	for _, symbol := range file.Symbols {
-		for _, point := range symbol.PinAnchors {
-			points[point] = struct{}{}
+	for _, label := range allSchematicLabels(file) {
+		if _, ok := candidatePins[label.Position]; ok {
+			counts[label.Position]++
 		}
 	}
 	for _, sheet := range file.Sheets {
 		for _, pin := range sheet.Pins {
-			points[pin.Position] = struct{}{}
+			if _, ok := candidatePins[pin.Position]; ok {
+				counts[pin.Position]++
+			}
 		}
 	}
-	return points
+	return counts
 }
 
 func labelAnchorCounts(file schematic.SchematicFile, wireIndex wireSegmentIndex) map[kicadfiles.Point]int {
@@ -346,7 +463,7 @@ func labelAnchorCounts(file schematic.SchematicFile, wireIndex wireSegmentIndex)
 			anchors[pin.Position]++
 		}
 	}
-	for _, label := range file.Labels {
+	for _, label := range allSchematicLabels(file) {
 		if wireIndex.contains(label.Position) {
 			anchors[label.Position]++
 		}
@@ -379,7 +496,7 @@ func wireConnectedComponents(file schematic.SchematicFile, wireIndex wireSegment
 			parent[rb] = ra
 		}
 	}
-	for _, label := range file.Labels {
+	for _, label := range allSchematicLabels(file) {
 		find(label.Position)
 	}
 	for _, junction := range file.Junctions {

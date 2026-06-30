@@ -62,6 +62,7 @@ const (
 	RulePinRequiredOpen             RuleID = "SCH_PIN_REQUIRED_OPEN"
 	RulePinOptionalOpen             RuleID = "SCH_PIN_OPTIONAL_OPEN"
 	RulePinNoConnectMissing         RuleID = "SCH_PIN_NC_MISSING"
+	RulePinNoConnectViolated        RuleID = "SCH_PIN_NC_VIOLATED"
 	RulePinNoConnectOnRequired      RuleID = "SCH_PIN_NC_ON_REQUIRED"
 	RulePinMetadataMissing          RuleID = "SCH_PIN_METADATA_MISSING"
 	RuleLabelFloating               RuleID = "SCH_LABEL_FLOATING"
@@ -86,10 +87,37 @@ const (
 
 // Options configures schematic electrical rule evaluation.
 type Options struct {
-	Acceptance            Acceptance `json:"acceptance,omitempty"`
-	Scope                 Scope      `json:"scope,omitempty"`
-	RequireConfidence     bool       `json:"require_confidence,omitempty"`
-	AcceptedExternalRails []string   `json:"accepted_external_rails,omitempty"`
+	Acceptance            Acceptance  `json:"acceptance,omitempty"`
+	Scope                 Scope       `json:"scope,omitempty"`
+	RequireConfidence     bool        `json:"require_confidence,omitempty"`
+	AcceptedExternalRails []string    `json:"accepted_external_rails,omitempty"`
+	PinIntents            []PinIntent `json:"pin_intents,omitempty"`
+}
+
+// PinIntentKind describes expected electrical treatment for a known symbol pin.
+type PinIntentKind string
+
+const (
+	PinIntentRequired  PinIntentKind = "required"
+	PinIntentOptional  PinIntentKind = "optional"
+	PinIntentExternal  PinIntentKind = "external"
+	PinIntentNoConnect PinIntentKind = "no_connect"
+)
+
+// PinIntent provides block or workflow pin policy to the schematic rule engine.
+type PinIntent struct {
+	Reference        string        `json:"reference,omitempty"`
+	Pin              string        `json:"pin,omitempty"`
+	Net              string        `json:"net,omitempty"`
+	Position         Point         `json:"position"`
+	Kind             PinIntentKind `json:"kind"`
+	AcceptedExternal bool          `json:"accepted_external,omitempty"`
+}
+
+// Point is a JSON-stable schematic coordinate in KiCad internal units.
+type Point struct {
+	X int64 `json:"x"`
+	Y int64 `json:"y"`
 }
 
 // Finding is one schematic electrical rule result.

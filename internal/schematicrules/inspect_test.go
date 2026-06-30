@@ -66,6 +66,22 @@ func TestInspectDetectsFloatingAndEmptyLabels(t *testing.T) {
 	}
 }
 
+func TestInspectHandlesNonLocalLabelKindsFromFlattenedLabels(t *testing.T) {
+	file := ruleTestSchematic()
+	point := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Text:     "GLOBAL_NET",
+		Kind:     schematic.LabelGlobal,
+		Position: point,
+	}}
+
+	report := Inspect(file, Options{})
+	if !hasRule(report, RuleLabelFloating) {
+		t.Fatalf("global label kind in flattened label list should be inspected: %#v", report.Findings)
+	}
+}
+
 func TestInspectTreatsJunctionOnlyLabelAsFloating(t *testing.T) {
 	file := ruleTestSchematic()
 	point := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
@@ -227,7 +243,7 @@ func TestInspectDetectsNoConnectOnConnectedPin(t *testing.T) {
 	}}
 
 	report := Inspect(file, Options{})
-	if !hasRule(report, RulePinNoConnectOnRequired) {
+	if !hasRule(report, RulePinNoConnectViolated) {
 		t.Fatalf("report missing connected no-connect finding: %#v", report.Findings)
 	}
 }
@@ -245,8 +261,114 @@ func TestInspectDetectsNoConnectOnPinConnectedByWireSegment(t *testing.T) {
 	}}
 
 	report := Inspect(file, Options{})
-	if !hasRule(report, RulePinNoConnectOnRequired) {
+	if !hasRule(report, RulePinNoConnectViolated) {
 		t.Fatalf("report missing wire-segment connected no-connect finding: %#v", report.Findings)
+	}
+}
+
+func TestInspectPinIntentsDetectRequiredPinOpen(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+
+	report := Inspect(file, Options{PinIntents: []PinIntent{ruleTestPinIntent("U1", "1", anchor, PinIntentRequired)}})
+	if !hasRule(report, RulePinRequiredOpen) || report.CheckedRequiredPins != 1 {
+		t.Fatalf("report missing required pin finding/count: %#v", report)
+	}
+}
+
+func TestInspectPinIntentsAcceptRequiredPinConnectedByLabel(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+	file.Labels = []schematic.Label{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Text:     "VCC",
+		Kind:     schematic.LabelLocal,
+		Position: anchor,
+	}}
+
+	report := Inspect(file, Options{PinIntents: []PinIntent{ruleTestPinIntent("U1", "1", anchor, PinIntentRequired)}})
+	if hasRule(report, RulePinRequiredOpen) {
+		t.Fatalf("connected required pin should pass: %#v", report.Findings)
+	}
+}
+
+func TestInspectPinIntentsOptionalOpenWarns(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+
+	report := Inspect(file, Options{PinIntents: []PinIntent{ruleTestPinIntent("U1", "2", anchor, PinIntentOptional)}})
+	if !hasRule(report, RulePinOptionalOpen) {
+		t.Fatalf("report missing optional open finding: %#v", report.Findings)
+	}
+}
+
+func TestInspectPinIntentsNoConnectPassesWithMarker(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+	file.NoConnects = []schematic.NoConnect{{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Position: anchor}}
+
+	report := Inspect(file, Options{PinIntents: []PinIntent{ruleTestPinIntent("U1", "3", anchor, PinIntentNoConnect)}})
+	if hasRule(report, RulePinNoConnectMissing) {
+		t.Fatalf("no-connect intent with marker should pass: %#v", report.Findings)
+	}
+}
+
+func TestInspectPinIntentsNoConnectFailsWhenConnected(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+	file.NoConnects = []schematic.NoConnect{{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Position: anchor}}
+	file.Labels = []schematic.Label{{UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"), Text: "NET", Kind: schematic.LabelLocal, Position: anchor}}
+
+	report := Inspect(file, Options{PinIntents: []PinIntent{ruleTestPinIntent("U1", "3", anchor, PinIntentNoConnect)}})
+	if !hasRule(report, RulePinNoConnectViolated) {
+		t.Fatalf("connected no-connect intent should fail: %#v", report.Findings)
+	}
+}
+
+func TestInspectPinIntentsRequiredNoConnectBlocks(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", anchor.X, anchor.Y)}
+	file.NoConnects = []schematic.NoConnect{{UUID: kicadfiles.UUID("11111111-1111-4111-8111-111111111111"), Position: anchor}}
+
+	report := Inspect(file, Options{PinIntents: []PinIntent{ruleTestPinIntent("U1", "1", anchor, PinIntentRequired)}})
+	if !hasRule(report, RulePinNoConnectOnRequired) {
+		t.Fatalf("required pin with no-connect should block: %#v", report.Findings)
+	}
+}
+
+func TestInspectPinIntentsExternalAcceptedPasses(t *testing.T) {
+	file := ruleTestSchematic()
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("J1", anchor.X, anchor.Y)}
+	intent := ruleTestPinIntent("J1", "1", anchor, PinIntentExternal)
+	intent.Net = "VIN"
+
+	report := Inspect(file, Options{AcceptedExternalRails: []string{"vin"}, PinIntents: []PinIntent{intent}})
+	if hasRule(report, RulePinRequiredOpen) || report.CheckedRequiredPins != 1 {
+		t.Fatalf("accepted external pin should pass and count as required: %#v", report)
+	}
+}
+
+func TestInspectPinIntentsMissingMetadataBlocksWhenRequired(t *testing.T) {
+	file := ruleTestSchematic()
+	file.Symbols = []schematic.SchematicSymbol{ruleTestSymbol("U1", kicadfiles.MM(10), kicadfiles.MM(10))}
+
+	report := Inspect(file, Options{RequireConfidence: true})
+	if !hasRule(report, RulePinMetadataMissing) || report.Status != StatusBlocked {
+		t.Fatalf("report missing metadata blocker: %#v", report)
+	}
+}
+
+func TestIntentCoordinateConversionPreservesInternalUnits(t *testing.T) {
+	value := int64(kicadfiles.MM(123.456))
+	if got := int64(iuFromIntentCoordinate(value)); got != value {
+		t.Fatalf("IU conversion = %d, want %d", got, value)
 	}
 }
 
@@ -269,6 +391,15 @@ func ruleTestSymbol(reference string, x kicadfiles.IU, y kicadfiles.IU) schemati
 		Value:      "1k",
 		Position:   point,
 		PinAnchors: []kicadfiles.Point{point},
+	}
+}
+
+func ruleTestPinIntent(reference string, pin string, point kicadfiles.Point, kind PinIntentKind) PinIntent {
+	return PinIntent{
+		Reference: reference,
+		Pin:       pin,
+		Position:  Point{X: int64(point.X), Y: int64(point.Y)},
+		Kind:      kind,
 	}
 }
 
