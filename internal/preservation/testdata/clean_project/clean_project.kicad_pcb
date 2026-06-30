@@ -1,0 +1,8 @@
+(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (paper "A4")
+  (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user))
+  (setup)
+  (gr_line (start 0 0) (end 10 0) (layer "Edge.Cuts") (uuid "22222222-2222-5222-8222-222222222222"))
+)

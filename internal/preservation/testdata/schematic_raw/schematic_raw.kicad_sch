@@ -1,0 +1,7 @@
+(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (uuid "33333333-3333-5333-8333-333333333333")
+  (paper A4)
+  (rule_area (name "Preserved") (uuid "44444444-4444-5444-8444-444444444444"))
+)
