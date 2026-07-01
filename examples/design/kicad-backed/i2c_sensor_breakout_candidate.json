@@ -36,10 +36,12 @@
     {"from": "sensor.SDA", "to": "io.SDA", "net_alias": "SDA"},
     {"from": "sensor.SCL", "to": "io.SCL", "net_alias": "SCL"}
   ],
+  "routing_retry": {
+    "enabled": true
+  },
   "validation": {
     "acceptance": "erc-drc",
     "require_erc": true,
-    "require_drc": true,
-    "skip_routing": true
+    "require_drc": true
   }
 }

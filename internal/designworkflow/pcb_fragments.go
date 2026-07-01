@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/reports"
@@ -51,6 +52,8 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 	}
 	request := NormalizeRequest(plan.Request)
 	columns := fragmentColumnCount(request)
+	aliasMaps, aliasIssues := fragmentNetAliasMaps(request)
+	issues = append(issues, aliasIssues...)
 	fragments := make([]BlockFragment, 0, len(request.Blocks))
 	for index, instance := range request.Blocks {
 		if err := ctx.Err(); err != nil {
@@ -69,8 +72,10 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		}
 		originX, originY := fragmentOrigin(index, columns)
 		realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{OriginXMM: originX, OriginYMM: originY})
+		applyFragmentNetAliases(aliasMaps[aliasInstanceKey(instance.ID)], &realization)
 		realizationPath := fmt.Sprintf("blocks[%d].pcb_realization", index)
-		realizationIssues := append(cloneIssues(realization.Issues), timingEvidenceIssues(realization)...)
+		realizationIssues := cloneIssues(realization.Issues)
+		realizationIssues = append(realizationIssues, timingEvidenceIssues(realization)...)
 		issues = append(issues, prefixIssues(realizationPath, realizationIssues)...)
 		fragment := BlockFragment{
 			InstanceID:    instance.ID,
@@ -98,6 +103,126 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		"timing_results":  timingCount,
 	}
 	return PCBFragmentResult{Fragments: fragments, Stage: stage}
+}
+
+func applyFragmentNetAliases(aliases map[string]string, realization *blocks.BlockPCBRealizationResult) {
+	if realization == nil {
+		return
+	}
+	for index := range realization.LocalRoutes {
+		netName := strings.TrimSpace(realization.LocalRoutes[index].NetName)
+		if alias := aliases[netName]; alias != "" {
+			realization.LocalRoutes[index].NetName = alias
+		}
+	}
+	for index := range realization.EntryAnchors {
+		netName := strings.TrimSpace(realization.EntryAnchors[index].NetName)
+		if alias := aliases[netName]; alias != "" {
+			realization.EntryAnchors[index].NetName = alias
+		}
+	}
+}
+
+func fragmentNetAliases(instanceID string, request Request) (map[string]string, []reports.Issue) {
+	aliasMaps, issues := fragmentNetAliasMaps(request)
+	aliases := aliasMaps[aliasInstanceKey(instanceID)]
+	if len(aliases) == 0 {
+		return nil, issues
+	}
+	return aliases, issues
+}
+
+func fragmentNetAliasMaps(request Request) (map[string]map[string]string, []reports.Issue) {
+	aliasMaps := map[string]map[string]string{}
+	var issues []reports.Issue
+	for index, connection := range request.Connections {
+		from, fromOK := ParseEndpoint(connection.From)
+		to, toOK := ParseEndpoint(connection.To)
+		if !fromOK {
+			issues = append(issues, invalidConnectionEndpointIssue(index, "from", connection.From))
+		}
+		if !toOK {
+			issues = append(issues, invalidConnectionEndpointIssue(index, "to", connection.To))
+		}
+		if !fromOK || !toOK {
+			continue
+		}
+		netName := canonicalInterBlockNetName(connection, from, to)
+		fromAliases := aliasesForInstance(aliasMaps, from.InstanceID)
+		issues = append(issues, addFragmentPortNetAliases(fromAliases, from.InstanceID, from.Port, netName)...)
+		toAliases := aliasesForInstance(aliasMaps, to.InstanceID)
+		issues = append(issues, addFragmentPortNetAliases(toAliases, to.InstanceID, to.Port, netName)...)
+	}
+	return aliasMaps, issues
+}
+
+func aliasesForInstance(aliasMaps map[string]map[string]string, instanceID string) map[string]string {
+	key := aliasInstanceKey(instanceID)
+	if key == "" {
+		return map[string]string{}
+	}
+	aliases := aliasMaps[key]
+	if aliases == nil {
+		aliases = map[string]string{}
+		aliasMaps[key] = aliases
+	}
+	return aliases
+}
+
+func aliasInstanceKey(instanceID string) string {
+	return strings.ToLower(strings.TrimSpace(instanceID))
+}
+
+func invalidConnectionEndpointIssue(index int, side string, endpoint string) reports.Issue {
+	return reports.Issue{
+		Code:       reports.CodeValidationFailed,
+		Severity:   reports.SeverityError,
+		Path:       fmt.Sprintf("connections[%d].%s", index, side),
+		Message:    "invalid connection endpoint: " + endpoint,
+		Suggestion: "use endpoint syntax '<instance>.<port>'",
+	}
+}
+
+func addFragmentPortNetAliases(aliases map[string]string, instanceID string, port string, netName string) []reports.Issue {
+	var issues []reports.Issue
+	instanceIDs := []string{strings.TrimSpace(instanceID)}
+	if normalized := aliasInstanceKey(instanceID); normalized != "" && normalized != instanceIDs[0] {
+		instanceIDs = append(instanceIDs, normalized)
+	}
+	ports := []string{strings.TrimSpace(port)}
+	if lowerPort := strings.ToLower(strings.TrimSpace(port)); lowerPort != "" && lowerPort != ports[0] {
+		ports = append(ports, lowerPort)
+	}
+	for _, candidateInstanceID := range instanceIDs {
+		for _, candidatePort := range ports {
+			// Built-in block route templates conventionally emit lower-case role nets
+			// even when request endpoints use canonical upper-case electrical names.
+			if issue, ok := addFragmentNetAlias(aliases, blocks.InstanceNetName(candidateInstanceID, candidatePort), netName); ok {
+				issues = append(issues, issue)
+			}
+		}
+	}
+	return issues
+}
+
+func addFragmentNetAlias(aliases map[string]string, from string, to string) (reports.Issue, bool) {
+	from = strings.TrimSpace(from)
+	to = strings.TrimSpace(to)
+	if from == "" || to == "" {
+		return reports.Issue{}, false
+	}
+	if existing := aliases[from]; existing != "" && existing != to {
+		return reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Path:       "net_aliases." + from,
+			Message:    fmt.Sprintf("conflicting PCB fragment net aliases for %s: %s and %s", from, existing, to),
+			Nets:       []string{existing, to},
+			Suggestion: "use one net_alias for each connected instance port",
+		}, true
+	}
+	aliases[from] = to
+	return reports.Issue{}, false
 }
 
 func clonePCBPlacementGroups(groups []blocks.PCBPlacementGroup) []blocks.PCBPlacementGroup {

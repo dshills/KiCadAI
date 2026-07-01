@@ -194,13 +194,15 @@ loop confidence:
   connector/LED optional KiCad-backed scenarios are now candidate fixtures with
   warning-only KiCad evidence. I2C sensor breakout and amplifier
   fabrication-candidate scenarios remain `expected_fail` fixtures. They now
-  progress past the previous writer-correctness pad/copper net-code blocker.
-  LED and connector/LED fixtures also prove block-local route endpoint binding
-  to physical same-net pad anchors. Generated inter-block routing now reports
-  endpoint-contact evidence and counts completion only when a same-net contact
-  graph connects the required endpoints. The remaining layout-quality blockers
-  are broader inter-block route coverage, richer generated-board validation,
-  and KiCad ERC/DRC-clean evidence.
+  progress past the previous writer-correctness pad/copper net-code blocker,
+  and the I2C fixture now progresses past stale routing-skip and local
+  sensor_* net-alias blockers. LED and connector/LED fixtures also prove
+  block-local route endpoint binding to physical same-net pad anchors.
+  Generated inter-block routing now reports endpoint-contact evidence and
+  counts completion only when a same-net contact graph connects the required
+  endpoints. The remaining layout-quality blockers are broader multi-endpoint
+  inter-block route completion, richer generated-board validation, and KiCad
+  ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
@@ -366,6 +368,9 @@ Implemented foundation.
   now exercises standalone exported-port labels, schematic electrical checks,
   and LED local-route contact proof. Both are candidate fixtures, not pass
   fixtures, because KiCad still reports warning-level evidence.
+  `i2c_sensor_breakout_candidate` now enables routing and bounded retry, proves
+  block-local VCC/GND/SDA/SCL alias propagation into local routes, and remains
+  expected-fail on incomplete multi-endpoint inter-block route completion.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -389,11 +394,12 @@ Implemented foundation.
   validation, and KiCad-clean layout blockers. Generated PCB pad/copper net
   assignment now has workflow evidence and no longer blocks the LED smoke
   fixture at writer correctness. Generated block-local route endpoints now bind
-  to physical same-net pad anchors for LED and connector/LED smoke fixtures.
-  Connector/LED has inter-block contact-miss evidence, and I2C sensor breakout
-  now has promoted VCC/GND/SDA/SCL inter-block candidate and contact evidence. The
-  `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
-  even though its current readiness is `expected_fail`.
+  to physical same-net pad anchors for LED, connector/LED, and I2C local-route
+  fixtures. Connector/LED has candidate-level inter-block contact evidence, and
+  I2C sensor breakout now has promoted VCC/GND/SDA/SCL alias propagation plus
+  explicit route-completion/contact blockers for the remaining multi-endpoint
+  nets. The `i2c_sensor_breakout_candidate` name identifies it as a promotion
+  candidate even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
@@ -771,8 +777,10 @@ block contracts, project writer, schematic/PCB readers, and component identity
 property propagation. Optional KiCad-backed design examples now live under
 `examples/design/kicad-backed/`; LED and connector/LED are candidate fixtures,
 while richer I2C and amplifier generated boards still record `expected_fail`
-evidence until writer correctness and KiCad ERC/DRC artifacts can be produced
-reliably.
+evidence. I2C now reaches routing with clean local-route alias/contact proof but
+still blocks on complete multi-endpoint inter-block route contacts; the
+amplifier fixture remains blocked by broader verified amplifier realization and
+KiCad evidence gaps.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:

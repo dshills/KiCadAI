@@ -33,6 +33,141 @@ func TestRealizePCBFragmentsCreatesLEDFragment(t *testing.T) {
 	}
 }
 
+func TestRealizePCBFragmentsAppliesConnectionAliasesToLocalRoutes(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "i2c_sensor_breakout_candidate",
+		Board:   BoardSpec{WidthMM: 55, HeightMM: 35, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"i2c_address": "0x48", "include_pullups": true}},
+			{ID: "io", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 4, "pin_names": []string{"VCC", "GND", "SDA", "SCL"}}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "sensor.VCC", To: "io.VCC", NetAlias: "VCC"},
+			{From: "sensor.GND", To: "io.GND", NetAlias: "GND"},
+			{From: "sensor.SDA", To: "io.SDA", NetAlias: "SDA"},
+			{From: "sensor.SCL", To: "io.SCL", NetAlias: "SCL"},
+		},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	result := RealizePCBFragments(context.Background(), registry, plan)
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("fragment issues = %#v", result.Stage.Issues)
+	}
+	if len(result.Fragments) == 0 {
+		t.Fatalf("fragments = %#v", result.Fragments)
+	}
+	nets := map[string]bool{}
+	for _, route := range result.Fragments[0].Realization.LocalRoutes {
+		nets[route.NetName] = true
+	}
+	for _, want := range []string{"VCC", "GND", "SDA", "SCL"} {
+		if !nets[want] {
+			t.Fatalf("local route nets = %#v, missing alias %s", nets, want)
+		}
+	}
+	for _, stale := range []string{"sensor_vcc", "sensor_gnd", "sensor_sda", "sensor_scl"} {
+		if nets[stale] {
+			t.Fatalf("local route nets = %#v, still include stale instance net %s", nets, stale)
+		}
+	}
+}
+
+func TestFragmentNetAliasesIncludesDestinationEndpoints(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "inbound_aliases",
+		Connections: []ConnectionSpec{
+			{From: "sensor.VCC", To: "io.VCC", NetAlias: "VCC"},
+			{From: "sensor.GND", To: "io.GND", NetAlias: "GND"},
+		},
+	}
+
+	aliases, issues := fragmentNetAliases("io", request)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	for _, want := range []string{"io_VCC", "io_GND"} {
+		if aliases[want] == "" {
+			t.Fatalf("aliases = %#v, missing destination alias for %s", aliases, want)
+		}
+	}
+	if aliases["io_VCC"] != "VCC" {
+		t.Fatalf("aliases[io_VCC] = %q, want VCC", aliases["io_VCC"])
+	}
+	if aliases["io_GND"] != "GND" {
+		t.Fatalf("aliases[io_GND] = %q, want GND", aliases["io_GND"])
+	}
+}
+
+func TestFragmentNetAliasesIncludesNormalizedInstanceKeys(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "mixed_case_aliases",
+		Connections: []ConnectionSpec{
+			{From: "Sensor.VCC", To: "IO.VCC", NetAlias: "VCC"},
+		},
+	}
+
+	aliases, issues := fragmentNetAliases("sensor", request)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if aliases["sensor_vcc"] != "VCC" {
+		t.Fatalf("aliases[sensor_vcc] = %q, want VCC", aliases["sensor_vcc"])
+	}
+	if aliases["Sensor_vcc"] != "VCC" {
+		t.Fatalf("aliases[Sensor_vcc] = %q, want VCC", aliases["Sensor_vcc"])
+	}
+}
+
+func TestFragmentNetAliasesReportsConflictingAliases(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "conflicting_aliases",
+		Connections: []ConnectionSpec{
+			{From: "sensor.VCC", To: "io.VCC", NetAlias: "VCC"},
+			{From: "sensor.VCC", To: "debug.VCC", NetAlias: "ALT_VCC"},
+		},
+	}
+
+	aliases, issues := fragmentNetAliases("sensor", request)
+	if aliases["sensor_vcc"] != "VCC" {
+		t.Fatalf("aliases[sensor_vcc] = %q, want first alias VCC", aliases["sensor_vcc"])
+	}
+	if len(issues) == 0 {
+		t.Fatalf("expected alias conflict issue")
+	}
+	foundLowerRoleConflict := false
+	for _, issue := range issues {
+		if issue.Path == "net_aliases.sensor_vcc" {
+			foundLowerRoleConflict = true
+		}
+	}
+	if !foundLowerRoleConflict {
+		t.Fatalf("issues = %#v, missing sensor_vcc conflict", issues)
+	}
+}
+
+func TestFragmentNetAliasesReportsInvalidEndpoints(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "invalid_endpoint",
+		Connections: []ConnectionSpec{
+			{From: "sensor.VCC", To: "missing_separator", NetAlias: "VCC"},
+		},
+	}
+
+	_, issues := fragmentNetAliases("sensor", request)
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one invalid endpoint issue", issues)
+	}
+	if issues[0].Path != "connections[0].to" {
+		t.Fatalf("issue path = %q, want connections[0].to", issues[0].Path)
+	}
+}
+
 func TestFragmentCountsIncludesTimingResults(t *testing.T) {
 	componentCount, routeCount, timingCount := fragmentCounts([]BlockFragment{{
 		Realization: blocks.BlockPCBRealizationResult{
