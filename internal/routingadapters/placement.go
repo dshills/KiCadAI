@@ -104,18 +104,77 @@ func routingPadsFromPlacement(component placement.Component, layer string) []rou
 	pads := make([]routing.Pad, 0, len(component.Pads))
 	layer = firstNonEmpty(layer, "F.Cu")
 	for _, pad := range component.Pads {
+		padType := routingPadType(pad)
+		layers := routingPadLayers(pad, layer, padType)
 		pads = append(pads, routing.Pad{
 			Ref:      component.Ref,
 			Name:     pad.Name,
 			Net:      pad.Net,
 			Position: routing.Point{XMM: pad.XMM, YMM: pad.YMM},
 			Shape:    routing.PadRect,
-			Type:     routing.PadSMD,
+			Type:     padType,
 			Size:     routing.Size{WidthMM: positiveOrDefault(pad.WidthMM, 1), HeightMM: positiveOrDefault(pad.HeightMM, 1)},
-			Layers:   []string{layer},
+			Drill:    routingPadDrill(pad, padType),
+			Layers:   layers,
 		})
 	}
 	return pads
+}
+
+func routingPadType(pad placement.PadSummary) routing.PadType {
+	switch strings.ToLower(strings.TrimSpace(pad.Type)) {
+	case "thru_hole", "through_hole", "np_thru_hole":
+		return routing.PadThroughHole
+	default:
+		if pad.DrillMM > 0 {
+			return routing.PadThroughHole
+		}
+		return routing.PadSMD
+	}
+}
+
+func routingPadDrill(pad placement.PadSummary, padType routing.PadType) *routing.Drill {
+	if padType != routing.PadThroughHole || pad.DrillMM <= 0 {
+		return nil
+	}
+	return &routing.Drill{DiameterMM: pad.DrillMM}
+}
+
+func routingPadLayers(pad placement.PadSummary, placementLayer string, padType routing.PadType) []string {
+	if padType == routing.PadThroughHole {
+		if len(pad.Layers) == 0 {
+			return []string{"*.Cu"}
+		}
+		layers := make([]string, 0, len(pad.Layers))
+		for _, layer := range pad.Layers {
+			layer = strings.TrimSpace(layer)
+			if layer == "" {
+				continue
+			}
+			if strings.EqualFold(layer, "*.Cu") {
+				return []string{"*.Cu"}
+			}
+			if strings.HasSuffix(strings.ToUpper(layer), ".CU") {
+				layers = append(layers, layer)
+			}
+		}
+		if len(layers) > 0 {
+			return layers
+		}
+		return []string{"*.Cu"}
+	}
+	layers := make([]string, 0, len(pad.Layers))
+	for _, layer := range pad.Layers {
+		layer = strings.TrimSpace(layer)
+		normalized := strings.ToUpper(layer)
+		if strings.HasSuffix(normalized, ".CU") && normalized != "*.CU" {
+			layers = append(layers, layer)
+		}
+	}
+	if len(layers) > 0 {
+		return layers
+	}
+	return []string{placementLayer}
 }
 
 func routingEndpointsFromPlacement(endpoints []placement.Endpoint) []routing.Endpoint {

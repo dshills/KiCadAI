@@ -45,6 +45,69 @@ func TestRequestFromPlacementUsesPlacementLayerForPads(t *testing.T) {
 	}
 }
 
+func TestRequestFromPlacementPreservesThroughHolePadLayerAccess(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Components[0].Pads[0].Type = "thru_hole"
+	placementRequest.Components[0].Pads[0].DrillMM = 0.8
+	placementRequest.Components[0].Pads[0].Layers = []string{"*.Cu", "*.Mask"}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pad := request.Components[0].Pads[0]
+	if pad.Type != routing.PadThroughHole || pad.Drill == nil || pad.Drill.DiameterMM != 0.8 {
+		t.Fatalf("pad = %#v, want through-hole drill evidence", pad)
+	}
+	access := routing.BuildPadAccess(request)
+	points, ok := routing.AccessPointsForEndpoint(access, routing.Endpoint{Ref: "J1", Pin: "1"})
+	if !ok || len(points) != 2 {
+		t.Fatalf("access points = %#v, ok=%v; issues=%#v", points, ok, access.Issues)
+	}
+}
+
+func TestRequestFromPlacementKeepsSMDPadLayerConstrained(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Components[0].Pads[0].Type = "smd"
+	placementRequest.Components[0].Pads[0].Layers = []string{"B.Cu", "B.Mask", "B.Paste"}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pad := request.Components[0].Pads[0]
+	if pad.Type != routing.PadSMD || len(pad.Layers) != 1 || pad.Layers[0] != "B.Cu" {
+		t.Fatalf("pad = %#v, want SMD constrained to B.Cu", pad)
+	}
+}
+
+func TestRequestFromPlacementPreservesExplicitSMDCopperLayers(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Components[0].Pads[0].Type = "smd"
+	placementRequest.Components[0].Pads[0].Layers = []string{"F.Cu", "B.Cu", "F.Mask"}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pad := request.Components[0].Pads[0]
+	if len(pad.Layers) != 2 || pad.Layers[0] != "F.Cu" || pad.Layers[1] != "B.Cu" {
+		t.Fatalf("pad layers = %#v, want explicit F.Cu/B.Cu SMD copper layers", pad.Layers)
+	}
+}
+
 func TestRequestFromPlacementPreservesLocalPadGeometryAndNet(t *testing.T) {
 	placementRequest := placementAdapterRequest()
 	if len(placementRequest.Components) < 2 {

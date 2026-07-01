@@ -264,8 +264,12 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 	if result.Stage.Status != StageStatusOK {
 		t.Fatalf("routing status = %s, want proven route-completion evidence; issues=%#v", result.Stage.Status, result.Stage.Issues)
 	}
-	if !routingRequestHasNet(result.Request, "LED_EN") {
-		t.Fatalf("routing request nets = %#v, want LED_EN", result.Request.Nets)
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, result.Stage)
+	if !stringSliceContains(routeTrees.ManagedNets, "LED_EN") {
+		t.Fatalf("route-tree managed nets = %#v, want LED_EN", routeTrees.ManagedNets)
+	}
+	if routingRequestHasNet(result.Request, "LED_EN") {
+		t.Fatalf("routing request nets = %#v, did not want route-tree managed LED_EN in fallback request", result.Request.Nets)
 	}
 	routes := requireRouteOperationsForNet(t, result.Operations, "LED_EN")
 	for _, route := range routes {
@@ -318,9 +322,10 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	expectedEndpoints := interBlockCandidateEndpointCount(candidates)
 
 	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, result.Stage)
 	for _, connection := range request.Connections {
-		if !routingRequestHasNet(result.Request, connection.NetAlias) {
-			t.Fatalf("routing request is missing net %s; nets=%#v", connection.NetAlias, result.Request.Nets)
+		if !stringSliceContains(routeTrees.ManagedNets, connection.NetAlias) {
+			t.Fatalf("route-tree managed nets = %#v, want %s", routeTrees.ManagedNets, connection.NetAlias)
 		}
 	}
 	interBlock := requireInterBlockRouteSummary(t, result.Stage)
@@ -393,9 +398,10 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 
 	blockedNets := issueNetSet(result.Stage.Issues)
 	i2cNets := connectionAliasSet(request.Connections)
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, result.Stage)
 	for net := range i2cNets {
-		if !routingRequestHasNet(result.Request, net) {
-			t.Fatalf("routing request missing %s; nets=%#v", net, result.Request.Nets)
+		if !stringSliceContains(routeTrees.ManagedNets, net) {
+			t.Fatalf("route-tree managed nets = %#v, want %s", routeTrees.ManagedNets, net)
 		}
 	}
 	if len(blockedNets) == 0 {
@@ -555,6 +561,32 @@ func TestInterBlockRouteCompletionSummaryJSONStable(t *testing.T) {
 	}
 }
 
+func TestInterBlockRouteTreeExecutionSummaryJSONStable(t *testing.T) {
+	summary := InterBlockRouteTreeExecutionSummary{
+		GroupsPlanned:     1,
+		GroupsAttempted:   1,
+		GroupsComplete:    0,
+		GroupsPartial:     1,
+		GroupsBlocked:     0,
+		BranchesPlanned:   2,
+		BranchesAttempted: 2,
+		BranchesRouted:    1,
+		BranchesBlocked:   1,
+		ContactMisses:     1,
+		GraphSplits:       1,
+		IssueCount:        1,
+		ManagedNets:       []string{"SDA"},
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"groups_planned":1,"groups_attempted":1,"groups_complete":0,"groups_partial":1,"groups_blocked":0,"branches_planned":2,"branches_attempted":2,"branches_routed":1,"branches_blocked":1,"contact_misses":1,"graph_splits":1,"issue_count":1,"managed_nets":["SDA"]}`
+	if string(data) != want {
+		t.Fatalf("summary JSON = %q, want %q", data, want)
+	}
+}
+
 func routingRequestHasNet(request routing.Request, name string) bool {
 	for _, net := range request.Nets {
 		if net.Name == name {
@@ -636,6 +668,11 @@ func requireInterBlockRouteSummary(t *testing.T, stage StageResult) InterBlockRo
 func requireInterBlockContactSummary(t *testing.T, stage StageResult) InterBlockContactSummary {
 	t.Helper()
 	return requireStageSummary[InterBlockContactSummary](t, stage, "inter_block_contacts")
+}
+
+func requireInterBlockRouteTreeExecutionSummary(t *testing.T, stage StageResult) InterBlockRouteTreeExecutionSummary {
+	t.Helper()
+	return requireStageSummary[InterBlockRouteTreeExecutionSummary](t, stage, "inter_block_route_trees")
 }
 
 func requireStageSummary[T any](t *testing.T, stage StageResult, key string) T {
@@ -750,4 +787,13 @@ func countTransactionOps(operations []transactions.Operation, kind transactions.
 		}
 	}
 	return count
+}
+
+func stringSliceContains(values []string, want string) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

@@ -52,8 +52,11 @@ to physical same-net pad anchors and report route-connectivity evidence.
 Generated inter-block route candidates now promote connector/LED and I2C
 breakout request connections into placement/routing evidence. Routing summaries
 now distinguish candidates, attempted routes, endpoint-contact evidence,
-graph-connected routes, partial routes, and unrouted nets. The next blocker is
-promoting richer generated boards to KiCad ERC/DRC-clean layout proof.
+graph-connected routes, partial routes, and unrouted nets. Multi-endpoint
+route-tree execution now manages the I2C fixture's VCC/GND/SDA/SCL nets and
+reports branch-level path/contact blockers. The next blocker is repairing those
+branch routes and promoting richer generated boards to KiCad ERC/DRC-clean
+layout proof.
 
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, polygonal copper width and

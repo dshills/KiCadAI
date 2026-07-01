@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"math"
+	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -109,6 +110,42 @@ func TestRouteInterBlockTreeBranchesReportsAllBranchesOnCanceledContext(t *testi
 	}
 	if len(result.Issues) != len(tree.Branches) {
 		t.Fatalf("issues = %d, want %d", len(result.Issues), len(tree.Branches))
+	}
+}
+
+func TestRouteInterBlockTreeBranchesScopesRoutingIssuesToBranch(t *testing.T) {
+	group := routeTreeTestGroup("SIG",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+	)
+	tree := BuildInterBlockRouteTree(group, routeTreeTestTargets("SIG", map[string]transactions.Point{
+		"J1.1": {XMM: 2, YMM: 2},
+		"U1.1": {XMM: 8, YMM: 2},
+	}))
+	base := routeBranchTestRequest("SIG", map[string]routing.Point{
+		"J1.1": {XMM: 2, YMM: 2},
+		"U1.1": {XMM: 8, YMM: 2},
+	})
+	base.Obstacles = append(base.Obstacles, routing.Obstacle{
+		Kind:  routing.ObstacleKeepout,
+		Layer: "F.Cu",
+		Geometry: routing.Shape{Rect: &routing.Rect{
+			Min: routing.Point{XMM: 0, YMM: 0},
+			Max: routing.Point{XMM: 10, YMM: 4},
+		}},
+	})
+
+	result := RouteInterBlockTreeBranches(context.Background(), base, group, tree)
+	if len(result.Issues) == 0 {
+		t.Fatalf("issues = %#v, want branch-scoped pathfinding issue", result.Issues)
+	}
+	for _, issue := range result.Issues {
+		if !strings.Contains(issue.Path, `design.inter_block_route_groups["SIG"].branches[0]`) {
+			t.Fatalf("issue path = %q, want branch-scoped route-tree path", issue.Path)
+		}
+		if !strings.Contains(issue.Suggestion, "route-tree branch") {
+			t.Fatalf("issue suggestion = %q, want route-tree repair context", issue.Suggestion)
+		}
 	}
 }
 

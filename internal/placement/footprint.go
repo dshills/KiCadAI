@@ -44,9 +44,23 @@ func BoundsFromFootprint(record libraryresolver.FootprintRecord) (Bounds, []PadS
 			YMM:      iuToMM(pad.Position.Y),
 			WidthMM:  iuToMM(pad.Size.X),
 			HeightMM: iuToMM(pad.Size.Y),
+			Type:     strings.TrimSpace(pad.Type),
+			DrillMM:  iuToMM(pad.Drill),
+			Layers:   footprintPadLayers(pad.Layers),
 		})
 	}
 	return bounds, pads, issues
+}
+
+func footprintPadLayers(layers []kicadfiles.BoardLayer) []string {
+	out := make([]string, 0, len(layers))
+	for _, layer := range layers {
+		value := strings.TrimSpace(string(layer))
+		if value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
 }
 
 func validBoundingBox(box libraryresolver.BoundingBox) bool {

@@ -130,6 +130,9 @@ type PadSummary struct {
 	YMM      float64
 	WidthMM  float64
 	HeightMM float64
+	Type     string
+	DrillMM  float64
+	Layers   []string
 }
 
 type Net struct {

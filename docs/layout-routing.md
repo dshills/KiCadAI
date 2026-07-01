@@ -90,6 +90,14 @@ and graph-level completion status. They do not yet mean KiCad DRC-clean routing
 for richer generated boards; the I2C breakout fixture remains an
 `expected_fail` case until every VCC/GND/SDA/SCL route group is graph-complete
 and KiCad-backed evidence passes.
+
+The routing stage also exposes `inter_block_route_trees` when generated
+inter-block nets are managed by route-tree execution instead of the fallback
+net-level router. That summary includes planned/attempted/complete/partial/
+blocked group counts, planned/attempted/routed/blocked branch counts, issue
+counts, and `managed_nets`. Managed nets are intentionally removed from the
+fallback `routing.Request.Nets` list to avoid double-routing; use
+`inter_block_route_trees.managed_nets` to see route-tree ownership.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,
 not thermal simulation, impedance calculation, or routed length matching.

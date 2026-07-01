@@ -45,7 +45,7 @@ kicadai \
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `candidate` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment, routed inter-block endpoint contact evidence, and candidate promotion coverage. |
-| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, and route-tree summaries; current blockers are VCC/SDA legal-path failures, GND partial graph completion, and an SCL contact miss. |
+| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, and route-tree execution; current blockers are branch-scoped VCC/SDA legal-path failures plus VCC/SDA contact proof gaps. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft amplifier seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, output DC-blocking/protection realization, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
 ## Interpreting Results
@@ -68,10 +68,13 @@ encounter the documented blockers. That is not the same as an ERC/DRC-clean
 generated design. These fixtures now document that generated design-level PCBs
 can progress past writer correctness net-code assignment and block-local route
 endpoint binding. The I2C fixture also exposes route-tree evidence for its
-multi-endpoint VCC/GND/SDA/SCL nets, including planned branches, attempted
-branches, proven endpoints, graph components, and group completion counts. The
-next layout-quality blockers are full inter-block routing coverage for richer
-boards and KiCad ERC/DRC-clean evidence.
+multi-endpoint VCC/GND/SDA/SCL nets, including managed nets, planned branches,
+attempted branches, proven endpoints, graph components, and group completion
+counts. The current run keeps the fixture in `expected_fail`: route-tree
+execution owns the four I2C nets, but VCC/SDA branch pathfinding and contact
+proof still block promotion before project write or KiCad checks run. The next
+layout-quality blockers are route-tree branch path repair, full inter-block
+routing coverage for richer boards, and KiCad ERC/DRC-clean evidence.
 
 Promotion gates currently include metadata, stages, writer correctness,
 connectivity, KiCad checks, route completion, physical rules, and artifacts.

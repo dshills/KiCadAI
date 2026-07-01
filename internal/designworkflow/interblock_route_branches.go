@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"strings"
 
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
@@ -108,16 +109,43 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 		branchResult := routing.RouteRequestContext(ctx, branchRequest)
 		branchOperations := transactionRouteOperations(branchResult.Operations)
 		branchExisting := existingCopperFromRoutedBranches(branchResult.Routes, defaultLayer, rules)
+		branchIssues := annotateInterBlockBranchRoutingIssues(branchResult.Issues, tree.NetName, branch)
 		result.Operations = append(result.Operations, branchOperations...)
 		result.ExistingCopper = append(result.ExistingCopper, branchExisting...)
-		result.Issues = append(result.Issues, branchResult.Issues...)
+		result.Issues = append(result.Issues, branchIssues...)
 		currentExisting = append(currentExisting, branchExisting...)
 		evidence.Status = branchResult.Status
 		evidence.OperationCount = len(branchOperations)
-		evidence.IssueCount = len(branchResult.Issues)
+		evidence.IssueCount = len(branchIssues)
 		result.Branches = append(result.Branches, evidence)
 	}
 	return result
+}
+
+func annotateInterBlockBranchRoutingIssues(issues []reports.Issue, netName string, branch InterBlockRouteTreeBranch) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	out := make([]reports.Issue, len(issues))
+	for index, issue := range issues {
+		out[index] = issue
+		basePath := fmt.Sprintf("design.inter_block_route_groups[%q].branches[%d]", netName, branch.Index)
+		trimmedPath := strings.TrimPrefix(issue.Path, ".")
+		if trimmedPath != "" {
+			basePath += "." + trimmedPath
+		}
+		out[index].Path = basePath
+		out[index].Suggestion = branchRepairSuggestion(issue.Suggestion)
+	}
+	return out
+}
+
+func branchRepairSuggestion(suggestion string) string {
+	suggestion = strings.TrimSpace(suggestion)
+	if suggestion == "" {
+		return "adjust placement spacing or route-tree layer access for this branch"
+	}
+	return suggestion + "; route-tree branch may need more spacing, fanout, or layer access"
 }
 
 func routeBranchCancellationIssue(netName string, branchIndex int, err error) reports.Issue {
