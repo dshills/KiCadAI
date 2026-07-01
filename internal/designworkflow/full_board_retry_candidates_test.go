@@ -63,10 +63,10 @@ func TestFullBoardRetryCandidateWorkflowReachesRoutingConnectivity(t *testing.T)
 			if !ok {
 				t.Fatalf("routing stage missing: %#v", result.Stages)
 			}
-			if stage.Status != StageStatusBlocked {
-				t.Fatalf("candidate workflow stage = %#v, want current generated routing blocker documented", stage)
+			if stage.Status != StageStatusOK {
+				t.Fatalf("candidate workflow stage = %#v, want generated routing connectivity to pass", stage)
 			}
-			assertIssueCode(t, stage.Issues, reports.CodeDisconnectedPad)
+			assertNoIssueCode(t, stage.Issues, reports.CodeDisconnectedPad)
 		})
 	}
 }

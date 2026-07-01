@@ -10,6 +10,7 @@ import (
 
 func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 	tests := []string{
+		"Connector_Generic:Conn_01x02",
 		"Device:R",
 		"Device:C",
 		"Device:D",
@@ -70,8 +71,12 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || len(pins) != 2 {
 		t.Fatalf("Device:R pins = %#v ok=%v, want two pins", pins, ok)
 	}
-	if pins[0].Number != "1" || pins[0].Offset.X != kicadfiles.MM(-5.08) || pins[1].Number != "2" || pins[1].Offset.X != kicadfiles.MM(5.08) {
+	if pins[0].Number != "1" || pins[0].Offset.Y != kicadfiles.MM(3.81) || pins[1].Number != "2" || pins[1].Offset.Y != kicadfiles.MM(-3.81) {
 		t.Fatalf("unexpected two-pin offsets: %#v", pins)
+	}
+	connectorPins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x02")
+	if !ok || len(connectorPins) != 2 || connectorPins[0].Offset.Y != 0 || connectorPins[1].Offset.Y != kicadfiles.MM(-2.54) {
+		t.Fatalf("unexpected connector offsets: %#v ok=%v", connectorPins, ok)
 	}
 	pins[0].Number = "BROKEN"
 	freshPins, ok := EmbeddedSymbolPinOffsets("Device:R")
@@ -92,6 +97,51 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	}
 	if _, ok := EmbeddedSymbolPinOffsets("Custom:Block"); ok {
 		t.Fatal("unexpected custom block template pins")
+	}
+}
+
+func TestEmbeddedSymbolTemplateRendersTemplatePinOffsets(t *testing.T) {
+	resistor, ok := EmbeddedSymbolTemplate("Device:R")
+	if !ok {
+		t.Fatal("Device:R template missing")
+	}
+	schematic := minimalSchematic()
+	schematic.LibSymbols = []EmbeddedSymbol{resistor}
+	var buf bytes.Buffer
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output := buf.String()
+	if !strings.Contains(output, "(at 0 3.81 270)") || !strings.Contains(output, "(at 0 -3.81 90)") {
+		t.Fatalf("resistor template did not render vertical KiCad pin anchors:\n%s", output)
+	}
+
+	led, ok := EmbeddedSymbolTemplate("Device:LED")
+	if !ok {
+		t.Fatal("Device:LED template missing")
+	}
+	schematic.LibSymbols = []EmbeddedSymbol{led}
+	buf.Reset()
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output = buf.String()
+	if !strings.Contains(output, "(at -3.81 0 0)") || !strings.Contains(output, "(at 3.81 0 180)") {
+		t.Fatalf("LED template did not render KiCad pin anchors:\n%s", output)
+	}
+
+	connector, ok := EmbeddedSymbolTemplate("Connector_Generic:Conn_01x02")
+	if !ok {
+		t.Fatal("Connector_Generic:Conn_01x02 template missing")
+	}
+	schematic.LibSymbols = []EmbeddedSymbol{connector}
+	buf.Reset()
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output = buf.String()
+	if !strings.Contains(output, "(at -5.08 0 0)") || !strings.Contains(output, "(at -5.08 -2.54 0)") {
+		t.Fatalf("connector template did not render KiCad pin anchors:\n%s", output)
 	}
 }
 

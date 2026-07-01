@@ -246,6 +246,13 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 			UUID:   builder.generator.New("root.schematic.symbol.pin", key, number),
 		})
 	}
+	symbol.Instances = []schematic.SymbolInstance{{
+		Project:   builder.design.Project.Name,
+		Path:      "/" + string(symbol.UUID),
+		Reference: symbol.Reference,
+		Unit:      1,
+		Value:     symbol.Value,
+	}}
 	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, symbol)
 	builder.symbols[reference] = &symbolState{
 		symbolIndex: len(builder.design.Schematic.Symbols) - 1,
@@ -343,7 +350,7 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 	}
 	points := orthogonalSchematicWirePoints(start, end)
 	for index := 0; index < len(points)-1; index++ {
-		if samePoint(points[index], points[index+1]) || hasSchematicWire(builder.design.Schematic.Wires, points[index], points[index+1]) {
+		if samePoint(points[index], points[index+1]) || hasSchematicWireSegment(builder.design.Schematic.Wires, points[index], points[index+1]) {
 			continue
 		}
 		wireOffset := len(builder.design.Schematic.Wires)
@@ -351,6 +358,23 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 			builder.generator.New("root.schematic.wire", netName, fmt.Sprintf("%d", wireOffset), fmt.Sprintf("%d", index), from.Reference, from.Pin, to.Reference, to.Pin),
 			points[index],
 			points[index+1],
+		))
+	}
+	for index := 1; index < len(points)-1; index++ {
+		if !hasSchematicJunction(builder.design.Schematic.Junctions, points[index]) {
+			builder.design.Schematic.Junctions = append(builder.design.Schematic.Junctions, schematic.Junction{
+				UUID:     builder.generator.New("root.schematic.junction", netName, fmt.Sprintf("%d", index), formatPoint(points[index])),
+				Position: points[index],
+			})
+		}
+		if hasSchematicLabel(builder.design.Schematic.Labels, netName, points[index]) {
+			continue
+		}
+		builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.NewLabel(
+			builder.generator.New("root.schematic.label", netName, fmt.Sprintf("%d", index), formatPoint(points[index])),
+			netName,
+			schematic.LabelLocal,
+			points[index],
 		))
 	}
 }
@@ -364,20 +388,34 @@ func hasNoConnect(noConnects []schematic.NoConnect, position kicadfiles.Point) b
 	return false
 }
 
-func hasSchematicWire(wires []schematic.Wire, start, end kicadfiles.Point) bool {
+func hasSchematicWireSegment(wires []schematic.Wire, start, end kicadfiles.Point) bool {
 	for _, wire := range wires {
-		if len(wire.Points) < 2 {
+		if len(wire.Points) != 2 {
 			continue
 		}
-		for index := 0; index < len(wire.Points)-1; index++ {
-			wireStart := wire.Points[index]
-			wireEnd := wire.Points[index+1]
-			if samePoint(wireStart, start) && samePoint(wireEnd, end) {
-				return true
-			}
-			if samePoint(wireStart, end) && samePoint(wireEnd, start) {
-				return true
-			}
+		if samePoint(wire.Points[0], start) && samePoint(wire.Points[1], end) {
+			return true
+		}
+		if samePoint(wire.Points[0], end) && samePoint(wire.Points[1], start) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSchematicJunction(junctions []schematic.Junction, position kicadfiles.Point) bool {
+	for _, junction := range junctions {
+		if samePoint(junction.Position, position) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSchematicLabel(labels []schematic.Label, text string, position kicadfiles.Point) bool {
+	for _, label := range labels {
+		if label.Kind == schematic.LabelLocal && label.Text == text && samePoint(label.Position, position) {
+			return true
 		}
 	}
 	return false
@@ -393,11 +431,9 @@ func orthogonalSchematicWirePoints(start, end kicadfiles.Point) []kicadfiles.Poi
 	if start.X == end.X || start.Y == end.Y {
 		return []kicadfiles.Point{start, end}
 	}
-	midX := start.X + (end.X-start.X)/2
 	return []kicadfiles.Point{
 		start,
-		{X: midX, Y: start.Y},
-		{X: midX, Y: end.Y},
+		{X: start.X, Y: end.Y},
 		end,
 	}
 }

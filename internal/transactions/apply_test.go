@@ -590,7 +590,7 @@ func TestApplyImportedPlacesFootprintAndRoute(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	for _, want := range []string{`"J1"`, `(size 1.2 1.4)`, `(net "SIG")`, `(segment`} {
+	for _, want := range []string{`"J1"`, `(size 1.2 1.4)`, `(net 1 "SIG")`, `(segment`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("PCB missing %q:\n%s", want, text)
 		}

@@ -836,7 +836,7 @@ func TestAssertSemanticsAcceptsAnyMatchingRolePin(t *testing.T) {
 			"R2": {Role: "resistor", Ref: "R2", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric"},
 			"D1": {Role: "led", Ref: "D1", SymbolID: "Device:LED", FootprintID: "LED_SMD:LED_0805_2012Metric"},
 		},
-		Nets:  map[string][]actualPin{"LED_A": {{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "1"}}},
+		Nets:  map[string][]actualPin{"LED_A": {{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "2"}}},
 		Ports: map[string]blocks.BlockPort{"IN": {Name: "IN", Direction: blocks.PortInput}, "GND": {Name: "GND", Direction: blocks.PortPower}},
 	}
 	issues := assertSemantics(manifest, summary, RunOptions{})
@@ -853,7 +853,7 @@ func TestAssertSemanticsReportsMissingRolePin(t *testing.T) {
 			"R2": {Role: "resistor", Ref: "R2", SymbolID: "Device:R"},
 			"D1": {Role: "led", Ref: "D1", SymbolID: "Device:LED"},
 		},
-		Nets:  map[string][]actualPin{"LED_A": {{Ref: "C1", Pin: "2"}, {Ref: "D1", Pin: "1"}}},
+		Nets:  map[string][]actualPin{"LED_A": {{Ref: "C1", Pin: "2"}, {Ref: "D1", Pin: "2"}}},
 		Ports: map[string]blocks.BlockPort{"IN": {Name: "IN", Direction: blocks.PortInput}, "GND": {Name: "GND", Direction: blocks.PortPower}},
 	}
 	issues := assertSemantics(manifest, summary, RunOptions{})
@@ -879,7 +879,7 @@ func TestAssertSemanticsChecksRoleForExplicitRef(t *testing.T) {
 			"R1": {Role: "capacitor", Ref: "R1", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric"},
 			"D1": {Role: "led", Ref: "D1", SymbolID: "Device:LED", FootprintID: "LED_SMD:LED_0805_2012Metric"},
 		},
-		Nets:  map[string][]actualPin{"LED_A": {{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "1"}}},
+		Nets:  map[string][]actualPin{"LED_A": {{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "2"}}},
 		Ports: map[string]blocks.BlockPort{"IN": {Name: "IN", Direction: blocks.PortInput}, "GND": {Name: "GND", Direction: blocks.PortPower}},
 	}
 	issues := assertSemantics(manifest, summary, RunOptions{})
@@ -896,7 +896,7 @@ func TestAssertStrictSemanticsReportsUnexpectedComponentAndPort(t *testing.T) {
 			"D1": {Role: "led", Ref: "D1", SymbolID: "Device:LED", FootprintID: "LED_SMD:LED_0805_2012Metric"},
 			"C1": {Role: "capacitor", Ref: "C1", SymbolID: "Device:C"},
 		},
-		Nets:  map[string][]actualPin{"LED_A": {{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "1"}}},
+		Nets:  map[string][]actualPin{"LED_A": {{Ref: "R1", Pin: "2"}, {Ref: "D1", Pin: "2"}}},
 		Ports: map[string]blocks.BlockPort{"IN": {Name: "IN", Direction: blocks.PortInput}, "GND": {Name: "GND", Direction: blocks.PortPower}, "OUT": {Name: "OUT", Direction: blocks.PortOutput}},
 	}
 	issues := assertSemantics(manifest, summary, RunOptions{Strict: true})

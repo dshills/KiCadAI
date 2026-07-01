@@ -503,6 +503,19 @@ func (builder *promotionReportBuilder) promotionArtifacts() []PromotionArtifact 
 		if path == "" {
 			continue
 		}
+		if path == PromotionReportArtifactPath {
+			if _, exists := seen[path]; exists {
+				continue
+			}
+			seen[path] = struct{}{}
+			artifacts = append(artifacts, PromotionArtifact{
+				Path:        path,
+				Kind:        reports.ArtifactPromotionReport,
+				Description: "KiCad-backed design promotion report",
+				Required:    true,
+			})
+			continue
+		}
 		if _, exists := seen[path]; exists {
 			continue
 		}
@@ -513,14 +526,54 @@ func (builder *promotionReportBuilder) promotionArtifacts() []PromotionArtifact 
 
 func (builder *promotionReportBuilder) producedArtifactPaths() map[string]bool {
 	produced := map[string]bool{}
+	for _, rawPath := range builder.fixture.ExpectedArtifacts {
+		if strings.TrimSpace(rawPath) == PromotionReportArtifactPath {
+			produced[PromotionReportArtifactPath] = true
+		}
+	}
 	for _, stage := range builder.result.Stages {
 		for _, artifact := range stage.Artifacts {
 			if path := strings.TrimSpace(artifact.Path); path != "" {
 				produced[path] = true
+				for _, relative := range builder.relativeProducedArtifactPaths(path) {
+					produced[relative] = true
+				}
 			}
 		}
 	}
 	return produced
+}
+
+func (builder *promotionReportBuilder) relativeProducedArtifactPaths(path string) []string {
+	path = strings.TrimSpace(filepathSlash(path))
+	if path == "" {
+		return nil
+	}
+	relatives := []string{}
+	if trimmed := strings.TrimPrefix(path, "./"); trimmed != path {
+		relatives = append(relatives, trimmed)
+	}
+	outputDir := strings.TrimSpace(builder.result.Project.OutputDir)
+	if outputDir != "" {
+		outputDir = strings.TrimSuffix(filepathSlash(outputDir), "/")
+		if path == outputDir {
+			relatives = append(relatives, ".")
+		}
+		if strings.HasPrefix(path, outputDir+"/") {
+			relatives = append(relatives, strings.TrimPrefix(path, outputDir+"/"))
+		}
+	}
+	if index := strings.Index(path, "/.kicadai/"); index >= 0 {
+		relatives = append(relatives, path[index+1:])
+	}
+	return relatives
+}
+
+func filepathSlash(path string) string {
+	if strings.Contains(path, "\\") {
+		return strings.ReplaceAll(path, "\\", "/")
+	}
+	return path
 }
 
 func promotionGateStatusForStage(stage StageResult) PromotionGateStatus {
@@ -675,12 +728,12 @@ func promotionCheckResultStatus(result any) (PromotionGateStatus, bool) {
 	case nil:
 		return PromotionGateStatusNotRun, true
 	case checks.CheckResult:
-		return checkResultStatusToPromotionStatus(value.Status), true
+		return checkResultToPromotionStatus(value), true
 	case *checks.CheckResult:
 		if value == nil {
 			return PromotionGateStatusNotRun, true
 		}
-		return checkResultStatusToPromotionStatus(value.Status), true
+		return checkResultToPromotionStatus(*value), true
 	case checks.CheckStatus:
 		return checkResultStatusToPromotionStatus(value), true
 	case string:
@@ -692,6 +745,30 @@ func promotionCheckResultStatus(result any) (PromotionGateStatus, bool) {
 	default:
 		return "", false
 	}
+}
+
+func checkResultToPromotionStatus(result checks.CheckResult) PromotionGateStatus {
+	if result.Status == checks.CheckStatusError && workflowCheckToolErrorHasNoFindingDRCInstability(result) {
+		return PromotionGateStatusWarn
+	}
+	if result.Status == checks.CheckStatusFail && checkResultFindingsAreWarningOnly(result) {
+		return PromotionGateStatusWarn
+	}
+	return checkResultStatusToPromotionStatus(result.Status)
+}
+
+func checkResultFindingsAreWarningOnly(result checks.CheckResult) bool {
+	if len(result.Findings) == 0 || len(result.ParserIssues) > 0 {
+		return false
+	}
+	for _, finding := range result.Findings {
+		switch workflowCheckSeverity(finding.Severity) {
+		case reports.SeverityInfo, reports.SeverityWarning:
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 func parsePromotionCheckStatus(value string) (checks.CheckStatus, bool) {

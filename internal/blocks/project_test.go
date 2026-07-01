@@ -80,6 +80,40 @@ func TestProjectTransactionForConnectorFiltersPseudoPortConnections(t *testing.T
 	}
 }
 
+func TestProjectTransactionMaterializesGeneratedToExternalConnection(t *testing.T) {
+	connect, issues := ConnectOperation("R1", "1", "J1", "1", "SIG")
+	if len(issues) != 0 {
+		t.Fatalf("connect issues: %#v", issues)
+	}
+	tx, err := ProjectTransactionForBlockOutput("mixed", BlockOutput{
+		Instance: BlockInstance{Refs: []string{"R1"}},
+		Operations: []transactions.Operation{
+			connect,
+		},
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var connects []transactions.ConnectOperation
+	for _, operation := range tx.Operations {
+		if operation.Op != transactions.OpConnect {
+			continue
+		}
+		var payload transactions.ConnectOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			t.Fatal(err)
+		}
+		connects = append(connects, payload)
+	}
+	if len(connects) != 1 {
+		t.Fatalf("connects = %#v, want one generated-to-external connection", connects)
+	}
+	got := connects[0]
+	if got.NetName != "SIG" || got.From.Ref != "J1" || got.From.Pin != "1" || got.To.Ref != "R1" || got.To.Pin != "1" {
+		t.Fatalf("materialized connect = %#v, want external endpoint preserved", got)
+	}
+}
+
 func TestProjectTransactionReportsMalformedConnect(t *testing.T) {
 	_, err := ProjectTransactionForBlockOutput("bad", BlockOutput{
 		Instance: BlockInstance{Refs: []string{"R1", "D1"}},

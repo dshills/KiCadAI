@@ -4,17 +4,17 @@
   "intent": "Generated LED design-create candidate that now hydrates footprint pad summaries and reaches real routing connectivity evidence.",
   "fixture_class": "generated_connectivity_boundary",
   "expected_categories": [],
-  "expected_stop_reason": "no_eligible_hints",
+  "expected_stop_reason": "routed",
   "expected_improvement": "generated_routing_connectivity",
   "expected_improved_metric": "real_routing_diagnostics",
   "preserve_constraints": [],
-  "expected_routing_status": "blocked",
-  "expected_baseline_status": "blocked",
-  "expected_final_status": "blocked",
+  "expected_routing_status": "routed",
+  "expected_baseline_status": "routed",
+  "expected_final_status": "ok",
   "expected_min_attempts": 1,
   "expected_min_applied": 0,
   "expect_pad_hydration": true,
   "expected_min_hydrated_pads": 2,
   "expect_project_write": false,
-  "determinism": "blocks deterministically on real routing/connectivity evidence after generated component pad summaries are hydrated"
+  "determinism": "routes deterministically after generated component pad summaries are hydrated"
 }

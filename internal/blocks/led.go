@@ -70,7 +70,7 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 		Value:       formatOhms(resistorOhms),
 		SymbolID:    "Device:R",
 		FootprintID: resistorFootprint,
-		Pins:        twoTerminalHorizontalPins(),
+		Pins:        resistorPins(),
 	}
 	led := BlockComponent{
 		Role:        "led",
@@ -78,7 +78,7 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 		Value:       strings.ToUpper(stringParam(params, "color")) + " LED",
 		SymbolID:    "Device:LED",
 		FootprintID: ledFootprint,
-		Pins:        twoTerminalHorizontalPins(),
+		Pins:        ledPins(),
 	}
 	var operations []transactions.Operation
 	resistorOps, componentIssues := ComponentOperations(resistor, resistorRef, transactions.Point{XMM: 0, YMM: 0})
@@ -97,15 +97,15 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 	} else {
 		appendConnectOperation(&operations, &issues, request.InstanceID, "VCC", resistorRef, "1", vccNet)
 	}
-	connect, connectIssues := ConnectOperation(resistorRef, "2", ledRef, "1", seriesNet)
+	connect, connectIssues := ConnectOperation(resistorRef, "2", ledRef, "2", seriesNet)
 	issues = append(issues, connectIssues...)
 	if len(connectIssues) == 0 {
 		operations = append(operations, connect)
 	}
 	if activeHigh {
-		appendConnectOperation(&operations, &issues, ledRef, "2", request.InstanceID, "GND", gndNet)
+		appendConnectOperation(&operations, &issues, ledRef, "1", request.InstanceID, "GND", gndNet)
 	} else {
-		appendConnectOperation(&operations, &issues, ledRef, "2", request.InstanceID, "IN", inputNet)
+		appendConnectOperation(&operations, &issues, ledRef, "1", request.InstanceID, "IN", inputNet)
 	}
 	output := dryRunBlockOutput(definition, request, operations, issues)
 	output.Instance.Params = params
@@ -118,9 +118,26 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 	return output
 }
 
-func twoTerminalHorizontalPins() []transactions.PinSpec {
+func resistorPins() []transactions.PinSpec {
 	// These are schematic symbol anchors only. Footprint pad geometry is
 	// resolved separately by the PCB/library writer.
+	return []transactions.PinSpec{
+		{Number: "1", XMM: 0, YMM: -3.81},
+		{Number: "2", XMM: 0, YMM: 3.81},
+	}
+}
+
+func ledPins() []transactions.PinSpec {
+	// KiCad's Device:LED is horizontal with cathode on pin 1 and anode on pin 2.
+	return []transactions.PinSpec{
+		{Number: "1", XMM: -3.81, YMM: 0},
+		{Number: "2", XMM: 3.81, YMM: 0},
+	}
+}
+
+func twoTerminalHorizontalPins() []transactions.PinSpec {
+	// Generic schematic anchors for two-terminal symbols that do not yet have
+	// symbol-specific KiCad 10 pin geometry.
 	return []transactions.PinSpec{
 		{Number: "1", XMM: -5.08, YMM: 0},
 		{Number: "2", XMM: 5.08, YMM: 0},

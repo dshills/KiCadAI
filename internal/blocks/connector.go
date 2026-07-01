@@ -86,7 +86,7 @@ func connectorSymbolPins(pinCount int) []transactions.PinSpec {
 	for pin := 1; pin <= pinCount; pin++ {
 		// These are schematic symbol anchors only. Footprint pad geometry is
 		// resolved separately by the PCB/library writer.
-		pins = append(pins, transactions.PinSpec{Number: fmt.Sprint(pin), XMM: 0, YMM: float64(pin-1) * 2.54})
+		pins = append(pins, transactions.PinSpec{Number: fmt.Sprint(pin), XMM: -5.08, YMM: float64(pin-1) * 2.54})
 	}
 	return pins
 }

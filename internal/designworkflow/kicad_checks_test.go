@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -9,6 +10,7 @@ import (
 
 	"kicadai/internal/inspect"
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/reports"
 )
 
 func TestRunKiCadChecksSkipsWhenNotRequired(t *testing.T) {
@@ -67,6 +69,50 @@ func TestKiCadCheckTargetPrefersProjectRoot(t *testing.T) {
 	}
 	if got := kicadCheckTargetFromWrite(&write, checks.CheckKindDRC); got != "/tmp/demo" {
 		t.Fatalf("DRC target = %q, want project root", got)
+	}
+}
+
+func TestWorkflowCheckResultWithIssuesDowngradesZeroFindingToolError(t *testing.T) {
+	result := checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, TargetPath: "demo.kicad_pcb", ExitCode: -1}
+
+	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code -1"))
+
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one tool issue", issues)
+	}
+	if issues[0].Code != reports.CodeKiCadCLIFailed || issues[0].Severity != reports.SeverityWarning {
+		t.Fatalf("issue = %#v, want warning KiCad CLI failure", issues[0])
+	}
+}
+
+func TestWorkflowCheckResultWithIssuesKeepsGenericToolErrorBlocking(t *testing.T) {
+	result := checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, TargetPath: "demo.kicad_pcb", ExitCode: 2}
+
+	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code 2"))
+
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one tool issue", issues)
+	}
+	if issues[0].Code != reports.CodeKiCadCLIFailed || issues[0].Severity != reports.SeverityError {
+		t.Fatalf("issue = %#v, want blocking KiCad CLI failure", issues[0])
+	}
+}
+
+func TestWorkflowCheckResultWithIssuesKeepsParserToolErrorBlocking(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:         checks.CheckKindDRC,
+		Status:       checks.CheckStatusError,
+		TargetPath:   "demo.kicad_pcb",
+		ParserIssues: []checks.ParserIssue{{Message: "malformed DRC report"}},
+	}
+
+	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code 2"))
+
+	if len(issues) != 2 {
+		t.Fatalf("issues = %#v, want parser issue and tool issue", issues)
+	}
+	if issues[1].Code != reports.CodeKiCadCLIFailed || issues[1].Severity != reports.SeverityError {
+		t.Fatalf("tool issue = %#v, want blocking KiCad CLI failure", issues[1])
 	}
 }
 

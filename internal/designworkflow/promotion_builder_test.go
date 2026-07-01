@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -144,6 +145,30 @@ func TestBuildInternalPromotionReportMissingExpectedArtifact(t *testing.T) {
 	}
 	if !promotionReportHasNextAction(report, "artifacts", "missing required promotion artifacts") {
 		t.Fatalf("missing artifact next action in %#v", report.NextActions)
+	}
+}
+
+func TestPromotionBuilderMatchesAbsoluteArtifactUnderOutputDir(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "project")
+	fixture := PromotionFixture{
+		ID:                "artifact_paths",
+		Request:           "artifact_paths.json",
+		Tier:              "smoke",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceStructural,
+		ExpectedArtifacts: []string{".kicadai/manifest.json"},
+		ExpectedStages:    []StageName{StageBlockPlanning},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "artifact_paths", OutputDir: output}, AcceptanceStructural, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK, Artifacts: []reports.Artifact{{
+			Path: filepath.Join(output, ".kicadai", "manifest.json"),
+			Kind: reports.ArtifactValidationReport,
+		}}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "artifacts")
+	if gate.Status != PromotionGateStatusPass {
+		t.Fatalf("artifact gate = %#v, want pass", gate)
 	}
 }
 
@@ -392,6 +417,83 @@ func TestBuildPromotionReportKiCadChecksUnexpectedFindingFails(t *testing.T) {
 	}
 	if report.Status != PromotionStatusFailed {
 		t.Fatalf("status = %q, want failed", report.Status)
+	}
+}
+
+func TestBuildPromotionReportKiCadWarningOnlyFindingsWarn(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "warning_kicad",
+		Request:           "warning_kicad.json",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceERCDRC,
+		RequireDRC:        true,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageKiCadChecks},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "warning_kicad"}, AcceptanceERCDRC, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{
+			Name:   StageKiCadChecks,
+			Status: StageStatusWarning,
+			Summary: map[string]any{
+				"drc": checks.CheckResult{
+					Kind:   checks.CheckKindDRC,
+					Status: checks.CheckStatusFail,
+					Findings: []checks.CheckFinding{{
+						Severity: "warning",
+						Message:  "silkscreen clearance",
+					}},
+				},
+			},
+			Issues: []reports.Issue{{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityWarning,
+				Message:  "silkscreen clearance",
+			}},
+		},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "kicad_checks")
+	if gate.Status != PromotionGateStatusWarn {
+		t.Fatalf("kicad gate status = %q, want warn", gate.Status)
+	}
+	if report.AchievedReadiness != PromotionReadinessCandidate {
+		t.Fatalf("achieved readiness = %q, want candidate", report.AchievedReadiness)
+	}
+}
+
+func TestBuildPromotionReportKiCadZeroFindingToolErrorWarns(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "unstable_drc",
+		Request:           "unstable_drc.json",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceERCDRC,
+		RequireDRC:        true,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageKiCadChecks},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "unstable_drc"}, AcceptanceERCDRC, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{
+			Name:   StageKiCadChecks,
+			Status: StageStatusWarning,
+			Summary: map[string]any{
+				"drc": checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, ExitCode: -1},
+			},
+			Issues: []reports.Issue{{
+				Code:     reports.CodeKiCadCLIFailed,
+				Severity: reports.SeverityWarning,
+				Message:  "drc check failed with exit code -1",
+			}},
+		},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "kicad_checks")
+	if gate.Status != PromotionGateStatusWarn {
+		t.Fatalf("kicad gate status = %q, want warn", gate.Status)
+	}
+	if report.AchievedReadiness != PromotionReadinessCandidate {
+		t.Fatalf("achieved readiness = %q, want candidate", report.AchievedReadiness)
 	}
 }
 

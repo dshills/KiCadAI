@@ -56,6 +56,7 @@ func render(board PCBFile) (sexpr.List, error) {
 	layerNumbers := layerNumberMap(board.Layers)
 	footprints := sortedFootprints(board.Footprints)
 	routeNetCodes := routedNetSortCodes(footprints, netNames)
+	nodes = append(nodes, renderNets(board.Nets)...)
 	for _, footprint := range footprints {
 		nodes = append(nodes, renderFootprint(footprint, netNames))
 	}
@@ -76,6 +77,14 @@ func render(board PCBFile) (sexpr.List, error) {
 	}
 	nodes = insertPreservedNodes(nodes, board.Preserved)
 	return sexpr.L(nodes...), nil
+}
+
+func renderNets(nets []Net) []sexpr.Node {
+	nodes := make([]sexpr.Node, 0, len(nets))
+	for _, net := range nets {
+		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.I(int64(net.Code)), sexpr.S(net.Name)))
+	}
+	return nodes
 }
 
 func renderGeneral(general PCBGeneral) sexpr.List {
@@ -418,7 +427,7 @@ func renderPad(pad Pad, netName string) sexpr.List {
 		nodes = append(nodes, sexpr.L(sexpr.A("roundrect_rratio"), sexpr.F(roundRectRRatio(pad))))
 	}
 	if pad.NetCode > 0 || strings.TrimSpace(pad.NetName) != "" {
-		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.S(netName)))
+		nodes = append(nodes, sexpr.L(sexpr.A("net"), sexpr.I(int64(pad.NetCode)), sexpr.S(netName)))
 	}
 	if pad.UUID.Valid() {
 		nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(pad.UUID))))
@@ -544,7 +553,7 @@ func renderTrack(track Track, netNames map[int]string) sexpr.List {
 		sexpr.L(sexpr.A("end"), fixed(track.End.X), fixed(track.End.Y)),
 		sexpr.L(sexpr.A("width"), fixed(track.Width)),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(track.Layer))),
-		sexpr.L(sexpr.A("net"), sexpr.S(routedNetName(track.NetCode, track.NetName, netNames))),
+		sexpr.L(sexpr.A("net"), sexpr.I(int64(track.NetCode))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(track.UUID))),
 	)
 }
@@ -557,7 +566,7 @@ func renderTrackArc(arc TrackArc, netNames map[int]string) sexpr.List {
 		sexpr.L(sexpr.A("end"), fixed(arc.End.X), fixed(arc.End.Y)),
 		sexpr.L(sexpr.A("width"), fixed(arc.Width)),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(arc.Layer))),
-		sexpr.L(sexpr.A("net"), sexpr.S(routedNetName(arc.NetCode, arc.NetName, netNames))),
+		sexpr.L(sexpr.A("net"), sexpr.I(int64(arc.NetCode))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(arc.UUID))),
 	)
 }
@@ -574,7 +583,7 @@ func renderVia(via Via, netNames map[int]string) sexpr.List {
 		nodes = append(nodes, renderSidePair("tenting", via.TentingFront, via.TentingBack))
 	}
 	nodes = append(nodes,
-		sexpr.L(sexpr.A("net"), sexpr.S(routedNetName(via.NetCode, via.NetName, netNames))),
+		sexpr.L(sexpr.A("net"), sexpr.I(int64(via.NetCode))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(via.UUID))),
 	)
 	return sexpr.L(nodes...)

@@ -46,7 +46,7 @@
         "visibility": "local",
         "pins": [
           {"role": "resistor", "pin": "2"},
-          {"role": "led", "pin": "1"}
+          {"role": "led", "pin": "2"}
         ]
       }
     ]

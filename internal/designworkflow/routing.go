@@ -2,6 +2,9 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
+	"math"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/blocks"
@@ -26,6 +29,8 @@ type RoutingStageResult struct {
 	Operations []transactions.Operation `json:"operations,omitempty"`
 	Stage      StageResult              `json:"stage"`
 }
+
+const interBlockRouteSnapMaxDistanceMM = 0.75
 
 type LocalRouteConnectivitySummary struct {
 	RoutesAttempted        int `json:"routes_attempted"`
@@ -99,14 +104,20 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	issues = append(issues, interBlockCandidateIssues...)
 	issues = append(issues, anchorIssues...)
 	applyRoutingOptions(normalized, opts, &routingRequest)
+	if localRouteConnectivity.IssueCount == 0 {
+		routingRequest.Nets = excludeNetsWithRouteOperations(routingRequest.Nets, localOperations, interBlockCandidates)
+	}
 	result := routing.Result{Status: routing.StatusBlocked}
 	if !reports.HasBlockingIssue(issues) {
 		result = routing.RouteRequestContext(ctx, routingRequest)
 		issues = append(issues, result.Issues...)
 	}
 	routeOperations := transactionRouteOperations(result.Operations)
+	routeOperations, snapIssues := snapInterBlockRouteEndpoints(interBlockCandidates, routeOperations, &placed)
+	issues = append(issues, snapIssues...)
 	interBlockContactEvidence := ValidateInterBlockRouteEndpointContacts(interBlockCandidates, routeOperations, &placed)
 	issues = append(issues, interBlockContactEvidence.Issues...)
+	issues = suppressProvenRouteDisconnectedIssues(issues, interBlockContactEvidence, routeOperations, localOperations, localRouteConnectivity)
 	operations := append(localOperations, anchorOperations...)
 	operations = append(operations, routeOperations...)
 	stage := NewStageResult(StageRouting, issues)
@@ -267,6 +278,33 @@ func routeSegmentCountsByNet(operations []transactions.Operation) map[string]int
 		counts[net]++
 	}
 	return counts
+}
+
+func excludeNetsWithRouteOperations(nets []routing.Net, operations []transactions.Operation, candidates []InterBlockRouteCandidate) []routing.Net {
+	routed := routeSegmentCountsByNet(operations)
+	if len(routed) == 0 {
+		return nets
+	}
+	interBlock := interBlockCandidateNets(candidates)
+	filtered := make([]routing.Net, 0, len(nets))
+	for _, net := range nets {
+		netName := strings.TrimSpace(net.Name)
+		if _, ok := routed[netName]; ok && !interBlock[netName] {
+			continue
+		}
+		filtered = append(filtered, net)
+	}
+	return filtered
+}
+
+func interBlockCandidateNets(candidates []InterBlockRouteCandidate) map[string]bool {
+	nets := map[string]bool{}
+	for _, candidate := range candidates {
+		if netName := strings.TrimSpace(candidate.NetName); netName != "" {
+			nets[netName] = true
+		}
+	}
+	return nets
 }
 
 func issueCountsByNet(issues []reports.Issue) map[string]int {
@@ -501,9 +539,174 @@ func transactionRouteOperations(operations []routing.Operation) []transactions.O
 		if operation.Op != string(transactions.OpRoute) || len(operation.Raw) == 0 {
 			continue
 		}
-		txOperation := transactions.NewOperation(transactions.OpRoute, operation.Raw)
+		raw := canonicalRouteOperationLayers(operation.Raw)
+		txOperation := transactions.NewOperation(transactions.OpRoute, raw)
 		txOperation.Index = index
 		out = append(out, txOperation)
 	}
 	return out
+}
+
+func canonicalRouteOperationLayers(raw json.RawMessage) json.RawMessage {
+	var payload transactions.RouteOperation
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return raw
+	}
+	payload.Layer = canonicalCopperLayer(payload.Layer)
+	for index := range payload.Vias {
+		for layerIndex := range payload.Vias[index].Layers {
+			payload.Vias[index].Layers[layerIndex] = canonicalCopperLayer(payload.Vias[index].Layers[layerIndex])
+		}
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return raw
+	}
+	return encoded
+}
+
+func canonicalCopperLayer(layer string) string {
+	switch strings.ToUpper(strings.TrimSpace(layer)) {
+	case "F.CU":
+		return "F.Cu"
+	case "B.CU":
+		return "B.Cu"
+	default:
+		return layer
+	}
+}
+
+func snapInterBlockRouteEndpoints(candidates []InterBlockRouteCandidate, operations []transactions.Operation, placed *PlacementStageResult) ([]transactions.Operation, []reports.Issue) {
+	if len(candidates) == 0 || len(operations) == 0 {
+		return operations, nil
+	}
+	evidence := BuildInterBlockContactTargets(candidates, placed)
+	issues := append([]reports.Issue(nil), evidence.Issues...)
+	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
+	if len(targetsByNet) == 0 {
+		return operations, issues
+	}
+	out := append([]transactions.Operation(nil), operations...)
+	for index, operation := range out {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var payload transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			issues = append(issues, interBlockRouteSnapIssue(index, operation, "route operation could not be decoded for endpoint snapping: "+err.Error()))
+			continue
+		}
+		netName := strings.TrimSpace(operation.Net)
+		if netName == "" {
+			netName = strings.TrimSpace(payload.NetName)
+		}
+		targets := targetsByNet[netName]
+		if len(payload.Points) < 2 || len(targets) < 2 {
+			continue
+		}
+		snapIssues := snapRoutePayloadEndpoints(&payload, targets, index, operation)
+		if len(snapIssues) != 0 {
+			issues = append(issues, snapIssues...)
+			continue
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			issues = append(issues, interBlockRouteSnapIssue(index, operation, "route operation could not be encoded after endpoint snapping: "+err.Error()))
+			continue
+		}
+		snapped := transactions.NewOperation(transactions.OpRoute, raw)
+		snapped.Index = operation.Index
+		out[index] = snapped
+	}
+	return out, issues
+}
+
+func suppressProvenRouteDisconnectedIssues(issues []reports.Issue, evidence InterBlockContactEvidence, interBlockOperations []transactions.Operation, localOperations []transactions.Operation, localSummary LocalRouteConnectivitySummary) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	proven := interBlockConnectedNets(evidence, interBlockOperations)
+	if localSummary.IssueCount == 0 && localSummary.EndpointContactsProven >= localSummary.RoutesBound*2 {
+		for netName := range routeSegmentCountsByNet(localOperations) {
+			proven[netName] = true
+		}
+	}
+	if len(proven) == 0 {
+		return issues
+	}
+	filtered := make([]reports.Issue, 0, len(issues))
+	for _, issue := range issues {
+		if issue.Code == reports.CodeDisconnectedPad && issueNetsProven(issue, proven) {
+			continue
+		}
+		filtered = append(filtered, issue)
+	}
+	return filtered
+}
+
+func issueNetsProven(issue reports.Issue, proven map[string]bool) bool {
+	if len(issue.Nets) == 0 {
+		return false
+	}
+	for _, netName := range issue.Nets {
+		if !proven[strings.TrimSpace(netName)] {
+			return false
+		}
+	}
+	return true
+}
+
+func snapRoutePayloadEndpoints(payload *transactions.RouteOperation, targets []InterBlockContactTarget, operationIndex int, operation transactions.Operation) []reports.Issue {
+	if payload == nil || len(payload.Points) < 2 || len(targets) < 2 {
+		return nil
+	}
+	first := payload.Points[0]
+	lastIndex := len(payload.Points) - 1
+	last := payload.Points[lastIndex]
+	left, right := nearestEndpointTargetPair(first, last, targets)
+	if distance := math.Sqrt(routeSnapDistance(first, left.Point)); distance > interBlockRouteSnapMaxDistanceMM {
+		return []reports.Issue{interBlockRouteSnapIssue(operationIndex, operation, "route start is too far from resolved contact target for endpoint snapping")}
+	}
+	if distance := math.Sqrt(routeSnapDistance(last, right.Point)); distance > interBlockRouteSnapMaxDistanceMM {
+		return []reports.Issue{interBlockRouteSnapIssue(operationIndex, operation, "route end is too far from resolved contact target for endpoint snapping")}
+	}
+	payload.Points[0] = left.Point
+	payload.Points[lastIndex] = right.Point
+	return nil
+}
+
+func nearestEndpointTargetPair(first transactions.Point, last transactions.Point, targets []InterBlockContactTarget) (InterBlockContactTarget, InterBlockContactTarget) {
+	bestLeft := targets[0]
+	bestRight := targets[1]
+	bestDistance := math.Inf(1)
+	for leftIndex, left := range targets {
+		for rightIndex, right := range targets {
+			if leftIndex == rightIndex {
+				continue
+			}
+			distance := routeSnapDistance(first, left.Point) + routeSnapDistance(last, right.Point)
+			if distance < bestDistance {
+				bestDistance = distance
+				bestLeft = left
+				bestRight = right
+			}
+		}
+	}
+	return bestLeft, bestRight
+}
+
+func routeSnapDistance(left transactions.Point, right transactions.Point) float64 {
+	dx := left.XMM - right.XMM
+	dy := left.YMM - right.YMM
+	return dx*dx + dy*dy
+}
+
+func interBlockRouteSnapIssue(index int, operation transactions.Operation, message string) reports.Issue {
+	return reports.Issue{
+		Code:        reports.CodeRouteContactUnsupported,
+		Severity:    reports.SeverityBlocked,
+		Path:        "design.inter_block_contact.operations[" + strconv.Itoa(index) + "]",
+		Message:     message,
+		OperationID: contactOperationID(operation),
+	}
 }

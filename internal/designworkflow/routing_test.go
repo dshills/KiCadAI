@@ -30,14 +30,14 @@ func TestRoutePlacementUsesGeneratedPadSummariesForLocalRoutes(t *testing.T) {
 	if countTransactionOps(result.Operations, transactions.OpRoute) == 0 {
 		t.Fatalf("operations = %#v, want local route operation", result.Operations)
 	}
-	if result.Stage.Status != StageStatusBlocked {
-		t.Fatalf("stage = %#v, want blocked on real generated route connectivity", result.Stage)
+	if result.Stage.Status != StageStatusOK {
+		t.Fatalf("stage = %#v, want clean local route connectivity", result.Stage)
 	}
 	localRoutes, ok := result.Stage.Summary["local_route_mobility"].(LocalRouteMobilitySummary)
 	if !ok || localRoutes.Total == 0 || localRoutes.Preserved == 0 {
 		t.Fatalf("local route mobility summary = %#v", result.Stage.Summary["local_route_mobility"])
 	}
-	assertIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
+	assertNoIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
 }
 
 func TestRoutePlacementAuditShowsNamedLocalRouteCanStillMissPhysicalPads(t *testing.T) {
@@ -68,10 +68,10 @@ func TestRoutePlacementAuditShowsNamedLocalRouteCanStillMissPhysicalPads(t *test
 	if netAssignment.AssignedCopperObjects == 0 {
 		t.Fatalf("net assignment = %#v, want assigned local-route copper", netAssignment)
 	}
-	if routed.Stage.Status != StageStatusBlocked {
-		t.Fatalf("routing stage = %#v, want blocked by physical route endpoint miss", routed.Stage)
+	if routed.Stage.Status != StageStatusOK {
+		t.Fatalf("routing stage = %#v, want physical route endpoint proof", routed.Stage)
 	}
-	assertIssueCode(t, routed.Stage.Issues, reports.CodeDisconnectedPad)
+	assertNoIssueCode(t, routed.Stage.Issues, reports.CodeDisconnectedPad)
 	if countTransactionOps(routed.Operations, transactions.OpRoute) == 0 {
 		t.Fatalf("operations = %#v, want named local route operation", routed.Operations)
 	}
@@ -261,8 +261,8 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 	}
 
 	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
-	if result.Stage.Status != StageStatusBlocked {
-		t.Fatalf("routing status = %s, want blocked pending route-completion evidence; issues=%#v", result.Stage.Status, result.Stage.Issues)
+	if result.Stage.Status != StageStatusOK {
+		t.Fatalf("routing status = %s, want proven route-completion evidence; issues=%#v", result.Stage.Status, result.Stage.Issues)
 	}
 	if !routingRequestHasNet(result.Request, "LED_EN") {
 		t.Fatalf("routing request nets = %#v, want LED_EN", result.Request.Nets)
@@ -280,18 +280,17 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 			}
 		}
 	}
-	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeDisconnectedPad)
-	assertNetHasIssueCode(t, result.Stage.Issues, "LED_EN", reports.CodeRouteContactMiss)
+	assertNoIssueCode(t, result.Stage.Issues, reports.CodeDisconnectedPad)
 	interBlock := requireInterBlockRouteSummary(t, result.Stage)
 	if interBlock.Candidates == 0 || interBlock.RoutesAttempted == 0 {
 		t.Fatalf("inter-block summary = %#v, want attempted candidate", interBlock)
 	}
-	if interBlock.RoutesCompleted != 0 || interBlock.PartialNets == 0 || interBlock.EmittedSegments == 0 || interBlock.IssueCount == 0 {
-		t.Fatalf("inter-block summary = %#v, want partial routed evidence for LED_EN", interBlock)
+	if interBlock.RoutesCompleted == 0 || interBlock.PartialNets != 0 || interBlock.EmittedSegments == 0 || interBlock.IssueCount != 0 {
+		t.Fatalf("inter-block summary = %#v, want completed routed evidence for LED_EN", interBlock)
 	}
 	contacts := requireInterBlockContactSummary(t, result.Stage)
-	if contacts.ContactsRequired == 0 || contacts.ContactsFailed == 0 || contacts.ContactMisses == 0 {
-		t.Fatalf("inter-block contact summary = %#v, want explicit contact miss evidence", contacts)
+	if contacts.ContactsRequired == 0 || contacts.ContactsProven == 0 || contacts.ContactMisses != 0 {
+		t.Fatalf("inter-block contact summary = %#v, want snapped contact evidence", contacts)
 	}
 }
 
@@ -478,6 +477,15 @@ func assertNetHasIssueCode(t *testing.T, issues []reports.Issue, net string, cod
 		}
 	}
 	t.Fatalf("issues = %#v, want issue code %s for net %s", issues, code, net)
+}
+
+func assertNoIssueCode(t *testing.T, issues []reports.Issue, code reports.Code) {
+	t.Helper()
+	for _, issue := range issues {
+		if issue.Code == code {
+			t.Fatalf("issues = %#v, did not want issue code %s", issues, code)
+		}
+	}
 }
 
 func stageUsableForRoutingTest(stage StageResult) bool {

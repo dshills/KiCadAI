@@ -120,7 +120,7 @@ func TestReadWritePCBPreservesViaGeometryAndNet(t *testing.T) {
 		t.Fatal(err)
 	}
 	output := buf.String()
-	for _, want := range []string{`(size 0.8)`, `(drill 0.4)`, `"F.Cu"`, `"B.Cu"`, `(net "GND")`} {
+	for _, want := range []string{`(size 0.8)`, `(drill 0.4)`, `"F.Cu"`, `"B.Cu"`, `(net 1)`} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %s:\n%s", want, output)
 		}

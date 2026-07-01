@@ -92,22 +92,50 @@ func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG"); err != nil {
 		t.Fatalf("Connect returned error: %v", err)
 	}
-	if got := len(builder.design.Schematic.Wires); got != 3 {
-		t.Fatalf("wire count = %d, want 3 orthogonal segments", got)
+	if got := len(builder.design.Schematic.Wires); got != 2 {
+		t.Fatalf("wire count = %d, want 2 orthogonal segments", got)
+	}
+	if got := len(builder.design.Schematic.Junctions); got != 1 {
+		t.Fatalf("junction count = %d, want 1 dogleg bend junction", got)
+	}
+	if got := len(builder.design.Schematic.Labels); got != 1 {
+		t.Fatalf("label count = %d, want 1 dogleg bend label", got)
+	}
+	wantSegments := [][2]kicadfiles.Point{
+		{
+			{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)},
+			{X: kicadfiles.MM(25), Y: kicadfiles.MM(32)},
+		},
+		{
+			{X: kicadfiles.MM(25), Y: kicadfiles.MM(32)},
+			{X: kicadfiles.MM(35), Y: kicadfiles.MM(32)},
+		},
 	}
 	for wireIndex, wire := range builder.design.Schematic.Wires {
 		if len(wire.Points) != 2 {
 			t.Fatalf("wire %d points = %#v, want 2-point KiCad segment", wireIndex, wire.Points)
 		}
+		if wire.Points[0] != wantSegments[wireIndex][0] || wire.Points[1] != wantSegments[wireIndex][1] {
+			t.Fatalf("wire %d points = %#v, want %#v", wireIndex, wire.Points, wantSegments[wireIndex])
+		}
 		if wire.Points[0].X != wire.Points[1].X && wire.Points[0].Y != wire.Points[1].Y {
 			t.Fatalf("wire %d is diagonal: %#v", wireIndex, wire.Points)
 		}
 	}
+	if label := builder.design.Schematic.Labels[0]; label.Text != "SIG" || label.Position != (kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(32)}) {
+		t.Fatalf("dogleg label = %#v, want SIG at bend", label)
+	}
 	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG"); err != nil {
 		t.Fatalf("duplicate Connect returned error: %v", err)
 	}
-	if got := len(builder.design.Schematic.Wires); got != 3 {
-		t.Fatalf("duplicate connect added wire count = %d, want 3", got)
+	if got := len(builder.design.Schematic.Wires); got != 2 {
+		t.Fatalf("duplicate connect added wire count = %d, want 2", got)
+	}
+	if got := len(builder.design.Schematic.Junctions); got != 1 {
+		t.Fatalf("duplicate connect added junction count = %d, want 1", got)
+	}
+	if got := len(builder.design.Schematic.Labels); got != 1 {
+		t.Fatalf("duplicate connect added label count = %d, want 1", got)
 	}
 }
 
@@ -514,8 +542,14 @@ func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	if len(design.Schematic.Symbols[0].Pins) != 2 || len(design.Schematic.Symbols[1].Pins) != 2 {
 		t.Fatalf("template pins not rendered: %#v", design.Schematic.Symbols)
 	}
-	if len(design.Schematic.Wires) != 1 {
-		t.Fatalf("wires = %d, want 1", len(design.Schematic.Wires))
+	if len(design.Schematic.Wires) != 2 {
+		t.Fatalf("wires = %d, want 2", len(design.Schematic.Wires))
+	}
+	if len(design.Schematic.Labels) != 1 {
+		t.Fatalf("labels = %d, want 1 dogleg label", len(design.Schematic.Labels))
+	}
+	if len(design.Schematic.Junctions) != 1 {
+		t.Fatalf("junctions = %d, want 1 dogleg junction", len(design.Schematic.Junctions))
 	}
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "R1", Pin: "2"}, "FILTER")
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "C1", Pin: "1"}, "FILTER")

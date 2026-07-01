@@ -753,7 +753,7 @@ func TestRunDesignCreateRetrySummarySnapshot(t *testing.T) {
 		wantStageStat string
 	}{
 		{name: "disabled", fixture: "disabled", wantStageStat: "skipped"},
-		{name: "enabled", fixture: "non_improving", wantRetry: true, wantAttempts: 1, wantStop: "no_eligible_hints", wantStageStat: "blocked"},
+		{name: "enabled", fixture: "non_improving", wantRetry: true, wantAttempts: 1, wantStop: "routed", wantStageStat: "ok"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -819,8 +819,8 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	assertCLINestedSummaryNumber(t, placementStage, "mobility", "eligible_count", 2)
 	assertCLINestedSummaryNumber(t, placementStage, "mobility", "group_transform_count", 2)
 	routingStage := cliRetryStageByName(t, result.Data.Stages, "routing")
-	if routingStage.Status != "blocked" {
-		t.Fatalf("routing stage status = %q, want blocked", routingStage.Status)
+	if routingStage.Status != "ok" {
+		t.Fatalf("routing stage status = %q, want ok", routingStage.Status)
 	}
 	assertCLINestedSummaryNumber(t, routingStage, "local_route_mobility", "total", 1)
 	assertCLINestedSummaryNumber(t, routingStage, "local_route_mobility", "transformable", 1)
@@ -837,7 +837,7 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if applied, ok := retry["applied"].(float64); !ok || applied != 0 {
 		t.Fatalf("retry applied = %#v", retry["applied"])
 	}
-	if stop, ok := retry["stop_reason"].(string); !ok || stop != "no_eligible_hints" {
+	if stop, ok := retry["stop_reason"].(string); !ok || stop != "routed" {
 		t.Fatalf("retry stop = %#v", retry["stop_reason"])
 	}
 	if selectedAttempt, ok := retry["selected_attempt"].(float64); !ok || selectedAttempt != 1 {
@@ -860,9 +860,7 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	if source, ok := first["drc_source"].(string); !ok || source != "skipped" {
 		t.Fatalf("baseline DRC source = %#v", first["drc_source"])
 	}
-	if _, hasCategories := retry["hint_categories"]; hasCategories {
-		t.Fatalf("retry hint categories should be absent for no-eligible-hints boundary: %#v", retry["hint_categories"])
-	}
+	assertCLINestedSummaryNumber(t, routingStage, "route_connectivity", "endpoint_contacts_proven", 2)
 	if cliRetryStageHasIssue(routingStage, "footprint pad summaries") {
 		t.Fatalf("routing stage still has pad-summary issue: %#v", routingStage.Issues)
 	}

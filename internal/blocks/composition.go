@@ -8,7 +8,7 @@ import (
 	"kicadai/internal/transactions"
 )
 
-const compositionInstanceSpacingMM = 90.0
+const compositionInstanceSpacingMM = 91.44
 
 type CompositionRequest struct {
 	ProjectName string                  `json:"project_name,omitempty"`

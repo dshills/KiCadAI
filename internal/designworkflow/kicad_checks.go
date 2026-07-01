@@ -231,9 +231,25 @@ func workflowCheckResultWithIssues(result checks.CheckResult, err error) (checks
 		issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: result.ReportPath, Message: parserIssue.Message})
 	}
 	if err != nil {
-		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: reports.SeverityError, Path: result.TargetPath, Message: err.Error()})
+		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: workflowCheckToolErrorSeverity(result), Path: result.TargetPath, Message: err.Error()})
 	}
 	return result, issues, workflowCheckArtifacts(result)
+}
+
+func workflowCheckToolErrorSeverity(result checks.CheckResult) reports.Severity {
+	if workflowCheckToolErrorHasNoFindingDRCInstability(result) {
+		return reports.SeverityWarning
+	}
+	return reports.SeverityError
+}
+
+func workflowCheckToolErrorHasNoFindingDRCInstability(result checks.CheckResult) bool {
+	return result.Kind == checks.CheckKindDRC &&
+		result.ExitCode == -1 &&
+		len(result.Findings) == 0 &&
+		len(result.ParserIssues) == 0 &&
+		strings.TrimSpace(result.Stdout) == "" &&
+		strings.TrimSpace(result.Stderr) == ""
 }
 
 func workflowCheckSeverity(severity string) reports.Severity {

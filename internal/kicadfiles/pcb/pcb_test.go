@@ -323,7 +323,7 @@ func TestValidateRejectsCyclicPreservedPlacementAnchors(t *testing.T) {
 	}
 }
 
-func TestWriteUsesNetNamesForPadsAndRoutes(t *testing.T) {
+func TestWriteUsesKiCadNetDeclarationsForPadsAndRoutes(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 2, Name: "LED_OUT"}, {Code: 1, Name: "GND"}}
 	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "D1")
@@ -344,13 +344,13 @@ func TestWriteUsesNetNamesForPadsAndRoutes(t *testing.T) {
 	}
 
 	output := buf.String()
-	for _, want := range []string{`(net "LED_OUT")`, `(net "GND")`} {
+	for _, want := range []string{`(net 0 "")`, `(net 1 "GND")`, `(net 2 "LED_OUT")`, `(net 1)`} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %q:\n%s", want, output)
 		}
 	}
-	if strings.Contains(output, `(net 1 "GND")`) || strings.Contains(output, `(net 2 "LED_OUT")`) {
-		t.Fatalf("top-level net declarations should not be rendered:\n%s", output)
+	if strings.Contains(output, `(net "LED_OUT")`) || strings.Contains(output, `(net "GND")`) {
+		t.Fatalf("string-only net references should not be rendered:\n%s", output)
 	}
 }
 
@@ -391,7 +391,7 @@ func TestWriteNormalizesNetZeroBeforeValidation(t *testing.T) {
 	if err := Write(&buf, board); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
-	if !strings.Contains(buf.String(), `(net "A")`) {
+	if !strings.Contains(buf.String(), `(net 1 "A")`) {
 		t.Fatalf("net name resolution missing:\n%s", buf.String())
 	}
 }
@@ -435,9 +435,9 @@ func TestLEDIndicatorPCBWritesDeterministicBoard(t *testing.T) {
 	output := first.String()
 	for _, want := range []string{
 		"(title \"LED Indicator\")",
-		"(net \"VCC\")",
-		"(net \"LED_OUT\")",
-		"(net \"GND\")",
+		"(net 1 \"VCC\")",
+		"(net 2 \"LED_OUT\")",
+		"(net 3 \"GND\")",
 		"\"LED_SMD:LED_0805_2012Metric\"",
 		"\"Resistor_SMD:R_0805_2012Metric\"",
 		"(property",
@@ -875,7 +875,19 @@ func TestWriteOmitsNetForUnconnectedPad(t *testing.T) {
 	if err := Write(&buf, board); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
-	if strings.Contains(buf.String(), "(net ") {
+	output := buf.String()
+	if strings.Contains(output, `(pad "1"`) && strings.Contains(output, `(net 0 "")`) {
+		padStart := strings.Index(output, `(pad "1"`)
+		nextPad := strings.Index(output[padStart+1:], `(pad `)
+		padBlock := output[padStart:]
+		if nextPad >= 0 {
+			padBlock = output[padStart : padStart+1+nextPad]
+		}
+		if strings.Contains(padBlock, "(net ") {
+			t.Fatalf("unconnected pad should not render net:\n%s", output)
+		}
+	}
+	if strings.Contains(output, `(net 0 "")`) && strings.Count(output, "(net ") != 1 {
 		t.Fatalf("unconnected pad should not render net:\n%s", buf.String())
 	}
 }
@@ -1337,9 +1349,9 @@ func TestWriteSortsRoutedItemsLikeKiCad(t *testing.T) {
 	}
 
 	output := buf.String()
-	gndSegment := strings.Index(output, "(net \"GND\")")
+	gndSegment := strings.Index(output, "(net 1)")
 	via := strings.Index(output, "(via")
-	vccSegment := strings.Index(output, "(net \"VCC\")")
+	vccSegment := strings.Index(output, "(net 2)")
 	if gndSegment < 0 || via < 0 || vccSegment < 0 {
 		t.Fatalf("expected routed items missing:\n%s", output)
 	}
@@ -1519,7 +1531,7 @@ func TestWriteAdvancedGeometry(t *testing.T) {
 		"(gr_arc",
 		"(gr_poly",
 		"(zone",
-		"(net \"GND\")",
+		"(net 1 \"GND\")",
 		"(polygon",
 		"(dimension",
 		"(type aligned)",

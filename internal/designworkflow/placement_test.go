@@ -125,7 +125,7 @@ func TestPlaceFragmentsPromotesRequestConnectionsToPlacementNets(t *testing.T) {
 	if !ok {
 		t.Fatalf("placement nets = %#v, want GND", result.Request.Nets)
 	}
-	if !placementNetHasEndpointPrefix(gndNet, "J", "2") || !placementNetHasEndpointPrefix(gndNet, "D", "2") {
+	if !placementNetHasEndpointPrefix(gndNet, "J", "2") || !placementNetHasEndpointPrefix(gndNet, "D", "1") {
 		t.Fatalf("GND endpoints = %#v, want connector ground and LED ground pad", gndNet.Endpoints)
 	}
 	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, result)

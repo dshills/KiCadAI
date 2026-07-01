@@ -131,6 +131,10 @@
       (outputdirectory "")
     )
   )
+  (net 0 "")
+  (net 1 "GND")
+  (net 2 "VCC")
+  (net 3 "SIGNAL")
   (footprint
     "LED_SMD:LED_0805_2012Metric"
     (layer "F.Cu")
@@ -238,7 +242,7 @@
       (pinfunction "1")
       (pintype "passive")
       (roundrect_rratio 0.25)
-      (net "SIGNAL")
+      (net 3 "SIGNAL")
       (uuid "0544355a-8d14-5234-85fc-a78fabadd186")
     )
     (pad
@@ -251,7 +255,7 @@
       (pinfunction "2")
       (pintype "passive")
       (roundrect_rratio 0.25)
-      (net "GND")
+      (net 1 "GND")
       (uuid "37a7b8b3-50b2-530d-8198-25cc712677ca")
     )
     (embedded_fonts no)
@@ -363,7 +367,7 @@
       (drill 1)
       (pinfunction "VCC")
       (pintype "power_in")
-      (net "VCC")
+      (net 2 "VCC")
       (uuid "9b82bd1c-1d65-5648-ae31-2c581ac1a113")
     )
     (pad
@@ -376,7 +380,7 @@
       (drill 1)
       (pinfunction "GND")
       (pintype "power_in")
-      (net "GND")
+      (net 1 "GND")
       (uuid "9a1c074b-0910-52ec-bd01-c0371a85963a")
     )
     (embedded_fonts no)
@@ -488,7 +492,7 @@
       (pinfunction "1")
       (pintype "passive")
       (roundrect_rratio 0.25)
-      (net "VCC")
+      (net 2 "VCC")
       (uuid "3a1cbe9a-8161-5051-b5a3-bbedf186b4f9")
     )
     (pad
@@ -501,7 +505,7 @@
       (pinfunction "2")
       (pintype "passive")
       (roundrect_rratio 0.25)
-      (net "SIGNAL")
+      (net 3 "SIGNAL")
       (uuid "9b8b295b-f673-5425-9aeb-9f48019fe477")
     )
     (embedded_fonts no)
@@ -563,7 +567,7 @@
     (end 36 24)
     (width 0.25)
     (layer "F.Cu")
-    (net "SIGNAL")
+    (net 3)
     (uuid "a5e84b4b-bf69-5637-82bb-6848235da344")
   )
   (via
@@ -571,7 +575,7 @@
     (size 0.8)
     (drill 0.4)
     (layers "F.Cu" "B.Cu")
-    (net "SIGNAL")
+    (net 3)
     (uuid "3abcf1f8-f8c1-50ad-8f41-000b8f4281d2")
   )
   (arc
@@ -580,7 +584,7 @@
     (end 44.9 24)
     (width 0.25)
     (layer "F.Cu")
-    (net "SIGNAL")
+    (net 3)
     (uuid "2aa70c79-7ca3-5a2e-a6e0-71f8095946ad")
   )
   (via
@@ -588,7 +592,7 @@
     (size 0.8)
     (drill 0.4)
     (layers "F.Cu" "B.Cu")
-    (net "GND")
+    (net 1)
     (uuid "b22299ea-833a-57f8-930b-f26d69f175d0")
   )
   (segment
@@ -596,7 +600,7 @@
     (end 16 25.27)
     (width 0.25)
     (layer "B.Cu")
-    (net "GND")
+    (net 1)
     (uuid "388351e6-80e5-5d69-8b53-bc87e0804fd3")
   )
   (segment
@@ -604,7 +608,7 @@
     (end 26.9 24)
     (width 0.25)
     (layer "F.Cu")
-    (net "VCC")
+    (net 2)
     (uuid "6267c7dc-0641-598f-9f0d-722c60aae3fa")
   )
   (zone

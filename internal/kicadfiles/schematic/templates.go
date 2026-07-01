@@ -18,19 +18,21 @@ type embeddedTemplate struct {
 	pinX     float64
 	power    bool
 	pins     []TemplatePin
+	rawBody  string
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
-	"device:c":    {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:d":    {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:led":  {bodyName: "LED", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:r":    {bodyName: "R", pinType: "passive", pins: twoPinTemplatePins()},
-	"power:+3.3v": powerTemplate("+3.3V", 5.08),
-	"power:+3v3":  powerTemplate("+3V3", 5.08),
-	"power:+5v":   powerTemplate("+5V", 5.08),
-	"power:+12v":  powerTemplate("+12V", 5.08),
-	"power:-12v":  powerTemplate("-12V", -5.08),
-	"power:gnd":   powerTemplate("GND", -5.08),
+	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
+	"device:c":                     {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:d":                     {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:led":                   {bodyName: "LED", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceLEDSymbol},
+	"device:r":                     {bodyName: "R", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}}}, rawBody: rawDeviceRSymbol},
+	"power:+3.3v":                  powerTemplate("+3.3V", 5.08),
+	"power:+3v3":                   powerTemplate("+3V3", 5.08),
+	"power:+5v":                    powerTemplate("+5V", 5.08),
+	"power:+12v":                   powerTemplate("+12V", 5.08),
+	"power:-12v":                   powerTemplate("-12V", -5.08),
+	"power:gnd":                    powerTemplate("GND", -5.08),
 	"power:pwr_flag": {
 		bodyName: "PWR_FLAG",
 		pinType:  "power_out",
@@ -96,12 +98,26 @@ func cloneTemplatePins(source []TemplatePin) []TemplatePin {
 
 func embeddedSymbolFromTemplate(libraryID string, template embeddedTemplate) EmbeddedSymbol {
 	var body sexpr.List
-	if template.power {
+	if strings.TrimSpace(template.rawBody) != "" {
+		body = rawEmbeddedSymbolBody(template.rawBody)
+	} else if template.power {
 		body = powerSymbolBody(libraryID, template.bodyName, template.pinType, template.pinX)
 	} else {
-		body = twoPinSymbolBody(libraryID, template.bodyName, template.pinType)
+		body = symbolBodyFromTemplatePins(libraryID, template.bodyName, template.pinType, template.pins)
 	}
 	return EmbeddedSymbol{LibraryID: libraryID, Body: body}
+}
+
+func rawEmbeddedSymbolBody(raw string) sexpr.List {
+	node, err := sexpr.Parse([]byte(raw))
+	if err != nil {
+		return nil
+	}
+	list, ok := node.Node().(sexpr.List)
+	if !ok {
+		return nil
+	}
+	return list
 }
 
 // EnsureEmbeddedSymbol adds a known embedded lib symbol template to file once.
@@ -165,15 +181,18 @@ func ensureEmbeddedSymbolBody(file *SchematicFile, libraryID string, body sexpr.
 }
 
 func twoPinSymbolBody(libraryID, bodyName, pinType string) sexpr.List {
+	return symbolBodyFromTemplatePins(libraryID, bodyName, pinType, twoPinTemplatePins())
+}
+
+func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []TemplatePin) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(libraryID)}
+	pinNodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(bodyName + "_1_1")}
+	for _, pin := range pins {
+		pinNodes = append(pinNodes, embeddedTemplatePin(pinType, pin))
+	}
 	nodes = append(nodes, embeddedSymbolDefaults()...)
 	nodes = append(nodes,
-		sexpr.L(
-			sexpr.A("symbol"),
-			sexpr.S(bodyName+"_1_1"),
-			embeddedPin(pinType, -5.08, 0, "~", "1"),
-			embeddedPin(pinType, 5.08, 180, "~", "2"),
-		),
+		sexpr.L(pinNodes...),
 		// KiCad 10.0.3 writes embedded_fonts inside each embedded lib symbol.
 		sexpr.L(sexpr.A("embedded_fonts"), sexpr.A("no")),
 	)
@@ -235,3 +254,113 @@ func embeddedPin(pinType string, pinX float64, rotation int64, name string, numb
 		sexpr.L(sexpr.A("number"), sexpr.S(number), renderEffects(false)),
 	)
 }
+
+func embeddedTemplatePin(pinType string, pin TemplatePin) sexpr.List {
+	return sexpr.L(
+		sexpr.A("pin"),
+		sexpr.A(pinType),
+		sexpr.A("line"),
+		sexpr.L(sexpr.A("at"), sexpr.F(templatePinMM(pin.Offset.X)), sexpr.F(templatePinMM(pin.Offset.Y)), sexpr.I(templatePinRotation(pin.Offset))),
+		sexpr.L(sexpr.A("length"), sexpr.X("2.54")),
+		sexpr.L(sexpr.A("name"), sexpr.S("~"), renderEffects(false)),
+		sexpr.L(sexpr.A("number"), sexpr.S(pin.Number), renderEffects(false)),
+	)
+}
+
+func templatePinRotation(offset kicadfiles.Point) int64 {
+	switch {
+	case offset.X < 0:
+		return 0
+	case offset.X > 0:
+		return 180
+	case offset.Y > 0:
+		return 270
+	case offset.Y < 0:
+		return 90
+	default:
+		return 0
+	}
+}
+
+func templatePinMM(value kicadfiles.IU) float64 {
+	return float64(value) / 1_000_000
+}
+
+const rawDeviceRSymbol = `(symbol "Device:R"
+  (pin_numbers (hide yes))
+  (pin_names (offset 0))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "R" (at 2.032 0 90) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Value" "R" (at 0 0 90) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Footprint" "" (at -1.778 0 90) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Resistor" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "R res resistor" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "R_*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "R_0_1"
+    (rectangle (start -1.016 -2.54) (end 1.016 2.54) (stroke (width 0.254) (type default)) (fill (type none)))
+  )
+  (symbol "R_1_1"
+    (pin passive line (at 0 3.81 270) (length 1.27) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at 0 -3.81 90) (length 1.27) (name "" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`
+
+const rawDeviceLEDSymbol = `(symbol "Device:LED"
+  (pin_numbers (hide yes))
+  (pin_names (offset 1.016) (hide yes))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "D" (at 0 2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Value" "LED" (at 0 -2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Footprint" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Light emitting diode" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Sim.Pins" "1=K 2=A" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "LED diode" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "LED* LED_SMD:* LED_THT:*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "LED_0_1"
+    (polyline (pts (xy -3.048 -0.762) (xy -4.572 -2.286) (xy -3.81 -2.286) (xy -4.572 -2.286) (xy -4.572 -1.524)) (stroke (width 0) (type default)) (fill (type none)))
+    (polyline (pts (xy -1.778 -0.762) (xy -3.302 -2.286) (xy -2.54 -2.286) (xy -3.302 -2.286) (xy -3.302 -1.524)) (stroke (width 0) (type default)) (fill (type none)))
+    (polyline (pts (xy -1.27 0) (xy 1.27 0)) (stroke (width 0) (type default)) (fill (type none)))
+    (polyline (pts (xy -1.27 -1.27) (xy -1.27 1.27)) (stroke (width 0.254) (type default)) (fill (type none)))
+    (polyline (pts (xy 1.27 -1.27) (xy 1.27 1.27) (xy -1.27 0) (xy 1.27 -1.27)) (stroke (width 0.254) (type default)) (fill (type none)))
+  )
+  (symbol "LED_1_1"
+    (pin passive line (at -3.81 0 0) (length 2.54) (name "K" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at 3.81 0 180) (length 2.54) (name "A" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`
+
+const rawConnectorGenericConn01x02Symbol = `(symbol "Connector_Generic:Conn_01x02"
+  (pin_names (offset 1.016) (hide yes))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "J" (at 0 2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Value" "Conn_01x02" (at 0 -5.08 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Footprint" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Generic connector, single row, 01x02, script generated (kicad-library-utils/schlib/autogen/connector/)" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "connector" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "Connector*:*_1x??_*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "Conn_01x02_1_1"
+    (rectangle (start -1.27 1.27) (end 1.27 -3.81) (stroke (width 0.254) (type default)) (fill (type background)))
+    (rectangle (start -1.27 0.127) (end 0 -0.127) (stroke (width 0.1524) (type default)) (fill (type none)))
+    (rectangle (start -1.27 -2.413) (end 0 -2.667) (stroke (width 0.1524) (type default)) (fill (type none)))
+    (pin passive line (at -5.08 0 0) (length 3.81) (name "Pin_1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at -5.08 -2.54 0) (length 3.81) (name "Pin_2" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`

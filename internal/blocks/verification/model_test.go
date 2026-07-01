@@ -540,7 +540,7 @@ func validManifest() Manifest {
 				Visibility: "local",
 				Pins: []ExpectedPin{
 					{Role: "resistor", Pin: "2"},
-					{Role: "led", Pin: "1"},
+					{Role: "led", Pin: "2"},
 				},
 			}},
 		},

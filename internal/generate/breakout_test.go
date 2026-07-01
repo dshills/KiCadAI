@@ -30,10 +30,10 @@ func TestGenerateBreakoutWritesProject(t *testing.T) {
 	for _, want := range []string{
 		`"Edge.Cuts"`,
 		`PinHeader_1x04_P2.54mm_Vertical`,
-		`(net "VCC")`,
-		`(net "GND")`,
-		`(net "SCL")`,
-		`(net "SDA")`,
+		`(net 1 "VCC")`,
+		`(net 2 "GND")`,
+		`(net 3 "SCL")`,
+		`(net 4 "SDA")`,
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("PCB missing %q\n%s", want, text)

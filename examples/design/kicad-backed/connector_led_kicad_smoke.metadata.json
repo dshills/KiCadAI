@@ -2,30 +2,32 @@
   "id": "connector_led_kicad_smoke",
   "request": "connector_led_kicad_smoke.json",
   "tier": "block-composition",
-  "readiness": "expected_fail",
+  "readiness": "candidate",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
     ".kicadai/transaction.json",
-    ".kicadai/manifest.json"
+    ".kicadai/manifest.json",
+    ".kicadai/design-promotion.json"
   ],
   "expected_stages": [
     "block_planning",
     "component_selection",
     "schematic",
+    "schematic_electrical",
     "pcb_realization",
     "placement",
+    "routing",
     "project_write",
     "writer_correctness",
     "validation",
     "kicad_checks"
   ],
   "known_gaps": [
-    "Inter-block connector-to-LED routing now emits evidence-of-contact diagnostics; the supported LED_EN path remains partial until all required contacts are graph-connected.",
-    "Promotion route_completion and kicad_checks gates are expected to block until the connector-to-LED route has complete endpoint-contact evidence and real ERC/DRC reports.",
-    "This KiCad-backed fixture still keeps routing skipped until endpoint-contact route completion validates cleanly."
+    "Local KiCad 10.0.3 DRC currently exits abnormally with no parsed findings for this generated board and the existing DRC-pass sample; promotion records this as warning evidence until the external tool crash is isolated.",
+    "The candidate still carries non-blocking warnings for explicit GND net-class policy and missing resolver-backed library-index evidence."
   ],
-  "notes": "Design-level multi-block PCB output carries pad/copper net code evidence, local LED block routes bind to physical same-net pad anchors, and separate routing-enabled regression coverage emits inter-block connector-to-LED contact-miss evidence instead of treating route emission as completion."
+  "notes": "Design-level multi-block PCB output now carries KiCad-native net declarations, exact embedded KiCad seed symbols for ERC-clean schematics, routed connector-to-LED endpoint contact evidence, and candidate promotion coverage."
 }
