@@ -297,6 +297,114 @@ func TestRoutePlacementPromotedInterBlockConnectorLEDNetReportsDisconnectedCompl
 func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
+	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	candidateNets := interBlockCandidateNetSetForRoutingTest(candidates)
+	for _, connection := range request.Connections {
+		netName := connection.NetAlias
+		candidate, ok := interBlockCandidateByNetForRoutingTest(candidates, netName)
+		if !ok || candidate.Status != InterBlockRouteCandidateRoutable || len(candidate.Endpoints) < 2 {
+			t.Fatalf("candidate %s = %#v, ok=%v", netName, candidate, ok)
+		}
+	}
+	for net := range connectionAliasSet(request.Connections) {
+		if !candidateNets[net] {
+			t.Fatalf("candidate nets = %#v, want request alias %s", candidateNets, net)
+		}
+	}
+	expectedEndpoints := interBlockCandidateEndpointCount(candidates)
+
+	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	for _, connection := range request.Connections {
+		if !routingRequestHasNet(result.Request, connection.NetAlias) {
+			t.Fatalf("routing request is missing net %s; nets=%#v", connection.NetAlias, result.Request.Nets)
+		}
+	}
+	interBlock := requireInterBlockRouteSummary(t, result.Stage)
+	if interBlock.Candidates != len(candidates) || interBlock.EndpointsResolved != expectedEndpoints {
+		t.Fatalf("inter-block summary counts = candidates %d endpoints %d, want candidate builder counts %d and %d", interBlock.Candidates, interBlock.EndpointsResolved, len(candidates), expectedEndpoints)
+	}
+	contacts := requireInterBlockContactSummary(t, result.Stage)
+	if contacts.ContactsRequired != expectedEndpoints || contacts.ContactsProven+contacts.ContactsFailed != expectedEndpoints {
+		t.Fatalf("inter-block contact counts = required %d resolved %d, want %d", contacts.ContactsRequired, contacts.ContactsProven+contacts.ContactsFailed, expectedEndpoints)
+	}
+}
+
+func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	local := requireStageSummary[LocalRouteConnectivitySummary](t, result.Stage, "route_connectivity")
+	if local.RoutesAttempted == 0 || local.RoutesBound != local.RoutesAttempted {
+		t.Fatalf("local route connectivity = %#v, want every local route bound", local)
+	}
+	if local.EndpointsUnresolved != 0 || local.EndpointNetMismatches != 0 || local.IssueCount != 0 {
+		t.Fatalf("local route connectivity = %#v, want no local endpoint blockers", local)
+	}
+	if local.EndpointContactsProven < local.RoutesAttempted*2 {
+		t.Fatalf("local route connectivity = %#v, want at least two proven endpoint contacts per local route", local)
+	}
+
+	interBlock := requireInterBlockRouteSummary(t, result.Stage)
+	expectedNets := len(connectionAliasSet(request.Connections))
+	if interBlock.Candidates != expectedNets || interBlock.EndpointsResolved <= expectedNets*2 {
+		t.Fatalf("inter-block summary = %#v, want four multi-endpoint I2C candidates", interBlock)
+	}
+	// Phase 1 intentionally documents the pre-implementation failure boundary.
+	// Later multi-endpoint routing phases should invert this assertion when the
+	// I2C route groups become graph-complete.
+	if interBlock.RoutesCompleted >= interBlock.Candidates || interBlock.PartialNets+interBlock.UnroutedNets == 0 {
+		t.Fatalf("inter-block summary = %#v, want current multi-endpoint route completion blocker", interBlock)
+	}
+	if interBlock.IssueCount == 0 {
+		t.Fatalf("inter-block summary = %#v, want actionable route/contact issues", interBlock)
+	}
+
+	contacts := requireInterBlockContactSummary(t, result.Stage)
+	if contacts.ContactsRequired != interBlock.EndpointsResolved {
+		t.Fatalf("contact summary = %#v, inter-block summary = %#v, want contact targets for every resolved endpoint", contacts, interBlock)
+	}
+	if contacts.ContactsFailed == 0 || contacts.MissingTargets+contacts.ContactMisses == 0 {
+		t.Fatalf("contact summary = %#v, want current missing-target or contact-miss blocker", contacts)
+	}
+	if contacts.NetMismatches != 0 {
+		t.Fatalf("contact summary = %#v, want no net-alias mismatch after I2C alias hydration", contacts)
+	}
+
+	blockedNets := issueNetSet(result.Stage.Issues)
+	i2cNets := connectionAliasSet(request.Connections)
+	for net := range i2cNets {
+		if !routingRequestHasNet(result.Request, net) {
+			t.Fatalf("routing request missing %s; nets=%#v", net, result.Request.Nets)
+		}
+	}
+	if len(blockedNets) == 0 {
+		t.Fatalf("issues = %#v, want named I2C net blockers", result.Stage.Issues)
+	}
+	for net := range blockedNets {
+		if !i2cNets[net] {
+			t.Fatalf("blocked nets = %#v, want blockers tied to I2C nets", blockedNets)
+		}
+	}
+}
+
+func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
+	nets := map[string]bool{}
+	for _, connection := range connections {
+		if connection.NetAlias != "" {
+			nets[connection.NetAlias] = true
+		}
+	}
+	return nets
+}
+
+func i2cSensorBreakoutRoutingFixture(t *testing.T, ctx context.Context) (Request, PCBFragmentResult, PlacementStageResult) {
+	t.Helper()
 	request := Request{
 		Version: RequestVersion,
 		Name:    "i2c_sensor_breakout_candidate",
@@ -326,35 +434,19 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	if !stageUsableForRoutingTest(placed.Stage) {
 		t.Fatalf("placement failed: %#v", placed.Stage.Issues)
 	}
-	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
-	if len(candidateIssues) != 0 {
-		t.Fatalf("candidate issues = %#v", candidateIssues)
-	}
-	expectedNets := len(request.Connections)
-	expectedEndpoints := 0
-	for _, connection := range request.Connections {
-		netName := connection.NetAlias
-		candidate, ok := interBlockCandidateByNetForRoutingTest(candidates, netName)
-		if !ok || candidate.Status != InterBlockRouteCandidateRoutable || len(candidate.Endpoints) < 2 {
-			t.Fatalf("candidate %s = %#v, ok=%v", netName, candidate, ok)
-		}
-		expectedEndpoints += len(candidate.Endpoints)
-	}
+	return request, fragments, placed
+}
 
-	result := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
-	for _, connection := range request.Connections {
-		if !routingRequestHasNet(result.Request, connection.NetAlias) {
-			t.Fatalf("routing request is missing net %s; nets=%#v", connection.NetAlias, result.Request.Nets)
+func issueNetSet(issues []reports.Issue) map[string]bool {
+	nets := map[string]bool{}
+	for _, issue := range issues {
+		for _, net := range issue.Nets {
+			if net != "" {
+				nets[net] = true
+			}
 		}
 	}
-	interBlock := requireInterBlockRouteSummary(t, result.Stage)
-	if interBlock.Candidates != expectedNets || interBlock.EndpointsResolved != expectedEndpoints {
-		t.Fatalf("inter-block summary counts = candidates %d endpoints %d, want %d and %d", interBlock.Candidates, interBlock.EndpointsResolved, expectedNets, expectedEndpoints)
-	}
-	contacts := requireInterBlockContactSummary(t, result.Stage)
-	if contacts.ContactsRequired != expectedEndpoints || contacts.ContactsProven+contacts.ContactsFailed != expectedEndpoints {
-		t.Fatalf("inter-block contact counts = required %d resolved %d, want %d", contacts.ContactsRequired, contacts.ContactsProven+contacts.ContactsFailed, expectedEndpoints)
-	}
+	return nets
 }
 
 // requireRouteOperationsForNet decodes every transaction route operation for a
@@ -462,6 +554,24 @@ func interBlockCandidateByNetForRoutingTest(candidates []InterBlockRouteCandidat
 		}
 	}
 	return InterBlockRouteCandidate{}, false
+}
+
+func interBlockCandidateNetSetForRoutingTest(candidates []InterBlockRouteCandidate) map[string]bool {
+	nets := map[string]bool{}
+	for _, candidate := range candidates {
+		if candidate.NetName != "" {
+			nets[candidate.NetName] = true
+		}
+	}
+	return nets
+}
+
+func interBlockCandidateEndpointCount(candidates []InterBlockRouteCandidate) int {
+	count := 0
+	for _, candidate := range candidates {
+		count += len(candidate.Endpoints)
+	}
+	return count
 }
 
 func assertNetHasIssueCode(t *testing.T, issues []reports.Issue, net string, code reports.Code) {
