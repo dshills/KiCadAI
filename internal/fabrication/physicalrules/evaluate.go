@@ -72,7 +72,8 @@ func evaluateMaskPaste(board *pcbfiles.PCBFile, opts Options) []Check {
 	maskViolations := 0
 	pasteViolations := 0
 	for _, footprint := range board.Footprints {
-		for _, pad := range footprint.Pads {
+		for padIndex := range footprint.Pads {
+			pad := &footprint.Pads[padIndex]
 			layers := summarizePadLayers(pad)
 			if layers.requiresMask() && !layers.hasRequiredMask() {
 				maskViolations++
@@ -454,9 +455,11 @@ func evaluatePlatedPadAnnularRings(board *pcbfiles.PCBFile, opts Options) Check 
 	var objects []string
 	refs := map[string]struct{}{}
 	minRing := math.MaxFloat64
-	for _, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		footprintSuggestsHole := mountingHoleFootprintCandidate(footprint)
-		for _, pad := range footprint.Pads {
+		for padIndex := range footprint.Pads {
+			pad := &footprint.Pads[padIndex]
 			if !isPlatedThroughHolePad(pad, footprintSuggestsHole) {
 				continue
 			}
@@ -600,7 +603,8 @@ func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []
 	var silkOutsideObjects []string
 	missingCourtyardCount := 0
 	silkOutsideCount := 0
-	for _, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		courtyard, ok := footprintCourtyardBounds(footprint)
 		if ok {
 			courtyards = append(courtyards, courtyardBounds{Reference: footprint.Reference, Bounds: courtyard})
@@ -701,9 +705,11 @@ func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []
 
 func evaluateMountingHoles(board *pcbfiles.PCBFile, bounds boardBounds, opts Options) []Check {
 	var holes []mountingHole
-	for _, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		footprintSuggestsHole := mountingHoleFootprintCandidate(footprint)
-		for _, pad := range footprint.Pads {
+		for padIndex := range footprint.Pads {
+			pad := &footprint.Pads[padIndex]
 			if isMountingHole(pad, footprintSuggestsHole) {
 				center := transformFootprintPoint(footprint, pad.Position)
 				holes = append(holes, mountingHole{Reference: footprint.Reference, UUID: string(pad.UUID), Center: center, Drill: pad.Drill})
@@ -816,7 +822,7 @@ type maskWebPad struct {
 	Rotated   bool
 }
 
-func summarizePadLayers(pad pcbfiles.Pad) padLayerSummary {
+func summarizePadLayers(pad *pcbfiles.Pad) padLayerSummary {
 	var summary padLayerSummary
 	for _, layer := range pad.Layers {
 		switch layer {
@@ -863,15 +869,17 @@ func (summary padLayerSummary) hasRequiredMask() bool {
 	return true
 }
 
-func padRequiresPaste(pad pcbfiles.Pad) bool {
+func padRequiresPaste(pad *pcbfiles.Pad) bool {
 	return strings.EqualFold(pad.Type, "smd")
 }
 
 func maskWebPads(board *pcbfiles.PCBFile) []maskWebPad {
 	var pads []maskWebPad
-	for _, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		transform := footprintTransform(footprint)
-		for _, pad := range footprint.Pads {
+		for padIndex := range footprint.Pads {
+			pad := &footprint.Pads[padIndex]
 			layers := summarizePadLayers(pad)
 			bounds := transformedPadBounds(footprint, transform, pad)
 			rotated := nonOrthogonalPadRotation(footprint, pad)
@@ -886,7 +894,7 @@ func maskWebPads(board *pcbfiles.PCBFile) []maskWebPad {
 	return pads
 }
 
-func nonOrthogonalPadRotation(footprint pcbfiles.Footprint, pad pcbfiles.Pad) bool {
+func nonOrthogonalPadRotation(footprint *pcbfiles.Footprint, pad *pcbfiles.Pad) bool {
 	rotation := int(math.Round(float64(footprint.Rotation + pad.Rotation)))
 	rotation %= 90
 	if rotation < 0 {
@@ -895,7 +903,7 @@ func nonOrthogonalPadRotation(footprint pcbfiles.Footprint, pad pcbfiles.Pad) bo
 	return rotation != 0
 }
 
-func transformedPadBounds(footprint pcbfiles.Footprint, transform transform2D, pad pcbfiles.Pad) rectBounds {
+func transformedPadBounds(footprint *pcbfiles.Footprint, transform transform2D, pad *pcbfiles.Pad) rectBounds {
 	var bounds rectBounds
 	if pad.Size.X <= 0 || pad.Size.Y <= 0 {
 		return bounds
@@ -968,7 +976,7 @@ func rectDistanceToBoardEdgeMM(bounds boardBounds, rect rectBounds) float64 {
 	return math.Abs(iuToMM(minDistance))
 }
 
-func footprintSuggestsEdgePlating(footprint pcbfiles.Footprint) bool {
+func footprintSuggestsEdgePlating(footprint *pcbfiles.Footprint) bool {
 	text := strings.ToLower(strings.Join([]string{
 		footprint.LibraryID,
 		footprint.Value,
@@ -980,7 +988,7 @@ func footprintSuggestsEdgePlating(footprint pcbfiles.Footprint) bool {
 		strings.Contains(text, "edge plat")
 }
 
-func isPotentialEdgePlatedPad(pad pcbfiles.Pad, footprintSuggestsEdgePlating bool) bool {
+func isPotentialEdgePlatedPad(pad *pcbfiles.Pad, footprintSuggestsEdgePlating bool) bool {
 	if !footprintSuggestsEdgePlating && !strings.EqualFold(pad.Type, "thru_hole") {
 		return false
 	}
@@ -991,7 +999,7 @@ func isPotentialEdgePlatedPad(pad pcbfiles.Pad, footprintSuggestsEdgePlating boo
 	return layers.FCu || layers.BCu || layers.AllCu
 }
 
-func isPlatedThroughHolePad(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
+func isPlatedThroughHolePad(pad *pcbfiles.Pad, footprintSuggestsHole bool) bool {
 	if strings.EqualFold(pad.Type, "np_thru_hole") || isMountingHole(pad, footprintSuggestsHole) {
 		return false
 	}
@@ -1677,10 +1685,12 @@ func edgePlatingFeatures(board *pcbfiles.PCBFile, bounds boardBounds) edgePlatin
 		return features
 	}
 	const edgeContactToleranceMM = 0.25
-	for _, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		nameSuggestsEdgePlating := footprintSuggestsEdgePlating(footprint)
 		transform := footprintTransform(footprint)
-		for _, pad := range footprint.Pads {
+		for padIndex := range footprint.Pads {
+			pad := &footprint.Pads[padIndex]
 			if !isPotentialEdgePlatedPad(pad, nameSuggestsEdgePlating) {
 				continue
 			}
@@ -1716,14 +1726,16 @@ func evaluateBoardContainment(board *pcbfiles.PCBFile, bounds boardBounds) []Che
 	refs := map[string]struct{}{}
 	var objects []string
 	violationCount := 0
-	for _, footprint := range board.Footprints {
+	for footprintIndex := range board.Footprints {
+		footprint := &board.Footprints[footprintIndex]
 		if !pointInsideBoard(bounds, footprint.Position) {
 			addRef(refs, footprint.Reference)
 			violationCount++
 			objects = appendLimited(objects, string(footprint.UUID))
 		}
 		transform := footprintTransform(footprint)
-		for _, pad := range footprint.Pads {
+		for padIndex := range footprint.Pads {
+			pad := &footprint.Pads[padIndex]
 			if !padInside(bounds, transform, footprint, pad) {
 				addRef(refs, footprint.Reference)
 				violationCount++
@@ -2212,7 +2224,7 @@ type transform2D struct {
 	MirrorX bool
 }
 
-func footprintTransform(footprint pcbfiles.Footprint) transform2D {
+func footprintTransform(footprint *pcbfiles.Footprint) transform2D {
 	radians := float64(footprint.Rotation) * math.Pi / 180
 	return transform2D{
 		Cosine:  math.Cos(radians),
@@ -2221,25 +2233,29 @@ func footprintTransform(footprint pcbfiles.Footprint) transform2D {
 	}
 }
 
-func transformFootprintPoint(footprint pcbfiles.Footprint, point kicadfiles.Point) kicadfiles.Point {
+func transformFootprintPoint(footprint *pcbfiles.Footprint, point kicadfiles.Point) kicadfiles.Point {
 	return transformFootprintPointWith(footprint, footprintTransform(footprint), point)
 }
 
-func transformFootprintPointWith(footprint pcbfiles.Footprint, transform transform2D, point kicadfiles.Point) kicadfiles.Point {
+func transformFootprintPointWith(footprint *pcbfiles.Footprint, transform transform2D, point kicadfiles.Point) kicadfiles.Point {
 	offset := transformedOffset(transform, point)
 	return kicadfiles.Point{X: footprint.Position.X + offset.X, Y: footprint.Position.Y + offset.Y}
 }
 
-func transformFootprintPoints(footprint pcbfiles.Footprint, points []kicadfiles.Point) []kicadfiles.Point {
-	out := make([]kicadfiles.Point, 0, len(points))
+func transformFootprintPoints(footprint *pcbfiles.Footprint, points []kicadfiles.Point) []kicadfiles.Point {
 	transform := footprintTransform(footprint)
+	return transformFootprintPointsWith(footprint, transform, points)
+}
+
+func transformFootprintPointsWith(footprint *pcbfiles.Footprint, transform transform2D, points []kicadfiles.Point) []kicadfiles.Point {
+	out := make([]kicadfiles.Point, 0, len(points))
 	for _, point := range points {
 		out = append(out, transformFootprintPointWith(footprint, transform, point))
 	}
 	return out
 }
 
-func padInside(bounds boardBounds, transform transform2D, footprint pcbfiles.Footprint, pad pcbfiles.Pad) bool {
+func padInside(bounds boardBounds, transform transform2D, footprint *pcbfiles.Footprint, pad *pcbfiles.Pad) bool {
 	center := transformedOffset(transform, pad.Position)
 	centerPoint := kicadfiles.Point{X: footprint.Position.X + center.X, Y: footprint.Position.Y + center.Y}
 	if !pointInsideBoard(bounds, centerPoint) {
@@ -2276,7 +2292,7 @@ func padInside(bounds boardBounds, transform transform2D, footprint pcbfiles.Foo
 	return true
 }
 
-func ovalPadInside(bounds boardBounds, transform transform2D, footprint pcbfiles.Footprint, pad pcbfiles.Pad) bool {
+func ovalPadInside(bounds boardBounds, transform transform2D, footprint *pcbfiles.Footprint, pad *pcbfiles.Pad) bool {
 	halfX := float64(pad.Size.X) / 2
 	halfY := float64(pad.Size.Y) / 2
 	padRadians := float64(pad.Rotation) * math.Pi / 180
@@ -2431,7 +2447,7 @@ func addRef(refs map[string]struct{}, ref string) {
 	}
 }
 
-func footprintNeedsCourtyard(footprint pcbfiles.Footprint) bool {
+func footprintNeedsCourtyard(footprint *pcbfiles.Footprint) bool {
 	if len(footprint.Pads) == 0 {
 		return false
 	}
@@ -2443,7 +2459,7 @@ func footprintNeedsCourtyard(footprint pcbfiles.Footprint) bool {
 	return true
 }
 
-func mountingHoleFootprintCandidate(footprint pcbfiles.Footprint) bool {
+func mountingHoleFootprintCandidate(footprint *pcbfiles.Footprint) bool {
 	ref := strings.ToUpper(strings.TrimSpace(footprint.Reference))
 	if strings.HasPrefix(ref, "MH") {
 		return true
@@ -2456,7 +2472,7 @@ func mountingHoleFootprintCandidate(footprint pcbfiles.Footprint) bool {
 		strings.Contains(value, "mounting hole")
 }
 
-func isMountingHole(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
+func isMountingHole(pad *pcbfiles.Pad, footprintSuggestsHole bool) bool {
 	if strings.EqualFold(pad.Type, "np_thru_hole") {
 		return true
 	}
@@ -2466,7 +2482,7 @@ func isMountingHole(pad pcbfiles.Pad, footprintSuggestsHole bool) bool {
 	return footprintSuggestsHole
 }
 
-func footprintCourtyardBounds(footprint pcbfiles.Footprint) (rectBounds, bool) {
+func footprintCourtyardBounds(footprint *pcbfiles.Footprint) (rectBounds, bool) {
 	var bounds rectBounds
 	for _, graphic := range footprint.Graphics {
 		drawing := pcbfiles.Drawing(graphic)
@@ -2521,7 +2537,7 @@ func rectsOverlap(a, b rectBounds) bool {
 	return a.MinX < b.MaxX && a.MaxX > b.MinX && a.MinY < b.MaxY && a.MaxY > b.MinY
 }
 
-func silkscreenTextInsideBoard(bounds boardBounds, footprint pcbfiles.Footprint, text pcbfiles.FootprintText) bool {
+func silkscreenTextInsideBoard(bounds boardBounds, footprint *pcbfiles.Footprint, text pcbfiles.FootprintText) bool {
 	width := kicadfiles.MM(math.Max(0.6, float64(len(text.Text))*0.6))
 	height := kicadfiles.MM(1.0)
 	halfWidth := float64(width) / 2
