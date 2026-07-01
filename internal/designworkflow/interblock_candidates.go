@@ -13,6 +13,10 @@ type InterBlockRouteStatus string
 
 const (
 	InterBlockRouteCandidateRoutable InterBlockRouteStatus = "routable"
+	InterBlockRouteCandidatePartial  InterBlockRouteStatus = "partial"
+	InterBlockRouteCandidateBlocked  InterBlockRouteStatus = "blocked"
+	InterBlockRouteCandidateFailed   InterBlockRouteStatus = "failed"
+	InterBlockRouteCandidateError    InterBlockRouteStatus = "error"
 )
 
 type InterBlockRouteCandidate struct {
