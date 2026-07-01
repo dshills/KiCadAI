@@ -38,49 +38,50 @@ const (
 type InterBlockContactProofStatus string
 
 const (
-	InterBlockContactProven               InterBlockContactProofStatus = "proven"
-	InterBlockContactMiss                 InterBlockContactProofStatus = "miss"
-	InterBlockContactNetMismatch          InterBlockContactProofStatus = "net_mismatch"
-	InterBlockContactLayerMismatch        InterBlockContactProofStatus = "layer_mismatch"
-	InterBlockContactMissingTarget        InterBlockContactProofStatus = "missing_target"
-	InterBlockContactUnsupportedGeometry  InterBlockContactProofStatus = "unsupported_geometry"
-	InterBlockContactAmbiguous            InterBlockContactProofStatus = "ambiguous"
+	InterBlockContactProven              InterBlockContactProofStatus = "proven"
+	InterBlockContactMiss                InterBlockContactProofStatus = "miss"
+	InterBlockContactNetMismatch         InterBlockContactProofStatus = "net_mismatch"
+	InterBlockContactLayerMismatch       InterBlockContactProofStatus = "layer_mismatch"
+	InterBlockContactMissingTarget       InterBlockContactProofStatus = "missing_target"
+	InterBlockContactUnsupportedGeometry InterBlockContactProofStatus = "unsupported_geometry"
+	InterBlockContactAmbiguous           InterBlockContactProofStatus = "ambiguous"
 )
 
 // InterBlockContactTarget is a same-net physical endpoint or access point that
 // an inter-block route may use for electrical contact.
 type InterBlockContactTarget struct {
-	NetName       string                         `json:"net_name"`
-	NetCode       int                            `json:"net_code"`
-	Kind          InterBlockContactTargetKind    `json:"kind"`
-	Ref           string                         `json:"ref,omitempty"`
-	Pad           string                         `json:"pad,omitempty"`
-	InstanceID    string                         `json:"instance_id,omitempty"`
-	BlockID       string                         `json:"block_id,omitempty"`
-	Point         transactions.Point             `json:"point"`
-	Layer         string                         `json:"layer,omitempty"`
-	ToleranceMM   float64                        `json:"tolerance_mm,omitempty"`
-	GeometrySource string                        `json:"geometry_source,omitempty"`
-	Confidence    InterBlockContactConfidence   `json:"confidence"`
-	Path          string                         `json:"path,omitempty"`
+	NetName        string                      `json:"net_name"`
+	NetCode        int                         `json:"net_code"`
+	Kind           InterBlockContactTargetKind `json:"kind"`
+	EndpointID     string                      `json:"endpoint_id,omitempty"`
+	Ref            string                      `json:"ref,omitempty"`
+	Pad            string                      `json:"pad,omitempty"`
+	InstanceID     string                      `json:"instance_id,omitempty"`
+	BlockID        string                      `json:"block_id,omitempty"`
+	Point          transactions.Point          `json:"point"`
+	Layer          string                      `json:"layer,omitempty"`
+	ToleranceMM    float64                     `json:"tolerance_mm,omitempty"`
+	GeometrySource string                      `json:"geometry_source,omitempty"`
+	Confidence     InterBlockContactConfidence `json:"confidence"`
+	Path           string                      `json:"path,omitempty"`
 }
 
 // InterBlockContactProof records whether one emitted route endpoint contacts a
 // required inter-block target.
 type InterBlockContactProof struct {
-	OperationID   string                       `json:"operation_id,omitempty"`
-	RouteClass    string                       `json:"route_class"`
-	NetName       string                       `json:"net_name"`
-	NetCode       int                          `json:"net_code"`
-	EndpointSide  string                       `json:"endpoint_side,omitempty"`
-	EmittedPoint  *transactions.Point          `json:"emitted_point,omitempty"`
-	Layer         string                       `json:"layer,omitempty"`
-	Target        InterBlockContactTarget      `json:"target"`
-	DistanceMM    float64                      `json:"distance_mm,omitempty"`
-	ToleranceMM   float64                      `json:"tolerance_mm,omitempty"`
-	Status        InterBlockContactProofStatus `json:"status"`
-	Blocking      bool                         `json:"blocking,omitempty"`
-	Suggestion    string                       `json:"suggestion,omitempty"`
+	OperationID  string                       `json:"operation_id,omitempty"`
+	RouteClass   string                       `json:"route_class"`
+	NetName      string                       `json:"net_name"`
+	NetCode      int                          `json:"net_code"`
+	EndpointSide string                       `json:"endpoint_side,omitempty"`
+	EmittedPoint *transactions.Point          `json:"emitted_point,omitempty"`
+	Layer        string                       `json:"layer,omitempty"`
+	Target       InterBlockContactTarget      `json:"target"`
+	DistanceMM   float64                      `json:"distance_mm,omitempty"`
+	ToleranceMM  float64                      `json:"tolerance_mm,omitempty"`
+	Status       InterBlockContactProofStatus `json:"status"`
+	Blocking     bool                         `json:"blocking,omitempty"`
+	Suggestion   string                       `json:"suggestion,omitempty"`
 }
 
 // InterBlockContactEvidence bundles resolved targets, proof records, and
@@ -206,16 +207,30 @@ func SummarizeInterBlockContacts(evidence InterBlockContactEvidence) InterBlockC
 }
 
 func interBlockConnectedNets(evidence InterBlockContactEvidence, operations []transactions.Operation) map[string]bool {
-	connected := map[string]bool{}
 	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
+	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
+	return interBlockConnectedNetsFromDecoded(targetsByNet, operationsByNet, operationIssues)
+}
+
+func interBlockConnectedNetsFromDecoded(targetsByNet map[string][]InterBlockContactTarget, operationsByNet map[string][]decodedContactRouteOperation, operationIssues []reports.Issue) map[string]bool {
+	connected := map[string]bool{}
 	if len(targetsByNet) == 0 {
 		return connected
 	}
-	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
-	if len(operationIssues) != 0 {
-		return connected
+	issueNets := map[string]bool{}
+	for _, issue := range operationIssues {
+		for _, netName := range issue.Nets {
+			netName = interBlockSummaryNetKey(netName)
+			if netName != "" {
+				issueNets[netName] = true
+			}
+		}
 	}
-	for netName, targets := range targetsByNet {
+	for rawNetName, targets := range targetsByNet {
+		netName := interBlockSummaryNetKey(rawNetName)
+		if issueNets[netName] {
+			continue
+		}
 		if len(targets) < 2 {
 			continue
 		}
@@ -364,6 +379,7 @@ func interBlockContactTarget(path string, netName string, endpoint InterBlockRou
 		issue := interBlockContactIssue(path, "inter-block contact endpoint requires ref and pin", nil, []string{netName}, "provide generated endpoint ref and pin evidence before routing")
 		return InterBlockContactTarget{}, false, &issue
 	}
+	endpointID := interBlockEndpointKey(ref, pin)
 	resolved, ok := resolver.Resolve(transactions.Endpoint{Ref: ref, Pin: pin})
 	if !ok {
 		issue := interBlockContactIssue(path, "inter-block contact target does not resolve to a placed pad", []string{ref}, []string{netName}, "verify footprint pad geometry and placement for "+ref+"."+pin)
@@ -386,6 +402,7 @@ func interBlockContactTarget(path string, netName string, endpoint InterBlockRou
 		NetName:        resolved.NetName,
 		NetCode:        resolved.NetCode,
 		Kind:           InterBlockContactTargetPad,
+		EndpointID:     endpointID,
 		Ref:            resolved.Ref,
 		Pad:            resolved.Pad,
 		InstanceID:     endpoint.InstanceID,
@@ -498,15 +515,15 @@ func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[s
 
 func proveContactTarget(target InterBlockContactTarget, operations []decodedContactRouteOperation) InterBlockContactProof {
 	best := InterBlockContactProof{
-		RouteClass:  "inter_block",
-		NetName:     target.NetName,
-		NetCode:     target.NetCode,
+		RouteClass:   "inter_block",
+		NetName:      target.NetName,
+		NetCode:      target.NetCode,
 		EndpointSide: "target",
-		Target:      target,
-		ToleranceMM: target.ToleranceMM,
-		Status:      InterBlockContactMiss,
-		Blocking:    true,
-		Suggestion:  "snap the route endpoint to the resolved contact target",
+		Target:       target,
+		ToleranceMM:  target.ToleranceMM,
+		Status:       InterBlockContactMiss,
+		Blocking:     true,
+		Suggestion:   "snap the route endpoint to the resolved contact target",
 	}
 	bestDistance := math.Inf(1)
 	layerCoordinateMatch := false
@@ -566,7 +583,11 @@ func proveContactTarget(target InterBlockContactTarget, operations []decodedCont
 func interBlockContactTargetsByNet(targets []InterBlockContactTarget) map[string][]InterBlockContactTarget {
 	byNet := map[string][]InterBlockContactTarget{}
 	for _, target := range targets {
-		byNet[target.NetName] = append(byNet[target.NetName], target)
+		netName := strings.TrimSpace(target.NetName)
+		if netName == "" {
+			continue
+		}
+		byNet[netName] = append(byNet[netName], target)
 	}
 	return byNet
 }

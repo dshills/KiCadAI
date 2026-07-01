@@ -327,6 +327,12 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	if interBlock.Candidates != len(candidates) || interBlock.EndpointsResolved != expectedEndpoints {
 		t.Fatalf("inter-block summary counts = candidates %d endpoints %d, want candidate builder counts %d and %d", interBlock.Candidates, interBlock.EndpointsResolved, len(candidates), expectedEndpoints)
 	}
+	if interBlock.MultiEndpointNets != len(request.Connections) || interBlock.RequiredEndpoints != expectedEndpoints {
+		t.Fatalf("inter-block group summary = %#v, want multi-endpoint net and required endpoint counts", interBlock)
+	}
+	if interBlock.BranchesPlanned == 0 || interBlock.GraphComponentCount == 0 {
+		t.Fatalf("inter-block route-tree summary = %#v, want planned branches and graph component evidence", interBlock)
+	}
 	contacts := requireInterBlockContactSummary(t, result.Stage)
 	if contacts.ContactsRequired != expectedEndpoints || contacts.ContactsProven+contacts.ContactsFailed != expectedEndpoints {
 		t.Fatalf("inter-block contact counts = required %d resolved %d, want %d", contacts.ContactsRequired, contacts.ContactsProven+contacts.ContactsFailed, expectedEndpoints)
@@ -354,6 +360,15 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 	expectedNets := len(connectionAliasSet(request.Connections))
 	if interBlock.Candidates != expectedNets || interBlock.EndpointsResolved <= expectedNets*2 {
 		t.Fatalf("inter-block summary = %#v, want four multi-endpoint I2C candidates", interBlock)
+	}
+	if interBlock.MultiEndpointNets != expectedNets || interBlock.RequiredEndpoints != interBlock.EndpointsResolved {
+		t.Fatalf("inter-block group summary = %#v, want all I2C nets represented as multi-endpoint groups", interBlock)
+	}
+	if interBlock.BranchesPlanned < expectedNets || interBlock.BranchesAttempted == 0 || interBlock.BranchesAttempted > interBlock.BranchesPlanned {
+		t.Fatalf("inter-block branch summary = %#v, want attempted branches bounded by planned branches", interBlock)
+	}
+	if interBlock.MissingRequired != 0 {
+		t.Fatalf("inter-block route-tree missing endpoints = %#v, want target resolution complete", interBlock)
 	}
 	// Phase 1 intentionally documents the pre-implementation failure boundary.
 	// Later multi-endpoint routing phases should invert this assertion when the
@@ -518,12 +533,23 @@ func TestInterBlockRouteCompletionSummaryJSONStable(t *testing.T) {
 		UnroutedNets:        0,
 		EmittedSegments:     1,
 		IssueCount:          1,
+		MultiEndpointNets:   1,
+		RequiredEndpoints:   3,
+		ProvenEndpoints:     2,
+		BranchesPlanned:     2,
+		BranchesAttempted:   2,
+		BranchesCompleted:   1,
+		GraphComponentCount: 2,
+		MissingRequired:     1,
+		CompleteGroups:      0,
+		PartialGroups:       1,
+		BlockedGroups:       0,
 	}
 	data, err := json.Marshal(summary)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"nets_considered":1,"candidates":1,"routes_attempted":1,"routes_completed":0,"endpoints_resolved":2,"endpoints_unresolved":0,"partial_nets":1,"unrouted_nets":0,"emitted_segments":1,"issue_count":1}`
+	want := `{"nets_considered":1,"candidates":1,"routes_attempted":1,"routes_completed":0,"endpoints_resolved":2,"endpoints_unresolved":0,"partial_nets":1,"unrouted_nets":0,"emitted_segments":1,"issue_count":1,"multi_endpoint_nets":1,"required_endpoints":3,"proven_endpoints":2,"branches_planned":2,"branches_attempted":2,"branches_completed":1,"graph_component_count":2,"missing_required_endpoints":1,"complete_groups":0,"partial_groups":1,"blocked_groups":0}`
 	if string(data) != want {
 		t.Fatalf("summary JSON = %q, want %q", data, want)
 	}

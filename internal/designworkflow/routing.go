@@ -54,6 +54,17 @@ type InterBlockRouteCompletionSummary struct {
 	UnroutedNets        int `json:"unrouted_nets"`
 	EmittedSegments     int `json:"emitted_segments"`
 	IssueCount          int `json:"issue_count"`
+	MultiEndpointNets   int `json:"multi_endpoint_nets"`
+	RequiredEndpoints   int `json:"required_endpoints"`
+	ProvenEndpoints     int `json:"proven_endpoints"`
+	BranchesPlanned     int `json:"branches_planned"`
+	BranchesAttempted   int `json:"branches_attempted"`
+	BranchesCompleted   int `json:"branches_completed"`
+	GraphComponentCount int `json:"graph_component_count"`
+	MissingRequired     int `json:"missing_required_endpoints"`
+	CompleteGroups      int `json:"complete_groups"`
+	PartialGroups       int `json:"partial_groups"`
+	BlockedGroups       int `json:"blocked_groups"`
 }
 
 func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, opts RoutingOptions) RoutingStageResult {
@@ -246,18 +257,35 @@ func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, o
 		Candidates:      len(candidates),
 		RoutesAttempted: len(candidates),
 	}
+	groups, groupIssues := BuildInterBlockRouteGroups(candidates)
+	trees := BuildInterBlockRouteTrees(groups, contactEvidence)
+	provenEndpoints := provenInterBlockEndpointSet(contactEvidence)
+	targetsByNet := interBlockContactTargetsByNet(contactEvidence.Targets)
+	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
+	graphComponents := interBlockGraphComponentCountsFromDecoded(targetsByNet, operationsByNet, operationIssues)
 	routeSegmentsByNet := routeSegmentCountsByNet(operations)
 	issueCountsByNet := issueCountsByNet(issues)
-	connectedNets := interBlockConnectedNets(contactEvidence, operations)
+	for _, issue := range groupIssues {
+		for _, net := range issue.Nets {
+			net = interBlockSummaryNetKey(net)
+			if net != "" {
+				issueCountsByNet[net]++
+			}
+		}
+	}
+	connectedNets := interBlockConnectedNetsFromDecoded(targetsByNet, operationsByNet, operationIssues)
+	treeByNet := interBlockRouteTreeByNet(trees)
+	summarizeInterBlockRouteGroups(&summary, groups, treeByNet, provenEndpoints, graphComponents, routeSegmentsByNet, issueCountsByNet, connectedNets)
 	for _, candidate := range candidates {
+		netName := interBlockSummaryNetKey(candidate.NetName)
 		summary.EndpointsResolved += len(candidate.Endpoints)
 		summary.EndpointsUnresolved += candidate.Unresolved
-		segments := routeSegmentsByNet[candidate.NetName]
+		segments := routeSegmentsByNet[netName]
 		summary.EmittedSegments += segments
-		netIssueCount := issueCountsByNet[candidate.NetName]
+		netIssueCount := issueCountsByNet[netName]
 		summary.IssueCount += netIssueCount
 		switch {
-		case connectedNets[candidate.NetName] && netIssueCount == 0:
+		case connectedNets[netName] && netIssueCount == 0:
 			summary.RoutesCompleted++
 		case segments > 0:
 			summary.PartialNets++
@@ -268,10 +296,130 @@ func summarizeInterBlockRouteCompletion(candidates []InterBlockRouteCandidate, o
 	return summary
 }
 
+func summarizeInterBlockRouteGroups(summary *InterBlockRouteCompletionSummary, groups []InterBlockRouteGroup, treeByNet map[string]InterBlockRouteTree, provenEndpoints map[string]bool, graphComponents map[string]int, routeSegmentsByNet map[string]int, issueCountsByNet map[string]int, connectedNets map[string]bool) {
+	if summary == nil {
+		return
+	}
+	for _, group := range groups {
+		if len(group.RequiredEndpoints) > 2 {
+			summary.MultiEndpointNets++
+		}
+		summary.RequiredEndpoints += len(group.RequiredEndpoints) + group.UnresolvedRequired
+		netName := interBlockSummaryNetKey(group.NetName)
+		tree := treeByNet[netName]
+		missingRequired := group.UnresolvedRequired
+		if missingRequired == 0 {
+			missingRequired = len(tree.MissingEndpointIDs)
+		}
+		summary.MissingRequired += missingRequired
+		summary.BranchesPlanned += len(tree.Branches)
+		if routeSegmentsByNet[netName] > 0 {
+			summary.BranchesAttempted += len(tree.Branches)
+		}
+		groupProven := 0
+		for _, endpoint := range group.RequiredEndpoints {
+			if provenEndpoints[interBlockEndpointKey(endpoint.Ref, endpoint.Pin)] {
+				groupProven++
+				summary.ProvenEndpoints++
+			}
+		}
+		for _, branch := range tree.Branches {
+			if provenEndpoints[branch.StartEndpointID] && provenEndpoints[branch.EndEndpointID] {
+				summary.BranchesCompleted++
+			}
+		}
+		componentCount := graphComponents[netName]
+		summary.GraphComponentCount += componentCount
+		netIssueCount := issueCountsByNet[netName]
+		switch {
+		case connectedNets[netName] && missingRequired == 0 && groupProven == len(group.RequiredEndpoints) && netIssueCount == 0:
+			summary.CompleteGroups++
+		case groupProven > 0 || routeSegmentsByNet[netName] > 0:
+			summary.PartialGroups++
+		default:
+			summary.BlockedGroups++
+		}
+	}
+}
+
+func interBlockSummaryNetKey(netName string) string {
+	return strings.TrimSpace(netName)
+}
+
+func interBlockRouteTreeByNet(trees []InterBlockRouteTree) map[string]InterBlockRouteTree {
+	byNet := make(map[string]InterBlockRouteTree, len(trees))
+	for _, tree := range trees {
+		byNet[interBlockSummaryNetKey(tree.NetName)] = tree
+	}
+	return byNet
+}
+
+func provenInterBlockEndpointSet(evidence InterBlockContactEvidence) map[string]bool {
+	proven := map[string]bool{}
+	for _, proof := range evidence.Proofs {
+		if proof.Status != InterBlockContactProven {
+			continue
+		}
+		key := strings.TrimSpace(proof.Target.EndpointID)
+		if key == "" {
+			key = interBlockEndpointKey(proof.Target.Ref, proof.Target.Pad)
+		}
+		if key != "" {
+			proven[key] = true
+		}
+	}
+	return proven
+}
+
+func interBlockEndpointKey(ref string, pinOrPad string) string {
+	ref = strings.TrimSpace(ref)
+	pinOrPad = strings.TrimSpace(pinOrPad)
+	if ref == "" || pinOrPad == "" {
+		return ""
+	}
+	return normalizedRouteGroupEndpointKey(ref, pinOrPad)
+}
+
+func interBlockGraphComponentCountsFromDecoded(targetsByNet map[string][]InterBlockContactTarget, operationsByNet map[string][]decodedContactRouteOperation, operationIssues []reports.Issue) map[string]int {
+	counts := map[string]int{}
+	if len(targetsByNet) == 0 {
+		return counts
+	}
+	issueNets := map[string]bool{}
+	for _, issue := range operationIssues {
+		for _, netName := range issue.Nets {
+			netName = interBlockSummaryNetKey(netName)
+			if netName != "" {
+				issueNets[netName] = true
+			}
+		}
+	}
+	for rawNetName, targets := range targetsByNet {
+		netName := interBlockSummaryNetKey(rawNetName)
+		if issueNets[netName] {
+			counts[netName] = len(targets)
+			continue
+		}
+		graph := newInterBlockContactGraph(operationsByNet[netName])
+		roots := map[int]bool{}
+		missing := 0
+		for _, target := range targets {
+			node, ok := graph.findTargetNode(target)
+			if !ok {
+				missing++
+				continue
+			}
+			roots[graph.find(node)] = true
+		}
+		counts[netName] = len(roots) + missing
+	}
+	return counts
+}
+
 func routeSegmentCountsByNet(operations []transactions.Operation) map[string]int {
 	counts := map[string]int{}
 	for _, operation := range operations {
-		net := strings.TrimSpace(operation.Net)
+		net := interBlockSummaryNetKey(operation.Net)
 		if operation.Op != transactions.OpRoute || net == "" {
 			continue
 		}
@@ -288,7 +436,7 @@ func excludeNetsWithRouteOperations(nets []routing.Net, operations []transaction
 	interBlock := interBlockCandidateNets(candidates)
 	filtered := make([]routing.Net, 0, len(nets))
 	for _, net := range nets {
-		netName := strings.TrimSpace(net.Name)
+		netName := interBlockSummaryNetKey(net.Name)
 		if _, ok := routed[netName]; ok && !interBlock[netName] {
 			continue
 		}
@@ -300,7 +448,7 @@ func excludeNetsWithRouteOperations(nets []routing.Net, operations []transaction
 func interBlockCandidateNets(candidates []InterBlockRouteCandidate) map[string]bool {
 	nets := map[string]bool{}
 	for _, candidate := range candidates {
-		if netName := strings.TrimSpace(candidate.NetName); netName != "" {
+		if netName := interBlockSummaryNetKey(candidate.NetName); netName != "" {
 			nets[netName] = true
 		}
 	}
@@ -311,7 +459,7 @@ func issueCountsByNet(issues []reports.Issue) map[string]int {
 	counts := map[string]int{}
 	for _, issue := range issues {
 		for _, net := range issue.Nets {
-			net = strings.TrimSpace(net)
+			net = interBlockSummaryNetKey(net)
 			if net != "" {
 				counts[net]++
 			}
