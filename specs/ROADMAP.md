@@ -210,10 +210,13 @@ loop confidence:
   counts completion only when a same-net contact graph connects the required
   endpoints. Multi-endpoint route-tree execution now owns the I2C fixture's
   VCC/GND/SDA/SCL nets, removes them from fallback net-level routing, and
-  reports managed nets plus branch-attempt evidence. The latest blockers are
-  branch-scoped VCC/SDA legal-path failures and VCC/SDA contact proof gaps. The
-  remaining layout-quality blockers are route-tree branch path repair, richer
-  generated-board validation, and KiCad ERC/DRC-clean evidence.
+  reports managed nets plus branch-attempt evidence. Route-tree repair now
+  classifies branch/contact failures, emits repairable hints, feeds bounded
+  placement retry, and selects attempts using route-tree completion evidence.
+  The latest selected-attempt blockers are GND/SDA branch path/contact proof
+  gaps. The remaining layout-quality blockers are route-tree branch path
+  completion, richer generated-board validation, and KiCad ERC/DRC-clean
+  evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
@@ -408,8 +411,9 @@ Implemented foundation.
   to physical same-net pad anchors for LED, connector/LED, and I2C local-route
   fixtures. Connector/LED has candidate-level inter-block contact evidence, and
   I2C sensor breakout now has promoted VCC/GND/SDA/SCL alias propagation,
-  route-tree-managed inter-block nets, and explicit branch-scoped
-  route-completion/contact blockers for VCC/SDA. The
+  route-tree-managed inter-block nets, classified route-tree repair hints,
+  retry selection based on route-tree completion evidence, and explicit
+  selected-attempt route-completion/contact blockers for GND/SDA. The
   `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
   even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
@@ -790,8 +794,9 @@ property propagation. Optional KiCad-backed design examples now live under
 `examples/design/kicad-backed/`; LED and connector/LED are candidate fixtures,
 while richer I2C and amplifier generated boards still record `expected_fail`
 evidence. I2C now reaches route-tree-managed inter-block routing with clean
-local-route alias/contact proof but still blocks on VCC/SDA branch pathfinding
-and contact proof; the amplifier fixture remains blocked by broader verified
+local-route alias/contact proof, route-tree repair hints, and selected retry
+evidence, but still blocks on selected-attempt GND/SDA branch pathfinding and
+contact proof; the amplifier fixture remains blocked by broader verified
 amplifier realization and KiCad evidence gaps.
 
 Structured semantic mapping is now implemented for target, bus, and supply

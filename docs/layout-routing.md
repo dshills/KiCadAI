@@ -98,6 +98,17 @@ blocked group counts, planned/attempted/routed/blocked branch counts, issue
 counts, and `managed_nets`. Managed nets are intentionally removed from the
 fallback `routing.Request.Nets` list to avoid double-routing; use
 `inter_block_route_trees.managed_nets` to see route-tree ownership.
+
+When route-tree branches or endpoint contacts fail, the routing stage also
+emits `route_tree_repair`. It summarizes classified branch/contact failures,
+repairable failures, generated hint count, affected nets, and affected refs.
+The current categories include other-net pad blockers, keepouts, board-edge
+blockers, existing copper blockers, layer/via access, search exhaustion,
+contact misses, missing contact targets, graph splits, unsupported failures,
+and unknown failures. Bounded placement-routing retry consumes repairable
+route-tree hints alongside normal routing diagnostics and ranks attempts using
+route-tree completion evidence such as complete/partial/blocked groups, proven
+endpoints, routed branches, contact misses, and issue counts.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,
 not thermal simulation, impedance calculation, or routed length matching.

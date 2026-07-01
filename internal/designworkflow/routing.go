@@ -158,6 +158,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	interBlockContactEvidence := ValidateInterBlockRouteEndpointContacts(interBlockCandidates, routeOperations, &placed)
 	issues = append(issues, interBlockContactEvidence.Issues...)
 	issues = suppressProvenRouteDisconnectedIssues(issues, interBlockContactEvidence, routeOperations, localOperations, localRouteConnectivity)
+	routeTreeRepairHints := BuildRouteTreeRepairHints(issues)
 	operations := append(localOperations, anchorOperations...)
 	operations = append(operations, routeOperations...)
 	stage := NewStageResult(StageRouting, issues)
@@ -174,6 +175,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"route_connectivity":      localRouteConnectivity,
 		"inter_block_routing":     summarizeInterBlockRouteCompletion(interBlockCandidates, routeOperations, issues, interBlockContactEvidence),
 		"inter_block_route_trees": routeTreeExecution.Summary,
+		"route_tree_repair":       SummarizeRouteTreeRepair(routeTreeRepairHints),
 		"inter_block_contacts":    SummarizeInterBlockContacts(interBlockContactEvidence),
 	}
 	if len(anchorOperations) > 0 {

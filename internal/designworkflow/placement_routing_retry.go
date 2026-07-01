@@ -49,6 +49,13 @@ type placementRoutingRetryAttemptSummary struct {
 	SelectedReason            string              `json:"selected_reason,omitempty"`
 	RegressionFlags           []string            `json:"regression_flags,omitempty"`
 	RetryAdjustment           string              `json:"retry_adjustment,omitempty"`
+	RouteTreeCompleteGroups   int                 `json:"route_tree_complete_groups,omitempty"`
+	RouteTreePartialGroups    int                 `json:"route_tree_partial_groups,omitempty"`
+	RouteTreeBlockedGroups    int                 `json:"route_tree_blocked_groups,omitempty"`
+	RouteTreeProvenEndpoints  int                 `json:"route_tree_proven_endpoints,omitempty"`
+	RouteTreeBranchesRouted   int                 `json:"route_tree_branches_routed,omitempty"`
+	RouteTreeContactMisses    int                 `json:"route_tree_contact_misses,omitempty"`
+	RouteTreeIssueCount       int                 `json:"route_tree_issue_count,omitempty"`
 }
 
 type retryEvidenceStatus string
@@ -89,6 +96,8 @@ func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments 
 		}
 		diagnostics := routing.DiagnosticsForResult(currentRouted.Result)
 		hints := filterPlacementRetryHints(BuildPlacementRetryHints(diagnostics, currentPlaced.Result.Quality), policy)
+		routeTreeHints := filterPlacementRetryHints(BuildRouteTreePlacementRetryHints(currentRouted.Stage.Issues), policy)
+		hints = mergePlacementRetryHints(hints, routeTreeHints...)
 		for _, category := range placementRetryHintCategoryStrings(hints) {
 			if _, ok := seenHintCategories[category]; ok {
 				continue
@@ -222,6 +231,28 @@ func filterPlacementRetryHints(hints []PlacementRetryHint, policy RoutingRetryPo
 	return filtered
 }
 
+func mergePlacementRetryHints(base []PlacementRetryHint, extra ...PlacementRetryHint) []PlacementRetryHint {
+	seen := map[string]struct{}{}
+	out := make([]PlacementRetryHint, 0, len(base)+len(extra))
+	for _, hint := range base {
+		key := placementRetryHintKey(hint)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, hint)
+	}
+	for _, hint := range extra {
+		key := placementRetryHintKey(hint)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, hint)
+	}
+	return out
+}
+
 func placementRetryHintCategoryStrings(hints []PlacementRetryHint) []string {
 	seen := map[string]struct{}{}
 	var categories []string
@@ -258,6 +289,17 @@ func placementRoutingAttemptSummaryForResult(attempt int, baseline *RoutingStage
 		BoardValidationBlocking: 0,
 	}
 	summary.BoardValidationIssueCount, summary.BoardValidationBlocking = boardValidationCountsFromRoutingStage(routed.Stage)
+	routeSummary := retryInterBlockSummary(routed.Stage)
+	treeSummary := retryRouteTreeSummary(routed.Stage)
+	contactSummary := retryInterBlockContactSummary(routed.Stage)
+	repairSummary := retryRouteTreeRepairSummary(routed.Stage)
+	summary.RouteTreeCompleteGroups = routeSummary.CompleteGroups
+	summary.RouteTreePartialGroups = routeSummary.PartialGroups
+	summary.RouteTreeBlockedGroups = routeSummary.BlockedGroups
+	summary.RouteTreeProvenEndpoints = routeSummary.ProvenEndpoints
+	summary.RouteTreeBranchesRouted = treeSummary.BranchesRouted
+	summary.RouteTreeContactMisses = contactSummary.ContactMisses
+	summary.RouteTreeIssueCount = repairSummary.BranchFailures
 	if baseline != nil {
 		summary.BaselineRoutingStatus = baseline.Result.Status
 		summary.BaselineRouteScore = routeQualityScore(*baseline)
@@ -347,61 +389,182 @@ func boardValidationCountsFromRoutingStage(stage StageResult) (total int, blocki
 	return 0, 0
 }
 
+func retryInterBlockSummary(stage StageResult) InterBlockRouteCompletionSummary {
+	value, ok := retrySummaryMapValue(stage, "inter_block_routing")
+	if !ok {
+		return InterBlockRouteCompletionSummary{}
+	}
+	if summary, ok := value.(InterBlockRouteCompletionSummary); ok {
+		return summary
+	}
+	fields, ok := value.(map[string]any)
+	if !ok {
+		return InterBlockRouteCompletionSummary{}
+	}
+	return InterBlockRouteCompletionSummary{
+		CompleteGroups:    intFromSummaryValue(fields["complete_groups"]),
+		PartialGroups:     intFromSummaryValue(fields["partial_groups"]),
+		BlockedGroups:     intFromSummaryValue(fields["blocked_groups"]),
+		ProvenEndpoints:   intFromSummaryValue(fields["proven_endpoints"]),
+		BranchesCompleted: intFromSummaryValue(fields["branches_completed"]),
+	}
+}
+
+func retryRouteTreeSummary(stage StageResult) InterBlockRouteTreeExecutionSummary {
+	value, ok := retrySummaryMapValue(stage, "inter_block_route_trees")
+	if !ok {
+		return InterBlockRouteTreeExecutionSummary{}
+	}
+	if summary, ok := value.(InterBlockRouteTreeExecutionSummary); ok {
+		return summary
+	}
+	fields, ok := value.(map[string]any)
+	if !ok {
+		return InterBlockRouteTreeExecutionSummary{}
+	}
+	return InterBlockRouteTreeExecutionSummary{
+		GroupsComplete: intFromSummaryValue(fields["groups_complete"]),
+		GroupsPartial:  intFromSummaryValue(fields["groups_partial"]),
+		GroupsBlocked:  intFromSummaryValue(fields["groups_blocked"]),
+		BranchesRouted: intFromSummaryValue(fields["branches_routed"]),
+		ContactMisses:  intFromSummaryValue(fields["contact_misses"]),
+		IssueCount:     intFromSummaryValue(fields["issue_count"]),
+		ManagedNets:    stringsFromSummaryValue(fields["managed_nets"]),
+	}
+}
+
+func retryInterBlockContactSummary(stage StageResult) InterBlockContactSummary {
+	value, ok := retrySummaryMapValue(stage, "inter_block_contacts")
+	if !ok {
+		return InterBlockContactSummary{}
+	}
+	if summary, ok := value.(InterBlockContactSummary); ok {
+		return summary
+	}
+	fields, ok := value.(map[string]any)
+	if !ok {
+		return InterBlockContactSummary{}
+	}
+	return InterBlockContactSummary{
+		ContactsProven: intFromSummaryValue(fields["contacts_proven"]),
+		ContactMisses:  intFromSummaryValue(fields["contact_misses"]),
+	}
+}
+
+func retryRouteTreeRepairSummary(stage StageResult) InterBlockRouteTreeRepairSummary {
+	value, ok := retrySummaryMapValue(stage, "route_tree_repair")
+	if !ok {
+		return InterBlockRouteTreeRepairSummary{}
+	}
+	if summary, ok := value.(InterBlockRouteTreeRepairSummary); ok {
+		return summary
+	}
+	fields, ok := value.(map[string]any)
+	if !ok {
+		return InterBlockRouteTreeRepairSummary{}
+	}
+	return InterBlockRouteTreeRepairSummary{
+		BranchFailures:     intFromSummaryValue(fields["branch_failures"]),
+		RepairableFailures: intFromSummaryValue(fields["repairable_failures"]),
+		HintCount:          intFromSummaryValue(fields["hint_count"]),
+		Nets:               stringsFromSummaryValue(fields["nets"]),
+	}
+}
+
+func retrySummaryMapValue(stage StageResult, key string) (any, bool) {
+	if stage.Summary == nil {
+		return nil, false
+	}
+	value, ok := stage.Summary[key]
+	if !ok || value == nil {
+		return nil, false
+	}
+	return value, true
+}
+
+func stringsFromSummaryValue(value any) []string {
+	switch values := value.(type) {
+	case []string:
+		return slices.Clone(values)
+	case []any:
+		out := make([]string, 0, len(values))
+		for _, raw := range values {
+			text, ok := raw.(string)
+			if ok && text != "" {
+				out = append(out, text)
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
 func placementRoutingAttemptBetter(candidate, current placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) bool {
 	return comparePlacementRoutingAttempts(candidate, current, policy) > 0
 }
 
 func comparePlacementRoutingAttempts(candidate, current placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) int {
+	compare, _ := placementRoutingAttemptComparison(candidate, current, policy)
+	return compare
+}
+
+func placementRoutingAttemptComparison(candidate, current placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) (int, string) {
 	if policy.DRCPolicy == RetryDRCPolicyRequired {
 		candidateDRCOK := candidate.DRCBlockingCount == 0 && candidate.DRCStatus != retryEvidenceFail
 		currentDRCOK := current.DRCBlockingCount == 0 && current.DRCStatus != retryEvidenceFail
 		if candidateDRCOK != currentDRCOK {
 			if candidateDRCOK {
-				return 1
+				return 1, "required_drc_cleaner"
 			}
-			return -1
+			return -1, "required_drc_cleaner"
 		}
 	}
 	if candidate.BoardValidationBlocking != current.BoardValidationBlocking {
-		return lowerIsBetter(candidate.BoardValidationBlocking, current.BoardValidationBlocking)
+		return lowerIsBetter(candidate.BoardValidationBlocking, current.BoardValidationBlocking), "fewer_board_validation_blockers"
 	}
 	if candidate.DRCBlockingCount != current.DRCBlockingCount {
-		return lowerIsBetter(candidate.DRCBlockingCount, current.DRCBlockingCount)
+		return lowerIsBetter(candidate.DRCBlockingCount, current.DRCBlockingCount), "fewer_drc_blockers"
+	}
+	if candidate.RouteTreeBlockedGroups != current.RouteTreeBlockedGroups {
+		return lowerIsBetter(candidate.RouteTreeBlockedGroups, current.RouteTreeBlockedGroups), "fewer_route_tree_blocked_groups"
+	}
+	if candidate.RouteTreeCompleteGroups != current.RouteTreeCompleteGroups {
+		return higherIsBetter(candidate.RouteTreeCompleteGroups, current.RouteTreeCompleteGroups), "more_route_tree_complete_groups"
+	}
+	if candidate.RouteTreeProvenEndpoints != current.RouteTreeProvenEndpoints {
+		return higherIsBetter(candidate.RouteTreeProvenEndpoints, current.RouteTreeProvenEndpoints), "more_route_tree_proven_endpoints"
+	}
+	if candidate.RouteTreeBranchesRouted != current.RouteTreeBranchesRouted {
+		return higherIsBetter(candidate.RouteTreeBranchesRouted, current.RouteTreeBranchesRouted), "more_route_tree_routed_branches"
+	}
+	if candidate.RouteTreeContactMisses != current.RouteTreeContactMisses {
+		return lowerIsBetter(candidate.RouteTreeContactMisses, current.RouteTreeContactMisses), "fewer_route_tree_contact_misses"
+	}
+	if candidate.RouteTreeIssueCount != current.RouteTreeIssueCount {
+		return lowerIsBetter(candidate.RouteTreeIssueCount, current.RouteTreeIssueCount), "fewer_route_tree_issues"
 	}
 	if routingStatusRank(candidate.RoutingStatus) != routingStatusRank(current.RoutingStatus) {
-		return higherIsBetter(routingStatusRank(candidate.RoutingStatus), routingStatusRank(current.RoutingStatus))
+		return higherIsBetter(routingStatusRank(candidate.RoutingStatus), routingStatusRank(current.RoutingStatus)), "routing_status_improved"
 	}
 	if candidate.FailedNets != current.FailedNets {
-		return lowerIsBetter(candidate.FailedNets, current.FailedNets)
+		return lowerIsBetter(candidate.FailedNets, current.FailedNets), "fewer_failed_nets"
 	}
 	if candidate.RoutedNets != current.RoutedNets {
-		return higherIsBetter(candidate.RoutedNets, current.RoutedNets)
+		return higherIsBetter(candidate.RoutedNets, current.RoutedNets), "more_routed_nets"
 	}
 	if candidate.RouteScore != current.RouteScore {
-		return higherFloatIsBetter(candidate.RouteScore, current.RouteScore)
+		return higherFloatIsBetter(candidate.RouteScore, current.RouteScore), "higher_route_quality"
 	}
-	return lowerIsBetter(candidate.Attempt, current.Attempt)
+	return lowerIsBetter(candidate.Attempt, current.Attempt), "best_ranked_attempt"
 }
 
 func placementRoutingAttemptSelectionReason(candidate, previousBest placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) string {
-	switch {
-	case policy.DRCPolicy == RetryDRCPolicyRequired && candidate.DRCBlockingCount == 0 && previousBest.DRCBlockingCount > 0:
-		return "required_drc_cleaner"
-	case candidate.BoardValidationBlocking < previousBest.BoardValidationBlocking:
-		return "fewer_board_validation_blockers"
-	case candidate.DRCBlockingCount < previousBest.DRCBlockingCount:
-		return "fewer_drc_blockers"
-	case routingStatusRank(candidate.RoutingStatus) > routingStatusRank(previousBest.RoutingStatus):
-		return "routing_status_improved"
-	case candidate.FailedNets < previousBest.FailedNets:
-		return "fewer_failed_nets"
-	case candidate.RoutedNets > previousBest.RoutedNets:
-		return "more_routed_nets"
-	case candidate.RouteScore > previousBest.RouteScore:
-		return "higher_route_quality"
-	default:
+	compare, reason := placementRoutingAttemptComparison(candidate, previousBest, policy)
+	if compare <= 0 {
 		return "best_ranked_attempt"
 	}
+	return reason
 }
 
 func lowerIsBetter(candidate, current int) int {
@@ -441,11 +604,17 @@ func intFromRetrySummary(summary map[string]any, key string) int {
 	if summary == nil {
 		return 0
 	}
-	switch value := summary[key].(type) {
+	return intFromSummaryValue(summary[key])
+}
+
+func intFromSummaryValue(value any) int {
+	switch value := value.(type) {
 	case int:
 		return value
 	case int64:
 		return int(value)
+	case float32:
+		return int(math.Round(float64(value)))
 	case float64:
 		return int(math.Round(value))
 	default:

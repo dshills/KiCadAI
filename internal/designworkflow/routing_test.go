@@ -342,6 +342,13 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	if contacts.ContactsRequired != expectedEndpoints || contacts.ContactsProven+contacts.ContactsFailed != expectedEndpoints {
 		t.Fatalf("inter-block contact counts = required %d resolved %d, want %d", contacts.ContactsRequired, contacts.ContactsProven+contacts.ContactsFailed, expectedEndpoints)
 	}
+	repair := requireRouteTreeRepairSummary(t, result.Stage)
+	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 {
+		t.Fatalf("route-tree repair summary = %#v, want repairable branch/contact failures", repair)
+	}
+	if !stringSliceContains(repair.Nets, "SDA") || !stringSliceContains(repair.Nets, "VCC") {
+		t.Fatalf("route-tree repair nets = %#v, want SDA and VCC", repair.Nets)
+	}
 }
 
 func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T) {
@@ -394,6 +401,10 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 	}
 	if contacts.NetMismatches != 0 {
 		t.Fatalf("contact summary = %#v, want no net-alias mismatch after I2C alias hydration", contacts)
+	}
+	repair := requireRouteTreeRepairSummary(t, result.Stage)
+	if repair.HintCount == 0 || !stringSliceContains(repair.Nets, "SDA") || !stringSliceContains(repair.Nets, "VCC") {
+		t.Fatalf("route-tree repair summary = %#v, want VCC/SDA repair hints", repair)
 	}
 
 	blockedNets := issueNetSet(result.Stage.Issues)
@@ -673,6 +684,11 @@ func requireInterBlockContactSummary(t *testing.T, stage StageResult) InterBlock
 func requireInterBlockRouteTreeExecutionSummary(t *testing.T, stage StageResult) InterBlockRouteTreeExecutionSummary {
 	t.Helper()
 	return requireStageSummary[InterBlockRouteTreeExecutionSummary](t, stage, "inter_block_route_trees")
+}
+
+func requireRouteTreeRepairSummary(t *testing.T, stage StageResult) InterBlockRouteTreeRepairSummary {
+	t.Helper()
+	return requireStageSummary[InterBlockRouteTreeRepairSummary](t, stage, "route_tree_repair")
 }
 
 func requireStageSummary[T any](t *testing.T, stage StageResult, key string) T {

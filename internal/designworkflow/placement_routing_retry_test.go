@@ -147,6 +147,65 @@ func TestPlacementRoutingRetryAttemptSummaryDoesNotTreatRoutingIssuesAsBoardVali
 	}
 }
 
+func TestBoardValidationCountsFromValidationStage(t *testing.T) {
+	stage := StageResult{
+		Name: StageValidation,
+		Issues: []reports.Issue{
+			{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning},
+			{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked},
+		},
+	}
+
+	total, blocking := boardValidationCountsFromRoutingStage(stage)
+	if total != 2 || blocking != 1 {
+		t.Fatalf("counts = %d/%d, want 2/1", total, blocking)
+	}
+}
+
+func TestRetrySummaryAccessorsDecodeJSONMaps(t *testing.T) {
+	stage := StageResult{Summary: map[string]any{
+		"inter_block_routing": map[string]any{
+			"complete_groups":  2,
+			"partial_groups":   1,
+			"proven_endpoints": 5,
+		},
+		"inter_block_route_trees": map[string]any{
+			"groups_complete": 1,
+			"groups_blocked":  2,
+			"branches_routed": 3,
+			"contact_misses":  4,
+			"managed_nets":    []any{"SCL", "SDA"},
+		},
+		"inter_block_contacts": map[string]any{
+			"contacts_proven": 10,
+			"contact_misses":  2,
+		},
+		"route_tree_repair": map[string]any{
+			"branch_failures":     4,
+			"repairable_failures": 3,
+			"hint_count":          3,
+			"nets":                []any{"GND", "SDA"},
+		},
+	}}
+
+	interBlock := retryInterBlockSummary(stage)
+	if interBlock.CompleteGroups != 2 || interBlock.PartialGroups != 1 || interBlock.ProvenEndpoints != 5 {
+		t.Fatalf("inter-block summary = %#v", interBlock)
+	}
+	routeTrees := retryRouteTreeSummary(stage)
+	if routeTrees.GroupsComplete != 1 || routeTrees.GroupsBlocked != 2 || routeTrees.BranchesRouted != 3 || routeTrees.ContactMisses != 4 || len(routeTrees.ManagedNets) != 2 {
+		t.Fatalf("route-tree summary = %#v", routeTrees)
+	}
+	contacts := retryInterBlockContactSummary(stage)
+	if contacts.ContactsProven != 10 || contacts.ContactMisses != 2 {
+		t.Fatalf("contact summary = %#v", contacts)
+	}
+	repair := retryRouteTreeRepairSummary(stage)
+	if repair.BranchFailures != 4 || repair.RepairableFailures != 3 || repair.HintCount != 3 || len(repair.Nets) != 2 {
+		t.Fatalf("repair summary = %#v", repair)
+	}
+}
+
 func TestPlacementRoutingRetrySummaryJSONKeepsExistingFields(t *testing.T) {
 	summary := placementRoutingRetrySummary{
 		Enabled:         true,
