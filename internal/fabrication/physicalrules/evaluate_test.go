@@ -1,6 +1,7 @@
 package physicalrules
 
 import (
+	"math"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -408,6 +409,36 @@ func TestEvaluateBoardWarnsOnUnsupportedPolygonMaskOpening(t *testing.T) {
 	assertCheckStatus(t, report, CheckSolderMaskPolygonWebWidth, StatusWarning)
 	check := requireCheck(t, report, CheckSolderMaskPolygonWebWidth)
 	assertMeasurement(t, check, "unsupported_opening_count", 1)
+
+	strictReport := EvaluateBoard(&board, &project, Options{Strict: true})
+	assertCheckStatus(t, strictReport, CheckSolderMaskPolygonWebWidth, StatusBlocked)
+}
+
+func TestEvaluateBoardStrictBlocksUnsupportedCopperPolygonEvidence(t *testing.T) {
+	board := physicalRuleTestBoard()
+	points := make([]kicadfiles.Point, 0, dfmWidthMaxEdges+1)
+	for index := 0; index < dfmWidthMaxEdges+1; index++ {
+		angle := 2 * math.Pi * float64(index) / float64(dfmWidthMaxEdges+1)
+		points = append(points, kicadfiles.Point{
+			X: kicadfiles.MM(5 + math.Cos(angle)),
+			Y: kicadfiles.MM(5 + math.Sin(angle)),
+		})
+	}
+	board.Zones = []pcbfiles.Zone{{
+		UUID:   kicadfiles.UUID("43000000-0000-4000-8000-000000000006"),
+		Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		FilledPolygons: []pcbfiles.ZoneFilledPolygon{{
+			Layer:  kicadfiles.LayerFCu,
+			Points: points,
+		}},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+	assertCheckStatus(t, report, CheckCopperSliverFilledPolygon, StatusWarning)
+
+	strictReport := EvaluateBoard(&board, &project, Options{Strict: true})
+	assertCheckStatus(t, strictReport, CheckCopperSliverFilledPolygon, StatusBlocked)
 }
 
 func TestEvaluateBoardWarnsOnLikelyEdgePlatingByDefault(t *testing.T) {

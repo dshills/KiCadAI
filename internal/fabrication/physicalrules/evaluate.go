@@ -253,17 +253,16 @@ func evaluateSolderMaskPolygonWeb(board *pcbfiles.PCBFile, opts Options) Check {
 	if minObserved != math.MaxFloat64 {
 		measurements = append(measurements, Measurement{Name: "minimum_observed_solder_mask_web", Value: minObserved, Unit: "mm"})
 	}
-	if candidates < 2 {
+	if candidates < 2 || (compared == 0 && !sameSidePairs) {
 		status := StatusSkipped
 		message := "not enough same-side supported mask opening polygons were found for polygon web checks"
+		suggestion := ""
 		if unsupported > 0 {
-			status = StatusWarning
-			message = "mask opening geometry was present but some openings could not be measured for polygon web checks"
+			status = unsupportedGeometryStatus(opts)
+			message = strictEvidenceMessage("mask opening geometry was present but some openings could not be measured for polygon web checks", opts)
+			suggestion = "run KiCad DRC or expand pad geometry support before treating solder-mask web checks as complete"
 		}
-		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: status, Message: message, IssuePath: "physical.solder_mask.polygon_web_width", Objects: objects, References: sortedMapKeys(refs), Measurements: measurements, Source: SourceParser}
-	}
-	if compared == 0 && !sameSidePairs {
-		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: StatusSkipped, Message: "not enough same-side supported mask opening polygons were found for polygon web checks", IssuePath: "physical.solder_mask.polygon_web_width", Objects: objects, References: sortedMapKeys(refs), Measurements: measurements, Source: SourceParser}
+		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: status, Message: message, Suggestion: suggestion, IssuePath: "physical.solder_mask.polygon_web_width", Objects: objects, References: sortedMapKeys(refs), Measurements: measurements, Source: SourceParser}
 	}
 	if compared == 0 && unsupported == 0 {
 		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: StatusPass, Message: "mask opening polygon bounding boxes are farther apart than the active profile threshold", Measurements: measurements, Source: SourceParser}
@@ -284,11 +283,12 @@ func evaluateSolderMaskPolygonWeb(board *pcbfiles.PCBFile, opts Options) Check {
 		}
 	}
 	if unsupported > 0 {
+		status := unsupportedGeometryStatus(opts)
 		return Check{
 			ID:           CheckSolderMaskPolygonWebWidth,
 			Category:     CategorySolderMask,
-			Status:       StatusWarning,
-			Message:      "supported mask opening polygons meet the active profile threshold, but some openings could not be measured",
+			Status:       status,
+			Message:      strictEvidenceMessage("supported mask opening polygons meet the active profile threshold, but some openings could not be measured", opts),
 			Suggestion:   "run KiCad DRC or expand pad geometry support before treating solder-mask web checks as complete",
 			IssuePath:    "physical.solder_mask.polygon_web_width",
 			Objects:      objects,
@@ -501,11 +501,12 @@ func evaluateCopperPolygonWidths(id, issuePath, label string, polygons []dfmPoly
 		}
 	}
 	if unsupported > 0 {
+		status := unsupportedGeometryStatus(opts)
 		return Check{
 			ID:           id,
 			Category:     CategoryCopperSliver,
-			Status:       StatusWarning,
-			Message:      "some " + label + " geometry could not be measured for polygon width checks",
+			Status:       status,
+			Message:      strictEvidenceMessage("some "+label+" geometry could not be measured for polygon width checks", opts),
 			Suggestion:   "run KiCad DRC or expand polygon parser support before treating copper sliver checks as complete",
 			IssuePath:    issuePath,
 			Objects:      objects,
@@ -634,11 +635,12 @@ func evaluateCopperPolygonEdgeClearance(board *pcbfiles.PCBFile, opts Options, o
 		}
 	}
 	if unsupported+partialUnsupported > 0 {
+		status := unsupportedGeometryStatus(opts)
 		return Check{
 			ID:           CheckCopperSliverPolygonEdge,
 			Category:     CategoryCopperSliver,
-			Status:       StatusWarning,
-			Message:      "some copper polygon geometry could not be measured for board-edge clearance",
+			Status:       status,
+			Message:      strictEvidenceMessage("some copper polygon geometry could not be measured for board-edge clearance", opts),
 			Suggestion:   "run KiCad DRC or expand polygon parser support before treating copper edge-clearance checks as complete",
 			IssuePath:    "physical.copper_sliver.polygon_edge_clearance",
 			Objects:      objects,
@@ -655,6 +657,20 @@ func polygonObjectID(polygon dfmPolygon) string {
 		return objectID
 	}
 	return polygon.SourcePath
+}
+
+func unsupportedGeometryStatus(opts Options) Status {
+	if opts.Strict {
+		return StatusBlocked
+	}
+	return StatusWarning
+}
+
+func strictEvidenceMessage(message string, opts Options) string {
+	if opts.Strict {
+		return message + " under strict evidence policy"
+	}
+	return message
 }
 
 func evaluateCopperTrackWidths(board *pcbfiles.PCBFile, opts Options) Check {
