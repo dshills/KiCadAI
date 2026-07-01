@@ -158,7 +158,146 @@ func evaluateMaskPaste(board *pcbfiles.PCBFile, opts Options) []Check {
 		})
 	}
 	checks = append(checks, evaluateSolderMaskWeb(board, opts))
+	checks = append(checks, evaluateSolderMaskPolygonWeb(board, opts))
 	return checks
+}
+
+func evaluateSolderMaskPolygonWeb(board *pcbfiles.PCBFile, opts Options) Check {
+	expansion := board.Setup.PadToMaskClearance
+	openings := dfmMaskOpenings(board, expansion)
+	if len(openings) < 2 {
+		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: StatusSkipped, Message: "not enough mask opening polygons were found for polygon web checks", Source: SourceParser}
+	}
+	unsupported := 0
+	candidates := 0
+	compared := 0
+	violations := 0
+	minObserved := math.MaxFloat64
+	var objects []string
+	objectSet := map[string]struct{}{}
+	addObject := func(objectID string) {
+		if strings.TrimSpace(objectID) == "" {
+			return
+		}
+		if _, ok := objectSet[objectID]; ok {
+			return
+		}
+		objectSet[objectID] = struct{}{}
+		objects = appendLimited(objects, objectID)
+	}
+	refs := map[string]struct{}{}
+	type openingRecord struct {
+		Polygon dfmPolygon
+		Bounds  dfmRect
+		Object  string
+		Layer   string
+	}
+	records := make([]openingRecord, 0, len(openings))
+	for _, opening := range openings {
+		if !opening.supported() {
+			unsupported++
+			addObject(polygonObjectID(opening))
+			addRef(refs, opening.Reference)
+			continue
+		}
+		candidates++
+		records = append(records, openingRecord{Polygon: opening, Bounds: dfmPolygonBounds(opening.Points), Object: polygonObjectID(opening), Layer: string(opening.Layer)})
+	}
+	slices.SortFunc(records, func(a, b openingRecord) int {
+		if a.Layer != b.Layer {
+			return strings.Compare(a.Layer, b.Layer)
+		}
+		if a.Bounds.MinX < b.Bounds.MinX {
+			return -1
+		}
+		if a.Bounds.MinX > b.Bounds.MinX {
+			return 1
+		}
+		return strings.Compare(a.Object, b.Object)
+	})
+	sameSidePairs := false
+	for index, opening := range records {
+		for otherIndex := index + 1; otherIndex < len(records); otherIndex++ {
+			other := records[otherIndex]
+			if opening.Polygon.Layer != other.Polygon.Layer {
+				break
+			}
+			sameSidePairs = true
+			if opening.Bounds.Valid && other.Bounds.Valid && other.Bounds.MinX-opening.Bounds.MaxX >= opts.MinSolderMaskWebMM {
+				break
+			}
+			if opening.Bounds.Valid && other.Bounds.Valid && dfmRectDistanceMM(opening.Bounds, other.Bounds) >= opts.MinSolderMaskWebMM {
+				continue
+			}
+			compared++
+			web := dfmPolygonDistanceMM(opening.Polygon.Points, other.Polygon.Points)
+			if web > 1e-6 && web < minObserved {
+				minObserved = web
+			}
+			if web > 1e-6 && web < opts.MinSolderMaskWebMM {
+				violations++
+				addObject(opening.Object)
+				addObject(other.Object)
+				addRef(refs, opening.Polygon.Reference)
+				addRef(refs, other.Polygon.Reference)
+			}
+		}
+	}
+	measurements := []Measurement{
+		{Name: "candidate_opening_count", Value: float64(candidates), Unit: "count"},
+		{Name: "compared_opening_pair_count", Value: float64(compared), Unit: "count"},
+		{Name: "unsupported_opening_count", Value: float64(unsupported), Unit: "count"},
+		{Name: "minimum_required_solder_mask_web", Value: opts.MinSolderMaskWebMM, Unit: "mm"},
+		{Name: "pad_to_mask_clearance", Value: iuToMM(expansion), Unit: "mm"},
+	}
+	if minObserved != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_solder_mask_web", Value: minObserved, Unit: "mm"})
+	}
+	if candidates < 2 {
+		status := StatusSkipped
+		message := "not enough same-side supported mask opening polygons were found for polygon web checks"
+		if unsupported > 0 {
+			status = StatusWarning
+			message = "mask opening geometry was present but some openings could not be measured for polygon web checks"
+		}
+		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: status, Message: message, IssuePath: "physical.solder_mask.polygon_web_width", Objects: objects, References: sortedMapKeys(refs), Measurements: measurements, Source: SourceParser}
+	}
+	if compared == 0 && !sameSidePairs {
+		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: StatusSkipped, Message: "not enough same-side supported mask opening polygons were found for polygon web checks", IssuePath: "physical.solder_mask.polygon_web_width", Objects: objects, References: sortedMapKeys(refs), Measurements: measurements, Source: SourceParser}
+	}
+	if compared == 0 && unsupported == 0 {
+		return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: StatusPass, Message: "mask opening polygon bounding boxes are farther apart than the active profile threshold", Measurements: measurements, Source: SourceParser}
+	}
+	if violations > 0 {
+		measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+		return Check{
+			ID:           CheckSolderMaskPolygonWebWidth,
+			Category:     CategorySolderMask,
+			Status:       StatusBlocked,
+			Message:      "one or more mask opening polygons leave less solder-mask web than the active profile threshold",
+			Suggestion:   "increase pad spacing, reduce pad-to-mask expansion, or select a profile that supports the modeled solder-mask web",
+			IssuePath:    "physical.solder_mask.polygon_web_width",
+			Objects:      objects,
+			References:   sortedMapKeys(refs),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	if unsupported > 0 {
+		return Check{
+			ID:           CheckSolderMaskPolygonWebWidth,
+			Category:     CategorySolderMask,
+			Status:       StatusWarning,
+			Message:      "supported mask opening polygons meet the active profile threshold, but some openings could not be measured",
+			Suggestion:   "run KiCad DRC or expand pad geometry support before treating solder-mask web checks as complete",
+			IssuePath:    "physical.solder_mask.polygon_web_width",
+			Objects:      objects,
+			References:   sortedMapKeys(refs),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	return Check{ID: CheckSolderMaskPolygonWebWidth, Category: CategorySolderMask, Status: StatusPass, Message: "mask opening polygon webs meet the active profile threshold", Measurements: measurements, Source: SourceParser}
 }
 
 func evaluateSolderMaskWeb(board *pcbfiles.PCBFile, opts Options) Check {

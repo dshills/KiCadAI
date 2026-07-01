@@ -92,6 +92,7 @@ const (
 	CheckSolderMaskWebWidth         = "physical.solder_mask.web_width"
 	CheckSolderMaskPadExpansion     = "physical.solder_mask.pad_expansion"
 	CheckSolderMaskUnsupported      = "physical.solder_mask.unsupported_geometry"
+	CheckSolderMaskPolygonWebWidth  = "physical.solder_mask.polygon_web_width"
 	CheckEdgePlatingCastellation    = "physical.edge_plating.castellation_detected"
 	CheckEdgePlatingProfile         = "physical.edge_plating.profile_support"
 	CheckEdgePlatingContact         = "physical.edge_plating.edge_contact"

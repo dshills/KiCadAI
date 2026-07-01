@@ -321,6 +321,7 @@ func TestEvaluateBoardChecksSolderMaskWeb(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckSolderMaskWebWidth, StatusPass)
+	assertCheckStatus(t, report, CheckSolderMaskPolygonWebWidth, StatusPass)
 }
 
 func TestEvaluateBoardBlocksNarrowSolderMaskWeb(t *testing.T) {
@@ -340,6 +341,9 @@ func TestEvaluateBoardBlocksNarrowSolderMaskWeb(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckSolderMaskWebWidth, StatusBlocked)
+	assertCheckStatus(t, report, CheckSolderMaskPolygonWebWidth, StatusBlocked)
+	check := requireCheck(t, report, CheckSolderMaskPolygonWebWidth)
+	assertMeasurement(t, check, "minimum_observed_solder_mask_web", 0.04)
 }
 
 func TestEvaluateBoardDoesNotCompareOppositeSideMaskWeb(t *testing.T) {
@@ -360,6 +364,7 @@ func TestEvaluateBoardDoesNotCompareOppositeSideMaskWeb(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckSolderMaskWebWidth, StatusPass)
+	assertCheckStatus(t, report, CheckSolderMaskPolygonWebWidth, StatusSkipped)
 }
 
 func TestEvaluateBoardWarnsOnRotatedPadMaskWebGeometry(t *testing.T) {
@@ -380,6 +385,29 @@ func TestEvaluateBoardWarnsOnRotatedPadMaskWebGeometry(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckSolderMaskUnsupported, StatusWarning)
+	assertCheckStatus(t, report, CheckSolderMaskPolygonWebWidth, StatusPass)
+}
+
+func TestEvaluateBoardWarnsOnUnsupportedPolygonMaskOpening(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
+		UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000009"),
+		Name:     "2",
+		Type:     "smd",
+		Shape:    "custom",
+		Position: point(2, 0),
+		Size:     point(1, 1),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask, kicadfiles.LayerFPaste},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckSolderMaskPolygonWebWidth, StatusWarning)
+	check := requireCheck(t, report, CheckSolderMaskPolygonWebWidth)
+	assertMeasurement(t, check, "unsupported_opening_count", 1)
 }
 
 func TestEvaluateBoardWarnsOnLikelyEdgePlatingByDefault(t *testing.T) {
