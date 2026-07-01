@@ -26,7 +26,8 @@
   "known_gaps": [
     "Routing is now enabled and bounded placement retry legalizes the generated sensor, pull-up, decoupling, and connector placements, but inter-block route completion still blocks promotion.",
     "Block-local route net names are rewritten to composed aliases so VCC/GND/SDA/SCL local route contact proof no longer fails on sensor_* instance-net mismatches.",
-    "Current route blockers are real route-completion/contact blockers: the router only partially routes the multi-endpoint VCC/GND/SDA/SCL nets and still reports missing or missed contact targets for the remaining sensor, connector, and pull-up/decoupling endpoints.",
+    "Current route-tree evidence narrows the blocker: all 4 VCC/GND/SDA/SCL nets are represented as multi-endpoint groups with resolved endpoint definitions, but none are graph-complete yet; the latest run reported 2 partial groups and 2 blocked groups.",
+    "Current route blockers are real route-completion/contact blockers: VCC and SDA report no legal two-layer path near other-net pads, VCC/SDA still report missing emitted contact evidence, GND remains partial rather than graph-complete, and SCL reports one missed required sensor contact.",
     "Project write, writer correctness, validation, and KiCad checks remain skipped until the routing stage emits complete same-net contact graph evidence for all required I2C breakout nets."
   ],
   "notes": "Tracks the richer sensor breakout scenario after placement and block-local net-alias blockers; the remaining expected failure is multi-endpoint inter-block route completion."

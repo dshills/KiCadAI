@@ -45,7 +45,7 @@ kicadai \
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `candidate` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment, routed inter-block endpoint contact evidence, and candidate promotion coverage. |
-| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, and VCC/GND/SDA/SCL alias propagation; current blocker is multi-endpoint inter-block route completion. |
+| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, and route-tree summaries; current blockers are VCC/SDA legal-path failures, GND partial graph completion, and an SCL contact miss. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft amplifier seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, output DC-blocking/protection realization, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
 ## Interpreting Results
@@ -67,8 +67,11 @@ Tests for `expected_fail` fixtures are considered successful only when they
 encounter the documented blockers. That is not the same as an ERC/DRC-clean
 generated design. These fixtures now document that generated design-level PCBs
 can progress past writer correctness net-code assignment and block-local route
-endpoint binding. The next layout-quality blockers are full inter-block routing
-coverage for richer boards and KiCad ERC/DRC-clean evidence.
+endpoint binding. The I2C fixture also exposes route-tree evidence for its
+multi-endpoint VCC/GND/SDA/SCL nets, including planned branches, attempted
+branches, proven endpoints, graph components, and group completion counts. The
+next layout-quality blockers are full inter-block routing coverage for richer
+boards and KiCad ERC/DRC-clean evidence.
 
 Promotion gates currently include metadata, stages, writer correctness,
 connectivity, KiCad checks, route completion, physical rules, and artifacts.
