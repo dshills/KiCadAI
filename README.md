@@ -56,7 +56,8 @@ blocker is promoting richer generated boards to KiCad ERC/DRC-clean layout
 proof.
 
 Fabrication readiness now includes expanded deterministic physical-rule
-evidence for annular rings, copper feature widths, solder-mask web estimates,
+evidence for annular rings, copper feature widths, polygonal copper width and
+edge-clearance checks, polygonal solder-mask web checks,
 edge-plating/castellation policy, impedance/differential-pair evidence gaps,
 and basic fabrication metadata. Physical-rule thresholds can now come from
 built-in or local fabrication profiles, with profile provenance recorded in

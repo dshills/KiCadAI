@@ -676,12 +676,14 @@ dry-run/execute/overwrite behavior, emit package manifests/readiness reports,
 generate and validate KiCad-CLI-backed Gerber/drill artifacts, emit
 `physical-rules.json`, run modeled physical fabrication checks for stackup, net
 classes, solder-mask/paste pad policy, solder-mask web estimates, annular
-rings, copper feature widths, Edge.Cuts containment, courtyard
-presence/overlap, silkscreen board clearance, mounting-hole geometry/edge
-clearance, edge-plating/castellation policy, and controlled-impedance and
-differential-pair evidence gaps. It also includes fabrication metadata evidence
-for board finish, panelization, and fabrication notes, exposes optional or
-required KiCad CLI evidence policy, applies built-in or local physical-rule
+rings, copper feature widths, polygonal copper width and edge-clearance
+evidence, polygonal solder-mask web evidence, Edge.Cuts containment,
+courtyard presence/overlap, silkscreen board clearance, mounting-hole
+geometry/edge clearance, edge-plating/castellation policy, and
+controlled-impedance and differential-pair evidence gaps. It also includes
+fabrication metadata evidence for board finish, panelization, and fabrication
+notes, exposes optional or required KiCad CLI evidence policy, applies built-in
+or local physical-rule
 fabrication profiles through `--manufacturer-profile` and
 `--manufacturer-profile-dir`, records profile hash/source provenance in
 readiness reports and package manifests, optionally applies the built-in
@@ -698,10 +700,10 @@ report path where available.
 
 ### Remaining Work
 
-- Expand physical DFM coverage beyond the current conservative checks,
-  especially exact polygonal copper/mask sliver proof, specific board-house
-  rule source curation, deeper edge-plating evidence, and solver-grade
-  impedance proof.
+- Expand physical DFM coverage beyond the current conservative polygon-backed
+  checks, especially exact constructive-geometry sliver proof for every KiCad
+  feature, specific board-house rule source curation, deeper edge-plating
+  evidence, and solver-grade impedance proof.
 - Add reviewed board-house profile snapshots once specific fabricator rule
   sources are selected, and keep them clearly labeled as local constraints
   rather than manufacturer acceptance guarantees.
