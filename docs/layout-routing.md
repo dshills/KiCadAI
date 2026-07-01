@@ -75,6 +75,21 @@ nets. The companion `inter_block_contacts` summary reports required contacts,
 proven contacts, failed contacts, contact misses, net/layer mismatches, and
 missing targets. `routes_completed` now means same-net contact graph completion,
 not merely route operation emission.
+
+For generated multi-block designs, `inter_block_routing` also reports
+multi-endpoint route-tree evidence:
+
+- `multi_endpoint_nets`, `required_endpoints`, and `proven_endpoints`;
+- `branches_planned`, `branches_attempted`, and `branches_completed`;
+- `graph_component_count` and `missing_required_endpoints`;
+- `complete_groups`, `partial_groups`, and `blocked_groups`.
+
+These fields are intended for AI repair loops and fixture promotion decisions.
+They prove endpoint grouping, target resolution, branch planning, contact proof,
+and graph-level completion status. They do not yet mean KiCad DRC-clean routing
+for richer generated boards; the I2C breakout fixture remains an
+`expected_fail` case until every VCC/GND/SDA/SCL route group is graph-complete
+and KiCad-backed evidence passes.
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,
 not thermal simulation, impedance calculation, or routed length matching.

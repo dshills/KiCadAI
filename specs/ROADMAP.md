@@ -139,6 +139,14 @@ from validation feedback to safe automatic repair.
   when the report artifact is written. Current KiCad-backed fixtures are
   classified as `expected_fail` with explicit promotion blockers rather than
   silently skipped or accidentally promoted.
+- Multi-endpoint generated inter-block routing now models route groups,
+  resolves deterministic route trees, routes branch requests with same-net
+  copper evidence, and reports group-level completion semantics. The
+  `inter_block_routing` summary exposes `multi_endpoint_nets`,
+  `required_endpoints`, `proven_endpoints`, `branches_planned`,
+  `branches_attempted`, `branches_completed`, `graph_component_count`,
+  `missing_required_endpoints`, `complete_groups`, `partial_groups`, and
+  `blocked_groups`.
 - README and focused docs for current CLI capabilities.
 
 ### Still Not Ready
@@ -200,9 +208,11 @@ loop confidence:
   block-local route endpoint binding to physical same-net pad anchors.
   Generated inter-block routing now reports endpoint-contact evidence and
   counts completion only when a same-net contact graph connects the required
-  endpoints. The remaining layout-quality blockers are broader multi-endpoint
-  inter-block route completion, richer generated-board validation, and KiCad
-  ERC/DRC-clean evidence.
+  endpoints. Multi-endpoint route-tree summaries now narrow the I2C fixture to
+  VCC/SDA legal-path failures, GND partial graph completion, and an SCL contact
+  miss. The remaining layout-quality blockers are graph-complete
+  multi-endpoint inter-block routing, richer generated-board validation, and
+  KiCad ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
