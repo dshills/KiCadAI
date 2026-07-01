@@ -247,6 +247,63 @@ func TestEvaluateBoardIgnoresNonCopperZoneForCopperSlivers(t *testing.T) {
 	assertCheckStatus(t, report, CheckCopperSliverZoneMinWidth, StatusSkipped)
 }
 
+func TestEvaluateBoardChecksFilledZonePolygonWidth(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Zones = []pcbfiles.Zone{{
+		UUID:     kicadfiles.UUID("43000000-0000-4000-8000-000000000004"),
+		NetCode:  1,
+		NetName:  "VCC",
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		Polygons: [][]kicadfiles.Point{{point(1, 1), point(4, 1), point(4, 1.05), point(1, 1.05)}},
+		FilledPolygons: []pcbfiles.ZoneFilledPolygon{{
+			Layer:  kicadfiles.LayerFCu,
+			Points: []kicadfiles.Point{point(1, 1), point(4, 1), point(4, 1.05), point(1, 1.05)},
+		}},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCopperSliverFilledPolygon, StatusBlocked)
+	check := requireCheck(t, report, CheckCopperSliverFilledPolygon)
+	assertMeasurement(t, check, "minimum_observed_polygon_width", 0.05)
+}
+
+func TestEvaluateBoardChecksCopperGraphicPolygonWidth(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Drawings = append(board.Drawings, pcbfiles.Drawing{
+		UUID:  kicadfiles.UUID("44000000-0000-4000-8000-000000000001"),
+		Layer: kicadfiles.LayerFCu,
+		Poly:  &pcbfiles.PolylineDrawing{Points: []kicadfiles.Point{point(1, 1), point(4, 1), point(4, 1.05), point(1, 1.05)}},
+	})
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{})
+
+	assertCheckStatus(t, report, CheckCopperSliverCopperPolygon, StatusBlocked)
+}
+
+func TestEvaluateBoardChecksCopperPolygonEdgeClearance(t *testing.T) {
+	board := physicalRuleTestBoard()
+	board.Zones = []pcbfiles.Zone{{
+		UUID:    kicadfiles.UUID("43000000-0000-4000-8000-000000000005"),
+		NetCode: 1,
+		NetName: "VCC",
+		Layers:  []kicadfiles.BoardLayer{kicadfiles.LayerFCu},
+		FilledPolygons: []pcbfiles.ZoneFilledPolygon{{
+			Layer:  kicadfiles.LayerFCu,
+			Points: []kicadfiles.Point{point(0.05, 1), point(2, 1), point(2, 2), point(0.05, 2)},
+		}},
+	}}
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{MinCopperEdgeMM: 0.2})
+
+	assertCheckStatus(t, report, CheckCopperSliverPolygonEdge, StatusBlocked)
+	check := requireCheck(t, report, CheckCopperSliverPolygonEdge)
+	assertMeasurement(t, check, "minimum_observed_copper_edge_clearance", 0.05)
+}
+
 func TestEvaluateBoardChecksSolderMaskWeb(t *testing.T) {
 	board := physicalRuleTestBoard()
 	board.Footprints[0].Pads = append(board.Footprints[0].Pads, pcbfiles.Pad{
@@ -838,15 +895,34 @@ func TestEvaluateBoardDoesNotTreatSMDPadInMountingHoleFootprintAsMountingHole(t 
 
 func assertCheckStatus(t *testing.T, report Report, id string, status Status) {
 	t.Helper()
+	check := requireCheck(t, report, id)
+	if check.Status != status {
+		t.Fatalf("%s status = %q, want %q; check=%#v", id, check.Status, status, check)
+	}
+}
+
+func requireCheck(t *testing.T, report Report, id string) Check {
+	t.Helper()
 	for _, check := range report.Checks {
 		if check.ID == id {
-			if check.Status != status {
-				t.Fatalf("%s status = %q, want %q; check=%#v", id, check.Status, status, check)
+			return check
+		}
+	}
+	t.Fatalf("missing check %s in %#v", id, report.Checks)
+	return Check{}
+}
+
+func assertMeasurement(t *testing.T, check Check, name string, value float64) {
+	t.Helper()
+	for _, measurement := range check.Measurements {
+		if measurement.Name == name {
+			if diff := measurement.Value - value; diff > 1e-9 || diff < -1e-9 {
+				t.Fatalf("%s measurement %s = %g, want %g; check=%#v", check.ID, name, measurement.Value, value, check)
 			}
 			return
 		}
 	}
-	t.Fatalf("missing check %s in %#v", id, report.Checks)
+	t.Fatalf("missing measurement %s in check %#v", name, check)
 }
 
 func physicalRuleTestBoard() pcbfiles.PCBFile {

@@ -37,9 +37,9 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateNetClasses(board, project)...)
 	checks = append(checks, evaluateImpedanceEvidence(board, project, opts)...)
 	checks = append(checks, evaluateAnnularRings(board, opts)...)
-	checks = append(checks, evaluateCopperSlivers(board, opts)...)
-	checks = append(checks, evaluateMaskPaste(board, opts)...)
 	outline := evaluateEdgeCuts(board)
+	checks = append(checks, evaluateCopperSlivers(board, opts, outline.Bounds)...)
+	checks = append(checks, evaluateMaskPaste(board, opts)...)
 	checks = append(checks, outline.Checks...)
 	edgePlating := edgePlatingFeatures(board, outline.Bounds)
 	checks = append(checks, evaluateEdgePlating(edgePlating, opts)...)
@@ -286,12 +286,236 @@ func evaluateAnnularRings(board *pcbfiles.PCBFile, opts Options) []Check {
 	}
 }
 
-func evaluateCopperSlivers(board *pcbfiles.PCBFile, opts Options) []Check {
+func evaluateCopperSlivers(board *pcbfiles.PCBFile, opts Options, outlineBounds boardBounds) []Check {
+	filledPolygons := dfmFilledZonePolygons(board)
+	copperPolygons := dfmCopperGraphicPolygons(board)
 	return []Check{
 		evaluateCopperTrackWidths(board, opts),
 		evaluateCopperZoneWidths(board, opts),
+		evaluateCopperPolygonWidths(CheckCopperSliverFilledPolygon, "physical.copper_sliver.filled_polygon_width", "filled zone polygon", filledPolygons, opts),
+		evaluateCopperPolygonWidths(CheckCopperSliverCopperPolygon, "physical.copper_sliver.copper_polygon_width", "copper graphic polygon", copperPolygons, opts),
+		evaluateCopperPolygonEdgeClearance(board, opts, outlineBounds, filledPolygons, copperPolygons),
 		evaluateUnsupportedCopperGeometry(board),
 	}
+}
+
+func dfmFilledZonePolygons(board *pcbfiles.PCBFile) []dfmPolygon {
+	observations := dfmZonePolygons(board)
+	out := make([]dfmPolygon, 0, len(observations))
+	for _, observation := range observations {
+		if observation.Kind == dfmGeometryFilledZonePolygon {
+			out = append(out, observation)
+		}
+	}
+	return out
+}
+
+func evaluateCopperPolygonWidths(id, issuePath, label string, polygons []dfmPolygon, opts Options) Check {
+	if len(polygons) == 0 {
+		return Check{ID: id, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no " + label + " geometry was found for polygon width checks", Source: SourceParser}
+	}
+	checked := 0
+	unsupported := 0
+	violations := 0
+	minObserved := math.MaxFloat64
+	var objects []string
+	nets := map[string]struct{}{}
+	for _, polygon := range polygons {
+		width := dfmEstimatePolygonWidth(polygon)
+		if !width.Measured {
+			unsupported++
+			objects = appendLimited(objects, polygonObjectID(polygon))
+			addRef(nets, polygon.NetName)
+			continue
+		}
+		checked++
+		if width.WidthMM < minObserved {
+			minObserved = width.WidthMM
+		}
+		if width.WidthMM < opts.MinCopperFeatureMM {
+			violations++
+			objects = appendLimited(objects, polygonObjectID(polygon))
+			addRef(nets, polygon.NetName)
+		}
+	}
+	measurements := []Measurement{
+		{Name: "checked_polygon_count", Value: float64(checked), Unit: "count"},
+		{Name: "unsupported_polygon_count", Value: float64(unsupported), Unit: "count"},
+		{Name: "minimum_required_copper_feature", Value: opts.MinCopperFeatureMM, Unit: "mm"},
+	}
+	if minObserved != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_polygon_width", Value: minObserved, Unit: "mm"})
+	}
+	if violations > 0 {
+		measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+		return Check{
+			ID:           id,
+			Category:     CategoryCopperSliver,
+			Status:       StatusBlocked,
+			Message:      "one or more " + label + " features are narrower than the active profile threshold",
+			Suggestion:   "increase polygon feature width or verify the geometry with KiCad DRC/manufacturer DFM evidence",
+			IssuePath:    issuePath,
+			Objects:      objects,
+			Nets:         sortedMapKeys(nets),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	if unsupported > 0 {
+		return Check{
+			ID:           id,
+			Category:     CategoryCopperSliver,
+			Status:       StatusWarning,
+			Message:      "some " + label + " geometry could not be measured for polygon width checks",
+			Suggestion:   "run KiCad DRC or expand polygon parser support before treating copper sliver checks as complete",
+			IssuePath:    issuePath,
+			Objects:      objects,
+			Nets:         sortedMapKeys(nets),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	return Check{ID: id, Category: CategoryCopperSliver, Status: StatusPass, Message: label + " widths meet the active profile threshold", Measurements: measurements, Source: SourceParser}
+}
+
+func evaluateCopperPolygonEdgeClearance(board *pcbfiles.PCBFile, opts Options, outlineBounds boardBounds, filledPolygons, copperPolygons []dfmPolygon) Check {
+	if opts.MinCopperEdgeMM <= 0 {
+		return Check{ID: CheckCopperSliverPolygonEdge, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no copper-to-edge threshold is active for polygon edge-clearance checks", Source: SourceProfile}
+	}
+	outlines := dfmBoardOutlinePolygons(board, outlineBounds)
+	if len(outlines) == 0 {
+		return Check{ID: CheckCopperSliverPolygonEdge, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no usable board outline polygon was found for copper polygon edge-clearance checks", Source: SourceParser}
+	}
+	type outlineGeometry struct {
+		Points []kicadfiles.Point
+		Bounds []dfmRect
+	}
+	outlineGeometries := make([]outlineGeometry, 0, len(outlines))
+	for _, outline := range outlines {
+		if outline.supported() {
+			points := dfmNormalizePolygon(outline.Points)
+			outlineGeometries = append(outlineGeometries, outlineGeometry{Points: points, Bounds: dfmSegmentBoundsForNormalizedPolygon(points)})
+		}
+	}
+	if len(outlineGeometries) == 0 {
+		return Check{ID: CheckCopperSliverPolygonEdge, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no supported board outline polygon was found for copper polygon edge-clearance checks", Source: SourceParser}
+	}
+	if len(filledPolygons)+len(copperPolygons) == 0 {
+		return Check{ID: CheckCopperSliverPolygonEdge, Category: CategoryCopperSliver, Status: StatusSkipped, Message: "no copper polygon geometry was found for edge-clearance checks", Source: SourceParser}
+	}
+	checked := 0
+	unsupported := 0
+	partialUnsupported := 0
+	violations := 0
+	minObserved := math.MaxFloat64
+	var objects []string
+	objectSet := map[string]struct{}{}
+	addObject := func(polygon dfmPolygon) {
+		objectID := polygonObjectID(polygon)
+		if strings.TrimSpace(objectID) == "" {
+			return
+		}
+		if _, ok := objectSet[objectID]; ok {
+			return
+		}
+		objectSet[objectID] = struct{}{}
+		objects = appendLimited(objects, objectID)
+	}
+	nets := map[string]struct{}{}
+	measurePolygon := func(polygon dfmPolygon) {
+		if !polygon.supported() {
+			unsupported++
+			addObject(polygon)
+			addRef(nets, polygon.NetName)
+			return
+		}
+		polygonPoints := dfmNormalizePolygon(polygon.Points)
+		polygonBounds := dfmSegmentBoundsForNormalizedPolygon(polygonPoints)
+		distance := math.Inf(1)
+		hasPartialUnsupported := false
+		for _, outline := range outlineGeometries {
+			observed := dfmPolygonEdgeDistanceWithBoundsMM(polygonPoints, polygonBounds, outline.Points, outline.Bounds)
+			if math.IsInf(observed, 1) {
+				hasPartialUnsupported = true
+				continue
+			}
+			if observed < distance {
+				distance = observed
+			}
+		}
+		if math.IsInf(distance, 1) {
+			unsupported++
+			addObject(polygon)
+			addRef(nets, polygon.NetName)
+			return
+		}
+		if hasPartialUnsupported {
+			partialUnsupported++
+			addObject(polygon)
+			addRef(nets, polygon.NetName)
+		}
+		checked++
+		if distance < minObserved {
+			minObserved = distance
+		}
+		if distance < opts.MinCopperEdgeMM {
+			violations++
+			addObject(polygon)
+			addRef(nets, polygon.NetName)
+		}
+	}
+	for _, polygon := range filledPolygons {
+		measurePolygon(polygon)
+	}
+	for _, polygon := range copperPolygons {
+		measurePolygon(polygon)
+	}
+	measurements := []Measurement{
+		{Name: "checked_polygon_count", Value: float64(checked), Unit: "count"},
+		{Name: "unsupported_polygon_count", Value: float64(unsupported), Unit: "count"},
+		{Name: "partial_unsupported_polygon_count", Value: float64(partialUnsupported), Unit: "count"},
+		{Name: "minimum_required_copper_edge_clearance", Value: opts.MinCopperEdgeMM, Unit: "mm"},
+	}
+	if minObserved != math.MaxFloat64 {
+		measurements = append(measurements, Measurement{Name: "minimum_observed_copper_edge_clearance", Value: minObserved, Unit: "mm"})
+	}
+	if violations > 0 {
+		measurements = append(measurements, Measurement{Name: "violation_count", Value: float64(violations), Unit: "count"})
+		return Check{
+			ID:           CheckCopperSliverPolygonEdge,
+			Category:     CategoryCopperSliver,
+			Status:       StatusBlocked,
+			Message:      "one or more copper polygons are closer to the board edge than the active profile allows",
+			Suggestion:   "move polygon copper away from Edge.Cuts or select a profile that supports the modeled clearance",
+			IssuePath:    "physical.copper_sliver.polygon_edge_clearance",
+			Objects:      objects,
+			Nets:         sortedMapKeys(nets),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	if unsupported+partialUnsupported > 0 {
+		return Check{
+			ID:           CheckCopperSliverPolygonEdge,
+			Category:     CategoryCopperSliver,
+			Status:       StatusWarning,
+			Message:      "some copper polygon geometry could not be measured for board-edge clearance",
+			Suggestion:   "run KiCad DRC or expand polygon parser support before treating copper edge-clearance checks as complete",
+			IssuePath:    "physical.copper_sliver.polygon_edge_clearance",
+			Objects:      objects,
+			Nets:         sortedMapKeys(nets),
+			Measurements: measurements,
+			Source:       SourceParser,
+		}
+	}
+	return Check{ID: CheckCopperSliverPolygonEdge, Category: CategoryCopperSliver, Status: StatusPass, Message: "copper polygon edge clearances meet the active profile threshold", Measurements: measurements, Source: SourceParser}
+}
+
+func polygonObjectID(polygon dfmPolygon) string {
+	if objectID := strings.TrimSpace(polygon.ObjectID); objectID != "" {
+		return objectID
+	}
+	return polygon.SourcePath
 }
 
 func evaluateCopperTrackWidths(board *pcbfiles.PCBFile, opts Options) Check {

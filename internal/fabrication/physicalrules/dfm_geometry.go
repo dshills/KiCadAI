@@ -169,6 +169,64 @@ func dfmPolygonDistanceMM(a, b []kicadfiles.Point) float64 {
 	return minDistance
 }
 
+func dfmPolygonEdgeDistanceMM(a, b []kicadfiles.Point) float64 {
+	a = dfmNormalizePolygon(a)
+	b = dfmNormalizePolygon(b)
+	return dfmPolygonEdgeDistanceNormalizedMM(a, b)
+}
+
+func dfmPolygonEdgeDistanceNormalizedMM(a, b []kicadfiles.Point) float64 {
+	if len(a) < 3 || len(b) < 3 {
+		return math.Inf(1)
+	}
+	return dfmPolygonEdgeDistanceWithBoundsMM(a, dfmSegmentBoundsForNormalizedPolygon(a), b, dfmSegmentBoundsForNormalizedPolygon(b))
+}
+
+func dfmPolygonEdgeDistanceWithBoundsMM(a []kicadfiles.Point, aBounds []dfmRect, b []kicadfiles.Point, bBounds []dfmRect) float64 {
+	if len(a) < 3 || len(b) < 3 || len(aBounds) != len(a) || len(bBounds) != len(b) {
+		return math.Inf(1)
+	}
+	if len(a)*len(b) > dfmPolygonEdgeDistanceMaxPairs {
+		return math.Inf(1)
+	}
+	minDistance := math.Inf(1)
+	for i := range a {
+		aNext := a[(i+1)%len(a)]
+		if a[i] == aNext {
+			continue
+		}
+		for j := range b {
+			bNext := b[(j+1)%len(b)]
+			if b[j] == bNext {
+				continue
+			}
+			if dfmRectDistanceMM(aBounds[i], bBounds[j]) >= minDistance {
+				continue
+			}
+			distance := dfmSegmentSegmentDistanceMM(a[i], aNext, b[j], bNext)
+			if distance < minDistance {
+				minDistance = distance
+			}
+		}
+	}
+	return minDistance
+}
+
+const dfmPolygonEdgeDistanceMaxPairs = 1_048_576
+
+func dfmSegmentBoundsForPolygon(points []kicadfiles.Point) []dfmRect {
+	points = dfmNormalizePolygon(points)
+	return dfmSegmentBoundsForNormalizedPolygon(points)
+}
+
+func dfmSegmentBoundsForNormalizedPolygon(points []kicadfiles.Point) []dfmRect {
+	bounds := make([]dfmRect, len(points))
+	for index := range points {
+		bounds[index] = dfmSegmentBounds(points[index], points[(index+1)%len(points)])
+	}
+	return bounds
+}
+
 func dfmRectsOverlap(a, b dfmRect) bool {
 	if !a.Valid || !b.Valid {
 		return false

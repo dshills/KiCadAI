@@ -72,6 +72,34 @@ func TestDFMPolygonDistanceAndSelfIntersection(t *testing.T) {
 	}
 }
 
+func TestDFMPolygonEdgeDistanceIgnoresContainmentOverlap(t *testing.T) {
+	outline := []kicadfiles.Point{point(0, 0), point(10, 0), point(10, 10), point(0, 10)}
+	copper := []kicadfiles.Point{point(0.05, 1), point(2, 1), point(2, 2), point(0.05, 2)}
+
+	if got := dfmPolygonDistanceMM(copper, outline); got != 0 {
+		t.Fatalf("contained polygon distance = %g, want overlap distance 0", got)
+	}
+	if got := dfmPolygonEdgeDistanceMM(copper, outline); math.Abs(got-0.05) > 1e-9 {
+		t.Fatalf("edge distance = %g, want 0.05", got)
+	}
+}
+
+func TestDFMPolygonEdgeDistanceCapsComplexComparisons(t *testing.T) {
+	const vertexCount = 1025
+	points := make([]kicadfiles.Point, 0, vertexCount)
+	for index := 0; index < vertexCount; index++ {
+		angle := 2 * math.Pi * float64(index) / vertexCount
+		points = append(points, kicadfiles.Point{
+			X: kicadfiles.MM(10 + math.Cos(angle)),
+			Y: kicadfiles.MM(10 + math.Sin(angle)),
+		})
+	}
+
+	if got := dfmPolygonEdgeDistanceNormalizedMM(points, points); !math.IsInf(got, 1) {
+		t.Fatalf("complex edge distance = %g, want +Inf unsupported sentinel", got)
+	}
+}
+
 func TestDFMRectDistance(t *testing.T) {
 	a := dfmRect{Valid: true, MinX: 0, MinY: 0, MaxX: 1, MaxY: 1}
 	b := dfmRect{Valid: true, MinX: 3, MinY: 0, MaxX: 4, MaxY: 1}
