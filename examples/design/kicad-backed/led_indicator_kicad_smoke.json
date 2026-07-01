@@ -25,7 +25,6 @@
   "validation": {
     "acceptance": "erc-drc",
     "require_erc": true,
-    "require_drc": true,
-    "skip_routing": true
+    "require_drc": true
   }
 }

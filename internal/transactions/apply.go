@@ -218,6 +218,14 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			payload.Pins = pins
 			symbol := schematic.NewSymbol(generator.New("imported.schematic.symbol", payload.Ref, opIndex), payload.LibraryID, payload.Ref, firstNonEmpty(payload.Value, payload.Ref), point(payload.At.XMM, payload.At.YMM))
 			symbol.Rotation = kicadfiles.Angle(payload.Rotation)
+			if strings.EqualFold(strings.TrimSpace(payload.Role), "generated_terminal") {
+				inBOM := false
+				onBoard := false
+				inPositionFile := false
+				symbol.InBOM = &inBOM
+				symbol.OnBoard = &onBoard
+				symbol.InPositionFile = &inPositionFile
+			}
 			symbol.Properties = schematic.MergeProperties(symbol.Properties, schematicPropertiesFromPayload(payload.Properties, symbol.Position, symbol.Rotation, 2))
 			for _, pin := range payload.Pins {
 				symbol.Pins = append(symbol.Pins, schematic.SymbolPin{Number: pin.Number, UUID: generator.New("imported.schematic.symbol.pin", payload.Ref, opIndex, pin.Number)})
@@ -258,6 +266,20 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				schematicDirty = true
 				lastDirtyIndex = i
 			}
+		case OpAddLabel:
+			if design.Schematic == nil {
+				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("root schematic required")))
+				return result
+			}
+			var payload AddLabelOperation
+			if err := decodeRaw(op, &payload); err != nil {
+				result.Issues = append(result.Issues, applyIssue(i, err))
+				return result
+			}
+			label := schematic.NewLabel(generator.New("imported.schematic.label", payload.Text, fmt.Sprintf("%d", i)), payload.Text, labelKind(payload.Kind), point(payload.At.XMM, payload.At.YMM))
+			design.Schematic.Labels = append(design.Schematic.Labels, label)
+			schematicDirty = true
+			lastDirtyIndex = i
 		case OpPlaceFootprint:
 			if design.PCB == nil {
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("PCB required")))
@@ -536,6 +558,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		}
 		_, err = builder.AddSymbol(designapi.SymbolOptions{
 			Reference:  payload.Ref,
+			Role:       payload.Role,
 			Value:      payload.Value,
 			LibraryID:  payload.LibraryID,
 			Position:   point(payload.At.XMM, payload.At.YMM),
@@ -550,6 +573,12 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			return nil, err
 		}
 		return nil, builder.Connect(endpoint(payload.From), endpoint(payload.To), payload.NetName)
+	case OpAddLabel:
+		var payload AddLabelOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return nil, err
+		}
+		return nil, builder.AddLabel(payload.Text, point(payload.At.XMM, payload.At.YMM), labelKind(payload.Kind))
 	case OpAddNoConnect:
 		var payload AddNoConnectOperation
 		if err := decodeRaw(op, &payload); err != nil {
@@ -1260,6 +1289,17 @@ func applyIssue(index int, err error) reports.Issue {
 
 func endpoint(value Endpoint) designapi.Endpoint {
 	return designapi.Endpoint{Reference: value.Ref, Pin: value.Pin}
+}
+
+func labelKind(value string) schematic.LabelKind {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "global":
+		return schematic.LabelGlobal
+	case "hierarchical":
+		return schematic.LabelHierarchical
+	default:
+		return schematic.LabelLocal
+	}
 }
 
 func schematicPropertiesFromPayload(properties []SymbolProperty, defaultPosition kicadfiles.Point, defaultRotation kicadfiles.Angle, visibleBaseIndex int) []schematic.Property {

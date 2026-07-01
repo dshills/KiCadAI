@@ -269,6 +269,9 @@ func schematicComponents(files []schematicFileEntry, result *Result) []component
 			if ref == "" || strings.HasPrefix(ref, "#") {
 				continue
 			}
+			if symbol.OnBoard != nil && !*symbol.OnBoard {
+				continue
+			}
 			footprintID := symbolProperty(symbol, "Footprint")
 			symbolRef := componentSymbol{FileIndex: fileIndex, Symbol: symbol}
 			if existing, ok := byRef[ref]; ok {

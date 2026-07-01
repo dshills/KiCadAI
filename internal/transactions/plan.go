@@ -209,7 +209,7 @@ func enrichPlannedOperationWithLibrary(index libraryresolver.LibraryIndex, plann
 
 func supportedExistingPlanOperation(kind OperationKind) bool {
 	switch kind {
-	case OpAddSymbol, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
+	case OpAddSymbol, OpAddLabel, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
 		return true
 	default:
 		return false
@@ -218,7 +218,7 @@ func supportedExistingPlanOperation(kind OperationKind) bool {
 
 func supportedPlanOperation(kind OperationKind) bool {
 	switch kind {
-	case OpCreateProject, OpSetBoardOutline, OpAddSymbol, OpConnect, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
+	case OpCreateProject, OpSetBoardOutline, OpAddSymbol, OpAddLabel, OpConnect, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
 		return true
 	default:
 		return false
@@ -251,6 +251,13 @@ func populatePlanFields(planned *PlannedOperation, op Operation, target string, 
 			return decodeIssue(err)
 		} else {
 			addRef(planned, payload.Ref)
+		}
+	case OpAddLabel:
+		var payload AddLabelOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return decodeIssue(err)
+		} else {
+			addNet(planned, payload.Text)
 		}
 	case OpConnect:
 		var payload ConnectOperation
@@ -451,7 +458,7 @@ func addSymbolKey(ref string, unit int) string {
 
 func touchesDesign(kind OperationKind) bool {
 	switch kind {
-	case OpAddSymbol, OpAssignFootprint, OpPlaceFootprint, OpConnect, OpRoute, OpAddZone, OpRemoveSymbol:
+	case OpAddSymbol, OpAddLabel, OpAssignFootprint, OpPlaceFootprint, OpConnect, OpRoute, OpAddZone, OpRemoveSymbol:
 		return true
 	default:
 		return false
@@ -507,7 +514,7 @@ func importedPlanMutability(operation PlannedOperation, issues []reports.Issue) 
 		return preservation.MutabilityUnsafe
 	}
 	switch operation.Op {
-	case OpAddSymbol, OpAddNoConnect:
+	case OpAddSymbol, OpAddLabel, OpAddNoConnect:
 		return preservation.MutabilitySafeAdd
 	default:
 		return preservation.MutabilityPlanOnly

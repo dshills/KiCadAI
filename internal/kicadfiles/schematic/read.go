@@ -2,6 +2,7 @@ package schematic
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -195,6 +196,15 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 	if mirror, ok := node.Child("mirror"); ok {
 		symbol.Mirror = SymbolMirror(mirror.ListValue(1))
 	}
+	if inBOM, ok := readYesNoChild(node, "in_bom"); ok {
+		symbol.InBOM = &inBOM
+	}
+	if onBoard, ok := readYesNoChild(node, "on_board"); ok {
+		symbol.OnBoard = &onBoard
+	}
+	if inPositionFile, ok := readYesNoChild(node, "in_pos_files"); ok {
+		symbol.InPositionFile = &inPositionFile
+	}
 	for _, prop := range node.ChildrenByHead("property") {
 		property := readProperty(prop)
 		if property.Name == "" {
@@ -211,7 +221,73 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 	for _, pin := range node.ChildrenByHead("pin") {
 		symbol.Pins = append(symbol.Pins, SymbolPin{Number: pin.ListValue(1), UUID: readUUID(pin)})
 	}
+	if len(symbol.PinAnchors) == 0 {
+		for _, pin := range templatePinsForReadSymbol(symbol) {
+			offset := transformedReadPinOffset(pin.Offset, symbol.Rotation, symbol.Mirror)
+			symbol.PinAnchors = append(symbol.PinAnchors, kicadfiles.Point{
+				X: symbol.Position.X + offset.X,
+				Y: symbol.Position.Y + offset.Y,
+			})
+		}
+	}
 	return symbol
+}
+
+func transformedReadPinOffset(offset kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror) kicadfiles.Point {
+	x := float64(offset.X)
+	y := float64(offset.Y)
+	switch mirror {
+	case SymbolMirrorX:
+		y = -y
+	case SymbolMirrorY:
+		x = -x
+	}
+	if rotation != 0 {
+		radians := float64(rotation) * math.Pi / 180
+		cosine := math.Cos(radians)
+		sine := math.Sin(radians)
+		x, y = x*cosine-y*sine, x*sine+y*cosine
+	}
+	return kicadfiles.Point{X: kicadfiles.IU(math.Round(x)), Y: kicadfiles.IU(math.Round(y))}
+}
+
+func templatePinsForReadSymbol(symbol SchematicSymbol) []TemplatePin {
+	templatePins, ok := EmbeddedSymbolPinOffsets(symbol.LibraryID)
+	if !ok {
+		return nil
+	}
+	if len(symbol.Pins) == 0 {
+		return templatePins
+	}
+	allowed := map[string]struct{}{}
+	for _, pin := range symbol.Pins {
+		number := strings.TrimSpace(pin.Number)
+		if number != "" {
+			allowed[number] = struct{}{}
+		}
+	}
+	filtered := make([]TemplatePin, 0, len(templatePins))
+	for _, pin := range templatePins {
+		if _, ok := allowed[strings.TrimSpace(pin.Number)]; ok {
+			filtered = append(filtered, pin)
+		}
+	}
+	return filtered
+}
+
+func readYesNoChild(node sexpr.ParsedNode, head string) (bool, bool) {
+	child, ok := node.Child(head)
+	if !ok {
+		return false, false
+	}
+	switch strings.ToLower(strings.TrimSpace(child.ListValue(1))) {
+	case "yes":
+		return true, true
+	case "no":
+		return false, true
+	default:
+		return false, false
+	}
 }
 
 func readLabel(node sexpr.ParsedNode, kind LabelKind) Label {

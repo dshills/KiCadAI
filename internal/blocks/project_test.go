@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"context"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -11,7 +12,7 @@ import (
 	"kicadai/internal/transactions"
 )
 
-func TestProjectTransactionForLEDKeepsInternalConnectionsOnly(t *testing.T) {
+func TestProjectTransactionForLEDMaterializesExportedPorts(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{BlockID: "led_indicator", InstanceID: "status"})
 	if reports.HasBlockingIssue(issues) {
@@ -26,14 +27,25 @@ func TestProjectTransactionForLEDKeepsInternalConnectionsOnly(t *testing.T) {
 	if tx.Name != "status_led" || tx.Project != "status_led" {
 		t.Fatalf("unexpected transaction identity: %#v", tx)
 	}
-	if len(tx.Operations) != 9 {
-		t.Fatalf("expected create + 6 component ops + 1 internal connect + write, got %d", len(tx.Operations))
+	if len(tx.Operations) != 11 {
+		t.Fatalf("expected create + 6 component ops + 2 exported-port labels + 1 internal connect + write, got %d", len(tx.Operations))
 	}
 	if tx.Operations[0].Op != transactions.OpCreateProject || tx.Operations[len(tx.Operations)-1].Op != transactions.OpWriteProject {
 		t.Fatalf("transaction must be bracketed by create/write: %#v", tx.Operations)
 	}
 	connects := 0
+	labels := 0
 	for _, operation := range tx.Operations {
+		if operation.Op == transactions.OpAddLabel {
+			var payload transactions.AddLabelOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				t.Fatal(err)
+			}
+			labels++
+			if payload.Text != "IN" && payload.Text != "GND" {
+				t.Fatalf("unexpected generated label: %#v", payload)
+			}
+		}
 		if operation.Op != transactions.OpConnect {
 			continue
 		}
@@ -45,6 +57,9 @@ func TestProjectTransactionForLEDKeepsInternalConnectionsOnly(t *testing.T) {
 		if payload.From.Ref == output.Instance.InstanceID || payload.To.Ref == output.Instance.InstanceID {
 			t.Fatalf("project transaction leaked pseudo-port connect: %#v", payload)
 		}
+	}
+	if labels != 2 {
+		t.Fatalf("expected two generated labels, got %d", labels)
 	}
 	if connects != 1 {
 		t.Fatalf("expected one internal connect, got %d", connects)
@@ -77,6 +92,175 @@ func TestProjectTransactionForConnectorFiltersPseudoPortConnections(t *testing.T
 	}
 	if validation := transactions.Validate(tx); len(validation.Issues) != 0 {
 		t.Fatalf("unexpected validation issues: %#v", validation.Issues)
+	}
+}
+
+func TestProjectTransactionLabelsExportedMultiEndpointNet(t *testing.T) {
+	resistor := BlockComponent{
+		Role:      "series_resistor",
+		RefPrefix: "R",
+		Value:     "1k",
+		SymbolID:  "Device:R",
+		Pins: []transactions.PinSpec{
+			{Number: "1", XMM: -3.81, YMM: 0},
+			{Number: "2", XMM: 3.81, YMM: 0},
+		},
+	}
+	led := BlockComponent{
+		Role:      "led",
+		RefPrefix: "D",
+		Value:     "LED",
+		SymbolID:  "Device:LED",
+		Pins: []transactions.PinSpec{
+			{Number: "1", XMM: -3.81, YMM: 0},
+			{Number: "2", XMM: 3.81, YMM: 0},
+		},
+	}
+	var operations []transactions.Operation
+	for _, item := range []struct {
+		component BlockComponent
+		ref       string
+		at        transactions.Point
+	}{
+		{component: resistor, ref: "R1", at: transactions.Point{XMM: 10, YMM: 20}},
+		{component: led, ref: "D1", at: transactions.Point{XMM: 25, YMM: 20}},
+	} {
+		componentOps, issues := ComponentOperations(item.component, item.ref, item.at)
+		if len(issues) != 0 {
+			t.Fatalf("component issues: %#v", issues)
+		}
+		operations = append(operations, componentOps...)
+	}
+	for _, pair := range []struct {
+		from transactions.Endpoint
+		to   transactions.Endpoint
+	}{
+		{from: transactions.Endpoint{Ref: "status", Pin: "IN"}, to: transactions.Endpoint{Ref: "R1", Pin: "1"}},
+		{from: transactions.Endpoint{Ref: "R1", Pin: "1"}, to: transactions.Endpoint{Ref: "D1", Pin: "1"}},
+	} {
+		connect, issues := ConnectOperation(pair.from.Ref, pair.from.Pin, pair.to.Ref, pair.to.Pin, "STATUS_IN")
+		if len(issues) != 0 {
+			t.Fatalf("connect issues: %#v", issues)
+		}
+		operations = append(operations, connect)
+	}
+
+	tx, err := ProjectTransactionForBlockOutput("status", BlockOutput{
+		Instance:   BlockInstance{InstanceID: "status", Refs: []string{"R1", "D1"}},
+		Operations: operations,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	labels := 0
+	connects := 0
+	for _, operation := range tx.Operations {
+		switch operation.Op {
+		case transactions.OpAddLabel:
+			var payload transactions.AddLabelOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				t.Fatal(err)
+			}
+			labels++
+			if payload.Text != "IN" || math.Abs(payload.At.XMM-6.19) > 0.000001 || math.Abs(payload.At.YMM-20) > 0.000001 {
+				t.Fatalf("unexpected exported label: %#v", payload)
+			}
+		case transactions.OpConnect:
+			var payload transactions.ConnectOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				t.Fatal(err)
+			}
+			connects++
+			if payload.From.Ref == "status" || payload.To.Ref == "status" {
+				t.Fatalf("pseudo-port connect leaked: %#v", payload)
+			}
+		}
+	}
+	if labels != 1 {
+		t.Fatalf("labels = %d, want 1", labels)
+	}
+	if connects != 1 {
+		t.Fatalf("connects = %d, want 1", connects)
+	}
+}
+
+func TestProjectTransactionLabelsOneOfMultiplePseudoPorts(t *testing.T) {
+	componentOps, issues := ComponentOperations(BlockComponent{
+		Role:      "test_node",
+		RefPrefix: "J",
+		Value:     "Test",
+		SymbolID:  "Connector:Conn_01x01_Pin",
+		Pins:      []transactions.PinSpec{{Number: "1", XMM: 0, YMM: 0}},
+	}, "J1", transactions.Point{XMM: 10, YMM: 20})
+	if len(issues) != 0 {
+		t.Fatalf("component issues: %#v", issues)
+	}
+	operations := append([]transactions.Operation{}, componentOps...)
+	for _, pair := range []struct {
+		from transactions.Endpoint
+		to   transactions.Endpoint
+	}{
+		{from: transactions.Endpoint{Ref: "status", Pin: "IN"}, to: transactions.Endpoint{Ref: "J1", Pin: "1"}},
+		{from: transactions.Endpoint{Ref: "status", Pin: "OUT"}, to: transactions.Endpoint{Ref: "J1", Pin: "1"}},
+	} {
+		connect, issues := ConnectOperation(pair.from.Ref, pair.from.Pin, pair.to.Ref, pair.to.Pin, "STATUS")
+		if len(issues) != 0 {
+			t.Fatalf("connect issues: %#v", issues)
+		}
+		operations = append(operations, connect)
+	}
+
+	tx, err := ProjectTransactionForBlockOutput("status", BlockOutput{
+		Instance:   BlockInstance{InstanceID: "status", Refs: []string{"J1"}},
+		Operations: operations,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels := 0
+	for _, operation := range tx.Operations {
+		if operation.Op != transactions.OpAddLabel {
+			continue
+		}
+		var payload transactions.AddLabelOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			t.Fatal(err)
+		}
+		labels++
+		if payload.Text != "STATUS" {
+			t.Fatalf("label = %#v, want stable first pseudo-port label", payload)
+		}
+	}
+	if labels != 1 {
+		t.Fatalf("labels = %d, want 1", labels)
+	}
+}
+
+func TestProjectEndpointAnchorsApplySymbolRotation(t *testing.T) {
+	operation, err := wrapOperation(transactions.OpAddSymbol, transactions.AddSymbolOperation{
+		Op:        transactions.OpAddSymbol,
+		Ref:       "R1",
+		Role:      "series_resistor",
+		Value:     "1k",
+		LibraryID: "Device:R",
+		At:        transactions.Point{XMM: 10, YMM: 20},
+		Rotation:  90,
+		Pins: []transactions.PinSpec{
+			{Number: "1", XMM: -3.81, YMM: 0},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	anchors, err := projectEndpointAnchors([]transactions.Operation{operation})
+	if err != nil {
+		t.Fatal(err)
+	}
+	anchor := anchors[projectEndpointKey{ref: "R1", pin: "1"}]
+	if math.Abs(anchor.xMM-10) > 0.000001 || math.Abs(anchor.yMM-16.19) > 0.000001 {
+		t.Fatalf("anchor = %#v, want rotated pin offset applied", anchor)
 	}
 }
 

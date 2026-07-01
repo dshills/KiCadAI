@@ -45,15 +45,15 @@ geometry, and broader example regeneration.
 Generated design PCB net assignment now propagates pad and copper net names
 through placement/project write, resolves KiCad 10 name-only net references
 during PCB readback, and reports net-assignment evidence in the `design create`
-workflow. The current KiCad-backed `expected_fail` examples have moved past the
-old missing net-code writer-correctness blocker. Generated block-local routes
-now bind to physical same-net pad anchors and report route-connectivity
-evidence. Generated inter-block route candidates now promote connector/LED and
-I2C breakout request connections into placement/routing evidence. Routing
-summaries now distinguish candidates, attempted routes, endpoint-contact
-evidence, graph-connected routes, partial routes, and unrouted nets. The next
-blocker is promoting richer generated boards to KiCad ERC/DRC-clean layout
-proof.
+workflow. The LED and connector/LED KiCad-backed examples have been promoted to
+candidate readiness with warning-only KiCad evidence, while richer I2C and
+amplifier fixtures remain expected-fail. Generated block-local routes now bind
+to physical same-net pad anchors and report route-connectivity evidence.
+Generated inter-block route candidates now promote connector/LED and I2C
+breakout request connections into placement/routing evidence. Routing summaries
+now distinguish candidates, attempted routes, endpoint-contact evidence,
+graph-connected routes, partial routes, and unrouted nets. The next blocker is
+promoting richer generated boards to KiCad ERC/DRC-clean layout proof.
 
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, polygonal copper width and

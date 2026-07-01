@@ -87,6 +87,44 @@ func TestReadSchematicReadsSymbolMirror(t *testing.T) {
 	}
 }
 
+func TestReadSchematicRecoversRotatedPinAnchors(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (symbol`,
+		`    (lib_id "Device:R")`,
+		`    (at 10 20 90)`,
+		`    (uuid "33333333-3333-5333-8333-333333333333")`,
+		`    (property "Reference" "R1")`,
+		`    (property "Value" "1k")`,
+		`    (pin "1" (uuid "44444444-4444-5444-8444-444444444444"))`,
+		`    (pin "2" (uuid "55555555-5555-5555-8555-555555555555"))`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 {
+		t.Fatalf("symbols = %#v", read.Symbols)
+	}
+	anchors := read.Symbols[0].PinAnchors
+	if len(anchors) != 2 {
+		t.Fatalf("pin anchors = %#v, want two recovered anchors", anchors)
+	}
+	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(6.19), Y: kicadfiles.MM(20)}) {
+		t.Fatalf("pin 1 anchor = %#v, want rotated left anchor", anchors[0])
+	}
+	if anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(13.81), Y: kicadfiles.MM(20)}) {
+		t.Fatalf("pin 2 anchor = %#v, want rotated right anchor", anchors[1])
+	}
+}
+
 func TestReadSchematicReadsEmbeddedLibSymbols(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,

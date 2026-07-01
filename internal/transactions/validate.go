@@ -181,6 +181,14 @@ func validateOperation(op Operation) []reports.Issue {
 			issues = append(issues, requireNonEmpty(path+".net_name", "net_name", payload.NetName)...)
 			return issues
 		})
+	case OpAddLabel:
+		var payload AddLabelOperation
+		return validateDecoded(op, &payload, func() []reports.Issue {
+			var issues []reports.Issue
+			issues = append(issues, requireNonEmpty(path+".text", "label text", payload.Text)...)
+			issues = append(issues, validatePoint(path+".at", payload.At)...)
+			return issues
+		})
 	case OpAddNoConnect:
 		var payload AddNoConnectOperation
 		return validateDecoded(op, &payload, func() []reports.Issue {

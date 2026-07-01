@@ -190,13 +190,13 @@ loop confidence:
   narrow, and broader topology synthesis is still intentionally limited.
   Deterministic rationale reports now explain supported planner decisions and
   blockers, but they do not replace broader synthesis.
-- the default design examples are intentionally small LED workflows.
-  Multi-block connector/LED and I2C sensor breakout scenarios now exist as
-  optional KiCad-backed `expected_fail` fixtures, joined by an amplifier
-  fabrication-candidate `expected_fail` fixture. They now progress past the
-  previous writer-correctness pad/copper net-code blocker. LED and
-  connector/LED fixtures also prove block-local route endpoint binding to
-  physical same-net pad anchors. Generated inter-block routing now reports
+- the default design examples are intentionally small LED workflows. LED and
+  connector/LED optional KiCad-backed scenarios are now candidate fixtures with
+  warning-only KiCad evidence. I2C sensor breakout and amplifier
+  fabrication-candidate scenarios remain `expected_fail` fixtures. They now
+  progress past the previous writer-correctness pad/copper net-code blocker.
+  LED and connector/LED fixtures also prove block-local route endpoint binding
+  to physical same-net pad anchors. Generated inter-block routing now reports
   endpoint-contact evidence and counts completion only when a same-net contact
   graph connects the required endpoints. The remaining layout-quality blockers
   are broader inter-block route coverage, richer generated-board validation,
@@ -354,15 +354,18 @@ Implemented foundation.
   exercise full generated-design workflows with metadata-declared readiness,
   expected stages, expected artifacts, and required ERC/DRC policy. Current
   readiness:
-  - `expected_fail`: `led_indicator_kicad_smoke`,
-    `connector_led_kicad_smoke`, and `i2c_sensor_breakout_candidate`;
-  - `candidate`: none yet;
+  - `expected_fail`: `i2c_sensor_breakout_candidate` and
+    `opamp_headphone_buffer_kicad_candidate`;
+  - `candidate`: `led_indicator_kicad_smoke` and
+    `connector_led_kicad_smoke`;
   - `pass`: none yet;
   - `blocked`: none yet.
 - `connector_led_kicad_smoke` now has routing-enabled regression coverage for
   promoted inter-block route candidates, endpoint-contact diagnostics, and
-  same-net contact graph completion semantics; it remains `expected_fail` until
-  all required contacts graph-connect and DRC-clean promotion are proven.
+  same-net contact graph completion semantics. `led_indicator_kicad_smoke`
+  now exercises standalone exported-port labels, schematic electrical checks,
+  and LED local-route contact proof. Both are candidate fixtures, not pass
+  fixtures, because KiCad still reports warning-level evidence.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -766,9 +769,10 @@ for `design create`. The default set exercises supported LED workflows and
 proves that checked-in examples remain aligned with the current request schema,
 block contracts, project writer, schematic/PCB readers, and component identity
 property propagation. Optional KiCad-backed design examples now live under
-`examples/design/kicad-backed/`; the current set records `expected_fail`
-evidence for richer generated boards until writer correctness and KiCad ERC/DRC
-artifacts can be produced reliably.
+`examples/design/kicad-backed/`; LED and connector/LED are candidate fixtures,
+while richer I2C and amplifier generated boards still record `expected_fail`
+evidence until writer correctness and KiCad ERC/DRC artifacts can be produced
+reliably.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:

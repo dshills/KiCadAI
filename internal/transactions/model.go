@@ -8,6 +8,7 @@ const (
 	OpCreateProject   OperationKind = "create_project"
 	OpSetBoardOutline OperationKind = "set_board_outline"
 	OpAddSymbol       OperationKind = "add_symbol"
+	OpAddLabel        OperationKind = "add_label"
 	OpConnect         OperationKind = "connect"
 	OpAssignFootprint OperationKind = "assign_footprint"
 	OpPlaceFootprint  OperationKind = "place_footprint"
@@ -196,6 +197,13 @@ type ConnectOperation struct {
 	From    Endpoint      `json:"from"`
 	To      Endpoint      `json:"to"`
 	NetName string        `json:"net_name"`
+}
+
+type AddLabelOperation struct {
+	Op   OperationKind `json:"op"`
+	Text string        `json:"text"`
+	At   Point         `json:"at"`
+	Kind string        `json:"kind,omitempty"`
 }
 
 type AddNoConnectOperation struct {

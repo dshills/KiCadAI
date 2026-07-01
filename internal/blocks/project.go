@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 
@@ -95,6 +96,17 @@ type projectEndpointSet struct {
 	parent map[projectEndpointKey]projectEndpointKey
 }
 
+type projectPoint struct {
+	xMM  float64
+	yMM  float64
+	role string
+}
+
+type projectPseudoEdge struct {
+	pseudo   projectEndpointKey
+	endpoint projectEndpointKey
+}
+
 func newProjectEndpointSet() projectEndpointSet {
 	return projectEndpointSet{parent: map[projectEndpointKey]projectEndpointKey{}}
 }
@@ -139,6 +151,11 @@ func (set projectEndpointSet) union(a, b projectEndpointKey) {
 func materializedGeneratedConnects(operations []transactions.Operation, generatedRefs map[string]struct{}, pseudoRefs map[string]struct{}) ([]transactions.Operation, error) {
 	set := newProjectEndpointSet()
 	netNames := map[projectEndpointKey]string{}
+	var pseudoEdges []projectPseudoEdge
+	anchors, err := projectEndpointAnchors(operations)
+	if err != nil {
+		return nil, err
+	}
 	for _, operation := range operations {
 		if operation.Op != transactions.OpConnect {
 			continue
@@ -150,6 +167,14 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		from := projectEndpoint(payload.From)
 		to := projectEndpoint(payload.To)
 		set.union(from, to)
+		fromPseudo := isProjectPseudoRef(from.ref, pseudoRefs)
+		toPseudo := isProjectPseudoRef(to.ref, pseudoRefs)
+		switch {
+		case fromPseudo && !toPseudo:
+			pseudoEdges = append(pseudoEdges, projectPseudoEdge{pseudo: from, endpoint: to})
+		case toPseudo && !fromPseudo:
+			pseudoEdges = append(pseudoEdges, projectPseudoEdge{pseudo: to, endpoint: from})
+		}
 		netName := strings.TrimSpace(payload.NetName)
 		if netName != "" {
 			netNames[from] = netName
@@ -159,8 +184,12 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 	groups := map[projectEndpointKey][]projectEndpointKey{}
 	groupHasGenerated := map[projectEndpointKey]bool{}
 	groupNetNames := map[projectEndpointKey]string{}
+	groupPseudoEndpoints := map[projectEndpointKey][]projectEndpointKey{}
+	groupPseudoLabelEndpoints := map[projectEndpointKey][]projectEndpointKey{}
 	for endpoint := range set.parent {
-		if _, pseudo := pseudoRefs[endpoint.ref]; pseudo {
+		if isProjectPseudoRef(endpoint.ref, pseudoRefs) {
+			root := set.find(endpoint)
+			groupPseudoEndpoints[root] = append(groupPseudoEndpoints[root], endpoint)
 			continue
 		}
 		root := set.find(endpoint)
@@ -171,6 +200,10 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		if netName := netNames[endpoint]; netName != "" {
 			groupNetNames[root] = preferredProjectNetName(groupNetNames[root], netName)
 		}
+	}
+	for _, edge := range pseudoEdges {
+		root := set.find(edge.endpoint)
+		groupPseudoLabelEndpoints[root] = append(groupPseudoLabelEndpoints[root], edge.endpoint)
 	}
 	var roots []projectEndpointKey
 	for root := range groups {
@@ -185,12 +218,26 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 			continue
 		}
 		endpoints := groups[root]
-		if len(endpoints) < 2 {
-			continue
-		}
+		pseudoEndpoints := groupPseudoEndpoints[root]
 		sort.Slice(endpoints, func(i, j int) bool {
 			return projectEndpointLess(endpoints[i], endpoints[j])
 		})
+		if len(endpoints) >= 1 && len(pseudoEndpoints) >= 1 {
+			sort.Slice(pseudoEndpoints, func(i, j int) bool {
+				return projectEndpointLess(pseudoEndpoints[i], pseudoEndpoints[j])
+			})
+			labelEndpoint := preferredProjectLabelEndpoint(endpoints, groupPseudoLabelEndpoints[root])
+			label, err := materializedPortLabel(labelEndpoint, pseudoEndpoints[0], groupNetNames[root], len(pseudoEndpoints), anchors)
+			if err != nil {
+				return nil, err
+			}
+			if label.Op != "" {
+				out = append(out, label)
+			}
+		}
+		if len(endpoints) < 2 {
+			continue
+		}
 		netName := groupNetNames[root]
 		if netName == "" {
 			netName = "NET_" + endpoints[0].ref + "_" + endpoints[0].pin
@@ -205,6 +252,111 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		}
 	}
 	return out, nil
+}
+
+func isProjectPseudoRef(ref string, pseudoRefs map[string]struct{}) bool {
+	_, ok := pseudoRefs[ref]
+	return ok
+}
+
+func preferredProjectLabelEndpoint(endpoints []projectEndpointKey, candidates []projectEndpointKey) projectEndpointKey {
+	if len(candidates) == 0 {
+		return endpoints[0]
+	}
+	candidateSet := make(map[projectEndpointKey]struct{}, len(candidates))
+	for _, candidate := range candidates {
+		candidateSet[candidate] = struct{}{}
+	}
+	var valid []projectEndpointKey
+	for _, endpoint := range endpoints {
+		if _, ok := candidateSet[endpoint]; ok {
+			valid = append(valid, endpoint)
+		}
+	}
+	if len(valid) == 0 {
+		return endpoints[0]
+	}
+	sort.Slice(valid, func(i, j int) bool {
+		return projectEndpointLess(valid[i], valid[j])
+	})
+	return valid[0]
+}
+
+func projectEndpointAnchors(operations []transactions.Operation) (map[projectEndpointKey]projectPoint, error) {
+	anchors := map[projectEndpointKey]projectPoint{}
+	for index, operation := range operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			return nil, fmt.Errorf("decode add_symbol operation %d: %w", index, err)
+		}
+		for _, pin := range payload.Pins {
+			number := strings.TrimSpace(pin.Number)
+			if number == "" {
+				continue
+			}
+			xMM, yMM := rotatedProjectPinOffset(pin.XMM, pin.YMM, payload.Rotation)
+			anchors[projectEndpointKey{ref: strings.TrimSpace(payload.Ref), pin: number}] = projectPoint{
+				xMM:  payload.At.XMM + xMM,
+				yMM:  payload.At.YMM + yMM,
+				role: strings.TrimSpace(payload.Role),
+			}
+		}
+	}
+	return anchors, nil
+}
+
+func rotatedProjectPinOffset(xMM float64, yMM float64, rotationDeg float64) (float64, float64) {
+	if rotationDeg == 0 {
+		return xMM, yMM
+	}
+	radians := rotationDeg * math.Pi / 180
+	cosine := math.Cos(radians)
+	sine := math.Sin(radians)
+	return xMM*cosine - yMM*sine, xMM*sine + yMM*cosine
+}
+
+func materializedPortLabel(endpoint projectEndpointKey, pseudoEndpoint projectEndpointKey, netName string, pseudoEndpointCount int, anchors map[projectEndpointKey]projectPoint) (transactions.Operation, error) {
+	anchor, ok := anchors[endpoint]
+	if !ok || projectEndpointIsExternalTerminal(anchor.role) {
+		return transactions.Operation{}, nil
+	}
+	netName = strings.TrimSpace(netName)
+	if netName == "" {
+		netName = "NET_" + endpoint.ref + "_" + endpoint.pin
+	}
+	text := terminalValue(pseudoEndpoint, netName)
+	if pseudoEndpointCount > 1 {
+		text = netName
+	}
+	return wrapOperation(transactions.OpAddLabel, transactions.AddLabelOperation{
+		Op:   transactions.OpAddLabel,
+		Text: text,
+		At:   transactions.Point{XMM: anchor.xMM, YMM: anchor.yMM},
+		Kind: "local",
+	})
+}
+
+func projectEndpointIsExternalTerminal(role string) bool {
+	role = strings.ToLower(strings.TrimSpace(role))
+	if role == "" {
+		return false
+	}
+	return role == "connector" ||
+		role == "generated_terminal" ||
+		strings.Contains(role, "header") ||
+		strings.Contains(role, "receptacle") ||
+		strings.Contains(role, "terminal")
+}
+
+func terminalValue(endpoint projectEndpointKey, netName string) string {
+	port := strings.TrimSpace(endpoint.pin)
+	if port == "" {
+		return netName
+	}
+	return strings.ToUpper(port)
 }
 
 func projectEndpoint(endpoint transactions.Endpoint) projectEndpointKey {

@@ -229,6 +229,7 @@ func TestPCBEvaluationReportsDisconnectedPad(t *testing.T) {
   (setup)
   (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))
   (footprint "Test:One" (property "Reference" "J1") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "SIG")))
+  (footprint "Test:One" (property "Reference" "J2") (pad "1" smd rect (at 5 0) (layers "F.Cu") (net "SIG")))
 )`)
 	report, err := PCB(path)
 	if err != nil {
@@ -236,6 +237,75 @@ func TestPCBEvaluationReportsDisconnectedPad(t *testing.T) {
 	}
 	if len(report.Issues) == 0 || report.Issues[0].Code != reports.CodeDisconnectedPad {
 		t.Fatalf("expected disconnected pad issue, got %#v", report.Issues)
+	}
+}
+
+func TestPCBEvaluationAllowsSinglePadExportedNet(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "single_endpoint.kicad_pcb")
+	writeFile(t, path, `(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user))
+  (setup)
+  (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))
+  (footprint "Test:One" (property "Reference" "J1") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "IN")))
+)`)
+	report, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	for _, issue := range report.Issues {
+		if issue.Code == reports.CodeDisconnectedPad {
+			t.Fatalf("single-pad exported net should not be disconnected: %#v", report.Issues)
+		}
+	}
+}
+
+func TestPCBEvaluationReportsGenericSinglePadNet(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "single_endpoint.kicad_pcb")
+	writeFile(t, path, `(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (layers (0 "F.Cu" signal) (25 "Edge.Cuts" user))
+  (setup)
+  (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))
+  (footprint "Test:One" (property "Reference" "J1") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "SIG")))
+)`)
+	report, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	found := false
+	for _, issue := range report.Issues {
+		if issue.Code == reports.CodeDisconnectedPad {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("generic single-pad net should be disconnected: %#v", report.Issues)
+	}
+}
+
+func TestPCBEvaluationCountsViasAsConnectedCopper(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "via_connected.kicad_pcb")
+	writeFile(t, path, `(kicad_pcb
+  (version 20260206)
+  (generator "pcbnew")
+  (layers (0 "F.Cu" signal) (31 "B.Cu" signal) (25 "Edge.Cuts" user))
+  (setup)
+  (gr_line (start 0 0) (end 1 0) (layer "Edge.Cuts"))
+  (footprint "Test:One" (property "Reference" "J1") (pad "1" smd rect (at 0 0) (layers "F.Cu") (net "SIG")))
+  (footprint "Test:One" (property "Reference" "J2") (pad "1" smd rect (at 5 0) (layers "B.Cu") (net "SIG")))
+  (via (at 2.5 0) (size 0.8) (drill 0.4) (layers "F.Cu" "B.Cu") (net "SIG"))
+)`)
+	report, err := PCB(path)
+	if err != nil {
+		t.Fatalf("PCB returned error: %v", err)
+	}
+	for _, issue := range report.Issues {
+		if issue.Code == reports.CodeDisconnectedPad {
+			t.Fatalf("via-connected net should not be disconnected: %#v", report.Issues)
+		}
 	}
 }
 

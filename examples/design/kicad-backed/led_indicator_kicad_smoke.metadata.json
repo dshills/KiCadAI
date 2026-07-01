@@ -2,30 +2,33 @@
   "id": "led_indicator_kicad_smoke",
   "request": "led_indicator_kicad_smoke.json",
   "tier": "smoke",
-  "readiness": "expected_fail",
+  "readiness": "candidate",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
   "allowlists": [],
   "expected_artifacts": [
     ".kicadai/transaction.json",
-    ".kicadai/manifest.json"
+    ".kicadai/manifest.json",
+    ".kicadai/design-promotion.json"
   ],
   "expected_stages": [
     "block_planning",
     "component_selection",
     "schematic",
+    "schematic_electrical",
     "pcb_realization",
     "placement",
+    "routing",
     "project_write",
     "writer_correctness",
     "validation",
     "kicad_checks"
   ],
   "known_gaps": [
-    "Generated LED PCB pad and copper net codes clear writer correctness, and local route endpoint binding now emits same-net copper from physical pad anchors.",
-    "Promotion gates still fail closed on kicad_checks_missing when no real kicad-cli ERC/DRC evidence is configured.",
-    "The fixture remains expected_fail until full internal validation plus optional KiCad ERC/DRC evidence proves the generated schematic and PCB are clean."
+    "KiCad ERC reports only warning-level one-pin label findings for exported standalone LED ports.",
+    "KiCad DRC reports warning-level footprint-library mismatch and silkscreen clearance findings for generated footprint copies.",
+    "Writer correctness still warns when no resolver library index or external round-trip evidence is configured."
   ],
-  "notes": "Smallest optional design-create fixture for local real kicad-cli smoke runs; currently tracks post-endpoint-binding validation and KiCad ERC/DRC blockers."
+  "notes": "Smallest optional design-create fixture promoted to candidate with schematic electrical checks, LED local-route contact proof, writer correctness, board validation, and warning-only KiCad ERC/DRC evidence."
 }

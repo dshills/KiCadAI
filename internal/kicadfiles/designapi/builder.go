@@ -58,6 +58,7 @@ type BoardOutlineHandle struct {
 
 type SymbolOptions struct {
 	Reference  string
+	Role       string
 	Value      string
 	LibraryID  string
 	Position   kicadfiles.Point
@@ -223,6 +224,14 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", key), libraryID, reference, value, options.Position)
 	symbol.Rotation = options.Rotation
 	symbol.Path = "root.component." + key
+	if strings.EqualFold(strings.TrimSpace(options.Role), "generated_terminal") {
+		inBOM := false
+		onBoard := false
+		inPositionFile := false
+		symbol.InBOM = &inBOM
+		symbol.OnBoard = &onBoard
+		symbol.InPositionFile = &inPositionFile
+	}
 	symbol.Properties = schematic.MergeProperties(symbol.Properties, options.Properties)
 	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
 	symbol.Pins = make([]schematic.SymbolPin, 0, len(pinSpecs))
@@ -340,6 +349,29 @@ func (builder *Builder) AddNoConnect(endpoint Endpoint) error {
 	builder.design.Schematic.NoConnects = append(builder.design.Schematic.NoConnects, schematic.NewNoConnect(
 		builder.generator.New("root.schematic.no_connect", endpoint.Reference, endpoint.Pin),
 		anchor,
+	))
+	return nil
+}
+
+func (builder *Builder) AddLabel(text string, position kicadfiles.Point, kind schematic.LabelKind) error {
+	if builder == nil {
+		return fmt.Errorf("builder required")
+	}
+	text = strings.TrimSpace(text)
+	if text == "" {
+		return fmt.Errorf("label text required")
+	}
+	if kind == "" {
+		kind = schematic.LabelLocal
+	}
+	if hasSchematicLabel(builder.design.Schematic.Labels, text, position) {
+		return nil
+	}
+	builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.NewLabel(
+		builder.generator.New("root.schematic.label", text, formatPoint(position)),
+		text,
+		kind,
+		position,
 	))
 	return nil
 }

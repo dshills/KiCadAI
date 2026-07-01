@@ -225,6 +225,9 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 		}
 	}
 	for key, symbol := range symbolsByRef {
+		if symbol.OnBoard != nil && !*symbol.OnBoard {
+			continue
+		}
 		footprintIndexes, ok := footprintsByRef[key]
 		if !ok {
 			errs = append(errs, designError(symbolFieldsByRef[key], "missing PCB footprint for schematic reference "+symbol.Reference))

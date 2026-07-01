@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
+	"sync"
 
 	"kicadai/internal/inspect"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
@@ -15,6 +17,34 @@ import (
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicrules"
 )
+
+var explicitSinglePadNetPatterns = []*regexp.Regexp{
+	regexp.MustCompile(`^(?i:PORT|EXPORT)_[A-Z0-9_.+\-]+$`),
+	regexp.MustCompile(`^(?i:IN|OUT|INPUT|OUTPUT)$`),
+	regexp.MustCompile(`^(?i:GND|GNDA|GNDD|VCC|VDD|VSS|VEE)$`),
+	regexp.MustCompile(`^[+-]?(?:[0-9]+(?:V[0-9]+|[._][0-9]+V?)|[0-9]+V)$`),
+}
+
+var explicitSinglePadNetPatternsMu sync.RWMutex
+
+func SetExplicitSinglePadNetPatterns(patterns []string) error {
+	compiled := make([]*regexp.Regexp, 0, len(patterns))
+	for _, pattern := range patterns {
+		pattern = strings.TrimSpace(pattern)
+		if pattern == "" {
+			continue
+		}
+		expression, err := regexp.Compile(pattern)
+		if err != nil {
+			return fmt.Errorf("compile explicit single-pad net pattern %q: %w", pattern, err)
+		}
+		compiled = append(compiled, expression)
+	}
+	explicitSinglePadNetPatternsMu.Lock()
+	defer explicitSinglePadNetPatternsMu.Unlock()
+	explicitSinglePadNetPatterns = compiled
+	return nil
+}
 
 type CodedError struct {
 	Code reports.Code
@@ -319,27 +349,45 @@ func schematicSemanticIssues(file schematicfiles.SchematicFile) []reports.Issue 
 func pcbSemanticIssues(board pcbfiles.PCBFile) []reports.Issue {
 	connectedNets := map[string]struct{}{}
 	for _, track := range board.Tracks {
-		if track.NetName != "" {
-			connectedNets[track.NetName] = struct{}{}
+		if netName := strings.TrimSpace(track.NetName); netName != "" {
+			connectedNets[netName] = struct{}{}
 		}
 	}
 	for _, arc := range board.TrackArcs {
-		if arc.NetName != "" {
-			connectedNets[arc.NetName] = struct{}{}
+		if netName := strings.TrimSpace(arc.NetName); netName != "" {
+			connectedNets[netName] = struct{}{}
+		}
+	}
+	for _, via := range board.Vias {
+		if netName := strings.TrimSpace(via.NetName); netName != "" {
+			connectedNets[netName] = struct{}{}
 		}
 	}
 	for _, zone := range board.Zones {
-		if zone.NetName != "" {
-			connectedNets[zone.NetName] = struct{}{}
+		if netName := strings.TrimSpace(zone.NetName); netName != "" {
+			connectedNets[netName] = struct{}{}
+		}
+	}
+	padCountByNet := map[string]int{}
+	for _, footprint := range board.Footprints {
+		for _, pad := range footprint.Pads {
+			netName := strings.TrimSpace(pad.NetName)
+			if netName != "" {
+				padCountByNet[netName]++
+			}
 		}
 	}
 	var issues []reports.Issue
 	for _, footprint := range board.Footprints {
 		for _, pad := range footprint.Pads {
-			if pad.NetName == "" {
+			netName := strings.TrimSpace(pad.NetName)
+			if netName == "" {
 				continue
 			}
-			if _, ok := connectedNets[pad.NetName]; !ok {
+			if padCountByNet[netName] < 2 && isExplicitSinglePadNet(netName) {
+				continue
+			}
+			if _, ok := connectedNets[netName]; !ok {
 				ref := footprint.Reference
 				if ref == "" {
 					ref = footprint.LibraryID
@@ -348,14 +396,29 @@ func pcbSemanticIssues(board pcbfiles.PCBFile) []reports.Issue {
 					Code:     reports.CodeDisconnectedPad,
 					Severity: reports.SeverityError,
 					Path:     "pcb.footprints." + ref + ".pads." + pad.Name,
-					Message:  "pad is assigned to net " + pad.NetName + " but no parsed track, arc, or zone uses that net",
+					Message:  "pad is assigned to net " + netName + " but no parsed track, arc, or zone uses that net",
 					Refs:     []string{ref},
-					Nets:     []string{pad.NetName},
+					Nets:     []string{netName},
 				})
 			}
 		}
 	}
 	return issues
+}
+
+func isExplicitSinglePadNet(netName string) bool {
+	normalized := strings.TrimSpace(netName)
+	if normalized == "" {
+		return false
+	}
+	explicitSinglePadNetPatternsMu.RLock()
+	defer explicitSinglePadNetPatternsMu.RUnlock()
+	for _, pattern := range explicitSinglePadNetPatterns {
+		if pattern.MatchString(normalized) {
+			return true
+		}
+	}
+	return false
 }
 
 func IssueFromError(err error, path string) reports.Issue {
