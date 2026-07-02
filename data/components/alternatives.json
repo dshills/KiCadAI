@@ -51,6 +51,18 @@
       "values": [{"kind": "capacitance", "typ": "100n", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "capacitor_evidence": {
+        "dielectric": "X7R",
+        "nominal_capacitance": "100n",
+        "capacitance_unit": "F",
+        "voltage_rating": "50",
+        "voltage_unit": "V",
+        "dc_bias_review": "review_required",
+        "effective_capacitance_review": "review_required",
+        "esr_review": "unknown",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Concrete MPN and dielectric are known, but regulator stability use still requires applied-voltage effective-capacitance and ESR review."
+      },
       "symbols": [{
         "symbol_id": "Device:C",
         "function_pins": [
@@ -272,6 +284,18 @@
       "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
       "derating_rules": [{"kind": "dc_bias", "description": "MLCC effective capacitance depends on package, dielectric, and applied DC bias; review high-accuracy or bulk-energy use."}],
+      "capacitor_evidence": {
+        "dielectric": "X7R",
+        "nominal_capacitance": "100n",
+        "capacitance_unit": "F",
+        "voltage_rating": "50",
+        "voltage_unit": "V",
+        "dc_bias_review": "review_required",
+        "effective_capacitance_review": "review_required",
+        "esr_review": "unknown",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Concrete MPN and dielectric are known, but regulator stability use still requires applied-voltage effective-capacitance and ESR review."
+      },
       "symbols": [{
         "symbol_id": "Device:C",
         "function_pins": [
@@ -309,6 +333,18 @@
       "ratings": [{"kind": "voltage", "max": "10", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
       "derating_rules": [{"kind": "dc_bias", "description": "MLCC effective capacitance must be reviewed under operating DC bias, especially for regulator stability or bulk storage."}],
+      "capacitor_evidence": {
+        "dielectric": "X5R",
+        "nominal_capacitance": "10u",
+        "capacitance_unit": "F",
+        "voltage_rating": "10",
+        "voltage_unit": "V",
+        "dc_bias_review": "review_required",
+        "effective_capacitance_review": "review_required",
+        "esr_review": "unknown",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Concrete 10 uF X5R MPN is selected for regulator connectivity, but fabrication-candidate use requires effective capacitance at rail voltage and regulator-specific ESR/stability review."
+      },
       "symbols": [{
         "symbol_id": "Device:C",
         "function_pins": [

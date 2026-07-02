@@ -113,6 +113,8 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireDeratingRule(t, ap2112, "thermal")
 	requireDeratingRule(t, ap2112, "enable_voltage")
 	requireDeratingRule(t, ap2112, "capacitor_stability")
+	requireRegulatorStability(t, regulator, "esr_window_required", true)
+	requireRegulatorStability(t, ap2112, "ceramic_stable", true)
 
 	capacitor := requireCatalogRecord(t, catalog, "capacitor.ceramic.0805")
 	if capacitor.Verification.Confidence != ConfidenceRuleInferred {
@@ -123,6 +125,11 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireToleranceMax(t, capacitor, "capacitance", "20", "%")
 	requireSymbolFunctions(t, capacitor, "Device:C", []string{"A", "B"})
 	requirePackagePads(t, capacitor, "0805", []string{"A", "B"})
+	requireCapacitorEvidence(t, capacitor, "unknown", true)
+
+	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm21br71h104ka01l.0805"), "X7R", true)
+	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm188r71h104ka93d.0603"), "X7R", true)
+	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm21br61a106ke19l.0805"), "X5R", true)
 }
 
 func checkedInCatalogDir(t *testing.T) string {
@@ -213,6 +220,33 @@ func requireDeratingRule(t *testing.T, record *ComponentRecord, kind string) {
 		}
 	}
 	t.Fatalf("%s missing derating rule %s: %+v", record.ID, kind, record.DeratingRules)
+}
+
+func requireRegulatorStability(t *testing.T, record *ComponentRecord, kind string, blocksFabrication bool) {
+	t.Helper()
+	if record.Regulator == nil || record.Regulator.OutputCapacitor == nil {
+		t.Fatalf("%s missing regulator output-capacitor evidence", record.ID)
+	}
+	stability := record.Regulator.OutputCapacitor
+	if stability.Kind != kind {
+		t.Fatalf("%s stability kind = %q, want %q", record.ID, stability.Kind, kind)
+	}
+	if stability.FabricationCandidateBlocks != blocksFabrication {
+		t.Fatalf("%s fabrication block = %t, want %t", record.ID, stability.FabricationCandidateBlocks, blocksFabrication)
+	}
+}
+
+func requireCapacitorEvidence(t *testing.T, record *ComponentRecord, dielectric string, blocksFabrication bool) {
+	t.Helper()
+	if record.Capacitor == nil {
+		t.Fatalf("%s missing capacitor evidence", record.ID)
+	}
+	if record.Capacitor.Dielectric != dielectric {
+		t.Fatalf("%s dielectric = %q, want %q", record.ID, record.Capacitor.Dielectric, dielectric)
+	}
+	if record.Capacitor.FabricationCandidateBlocks != blocksFabrication {
+		t.Fatalf("%s fabrication block = %t, want %t", record.ID, record.Capacitor.FabricationCandidateBlocks, blocksFabrication)
+	}
 }
 
 func requireSymbolFunctions(t *testing.T, record *ComponentRecord, symbolID string, functions []string) {

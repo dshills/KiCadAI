@@ -105,6 +105,14 @@
       "values": [{"kind": "capacitance", "min": "1p", "max": "100u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "25", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "max": "20", "unit": "%"}],
+      "capacitor_evidence": {
+        "dielectric": "unknown",
+        "dc_bias_review": "unknown",
+        "effective_capacitance_review": "unknown",
+        "esr_review": "unknown",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Generic ceramic capacitor records do not prove dielectric, DC-bias, effective-capacitance, or ESR behavior for regulator stability."
+      },
       "symbols": [{
         "symbol_id": "Device:C",
         "function_pins": [

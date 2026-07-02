@@ -27,6 +27,21 @@
       "derating_rules": [
         {"kind": "thermal", "description": "Check package dissipation for VIN-VOUT drop and requested load current before fabrication."}
       ],
+      "regulator_evidence": {
+        "thermal_review": "review_required",
+        "output_capacitor": {
+          "kind": "esr_window_required",
+          "min_capacitance": "10u",
+          "capacitance_unit": "F",
+          "esr_min": "0.3",
+          "esr_max": "22",
+          "esr_unit": "ohm",
+          "proof_status": "review_required",
+          "fabrication_candidate_blocks": true,
+          "review_note": "AMS1117-family output-capacitor stability depends on manufacturer-specific ESR and capacitance requirements; low-ESR ceramic output capacitors are not fabrication-candidate proof without a verified network."
+        },
+        "notes": ["Structural/connectivity use is allowed with review warnings; fabrication-candidate use requires part-specific output capacitor ESR/stability and thermal evidence."]
+      },
       "placement_hints": [
         {"kind": "near", "target": "input_capacitor", "value": "3", "unit": "mm"},
         {"kind": "near", "target": "output_capacitor", "value": "3", "unit": "mm"}
@@ -92,6 +107,19 @@
         {"kind": "enable_voltage", "description": "Tie EN to VIN only when normal operation stays within enable_voltage and the expected transient maximum stays below enable_voltage_abs_max."},
         {"kind": "capacitor_stability", "description": "Output capacitor ESR and MLCC DC-bias derating are review requirements until a concrete capacitor part carries stability evidence."}
       ],
+      "regulator_evidence": {
+        "thermal_review": "review_required",
+        "output_capacitor": {
+          "kind": "ceramic_stable",
+          "min_capacitance": "1u",
+          "capacitance_unit": "F",
+          "accepted_dielectrics": ["X5R", "X7R"],
+          "proof_status": "review_required",
+          "fabrication_candidate_blocks": true,
+          "review_note": "AP2112K is modeled as ceramic-stable for connectivity, but fabrication-candidate use still requires concrete MLCC voltage, DC-bias, effective-capacitance, and thermal evidence."
+        },
+        "notes": ["EN tied to VIN is supported inside modeled voltage limits; NC must remain explicitly no-connected."]
+      },
       "placement_hints": [
         {"kind": "near", "target": "input_capacitor", "value": "2", "unit": "mm"},
         {"kind": "near", "target": "output_capacitor", "value": "2", "unit": "mm"}
