@@ -88,10 +88,16 @@ type InterBlockRouteTreeExecutionSummary struct {
 	ManagedNets         []string `json:"managed_nets,omitempty"`
 }
 
+type RouteTreeBranchEvidenceSummary struct {
+	NetName  string                            `json:"net_name"`
+	Branches []InterBlockBranchRoutingEvidence `json:"branches,omitempty"`
+}
+
 type interBlockRouteTreeExecutionResult struct {
 	Operations []transactions.Operation
 	Issues     []reports.Issue
 	Summary    InterBlockRouteTreeExecutionSummary
+	Branches   []RouteTreeBranchEvidenceSummary
 }
 
 func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, opts RoutingOptions) RoutingStageResult {
@@ -184,6 +190,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"route_connectivity":       localRouteConnectivity,
 		"inter_block_routing":      summarizeInterBlockRouteCompletionWithGraphOperations(interBlockCandidates, routeOperations, contactGraphOperations, issues, interBlockContactEvidence),
 		"inter_block_route_trees":  routeTreeExecution.Summary,
+		"route_tree_branches":      routeTreeExecution.Branches,
 		"route_tree_access":        SummarizeRouteTreeEndpointAccess(routeTreeAccess),
 		"route_tree_contact_graph": SummarizeRouteTreeContactGraph(interBlockContactEvidence, contactGraphOperations, routeTreeAccess),
 		"route_tree_repair":        SummarizeRouteTreeRepair(routeTreeRepairHints),
@@ -428,6 +435,10 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 		branchResult := RouteInterBlockTreeBranchesWithAccess(ctx, workingBase, group, tree, routeTreeAccess)
 		execution.Operations = append(execution.Operations, branchResult.Operations...)
 		execution.Issues = append(execution.Issues, branchResult.Issues...)
+		execution.Branches = append(execution.Branches, RouteTreeBranchEvidenceSummary{
+			NetName:  branchResult.NetName,
+			Branches: append([]InterBlockBranchRoutingEvidence(nil), branchResult.Branches...),
+		})
 		workingBase.Existing = append(workingBase.Existing, branchResult.ExistingCopper...)
 		routedBranches := 0
 		blockedBranches := 0

@@ -518,6 +518,29 @@ func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
 		!routeTreeIssuesContainMessage(vccIssues, "no legal") {
 		t.Fatalf("VCC issues = %#v, want graph-split, contact-miss, or pathfinding blocker", vccIssues)
 	}
+	vccBranches := requireRouteTreeBranchesForNet(t, routingStage, "VCC")
+	if len(vccBranches) == 0 {
+		t.Fatalf("route-tree branches missing VCC evidence")
+	}
+	failingWithAttempts := 0
+	for _, branch := range vccBranches {
+		if branch.Status == routing.StatusRouted {
+			continue
+		}
+		if branch.BlockingIssueCount == 0 {
+			t.Fatalf("VCC branch = %#v, want blocking issue count for failing branch", branch)
+		}
+		if branch.AccessPairCount == 0 || branch.AccessPairLimit == 0 || len(branch.AccessAttempts) == 0 {
+			t.Fatalf("VCC branch = %#v, want access audit and attempt evidence", branch)
+		}
+		if branch.AccessPairsTried == 0 {
+			t.Fatalf("VCC branch = %#v, want attempted access evidence", branch)
+		}
+		failingWithAttempts++
+	}
+	if failingWithAttempts == 0 {
+		t.Fatalf("VCC branches = %#v, want failing branch with access attempts", vccBranches)
+	}
 }
 
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
@@ -857,6 +880,22 @@ func requireInterBlockRouteTreeExecutionSummary(t *testing.T, stage StageResult)
 func requireRouteTreeRepairSummary(t *testing.T, stage StageResult) InterBlockRouteTreeRepairSummary {
 	t.Helper()
 	return requireStageSummary[InterBlockRouteTreeRepairSummary](t, stage, "route_tree_repair")
+}
+
+func requireRouteTreeBranchesForNet(t *testing.T, stage StageResult, netName string) []InterBlockBranchRoutingEvidence {
+	t.Helper()
+	summaries := requireStageSummary[[]RouteTreeBranchEvidenceSummary](t, stage, "route_tree_branches")
+	var branches []InterBlockBranchRoutingEvidence
+	for _, summary := range summaries {
+		if strings.EqualFold(summary.NetName, netName) {
+			branches = append(branches, summary.Branches...)
+		}
+	}
+	if len(branches) != 0 {
+		return branches
+	}
+	t.Fatalf("route_tree_branches = %#v, want net %s", summaries, netName)
+	return nil
 }
 
 func requireStageSummary[T any](t *testing.T, stage StageResult, key string) T {
