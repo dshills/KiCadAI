@@ -55,6 +55,12 @@ increases downward.
 - Design workflow placement summaries include advanced-rule dimension counts,
   worst scores, hard violations, warning counts, and unsupported/missing proof
   evidence for AI callers.
+- Design workflow placement summaries also include `component_hints` and
+  `component_hint_summary` when selected catalog components carry layout hints.
+  Supported `near` hints become placement proximity rules when both the source
+  role and target role resolve to generated PCB refs. Hints that cannot be
+  resolved or checked remain visible as failed, skipped, or unsupported
+  evidence.
 - Design workflow PCB realization summaries include `timing_results`, and
   timing evidence findings are surfaced as stage issues with refs, nets, and
   repair suggestions when thresholds are violated.
@@ -216,3 +222,31 @@ The Go API entry points are:
 - `routing.DiagnosticsForResult(result)` for repair categories/actions.
 - `routingadapters.RequestFromPlacement(...)` to route placement output.
 - `designapi.Builder.RouteBoard(...)` to apply routed tracks/vias to a design.
+
+When `design create` uses catalog-backed component selection, routing stage
+summaries may include `component_hints` and `component_hint_summary`.
+Current hint status values are:
+
+- `pending`: recognized but not yet consumed by the current stage;
+- `enforced`: converted into a placement/routing constraint or check and met
+  by the current stage;
+- `satisfied_by_block`: proven by block-emitted operations;
+- `failed`: evaluated and did not meet the requested constraint;
+- `skipped`: could not be evaluated because required refs, pins, nets, or
+  roles were missing;
+- `unsupported`: the hint kind is not supported by the current workflow.
+
+Supported `net_class` hints currently evaluate only the requested trace-width
+value, not KiCad clearance, via, or drill-class properties. The width value is
+treated as a hard floor across the matching realized local route: the check
+passes only when the narrowest segment meets or exceeds the requested width,
+and there are no necking exceptions yet. Passing this hint is not full KiCad
+net-class or DRC compliance. Supported pin-strapping `tie` hints are marked
+`satisfied_by_block` only when selected component function-pin metadata and
+block-emitted connection operations agree; missing metadata or missing matching
+operations leaves them `skipped`. Supported `no_connect` hints require an
+explicit block-emitted no-connect operation for the selected
+function pin, serialized as an `add_no_connect` transaction operation; merely
+leaving a pin unwired is not enough. These fields are AI-facing workflow
+evidence; they do not replace KiCad ERC/DRC, thermal review, impedance
+calculation, or fabrication-candidate regulator stability proof.

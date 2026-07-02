@@ -261,6 +261,16 @@ not applicable. For any LDO, verify the exact selected part is stable with the
 generated output capacitors or choose a catalog record that models the required
 output-capacitor ESR.
 
+Inspect component hint enforcement before claiming the generated layout honors
+catalog guidance. `workflow-result.json` placement and routing stages can
+contain `component_hints` plus `component_hint_summary`; `design-rationale.json`
+also emits component hint evidence records. Treat `enforced` and
+`satisfied_by_block` as useful workflow evidence. Treat `failed`, `skipped`,
+and `unsupported` as repair or review inputs. Treat `pending` as recognized
+guidance that has not been consumed by the current stage. These records are not
+a fabrication-proof substitute for KiCad ERC/DRC, thermal checks,
+output-capacitor stability proof, or impedance/clearance analysis.
+
 ## Intent Planning Guidance
 
 Prefer structured intent fields:

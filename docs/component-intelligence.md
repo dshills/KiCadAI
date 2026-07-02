@@ -291,6 +291,19 @@ The generated request also persists these requirements in
 can audit why a selected regulator or capacitor was accepted. Missing or
 insufficient ratings remain blocking for connectivity-oriented acceptance.
 
+Selected component `placement_hints` and `routing_hints` now flow through the
+workflow as deterministic `component_hints` evidence. The placement stage
+converts supported `near` hints into proximity rules when source and target
+roles resolve to PCB refs. The routing stage evaluates supported `net_class`
+hints against realized local-route widths and records supported pin-strapping
+or explicit no-connect hints as `satisfied_by_block` when the block emits
+matching function-pin operations. Standard LDO enable/no-connect handling is an
+example of a supported catalog-backed hint.
+Unsupported, skipped, or failed hints are surfaced as warning diagnostics and
+rationale evidence instead of being silently
+ignored. This is layout evidence for AI review and repair loops, not
+fabrication proof.
+
 This is not yet an analog-stability proof. The current selector checks catalog
 ratings, modeled dropout/headroom, EN/NC handling, KiCad-resolvable bindings,
 and structured regulator/capacitor evidence status. Connectivity-oriented

@@ -303,6 +303,12 @@ USB-C power-only, and protection parts. It includes:
   properties, including component ID, variant ID, role, block ID,
   manufacturer, MPN, confidence, source, lifecycle, availability, and pinmap
   evidence where known;
+- component placement/routing hint enforcement evidence: supported placement
+  `near` hints feed placement proximity rules, supported routing `net_class`
+  hints are checked against realized local-route widths, AP2112K EN/NC hints
+  are reported as block-satisfied when emitted operations match selected
+  function pins, and all unsupported/skipped/failed hint outcomes surface in
+  workflow diagnostics and rationale output;
 - BOM/fabrication identity extraction that prefers the generated schematic
   identity properties while retaining legacy property-name fallbacks;
 - golden coverage and representative selection snapshots.
@@ -324,7 +330,9 @@ USB-C power-only, and protection parts. It includes:
   thermal, SOA, and layout constraints are represented and tested.
 - Improve MCU function names from generic GPIO placeholders to datasheet port
   and peripheral roles.
-- Convert component placement/routing hints into downstream rule enforcement.
+- Broaden component hint enforcement beyond the initial supported subset and
+  tie hint failures to required-hint severity once catalog metadata can
+  distinguish hard constraints from review guidance.
 - Add KiCad-library-backed evidence runs for the full checked-in catalog when
   external library roots are configured.
 
