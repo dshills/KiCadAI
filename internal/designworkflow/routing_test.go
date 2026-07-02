@@ -441,6 +441,53 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 	}
 }
 
+func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
+	if len(fragments.Fragments) == 0 || placed.Result.Metrics.PlacedCount == 0 {
+		t.Fatalf("fixture fragments=%#v placement=%#v, want realized and placed I2C fixture", fragments, placed.Result)
+	}
+
+	result := Create(ctx, request, CreateOptions{})
+	routingStage, ok := workflowStageForRoutingTest(result, StageRouting)
+	if !ok {
+		t.Fatalf("stages = %#v, want routing stage", result.Stages)
+	}
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routingStage)
+	access := requireStageSummary[RouteTreeEndpointAccessSummary](t, routingStage, "route_tree_access")
+	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
+	retry := requireStageSummary[placementRoutingRetrySummary](t, routingStage, "routing_retry")
+
+	if access.LocalRouteAnchors == 0 {
+		t.Fatalf("route-tree access = %#v, want local-route anchors", access)
+	}
+	for _, net := range routeTrees.ManagedNets {
+		if !stringSliceContains(access.Nets, net) {
+			t.Fatalf("access nets = %#v, want managed net %s", access.Nets, net)
+		}
+	}
+	// These exact counts intentionally freeze the current access-driven routing
+	// gap: access/contact graph evidence exists, but branch execution is not
+	// fully using it yet. Later phases should update this baseline when the
+	// router proves more endpoints or completes the partial group.
+	if contactGraph.ProvenEndpoints != 11 || contactGraph.CompleteGroups != 3 || contactGraph.PartialGroups != 1 {
+		t.Fatalf("contact graph = %#v, want 11 proven endpoints, 3 complete groups, 1 partial group", contactGraph)
+	}
+	if retry.Attempts != 2 || retry.Applied != 1 || len(retry.AttemptHistory) != 2 {
+		t.Fatalf("retry = %#v, want one bounded retry attempt", retry)
+	}
+	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 11 || retry.AttemptHistory[1].RouteTreeProvenEndpoints != 11 {
+		t.Fatalf("retry history = %#v, want stable 11-endpoint baseline", retry.AttemptHistory)
+	}
+	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
+	for _, net := range []string{"SDA", "VCC"} {
+		if len(branchPaths[net]) == 0 {
+			t.Fatalf("branch paths = %#v, want selected-attempt blocker for %s", branchPaths, net)
+		}
+	}
+}
+
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 	nets := map[string]bool{}
 	for _, connection := range connections {
@@ -449,6 +496,15 @@ func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 		}
 	}
 	return nets
+}
+
+func workflowStageForRoutingTest(result WorkflowResult, name StageName) (StageResult, bool) {
+	for _, stage := range result.Stages {
+		if stage.Name == name {
+			return stage, true
+		}
+	}
+	return StageResult{}, false
 }
 
 func i2cSensorBreakoutRoutingFixture(t *testing.T, ctx context.Context) (Request, PCBFragmentResult, PlacementStageResult) {
