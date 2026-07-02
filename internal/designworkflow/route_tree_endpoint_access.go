@@ -42,9 +42,121 @@ type RouteTreeEndpointAccessSummary struct {
 	Refs              []string `json:"refs,omitempty"`
 }
 
+const routeTreeBranchAccessPairLimit = 8
+
+const (
+	routeTreeAccessPreferredLayerRank int   = 0
+	routeTreeAccessMissingLayerRank   int   = 1
+	routeTreeAccessMissingDistance    int64 = 1<<63 - 1
+)
+
+type routeTreeBranchAccessCandidate struct {
+	Access       RouteTreeEndpointAccess
+	RoleRank     int
+	DistanceRank int64
+	LayerRank    int
+	ObstacleRank int
+}
+
+type routeTreeBranchAccessPair struct {
+	Source routeTreeBranchAccessCandidate
+	Target routeTreeBranchAccessCandidate
+	Rank   int
+}
+
 func BuildRouteTreeEndpointAccess(targetEvidence InterBlockContactEvidence, routeOperations []transactions.Operation) []RouteTreeEndpointAccess {
 	access, _ := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, routeOperations)
 	return access
+}
+
+func routeTreeAccessCandidatesForEndpoint(access []RouteTreeEndpointAccess, endpointID string, netName string, opposite RouteTreeEndpointAccess) []routeTreeBranchAccessCandidate {
+	var candidates []routeTreeBranchAccessCandidate
+	endpointID = strings.TrimSpace(endpointID)
+	netName = strings.TrimSpace(netName)
+	for _, item := range access {
+		if netName != "" && item.Net != netName {
+			continue
+		}
+		if endpointID != "" && item.EndpointID != "" && item.EndpointID != endpointID {
+			continue
+		}
+		candidates = append(candidates, routeTreeBranchAccessCandidate{
+			Access:       item,
+			RoleRank:     routeTreeAccessRoleRank(item.Role),
+			DistanceRank: routeTreeAccessDistanceRank(item, opposite),
+			LayerRank:    routeTreeAccessLayerRank(item),
+			ObstacleRank: 0,
+		})
+	}
+	slices.SortFunc(candidates, compareRouteTreeAccessCandidate)
+	return candidates
+}
+
+func routeTreeBranchAccessPairs(sourceCandidates []routeTreeBranchAccessCandidate, targetCandidates []routeTreeBranchAccessCandidate, limit int) []routeTreeBranchAccessPair {
+	if limit <= 0 {
+		limit = routeTreeBranchAccessPairLimit
+	}
+	sources := slices.Clone(sourceCandidates)
+	targets := slices.Clone(targetCandidates)
+	slices.SortFunc(sources, compareRouteTreeAccessCandidate)
+	slices.SortFunc(targets, compareRouteTreeAccessCandidate)
+	pairs := make([]routeTreeBranchAccessPair, 0, min(len(sources)*len(targets), limit))
+	for _, source := range sources {
+		for _, target := range targets {
+			if len(pairs) >= limit {
+				return pairs
+			}
+			pairs = append(pairs, routeTreeBranchAccessPair{Source: source, Target: target, Rank: len(pairs)})
+		}
+	}
+	return pairs
+}
+
+func routeTreeAccessRoleRank(role RouteTreeEndpointAccessRole) int {
+	switch role {
+	case RouteTreeAccessLocalRouteAnchor:
+		return 0
+	case RouteTreeAccessSameNetCopper:
+		return 1
+	case RouteTreeAccessSourcePad, RouteTreeAccessTargetPad:
+		return 2
+	case RouteTreeAccessExternalAnchor:
+		return 3
+	default:
+		return 4
+	}
+}
+
+func routeTreeAccessDistanceRank(item RouteTreeEndpointAccess, opposite RouteTreeEndpointAccess) int64 {
+	if opposite.Net == "" && opposite.XMM == 0 && opposite.YMM == 0 {
+		return routeTreeAccessMissingDistance
+	}
+	dx := item.XMM - opposite.XMM
+	dy := item.YMM - opposite.YMM
+	return int64(math.Round((dx*dx + dy*dy) * 1_000_000))
+}
+
+func routeTreeAccessLayerRank(item RouteTreeEndpointAccess) int {
+	if item.Layer == "" {
+		return routeTreeAccessMissingLayerRank
+	}
+	return routeTreeAccessPreferredLayerRank
+}
+
+func compareRouteTreeAccessCandidate(left, right routeTreeBranchAccessCandidate) int {
+	if compare := cmp.Compare(left.RoleRank, right.RoleRank); compare != 0 {
+		return compare
+	}
+	if compare := cmp.Compare(left.LayerRank, right.LayerRank); compare != 0 {
+		return compare
+	}
+	if compare := cmp.Compare(left.ObstacleRank, right.ObstacleRank); compare != 0 {
+		return compare
+	}
+	if compare := cmp.Compare(left.DistanceRank, right.DistanceRank); compare != 0 {
+		return compare
+	}
+	return compareRouteTreeEndpointAccess(left.Access, right.Access)
 }
 
 func BuildRouteTreeEndpointAccessWithIssues(targetEvidence InterBlockContactEvidence, routeOperations []transactions.Operation) ([]RouteTreeEndpointAccess, []reports.Issue) {

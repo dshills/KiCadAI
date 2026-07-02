@@ -41,6 +41,59 @@ func TestBuildRouteTreeEndpointAccessReturnsDecodeIssues(t *testing.T) {
 	}
 }
 
+func TestRouteTreeAccessCandidatesPreferLocalRouteAnchor(t *testing.T) {
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "SDA", Layer: "F.CU", XMM: 10, YMM: 0, Source: "pad"},
+		{EndpointID: "U1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "SDA", Layer: "F.CU", XMM: 12, YMM: 0, Source: "local_route"},
+	}
+	candidates := routeTreeAccessCandidatesForEndpoint(access, "U1.1", "SDA", RouteTreeEndpointAccess{Net: "SDA", XMM: 0, YMM: 0})
+	if len(candidates) != 2 {
+		t.Fatalf("candidates = %#v, want two", candidates)
+	}
+	if candidates[0].Access.Role != RouteTreeAccessLocalRouteAnchor {
+		t.Fatalf("candidates = %#v, want local-route anchor first", candidates)
+	}
+}
+
+func TestRouteTreeAccessCandidatesFallBackToPadAndTieBreakDeterministically(t *testing.T) {
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U2", Pad: "1", Net: "SDA", Layer: "F.CU", XMM: 10, YMM: 0, Source: "pad"},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "SDA", Layer: "F.CU", XMM: 10, YMM: 0, Source: "pad"},
+	}
+	candidates := routeTreeAccessCandidatesForEndpoint(access, "U1.1", "SDA", RouteTreeEndpointAccess{Net: "SDA", XMM: 0, YMM: 0})
+	if len(candidates) != 2 {
+		t.Fatalf("candidates = %#v, want two", candidates)
+	}
+	if candidates[0].Access.Ref != "U1" || candidates[1].Access.Ref != "U2" {
+		t.Fatalf("candidates = %#v, want deterministic ref ordering", candidates)
+	}
+}
+
+func TestRouteTreeBranchAccessPairsAreBoundedAndRanked(t *testing.T) {
+	sources := []routeTreeBranchAccessCandidate{
+		{Access: RouteTreeEndpointAccess{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Ref: "J2", Net: "SDA"}, RoleRank: 2},
+		{Access: RouteTreeEndpointAccess{EndpointID: "J1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "SDA"}, RoleRank: 0},
+	}
+	targets := []routeTreeBranchAccessCandidate{
+		{Access: RouteTreeEndpointAccess{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Net: "SDA"}, RoleRank: 2},
+		{Access: RouteTreeEndpointAccess{EndpointID: "U1.1", Role: RouteTreeAccessSameNetCopper, Net: "SDA"}, RoleRank: 1},
+	}
+	pairs := routeTreeBranchAccessPairs(sources, targets, 2)
+	if len(pairs) != 2 {
+		t.Fatalf("pairs = %#v, want bounded pair list", pairs)
+	}
+	if pairs[0].Rank != 0 || pairs[0].Source.Access.Role != RouteTreeAccessLocalRouteAnchor || pairs[0].Target.Access.Role != RouteTreeAccessSameNetCopper {
+		t.Fatalf("first pair = %#v, want best source/target roles", pairs[0])
+	}
+}
+
+func TestRouteTreeAccessDistanceRankPenalizesMissingOpposite(t *testing.T) {
+	rank := routeTreeAccessDistanceRank(RouteTreeEndpointAccess{Net: "SDA", XMM: 0, YMM: 0}, RouteTreeEndpointAccess{})
+	if rank != routeTreeAccessMissingDistance {
+		t.Fatalf("rank = %d, want missing-distance penalty", rank)
+	}
+}
+
 func TestRouteTreeEndpointAccessSummaryJSONStable(t *testing.T) {
 	summary := RouteTreeEndpointAccessSummary{
 		AccessPoints:      3,
