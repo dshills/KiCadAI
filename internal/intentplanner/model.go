@@ -132,6 +132,8 @@ type ConstraintIntent struct {
 
 var projectNamePattern = regexp.MustCompile(`[^A-Za-z0-9_-]+`)
 
+const maxIntentQuantity = 256
+
 func DecodeRequestStrict(reader io.Reader) (Request, []reports.Issue) {
 	var buffer bytes.Buffer
 	limited := io.LimitReader(reader, MaxRequestBytes+1)
@@ -328,6 +330,8 @@ func validateInterfaces(values []InterfaceIntent) []reports.Issue {
 		}
 		if iface.Quantity < 1 {
 			issues = append(issues, issue(path+".quantity", "interface quantity must be at least 1"))
+		} else if iface.Quantity > maxIntentQuantity {
+			issues = append(issues, issue(path+".quantity", fmt.Sprintf("interface quantity must be at most %d", maxIntentQuantity)))
 		}
 		issues = append(issues, validateVoltage(path+".voltage", iface.Voltage, iface.Strength)...)
 		if !validStrength(iface.Strength) {
@@ -352,6 +356,8 @@ func validateFunctions(values []FunctionIntent) []reports.Issue {
 		}
 		if function.Quantity < 1 {
 			issues = append(issues, issue(path+".quantity", "function quantity must be at least 1"))
+		} else if function.Quantity > maxIntentQuantity {
+			issues = append(issues, issue(path+".quantity", fmt.Sprintf("function quantity must be at most %d", maxIntentQuantity)))
 		}
 		if !validStrength(function.Strength) {
 			issues = append(issues, issue(path+".strength", "unsupported requirement strength "+string(function.Strength)))

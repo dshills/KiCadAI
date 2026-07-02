@@ -101,6 +101,47 @@ func TestPlacementRoutingAttemptRankingUsesScoresAndAttemptTieBreak(t *testing.T
 	}
 }
 
+func TestPlacementRoutingAttemptRankingRequiresMeaningfulDefaultScoreImprovement(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{Attempt: 1, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.5, PlacementScore: 0.5}
+	candidate := placementRoutingRetryAttemptSummary{Attempt: 2, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.5000000001, PlacementScore: 0.5}
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("candidate within default score comparison noise should not rank better")
+	}
+	candidate.RouteScore = 0.50000001
+	if !placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{}) {
+		t.Fatalf("candidate above default score comparison noise should rank better")
+	}
+}
+
+func TestPlacementRoutingAttemptRankingHonorsMinimumScoreDelta(t *testing.T) {
+	current := placementRoutingRetryAttemptSummary{Attempt: 1, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.5}
+	candidate := placementRoutingRetryAttemptSummary{Attempt: 2, RoutingStatus: routing.StatusPartial, RoutedNets: 2, RouteScore: 0.55}
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{MinRoutingScoreDelta: 0.1}) {
+		t.Fatalf("candidate below minimum score delta should not rank better")
+	}
+	candidate.RouteScore = current.RouteScore
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{MinRoutingScoreDelta: 0.1}) {
+		t.Fatalf("candidate with equal route score should fall through to earlier-attempt tie break")
+	}
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{MinRoutingScoreDelta: 1e-12}) {
+		t.Fatalf("candidate with equal route score should not satisfy tiny positive minimum score delta")
+	}
+	candidate.RouteScore = 0.4
+	if placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{MinRoutingScoreDelta: 0.1}) {
+		t.Fatalf("candidate with lower route score should not rank better")
+	}
+	earlierWorse := current
+	earlierWorse.Attempt = 0
+	earlierWorse.RouteScore = 0.4
+	if placementRoutingAttemptBetter(earlierWorse, current, RoutingRetryPolicySpec{MinRoutingScoreDelta: 0.1}) {
+		t.Fatalf("earlier candidate with lower route score should not win by attempt tie-break")
+	}
+	candidate.RouteScore = 0.61
+	if !placementRoutingAttemptBetter(candidate, current, RoutingRetryPolicySpec{MinRoutingScoreDelta: 0.1}) {
+		t.Fatalf("candidate above minimum score delta should rank better")
+	}
+}
+
 func TestPlacementRoutingAttemptSelectionReasons(t *testing.T) {
 	previous := placementRoutingRetryAttemptSummary{Attempt: 1, RoutingStatus: routing.StatusPartial, RoutedNets: 1, DRCBlockingCount: 1}
 	candidate := placementRoutingRetryAttemptSummary{Attempt: 2, RoutingStatus: routing.StatusPartial, RoutedNets: 1, DRCBlockingCount: 0}

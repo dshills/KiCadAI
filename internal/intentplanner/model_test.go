@@ -86,6 +86,23 @@ func TestValidateRequestReportsInvalidFields(t *testing.T) {
 	}
 }
 
+func TestValidateRequestRejectsExcessiveQuantities(t *testing.T) {
+	issues := ValidateRequest(Request{
+		Version:    RequestVersion,
+		Name:       "too_many",
+		Kind:       IntentCustomStructured,
+		Acceptance: designworkflow.AcceptanceStructural,
+		Board:      BoardIntent{WidthMM: 10, HeightMM: 10, Layers: 2},
+		Interfaces: []InterfaceIntent{{Kind: "i2c", Quantity: maxIntentQuantity + 1}},
+		Functions:  []FunctionIntent{{Kind: "sensor", Family: "i2c_sensor", Quantity: maxIntentQuantity + 1}},
+	})
+	for _, path := range []string{"interfaces[0].quantity", "functions[0].quantity"} {
+		if !hasIssuePath(issues, path) {
+			t.Fatalf("missing issue path %s in %#v", path, issues)
+		}
+	}
+}
+
 func TestNormalizeRequestCopiesMutableFields(t *testing.T) {
 	request := Request{
 		Version: "0.1.0",

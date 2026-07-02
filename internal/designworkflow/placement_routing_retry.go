@@ -68,6 +68,9 @@ const (
 	retryEvidenceWarning retryEvidenceStatus = "warning"
 )
 
+const retryScoreComparisonEpsilon = 1e-9
+const retryScoreRelativeTolerance = 1e-6
+
 func maybeRetryPlacementRouting(ctx context.Context, request Request, fragments PCBFragmentResult, placed PlacementStageResult, routed RoutingStageResult, routingOpts RoutingOptions, policy RoutingRetryPolicySpec) (PlacementStageResult, RoutingStageResult, placementRoutingRetrySummary) {
 	summary := placementRoutingRetrySummary{Enabled: policy.Enabled, Attempts: 1}
 	if !policy.Enabled || policy.MaxAttempts <= 1 {
@@ -553,10 +556,38 @@ func placementRoutingAttemptComparison(candidate, current placementRoutingRetryA
 	if candidate.RoutedNets != current.RoutedNets {
 		return higherIsBetter(candidate.RoutedNets, current.RoutedNets), "more_routed_nets"
 	}
-	if candidate.RouteScore != current.RouteScore {
-		return higherFloatIsBetter(candidate.RouteScore, current.RouteScore), "higher_route_quality"
+	if compare := compareRouteScoreWithPolicy(candidate.RouteScore, current.RouteScore, policy); compare != 0 {
+		return compare, "higher_route_quality"
 	}
 	return lowerIsBetter(candidate.Attempt, current.Attempt), "best_ranked_attempt"
+}
+
+func compareRouteScoreWithPolicy(candidate float64, current float64, policy RoutingRetryPolicySpec) int {
+	delta := candidate - current
+	epsilon := routeScoreComparisonEpsilon(candidate, current)
+	if delta < -epsilon {
+		return -1
+	}
+	threshold := policy.MinRoutingScoreDelta
+	if threshold <= 0 {
+		if delta > epsilon {
+			return 1
+		}
+		return 0
+	}
+	tolerance := threshold * retryScoreRelativeTolerance
+	if delta >= threshold-tolerance {
+		return 1
+	}
+	return 0
+}
+
+func routeScoreComparisonEpsilon(candidate float64, current float64) float64 {
+	scale := math.Max(math.Abs(candidate), math.Abs(current))
+	if scale < 1 {
+		scale = 1
+	}
+	return retryScoreComparisonEpsilon * scale
 }
 
 func placementRoutingAttemptSelectionReason(candidate, previousBest placementRoutingRetryAttemptSummary, policy RoutingRetryPolicySpec) string {

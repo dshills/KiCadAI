@@ -39,6 +39,9 @@ func TestDraftExtractsMCUProgrammerClock(t *testing.T) {
 	if len(result.Request.Functions) < 3 {
 		t.Fatalf("functions = %#v", result.Request.Functions)
 	}
+	if result.Request.Functions[2].Kind != "clock" || result.Request.Functions[2].Family != "crystal_oscillator" {
+		t.Fatalf("clock function = %#v", result.Request.Functions)
+	}
 }
 
 func TestDraftExtractsPowerModule(t *testing.T) {

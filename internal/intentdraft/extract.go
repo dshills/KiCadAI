@@ -117,7 +117,7 @@ func extractFunctions(source string, normalized string, request *intentplanner.R
 		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, []string{"programmer", "programming", "isp"}), confidenceRegexHigh, "keyword.function")
 	}
 	if frequencies := findFrequencies(source); len(frequencies) > 0 {
-		function := intentplanner.FunctionIntent{Kind: "clock", Family: "crystal", Params: map[string]any{"frequency": frequencies[0].TextValue}}
+		function := intentplanner.FunctionIntent{Kind: "clock", Family: "crystal_oscillator", Params: map[string]any{"frequency": frequencies[0].TextValue}}
 		request.Functions = append(request.Functions, function)
 		addField(extraction, fmt.Sprintf("functions[%d].params.frequency", len(request.Functions)-1), frequencies[0].TextValue, source, frequencies[0].Field, confidenceRegexMedium, "regex.frequency")
 	}

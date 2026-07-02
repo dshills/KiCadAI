@@ -1,6 +1,16 @@
 package intentdraft
 
-import "kicadai/internal/intentplanner"
+import (
+	"regexp"
+
+	"kicadai/internal/intentplanner"
+)
+
+var unsupportedInterfacePatterns = []*regexp.Regexp{
+	regexp.MustCompile(`\b(?:ethernet|usb[- ]?data|controller area network)\b`),
+	regexp.MustCompile(`\b(?:canbus|can[- ]?(?:adapter|bus|interface|transceiver|sensor|board|connector|controller|node|shield|breakout|port))\b`),
+	regexp.MustCompile(`\bCAN(?:[- ]?)(?:adapter|bus|interface|transceiver|sensor|board|connector|controller|node|shield|breakout|port)\b`),
+}
 
 func clarifyDraft(source string, normalized string, request intentplanner.Request, extraction ExtractionReport) []Clarification {
 	var clarifications []Clarification
@@ -16,7 +26,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 			Suggestion: "Specify the battery voltage or chemistry.",
 		})
 	}
-	if containsAny(normalized, "can", "ethernet", "usb data") {
+	if unsupportedInterfaceClarificationRequested(source, normalized) {
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.interface.kind_unsupported",
 			Path:       "interfaces",
@@ -59,6 +69,15 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 		})
 	}
 	return clarifications
+}
+
+func unsupportedInterfaceClarificationRequested(source string, normalized string) bool {
+	for _, pattern := range unsupportedInterfacePatterns[:2] {
+		if pattern.MatchString(normalized) {
+			return true
+		}
+	}
+	return unsupportedInterfacePatterns[2].MatchString(source)
 }
 
 func BlockingClarifications(values []Clarification) bool {
