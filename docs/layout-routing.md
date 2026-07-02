@@ -127,6 +127,34 @@ Larger-board convergence, spatial acceleration for large hard-rule sets, richer
 contact repair execution, and final KiCad DRC-backed layout proof remain future
 work.
 
+#### Route-tree troubleshooting
+
+Use the route-tree summaries together rather than reading one field in
+isolation:
+
+- `inter_block_route_trees` reports branch executor ownership and branch
+  success/failure.
+- `route_tree_access` reports whether generated pads and local-route anchors
+  were available as physical access evidence.
+- `route_tree_contact_graph` reports same-net graph connectivity, including
+  local-route merge evidence, without inflating emitted inter-block route
+  segment counts.
+- `route_tree_repair` reports classified branch/contact blockers and retry
+  hint inputs.
+
+Common blocker meanings:
+
+- Missing endpoint access means footprint pad hydration, net assignment, or
+  local-route binding did not expose a usable physical point.
+- A split or partial contact graph means some same-net endpoints are proven,
+  but not all required endpoints are in one same-net component.
+- A same-net merge gap means pads/local routes are known but the branch router
+  did not legally reach or merge into them.
+- An other-net obstacle means placement, fanout, clearance, or layer access
+  must change before that branch can route.
+- A clean internal contact graph followed by KiCad DRC findings means the
+  remaining blocker is external ERC/DRC evidence, not internal graph proof.
+
 
 ### Routing
 
