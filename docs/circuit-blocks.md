@@ -222,7 +222,12 @@ do-not-connect pins without explicit evidence block rather than guessing.
 Optional power-LED roles are active only when `include_power_led` is true, so
 omitted indicator LEDs do not force unnecessary component selection. The
 resulting selections are written into the generated transaction and reported in
-workflow evidence.
+the `component_selection` stage. Regulator and capacitor selections now include
+structured evidence summaries: AMS1117 reports ESR-window stability review
+requirements, AP2112K reports ceramic-stable output-cap status plus review
+requirements, and selected MLCC capacitors report DC-bias/effective-capacitance
+review status. Fabrication-candidate workflows block on unproven stability,
+thermal, or derating evidence.
 
 The generated block examples are structural schematic/project outputs; they are
 not yet fabrication-ready PCB designs. See

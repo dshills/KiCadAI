@@ -251,12 +251,15 @@ capacitors. The AP2112K path is limited to 3.3 V rails from inputs at or below
 6 V and at or below 150 mA for automatic planner selection; generated
 connectivity ties `EN` to VIN and emits
 an explicit KiCad no-connect marker for the NC pin. Broader regulator families
-and exact capacitor part-number selection are still catalog expansion work. Do
-not treat this slice as regulator stability proof: ESR, MLCC DC-bias derating,
-thermal dissipation, and transient response still require part-specific
-evidence or human review. For any LDO, verify the exact selected part is stable
-with the generated ceramic output capacitors or choose a catalog record that
-models the required output-capacitor ESR.
+and exact capacitor part-number selection are still catalog expansion work. This
+slice is not fabrication-ready regulator stability proof:
+`component select`, `design create`, workflow summaries, and rationale output
+now expose structured `regulator_evidence` and `capacitor_evidence`, but
+fabrication-candidate selection blocks until ESR-window, MLCC DC-bias,
+effective-capacitance, and thermal review evidence is proven or explicitly
+not applicable. For any LDO, verify the exact selected part is stable with the
+generated output capacitors or choose a catalog record that models the required
+output-capacitor ESR.
 
 ## Intent Planning Guidance
 

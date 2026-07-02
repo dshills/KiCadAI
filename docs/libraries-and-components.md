@@ -51,9 +51,13 @@ satisfy the request; draft and structural selection can still use generic
 fallbacks. Local source snapshots are curated evidence fixtures, not live
 availability or pricing data.
 
-High-value MLCC selections, such as 10 uF 0603/0805 ceramic capacitors, require
-design-specific DC-bias and effective-capacitance review. AMS1117
-fabrication-candidate use still requires output-capacitor ESR/stability review.
+High-value MLCC selections, such as 10 uF 0603/0805 ceramic capacitors, now
+carry structured `capacitor_evidence` fields for dielectric, DC-bias review,
+effective-capacitance review, and ESR review. AMS1117 and AP2112K regulator
+records carry structured `regulator_evidence`. Connectivity workflows surface
+these as warnings; fabrication-candidate selection blocks until the required
+regulator stability, MLCC derating, and thermal evidence is proven or marked
+not applicable.
 
 `design create` includes a `component_selection` stage after block planning and
 before schematic or PCB writes. Request JSON can include `component_policy` to

@@ -107,9 +107,10 @@ unsupported power devices:
 - Lite-On 0603/0805 indicator LEDs with polarity evidence.
 - Concrete signal and Schottky diodes, and a SOD-323 ESD/TVS protection diode.
 - AMS1117 SOT-223 and AP2112K SOT-23-5 fixed 3.3 V LDO records used by the
-  regulator block path. AMS1117 fabrication-candidate use still requires
-  output-capacitor ESR/stability evidence instead of assuming ceramic output
-  capacitors are acceptable.
+  regulator block path. These records now carry structured
+  `regulator_evidence`: AMS1117 is modeled as ESR-window-required for output
+  capacitor stability, while AP2112K is modeled as ceramic-stable for
+  connectivity but still review-gated for MLCC derating and thermal evidence.
 - onsemi MMBT3904/MMBT3906 SOT-23 small-signal BJT amplifier seeds, plus a
   blocked-by-default NPN TO-220 power-output placeholder that requires pinout,
   package, thermal, Safe Operating Area (SOA), and layout-constraint evidence
@@ -291,14 +292,15 @@ can audit why a selected regulator or capacitor was accepted. Missing or
 insufficient ratings remain blocking for connectivity-oriented acceptance.
 
 This is not yet an analog-stability proof. The current selector checks catalog
-ratings, modeled dropout/headroom, EN/NC handling, and KiCad-resolvable
-bindings; it does not prove LDO output-capacitor ESR windows, MLCC DC-bias
-capacitance loss, thermal dissipation, or transient response. In particular,
-manually verify linear-regulator power dissipation with
-`Pd = (Vin - Vout) * Iout` and confirm the selected package and PCB copper can
-handle it. Treat generated regulator designs as structurally and
-connectivity-oriented evidence until a block or catalog record carries
-part-specific stability and derating evidence.
+ratings, modeled dropout/headroom, EN/NC handling, KiCad-resolvable bindings,
+and structured regulator/capacitor evidence status. Connectivity-oriented
+selection and ERC/DRC validation can proceed with explicit review warnings, but
+fabrication-candidate selection blocks when regulator thermal review,
+AMS1117-style ESR-window proof, AP2112K MLCC derating, or capacitor
+effective-capacitance evidence is missing. In particular, manually verify
+linear-regulator power dissipation with `Pd = (Vin - Vout) * Iout` and confirm
+the selected package and PCB copper can handle it before treating the design as
+manufacturable.
 
 ## Current Limitations
 

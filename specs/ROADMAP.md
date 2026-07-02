@@ -295,7 +295,10 @@ USB-C power-only, and protection parts. It includes:
 - verified regulator-path coverage that connects fixed 3.3 V linear regulator
   blocks to catalog-backed AMS1117 SOT-223 and AP2112K SOT-23-5 selection,
   capacitor selection, rating requirements, generated request overrides,
-  AP2112K EN/NC handling, headroom blocking, and persisted workflow evidence;
+  AP2112K EN/NC handling, headroom blocking, persisted workflow evidence,
+  structured regulator/capacitor stability evidence, connectivity warnings,
+  fabrication-candidate blockers for unproven AMS1117 ESR-window evidence,
+  AP2112K MLCC derating evidence, and thermal review evidence;
 - selected component identity propagation into generated schematic symbol
   properties, including component ID, variant ID, role, block ID,
   manufacturer, MPN, confidence, source, lifecycle, availability, and pinmap
@@ -310,8 +313,9 @@ USB-C power-only, and protection parts. It includes:
   packages, voltages, tolerances, and real second-source alternates.
 - Broaden the verified regulator path beyond the current 3.3 V AMS1117-style
   and AP2112K LDO slices, including additional voltages, adjustable/BYP
-  networks, exported enable control, and part-specific capacitor stability
-  evidence.
+  networks, exported enable control, regulator-specific proven capacitor
+  networks, and thermal/layout evidence strong enough to unblock
+  fabrication-candidate regulator designs.
 - Add trusted provider importers or remote snapshot adapters once a source is
   selected; current support is local snapshot JSON only.
 - Replace remaining structural placeholders where verified concrete parts are
