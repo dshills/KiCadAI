@@ -57,6 +57,8 @@ type ComponentSelectionEntry struct {
 	Companions      []components.CompanionRequirement `json:"companions,omitempty"`
 	Regulator       *components.RegulatorEvidence     `json:"regulator_evidence,omitempty"`
 	Capacitor       *components.CapacitorEvidence     `json:"capacitor_evidence,omitempty"`
+	PlacementHints  []components.PlacementHint        `json:"placement_hints,omitempty"`
+	RoutingHints    []components.RoutingHint          `json:"routing_hints,omitempty"`
 	Procurement     *components.ProcurementEvidence   `json:"procurement,omitempty"`
 	Rejected        []components.CandidateRejection   `json:"rejected,omitempty"`
 	Warnings        []reports.Issue                   `json:"warnings,omitempty"`
@@ -158,6 +160,8 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 					Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
 					Regulator:       cloneRegulatorEvidence(selection.Component.Regulator),
 					Capacitor:       cloneCapacitorEvidence(selection.Component.Capacitor),
+					PlacementHints:  append([]components.PlacementHint(nil), selection.Component.PlacementHints...),
+					RoutingHints:    append([]components.RoutingHint(nil), selection.Component.RoutingHints...),
 					Procurement:     cloneProcurementEvidence(selection.Procurement),
 					Rejected:        append([]components.CandidateRejection(nil), selection.Rejected...),
 					Warnings:        append([]reports.Issue(nil), selection.Warnings...),
@@ -709,20 +713,22 @@ func selectedComponentSummary(selections []ComponentSelectionEntry) []map[string
 	out := make([]map[string]any, 0, len(selections))
 	for _, selection := range selections {
 		item := map[string]any{
-			"instance_id":      selection.InstanceID,
-			"role":             selection.Role,
-			"component_id":     selection.ComponentID,
-			"variant_id":       selection.VariantID,
-			"manufacturer":     selection.Manufacturer,
-			"mpn":              selection.MPN,
-			"symbol_id":        selection.SymbolID,
-			"footprint_id":     selection.FootprintID,
-			"confidence":       selection.Confidence,
-			"resolver_checked": selection.ResolverChecked,
-			"pinmap_checked":   selection.PinMapChecked,
-			"companion_count":  len(selection.Companions),
-			"rejected_count":   len(selection.Rejected),
-			"warning_count":    len(selection.Warnings),
+			"instance_id":          selection.InstanceID,
+			"role":                 selection.Role,
+			"component_id":         selection.ComponentID,
+			"variant_id":           selection.VariantID,
+			"manufacturer":         selection.Manufacturer,
+			"mpn":                  selection.MPN,
+			"symbol_id":            selection.SymbolID,
+			"footprint_id":         selection.FootprintID,
+			"confidence":           selection.Confidence,
+			"resolver_checked":     selection.ResolverChecked,
+			"pinmap_checked":       selection.PinMapChecked,
+			"companion_count":      len(selection.Companions),
+			"placement_hint_count": len(selection.PlacementHints),
+			"routing_hint_count":   len(selection.RoutingHints),
+			"rejected_count":       len(selection.Rejected),
+			"warning_count":        len(selection.Warnings),
 		}
 		if selection.Regulator != nil {
 			item["regulator_evidence"] = regulatorEvidenceSummary(selection.Regulator)

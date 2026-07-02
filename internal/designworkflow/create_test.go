@@ -523,6 +523,9 @@ func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
 		if outputCap["kind"] != "ceramic_stable" || outputCap["proof_status"] != "review_required" {
 			t.Fatalf("AP2112 output-cap evidence = %#v", outputCap)
 		}
+		if item["placement_hint_count"] != 2 || item["routing_hint_count"] != 3 {
+			t.Fatalf("AP2112 hint counts missing: %#v", item)
+		}
 		found = true
 	}
 	if !found {
