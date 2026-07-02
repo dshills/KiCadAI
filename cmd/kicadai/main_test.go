@@ -1168,6 +1168,19 @@ func TestRunComponentCoverageWithSourceDir(t *testing.T) {
 			t.Errorf("missing alternative coverage field %s: %#v", field, alternativeCoverage)
 		}
 	}
+	if got, ok := alternativeCoverage["concrete_records"].(float64); !ok || got < 27 {
+		t.Fatalf("concrete_records = %#v in %#v", alternativeCoverage["concrete_records"], alternativeCoverage)
+	}
+	if got, ok := alternativeCoverage["equivalence_groups"].(float64); !ok || got < 19 {
+		t.Fatalf("equivalence_groups = %#v in %#v", alternativeCoverage["equivalence_groups"], alternativeCoverage)
+	}
+	sourceCoverage, ok := data["source_coverage"].(map[string]any)
+	if !ok {
+		t.Fatalf("missing source coverage: %#v", data)
+	}
+	if got, ok := sourceCoverage["lifecycle_evidence_records"].(float64); !ok || got < 22 {
+		t.Fatalf("lifecycle_evidence_records = %#v in %#v", sourceCoverage["lifecycle_evidence_records"], sourceCoverage)
+	}
 }
 
 type componentSelectCompanion struct {

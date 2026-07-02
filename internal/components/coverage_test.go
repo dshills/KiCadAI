@@ -41,7 +41,7 @@ var plannedVerifiedExpansionTargetMatrix = []struct {
 	{Family: "protection", Current: true, BaselinePackages: []string{"sod_323"}, PlannedPackages: []string{"sod_323", "sot23", "dfn"}, PlannedUses: []string{"esd", "tvs", "power_entry"}},
 	{Family: "opamp", Current: true, BaselinePackages: []string{"sot23_5"}, PlannedPackages: []string{"sot23_5", "soic8"}, PlannedUses: []string{"audio_buffer", "gain_stage"}},
 	{Family: "crystal", Current: true, BaselinePackages: []string{"5032_2pin"}, BaselineValues: []string{"16"}, PlannedPackages: []string{"5032_2pin"}, PlannedValues: []string{"16"}, PlannedUses: []string{"clock_source"}},
-	{Family: "bjt", PlannedPackages: []string{"sot23", "to92"}, PlannedUses: []string{"class_ab_driver", "small_signal_switch"}},
+	{Family: "bjt", Current: true, BaselinePackages: []string{"sot23"}, PlannedPackages: []string{"sot23", "to92", "to220"}, PlannedUses: []string{"class_ab_driver", "small_signal_switch", "power_output_blocked"}},
 	{Family: "usb_c", Current: true, BaselinePackages: []string{"gct_usb4125_6p"}, PlannedPackages: []string{"power_only"}, PlannedUses: []string{"power_entry"}},
 }
 
@@ -184,6 +184,51 @@ func TestDefaultRoadmapRequiredFamiliesIncludeCurrentCoverageFamilies(t *testing
 	for _, family := range currentVerifiedExpansionFamilies() {
 		if !slices.Contains(required, family) {
 			t.Errorf("default required families missing %s: %#v", family, required)
+		}
+	}
+}
+
+func TestCheckedInCatalogMeetsExpandedCoverageThresholds(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	report, result := ComponentCoverage(catalog, CoverageOptions{RequiredFamilies: currentVerifiedExpansionFamilies()})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("coverage should not block: %+v", result.Issues)
+	}
+	if report.AlternativeCoverage.ConcreteRecords < 27 {
+		t.Fatalf("concrete records = %d, want at least 27", report.AlternativeCoverage.ConcreteRecords)
+	}
+	if report.AlternativeCoverage.EquivalenceGroups < 19 {
+		t.Fatalf("equivalence groups = %d, want at least 19", report.AlternativeCoverage.EquivalenceGroups)
+	}
+	thresholds := map[string]struct {
+		concrete int
+		generic  int
+		blocked  int
+	}{
+		"bjt":        {concrete: 2, generic: 1, blocked: 1},
+		"capacitor":  {concrete: 3, generic: 3},
+		"connector":  {concrete: 5, generic: 5},
+		"diode":      {concrete: 2, generic: 3},
+		"led":        {concrete: 3, generic: 2},
+		"protection": {concrete: 1, generic: 1},
+		"resistor":   {concrete: 4, generic: 2},
+	}
+	for family, threshold := range thresholds {
+		coverage, ok := familyCoverageByID(report, family)
+		if !ok {
+			t.Fatalf("missing coverage for %s", family)
+		}
+		if coverage.ConcreteRecords < threshold.concrete {
+			t.Errorf("%s concrete records = %d, want at least %d", family, coverage.ConcreteRecords, threshold.concrete)
+		}
+		if coverage.GenericFallbackRecords < threshold.generic {
+			t.Errorf("%s generic records = %d, want at least %d", family, coverage.GenericFallbackRecords, threshold.generic)
+		}
+		if coverage.BlockedRecords < threshold.blocked {
+			t.Errorf("%s blocked records = %d, want at least %d", family, coverage.BlockedRecords, threshold.blocked)
 		}
 	}
 }

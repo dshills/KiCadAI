@@ -50,12 +50,23 @@ func TestCreateWritesWorkflowResult(t *testing.T) {
 	if got := componentStage.Summary["selection_count"]; got != 2 {
 		t.Fatalf("component selection count = %#v, want 2", got)
 	}
+	selected := selectedComponentsFromSummary(t, componentStage.Summary["selected_components"])
+	if len(selected) == 0 {
+		t.Fatal("expected at least one selected component")
+	}
+	componentID, _ := selected[0]["component_id"].(string)
+	if componentID == "" {
+		t.Fatalf("selected component missing component_id: %#v", selected[0])
+	}
 	schematicFile, err := schematic.ReadFile(filepath.Join(output, "status_board.kicad_sch"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got := countSymbolsWithProperty(schematicFile.Symbols, componentprops.PropertyComponentID); got < 2 {
 		t.Fatalf("component identity properties not propagated to schematic: %#v", schematicFile.Symbols)
+	}
+	if !hasSymbolWithProperties(schematicFile.Symbols, map[string]string{componentprops.PropertyComponentID: componentID}) {
+		t.Fatalf("selected component identity not propagated to schematic: want component_id %q symbols %#v", componentID, schematicFile.Symbols)
 	}
 }
 
@@ -233,6 +244,46 @@ func countSymbolsWithProperty(symbols []schematic.SchematicSymbol, name string) 
 	return count
 }
 
+func hasSymbolWithProperties(symbols []schematic.SchematicSymbol, want map[string]string) bool {
+	for _, symbol := range symbols {
+		values := map[string]string{}
+		for _, property := range symbol.Properties {
+			values[property.Name] = property.Value
+		}
+		matches := true
+		for name, value := range want {
+			if values[name] != value {
+				matches = false
+				break
+			}
+		}
+		if matches {
+			return true
+		}
+	}
+	return false
+}
+
+func selectedComponentsFromSummary(t *testing.T, value any) []map[string]any {
+	t.Helper()
+	if selected, ok := value.([]map[string]any); ok {
+		return selected
+	}
+	items, ok := value.([]any)
+	if !ok {
+		t.Fatalf("selected component summary type = %T", value)
+	}
+	selected := make([]map[string]any, 0, len(items))
+	for _, item := range items {
+		entry, ok := item.(map[string]any)
+		if !ok {
+			t.Fatalf("selected component entry type = %T", item)
+		}
+		selected = append(selected, entry)
+	}
+	return selected
+}
+
 func stageByName(result WorkflowResult, name StageName) (StageResult, bool) {
 	for _, stage := range result.Stages {
 		if stage.Name == name {
@@ -348,7 +399,7 @@ func TestCreateConnectivityRejectsPlaceholderActiveComponent(t *testing.T) {
 		Name:       "connectivity_opamp",
 		Board:      BoardSpec{WidthMM: 60, HeightMM: 35, Layers: 2},
 		Blocks:     []BlockInstanceSpec{{ID: "gain", BlockID: "opamp_gain_stage"}},
-		Validation: ValidationSpec{Acceptance: AcceptanceConnectivity, SkipRouting: true},
+		Validation: ValidationSpec{Acceptance: AcceptanceStructural, SkipRouting: true},
 	}
 	result := Create(context.Background(), request, CreateOptions{OutputDir: output})
 	stage, ok := stageByName(result, StageComponentSelection)
@@ -411,10 +462,11 @@ func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
 				"enable_mode":         "tied_input",
 			},
 		}},
-		Validation: ValidationSpec{Acceptance: AcceptanceConnectivity, SkipRouting: true},
+		Validation: ValidationSpec{Acceptance: AcceptanceStructural, SkipRouting: true},
 	}
+	outputDir := filepath.Join(t.TempDir(), "sourced_regulator")
 	result := Create(context.Background(), request, CreateOptions{
-		OutputDir: filepath.Join(t.TempDir(), "sourced_regulator"),
+		OutputDir: outputDir,
 		Components: ComponentSelectionOptions{
 			SourceDir: componentSourceFixtureDir(t, "valid"),
 		},
@@ -430,8 +482,8 @@ func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
 	if !ok {
 		t.Fatalf("procurement summary missing: %#v", stage.Summary)
 	}
-	if procurement["lifecycle_evidence_count"] != 1 {
-		t.Fatalf("procurement summary = %#v, want one lifecycle evidence row", procurement)
+	if procurement["lifecycle_evidence_count"] != 3 {
+		t.Fatalf("procurement summary = %#v, want three lifecycle evidence rows", procurement)
 	}
 	selected, ok := stage.Summary["selected_components"].([]map[string]any)
 	if !ok {

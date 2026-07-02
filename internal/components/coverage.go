@@ -265,6 +265,7 @@ func emptyConfidenceCounts() map[string]int {
 
 func defaultRoadmapRequiredFamilies() []string {
 	return []string{
+		"bjt",
 		"capacitor",
 		"connector",
 		"crystal",
