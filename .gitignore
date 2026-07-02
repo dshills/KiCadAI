@@ -11,6 +11,10 @@
 *.test
 coverage.out
 
+# Atlas local index
+.atlas/atlas.db
+.atlas/atlas.db-*
+
 # Local environment
 .env
 .env.*

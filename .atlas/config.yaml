@@ -1,0 +1,60 @@
+# Atlas configuration
+version: 1
+include:
+  - "**/*.go"
+  - "**/*.ts"
+  - "**/*.tsx"
+  - "**/*.js"
+  - "**/*.jsx"
+  - "**/*.py"
+  - "**/*.pyi"
+  - "**/*.rs"
+  - "**/*.java"
+  - "**/*.cs"
+  - "**/*.swift"
+  - "**/*.lua"
+exclude:
+  - "vendor/**"
+  - "node_modules/**"
+  - ".atlas/**"
+  - ".git/**"
+  - ".cache/**"
+  - ".coverage/**"
+  - ".gocache/**"
+  - ".gomodcache/**"
+  - ".tmp/**"
+  - "dist/**"
+  - "testdata/**"
+  - "__pycache__/**"
+  - "target/**"
+  - ".venv/**"
+  - "venv/**"
+  - "build/**"
+  - "bin/**"
+  - "obj/**"
+  - ".build/**"
+  - "Packages/**"
+  - "examples/.generated/**"
+  - "examples/promotion_artifacts/**"
+  - "examples/roundtrip_artifacts/**"
+languages:
+  go: true
+  typescript: true
+  javascript: true
+  python: true
+  rust: true
+  java: true
+  csharp: true
+  swift: true
+  lua: true
+indexing:
+  max_file_size_bytes: 1048576
+  workers: 0  # 0 = runtime.NumCPU()
+  batch_size: 50  # files per SQLite transaction
+summaries:
+  enabled: true
+  file: true
+  package: true
+  symbol: true
+output:
+  default_format: text
