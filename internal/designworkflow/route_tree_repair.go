@@ -143,6 +143,12 @@ func classifyRouteTreeRepairIssue(issue reports.Issue) (InterBlockBranchRepairHi
 }
 
 func isRouteTreeRepairIssue(issue reports.Issue) bool {
+	if issue.Severity == reports.SeverityInfo {
+		return false
+	}
+	if issue.Code == reports.CodeFixedNetSkipped || issue.Code == reports.CodeMissingNetClass {
+		return false
+	}
 	if strings.Contains(issue.Path, "design.inter_block_route_groups") {
 		return true
 	}

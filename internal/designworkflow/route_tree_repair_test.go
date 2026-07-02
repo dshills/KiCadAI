@@ -45,6 +45,33 @@ func TestClassifyRouteTreeContactFailures(t *testing.T) {
 	}
 }
 
+func TestRouteTreeRepairIgnoresNonBlockingFixedNetAndNetClassNotices(t *testing.T) {
+	hints := BuildRouteTreeRepairHints([]reports.Issue{
+		{Code: reports.CodeFixedNetSkipped, Severity: reports.SeverityInfo, Path: `design.inter_block_route_groups["VCC"].branches[0].nets.GND`, Nets: []string{"GND"}, Message: "fixed net was preserved and skipped"},
+		{Code: reports.CodeMissingNetClass, Severity: reports.SeverityWarning, Path: `design.inter_block_route_groups["VCC"].branches[0].nets.VCC.class`, Nets: []string{"VCC"}, Message: "power or high-current net has no explicit net class"},
+		{Code: reports.CodeRouteContactMiss, Severity: reports.SeverityBlocked, Path: `design.inter_block_contact.nets[0].endpoints[1].start`, Nets: []string{"VCC"}, Message: "route endpoint does not contact the required same-net target"},
+	})
+	if len(hints) != 1 {
+		t.Fatalf("hints = %#v, want only blocked route-tree repair hint", hints)
+	}
+	if hints[0].Category != InterBlockBranchFailureContactMiss || hints[0].NetName != "VCC" {
+		t.Fatalf("hint = %#v, want VCC contact miss", hints[0])
+	}
+}
+
+func TestRouteTreeRepairKeepsBlockingWarningsExceptKnownNotices(t *testing.T) {
+	hints := BuildRouteTreeRepairHints([]reports.Issue{{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityWarning,
+		Path:     `design.inter_block_route_groups["VCC"].branches[0].nets.VCC`,
+		Nets:     []string{"VCC"},
+		Message:  "route-tree warning requires user-guided repair",
+	}})
+	if len(hints) != 1 {
+		t.Fatalf("hints = %#v, want warning route-tree hint preserved", hints)
+	}
+}
+
 func TestRouteTreeRepairSummaryJSONStable(t *testing.T) {
 	summary := InterBlockRouteTreeRepairSummary{
 		BranchFailures:       2,

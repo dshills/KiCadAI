@@ -61,7 +61,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		netRequest.Rules = applyEffectiveRule(request.Rules, effectiveRule)
 		if plan.Net.Class == "" && (plan.Net.Role == NetPower || plan.Net.Role == NetGround || plan.Net.Role == NetHighCurrent) {
 			route.Issues = append(route.Issues, reports.Issue{
-				Code:       reports.CodeValidationFailed,
+				Code:       reports.CodeMissingNetClass,
 				Severity:   reports.SeverityWarning,
 				Path:       "nets." + plan.Net.Name + ".class",
 				Message:    "power or high-current net has no explicit net class",

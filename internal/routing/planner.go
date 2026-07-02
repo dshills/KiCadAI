@@ -50,7 +50,7 @@ func PlanRoutes(request Request, access PadAccess) ([]PlannedNet, []reports.Issu
 		}
 		if net.Fixed {
 			issues = append(issues, reports.Issue{
-				Code:     reports.CodeValidationFailed,
+				Code:     reports.CodeFixedNetSkipped,
 				Severity: reports.SeverityInfo,
 				Path:     "nets." + net.Name,
 				Message:  "fixed net was preserved and skipped",

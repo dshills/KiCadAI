@@ -44,6 +44,8 @@ const (
 	CodeRouteContactUnsupported   Code = "ROUTE_CONTACT_UNSUPPORTED_GEOMETRY"
 	CodeRouteGraphIncomplete      Code = "ROUTE_GRAPH_INCOMPLETE"
 	CodeRouteCompletionPartial    Code = "ROUTE_COMPLETION_PARTIAL"
+	CodeFixedNetSkipped           Code = "FIXED_NET_SKIPPED"
+	CodeMissingNetClass           Code = "MISSING_NET_CLASS"
 )
 
 type Issue struct {

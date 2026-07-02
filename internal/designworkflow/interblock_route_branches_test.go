@@ -148,6 +148,62 @@ func TestRouteTreeBranchAccessCandidateAuditReportsVCCLimitTruncation(t *testing
 	}
 }
 
+func TestRouteTreeBranchDiagnosticsSeparateFixedNetInfoFromVCCWarnings(t *testing.T) {
+	group := routeTreeTestGroup("VCC",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+	)
+	tree := BuildInterBlockRouteTree(group, routeTreeTestTargets("VCC", map[string]transactions.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	}))
+	base := routeBranchTestRequest("VCC", map[string]routing.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	})
+	base.Nets = []routing.Net{
+		{Name: "VCC", Role: routing.NetPower, Endpoints: []routing.Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "U1", Pin: "1"}}},
+		{Name: "GND", Role: routing.NetGround, Endpoints: []routing.Endpoint{{Ref: "J2", Pin: "1"}, {Ref: "J2", Pin: "2"}}},
+	}
+	base.Components = append(base.Components, routing.Component{
+		Ref:      "J2",
+		Position: routing.Placement{Layer: "F.Cu"},
+		Pads: []routing.Pad{
+			{Ref: "J2", Name: "1", Net: "GND", Position: routing.Point{XMM: 5, YMM: 15}, Shape: routing.PadRect, Type: routing.PadSMD, Size: routing.Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"}},
+			{Ref: "J2", Name: "2", Net: "GND", Position: routing.Point{XMM: 25, YMM: 15}, Shape: routing.PadRect, Type: routing.PadSMD, Size: routing.Size{WidthMM: 1, HeightMM: 1}, Layers: []string{"F.Cu"}},
+		},
+	})
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 5, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 25, YMM: 5},
+	}
+
+	result := RouteInterBlockTreeBranchesWithAccess(context.Background(), base, group, tree, access)
+	if len(result.Branches) != 1 {
+		t.Fatalf("branches = %#v, want one branch", result.Branches)
+	}
+	branch := result.Branches[0]
+	if branch.BlockingIssueCount != 0 || branch.WarningIssueCount == 0 || branch.InfoIssueCount == 0 || branch.FixedNetSkipNotices == 0 {
+		t.Fatalf("branch = %#v, want VCC warning and fixed-net info separated from blockers", branch)
+	}
+	if !routeTreeBranchIssuesContainCode(result.Issues, reports.CodeMissingNetClass) || !routeTreeBranchIssuesContainCode(result.Issues, reports.CodeFixedNetSkipped) {
+		t.Fatalf("issues = %#v, want missing-net-class warning and fixed-net skip info", result.Issues)
+	}
+	hints := BuildRouteTreeRepairHints(result.Issues)
+	if len(hints) != 0 {
+		t.Fatalf("repair hints = %#v, want fixed-net info and VCC net-class warning excluded from route-tree blockers", hints)
+	}
+}
+
+func routeTreeBranchIssuesContainCode(issues []reports.Issue, code reports.Code) bool {
+	for _, issue := range issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
 func TestRouteInterBlockTreeBranchesReportsMissingGroupEndpoint(t *testing.T) {
 	group := routeTreeTestGroup("SIG",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},

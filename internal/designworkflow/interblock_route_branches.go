@@ -42,6 +42,10 @@ type InterBlockBranchRoutingEvidence struct {
 	Status               routing.Status                         `json:"status"`
 	OperationCount       int                                    `json:"operation_count"`
 	IssueCount           int                                    `json:"issue_count"`
+	BlockingIssueCount   int                                    `json:"blocking_issue_count,omitempty"`
+	WarningIssueCount    int                                    `json:"warning_issue_count,omitempty"`
+	InfoIssueCount       int                                    `json:"info_issue_count,omitempty"`
+	FixedNetSkipNotices  int                                    `json:"fixed_net_skip_notices,omitempty"`
 	AccessPairsTried     int                                    `json:"access_pairs_tried,omitempty"`
 	AccessSourceCount    int                                    `json:"access_source_count,omitempty"`
 	AccessTargetCount    int                                    `json:"access_target_count,omitempty"`
@@ -178,9 +182,33 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		currentExisting = append(currentExisting, branchExisting...)
 		evidence.Status = branchResult.Status
 		evidence.IssueCount = len(branchIssues)
+		evidence.BlockingIssueCount, evidence.WarningIssueCount, evidence.InfoIssueCount, evidence.FixedNetSkipNotices = routeTreeIssueCounters(branchIssues)
 		result.Branches = append(result.Branches, evidence)
 	}
 	return result
+}
+
+func routeTreeIssueCounters(issues []reports.Issue) (blocking int, warnings int, info int, fixedNetSkips int) {
+	for _, issue := range issues {
+		switch issue.Severity {
+		case reports.SeverityBlocked, reports.SeverityError:
+			blocking++
+		case reports.SeverityWarning:
+			warnings++
+		case reports.SeverityInfo:
+			info++
+		default:
+			blocking++
+		}
+		if routeTreeIssueIsFixedNetSkip(issue) {
+			fixedNetSkips++
+		}
+	}
+	return blocking, warnings, info, fixedNetSkips
+}
+
+func routeTreeIssueIsFixedNetSkip(issue reports.Issue) bool {
+	return issue.Code == reports.CodeFixedNetSkipped
 }
 
 func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName string, branch InterBlockRouteTreeBranch, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint, accessAudit routeTreeBranchAccessAudit) (routing.Result, routeTreeBranchAccessPair, bool, int, []RouteTreeBranchAccessAttemptEvidence) {

@@ -69,19 +69,23 @@ type InterBlockRouteCompletionSummary struct {
 }
 
 type InterBlockRouteTreeExecutionSummary struct {
-	GroupsPlanned     int      `json:"groups_planned"`
-	GroupsAttempted   int      `json:"groups_attempted"`
-	GroupsComplete    int      `json:"groups_complete"`
-	GroupsPartial     int      `json:"groups_partial"`
-	GroupsBlocked     int      `json:"groups_blocked"`
-	BranchesPlanned   int      `json:"branches_planned"`
-	BranchesAttempted int      `json:"branches_attempted"`
-	BranchesRouted    int      `json:"branches_routed"`
-	BranchesBlocked   int      `json:"branches_blocked"`
-	ContactMisses     int      `json:"contact_misses"`
-	GraphSplits       int      `json:"graph_splits"`
-	IssueCount        int      `json:"issue_count"`
-	ManagedNets       []string `json:"managed_nets,omitempty"`
+	GroupsPlanned       int      `json:"groups_planned"`
+	GroupsAttempted     int      `json:"groups_attempted"`
+	GroupsComplete      int      `json:"groups_complete"`
+	GroupsPartial       int      `json:"groups_partial"`
+	GroupsBlocked       int      `json:"groups_blocked"`
+	BranchesPlanned     int      `json:"branches_planned"`
+	BranchesAttempted   int      `json:"branches_attempted"`
+	BranchesRouted      int      `json:"branches_routed"`
+	BranchesBlocked     int      `json:"branches_blocked"`
+	ContactMisses       int      `json:"contact_misses"`
+	GraphSplits         int      `json:"graph_splits"`
+	IssueCount          int      `json:"issue_count"`
+	BlockingIssueCount  int      `json:"blocking_issue_count,omitempty"`
+	WarningIssueCount   int      `json:"warning_issue_count,omitempty"`
+	InfoIssueCount      int      `json:"info_issue_count,omitempty"`
+	FixedNetSkipNotices int      `json:"fixed_net_skip_notices,omitempty"`
+	ManagedNets         []string `json:"managed_nets,omitempty"`
 }
 
 type interBlockRouteTreeExecutionResult struct {
@@ -448,6 +452,7 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 	}
 	execution.Summary.ManagedNets = uniqueSortedInterBlockNets(execution.Summary.ManagedNets)
 	execution.Summary.IssueCount = len(execution.Issues)
+	execution.Summary.BlockingIssueCount, execution.Summary.WarningIssueCount, execution.Summary.InfoIssueCount, execution.Summary.FixedNetSkipNotices = routeTreeIssueCounters(execution.Issues)
 	return execution
 }
 
