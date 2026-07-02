@@ -133,6 +133,41 @@ func TestBuildOccupancyDoesNotBlockSameNetFixedCopper(t *testing.T) {
 	}
 }
 
+func TestBuildOccupancyDoesNotBlockSameNetGeneratedCopper(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 1
+	request.Existing = []ExistingCopper{{
+		Kind:     CopperSegment,
+		Net:      "SIG",
+		Layer:    "F.Cu",
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 8, YMM: 8}, Max: Point{XMM: 9, YMM: 9}}},
+	}}
+
+	occupancy := mustBuildOccupancy(t, request, "SIG")
+	if occupancy.BlockedCell(GridCoord{X: 8, Y: 8, Layer: 0}) {
+		t.Fatal("same-net generated copper should remain a legal merge target")
+	}
+}
+
+func TestBuildOccupancyBlocksOtherNetGeneratedCopper(t *testing.T) {
+	request := minimalRequest()
+	request.Rules.GridMM = 1
+	request.Existing = []ExistingCopper{{
+		Kind:     CopperSegment,
+		Net:      "OTHER",
+		Layer:    "F.Cu",
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 8, YMM: 8}, Max: Point{XMM: 9, YMM: 9}}},
+	}}
+
+	occupancy := mustBuildOccupancy(t, request, "SIG")
+	if !occupancy.BlockedCell(GridCoord{X: 8, Y: 8, Layer: 0}) {
+		t.Fatal("other-net generated copper should block occupancy")
+	}
+	if obstacle, ok := occupancy.FirstObstacle(GridCoord{X: 8, Y: 8, Layer: 0}); !ok || obstacle.Kind != ObstacleExistingCopper {
+		t.Fatalf("obstacle = %#v ok=%v, want existing copper", obstacle, ok)
+	}
+}
+
 func TestBuildOccupancyZonePolicies(t *testing.T) {
 	request := minimalRequest()
 	request.Rules.GridMM = 1

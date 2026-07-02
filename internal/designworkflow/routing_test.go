@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"sort"
+	"strings"
 	"testing"
 	"time"
 
@@ -423,6 +425,12 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 			t.Fatalf("blocked nets = %#v, want blockers tied to I2C nets", blockedNets)
 		}
 	}
+	branchPaths := routeTreeBranchIssuePathsByNet(result.Stage.Issues)
+	for _, net := range []string{"SDA", "VCC"} {
+		if len(branchPaths[net]) == 0 {
+			t.Fatalf("route-tree branch issue paths by net = %#v, want branch-scoped blocker for %s", branchPaths, net)
+		}
+	}
 }
 
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
@@ -479,6 +487,31 @@ func issueNetSet(issues []reports.Issue) map[string]bool {
 		}
 	}
 	return nets
+}
+
+func routeTreeBranchIssuePathsByNet(issues []reports.Issue) map[string][]string {
+	pathSets := map[string]map[string]struct{}{}
+	for _, issue := range issues {
+		if !strings.Contains(issue.Path, "design.inter_block_route_groups") || !strings.Contains(issue.Path, ".branches[") {
+			continue
+		}
+		for _, net := range issue.Nets {
+			if net != "" {
+				if pathSets[net] == nil {
+					pathSets[net] = map[string]struct{}{}
+				}
+				pathSets[net][issue.Path] = struct{}{}
+			}
+		}
+	}
+	paths := map[string][]string{}
+	for net, set := range pathSets {
+		for path := range set {
+			paths[net] = append(paths[net], path)
+		}
+		sort.Strings(paths[net])
+	}
+	return paths
 }
 
 // requireRouteOperationsForNet decodes every transaction route operation for a
