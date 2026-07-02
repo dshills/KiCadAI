@@ -49,6 +49,38 @@ func TestRouteInterBlockTreeBranchesRoutesThreeEndpointTree(t *testing.T) {
 	}
 }
 
+func TestRouteInterBlockTreeBranchesWithAccessReportsSelectedAccessPair(t *testing.T) {
+	group := routeTreeTestGroup("SIG",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+	)
+	tree := BuildInterBlockRouteTree(group, routeTreeTestTargets("SIG", map[string]transactions.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	}))
+	base := routeBranchTestRequest("SIG", map[string]routing.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	})
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "1", Net: "SIG", Layer: "F.Cu", XMM: 5, YMM: 5},
+		{EndpointID: "J1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "SIG", Layer: "F.Cu", XMM: 8, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "SIG", Layer: "F.Cu", XMM: 25, YMM: 5},
+	}
+
+	result := RouteInterBlockTreeBranchesWithAccess(context.Background(), base, group, tree, access)
+	if len(result.Branches) != 1 {
+		t.Fatalf("branches = %#v, want one", result.Branches)
+	}
+	branch := result.Branches[0]
+	if branch.Status != routing.StatusRouted || branch.AccessPairsTried == 0 {
+		t.Fatalf("branch = %#v, want routed access-driven branch evidence", branch)
+	}
+	if branch.SelectedSourceRole != RouteTreeAccessLocalRouteAnchor || branch.SelectedTargetRole != RouteTreeAccessTargetPad {
+		t.Fatalf("branch = %#v, want selected local-anchor to pad access roles", branch)
+	}
+}
+
 func TestRouteInterBlockTreeBranchesReportsMissingGroupEndpoint(t *testing.T) {
 	group := routeTreeTestGroup("SIG",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
@@ -231,7 +263,7 @@ func TestRouteTreeAccessBranchRequestRoutesSyntheticAccessPoints(t *testing.T) {
 		}},
 	}
 
-	request := routeTreeAccessBranchRequest(&base, "SIG", pair)
+	request := routeTreeAccessBranchRequest(base, "SIG", pair)
 	if len(base.Components) != 2 {
 		t.Fatalf("base components = %d, want unmodified base request", len(base.Components))
 	}
@@ -286,7 +318,7 @@ func TestRouteTreeAccessBranchRequestUsesMatchedNetNameForSyntheticPads(t *testi
 		Target: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{Net: "SIG", Layer: "F.Cu", XMM: 15, YMM: 5}},
 	}
 
-	request := routeTreeAccessBranchRequest(&base, "SIG", pair)
+	request := routeTreeAccessBranchRequest(base, "SIG", pair)
 	if request.Nets[0].Name != "sig" {
 		t.Fatalf("branch net name = %q, want matched canonical name", request.Nets[0].Name)
 	}

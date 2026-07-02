@@ -144,7 +144,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
 	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, localOperations)
 	issues = append(issues, routeTreeAccessIssues...)
-	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence)
+	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence, routeTreeAccess)
 	routingRequest.Nets = excludeManagedInterBlockNets(routingRequest.Nets, routeTreeExecution.Summary.ManagedNets)
 	issues = append(issues, targetEvidence.Issues...)
 	issues = append(issues, routeTreeExecution.Issues...)
@@ -397,7 +397,7 @@ func interBlockRouteTreeByNet(trees []InterBlockRouteTree) map[string]InterBlock
 	return byNet
 }
 
-func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, candidates []InterBlockRouteCandidate, targetEvidence InterBlockContactEvidence) interBlockRouteTreeExecutionResult {
+func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, candidates []InterBlockRouteCandidate, targetEvidence InterBlockContactEvidence, routeTreeAccess []RouteTreeEndpointAccess) interBlockRouteTreeExecutionResult {
 	groups, groupIssues := BuildInterBlockRouteGroups(candidates)
 	trees := BuildInterBlockRouteTrees(groups, targetEvidence)
 	groupByNet := interBlockRouteGroupByNet(groups)
@@ -421,7 +421,7 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 		execution.Summary.GroupsAttempted++
 		execution.Summary.BranchesPlanned += len(tree.Branches)
 		execution.Summary.ManagedNets = append(execution.Summary.ManagedNets, netName)
-		branchResult := RouteInterBlockTreeBranches(ctx, workingBase, group, tree)
+		branchResult := RouteInterBlockTreeBranchesWithAccess(ctx, workingBase, group, tree, routeTreeAccess)
 		execution.Operations = append(execution.Operations, branchResult.Operations...)
 		execution.Issues = append(execution.Issues, branchResult.Issues...)
 		workingBase.Existing = append(workingBase.Existing, branchResult.ExistingCopper...)

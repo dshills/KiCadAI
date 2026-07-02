@@ -36,15 +36,36 @@ type InterBlockBranchRoutingResult struct {
 }
 
 type InterBlockBranchRoutingEvidence struct {
-	BranchIndex     int            `json:"branch_index"`
-	StartEndpointID string         `json:"start_endpoint_id"`
-	EndEndpointID   string         `json:"end_endpoint_id"`
-	Status          routing.Status `json:"status"`
-	OperationCount  int            `json:"operation_count"`
-	IssueCount      int            `json:"issue_count"`
+	BranchIndex        int                         `json:"branch_index"`
+	StartEndpointID    string                      `json:"start_endpoint_id"`
+	EndEndpointID      string                      `json:"end_endpoint_id"`
+	Status             routing.Status              `json:"status"`
+	OperationCount     int                         `json:"operation_count"`
+	IssueCount         int                         `json:"issue_count"`
+	AccessPairsTried   int                         `json:"access_pairs_tried,omitempty"`
+	SelectedSourceRole RouteTreeEndpointAccessRole `json:"selected_source_role,omitempty"`
+	SelectedTargetRole RouteTreeEndpointAccessRole `json:"selected_target_role,omitempty"`
+}
+
+type routeTreeAccessCandidateCache map[routeTreeAccessCandidateCacheKey][]routeTreeBranchAccessCandidate
+
+type routeTreeAccessCandidateCacheKey struct {
+	endpointID       string
+	netName          string
+	oppositeRole     RouteTreeEndpointAccessRole
+	oppositeEndpoint string
+	oppositeRef      string
+	oppositePad      string
+	oppositeLayer    string
+	oppositeXMicron  int64
+	oppositeYMicron  int64
 }
 
 func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, group InterBlockRouteGroup, tree InterBlockRouteTree) InterBlockBranchRoutingResult {
+	return RouteInterBlockTreeBranchesWithAccess(ctx, base, group, tree, nil)
+}
+
+func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Request, group InterBlockRouteGroup, tree InterBlockRouteTree, access []RouteTreeEndpointAccess) InterBlockBranchRoutingResult {
 	result := InterBlockBranchRoutingResult{NetName: tree.NetName}
 	result.Branches = make([]InterBlockBranchRoutingEvidence, 0, len(tree.Branches))
 	endpoints := interBlockRouteGroupEndpointsByID(group)
@@ -53,6 +74,7 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 	currentExisting := make([]routing.ExistingCopper, 0, len(base.Existing)+len(tree.Branches)*routeBranchExistingCopperCapacityPerBranch)
 	currentExisting = append(currentExisting, base.Existing...)
 	orderedBranches := routeTreeBranchesForRouting(tree.Branches)
+	accessCandidateCache := routeTreeAccessCandidateCache{}
 	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{
 			BranchIndex:     branch.Index,
@@ -93,24 +115,14 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 			result.Branches = append(result.Branches, evidence)
 			continue
 		}
-		branchNet := routing.Net{
-			Name: tree.NetName,
-			Endpoints: []routing.Endpoint{
-				{Ref: start.Ref, Pin: start.Pin},
-				{Ref: end.Ref, Pin: end.Pin},
-			},
+		branchBase := base
+		branchBase.Existing = currentExisting
+		branchResult, selectedPair, selectedPairOK, accessPairsTried := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, access, accessCandidateCache)
+		evidence.AccessPairsTried = accessPairsTried
+		if selectedPairOK {
+			evidence.SelectedSourceRole = selectedPair.Source.Access.Role
+			evidence.SelectedTargetRole = selectedPair.Target.Access.Role
 		}
-		branchRequest := routing.Request{
-			Board:      base.Board,
-			Components: base.Components,
-			Obstacles:  base.Obstacles,
-			Existing:   currentExisting,
-			Nets:       []routing.Net{branchNet},
-			Rules:      base.Rules,
-			Strategy:   base.Strategy,
-			Seed:       base.Seed,
-		}
-		branchResult := routing.RouteRequestContext(ctx, branchRequest)
 		branchOperations := transactionRouteOperations(branchResult.Operations)
 		branchExisting := existingCopperFromRoutedBranches(branchResult.Routes, defaultLayer, rules)
 		branchIssues := annotateInterBlockBranchRoutingIssues(branchResult.Issues, tree.NetName, branch)
@@ -126,30 +138,111 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 	return result
 }
 
-func routeTreeAccessBranchRequest(base *routing.Request, netName string, pair routeTreeBranchAccessPair) routing.Request {
-	baseRequest := routing.Request{}
-	defaultLayer := routing.DefaultRules().PreferLayer
-	if base != nil {
-		baseRequest = *base
-		defaultLayer = routeBranchDefaultLayer(baseRequest.Board)
+func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName string, branch InterBlockRouteTreeBranch, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint, access []RouteTreeEndpointAccess, cache routeTreeAccessCandidateCache) (routing.Result, routeTreeBranchAccessPair, bool, int) {
+	pairs := routeTreeBranchAccessPairsForBranch(access, netName, branch, cache)
+	if len(pairs) == 0 {
+		return routing.RouteRequestContext(ctx, routeTreeEndpointBranchRequest(base, netName, start, end)), routeTreeBranchAccessPair{}, false, 0
 	}
+	var lastResult routing.Result
+	for index := range pairs {
+		if ctx != nil && ctx.Err() != nil {
+			return routing.RouteRequestContext(ctx, routeTreeAccessBranchRequest(base, netName, pairs[index])), routeTreeBranchAccessPair{}, false, index
+		}
+		pair := pairs[index]
+		result := routing.RouteRequestContext(ctx, routeTreeAccessBranchRequest(base, netName, pair))
+		lastResult = result
+		if result.Status == routing.StatusRouted {
+			return result, pair, true, index + 1
+		}
+	}
+	return lastResult, routeTreeBranchAccessPair{}, false, len(pairs)
+}
+
+func routeTreeAccessBranchRequest(base routing.Request, netName string, pair routeTreeBranchAccessPair) routing.Request {
+	defaultLayer := routeBranchDefaultLayer(base.Board)
 	sourceRef := routeTreeSyntheticAccessRef("SRC", pair.Rank)
 	targetRef := routeTreeSyntheticAccessRef("DST", pair.Rank)
 	endpoints := []routing.Endpoint{
 		{Ref: sourceRef, Pin: "1"},
 		{Ref: targetRef, Pin: "1"},
 	}
-	request := baseRequest
+	request := base
 	// This helper only appends synthetic components and replaces Nets. The
 	// router clones and normalizes the full request before pathfinding.
-	request.Components = append([]routing.Component(nil), baseRequest.Components...)
-	branchNet, branchNets := routeTreeAccessBranchNetSet(baseRequest.Nets, netName, endpoints)
+	request.Components = make([]routing.Component, 0, len(base.Components)+2)
+	request.Components = append(request.Components, base.Components...)
+	branchNet, branchNets := routeTreeAccessBranchNetSet(base.Nets, netName, endpoints)
 	request.Nets = branchNets
 	request.Components = append(request.Components,
 		routeTreeSyntheticAccessComponent(sourceRef, branchNet.Name, pair.Source.Access, defaultLayer),
 		routeTreeSyntheticAccessComponent(targetRef, branchNet.Name, pair.Target.Access, defaultLayer),
 	)
 	return request
+}
+
+func routeTreeBranchAccessPairsForBranch(access []RouteTreeEndpointAccess, netName string, branch InterBlockRouteTreeBranch, cache routeTreeAccessCandidateCache) []routeTreeBranchAccessPair {
+	sourceOpposite := routeTreeFirstAccessForEndpoint(access, branch.EndEndpointID, netName, cache)
+	targetOpposite := routeTreeFirstAccessForEndpoint(access, branch.StartEndpointID, netName, cache)
+	sourceCandidates := routeTreeCachedAccessCandidates(cache, access, branch.StartEndpointID, netName, sourceOpposite)
+	targetCandidates := routeTreeCachedAccessCandidates(cache, access, branch.EndEndpointID, netName, targetOpposite)
+	return routeTreeBranchAccessPairs(sourceCandidates, targetCandidates, routeTreeBranchAccessPairLimit)
+}
+
+func routeTreeCachedAccessCandidates(cache routeTreeAccessCandidateCache, access []RouteTreeEndpointAccess, endpointID string, netName string, opposite RouteTreeEndpointAccess) []routeTreeBranchAccessCandidate {
+	if cache == nil {
+		return routeTreeAccessCandidatesForEndpoint(access, endpointID, netName, opposite)
+	}
+	key := routeTreeAccessCandidateCacheKeyFor(endpointID, netName, opposite)
+	if candidates, ok := cache[key]; ok {
+		return append([]routeTreeBranchAccessCandidate(nil), candidates...)
+	}
+	candidates := routeTreeAccessCandidatesForEndpoint(access, endpointID, netName, opposite)
+	cache[key] = append([]routeTreeBranchAccessCandidate(nil), candidates...)
+	return candidates
+}
+
+func routeTreeAccessCandidateCacheKeyFor(endpointID string, netName string, opposite RouteTreeEndpointAccess) routeTreeAccessCandidateCacheKey {
+	return routeTreeAccessCandidateCacheKey{
+		endpointID:       strings.TrimSpace(endpointID),
+		netName:          strings.TrimSpace(netName),
+		oppositeRole:     opposite.Role,
+		oppositeEndpoint: opposite.EndpointID,
+		oppositeRef:      opposite.Ref,
+		oppositePad:      opposite.Pad,
+		oppositeLayer:    opposite.Layer,
+		oppositeXMicron:  routeTreeMicronKey(opposite.XMM),
+		oppositeYMicron:  routeTreeMicronKey(opposite.YMM),
+	}
+}
+
+func routeTreeEndpointBranchRequest(base routing.Request, netName string, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint) routing.Request {
+	branchNet := routeTreeEndpointBranchNet(base.Nets, netName, []routing.Endpoint{
+		{Ref: start.Ref, Pin: start.Pin},
+		{Ref: end.Ref, Pin: end.Pin},
+	})
+	return routing.Request{
+		Board:      base.Board,
+		Components: base.Components,
+		Obstacles:  base.Obstacles,
+		Existing:   base.Existing,
+		Nets:       []routing.Net{branchNet},
+		Rules:      base.Rules,
+		Strategy:   base.Strategy,
+		Seed:       base.Seed,
+	}
+}
+
+func routeTreeEndpointBranchNet(nets []routing.Net, netName string, endpoints []routing.Endpoint) routing.Net {
+	branchNet, _ := routeTreeAccessBranchNetSet(nets, netName, endpoints)
+	return branchNet
+}
+
+func routeTreeFirstAccessForEndpoint(access []RouteTreeEndpointAccess, endpointID string, netName string, cache routeTreeAccessCandidateCache) RouteTreeEndpointAccess {
+	candidates := routeTreeCachedAccessCandidates(cache, access, endpointID, netName, RouteTreeEndpointAccess{})
+	if len(candidates) == 0 {
+		return RouteTreeEndpointAccess{}
+	}
+	return candidates[0].Access
 }
 
 func routeTreeAccessBranchNetSet(nets []routing.Net, netName string, endpoints []routing.Endpoint) (routing.Net, []routing.Net) {
