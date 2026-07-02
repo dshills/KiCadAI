@@ -31,6 +31,9 @@ type Operation struct {
 	Raw   json.RawMessage `json:"-"`
 	Ref   string          `json:"-"`
 	Net   string          `json:"-"`
+	// SnapExempt is in-memory routing-stage metadata. It is set and consumed
+	// during a single RoutePlacement call before operations are serialized.
+	SnapExempt bool `json:"-"`
 }
 
 func (tx Transaction) Clone() Transaction {

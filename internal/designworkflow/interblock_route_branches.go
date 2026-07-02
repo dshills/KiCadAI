@@ -118,14 +118,22 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		branchBase := base
 		branchBase.Existing = currentExisting
 		branchResult, selectedPair, selectedPairOK, accessPairsTried := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, access, accessCandidateCache)
+		accessSelected := selectedPairOK
 		evidence.AccessPairsTried = accessPairsTried
-		if selectedPairOK {
+		if accessSelected {
 			evidence.SelectedSourceRole = selectedPair.Source.Access.Role
 			evidence.SelectedTargetRole = selectedPair.Target.Access.Role
 		}
 		branchOperations := transactionRouteOperations(branchResult.Operations)
 		branchExisting := existingCopperFromRoutedBranches(branchResult.Routes, defaultLayer, rules)
 		branchIssues := annotateInterBlockBranchRoutingIssues(branchResult.Issues, tree.NetName, branch)
+		if accessSelected {
+			for index := range branchOperations {
+				if branchOperations[index].Op == transactions.OpRoute {
+					branchOperations[index].SnapExempt = true
+				}
+			}
+		}
 		result.Operations = append(result.Operations, branchOperations...)
 		result.ExistingCopper = append(result.ExistingCopper, branchExisting...)
 		result.Issues = append(result.Issues, branchIssues...)

@@ -887,6 +887,9 @@ func snapInterBlockRouteEndpoints(candidates []InterBlockRouteCandidate, operati
 	}
 	out := append([]transactions.Operation(nil), operations...)
 	for index, operation := range out {
+		if operation.SnapExempt {
+			continue
+		}
 		if operation.Op != transactions.OpRoute {
 			continue
 		}
