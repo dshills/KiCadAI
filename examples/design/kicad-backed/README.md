@@ -45,7 +45,7 @@ kicadai \
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `candidate` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment, routed inter-block endpoint contact evidence, and candidate promotion coverage. |
-| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, and route-tree repair retry; current blockers are selected-attempt VCC/SDA graph splits plus VCC/GND pathfinding gaps with 10/12 required contacts proven. |
+| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, and route-tree repair retry; current blockers are selected-attempt VCC/SDA graph splits plus VCC/GND pathfinding gaps with 9/12 required contacts proven after failed-route branches are excluded. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft amplifier seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, output DC-blocking/protection realization, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
 ## Interpreting Results
@@ -72,16 +72,15 @@ multi-endpoint VCC/GND/SDA/SCL nets, including managed nets, planned branches,
 attempted branches, proven endpoints, graph components, and group completion
 counts. The current run keeps the fixture in `expected_fail`: route-tree
 execution owns the four I2C nets, route-tree repair emits retry hints, and
-bounded placement retry selects attempt 2 after improving route-tree proven
-endpoint evidence. Route-tree contact graph evidence now reports three complete
-contact-graph groups, one partial contact-graph group, local-route merge
-evidence, and 11 of 12 required contacts proven. The current selected attempt
-narrows the remaining blocker to VCC: one `ROUTE_GRAPH_INCOMPLETE` contact proof
-plus two VCC branch-scoped no-legal-two-layer-path blockers. Route-tree
+bounded placement retry selects attempt 2 after improving route-tree routed
+branch evidence. Route-tree contact graph evidence now reports one complete
+contact-graph group, three partial contact-graph groups, local-route merge
+evidence, and 9 of 12 required contacts proven after failed-route branches are
+excluded from contact proof. The current selected attempt reports VCC/SDA graph
+splits plus VCC/GND branch-scoped no-legal-two-layer-path blockers. Route-tree
 diagnostics also separate fixed-net preservation notices and missing-net-class
-warnings from repairable blockers, so `route_tree_repair` reports three VCC
-failures instead of broad fixed-net noise. The next layout-quality blockers are
-final VCC route-tree branch path completion, full inter-block routing coverage
+warnings from repairable blockers. The next layout-quality blockers are
+route-tree branch path completion, full inter-block routing coverage
 for richer boards, and KiCad ERC/DRC-clean evidence.
 
 Promotion gates currently include metadata, stages, writer correctness,

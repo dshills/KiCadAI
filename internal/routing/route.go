@@ -171,8 +171,10 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	operations, operationIssues := OperationsFromResultWithIssues(result)
 	result.Operations = operations
 	if len(operationIssues) != 0 {
-		result.Issues = append(result.Issues, operationIssues...)
-		if result.Status == StatusRouted {
+		seenIssues := map[issueKey]struct{}{}
+		result.Issues = appendUniqueIssues(nil, result.Issues, seenIssues)
+		result.Issues = appendUniqueIssues(result.Issues, operationIssues, seenIssues)
+		if result.Status == StatusRouted && reports.HasBlockingIssue(operationIssues) {
 			result.Status = StatusBlocked
 		}
 	}

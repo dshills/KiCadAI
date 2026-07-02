@@ -59,11 +59,11 @@ ranks pad and local-route access candidates, tries bounded access pairs, keeps
 access-selected route endpoints out of post-route pad snapping, and records
 selected access roles in branch evidence. Route-tree contact graph evidence now
 includes local-route and same-net copper merge anchors. The I2C fixture
-currently proves 10 of 12 required contacts across local-route and inter-block
-graph operations, but remains expected-fail with VCC/SDA graph splits plus
-VCC/GND branch pathfinding blockers. Route-tree repair classifies branch and
-contact blockers, feeds repairable hints into bounded placement retry, and
-ranks selected attempts by route-tree completion evidence. Route-tree
+currently proves 9 of 12 required contacts after failed route branches are
+excluded from contact proof, but remains expected-fail with VCC/SDA graph
+splits plus VCC/GND branch pathfinding blockers. Route-tree repair classifies
+branch and contact blockers, feeds repairable hints into bounded placement
+retry, and ranks selected attempts by route-tree completion evidence. Route-tree
 diagnostics now separate fixed-net skip notices and missing-net-class warnings
 from repairable blockers. The next blocker is completing route-tree branch
 pathfinding/contact graph proof for richer generated boards before KiCad

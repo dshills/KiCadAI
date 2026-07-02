@@ -470,20 +470,21 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 		}
 	}
 	// These exact counts intentionally freeze the current access-driven routing
-	// gap: access/contact graph evidence exists, but branch execution is not
-	// fully using it yet. Later phases should update this baseline when the
-	// router proves more endpoints or completes the partial group.
-	if contactGraph.ProvenEndpoints != 11 || contactGraph.CompleteGroups != 3 || contactGraph.PartialGroups != 1 {
-		t.Fatalf("contact graph = %#v, want 11 proven endpoints, 3 complete groups, 1 partial group", contactGraph)
+	// gap after failed route branches stopped contributing contact evidence:
+	// access/contact graph evidence exists, but branch execution is not fully
+	// using it yet. Later phases should update this baseline when the router
+	// proves more endpoints or completes the partial groups.
+	if contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
+		t.Fatalf("contact graph = %#v, want 9 proven endpoints, 1 complete group, 3 partial groups", contactGraph)
 	}
 	if retry.Attempts != 2 || retry.Applied != 1 || len(retry.AttemptHistory) != 2 {
 		t.Fatalf("retry = %#v, want one bounded retry attempt", retry)
 	}
-	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 11 || !retry.AttemptHistory[0].Selected {
-		t.Fatalf("retry history = %#v, want selected initial 11-endpoint baseline", retry.AttemptHistory)
+	if retry.AttemptHistory[0].Selected {
+		t.Fatalf("retry history = %#v, want initial failed-route-filtered attempt to remain unselected", retry.AttemptHistory)
 	}
-	if retry.AttemptHistory[1].Selected {
-		t.Fatalf("retry history = %#v, want exploratory retry to remain unselected", retry.AttemptHistory)
+	if retry.AttemptHistory[1].RouteTreeProvenEndpoints != 9 || retry.AttemptHistory[1].RouteTreeBranchesRouted != 6 || !retry.AttemptHistory[1].Selected {
+		t.Fatalf("retry history = %#v, want second attempt selected by routed route-tree branch count", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
 	if len(branchPaths["VCC"]) == 0 || len(branchPaths["SDA"]) != 0 || len(branchPaths["SCL"]) != 0 {
@@ -502,8 +503,8 @@ func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
 		t.Fatalf("stages = %#v, want routing stage", result.Stages)
 	}
 	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
-	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 11 || contactGraph.CompleteGroups != 3 || contactGraph.PartialGroups != 1 {
-		t.Fatalf("contact graph = %#v, want required=12 proven=11 complete=3 partial=1 VCC proof-gap baseline", contactGraph)
+	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
+		t.Fatalf("contact graph = %#v, want required=12 proven=9 complete=1 partial=3 failed-route-filtered baseline", contactGraph)
 	}
 	repair := requireRouteTreeRepairSummary(t, routingStage)
 	if !stringSliceContains(repair.Nets, "VCC") {

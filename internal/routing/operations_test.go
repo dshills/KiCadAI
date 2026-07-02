@@ -4,11 +4,14 @@ import (
 	"encoding/json"
 	"math"
 	"testing"
+
+	"kicadai/internal/reports"
 )
 
 func TestOperationsFromResultEmitsSegmentsAndViasInOrder(t *testing.T) {
 	result := Result{Routes: []Route{{
-		Net: "SIG",
+		Net:    "SIG",
+		Status: RouteStatusRouted,
 		Segments: []Segment{{
 			Net: "SIG", Layer: "F.CU", Start: Point{XMM: 1, YMM: 2}, End: Point{XMM: 3, YMM: 2}, WidthMM: 0.2,
 		}},
@@ -39,7 +42,8 @@ func TestOperationsFromResultEmitsSegmentsAndViasInOrder(t *testing.T) {
 
 func TestOperationsFromResultSkipsInvalidFloatPayload(t *testing.T) {
 	result := Result{Routes: []Route{{
-		Net: "SIG",
+		Net:    "SIG",
+		Status: RouteStatusRouted,
 		Segments: []Segment{{
 			Net: "SIG", Layer: "F.CU", Start: Point{XMM: math.NaN(), YMM: 2}, End: Point{XMM: 3, YMM: 2}, WidthMM: 0.2,
 		}},
@@ -54,9 +58,46 @@ func TestOperationsFromResultSkipsInvalidFloatPayload(t *testing.T) {
 	}
 }
 
+func TestOperationsFromResultSkipsFailedRoutes(t *testing.T) {
+	result := Result{Routes: []Route{
+		{
+			Net:    "OK",
+			Status: RouteStatusRouted,
+			Segments: []Segment{{
+				Net: "OK", Layer: "F.CU", Start: Point{XMM: 1, YMM: 2}, End: Point{XMM: 3, YMM: 2}, WidthMM: 0.2,
+			}},
+		},
+		{
+			Net:    "FAIL",
+			Status: RouteStatusFailed,
+			Issues: []reports.Issue{{
+				Code:     reports.CodeValidationFailed,
+				Severity: reports.SeverityBlocked,
+				Message:  "route failed",
+			}},
+			Segments: []Segment{{
+				Net: "FAIL", Layer: "F.CU", Start: Point{XMM: 4, YMM: 2}, End: Point{XMM: 6, YMM: 2}, WidthMM: 0.2,
+			}},
+		},
+	}}
+
+	operations := OperationsFromResult(result)
+	if len(operations) != 1 {
+		t.Fatalf("operations = %#v, want only routed route operation", operations)
+	}
+	var payload RouteOperation
+	if err := json.Unmarshal(operations[0].Raw, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.NetName != "OK" {
+		t.Fatalf("payload = %#v, want OK route only", payload)
+	}
+}
+
 func TestOperationsFromResultGroupsContiguousSegments(t *testing.T) {
 	result := Result{Routes: []Route{{
-		Net: "SIG",
+		Net:    "SIG",
+		Status: RouteStatusRouted,
 		Segments: []Segment{
 			{Net: "SIG", Layer: "F.CU", Start: Point{XMM: 1, YMM: 1}, End: Point{XMM: 2, YMM: 1}, WidthMM: 0.2},
 			{Net: "SIG", Layer: "F.CU", Start: Point{XMM: 2, YMM: 1}, End: Point{XMM: 3, YMM: 1}, WidthMM: 0.2},

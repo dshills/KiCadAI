@@ -218,9 +218,9 @@ loop confidence:
   anchors, required/proven endpoints, and graph group completion evidence.
   Route-tree repair classifies branch/contact failures, emits repairable
   hints, feeds bounded placement retry, and selects attempts using route-tree
-  completion evidence. The latest selected attempt proves 10 of 12 required
-  contacts across local-route and inter-block graph operations, but all four
-  route-tree-managed groups remain blocked at branch execution. The current
+  completion evidence. The latest selected attempt proves 9 of 12 required
+  contacts after failed route branches are excluded from contact proof, with
+  one complete route-tree contact group and three partial groups. The current
   selected-attempt blockers are VCC/SDA same-net graph splits plus VCC/GND
   branch-scoped pathfinding blockers. Route-tree diagnostics now separate
   fixed-net skip notices and missing-net-class warnings from repairable

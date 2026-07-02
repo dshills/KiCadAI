@@ -91,6 +91,7 @@ func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess
 	for _, coord := range path {
 		points = append(points, occupancy.Grid.ToPoint(coord))
 	}
+	points = alignPathEndpointsToAccess(points, access, occupancy.Grid, pair, path)
 	return GridPath{
 		Net:            netName,
 		Layer:          normalizedLayer,
@@ -168,6 +169,7 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 	for _, coord := range path {
 		points = append(points, occupancy.Grid.ToPoint(coord))
 	}
+	points = alignPathEndpointsToAccess(points, access, occupancy.Grid, pair, path)
 	return GridPath{
 		Net:            netName,
 		Layer:          layerNames[path[0].Layer],
@@ -177,6 +179,70 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 		SearchNodes:    searchNodes,
 		SearchLimitHit: searchNodes >= rules.MaxSearchNodes,
 	}, nil
+}
+
+func alignPathEndpointsToAccess(points []Point, access PadAccess, grid Grid, pair EndpointPair, path []GridCoord) []Point {
+	if len(points) == 0 || len(points) != len(path) {
+		return points
+	}
+	lastIndex := len(path) - 1
+	directStart, directStartOK := accessPointForPathCoord(access, grid, pair.From, path[0], points[0])
+	directEnd, directEndOK := accessPointForPathCoord(access, grid, pair.To, path[lastIndex], points[lastIndex])
+	swappedStart, swappedStartOK := accessPointForPathCoord(access, grid, pair.To, path[0], points[0])
+	swappedEnd, swappedEndOK := accessPointForPathCoord(access, grid, pair.From, path[lastIndex], points[lastIndex])
+	directOK := directStartOK && directEndOK
+	swappedOK := swappedStartOK && swappedEndOK
+	directScore := math.Inf(1)
+	if directOK {
+		directScore = pointDistance(points[0], directStart) + pointDistance(points[lastIndex], directEnd)
+	}
+	swappedScore := math.Inf(1)
+	if swappedOK {
+		swappedScore = pointDistance(points[0], swappedStart) + pointDistance(points[lastIndex], swappedEnd)
+	}
+	if swappedOK && (!directOK || swappedScore < directScore) {
+		reverseGridPath(points, path)
+		points[0] = swappedEnd
+		points[lastIndex] = swappedStart
+		return points
+	}
+	if directStartOK {
+		points[0] = directStart
+	}
+	if directEndOK {
+		points[lastIndex] = directEnd
+	}
+	return points
+}
+
+// reverseGridPath mutates both slices so GridPath.Points and GridPath.Coordinates
+// stay in the same endpoint order when alignment detects a swapped path.
+func reverseGridPath(points []Point, path []GridCoord) {
+	for left, right := 0, len(points)-1; left < right; left, right = left+1, right-1 {
+		points[left], points[right] = points[right], points[left]
+		path[left], path[right] = path[right], path[left]
+	}
+}
+
+func accessPointForPathCoord(access PadAccess, grid Grid, endpoint Endpoint, coord GridCoord, preferred Point) (Point, bool) {
+	points, ok := AccessPointsForEndpoint(access, endpoint)
+	if !ok {
+		return Point{}, false
+	}
+	var best Point
+	bestDistance := math.Inf(1)
+	found := false
+	for _, candidate := range points {
+		if grid.ToGrid(candidate.Point, coord.Layer) == coord {
+			distance := pointDistance(candidate.Point, preferred)
+			if !found || distance < bestDistance {
+				best = candidate.Point
+				bestDistance = distance
+				found = true
+			}
+		}
+	}
+	return best, found
 }
 
 func astarSearch(ctx context.Context, occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool, bool) {

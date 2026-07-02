@@ -3,6 +3,9 @@ package routing
 import (
 	"encoding/json"
 	"math"
+	"sort"
+	"strconv"
+	"strings"
 
 	"kicadai/internal/reports"
 )
@@ -17,7 +20,12 @@ func OperationsFromResult(result Result) []Operation {
 func OperationsFromResultWithIssues(result Result) ([]Operation, []reports.Issue) {
 	operations := make([]Operation, 0, len(result.Routes))
 	issues := make([]reports.Issue, 0)
+	seenIssues := map[issueKey]struct{}{}
 	for _, route := range result.Routes {
+		issues = appendUniqueIssues(issues, route.Issues, seenIssues)
+		if !routeEligibleForOperations(route) {
+			continue
+		}
 		for _, group := range segmentOperationGroups(route.Segments) {
 			payload := RouteOperation{
 				Op:      routeOperationName,
@@ -29,7 +37,8 @@ func OperationsFromResultWithIssues(result Result) ([]Operation, []reports.Issue
 			if operation, ok := routeOperation(payload); ok {
 				operations = append(operations, operation)
 			} else {
-				issues = append(issues, operationIssue(route.Net, "route segment operation contains invalid numeric values"))
+				issue := operationIssue(route.Net, "route segment operation contains invalid numeric values")
+				issues = appendUniqueIssues(issues, []reports.Issue{issue}, seenIssues)
 			}
 		}
 		if len(route.Vias) != 0 {
@@ -49,11 +58,77 @@ func OperationsFromResultWithIssues(result Result) ([]Operation, []reports.Issue
 			if operation, ok := routeOperation(payload); ok {
 				operations = append(operations, operation)
 			} else {
-				issues = append(issues, operationIssue(route.Net, "route via operation contains invalid numeric values"))
+				issue := operationIssue(route.Net, "route via operation contains invalid numeric values")
+				issues = appendUniqueIssues(issues, []reports.Issue{issue}, seenIssues)
 			}
 		}
 	}
 	return operations, issues
+}
+
+type issueKey struct {
+	Code        reports.Code
+	Severity    reports.Severity
+	Path        string
+	Message     string
+	UUIDs       string
+	Refs        string
+	Nets        string
+	Suggestion  string
+	OperationID string
+}
+
+func appendUniqueIssues(out []reports.Issue, issues []reports.Issue, seen map[issueKey]struct{}) []reports.Issue {
+	for _, issue := range issues {
+		key := newIssueKey(issue)
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, issue)
+	}
+	return out
+}
+
+func newIssueKey(issue reports.Issue) issueKey {
+	return issueKey{
+		Code:        issue.Code,
+		Severity:    issue.Severity,
+		Path:        issue.Path,
+		Message:     issue.Message,
+		UUIDs:       issueKeySlice(issue.UUIDs),
+		Refs:        issueKeySlice(issue.Refs),
+		Nets:        issueKeySlice(issue.Nets),
+		Suggestion:  issue.Suggestion,
+		OperationID: issue.OperationID,
+	}
+}
+
+func issueKeySlice(values []string) string {
+	switch len(values) {
+	case 0:
+		return ""
+	case 1:
+		return issueKeyPart(values[0])
+	}
+	out := append([]string(nil), values...)
+	sort.Strings(out)
+	var builder strings.Builder
+	for _, value := range out {
+		builder.WriteString(issueKeyPart(value))
+	}
+	return builder.String()
+}
+
+func issueKeyPart(value string) string {
+	return strconv.Itoa(len(value)) + ":" + value + ";"
+}
+
+func routeEligibleForOperations(route Route) bool {
+	if reports.HasBlockingIssue(route.Issues) {
+		return false
+	}
+	return route.Status == RouteStatusRouted
 }
 
 type segmentOperationGroup struct {

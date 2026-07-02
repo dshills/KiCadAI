@@ -127,12 +127,12 @@ nets. It reports required/proven endpoint counts, graph component counts,
 complete/partial/blocked group counts, and same-net/local-route merge evidence.
 This graph evidence lets generated block-local routes participate in
 route-tree contact proof without inflating inter-block emitted-segment counts.
-The I2C fixture currently proves 10 of 12 required endpoint contacts across
-local-route and inter-block graph operations. It remains an `expected_fail`
-fixture because the latest selected attempt still has VCC/SDA same-net graph
-splits plus VCC/GND branch-scoped `no legal two-layer path` blockers after
-bounded retry; all four route-tree-managed groups are still blocked at branch
-execution. Fixed-net skip notices and missing-net-class warnings are reported
+The I2C fixture currently proves 9 of 12 required endpoint contacts after
+failed route branches are excluded from contact proof. It remains an
+`expected_fail` fixture because the latest selected retry attempt still has
+VCC/SDA same-net graph splits plus VCC/GND branch-scoped `no legal two-layer
+path` blockers after bounded retry; one route-tree group is complete and three
+are partial. Fixed-net skip notices and missing-net-class warnings are reported
 separately and do not inflate `route_tree_repair.branch_failures`.
 
 Placement is still a deterministic heuristic, not a production-grade constraint

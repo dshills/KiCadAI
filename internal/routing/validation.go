@@ -189,27 +189,193 @@ func pointKey(point Point, layer string) string {
 }
 
 func clearanceIssues(routes []Route, clearanceMM float64) []reports.Issue {
+	segments := clearanceSegments(routes)
+	if len(segments) < 2 {
+		return nil
+	}
+	maxHalfWidth := 0.0
+	for _, candidate := range segments {
+		maxHalfWidth = max(maxHalfWidth, candidate.Segment.WidthMM/2)
+	}
+	cellSize := clearanceIndexCellSize(clearanceMM)
+	index := clearanceSpatialIndex(segments, cellSize)
+	scratch := newClearanceQueryScratch(len(segments))
 	issues := []reports.Issue{}
-	for leftIndex, leftRoute := range routes {
-		for _, left := range leftRoute.Segments {
-			for rightIndex := leftIndex + 1; rightIndex < len(routes); rightIndex++ {
-				rightRoute := routes[rightIndex]
-				for _, right := range rightRoute.Segments {
-					if normalizeLayer(left.Layer) != normalizeLayer(right.Layer) {
-						continue
-					}
-					copperClearance := segmentDistance(left, right) - left.WidthMM/2 - right.WidthMM/2
-					if copperClearance < clearanceMM {
-						issues = append(issues, routeValidationIssue(leftRoute.Net, reports.CodeValidationFailed, "segment clearance violation with net "+rightRoute.Net))
-					}
-				}
+	for leftIndex, left := range segments {
+		queryMargin := clearanceMM + left.Segment.WidthMM/2 + maxHalfWidth
+		for _, rightIndex := range index.query(left.Layer, left.Segment, queryMargin, scratch) {
+			if rightIndex <= leftIndex {
+				continue
+			}
+			right := segments[rightIndex]
+			if left.Net == right.Net {
+				continue
+			}
+			requiredGap := clearanceMM + left.Segment.WidthMM/2 + right.Segment.WidthMM/2
+			if !segmentBoundsWithin(left.Segment, right.Segment, requiredGap) {
+				continue
+			}
+			copperClearance := segmentDistance(left.Segment, right.Segment) - left.Segment.WidthMM/2 - right.Segment.WidthMM/2
+			if copperClearance < clearanceMM {
+				issues = append(issues, routeValidationIssue(left.Net, reports.CodeValidationFailed, "segment clearance violation with net "+right.Net))
 			}
 		}
 	}
 	return issues
 }
 
+func clearanceIndexCellSize(clearanceMM float64) float64 {
+	cellSize := max(clearanceMM, 0.25)
+	return min(cellSize, 2.54)
+}
+
+type clearanceSegment struct {
+	Net     string
+	Layer   string
+	Segment Segment
+}
+
+type clearanceGridIndex struct {
+	cellSize float64
+	cells    map[clearanceCellKey][]int
+}
+
+type clearanceQueryScratch struct {
+	marks          []int
+	generation     int
+	cellMarks      map[clearanceCellKey]int
+	cellGeneration int
+	out            []int
+}
+
+const maxClearanceQueryGeneration = int(^uint(0) >> 1)
+
+type clearanceCellKey struct {
+	Layer string
+	X     int
+	Y     int
+}
+
+func clearanceSegments(routes []Route) []clearanceSegment {
+	var out []clearanceSegment
+	for _, route := range routes {
+		for _, segment := range route.Segments {
+			out = append(out, clearanceSegment{
+				Net:     route.Net,
+				Layer:   normalizeLayer(segment.Layer),
+				Segment: segment,
+			})
+		}
+	}
+	return out
+}
+
+func clearanceSpatialIndex(segments []clearanceSegment, cellSize float64) clearanceGridIndex {
+	index := clearanceGridIndex{cellSize: cellSize, cells: map[clearanceCellKey][]int{}}
+	for segmentIndex, segment := range segments {
+		index.addSegment(segmentIndex, segment.Layer, segment.Segment)
+	}
+	return index
+}
+
+func newClearanceQueryScratch(segmentCount int) *clearanceQueryScratch {
+	return &clearanceQueryScratch{
+		marks:     make([]int, segmentCount),
+		cellMarks: map[clearanceCellKey]int{},
+	}
+}
+
+func (scratch *clearanceQueryScratch) nextGeneration() {
+	if scratch.generation == maxClearanceQueryGeneration {
+		for i := range scratch.marks {
+			scratch.marks[i] = 0
+		}
+		scratch.generation = 0
+	}
+	scratch.generation++
+}
+
+func (scratch *clearanceQueryScratch) nextCellGeneration() {
+	if scratch.cellGeneration == maxClearanceQueryGeneration {
+		clear(scratch.cellMarks)
+		scratch.cellGeneration = 0
+	}
+	scratch.cellGeneration++
+}
+
+func (index clearanceGridIndex) addSegment(segmentIndex int, layer string, segment Segment) {
+	index.forEachSegmentCell(segment, 0, func(key clearanceCellKey) {
+		key.Layer = layer
+		index.cells[key] = append(index.cells[key], segmentIndex)
+	})
+}
+
+func (index clearanceGridIndex) query(layer string, segment Segment, marginMM float64, scratch *clearanceQueryScratch) []int {
+	scratch.nextGeneration()
+	scratch.nextCellGeneration()
+	scratch.out = scratch.out[:0]
+	index.forEachSegmentCell(segment, marginMM, func(key clearanceCellKey) {
+		key.Layer = layer
+		if scratch.cellMarks[key] == scratch.cellGeneration {
+			return
+		}
+		scratch.cellMarks[key] = scratch.cellGeneration
+		for _, segmentIndex := range index.cells[key] {
+			if scratch.marks[segmentIndex] == scratch.generation {
+				continue
+			}
+			scratch.marks[segmentIndex] = scratch.generation
+			scratch.out = append(scratch.out, segmentIndex)
+		}
+	})
+	return scratch.out
+}
+
+func (index clearanceGridIndex) forEachSegmentCell(segment Segment, marginMM float64, fn func(clearanceCellKey)) {
+	cellSize := max(index.cellSize, distanceEpsilon)
+	length := pointDistance(segment.Start, segment.End)
+	steps := int(math.Ceil(length / (cellSize / 2)))
+	if steps < 1 {
+		steps = 1
+	}
+	radiusCells := max(0, int(math.Ceil(marginMM/cellSize)))
+	var lastKey clearanceCellKey
+	hasLastKey := false
+	var lastCenterX int
+	var lastCenterY int
+	hasLastCenter := false
+	for step := 0; step <= steps; step++ {
+		t := float64(step) / float64(steps)
+		point := Point{
+			XMM: segment.Start.XMM + (segment.End.XMM-segment.Start.XMM)*t,
+			YMM: segment.Start.YMM + (segment.End.YMM-segment.Start.YMM)*t,
+		}
+		centerX := int(math.Floor(point.XMM / cellSize))
+		centerY := int(math.Floor(point.YMM / cellSize))
+		if hasLastCenter && centerX == lastCenterX && centerY == lastCenterY {
+			continue
+		}
+		lastCenterX = centerX
+		lastCenterY = centerY
+		hasLastCenter = true
+		for offsetX := -radiusCells; offsetX <= radiusCells; offsetX++ {
+			for offsetY := -radiusCells; offsetY <= radiusCells; offsetY++ {
+				key := clearanceCellKey{X: centerX + offsetX, Y: centerY + offsetY}
+				if hasLastKey && key == lastKey {
+					continue
+				}
+				fn(key)
+				lastKey = key
+				hasLastKey = true
+			}
+		}
+	}
+}
+
 func segmentDistance(left Segment, right Segment) float64 {
+	if segmentsIntersect(left.Start, left.End, right.Start, right.End) {
+		return 0
+	}
 	if left.Start.YMM == left.End.YMM && right.Start.YMM == right.End.YMM {
 		if rangesOverlap(left.Start.XMM, left.End.XMM, right.Start.XMM, right.End.XMM) {
 			return math.Abs(left.Start.YMM - right.Start.YMM)
@@ -231,6 +397,65 @@ func segmentDistance(left Segment, right Segment) float64 {
 		best = min(best, distance)
 	}
 	return best
+}
+
+func segmentBoundsWithin(left Segment, right Segment, marginMM float64) bool {
+	leftMinX := min(left.Start.XMM, left.End.XMM) - marginMM
+	leftMaxX := max(left.Start.XMM, left.End.XMM) + marginMM
+	leftMinY := min(left.Start.YMM, left.End.YMM) - marginMM
+	leftMaxY := max(left.Start.YMM, left.End.YMM) + marginMM
+	rightMinX := min(right.Start.XMM, right.End.XMM)
+	rightMaxX := max(right.Start.XMM, right.End.XMM)
+	rightMinY := min(right.Start.YMM, right.End.YMM)
+	rightMaxY := max(right.Start.YMM, right.End.YMM)
+	return leftMinX <= rightMaxX && leftMaxX >= rightMinX &&
+		leftMinY <= rightMaxY && leftMaxY >= rightMinY
+}
+
+func segmentsIntersect(a1 Point, a2 Point, b1 Point, b2 Point) bool {
+	o1 := orientation(a1, a2, b1)
+	o2 := orientation(a1, a2, b2)
+	o3 := orientation(b1, b2, a1)
+	o4 := orientation(b1, b2, a2)
+	if o1 != o2 && o3 != o4 {
+		return true
+	}
+	if o1 == 0 && pointOnSegment(b1, a1, a2) {
+		return true
+	}
+	if o2 == 0 && pointOnSegment(b2, a1, a2) {
+		return true
+	}
+	if o3 == 0 && pointOnSegment(a1, b1, b2) {
+		return true
+	}
+	if o4 == 0 && pointOnSegment(a2, b1, b2) {
+		return true
+	}
+	return false
+}
+
+func orientation(a Point, b Point, c Point) int {
+	abX := b.XMM - a.XMM
+	abY := b.YMM - a.YMM
+	acX := c.XMM - a.XMM
+	acY := c.YMM - a.YMM
+	value := abX*acY - abY*acX
+	scaleSq := abX*abX + abY*abY
+	if scaleSq <= distanceEpsilonSquared || value*value <= distanceEpsilonSquared*scaleSq {
+		return 0
+	}
+	if value > 0 {
+		return 1
+	}
+	return 2
+}
+
+func pointOnSegment(point Point, start Point, end Point) bool {
+	return point.XMM <= max(start.XMM, end.XMM)+distanceEpsilon &&
+		point.XMM >= min(start.XMM, end.XMM)-distanceEpsilon &&
+		point.YMM <= max(start.YMM, end.YMM)+distanceEpsilon &&
+		point.YMM >= min(start.YMM, end.YMM)-distanceEpsilon
 }
 
 func rangesOverlap(a1 float64, a2 float64, b1 float64, b2 float64) bool {
