@@ -31,6 +31,7 @@ const routeTreeImmediateObstaclePressureMM = 0.75
 const routeTreeNearObstaclePressureMM = 1.5
 const routeTreeMaxPolygonCopperAccessPoints = 16
 const routeTreeSameNetExistingCopperSource = "same_net_existing_copper"
+const routeTreeGeneratedSameNetCopperNonPreferredRankPenalty = 3
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
@@ -125,9 +126,11 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 	currentExisting := make([]routing.ExistingCopper, 0, len(base.Existing)+len(tree.Branches)*routeBranchExistingCopperCapacityPerBranch)
 	currentExisting = append(currentExisting, base.Existing...)
 	orderedBranches := routeTreeBranchesForRouting(tree.Branches)
-	branchAccess := routeTreeEndpointAccessWithSameNetCopper(access, base.Existing, tree.NetName)
+	branchAccess := access
+	preferSameNetCopperMerge := routeTreePrefersSameNetCopperAccess(base.Nets, tree.NetName)
+	branchAccess = routeTreeEndpointAccessWithSameNetCopper(branchAccess, base.Existing, tree.NetName)
 	accessCandidateCache := routeTreeAccessCandidateCache{}
-	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName)
+	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName, preferSameNetCopperMerge)
 	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{
 			BranchIndex:     branch.Index,
@@ -332,8 +335,9 @@ type routeTreeOtherNetPad struct {
 }
 
 type routeTreeMergeAuditBase struct {
-	SameNetPads     int
-	OtherNetPadGrid routeTreeOtherNetPadGrid
+	SameNetPads              int
+	PreferSameNetCopperMerge bool
+	OtherNetPadGrid          routeTreeOtherNetPadGrid
 }
 
 type routeTreeOtherNetPadGrid struct {
@@ -350,8 +354,11 @@ type routeTreeOtherNetPadCell struct {
 	Y int
 }
 
-func routeTreeMergeAuditBaseForRequest(base routing.Request, netName string) routeTreeMergeAuditBase {
-	audit := routeTreeMergeAuditBase{OtherNetPadGrid: routeTreeOtherNetPadGrid{Cells: map[routeTreeOtherNetPadCell][]routeTreeOtherNetPad{}}}
+func routeTreeMergeAuditBaseForRequest(base routing.Request, netName string, preferSameNetCopperMerge bool) routeTreeMergeAuditBase {
+	audit := routeTreeMergeAuditBase{
+		PreferSameNetCopperMerge: preferSameNetCopperMerge,
+		OtherNetPadGrid:          routeTreeOtherNetPadGrid{Cells: map[routeTreeOtherNetPadCell][]routeTreeOtherNetPad{}},
+	}
 	for _, component := range base.Components {
 		for _, pad := range component.Pads {
 			padNet := pad.Net
@@ -597,13 +604,42 @@ func routeTreeEndpointAccessWithSameNetCopper(access []RouteTreeEndpointAccess, 
 	return out
 }
 
+func routeTreePrefersSameNetCopperAccess(nets []routing.Net, netName string) bool {
+	trimmedNetName := strings.TrimSpace(netName)
+	for _, net := range nets {
+		if !strings.EqualFold(strings.TrimSpace(net.Name), trimmedNetName) {
+			continue
+		}
+		return net.Role == routing.NetPower || net.Role == routing.NetGround || net.Role == routing.NetHighCurrent
+	}
+	return false
+}
+
 func routeTreeExistingCopperAccessPoints(shape routing.Shape) []routing.Point {
 	if shape.Rect != nil {
 		rect := normalizeRoutingRect(*shape.Rect)
-		return []routing.Point{{
+		center := routing.Point{
 			XMM: (rect.Min.XMM + rect.Max.XMM) / 2,
 			YMM: (rect.Min.YMM + rect.Max.YMM) / 2,
-		}}
+		}
+		if rect.WidthMM() >= rect.HeightMM() {
+			inset := rect.HeightMM() / 2
+			minX := min(rect.Min.XMM+inset, center.XMM)
+			maxX := max(rect.Max.XMM-inset, center.XMM)
+			return uniqueRouteTreeCopperAccessPoints([]routing.Point{
+				{XMM: minX, YMM: center.YMM},
+				center,
+				{XMM: maxX, YMM: center.YMM},
+			})
+		}
+		inset := rect.WidthMM() / 2
+		minY := min(rect.Min.YMM+inset, center.YMM)
+		maxY := max(rect.Max.YMM-inset, center.YMM)
+		return uniqueRouteTreeCopperAccessPoints([]routing.Point{
+			{XMM: center.XMM, YMM: minY},
+			center,
+			{XMM: center.XMM, YMM: maxY},
+		})
 	}
 	if len(shape.Polygon) == 0 {
 		return nil
@@ -621,6 +657,20 @@ func routeTreeExistingCopperAccessPoints(shape routing.Shape) []routing.Point {
 		points = append(points, shape.Polygon[sourceIndex])
 	}
 	return points
+}
+
+func uniqueRouteTreeCopperAccessPoints(points []routing.Point) []routing.Point {
+	seen := map[[2]int64]struct{}{}
+	out := make([]routing.Point, 0, len(points))
+	for _, point := range points {
+		key := [2]int64{routeTreeMicronKey(point.XMM), routeTreeMicronKey(point.YMM)}
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, point)
+	}
+	return out
 }
 
 func normalizeRoutingRect(rect routing.Rect) routing.Rect {
@@ -659,6 +709,8 @@ func routeTreeBranchAccessAuditForBranchWithMergeAudit(access []RouteTreeEndpoin
 	targetOpposite := routeTreeFirstAccessForEndpoint(access, branch.StartEndpointID, netName, cache)
 	sourceCandidates := routeTreeCachedAccessCandidates(cache, access, branch.StartEndpointID, netName, sourceOpposite)
 	targetCandidates := routeTreeCachedAccessCandidates(cache, access, branch.EndEndpointID, netName, targetOpposite)
+	sourceCandidates = routeTreeAccessCandidatesWithMergePriority(sourceCandidates, mergeAuditBase)
+	targetCandidates = routeTreeAccessCandidatesWithMergePriority(targetCandidates, mergeAuditBase)
 	sourceCandidates = routeTreeAccessCandidatesWithObstacleRanks(sourceCandidates, mergeAuditBase.OtherNetPadGrid)
 	targetCandidates = routeTreeAccessCandidatesWithObstacleRanks(targetCandidates, mergeAuditBase.OtherNetPadGrid)
 	totalPairCount := len(sourceCandidates) * len(targetCandidates)
@@ -671,6 +723,30 @@ func routeTreeBranchAccessAuditForBranchWithMergeAudit(access []RouteTreeEndpoin
 		Limit:            limit,
 		Truncated:        totalPairCount > limit,
 	}
+}
+
+func routeTreeAccessCandidatesWithMergePriority(candidates []routeTreeBranchAccessCandidate, mergeAuditBase routeTreeMergeAuditBase) []routeTreeBranchAccessCandidate {
+	if mergeAuditBase.PreferSameNetCopperMerge || len(candidates) == 0 {
+		return candidates
+	}
+	hasGeneratedCopper := false
+	for _, candidate := range candidates {
+		if routeTreeAccessIsGeneratedSameNetCopper(candidate.Access) {
+			hasGeneratedCopper = true
+			break
+		}
+	}
+	if !hasGeneratedCopper {
+		return candidates
+	}
+	ranked := slices.Clone(candidates)
+	for index := range ranked {
+		if routeTreeAccessIsGeneratedSameNetCopper(ranked[index].Access) {
+			ranked[index].RoleRank += routeTreeGeneratedSameNetCopperNonPreferredRankPenalty
+		}
+	}
+	slices.SortStableFunc(ranked, compareRouteTreeAccessCandidate)
+	return ranked
 }
 
 func routeTreeAccessCandidatesWithObstacleRanks(candidates []routeTreeBranchAccessCandidate, grid routeTreeOtherNetPadGrid) []routeTreeBranchAccessCandidate {

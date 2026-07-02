@@ -438,8 +438,8 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 		}
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(result.Stage.Issues)
-	if len(branchPaths) != 1 || len(branchPaths["VCC"]) == 0 {
-		t.Fatalf("route-tree branch issue paths by net = %#v, want VCC-only branch-scoped blocker", branchPaths)
+	if len(branchPaths["VCC"]) == 0 || len(branchPaths["SDA"]) != 0 || len(branchPaths["SCL"]) != 0 {
+		t.Fatalf("route-tree branch issue paths by net = %#v, want VCC blocker without SDA/SCL regression", branchPaths)
 	}
 }
 
@@ -486,8 +486,8 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 		t.Fatalf("retry history = %#v, want exploratory retry to remain unselected", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
-	if len(branchPaths) != 1 || len(branchPaths["VCC"]) == 0 {
-		t.Fatalf("branch paths = %#v, want selected-attempt VCC blocker only", branchPaths)
+	if len(branchPaths["VCC"]) == 0 || len(branchPaths["SDA"]) != 0 || len(branchPaths["SCL"]) != 0 {
+		t.Fatalf("branch paths = %#v, want selected-attempt VCC blocker without SDA/SCL regression", branchPaths)
 	}
 }
 

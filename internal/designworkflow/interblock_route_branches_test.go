@@ -187,7 +187,7 @@ func TestRouteTreeBranchAccessRankingPenalizesImmediateOtherNetObstacle(t *testi
 		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 25, YMM: 5},
 	}
 
-	audit := routeTreeBranchAccessAuditForBranchWithMergeAudit(access, "VCC", tree.Branches[0], routeTreeAccessCandidateCache{}, routeTreeMergeAuditBaseForRequest(base, "VCC"))
+	audit := routeTreeBranchAccessAuditForBranchWithMergeAudit(access, "VCC", tree.Branches[0], routeTreeAccessCandidateCache{}, routeTreeMergeAuditBaseForRequest(base, "VCC", true))
 	if len(audit.Pairs) == 0 {
 		t.Fatalf("audit = %#v, want ranked access pairs", audit)
 	}
@@ -482,15 +482,33 @@ func TestRouteTreeEndpointAccessWithSameNetCopperIgnoresOtherNetCopper(t *testin
 			}},
 		},
 	}, "VCC")
-	if len(access) != 1 {
-		t.Fatalf("access = %#v, want one VCC copper access point", access)
+	if len(access) != 3 {
+		t.Fatalf("access = %#v, want three VCC copper access points", access)
 	}
-	got := access[0]
+	got := access[1]
 	if got.Role != RouteTreeAccessSameNetCopper || got.Net != "VCC" || got.Layer != "F.CU" || got.Source != routeTreeSameNetExistingCopperSource {
 		t.Fatalf("access = %#v, want same-net copper access metadata", got)
 	}
 	if math.Abs(got.XMM-6) > 1e-9 || math.Abs(got.YMM-5.25) > 1e-9 {
 		t.Fatalf("access = %#v, want center of VCC copper geometry", got)
+	}
+}
+
+func TestRouteTreePrefersSameNetCopperAccessOnlyForPowerNets(t *testing.T) {
+	nets := []routing.Net{
+		{Name: "VCC", Role: routing.NetPower},
+		{Name: "GND", Role: routing.NetGround},
+		{Name: "SIG", Role: routing.NetSignal},
+	}
+
+	if !routeTreePrefersSameNetCopperAccess(nets, "VCC") {
+		t.Fatalf("VCC should allow same-net copper access")
+	}
+	if !routeTreePrefersSameNetCopperAccess(nets, "GND") {
+		t.Fatalf("GND should prefer same-net copper access")
+	}
+	if routeTreePrefersSameNetCopperAccess(nets, "SIG") {
+		t.Fatalf("SIG should not use same-net copper in VCC closeout path")
 	}
 }
 

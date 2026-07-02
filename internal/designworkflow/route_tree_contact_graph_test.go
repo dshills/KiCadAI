@@ -29,6 +29,75 @@ func TestSummarizeRouteTreeContactGraphCountsCompleteAndPartialGroups(t *testing
 	}
 }
 
+func TestSummarizeRouteTreeContactGraphCountsBranchToPadContact(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 2 || summary.CompleteGroups != 1 || summary.PartialGroups != 0 {
+		t.Fatalf("summary = %#v, want branch-to-pad complete group", summary)
+	}
+}
+
+func TestSummarizeRouteTreeContactGraphCountsBranchToLocalRouteMerge(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTarget("SIG", "U2", "1", 20, 0),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 10, YMM: 0}, {XMM: 20, YMM: 0}}),
+	}
+	access := []RouteTreeEndpointAccess{{Role: RouteTreeAccessLocalRouteAnchor, Net: "SIG", Layer: "F.CU", XMM: 10, YMM: 0}}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, access)
+	if summary.ProvenEndpoints != 3 || summary.CompleteGroups != 1 || summary.LocalRouteMerges != 1 {
+		t.Fatalf("summary = %#v, want local-route merge to complete group", summary)
+	}
+}
+
+func TestSummarizeRouteTreeContactGraphCountsBranchToSameNetCopperMerge(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("VCC", "J1", "1", 0, 0),
+		routeTreeGraphTarget("VCC", "U1", "1", 10, 0),
+		routeTreeGraphTarget("VCC", "U2", "1", 20, 0),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "VCC", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 5, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "VCC", []transactions.Point{{XMM: 20, YMM: 0}, {XMM: 5, YMM: 0}}),
+	}
+	access := []RouteTreeEndpointAccess{{Role: RouteTreeAccessSameNetCopper, Net: "VCC", Layer: "F.CU", XMM: 5, YMM: 0}}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, access)
+	if summary.ProvenEndpoints != 3 || summary.CompleteGroups != 1 || summary.SameNetMerges != 1 {
+		t.Fatalf("summary = %#v, want same-net copper merge to complete group", summary)
+	}
+}
+
+func TestSummarizeRouteTreeContactGraphRejectsWrongNetAndWrongLayerContacts(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTargetOnLayer("CLK", "J2", "1", 0, 5, "B.Cu"),
+		routeTreeGraphTargetOnLayer("CLK", "U2", "1", 10, 5, "B.Cu"),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "GND", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "CLK", []transactions.Point{{XMM: 0, YMM: 5}, {XMM: 10, YMM: 5}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 0 || summary.CompleteGroups != 0 || summary.BlockedGroups != 2 {
+		t.Fatalf("summary = %#v, want wrong-net and wrong-layer contacts rejected", summary)
+	}
+}
+
 func TestRouteTreeContactGraphSummaryJSONStable(t *testing.T) {
 	summary := RouteTreeContactGraphSummary{
 		Nets:              []string{"GND", "SIG"},
@@ -52,6 +121,10 @@ func TestRouteTreeContactGraphSummaryJSONStable(t *testing.T) {
 }
 
 func routeTreeGraphTarget(net string, ref string, pad string, x float64, y float64) InterBlockContactTarget {
+	return routeTreeGraphTargetOnLayer(net, ref, pad, x, y, "F.Cu")
+}
+
+func routeTreeGraphTargetOnLayer(net string, ref string, pad string, x float64, y float64, layer string) InterBlockContactTarget {
 	return InterBlockContactTarget{
 		NetName:    net,
 		Kind:       InterBlockContactTargetPad,
@@ -59,7 +132,7 @@ func routeTreeGraphTarget(net string, ref string, pad string, x float64, y float
 		Ref:        ref,
 		Pad:        pad,
 		Point:      transactions.Point{XMM: x, YMM: y},
-		Layer:      "F.Cu",
+		Layer:      layer,
 		Confidence: InterBlockContactConfidenceHigh,
 	}
 }
