@@ -142,6 +142,8 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		routingRequest.Nets = excludeNetsWithRouteOperations(routingRequest.Nets, localOperations, interBlockCandidates)
 	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
+	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, localOperations)
+	issues = append(issues, routeTreeAccessIssues...)
 	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence)
 	routingRequest.Nets = excludeManagedInterBlockNets(routingRequest.Nets, routeTreeExecution.Summary.ManagedNets)
 	issues = append(issues, targetEvidence.Issues...)
@@ -175,6 +177,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		"route_connectivity":      localRouteConnectivity,
 		"inter_block_routing":     summarizeInterBlockRouteCompletion(interBlockCandidates, routeOperations, issues, interBlockContactEvidence),
 		"inter_block_route_trees": routeTreeExecution.Summary,
+		"route_tree_access":       SummarizeRouteTreeEndpointAccess(routeTreeAccess),
 		"route_tree_repair":       SummarizeRouteTreeRepair(routeTreeRepairHints),
 		"inter_block_contacts":    SummarizeInterBlockContacts(interBlockContactEvidence),
 	}
