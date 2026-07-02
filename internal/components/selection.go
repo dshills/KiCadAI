@@ -28,6 +28,22 @@ const (
 	CodeComponentSourceMissing       reports.Code = "COMPONENT_SOURCE_MISSING"
 )
 
+const (
+	reviewStatusProven        = "proven"
+	reviewStatusNotApplicable = "not_applicable"
+	reviewStatusUnknown       = "unknown"
+)
+
+var capacitorEvidenceReviewChecks = []struct {
+	path  string
+	label string
+	get   func(*CapacitorEvidence) string
+}{
+	{path: "dc_bias_review", label: "DC-bias", get: func(evidence *CapacitorEvidence) string { return evidence.DCBiasReview }},
+	{path: "effective_capacitance_review", label: "effective-capacitance", get: func(evidence *CapacitorEvidence) string { return evidence.EffectiveCapacitanceReview }},
+	{path: "esr_review", label: "ESR", get: func(evidence *CapacitorEvidence) string { return evidence.ESRReview }},
+}
+
 type Query struct {
 	Text              string          `json:"text,omitempty"`
 	Family            string          `json:"family,omitempty"`
@@ -343,8 +359,10 @@ func selectionCandidateIssues(record ComponentRecord, candidate Candidate, reque
 	if request.RequireCompanions && !recordHasRequiredCompanions(record) {
 		issues = append(issues, NewIssue(CodeComponentCompanionMissing, reports.SeverityBlocked, "component."+record.ID+".companions", "component requires explicit companion component metadata"))
 	}
-	if request.Acceptance == AcceptanceFabricationCandidate {
+	if CompareAcceptance(request.Acceptance, AcceptanceFabricationCandidate) >= 0 {
 		issues = append(issues, fabricationCandidateReviewIssues(record)...)
+	} else if CompareAcceptance(request.Acceptance, AcceptanceConnectivity) >= 0 {
+		issues = append(issues, structuredEvidenceReviewIssues(record, reports.SeverityWarning)...)
 	}
 	_, procurementIssues := evaluateProcurement(record, request, true)
 	issues = append(issues, procurementIssues...)
@@ -525,6 +543,57 @@ func fabricationCandidateReviewIssues(record ComponentRecord) []reports.Issue {
 		case "thermal", "capacitor_stability":
 			message := "component requires unresolved " + strings.ReplaceAll(rule.Kind, "_", " ") + " evidence before fabrication-candidate selection"
 			issues = append(issues, NewIssue(CodeComponentReviewRequired, reports.SeverityBlocked, "component."+record.ID+".derating_rules."+rule.Kind, message))
+		}
+	}
+	issues = append(issues, structuredEvidenceReviewIssues(record, reports.SeverityBlocked)...)
+	return issues
+}
+
+func structuredEvidenceReviewIssues(record ComponentRecord, severity reports.Severity) []reports.Issue {
+	var issues []reports.Issue
+	basePath := "component." + record.ID
+	if record.Regulator != nil {
+		if record.Regulator.ThermalReview != reviewStatusProven && record.Regulator.ThermalReview != reviewStatusNotApplicable {
+			status := reviewStatusUnknown
+			if record.Regulator.ThermalReview != "" {
+				status = record.Regulator.ThermalReview
+			}
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".regulator_evidence.thermal_review", "regulator thermal evidence is not proven: "+status))
+		}
+		if stability := record.Regulator.OutputCapacitor; stability != nil {
+			if stability.FabricationCandidateBlocks || (stability.ProofStatus != reviewStatusProven && stability.ProofStatus != reviewStatusNotApplicable) {
+				status := reviewStatusUnknown
+				if stability.ProofStatus != "" {
+					status = stability.ProofStatus
+				}
+				message := "regulator output-capacitor stability evidence is not proven"
+				switch stability.Kind {
+				case "esr_window_required":
+					message = "regulator output capacitor requires ESR-window stability proof: " + status
+				case "ceramic_stable":
+					message = "regulator is ceramic-stable, but selected capacitor derating/effective-capacitance proof is still required: " + status
+				case "datasheet_specific":
+					message = "regulator output capacitor requires datasheet-specific stability proof: " + status
+				default:
+					message += ": " + status
+				}
+				issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".regulator_evidence.output_capacitor", message))
+			}
+		}
+	}
+	if record.Capacitor != nil {
+		if record.Capacitor.FabricationCandidateBlocks {
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".capacitor_evidence.fabrication_candidate_blocks", "capacitor evidence blocks fabrication-candidate use until review is complete"))
+		}
+		for _, review := range capacitorEvidenceReviewChecks {
+			value := review.get(record.Capacitor)
+			if value == reviewStatusProven || value == reviewStatusNotApplicable {
+				continue
+			}
+			if value == "" {
+				value = reviewStatusUnknown
+			}
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".capacitor_evidence."+review.path, "capacitor "+review.label+" evidence is not proven: "+value))
 		}
 	}
 	return issues

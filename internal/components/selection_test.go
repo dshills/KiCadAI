@@ -41,12 +41,13 @@ func TestSelectIncludesActiveProcurementEvidence(t *testing.T) {
 		RequiredRatings: []RequiredRating{{Kind: "input_voltage", Value: "5", Unit: "V"}},
 		Sources:         sources,
 	})
-	if len(result.Issues) != 0 {
-		t.Fatalf("issues = %#v", result.Issues)
+	if !result.OK {
+		t.Fatalf("select regulator failed: %#v", result.Issues)
 	}
 	if selection.Procurement == nil || selection.Procurement.LifecycleStatus != LifecycleActive || selection.Procurement.Outcome != "accepted" {
 		t.Fatalf("procurement = %#v", selection.Procurement)
 	}
+	assertIssuePath(t, result.Issues, "component.regulator.linear.ap2112k_3v3.sot23_5.regulator_evidence.output_capacitor")
 }
 
 func TestSelectBlocksObsoleteLifecycle(t *testing.T) {
@@ -389,6 +390,7 @@ func TestSelectAP2112KRegulatorVariant(t *testing.T) {
 			t.Fatalf("selected AP2112K missing derating rule %s: %+v", kind, selection.Component.DeratingRules)
 		}
 	}
+	assertIssuePath(t, selection.Warnings, "component.regulator.linear.ap2112k_3v3.sot23_5.regulator_evidence.output_capacitor")
 }
 
 func TestSelectAP2112KRejectsInsufficientInputHeadroom(t *testing.T) {
@@ -448,6 +450,45 @@ func TestSelectAP2112KBlocksFabricationCandidateReviewGaps(t *testing.T) {
 		t.Fatal("expected AP2112K fabrication-candidate selection to block on review evidence")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
+	assertIssuePath(t, result.Issues, "component.regulator.linear.ap2112k_3v3.sot23_5.regulator_evidence.output_capacitor")
+	assertIssuePath(t, result.Issues, "component.regulator.linear.ap2112k_3v3.sot23_5.regulator_evidence.thermal_review")
+}
+
+func TestSelectAMS1117BlocksFabricationCandidateOnESRProof(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "regulator", Package: "sot223", ValueKind: "output_voltage", Value: "3.3"},
+		Acceptance:        AcceptanceFabricationCandidate,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+		RequiredRatings: []RequiredRating{
+			{Kind: "input_voltage", Value: "5", Unit: "V"},
+			{Kind: "output_current", Value: "100", Unit: "mA"},
+		},
+	})
+	if result.OK {
+		t.Fatal("expected AMS1117 fabrication-candidate selection to block on ESR proof")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
+	assertIssuePath(t, result.Issues, "component.regulator.linear.ams1117_3v3.sot223.regulator_evidence.output_capacitor")
+}
+
+func TestSelectConcreteMLCCBlocksFabricationCandidateWithoutDeratingProof(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "capacitor", Package: "0805", ValueKind: "capacitance", Value: "10u"},
+		Acceptance:      AcceptanceFabricationCandidate,
+		RequireConcrete: true,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "voltage",
+			Value: "3.3",
+			Unit:  "V",
+		}},
+	})
+	if result.OK {
+		t.Fatal("expected MLCC fabrication-candidate selection to block on derating proof")
+	}
+	assertIssuePath(t, result.Issues, "component.capacitor.murata.grm21br61a106ke19l.0805.capacitor_evidence.effective_capacitance_review")
 }
 
 func TestSelectRejectsRegulatorOverCurrent(t *testing.T) {
