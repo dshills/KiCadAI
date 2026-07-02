@@ -54,13 +54,16 @@ breakout request connections into placement/routing evidence. Routing summaries
 now distinguish candidates, attempted routes, endpoint-contact evidence,
 graph-connected routes, partial routes, and unrouted nets. Multi-endpoint
 route-tree execution now manages the I2C fixture's VCC/GND/SDA/SCL nets and
-reports branch-level path/contact blockers. Route-tree contact graph evidence
-now includes local-route merge anchors, and the I2C fixture currently proves
-11 of 12 required inter-block contacts with three complete contact-graph groups
-and one partial contact-graph group. Route-tree repair classifies the remaining
+reports branch-level path/contact blockers. Route-tree branch execution now
+ranks pad and local-route access candidates, tries bounded access pairs, keeps
+access-selected route endpoints out of post-route pad snapping, and records
+selected access roles in branch evidence. Route-tree contact graph evidence now
+includes local-route merge anchors, and the I2C fixture currently proves 11 of
+12 required inter-block contacts with three complete contact-graph groups and
+one partial contact-graph group. Route-tree repair classifies the remaining
 branch executor blockers, feeds repairable hints into bounded placement retry,
 and ranks selected attempts by route-tree completion evidence. The next blocker
-is completing the remaining selected-attempt GND/SDA branch/contact proof and
+is completing the remaining selected-attempt VCC contact/branch proof and
 promoting richer generated boards to KiCad ERC/DRC-clean layout proof.
 
 Fabrication readiness now includes expanded deterministic physical-rule

@@ -99,6 +99,15 @@ counts, and `managed_nets`. Managed nets are intentionally removed from the
 fallback `routing.Request.Nets` list to avoid double-routing; use
 `inter_block_route_trees.managed_nets` to see route-tree ownership.
 
+Route-tree branch execution is now access-driven. For each branch, KiCadAI
+ranks available endpoint access candidates from physical pads and generated
+block-local route anchors, builds bounded synthetic access-pad route requests,
+and tries candidate pairs in deterministic order. Selected access routes are
+emitted as normal KiCad route operations, but are marked internally so
+post-route endpoint snapping does not move a local-anchor merge back to the
+original pad center. Branch evidence includes attempted access-pair counts and
+selected source/target access roles.
+
 When route-tree branches or endpoint contacts fail, the routing stage also
 emits `route_tree_repair`. It summarizes classified branch/contact failures,
 repairable failures, generated hint count, affected nets, and affected refs.
@@ -117,8 +126,8 @@ This graph evidence lets generated block-local routes participate in
 route-tree contact proof without inflating inter-block emitted-segment counts.
 The I2C fixture now reaches three complete contact-graph groups and one partial
 contact-graph group, with 11 of 12 required endpoint contacts proven; the
-remaining expected-fail blockers are GND/SDA branch executor pathfinding and
-one SDA contact miss.
+remaining expected-fail blocker is one VCC contact/branch proof gap after
+bounded retry.
 
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,

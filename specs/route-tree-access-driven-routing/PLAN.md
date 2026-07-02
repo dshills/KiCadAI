@@ -9,6 +9,16 @@ inputs, not only diagnostics, so generated branch routes can choose local-route
 anchors, same-net merge points, and alternate pad access candidates before
 failing. The target is the remaining I2C GND/SDA branch/contact blockers.
 
+## Implementation Status
+
+Implemented phases 1-6 on 2026-07-02. Route-tree branches now rank access
+candidates, route through bounded synthetic access-pad pairs, preserve selected
+local-anchor endpoints during post-route snapping, and expose selected access
+roles in branch evidence. The regenerated I2C fixture remains `expected_fail`:
+the selected retry still proves 11 of 12 required contacts with three complete
+route-tree contact-graph groups and one partial group, leaving one VCC
+contact/branch proof gap for follow-up work.
+
 ## Phase 1: Baseline And Access Gap Tests
 
 ### Goals
@@ -276,4 +286,3 @@ Acceptable intermediate case: the fixture remains `expected_fail`, but the
 remaining blocker is narrower than today, such as a specific DRC-grade
 neckdown, layer transition, or clearance problem that access-driven routing
 cannot legally solve.
-

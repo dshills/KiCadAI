@@ -211,16 +211,19 @@ loop confidence:
   endpoints. Multi-endpoint route-tree execution now owns the I2C fixture's
   VCC/GND/SDA/SCL nets, removes them from fallback net-level routing, and
   reports managed nets plus branch-attempt evidence. Route-tree endpoint
+  access now drives branch routing through ranked pad/local-route access
+  candidates, bounded synthetic access-pad attempts, selected access-role
+  evidence, and snap-exempt local-anchor route operations. Route-tree endpoint
   access and contact graph summaries now expose pad access, local-route merge
   anchors, required/proven endpoints, and graph group completion evidence.
   Route-tree repair classifies branch/contact failures, emits repairable
   hints, feeds bounded placement retry, and selects attempts using route-tree
   completion evidence. The latest selected attempt proves 11 of 12 required
   contacts with three complete route-tree contact-graph groups and one partial
-  contact-graph group. The branch executor still reports selected-attempt
-  GND/SDA pathfinding blockers, and one SDA contact miss remains. The remaining
-  layout-quality blockers are final route-tree branch path completion, richer
-  generated-board validation, and KiCad ERC/DRC-clean evidence.
+  contact-graph group. The remaining selected-attempt blocker is one VCC
+  contact/branch proof gap. The remaining layout-quality blockers are final
+  route-tree branch path completion, richer generated-board validation, and
+  KiCad ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
