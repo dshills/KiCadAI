@@ -478,6 +478,7 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 		})
 		report.Evidence = append(report.Evidence, procurementEvidenceFromStage(stage)...)
 		report.Evidence = append(report.Evidence, stabilityEvidenceFromStage(stage)...)
+		report.Evidence = append(report.Evidence, componentHintEvidenceFromStage(stage)...)
 		for index, issue := range stage.Issues {
 			report.Evidence = append(report.Evidence, EvidenceRecord{
 				ID:      fmt.Sprintf("stage_issue:%s:%03d", stage.Name, index+1),
@@ -500,6 +501,74 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 			Action:   repair.SuggestedAction,
 			Reason:   repair.Message,
 		})
+	}
+}
+
+func componentHintEvidenceFromStage(stage designworkflow.StageResult) []EvidenceRecord {
+	raw, ok := stage.Summary["component_hints"]
+	if !ok {
+		return nil
+	}
+	switch values := raw.(type) {
+	case []designworkflow.ComponentHintEvidence:
+		out := make([]EvidenceRecord, 0, len(values))
+		for index, hint := range values {
+			out = append(out, componentHintEvidenceRecord(stage.Name, index, hint))
+		}
+		return out
+	case []any:
+		out := make([]EvidenceRecord, 0, len(values))
+		for _, value := range values {
+			if row, ok := summaryMap(value); ok && row != nil {
+				out = append(out, componentHintEvidenceRecord(stage.Name, len(out), componentHintEvidenceFromMap(row)))
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func componentHintEvidenceFromMap(row map[string]any) designworkflow.ComponentHintEvidence {
+	return designworkflow.ComponentHintEvidence{
+		ID:          summaryString(row["id"]),
+		Type:        designworkflow.ComponentHintKind(summaryString(row["type"])),
+		InstanceID:  summaryString(row["instance_id"]),
+		BlockID:     summaryString(row["block_id"]),
+		Role:        summaryString(row["role"]),
+		ComponentID: summaryString(row["component_id"]),
+		Kind:        summaryString(row["kind"]),
+		Target:      summaryString(row["target"]),
+		NetRole:     summaryString(row["net_role"]),
+		Value:       summaryString(row["value"]),
+		Unit:        summaryString(row["unit"]),
+		Status:      designworkflow.ComponentHintStatus(summaryString(row["status"])),
+		Message:     summaryString(row["message"]),
+	}
+}
+
+func componentHintEvidenceRecord(stageName designworkflow.StageName, index int, hint designworkflow.ComponentHintEvidence) EvidenceRecord {
+	summary := strings.Join(compactStrings([]string{
+		summaryKV("status", string(hint.Status)),
+		summaryKV("kind", hint.Kind),
+		summaryKV("component", hint.ComponentID),
+		summaryKV("role", hint.Role),
+		summaryKV("target", hint.Target),
+		summaryKV("net_role", hint.NetRole),
+	}), " ")
+	return EvidenceRecord{
+		ID:      fmt.Sprintf("component_hint:%s:%03d", stageName, index+1),
+		Kind:    "component_hint",
+		Path:    strings.Join(compactStrings([]string{string(stageName), hint.ID}), "."),
+		Summary: summary,
+		Notes: compactStrings([]string{
+			summaryKV("type", string(hint.Type)),
+			summaryKV("instance", hint.InstanceID),
+			summaryKV("block", hint.BlockID),
+			summaryKV("value", hint.Value),
+			summaryKV("unit", hint.Unit),
+			hint.Message,
+		}),
 	}
 }
 

@@ -148,6 +148,38 @@ func TestBuildWithWorkflowProcurementEvidence(t *testing.T) {
 	}
 }
 
+func TestBuildWithWorkflowComponentHintEvidence(t *testing.T) {
+	workflow := designworkflow.BuildWorkflowResult(
+		designworkflow.ProjectSummary{Name: "demo"},
+		designworkflow.AcceptanceConnectivity,
+		[]designworkflow.StageResult{{
+			Name:   designworkflow.StageRouting,
+			Status: designworkflow.StageStatusWarning,
+			Summary: map[string]any{
+				"component_hints": []designworkflow.ComponentHintEvidence{{
+					ID:          "component_hint:rail:voltage_regulator:regulator:ap2112:routing:tie:%00:enable:%00:%00",
+					InstanceID:  "rail",
+					BlockID:     "voltage_regulator",
+					Role:        "regulator",
+					ComponentID: "regulator.linear.ap2112k_3v3.sot23_5",
+					Type:        designworkflow.ComponentHintRouting,
+					Kind:        "tie",
+					NetRole:     "enable",
+					Status:      designworkflow.ComponentHintSatisfiedByBlock,
+					Message:     "routing hint satisfied by block-local tie operation",
+				}},
+			},
+		}},
+	)
+	report := Build(BuildOptions{Source: SourceSummary{Mode: "request"}, Workflow: &workflow})
+	if !hasEvidenceKind(report, "component_hint") {
+		t.Fatalf("component hint evidence missing from %#v", report.Evidence)
+	}
+	if !hasEvidenceSummary(report, "status=satisfied_by_block") {
+		t.Fatalf("component hint status missing from %#v", report.Evidence)
+	}
+}
+
 func TestBuildFromPlanMapsSynthesisTrace(t *testing.T) {
 	plan := intentplanner.Plan(intentplanner.Request{
 		Version: intentplanner.RequestVersion,
