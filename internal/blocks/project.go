@@ -1,6 +1,7 @@
 package blocks
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -246,7 +247,11 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		for _, endpoint := range endpoints[1:] {
 			operation, issues := ConnectOperation(first.ref, first.pin, endpoint.ref, endpoint.pin, netName)
 			if len(issues) != 0 {
-				return nil, fmt.Errorf(issues[0].Message)
+				errs := make([]error, 0, len(issues))
+				for _, issue := range issues {
+					errs = append(errs, errors.New(issue.Message))
+				}
+				return nil, fmt.Errorf("failed to connect %s.%s to %s.%s on %s: %w", first.ref, first.pin, endpoint.ref, endpoint.pin, netName, errors.Join(errs...))
 			}
 			out = append(out, operation)
 		}

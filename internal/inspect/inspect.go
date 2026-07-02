@@ -1,10 +1,8 @@
 package inspect
 
 import (
-	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -312,19 +310,6 @@ func baseNames(paths []string) []string {
 	return names
 }
 
-func copyCounts(source map[string]int) map[string]int {
-	if len(source) == 0 {
-		return nil
-	}
-	result := make(map[string]int, len(source))
-	for key, value := range source {
-		if value != 0 {
-			result[key] = value
-		}
-	}
-	return result
-}
-
 func boundedStrings(values []string, limit int) ([]string, bool) {
 	if len(values) == 0 {
 		return nil, false
@@ -526,183 +511,6 @@ func preservationObjectsFromNodes(path string, nodes []UnsupportedNode, ownershi
 		})
 	}
 	return objects
-}
-
-type schematicScan struct {
-	Counts   map[string]int
-	Metadata map[string]string
-}
-
-func scanSchematic(r io.Reader) (schematicScan, error) {
-	scanner := bufio.NewReader(r)
-	scan := schematicScan{
-		Counts:   map[string]int{},
-		Metadata: map[string]string{},
-	}
-	depth := 0
-	for {
-		b, err := scanner.ReadByte()
-		if err == io.EOF {
-			return scan, nil
-		}
-		if err != nil {
-			return schematicScan{}, err
-		}
-		switch b {
-		case ';':
-			if err := discardLine(scanner); err != nil {
-				return schematicScan{}, err
-			}
-		case '"':
-			if err := discardQuoted(scanner); err != nil {
-				return schematicScan{}, err
-			}
-		case '(':
-			token, err := readAtom(scanner)
-			if err != nil {
-				return schematicScan{}, err
-			}
-			depth++
-			if token == "" {
-				continue
-			}
-			if depth == 2 {
-				scan.Counts[token]++
-				switch token {
-				case "version", "generator":
-					value, err := readScalar(scanner)
-					if err != nil {
-						return schematicScan{}, err
-					}
-					scan.Metadata[token] = value
-				}
-			}
-		case ')':
-			if depth > 0 {
-				depth--
-			}
-		}
-	}
-}
-
-func discardLine(r *bufio.Reader) error {
-	for {
-		b, err := r.ReadByte()
-		if err == io.EOF {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		if b == '\n' {
-			return nil
-		}
-	}
-}
-
-func discardQuoted(r *bufio.Reader) error {
-	escaped := false
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			return err
-		}
-		if escaped {
-			escaped = false
-			continue
-		}
-		if b == '\\' {
-			escaped = true
-			continue
-		}
-		if b == '"' {
-			return nil
-		}
-	}
-}
-
-func readAtom(r *bufio.Reader) (string, error) {
-	var builder strings.Builder
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				return builder.String(), nil
-			}
-			return "", err
-		}
-		if b == ' ' || b == '\t' || b == '\n' || b == '\r' {
-			if builder.Len() == 0 {
-				continue
-			}
-			return builder.String(), nil
-		}
-		if b == '(' || b == ')' || b == ';' {
-			if b == ')' || b == ';' || builder.Len() > 0 {
-				if err := r.UnreadByte(); err != nil {
-					return "", err
-				}
-			}
-			return builder.String(), nil
-		}
-		builder.WriteByte(b)
-	}
-}
-
-func readScalar(r *bufio.Reader) (string, error) {
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			if err == io.EOF {
-				return "", nil
-			}
-			return "", err
-		}
-		switch b {
-		case ' ', '\t', '\r', '\n':
-			continue
-		case ';':
-			if err := discardLine(r); err != nil {
-				return "", err
-			}
-		case ')':
-			if err := r.UnreadByte(); err != nil {
-				return "", err
-			}
-			return "", nil
-		case '"':
-			return readQuotedScalar(r)
-		default:
-			if err := r.UnreadByte(); err != nil {
-				return "", err
-			}
-			return readAtom(r)
-		}
-	}
-}
-
-func readQuotedScalar(r *bufio.Reader) (string, error) {
-	var builder strings.Builder
-	escaped := false
-	for {
-		b, err := r.ReadByte()
-		if err != nil {
-			return "", err
-		}
-		if escaped {
-			builder.WriteByte(b)
-			escaped = false
-			continue
-		}
-		if b == '\\' {
-			escaped = true
-			continue
-		}
-		if b == '"' {
-			return builder.String(), nil
-		}
-		builder.WriteByte(b)
-	}
 }
 
 func issueFromError(err error, path string) reports.Issue {
