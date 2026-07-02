@@ -109,6 +109,17 @@ and unknown failures. Bounded placement-routing retry consumes repairable
 route-tree hints alongside normal routing diagnostics and ranks attempts using
 route-tree completion evidence such as complete/partial/blocked groups, proven
 endpoints, routed branches, contact misses, and issue counts.
+
+The routing stage also emits `route_tree_contact_graph` for route-tree-managed
+nets. It reports required/proven endpoint counts, graph component counts,
+complete/partial/blocked group counts, and same-net/local-route merge evidence.
+This graph evidence lets generated block-local routes participate in
+route-tree contact proof without inflating inter-block emitted-segment counts.
+The I2C fixture now reaches three complete contact-graph groups and one partial
+contact-graph group, with 11 of 12 required endpoint contacts proven; the
+remaining expected-fail blockers are GND/SDA branch executor pathfinding and
+one SDA contact miss.
+
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,
 not thermal simulation, impedance calculation, or routed length matching.

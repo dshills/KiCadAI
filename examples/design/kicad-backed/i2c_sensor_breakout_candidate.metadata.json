@@ -27,8 +27,9 @@
     "Routing is now enabled and bounded placement retry legalizes the generated sensor, pull-up, decoupling, and connector placements, but inter-block route completion still blocks promotion.",
     "Block-local route net names are rewritten to composed aliases so VCC/GND/SDA/SCL local route contact proof no longer fails on sensor_* instance-net mismatches.",
     "Current route-tree repair evidence manages all 4 VCC/GND/SDA/SCL nets, excludes them from fallback net-level routing, classifies branch/contact failures, and feeds repairable route-tree hints into bounded placement retry.",
-    "The latest run selected retry attempt 2 after a spacing adjustment because route-tree blocked groups improved. The fixture still blocks on route-completion/contact evidence: GND and SDA report branch-scoped no-legal-two-layer-path/contact-miss blockers, while only 10 of 12 required inter-block contacts are proven.",
-    "Project write, writer correctness, validation, and KiCad checks remain skipped until the routing stage emits complete same-net contact graph evidence for all required I2C breakout nets."
+    "The latest run selected retry attempt 2 after a spacing adjustment because route-tree proven endpoints improved from 10 to 11. The fixture still blocks on route-completion/contact evidence: GND reports a branch-scoped no-legal-two-layer-path blocker near the connector ground pad, SDA reports a branch-scoped no-legal-two-layer-path blocker plus one contact miss, and 11 of 12 required inter-block contacts are proven.",
+    "Route-tree contact graph evidence now reports 3 complete contact-graph groups, 1 partial contact-graph group, 0 blocked contact-graph groups, 11 proven endpoints, and local-route merge evidence for the managed VCC/GND/SDA/SCL nets. Branch executor completion remains blocked until the GND/SDA route-tree branch path issues are resolved.",
+    "Project write, writer correctness, validation, and KiCad checks remain skipped until the routing stage emits complete same-net contact graph evidence for every required I2C breakout endpoint."
   ],
   "notes": "Tracks the richer sensor breakout scenario after placement and block-local net-alias blockers; the remaining expected failure is multi-endpoint inter-block route completion."
 }
