@@ -221,6 +221,72 @@ func TestReadWriteSchematicReadsSheetSizePinsAndInstances(t *testing.T) {
 	}
 }
 
+func TestReadWriteSchematicPreservesSymbolAndLabelSemantics(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.0")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (lib_symbols)`,
+		`  (symbol`,
+		`    (lib_id "Amplifier_Operational:TL072")`,
+		`    (at 10 20 90)`,
+		`    (unit 2)`,
+		`    (body_style 1)`,
+		`    (exclude_from_sim yes)`,
+		`    (in_bom no)`,
+		`    (on_board yes)`,
+		`    (in_pos_files no)`,
+		`    (dnp yes)`,
+		`    (uuid "22222222-2222-5222-8222-222222222222")`,
+		`    (property "Reference" "U1B" (at 10 20 0))`,
+		`    (property "Value" "TL072" (at 10 22 0))`,
+		`    (instances`,
+		`      (project "project"`,
+		`        (path "/22222222-2222-5222-8222-222222222222" (reference "U1") (unit 2) (value "TL072"))`,
+		`      )`,
+		`    )`,
+		`  )`,
+		`  (global_label "AUDIO_OUT" (shape output) (at 30 20 180) (fields_autoplaced yes) (uuid "33333333-3333-5333-8333-333333333333"))`,
+		`  (sheet_instances (path "/" (page "1")))`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 || read.Symbols[0].Unit != 2 || !read.Symbols[0].DoNotPopulate || len(read.Symbols[0].Instances) != 1 {
+		t.Fatalf("symbol semantics not read: %#v", read.Symbols)
+	}
+	if len(read.Labels) != 1 || read.Labels[0].Shape != LabelShapeOutput || read.Labels[0].Rotation != 180 || !read.Labels[0].FieldsAutoplaced {
+		t.Fatalf("label semantics not read: %#v", read.Labels)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	for _, want := range []string{
+		"(unit 2)",
+		"(exclude_from_sim yes)",
+		"(in_bom no)",
+		"(in_pos_files no)",
+		"(dnp yes)",
+		"\"/22222222-2222-5222-8222-222222222222\"",
+		"(reference \"U1\")",
+		"(unit 2)",
+		"(value \"TL072\")",
+		"(shape output)",
+		"(at 30.0 20.0 180)",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+}
+
 func TestReadSymbolPropertyFlagsAndMalformedProperties(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,

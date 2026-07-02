@@ -196,6 +196,19 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 	if mirror, ok := node.Child("mirror"); ok {
 		symbol.Mirror = SymbolMirror(mirror.ListValue(1))
 	}
+	if unit, ok := node.Child("unit"); ok {
+		if value, ok := unit.FloatValue(1); ok {
+			symbol.Unit = int(value)
+		}
+	}
+	if bodyStyle, ok := node.Child("body_style"); ok {
+		if value, ok := bodyStyle.FloatValue(1); ok {
+			symbol.BodyStyle = int(value)
+		}
+	}
+	if excludeFromSim, ok := readYesNoChild(node, "exclude_from_sim"); ok {
+		symbol.ExcludeFromSim = excludeFromSim
+	}
 	if inBOM, ok := readYesNoChild(node, "in_bom"); ok {
 		symbol.InBOM = &inBOM
 	}
@@ -204,6 +217,18 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 	}
 	if inPositionFile, ok := readYesNoChild(node, "in_pos_files"); ok {
 		symbol.InPositionFile = &inPositionFile
+	}
+	if doNotPopulate, ok := readYesNoChild(node, "dnp"); ok {
+		symbol.DoNotPopulate = doNotPopulate
+	}
+	if passthrough, ok := node.Child("passthrough"); ok {
+		symbol.Passthrough = SymbolPassthrough(passthrough.ListValue(1))
+	}
+	if locked, ok := readYesNoChild(node, "locked"); ok {
+		symbol.Locked = locked
+	}
+	if fieldsAutoplaced, ok := readYesNoChild(node, "fields_autoplaced"); ok {
+		symbol.FieldsAutoplaced = fieldsAutoplaced
 	}
 	for _, prop := range node.ChildrenByHead("property") {
 		property := readProperty(prop)
@@ -221,6 +246,9 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 	for _, pin := range node.ChildrenByHead("pin") {
 		symbol.Pins = append(symbol.Pins, SymbolPin{Number: pin.ListValue(1), UUID: readUUID(pin)})
 	}
+	if instances, ok := node.Child("instances"); ok {
+		symbol.Instances = readSymbolInstances(instances)
+	}
 	if len(symbol.PinAnchors) == 0 {
 		for _, pin := range templatePinsForReadSymbol(symbol) {
 			offset := transformedReadPinOffset(pin.Offset, symbol.Rotation, symbol.Mirror)
@@ -231,6 +259,29 @@ func readSymbol(node sexpr.ParsedNode) SchematicSymbol {
 		}
 	}
 	return symbol
+}
+
+func readSymbolInstances(node sexpr.ParsedNode) []SymbolInstance {
+	var instances []SymbolInstance
+	for _, project := range node.ChildrenByHead("project") {
+		projectName := project.ListValue(1)
+		for _, pathNode := range project.ChildrenByHead("path") {
+			instance := SymbolInstance{Project: projectName, Path: pathNode.ListValue(1)}
+			if reference, ok := pathNode.Child("reference"); ok {
+				instance.Reference = reference.ListValue(1)
+			}
+			if unit, ok := pathNode.Child("unit"); ok {
+				if value, ok := unit.FloatValue(1); ok {
+					instance.Unit = int(value)
+				}
+			}
+			if value, ok := pathNode.Child("value"); ok {
+				instance.Value = value.ListValue(1)
+			}
+			instances = append(instances, instance)
+		}
+	}
+	return instances
 }
 
 func transformedReadPinOffset(offset kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror) kicadfiles.Point {
@@ -291,7 +342,20 @@ func readYesNoChild(node sexpr.ParsedNode, head string) (bool, bool) {
 }
 
 func readLabel(node sexpr.ParsedNode, kind LabelKind) Label {
-	return Label{Kind: kind, Text: node.ListValue(1), UUID: readUUID(node), Position: readAtPoint(node)}
+	label := Label{Kind: kind, Text: node.ListValue(1), UUID: readUUID(node), Position: readAtPoint(node)}
+	if _, rotation, ok := readAt(node); ok {
+		label.Rotation = rotation
+	}
+	if shape, ok := node.Child("shape"); ok {
+		label.Shape = LabelShape(shape.ListValue(1))
+	}
+	if locked, ok := readYesNoChild(node, "locked"); ok {
+		label.Locked = locked
+	}
+	if fieldsAutoplaced, ok := readYesNoChild(node, "fields_autoplaced"); ok {
+		label.FieldsAutoplaced = fieldsAutoplaced
+	}
+	return label
 }
 
 func rawItem(node sexpr.ParsedNode, order int) RawSchematicItem {

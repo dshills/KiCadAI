@@ -61,6 +61,8 @@ func Read(data []byte) (PCBFile, error) {
 			board.Footprints = append(board.Footprints, readFootprint(child))
 		case "segment":
 			board.Tracks = append(board.Tracks, readTrack(child))
+		case "arc":
+			board.TrackArcs = append(board.TrackArcs, readTrackArc(child))
 		case "via":
 			board.Vias = append(board.Vias, readVia(child))
 		case "gr_line", "gr_rect", "gr_circle", "gr_arc", "gr_poly", "gr_text":
@@ -136,7 +138,7 @@ func readPad(node sexpr.ParsedNode) Pad {
 		}
 	}
 	if drill, ok := node.Child("drill"); ok {
-		pad.Drill = readPadDrill(drill)
+		pad.Drill, pad.DrillShape, pad.DrillSize = readPadDrill(drill)
 	}
 	if layers, ok := node.Child("layers"); ok {
 		pad.Layers = readPCBLayerList(layers)
@@ -165,6 +167,25 @@ func readTrack(node sexpr.ParsedNode) Track {
 		track.NetCode, track.NetName = readPCBNetRef(net)
 	}
 	return track
+}
+
+func readTrackArc(node sexpr.ParsedNode) TrackArc {
+	arc := TrackArc{UUID: readPCBUUID(node)}
+	arc.Start = readNamedPCBPoint(node, "start")
+	arc.Mid = readNamedPCBPoint(node, "mid")
+	arc.End = readNamedPCBPoint(node, "end")
+	if width, ok := node.Child("width"); ok {
+		if value, ok := width.FloatValue(1); ok {
+			arc.Width = kicadfiles.MM(value)
+		}
+	}
+	if layer, ok := node.Child("layer"); ok {
+		arc.Layer = kicadfiles.BoardLayer(layer.ListValue(1))
+	}
+	if net, ok := node.Child("net"); ok {
+		arc.NetCode, arc.NetName = readPCBNetRef(net)
+	}
+	return arc
 }
 
 func readVia(node sexpr.ParsedNode) Via {
@@ -318,23 +339,50 @@ func readPCBLayerList(node sexpr.ParsedNode) []kicadfiles.BoardLayer {
 	return layers
 }
 
-func readPadDrill(node sexpr.ParsedNode) kicadfiles.IU {
+func readPadDrill(node sexpr.ParsedNode) (kicadfiles.IU, string, kicadfiles.Point) {
 	if value, ok := node.FloatValue(1); ok {
-		return kicadfiles.MM(value)
+		drill := kicadfiles.MM(value)
+		return drill, "", kicadfiles.Point{X: drill, Y: drill}
 	}
-	if node.ListValue(1) == "oval" {
+	if len(node.Children) > 1 && node.ListValue(1) == "oval" {
 		x, xOK := node.FloatValue(2)
 		y, yOK := node.FloatValue(3)
-		switch {
-		case xOK && yOK && y > x:
-			return kicadfiles.MM(y)
-		case xOK:
-			return kicadfiles.MM(x)
-		case yOK:
-			return kicadfiles.MM(y)
+		if xOK && yOK && (x <= 0 || y <= 0) {
+			return 0, "oval", kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+		}
+		if xOK || yOK {
+			size := kicadfiles.Point{}
+			if xOK {
+				size.X = kicadfiles.MM(x)
+			}
+			if yOK {
+				size.Y = kicadfiles.MM(y)
+			}
+			if size.X == 0 {
+				size.X = size.Y
+			}
+			if size.Y == 0 {
+				size.Y = size.X
+			}
+			return smallestPositiveIU(size.X, size.Y), "oval", size
 		}
 	}
-	return 0
+	return 0, "", kicadfiles.Point{}
+}
+
+func smallestPositiveIU(a, b kicadfiles.IU) kicadfiles.IU {
+	switch {
+	case a <= 0 && b <= 0:
+		return 0
+	case a <= 0:
+		return b
+	case b <= 0:
+		return a
+	case a < b:
+		return a
+	default:
+		return b
+	}
 }
 
 func readPCBNetRef(node sexpr.ParsedNode) (int, string) {

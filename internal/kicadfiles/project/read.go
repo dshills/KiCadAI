@@ -67,6 +67,28 @@ func Read(data []byte) (ProjectFile, error) {
 			})
 		}
 	}
+	for sectionName := range preservableProjectSections() {
+		raw, ok := document[sectionName]
+		if !ok {
+			continue
+		}
+		var section map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &section); err != nil {
+			return ProjectFile{}, fmt.Errorf("%s: %w", sectionName, err)
+		}
+		for key, value := range section {
+			if _, modeled := modeledProjectSectionKeys(sectionName)[key]; modeled {
+				continue
+			}
+			if project.PreservedSections == nil {
+				project.PreservedSections = map[string]map[string]json.RawMessage{}
+			}
+			if project.PreservedSections[sectionName] == nil {
+				project.PreservedSections[sectionName] = map[string]json.RawMessage{}
+			}
+			project.PreservedSections[sectionName][key] = append(json.RawMessage(nil), value...)
+		}
+	}
 	for key, raw := range document {
 		if _, modeled := modeledProjectKeys()[key]; !modeled {
 			project.Preserved[key] = append(json.RawMessage(nil), raw...)

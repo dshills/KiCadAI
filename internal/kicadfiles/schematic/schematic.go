@@ -46,16 +46,17 @@ type EmbeddedSymbol struct {
 }
 
 type SchematicSymbol struct {
-	Raw              string
-	UUID             kicadfiles.UUID
-	Path             string
-	LibraryID        string
-	Reference        string
-	Value            string
-	Position         kicadfiles.Point
-	Rotation         kicadfiles.Angle
-	Mirror           SymbolMirror
-	Unit             int
+	Raw       string
+	UUID      kicadfiles.UUID
+	Path      string
+	LibraryID string
+	Reference string
+	Value     string
+	Position  kicadfiles.Point
+	Rotation  kicadfiles.Angle
+	Mirror    SymbolMirror
+	Unit      int
+	// BodyStyle maps to KiCad's body_style S-expression token.
 	BodyStyle        int
 	ExcludeFromSim   bool
 	InBOM            *bool
@@ -1642,12 +1643,16 @@ func renderSymbolInstances(instances []SymbolInstance) sexpr.List {
 		for _, instance := range projectInstances {
 			path := strings.TrimSpace(instance.Path)
 			reference := strings.TrimSpace(instance.Reference)
-			projectNodes = append(projectNodes, sexpr.L(
+			pathNodes := []sexpr.Node{
 				sexpr.A("path"),
 				sexpr.S(path),
 				sexpr.L(sexpr.A("reference"), sexpr.S(reference)),
 				sexpr.L(sexpr.A("unit"), sexpr.I(int64(defaultPositive(instance.Unit, 1)))),
-			))
+			}
+			if value := strings.TrimSpace(instance.Value); value != "" {
+				pathNodes = append(pathNodes, sexpr.L(sexpr.A("value"), sexpr.S(value)))
+			}
+			projectNodes = append(projectNodes, sexpr.L(pathNodes...))
 		}
 		nodes = append(nodes, sexpr.L(projectNodes...))
 	}

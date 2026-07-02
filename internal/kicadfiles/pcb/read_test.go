@@ -127,6 +127,52 @@ func TestReadWritePCBPreservesViaGeometryAndNet(t *testing.T) {
 	}
 }
 
+func TestReadWritePCBPreservesTrackArcsAndOvalDrills(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_pcb`,
+		`  (version 20260206)`,
+		`  (generator "pcbnew")`,
+		`  (generator_version "10.0.0")`,
+		`  (paper "A4")`,
+		`  (layers (0 "F.Cu" signal) (2 "B.Cu" signal))`,
+		`  (setup)`,
+		`  (net 0 "")`,
+		`  (net 1 "SLOT")`,
+		`  (footprint "Connector:Slot"`,
+		`    (layer "F.Cu")`,
+		`    (uuid "11111111-1111-5111-8111-111111111111")`,
+		`    (at 10 10 0)`,
+		`    (property "Reference" "J1" (at 10 8 0) (layer "F.SilkS") (uuid "22222222-2222-5222-8222-222222222222"))`,
+		`    (property "Value" "Slot" (at 10 12 0) (layer "F.Fab") (uuid "33333333-3333-5333-8333-333333333333"))`,
+		`    (path "/11111111-1111-5111-8111-111111111111")`,
+		`    (pad "1" thru_hole oval (at 0 0) (size 1.4 2.0) (drill oval 0.6 1.0) (layers "*.Cu" "*.Mask") (net 1 "SLOT") (uuid "44444444-4444-5444-8444-444444444444"))`,
+		`  )`,
+		`  (arc (start 20 20) (mid 22 18) (end 24 20) (width 0.25) (layer "F.Cu") (net 1) (uuid "55555555-5555-5555-8555-555555555555"))`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.TrackArcs) != 1 {
+		t.Fatalf("track arcs = %#v", read.TrackArcs)
+	}
+	pad := read.Footprints[0].Pads[0]
+	if pad.DrillShape != "oval" || pad.DrillSize != (kicadfiles.Point{X: kicadfiles.MM(0.6), Y: kicadfiles.MM(1.0)}) {
+		t.Fatalf("unexpected pad drill: %#v", pad)
+	}
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+	for _, want := range []string{"(arc", "(mid 22 18)", "(drill oval 0.6 1)"} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("output missing %s:\n%s", want, output)
+		}
+	}
+}
+
 func TestReadWritePCBPreservesNonLineDrawings(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_pcb`,
@@ -221,7 +267,19 @@ func TestReadPadDrillHandlesOvalDrill(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := readPadDrill(node); got != kicadfiles.MM(0.8) {
-		t.Fatalf("drill = %s, want %s", kicadfiles.ToMMString(got), kicadfiles.ToMMString(kicadfiles.MM(0.8)))
+	drill, shape, size := readPadDrill(node)
+	if drill != kicadfiles.MM(0.5) || shape != "oval" || size != (kicadfiles.Point{X: kicadfiles.MM(0.5), Y: kicadfiles.MM(0.8)}) {
+		t.Fatalf("drill = %s shape = %q size = %#v", kicadfiles.ToMMString(drill), shape, size)
+	}
+}
+
+func TestReadPadDrillRejectsZeroOvalDimension(t *testing.T) {
+	node, err := sexpr.Parse([]byte(`(drill oval 0.5 0)`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	drill, shape, size := readPadDrill(node)
+	if drill != 0 || shape != "oval" || size.Y != 0 {
+		t.Fatalf("drill = %s shape = %q size = %#v", kicadfiles.ToMMString(drill), shape, size)
 	}
 }

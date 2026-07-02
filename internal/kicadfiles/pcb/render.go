@@ -409,7 +409,7 @@ func renderPad(pad Pad, netName string) sexpr.List {
 		renderLayerList("layers", pad.Layers),
 	}
 	if pad.Drill > 0 {
-		nodes = append(nodes, sexpr.L(sexpr.A("drill"), fixed(pad.Drill)))
+		nodes = append(nodes, renderPadDrill(pad))
 	}
 	if pad.RemoveUnusedLayers != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("remove_unused_layers"), yesNo(*pad.RemoveUnusedLayers)))
@@ -436,6 +436,13 @@ func renderPad(pad Pad, netName string) sexpr.List {
 		nodes = append(nodes, renderTeardrops(*pad.Teardrops))
 	}
 	return sexpr.L(nodes...)
+}
+
+func renderPadDrill(pad Pad) sexpr.List {
+	if pad.DrillShape == "oval" && pad.DrillSize.X > 0 && pad.DrillSize.Y > 0 {
+		return sexpr.L(sexpr.A("drill"), sexpr.A("oval"), fixed(pad.DrillSize.X), fixed(pad.DrillSize.Y))
+	}
+	return sexpr.L(sexpr.A("drill"), fixed(pad.Drill))
 }
 
 func renderTeardrops(teardrops TeardropSettings) sexpr.List {

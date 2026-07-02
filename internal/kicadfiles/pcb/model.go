@@ -210,6 +210,8 @@ type Pad struct {
 	Rotation           kicadfiles.Angle
 	Size               kicadfiles.Point
 	Drill              kicadfiles.IU
+	DrillShape         string
+	DrillSize          kicadfiles.Point
 	Layers             []kicadfiles.BoardLayer
 	RemoveUnusedLayers *bool
 	ThermalBridgeAngle *float64

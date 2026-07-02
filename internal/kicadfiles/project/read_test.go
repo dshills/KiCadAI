@@ -48,6 +48,47 @@ func TestReadProjectPreservesUnknownTopLevelJSON(t *testing.T) {
 	}
 }
 
+func TestReadWriteProjectPreservesModeledSectionJSON(t *testing.T) {
+	data := []byte(`{
+  "board":{"design_settings":{"defaults":true},"visible_elements":"ffff"},
+  "erc":{"erc_exclusions":[{"symbol":"U1"}]},
+  "meta":{"version":1},
+  "net_settings":{"classes":[{"name":"Default","clearance":0.2,"track_width":0.25,"via_diameter":0.8,"via_drill":0.4}],"meta":"keep"},
+  "pcbnew":{"last_paths":{"gbr":"gerbers"}},
+  "sheets":[["11111111-1111-5111-8111-111111111111","Root"]],
+  "text_variables":{}
+}`)
+	read, err := Read(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	read.Name = "preserved_project"
+	read.DesignID = "22222222-2222-5222-8222-222222222222"
+	read.FormatVersion = kicadfiles.KiCadFormatV20260306
+	var buf bytes.Buffer
+	if err := Write(&buf, read); err != nil {
+		t.Fatal(err)
+	}
+	var out map[string]json.RawMessage
+	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
+		t.Fatal(err)
+	}
+	for section, key := range map[string]string{
+		"board":        "visible_elements",
+		"erc":          "erc_exclusions",
+		"net_settings": "meta",
+		"pcbnew":       "last_paths",
+	} {
+		var sectionDocument map[string]json.RawMessage
+		if err := json.Unmarshal(out[section], &sectionDocument); err != nil {
+			t.Fatalf("decode %s: %v\n%s", section, err, buf.String())
+		}
+		if len(sectionDocument[key]) == 0 {
+			t.Fatalf("missing preserved %s.%s in %s", section, key, buf.String())
+		}
+	}
+}
+
 func TestReadProjectRejectsMalformedModeledSections(t *testing.T) {
 	_, err := Read([]byte(`{"sheets":{}}`))
 	if err == nil {
