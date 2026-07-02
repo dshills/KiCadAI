@@ -1,19 +1,42 @@
 {
-  "record_count": 45,
-  "family_count": 12,
+  "record_count": 48,
+  "family_count": 13,
   "confidence_counts": {
-    "blocked": 0,
+    "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 4,
-    "verified": 37
+    "verified": 39
   },
   "alternative_coverage": {
-    "concrete_records": 25,
-    "generic_fallback_records": 20,
-    "equivalence_groups": 17
+    "concrete_records": 27,
+    "generic_fallback_records": 21,
+    "equivalence_groups": 19
   },
   "families": [
+    {
+      "family": "bjt",
+      "defined": true,
+      "record_count": 3,
+      "concrete_records": 2,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 2,
+      "verified_records": 2,
+      "library_derived_records": 0,
+      "rule_inferred_records": 0,
+      "placeholder_records": 0,
+      "blocked_records": 1,
+      "missing_resolver_evidence": [
+        "bjt.onsemi.mmbt3904.sot23",
+        "bjt.onsemi.mmbt3906.sot23",
+        "bjt.placeholder.npn_power_output.to220"
+      ],
+      "record_ids": [
+        "bjt.onsemi.mmbt3904.sot23",
+        "bjt.onsemi.mmbt3906.sot23",
+        "bjt.placeholder.npn_power_output.to220"
+      ]
+    },
     {
       "family": "capacitor",
       "defined": true,

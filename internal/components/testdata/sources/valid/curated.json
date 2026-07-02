@@ -325,6 +325,38 @@
         "source_date": "2026-06-26",
         "confidence": "not_checked"
       }
+    },
+    {
+      "manufacturer": "onsemi",
+      "mpn": "MMBT3904LT1G",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "onsemi",
+      "mpn": "MMBT3906LT1G",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
     }
   ]
 }

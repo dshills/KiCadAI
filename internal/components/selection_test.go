@@ -642,6 +642,84 @@ func TestSelectRejectsOpAmpBelowMinimumSupplyRange(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
 }
 
+func TestSelectConcreteNPNBJTByPackageAndFunctions(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Text: "npn", Family: "bjt", Package: "sot23"},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequiredFunctions: []string{"BASE", "EMITTER", "COLLECTOR"},
+		RequiredRatings: []RequiredRating{{
+			Kind:  "collector_current",
+			Value: "100",
+			Unit:  "mA",
+		}},
+	})
+	if !result.OK {
+		t.Fatalf("select NPN BJT failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "bjt.onsemi.mmbt3904.sot23" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected NPN selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+	wantPads := map[string]string{"BASE": "1", "EMITTER": "2", "COLLECTOR": "3"}
+	for _, padFunction := range selection.Variant.PadFunctions {
+		if want, ok := wantPads[padFunction.Function]; ok && padFunction.Pad != want {
+			t.Fatalf("BJT %s mapped to pad %s, want %s", padFunction.Function, padFunction.Pad, want)
+		}
+	}
+}
+
+func TestSelectConcretePNPBJTByPackageAndFunctions(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Text: "pnp", Family: "bjt", Package: "sot23"},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequiredFunctions: []string{"BASE", "EMITTER", "COLLECTOR"},
+	})
+	if !result.OK {
+		t.Fatalf("select PNP BJT failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "bjt.onsemi.mmbt3906.sot23" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected PNP selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+	wantPads := map[string]string{"BASE": "1", "EMITTER": "2", "COLLECTOR": "3"}
+	for _, padFunction := range selection.Variant.PadFunctions {
+		if want, ok := wantPads[padFunction.Function]; ok && padFunction.Pad != want {
+			t.Fatalf("PNP BJT %s mapped to pad %s, want %s", padFunction.Function, padFunction.Pad, want)
+		}
+	}
+}
+
+func TestSelectRejectsSmallSignalBJTOverCurrent(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Text: "npn", Family: "bjt", Package: "sot23"},
+		Acceptance: AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "collector_current",
+			Value: "500",
+			Unit:  "mA",
+		}},
+	})
+	if result.OK {
+		t.Fatal("expected small-signal BJT over-current request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectBlocksPowerBJTPlaceholderForConnectivity(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "bjt", Package: "to220"},
+		Acceptance: AcceptanceConnectivity,
+	})
+	if result.OK {
+		t.Fatal("expected blocked power BJT placeholder to fail connectivity selection")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentUnsafe)
+}
+
 func TestSelectWithRejectedPlaceholderAlternativeStillSucceeds(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{

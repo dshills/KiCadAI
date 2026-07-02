@@ -45,6 +45,124 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
     },
     {
+      "id": "bjt.onsemi.mmbt3904.sot23",
+      "family": "bjt",
+      "name": "onsemi MMBT3904 NPN small-signal transistor",
+      "description": "Concrete NPN BJT seed part for low-current amplifier bias, switching, and small-signal stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "MMBT3904LT1G",
+      "lifecycle": "active",
+      "equivalence": {"group": "bjt.npn.small_signal.sot23", "role": "preferred"},
+      "tags": ["bjt", "npn", "small_signal", "sot23", "amplifier_seed"],
+      "ratings": [
+        {"kind": "collector_current", "max": "200", "unit": "mA"},
+        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"}
+      ],
+      "symbols": [{
+        "symbol_id": "Device:Q_NPN_BEC",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
+          {"function": "EMITTER", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["E"]},
+          {"function": "COLLECTOR", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["C"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot23",
+        "name": "SOT-23",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "package_type": "sot23",
+        "mpn": "MMBT3904LT1G",
+        "lifecycle": "active",
+        "pinmap_id": "Device:Q_NPN_BEC|Package_TO_SOT_SMD:SOT-23",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "EMITTER", "pad": "2", "aliases": ["E"]},
+          {"function": "COLLECTOR", "pad": "3", "aliases": ["C"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+    },
+    {
+      "id": "bjt.onsemi.mmbt3906.sot23",
+      "family": "bjt",
+      "name": "onsemi MMBT3906 PNP small-signal transistor",
+      "description": "Concrete PNP BJT seed part for complementary low-current amplifier and bias stages.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "MMBT3906LT1G",
+      "lifecycle": "active",
+      "equivalence": {"group": "bjt.pnp.small_signal.sot23", "role": "preferred"},
+      "tags": ["bjt", "pnp", "small_signal", "sot23", "amplifier_seed"],
+      "ratings": [
+        {"kind": "collector_current", "max": "200", "unit": "mA"},
+        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"}
+      ],
+      "symbols": [{
+        "symbol_id": "Device:Q_PNP_BEC",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
+          {"function": "EMITTER", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["E"]},
+          {"function": "COLLECTOR", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["C"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sot23",
+        "name": "SOT-23",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "package_type": "sot23",
+        "mpn": "MMBT3906LT1G",
+        "lifecycle": "active",
+        "pinmap_id": "Device:Q_PNP_BEC|Package_TO_SOT_SMD:SOT-23",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "EMITTER", "pad": "2", "aliases": ["E"]},
+          {"function": "COLLECTOR", "pad": "3", "aliases": ["C"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+    },
+    {
+      "id": "bjt.placeholder.npn_power_output.to220",
+      "family": "bjt",
+      "name": "Blocked TO-220 NPN power output BJT placeholder",
+      "description": "Fail-closed placeholder for NPN power amplifier output devices until pinout, thermal, and SOA evidence are modeled.",
+      "generic": true,
+      "lifecycle": "unknown",
+      "tags": ["bjt", "npn", "power_output", "to220", "blocked", "amplifier_seed"],
+      "symbols": [{
+        "symbol_id": "Device:Q_NPN_BEC",
+        "function_pins": [
+          {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
+          {"function": "EMITTER", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["E"]},
+          {"function": "COLLECTOR", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["C"]}
+        ],
+        "verification": {"confidence": "blocked", "sources": ["blocked:power_bjt_needs_pinout_thermal_soa"], "pinmap_checked": false}
+      }],
+      "packages": [{
+        "id": "to220",
+        "name": "TO-220",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "package_type": "to220",
+        "pinmap_id": "Device:Q_NPN_BEC|Package_TO_SOT_THT:TO-220-3_Vertical",
+        "pad_functions": [
+          {"function": "BASE", "pad": "1", "aliases": ["B"]},
+          {"function": "COLLECTOR", "pad": "2", "aliases": ["C"]},
+          {"function": "EMITTER", "pad": "3", "aliases": ["E"]}
+        ],
+        "verification": {"confidence": "blocked", "sources": ["blocked:power_bjt_needs_pinout_thermal_soa"], "pinmap_checked": false}
+      }],
+      "derating_rules": [
+        {"kind": "thermal", "description": "Power transistor selection requires package thermal model, heatsink strategy, and board copper assumptions."},
+        {"kind": "safe_operating_area", "description": "Power amplifier output devices require SOA checks for rail voltage, load impedance, and fault cases."}
+      ],
+      "verification": {"confidence": "blocked", "sources": ["blocked:power_bjt_needs_pinout_thermal_soa"], "pinmap_checked": false, "notes": ["Use explicit verified output transistor records before fabrication."]}
+    },
+    {
       "id": "sensor.bosch.bme280.lga8",
       "family": "sensor",
       "name": "Bosch BME280 I2C/SPI environmental sensor",

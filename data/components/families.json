@@ -1,6 +1,7 @@
 {
   "version": "0.1.0",
   "families": [
+    {"id": "bjt", "name": "Bipolar Junction Transistor", "description": "Small-signal and power BJT devices."},
     {"id": "capacitor", "name": "Capacitor", "description": "Charge storage and decoupling components."},
     {"id": "connector", "name": "Connector", "description": "Board interconnects and headers."},
     {"id": "crystal", "name": "Crystal", "description": "Quartz crystals and resonators for timing circuits."},
