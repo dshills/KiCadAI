@@ -488,6 +488,36 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 	}
 }
 
+func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	result := Create(ctx, request, CreateOptions{})
+	routingStage, ok := workflowStageForRoutingTest(result, StageRouting)
+	if !ok {
+		t.Fatalf("stages = %#v, want routing stage", result.Stages)
+	}
+	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
+	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 11 || contactGraph.CompleteGroups != 3 || contactGraph.PartialGroups != 1 {
+		t.Fatalf("contact graph = %#v, want required=12 proven=11 complete=3 partial=1 VCC proof-gap baseline", contactGraph)
+	}
+	repair := requireRouteTreeRepairSummary(t, routingStage)
+	if !stringSliceContains(repair.Nets, "VCC") {
+		t.Fatalf("route-tree repair summary = %#v, want VCC blocker evidence", repair)
+	}
+	if repair.HintCount == 0 || repair.RepairableFailures == 0 {
+		t.Fatalf("route-tree repair summary = %#v, want repairable VCC route-tree hints", repair)
+	}
+	vccIssues := routeTreeIssuesForNet(routingStage.Issues, "VCC")
+	if len(vccIssues) == 0 {
+		t.Fatalf("routing issues = %#v, want VCC route-tree/contact issues", routingStage.Issues)
+	}
+	if !routeTreeIssuesContainCode(vccIssues, reports.CodeRouteContactMiss) && !routeTreeIssuesContainMessage(vccIssues, "no legal") {
+		t.Fatalf("VCC issues = %#v, want contact-miss or pathfinding blocker", vccIssues)
+	}
+}
+
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 	nets := map[string]bool{}
 	for _, connection := range connections {
@@ -766,6 +796,42 @@ func assertNoIssueCode(t *testing.T, issues []reports.Issue, code reports.Code) 
 
 func stageUsableForRoutingTest(stage StageResult) bool {
 	return stage.Status == StageStatusOK || stage.Status == StageStatusWarning
+}
+
+func routeTreeIssuesForNet(issues []reports.Issue, netName string) []reports.Issue {
+	netName = strings.TrimSpace(netName)
+	out := []reports.Issue{}
+	for _, issue := range issues {
+		if !strings.Contains(issue.Path, "route_tree") && !strings.Contains(issue.Path, "inter_block_route_groups") && !strings.Contains(issue.Path, "inter_block_contact") {
+			continue
+		}
+		for _, issueNet := range issue.Nets {
+			if strings.EqualFold(strings.TrimSpace(issueNet), netName) {
+				out = append(out, issue)
+				break
+			}
+		}
+	}
+	return out
+}
+
+func routeTreeIssuesContainCode(issues []reports.Issue, code reports.Code) bool {
+	for _, issue := range issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
+}
+
+func routeTreeIssuesContainMessage(issues []reports.Issue, text string) bool {
+	lowerText := strings.ToLower(text)
+	for _, issue := range issues {
+		if strings.Contains(strings.ToLower(issue.Message), lowerText) {
+			return true
+		}
+	}
+	return false
 }
 
 func requireInterBlockRouteSummary(t *testing.T, stage StageResult) InterBlockRouteCompletionSummary {
