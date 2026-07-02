@@ -563,6 +563,115 @@ func TestValidateCatalogTemperaturePath(t *testing.T) {
 	t.Fatalf("expected temperature min path in %+v", result.Issues)
 }
 
+func TestValidateCatalogRegulatorEvidenceRejectsMalformedStability(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(record *ComponentRecord)
+		path   string
+	}{
+		{
+			name: "invalid stability kind",
+			mutate: func(record *ComponentRecord) {
+				record.Regulator = &RegulatorEvidence{OutputCapacitor: &RegulatorCapacitorStability{
+					Kind:            "magic",
+					MinCapacitance:  "10u",
+					CapacitanceUnit: "F",
+				}}
+			},
+			path: "records[0].regulator_evidence.output_capacitor.kind",
+		},
+		{
+			name: "missing required capacitance",
+			mutate: func(record *ComponentRecord) {
+				record.Regulator = &RegulatorEvidence{OutputCapacitor: &RegulatorCapacitorStability{
+					Kind: "ceramic_stable",
+				}}
+			},
+			path: "records[0].regulator_evidence.output_capacitor.min_capacitance",
+		},
+		{
+			name: "ESR minimum greater than maximum",
+			mutate: func(record *ComponentRecord) {
+				record.Regulator = &RegulatorEvidence{OutputCapacitor: &RegulatorCapacitorStability{
+					Kind:            "esr_window_required",
+					MinCapacitance:  "10u",
+					CapacitanceUnit: "F",
+					ESRMin:          "2",
+					ESRMax:          "0.5",
+					ESRUnit:         "ohm",
+				}}
+			},
+			path: "records[0].regulator_evidence.output_capacitor.esr_min",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			tt.mutate(&catalog.Records[0])
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected validation to fail")
+			}
+			assertIssueCode(t, result.Issues, CodeInvalidMetadata)
+			assertIssuePath(t, result.Issues, tt.path)
+		})
+	}
+}
+
+func TestValidateCatalogCapacitorEvidenceRejectsMalformedMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(record *ComponentRecord)
+		path   string
+	}{
+		{
+			name: "invalid nominal capacitance",
+			mutate: func(record *ComponentRecord) {
+				record.Capacitor = &CapacitorEvidence{
+					NominalCapacitance: "many",
+					CapacitanceUnit:    "F",
+				}
+			},
+			path: "records[0].capacitor_evidence.nominal_capacitance",
+		},
+		{
+			name: "invalid voltage rating",
+			mutate: func(record *ComponentRecord) {
+				record.Capacitor = &CapacitorEvidence{
+					VoltageRating: "high",
+					VoltageUnit:   "V",
+				}
+			},
+			path: "records[0].capacitor_evidence.voltage_rating",
+		},
+		{
+			name: "generic fabrication proof",
+			mutate: func(record *ComponentRecord) {
+				record.Capacitor = &CapacitorEvidence{
+					NominalCapacitance: "100n",
+					CapacitanceUnit:    "F",
+					FabricationProof:   true,
+				}
+			},
+			path: "records[0].capacitor_evidence.fabrication_proof",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			catalog.Records[0].Family = "capacitor"
+			catalog.Families = append(catalog.Families, FamilyDefinition{ID: "capacitor", Name: "Capacitor"})
+			tt.mutate(&catalog.Records[0])
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected validation to fail")
+			}
+			assertIssueCode(t, result.Issues, CodeInvalidMetadata)
+			assertIssuePath(t, result.Issues, tt.path)
+		})
+	}
+}
+
 func validCatalog() Catalog {
 	return Catalog{
 		Version: CatalogVersion,
@@ -647,4 +756,14 @@ func assertIssueCode(t *testing.T, issues []reports.Issue, code reports.Code) {
 		}
 	}
 	t.Fatalf("expected issue code %s in %+v", code, issues)
+}
+
+func assertIssuePath(t *testing.T, issues []reports.Issue, path string) {
+	t.Helper()
+	for _, issue := range issues {
+		if issue.Path == path {
+			return
+		}
+	}
+	t.Fatalf("expected issue path %s in %+v", path, issues)
 }

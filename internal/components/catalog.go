@@ -150,6 +150,8 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateTemperatureRange(path+".temperature", record.Temperature)...)
 		issues = append(issues, validateCompanions(path+".companions", record.Companions)...)
 		issues = append(issues, validateDeratingRules(path+".derating_rules", record.DeratingRules)...)
+		issues = append(issues, validateRegulatorEvidence(path+".regulator_evidence", record.Regulator)...)
+		issues = append(issues, validateCapacitorEvidence(path+".capacitor_evidence", record.Generic, record.Capacitor)...)
 		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
 		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
 		issues = append(issues, validateSchematicProperties(path+".properties", record.Properties)...)
@@ -364,6 +366,126 @@ func validateDeratingRules(path string, rules []DeratingRule) []reports.Issue {
 		}
 	}
 	return issues
+}
+
+func validateRegulatorEvidence(path string, evidence *RegulatorEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	issues = append(issues, validateReviewStatus(path+".thermal_review", evidence.ThermalReview, "thermal review")...)
+	if evidence.OutputCapacitor != nil {
+		issues = append(issues, validateRegulatorCapacitorStability(path+".output_capacitor", *evidence.OutputCapacitor)...)
+	}
+	return issues
+}
+
+func validateRegulatorCapacitorStability(path string, stability RegulatorCapacitorStability) []reports.Issue {
+	var issues []reports.Issue
+	switch stability.Kind {
+	case "ceramic_stable", "esr_window_required", "datasheet_specific", "unknown":
+	case "":
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".kind", "regulator capacitor stability kind is required"))
+	default:
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".kind", "invalid regulator capacitor stability kind: "+stability.Kind))
+	}
+	if strings.TrimSpace(stability.ProofStatus) != "" {
+		switch stability.ProofStatus {
+		case "proven", "review_required", "blocked", "unknown":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".proof_status", "invalid regulator capacitor stability proof status: "+stability.ProofStatus))
+		}
+	}
+	if stability.Kind != "" && strings.TrimSpace(stability.MinCapacitance) == "" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".min_capacitance", "regulator capacitor stability requires minimum capacitance"))
+	}
+	issues = append(issues, validateEvidenceEngineeringValue(path+".min_capacitance", stability.MinCapacitance, path+".capacitance_unit", stability.CapacitanceUnit, "minimum capacitance")...)
+	issues = append(issues, validateEvidenceEngineeringValue(path+".max_capacitance", stability.MaxCapacitance, path+".capacitance_unit", stability.CapacitanceUnit, "maximum capacitance")...)
+	issues = append(issues, validateEvidenceEngineeringValue(path+".esr_min", stability.ESRMin, path+".esr_unit", stability.ESRUnit, "minimum ESR")...)
+	issues = append(issues, validateEvidenceEngineeringValue(path+".esr_max", stability.ESRMax, path+".esr_unit", stability.ESRUnit, "maximum ESR")...)
+	if strings.TrimSpace(stability.MinCapacitance) != "" && strings.TrimSpace(stability.MaxCapacitance) != "" {
+		min, minOK := parseEvidenceEngineeringValue(stability.MinCapacitance, stability.CapacitanceUnit)
+		max, maxOK := parseEvidenceEngineeringValue(stability.MaxCapacitance, stability.CapacitanceUnit)
+		if minOK && maxOK && min > max {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".min_capacitance", "minimum capacitance must not exceed maximum capacitance"))
+		}
+	}
+	if strings.TrimSpace(stability.ESRMin) != "" && strings.TrimSpace(stability.ESRMax) != "" {
+		min, minOK := parseEvidenceEngineeringValue(stability.ESRMin, stability.ESRUnit)
+		max, maxOK := parseEvidenceEngineeringValue(stability.ESRMax, stability.ESRUnit)
+		if minOK && maxOK && min > max {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".esr_min", "minimum ESR must not exceed maximum ESR"))
+		}
+	}
+	for i, dielectric := range stability.AcceptedDielectrics {
+		if issue, ok := validateTrimmedMetadata(fmt.Sprintf("%s.accepted_dielectrics[%d]", path, i), dielectric, "accepted dielectric"); ok {
+			issues = append(issues, issue)
+		} else if dielectric == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, fmt.Sprintf("%s.accepted_dielectrics[%d]", path, i), "accepted dielectric is required"))
+		}
+	}
+	return issues
+}
+
+func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	if issue, ok := validateTrimmedMetadata(path+".dielectric", evidence.Dielectric, "capacitor dielectric"); ok {
+		issues = append(issues, issue)
+	}
+	issues = append(issues, validateEvidenceEngineeringValue(path+".nominal_capacitance", evidence.NominalCapacitance, path+".capacitance_unit", evidence.CapacitanceUnit, "nominal capacitance")...)
+	issues = append(issues, validateEvidenceEngineeringValue(path+".voltage_rating", evidence.VoltageRating, path+".voltage_unit", evidence.VoltageUnit, "voltage rating")...)
+	for _, status := range []struct {
+		path  string
+		value string
+		label string
+	}{
+		{path: path + ".dc_bias_review", value: evidence.DCBiasReview, label: "DC-bias review"},
+		{path: path + ".effective_capacitance_review", value: evidence.EffectiveCapacitanceReview, label: "effective-capacitance review"},
+		{path: path + ".esr_review", value: evidence.ESRReview, label: "ESR review"},
+	} {
+		issues = append(issues, validateReviewStatus(status.path, status.value, status.label)...)
+	}
+	if generic && evidence.FabricationProof {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "generic capacitor records cannot carry fabrication proof"))
+	}
+	return issues
+}
+
+func validateEvidenceEngineeringValue(path string, value string, unitPath string, unit string, label string) []reports.Issue {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	if strings.TrimSpace(unit) == "" {
+		return []reports.Issue{NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, unitPath, label+" unit is required")}
+	}
+	if _, ok := parseEvidenceEngineeringValue(value, unit); !ok {
+		return []reports.Issue{NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, label+" cannot be parsed: "+value+" "+unit)}
+	}
+	return nil
+}
+
+func validateReviewStatus(path string, value string, label string) []reports.Issue {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	switch value {
+	case "proven", "review_required", "blocked", "unknown", "not_applicable":
+		return nil
+	default:
+		return []reports.Issue{NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "invalid "+label+" status: "+value)}
+	}
+}
+
+func parseEvidenceEngineeringValue(value string, unit string) (float64, bool) {
+	compact := strings.TrimSpace(value + unit)
+	if number, ok := parseLeadingEngineeringNumber(compact); ok {
+		return number, true
+	}
+	spaced := strings.TrimSpace(value + " " + unit)
+	return parseLeadingEngineeringNumber(spaced)
 }
 
 func validatePlacementHints(path string, hints []PlacementHint) []reports.Issue {

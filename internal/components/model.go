@@ -91,6 +91,8 @@ type ComponentRecord struct {
 	Packages        []PackageVariant       `json:"packages,omitempty"`
 	Companions      []CompanionRequirement `json:"companions,omitempty"`
 	DeratingRules   []DeratingRule         `json:"derating_rules,omitempty"`
+	Regulator       *RegulatorEvidence     `json:"regulator_evidence,omitempty"`
+	Capacitor       *CapacitorEvidence     `json:"capacitor_evidence,omitempty"`
 	PlacementHints  []PlacementHint        `json:"placement_hints,omitempty"`
 	RoutingHints    []RoutingHint          `json:"routing_hints,omitempty"`
 	Properties      []SchematicProperty    `json:"properties,omitempty"`
@@ -206,6 +208,40 @@ type DeratingRule struct {
 	Kind        string `json:"kind"`
 	Expression  string `json:"expression,omitempty"`
 	Description string `json:"description,omitempty"`
+}
+
+type RegulatorEvidence struct {
+	OutputCapacitor *RegulatorCapacitorStability `json:"output_capacitor,omitempty"`
+	ThermalReview   string                       `json:"thermal_review,omitempty"`
+	Notes           []string                     `json:"notes,omitempty"`
+}
+
+type RegulatorCapacitorStability struct {
+	Kind                       string   `json:"kind"`
+	MinCapacitance             string   `json:"min_capacitance,omitempty"`
+	MaxCapacitance             string   `json:"max_capacitance,omitempty"`
+	CapacitanceUnit            string   `json:"capacitance_unit,omitempty"`
+	AcceptedDielectrics        []string `json:"accepted_dielectrics,omitempty"`
+	ESRMin                     string   `json:"esr_min,omitempty"`
+	ESRMax                     string   `json:"esr_max,omitempty"`
+	ESRUnit                    string   `json:"esr_unit,omitempty"`
+	ProofStatus                string   `json:"proof_status,omitempty"`
+	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string   `json:"review_note,omitempty"`
+}
+
+type CapacitorEvidence struct {
+	Dielectric                 string `json:"dielectric,omitempty"`
+	NominalCapacitance         string `json:"nominal_capacitance,omitempty"`
+	CapacitanceUnit            string `json:"capacitance_unit,omitempty"`
+	VoltageRating              string `json:"voltage_rating,omitempty"`
+	VoltageUnit                string `json:"voltage_unit,omitempty"`
+	DCBiasReview               string `json:"dc_bias_review,omitempty"`
+	EffectiveCapacitanceReview string `json:"effective_capacitance_review,omitempty"`
+	ESRReview                  string `json:"esr_review,omitempty"`
+	FabricationProof           bool   `json:"fabrication_proof,omitempty"`
+	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string `json:"review_note,omitempty"`
 }
 
 type PlacementHint struct {
