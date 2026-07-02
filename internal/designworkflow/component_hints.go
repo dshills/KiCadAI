@@ -1,8 +1,11 @@
 package designworkflow
 
 import (
+	"fmt"
 	"slices"
 	"strings"
+
+	"kicadai/internal/reports"
 )
 
 type ComponentHintKind string
@@ -137,6 +140,50 @@ func SummarizeComponentHints(hints []ComponentHintEvidence) ComponentHintSummary
 		}
 	}
 	return summary
+}
+
+func ComponentHintIssues(hints []ComponentHintEvidence) []reports.Issue {
+	issues := make([]reports.Issue, 0, len(hints))
+	for _, hint := range hints {
+		if !componentHintStatusNeedsIssue(hint.Status) {
+			continue
+		}
+		message := hint.Message
+		if strings.TrimSpace(message) == "" {
+			message = fmt.Sprintf("component hint %s is %s", hint.Kind, hint.Status)
+		}
+		issue := reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityWarning,
+			Path:       "component_hints." + stablePlacementRuleID(hint.ID),
+			Message:    message,
+			Suggestion: componentHintIssueSuggestion(hint.Status),
+		}
+		issues = append(issues, issue)
+	}
+	return issues
+}
+
+func componentHintIssueSuggestion(status ComponentHintStatus) string {
+	switch status {
+	case ComponentHintFailed:
+		return "check the generated layout against the selected component hint requirement"
+	case ComponentHintSkipped:
+		return "add missing role, ref, pin, or net evidence so the hint can be evaluated"
+	case ComponentHintUnsupported:
+		return "verify whether this hint kind is supported by the current KiCadAI workflow"
+	default:
+		return "review selected component hint evidence before fabrication"
+	}
+}
+
+func componentHintStatusNeedsIssue(status ComponentHintStatus) bool {
+	switch status {
+	case ComponentHintUnsupported, ComponentHintSkipped, ComponentHintFailed:
+		return true
+	default:
+		return false
+	}
 }
 
 func componentHintStatusSupported(status ComponentHintStatus) bool {

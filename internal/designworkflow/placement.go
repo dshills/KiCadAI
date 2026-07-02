@@ -98,6 +98,7 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	componentHintResult := componentPlacementHintRules(opts.ComponentSelections, fragments)
 	placementRequest.ProximityRules = append(placementRequest.ProximityRules, componentHintResult.Rules...)
+	issues = append(issues, ComponentHintIssues(componentHintResult.Evidence)...)
 	issues = append(issues, addPlacementConnectionNets(&placementRequest, netIndexes, normalized, fragments)...)
 	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
 	issues = append(issues, padIssues...)

@@ -117,6 +117,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	interBlockCandidates, interBlockCandidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
 	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
 	componentHintResult := componentRoutingHints(opts.ComponentSelections, fragments)
+	componentHintIssues := ComponentHintIssues(componentHintResult.Evidence)
 	if opts.Skip || normalized.Validation.SkipRouting {
 		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
 			"reason":               "routing skipped",
@@ -125,6 +126,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...), InterBlockContactEvidence{}),
 		}}
 		addComponentHintSummaryToStage(&stage, componentHintResult.Evidence)
+		stage.Issues = append(stage.Issues, componentHintIssues...)
 		stage.Issues = append(stage.Issues, localRouteIssues...)
 		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
@@ -139,6 +141,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...), InterBlockContactEvidence{}),
 		}}
 		addComponentHintSummaryToStage(&stage, componentHintResult.Evidence)
+		stage.Issues = append(stage.Issues, componentHintIssues...)
 		stage.Issues = append(stage.Issues, localRouteIssues...)
 		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
@@ -148,6 +151,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	anchorBindings, anchorOperations, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, true, opts)
 
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
+	issues = append(issues, componentHintIssues...)
 	issues = append(issues, localRouteIssues...)
 	issues = append(issues, interBlockCandidateIssues...)
 	issues = append(issues, anchorIssues...)

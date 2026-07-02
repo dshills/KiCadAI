@@ -6,6 +6,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/components"
+	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
 
@@ -56,6 +57,26 @@ func TestNormalizeComponentHintsDeduplicatesDeterministically(t *testing.T) {
 	}
 	if hints[0].Target != "input_capacitor" || hints[1].Target != "output_capacitor" {
 		t.Fatalf("hints not sorted deterministically: %#v", hints)
+	}
+}
+
+func TestComponentHintIssuesWarnOnFailedSkippedAndUnsupported(t *testing.T) {
+	hints := []ComponentHintEvidence{
+		{ID: "failed", Kind: "net_class", NetRole: "power", Status: ComponentHintFailed, Message: "width failed"},
+		{ID: "skipped", Kind: "near", Role: "regulator", Status: ComponentHintSkipped, Message: "missing ref"},
+		{ID: "unsupported", Kind: "short_loop", Status: ComponentHintUnsupported, Message: "unsupported"},
+		{ID: "ok", Kind: "near", Status: ComponentHintEnforced},
+		{ID: "pending", Kind: "edge", Status: ComponentHintPending},
+	}
+
+	issues := ComponentHintIssues(hints)
+	if len(issues) != 3 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	for _, issue := range issues {
+		if issue.Code != reports.CodeValidationFailed || issue.Severity != reports.SeverityWarning {
+			t.Fatalf("issue = %#v", issue)
+		}
 	}
 }
 
