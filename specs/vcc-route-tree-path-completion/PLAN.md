@@ -8,11 +8,28 @@ Close the next concrete routing blocker after route-tree VCC proof closeout:
 make the I2C fixture's remaining VCC route-tree branch complete when legal, or
 produce narrower same-net merge and obstacle evidence for the next repair loop.
 
+## Implementation Status
+
+- Phases 1 through 6 are complete as of 2026-07-02.
+- Latest fixture evidence remains honest `expected_fail` evidence rather than
+  promotion evidence: the I2C fixture proves 10 of 12 required contacts across
+  local-route and inter-block graph operations, while all four
+  route-tree-managed groups are still blocked at branch execution.
+- VCC is not graph-complete yet. The latest selected attempt reports VCC/SDA
+  same-net graph splits plus VCC/GND branch pathfinding blockers.
+- Same-net merge evidence now proves that pads, generated local routes, and
+  existing same-net copper can be hydrated into route-tree contact candidates.
+  It should be read as internal graph evidence, not as KiCad ERC/DRC-clean
+  proof.
+- The next follow-up is route-tree branch pathfinding/contact graph repair for
+  the selected VCC/GND/SDA blockers, followed by rerunning the KiCad-backed I2C
+  fixture and only then considering promotion from `expected_fail`.
+
 ## Phase 1: Lock Current VCC Failure Evidence
 
 ### Goals
 
-- Freeze the current VCC-only failure boundary.
+- Freeze the current selected route-tree failure boundary.
 - Prevent regression back to broad SDA/GND route-tree blockers.
 - Make the selected VCC access attempts easy to inspect in tests.
 
@@ -269,4 +286,3 @@ produce narrower same-net merge and obstacle evidence for the next repair loop.
 - Run `prism review staged`.
 - Fix high and medium findings.
 - Commit message: `Document VCC route completion status`.
-

@@ -218,14 +218,15 @@ loop confidence:
   anchors, required/proven endpoints, and graph group completion evidence.
   Route-tree repair classifies branch/contact failures, emits repairable
   hints, feeds bounded placement retry, and selects attempts using route-tree
-  completion evidence. The latest selected attempt proves 11 of 12 required
-  contacts with three complete route-tree contact-graph groups and one partial
-  contact-graph group. The remaining selected-attempt blocker is VCC-specific:
-  one graph-split contact proof plus two branch-scoped pathfinding blockers.
-  Route-tree diagnostics now separate fixed-net skip notices and
-  missing-net-class warnings from repairable blockers. The remaining
-  layout-quality blockers are final VCC route-tree branch path completion,
-  richer generated-board validation, and KiCad ERC/DRC-clean evidence.
+  completion evidence. The latest selected attempt proves 10 of 12 required
+  contacts across local-route and inter-block graph operations, but all four
+  route-tree-managed groups remain blocked at branch execution. The current
+  selected-attempt blockers are VCC/SDA same-net graph splits plus VCC/GND
+  branch-scoped pathfinding blockers. Route-tree diagnostics now separate
+  fixed-net skip notices and missing-net-class warnings from repairable
+  blockers. The remaining layout-quality blockers are route-tree branch
+  pathfinding/contact graph proof for VCC/GND/SDA, richer generated-board
+  validation, and KiCad ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
@@ -420,10 +421,11 @@ Implemented foundation.
   to physical same-net pad anchors for LED, connector/LED, and I2C local-route
   fixtures. Connector/LED has candidate-level inter-block contact evidence, and
   I2C sensor breakout now has promoted VCC/GND/SDA/SCL alias propagation,
-  route-tree-managed inter-block nets, endpoint-access evidence, contact graph
-  completion evidence, classified route-tree repair hints, retry selection
-  based on route-tree completion evidence, and explicit selected-attempt
-  VCC route-completion/contact blockers. The
+  route-tree-managed inter-block nets, endpoint-access evidence, local-route
+  and same-net copper merge evidence, contact graph completion evidence,
+  classified route-tree repair hints, retry selection based on route-tree
+  completion evidence, and explicit selected-attempt VCC/SDA graph-split plus
+  VCC/GND branch pathfinding blockers. The
   `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
   even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
