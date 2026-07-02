@@ -94,10 +94,12 @@ and KiCad-backed evidence passes.
 The routing stage also exposes `inter_block_route_trees` when generated
 inter-block nets are managed by route-tree execution instead of the fallback
 net-level router. That summary includes planned/attempted/complete/partial/
-blocked group counts, planned/attempted/routed/blocked branch counts, issue
-counts, and `managed_nets`. Managed nets are intentionally removed from the
-fallback `routing.Request.Nets` list to avoid double-routing; use
-`inter_block_route_trees.managed_nets` to see route-tree ownership.
+blocked group counts, planned/attempted/routed/blocked branch counts, total
+`issue_count`, `blocking_issue_count`, `warning_issue_count`,
+`info_issue_count`, `fixed_net_skip_notices`, and `managed_nets`. Managed nets
+are intentionally removed from the fallback `routing.Request.Nets` list to
+avoid double-routing; use `inter_block_route_trees.managed_nets` to see
+route-tree ownership.
 
 Route-tree branch execution is now access-driven. For each branch, KiCadAI
 ranks available endpoint access candidates from physical pads and generated
@@ -106,7 +108,8 @@ and tries candidate pairs in deterministic order. Selected access routes are
 emitted as normal KiCad route operations, but are marked internally so
 post-route endpoint snapping does not move a local-anchor merge back to the
 original pad center. Branch evidence includes attempted access-pair counts and
-selected source/target access roles.
+candidate-pair limit audits, selected source/target access roles, selected
+access coordinates, and compact failed-attempt issue evidence.
 
 When route-tree branches or endpoint contacts fail, the routing stage also
 emits `route_tree_repair`. It summarizes classified branch/contact failures,
@@ -126,8 +129,10 @@ This graph evidence lets generated block-local routes participate in
 route-tree contact proof without inflating inter-block emitted-segment counts.
 The I2C fixture now reaches three complete contact-graph groups and one partial
 contact-graph group, with 11 of 12 required endpoint contacts proven; the
-remaining expected-fail blocker is one VCC contact/branch proof gap after
-bounded retry.
+remaining expected-fail blocker is VCC-specific: one `ROUTE_GRAPH_INCOMPLETE`
+contact proof plus two branch-scoped `no legal two-layer path` blockers after
+bounded retry. Fixed-net skip notices and missing-net-class warnings are
+reported separately and do not inflate `route_tree_repair.branch_failures`.
 
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,

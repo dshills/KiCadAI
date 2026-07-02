@@ -270,3 +270,31 @@ proof, or diagnostics without weakening validation gates.
 - Run `prism review staged`.
 - Fix high and medium findings.
 - Commit message: `Document VCC route-tree closeout status`.
+
+## Implementation Status
+
+Status date: 2026-07-02
+
+- Phase 1 complete: the I2C fixture now locks the VCC-specific proof boundary
+  at 12 required route-tree endpoints, 11 proven endpoints, 3 complete contact
+  graph groups, and 1 partial group.
+- Phase 2 complete: branch evidence records bounded access attempts, selected
+  access roles, coordinates, layers, selected refs/pads, and snap-exempt route
+  use.
+- Phase 3 complete: endpoint contact proof now distinguishes same-net graph
+  splits from generic misses and maps those blockers into route-tree repair.
+- Phase 4 complete: VCC access ranking now records source/target candidate
+  counts, candidate-pair totals, limits, truncation, and deterministic selected
+  pair evidence.
+- Phase 5 complete: fixed-net skip notices and missing-net-class
+  warnings are structured and counted separately from repairable route-tree
+  blockers.
+- Phase 6 complete: the real KiCad-backed I2C fixture remains `expected_fail`,
+  but the blocker is narrowed to VCC: one `ROUTE_GRAPH_INCOMPLETE` contact
+  proof plus two branch-scoped `no legal two-layer path` blockers.
+- Phase 7 complete when this documentation update, Prism review, and full
+  regression pass are committed.
+
+Remaining follow-up: complete the VCC route-tree branch path so the final VCC
+endpoint enters the same contact graph component, then rerun promotion gates for
+project write, writer correctness, validation, and KiCad ERC/DRC evidence.

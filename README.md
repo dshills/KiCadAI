@@ -62,9 +62,11 @@ includes local-route merge anchors, and the I2C fixture currently proves 11 of
 12 required inter-block contacts with three complete contact-graph groups and
 one partial contact-graph group. Route-tree repair classifies the remaining
 branch executor blockers, feeds repairable hints into bounded placement retry,
-and ranks selected attempts by route-tree completion evidence. The next blocker
-is completing the remaining selected-attempt VCC contact/branch proof and
-promoting richer generated boards to KiCad ERC/DRC-clean layout proof.
+and ranks selected attempts by route-tree completion evidence. Route-tree
+diagnostics now separate fixed-net skip notices and missing-net-class
+warnings from repairable blockers. The next blocker is completing the remaining
+selected-attempt VCC graph-split/pathfinding proof and promoting richer
+generated boards to KiCad ERC/DRC-clean layout proof.
 
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, polygonal copper width and
