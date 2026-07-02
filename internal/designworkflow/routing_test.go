@@ -334,6 +334,10 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	if access.PadAccess < expectedEndpoints || access.LocalRouteAnchors == 0 {
 		t.Fatalf("route-tree access summary = %#v, want pad and local-route anchor evidence", access)
 	}
+	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, result.Stage, "route_tree_contact_graph")
+	if contactGraph.RequiredEndpoints != expectedEndpoints || contactGraph.LocalRouteMerges == 0 {
+		t.Fatalf("route-tree contact graph = %#v, want required endpoints and local-route merge evidence", contactGraph)
+	}
 	interBlock := requireInterBlockRouteSummary(t, result.Stage)
 	if interBlock.Candidates != len(candidates) || interBlock.EndpointsResolved != expectedEndpoints {
 		t.Fatalf("inter-block summary counts = candidates %d endpoints %d, want candidate builder counts %d and %d", interBlock.Candidates, interBlock.EndpointsResolved, len(candidates), expectedEndpoints)
