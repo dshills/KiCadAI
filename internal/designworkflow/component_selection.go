@@ -700,12 +700,15 @@ func componentSelectionPath(instanceID string, role string) string {
 }
 
 func componentSelectionSummary(catalogDir string, sourceDir string, selections []ComponentSelectionEntry) map[string]any {
+	hints := NormalizeComponentHints(selections)
 	return map[string]any{
 		"catalog_dir":         catalogDir,
 		"source_dir":          sourceDir,
 		"selection_count":     len(selections),
 		"selected_components": selectedComponentSummary(selections),
 		"procurement":         procurementSelectionSummary(selections),
+		"component_hints":     hints,
+		"hint_summary":        SummarizeComponentHints(hints),
 	}
 }
 
