@@ -55,6 +55,8 @@ type ComponentSelectionEntry struct {
 	ResolverChecked bool                              `json:"resolver_checked,omitempty"`
 	PinMapChecked   bool                              `json:"pinmap_checked,omitempty"`
 	Companions      []components.CompanionRequirement `json:"companions,omitempty"`
+	Regulator       *components.RegulatorEvidence     `json:"regulator_evidence,omitempty"`
+	Capacitor       *components.CapacitorEvidence     `json:"capacitor_evidence,omitempty"`
 	Procurement     *components.ProcurementEvidence   `json:"procurement,omitempty"`
 	Rejected        []components.CandidateRejection   `json:"rejected,omitempty"`
 	Warnings        []reports.Issue                   `json:"warnings,omitempty"`
@@ -154,6 +156,8 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 					ResolverChecked: selectedResolverChecked(selection),
 					PinMapChecked:   selectedPinMapChecked(selection),
 					Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
+					Regulator:       cloneRegulatorEvidence(selection.Component.Regulator),
+					Capacitor:       cloneCapacitorEvidence(selection.Component.Capacitor),
 					Procurement:     cloneProcurementEvidence(selection.Procurement),
 					Rejected:        append([]components.CandidateRejection(nil), selection.Rejected...),
 					Warnings:        append([]reports.Issue(nil), selection.Warnings...),
@@ -718,6 +722,13 @@ func selectedComponentSummary(selections []ComponentSelectionEntry) []map[string
 			"pinmap_checked":   selection.PinMapChecked,
 			"companion_count":  len(selection.Companions),
 			"rejected_count":   len(selection.Rejected),
+			"warning_count":    len(selection.Warnings),
+		}
+		if selection.Regulator != nil {
+			item["regulator_evidence"] = regulatorEvidenceSummary(selection.Regulator)
+		}
+		if selection.Capacitor != nil {
+			item["capacitor_evidence"] = capacitorEvidenceSummary(selection.Capacitor)
 		}
 		if selection.Procurement != nil {
 			item["procurement"] = selection.Procurement
@@ -773,4 +784,53 @@ func cloneProcurementEvidence(evidence *components.ProcurementEvidence) *compone
 		clone.AvailabilityFresh = &value
 	}
 	return &clone
+}
+
+func cloneRegulatorEvidence(evidence *components.RegulatorEvidence) *components.RegulatorEvidence {
+	if evidence == nil {
+		return nil
+	}
+	clone := *evidence
+	if evidence.OutputCapacitor != nil {
+		output := *evidence.OutputCapacitor
+		output.AcceptedDielectrics = append([]string(nil), evidence.OutputCapacitor.AcceptedDielectrics...)
+		clone.OutputCapacitor = &output
+	}
+	clone.Notes = append([]string(nil), evidence.Notes...)
+	return &clone
+}
+
+func cloneCapacitorEvidence(evidence *components.CapacitorEvidence) *components.CapacitorEvidence {
+	if evidence == nil {
+		return nil
+	}
+	clone := *evidence
+	return &clone
+}
+
+func regulatorEvidenceSummary(evidence *components.RegulatorEvidence) map[string]any {
+	out := map[string]any{
+		"thermal_review": evidence.ThermalReview,
+	}
+	if evidence.OutputCapacitor != nil {
+		out["output_capacitor"] = map[string]any{
+			"kind":                         evidence.OutputCapacitor.Kind,
+			"proof_status":                 evidence.OutputCapacitor.ProofStatus,
+			"fabrication_candidate_blocks": evidence.OutputCapacitor.FabricationCandidateBlocks,
+			"review_note":                  evidence.OutputCapacitor.ReviewNote,
+		}
+	}
+	return out
+}
+
+func capacitorEvidenceSummary(evidence *components.CapacitorEvidence) map[string]any {
+	return map[string]any{
+		"dielectric":                   evidence.Dielectric,
+		"dc_bias_review":               evidence.DCBiasReview,
+		"effective_capacitance_review": evidence.EffectiveCapacitanceReview,
+		"esr_review":                   evidence.ESRReview,
+		"fabrication_candidate_blocks": evidence.FabricationCandidateBlocks,
+		"fabrication_proof":            evidence.FabricationProof,
+		"review_note":                  evidence.ReviewNote,
+	}
 }

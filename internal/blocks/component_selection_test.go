@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kicadai/internal/components"
+	"kicadai/internal/reports"
 )
 
 func TestSelectDefinitionComponentsForLED(t *testing.T) {
@@ -32,8 +33,11 @@ func TestSelectDefinitionComponentsForVoltageRegulator(t *testing.T) {
 	catalog := loadBlockTestCatalog(t)
 	definition := voltageRegulatorDefinition()
 	report := SelectDefinitionComponents(context.Background(), definition, catalog, components.AcceptanceConnectivity)
-	if len(report.Issues) != 0 {
-		t.Fatalf("unexpected issues: %+v", report.Issues)
+	if reports.HasBlockingIssue(report.Issues) {
+		t.Fatalf("unexpected blocking issues: %+v", report.Issues)
+	}
+	if len(report.Issues) == 0 {
+		t.Fatal("expected regulator stability review warnings")
 	}
 	want := map[string]string{
 		"regulator":        "regulator.linear.ams1117_3v3.sot223",

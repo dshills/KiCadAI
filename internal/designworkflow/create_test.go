@@ -490,8 +490,19 @@ func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
 		t.Fatalf("selected components type = %T", stage.Summary["selected_components"])
 	}
 	found := false
+	foundOutputCapEvidence := false
 	for _, item := range selected {
 		if item["component_id"] != "regulator.linear.ap2112k_3v3.sot23_5" {
+			if item["component_id"] == "capacitor.murata.grm21br61a106ke19l.0805" {
+				evidence, ok := item["capacitor_evidence"].(map[string]any)
+				if !ok {
+					t.Fatalf("selected output capacitor evidence missing: %#v", item)
+				}
+				if evidence["dielectric"] != "X5R" || evidence["effective_capacitance_review"] != "review_required" {
+					t.Fatalf("output capacitor evidence = %#v", evidence)
+				}
+				foundOutputCapEvidence = true
+			}
 			continue
 		}
 		procurement, ok := item["procurement"].(*components.ProcurementEvidence)
@@ -501,10 +512,24 @@ func TestCreateComponentSelectionCarriesProcurementEvidence(t *testing.T) {
 		if procurement.LifecycleStatus != components.LifecycleActive || procurement.AvailabilityStatus != components.AvailabilityNotChecked {
 			t.Fatalf("procurement = %#v", procurement)
 		}
+		evidence, ok := item["regulator_evidence"].(map[string]any)
+		if !ok {
+			t.Fatalf("selected AP2112 regulator evidence missing: %#v", item)
+		}
+		outputCap, ok := evidence["output_capacitor"].(map[string]any)
+		if !ok {
+			t.Fatalf("selected AP2112 output-cap evidence missing: %#v", evidence)
+		}
+		if outputCap["kind"] != "ceramic_stable" || outputCap["proof_status"] != "review_required" {
+			t.Fatalf("AP2112 output-cap evidence = %#v", outputCap)
+		}
 		found = true
 	}
 	if !found {
 		t.Fatalf("AP2112 selection missing from %#v", selected)
+	}
+	if !foundOutputCapEvidence {
+		t.Fatalf("10uF capacitor evidence missing from %#v", selected)
 	}
 }
 
