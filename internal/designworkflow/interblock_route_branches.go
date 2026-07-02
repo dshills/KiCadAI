@@ -26,6 +26,7 @@ var routeBranchOctagonUnitVectors = [...]routing.Point{
 
 const routeBranchExistingCopperCapacityPerBranch = 8
 const routeTreeSyntheticAccessPadSizeMM = 0.4
+const routeTreeObstacleAuditCellMM = 5.0
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
@@ -84,6 +85,13 @@ type RouteTreeBranchAccessAttemptEvidence struct {
 	PrimaryMessage string                      `json:"primary_message,omitempty"`
 	PrimaryRef     string                      `json:"primary_ref,omitempty"`
 	PrimaryNet     string                      `json:"primary_net,omitempty"`
+	SameNetPads    int                         `json:"same_net_pads,omitempty"`
+	SameNetAnchors int                         `json:"same_net_local_route_anchors,omitempty"`
+	SameNetCopper  int                         `json:"same_net_existing_copper,omitempty"`
+	ObstacleKind   string                      `json:"nearest_obstacle_kind,omitempty"`
+	ObstacleRef    string                      `json:"nearest_obstacle_ref,omitempty"`
+	ObstacleNet    string                      `json:"nearest_obstacle_net,omitempty"`
+	ObstacleDistMM float64                     `json:"nearest_obstacle_distance_mm,omitempty"`
 }
 
 type routeTreeAccessCandidateCache map[routeTreeAccessCandidateCacheKey][]routeTreeBranchAccessCandidate
@@ -114,6 +122,7 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 	currentExisting = append(currentExisting, base.Existing...)
 	orderedBranches := routeTreeBranchesForRouting(tree.Branches)
 	accessCandidateCache := routeTreeAccessCandidateCache{}
+	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName)
 	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{
 			BranchIndex:     branch.Index,
@@ -156,7 +165,8 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		branchBase := base
 		branchBase.Existing = currentExisting
 		accessAudit := routeTreeBranchAccessAuditForBranch(access, tree.NetName, branch, accessCandidateCache)
-		branchResult, selectedPair, selectedPairOK, accessPairsTried, accessAttempts := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, accessAudit)
+		mergeAudit := routeTreeMergeAuditForBranch(mergeAuditBase, branchBase.Existing, tree.NetName)
+		branchResult, selectedPair, selectedPairOK, accessPairsTried, accessAttempts := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, accessAudit, mergeAudit)
 		accessSelected := selectedPairOK
 		evidence.AccessPairsTried = accessPairsTried
 		populateRouteTreeAccessAuditEvidence(&evidence, accessAudit)
@@ -211,7 +221,7 @@ func routeTreeIssueIsFixedNetSkip(issue reports.Issue) bool {
 	return issue.Code == reports.CodeFixedNetSkipped
 }
 
-func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName string, branch InterBlockRouteTreeBranch, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint, accessAudit routeTreeBranchAccessAudit) (routing.Result, routeTreeBranchAccessPair, bool, int, []RouteTreeBranchAccessAttemptEvidence) {
+func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName string, branch InterBlockRouteTreeBranch, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint, accessAudit routeTreeBranchAccessAudit, mergeAudit routeTreeMergeAudit) (routing.Result, routeTreeBranchAccessPair, bool, int, []RouteTreeBranchAccessAttemptEvidence) {
 	pairs := accessAudit.Pairs
 	if len(pairs) == 0 {
 		return routing.RouteRequestContext(ctx, routeTreeEndpointBranchRequest(base, netName, start, end)), routeTreeBranchAccessPair{}, false, 0, nil
@@ -230,7 +240,7 @@ func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName str
 		pair := pairs[index]
 		result := routing.RouteRequestContext(ctx, routeTreeAccessBranchRequest(base, netName, pair))
 		lastResult = result
-		attempts = append(attempts, routeTreeBranchAccessAttemptEvidenceFor(pair, result))
+		attempts = append(attempts, routeTreeBranchAccessAttemptEvidenceFor(mergeAudit, netName, pair, result))
 		if result.Status == routing.StatusRouted {
 			return result, pair, true, index + 1, attempts
 		}
@@ -271,7 +281,7 @@ func populateRouteTreeAccessAuditEvidence(evidence *InterBlockBranchRoutingEvide
 	evidence.AccessPairsTruncated = audit.Truncated
 }
 
-func routeTreeBranchAccessAttemptEvidenceFor(pair routeTreeBranchAccessPair, result routing.Result) RouteTreeBranchAccessAttemptEvidence {
+func routeTreeBranchAccessAttemptEvidenceFor(mergeAudit routeTreeMergeAudit, netName string, pair routeTreeBranchAccessPair, result routing.Result) RouteTreeBranchAccessAttemptEvidence {
 	attempt := RouteTreeBranchAccessAttemptEvidence{
 		PairRank:    pair.Rank,
 		SourceRole:  pair.Source.Access.Role,
@@ -285,6 +295,7 @@ func routeTreeBranchAccessAttemptEvidenceFor(pair routeTreeBranchAccessPair, res
 		Status:      result.Status,
 		IssueCount:  len(result.Issues),
 	}
+	populateRouteTreeSameNetMergeAudit(&attempt, mergeAudit, netName, pair)
 	if len(result.Issues) != 0 {
 		issue := result.Issues[0]
 		attempt.PrimaryCode = issue.Code
@@ -297,6 +308,202 @@ func routeTreeBranchAccessAttemptEvidenceFor(pair routeTreeBranchAccessPair, res
 		}
 	}
 	return attempt
+}
+
+type routeTreeMergeAudit struct {
+	SameNetPads     int
+	SameNetCopper   int
+	OtherNetPadGrid routeTreeOtherNetPadGrid
+}
+
+type routeTreeOtherNetPad struct {
+	Ref   string
+	Net   string
+	Point routing.Point
+}
+
+type routeTreeMergeAuditBase struct {
+	SameNetPads     int
+	OtherNetPadGrid routeTreeOtherNetPadGrid
+}
+
+type routeTreeOtherNetPadGrid struct {
+	Cells map[routeTreeOtherNetPadCell][]routeTreeOtherNetPad
+	Count int
+	MinX  int
+	MaxX  int
+	MinY  int
+	MaxY  int
+}
+
+type routeTreeOtherNetPadCell struct {
+	X int
+	Y int
+}
+
+func routeTreeMergeAuditBaseForRequest(base routing.Request, netName string) routeTreeMergeAuditBase {
+	audit := routeTreeMergeAuditBase{OtherNetPadGrid: routeTreeOtherNetPadGrid{Cells: map[routeTreeOtherNetPadCell][]routeTreeOtherNetPad{}}}
+	for _, component := range base.Components {
+		for _, pad := range component.Pads {
+			padNet := pad.Net
+			if strings.EqualFold(padNet, netName) {
+				audit.SameNetPads++
+				continue
+			}
+			if padNet == "" {
+				continue
+			}
+			ref := pad.Ref
+			if ref == "" {
+				ref = component.Ref
+			}
+			if pad.Name != "" {
+				ref += "." + pad.Name
+			}
+			audit.OtherNetPadGrid.add(routeTreeOtherNetPad{
+				Ref:   ref,
+				Net:   padNet,
+				Point: pad.Position,
+			})
+		}
+	}
+	return audit
+}
+
+func routeTreeMergeAuditForBranch(base routeTreeMergeAuditBase, existing []routing.ExistingCopper, netName string) routeTreeMergeAudit {
+	audit := routeTreeMergeAudit{
+		SameNetPads:     base.SameNetPads,
+		OtherNetPadGrid: base.OtherNetPadGrid,
+	}
+	for _, copper := range existing {
+		if strings.EqualFold(copper.Net, netName) {
+			audit.SameNetCopper++
+		}
+	}
+	return audit
+}
+
+func (grid *routeTreeOtherNetPadGrid) add(pad routeTreeOtherNetPad) {
+	if grid.Cells == nil {
+		grid.Cells = map[routeTreeOtherNetPadCell][]routeTreeOtherNetPad{}
+	}
+	cell := routeTreeOtherNetPadCellFor(pad.Point)
+	grid.Cells[cell] = append(grid.Cells[cell], pad)
+	grid.Count++
+	if grid.Count == 1 {
+		grid.MinX = cell.X
+		grid.MaxX = cell.X
+		grid.MinY = cell.Y
+		grid.MaxY = cell.Y
+		return
+	}
+	if cell.X < grid.MinX {
+		grid.MinX = cell.X
+	}
+	if cell.X > grid.MaxX {
+		grid.MaxX = cell.X
+	}
+	if cell.Y < grid.MinY {
+		grid.MinY = cell.Y
+	}
+	if cell.Y > grid.MaxY {
+		grid.MaxY = cell.Y
+	}
+}
+
+func populateRouteTreeSameNetMergeAudit(attempt *RouteTreeBranchAccessAttemptEvidence, mergeAudit routeTreeMergeAudit, netName string, pair routeTreeBranchAccessPair) {
+	if attempt == nil {
+		return
+	}
+	attempt.SameNetPads = mergeAudit.SameNetPads
+	attempt.SameNetAnchors = routeTreeSameNetAnchorCount(pair, netName)
+	attempt.SameNetCopper = mergeAudit.SameNetCopper
+	kind, ref, net, distance := nearestRouteTreeOtherNetPad(mergeAudit.OtherNetPadGrid, pair)
+	attempt.ObstacleKind = kind
+	attempt.ObstacleRef = ref
+	attempt.ObstacleNet = net
+	attempt.ObstacleDistMM = distance
+}
+
+func routeTreeSameNetAnchorCount(pair routeTreeBranchAccessPair, netName string) int {
+	count := 0
+	for _, access := range []RouteTreeEndpointAccess{pair.Source.Access, pair.Target.Access} {
+		if access.Role == RouteTreeAccessLocalRouteAnchor && strings.EqualFold(access.Net, netName) {
+			count++
+		}
+	}
+	return count
+}
+
+func nearestRouteTreeOtherNetPad(grid routeTreeOtherNetPadGrid, pair routeTreeBranchAccessPair) (string, string, string, float64) {
+	if grid.Count == 0 {
+		return "", "", "", 0
+	}
+	points := []routing.Point{
+		{XMM: pair.Source.Access.XMM, YMM: pair.Source.Access.YMM},
+		{XMM: pair.Target.Access.XMM, YMM: pair.Target.Access.YMM},
+	}
+	bestDistance := math.Inf(1)
+	bestRef := ""
+	bestNet := ""
+	for _, point := range points {
+		center := routeTreeOtherNetPadCellFor(point)
+		for radius := 0; radius <= routeTreeOtherNetPadSearchRadius(grid, center); radius++ {
+			for x := center.X - radius; x <= center.X+radius; x++ {
+				for y := center.Y - radius; y <= center.Y+radius; y++ {
+					if radius > 0 && x > center.X-radius && x < center.X+radius && y > center.Y-radius && y < center.Y+radius {
+						continue
+					}
+					cell := routeTreeOtherNetPadCell{X: x, Y: y}
+					for _, pad := range grid.Cells[cell] {
+						distance := math.Hypot(point.XMM-pad.Point.XMM, point.YMM-pad.Point.YMM)
+						if distance < bestDistance {
+							bestDistance = distance
+							bestRef = pad.Ref
+							bestNet = pad.Net
+						}
+					}
+				}
+			}
+			if radius > 0 && bestRef != "" && bestDistance <= float64(radius-1)*routeTreeObstacleAuditCellMM {
+				break
+			}
+		}
+	}
+	if bestRef == "" {
+		return "", "", "", 0
+	}
+	return "other_net_pad", bestRef, bestNet, bestDistance
+}
+
+func routeTreeOtherNetPadCellFor(point routing.Point) routeTreeOtherNetPadCell {
+	return routeTreeOtherNetPadCell{
+		X: int(math.Floor(point.XMM / routeTreeObstacleAuditCellMM)),
+		Y: int(math.Floor(point.YMM / routeTreeObstacleAuditCellMM)),
+	}
+}
+
+func routeTreeOtherNetPadSearchRadius(grid routeTreeOtherNetPadGrid, center routeTreeOtherNetPadCell) int {
+	if grid.Count <= 0 {
+		return 0
+	}
+	radius := max(
+		absInt(center.X-grid.MinX),
+		absInt(center.X-grid.MaxX),
+		absInt(center.Y-grid.MinY),
+		absInt(center.Y-grid.MaxY),
+	)
+	if radius < 1 {
+		return 1
+	}
+	return radius
+}
+
+func absInt(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func routeTreeAccessBranchRequest(base routing.Request, netName string, pair routeTreeBranchAccessPair) routing.Request {

@@ -536,6 +536,13 @@ func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
 		if branch.AccessPairsTried == 0 {
 			t.Fatalf("VCC branch = %#v, want attempted access evidence", branch)
 		}
+		auditAttempt := branch.AccessAttempts[0]
+		if auditAttempt.SameNetPads == 0 || auditAttempt.SameNetAnchors == 0 {
+			t.Fatalf("VCC branch attempt = %#v, want same-net pad and local-anchor audit", auditAttempt)
+		}
+		if auditAttempt.ObstacleKind == "" && !routeTreeIssuesContainMessage(vccIssues, "no legal") {
+			t.Fatalf("VCC branch attempt = %#v, want obstacle audit or pathfinding issue", auditAttempt)
+		}
 		failingWithAttempts++
 	}
 	if failingWithAttempts == 0 {

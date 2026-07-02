@@ -98,6 +98,12 @@ func TestRouteInterBlockTreeBranchesWithAccessReportsSelectedAccessPair(t *testi
 	if attempt.PairRank != 0 || attempt.SourceRole != RouteTreeAccessLocalRouteAnchor || attempt.TargetRole != RouteTreeAccessTargetPad || attempt.Status != routing.StatusRouted {
 		t.Fatalf("first access attempt = %#v, want routed local-anchor to pad attempt", attempt)
 	}
+	if attempt.SameNetPads != 2 || attempt.SameNetAnchors != 1 || attempt.SameNetCopper != 0 {
+		t.Fatalf("first access attempt = %#v, want same-net pad/local-anchor merge audit", attempt)
+	}
+	if attempt.ObstacleKind != "" || attempt.ObstacleRef != "" || attempt.ObstacleNet != "" {
+		t.Fatalf("first access attempt = %#v, want no other-net obstacle audit", attempt)
+	}
 }
 
 func TestRouteTreeBranchAccessCandidateAuditReportsVCCLimitTruncation(t *testing.T) {
@@ -185,6 +191,13 @@ func TestRouteTreeBranchDiagnosticsSeparateFixedNetInfoFromVCCWarnings(t *testin
 	branch := result.Branches[0]
 	if branch.BlockingIssueCount != 0 || branch.WarningIssueCount == 0 || branch.InfoIssueCount == 0 || branch.FixedNetSkipNotices == 0 {
 		t.Fatalf("branch = %#v, want VCC warning and fixed-net info separated from blockers", branch)
+	}
+	if len(branch.AccessAttempts) == 0 {
+		t.Fatalf("branch = %#v, want access attempts", branch)
+	}
+	attempt := branch.AccessAttempts[0]
+	if attempt.SameNetPads != 2 || attempt.ObstacleKind != "other_net_pad" || attempt.ObstacleNet != "GND" || attempt.ObstacleRef == "" || attempt.ObstacleDistMM <= 0 {
+		t.Fatalf("first access attempt = %#v, want same-net pad count and nearest GND obstacle audit", attempt)
 	}
 	if !routeTreeBranchIssuesContainCode(result.Issues, reports.CodeMissingNetClass) || !routeTreeBranchIssuesContainCode(result.Issues, reports.CodeFixedNetSkipped) {
 		t.Fatalf("issues = %#v, want missing-net-class warning and fixed-net skip info", result.Issues)
