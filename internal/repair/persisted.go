@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -149,9 +150,7 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 		Footprints:   opts.Footprints,
 		PadNets:      opts.PadNets,
 	})
-	validator := ValidatorFunc(func() []reports.Issue {
-		return transactions.Validate(tx).Issues
-	})
+	validator := &persistedRepairValidator{transaction: &tx, remaining: flattenIssues(bundle.StageIssues)}
 	if err := ctx.Err(); err != nil {
 		result.Issues = appendIssues(result.Issues, []reports.Issue{contextIssue(err)})
 		result.Status = StatusBlocked
@@ -193,6 +192,15 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 			collectPostValidationEvidence(&result, result.Validation)
 			return finalizePersistedValidationResult(result, bundle.StageIssues)
 		}
+		if zoneRefillValidation.Ran {
+			artifact, err := refreshGeneratedManifest(outputDir)
+			if err != nil {
+				result.Issues = append(result.Issues, persistedIssue(reports.CodeValidationFailed, "manifest", err.Error()))
+				collectPostValidationEvidence(&result, result.Validation)
+				return finalizePersistedValidationResult(result, bundle.StageIssues)
+			}
+			result.Artifacts = appendArtifacts(result.Artifacts, []reports.Artifact{artifact})
+		}
 	}
 	postValidators := append(BuiltInPostApplyValidators(opts.PostValidation), opts.PostValidators...)
 	result.Validation = append(result.Validation, runPostApplyValidators(ctx, PostApplyValidationContext{
@@ -203,6 +211,99 @@ func applyPersistedBundle(ctx context.Context, targetPath string, bundle Bundle,
 	}, postValidators)...)
 	collectPostValidationEvidence(&result, result.Validation)
 	return finalizePersistedValidationResult(result, bundle.StageIssues)
+}
+
+func refreshGeneratedManifest(outputDir string) (reports.Artifact, error) {
+	current, status, err := manifest.Read(outputDir)
+	if err != nil {
+		return reports.Artifact{}, err
+	}
+	if !status.Present {
+		return reports.Artifact{}, fmt.Errorf("generated manifest is missing")
+	}
+	current.Artifacts = normalizeRepairStageManifestArtifacts(outputDir, current.Artifacts)
+	for rel := range current.FileHashes {
+		if strings.HasPrefix(filepath.ToSlash(rel), ".kicadai/repair-stage-") {
+			delete(current.FileHashes, rel)
+		}
+	}
+	artifact, err := manifest.Write(outputDir, current)
+	if err != nil {
+		return reports.Artifact{}, err
+	}
+	_, refreshed, err := manifest.Read(outputDir)
+	if err != nil {
+		return reports.Artifact{}, err
+	}
+	if refreshed.Stale {
+		return reports.Artifact{}, fmt.Errorf("generated manifest remains stale after refresh: %s", strings.Join(refreshed.Issues, "; "))
+	}
+	return artifact, nil
+}
+
+type persistedRepairValidator struct {
+	transaction *transactions.Transaction
+	remaining   []reports.Issue
+}
+
+func (validator *persistedRepairValidator) Validate() []reports.Issue {
+	if validator == nil || validator.transaction == nil {
+		return nil
+	}
+	issues := transactions.Validate(*validator.transaction).Issues
+	if len(issues) > 0 {
+		return issues
+	}
+	return append([]reports.Issue(nil), validator.remaining...)
+}
+
+func (validator *persistedRepairValidator) ValidateAttempt(attempt Attempt, current []reports.Issue) []reports.Issue {
+	if validator == nil || validator.transaction == nil {
+		return nil
+	}
+	issues := transactions.Validate(*validator.transaction).Issues
+	if len(issues) > 0 {
+		validator.remaining = append([]reports.Issue(nil), issues...)
+		return issues
+	}
+	validator.remaining = removeAttemptedIssue(current, attempt.Issue)
+	return append([]reports.Issue(nil), validator.remaining...)
+}
+
+func normalizeRepairStageManifestArtifacts(outputDir string, artifacts []reports.Artifact) []reports.Artifact {
+	absRoot, err := filepath.Abs(outputDir)
+	if err != nil {
+		return artifacts
+	}
+	normalized := make([]reports.Artifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		portablePath := filepath.ToSlash(artifact.Path)
+		relSlash := portablePath
+		if artifactPathIsAbs(artifact.Path) {
+			rel, err := filepath.Rel(absRoot, filepath.FromSlash(portablePath))
+			if err != nil {
+				normalized = append(normalized, artifact)
+				continue
+			}
+			relSlash = filepath.ToSlash(rel)
+		}
+		if strings.HasPrefix(relSlash, ".kicadai/repair-stage-") {
+			parts := strings.SplitN(relSlash, "/", 3)
+			if len(parts) == 3 {
+				artifact.Path = parts[2]
+			}
+		}
+		normalized = append(normalized, artifact)
+	}
+	return normalized
+}
+
+func artifactPathIsAbs(value string) bool {
+	portable := filepath.ToSlash(value)
+	if path.IsAbs(portable) || filepath.IsAbs(filepath.FromSlash(portable)) {
+		return true
+	}
+	return len(portable) >= 3 && portable[1] == ':' && portable[2] == '/'
 }
 
 func finalizePersistedValidationResult(result PersistedApplyResult, stageIssues []StageIssues) PersistedApplyResult {
@@ -421,6 +522,11 @@ func replaceGeneratedOutput(stage string, outputDir string, produced []reports.A
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return nil, err
 	}
+	releaseLock, err := transactions.AcquireProjectApplyLock(outputDir)
+	if err != nil {
+		return nil, err
+	}
+	defer releaseLock()
 	marker, err := writeRepairMarker(outputDir)
 	if err != nil {
 		return nil, err

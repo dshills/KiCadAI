@@ -2,6 +2,7 @@ package repair
 
 import (
 	"context"
+	"slices"
 
 	"kicadai/internal/reports"
 )
@@ -14,6 +15,10 @@ type ValidatorFunc func() []reports.Issue
 
 func (fn ValidatorFunc) Validate() []reports.Issue {
 	return fn()
+}
+
+type AttemptAwareValidator interface {
+	ValidateAttempt(Attempt, []reports.Issue) []reports.Issue
 }
 
 type Runner struct {
@@ -89,7 +94,11 @@ func (runner Runner) RunContext(ctx context.Context, groups []StageIssues) Resul
 		planned.BeforeIssues = len(latestIssues)
 		planned.DryRun = false
 		executed := runner.Executor.Execute(planned)
-		latestIssues = runner.Validate.Validate()
+		if validator, ok := runner.Validate.(AttemptAwareValidator); ok {
+			latestIssues = validator.ValidateAttempt(executed, latestIssues)
+		} else {
+			latestIssues = runner.Validate.Validate()
+		}
 		executed.AfterIssues = len(latestIssues)
 		executed.Issues = append([]reports.Issue(nil), latestIssues...)
 		if len(latestIssues) == 0 {
@@ -107,6 +116,51 @@ func (runner Runner) RunContext(ctx context.Context, groups []StageIssues) Resul
 		status = StatusPartial
 	}
 	return Result{Status: status, Attempts: attempts, FinalIssues: latestIssues, Summary: summarizeAttempts(attempts)}
+}
+
+func removeAttemptedIssue(issues []reports.Issue, attempted reports.Issue) []reports.Issue {
+	out := make([]reports.Issue, 0, max(0, len(issues)-1))
+	removed := false
+	for _, issue := range issues {
+		if !removed && sameRepairIssue(issue, attempted) {
+			removed = true
+			continue
+		}
+		out = append(out, issue)
+	}
+	return out
+}
+
+func sameRepairIssue(a, b reports.Issue) bool {
+	if a.Code != b.Code || a.Path != b.Path {
+		return false
+	}
+	if !sameStringSet(a.Refs, b.Refs) {
+		return false
+	}
+	if !sameStringSet(a.Nets, b.Nets) {
+		return false
+	}
+	return true
+}
+
+func sameStringSet(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	if slices.Equal(a, b) {
+		return true
+	}
+	left := append([]string(nil), a...)
+	right := append([]string(nil), b...)
+	slices.Sort(left)
+	slices.Sort(right)
+	for i := range left {
+		if left[i] != right[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func flattenIssues(groups []StageIssues) []reports.Issue {

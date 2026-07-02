@@ -21,7 +21,8 @@ import (
 	"kicadai/internal/reports"
 )
 
-const applyLockFileName = ".kicadai.apply.lock"
+const ApplyLockFileName = ".kicadai.apply.lock"
+const applyLockFileName = ApplyLockFileName
 const transactionProvenanceSchema = "kicadai.transaction.provenance.v1"
 const transactionProvenancePath = ".kicadai/transaction.json"
 
@@ -73,18 +74,31 @@ func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 	if reports.HasBlockingIssue(result.Issues) {
 		return result
 	}
-	if existingProjectTarget(opts.OutputDir) && !generatedOverwriteApply(tx, opts) {
-		if !opts.AllowImportedMutation {
-			result.Issues = append(result.Issues, reports.Issue{
-				Code:       reports.CodePreservationConflict,
-				Severity:   reports.SeverityBlocked,
-				Path:       "transaction.apply.imported",
-				Message:    "imported project apply is disabled by default",
-				Suggestion: "rerun with explicit imported mutation approval after reviewing the transaction preservation report",
-			})
-			return result
+	if existingProjectTarget(opts.OutputDir) {
+		if generatedOverwriteApply(tx, opts) {
+			if !opts.AllowImportedMutation && !generatedProjectManifestCurrent(opts.OutputDir) {
+				result.Issues = append(result.Issues, reports.Issue{
+					Code:       reports.CodePreservationConflict,
+					Severity:   reports.SeverityBlocked,
+					Path:       "transaction.apply.generated_overwrite",
+					Message:    "generated overwrite requires current KiCadAI provenance or explicit imported mutation approval",
+					Suggestion: "rerun with explicit imported mutation approval only after reviewing the existing project",
+				})
+				return result
+			}
+		} else {
+			if !opts.AllowImportedMutation {
+				result.Issues = append(result.Issues, reports.Issue{
+					Code:       reports.CodePreservationConflict,
+					Severity:   reports.SeverityBlocked,
+					Path:       "transaction.apply.imported",
+					Message:    "imported project apply is disabled by default",
+					Suggestion: "rerun with explicit imported mutation approval after reviewing the transaction preservation report",
+				})
+				return result
+			}
+			return applyImported(tx, opts, result)
 		}
-		return applyImported(tx, opts, result)
 	}
 	if len(tx.Operations) == 0 || tx.Operations[0].Op != OpCreateProject {
 		result.Issues = append(result.Issues, reports.Issue{
@@ -94,6 +108,16 @@ func Apply(tx Transaction, opts ApplyOptions) (result ApplyResult) {
 			Message:  "create_project must be the first operation for apply",
 		})
 		return result
+	}
+	var releaseLock func()
+	if existingProjectTarget(opts.OutputDir) {
+		var err error
+		releaseLock, err = AcquireProjectApplyLock(opts.OutputDir)
+		if err != nil {
+			result.Issues = append(result.Issues, applyIssue(0, err))
+			return result
+		}
+		defer releaseLock()
 	}
 	builder, err := builderFromTransaction(tx, opts)
 	if err != nil {
@@ -126,6 +150,11 @@ func generatedOverwriteApply(tx Transaction, opts ApplyOptions) bool {
 	return opts.Overwrite && firstOperationKind(tx) == OpCreateProject
 }
 
+func generatedProjectManifestCurrent(outputDir string) bool {
+	_, status, err := manifest.Read(outputDir)
+	return err == nil && status.Present && !status.Stale
+}
+
 func annotateApplyResultIssueOperationIDs(result *ApplyResult) {
 	if len(result.Issues) == 0 {
 		return
@@ -151,7 +180,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 		}
 	}
-	releaseLock, err := acquireProjectApplyLock(opts.OutputDir)
+	releaseLock, err := AcquireProjectApplyLock(opts.OutputDir)
 	if err != nil {
 		result.Issues = append(result.Issues, applyIssue(0, err))
 		return result
@@ -1205,7 +1234,7 @@ func writeAtomic(path string, write func(*os.File) error) error {
 	return nil
 }
 
-func acquireProjectApplyLock(root string) (func(), error) {
+func AcquireProjectApplyLock(root string) (func(), error) {
 	lockPath := filepath.Join(root, applyLockFileName)
 	file, err := createApplyLock(lockPath)
 	if err != nil {

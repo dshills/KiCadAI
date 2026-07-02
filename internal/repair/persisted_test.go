@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"kicadai/internal/inspect"
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -137,6 +138,37 @@ func TestApplyPersistedBundleBlocksWithoutExecute(t *testing.T) {
 	}, PersistedApplyOptions{Overwrite: true, InspectProject: cleanInspection})
 	if result.Status != StatusBlocked || !containsIssue(result.Issues, "execute") {
 		t.Fatalf("expected execute block, got %#v", result)
+	}
+}
+
+func TestApplyPersistedBundleRejectsExistingApplyLock(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	tx := persistedBaseTransaction(t, "demo",
+		mustRepairOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject}, ""),
+	)
+	if initial := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output}); len(initial.Issues) != 0 {
+		t.Fatalf("initial apply issues: %#v", initial.Issues)
+	}
+	if err := os.WriteFile(filepath.Join(output, transactions.ApplyLockFileName), []byte("pid=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result := ApplyPersistedBundle(output, Bundle{
+		Schema:      BundleSchemaV1,
+		ProjectRoot: output,
+		Generated:   true,
+		Transaction: &tx,
+		StageIssues: []StageIssues{{Stage: "validation", Issues: []reports.Issue{{
+			Code: reports.CodeMissingBoardOutline, Severity: reports.SeverityError, Message: "missing outline",
+		}}}},
+		RepairOptions: Options{Enabled: true, AllowOutlineGeneration: true},
+	}, PersistedApplyOptions{
+		Execute:        true,
+		Overwrite:      true,
+		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		InspectProject: cleanInspection,
+	})
+	if result.Status != StatusBlocked || !containsIssueMessage(result.Issues, "apply lock already exists") {
+		t.Fatalf("expected apply lock block, got %#v", result)
 	}
 }
 
@@ -286,6 +318,47 @@ func TestApplyPersistedBundleSkippedOptionalValidatorDoesNotBlock(t *testing.T) 
 	}
 }
 
+func TestApplyPersistedBundleRefreshesManifestAfterZoneRefill(t *testing.T) {
+	output, bundle := persistedOutlineFixture(t)
+	runner := mutatingZoneRefillRunner{pcbPath: filepath.Join(output, "demo.kicad_pcb")}
+	result := ApplyPersistedBundle(output, bundle, PersistedApplyOptions{
+		Execute:        true,
+		Overwrite:      true,
+		Board:          &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		InspectProject: cleanInspection,
+		PostValidation: PostValidationOptions{
+			ZoneRefill: string(ZoneRefillAfterRepairValidation),
+			KiCadCLI:   "/bin/sh",
+		},
+		ZoneRefill: runner,
+	})
+	if result.Status != StatusRepaired || len(result.Issues) != 0 || result.ZoneRefill == nil || !result.ZoneRefill.Ran {
+		t.Fatalf("expected successful zone refill, got %#v", result)
+	}
+	_, status, err := manifest.Read(output)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !status.Present || status.Stale {
+		t.Fatalf("manifest should be current after zone refill: %#v", status)
+	}
+}
+
+type mutatingZoneRefillRunner struct {
+	pcbPath string
+}
+
+func (runner mutatingZoneRefillRunner) RefillZones(context.Context, checks.KiCadCLI, string, ZoneRefillOptions) (ZoneRefillRunResult, error) {
+	data, err := os.ReadFile(runner.pcbPath)
+	if err != nil {
+		return ZoneRefillRunResult{}, err
+	}
+	if err := os.WriteFile(runner.pcbPath, append(data, '\n'), 0o644); err != nil {
+		return ZoneRefillRunResult{}, err
+	}
+	return ZoneRefillRunResult{Command: []string{"/bin/sh", "fake-zone-refill"}}, nil
+}
+
 func TestRepairBudgetSummaryNormalizesDefaultsAndDetectsExhaustion(t *testing.T) {
 	summary := repairBudgetSummary(Options{}, Result{
 		FinalIssues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Message: "still failing"}},
@@ -355,6 +428,15 @@ func hasOperation(tx transactions.Transaction, kind transactions.OperationKind) 
 func containsIssue(issues []reports.Issue, path string) bool {
 	for _, issue := range issues {
 		if issue.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func containsIssueMessage(issues []reports.Issue, message string) bool {
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, message) {
 			return true
 		}
 	}

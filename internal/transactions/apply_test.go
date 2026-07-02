@@ -402,6 +402,42 @@ func TestApplyGeneratedOverwriteDoesNotRequireImportedApproval(t *testing.T) {
 	}
 }
 
+func TestApplyGeneratedOverwriteBlocksHandAuthoredProject(t *testing.T) {
+	output := writeImportedApplyProject(t, `(kicad_sch
+  (version 20260306)
+  (generator "eeschema")
+  (uuid "11111111-1111-5111-8111-111111111111")
+  (paper A4)
+)`, `(kicad_pcb (version 20260206) (generator "pcbnew") (paper "A4") (layers (0 "F.Cu" signal)) (setup))`)
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"write_project","overwrite":true}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, Overwrite: true})
+	if len(result.Issues) == 0 || result.Issues[0].Code != reports.CodePreservationConflict {
+		t.Fatalf("expected generated overwrite preservation conflict: %#v", result.Issues)
+	}
+}
+
+func TestApplyGeneratedOverwriteRejectsExistingApplyLock(t *testing.T) {
+	output := t.TempDir()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"write_project","overwrite":true}
+	]}`)
+	first := Apply(tx, ApplyOptions{OutputDir: output, Overwrite: true})
+	if len(first.Issues) != 0 {
+		t.Fatalf("initial apply issues: %#v", first.Issues)
+	}
+	if err := os.WriteFile(filepath.Join(output, applyLockFileName), []byte("pid=1\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	second := Apply(tx, ApplyOptions{OutputDir: output, Overwrite: true})
+	if len(second.Issues) == 0 || !strings.Contains(second.Issues[0].Message, "apply lock already exists") {
+		t.Fatalf("expected lock issue: %#v", second.Issues)
+	}
+}
+
 func TestApplyRejectsLateCreateProject(t *testing.T) {
 	tx := mustParse(t, `{"operations":[{"op":"write_project"},{"op":"create_project","name":"demo"}]}`)
 	result := Apply(tx, ApplyOptions{OutputDir: t.TempDir()})

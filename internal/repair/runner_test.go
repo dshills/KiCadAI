@@ -26,6 +26,35 @@ func TestRunnerReportsRepairedAfterValidatorClearsIssue(t *testing.T) {
 	}
 }
 
+func TestRunnerAttemptAwareValidatorCanClearCurrentIssueWhenMultipleRemain(t *testing.T) {
+	tx := transactions.Transaction{}
+	runner := NewRunner(Options{Enabled: true, AllowFootprintAssignment: true, AllowOutlineGeneration: true}, NewExecutor(ExecutionContext{
+		Transaction: &tx,
+		Board:       &transactions.BoardSize{WidthMM: 40, HeightMM: 25},
+		Footprints: map[string]FootprintEvidence{
+			"R1": {Ref: "R1", FootprintID: "Resistor_SMD:R_0805_2012Metric", Verified: true},
+		},
+	}), issueClearingValidator{})
+	issues := []reports.Issue{
+		{Code: reports.CodeMissingFootprint, Refs: []string{"R1"}},
+		{Code: reports.CodeMissingBoardOutline, Message: "missing outline"},
+	}
+	result := runner.Run([]StageIssues{{Stage: "validation", Issues: issues}})
+	if result.Status != StatusRepaired || len(result.Attempts) != 2 {
+		t.Fatalf("result = %#v", result)
+	}
+}
+
+type issueClearingValidator struct{}
+
+func (issueClearingValidator) Validate() []reports.Issue {
+	return nil
+}
+
+func (issueClearingValidator) ValidateAttempt(attempt Attempt, issues []reports.Issue) []reports.Issue {
+	return removeAttemptedIssue(issues, attempt.Issue)
+}
+
 func TestRunnerBlocksAppliedRepairWithoutValidator(t *testing.T) {
 	tx := transactions.Transaction{}
 	result := NewRunner(Options{Enabled: true, AllowFootprintAssignment: true}, NewExecutor(ExecutionContext{
