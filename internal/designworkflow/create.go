@@ -73,7 +73,9 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		stages = append(stages, skippedWorkflowStages("PCB realization did not complete", StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
-	placed := PlaceFragments(ctx, normalized, fragments, opts.Placement)
+	placementOpts := opts.Placement
+	placementOpts.ComponentSelections = componentSelections.Selections
+	placed := PlaceFragments(ctx, normalized, fragments, placementOpts)
 	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
 	if workflowStageBlocked(placed.Stage) {

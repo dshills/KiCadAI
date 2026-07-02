@@ -15,9 +15,10 @@ import (
 var defaultWorkflowBounds = placement.Bounds{WidthMM: 2.0, HeightMM: 1.25, Source: placement.BoundsEstimated}
 
 type PlacementOptions struct {
-	DefaultBounds placement.Bounds
-	Rules         placement.Rules
-	LibraryIndex  *libraryresolver.LibraryIndex
+	DefaultBounds       placement.Bounds
+	Rules               placement.Rules
+	LibraryIndex        *libraryresolver.LibraryIndex
+	ComponentSelections []ComponentSelectionEntry
 }
 
 type PlacementStageResult struct {
@@ -95,6 +96,8 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 			addPlacementRouteNet(&placementRequest, netIndexes, route)
 		}
 	}
+	componentHintResult := componentPlacementHintRules(opts.ComponentSelections, fragments)
+	placementRequest.ProximityRules = append(placementRequest.ProximityRules, componentHintResult.Rules...)
 	issues = append(issues, addPlacementConnectionNets(&placementRequest, netIndexes, normalized, fragments)...)
 	placementRequest, padEntries, padIssues := hydratePlacementRequestPads(placementRequest, opts.LibraryIndex)
 	issues = append(issues, padIssues...)
@@ -115,6 +118,10 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 	}
 	if len(padEntries) != 0 || len(padIssues) != 0 {
 		stage.Summary["pad_hydration"] = summarizePadHydration(padEntries, padIssues)
+	}
+	if len(componentHintResult.Evidence) != 0 {
+		stage.Summary["component_hints"] = componentHintResult.Evidence
+		stage.Summary["component_hint_summary"] = SummarizeComponentHints(componentHintResult.Evidence)
 	}
 	stage.Issues = issues
 	if result.Status != placement.StatusPlaced && stage.Status == StageStatusOK {
