@@ -1135,7 +1135,7 @@ func TestRunComponentValidateWithSourceDir(t *testing.T) {
 	if !ok {
 		t.Fatalf("result data = %#v", result.Data)
 	}
-	if got, ok := data["source_record_count"].(float64); !ok || got != 11 {
+	if got, ok := data["source_record_count"].(float64); !ok || got != 20 {
 		t.Fatalf("source_record_count = %#v in %#v", data["source_record_count"], data)
 	}
 }

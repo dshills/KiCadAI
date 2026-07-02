@@ -132,6 +132,44 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
+    },
+    {
+      "id": "connector.pinheader.1x06.2_54mm",
+      "family": "connector",
+      "name": "1x06 2.54 mm pin header",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["connector", "pin_header", "2.54mm", "1x06"],
+      "values": [{"kind": "pin_count", "typ": "6", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x06",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true},
+          {"function": "PIN_3", "symbol_pin": "3", "required": true},
+          {"function": "PIN_4", "symbol_pin": "4", "required": true},
+          {"function": "PIN_5", "symbol_pin": "5", "required": true},
+          {"function": "PIN_6", "symbol_pin": "6", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "vertical",
+        "name": "Vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
+        "package_type": "pin_header_1x06",
+        "pinmap_id": "Connector_Generic:Conn_01x06|Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"},
+          {"function": "PIN_3", "pad": "3"},
+          {"function": "PIN_4", "pad": "4"},
+          {"function": "PIN_5", "pad": "5"},
+          {"function": "PIN_6", "pad": "6"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
     }
   ]
 }

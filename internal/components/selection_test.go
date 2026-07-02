@@ -196,8 +196,57 @@ func TestFindConnectorByThreePinCount(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("find connector failed: %+v", result.Issues)
 	}
-	if len(candidates) != 1 || candidates[0].ComponentID != "connector.pinheader.1x03.2_54mm" {
+	found := map[string]bool{}
+	for _, candidate := range candidates {
+		found[candidate.ComponentID] = true
+	}
+	if len(candidates) != 2 || !found["connector.pinheader.1x03.2_54mm"] || !found["connector.samtec.tsw_103_07_l_s.1x03"] {
 		t.Fatalf("unexpected candidates: %+v", candidates)
+	}
+}
+
+func TestSelectConcreteSixPinHeader(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "connector",
+			Package:   "1x06",
+			ValueKind: "pin_count",
+			Value:     "6",
+		},
+		Acceptance:      AcceptanceConnectivity,
+		RequireConcrete: true,
+	})
+	if !result.OK {
+		t.Fatalf("select connector failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "connector.samtec.tsw_106_07_l_s.1x06" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected connector selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+}
+
+func TestSelectConcreteLEDByColorAndPackage(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Text:    "blue",
+			Family:  "led",
+			Package: "0603",
+		},
+		Acceptance:      AcceptanceConnectivity,
+		RequireConcrete: true,
+	})
+	if !result.OK {
+		t.Fatalf("select LED failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "led.liteon.ltst_c190tbkt.0603" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected LED selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+	wantPads := map[string]string{"CATHODE": "1", "ANODE": "2"}
+	for _, padFunction := range selection.Variant.PadFunctions {
+		if want, ok := wantPads[padFunction.Function]; ok && padFunction.Pad != want {
+			t.Fatalf("LED %s mapped to pad %s, want %s", padFunction.Function, padFunction.Pad, want)
+		}
 	}
 }
 
@@ -230,6 +279,37 @@ func TestSelectVerifiedSignalDiodeForConnectivity(t *testing.T) {
 		if !found {
 			t.Fatalf("diode missing %s pad function: %+v", function, selection.Variant.PadFunctions)
 		}
+	}
+}
+
+func TestSelectConcreteSchottkyDiodeByPackage(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Family: "diode", Package: "sod_323"},
+		Acceptance:      AcceptanceConnectivity,
+		RequireConcrete: true,
+	})
+	if !result.OK {
+		t.Fatalf("select Schottky diode failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "diode.diodes.bat54ws.sod_323" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected Schottky selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
+	}
+}
+
+func TestSelectProtectionRequiresTVSPinFunctions(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "protection", Package: "sod_323"},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequiredFunctions: []string{"CATHODE", "ANODE"},
+	})
+	if !result.OK {
+		t.Fatalf("select TVS protection failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "protection.nexperia.pesd5v0s1ba.sod_323" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected protection selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
 	}
 }
 

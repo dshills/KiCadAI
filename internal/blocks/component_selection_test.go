@@ -37,8 +37,8 @@ func TestSelectDefinitionComponentsForVoltageRegulator(t *testing.T) {
 	}
 	want := map[string]string{
 		"regulator":        "regulator.linear.ams1117_3v3.sot223",
-		"input_capacitor":  "capacitor.ceramic.0805",
-		"output_capacitor": "capacitor.ceramic.0805",
+		"input_capacitor":  "capacitor.murata.grm21br61a106ke19l.0805",
+		"output_capacitor": "capacitor.murata.grm21br61a106ke19l.0805",
 	}
 	if len(report.Selections) != len(want) {
 		t.Fatalf("selections = %+v", report.Selections)

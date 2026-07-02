@@ -120,7 +120,7 @@
       "manufacturer": "Samtec",
       "mpn": "TSW-104-07-L-S",
       "lifecycle": "active",
-      "equivalence": {"group": "connector.pinheader.1x04.2_54mm.vertical", "role": "preferred"},
+      "equivalence": {"group": "connector.pinheader.1x04.2_54mm", "role": "preferred"},
       "tags": ["connector", "pin_header", "2.54mm", "1x04"],
       "values": [{"kind": "pin_count", "typ": "4", "unit": "pins"}],
       "symbols": [{
@@ -330,6 +330,336 @@
         "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Murata:GRM21BR61A106KE19L", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Voltage and capacitance derating remain design-specific."]}
+    },
+    {
+      "id": "connector.samtec.tsw_102_07_l_s.1x02",
+      "family": "connector",
+      "name": "Samtec TSW-102-07-L-S 1x02 pin header",
+      "description": "Concrete 1x02 2.54 mm vertical through-hole pin header for power and signal breakouts.",
+      "generic": false,
+      "manufacturer": "Samtec",
+      "mpn": "TSW-102-07-L-S",
+      "lifecycle": "active",
+      "equivalence": {"group": "connector.pinheader.1x02.2_54mm", "role": "preferred"},
+      "tags": ["connector", "pin_header", "2.54mm", "1x02", "power", "signal"],
+      "values": [{"kind": "pin_count", "typ": "2", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x02",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02", "curated_part:Samtec:TSW-102-07-L-S"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1x02",
+        "name": "1x02 vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "package_type": "pin_header_1x02",
+        "pinmap_id": "Connector_Generic:Conn_01x02|Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Samtec:TSW-102-07-L-S", "builtin_pinmap:Connector_Generic:Conn_01x02"], "pinmap_checked": true}
+    },
+    {
+      "id": "connector.samtec.tsw_103_07_l_s.1x03",
+      "family": "connector",
+      "name": "Samtec TSW-103-07-L-S 1x03 pin header",
+      "description": "Concrete 1x03 2.54 mm vertical through-hole pin header for UART, sensors, and power breakouts.",
+      "generic": false,
+      "manufacturer": "Samtec",
+      "mpn": "TSW-103-07-L-S",
+      "lifecycle": "active",
+      "equivalence": {"group": "connector.pinheader.1x03.2_54mm", "role": "preferred"},
+      "tags": ["connector", "pin_header", "2.54mm", "1x03", "power", "ground", "signal"],
+      "values": [{"kind": "pin_count", "typ": "3", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x03",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true},
+          {"function": "PIN_3", "symbol_pin": "3", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x03", "curated_part:Samtec:TSW-103-07-L-S"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1x03",
+        "name": "1x03 vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+        "package_type": "pin_header_1x03",
+        "pinmap_id": "Connector_Generic:Conn_01x03|Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"},
+          {"function": "PIN_3", "pad": "3"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x03"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Samtec:TSW-103-07-L-S", "builtin_pinmap:Connector_Generic:Conn_01x03"], "pinmap_checked": true}
+    },
+    {
+      "id": "connector.samtec.tsw_105_07_l_s.1x05",
+      "family": "connector",
+      "name": "Samtec TSW-105-07-L-S 1x05 pin header",
+      "description": "Concrete 1x05 2.54 mm vertical through-hole pin header for programming and mixed-signal breakouts.",
+      "generic": false,
+      "manufacturer": "Samtec",
+      "mpn": "TSW-105-07-L-S",
+      "lifecycle": "active",
+      "equivalence": {"group": "connector.pinheader.1x05.2_54mm", "role": "preferred"},
+      "tags": ["connector", "pin_header", "2.54mm", "1x05", "programming", "signal"],
+      "values": [{"kind": "pin_count", "typ": "5", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x05",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true},
+          {"function": "PIN_3", "symbol_pin": "3", "required": true},
+          {"function": "PIN_4", "symbol_pin": "4", "required": true},
+          {"function": "PIN_5", "symbol_pin": "5", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x05", "curated_part:Samtec:TSW-105-07-L-S"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1x05",
+        "name": "1x05 vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical",
+        "package_type": "pin_header_1x05",
+        "pinmap_id": "Connector_Generic:Conn_01x05|Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"},
+          {"function": "PIN_3", "pad": "3"},
+          {"function": "PIN_4", "pad": "4"},
+          {"function": "PIN_5", "pad": "5"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Samtec:TSW-105-07-L-S", "builtin_pinmap:Connector_Generic:Conn_01x05"], "pinmap_checked": true}
+    },
+    {
+      "id": "connector.samtec.tsw_106_07_l_s.1x06",
+      "family": "connector",
+      "name": "Samtec TSW-106-07-L-S 1x06 pin header",
+      "description": "Concrete 1x06 2.54 mm vertical through-hole pin header for programming and expansion breakouts.",
+      "generic": false,
+      "manufacturer": "Samtec",
+      "mpn": "TSW-106-07-L-S",
+      "lifecycle": "active",
+      "equivalence": {"group": "connector.pinheader.1x06.2_54mm", "role": "preferred"},
+      "tags": ["connector", "pin_header", "2.54mm", "1x06", "programming", "signal"],
+      "values": [{"kind": "pin_count", "typ": "6", "unit": "pins"}],
+      "symbols": [{
+        "symbol_id": "Connector_Generic:Conn_01x06",
+        "function_pins": [
+          {"function": "PIN_1", "symbol_pin": "1", "required": true},
+          {"function": "PIN_2", "symbol_pin": "2", "required": true},
+          {"function": "PIN_3", "symbol_pin": "3", "required": true},
+          {"function": "PIN_4", "symbol_pin": "4", "required": true},
+          {"function": "PIN_5", "symbol_pin": "5", "required": true},
+          {"function": "PIN_6", "symbol_pin": "6", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x06", "curated_part:Samtec:TSW-106-07-L-S"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1x06",
+        "name": "1x06 vertical",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
+        "package_type": "pin_header_1x06",
+        "pinmap_id": "Connector_Generic:Conn_01x06|Connector_PinHeader_2.54mm:PinHeader_1x06_P2.54mm_Vertical",
+        "pad_functions": [
+          {"function": "PIN_1", "pad": "1"},
+          {"function": "PIN_2", "pad": "2"},
+          {"function": "PIN_3", "pad": "3"},
+          {"function": "PIN_4", "pad": "4"},
+          {"function": "PIN_5", "pad": "5"},
+          {"function": "PIN_6", "pad": "6"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Samtec:TSW-106-07-L-S", "builtin_pinmap:Connector_Generic:Conn_01x06"], "pinmap_checked": true}
+    },
+    {
+      "id": "led.liteon.ltst_c170krkt.0805",
+      "family": "led",
+      "name": "Lite-On LTST-C170KRKT red 0805 LED",
+      "description": "Concrete red 0805 indicator LED alternative with verified polarity mapping.",
+      "generic": false,
+      "manufacturer": "Lite-On",
+      "mpn": "LTST-C170KRKT",
+      "lifecycle": "active",
+      "equivalence": {"group": "led.generic.0805", "role": "preferred"},
+      "tags": ["led", "indicator", "0805", "red"],
+      "values": [
+        {"kind": "forward_voltage", "typ": "2.0", "unit": "V"},
+        {"kind": "forward_current", "typ": "20", "unit": "mA"}
+      ],
+      "ratings": [{"kind": "forward_current", "max": "20", "unit": "mA"}],
+      "symbols": [{
+        "symbol_id": "Device:LED",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED", "curated_part:Lite-On:LTST-C170KRKT"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "LED_SMD:LED_0805_2012Metric",
+        "package_type": "0805",
+        "pinmap_id": "Device:LED|LED_SMD:LED_0805_2012Metric",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED", "curated_part:Lite-On:LTST-C170KRKT"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Lite-On:LTST-C170KRKT", "builtin_pinmap:Device:LED"], "pinmap_checked": true}
+    },
+    {
+      "id": "led.liteon.ltst_c190tbkt.0603",
+      "family": "led",
+      "name": "Lite-On LTST-C190TBKT blue 0603 LED",
+      "description": "Concrete blue 0603 indicator LED alternative with verified polarity mapping.",
+      "generic": false,
+      "manufacturer": "Lite-On",
+      "mpn": "LTST-C190TBKT",
+      "lifecycle": "active",
+      "equivalence": {"group": "led.generic.0603", "role": "preferred"},
+      "tags": ["led", "indicator", "0603", "blue"],
+      "values": [
+        {"kind": "forward_voltage", "typ": "3.2", "unit": "V"},
+        {"kind": "forward_current", "typ": "20", "unit": "mA"}
+      ],
+      "ratings": [{"kind": "forward_current", "max": "30", "unit": "mA"}],
+      "symbols": [{
+        "symbol_id": "Device:LED",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED", "curated_part:Lite-On:LTST-C190TBKT"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "LED_SMD:LED_0603_1608Metric",
+        "package_type": "0603",
+        "pinmap_id": "Device:LED|LED_SMD:LED_0603_1608Metric",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED", "curated_part:Lite-On:LTST-C190TBKT"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Lite-On:LTST-C190TBKT", "builtin_pinmap:Device:LED"], "pinmap_checked": true}
+    },
+    {
+      "id": "diode.onsemi.1n4148w.sod_123",
+      "family": "diode",
+      "name": "onsemi 1N4148W SOD-123 switching diode",
+      "description": "Concrete small-signal switching diode with verified KiCad symbol and footprint polarity mapping.",
+      "generic": false,
+      "manufacturer": "onsemi",
+      "mpn": "1N4148W",
+      "lifecycle": "active",
+      "equivalence": {"group": "diode.signal.generic", "role": "preferred"},
+      "tags": ["diode", "signal", "switching", "sod_123"],
+      "ratings": [{"kind": "current", "max": "200", "unit": "mA"}],
+      "symbols": [{
+        "symbol_id": "Device:D",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D", "curated_part:onsemi:1N4148W"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sod_123",
+        "name": "SOD-123",
+        "footprint_id": "Diode_SMD:D_SOD-123",
+        "package_type": "sod_123",
+        "pinmap_id": "Device:D|Diode_SMD:D_SOD-123",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D", "curated_part:onsemi:1N4148W"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:onsemi:1N4148W", "builtin_pinmap:Device:D"], "pinmap_checked": true}
+    },
+    {
+      "id": "diode.diodes.bat54ws.sod_323",
+      "family": "diode",
+      "name": "Diodes Inc. BAT54WS SOD-323 Schottky diode",
+      "description": "Concrete Schottky diode for low-current protection and steering applications.",
+      "generic": false,
+      "manufacturer": "Diodes Incorporated",
+      "mpn": "BAT54WS",
+      "lifecycle": "active",
+      "equivalence": {"group": "diode.schottky.generic", "role": "preferred"},
+      "tags": ["diode", "schottky", "sod_323"],
+      "ratings": [{"kind": "current", "max": "200", "unit": "mA"}],
+      "symbols": [{
+        "symbol_id": "Device:D_Schottky",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_Schottky", "curated_part:Diodes Incorporated:BAT54WS"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sod_323",
+        "name": "SOD-323",
+        "footprint_id": "Diode_SMD:D_SOD-323",
+        "package_type": "sod_323",
+        "pinmap_id": "Device:D_Schottky|Diode_SMD:D_SOD-323",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_Schottky", "curated_part:Diodes Incorporated:BAT54WS"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Diodes Incorporated:BAT54WS", "builtin_pinmap:Device:D_Schottky"], "pinmap_checked": true}
+    },
+    {
+      "id": "protection.nexperia.pesd5v0s1ba.sod_323",
+      "family": "protection",
+      "name": "Nexperia PESD5V0S1BA SOD-323 unidirectional ESD diode",
+      "description": "Concrete 5 V unidirectional ESD/TVS protection diode for USB and low-voltage signal lines.",
+      "generic": false,
+      "manufacturer": "Nexperia",
+      "mpn": "PESD5V0S1BA",
+      "lifecycle": "active",
+      "equivalence": {"group": "protection.tvs.usb_5v_unidirectional", "role": "preferred"},
+      "tags": ["protection", "tvs", "esd", "usb", "5v", "sod_323"],
+      "ratings": [{"kind": "working_voltage", "max": "5", "unit": "V"}],
+      "symbols": [{
+        "symbol_id": "Device:D_TVS",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A", "GND"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS", "curated_part:Nexperia:PESD5V0S1BA"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "sod_323",
+        "name": "SOD-323",
+        "footprint_id": "Diode_SMD:D_SOD-323",
+        "package_type": "sod_323",
+        "pinmap_id": "Device:D_TVS|Diode_SMD:D_SOD-323",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K", "LINE"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A", "GND"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:D_TVS", "curated_part:Nexperia:PESD5V0S1BA"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Nexperia:PESD5V0S1BA", "builtin_pinmap:Device:D_TVS"], "pinmap_checked": true}
     }
   ]
 }

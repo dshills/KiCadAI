@@ -35,6 +35,39 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:LED"], "pinmap_checked": true, "notes": ["Generic electrical ratings are placeholders; exact LED must be selected before fabrication."]}
     },
     {
+      "id": "led.generic.0603",
+      "family": "led",
+      "name": "Generic 0603 indicator LED",
+      "generic": true,
+      "lifecycle": "active",
+      "tags": ["led", "indicator", "0603"],
+      "values": [
+        {"kind": "forward_voltage", "typ": "2", "unit": "V"},
+        {"kind": "forward_current", "typ": "10", "unit": "mA"}
+      ],
+      "symbols": [{
+        "symbol_id": "Device:LED",
+        "function_pins": [
+          {"function": "CATHODE", "symbol_pin": "1", "polarity": "negative", "required": true, "aliases": ["K"]},
+          {"function": "ANODE", "symbol_pin": "2", "polarity": "positive", "required": true, "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "LED_SMD:LED_0603_1608Metric",
+        "package_type": "0603",
+        "pinmap_id": "Device:LED|LED_SMD:LED_0603_1608Metric",
+        "pad_functions": [
+          {"function": "CATHODE", "pad": "1", "polarity": "negative", "aliases": ["K"]},
+          {"function": "ANODE", "pad": "2", "polarity": "positive", "aliases": ["A"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:LED"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:LED"], "pinmap_checked": true, "notes": ["Generic electrical ratings are placeholders; exact LED must be selected before fabrication."]}
+    },
+    {
       "id": "diode.signal.generic",
       "family": "diode",
       "name": "Generic signal diode",

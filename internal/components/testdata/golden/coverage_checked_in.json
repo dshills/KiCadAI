@@ -1,17 +1,17 @@
 {
-  "record_count": 34,
+  "record_count": 45,
   "family_count": 12,
   "confidence_counts": {
     "blocked": 0,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 4,
-    "verified": 26
+    "verified": 37
   },
   "alternative_coverage": {
-    "concrete_records": 16,
-    "generic_fallback_records": 18,
-    "equivalence_groups": 8
+    "concrete_records": 25,
+    "generic_fallback_records": 20,
+    "equivalence_groups": 17
   },
   "families": [
     {
@@ -46,11 +46,11 @@
     {
       "family": "connector",
       "defined": true,
-      "record_count": 5,
-      "concrete_records": 1,
-      "generic_fallback_records": 4,
-      "equivalence_groups": 1,
-      "verified_records": 5,
+      "record_count": 10,
+      "concrete_records": 5,
+      "generic_fallback_records": 5,
+      "equivalence_groups": 5,
+      "verified_records": 10,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
@@ -60,14 +60,24 @@
         "connector.pinheader.1x03.2_54mm",
         "connector.pinheader.1x04.2_54mm",
         "connector.pinheader.1x05.2_54mm",
-        "connector.samtec.tsw_104_07_l_s.1x04"
+        "connector.pinheader.1x06.2_54mm",
+        "connector.samtec.tsw_102_07_l_s.1x02",
+        "connector.samtec.tsw_103_07_l_s.1x03",
+        "connector.samtec.tsw_104_07_l_s.1x04",
+        "connector.samtec.tsw_105_07_l_s.1x05",
+        "connector.samtec.tsw_106_07_l_s.1x06"
       ],
       "record_ids": [
         "connector.pinheader.1x02.2_54mm",
         "connector.pinheader.1x03.2_54mm",
         "connector.pinheader.1x04.2_54mm",
         "connector.pinheader.1x05.2_54mm",
-        "connector.samtec.tsw_104_07_l_s.1x04"
+        "connector.pinheader.1x06.2_54mm",
+        "connector.samtec.tsw_102_07_l_s.1x02",
+        "connector.samtec.tsw_103_07_l_s.1x03",
+        "connector.samtec.tsw_104_07_l_s.1x04",
+        "connector.samtec.tsw_105_07_l_s.1x05",
+        "connector.samtec.tsw_106_07_l_s.1x06"
       ]
     },
     {
@@ -94,21 +104,25 @@
     {
       "family": "diode",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 0,
+      "record_count": 5,
+      "concrete_records": 2,
       "generic_fallback_records": 3,
-      "equivalence_groups": 0,
-      "verified_records": 3,
+      "equivalence_groups": 2,
+      "verified_records": 5,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
+        "diode.diodes.bat54ws.sod_323",
+        "diode.onsemi.1n4148w.sod_123",
         "diode.schottky.generic",
         "diode.signal.generic",
         "diode.tvs_unidirectional.generic"
       ],
       "record_ids": [
+        "diode.diodes.bat54ws.sod_323",
+        "diode.onsemi.1n4148w.sod_123",
         "diode.schottky.generic",
         "diode.signal.generic",
         "diode.tvs_unidirectional.generic"
@@ -117,22 +131,28 @@
     {
       "family": "led",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 1,
-      "generic_fallback_records": 1,
-      "equivalence_groups": 1,
-      "verified_records": 2,
+      "record_count": 5,
+      "concrete_records": 3,
+      "generic_fallback_records": 2,
+      "equivalence_groups": 3,
+      "verified_records": 5,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
+        "led.generic.0603",
         "led.generic.0805",
-        "led.liteon.ltst_c170kgkt.0805"
+        "led.liteon.ltst_c170kgkt.0805",
+        "led.liteon.ltst_c170krkt.0805",
+        "led.liteon.ltst_c190tbkt.0603"
       ],
       "record_ids": [
+        "led.generic.0603",
         "led.generic.0805",
-        "led.liteon.ltst_c170kgkt.0805"
+        "led.liteon.ltst_c170kgkt.0805",
+        "led.liteon.ltst_c170krkt.0805",
+        "led.liteon.ltst_c190tbkt.0603"
       ]
     },
     {
@@ -180,19 +200,21 @@
     {
       "family": "protection",
       "defined": true,
-      "record_count": 1,
-      "concrete_records": 0,
+      "record_count": 2,
+      "concrete_records": 1,
       "generic_fallback_records": 1,
-      "equivalence_groups": 0,
-      "verified_records": 1,
+      "equivalence_groups": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 0,
       "blocked_records": 0,
       "missing_resolver_evidence": [
+        "protection.nexperia.pesd5v0s1ba.sod_323",
         "protection.tvs.usb_5v_unidirectional"
       ],
       "record_ids": [
+        "protection.nexperia.pesd5v0s1ba.sod_323",
         "protection.tvs.usb_5v_unidirectional"
       ]
     },
