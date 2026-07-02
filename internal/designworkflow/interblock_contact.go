@@ -43,6 +43,7 @@ const (
 	InterBlockContactNetMismatch         InterBlockContactProofStatus = "net_mismatch"
 	InterBlockContactLayerMismatch       InterBlockContactProofStatus = "layer_mismatch"
 	InterBlockContactMissingTarget       InterBlockContactProofStatus = "missing_target"
+	InterBlockContactGraphSplit          InterBlockContactProofStatus = "graph_split"
 	InterBlockContactUnsupportedGeometry InterBlockContactProofStatus = "unsupported_geometry"
 	InterBlockContactAmbiguous           InterBlockContactProofStatus = "ambiguous"
 )
@@ -170,8 +171,20 @@ func ValidateInterBlockRouteEndpointContacts(candidates []InterBlockRouteCandida
 			}
 			continue
 		}
+		proofs := make([]InterBlockContactProof, 0, len(targets))
+		provenTargets := 0
 		for _, target := range targets {
 			proof := proveContactTarget(target, routeOperations)
+			if proof.Status == InterBlockContactProven {
+				provenTargets++
+			}
+			proofs = append(proofs, proof)
+		}
+		for _, proof := range proofs {
+			if proof.Status == InterBlockContactMiss && provenTargets > 0 {
+				proof.Status = InterBlockContactGraphSplit
+				proof.Suggestion = "bridge the same-net route graph component to the isolated contact target"
+			}
 			evidence.Proofs = append(evidence.Proofs, proof)
 			if proof.Status != InterBlockContactProven {
 				evidence.Issues = append(evidence.Issues, interBlockContactProofIssue(proof, contactIssueCode(proof.Status), contactIssueMessage(proof.Status)))
@@ -617,6 +630,8 @@ func contactIssueCode(status InterBlockContactProofStatus) reports.Code {
 		return reports.CodeRouteContactLayerMismatch
 	case InterBlockContactMissingTarget:
 		return reports.CodeRouteContactMissingTarget
+	case InterBlockContactGraphSplit:
+		return reports.CodeRouteGraphIncomplete
 	case InterBlockContactUnsupportedGeometry:
 		return reports.CodeRouteContactUnsupported
 	case InterBlockContactAmbiguous:
@@ -634,6 +649,8 @@ func contactIssueMessage(status InterBlockContactProofStatus) string {
 		return "route endpoint contact target is missing"
 	case InterBlockContactNetMismatch:
 		return "route endpoint net does not match contact target net"
+	case InterBlockContactGraphSplit:
+		return "route copper is in a separate same-net contact graph component"
 	default:
 		return "route endpoint does not contact the required same-net target"
 	}

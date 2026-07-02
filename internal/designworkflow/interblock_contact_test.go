@@ -130,6 +130,37 @@ func TestValidateInterBlockRouteEndpointContactsReportsMiss(t *testing.T) {
 	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactMiss)
 }
 
+func TestValidateInterBlockRouteEndpointContactsClassifiesGraphSplit(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operations := []transactions.Operation{mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 8, YMM: 10},
+	)}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Proofs) != 2 {
+		t.Fatalf("proofs = %#v, want two endpoint proofs", evidence.Proofs)
+	}
+	var splitProofs int
+	for _, proof := range evidence.Proofs {
+		if proof.Status == InterBlockContactGraphSplit {
+			splitProofs++
+		}
+	}
+	if splitProofs != 1 {
+		t.Fatalf("proofs = %#v, want one graph-split proof", evidence.Proofs)
+	}
+	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteGraphIncomplete)
+}
+
 func TestValidateInterBlockRouteEndpointContactsReportsLayerMismatch(t *testing.T) {
 	placed := interBlockContactPlaced("SIG", "SIG")
 	candidates := []InterBlockRouteCandidate{{

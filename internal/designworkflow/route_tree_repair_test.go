@@ -32,13 +32,16 @@ func TestClassifyRouteTreeContactFailures(t *testing.T) {
 	hints := BuildRouteTreeRepairHints([]reports.Issue{
 		{Code: reports.CodeRouteContactMiss, Severity: reports.SeverityBlocked, Path: "design.inter_block_contact.nets[0].endpoints[1].start", Refs: []string{"J1"}, Nets: []string{"VCC"}, Message: "route endpoint does not contact the required same-net target"},
 		{Code: reports.CodeRouteContactMissingTarget, Severity: reports.SeverityBlocked, Path: "design.inter_block_contact.nets[2].endpoints[0].target", Refs: []string{"U1"}, Nets: []string{"SDA"}, Message: "inter-block contact target has no emitted route operation"},
+		{Code: reports.CodeRouteGraphIncomplete, Severity: reports.SeverityBlocked, Path: "design.inter_block_contact.nets[3].endpoints[1].end", Refs: []string{"J2"}, Nets: []string{"GND"}, Message: "route copper is in a separate same-net contact graph component"},
 	})
-	if len(hints) != 2 {
-		t.Fatalf("hints = %#v, want two contact hints", hints)
+	if len(hints) != 3 {
+		t.Fatalf("hints = %#v, want three contact hints", hints)
 	}
-	categories := []InterBlockBranchFailureCategory{hints[0].Category, hints[1].Category}
-	if !slices.Contains(categories, InterBlockBranchFailureContactMiss) || !slices.Contains(categories, InterBlockBranchFailureMissingTarget) {
-		t.Fatalf("categories = %#v, want contact miss and missing target", categories)
+	categories := []InterBlockBranchFailureCategory{hints[0].Category, hints[1].Category, hints[2].Category}
+	if !slices.Contains(categories, InterBlockBranchFailureContactMiss) ||
+		!slices.Contains(categories, InterBlockBranchFailureMissingTarget) ||
+		!slices.Contains(categories, InterBlockBranchFailureGraphSplit) {
+		t.Fatalf("categories = %#v, want contact miss, missing target, and graph split", categories)
 	}
 }
 

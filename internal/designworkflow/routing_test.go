@@ -513,8 +513,10 @@ func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
 	if len(vccIssues) == 0 {
 		t.Fatalf("routing issues = %#v, want VCC route-tree/contact issues", routingStage.Issues)
 	}
-	if !routeTreeIssuesContainCode(vccIssues, reports.CodeRouteContactMiss) && !routeTreeIssuesContainMessage(vccIssues, "no legal") {
-		t.Fatalf("VCC issues = %#v, want contact-miss or pathfinding blocker", vccIssues)
+	if !routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) &&
+		!routeTreeIssuesContainCode(vccIssues, reports.CodeRouteContactMiss) &&
+		!routeTreeIssuesContainMessage(vccIssues, "no legal") {
+		t.Fatalf("VCC issues = %#v, want graph-split, contact-miss, or pathfinding blocker", vccIssues)
 	}
 }
 
