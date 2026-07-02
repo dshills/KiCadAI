@@ -171,6 +171,22 @@ kicadai component validate
 kicadai --source-dir ./data/component-sources component coverage
 ```
 
+The checked-in catalog now includes a verified first-slice component set for
+common generated designs:
+
+- 0603/0805 resistor seeds and voltage-rated Murata ceramic capacitor seeds;
+- 1x02 through 1x06 2.54 mm pin headers and indicator LEDs;
+- Signal and Schottky diodes plus a SOD-323 ESD/TVS protection diode;
+- AMS1117 SOT-223 and AP2112K SOT-23-5 fixed 3.3 V LDOs;
+- onsemi MMBT3904/MMBT3906 SOT-23 BJT amplifier seeds;
+- blocked-by-default NPN TO-220 power-output placeholders for unsupported
+  power-device scenarios.
+
+Source snapshots are local curated evidence fixtures; they are not live
+availability, pricing, or distributor data. AMS1117 fabrication-candidate use
+still requires output-capacitor ESR/stability review; MLCC DC-bias review
+applies broadly to Class II X5R/X7R ceramic-capacitor designs.
+
 Generated schematic symbols include hidden KiCadAI component identity
 properties when selected evidence is available, including component IDs,
 variant IDs, roles, block IDs, manufacturer/MPN, class, confidence, source,

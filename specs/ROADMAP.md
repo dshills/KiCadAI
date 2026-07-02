@@ -257,13 +257,14 @@ Make part selection reliable enough for AI-generated designs beyond demos.
 
 ### Status
 
-Implemented foundation.
+Foundation plus first verified family-expansion slice implemented.
 
 ### Current Foundation
 
-The component catalog now has verified or policy-allowed coverage for common
-passives, pin headers, LEDs, diodes, a regulator, an op-amp, an MCU, an I2C
-sensor, a crystal, USB-C power-only, and a protection part. It includes:
+The component catalog now has verified, blocked, or policy-allowed coverage for
+common passives, pin headers, LEDs, signal/Schottky/TVS diodes, a regulator, an
+op-amp, small-signal BJT amplifier seeds, an MCU, an I2C sensor, a crystal,
+USB-C power-only, and protection parts. It includes:
 
 - catalog coverage reporting through `component coverage`;
 - richer metadata for lifecycle, ratings, tolerances, temperature, companion
@@ -280,11 +281,17 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
   with deterministic validation, component selection gates, workflow
   procurement summaries, rationale evidence, and BOM/fabrication snapshot
   reporting;
-- verified concrete alternatives for a seed 10 kOhm 0805 resistor, 100 nF
-  0805 capacitor, green 0805 LED, and 1x04 2.54 mm header, with deterministic
-  concrete-vs-generic selection, equivalence metadata validation, alternative
+- verified concrete alternatives for the first expanded family slice:
+  0603/0805 resistor and capacitor seeds, 1x02 through 1x06 Samtec pin
+  headers, 0603/0805 Lite-On indicator LEDs, signal and Schottky diodes, a
+  concrete SOD-323 ESD/TVS protection diode, and onsemi MMBT3904/MMBT3906
+  SOT-23 BJT amplifier seeds. Selection has deterministic
+  concrete-vs-generic behavior, equivalence metadata validation, alternative
   coverage reporting, workflow procurement evidence, and BOM procurement
   snapshot propagation;
+- an NPN TO-220 power-output BJT placeholder that is blocked by default
+  until pinout, package, thermal, Safe Operating Area (SOA), and layout
+  constraints are modeled;
 - verified regulator-path coverage that connects fixed 3.3 V linear regulator
   blocks to catalog-backed AMS1117 SOT-223 and AP2112K SOT-23-5 selection,
   capacitor selection, rating requirements, generated request overrides,
@@ -299,8 +306,8 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
 
 ### Remaining Work
 
-- Expand from the first verified alternative slice to larger verified families,
-  more values/packages, and real second-source alternates.
+- Continue expanding from the first verified family slice to broader values,
+  packages, voltages, tolerances, and real second-source alternates.
 - Broaden the verified regulator path beyond the current 3.3 V AMS1117-style
   and AP2112K LDO slices, including additional voltages, adjustable/BYP
   networks, exported enable control, and part-specific capacitor stability
@@ -309,6 +316,8 @@ sensor, a crystal, USB-C power-only, and a protection part. It includes:
   selected; current support is local snapshot JSON only.
 - Replace remaining structural placeholders where verified concrete parts are
   needed.
+- Promote blocked output-stage and high-power records only after pinout,
+  thermal, SOA, and layout constraints are represented and tested.
 - Improve MCU function names from generic GPIO placeholders to datasheet port
   and peripheral roles.
 - Convert component placement/routing hints into downstream rule enforcement.

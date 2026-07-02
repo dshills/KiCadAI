@@ -34,11 +34,26 @@ kicadai --request examples/components/select_concrete_resistor.json component se
 kicadai component validate
 ```
 
-The catalog includes a small verified alternative slice for common generated
-parts: a Yageo 10 kOhm 0805 resistor, Murata 100 nF 0805 capacitor, Lite-On
-green 0805 LED, and Samtec 1x04 2.54 mm header. Connectivity and stronger
-selection prefers concrete alternatives when they satisfy the request; draft and
-structural selection can still use generic fallbacks.
+The catalog includes a verified first-slice alternative set for common
+generated parts, plus explicit blocked placeholders for unsupported power
+devices:
+
+- 0603/0805 resistor and capacitor seeds;
+- 1x02 through 1x06 Samtec pin headers;
+- 0603/0805 Lite-On indicator LEDs;
+- Signal and Schottky diodes plus a SOD-323 ESD/TVS protection diode;
+- fixed 3.3 V LDO records;
+- onsemi MMBT3904/MMBT3906 SOT-23 BJT amplifier seeds;
+- blocked-by-default NPN TO-220 power-output placeholder.
+
+Connectivity and stronger selection prefer concrete alternatives when they
+satisfy the request; draft and structural selection can still use generic
+fallbacks. Local source snapshots are curated evidence fixtures, not live
+availability or pricing data.
+
+High-value MLCC selections, such as 10 uF 0603/0805 ceramic capacitors, require
+design-specific DC-bias and effective-capacitance review. AMS1117
+fabrication-candidate use still requires output-capacitor ESR/stability review.
 
 `design create` includes a `component_selection` stage after block planning and
 before schematic or PCB writes. Request JSON can include `component_policy` to

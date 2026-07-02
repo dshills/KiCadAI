@@ -94,21 +94,35 @@ manufacturer approval.
 
 ## Verified Alternatives
 
-The checked-in catalog now includes a small verified alternative slice for
-common generated-design parts:
+The checked-in catalog now includes a verified first-slice alternative set for
+common generated-design parts, plus explicit blocked placeholders for
+unsupported power devices:
 
-- `resistor.yageo.rc0805fr_0710kl.0805` for 10 kOhm 0805 pull-up and
-  current-limiting roles;
-- `capacitor.murata.grm21br71h104ka01l.0805` for 100 nF 0805 decoupling and
-  filter roles;
-- `led.liteon.ltst_c170kgkt.0805` for green 0805 indicator LEDs;
-- `connector.samtec.tsw_104_07_l_s.1x04` for 1x04 2.54 mm vertical pin
-  headers.
+- Yageo and Vishay 0603/0805 resistor seeds for 10 kOhm and 4.7 kOhm roles.
+- Murata 0603/0805 ceramic capacitor seeds for 100 nF X7R 50 V and 10 uF X5R
+  10 V regulator and decoupling roles; 10 uF MLCC selections still require
+  design-specific DC-bias and effective-capacitance review.
+- Samtec 1x02 through 1x06 2.54 mm vertical pin headers, with generic
+  fallbacks for the same pin counts.
+- Lite-On 0603/0805 indicator LEDs with polarity evidence.
+- Concrete signal and Schottky diodes, and a SOD-323 ESD/TVS protection diode.
+- AMS1117 SOT-223 and AP2112K SOT-23-5 fixed 3.3 V LDO records used by the
+  regulator block path. AMS1117 fabrication-candidate use still requires
+  output-capacitor ESR/stability evidence instead of assuming ceramic output
+  capacitors are acceptable.
+- onsemi MMBT3904/MMBT3906 SOT-23 small-signal BJT amplifier seeds, plus a
+  blocked-by-default NPN TO-220 power-output placeholder that requires pinout,
+  package, thermal, Safe Operating Area (SOA), and layout-constraint evidence
+  before promotion.
 
 Concrete records carry manufacturer, MPN, lifecycle status, symbol bindings,
 footprints, pad-function mappings, and rating/value metadata. Generic records
 remain available for draft and structural workflows where a design needs shape
 or connectivity scaffolding before choosing an exact part.
+
+The checked-in source records are local curated snapshots. They prove that the
+workflow can carry lifecycle and availability-status fields, but they do not
+imply live stock, pricing, or current distributor availability.
 
 Records can include optional `equivalence` metadata:
 
