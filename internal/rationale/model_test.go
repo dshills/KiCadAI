@@ -110,6 +110,14 @@ func TestBuildWithWorkflowProcurementEvidence(t *testing.T) {
 				"selected_components": []map[string]any{{
 					"role":         "regulator",
 					"component_id": "regulator.linear.ap2112k_3v3.sot23_5",
+					"regulator_evidence": map[string]any{
+						"thermal_review": "review_required",
+						"output_capacitor": map[string]any{
+							"kind":                         "ceramic_stable",
+							"proof_status":                 "review_required",
+							"fabrication_candidate_blocks": true,
+						},
+					},
 					"procurement": &components.ProcurementEvidence{
 						Manufacturer:           "Diodes Incorporated",
 						MPN:                    "AP2112K-3.3",
@@ -134,6 +142,9 @@ func TestBuildWithWorkflowProcurementEvidence(t *testing.T) {
 	}
 	if !found {
 		t.Fatalf("procurement evidence missing from %#v", report.Evidence)
+	}
+	if !hasEvidenceKind(report, "regulator_stability") {
+		t.Fatalf("regulator stability evidence missing from %#v", report.Evidence)
 	}
 }
 
@@ -223,6 +234,15 @@ func hasDecisionType(report Report, kind string) bool {
 func hasEvidenceSummary(report Report, text string) bool {
 	for _, evidence := range report.Evidence {
 		if strings.Contains(evidence.Summary, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasEvidenceKind(report Report, kind string) bool {
+	for _, evidence := range report.Evidence {
+		if evidence.Kind == kind {
 			return true
 		}
 	}

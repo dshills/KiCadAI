@@ -1118,6 +1118,64 @@ func TestRunComponentSelectWithSourceEvidence(t *testing.T) {
 	if !strings.Contains(stdout.String(), `"lifecycle_status": "active"`) || !strings.Contains(stdout.String(), `"source_id": "curated_seed_procurement"`) {
 		t.Fatalf("missing procurement evidence: %s", stdout.String())
 	}
+	if !strings.Contains(stdout.String(), `"regulator_evidence"`) || !strings.Contains(stdout.String(), `"kind": "ceramic_stable"`) {
+		t.Fatalf("missing AP2112K regulator stability evidence: %s", stdout.String())
+	}
+}
+
+func TestRunComponentSelectBlocksAMS1117FabricationCandidateOnStabilityEvidence(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "regulator-select.json")
+	writeTestFile(t, requestPath, `{
+  "query": {
+    "family": "regulator",
+    "package": "sot223",
+    "value_kind": "output_voltage",
+    "value": "3.3"
+  },
+  "acceptance": "fabrication_candidate",
+  "require_concrete": true,
+  "require_companions": true,
+  "required_ratings": [
+    {"kind": "input_voltage", "value": "5", "unit": "V"},
+    {"kind": "output_current", "value": "100", "unit": "mA"}
+  ]
+}`)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--request", requestPath, "component", "select"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected AMS1117 fabrication-candidate selection to fail")
+	}
+	if !strings.Contains(stdout.String(), `"component.regulator.linear.ams1117_3v3.sot223.regulator_evidence.output_capacitor"`) ||
+		!strings.Contains(stdout.String(), "ESR-window stability proof") {
+		t.Fatalf("missing AMS1117 stability blocker: %s", stdout.String())
+	}
+}
+
+func TestRunComponentSelectBlocksMLCCFabricationCandidateOnDeratingEvidence(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "capacitor-select.json")
+	writeTestFile(t, requestPath, `{
+  "query": {
+    "family": "capacitor",
+    "package": "0805",
+    "value_kind": "capacitance",
+    "value": "10u"
+  },
+  "acceptance": "fabrication_candidate",
+  "require_concrete": true,
+  "required_ratings": [
+    {"kind": "voltage", "value": "3.3", "unit": "V"}
+  ]
+}`)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--catalog-dir", testComponentCatalogDir(t), "--request", requestPath, "component", "select"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected MLCC fabrication-candidate selection to fail")
+	}
+	if !strings.Contains(stdout.String(), `"component.capacitor.murata.grm21br61a106ke19l.0805.capacitor_evidence.effective_capacitance_review"`) {
+		t.Fatalf("missing MLCC effective-capacitance blocker: %s", stdout.String())
+	}
 }
 
 func TestRunComponentValidateWithSourceDir(t *testing.T) {

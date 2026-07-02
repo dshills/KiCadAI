@@ -477,6 +477,7 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 			Summary: string(stage.Status),
 		})
 		report.Evidence = append(report.Evidence, procurementEvidenceFromStage(stage)...)
+		report.Evidence = append(report.Evidence, stabilityEvidenceFromStage(stage)...)
 		for index, issue := range stage.Issues {
 			report.Evidence = append(report.Evidence, EvidenceRecord{
 				ID:      fmt.Sprintf("stage_issue:%s:%03d", stage.Name, index+1),
@@ -543,6 +544,64 @@ func procurementEvidenceFromStage(stage designworkflow.StageResult) []EvidenceRe
 				summaryKV("outcome", procurement["outcome"]),
 			}),
 		})
+	}
+	return out
+}
+
+func stabilityEvidenceFromStage(stage designworkflow.StageResult) []EvidenceRecord {
+	if stage.Name != designworkflow.StageComponentSelection {
+		return nil
+	}
+	selected, ok := stage.Summary["selected_components"]
+	if !ok {
+		return nil
+	}
+	rows := selectedComponentSummaryRows(selected)
+	var out []EvidenceRecord
+	for index, row := range rows {
+		componentID := summaryString(row["component_id"])
+		role := summaryString(row["role"])
+		if regulator, ok := summaryMap(row["regulator_evidence"]); ok && len(regulator) > 0 {
+			outputCap, outputCapOK := summaryMap(regulator["output_capacitor"])
+			if !outputCapOK {
+				outputCap = nil
+			}
+			summary := strings.Join(compactStrings([]string{
+				summaryKV("component", componentID),
+				summaryKV("thermal_review", regulator["thermal_review"]),
+				summaryKV("output_cap_kind", outputCap["kind"]),
+				summaryKV("output_cap_proof", outputCap["proof_status"]),
+				summaryKV("fabrication_blocks", outputCap["fabrication_candidate_blocks"]),
+			}), " ")
+			out = append(out, EvidenceRecord{
+				ID:      fmt.Sprintf("regulator_stability:%s:%03d", stage.Name, index+1),
+				Kind:    "regulator_stability",
+				Path:    strings.Join(compactStrings([]string{"component_selection", role, componentID, "regulator_evidence"}), "."),
+				Summary: summary,
+				Notes: compactStrings([]string{
+					summaryKV("review_note", outputCap["review_note"]),
+				}),
+			})
+		}
+		if capacitor, ok := summaryMap(row["capacitor_evidence"]); ok && len(capacitor) > 0 {
+			summary := strings.Join(compactStrings([]string{
+				summaryKV("component", componentID),
+				summaryKV("dielectric", capacitor["dielectric"]),
+				summaryKV("dc_bias_review", capacitor["dc_bias_review"]),
+				summaryKV("effective_capacitance_review", capacitor["effective_capacitance_review"]),
+				summaryKV("esr_review", capacitor["esr_review"]),
+				summaryKV("fabrication_blocks", capacitor["fabrication_candidate_blocks"]),
+			}), " ")
+			out = append(out, EvidenceRecord{
+				ID:      fmt.Sprintf("capacitor_derating:%s:%03d", stage.Name, index+1),
+				Kind:    "capacitor_derating",
+				Path:    strings.Join(compactStrings([]string{"component_selection", role, componentID, "capacitor_evidence"}), "."),
+				Summary: summary,
+				Notes: compactStrings([]string{
+					summaryKV("review_note", capacitor["review_note"]),
+				}),
+			})
+		}
 	}
 	return out
 }
