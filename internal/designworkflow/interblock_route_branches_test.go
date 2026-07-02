@@ -149,6 +149,56 @@ func TestRouteInterBlockTreeBranchesScopesRoutingIssuesToBranch(t *testing.T) {
 	}
 }
 
+func TestRouteTreeBranchesForRoutingOrdersShortConstrainedBranchesFirst(t *testing.T) {
+	branches := routeTreeBranchesForRouting([]InterBlockRouteTreeBranch{
+		{Index: 3, StartEndpointID: "J1.1", EndEndpointID: "U3.1", PlannedDistanceMM: 30},
+		{Index: 1, StartEndpointID: "J1.1", EndEndpointID: "U1.1", PlannedDistanceMM: 5},
+		{Index: 2, StartEndpointID: "J1.1", EndEndpointID: "U2.1", PlannedDistanceMM: 5},
+		{Index: 0, StartEndpointID: "J1.1", EndEndpointID: "U0.1"},
+	})
+	got := []int{}
+	for _, branch := range branches {
+		got = append(got, branch.Index)
+	}
+	want := []int{0, 1, 2, 3}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("branch order = %v, want %v", got, want)
+		}
+	}
+}
+
+func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.T) {
+	group := routeTreeTestGroup("SIG",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+	)
+	tree := BuildInterBlockRouteTree(group, routeTreeTestTargets("SIG", map[string]transactions.Point{
+		"J1.1": {XMM: 2, YMM: 2},
+		"U1.1": {XMM: 8, YMM: 2},
+	}))
+	base := routeBranchTestRequest("SIG", map[string]routing.Point{
+		"J1.1": {XMM: 2, YMM: 2},
+		"U1.1": {XMM: 8, YMM: 2},
+	})
+	base.Obstacles = append(base.Obstacles, routing.Obstacle{
+		Kind:  routing.ObstacleKeepout,
+		Layer: "F.Cu",
+		Geometry: routing.Shape{Rect: &routing.Rect{
+			Min: routing.Point{XMM: 0, YMM: 0},
+			Max: routing.Point{XMM: 10, YMM: 4},
+		}},
+	})
+
+	result := RouteInterBlockTreeBranches(context.Background(), base, group, tree)
+	if len(result.Issues) == 0 {
+		t.Fatalf("issues = %#v, want failed branch issue", result.Issues)
+	}
+	if len(result.Operations) != 0 || len(result.ExistingCopper) != 0 {
+		t.Fatalf("operations=%#v existing=%#v, want no failed partial copper", result.Operations, result.ExistingCopper)
+	}
+}
+
 func TestInterBlockRouteGroupEndpointsByIDKeepsRequiredOnDuplicate(t *testing.T) {
 	group := InterBlockRouteGroup{
 		RequiredEndpoints: []InterBlockRouteGroupEndpoint{{ID: "U1.1", Ref: "U1", Pin: "1"}},

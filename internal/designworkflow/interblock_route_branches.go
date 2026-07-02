@@ -1,9 +1,11 @@
 package designworkflow
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -49,7 +51,8 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 	rules := routeBranchEffectiveRules(base.Rules)
 	currentExisting := make([]routing.ExistingCopper, 0, len(base.Existing)+len(tree.Branches)*routeBranchExistingCopperCapacityPerBranch)
 	currentExisting = append(currentExisting, base.Existing...)
-	for branchPosition, branch := range tree.Branches {
+	orderedBranches := routeTreeBranchesForRouting(tree.Branches)
+	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{
 			BranchIndex:     branch.Index,
 			StartEndpointID: branch.StartEndpointID,
@@ -60,7 +63,7 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 			evidence.Status = routing.StatusBlocked
 			evidence.IssueCount = 1
 			result.Branches = append(result.Branches, evidence)
-			for _, remaining := range tree.Branches[branchPosition+1:] {
+			for _, remaining := range orderedBranches[branchPosition+1:] {
 				result.Issues = append(result.Issues, routeBranchCancellationIssue(tree.NetName, remaining.Index, err))
 				result.Branches = append(result.Branches, InterBlockBranchRoutingEvidence{
 					BranchIndex:     remaining.Index,
@@ -120,6 +123,37 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 		result.Branches = append(result.Branches, evidence)
 	}
 	return result
+}
+
+func routeTreeBranchesForRouting(branches []InterBlockRouteTreeBranch) []InterBlockRouteTreeBranch {
+	if len(branches) == 0 {
+		return nil
+	}
+	ordered := slices.Clone(branches)
+	slices.SortFunc(ordered, compareRouteTreeBranchForRouting)
+	return ordered
+}
+
+func compareRouteTreeBranchForRouting(left, right InterBlockRouteTreeBranch) int {
+	leftDistance := routeTreeBranchDistanceRank(left.PlannedDistanceMM)
+	rightDistance := routeTreeBranchDistanceRank(right.PlannedDistanceMM)
+	if compare := cmp.Compare(leftDistance, rightDistance); compare != 0 {
+		return compare
+	}
+	if compare := cmp.Compare(left.StartEndpointID, right.StartEndpointID); compare != 0 {
+		return compare
+	}
+	if compare := cmp.Compare(left.EndEndpointID, right.EndEndpointID); compare != 0 {
+		return compare
+	}
+	return cmp.Compare(left.Index, right.Index)
+}
+
+func routeTreeBranchDistanceRank(distance float64) int64 {
+	if distance < 0 || math.IsNaN(distance) || math.IsInf(distance, 0) {
+		return math.MaxInt64
+	}
+	return int64(math.Round(distance * 1000))
 }
 
 func annotateInterBlockBranchRoutingIssues(issues []reports.Issue, netName string, branch InterBlockRouteTreeBranch) []reports.Issue {
