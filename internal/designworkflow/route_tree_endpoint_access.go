@@ -103,6 +103,9 @@ func routeTreeBranchAccessPairs(sourceCandidates []routeTreeBranchAccessCandidat
 	pairs := make([]routeTreeBranchAccessPair, 0, min(len(sources)*len(targets), limit))
 	for _, source := range sources {
 		for _, target := range targets {
+			if routeTreeAccessIsGeneratedSameNetCopper(source.Access) && routeTreeAccessIsGeneratedSameNetCopper(target.Access) {
+				continue
+			}
 			if len(pairs) >= limit {
 				return pairs
 			}
@@ -110,6 +113,10 @@ func routeTreeBranchAccessPairs(sourceCandidates []routeTreeBranchAccessCandidat
 		}
 	}
 	return pairs
+}
+
+func routeTreeAccessIsGeneratedSameNetCopper(access RouteTreeEndpointAccess) bool {
+	return access.Role == RouteTreeAccessSameNetCopper && strings.TrimSpace(access.Source) == routeTreeSameNetExistingCopperSource
 }
 
 func routeTreeAccessRoleRank(role RouteTreeEndpointAccessRole) int {

@@ -87,6 +87,27 @@ func TestRouteTreeBranchAccessPairsAreBoundedAndRanked(t *testing.T) {
 	}
 }
 
+func TestRouteTreeBranchAccessPairsSkipSameNetCopperToSameNetCopper(t *testing.T) {
+	sources := []routeTreeBranchAccessCandidate{
+		{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessSameNetCopper, Net: "VCC", Source: routeTreeSameNetExistingCopperSource}, RoleRank: 1},
+		{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "1", Net: "VCC"}, RoleRank: 2},
+	}
+	targets := []routeTreeBranchAccessCandidate{
+		{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessSameNetCopper, Net: "VCC", Source: routeTreeSameNetExistingCopperSource}, RoleRank: 1},
+		{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "VCC"}, RoleRank: 2},
+	}
+
+	pairs := routeTreeBranchAccessPairs(sources, targets, 4)
+	if len(pairs) != 3 {
+		t.Fatalf("pairs = %#v, want only non-copper-to-copper combinations", pairs)
+	}
+	for _, pair := range pairs {
+		if pair.Source.Access.Role == RouteTreeAccessSameNetCopper && pair.Target.Access.Role == RouteTreeAccessSameNetCopper {
+			t.Fatalf("pairs = %#v, want copper-to-copper pair filtered", pairs)
+		}
+	}
+}
+
 func TestRouteTreeAccessDistanceRankPenalizesMissingOpposite(t *testing.T) {
 	rank := routeTreeAccessDistanceRank(RouteTreeEndpointAccess{Net: "SDA", XMM: 0, YMM: 0}, RouteTreeEndpointAccess{})
 	if rank != routeTreeAccessMissingDistance {

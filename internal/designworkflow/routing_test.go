@@ -479,8 +479,11 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 	if retry.Attempts != 2 || retry.Applied != 1 || len(retry.AttemptHistory) != 2 {
 		t.Fatalf("retry = %#v, want one bounded retry attempt", retry)
 	}
-	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 11 || retry.AttemptHistory[1].RouteTreeProvenEndpoints != 11 {
-		t.Fatalf("retry history = %#v, want stable 11-endpoint baseline", retry.AttemptHistory)
+	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 11 || !retry.AttemptHistory[0].Selected {
+		t.Fatalf("retry history = %#v, want selected initial 11-endpoint baseline", retry.AttemptHistory)
+	}
+	if retry.AttemptHistory[1].Selected {
+		t.Fatalf("retry history = %#v, want exploratory retry to remain unselected", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
 	if len(branchPaths) != 1 || len(branchPaths["VCC"]) == 0 {

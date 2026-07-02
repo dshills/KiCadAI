@@ -411,6 +411,89 @@ func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.
 	}
 }
 
+func TestRouteInterBlockTreeBranchesMergesLaterBranchIntoGeneratedSameNetCopper(t *testing.T) {
+	group := routeTreeTestGroup("VCC",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U2", Pin: "1"},
+	)
+	tree := InterBlockRouteTree{
+		NetName: "VCC",
+		Branches: []InterBlockRouteTreeBranch{
+			{Index: 0, StartEndpointID: "J1.1", EndEndpointID: "U1.1", PlannedDistanceMM: 10},
+			{Index: 1, StartEndpointID: "J1.1", EndEndpointID: "U2.1", PlannedDistanceMM: 12},
+		},
+	}
+	base := routeBranchTestRequest("VCC", map[string]routing.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 15, YMM: 5},
+		"U2.1": {XMM: 10, YMM: 12},
+	})
+	base.Nets = []routing.Net{{
+		Name: "VCC",
+		Role: routing.NetPower,
+		Endpoints: []routing.Endpoint{
+			{Ref: "J1", Pin: "1"},
+			{Ref: "U1", Pin: "1"},
+			{Ref: "U2", Pin: "1"},
+		},
+	}}
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 5, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 15, YMM: 5},
+		{EndpointID: "U2.1", Role: RouteTreeAccessTargetPad, Ref: "U2", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 10, YMM: 12},
+	}
+
+	result := RouteInterBlockTreeBranchesWithAccess(context.Background(), base, group, tree, access)
+	if len(result.Branches) != 2 {
+		t.Fatalf("branches = %#v, want two", result.Branches)
+	}
+	first := result.Branches[0]
+	second := result.Branches[1]
+	if first.Status != routing.StatusRouted || second.Status != routing.StatusRouted {
+		t.Fatalf("branches = %#v, want both routed", result.Branches)
+	}
+	if second.SelectedSourceRole != RouteTreeAccessSameNetCopper && second.SelectedTargetRole != RouteTreeAccessSameNetCopper {
+		t.Fatalf("second branch = %#v, want generated same-net copper merge selected", second)
+	}
+	if len(second.AccessAttempts) == 0 || second.AccessAttempts[0].SameNetCopper == 0 {
+		t.Fatalf("second branch attempts = %#v, want same-net copper merge audit", second.AccessAttempts)
+	}
+}
+
+func TestRouteTreeEndpointAccessWithSameNetCopperIgnoresOtherNetCopper(t *testing.T) {
+	access := routeTreeEndpointAccessWithSameNetCopper(nil, []routing.ExistingCopper{
+		{
+			Kind:  routing.CopperSegment,
+			Net:   "VCC",
+			Layer: "F.Cu",
+			Geometry: routing.Shape{Rect: &routing.Rect{
+				Min: routing.Point{XMM: 4, YMM: 5},
+				Max: routing.Point{XMM: 8, YMM: 5.5},
+			}},
+		},
+		{
+			Kind:  routing.CopperSegment,
+			Net:   "GND",
+			Layer: "F.Cu",
+			Geometry: routing.Shape{Rect: &routing.Rect{
+				Min: routing.Point{XMM: 10, YMM: 10},
+				Max: routing.Point{XMM: 12, YMM: 10.5},
+			}},
+		},
+	}, "VCC")
+	if len(access) != 1 {
+		t.Fatalf("access = %#v, want one VCC copper access point", access)
+	}
+	got := access[0]
+	if got.Role != RouteTreeAccessSameNetCopper || got.Net != "VCC" || got.Layer != "F.CU" || got.Source != routeTreeSameNetExistingCopperSource {
+		t.Fatalf("access = %#v, want same-net copper access metadata", got)
+	}
+	if math.Abs(got.XMM-6) > 1e-9 || math.Abs(got.YMM-5.25) > 1e-9 {
+		t.Fatalf("access = %#v, want center of VCC copper geometry", got)
+	}
+}
+
 func TestRouteTreeAccessBranchRequestRoutesSyntheticAccessPoints(t *testing.T) {
 	base := routeBranchTestRequest("SIG", map[string]routing.Point{
 		"J1.1": {XMM: 2, YMM: 2},

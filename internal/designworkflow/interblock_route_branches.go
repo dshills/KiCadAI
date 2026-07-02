@@ -29,6 +29,8 @@ const routeTreeSyntheticAccessPadSizeMM = 0.4
 const routeTreeObstacleAuditCellMM = 5.0
 const routeTreeImmediateObstaclePressureMM = 0.75
 const routeTreeNearObstaclePressureMM = 1.5
+const routeTreeMaxPolygonCopperAccessPoints = 16
+const routeTreeSameNetExistingCopperSource = "same_net_existing_copper"
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
@@ -123,6 +125,7 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 	currentExisting := make([]routing.ExistingCopper, 0, len(base.Existing)+len(tree.Branches)*routeBranchExistingCopperCapacityPerBranch)
 	currentExisting = append(currentExisting, base.Existing...)
 	orderedBranches := routeTreeBranchesForRouting(tree.Branches)
+	branchAccess := routeTreeEndpointAccessWithSameNetCopper(access, base.Existing, tree.NetName)
 	accessCandidateCache := routeTreeAccessCandidateCache{}
 	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName)
 	for branchPosition, branch := range orderedBranches {
@@ -166,7 +169,7 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		}
 		branchBase := base
 		branchBase.Existing = currentExisting
-		accessAudit := routeTreeBranchAccessAuditForBranchWithMergeAudit(access, tree.NetName, branch, accessCandidateCache, mergeAuditBase)
+		accessAudit := routeTreeBranchAccessAuditForBranchWithMergeAudit(branchAccess, tree.NetName, branch, accessCandidateCache, mergeAuditBase)
 		mergeAudit := routeTreeMergeAuditForBranch(mergeAuditBase, branchBase.Existing, tree.NetName)
 		branchResult, selectedPair, selectedPairOK, accessPairsTried, accessAttempts := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, accessAudit, mergeAudit)
 		accessSelected := selectedPairOK
@@ -192,6 +195,10 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		result.ExistingCopper = append(result.ExistingCopper, branchExisting...)
 		result.Issues = append(result.Issues, branchIssues...)
 		currentExisting = append(currentExisting, branchExisting...)
+		if len(branchExisting) != 0 {
+			branchAccess = routeTreeEndpointAccessWithSameNetCopper(branchAccess, branchExisting, tree.NetName)
+			accessCandidateCache = routeTreeAccessCandidateCache{}
+		}
 		evidence.Status = branchResult.Status
 		evidence.IssueCount = len(branchIssues)
 		evidence.BlockingIssueCount, evidence.WarningIssueCount, evidence.InfoIssueCount, evidence.FixedNetSkipNotices = routeTreeIssueCounters(branchIssues)
@@ -559,6 +566,74 @@ func routeTreeAccessBranchRequest(base routing.Request, netName string, pair rou
 		routeTreeSyntheticAccessComponent(targetRef, branchNet.Name, pair.Target.Access, defaultLayer),
 	)
 	return request
+}
+
+func routeTreeEndpointAccessWithSameNetCopper(access []RouteTreeEndpointAccess, existing []routing.ExistingCopper, netName string) []RouteTreeEndpointAccess {
+	if len(existing) == 0 {
+		return access
+	}
+	trimmedNetName := strings.TrimSpace(netName)
+	out := make([]RouteTreeEndpointAccess, 0, len(access)+len(existing))
+	out = append(out, access...)
+	for _, copper := range existing {
+		copperNet := strings.TrimSpace(copper.Net)
+		if !strings.EqualFold(copperNet, trimmedNetName) {
+			continue
+		}
+		layer := normalizeContactLayer(copper.Layer)
+		for _, point := range routeTreeExistingCopperAccessPoints(copper.Geometry) {
+			out = append(out, RouteTreeEndpointAccess{
+				Role:   RouteTreeAccessSameNetCopper,
+				Net:    trimmedNetName,
+				Layer:  layer,
+				XMM:    point.XMM,
+				YMM:    point.YMM,
+				Source: routeTreeSameNetExistingCopperSource,
+			})
+		}
+	}
+	out = uniqueRouteTreeEndpointAccess(out)
+	slices.SortFunc(out, compareRouteTreeEndpointAccess)
+	return out
+}
+
+func routeTreeExistingCopperAccessPoints(shape routing.Shape) []routing.Point {
+	if shape.Rect != nil {
+		rect := normalizeRoutingRect(*shape.Rect)
+		return []routing.Point{{
+			XMM: (rect.Min.XMM + rect.Max.XMM) / 2,
+			YMM: (rect.Min.YMM + rect.Max.YMM) / 2,
+		}}
+	}
+	if len(shape.Polygon) == 0 {
+		return nil
+	}
+	// routing.Shape currently supports only rectangles and polygons. For
+	// large polygons, sample deterministic boundary vertices to keep access
+	// pair generation bounded.
+	if len(shape.Polygon) <= routeTreeMaxPolygonCopperAccessPoints {
+		return append([]routing.Point(nil), shape.Polygon...)
+	}
+	points := make([]routing.Point, 0, routeTreeMaxPolygonCopperAccessPoints)
+	denominator := max(1, routeTreeMaxPolygonCopperAccessPoints-1)
+	for index := 0; index < routeTreeMaxPolygonCopperAccessPoints; index++ {
+		sourceIndex := int(math.Round(float64(index) * float64(len(shape.Polygon)-1) / float64(denominator)))
+		points = append(points, shape.Polygon[sourceIndex])
+	}
+	return points
+}
+
+func normalizeRoutingRect(rect routing.Rect) routing.Rect {
+	return routing.Rect{
+		Min: routing.Point{
+			XMM: min(rect.Min.XMM, rect.Max.XMM),
+			YMM: min(rect.Min.YMM, rect.Max.YMM),
+		},
+		Max: routing.Point{
+			XMM: max(rect.Min.XMM, rect.Max.XMM),
+			YMM: max(rect.Min.YMM, rect.Max.YMM),
+		},
+	}
 }
 
 func routeTreeBranchAccessPairsForBranch(access []RouteTreeEndpointAccess, netName string, branch InterBlockRouteTreeBranch, cache routeTreeAccessCandidateCache) []routeTreeBranchAccessPair {
