@@ -380,6 +380,8 @@ type NetQualityReport struct {
 	Layers          []string    `json:"layers,omitempty"`
 	SearchNodes     int         `json:"search_nodes"`
 	SearchLimitHit  bool        `json:"search_limit_hit,omitempty"`
+	SameNetPads     int         `json:"same_net_pads"`
+	SameNetCopper   int         `json:"same_net_copper"`
 	FailureCategory string      `json:"failure_category,omitempty"`
 	SuggestedRepair string      `json:"suggested_repair,omitempty"`
 }

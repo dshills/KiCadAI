@@ -23,6 +23,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	}
 	request = cloneRequest(request)
 	NormalizeRequest(&request)
+	qualityEvidence := BuildQualityInputEvidence(request)
 	result := Result{Status: StatusBlocked}
 	issues := Validate(&request)
 	access := BuildPadAccess(request)
@@ -130,7 +131,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if !request.Strategy.AllowPartial {
 				result.Status = StatusBlocked
 				result.Issues = append(issues, collectRouteIssues(result.Routes)...)
-				quality := BuildQualityReport(request, result)
+				quality := BuildQualityReportWithEvidence(request, result, qualityEvidence)
 				result.Quality = &quality
 				return result
 			}
@@ -144,7 +145,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if !request.Strategy.AllowPartial {
 				result.Status = StatusBlocked
 				result.Issues = append(issues, collectRouteIssues(result.Routes)...)
-				quality := BuildQualityReport(request, result)
+				quality := BuildQualityReportWithEvidence(request, result, qualityEvidence)
 				result.Quality = &quality
 				return result
 			}
@@ -175,7 +176,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			result.Status = StatusBlocked
 		}
 	}
-	quality := BuildQualityReport(request, result)
+	quality := BuildQualityReportWithEvidence(request, result, qualityEvidence)
 	result.Quality = &quality
 	return result
 }

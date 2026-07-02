@@ -6,7 +6,23 @@ import (
 	"kicadai/internal/reports"
 )
 
+type QualityInputEvidence struct {
+	SameNetPads   map[string]int
+	SameNetCopper map[string]int
+}
+
+func BuildQualityInputEvidence(request Request) QualityInputEvidence {
+	return QualityInputEvidence{
+		SameNetPads:   sameNetPadCounts(request),
+		SameNetCopper: sameNetCopperCounts(request),
+	}
+}
+
 func BuildQualityReport(request Request, result Result) QualityReport {
+	return BuildQualityReportWithEvidence(request, result, BuildQualityInputEvidence(request))
+}
+
+func BuildQualityReportWithEvidence(request Request, result Result, evidence QualityInputEvidence) QualityReport {
 	netByName := map[string]Net{}
 	for _, net := range request.Nets {
 		netByName[net.Name] = net
@@ -59,6 +75,8 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 			Layers:          routeLayers(route),
 			SearchNodes:     route.SearchNodes,
 			SearchLimitHit:  route.SearchLimitHit,
+			SameNetPads:     evidence.SameNetPads[netName],
+			SameNetCopper:   evidence.SameNetCopper[netName],
 			FailureCategory: failureCategory(route.Issues),
 			SuggestedRepair: suggestedRepair(route.Issues),
 		}
@@ -71,6 +89,28 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	}
 	report.Score = buildQualityScore(result, report.NetReports)
 	return report
+}
+
+func sameNetPadCounts(request Request) map[string]int {
+	counts := make(map[string]int, len(request.Nets))
+	for _, component := range request.Components {
+		for _, pad := range component.Pads {
+			if pad.Net != "" {
+				counts[pad.Net]++
+			}
+		}
+	}
+	return counts
+}
+
+func sameNetCopperCounts(request Request) map[string]int {
+	counts := make(map[string]int, len(request.Nets))
+	for _, copper := range request.Existing {
+		if copper.Net != "" {
+			counts[copper.Net]++
+		}
+	}
+	return counts
 }
 
 func buildQualityScore(result Result, nets []NetQualityReport) QualityScore {

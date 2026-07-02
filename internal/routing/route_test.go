@@ -127,6 +127,36 @@ func TestRouteRequestAllowedLayersCanBlockRoute(t *testing.T) {
 	}
 }
 
+func TestRouteQualityReportsSameNetMergeCandidates(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Existing = []ExistingCopper{
+		{
+			Kind:     CopperSegment,
+			Net:      "SIG",
+			Layer:    "F.Cu",
+			Geometry: Shape{Rect: &Rect{Min: Point{XMM: 10, YMM: 9}, Max: Point{XMM: 11, YMM: 10}}},
+		},
+		{
+			Kind:     CopperSegment,
+			Net:      "OTHER",
+			Layer:    "F.Cu",
+			Geometry: Shape{Rect: &Rect{Min: Point{XMM: 18, YMM: 1}, Max: Point{XMM: 19, YMM: 2}}},
+		},
+	}
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted {
+		t.Fatalf("status = %s, issues = %#v", result.Status, result.Issues)
+	}
+	if result.Quality == nil || len(result.Quality.NetReports) != 1 {
+		t.Fatalf("quality = %#v", result.Quality)
+	}
+	report := result.Quality.NetReports[0]
+	if report.SameNetPads != 2 || report.SameNetCopper != 1 {
+		t.Fatalf("same-net evidence = pads %d copper %d, want 2/1", report.SameNetPads, report.SameNetCopper)
+	}
+}
+
 func TestRouteRequestLengthWarningDoesNotFailRoute(t *testing.T) {
 	request := singleLayerSearchRequest()
 	request.Rules.NetOverrides = map[string]NetRule{
