@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"flag"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+
+	"kicadai/internal/blocks"
 )
 
 var updateBlockVerificationGoldens = flag.Bool("update-block-verification-goldens", false, "update block verification CLI golden files")
@@ -27,7 +30,18 @@ func TestRunBlockVerificationGoldens(t *testing.T) {
 		},
 		{
 			name: "led_case_pass",
-			args: []string{"--json", "--case", filepath.Join(builtInBlockVerificationRoot(), "led_indicator_default", "manifest.json"), "block", "verify"},
+			args: []string{"--json", "--case", "__CASE__", "block", "verify"},
+			beforeRun: func(t *testing.T) []string {
+				data, err := fs.ReadFile(blocks.BuiltinVerificationFS(), "led_indicator_default/manifest.json")
+				if err != nil {
+					t.Fatalf("read embedded manifest: %v", err)
+				}
+				path := filepath.Join(t.TempDir(), "manifest.json")
+				if err := os.WriteFile(path, data, 0o644); err != nil {
+					t.Fatalf("write embedded manifest copy: %v", err)
+				}
+				return []string{"__CASE__", path}
+			},
 		},
 		{
 			name: "blocked_case",

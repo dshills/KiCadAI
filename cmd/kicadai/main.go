@@ -124,12 +124,17 @@ Global flags:
   --case string         Block verification manifest path
   --suite string        Block verification suite directory
   --builtins            Run built-in block verification manifests
+  --kicad-corpus        Run only built-in block manifests included in the KiCad corpus
+  --kicad-corpus-tier string Comma-separated KiCad corpus tier filter
   --require-erc         Require KiCad ERC evidence for block verification
   --require-drc         Require KiCad DRC evidence for board validation or block verification
   --allow-missing-drc   Do not fail board validation when KiCad DRC is unavailable
   --strict-zones        Treat zones without fill evidence as blocking
   --strict-unrouted     Treat unrouted multi-pad nets as blocking
   --zone-refill string  KiCad zone refill policy: never, before_validation, after_repair_before_validation
+  --require-kicad-roundtrip Require KiCad round-trip evidence for writer checks
+  --strict-diffs        Treat benign round-trip differences as writer failures
+  --allow-unrouted      Allow unrouted nets in writer checks
   --klc-root string        KiCad Library Convention repository root
   --symbols-root string    KiCad symbol library root
   --footprints-root string KiCad footprint library root
@@ -137,6 +142,7 @@ Global flags:
   --library-cache string   Library resolver cache file path
   --refresh-library-cache  Rebuild library resolver cache
   --catalog-dir string     Component catalog directory (default: data/components)
+  --source-dir string      Component lifecycle/availability source directory
   --family string          Component family filter
   --package string         Component package filter
   --value-kind string      Component value kind filter
@@ -150,6 +156,7 @@ Global flags:
   --allow-partial                    Allow partial routing results
   --repair                           Include validation repair planning in design create
   --repair-apply                     Apply generated-project validation repairs during design create
+  --max-repair-attempts int          Maximum validation repair attempts (default 3)
   --skip-routing                     Skip design workflow board routing
   --placement-board-width float      Placement feedback board width in millimeters (default {{defaultPlacementBoardWidthMM}})
   --placement-board-height float     Placement feedback board height in millimeters (default {{defaultPlacementBoardHeightMM}})
@@ -937,7 +944,8 @@ func blockVerificationManifests(opts cliOptions) ([]verification.Manifest, []rep
 	}
 	root := strings.TrimSpace(opts.blockVerifySuite)
 	if opts.blockVerifyBuiltins {
-		root = builtInBlockVerificationRoot()
+		manifests, issues := verification.LoadSuiteFS(blocks.BuiltinVerificationFS(), ".")
+		return manifests, issues, nil
 	}
 	manifests, issues := verification.LoadSuite(root)
 	return manifests, issues, nil
@@ -968,16 +976,6 @@ func safeBlockVerificationPathSegment(value string) string {
 		}
 	}
 	return builder.String()
-}
-
-func builtInBlockVerificationRoot() string {
-	rel := filepath.Join("internal", "blocks", "testdata", "verification")
-	for _, candidate := range []string{rel, filepath.Join("..", "..", rel)} {
-		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
-			return candidate
-		}
-	}
-	return rel
 }
 
 func blockVerificationRunOptions(opts cliOptions, registry blocks.Registry) (verification.RunOptions, error) {
@@ -3081,9 +3079,11 @@ func loadIntentPlan(opts cliOptions) (intentplanner.PlanResult, []reports.Issue,
 }
 
 func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subcommand string) error {
-	_ = ctx
 	if !opts.jsonOutput {
 		return fmt.Errorf("intent plan requires --format json")
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 	if subcommand == "explain" && (strings.TrimSpace(opts.intentText) != "" || strings.TrimSpace(opts.intentFile) != "") {
 		if strings.TrimSpace(opts.requestPath) != "" {
@@ -3107,9 +3107,18 @@ func runIntentPlan(ctx context.Context, opts cliOptions, stdout io.Writer, subco
 		}
 		return errors.New("intent request reported blocking issues")
 	}
-	plan := intentplanner.Plan(request)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	plan, err := intentplanner.PlanContext(ctx, request)
+	if err != nil {
+		return err
+	}
 	var artifactIssues []reports.Issue
 	if strings.TrimSpace(opts.output) != "" {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		plan, artifactIssues = intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: opts.output, Overwrite: opts.overwrite})
 	}
 	plan.Issues = append(plan.Issues, issues...)
@@ -4495,6 +4504,9 @@ func (a app) runVersion(opts cliOptions, stdout io.Writer) error {
 	}
 	if err != nil {
 		return err
+	}
+	if result.Version == nil {
+		return errors.New("KiCad version response did not include version details")
 	}
 
 	fmt.Fprintf(stdout, "reachable: true\n")

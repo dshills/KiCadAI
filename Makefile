@@ -6,6 +6,7 @@ BIN_DIR := $(CURDIR)/bin
 BIN := $(BIN_DIR)/kicadai
 GOCACHE_DIR := $(CURDIR)/.gocache
 GOMODCACHE_DIR := $(CURDIR)/.gomodcache
+GOLANGCI_LINT_CACHE := $(CURDIR)/.cache/golangci-lint
 PATH_WITH_TOOLS := $(CURDIR)/bin:$(PATH)
 COVER_DIR := $(CURDIR)/.coverage
 COVER_PROFILE := $(COVER_DIR)/kicadai.cover.out
@@ -19,7 +20,7 @@ help:
 	@printf "  make build           Build CLI binary to ./bin/kicadai\n"
 	@printf "  make install         Install CLI binary to ./bin using go install\n"
 	@printf "  make test            Run Go tests\n"
-	@printf "  make lint            Run gofmt check and go vet\n"
+	@printf "  make lint            Run gofmt, go vet, and golangci-lint when installed\n"
 	@printf "  make coverage        Generate coverage profiles\n"
 	@printf "  make coverage-check  Enforce coverage threshold (COVERAGE_THRESHOLD=%s)\n" "$(COVERAGE_THRESHOLD)"
 	@printf "  make run-help        Run kicadai --help from source\n"
@@ -43,6 +44,11 @@ lint:
 		exit 1; \
 	fi
 	GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" go vet ./...
+	@if command -v golangci-lint >/dev/null 2>&1; then \
+		GOCACHE="$(GOCACHE_DIR)" GOMODCACHE="$(GOMODCACHE_DIR)" GOLANGCI_LINT_CACHE="$(GOLANGCI_LINT_CACHE)" golangci-lint run ./cmd/... ./internal/...; \
+	else \
+		printf "golangci-lint not installed; skipped optional lint pass\n"; \
+	fi
 
 coverage:
 	mkdir -p "$(COVER_DIR)"

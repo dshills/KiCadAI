@@ -1,6 +1,7 @@
 package intentplanner
 
 import (
+	"context"
 	"fmt"
 	"math"
 	"sort"
@@ -15,6 +16,17 @@ import (
 const voltageCompareEpsilon = 0.01
 
 var builtinIntentRegistry = blocks.NewBuiltinRegistry()
+
+func PlanContext(ctx context.Context, request Request) (PlanResult, error) {
+	if err := ctx.Err(); err != nil {
+		return PlanResult{}, err
+	}
+	plan := Plan(request)
+	if err := ctx.Err(); err != nil {
+		return PlanResult{}, err
+	}
+	return plan, nil
+}
 
 func Plan(request Request) PlanResult {
 	normalized := NormalizeRequest(request)

@@ -42,7 +42,7 @@ func TestModelJSONShape(t *testing.T) {
 		}},
 	}
 
-	body, err := json.Marshal(catalog)
+	body, err := json.Marshal(&catalog)
 	if err != nil {
 		t.Fatalf("marshal catalog: %v", err)
 	}
@@ -141,7 +141,7 @@ func TestSortCatalogStable(t *testing.T) {
 	SortCatalog(&catalog)
 
 	if catalog.Families[0].ID != "a" || catalog.Records[0].ID != "a" {
-		t.Fatalf("catalog not sorted: %+v", catalog)
+		t.Fatalf("catalog not sorted: %+v", &catalog)
 	}
 	record := catalog.Records[1]
 	if record.Tags[0] != "a" || record.Packages[0].ID != "0805" || record.Symbols[0].Unit != 1 {

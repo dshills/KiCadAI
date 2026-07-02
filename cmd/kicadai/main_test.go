@@ -2117,13 +2117,17 @@ func TestRunBlockVerifyBuiltinsAndCase(t *testing.T) {
 	}
 
 	stdout.Reset()
-	manifest := filepath.Join(builtInBlockVerificationRoot(), "led_indicator_default", "manifest.json")
+	manifest := testBlockVerificationManifestPath("led_indicator_default")
 	if err := run([]string{"--json", "--case", manifest, "block", "verify"}, &stdout, &stderr); err != nil {
 		t.Fatalf("verify case err = %v stdout=%s", err, stdout.String())
 	}
 	if !strings.Contains(stdout.String(), `"count": 1`) || !strings.Contains(stdout.String(), `"status": "pass"`) {
 		t.Fatalf("unexpected verify case output: %s", stdout.String())
 	}
+}
+
+func testBlockVerificationManifestPath(caseID string) string {
+	return filepath.Join("..", "..", "internal", "blocks", "testdata", "verification", caseID, "manifest.json")
 }
 
 func TestRunBlockVerifyRequiresSelection(t *testing.T) {

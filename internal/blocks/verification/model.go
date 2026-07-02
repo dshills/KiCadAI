@@ -191,6 +191,10 @@ func LoadManifest(path string) (Manifest, []reports.Issue) {
 	if err != nil {
 		return Manifest{}, []reports.Issue{issue(reports.CodeMissingFile, reports.SeverityError, "verification.manifest", err.Error())}
 	}
+	return parseManifest(data)
+}
+
+func parseManifest(data []byte) (Manifest, []reports.Issue) {
 	var manifest Manifest
 	if err := json.Unmarshal(data, &manifest); err != nil {
 		return Manifest{}, []reports.Issue{issue(reports.CodeValidationFailed, reports.SeverityError, "verification.manifest", err.Error())}

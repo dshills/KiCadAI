@@ -9,7 +9,6 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
-	"syscall"
 
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
@@ -1300,11 +1299,6 @@ func parseApplyLockPID(contents string) (int, bool) {
 		return pid, true
 	}
 	return 0, false
-}
-
-func processAlive(pid int) bool {
-	err := syscall.Kill(pid, 0)
-	return err == nil || err == syscall.EPERM
 }
 
 func applyIssue(index int, err error) reports.Issue {
