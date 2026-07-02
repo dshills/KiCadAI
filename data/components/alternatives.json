@@ -148,6 +148,188 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Connector_Generic:Conn_01x04"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Samtec:TSW-104-07-L-S", "builtin_pinmap:Connector_Generic:Conn_01x04"], "pinmap_checked": true}
+    },
+    {
+      "id": "resistor.vishay.crcw080510k0fkea.0805",
+      "family": "resistor",
+      "name": "Vishay CRCW080510K0FKEA 10k 0805 resistor",
+      "description": "Concrete 10 kOhm 1% 0805 resistor alternate for the existing 10k 0805 equivalence group.",
+      "generic": false,
+      "manufacturer": "Vishay",
+      "mpn": "CRCW080510K0FKEA",
+      "lifecycle": "active",
+      "equivalence": {"group": "resistor.10k.0805", "role": "alternate"},
+      "tags": ["passive", "smd", "0805", "resistor", "10k"],
+      "values": [{"kind": "resistance", "typ": "10k", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "max": "0.125", "unit": "W"}],
+      "tolerances": [{"kind": "resistance", "typ": "1", "unit": "%"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:R", "curated_part:Vishay:CRCW080510K0FKEA"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "package_type": "0805",
+        "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Vishay:CRCW080510K0FKEA", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+    },
+    {
+      "id": "resistor.yageo.rc0805fr_074k7l.0805",
+      "family": "resistor",
+      "name": "Yageo RC0805FR-074K7L 4.7k 0805 resistor",
+      "description": "Concrete 4.7 kOhm 1% 0805 resistor for pull-up, bias, and feedback networks.",
+      "generic": false,
+      "manufacturer": "Yageo",
+      "mpn": "RC0805FR-074K7L",
+      "lifecycle": "active",
+      "equivalence": {"group": "resistor.4k7.0805", "role": "preferred"},
+      "tags": ["passive", "smd", "0805", "resistor", "4k7"],
+      "values": [{"kind": "resistance", "typ": "4.7k", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "max": "0.125", "unit": "W"}],
+      "tolerances": [{"kind": "resistance", "typ": "1", "unit": "%"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:R", "curated_part:Yageo:RC0805FR-074K7L"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric",
+        "package_type": "0805",
+        "pinmap_id": "Device:R|Resistor_SMD:R_0805_2012Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Yageo:RC0805FR-074K7L", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+    },
+    {
+      "id": "resistor.yageo.rc0603fr_0710kl.0603",
+      "family": "resistor",
+      "name": "Yageo RC0603FR-0710KL 10k 0603 resistor",
+      "description": "Concrete 10 kOhm 1% 0603 resistor for compact pull-up, bias, and feedback networks.",
+      "generic": false,
+      "manufacturer": "Yageo",
+      "mpn": "RC0603FR-0710KL",
+      "lifecycle": "active",
+      "equivalence": {"group": "resistor.10k.0603", "role": "preferred"},
+      "tags": ["passive", "smd", "0603", "resistor", "10k"],
+      "values": [{"kind": "resistance", "typ": "10k", "unit": "ohm"}],
+      "ratings": [{"kind": "power", "max": "0.1", "unit": "W"}],
+      "tolerances": [{"kind": "resistance", "typ": "1", "unit": "%"}],
+      "symbols": [{
+        "symbol_id": "Device:R",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:R", "curated_part:Yageo:RC0603FR-0710KL"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "Resistor_SMD:R_0603_1608Metric",
+        "package_type": "0603",
+        "pinmap_id": "Device:R|Resistor_SMD:R_0603_1608Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Yageo:RC0603FR-0710KL", "builtin_pinmap:Device:R"], "pinmap_checked": true}
+    },
+    {
+      "id": "capacitor.murata.grm188r71h104ka93d.0603",
+      "family": "capacitor",
+      "name": "Murata GRM188R71H104KA93D 100nF 0603 capacitor",
+      "description": "Concrete 100 nF X7R 0603 ceramic capacitor for compact decoupling.",
+      "generic": false,
+      "manufacturer": "Murata",
+      "mpn": "GRM188R71H104KA93D",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.100n.0603.50v", "role": "preferred"},
+      "tags": ["passive", "smd", "0603", "ceramic", "100n", "x7r"],
+      "values": [{"kind": "capacitance", "typ": "100n", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "derating_rules": [{"kind": "dc_bias", "description": "MLCC effective capacitance depends on package, dielectric, and applied DC bias; review high-accuracy or bulk-energy use."}],
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:C", "curated_part:Murata:GRM188R71H104KA93D"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0603",
+        "name": "0603 SMD",
+        "footprint_id": "Capacitor_SMD:C_0603_1608Metric",
+        "package_type": "0603",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_0603_1608Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Murata:GRM188R71H104KA93D", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Voltage and capacitance derating remain design-specific."]}
+    },
+    {
+      "id": "capacitor.murata.grm21br61a106ke19l.0805",
+      "family": "capacitor",
+      "name": "Murata GRM21BR61A106KE19L 10uF 0805 capacitor",
+      "description": "Concrete 10 uF X5R 0805 ceramic capacitor for local regulator and bulk decoupling.",
+      "generic": false,
+      "manufacturer": "Murata",
+      "mpn": "GRM21BR61A106KE19L",
+      "lifecycle": "active",
+      "equivalence": {"group": "capacitor.10u.0805.10v", "role": "preferred"},
+      "tags": ["passive", "smd", "0805", "ceramic", "10u", "x5r"],
+      "values": [{"kind": "capacitance", "typ": "10u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "10", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "derating_rules": [{"kind": "dc_bias", "description": "MLCC effective capacitance must be reviewed under operating DC bias, especially for regulator stability or bulk storage."}],
+      "symbols": [{
+        "symbol_id": "Device:C",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:C", "curated_part:Murata:GRM21BR61A106KE19L"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "0805",
+        "name": "0805 SMD",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric",
+        "package_type": "0805",
+        "pinmap_id": "Device:C|Capacitor_SMD:C_0805_2012Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:C"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Murata:GRM21BR61A106KE19L", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Voltage and capacitance derating remain design-specific."]}
     }
   ]
 }

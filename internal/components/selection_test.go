@@ -122,7 +122,7 @@ func TestSelectRejectsCapacitorBelowVoltageRating(t *testing.T) {
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
 }
 
-func TestSelectGeneric0603CapacitorByPackage(t *testing.T) {
+func TestSelectConcrete0603CapacitorByPackage(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
 		Query: Query{
@@ -136,8 +136,8 @@ func TestSelectGeneric0603CapacitorByPackage(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("select capacitor failed: %+v", result.Issues)
 	}
-	if selection.Component.ID != "capacitor.ceramic.0603" {
-		t.Fatalf("selected %s", selection.Component.ID)
+	if selection.Component.ID != "capacitor.murata.grm188r71h104ka93d.0603" || selection.Candidate.Confidence != ConfidenceVerified {
+		t.Fatalf("unexpected capacitor selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
 	}
 }
 
@@ -160,7 +160,7 @@ func TestSelectRegulatorCompanionCapacitorWithRatings(t *testing.T) {
 	if !result.OK {
 		t.Fatalf("select regulator capacitor failed: %+v", result.Issues)
 	}
-	if selection.Component.ID != "capacitor.ceramic.0805" || selection.Candidate.Confidence != ConfidenceRuleInferred {
+	if selection.Component.ID != "capacitor.murata.grm21br61a106ke19l.0805" || selection.Candidate.Confidence != ConfidenceVerified {
 		t.Fatalf("unexpected capacitor selection: ID=%q candidate=%+v", selection.Component.ID, selection.Candidate)
 	}
 }
@@ -619,7 +619,7 @@ func TestSelectRequiresConcreteAndCompanions(t *testing.T) {
 	}
 
 	_, result = Select(context.Background(), catalog, SelectionRequest{
-		Query:           Query{Family: "capacitor", Package: "0603"},
+		Query:           Query{Family: "capacitor", Package: "0603", ValueKind: "capacitance", Value: "1u"},
 		Acceptance:      AcceptanceConnectivity,
 		RequireConcrete: true,
 	})

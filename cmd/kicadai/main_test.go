@@ -413,10 +413,10 @@ func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
 	if !workflowSelectedComponent(workflow.Stages, "regulator", "regulator", "regulator.linear.ap2112k_3v3.sot23_5") {
 		t.Fatalf("workflow missing regulator selection: %#v", workflow.Stages)
 	}
-	if !workflowSelectedComponent(workflow.Stages, "regulator", "input_capacitor", "capacitor.ceramic.0805") {
+	if !workflowSelectedComponent(workflow.Stages, "regulator", "input_capacitor", "capacitor.murata.grm21br61a106ke19l.0805") {
 		t.Fatalf("workflow missing input capacitor selection: %#v", workflow.Stages)
 	}
-	if !workflowSelectedComponent(workflow.Stages, "regulator", "output_capacitor", "capacitor.ceramic.0805") {
+	if !workflowSelectedComponent(workflow.Stages, "regulator", "output_capacitor", "capacitor.murata.grm21br61a106ke19l.0805") {
 		t.Fatalf("workflow missing output capacitor selection: %#v", workflow.Stages)
 	}
 
@@ -1135,7 +1135,7 @@ func TestRunComponentValidateWithSourceDir(t *testing.T) {
 	if !ok {
 		t.Fatalf("result data = %#v", result.Data)
 	}
-	if got, ok := data["source_record_count"].(float64); !ok || got != 6 {
+	if got, ok := data["source_record_count"].(float64); !ok || got != 11 {
 		t.Fatalf("source_record_count = %#v in %#v", data["source_record_count"], data)
 	}
 }

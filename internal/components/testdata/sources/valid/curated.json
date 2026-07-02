@@ -101,6 +101,86 @@
         "source_date": "2026-06-26",
         "confidence": "not_checked"
       }
+    },
+    {
+      "manufacturer": "Vishay",
+      "mpn": "CRCW080510K0FKEA",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Yageo",
+      "mpn": "RC0805FR-074K7L",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Yageo",
+      "mpn": "RC0603FR-0710KL",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Murata",
+      "mpn": "GRM188R71H104KA93D",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
+    },
+    {
+      "manufacturer": "Murata",
+      "mpn": "GRM21BR61A106KE19L",
+      "lifecycle": {
+        "status": "active",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-06-26",
+        "confidence": "not_checked"
+      }
     }
   ]
 }

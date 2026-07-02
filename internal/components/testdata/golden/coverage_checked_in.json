@@ -1,27 +1,27 @@
 {
-  "record_count": 29,
+  "record_count": 34,
   "family_count": 12,
   "confidence_counts": {
     "blocked": 0,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 4,
-    "verified": 21
+    "verified": 26
   },
   "alternative_coverage": {
-    "concrete_records": 11,
+    "concrete_records": 16,
     "generic_fallback_records": 18,
-    "equivalence_groups": 4
+    "equivalence_groups": 8
   },
   "families": [
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 4,
-      "concrete_records": 1,
+      "record_count": 6,
+      "concrete_records": 3,
       "generic_fallback_records": 3,
-      "equivalence_groups": 1,
-      "verified_records": 1,
+      "equivalence_groups": 3,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 1,
@@ -30,12 +30,16 @@
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
         "capacitor.electrolytic.radial",
+        "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805"
       ],
       "record_ids": [
         "capacitor.ceramic.0603",
         "capacitor.ceramic.0805",
         "capacitor.electrolytic.radial",
+        "capacitor.murata.grm188r71h104ka93d.0603",
+        "capacitor.murata.grm21br61a106ke19l.0805",
         "capacitor.murata.grm21br71h104ka01l.0805"
       ]
     },
@@ -216,11 +220,11 @@
     {
       "family": "resistor",
       "defined": true,
-      "record_count": 3,
-      "concrete_records": 1,
+      "record_count": 6,
+      "concrete_records": 4,
       "generic_fallback_records": 2,
-      "equivalence_groups": 1,
-      "verified_records": 1,
+      "equivalence_groups": 3,
+      "verified_records": 4,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 0,
@@ -228,12 +232,18 @@
       "missing_resolver_evidence": [
         "resistor.generic.0603",
         "resistor.generic.0805",
-        "resistor.yageo.rc0805fr_0710kl.0805"
+        "resistor.vishay.crcw080510k0fkea.0805",
+        "resistor.yageo.rc0603fr_0710kl.0603",
+        "resistor.yageo.rc0805fr_0710kl.0805",
+        "resistor.yageo.rc0805fr_074k7l.0805"
       ],
       "record_ids": [
         "resistor.generic.0603",
         "resistor.generic.0805",
-        "resistor.yageo.rc0805fr_0710kl.0805"
+        "resistor.vishay.crcw080510k0fkea.0805",
+        "resistor.yageo.rc0603fr_0710kl.0603",
+        "resistor.yageo.rc0805fr_0710kl.0805",
+        "resistor.yageo.rc0805fr_074k7l.0805"
       ]
     },
     {
