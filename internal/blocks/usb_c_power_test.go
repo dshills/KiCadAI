@@ -54,6 +54,42 @@ func TestUSBCPowerCCPullDownsArePresent(t *testing.T) {
 	}
 }
 
+func TestUSBCPowerPowerLEDIsForwardBiased(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "usb_c_power",
+		InstanceID: "usb",
+		Params: map[string]any{
+			"include_power_led": true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	rolesByRef := addSymbolRolesByRef(t, output.Operations)
+	var resistorRef, ledRef string
+	for ref, role := range rolesByRef {
+		switch role {
+		case "power_led_resistor":
+			resistorRef = ref
+		case "power_led":
+			ledRef = ref
+		}
+	}
+	if resistorRef == "" || ledRef == "" {
+		t.Fatalf("roles by ref = %#v", rolesByRef)
+	}
+	if !hasPinOnNet(output.Operations, resistorRef, "1", "usb_vbus_out") {
+		t.Fatalf("expected VBUS_OUT net to feed power LED resistor pin 1")
+	}
+	if !hasConnect(output.Operations, resistorRef, "2", ledRef, "2", "usb_power_led_series") {
+		t.Fatalf("expected power LED resistor pin 2 to feed LED anode pin 2")
+	}
+	if !hasPinOnNet(output.Operations, ledRef, "1", "usb_gnd") {
+		t.Fatalf("expected power LED cathode pin 1 to return to GND")
+	}
+}
+
 func TestUSBCPowerFuseCanBeDisabled(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{

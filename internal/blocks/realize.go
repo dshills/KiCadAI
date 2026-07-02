@@ -526,6 +526,7 @@ type emittedComponentFact struct {
 	Value       string
 	SymbolID    string
 	FootprintID string
+	Role        string
 }
 
 func componentFactsFromOperations(operations []transactions.Operation) (map[string]emittedComponentFact, []reports.Issue) {
@@ -540,7 +541,9 @@ func componentFactsFromOperations(operations []transactions.Operation) (map[stri
 				continue
 			}
 			fact := facts[payload.Ref]
+			fact.Role = strings.TrimSpace(payload.Role)
 			fact.Value = payload.Value
+			// AddSymbolOperation.LibraryID is the schematic symbol library ID.
 			fact.SymbolID = payload.LibraryID
 			facts[payload.Ref] = fact
 		case transactions.OpAssignFootprint, transactions.OpPlaceFootprint:
@@ -615,6 +618,21 @@ func componentForRoleMatching(component BlockComponent, params map[string]any) B
 }
 
 func matchingRefForComponent(component BlockComponent, refs []string, facts map[string]emittedComponentFact, used map[string]struct{}) string {
+	role := strings.TrimSpace(component.Role)
+	if role != "" {
+		for _, ref := range refs {
+			if _, exists := used[ref]; exists {
+				continue
+			}
+			fact, ok := facts[ref]
+			if !ok || fact.Role != role {
+				continue
+			}
+			if componentFactMatches(component, fact, role) {
+				return ref
+			}
+		}
+	}
 	for _, ref := range refs {
 		if _, exists := used[ref]; exists {
 			continue
@@ -623,21 +641,30 @@ func matchingRefForComponent(component BlockComponent, refs []string, facts map[
 		if !ok {
 			continue
 		}
-		if component.Role == "connector" {
-			if connectorComponentFactCompatible(component, fact) {
-				return ref
-			}
+		// Role-bearing operations must match through the exact-role path above.
+		// This fallback exists only for older operations emitted before roles
+		// were captured in add_symbol payloads.
+		if fact.Role != "" {
 			continue
 		}
-		if component.SymbolID != "" && fact.SymbolID != component.SymbolID {
-			continue
+		if componentFactMatches(component, fact, role) {
+			return ref
 		}
-		if component.FootprintID != "" && fact.FootprintID != component.FootprintID {
-			continue
-		}
-		return ref
 	}
 	return ""
+}
+
+func componentFactMatches(component BlockComponent, fact emittedComponentFact, role string) bool {
+	if role == "connector" {
+		return connectorComponentFactCompatible(component, fact)
+	}
+	if component.SymbolID != "" && fact.SymbolID != component.SymbolID {
+		return false
+	}
+	if component.FootprintID != "" && fact.FootprintID != component.FootprintID {
+		return false
+	}
+	return true
 }
 
 func connectorComponentFactCompatible(component BlockComponent, fact emittedComponentFact) bool {

@@ -187,6 +187,17 @@ func TestVoltageRegulatorPowerLEDComposesDeterministically(t *testing.T) {
 	if len(output.Operations) != 25 {
 		t.Fatalf("operations = %#v", output.Operations)
 	}
+	resistorRef := output.Instance.Refs[3]
+	ledRef := output.Instance.Refs[4]
+	if !hasPinOnNet(output.Operations, resistorRef, "1", "rail3v3_vout") {
+		t.Fatalf("expected VOUT net to feed power LED resistor pin 1")
+	}
+	if !hasConnect(output.Operations, resistorRef, "2", ledRef, "2", "rail3v3_power_led_series") {
+		t.Fatalf("expected power LED resistor pin 2 to feed LED anode pin 2")
+	}
+	if !hasConnect(output.Operations, ledRef, "1", "rail3v3", "GND", "rail3v3_gnd") {
+		t.Fatalf("expected power LED cathode pin 1 to return to GND")
+	}
 }
 
 func TestVoltageRegulatorProjectTransactionApplies(t *testing.T) {
@@ -283,6 +294,24 @@ func hasConnect(operations []transactions.Operation, fromRef string, fromPin str
 		if payload.NetName == netName &&
 			payload.From.Ref == fromRef && payload.From.Pin == fromPin &&
 			payload.To.Ref == toRef && payload.To.Pin == toPin {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPinOnNet(operations []transactions.Operation, ref string, pin string, netName string) bool {
+	for _, op := range operations {
+		if op.Op != transactions.OpConnect {
+			continue
+		}
+		var payload transactions.ConnectOperation
+		if err := json.Unmarshal(op.Raw, &payload); err != nil {
+			continue
+		}
+		if payload.NetName == netName &&
+			((payload.From.Ref == ref && payload.From.Pin == pin) ||
+				(payload.To.Ref == ref && payload.To.Pin == pin)) {
 			return true
 		}
 	}

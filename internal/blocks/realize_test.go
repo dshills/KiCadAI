@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -35,6 +36,37 @@ func TestRealizeBlockPCBProducesPlacementsAndRoutes(t *testing.T) {
 	if countOperations(result.Operations, transactions.OpPlaceFootprint) != 2 ||
 		countOperations(result.Operations, transactions.OpRoute) != 1 {
 		t.Fatalf("operations = %#v", result.Operations)
+	}
+}
+
+func TestRealizeBlockPCBMatchesComponentsByEmittedRole(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("mcu_minimal")
+	if !ok {
+		t.Fatal("missing mcu_minimal")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{BlockID: "mcu_minimal", InstanceID: "mcu1"})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	rolesByRef := addSymbolRolesByRef(t, output.Operations)
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	routeByID := map[string]RealizedPCBLocalRoute{}
+	for _, route := range result.LocalRoutes {
+		routeByID[route.ID] = route
+	}
+	aref := routeByID["mcu_aref_decoupling"]
+	if aref.ID == "" {
+		t.Fatalf("routes = %#v, want mcu_aref_decoupling", result.LocalRoutes)
+	}
+	if got := rolesByRef[aref.From.Ref]; got != "aref_decoupling_capacitor" {
+		t.Fatalf("AREF route starts at ref %s role %q, want aref_decoupling_capacitor; routes = %#v", aref.From.Ref, got, result.LocalRoutes)
+	}
+	if aref.From.Pin != "1" || aref.To.Pin != defaultMCUAREFPin() {
+		t.Fatalf("AREF route endpoints = %#v -> %#v", aref.From, aref.To)
 	}
 }
 
@@ -308,4 +340,20 @@ func countOperations(operations []transactions.Operation, kind transactions.Oper
 		}
 	}
 	return count
+}
+
+func addSymbolRolesByRef(t *testing.T, operations []transactions.Operation) map[string]string {
+	t.Helper()
+	roles := map[string]string{}
+	for _, operation := range operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("decode add_symbol: %v", err)
+		}
+		roles[payload.Ref] = payload.Role
+	}
+	return roles
 }

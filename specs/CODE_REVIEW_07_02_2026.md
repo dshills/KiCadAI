@@ -1,5 +1,15 @@
 # Code Review — 2026-07-02
 
+## Current Triage Note
+
+This review was created against a transient tree that included staged
+route-tree work. Treat it as a high-value backlog source, not as an
+already-authoritative implementation plan. Before fixing any item, verify that
+the cited behavior still exists in the current tree and add a focused
+regression test that fails before the fix.
+
+Follow-up plan: `specs/CODE_REVIEW_FIX_PLAN_07_02_2026.md`.
+
 Scope: full-repository review of non-generated Go code (~101k production LOC, ~66k test LOC across `cmd/kicadai` and ~47 internal packages). Generated protobuf code under `internal/kiapi/gen` and vendored snapshots under `third_party/` were excluded. The review was performed by ten parallel review passes, each covering a coherent package cluster (kicadfiles, designworkflow, blocks, fabrication/validation, placement/routing, repair/transactions, intent/AI, components/library, CLI + small packages, and a cross-cutting architecture pass). Every finding below was verified against the surrounding code; several were verified empirically with throwaway tests.
 
 Note: at review time the working tree contained staged, uncommitted changes (`internal/designworkflow/routing.go`, `internal/designworkflow/routing_test.go`, and the new `specs/vcc-route-tree-path-completion/` spec). The review covers the tree as it stood, including those changes.

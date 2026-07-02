@@ -318,9 +318,9 @@ func instantiateRegulatorPowerLED(definition BlockDefinition, request BlockReque
 	issues = append(issues, componentIssues...)
 	operations = append(operations, componentOps...)
 	seriesNet := InstanceNetName(request.InstanceID, "power_led_series")
-	appendConnectOperation(&operations, &issues, resistorRef, "2", ledRef, "1", seriesNet)
+	appendConnectOperation(&operations, &issues, resistorRef, "2", ledRef, "2", seriesNet)
 	appendConnectOperation(&operations, &issues, request.InstanceID, "VOUT", resistorRef, "1", voutNet)
-	appendConnectOperation(&operations, &issues, ledRef, "2", request.InstanceID, "GND", gndNet)
+	appendConnectOperation(&operations, &issues, ledRef, "1", request.InstanceID, "GND", gndNet)
 	return BlockOutput{
 		Definition: Summary(definition),
 		Instance:   BlockInstance{BlockID: definition.ID, InstanceID: request.InstanceID, Params: params, Refs: []string{resistorRef, ledRef}, Nets: []string{seriesNet}},

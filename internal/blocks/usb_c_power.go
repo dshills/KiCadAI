@@ -259,7 +259,7 @@ func instantiateUSBPowerLED(definition BlockDefinition, request BlockRequest, al
 	operations = append(operations, ledOps...)
 	seriesNet := InstanceNetName(request.InstanceID, "power_led_series")
 	appendConnectOperation(&operations, &issues, vbusRef, vbusPin, resistorRef, "1", vbusNet)
-	appendConnectOperation(&operations, &issues, resistorRef, "2", ledRef, "1", seriesNet)
-	appendConnectOperation(&operations, &issues, ledRef, "2", gndRef, gndPin, gndNet)
+	appendConnectOperation(&operations, &issues, resistorRef, "2", ledRef, "2", seriesNet)
+	appendConnectOperation(&operations, &issues, ledRef, "1", gndRef, gndPin, gndNet)
 	return BlockOutput{Definition: Summary(definition), Instance: BlockInstance{BlockID: definition.ID, InstanceID: request.InstanceID, Refs: []string{resistorRef, ledRef}, Nets: []string{seriesNet}}, Operations: operations, Issues: issues}, issues
 }
