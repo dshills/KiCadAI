@@ -79,6 +79,25 @@ func TestRouteInterBlockTreeBranchesWithAccessReportsSelectedAccessPair(t *testi
 	if branch.SelectedSourceRole != RouteTreeAccessLocalRouteAnchor || branch.SelectedTargetRole != RouteTreeAccessTargetPad {
 		t.Fatalf("branch = %#v, want selected local-anchor to pad access roles", branch)
 	}
+	if branch.SelectedSourceLayer != "F.Cu" || branch.SelectedTargetLayer != "F.Cu" {
+		t.Fatalf("branch = %#v, want selected access layers", branch)
+	}
+	if math.Abs(branch.SelectedSourceXMM-8) > 1e-9 || math.Abs(branch.SelectedSourceYMM-5) > 1e-9 {
+		t.Fatalf("branch = %#v, want selected source coordinates from local-route anchor", branch)
+	}
+	if branch.SelectedTargetRef != "U1" || branch.SelectedTargetPad != "1" || math.Abs(branch.SelectedTargetXMM-25) > 1e-9 || math.Abs(branch.SelectedTargetYMM-5) > 1e-9 {
+		t.Fatalf("branch = %#v, want selected target pad evidence", branch)
+	}
+	if !branch.SnapExemptRoute {
+		t.Fatalf("branch = %#v, want access-selected route to be snap-exempt", branch)
+	}
+	if len(branch.AccessAttempts) == 0 || len(branch.AccessAttempts) > routeTreeBranchAccessPairLimit {
+		t.Fatalf("branch = %#v, want bounded access attempt evidence", branch)
+	}
+	attempt := branch.AccessAttempts[0]
+	if attempt.PairRank != 0 || attempt.SourceRole != RouteTreeAccessLocalRouteAnchor || attempt.TargetRole != RouteTreeAccessTargetPad || attempt.Status != routing.StatusRouted {
+		t.Fatalf("first access attempt = %#v, want routed local-anchor to pad attempt", attempt)
+	}
 }
 
 func TestRouteInterBlockTreeBranchesReportsMissingGroupEndpoint(t *testing.T) {
@@ -141,8 +160,8 @@ func TestRouteInterBlockTreeBranchesReportsAllBranchesOnCanceledContext(t *testi
 			t.Fatalf("branch %d status = %s, want blocked", branch.BranchIndex, branch.Status)
 		}
 	}
-	if len(result.Issues) != len(tree.Branches) {
-		t.Fatalf("issues = %d, want %d", len(result.Issues), len(tree.Branches))
+	if len(result.Issues) != 1 {
+		t.Fatalf("issues = %d, want one cancellation issue", len(result.Issues))
 	}
 }
 

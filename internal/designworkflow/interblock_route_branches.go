@@ -36,15 +36,45 @@ type InterBlockBranchRoutingResult struct {
 }
 
 type InterBlockBranchRoutingEvidence struct {
-	BranchIndex        int                         `json:"branch_index"`
-	StartEndpointID    string                      `json:"start_endpoint_id"`
-	EndEndpointID      string                      `json:"end_endpoint_id"`
-	Status             routing.Status              `json:"status"`
-	OperationCount     int                         `json:"operation_count"`
-	IssueCount         int                         `json:"issue_count"`
-	AccessPairsTried   int                         `json:"access_pairs_tried,omitempty"`
-	SelectedSourceRole RouteTreeEndpointAccessRole `json:"selected_source_role,omitempty"`
-	SelectedTargetRole RouteTreeEndpointAccessRole `json:"selected_target_role,omitempty"`
+	BranchIndex         int                                    `json:"branch_index"`
+	StartEndpointID     string                                 `json:"start_endpoint_id"`
+	EndEndpointID       string                                 `json:"end_endpoint_id"`
+	Status              routing.Status                         `json:"status"`
+	OperationCount      int                                    `json:"operation_count"`
+	IssueCount          int                                    `json:"issue_count"`
+	AccessPairsTried    int                                    `json:"access_pairs_tried,omitempty"`
+	SelectedSourceRole  RouteTreeEndpointAccessRole            `json:"selected_source_role,omitempty"`
+	SelectedTargetRole  RouteTreeEndpointAccessRole            `json:"selected_target_role,omitempty"`
+	SelectedSourceRef   string                                 `json:"selected_source_ref,omitempty"`
+	SelectedSourcePad   string                                 `json:"selected_source_pad,omitempty"`
+	SelectedSourceLayer string                                 `json:"selected_source_layer,omitempty"`
+	SelectedSourceXMM   float64                                `json:"selected_source_x_mm"`
+	SelectedSourceYMM   float64                                `json:"selected_source_y_mm"`
+	SelectedTargetRef   string                                 `json:"selected_target_ref,omitempty"`
+	SelectedTargetPad   string                                 `json:"selected_target_pad,omitempty"`
+	SelectedTargetLayer string                                 `json:"selected_target_layer,omitempty"`
+	SelectedTargetXMM   float64                                `json:"selected_target_x_mm"`
+	SelectedTargetYMM   float64                                `json:"selected_target_y_mm"`
+	SnapExemptRoute     bool                                   `json:"snap_exempt_route,omitempty"`
+	AccessAttempts      []RouteTreeBranchAccessAttemptEvidence `json:"access_attempts,omitempty"`
+}
+
+type RouteTreeBranchAccessAttemptEvidence struct {
+	PairRank       int                         `json:"pair_rank"`
+	SourceRole     RouteTreeEndpointAccessRole `json:"source_role,omitempty"`
+	TargetRole     RouteTreeEndpointAccessRole `json:"target_role,omitempty"`
+	SourceLayer    string                      `json:"source_layer,omitempty"`
+	TargetLayer    string                      `json:"target_layer,omitempty"`
+	SourceXMM      float64                     `json:"source_x_mm"`
+	SourceYMM      float64                     `json:"source_y_mm"`
+	TargetXMM      float64                     `json:"target_x_mm"`
+	TargetYMM      float64                     `json:"target_y_mm"`
+	Status         routing.Status              `json:"status"`
+	IssueCount     int                         `json:"issue_count,omitempty"`
+	PrimaryCode    reports.Code                `json:"primary_code,omitempty"`
+	PrimaryMessage string                      `json:"primary_message,omitempty"`
+	PrimaryRef     string                      `json:"primary_ref,omitempty"`
+	PrimaryNet     string                      `json:"primary_net,omitempty"`
 }
 
 type routeTreeAccessCandidateCache map[routeTreeAccessCandidateCacheKey][]routeTreeBranchAccessCandidate
@@ -81,19 +111,18 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 			StartEndpointID: branch.StartEndpointID,
 			EndEndpointID:   branch.EndEndpointID,
 		}
-		if err := ctx.Err(); err != nil {
+		if ctx != nil && ctx.Err() != nil {
+			err := ctx.Err()
 			result.Issues = append(result.Issues, routeBranchCancellationIssue(tree.NetName, branch.Index, err))
 			evidence.Status = routing.StatusBlocked
 			evidence.IssueCount = 1
 			result.Branches = append(result.Branches, evidence)
 			for _, remaining := range orderedBranches[branchPosition+1:] {
-				result.Issues = append(result.Issues, routeBranchCancellationIssue(tree.NetName, remaining.Index, err))
 				result.Branches = append(result.Branches, InterBlockBranchRoutingEvidence{
 					BranchIndex:     remaining.Index,
 					StartEndpointID: remaining.StartEndpointID,
 					EndEndpointID:   remaining.EndEndpointID,
 					Status:          routing.StatusBlocked,
-					IssueCount:      1,
 				})
 			}
 			return result
@@ -117,20 +146,22 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		}
 		branchBase := base
 		branchBase.Existing = currentExisting
-		branchResult, selectedPair, selectedPairOK, accessPairsTried := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, access, accessCandidateCache)
+		branchResult, selectedPair, selectedPairOK, accessPairsTried, accessAttempts := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, access, accessCandidateCache)
 		accessSelected := selectedPairOK
 		evidence.AccessPairsTried = accessPairsTried
+		evidence.AccessAttempts = accessAttempts
 		if accessSelected {
-			evidence.SelectedSourceRole = selectedPair.Source.Access.Role
-			evidence.SelectedTargetRole = selectedPair.Target.Access.Role
+			populateSelectedRouteTreeAccessEvidence(&evidence, selectedPair)
 		}
 		branchOperations := transactionRouteOperations(branchResult.Operations)
+		evidence.OperationCount = len(branchOperations)
 		branchExisting := existingCopperFromRoutedBranches(branchResult.Routes, defaultLayer, rules)
 		branchIssues := annotateInterBlockBranchRoutingIssues(branchResult.Issues, tree.NetName, branch)
 		if accessSelected {
 			for index := range branchOperations {
 				if branchOperations[index].Op == transactions.OpRoute {
 					branchOperations[index].SnapExempt = true
+					evidence.SnapExemptRoute = true
 				}
 			}
 		}
@@ -139,31 +170,85 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		result.Issues = append(result.Issues, branchIssues...)
 		currentExisting = append(currentExisting, branchExisting...)
 		evidence.Status = branchResult.Status
-		evidence.OperationCount = len(branchOperations)
 		evidence.IssueCount = len(branchIssues)
 		result.Branches = append(result.Branches, evidence)
 	}
 	return result
 }
 
-func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName string, branch InterBlockRouteTreeBranch, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint, access []RouteTreeEndpointAccess, cache routeTreeAccessCandidateCache) (routing.Result, routeTreeBranchAccessPair, bool, int) {
+func routeTreeRouteBranch(ctx context.Context, base routing.Request, netName string, branch InterBlockRouteTreeBranch, start InterBlockRouteGroupEndpoint, end InterBlockRouteGroupEndpoint, access []RouteTreeEndpointAccess, cache routeTreeAccessCandidateCache) (routing.Result, routeTreeBranchAccessPair, bool, int, []RouteTreeBranchAccessAttemptEvidence) {
 	pairs := routeTreeBranchAccessPairsForBranch(access, netName, branch, cache)
 	if len(pairs) == 0 {
-		return routing.RouteRequestContext(ctx, routeTreeEndpointBranchRequest(base, netName, start, end)), routeTreeBranchAccessPair{}, false, 0
+		return routing.RouteRequestContext(ctx, routeTreeEndpointBranchRequest(base, netName, start, end)), routeTreeBranchAccessPair{}, false, 0, nil
 	}
 	var lastResult routing.Result
+	attempts := make([]RouteTreeBranchAccessAttemptEvidence, 0, len(pairs))
 	for index := range pairs {
 		if ctx != nil && ctx.Err() != nil {
-			return routing.RouteRequestContext(ctx, routeTreeAccessBranchRequest(base, netName, pairs[index])), routeTreeBranchAccessPair{}, false, index
+			return routing.Result{
+				Status: routing.StatusBlocked,
+				Issues: []reports.Issue{
+					routeBranchCancellationIssue(netName, branch.Index, ctx.Err()),
+				},
+			}, routeTreeBranchAccessPair{}, false, index, attempts
 		}
 		pair := pairs[index]
 		result := routing.RouteRequestContext(ctx, routeTreeAccessBranchRequest(base, netName, pair))
 		lastResult = result
+		attempts = append(attempts, routeTreeBranchAccessAttemptEvidenceFor(pair, result))
 		if result.Status == routing.StatusRouted {
-			return result, pair, true, index + 1
+			return result, pair, true, index + 1, attempts
 		}
 	}
-	return lastResult, routeTreeBranchAccessPair{}, false, len(pairs)
+	return lastResult, routeTreeBranchAccessPair{}, false, len(pairs), attempts
+}
+
+func populateSelectedRouteTreeAccessEvidence(evidence *InterBlockBranchRoutingEvidence, pair routeTreeBranchAccessPair) {
+	if evidence == nil {
+		return
+	}
+	source := pair.Source.Access
+	target := pair.Target.Access
+	evidence.SelectedSourceRole = source.Role
+	evidence.SelectedSourceRef = source.Ref
+	evidence.SelectedSourcePad = source.Pad
+	evidence.SelectedSourceLayer = source.Layer
+	evidence.SelectedSourceXMM = source.XMM
+	evidence.SelectedSourceYMM = source.YMM
+	evidence.SelectedTargetRole = target.Role
+	evidence.SelectedTargetRef = target.Ref
+	evidence.SelectedTargetPad = target.Pad
+	evidence.SelectedTargetLayer = target.Layer
+	evidence.SelectedTargetXMM = target.XMM
+	evidence.SelectedTargetYMM = target.YMM
+}
+
+func routeTreeBranchAccessAttemptEvidenceFor(pair routeTreeBranchAccessPair, result routing.Result) RouteTreeBranchAccessAttemptEvidence {
+	attempt := RouteTreeBranchAccessAttemptEvidence{
+		PairRank:    pair.Rank,
+		SourceRole:  pair.Source.Access.Role,
+		TargetRole:  pair.Target.Access.Role,
+		SourceLayer: pair.Source.Access.Layer,
+		TargetLayer: pair.Target.Access.Layer,
+		SourceXMM:   pair.Source.Access.XMM,
+		SourceYMM:   pair.Source.Access.YMM,
+		TargetXMM:   pair.Target.Access.XMM,
+		TargetYMM:   pair.Target.Access.YMM,
+		Status:      result.Status,
+		IssueCount:  len(result.Issues),
+	}
+	if len(result.Issues) != 0 {
+		issue := result.Issues[0]
+		attempt.PrimaryCode = issue.Code
+		attempt.PrimaryMessage = issue.Message
+		if len(issue.Refs) != 0 {
+			attempt.PrimaryRef = issue.Refs[0]
+		}
+		if len(issue.Nets) != 0 {
+			attempt.PrimaryNet = issue.Nets[0]
+		}
+	}
+	return attempt
 }
 
 func routeTreeAccessBranchRequest(base routing.Request, netName string, pair routeTreeBranchAccessPair) routing.Request {
