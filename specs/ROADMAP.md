@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-06-30
+Date: 2026-07-02
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -81,6 +81,11 @@ from validation feedback to safe automatic repair.
 - Writer correctness closeout foundation with project, schematic, PCB,
   transfer, pad-net, copper-net, zone-net, and optional KiCad round-trip gates.
 - Schematic round-trip compatibility foundation.
+- KiCad round-trip preservation closeout foundation with `.kicad_pro`
+  modeled-section raw-key preservation, PCB track arc and slotted/oval drill
+  readback, schematic DNP/unit/body-style/simulation/BOM/placement flag
+  readback, symbol instance preservation, label shape/rotation preservation,
+  and focused regression coverage.
 - Schematic layout readability foundation with deterministic role/stage/lane
   classification, conservative readable schematic placement, orthogonal
   schematic wire routing, label fallback for long/shared nets, overlap and
@@ -187,7 +192,7 @@ loop confidence:
   exact KiCad text-justification geometry, hierarchy/page splitting, and safe
   imported-schematic layout mutation;
 - repair can persist generated-project changes, but imported-project mutation
-  remains blocked by preservation safety;
+  remains limited to explicitly preservation-reviewed cases;
 - fabrication export now provides conservative readiness gates with BOM/CPL
   identity, consistency, local assembly manufacturer-profile evidence, and
   physical-rule fabrication-profile threshold/provenance evidence, but does not
