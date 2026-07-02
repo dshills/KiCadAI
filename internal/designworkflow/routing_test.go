@@ -356,8 +356,8 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 {
 		t.Fatalf("route-tree repair summary = %#v, want repairable branch/contact failures", repair)
 	}
-	if !stringSliceContains(repair.Nets, "SDA") || !stringSliceContains(repair.Nets, "VCC") {
-		t.Fatalf("route-tree repair nets = %#v, want SDA and VCC", repair.Nets)
+	if !stringSliceContains(repair.Nets, "VCC") || stringSliceContains(repair.Nets, "SDA") {
+		t.Fatalf("route-tree repair nets = %#v, want narrowed VCC-only blocker evidence", repair.Nets)
 	}
 }
 
@@ -406,15 +406,19 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 	if contacts.ContactsRequired != interBlock.EndpointsResolved {
 		t.Fatalf("contact summary = %#v, inter-block summary = %#v, want contact targets for every resolved endpoint", contacts, interBlock)
 	}
-	if contacts.ContactsFailed == 0 || contacts.MissingTargets+contacts.ContactMisses == 0 {
-		t.Fatalf("contact summary = %#v, want current missing-target or contact-miss blocker", contacts)
+	if contacts.ContactsFailed == 0 {
+		t.Fatalf("contact summary = %#v, want current VCC contact blocker", contacts)
 	}
 	if contacts.NetMismatches != 0 {
 		t.Fatalf("contact summary = %#v, want no net-alias mismatch after I2C alias hydration", contacts)
 	}
+	vccIssues := routeTreeIssuesForNet(result.Stage.Issues, "VCC")
+	if !routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) {
+		t.Fatalf("VCC issues = %#v, want graph-split contact blocker", vccIssues)
+	}
 	repair := requireRouteTreeRepairSummary(t, result.Stage)
-	if repair.HintCount == 0 || !stringSliceContains(repair.Nets, "SDA") || !stringSliceContains(repair.Nets, "VCC") {
-		t.Fatalf("route-tree repair summary = %#v, want VCC/SDA repair hints", repair)
+	if repair.HintCount == 0 || !stringSliceContains(repair.Nets, "VCC") || stringSliceContains(repair.Nets, "SDA") {
+		t.Fatalf("route-tree repair summary = %#v, want narrowed VCC repair hints", repair)
 	}
 
 	blockedNets := issueNetSet(result.Stage.Issues)
@@ -434,10 +438,8 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 		}
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(result.Stage.Issues)
-	for _, net := range []string{"SDA", "VCC"} {
-		if len(branchPaths[net]) == 0 {
-			t.Fatalf("route-tree branch issue paths by net = %#v, want branch-scoped blocker for %s", branchPaths, net)
-		}
+	if len(branchPaths) != 1 || len(branchPaths["VCC"]) == 0 {
+		t.Fatalf("route-tree branch issue paths by net = %#v, want VCC-only branch-scoped blocker", branchPaths)
 	}
 }
 
@@ -481,10 +483,8 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 		t.Fatalf("retry history = %#v, want stable 11-endpoint baseline", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
-	for _, net := range []string{"SDA", "VCC"} {
-		if len(branchPaths[net]) == 0 {
-			t.Fatalf("branch paths = %#v, want selected-attempt blocker for %s", branchPaths, net)
-		}
+	if len(branchPaths) != 1 || len(branchPaths["VCC"]) == 0 {
+		t.Fatalf("branch paths = %#v, want selected-attempt VCC blocker only", branchPaths)
 	}
 }
 
@@ -588,6 +588,9 @@ func issueNetSet(issues []reports.Issue) map[string]bool {
 func routeTreeBranchIssuePathsByNet(issues []reports.Issue) map[string][]string {
 	pathSets := map[string]map[string]struct{}{}
 	for _, issue := range issues {
+		if issue.Severity != reports.SeverityBlocked && issue.Severity != reports.SeverityError {
+			continue
+		}
 		if !strings.Contains(issue.Path, "design.inter_block_route_groups") || !strings.Contains(issue.Path, ".branches[") {
 			continue
 		}
