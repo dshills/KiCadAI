@@ -48,6 +48,7 @@ type ComponentSelectionEntry struct {
 	MPN             string                            `json:"mpn,omitempty"`
 	ComponentClass  string                            `json:"component_class,omitempty"`
 	SymbolID        string                            `json:"symbol_id,omitempty"`
+	FunctionPins    []components.FunctionPin          `json:"function_pins,omitempty"`
 	Value           string                            `json:"value,omitempty"`
 	FootprintID     string                            `json:"footprint_id,omitempty"`
 	PinMapID        string                            `json:"pinmap_id,omitempty"`
@@ -152,6 +153,7 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 					MPN:             selectedMPN(selection),
 					ComponentClass:  selection.Candidate.Family,
 					SymbolID:        firstSelectedSymbolID(selection),
+					FunctionPins:    selectedFunctionPins(selection),
 					FootprintID:     selection.Candidate.FootprintID,
 					PinMapID:        selectedPinMapID(selection),
 					Confidence:      selection.Candidate.Confidence,
@@ -593,6 +595,16 @@ func firstSelectedSymbolID(selection components.Selection) string {
 		return ""
 	}
 	return selection.Component.Symbols[0].SymbolID
+}
+
+func selectedFunctionPins(selection components.Selection) []components.FunctionPin {
+	symbolID := firstSelectedSymbolID(selection)
+	for _, binding := range selection.Component.Symbols {
+		if binding.SymbolID == symbolID {
+			return append([]components.FunctionPin(nil), binding.FunctionPins...)
+		}
+	}
+	return nil
 }
 
 func selectedMPN(selection components.Selection) string {

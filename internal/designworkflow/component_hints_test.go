@@ -1,10 +1,12 @@
 package designworkflow
 
 import (
+	"encoding/json"
 	"testing"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/components"
+	"kicadai/internal/transactions"
 )
 
 func TestNormalizeComponentHintsClassifiesSupportedAndUnsupportedKinds(t *testing.T) {
@@ -152,6 +154,126 @@ func TestComponentPlacementHintRulesPreservesNonPlacementEvidence(t *testing.T) 
 	}
 }
 
+func TestComponentRoutingHintsEnforcesPowerNetClassWidth(t *testing.T) {
+	result := componentRoutingHints([]ComponentSelectionEntry{{
+		InstanceID:  "rail",
+		Role:        "regulator",
+		ComponentID: "regulator.linear.ap2112k_3v3.sot23_5",
+		FunctionPins: []components.FunctionPin{
+			{Function: "VOUT", SymbolPin: "5", Electrical: "power_out"},
+		},
+		RoutingHints: []components.RoutingHint{
+			{Kind: "net_class", NetRole: "power", Value: "0.3", Unit: "mm"},
+		},
+	}}, PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "rail",
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"regulator": "U1"},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{
+				{
+					ID: "quiet_name",
+					From: transactions.Endpoint{
+						Ref: "U1",
+						Pin: "5",
+					},
+					To:      transactions.Endpoint{Ref: "C2", Pin: "1"},
+					NetName: "rail_output",
+					WidthMM: 0.5,
+				},
+			},
+		},
+	}}})
+
+	if len(result.Evidence) != 1 || result.Evidence[0].Status != ComponentHintEnforced {
+		t.Fatalf("evidence = %#v", result.Evidence)
+	}
+}
+
+func TestComponentRoutingHintsSatisfiedByBlockTieAndNoConnect(t *testing.T) {
+	connect := testOperation(t, transactions.OpConnect, transactions.ConnectOperation{
+		Op:      transactions.OpConnect,
+		From:    transactions.Endpoint{Ref: "U1", Pin: "3"},
+		To:      transactions.Endpoint{Ref: "U1", Pin: "1"},
+		NetName: "rail_vin",
+	})
+	noConnect := testOperation(t, transactions.OpAddNoConnect, transactions.AddNoConnectOperation{
+		Op:       transactions.OpAddNoConnect,
+		Endpoint: transactions.Endpoint{Ref: "U1", Pin: "4"},
+	})
+	result := componentRoutingHints([]ComponentSelectionEntry{{
+		InstanceID:  "rail",
+		Role:        "regulator",
+		ComponentID: "regulator.linear.ap2112k_3v3.sot23_5",
+		FunctionPins: []components.FunctionPin{
+			{Function: "EN", SymbolPin: "3"},
+			{Function: "NC", SymbolPin: "4"},
+		},
+		RoutingHints: []components.RoutingHint{
+			{Kind: "tie", NetRole: "enable"},
+			{Kind: "no_connect", NetRole: "nc"},
+		},
+	}}, PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "rail",
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs:   map[string]string{"regulator": "U1"},
+			Operations: []transactions.Operation{connect, noConnect},
+		},
+	}}})
+
+	if len(result.Evidence) != 2 {
+		t.Fatalf("evidence = %#v", result.Evidence)
+	}
+	if got := hintByKind(result.Evidence, "tie"); got == nil || got.Status != ComponentHintSatisfiedByBlock {
+		t.Fatalf("tie evidence = %#v", got)
+	}
+	if got := hintByKind(result.Evidence, "no_connect"); got == nil || got.Status != ComponentHintSatisfiedByBlock {
+		t.Fatalf("no_connect evidence = %#v", got)
+	}
+}
+
+func TestComponentRoutingHintsDoesNotSatisfyWrongNoConnectPin(t *testing.T) {
+	noConnect := testOperation(t, transactions.OpAddNoConnect, transactions.AddNoConnectOperation{
+		Op:       transactions.OpAddNoConnect,
+		Endpoint: transactions.Endpoint{Ref: "U1", Pin: "5"},
+	})
+	result := componentRoutingHints([]ComponentSelectionEntry{{
+		InstanceID:  "rail",
+		Role:        "regulator",
+		ComponentID: "regulator.linear.ap2112k_3v3.sot23_5",
+		FunctionPins: []components.FunctionPin{
+			{Function: "NC", SymbolPin: "4"},
+		},
+		RoutingHints: []components.RoutingHint{
+			{Kind: "no_connect", NetRole: "nc"},
+		},
+	}}, PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "rail",
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs:   map[string]string{"regulator": "U1"},
+			Operations: []transactions.Operation{noConnect},
+		},
+	}}})
+
+	if len(result.Evidence) != 1 || result.Evidence[0].Status == ComponentHintSatisfiedByBlock {
+		t.Fatalf("evidence = %#v", result.Evidence)
+	}
+}
+
+func TestComponentRoutingHintsPreservesUnsupportedHint(t *testing.T) {
+	result := componentRoutingHints([]ComponentSelectionEntry{{
+		InstanceID:  "clock",
+		Role:        "crystal",
+		ComponentID: "crystal.abracon.abm3b.16mhz",
+		RoutingHints: []components.RoutingHint{
+			{Kind: "short_loop", NetRole: "clock"},
+		},
+	}}, PCBFragmentResult{})
+
+	if len(result.Evidence) != 1 || result.Evidence[0].Status != ComponentHintUnsupported {
+		t.Fatalf("evidence = %#v", result.Evidence)
+	}
+}
+
 func hintByKind(hints []ComponentHintEvidence, kind string) *ComponentHintEvidence {
 	for index := range hints {
 		if hints[index].Kind == kind {
@@ -159,4 +281,13 @@ func hintByKind(hints []ComponentHintEvidence, kind string) *ComponentHintEviden
 		}
 	}
 	return nil
+}
+
+func testOperation(t *testing.T, kind transactions.OperationKind, payload any) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal operation: %v", err)
+	}
+	return transactions.NewOperation(kind, raw)
 }

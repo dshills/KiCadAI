@@ -15,10 +15,12 @@ const (
 type ComponentHintStatus string
 
 const (
-	ComponentHintPending     ComponentHintStatus = "pending"
-	ComponentHintEnforced    ComponentHintStatus = "enforced"
-	ComponentHintSkipped     ComponentHintStatus = "skipped"
-	ComponentHintUnsupported ComponentHintStatus = "unsupported"
+	ComponentHintPending          ComponentHintStatus = "pending"
+	ComponentHintEnforced         ComponentHintStatus = "enforced"
+	ComponentHintSatisfiedByBlock ComponentHintStatus = "satisfied_by_block"
+	ComponentHintFailed           ComponentHintStatus = "failed"
+	ComponentHintSkipped          ComponentHintStatus = "skipped"
+	ComponentHintUnsupported      ComponentHintStatus = "unsupported"
 )
 
 type ComponentHintEvidence struct {
@@ -47,6 +49,8 @@ type ComponentHintSummary struct {
 	Unsupported int `json:"unsupported"`
 	Pending     int `json:"pending"`
 	Enforced    int `json:"enforced"`
+	Satisfied   int `json:"satisfied_by_block"`
+	Failed      int `json:"failed"`
 	Skipped     int `json:"skipped"`
 }
 
@@ -121,9 +125,12 @@ func SummarizeComponentHints(hints []ComponentHintEvidence) ComponentHintSummary
 			summary.Pending++
 		case ComponentHintEnforced:
 			summary.Enforced++
+		case ComponentHintSatisfiedByBlock:
+			summary.Satisfied++
+		case ComponentHintFailed:
+			summary.Failed++
 		case ComponentHintSkipped:
 			summary.Skipped++
-			summary.Unsupported++
 		}
 		if componentHintStatusSupported(hint.Status) {
 			summary.Supported++
@@ -134,7 +141,7 @@ func SummarizeComponentHints(hints []ComponentHintEvidence) ComponentHintSummary
 
 func componentHintStatusSupported(status ComponentHintStatus) bool {
 	switch status {
-	case ComponentHintPending, ComponentHintEnforced:
+	case ComponentHintPending, ComponentHintEnforced, ComponentHintSatisfiedByBlock:
 		return true
 	default:
 		return false

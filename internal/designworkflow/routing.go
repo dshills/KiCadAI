@@ -16,12 +16,13 @@ import (
 )
 
 type RoutingOptions struct {
-	Skip         bool
-	Mode         routing.RouteMode
-	GridMM       float64
-	TraceWidthMM float64
-	ClearanceMM  float64
-	AllowPartial *bool
+	Skip                bool
+	Mode                routing.RouteMode
+	GridMM              float64
+	TraceWidthMM        float64
+	ClearanceMM         float64
+	AllowPartial        *bool
+	ComponentSelections []ComponentSelectionEntry
 }
 
 type RoutingStageResult struct {
@@ -115,6 +116,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	localOperations, localRouteIssues, localRouteConnectivity := localRouteOperations(fragments, &placed)
 	interBlockCandidates, interBlockCandidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
 	localRouteMobility := classifyLocalRouteMobility(fragments, placed.Request)
+	componentHintResult := componentRoutingHints(opts.ComponentSelections, fragments)
 	if opts.Skip || normalized.Validation.SkipRouting {
 		stage := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{
 			"reason":               "routing skipped",
@@ -122,6 +124,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"route_connectivity":   localRouteConnectivity,
 			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...), InterBlockContactEvidence{}),
 		}}
+		addComponentHintSummaryToStage(&stage, componentHintResult.Evidence)
 		stage.Issues = append(stage.Issues, localRouteIssues...)
 		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
@@ -135,6 +138,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			"route_connectivity":   localRouteConnectivity,
 			"inter_block_routing":  summarizeInterBlockRouteCompletion(interBlockCandidates, nil, append(localRouteIssues, interBlockCandidateIssues...), InterBlockContactEvidence{}),
 		}}
+		addComponentHintSummaryToStage(&stage, componentHintResult.Evidence)
 		stage.Issues = append(stage.Issues, localRouteIssues...)
 		stage.Issues = append(stage.Issues, interBlockCandidateIssues...)
 		anchorSummary, _, anchorIssues := anchorBindingDiagnostics(normalized, fragments, placed, false, opts)
@@ -199,12 +203,24 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	if len(anchorOperations) > 0 {
 		stage.Summary["anchor_binding_route_operations"] = len(anchorOperations)
 	}
+	addComponentHintSummaryToStage(&stage, componentHintResult.Evidence)
 	addAnchorBindingSummaryToStage(&stage, anchorBindings)
 	if result.Quality != nil {
 		stage.Summary["quality_score"] = result.Quality.Score.Overall
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func addComponentHintSummaryToStage(stage *StageResult, hints []ComponentHintEvidence) {
+	if stage == nil || len(hints) == 0 {
+		return
+	}
+	if stage.Summary == nil {
+		stage.Summary = map[string]any{}
+	}
+	stage.Summary["component_hints"] = hints
+	stage.Summary["component_hint_summary"] = SummarizeComponentHints(hints)
 }
 
 func anchorBindingDiagnostics(request Request, fragments PCBFragmentResult, placed PlacementStageResult, route bool, opts RoutingOptions) (AnchorBindingSummary, []transactions.Operation, []reports.Issue) {

@@ -83,6 +83,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
 	routingOpts := opts.Routing
+	routingOpts.ComponentSelections = componentSelections.Selections
 	routingOpts.Skip = routingOpts.Skip || opts.SkipRouting || normalized.Validation.SkipRouting
 	routed := RoutePlacement(ctx, normalized, fragments, placed, routingOpts)
 	placed, routed, _ = maybeRetryPlacementRouting(ctx, normalized, fragments, placed, routed, routingOpts, normalized.RoutingRetry)
