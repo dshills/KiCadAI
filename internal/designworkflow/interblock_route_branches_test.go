@@ -100,6 +100,54 @@ func TestRouteInterBlockTreeBranchesWithAccessReportsSelectedAccessPair(t *testi
 	}
 }
 
+func TestRouteTreeBranchAccessCandidateAuditReportsVCCLimitTruncation(t *testing.T) {
+	group := routeTreeTestGroup("VCC",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+	)
+	tree := BuildInterBlockRouteTree(group, routeTreeTestTargets("VCC", map[string]transactions.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	}))
+	base := routeBranchTestRequest("VCC", map[string]routing.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	})
+	branch := tree.Branches[0]
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 5, YMM: 5},
+		{EndpointID: "J1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "VCC", Layer: "F.Cu", XMM: 6, YMM: 5},
+		{EndpointID: "J1.1", Role: RouteTreeAccessSameNetCopper, Net: "VCC", Layer: "F.Cu", XMM: 7, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 25, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "VCC", Layer: "F.Cu", XMM: 24, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessSameNetCopper, Net: "VCC", Layer: "F.Cu", XMM: 23, YMM: 5},
+	}
+
+	audit := routeTreeBranchAccessAuditForBranch(access, "VCC", branch, routeTreeAccessCandidateCache{})
+	if len(audit.SourceCandidates) != 3 || len(audit.TargetCandidates) != 3 || audit.TotalPairCount != 9 {
+		t.Fatalf("audit = %#v, want 3 source, 3 target, and 9 total pairs", audit)
+	}
+	if len(audit.Pairs) != routeTreeBranchAccessPairLimit || !audit.Truncated {
+		t.Fatalf("audit = %#v, want truncated candidate-pair list at limit", audit)
+	}
+	firstPair := audit.Pairs[0]
+	if firstPair.Rank != 0 || firstPair.Source.Access.Role != RouteTreeAccessLocalRouteAnchor || firstPair.Target.Access.Role != RouteTreeAccessLocalRouteAnchor {
+		t.Fatalf("first pair = %#v, want local-anchor to local-anchor first", firstPair)
+	}
+
+	result := RouteInterBlockTreeBranchesWithAccess(context.Background(), base, group, tree, access)
+	if len(result.Branches) != 1 {
+		t.Fatalf("branches = %#v, want one branch", result.Branches)
+	}
+	evidence := result.Branches[0]
+	if evidence.AccessSourceCount != 3 || evidence.AccessTargetCount != 3 || evidence.AccessPairCount != 9 || evidence.AccessPairLimit != routeTreeBranchAccessPairLimit || !evidence.AccessPairsTruncated {
+		t.Fatalf("branch evidence = %#v, want VCC candidate truncation audit fields", evidence)
+	}
+	if evidence.SelectedSourceRole != RouteTreeAccessLocalRouteAnchor || evidence.SelectedTargetRole != RouteTreeAccessLocalRouteAnchor {
+		t.Fatalf("branch evidence = %#v, want selected local-anchor VCC pair", evidence)
+	}
+}
+
 func TestRouteInterBlockTreeBranchesReportsMissingGroupEndpoint(t *testing.T) {
 	group := routeTreeTestGroup("SIG",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
