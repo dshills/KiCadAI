@@ -238,6 +238,56 @@ func TestIndexSymbolsResolvesInheritedSymbolMetadata(t *testing.T) {
 	}
 }
 
+func TestIndexSymbolsParsesPropertyFormMetadata(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), propertyFormMetadataSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	record := records["Device:Property_Metadata"]
+	if record.Description != "Property form description" {
+		t.Fatalf("description = %q", record.Description)
+	}
+	if got := strings.Join(record.Keywords, " "); got != "property form metadata" {
+		t.Fatalf("keywords = %#v", record.Keywords)
+	}
+	if len(record.FootprintFilter) != 2 || record.FootprintFilter[0] != "R_*" || record.FootprintFilter[1] != "Resistor_*" {
+		t.Fatalf("footprint filters = %#v", record.FootprintFilter)
+	}
+	if record.Datasheet != "https://example.test/ds.pdf" {
+		t.Fatalf("datasheet = %q", record.Datasheet)
+	}
+	kiDescriptionRecord := records["Device:Ki_Description_Property"]
+	if kiDescriptionRecord.Description != "ki_description property value" {
+		t.Fatalf("ki_description property description = %q", kiDescriptionRecord.Description)
+	}
+	if got := strings.Join(kiDescriptionRecord.Keywords, " "); got != "standard keywords" {
+		t.Fatalf("standard Keywords property = %#v", kiDescriptionRecord.Keywords)
+	}
+}
+
+func TestIndexSymbolsReportsCyclicInheritanceOnAllAffectedSymbols(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), cyclicInheritanceSymbolLibrary())
+
+	inventory := Discover(LibraryRoots{SymbolsRoot: symbols})
+	records, issues := IndexSymbols(inventory)
+	if _, ok := records["Device:Cycle_A"]; !ok {
+		t.Fatalf("records = %#v", records)
+	}
+	if !hasSymbolIssueForPath(issues, "library.symbol.Device:Cycle_A", "cyclic symbol inheritance") {
+		t.Fatalf("missing Cycle_A cyclic diagnostic: %#v", issues)
+	}
+	if !hasSymbolIssueForPath(issues, "library.symbol.Device:Cycle_B", "cyclic symbol inheritance") {
+		t.Fatalf("missing Cycle_B cyclic diagnostic: %#v", issues)
+	}
+}
+
 func TestIndexSymbolsMissingInheritedBaseBlocks(t *testing.T) {
 	root := t.TempDir()
 	symbols := filepath.Join(root, "symbols")
@@ -554,7 +604,53 @@ func inheritedSymbolLibrary() string {
     (extends "R_Base")
     (property "Value" "R_Small" (at 0 -2.54 0))
   )
-)`
+	)`
+}
+
+func propertyFormMetadataSymbolLibrary() string {
+	return `
+	(kicad_symbol_lib
+	  (version 20220914)
+	  (generator "kicadai-test")
+	  (symbol "Property_Metadata"
+	    (property "Reference" "R" (at 0 0 0))
+	    (property "Value" "Property_Metadata" (at 0 -2.54 0))
+	    (property "Description" "Property form description" (at 0 0 0))
+	    (property "ki_keywords" "property form metadata" (at 0 0 0))
+	    (property "ki_fp_filters" "R_* Resistor_*" (at 0 0 0))
+	    (property "ki_datasheet" "https://example.test/ds.pdf" (at 0 0 0))
+	    (symbol "Property_Metadata_1_1"
+	      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+	      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))
+	    )
+	  )
+	  (symbol "Ki_Description_Property"
+	    (property "Reference" "R" (at 0 0 0))
+	    (property "Value" "Ki_Description_Property" (at 0 -2.54 0))
+	    (property "ki_description" "ki_description property value" (at 0 0 0))
+	    (property "Keywords" "standard keywords" (at 0 0 0))
+	    (symbol "Ki_Description_Property_1_1"
+	      (pin passive line (at -5.08 0 0) (length 2.54) (name "~") (number "1"))
+	      (pin passive line (at 5.08 0 180) (length 2.54) (name "~") (number "2"))
+	    )
+	  )
+	)`
+}
+
+func cyclicInheritanceSymbolLibrary() string {
+	return `
+	(kicad_symbol_lib
+	  (version 20220914)
+	  (generator "kicadai-test")
+	  (symbol "Cycle_A"
+	    (extends "Cycle_B")
+	    (property "Reference" "U" (at 0 0 0))
+	  )
+	  (symbol "Cycle_B"
+	    (extends "Cycle_A")
+	    (property "Reference" "U" (at 0 0 0))
+	  )
+	)`
 }
 
 func missingBaseSymbolLibrary() string {
@@ -588,6 +684,15 @@ func graphicsSymbolLibrary() string {
 func hasSymbolIssue(issues []reports.Issue, text string) bool {
 	for _, issue := range issues {
 		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
+}
+
+func hasSymbolIssueForPath(issues []reports.Issue, path string, text string) bool {
+	for _, issue := range issues {
+		if issue.Path == path && strings.Contains(issue.Message, text) {
 			return true
 		}
 	}
