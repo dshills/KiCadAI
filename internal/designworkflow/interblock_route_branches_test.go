@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"math"
 	"strings"
 	"testing"
@@ -196,6 +197,105 @@ func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.
 	}
 	if len(result.Operations) != 0 || len(result.ExistingCopper) != 0 {
 		t.Fatalf("operations=%#v existing=%#v, want no failed partial copper", result.Operations, result.ExistingCopper)
+	}
+}
+
+func TestRouteTreeAccessBranchRequestRoutesSyntheticAccessPoints(t *testing.T) {
+	base := routeBranchTestRequest("SIG", map[string]routing.Point{
+		"J1.1": {XMM: 2, YMM: 2},
+		"U1.1": {XMM: 18, YMM: 2},
+	})
+	base.Rules.GridMM = 0.5
+	base.Rules.NetClasses = map[string]routing.NetClass{"audio": {TraceWidthMM: 0.25, ClearanceMM: 0.2}}
+	base.Nets = []routing.Net{
+		{Name: "SIG", Class: "audio", Role: routing.NetAnalog, Priority: 7, Fixed: true},
+		{Name: "GND", Role: routing.NetGround},
+	}
+	pair := routeTreeBranchAccessPair{
+		Rank: 3,
+		Source: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{
+			Role:  RouteTreeAccessLocalRouteAnchor,
+			Net:   "SIG",
+			Layer: "F.Cu",
+			XMM:   5,
+			YMM:   5,
+		}},
+		Target: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{
+			Role:  RouteTreeAccessTargetPad,
+			Ref:   "U1",
+			Pad:   "1",
+			Net:   "SIG",
+			Layer: "F.Cu",
+			XMM:   15,
+			YMM:   5,
+		}},
+	}
+
+	request := routeTreeAccessBranchRequest(&base, "SIG", pair)
+	if len(base.Components) != 2 {
+		t.Fatalf("base components = %d, want unmodified base request", len(base.Components))
+	}
+	if len(request.Components) != 4 {
+		t.Fatalf("components = %d, want base plus synthetic access components", len(request.Components))
+	}
+	if request.Nets[0].Endpoints[0].Ref != "__KICADAI_RT_SRC_3" || request.Nets[0].Endpoints[1].Ref != "__KICADAI_RT_DST_3" {
+		t.Fatalf("endpoints = %#v, want synthetic access refs", request.Nets[0].Endpoints)
+	}
+	if request.Nets[0].Class != "audio" || request.Nets[0].Role != routing.NetAnalog || request.Nets[0].Priority != 7 {
+		t.Fatalf("branch net = %#v, want preserved metadata from base net", request.Nets[0])
+	}
+	if request.Nets[0].Fixed {
+		t.Fatalf("branch net = %#v, want selected branch net to be routable", request.Nets[0])
+	}
+	if len(request.Nets) != 2 || request.Nets[1].Name != "GND" || !request.Nets[1].Fixed {
+		t.Fatalf("nets = %#v, want other net metadata preserved as fixed", request.Nets)
+	}
+
+	result := routing.RouteRequestContext(context.Background(), request)
+	if result.Status != routing.StatusRouted || len(result.Operations) != 1 {
+		t.Fatalf("result = %#v, want routed synthetic access branch", result)
+	}
+	operations := transactionRouteOperations(result.Operations)
+	if len(operations) != 1 {
+		t.Fatalf("operations = %#v, want one transaction route", operations)
+	}
+	var route transactions.RouteOperation
+	if err := json.Unmarshal(operations[0].Raw, &route); err != nil {
+		t.Fatal(err)
+	}
+	if len(route.Points) < 2 {
+		t.Fatalf("points = %#v, want routed access path", route.Points)
+	}
+	first := route.Points[0]
+	last := route.Points[len(route.Points)-1]
+	forward := math.Abs(first.XMM-5) <= 1e-9 && math.Abs(first.YMM-5) <= 1e-9 && math.Abs(last.XMM-15) <= 1e-9 && math.Abs(last.YMM-5) <= 1e-9
+	reverse := math.Abs(first.XMM-15) <= 1e-9 && math.Abs(first.YMM-5) <= 1e-9 && math.Abs(last.XMM-5) <= 1e-9 && math.Abs(last.YMM-5) <= 1e-9
+	if !forward && !reverse {
+		t.Fatalf("route points = %#v, want route snapped to selected access coordinates", route.Points)
+	}
+}
+
+func TestRouteTreeAccessBranchRequestUsesMatchedNetNameForSyntheticPads(t *testing.T) {
+	base := routeBranchTestRequest("sig", map[string]routing.Point{
+		"J1.1": {XMM: 2, YMM: 2},
+		"U1.1": {XMM: 18, YMM: 2},
+	})
+	base.Nets = []routing.Net{{Name: "sig", Class: "signal"}, {Name: "SIG", Class: "duplicate"}}
+	pair := routeTreeBranchAccessPair{
+		Source: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{Net: "SIG", Layer: "F.Cu", XMM: 5, YMM: 5}},
+		Target: routeTreeBranchAccessCandidate{Access: RouteTreeEndpointAccess{Net: "SIG", Layer: "F.Cu", XMM: 15, YMM: 5}},
+	}
+
+	request := routeTreeAccessBranchRequest(&base, "SIG", pair)
+	if request.Nets[0].Name != "sig" {
+		t.Fatalf("branch net name = %q, want matched canonical name", request.Nets[0].Name)
+	}
+	if len(request.Nets) != 1 {
+		t.Fatalf("nets = %#v, want duplicate target nets collapsed", request.Nets)
+	}
+	last := request.Components[len(request.Components)-1]
+	if got := last.Pads[0].Net; got != "sig" {
+		t.Fatalf("synthetic pad net = %q, want matched canonical net name", got)
 	}
 }
 

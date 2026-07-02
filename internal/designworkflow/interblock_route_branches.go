@@ -25,6 +25,7 @@ var routeBranchOctagonUnitVectors = [...]routing.Point{
 }
 
 const routeBranchExistingCopperCapacityPerBranch = 8
+const routeTreeSyntheticAccessPadSizeMM = 0.4
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
@@ -123,6 +124,90 @@ func RouteInterBlockTreeBranches(ctx context.Context, base routing.Request, grou
 		result.Branches = append(result.Branches, evidence)
 	}
 	return result
+}
+
+func routeTreeAccessBranchRequest(base *routing.Request, netName string, pair routeTreeBranchAccessPair) routing.Request {
+	baseRequest := routing.Request{}
+	defaultLayer := routing.DefaultRules().PreferLayer
+	if base != nil {
+		baseRequest = *base
+		defaultLayer = routeBranchDefaultLayer(baseRequest.Board)
+	}
+	sourceRef := routeTreeSyntheticAccessRef("SRC", pair.Rank)
+	targetRef := routeTreeSyntheticAccessRef("DST", pair.Rank)
+	endpoints := []routing.Endpoint{
+		{Ref: sourceRef, Pin: "1"},
+		{Ref: targetRef, Pin: "1"},
+	}
+	request := baseRequest
+	// This helper only appends synthetic components and replaces Nets. The
+	// router clones and normalizes the full request before pathfinding.
+	request.Components = append([]routing.Component(nil), baseRequest.Components...)
+	branchNet, branchNets := routeTreeAccessBranchNetSet(baseRequest.Nets, netName, endpoints)
+	request.Nets = branchNets
+	request.Components = append(request.Components,
+		routeTreeSyntheticAccessComponent(sourceRef, branchNet.Name, pair.Source.Access, defaultLayer),
+		routeTreeSyntheticAccessComponent(targetRef, branchNet.Name, pair.Target.Access, defaultLayer),
+	)
+	return request
+}
+
+func routeTreeAccessBranchNetSet(nets []routing.Net, netName string, endpoints []routing.Endpoint) (routing.Net, []routing.Net) {
+	trimmedNetName := strings.TrimSpace(netName)
+	branchNet := routing.Net{Name: trimmedNetName}
+	out := make([]routing.Net, 0, len(nets)+1)
+	matched := false
+	for _, net := range nets {
+		netNameMatches := strings.EqualFold(strings.TrimSpace(net.Name), trimmedNetName)
+		if netNameMatches && matched {
+			continue
+		}
+		if netNameMatches {
+			branchNet = net
+			branchNet.Fixed = false
+			branchNet.Endpoints = append([]routing.Endpoint(nil), endpoints...)
+			out = append(out, branchNet)
+			matched = true
+			continue
+		}
+		net.Endpoints = append([]routing.Endpoint(nil), net.Endpoints...)
+		net.Fixed = true
+		out = append(out, net)
+	}
+	if strings.TrimSpace(branchNet.Name) == "" {
+		branchNet.Name = trimmedNetName
+	}
+	if !matched {
+		branchNet.Fixed = false
+		branchNet.Endpoints = append([]routing.Endpoint(nil), endpoints...)
+		out = append(out, branchNet)
+	}
+	return branchNet, out
+}
+
+func routeTreeSyntheticAccessComponent(ref string, netName string, access RouteTreeEndpointAccess, defaultLayer string) routing.Component {
+	layer := routeBranchCanonicalLayer(access.Layer, defaultLayer)
+	return routing.Component{
+		Ref:   ref,
+		Fixed: true,
+		Position: routing.Placement{
+			Layer: layer,
+		},
+		Pads: []routing.Pad{{
+			Ref:      ref,
+			Name:     "1",
+			Net:      netName,
+			Position: routing.Point{XMM: access.XMM, YMM: access.YMM},
+			Shape:    routing.PadCircle,
+			Type:     routing.PadSMD,
+			Size:     routing.Size{WidthMM: routeTreeSyntheticAccessPadSizeMM, HeightMM: routeTreeSyntheticAccessPadSizeMM},
+			Layers:   []string{layer},
+		}},
+	}
+}
+
+func routeTreeSyntheticAccessRef(kind string, rank int) string {
+	return fmt.Sprintf("__KICADAI_RT_%s_%d", kind, rank)
 }
 
 func routeTreeBranchesForRouting(branches []InterBlockRouteTreeBranch) []InterBlockRouteTreeBranch {
