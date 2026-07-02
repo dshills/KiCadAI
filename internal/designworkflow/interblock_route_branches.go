@@ -27,6 +27,8 @@ var routeBranchOctagonUnitVectors = [...]routing.Point{
 const routeBranchExistingCopperCapacityPerBranch = 8
 const routeTreeSyntheticAccessPadSizeMM = 0.4
 const routeTreeObstacleAuditCellMM = 5.0
+const routeTreeImmediateObstaclePressureMM = 0.75
+const routeTreeNearObstaclePressureMM = 1.5
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
@@ -164,7 +166,7 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 		}
 		branchBase := base
 		branchBase.Existing = currentExisting
-		accessAudit := routeTreeBranchAccessAuditForBranch(access, tree.NetName, branch, accessCandidateCache)
+		accessAudit := routeTreeBranchAccessAuditForBranchWithMergeAudit(access, tree.NetName, branch, accessCandidateCache, mergeAuditBase)
 		mergeAudit := routeTreeMergeAuditForBranch(mergeAuditBase, branchBase.Existing, tree.NetName)
 		branchResult, selectedPair, selectedPairOK, accessPairsTried, accessAttempts := routeTreeRouteBranch(ctx, branchBase, tree.NetName, branch, start, end, accessAudit, mergeAudit)
 		accessSelected := selectedPairOK
@@ -476,6 +478,37 @@ func nearestRouteTreeOtherNetPad(grid routeTreeOtherNetPadGrid, pair routeTreeBr
 	return "other_net_pad", bestRef, bestNet, bestDistance
 }
 
+func nearestRouteTreeOtherNetPadDistance(grid routeTreeOtherNetPadGrid, point routing.Point) (float64, bool) {
+	if grid.Count == 0 {
+		return 0, false
+	}
+	center := routeTreeOtherNetPadCellFor(point)
+	bestDistance := math.Inf(1)
+	for radius := 0; radius <= routeTreeOtherNetPadSearchRadius(grid, center); radius++ {
+		for x := center.X - radius; x <= center.X+radius; x++ {
+			for y := center.Y - radius; y <= center.Y+radius; y++ {
+				if radius > 0 && x > center.X-radius && x < center.X+radius && y > center.Y-radius && y < center.Y+radius {
+					continue
+				}
+				cell := routeTreeOtherNetPadCell{X: x, Y: y}
+				for _, pad := range grid.Cells[cell] {
+					distance := math.Hypot(point.XMM-pad.Point.XMM, point.YMM-pad.Point.YMM)
+					if distance < bestDistance {
+						bestDistance = distance
+					}
+				}
+			}
+		}
+		if radius > 0 && bestDistance <= float64(radius-1)*routeTreeObstacleAuditCellMM {
+			break
+		}
+	}
+	if math.IsInf(bestDistance, 1) {
+		return 0, false
+	}
+	return bestDistance, true
+}
+
 func routeTreeOtherNetPadCellFor(point routing.Point) routeTreeOtherNetPadCell {
 	return routeTreeOtherNetPadCell{
 		X: int(math.Floor(point.XMM / routeTreeObstacleAuditCellMM)),
@@ -543,10 +576,16 @@ type routeTreeBranchAccessAudit struct {
 }
 
 func routeTreeBranchAccessAuditForBranch(access []RouteTreeEndpointAccess, netName string, branch InterBlockRouteTreeBranch, cache routeTreeAccessCandidateCache) routeTreeBranchAccessAudit {
+	return routeTreeBranchAccessAuditForBranchWithMergeAudit(access, netName, branch, cache, routeTreeMergeAuditBase{})
+}
+
+func routeTreeBranchAccessAuditForBranchWithMergeAudit(access []RouteTreeEndpointAccess, netName string, branch InterBlockRouteTreeBranch, cache routeTreeAccessCandidateCache, mergeAuditBase routeTreeMergeAuditBase) routeTreeBranchAccessAudit {
 	sourceOpposite := routeTreeFirstAccessForEndpoint(access, branch.EndEndpointID, netName, cache)
 	targetOpposite := routeTreeFirstAccessForEndpoint(access, branch.StartEndpointID, netName, cache)
 	sourceCandidates := routeTreeCachedAccessCandidates(cache, access, branch.StartEndpointID, netName, sourceOpposite)
 	targetCandidates := routeTreeCachedAccessCandidates(cache, access, branch.EndEndpointID, netName, targetOpposite)
+	sourceCandidates = routeTreeAccessCandidatesWithObstacleRanks(sourceCandidates, mergeAuditBase.OtherNetPadGrid)
+	targetCandidates = routeTreeAccessCandidatesWithObstacleRanks(targetCandidates, mergeAuditBase.OtherNetPadGrid)
 	totalPairCount := len(sourceCandidates) * len(targetCandidates)
 	limit := routeTreeBranchAccessPairLimit
 	return routeTreeBranchAccessAudit{
@@ -557,6 +596,31 @@ func routeTreeBranchAccessAuditForBranch(access []RouteTreeEndpointAccess, netNa
 		Limit:            limit,
 		Truncated:        totalPairCount > limit,
 	}
+}
+
+func routeTreeAccessCandidatesWithObstacleRanks(candidates []routeTreeBranchAccessCandidate, grid routeTreeOtherNetPadGrid) []routeTreeBranchAccessCandidate {
+	if grid.Count == 0 || len(candidates) == 0 {
+		return candidates
+	}
+	ranked := append([]routeTreeBranchAccessCandidate(nil), candidates...)
+	for index := range ranked {
+		distance, ok := nearestRouteTreeOtherNetPadDistance(grid, routing.Point{
+			XMM: ranked[index].Access.XMM,
+			YMM: ranked[index].Access.YMM,
+		})
+		if !ok {
+			continue
+		}
+		switch {
+		case distance <= routeTreeImmediateObstaclePressureMM:
+			ranked[index].RoleRank += 4
+			ranked[index].ObstacleRank = 2
+		case distance <= routeTreeNearObstaclePressureMM:
+			ranked[index].ObstacleRank = 1
+		}
+	}
+	slices.SortFunc(ranked, compareRouteTreeAccessCandidate)
+	return ranked
 }
 
 func routeTreeCachedAccessCandidates(cache routeTreeAccessCandidateCache, access []RouteTreeEndpointAccess, endpointID string, netName string, opposite RouteTreeEndpointAccess) []routeTreeBranchAccessCandidate {

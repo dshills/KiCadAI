@@ -154,6 +154,49 @@ func TestRouteTreeBranchAccessCandidateAuditReportsVCCLimitTruncation(t *testing
 	}
 }
 
+func TestRouteTreeBranchAccessRankingPenalizesImmediateOtherNetObstacle(t *testing.T) {
+	group := routeTreeTestGroup("VCC",
+		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
+		InterBlockRouteEndpoint{Ref: "U1", Pin: "1"},
+	)
+	tree := BuildInterBlockRouteTree(group, routeTreeTestTargets("VCC", map[string]transactions.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	}))
+	base := routeBranchTestRequest("VCC", map[string]routing.Point{
+		"J1.1": {XMM: 5, YMM: 5},
+		"U1.1": {XMM: 25, YMM: 5},
+	})
+	base.Components = append(base.Components, routing.Component{
+		Ref:      "C1",
+		Position: routing.Placement{Layer: "F.Cu"},
+		Pads: []routing.Pad{{
+			Ref:      "C1",
+			Name:     "1",
+			Net:      "GND",
+			Position: routing.Point{XMM: 6, YMM: 5},
+			Shape:    routing.PadRect,
+			Type:     routing.PadSMD,
+			Size:     routing.Size{WidthMM: 1, HeightMM: 1},
+			Layers:   []string{"F.Cu"},
+		}},
+	})
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 5, YMM: 5},
+		{EndpointID: "J1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "VCC", Layer: "F.Cu", XMM: 6, YMM: 5},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Ref: "U1", Pad: "1", Net: "VCC", Layer: "F.Cu", XMM: 25, YMM: 5},
+	}
+
+	audit := routeTreeBranchAccessAuditForBranchWithMergeAudit(access, "VCC", tree.Branches[0], routeTreeAccessCandidateCache{}, routeTreeMergeAuditBaseForRequest(base, "VCC"))
+	if len(audit.Pairs) == 0 {
+		t.Fatalf("audit = %#v, want ranked access pairs", audit)
+	}
+	firstPair := audit.Pairs[0]
+	if firstPair.Source.Access.Role != RouteTreeAccessTargetPad {
+		t.Fatalf("first pair = %#v, want pad source before obstacle-pressured local anchor", firstPair)
+	}
+}
+
 func TestRouteTreeBranchDiagnosticsSeparateFixedNetInfoFromVCCWarnings(t *testing.T) {
 	group := routeTreeTestGroup("VCC",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},
