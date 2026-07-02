@@ -8,7 +8,42 @@ import (
 	"kicadai/internal/reports"
 )
 
-var verifiedExpansionTargetFamilies = []string{"connector", "crystal", "diode", "protection", "usb_c"}
+var plannedVerifiedExpansionTargetMatrix = []struct {
+	Family           string
+	Current          bool
+	BaselinePackages []string
+	BaselineValues   []string
+	PlannedPackages  []string
+	PlannedValues    []string
+	PlannedUses      []string
+}{
+	{
+		Family:           "resistor",
+		Current:          true,
+		BaselinePackages: []string{"0805"},
+		BaselineValues:   []string{"10k"},
+		PlannedPackages:  []string{"0603", "0805"},
+		PlannedValues:    []string{"0R", "47R", "100R", "220R", "330R", "470R", "1k", "2.2k", "4.7k", "10k", "22k", "47k", "100k"},
+		PlannedUses:      []string{"bias", "pullup", "current_limit", "feedback"},
+	},
+	{
+		Family:           "capacitor",
+		Current:          true,
+		BaselinePackages: []string{"0805"},
+		BaselineValues:   []string{"100n"},
+		PlannedPackages:  []string{"0603", "0805", "radial"},
+		PlannedValues:    []string{"10p", "18p", "22p", "100p", "1n", "10n", "100n", "1u", "4.7u", "10u", "47u", "100u", "220u"},
+		PlannedUses:      []string{"decoupling", "filter", "bulk"},
+	},
+	{Family: "connector", Current: true, BaselinePackages: []string{"pin_header_1x04"}, BaselineValues: []string{"4"}, PlannedPackages: []string{"1x02", "1x03", "1x04", "1x05", "1x06"}, PlannedUses: []string{"power", "signal", "programming", "audio_io"}},
+	{Family: "diode", Current: true, BaselinePackages: []string{"sod_123", "sma"}, PlannedPackages: []string{"sod_123", "sod_323", "sma"}, PlannedUses: []string{"signal", "schottky", "reverse_polarity"}},
+	{Family: "led", Current: true, BaselinePackages: []string{"0805"}, BaselineValues: []string{"green"}, PlannedPackages: []string{"0603", "0805"}, PlannedValues: []string{"green", "red", "blue", "amber"}, PlannedUses: []string{"indicator"}},
+	{Family: "protection", Current: true, BaselinePackages: []string{"sod_323"}, PlannedPackages: []string{"sod_323", "sot23", "dfn"}, PlannedUses: []string{"esd", "tvs", "power_entry"}},
+	{Family: "opamp", Current: true, BaselinePackages: []string{"sot23_5"}, PlannedPackages: []string{"sot23_5", "soic8"}, PlannedUses: []string{"audio_buffer", "gain_stage"}},
+	{Family: "crystal", Current: true, BaselinePackages: []string{"5032_2pin"}, BaselineValues: []string{"16"}, PlannedPackages: []string{"5032_2pin"}, PlannedValues: []string{"16"}, PlannedUses: []string{"clock_source"}},
+	{Family: "bjt", PlannedPackages: []string{"sot23", "to92"}, PlannedUses: []string{"class_ab_driver", "small_signal_switch"}},
+	{Family: "usb_c", Current: true, BaselinePackages: []string{"gct_usb4125_6p"}, PlannedPackages: []string{"power_only"}, PlannedUses: []string{"power_entry"}},
+}
 
 func TestComponentCoverageCountsCatalog(t *testing.T) {
 	catalog := validCatalog()
@@ -128,11 +163,11 @@ func TestCheckedInCatalogIncludesVerifiedExpansionFamilies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("load catalog: %v", err)
 	}
-	report, result := ComponentCoverage(catalog, CoverageOptions{RequiredFamilies: verifiedExpansionTargetFamilies})
+	report, result := ComponentCoverage(catalog, CoverageOptions{RequiredFamilies: currentVerifiedExpansionFamilies()})
 	if reports.HasBlockingIssue(result.Issues) {
 		t.Fatalf("coverage should not block: %+v", result.Issues)
 	}
-	for _, family := range verifiedExpansionTargetFamilies {
+	for _, family := range currentVerifiedExpansionFamilies() {
 		coverage, ok := familyCoverageByID(report, family)
 		if !ok {
 			t.Errorf("missing family coverage for %s; found families: %#v", family, familyIDs(report))
@@ -144,11 +179,74 @@ func TestCheckedInCatalogIncludesVerifiedExpansionFamilies(t *testing.T) {
 	}
 }
 
-func TestDefaultRoadmapRequiredFamiliesIncludeCoverageExpansionTargets(t *testing.T) {
+func TestDefaultRoadmapRequiredFamiliesIncludeCurrentCoverageFamilies(t *testing.T) {
 	required := defaultRoadmapRequiredFamilies()
-	for _, family := range verifiedExpansionTargetFamilies {
+	for _, family := range currentVerifiedExpansionFamilies() {
 		if !slices.Contains(required, family) {
 			t.Errorf("default required families missing %s: %#v", family, required)
+		}
+	}
+}
+
+func TestVerifiedExpansionTargetMatrixCoversPlannedFamilies(t *testing.T) {
+	seen := map[string]bool{}
+	expected := map[string]bool{
+		"bjt":        true,
+		"capacitor":  true,
+		"connector":  true,
+		"crystal":    true,
+		"diode":      true,
+		"led":        true,
+		"opamp":      true,
+		"protection": true,
+		"resistor":   true,
+		"usb_c":      true,
+	}
+	for _, target := range plannedVerifiedExpansionTargetMatrix {
+		if target.Family == "" {
+			t.Error("target family is required")
+		}
+		if len(target.PlannedPackages) == 0 {
+			t.Errorf("target family %s has no planned packages", target.Family)
+		}
+		if len(target.PlannedUses) == 0 {
+			t.Errorf("target family %s has no planned uses", target.Family)
+		}
+		if seen[target.Family] {
+			t.Errorf("duplicate family in expansion target matrix: %s", target.Family)
+		}
+		if !expected[target.Family] {
+			t.Errorf("expansion target matrix has unplanned family %s", target.Family)
+		}
+		seen[target.Family] = true
+	}
+	for family := range expected {
+		if !seen[family] {
+			t.Errorf("expansion target matrix missing expected family %s", family)
+		}
+	}
+}
+
+func TestVerifiedExpansionTargetMatrixBaselineCoverage(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load catalog: %v", err)
+	}
+	recordsByFamily := catalogRecordsByFamily(catalog)
+	valuesByFamily := catalogValuesByFamily(recordsByFamily)
+	for _, target := range plannedVerifiedExpansionTargetMatrix {
+		if target.Current && len(target.BaselinePackages) == 0 {
+			t.Errorf("current family %s must declare at least one baseline package", target.Family)
+		}
+		for _, pkg := range target.BaselinePackages {
+			if !catalogFamilyHasPackage(recordsByFamily[target.Family], pkg) {
+				t.Errorf("family %s missing baseline package %s", target.Family, pkg)
+			}
+		}
+		for _, value := range target.BaselineValues {
+			if !valuesByFamily[target.Family][normalizeMetadata(value)] {
+				t.Errorf("family %s missing baseline value %s", target.Family, value)
+			}
 		}
 	}
 }
@@ -162,10 +260,58 @@ func familyCoverageByID(report CoverageReport, family string) (FamilyCoverage, b
 	return FamilyCoverage{}, false
 }
 
+func currentVerifiedExpansionFamilies() []string {
+	var families []string
+	for _, target := range plannedVerifiedExpansionTargetMatrix {
+		if target.Current {
+			families = append(families, target.Family)
+		}
+	}
+	return families
+}
+
 func familyIDs(report CoverageReport) []string {
 	ids := make([]string, 0, len(report.Families))
 	for _, coverage := range report.Families {
 		ids = append(ids, coverage.Family)
 	}
 	return ids
+}
+
+func catalogRecordsByFamily(catalog *Catalog) map[string][]ComponentRecord {
+	recordsByFamily := map[string][]ComponentRecord{}
+	for _, record := range catalog.Records {
+		recordsByFamily[record.Family] = append(recordsByFamily[record.Family], record)
+	}
+	return recordsByFamily
+}
+
+func catalogFamilyHasPackage(records []ComponentRecord, packageID string) bool {
+	for _, record := range records {
+		for _, pkg := range record.Packages {
+			if pkg.ID == packageID || pkg.PackageType == packageID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func catalogValuesByFamily(recordsByFamily map[string][]ComponentRecord) map[string]map[string]bool {
+	valuesByFamily := map[string]map[string]bool{}
+	for family, records := range recordsByFamily {
+		values := map[string]bool{}
+		for _, record := range records {
+			for _, candidate := range record.Values {
+				values[normalizeMetadata(candidate.Min)] = true
+				values[normalizeMetadata(candidate.Typ)] = true
+				values[normalizeMetadata(candidate.Max)] = true
+			}
+			for _, tag := range record.Tags {
+				values[normalizeMetadata(tag)] = true
+			}
+		}
+		valuesByFamily[family] = values
+	}
+	return valuesByFamily
 }
