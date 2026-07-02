@@ -63,6 +63,203 @@ func TestValidateBoardUnroutedNet(t *testing.T) {
 	}
 }
 
+func TestValidateBoardSplitSameNetCopperIsNotFullyRouted(t *testing.T) {
+	board := twoPadBoard(t)
+	board.Footprints = append(board.Footprints,
+		testFootprint("U3", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(15)}, 1),
+		testFootprint("U4", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(15)}, 1),
+	)
+	board.Tracks = []pcbfiles.Track{{
+		UUID:    testUUID("track-a"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}, {
+		UUID:    testUUID("track-b"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(15)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(15)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}}
+
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+
+	if result.Status != StatusFail {
+		t.Fatalf("Status = %q, want fail for split same-net copper", result.Status)
+	}
+	net := findNetStatus(t, result, "SIGNAL")
+	if net.Status != NetStatusPartiallyRouted {
+		t.Fatalf("SIGNAL status = %q, want partially_routed", net.Status)
+	}
+	if !hasIssueCode(result.Issues, reports.CodeDisconnectedPad) {
+		t.Fatalf("missing disconnected pad issue: %#v", result.Issues)
+	}
+}
+
+func TestValidateBoardPadBridgesNearbySameNetCopperSegments(t *testing.T) {
+	board := twoPadBoard(t)
+	board.Footprints = append(board.Footprints, testFootprint("U3", kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(10)}, 1))
+	board.Tracks = []pcbfiles.Track{{
+		UUID:    testUUID("track-a"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(20) - routePointTolerance/2, Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}, {
+		UUID:    testUUID("track-b"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(20) + routePointTolerance/2, Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}}
+
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+
+	if result.Status != StatusPass {
+		t.Fatalf("Status = %q, want pass for pad-bridged copper; issues=%#v", result.Status, result.Issues)
+	}
+	net := findNetStatus(t, result, "SIGNAL")
+	if net.Status != NetStatusFullyRouted {
+		t.Fatalf("SIGNAL status = %q, want fully_routed", net.Status)
+	}
+}
+
+func TestValidateBoardNearbySameLayerRouteEndpointsAreConnected(t *testing.T) {
+	board := twoPadBoard(t)
+	board.Tracks = []pcbfiles.Track{{
+		UUID:    testUUID("track-a"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(15) - routePointTolerance/2, Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}, {
+		UUID:    testUUID("track-b"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(15) + routePointTolerance/2, Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}}
+
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+
+	if result.Status != StatusPass {
+		t.Fatalf("Status = %q, want pass for nearby route endpoints; issues=%#v", result.Status, result.Issues)
+	}
+	net := findNetStatus(t, result, "SIGNAL")
+	if net.Status != NetStatusFullyRouted {
+		t.Fatalf("SIGNAL status = %q, want fully_routed", net.Status)
+	}
+}
+
+func TestValidateBoardSameXYDifferentLayersRequiresVia(t *testing.T) {
+	board := twoPadBoard(t)
+	internalLayer := kicadfiles.BoardLayer("In1.Cu")
+	board.Layers = append([]pcbfiles.LayerDefinition{
+		{Number: 0, Name: kicadfiles.LayerFCu, Kind: "signal"},
+		{Number: 4, Name: internalLayer, Kind: "signal"},
+		{Number: 2, Name: kicadfiles.LayerBCu, Kind: "signal"},
+	}, board.Layers[2:]...)
+	for footprintIndex := range board.Footprints {
+		pad := &board.Footprints[footprintIndex].Pads[0]
+		pad.Type = "thru_hole"
+		pad.Shape = "circle"
+		pad.Size = kicadfiles.Point{X: kicadfiles.MM(1.2), Y: kicadfiles.MM(1.2)}
+		pad.Drill = kicadfiles.MM(0.6)
+		pad.Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	}
+	board.Tracks = []pcbfiles.Track{{
+		UUID:    testUUID("track-f"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}, {
+		UUID:    testUUID("track-b"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerBCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}}
+
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	net := findNetStatus(t, result, "SIGNAL")
+	if net.Status != NetStatusPartiallyRouted {
+		t.Fatalf("SIGNAL status without via = %q, want partially_routed", net.Status)
+	}
+
+	board.Vias = []pcbfiles.Via{{
+		UUID:     testUUID("via-fb"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		Size:     kicadfiles.MM(0.6),
+		Drill:    kicadfiles.MM(0.3),
+		Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+		NetCode:  1,
+		NetName:  "SIGNAL",
+	}}
+	result = ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	if result.Status != StatusPass {
+		t.Fatalf("Status with via = %q, want pass; issues=%#v", result.Status, result.Issues)
+	}
+	net = findNetStatus(t, result, "SIGNAL")
+	if net.Status != NetStatusFullyRouted {
+		t.Fatalf("SIGNAL status with via = %q, want fully_routed", net.Status)
+	}
+
+	board.Tracks = []pcbfiles.Track{{
+		UUID:    testUUID("track-f-internal"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   kicadfiles.LayerFCu,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}, {
+		UUID:    testUUID("track-internal"),
+		Start:   kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		End:     kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)},
+		Width:   kicadfiles.MM(0.25),
+		Layer:   internalLayer,
+		NetCode: 1,
+		NetName: "SIGNAL",
+	}}
+	result = ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	if result.Status != StatusPass {
+		t.Fatalf("Status with through-via internal layer = %q, want pass; issues=%#v", result.Status, result.Issues)
+	}
+	net = findNetStatus(t, result, "SIGNAL")
+	if net.Status != NetStatusFullyRouted {
+		t.Fatalf("SIGNAL internal status = %q, want fully_routed", net.Status)
+	}
+}
+
+func TestViaConnectivityLayersExpandsThroughStackup(t *testing.T) {
+	internalLayer := kicadfiles.BoardLayer("In1.Cu")
+	layers := viaConnectivityLayers(
+		[]kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+		[]kicadfiles.BoardLayer{kicadfiles.LayerFCu, internalLayer, kicadfiles.LayerBCu},
+	)
+	if got := strings.Join(boardLayersToStrings(layers), " "); got != "F.Cu In1.Cu B.Cu" {
+		t.Fatalf("via layers = %s, want all copper layers in stackup", got)
+	}
+}
+
 func TestValidateBoardDanglingRouteEndpoint(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Tracks[0].End = kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(20)}

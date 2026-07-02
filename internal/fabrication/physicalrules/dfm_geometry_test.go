@@ -72,6 +72,27 @@ func TestDFMPolygonDistanceAndSelfIntersection(t *testing.T) {
 	}
 }
 
+func TestDFMPolygonSelfIntersectionCapsComplexComparisons(t *testing.T) {
+	const vertexCount = 1025
+	points := make([]kicadfiles.Point, 0, vertexCount)
+	for index := 0; index < vertexCount; index++ {
+		angle := 2 * math.Pi * float64(index) / vertexCount
+		points = append(points, kicadfiles.Point{
+			X: kicadfiles.MM(10 + math.Cos(angle)),
+			Y: kicadfiles.MM(10 + math.Sin(angle)),
+		})
+	}
+
+	intersects, ok := dfmSelfIntersectsBounded(points)
+	if ok || intersects {
+		t.Fatalf("bounded self-intersection = (%t, %t), want unsupported false/false", intersects, ok)
+	}
+	polygon := dfmValidatedPolygon(dfmPolygon{Points: points})
+	if polygon.UnsupportedReason != "polygon is too complex for bounded self-intersection validation" {
+		t.Fatalf("unsupported reason = %q", polygon.UnsupportedReason)
+	}
+}
+
 func TestDFMPolygonEdgeDistanceIgnoresContainmentOverlap(t *testing.T) {
 	outline := []kicadfiles.Point{point(0, 0), point(10, 0), point(10, 10), point(0, 10)}
 	copper := []kicadfiles.Point{point(0.05, 1), point(2, 1), point(2, 2), point(0.05, 2)}

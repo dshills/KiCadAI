@@ -212,7 +212,10 @@ func dfmPolygonEdgeDistanceWithBoundsMM(a []kicadfiles.Point, aBounds []dfmRect,
 	return minDistance
 }
 
-const dfmPolygonEdgeDistanceMaxPairs = 1_048_576
+const (
+	dfmPolygonEdgeDistanceMaxPairs     = 1_048_576
+	dfmPolygonSelfIntersectionMaxPairs = 1_048_576
+)
 
 func dfmSegmentBoundsForPolygon(points []kicadfiles.Point) []dfmRect {
 	points = dfmNormalizePolygon(points)
@@ -235,9 +238,17 @@ func dfmRectsOverlap(a, b dfmRect) bool {
 }
 
 func dfmSelfIntersects(points []kicadfiles.Point) bool {
+	intersects, ok := dfmSelfIntersectsBounded(points)
+	return intersects || !ok
+}
+
+func dfmSelfIntersectsBounded(points []kicadfiles.Point) (bool, bool) {
 	normalized := dfmNormalizePolygon(points)
 	if len(normalized) < 4 {
-		return false
+		return false, true
+	}
+	if len(normalized)*len(normalized) > dfmPolygonSelfIntersectionMaxPairs {
+		return false, false
 	}
 	for i := range normalized {
 		a1 := normalized[i]
@@ -252,11 +263,11 @@ func dfmSelfIntersects(points []kicadfiles.Point) bool {
 				continue
 			}
 			if segmentsIntersect(a1, a2, b1, b2) {
-				return true
+				return true, true
 			}
 		}
 	}
-	return false
+	return false, true
 }
 
 func dfmSegmentBounds(a, b kicadfiles.Point) dfmRect {

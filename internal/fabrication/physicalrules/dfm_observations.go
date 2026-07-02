@@ -263,8 +263,8 @@ func dfmTransformPadOpeningPoints(center kicadfiles.Point, footprintTransform tr
 	out := make([]kicadfiles.Point, 0, len(points))
 	for _, point := range points {
 		rotated := kicadfiles.Point{
-			X: dfmRoundIU(float64(point.X)*padRotation.Cosine + float64(point.Y)*padRotation.Sine),
-			Y: dfmRoundIU(-float64(point.X)*padRotation.Sine + float64(point.Y)*padRotation.Cosine),
+			X: dfmRoundIU(float64(point.X)*padRotation.Cosine - float64(point.Y)*padRotation.Sine),
+			Y: dfmRoundIU(float64(point.X)*padRotation.Sine + float64(point.Y)*padRotation.Cosine),
 		}
 		offset := transformedOffset(footprintTransform, rotated)
 		out = append(out, kicadfiles.Point{X: center.X + offset.X, Y: center.Y + offset.Y})
@@ -408,7 +408,12 @@ func dfmValidatedPolygon(polygon dfmPolygon) dfmPolygon {
 		polygon.UnsupportedReason = "polygon has fewer than three distinct points"
 		return polygon
 	}
-	if dfmSelfIntersects(polygon.Points) {
+	selfIntersects, ok := dfmSelfIntersectsBounded(polygon.Points)
+	if !ok {
+		polygon.UnsupportedReason = "polygon is too complex for bounded self-intersection validation"
+		return polygon
+	}
+	if selfIntersects {
 		polygon.UnsupportedReason = "self-intersecting polygon is not modeled"
 		return polygon
 	}

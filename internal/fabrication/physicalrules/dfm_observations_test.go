@@ -140,12 +140,42 @@ func TestDFMMaskOpeningsAndUnsupportedPads(t *testing.T) {
 	}
 }
 
-func TestDFMTransformPadOpeningPointsUsesKiCadRotationDirection(t *testing.T) {
+func TestDFMTransformPadOpeningPointsUsesBoardValidationRotationDirection(t *testing.T) {
 	rotation := dfmCachedRotation(map[int64]dfmRotation2D{}, kicadfiles.Angle(90))
 
 	points := dfmTransformPadOpeningPoints(kicadfiles.Point{}, transform2D{Cosine: 1}, rotation, []kicadfiles.Point{point(1, 0)})
 
-	if len(points) != 1 || points[0] != point(0, -1) {
-		t.Fatalf("rotated points = %#v, want +90 degrees to move rightward point upward in KiCad coordinates", points)
+	if len(points) != 1 || points[0] != point(0, 1) {
+		t.Fatalf("rotated points = %#v, want +90 degrees to match board-validation pad transforms", points)
+	}
+}
+
+func TestDFMMaskOpeningComposesPadAndFootprintRotation(t *testing.T) {
+	pointTransform := dfmTransformPadOpeningPoints(point(10, 12), transform2D{Cosine: 0, Sine: 1}, dfmCachedRotation(map[int64]dfmRotation2D{}, 90), []kicadfiles.Point{point(1, 0)})
+	if len(pointTransform) != 1 || pointTransform[0] != point(9, 12) {
+		t.Fatalf("composed point transform = %#v, want pad + footprint rotation to move rightward point left", pointTransform)
+	}
+	board := &pcbfiles.PCBFile{Footprints: []pcbfiles.Footprint{{
+		Reference: "U1",
+		Position:  point(10, 10),
+		Rotation:  90,
+		Pads: []pcbfiles.Pad{{
+			UUID:     kicadfiles.UUID("40000000-0000-4000-8000-000000000011"),
+			Shape:    "rect",
+			Rotation: 90,
+			Position: point(2, 0),
+			Size:     point(2, 1),
+			Layers:   []kicadfiles.BoardLayer{kicadfiles.LayerFMask},
+		}},
+	}}}
+
+	observations := dfmMaskOpenings(board, 0)
+
+	if len(observations) != 1 || !observations[0].supported() {
+		t.Fatalf("observations = %#v", observations)
+	}
+	bounds := dfmPolygonBounds(observations[0].Points)
+	if math.Abs(bounds.MinX-9) > 1e-9 || math.Abs(bounds.MaxX-11) > 1e-9 || math.Abs(bounds.MinY-11.5) > 1e-9 || math.Abs(bounds.MaxY-12.5) > 1e-9 {
+		t.Fatalf("rotated footprint+pad bounds = %#v, want center (10,12) with composed 180-degree pad opening", bounds)
 	}
 }

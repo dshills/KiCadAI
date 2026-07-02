@@ -45,7 +45,7 @@ func EvaluateBoard(board *pcbfiles.PCBFile, project *projectfiles.ProjectFile, o
 	checks = append(checks, evaluateEdgePlating(edgePlating, opts)...)
 	checks = append(checks, evaluateFabricationMetadata(project, edgePlating, opts)...)
 	checks = append(checks, evaluateBoardContainment(board, outline.Bounds)...)
-	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds)...)
+	checks = append(checks, evaluateCourtyardSilkscreen(board, outline.Bounds, opts)...)
 	checks = append(checks, evaluateMountingHoles(board, outline.Bounds, opts)...)
 	report := NewReport(opts.ProfileID, BoardRef{LayerCount: copperLayerCount(board)}, checks)
 	report.ProfileDetails = opts.ProfileDetails
@@ -974,7 +974,7 @@ func evaluateViaAnnularRings(board *pcbfiles.PCBFile, opts Options) Check {
 	return Check{ID: CheckAnnularRingVia, Category: CategoryAnnularRing, Status: StatusPass, Message: "via annular rings meet the active profile threshold", Measurements: measurements, Source: SourceParser}
 }
 
-func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []Check {
+func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds, opts Options) []Check {
 	var courtyards []courtyardBounds
 	var missingCourtyardRefs = map[string]struct{}{}
 	var missingCourtyardObjects []string
@@ -1014,10 +1014,14 @@ func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []
 	if missingCourtyardCount == 0 {
 		checks = append(checks, Check{ID: CheckCourtyardPresence, Category: CategoryCourtyard, Status: StatusPass, Message: "assembly footprints have courtyard evidence or do not require it", Source: SourceParser})
 	} else {
+		status := StatusWarning
+		if opts.RequireCourtyard {
+			status = StatusBlocked
+		}
 		checks = append(checks, Check{
 			ID:         CheckCourtyardPresence,
 			Category:   CategoryCourtyard,
-			Status:     StatusWarning,
+			Status:     status,
 			Message:    "one or more assembly footprints are missing courtyard graphics",
 			Suggestion: "hydrate footprints from KiCad libraries or add courtyard graphics before fabrication release",
 			IssuePath:  "physical.courtyard.presence",
@@ -1029,39 +1033,69 @@ func evaluateCourtyardSilkscreen(board *pcbfiles.PCBFile, bounds boardBounds) []
 			Source: SourceParser,
 		})
 	}
-	overlapRefs, overlapCount := courtyardOverlaps(courtyards)
+	overlapRefs, overlapCount := courtyardSpacingViolations(courtyards, opts.MinCourtyardSpacingMM)
 	if overlapCount == 0 {
-		checks = append(checks, Check{ID: CheckCourtyardOverlap, Category: CategoryCourtyard, Status: StatusPass, Message: "footprint courtyard bounds do not overlap", Source: SourceParser})
+		checks = append(checks, Check{ID: CheckCourtyardOverlap, Category: CategoryCourtyard, Status: StatusPass, Message: "footprint courtyard bounds meet spacing requirements", Source: SourceParser})
 	} else {
+		message := "one or more footprint courtyard bounds overlap"
+		if opts.MinCourtyardSpacingMM > 0 {
+			message = "one or more footprint courtyard bounds violate minimum spacing"
+		}
 		checks = append(checks, Check{
 			ID:         CheckCourtyardOverlap,
 			Category:   CategoryCourtyard,
 			Status:     StatusBlocked,
-			Message:    "one or more footprint courtyard bounds overlap",
+			Message:    message,
 			Suggestion: "move overlapping footprints apart before fabrication export",
 			IssuePath:  "physical.courtyard.overlap",
 			References: overlapRefs,
 			Measurements: []Measurement{
 				{Name: "violation_count", Value: float64(overlapCount), Unit: "count"},
+				{Name: "min_required_courtyard_spacing", Value: opts.MinCourtyardSpacingMM, Unit: "mm"},
 			},
 			Source: SourceParser,
 		})
 	}
-	checks = append(checks, Check{
-		ID:       CheckSilkscreenPadClearance,
-		Category: CategorySilkscreen,
-		Status:   StatusSkipped,
-		Message:  "silkscreen-to-pad clearance requires rendered text and stroke geometry and is deferred to KiCad DRC evidence",
-		Source:   SourceHeuristic,
-	})
+	if opts.MinSilkPadClearanceMM > 0 {
+		checks = append(checks, Check{
+			ID:         CheckSilkscreenPadClearance,
+			Category:   CategorySilkscreen,
+			Status:     StatusWarning,
+			Message:    "silkscreen-to-pad clearance threshold is configured but requires KiCad DRC evidence",
+			Suggestion: "run KiCad DRC before fabrication release when enforcing silkscreen-to-pad clearance",
+			IssuePath:  "physical.silkscreen.pad_clearance",
+			Measurements: []Measurement{
+				{Name: "min_required_silkscreen_pad_clearance", Value: opts.MinSilkPadClearanceMM, Unit: "mm"},
+			},
+			Source: SourceHeuristic,
+		})
+	} else {
+		checks = append(checks, Check{
+			ID:       CheckSilkscreenPadClearance,
+			Category: CategorySilkscreen,
+			Status:   StatusSkipped,
+			Message:  "silkscreen-to-pad clearance requires rendered text and stroke geometry and is deferred to KiCad DRC evidence",
+			Source:   SourceHeuristic,
+		})
+	}
 	if silkOutsideCount == 0 {
 		status := StatusPass
 		message := "silkscreen reference points and graphics are inside board bounds"
 		if !bounds.Valid {
 			status = StatusSkipped
 			message = "silkscreen board-clearance check skipped because no usable Edge.Cuts bounds were found"
+		} else if opts.MinSilkEdgeClearanceMM > 0 {
+			status = StatusWarning
+			message = "silkscreen-to-board-edge threshold is configured but exact stroke clearance requires KiCad DRC evidence"
 		}
-		checks = append(checks, Check{ID: CheckSilkscreenBoardClearance, Category: CategorySilkscreen, Status: status, Message: message, Source: SourceParser})
+		check := Check{ID: CheckSilkscreenBoardClearance, Category: CategorySilkscreen, Status: status, Message: message, Source: SourceParser}
+		if opts.MinSilkEdgeClearanceMM > 0 && bounds.Valid {
+			check.Suggestion = "run KiCad DRC before fabrication release when enforcing silkscreen-to-edge clearance"
+			check.IssuePath = "physical.silkscreen.board_clearance"
+			check.Source = SourceHeuristic
+			check.Measurements = []Measurement{{Name: "min_required_silkscreen_edge_clearance", Value: opts.MinSilkEdgeClearanceMM, Unit: "mm"}}
+		}
+		checks = append(checks, check)
 	} else {
 		checks = append(checks, Check{
 			ID:         CheckSilkscreenBoardClearance,
@@ -2894,12 +2928,12 @@ func includeRectPoint(bounds rectBounds, point kicadfiles.Point) rectBounds {
 	return bounds
 }
 
-func courtyardOverlaps(courtyards []courtyardBounds) ([]string, int) {
+func courtyardSpacingViolations(courtyards []courtyardBounds, minSpacingMM float64) ([]string, int) {
 	overlapRefs := map[string]struct{}{}
 	count := 0
 	for i := 0; i < len(courtyards); i++ {
 		for j := i + 1; j < len(courtyards); j++ {
-			if rectsOverlap(courtyards[i].Bounds, courtyards[j].Bounds) {
+			if rectsOverlap(courtyards[i].Bounds, courtyards[j].Bounds) || rectDistanceMM(courtyards[i].Bounds, courtyards[j].Bounds) < minSpacingMM {
 				count++
 				overlapRefs[courtyards[i].Reference] = struct{}{}
 				overlapRefs[courtyards[j].Reference] = struct{}{}
@@ -2914,6 +2948,27 @@ func rectsOverlap(a, b rectBounds) bool {
 		return false
 	}
 	return a.MinX < b.MaxX && a.MaxX > b.MinX && a.MinY < b.MaxY && a.MaxY > b.MinY
+}
+
+func rectDistanceMM(a, b rectBounds) float64 {
+	if !a.Valid || !b.Valid {
+		return math.Inf(1)
+	}
+	dx := kicadfiles.IU(0)
+	switch {
+	case a.MaxX < b.MinX:
+		dx = b.MinX - a.MaxX
+	case b.MaxX < a.MinX:
+		dx = a.MinX - b.MaxX
+	}
+	dy := kicadfiles.IU(0)
+	switch {
+	case a.MaxY < b.MinY:
+		dy = b.MinY - a.MaxY
+	case b.MaxY < a.MinY:
+		dy = a.MinY - b.MaxY
+	}
+	return math.Hypot(iuToMM(dx), iuToMM(dy))
 }
 
 func silkscreenTextInsideBoard(bounds boardBounds, footprint *pcbfiles.Footprint, text pcbfiles.FootprintText) bool {

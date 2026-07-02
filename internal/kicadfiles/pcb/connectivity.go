@@ -77,6 +77,7 @@ func ValidateGeneratedConnectivity(board PCBFile) error {
 
 func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 	anchors := []connectivityAnchor{}
+	boardCopperLayers := connectivityBoardCopperLayers(board.Layers)
 	for footprintIndex, footprint := range board.Footprints {
 		for padIndex, pad := range footprint.Pads {
 			if pad.NetCode == 0 || padType(pad) == "np_thru_hole" {
@@ -128,6 +129,7 @@ func collectConnectivityAnchors(board PCBFile) []connectivityAnchor {
 			continue
 		}
 		layers, _ := copperLayersForConnectivity(via.Layers)
+		layers = expandConnectivityLayerSpan(via.Layers, layers, boardCopperLayers)
 		anchors = append(anchors, connectivityAnchor{
 			id:        len(anchors),
 			itemKey:   "via:" + string(via.UUID),
@@ -562,6 +564,56 @@ func copperLayersForConnectivity(layers []kicadfiles.BoardLayer) ([]kicadfiles.B
 		copperLayers = append(copperLayers, layer)
 	}
 	return copperLayers, allCopper
+}
+
+func connectivityBoardCopperLayers(layers []LayerDefinition) []kicadfiles.BoardLayer {
+	var out []kicadfiles.BoardLayer
+	seen := map[kicadfiles.BoardLayer]struct{}{}
+	for _, layer := range layers {
+		if !isCopperLayer(layer.Name) || layer.Name == kicadfiles.LayerAllCu {
+			continue
+		}
+		if _, ok := seen[layer.Name]; ok {
+			continue
+		}
+		seen[layer.Name] = struct{}{}
+		out = append(out, layer.Name)
+	}
+	if len(out) == 0 {
+		return []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
+	}
+	return out
+}
+
+func expandConnectivityLayerSpan(rawLayers []kicadfiles.BoardLayer, parsed []kicadfiles.BoardLayer, boardCopperLayers []kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	if len(rawLayers) < 2 {
+		return parsed
+	}
+	start := rawLayers[0]
+	end := rawLayers[len(rawLayers)-1]
+	if start == kicadfiles.LayerAllCu || end == kicadfiles.LayerAllCu {
+		return append([]kicadfiles.BoardLayer(nil), boardCopperLayers...)
+	}
+	startIndex := -1
+	endIndex := -1
+	for index, layer := range boardCopperLayers {
+		if layer == start {
+			startIndex = index
+		}
+		if layer == end {
+			endIndex = index
+		}
+	}
+	if startIndex < 0 || endIndex < 0 {
+		return parsed
+	}
+	if startIndex > endIndex {
+		startIndex, endIndex = endIndex, startIndex
+	}
+	if endIndex-startIndex+1 <= len(parsed) {
+		return parsed
+	}
+	return append([]kicadfiles.BoardLayer(nil), boardCopperLayers[startIndex:endIndex+1]...)
 }
 
 func pointTouchesPad(point kicadfiles.Point, pad connectivityAnchor) bool {

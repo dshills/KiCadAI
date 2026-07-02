@@ -216,6 +216,7 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 		componentClass string
 	}
 	groups := map[bomGroupKey]*BOMRow{}
+	seenPhysicalRefs := map[string]bomGroupKey{}
 	var issues []reports.Issue
 	for _, symbol := range schematic.Symbols {
 		if symbol.DoNotPopulate || boolPtrValue(symbol.InBOM, true) == false || boolPtrValue(symbol.OnBoard, true) == false {
@@ -225,6 +226,7 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 		if ref == "" || strings.HasPrefix(ref, "#") {
 			continue
 		}
+		refKey := referenceKey(ref)
 		properties := propertyMap(symbol.Properties)
 		fields := fieldMap(symbol.Fields)
 		value := firstNonEmpty(strings.TrimSpace(symbol.Value), lookup(properties, "Value"), lookup(fields, "Value"))
@@ -260,6 +262,19 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 			packageName:    identity.Package,
 			componentClass: identity.ComponentClass,
 		}
+		if existingKey, exists := seenPhysicalRefs[refKey]; exists {
+			if existingKey != key {
+				issues = append(issues, reports.Issue{
+					Code:       reports.CodeValidationFailed,
+					Severity:   reports.SeverityWarning,
+					Path:       "bom." + ref,
+					Message:    fmt.Sprintf("%s has inconsistent value, footprint, or manufacturer identity across schematic units", ref),
+					Refs:       []string{ref},
+					Suggestion: "make all units of a multi-unit symbol share identical BOM identity fields before fabrication release",
+				})
+			}
+			continue
+		}
 		row := groups[key]
 		if row == nil {
 			issueCount, blockingCount := IdentityIssueCounts(identity.Issues)
@@ -283,6 +298,7 @@ func BuildBOMRows(schematic schematicfiles.SchematicFile) ([]BOMRow, []reports.I
 			groups[key] = row
 		}
 		row.References = append(row.References, ref)
+		seenPhysicalRefs[refKey] = key
 		if identity.Manufacturer == "" || identity.MPN == "" {
 			issue := reports.Issue{
 				Code:       reports.CodeValidationFailed,

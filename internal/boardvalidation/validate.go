@@ -218,26 +218,36 @@ type boardConnectivity struct {
 	netCopperCount map[int]int
 	netZoneCount   map[int]int
 	routeAnchors   map[int]map[pointKey][]string
+	routeEdges     map[int][]connectivityEdge
 }
 
 type connectivityPad struct {
-	ref   string
-	name  string
-	point kicadfiles.Point
+	ref    string
+	name   string
+	point  kicadfiles.Point
+	layers []kicadfiles.BoardLayer
+}
+
+type connectivityEdge struct {
+	start pointKey
+	end   pointKey
 }
 
 type pointKey struct {
-	x int64
-	y int64
+	x     int64
+	y     int64
+	layer string
 }
 
 func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
+	boardCopperLayers := copperLayersFromStack(board.Layers)
 	graph := boardConnectivity{
 		netNames:       map[int]string{},
 		netPads:        map[int][]connectivityPad{},
 		netCopperCount: map[int]int{},
 		netZoneCount:   map[int]int{},
 		routeAnchors:   map[int]map[pointKey][]string{},
+		routeEdges:     map[int][]connectivityEdge{},
 	}
 	for _, net := range board.Nets {
 		graph.netNames[net.Code] = net.Name
@@ -250,12 +260,16 @@ func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
 				continue
 			}
 			padPoint := absolutePadPosition(footprint, pad)
+			layers := padConnectivityLayers(pad.Layers, boardCopperLayers)
 			graph.netPads[pad.NetCode] = append(graph.netPads[pad.NetCode], connectivityPad{
-				ref:   ref,
-				name:  pad.Name,
-				point: padPoint,
+				ref:    ref,
+				name:   pad.Name,
+				point:  padPoint,
+				layers: layers,
 			})
-			graph.addRouteAnchor(pad.NetCode, padPoint, "pad")
+			for _, layer := range layers {
+				graph.addRouteAnchor(pad.NetCode, padPoint, layer, "pad")
+			}
 		}
 	}
 	for _, track := range board.Tracks {
@@ -263,23 +277,29 @@ func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
 			continue
 		}
 		graph.netCopperCount[track.NetCode]++
-		graph.addRouteAnchor(track.NetCode, track.Start, "track")
-		graph.addRouteAnchor(track.NetCode, track.End, "track")
+		graph.addRouteAnchor(track.NetCode, track.Start, track.Layer, "track")
+		graph.addRouteAnchor(track.NetCode, track.End, track.Layer, "track")
+		graph.addRouteEdge(track.NetCode, track.Start, track.End, track.Layer)
 	}
 	for _, arc := range board.TrackArcs {
 		if arc.NetCode == 0 {
 			continue
 		}
 		graph.netCopperCount[arc.NetCode]++
-		graph.addRouteAnchor(arc.NetCode, arc.Start, "track_arc")
-		graph.addRouteAnchor(arc.NetCode, arc.End, "track_arc")
+		graph.addRouteAnchor(arc.NetCode, arc.Start, arc.Layer, "track_arc")
+		graph.addRouteAnchor(arc.NetCode, arc.End, arc.Layer, "track_arc")
+		graph.addRouteEdge(arc.NetCode, arc.Start, arc.End, arc.Layer)
 	}
 	for _, via := range board.Vias {
 		if via.NetCode == 0 {
 			continue
 		}
 		graph.netCopperCount[via.NetCode]++
-		graph.addRouteAnchor(via.NetCode, via.Position, "via")
+		layers := viaConnectivityLayers(via.Layers, boardCopperLayers)
+		for _, layer := range layers {
+			graph.addRouteAnchor(via.NetCode, via.Position, layer, "via")
+		}
+		graph.addViaEdges(via.NetCode, via.Position, layers)
 	}
 	for _, zone := range board.Zones {
 		if zone.NetCode > 0 {
@@ -289,11 +309,25 @@ func buildBoardConnectivity(board *pcbfiles.PCBFile) boardConnectivity {
 	return graph
 }
 
-func (graph boardConnectivity) addRouteAnchor(netCode int, point kicadfiles.Point, kind string) {
+func (graph boardConnectivity) addRouteAnchor(netCode int, point kicadfiles.Point, layer kicadfiles.BoardLayer, kind string) {
 	if graph.routeAnchors[netCode] == nil {
 		graph.routeAnchors[netCode] = map[pointKey][]string{}
 	}
-	graph.routeAnchors[netCode][newPointKey(point)] = append(graph.routeAnchors[netCode][newPointKey(point)], kind)
+	key := newLayerPointKey(point, layer)
+	graph.routeAnchors[netCode][key] = append(graph.routeAnchors[netCode][key], kind)
+}
+
+func (graph boardConnectivity) addRouteEdge(netCode int, start, end kicadfiles.Point, layer kicadfiles.BoardLayer) {
+	graph.routeEdges[netCode] = append(graph.routeEdges[netCode], connectivityEdge{start: newLayerPointKey(start, layer), end: newLayerPointKey(end, layer)})
+}
+
+func (graph boardConnectivity) addViaEdges(netCode int, point kicadfiles.Point, layers []kicadfiles.BoardLayer) {
+	for index := 1; index < len(layers); index++ {
+		graph.routeEdges[netCode] = append(graph.routeEdges[netCode], connectivityEdge{
+			start: newLayerPointKey(point, layers[0]),
+			end:   newLayerPointKey(point, layers[index]),
+		})
+	}
 }
 
 func (graph boardConnectivity) netStatuses(opts Options) ([]NetStatus, []reports.Issue) {
@@ -316,7 +350,7 @@ func (graph boardConnectivity) netStatuses(opts Options) ([]NetStatus, []reports
 			status = NetStatusIgnored
 		case len(pads) == 1:
 			status = NetStatusSingleEndpoint
-		case graph.allPadsHaveRouteAnchor(code, pads):
+		case graph.allPadsHaveRouteAnchor(code, pads) && graph.sameNetCopperIsConnected(code, pads):
 			status = NetStatusFullyRouted
 		case copperCount == 0 && zoneCount > 0:
 			status = NetStatusZoneDependent
@@ -360,7 +394,75 @@ func (graph boardConnectivity) allPadsHaveRouteAnchor(netCode int, pads []connec
 		return false
 	}
 	for _, pad := range pads {
-		if !hasNearbyNonPadAnchor(anchors, pad.point) {
+		if !padHasNearbyNonPadAnchor(anchors, pad) {
+			return false
+		}
+	}
+	return true
+}
+
+func (graph boardConnectivity) sameNetCopperIsConnected(netCode int, pads []connectivityPad) bool {
+	if len(pads) < 2 {
+		return true
+	}
+	anchors := graph.routeAnchors[netCode]
+	if len(anchors) == 0 {
+		return false
+	}
+	parent := map[pointKey]pointKey{}
+	var find func(pointKey) pointKey
+	find = func(key pointKey) pointKey {
+		root, ok := parent[key]
+		if !ok {
+			parent[key] = key
+			return key
+		}
+		if root != key {
+			parent[key] = find(root)
+		}
+		return parent[key]
+	}
+	union := func(a, b pointKey) {
+		ra := find(a)
+		rb := find(b)
+		if ra != rb {
+			parent[rb] = ra
+		}
+	}
+	for key := range anchors {
+		find(key)
+	}
+	for _, edge := range graph.routeEdges[netCode] {
+		union(edge.start, edge.end)
+	}
+	for key := range anchors {
+		forEachNearbyLayerPointKey(key, func(nearby pointKey) {
+			if _, ok := anchors[nearby]; ok {
+				union(key, nearby)
+			}
+		})
+	}
+	padAnchorKeys := make([][]pointKey, 0, len(pads))
+	for _, pad := range pads {
+		keys := nearbyNonPadAnchorKeysForPad(anchors, pad)
+		if len(keys) == 0 {
+			return false
+		}
+		for index := 1; index < len(keys); index++ {
+			union(keys[0], keys[index])
+		}
+		padAnchorKeys = append(padAnchorKeys, keys)
+	}
+	var firstRoot pointKey
+	haveFirstRoot := false
+	for _, keys := range padAnchorKeys {
+		root := find(keys[0])
+		if !haveFirstRoot {
+			firstRoot = root
+			haveFirstRoot = true
+			continue
+		}
+		if root != firstRoot {
 			return false
 		}
 	}
@@ -391,16 +493,16 @@ func validateRouteCompletion(board *pcbfiles.PCBFile, graph boardConnectivity) [
 		path := fmt.Sprintf("tracks.%d", index)
 		issues = append(issues, validateRouteNetAndLayer(path, track.NetCode, track.NetName, string(track.Layer), netNames)...)
 		if track.NetCode > 0 {
-			issues = append(issues, validateRouteEndpoint(path+".start", track.NetCode, track.Start, graph)...)
-			issues = append(issues, validateRouteEndpoint(path+".end", track.NetCode, track.End, graph)...)
+			issues = append(issues, validateRouteEndpoint(path+".start", track.NetCode, track.Start, track.Layer, graph)...)
+			issues = append(issues, validateRouteEndpoint(path+".end", track.NetCode, track.End, track.Layer, graph)...)
 		}
 	}
 	for index, arc := range board.TrackArcs {
 		path := fmt.Sprintf("track_arcs.%d", index)
 		issues = append(issues, validateRouteNetAndLayer(path, arc.NetCode, arc.NetName, string(arc.Layer), netNames)...)
 		if arc.NetCode > 0 {
-			issues = append(issues, validateRouteEndpoint(path+".start", arc.NetCode, arc.Start, graph)...)
-			issues = append(issues, validateRouteEndpoint(path+".end", arc.NetCode, arc.End, graph)...)
+			issues = append(issues, validateRouteEndpoint(path+".start", arc.NetCode, arc.Start, arc.Layer, graph)...)
+			issues = append(issues, validateRouteEndpoint(path+".end", arc.NetCode, arc.End, arc.Layer, graph)...)
 		}
 	}
 	for index, via := range board.Vias {
@@ -434,9 +536,9 @@ func validateRouteNetAndLayer(path string, netCode int, netName string, layer st
 	return issues
 }
 
-func validateRouteEndpoint(path string, netCode int, point kicadfiles.Point, graph boardConnectivity) []reports.Issue {
+func validateRouteEndpoint(path string, netCode int, point kicadfiles.Point, layer kicadfiles.BoardLayer, graph boardConnectivity) []reports.Issue {
 	anchors := graph.routeAnchors[netCode]
-	if len(anchors) == 0 || len(anchors[newPointKey(point)]) > 1 || hasNearbyAnchorExcludingSelf(anchors, point) {
+	if len(anchors) == 0 || len(anchors[newLayerPointKey(point, layer)]) > 1 || hasNearbyAnchorExcludingSelf(anchors, point, layer) {
 		return nil
 	}
 	return []reports.Issue{invalidRouteIssue(path, "route endpoint is not connected to a same-net pad, via, or route endpoint", netIssueNames(netCode, graph.netNames))}
@@ -747,45 +849,53 @@ func appendRepairCategory(suggestion string, category string) string {
 	return suggestion + "; repair category: " + category
 }
 
-func newPointKey(point kicadfiles.Point) pointKey {
-	return pointKey{x: floorBucket(point.X), y: floorBucket(point.Y)}
+func newLayerPointKey(point kicadfiles.Point, layer kicadfiles.BoardLayer) pointKey {
+	return pointKey{x: floorBucket(point.X), y: floorBucket(point.Y), layer: string(layer)}
 }
 
 func floorBucket(value kicadfiles.IU) int64 {
 	return int64(math.Floor(float64(value) / float64(routePointTolerance)))
 }
 
-func hasNearbyAnchor(anchors map[pointKey][]string, point kicadfiles.Point) bool {
-	key := newPointKey(point)
+func forEachNearbyLayerPointKey(key pointKey, visit func(pointKey)) {
 	for dx := int64(-1); dx <= 1; dx++ {
 		for dy := int64(-1); dy <= 1; dy++ {
-			if len(anchors[pointKey{x: key.x + dx, y: key.y + dy}]) > 0 {
-				return true
+			if dx == 0 && dy == 0 {
+				continue
 			}
+			visit(pointKey{x: key.x + dx, y: key.y + dy, layer: key.layer})
 		}
 	}
-	return false
 }
 
-func hasNearbyNonPadAnchor(anchors map[pointKey][]string, point kicadfiles.Point) bool {
-	key := newPointKey(point)
-	for dx := int64(-1); dx <= 1; dx++ {
-		for dy := int64(-1); dy <= 1; dy++ {
-			for _, kind := range anchors[pointKey{x: key.x + dx, y: key.y + dy}] {
-				if kind != "pad" {
-					return true
+func padHasNearbyNonPadAnchor(anchors map[pointKey][]string, pad connectivityPad) bool {
+	return len(nearbyNonPadAnchorKeysForPad(anchors, pad)) > 0
+}
+
+func nearbyNonPadAnchorKeysForPad(anchors map[pointKey][]string, pad connectivityPad) []pointKey {
+	var out []pointKey
+	for _, layer := range pad.layers {
+		key := newLayerPointKey(pad.point, layer)
+		for dx := int64(-1); dx <= 1; dx++ {
+			for dy := int64(-1); dy <= 1; dy++ {
+				candidate := pointKey{x: key.x + dx, y: key.y + dy, layer: key.layer}
+				for _, kind := range anchors[candidate] {
+					if kind != "pad" {
+						out = append(out, candidate)
+						break
+					}
 				}
 			}
 		}
 	}
-	return false
+	return out
 }
 
-func hasNearbyAnchorExcludingSelf(anchors map[pointKey][]string, point kicadfiles.Point) bool {
-	key := newPointKey(point)
+func hasNearbyAnchorExcludingSelf(anchors map[pointKey][]string, point kicadfiles.Point, layer kicadfiles.BoardLayer) bool {
+	key := newLayerPointKey(point, layer)
 	for dx := int64(-1); dx <= 1; dx++ {
 		for dy := int64(-1); dy <= 1; dy++ {
-			candidates := anchors[pointKey{x: key.x + dx, y: key.y + dy}]
+			candidates := anchors[pointKey{x: key.x + dx, y: key.y + dy, layer: key.layer}]
 			if len(candidates) == 0 {
 				continue
 			}
@@ -795,4 +905,85 @@ func hasNearbyAnchorExcludingSelf(anchors map[pointKey][]string, point kicadfile
 		}
 	}
 	return false
+}
+
+func padConnectivityLayers(layers []kicadfiles.BoardLayer, boardCopperLayers []kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	return connectivityLayers(layers, boardCopperLayers, false)
+}
+
+func viaConnectivityLayers(layers []kicadfiles.BoardLayer, boardCopperLayers []kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	return connectivityLayers(layers, boardCopperLayers, true)
+}
+
+func connectivityLayers(layers []kicadfiles.BoardLayer, boardCopperLayers []kicadfiles.BoardLayer, expandSpan bool) []kicadfiles.BoardLayer {
+	if len(boardCopperLayers) == 0 {
+		boardCopperLayers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
+	}
+	seen := map[kicadfiles.BoardLayer]struct{}{}
+	var out []kicadfiles.BoardLayer
+	add := func(layer kicadfiles.BoardLayer) {
+		if !isCopperLayer(layer) {
+			return
+		}
+		if _, exists := seen[layer]; exists {
+			return
+		}
+		seen[layer] = struct{}{}
+		out = append(out, layer)
+	}
+	for _, layer := range layers {
+		switch layer {
+		case kicadfiles.LayerAllCu:
+			for _, copperLayer := range boardCopperLayers {
+				add(copperLayer)
+			}
+		default:
+			add(layer)
+		}
+	}
+	if expandSpan && len(layers) >= 2 {
+		expanded := expandCopperLayerSpan(layers[0], layers[len(layers)-1], boardCopperLayers)
+		if len(expanded) > len(out) {
+			out = out[:0]
+			clear(seen)
+			for _, layer := range expanded {
+				add(layer)
+			}
+		}
+	}
+	return out
+}
+
+func copperLayersFromStack(layers []pcbfiles.LayerDefinition) []kicadfiles.BoardLayer {
+	var out []kicadfiles.BoardLayer
+	seen := map[kicadfiles.BoardLayer]struct{}{}
+	for _, layer := range layers {
+		if !isCopperLayer(layer.Name) || layer.Name == kicadfiles.LayerAllCu {
+			continue
+		}
+		if _, exists := seen[layer.Name]; exists {
+			continue
+		}
+		seen[layer.Name] = struct{}{}
+		out = append(out, layer.Name)
+	}
+	if len(out) == 0 {
+		return []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
+	}
+	return out
+}
+
+func expandCopperLayerSpan(start, end kicadfiles.BoardLayer, boardCopperLayers []kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	if start == kicadfiles.LayerAllCu || end == kicadfiles.LayerAllCu {
+		return slices.Clone(boardCopperLayers)
+	}
+	startIndex := slices.Index(boardCopperLayers, start)
+	endIndex := slices.Index(boardCopperLayers, end)
+	if startIndex < 0 || endIndex < 0 {
+		return nil
+	}
+	if startIndex > endIndex {
+		startIndex, endIndex = endIndex, startIndex
+	}
+	return slices.Clone(boardCopperLayers[startIndex : endIndex+1])
 }

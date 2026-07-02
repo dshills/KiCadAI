@@ -39,6 +39,44 @@ func TestBuildBOMRowsSortsAndGroupsDeterministically(t *testing.T) {
 	}
 }
 
+func TestBuildBOMRowsDeduplicatesMultiUnitPhysicalReference(t *testing.T) {
+	unitA := testBOMSymbol("U1", "TL072", "Amplifier_Operational:TL072", "Package_DIP:DIP-8_W7.62mm", "Texas Instruments", "TL072CP")
+	unitA.Unit = 1
+	unitB := unitA
+	unitB.Unit = 2
+	rows, issues := BuildBOMRows(schematicfiles.SchematicFile{Symbols: []schematicfiles.SchematicSymbol{unitA, unitB}})
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v, want none", issues)
+	}
+	if len(rows) != 1 {
+		t.Fatalf("rows = %#v, want one physical BOM row", rows)
+	}
+	if rows[0].Quantity != 1 || strings.Join(rows[0].References, " ") != "U1" {
+		t.Fatalf("multi-unit row = %#v, want U1 quantity 1", rows[0])
+	}
+	cpl := []CPLRow{{Reference: "U1", Footprint: "Package_DIP:DIP-8_W7.62mm", XMM: "10", YMM: "20", Layer: cplSideTop, NormalizedSide: cplSideTop}}
+	summary, consistencyIssues := ValidateBOMCPLConsistency(rows, cpl)
+	if len(consistencyIssues) != 0 || summary.MatchedReferences != 1 {
+		t.Fatalf("consistency summary=%#v issues=%#v, want one clean U1 match", summary, consistencyIssues)
+	}
+}
+
+func TestBuildBOMRowsWarnsOnInconsistentMultiUnitIdentity(t *testing.T) {
+	unitA := testBOMSymbol("U1", "TL072", "Amplifier_Operational:TL072", "Package_DIP:DIP-8_W7.62mm", "Texas Instruments", "TL072CP")
+	unitA.Unit = 1
+	unitB := testBOMSymbol("U1", "TL072", "Amplifier_Operational:TL072", "Package_SO:SOIC-8_3.9x4.9mm", "Texas Instruments", "TL072CP")
+	unitB.Unit = 2
+
+	rows, issues := BuildBOMRows(schematicfiles.SchematicFile{Symbols: []schematicfiles.SchematicSymbol{unitA, unitB}})
+
+	if len(rows) != 1 || rows[0].Quantity != 1 || rows[0].FootprintID != "Package_DIP:DIP-8_W7.62mm" {
+		t.Fatalf("rows = %#v, want first physical U1 row preserved once", rows)
+	}
+	if !hasIssueMessage(issues, "inconsistent value, footprint, or manufacturer identity") {
+		t.Fatalf("issues = %#v, want inconsistent multi-unit identity warning", issues)
+	}
+}
+
 func TestBuildBOMRowsReportsMissingReadinessData(t *testing.T) {
 	rows, issues := BuildBOMRows(schematicfiles.SchematicFile{Symbols: []schematicfiles.SchematicSymbol{
 		{Reference: "U1", Value: "MCU", LibraryID: "MCU:Part"},
@@ -386,6 +424,15 @@ func testBOMSymbol(reference, value, libraryID, footprint, manufacturer, mpn str
 			{Name: "MPN", Value: mpn},
 		},
 	}
+}
+
+func hasIssueMessage(issues []reports.Issue, text string) bool {
+	for _, issue := range issues {
+		if strings.Contains(issue.Message, text) {
+			return true
+		}
+	}
+	return false
 }
 
 func testSchematic() schematicfiles.SchematicFile {

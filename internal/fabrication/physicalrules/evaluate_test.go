@@ -823,6 +823,9 @@ func TestEvaluateBoardWarnsMissingCourtyard(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckCourtyardPresence, StatusWarning)
+
+	report = EvaluateBoard(&board, &project, Options{RequireCourtyard: true})
+	assertCheckStatus(t, report, CheckCourtyardPresence, StatusBlocked)
 }
 
 func TestEvaluateBoardBlocksCourtyardOverlap(t *testing.T) {
@@ -837,6 +840,34 @@ func TestEvaluateBoardBlocksCourtyardOverlap(t *testing.T) {
 	report := EvaluateBoard(&board, &project, Options{})
 
 	assertCheckStatus(t, report, CheckCourtyardOverlap, StatusBlocked)
+}
+
+func TestEvaluateBoardBlocksCourtyardSpacingViolation(t *testing.T) {
+	board := physicalRuleTestBoard()
+	second := board.Footprints[0]
+	second.UUID = kicadfiles.UUID("20000000-0000-4000-8000-000000000003")
+	second.Reference = "U2"
+	second.Position = point(7.2, 5)
+	board.Footprints = append(board.Footprints, second)
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{MinCourtyardSpacingMM: 0.5})
+
+	assertCheckStatus(t, report, CheckCourtyardOverlap, StatusBlocked)
+	check := requireCheck(t, report, CheckCourtyardOverlap)
+	assertMeasurement(t, check, "min_required_courtyard_spacing", 0.5)
+}
+
+func TestEvaluateBoardReportsSilkscreenProfileThresholds(t *testing.T) {
+	board := physicalRuleTestBoard()
+	project := physicalRuleTestProject()
+
+	report := EvaluateBoard(&board, &project, Options{MinSilkPadClearanceMM: 0.15, MinSilkEdgeClearanceMM: 0.2})
+
+	assertCheckStatus(t, report, CheckSilkscreenPadClearance, StatusWarning)
+	assertCheckStatus(t, report, CheckSilkscreenBoardClearance, StatusWarning)
+	assertMeasurement(t, requireCheck(t, report, CheckSilkscreenPadClearance), "min_required_silkscreen_pad_clearance", 0.15)
+	assertMeasurement(t, requireCheck(t, report, CheckSilkscreenBoardClearance), "min_required_silkscreen_edge_clearance", 0.2)
 }
 
 func TestEvaluateBoardBlocksSilkscreenOutsideBoard(t *testing.T) {
