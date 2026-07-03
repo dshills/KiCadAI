@@ -2683,7 +2683,6 @@ type aiLaneStatus struct {
 	ArtifactPaths             []string          `json:"artifact_paths,omitempty"`
 	RepairCategory            repair.Category   `json:"repair_category,omitempty"`
 	RepairBundlePath          string            `json:"repair_bundle_path,omitempty"`
-	RepairCommandArgs         []string          `json:"repair_command_args,omitempty"`
 	SuggestedNextAction       string            `json:"suggested_next_action,omitempty"`
 	RetryAllowed              bool              `json:"retry_allowed"`
 	RetryKey                  string            `json:"retry_key,omitempty"`
@@ -3035,9 +3034,6 @@ func writeAILaneArtifacts(outputDir string, plan intentplanner.PlanResult, draft
 	}
 	if status.RepairBundlePath != "" {
 		retryState["repair_bundle_path"] = status.RepairBundlePath
-	}
-	if len(status.RepairCommandArgs) > 0 {
-		retryState["repair_command_args"] = status.RepairCommandArgs
 	}
 	if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "retry-state.json"), retryState, reports.ArtifactValidationReport, ".kicadai/retry-state.json", "AI lane retry state"); issue != nil {
 		issues = append(issues, *issue)
@@ -3411,7 +3407,6 @@ func applyAILaneRepairGuidance(status *aiLaneStatus, issue reports.Issue, repair
 		status.SuggestedNextAction = aiLaneRepairAction(classification.Category)
 	}
 	if repairBundlePath != "" {
-		status.RepairCommandArgs = []string{"kicadai", "repair", "apply", "--request", repairBundlePath, "--target", repairCommandTargetForBundle(repairBundlePath), "--execute", "--overwrite"}
 		status.SuggestedNextAction = "apply the repair bundle, then rerun validation"
 	}
 }
@@ -3443,15 +3438,6 @@ func repairBundleArtifactPath(artifacts []reports.Artifact) string {
 		}
 	}
 	return ""
-}
-
-func repairCommandTargetForBundle(bundlePath string) string {
-	path := filepath.ToSlash(strings.TrimSpace(bundlePath))
-	dir := filepath.Dir(path)
-	if filepath.Base(dir) == ".kicadai" {
-		return filepath.ToSlash(filepath.Dir(dir))
-	}
-	return filepath.ToSlash(dir)
 }
 
 func joinNonEmptyString(separator string, values ...string) string {

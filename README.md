@@ -235,8 +235,45 @@ Plan or create from structured intent:
 kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_plan --overwrite intent plan
 kicadai --request ./examples/intent/sensor_breakout.json intent explain
 kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
+kicadai --text "make a simple LED indicator board" --output ./out/ai_led --overwrite intent create
 kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
 ```
+
+Use `intent create --overwrite` only for disposable output directories; it
+authorizes KiCadAI to replace generated output at that path. Do not use
+`intent create --overwrite` as the retry-loop default if you need to preserve
+`.kicadai/retry-state.json`; keep separate agent-side retry bookkeeping or
+rerun against the same generated output when tracking automatic retry budgets.
+This warning is about project generation. `repair apply --overwrite` is a
+separate repair command authorization for KiCadAI-managed generated files.
+
+### AI-Controlled Generation Lane
+
+The shortest current path for an AI agent is prompt-driven `intent create`.
+First-lane prompts include simple LED indicator, connector breakout with power
+LED, and 3.3 V I2C sensor breakout requests. "First-lane" means deterministic,
+instrumented, and fail-closed; it does not guarantee `ready` status yet. The
+current LED prompt may stop at a precise placement blocker that requires repair
+or request revision. The command drafts the intent, plans supported blocks,
+runs the deterministic design workflow, and writes `.kicadai/` evidence
+artifacts even when blocked:
+
+```sh
+kicadai --text "make a simple LED indicator board" --output ./out/ai_led --overwrite intent create
+```
+
+Read `data.ai_status.status` in the CLI JSON response. The file
+`.kicadai/validation-summary.json` contains the `ai_status` object itself, so
+the status field is at the root JSON property `status`; this file is intended
+as the compact persisted status, not a full CLI response wrapper. In short:
+stdout uses `data.ai_status.status`; the file uses `status`. Important statuses
+are `ready`, `candidate`, `blocked`, `needs_clarification`, `unsupported`, and
+`tool_error`. Retryable blockers
+include `retry_allowed`, `retry_key`, `max_automatic_retry_attempts`,
+`current_automatic_retry_attempt`, `repair_category`, optional
+`repair_bundle_path`, and artifact paths. Revalidate after any repair.
+Mains/high-voltage and ambiguous battery prompts fail closed instead of
+guessing.
 
 Run KiCad-backed checks when `kicad-cli` is available:
 

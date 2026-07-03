@@ -375,7 +375,7 @@ Build a reusable library of verified schematic and PCB design fragments.
 
 ### Status
 
-Implemented foundation.
+Implemented foundation with a documented first AI-controlled generation lane.
 
 ### Current Foundation
 
@@ -892,6 +892,19 @@ intent:
 - `intent create` now persists `.kicadai/workflow-result.json` and
   `.kicadai/design-rationale.json` alongside planner artifacts so generated
   targets can be explained after creation.
+- Prompt-driven `intent create` now exposes `data.ai_status` and persists
+  `.kicadai/validation-summary.json`, `.kicadai/retry-state.json`, and
+  `.kicadai/manifest.json` for AI control loops. Status values distinguish
+  `ready`, `candidate`, `blocked`, `needs_clarification`, `unsupported`, and
+  `tool_error`.
+- The first AI-controlled prompt lane is locked down by golden tests for simple
+  LED indicator, connector breakout with power LED, and 3.3 V I2C sensor
+  breakout prompts. Unsafe mains/high-voltage and ambiguous battery prompts
+  fail closed instead of receiving guessed low-voltage defaults.
+- Retryable blockers now include deterministic `retry_key`, repair category,
+  and optional repair bundle path when a generated repair bundle exists.
+  Agents should construct repair apply commands from trusted executable and
+  workspace paths; revalidation remains required after repair.
 - `intent-plan.json` now includes `synthesis`, a deterministic trace with
   topology decisions, bus/target/voltage-domain evidence, component policy
   constraints, value-calculation records, applied/deferred/blocked calculation
@@ -909,6 +922,9 @@ intent:
 
 - Broaden natural-language coverage beyond deterministic seed phrases and add
   future LLM adapter auditing against the draft result shape.
+- Promote the first prompt-driven LED lane from current precise placement
+  blocker to passing/candidate once placement repair or board sizing policy can
+  close the generated placement issue.
 - Expand semantic synthesis beyond the seed MCU template, especially
   resolver-backed MCU alternate functions, additional bus peripherals,
   supported GPIO assignment, and safe external-clock topology generation.

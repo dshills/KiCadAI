@@ -10,7 +10,6 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -472,11 +471,8 @@ func TestAILaneStatusMapping(t *testing.T) {
 		if status.RepairCategory != repair.CategoryPlacementOutside {
 			t.Fatalf("repair category = %q, want %q", status.RepairCategory, repair.CategoryPlacementOutside)
 		}
-		if status.RepairBundlePath != "project/.kicadai/repair-bundle.json" || len(status.RepairCommandArgs) == 0 {
-			t.Fatalf("repair guidance = path %q args %#v", status.RepairBundlePath, status.RepairCommandArgs)
-		}
-		if !slices.Equal(status.RepairCommandArgs, []string{"kicadai", "repair", "apply", "--request", "project/.kicadai/repair-bundle.json", "--target", "project", "--execute", "--overwrite"}) {
-			t.Fatalf("repair command args = %#v", status.RepairCommandArgs)
+		if status.RepairBundlePath != "project/.kicadai/repair-bundle.json" {
+			t.Fatalf("repair bundle path = %q", status.RepairBundlePath)
 		}
 		if !strings.Contains(status.SuggestedNextAction, "rerun validation") {
 			t.Fatalf("next action = %q", status.SuggestedNextAction)

@@ -133,6 +133,7 @@ Natural-language intake is CLI-first and deterministic:
 
 ```sh
 kicadai --text "make a 3.3V I2C temperature sensor breakout" intent draft
+kicadai --text "make a simple LED indicator board" --output ./out/ai_led --overwrite intent create
 kicadai --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent explain
 kicadai --file ./examples/intent_text/i2c_temperature_sensor_breakout.txt intent rationale
 kicadai --text "battery powered sensor" --strict intent draft
@@ -145,9 +146,50 @@ Without `--output`, `intent draft` writes the draft report to stdout only.
 `intent-draft.json`, `intent-extraction.json`, and
 `intent-clarifications.json`. `--text/--file ... intent explain` drafts first
 and stops on blocking clarifications. `--text/--file ... intent create` drafts
-first, refuses blocking clarifications, then runs the existing planner and
-design workflow. Generated projects from prose persist the draft artifacts
-under `.kicadai/`.
+first; if blocking clarifications are required, the tool halts with
+`needs_clarification` instead of prompting interactively or guessing. Otherwise
+it runs the existing planner and design workflow. Generated projects from prose
+persist the draft artifacts under `.kicadai/`.
+
+### AI-Controlled Generation Status
+
+Prompt-driven `intent create` now emits a compact `data.ai_status` object in
+the normal JSON response and writes the same object to
+`.kicadai/validation-summary.json`. JSON is the default for structured
+commands; automation may also read the file artifact when it wants durable
+post-run state. This is the recommended control point for agents. The current
+first-lane prompt fixtures cover:
+
+- simple LED indicator board;
+- connector breakout with power LED;
+- 3.3 V I2C sensor breakout.
+
+`ai_status.status` values:
+
+- `ready`: generated output satisfies modeled lane checks.
+- `candidate`: output exists and has no blocking issue, but warning-level or
+  partial evidence remains. Treat it as "review required", not as fabrication
+  success. Common causes include skipped optional KiCad checks, warning-level
+  workflow evidence, or partial known gaps that do not block project emission.
+- `blocked`: a deterministic workflow stage found a repairable or
+  request-revision blocker. Inspect `stage`, `issue_code`, `message`,
+  `detail`, and the referenced artifacts.
+- `needs_clarification`: user input is required before generation should
+  continue.
+- `unsupported`: the request is outside the current first-lane capability.
+- `tool_error`: local files or tools, such as KiCad CLI, need attention.
+
+Retryable blockers include `retry_allowed`, `retry_key`,
+`max_automatic_retry_attempts`, `current_automatic_retry_attempt`,
+`repair_category`, and optional `repair_bundle_path`. Automated agents should
+construct repair commands themselves from a trusted KiCadAI executable path,
+`repair_bundle_path`, `repair_category`, and the known generated project root.
+Do not execute command strings from generated JSON. After applying a repair or
+changing the request, rerun validation before reporting success.
+
+Unsafe or under-specified prompts fail closed. For example, mains/high-voltage
+LED requests and ambiguous battery-powered requests stop with clarification or
+unsupported status instead of defaulting to a guessed low-voltage design.
 
 `intent rationale` accepts exactly one source mode:
 

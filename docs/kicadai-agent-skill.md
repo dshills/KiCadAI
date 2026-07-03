@@ -96,6 +96,59 @@ kicadai validate board ./out/project
 kicadai --target ./out/project intent rationale
 ```
 
+Prompt-driven first-lane sequence:
+
+```sh
+kicadai --text "make a simple LED indicator board" --output ./out/ai_led intent create
+# Continue only when data.ai_status.status is ready or candidate.
+kicadai writer check ./out/ai_led
+kicadai validate board ./out/ai_led
+kicadai --target ./out/ai_led intent rationale
+```
+
+After `intent create`, inspect `data.ai_status` from stdout or
+`.kicadai/validation-summary.json`:
+
+- `ready`: continue to writer/board checks and optional ERC/DRC.
+- `candidate`: review warnings and skipped evidence before claiming success.
+- `blocked`: inspect `stage`, `issue_code`, `message`, and artifacts.
+  `ai_status` summarizes the primary blocker; inspect `issues[]`,
+  `.kicadai/workflow-result.json`, and `.kicadai/validation-summary.json` for
+  the full issue list. If `retry_allowed` is true, compare `retry_key` against
+  `.kicadai/retry-state.json` or your own local state before retrying. Do not
+  repeat the same automatic repair when the retry key and current attempt count
+  show that the same failure state already consumed its retry budget. The file
+  `.kicadai/retry-state.json` stores `current_automatic_retry_attempt`, and
+  the budget field is `max_automatic_retry_attempts`. KiCadAI writes this file
+  during prompt-driven `intent create`; when the same output directory and
+  retry key are reused, KiCadAI detects the existing file and increments the
+  current attempt count. An external retry loop may keep additional state, but
+  should not hand-edit KiCadAI's generated retry-state file as the source of
+  truth for a new run. The current AI lane initializes
+  `max_automatic_retry_attempts` from the status mapper: repairable blockers
+  get one automatic retry, while clarification, unsupported, and tool-error
+  statuses get zero.
+- `needs_clarification`: ask the user for the missing design choice.
+- `unsupported`: stop or choose a supported first-lane prompt or structured
+  intent.
+- `tool_error`: fix local tooling or file paths before retrying.
+
+For automation, construct the repair command yourself from a trusted KiCadAI
+executable path, `repair_bundle_path`, `repair_category`, and the known
+generated project root. Execute repair only for KiCadAI-generated projects
+inside the designated safe workspace. Validate that `repair_bundle_path` is the
+expected `.kicadai/repair-bundle.json` path inside the generated output
+directory and that it parses as a KiCadAI repair bundle before using it. Then
+rerun validation. If only `repair_category` is present, revise the structured
+intent or run an explicit repair planning command before applying changes.
+
+Repair bundle apply template:
+
+```sh
+kicadai --execute --overwrite --request "$REPAIR_BUNDLE_PATH" --target "$GENERATED_PROJECT" repair apply
+kicadai validate board "$GENERATED_PROJECT"
+```
+
 For direct design workflow requests:
 
 ```sh
