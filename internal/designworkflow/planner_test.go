@@ -86,6 +86,337 @@ func TestPlanBlocksComposesExpandedVerifiedCoverageBlocks(t *testing.T) {
 	assertRequiredRouteSet(t, requiredRoutesByBlock, "reverse_polarity_protection", []string{"diode_to_protected_output", "raw_input_to_diode"})
 }
 
+func TestPlanBlocksSummarizesClassABOutputStageRationale(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_summary",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "coupling", BlockID: "dc_blocking_capacitor"},
+		},
+		Connections: []ConnectionSpec{{From: "output.AMP_OUT", To: "coupling.IN", NetAlias: "AMP_OUT_DC_BIASED"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("PlanBlocks issues = %#v", result.Stage.Issues)
+	}
+	summary, ok := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if !ok {
+		t.Fatalf("amplifier summary = %#v", result.Stage.Summary["amplifier_output_stage"])
+	}
+	if summary.Readiness != "headphone_connectivity" || !summary.DCBlockingPresent {
+		t.Fatalf("summary = %#v", summary)
+	}
+	if !slices.Contains(summary.OutputDevices, "bjt.onsemi.mmbt3904.sot23") {
+		t.Fatalf("output devices = %#v", summary.OutputDevices)
+	}
+	summaries, ok := result.Stage.Summary["amplifier_output_stages"].([]AmplifierOutputStageSummary)
+	if !ok || len(summaries) != 1 {
+		t.Fatalf("amplifier summaries = %#v", result.Stage.Summary["amplifier_output_stages"])
+	}
+}
+
+func TestAmplifierOutputStageSummaryKeepsWarningsOutOfBlockers(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_warning_summary",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{
+				"topology":                  "diode_string",
+				"supply_voltage":            "9V",
+				"load_impedance":            "32Ω",
+				"upper_output_component_id": "bjt.example.power_npn.to220",
+				"lower_output_component_id": "bjt.example.power_pnp.to220",
+			}},
+			{ID: "coupling", BlockID: "dc_blocking_capacitor"},
+		},
+		Connections: []ConnectionSpec{{From: "output.AMP_OUT", To: "coupling.IN", NetAlias: "AMP_OUT_DC_BIASED"}},
+	}
+	summary := amplifierOutputStageSummary(request, []reports.Issue{{
+		Severity: reports.SeverityWarning,
+		Path:     "blocks[0].params",
+		Message:  "style warning",
+	}}, request.Blocks[0], 0, blockIDsByInstanceID(request))
+	if summary.Readiness != "headphone_connectivity" || slices.Contains(summary.Blockers, "style warning") {
+		t.Fatalf("summary = %#v", summary)
+	}
+	if !slices.Contains(summary.Notes, "style warning") {
+		t.Fatalf("notes = %#v", summary.Notes)
+	}
+	if !strings.Contains(strings.Join(summary.Notes, "\n"), "bjt.example.power_npn.to220, bjt.example.power_pnp.to220") {
+		t.Fatalf("notes do not mention selected output devices: %#v", summary.Notes)
+	}
+}
+
+func TestPlanBlocksSummarizesMissingClassABDCBlocking(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_missing_dc_block",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary, ok := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if !ok {
+		t.Fatalf("amplifier summary = %#v", result.Stage.Summary["amplifier_output_stage"])
+	}
+	if summary.Readiness != "blocked" || summary.DCBlockingPresent {
+		t.Fatalf("summary = %#v", summary)
+	}
+	if !slices.Contains(summary.Blockers, "single-supply headphone outputs require a DC blocking capacitor before the load") {
+		t.Fatalf("blockers = %#v", summary.Blockers)
+	}
+}
+
+func TestPlanBlocksSummarizesMultipleClassABOutputStages(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "stereo_class_ab_summary",
+		Board:   BoardSpec{WidthMM: 100, HeightMM: 60, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "left_output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "left_coupling", BlockID: "dc_blocking_capacitor"},
+			{ID: "right_output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+		},
+		Connections: []ConnectionSpec{{From: "left_output.AMP_OUT", To: "left_coupling.IN", NetAlias: "LEFT_DC_BIASED"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	if _, ok := result.Stage.Summary["amplifier_output_stage"]; ok {
+		t.Fatalf("single-stage compatibility summary should be omitted for multiple stages: %#v", result.Stage.Summary)
+	}
+	summaries, ok := result.Stage.Summary["amplifier_output_stages"].([]AmplifierOutputStageSummary)
+	if !ok || len(summaries) != 2 {
+		t.Fatalf("amplifier summaries = %#v", result.Stage.Summary["amplifier_output_stages"])
+	}
+	byInstance := map[string]AmplifierOutputStageSummary{}
+	for _, summary := range summaries {
+		byInstance[summary.InstanceID] = summary
+	}
+	if byInstance["left_output"].Readiness != "headphone_connectivity" || !byInstance["left_output"].DCBlockingPresent {
+		t.Fatalf("left summary = %#v", byInstance["left_output"])
+	}
+	if byInstance["right_output"].Readiness != "blocked" || byInstance["right_output"].DCBlockingPresent {
+		t.Fatalf("right summary = %#v", byInstance["right_output"])
+	}
+}
+
+func TestPlanBlocksRequiresClassABDCBlockingOnOutputConnection(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_unrelated_dc_block",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "unused_coupling", BlockID: "dc_blocking_capacitor"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "blocked" || summary.DCBlockingPresent {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksDetectsClassABDCBlockingOnSameOutputNetAlias(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_dc_block_same_alias",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "series_placeholder", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []any{"A", "B"}}},
+			{ID: "coupling", BlockID: "dc_blocking_capacitor"},
+		},
+		Connections: []ConnectionSpec{
+			{From: "output.AMP_OUT", To: "series_placeholder.A", NetAlias: "AMP_OUT_DC_BIASED"},
+			{From: "series_placeholder.B", To: "coupling.IN", NetAlias: "AMP_OUT_DC_BIASED"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "headphone_connectivity" || !summary.DCBlockingPresent {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksDetectsClassABDCBlockingOnNetOnlyOutputAlias(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_dc_block_net_alias",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "coupling", BlockID: "dc_blocking_capacitor"},
+		},
+		Connections: []ConnectionSpec{
+			{From: "output.AMP_OUT", NetAlias: "AMP_OUT_DC_BIASED"},
+			{From: "coupling.IN", NetAlias: "AMP_OUT_DC_BIASED"},
+		},
+	}
+	if !classABHasOutputCoupling(request, request.Blocks[0], blockIDsByInstanceID(request)) {
+		t.Fatal("expected net-alias-only coupling to be detected by helper")
+	}
+}
+
+func TestPlanBlocksDoesNotRequireClassABDCBlockingForDualRail(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_dual_rail",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "power", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []any{"VCC", "VEE"}}},
+		},
+		Connections: []ConnectionSpec{{From: "power.VEE", To: "output.VEE", NetAlias: "VEE"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary, ok := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if !ok {
+		t.Fatalf("amplifier summary = %#v", result.Stage.Summary["amplifier_output_stage"])
+	}
+	if summary.Readiness != "headphone_connectivity" || slices.Contains(summary.Blockers, "single-supply headphone outputs require a DC blocking capacitor before the load") {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksDetectsDualRailClassABWithoutNetAlias(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_dual_rail_unaliased",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "power", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []any{"VCC", "VEE"}}},
+		},
+		Connections: []ConnectionSpec{{From: "power.VEE", To: "output.VEE"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "headphone_connectivity" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksTreatsVSSAsClassABNegativeRail(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_vss_rail",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "power", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []any{"VDD", "VSS"}}},
+		},
+		Connections: []ConnectionSpec{{From: "power.VSS", To: "output.VEE", NetAlias: "VSS"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "headphone_connectivity" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksTreatsUnaliasedVSSPortAsClassABNegativeRail(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_unaliased_vss_rail",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "power", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []any{"VDD", "VSS"}}},
+		},
+		Connections: []ConnectionSpec{{From: "power.VSS", To: "output.VEE"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "headphone_connectivity" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksDetectsDualRailClassABWithLowercaseVEEEndpoint(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_lowercase_vee_endpoint",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "power", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []any{"VCC", "VEE"}}},
+		},
+		Connections: []ConnectionSpec{{From: "power.VEE", To: "output.vee", NetAlias: "VEE"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "headphone_connectivity" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksRejectsArbitraryClassABVEENetAliasAsNegativeRail(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_unknown_vee_alias",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+		},
+		Connections: []ConnectionSpec{{From: "output.VEE", To: "output.LOAD_REF", NetAlias: "BIAS_REFERENCE"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "blocked" || !slices.Contains(summary.Blockers, "single-supply headphone outputs require a DC blocking capacitor before the load") {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksRejectsNegativeSignalAliasAsClassABNegativeRail(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_negative_signal_alias",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+		},
+		Connections: []ConnectionSpec{{From: "output.VEE", To: "output.LOAD_REF", NetAlias: "-IN"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "blocked" || !slices.Contains(summary.Blockers, "single-supply headphone outputs require a DC blocking capacitor before the load") {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksTreatsAGNDAsClassABLoadReference(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "class_ab_agnd_reference",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+		},
+		Connections: []ConnectionSpec{{From: "output.VEE", To: "output.LOAD_REF", NetAlias: "AGND"}},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["amplifier_output_stage"].(AmplifierOutputStageSummary)
+	if summary.Readiness != "blocked" || !slices.Contains(summary.Blockers, "single-supply headphone outputs require a DC blocking capacitor before the load") {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestIssueBelongsToBlockRejectsNeighborIndex(t *testing.T) {
+	if !issueBelongsToBlock(reports.Issue{Path: "blocks[1].params.load_impedance"}, 1) {
+		t.Fatal("expected exact indexed block path to match")
+	}
+	for _, path := range []string{"blocks[10].params.load_impedance", "blocks[1]0.params.load_impedance", "blocks[1]_suffix.params.load_impedance"} {
+		if issueBelongsToBlock(reports.Issue{Path: path}, 1) {
+			t.Fatalf("path %q should not match block index 1", path)
+		}
+	}
+}
+
 func assertRequiredRouteSet(t *testing.T, routesByBlock map[string][]string, blockID string, want []string) {
 	t.Helper()
 	got, ok := routesByBlock[blockID]
