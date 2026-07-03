@@ -1,0 +1,27 @@
+{
+  "id": "class_ab_headphone_protected",
+  "request": "class_ab_headphone_protected.json",
+  "tier": "block-composition",
+  "readiness": "expected_fail",
+  "acceptance": "connectivity",
+  "require_erc": true,
+  "require_drc": false,
+  "allowlists": [],
+  "expected_artifacts": [
+    ".kicadai/design-promotion.json"
+  ],
+  "expected_stages": [
+    "block_planning",
+    "component_selection",
+    "schematic",
+    "schematic_electrical"
+  ],
+  "known_gaps": [
+    "The protected Class AB headphone path now reaches schematic electrical validation with verified LMV321 op-amp, diode, and output-transistor component selections, but schematic label conflicts block promotion before PCB realization.",
+    "Current schematic electrical blockers are connected-net label conflicts between headphones_SIG and output_amp_out, and between output_lower_emitter and output_upper_emitter. The writer must preserve the requested HP_OUT and AMP_OUT_DC_BIASED intent without conflicting generated local labels.",
+    "Output protection remains connectivity-level: fault_protection_status is placeholder_blocked, active fault protection is not implemented, HP_RET-to-LOAD_REF load-return policy is not promoted, and separated LOAD_REF-to-GND net-tie evidence is not proven.",
+    "Amplifier output transistor evidence remains warning-only for fabrication promotion: power dissipation, thermal review, safe operating area, and bias-diode thermal placement evidence are still review_required.",
+    "PCB realization, placement, routing, writer correctness, board validation, and real KiCad ERC/DRC evidence remain skipped until schematic electrical label conflicts are resolved."
+  ],
+  "notes": "Optional protected Class AB headphone amplifier fixture that captures the first KiCad-backed evidence gap after verified op-amp selection: schematic label conflict cleanup before PCB promotion."
+}

@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -323,6 +324,16 @@ func hasIssueCode(issues []reports.Issue, code reports.Code) bool {
 	return false
 }
 
+func hasSelectedComponentID(selected []map[string]any, id string) bool {
+	for _, item := range selected {
+		componentID, ok := item["component_id"].(string)
+		if ok && componentID == id {
+			return true
+		}
+	}
+	return false
+}
+
 func TestCreateShortCircuitsAfterPlanFailure(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
@@ -368,7 +379,7 @@ func TestCreateComponentSelectionFailureBlocksBeforeWrite(t *testing.T) {
 	}
 }
 
-func TestCreateDraftComponentPolicyAllowsPlaceholder(t *testing.T) {
+func TestCreateDraftComponentPolicySelectsVerifiedOpAmp(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
 		Name:    "draft_opamp",
@@ -387,17 +398,43 @@ func TestCreateDraftComponentPolicyAllowsPlaceholder(t *testing.T) {
 	if stage.Status == StageStatusBlocked {
 		t.Fatalf("draft component stage blocked: %#v", stage)
 	}
-	if !hasIssueCode(stage.Issues, components.CodeComponentUnsafe) {
-		t.Fatalf("expected placeholder warning in %#v", stage.Issues)
+	selected := selectedComponentsFromSummary(t, stage.Summary["selected_components"])
+	if !hasSelectedComponentID(selected, "opamp.ti.lmv321.sot23_5") {
+		t.Fatalf("expected verified LMV321 selection in %#v", selected)
 	}
 }
 
-func TestCreateConnectivityRejectsPlaceholderActiveComponent(t *testing.T) {
+func TestCreateConnectivityAllowsVerifiedOpAmpSelection(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "connectivity")
 	request := Request{
 		Version:    RequestVersion,
 		Name:       "connectivity_opamp",
 		Board:      BoardSpec{WidthMM: 60, HeightMM: 35, Layers: 2},
+		Blocks:     []BlockInstanceSpec{{ID: "gain", BlockID: "opamp_gain_stage"}},
+		Validation: ValidationSpec{Acceptance: AcceptanceStructural, SkipRouting: true},
+	}
+	result := Create(context.Background(), request, CreateOptions{OutputDir: output})
+	stage, ok := stageByName(result, StageComponentSelection)
+	if !ok {
+		t.Fatalf("component selection stage missing: %#v", result.Stages)
+	}
+	if stage.Status == StageStatusBlocked {
+		t.Fatalf("component stage blocked unexpectedly: %#v", stage)
+	}
+	selected := selectedComponentsFromSummary(t, stage.Summary["selected_components"])
+	if !hasSelectedComponentID(selected, "opamp.ti.lmv321.sot23_5") {
+		t.Fatalf("expected verified LMV321 selection in %#v", selected)
+	}
+}
+
+func TestCreateConnectivityRejectsPlaceholderActiveComponent(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "connectivity_placeholder")
+	catalogDir := writeUnsafeOpAmpCatalog(t)
+	request := Request{
+		Version:    RequestVersion,
+		Name:       "connectivity_placeholder",
+		Board:      BoardSpec{WidthMM: 60, HeightMM: 35, Layers: 2},
+		Components: ComponentPolicySpec{CatalogDir: catalogDir},
 		Blocks:     []BlockInstanceSpec{{ID: "gain", BlockID: "opamp_gain_stage"}},
 		Validation: ValidationSpec{Acceptance: AcceptanceStructural, SkipRouting: true},
 	}
@@ -415,6 +452,38 @@ func TestCreateConnectivityRejectsPlaceholderActiveComponent(t *testing.T) {
 	if _, err := os.Stat(output); !os.IsNotExist(err) {
 		t.Fatalf("output dir stat err = %v, want not exist", err)
 	}
+}
+
+func writeUnsafeOpAmpCatalog(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	data, err := json.Marshal(map[string]any{
+		"version":  "0.1.0",
+		"families": []map[string]any{{"id": "opamp", "name": "Operational Amplifier"}},
+		"records": []map[string]any{{
+			"id":      "opamp.ti.lmv321.sot23_5",
+			"family":  "opamp",
+			"name":    "Placeholder LMV321",
+			"generic": true,
+			"symbols": []map[string]any{{
+				"symbol_id":    "Amplifier_Operational:LMV321",
+				"verification": map[string]any{"confidence": "placeholder"},
+			}},
+			"packages": []map[string]any{{
+				"id":           "sot23_5",
+				"footprint_id": "Package_TO_SOT_SMD:SOT-23-5",
+				"verification": map[string]any{"confidence": "placeholder"},
+			}},
+			"verification": map[string]any{"confidence": "placeholder"},
+		}},
+	})
+	if err != nil {
+		t.Fatalf("marshal unsafe opamp catalog: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "catalog.json"), data, 0o644); err != nil {
+		t.Fatalf("write unsafe opamp catalog: %v", err)
+	}
+	return dir
 }
 
 func TestCreateComponentSelectionSummaryCarriesMetadata(t *testing.T) {
