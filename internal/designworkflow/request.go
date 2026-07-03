@@ -330,6 +330,16 @@ func normalizeRoutingRetryPolicy(policy RoutingRetryPolicySpec) RoutingRetryPoli
 	return policy
 }
 
+func EnableGeneratedRoutingRetry(request *Request, minAttempts int) {
+	if request == nil {
+		return
+	}
+	request.RoutingRetry.Enabled = true
+	if request.RoutingRetry.MaxAttempts < minAttempts {
+		request.RoutingRetry.MaxAttempts = minAttempts
+	}
+}
+
 func ValidateRequest(request Request) []reports.Issue {
 	request = NormalizeRequest(request)
 	var issues []reports.Issue

@@ -130,6 +130,17 @@ func TestNormalizeRequestEnabledRoutingRetryIsBounded(t *testing.T) {
 	}
 }
 
+func TestEnableGeneratedRoutingRetrySetsMinimumAttempts(t *testing.T) {
+	request := validRequest()
+	request.RoutingRetry.MaxAttempts = 1
+
+	EnableGeneratedRoutingRetry(&request, 2)
+
+	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 2 {
+		t.Fatalf("routing retry = %#v", request.RoutingRetry)
+	}
+}
+
 func TestValidateRequestRejectsInvalidRoutingRetryPolicy(t *testing.T) {
 	request := validRequest()
 	request.RoutingRetry = RoutingRetryPolicySpec{

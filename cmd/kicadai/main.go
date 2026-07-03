@@ -3606,7 +3606,15 @@ func loadIntentPlanForCreate(opts cliOptions) (intentplanner.PlanResult, []repor
 		return intentplanner.PlanResult{Status: intentplanner.PlanStatusNeedsClarification}, issues, draftOutput, text, nil
 	}
 	plan := intentplanner.Plan(draft.Request)
+	enablePromptGeneratedRoutingRetry(&plan)
 	return plan, draft.Issues, draftOutput, text, nil
+}
+
+func enablePromptGeneratedRoutingRetry(plan *intentplanner.PlanResult) {
+	if plan == nil || plan.GeneratedRequest == nil {
+		return
+	}
+	designworkflow.EnableGeneratedRoutingRetry(plan.GeneratedRequest, 2)
 }
 
 func loadIntentPlan(opts cliOptions) (intentplanner.PlanResult, []reports.Issue, error) {

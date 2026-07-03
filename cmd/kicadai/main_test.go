@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -518,13 +519,13 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	}
 }
 
-func TestRunIntentCreateLEDPromptGoldenReachesPlacement(t *testing.T) {
+func TestRunIntentCreateLEDPromptGoldenReachesRouting(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "led_project")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	err := run([]string{"--json", "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
 	if err == nil {
-		t.Fatal("expected current placement validation to report issues")
+		t.Fatal("expected current routing validation to report issues")
 	}
 	var payload struct {
 		Data struct {
@@ -537,7 +538,7 @@ func TestRunIntentCreateLEDPromptGoldenReachesPlacement(t *testing.T) {
 	if payload.Data.AIStatus == nil {
 		t.Fatalf("missing ai_status: %s", stdout.String())
 	}
-	if payload.Data.AIStatus.Status != aiLaneStatusBlocked || payload.Data.AIStatus.Stage != "placement" || payload.Data.AIStatus.IssueCode != reports.CodePlacementOutsideBoard {
+	if payload.Data.AIStatus.Status != aiLaneStatusBlocked || payload.Data.AIStatus.Stage != "routing" || payload.Data.AIStatus.IssueCode != reports.CodeValidationFailed {
 		t.Fatalf("ai_status = %#v", payload.Data.AIStatus)
 	}
 	var workflow struct {
@@ -549,12 +550,19 @@ func TestRunIntentCreateLEDPromptGoldenReachesPlacement(t *testing.T) {
 		"schematic":            string(designworkflow.StageStatusOK),
 		"schematic_electrical": string(designworkflow.StageStatusOK),
 		"pcb_realization":      string(designworkflow.StageStatusOK),
-		"placement":            string(designworkflow.StageStatusBlocked),
+		"placement":            string(designworkflow.StageStatusWarning),
+		"routing":              string(designworkflow.StageStatusBlocked),
 	}
 	for stage, wantStatus := range wantStages {
 		if got := workflowStageStatus(workflow.Stages, stage); got != wantStatus {
 			t.Fatalf("stage %s status = %q, want %q; stages = %#v", stage, got, wantStatus, workflow.Stages)
 		}
+	}
+	if stageHasIssue(workflow.Stages, "placement", reports.CodePlacementOutsideBoard) {
+		t.Fatalf("placement still reports outside-board blocker: %#v", workflow.Stages)
+	}
+	if !stageHasIssueForNet(workflow.Stages, "routing", reports.CodeValidationFailed, "LED_SIG_indicator", "no legal two-layer path found") {
+		t.Fatalf("routing stage missing LED signal route blocker: %#v", workflow.Stages)
 	}
 }
 
@@ -681,9 +689,10 @@ func readJSONFile(t *testing.T, path string, target any) {
 }
 
 type workflowEvidenceStage struct {
-	Name    string         `json:"name"`
-	Status  string         `json:"status"`
-	Summary map[string]any `json:"summary"`
+	Name    string          `json:"name"`
+	Status  string          `json:"status"`
+	Summary map[string]any  `json:"summary"`
+	Issues  []reports.Issue `json:"issues"`
 }
 
 func workflowStageStatus(stages []workflowEvidenceStage, name string) string {
@@ -693,6 +702,34 @@ func workflowStageStatus(stages []workflowEvidenceStage, name string) string {
 		}
 	}
 	return ""
+}
+
+func stageHasIssue(stages []workflowEvidenceStage, name string, code reports.Code) bool {
+	for _, stage := range stages {
+		if stage.Name != name {
+			continue
+		}
+		for _, issue := range stage.Issues {
+			if issue.Code == code {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func stageHasIssueForNet(stages []workflowEvidenceStage, name string, code reports.Code, net string, message string) bool {
+	for _, stage := range stages {
+		if stage.Name != name {
+			continue
+		}
+		for _, issue := range stage.Issues {
+			if issue.Code == code && strings.Contains(issue.Message, message) && slices.Contains(issue.Nets, net) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 type componentEvidenceOverride struct {
