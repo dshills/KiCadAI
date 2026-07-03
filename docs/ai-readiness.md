@@ -93,7 +93,7 @@ minimum matrix coverage expected for a domain.
 
 ## Amplifier Coverage
 
-The initial `amplifier` matrix covers:
+The `amplifier` matrix covers:
 
 - verified op-amp drive and stability choices;
 - Class A/Class AB output devices;
@@ -104,9 +104,13 @@ The initial `amplifier` matrix covers:
 - KiCad-backed amplifier promotion evidence;
 - AI-facing amplifier design-limit documentation.
 
-These records are mostly `missing` or `draft`. They are not claims that
-amplifier generation is fabrication-ready. They are a queue of work needed to
-make that claim defensible.
+Several amplifier records have now reached `connectivity` for the narrow
+low-voltage headphone slice: seeded MMBT3904/MMBT3906 output devices,
+diode-string Class AB output-stage realization, single-supply DC-blocking
+diagnostics, and AI-facing design-limit notes. These are not claims that
+amplifier generation is fabrication-ready. The remaining queue is SOA and
+thermal evidence, load-safety and fault-protection policy, analog
+stability/layout proof, and KiCad ERC/DRC promotion evidence.
 
 ## Validation
 
