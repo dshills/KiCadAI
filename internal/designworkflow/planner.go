@@ -80,18 +80,18 @@ type AmplifierOutputStageSummary struct {
 
 func amplifierOutputStageSummaries(request Request, issues []reports.Issue) []AmplifierOutputStageSummary {
 	var summaries []AmplifierOutputStageSummary
-	blockIDsByInstance := blockIDsByInstanceID(request)
+	blocksByInstance := blocksByInstanceID(request)
 	for index, instance := range request.Blocks {
 		switch instance.BlockID {
 		case "class_ab_output_stage":
-			summaries = append(summaries, amplifierOutputStageSummary(request, issues, instance, index, blockIDsByInstance))
+			summaries = append(summaries, amplifierOutputStageSummary(request, issues, instance, index, blocksByInstance))
 		}
 	}
 	return summaries
 }
 
-func amplifierOutputStageSummary(request Request, issues []reports.Issue, stage BlockInstanceSpec, stageIndex int, blockIDsByInstance map[string]string) AmplifierOutputStageSummary {
-	dcBlockingPresent := classABHasOutputCoupling(request, stage, blockIDsByInstance)
+func amplifierOutputStageSummary(request Request, issues []reports.Issue, stage BlockInstanceSpec, stageIndex int, blocksByInstance map[string]BlockInstanceSpec) AmplifierOutputStageSummary {
+	dcBlockingPresent := classABHasOutputCoupling(request, stage, blocksByInstance)
 	summary := AmplifierOutputStageSummary{
 		InstanceID:    stage.ID,
 		BlockID:       stage.BlockID,
@@ -154,7 +154,7 @@ func classABRequiresDCBlocking(request Request, stage BlockInstanceSpec) bool {
 	return true
 }
 
-func classABHasOutputCoupling(request Request, stage BlockInstanceSpec, blockIDsByInstance map[string]string) bool {
+func classABHasOutputCoupling(request Request, stage BlockInstanceSpec, blocksByInstance map[string]BlockInstanceSpec) bool {
 	outputAliases := map[string]struct{}{}
 	dcBlockAliases := map[string]struct{}{}
 	for _, connection := range request.Connections {
@@ -162,8 +162,8 @@ func classABHasOutputCoupling(request Request, stage BlockInstanceSpec, blockIDs
 		to, toOK := ParseEndpoint(connection.To)
 		fromIsOutput := fromOK && endpointIsClassABOutput(from, stage)
 		toIsOutput := toOK && endpointIsClassABOutput(to, stage)
-		fromIsDCBlock := fromOK && endpointIsDCBlock(from, blockIDsByInstance)
-		toIsDCBlock := toOK && endpointIsDCBlock(to, blockIDsByInstance)
+		fromIsDCBlock := fromOK && endpointIsDCBlock(from, blocksByInstance)
+		toIsDCBlock := toOK && endpointIsDCBlock(to, blocksByInstance)
 		if fromIsOutput && toIsDCBlock {
 			return true
 		}
@@ -189,20 +189,98 @@ func classABHasOutputCoupling(request Request, stage BlockInstanceSpec, blockIDs
 	return false
 }
 
-func blockIDsByInstanceID(request Request) map[string]string {
-	blockIDs := make(map[string]string, len(request.Blocks))
+func blocksByInstanceID(request Request) map[string]BlockInstanceSpec {
+	instances := make(map[string]BlockInstanceSpec, len(request.Blocks))
 	for _, instance := range request.Blocks {
-		blockIDs[instance.ID] = instance.BlockID
+		instances[instance.ID] = instance
 	}
-	return blockIDs
+	return instances
 }
 
 func endpointIsClassABOutput(endpoint blocks.PortRef, stage BlockInstanceSpec) bool {
 	return endpoint.InstanceID == stage.ID && strings.EqualFold(endpoint.Port, "AMP_OUT")
 }
 
-func endpointIsDCBlock(endpoint blocks.PortRef, blockIDsByInstance map[string]string) bool {
-	return blockIDsByInstance[endpoint.InstanceID] == "dc_blocking_capacitor"
+func endpointIsDCBlock(endpoint blocks.PortRef, blocksByInstance map[string]BlockInstanceSpec) bool {
+	instance, ok := blocksByInstance[endpoint.InstanceID]
+	if !ok {
+		return false
+	}
+	switch instance.BlockID {
+	case "dc_blocking_capacitor":
+		return hasPositiveCapacitance(instance, "capacitance", "220uF")
+	case "headphone_output_protection":
+		return strings.EqualFold(endpoint.Port, "AMP_OUT") && headphoneProtectionHasDCBlocking(instance)
+	default:
+		return false
+	}
+}
+
+func headphoneProtectionHasDCBlocking(instance BlockInstanceSpec) bool {
+	coupling := strings.TrimSpace(stringParamSummaryDefault(instance.Params, "coupling", "ac_coupled_required"))
+	if coupling == "dual_rail_direct_review_required" {
+		return false
+	}
+	return hasPositiveCapacitance(instance, "dc_blocking_capacitance", "220uF")
+}
+
+func hasPositiveCapacitance(instance BlockInstanceSpec, key string, defaultValue string) bool {
+	capacitance := strings.TrimSpace(stringParamSummaryDefault(instance.Params, key, defaultValue))
+	if capacitance == "" {
+		return false
+	}
+	return hasPositiveNumericPrefix(capacitance)
+}
+
+func hasPositiveNumericPrefix(value string) bool {
+	number, ok := numericPrefix(value)
+	return ok && number > 0
+}
+
+func numericPrefix(value string) (float64, bool) {
+	value = strings.TrimSpace(value)
+	end := 0
+	if end < len(value) && (value[end] == '+' || value[end] == '-') {
+		end++
+	}
+	mantissaStart := end
+	dotSeen := false
+	for end < len(value) {
+		char := value[end]
+		if char >= '0' && char <= '9' {
+			end++
+			continue
+		}
+		if char == '.' && !dotSeen {
+			dotSeen = true
+			end++
+			continue
+		}
+		break
+	}
+	if end == mantissaStart || value[mantissaStart:end] == "." {
+		return 0, false
+	}
+	numberEnd := end
+	if end < len(value) && (value[end] == 'e' || value[end] == 'E') {
+		exponentEnd := end + 1
+		if exponentEnd < len(value) && (value[exponentEnd] == '+' || value[exponentEnd] == '-') {
+			exponentEnd++
+		}
+		exponentDigitsStart := exponentEnd
+		for exponentEnd < len(value) {
+			char := value[exponentEnd]
+			if char < '0' || char > '9' {
+				break
+			}
+			exponentEnd++
+		}
+		if exponentEnd > exponentDigitsStart {
+			numberEnd = exponentEnd
+		}
+	}
+	number, err := strconv.ParseFloat(value[:numberEnd], 64)
+	return number, err == nil
 }
 
 func issueBelongsToBlock(issue reports.Issue, blockIndex int) bool {

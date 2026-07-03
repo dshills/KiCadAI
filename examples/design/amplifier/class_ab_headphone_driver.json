@@ -50,11 +50,15 @@
       }
     },
     {
-      "id": "output_coupling",
-      "block_id": "dc_blocking_capacitor",
+      "id": "output_protection",
+      "block_id": "headphone_output_protection",
       "params": {
-        "capacitance": "220uF",
-        "capacitor_footprint": "Capacitor_SMD:C_1210_3225Metric"
+        "load_kind": "headphone",
+        "nominal_load_ohms": "32Ω",
+        "dc_blocking_capacitance": "220uF",
+        "bleed_resistor_ohms": "100kΩ",
+        "connector_return_policy": "load_ref",
+        "fault_protection_status": "placeholder_blocked"
       }
     },
     {
@@ -71,9 +75,10 @@
     {"from": "gain.OUT", "to": "output.DRIVER_OUT", "net_alias": "DRIVER_OUT"},
     {"from": "gain.VCC", "to": "output.VCC", "net_alias": "VCC"},
     {"from": "gain.GND", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"},
-    {"from": "output.AMP_OUT", "to": "output_coupling.IN", "net_alias": "AMP_OUT_DC_BIASED"},
-    {"from": "output_coupling.OUT", "to": "headphones.SIG", "net_alias": "HP_OUT"},
-    {"from": "output.LOAD_REF", "to": "headphones.RET", "net_alias": "LOAD_REF"},
+    {"from": "output.AMP_OUT", "to": "output_protection.AMP_OUT", "net_alias": "AMP_OUT_DC_BIASED"},
+    {"from": "output_protection.HP_OUT", "to": "headphones.SIG", "net_alias": "HP_OUT"},
+    {"from": "output.LOAD_REF", "to": "output_protection.LOAD_REF", "net_alias": "LOAD_REF"},
+    {"from": "output_protection.LOAD_RET", "to": "headphones.RET", "net_alias": "HP_RET"},
     {"from": "power.VCC", "to": "gain.VCC", "net_alias": "VCC"},
     {"from": "power.VCC", "to": "output.VCC", "net_alias": "VCC"},
     {"from": "power.LOAD_REF", "to": "gain.GND", "net_alias": "LOAD_REF"},
