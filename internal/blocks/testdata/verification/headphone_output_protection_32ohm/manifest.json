@@ -16,12 +16,64 @@
     }
   },
   "expected": {
-    "evidence_level": "definition_only",
+    "evidence_level": "schematic_verified",
+    "references": ["C1", "R1", "TP1"],
+    "components": [
+      {
+        "role": "dc_blocking_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C_Polarized",
+        "footprint_id": "Capacitor_SMD:C_1210_3225Metric"
+      },
+      {
+        "role": "bleed_resistor",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "load_return_anchor",
+        "ref_prefix": "TP",
+        "symbol_id": "Connector:TestPoint",
+        "footprint_id": "TestPoint:TestPoint_Pad_D1.0mm"
+      }
+    ],
     "ports": [
-      {"name": "AMP_OUT", "direction": "input"},
-      {"name": "HP_OUT", "direction": "output"},
-      {"name": "LOAD_RET", "direction": "passive"},
-      {"name": "LOAD_REF", "direction": "passive"}
+      {"name": "AMP_OUT", "direction": "input", "net": "hp_protect_amp_out_dc_biased"},
+      {"name": "HP_OUT", "direction": "output", "net": "hp_protect_hp_out"},
+      {"name": "LOAD_RET", "direction": "passive", "net": "hp_protect_load_ret"},
+      {"name": "LOAD_REF", "direction": "passive", "net": "hp_protect_load_ref"}
+    ],
+    "nets": [
+      {
+        "name": "hp_protect_amp_out_dc_biased",
+        "visibility": "exported",
+        "pins": [
+          {"role": "dc_blocking_capacitor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_protect_hp_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "dc_blocking_capacitor", "pin": "2"},
+          {"role": "bleed_resistor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_protect_load_ref",
+        "visibility": "exported",
+        "pins": [
+          {"role": "bleed_resistor", "pin": "2"}
+        ]
+      },
+      {
+        "name": "hp_protect_load_ret",
+        "visibility": "exported",
+        "pins": [
+          {"role": "load_return_anchor", "pin": "1"}
+        ]
+      }
     ]
   }
 }

@@ -90,9 +90,117 @@ func instantiateHeadphoneOutputProtection(definition BlockDefinition, request Bl
 	defaulted := ApplyParameterDefaults(definition, params)
 	issues = append(issues, validateHeadphoneOutputProtectionParams(defaulted)...)
 	definition = headphoneOutputProtectionDefinitionForParams(definition, defaulted)
-	output := dryRunBlockOutput(definition, request, nil, issues)
+	if hasBlockingIssues(issues) {
+		output := dryRunBlockOutput(definition, request, nil, issues)
+		output.Instance.Params = defaulted
+		return output
+	}
+	operations, refs, nets, operationIssues := headphoneOutputProtectionOperations(definition, request, defaulted)
+	issues = append(issues, operationIssues...)
+	output := dryRunBlockOutput(definition, request, operations, issues)
 	output.Instance.Params = defaulted
+	output.Instance.Refs = refs
+	output.Instance.Nets = nets
 	return output
+}
+
+func headphoneOutputProtectionOperations(definition BlockDefinition, request BlockRequest, params map[string]any) ([]transactions.Operation, []string, []string, []reports.Issue) {
+	componentsByRole := blockComponentByRole(definition.Components)
+	allocator := NewInstanceReferenceAllocator(request.InstanceID)
+	capRef := allocator.Next("C")
+	loadReturnRef := allocator.Next("TP")
+	seriesOhms, seriesOK := parseUnit(params["series_resistor_ohms"], "Ω", resistanceMultipliers())
+	if !seriesOK {
+		return nil, nil, nil, []reports.Issue{blockIssue("params.series_resistor_ohms", "series_resistor_ohms must be a resistance literal")}
+	}
+	includeSeries := seriesOhms > 0
+	seriesRef := ""
+	if includeSeries {
+		seriesRef = allocator.Next("R")
+	}
+	includeBleed := boolParam(params, "bleed_required", true)
+	bleedRef := ""
+	if includeBleed {
+		bleedRef = allocator.Next("R")
+	}
+	requiredRoles := []string{"dc_blocking_capacitor", "load_return_anchor"}
+	if includeSeries {
+		requiredRoles = append(requiredRoles, "series_resistor")
+	}
+	if includeBleed {
+		requiredRoles = append(requiredRoles, "bleed_resistor")
+	}
+	var issues []reports.Issue
+	for _, role := range requiredRoles {
+		if _, ok := componentsByRole[role]; !ok {
+			issues = append(issues, blockIssue("component."+role, "component metadata is required"))
+		}
+	}
+	if len(issues) != 0 {
+		return nil, nil, nil, issues
+	}
+
+	var operations []transactions.Operation
+	refs := []string{capRef}
+	addComponent := func(role string, ref string, point transactions.Point) {
+		component := componentsByRole[role]
+		componentOps, componentIssues := ComponentOperations(component, ref, point)
+		issues = append(issues, componentIssues...)
+		operations = append(operations, componentOps...)
+	}
+	addComponent("dc_blocking_capacitor", capRef, transactions.Point{XMM: 10, YMM: 0})
+	if includeSeries {
+		addComponent("series_resistor", seriesRef, transactions.Point{XMM: 25, YMM: 0})
+		refs = append(refs, seriesRef)
+	}
+	if includeBleed {
+		addComponent("bleed_resistor", bleedRef, transactions.Point{XMM: 28, YMM: 10})
+		refs = append(refs, bleedRef)
+	}
+	addComponent("load_return_anchor", loadReturnRef, transactions.Point{XMM: 38, YMM: 14})
+	refs = append(refs, loadReturnRef)
+
+	ampNet := InstanceNetName(request.InstanceID, "amp_out_dc_biased")
+	coupledNet := InstanceNetName(request.InstanceID, "coupled_output")
+	hpNet := InstanceNetName(request.InstanceID, "hp_out")
+	loadRefNet := InstanceNetName(request.InstanceID, "load_ref")
+	loadRetNet := InstanceNetName(request.InstanceID, "load_ret")
+	appendConnectOperation(&operations, &issues, request.InstanceID, "AMP_OUT", capRef, "1", ampNet)
+	if includeSeries {
+		appendConnectOperation(&operations, &issues, capRef, "2", seriesRef, "1", coupledNet)
+		appendConnectOperation(&operations, &issues, seriesRef, "2", request.InstanceID, "HP_OUT", hpNet)
+	} else {
+		appendConnectOperation(&operations, &issues, capRef, "2", request.InstanceID, "HP_OUT", hpNet)
+	}
+	if includeBleed {
+		if includeSeries {
+			appendConnectOperation(&operations, &issues, seriesRef, "2", bleedRef, "1", hpNet)
+		} else {
+			appendConnectOperation(&operations, &issues, capRef, "2", bleedRef, "1", hpNet)
+		}
+		appendConnectOperation(&operations, &issues, bleedRef, "2", request.InstanceID, "LOAD_REF", loadRefNet)
+	}
+	appendConnectOperation(&operations, &issues, request.InstanceID, "LOAD_RET", loadReturnRef, "1", loadRetNet)
+
+	for _, label := range []struct {
+		text string
+		at   transactions.Point
+	}{
+		{text: ampNet, at: transactions.Point{XMM: 0, YMM: -3}},
+		{text: hpNet, at: transactions.Point{XMM: 36, YMM: -3}},
+		{text: loadRefNet, at: transactions.Point{XMM: 30, YMM: 17}},
+		{text: loadRetNet, at: transactions.Point{XMM: 38, YMM: 10}},
+	} {
+		appendLabelOperation(&operations, &issues, label.text, label.at)
+	}
+	nets := []string{ampNet, hpNet, loadRetNet}
+	if includeSeries {
+		nets = append(nets, coupledNet)
+	}
+	if includeBleed {
+		nets = append(nets, loadRefNet)
+	}
+	return operations, refs, nets, issues
 }
 
 func headphoneOutputProtectionDefinitionForParams(definition BlockDefinition, params map[string]any) BlockDefinition {

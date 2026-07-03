@@ -163,7 +163,7 @@
       {
         "case_id": "headphone_output_protection_32ohm",
         "block_id": "headphone_output_protection",
-        "evidence_level": "definition_only",
+        "evidence_level": "schematic_verified",
         "status": "pass",
         "stages": [
           {
