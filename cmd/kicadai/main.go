@@ -2681,6 +2681,9 @@ type aiLaneStatus struct {
 	Message                   string            `json:"message"`
 	Detail                    string            `json:"detail,omitempty"`
 	ArtifactPaths             []string          `json:"artifact_paths,omitempty"`
+	RepairCategory            repair.Category   `json:"repair_category,omitempty"`
+	RepairBundlePath          string            `json:"repair_bundle_path,omitempty"`
+	RepairCommandArgs         []string          `json:"repair_command_args,omitempty"`
 	SuggestedNextAction       string            `json:"suggested_next_action,omitempty"`
 	RetryAllowed              bool              `json:"retry_allowed"`
 	RetryKey                  string            `json:"retry_key,omitempty"`
@@ -3027,6 +3030,15 @@ func writeAILaneArtifacts(outputDir string, plan intentplanner.PlanResult, draft
 		"user_clarification_required":     status.UserClarificationRequired,
 		"current_automatic_retry_attempt": aiLaneRetryAttempt(artifactDir, status.RetryKey),
 	}
+	if status.RepairCategory != "" {
+		retryState["repair_category"] = status.RepairCategory
+	}
+	if status.RepairBundlePath != "" {
+		retryState["repair_bundle_path"] = status.RepairBundlePath
+	}
+	if len(status.RepairCommandArgs) > 0 {
+		retryState["repair_command_args"] = status.RepairCommandArgs
+	}
 	if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "retry-state.json"), retryState, reports.ArtifactValidationReport, ".kicadai/retry-state.json", "AI lane retry state"); issue != nil {
 		issues = append(issues, *issue)
 	} else {
@@ -3167,6 +3179,7 @@ func aiLaneRequestHash(plan intentplanner.PlanResult) string {
 }
 
 func buildAILaneStatus(plan intentplanner.PlanResult, workflow *designworkflow.WorkflowResult, issues []reports.Issue, artifacts []reports.Artifact) aiLaneStatus {
+	repairBundlePath := repairBundleArtifactPath(artifacts)
 	status := aiLaneStatus{
 		Status:              aiLaneStatusReady,
 		Stage:               "validation",
@@ -3225,7 +3238,7 @@ func buildAILaneStatus(plan intentplanner.PlanResult, workflow *designworkflow.W
 		status.Message = issue.Message
 		status.Detail = issue.Suggestion
 		status.SuggestedNextAction = aiLaneNextAction(issue)
-		status.RetryAllowed = aiLaneRetryAllowed(issue)
+		applyAILaneRepairGuidance(&status, issue, repairBundlePath)
 		if status.RetryAllowed {
 			status.MaxAutomaticRetryAttempts = 1
 		}
@@ -3383,13 +3396,73 @@ func aiLaneNextAction(issue reports.Issue) string {
 	}
 }
 
-func aiLaneRetryAllowed(issue reports.Issue) bool {
-	switch issue.Code {
-	case reports.CodePlacementCollision, reports.CodePlacementOutsideBoard, reports.CodeRouteGraphIncomplete, reports.CodeRouteCompletionPartial, reports.CodeRouteContactMiss, reports.CodeRouteContactMissingTarget:
-		return true
-	default:
-		return false
+func applyAILaneRepairGuidance(status *aiLaneStatus, issue reports.Issue, repairBundlePath string) {
+	classification := repair.Classify(issue)
+	status.RepairCategory = classification.Category
+	status.RetryAllowed = classification.Repairable
+	status.Detail = joinNonEmptyString("; ", status.Detail, classification.Reason)
+	if repairBundlePath != "" {
+		status.RepairBundlePath = repairBundlePath
 	}
+	if !classification.Repairable {
+		return
+	}
+	if strings.TrimSpace(issue.Suggestion) == "" {
+		status.SuggestedNextAction = aiLaneRepairAction(classification.Category)
+	}
+	if repairBundlePath != "" {
+		status.RepairCommandArgs = []string{"kicadai", "repair", "apply", "--request", repairBundlePath, "--target", repairCommandTargetForBundle(repairBundlePath), "--execute", "--overwrite"}
+		status.SuggestedNextAction = "apply the repair bundle, then rerun validation"
+	}
+}
+
+func aiLaneRepairAction(category repair.Category) string {
+	switch category {
+	case repair.CategoryPlacementCollision, repair.CategoryPlacementOutside:
+		return "retry with placement repair, then rerun validation"
+	case repair.CategoryUnroutedNet, repair.CategoryRouteClearance:
+		return "retry with routing repair, then rerun validation"
+	case repair.CategoryInvalidNetAssignment, repair.CategoryDisconnectedPad:
+		return "repair net-to-pad assignments, then rerun validation"
+	case repair.CategoryMissingFootprint, repair.CategoryUnknownSymbol:
+		return "select verified library mappings, then rerun validation"
+	case repair.CategoryMissingBoardOutline:
+		return "generate a board outline, then rerun validation"
+	case repair.CategoryZoneUnfilled, repair.CategoryZoneWrongNet:
+		return "repair zone connectivity, refill zones, then rerun validation"
+	default:
+		return fmt.Sprintf("inspect repair classification %q and rerun validation after repair", category)
+	}
+}
+
+func repairBundleArtifactPath(artifacts []reports.Artifact) string {
+	for _, artifact := range artifacts {
+		path := filepath.ToSlash(strings.TrimSpace(artifact.Path))
+		if filepath.Base(path) == "repair-bundle.json" {
+			return path
+		}
+	}
+	return ""
+}
+
+func repairCommandTargetForBundle(bundlePath string) string {
+	path := filepath.ToSlash(strings.TrimSpace(bundlePath))
+	dir := filepath.Dir(path)
+	if filepath.Base(dir) == ".kicadai" {
+		return filepath.ToSlash(filepath.Dir(dir))
+	}
+	return filepath.ToSlash(dir)
+}
+
+func joinNonEmptyString(separator string, values ...string) string {
+	parts := make([]string, 0, len(values))
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed != "" {
+			parts = append(parts, trimmed)
+		}
+	}
+	return strings.Join(parts, separator)
 }
 
 func aiLaneRetryKey(stage string, issue reports.Issue) string {

@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -451,6 +452,34 @@ func TestAILaneStatusMapping(t *testing.T) {
 		status := buildAILaneStatus(intentplanner.PlanResult{Status: intentplanner.PlanStatusReady}, &workflow, []reports.Issue{issue}, nil)
 		if status.Status != aiLaneStatusBlocked || status.Stage != "routing" || !status.RetryAllowed || status.MaxAutomaticRetryAttempts != 1 {
 			t.Fatalf("status = %#v, want retryable routing blocker", status)
+		}
+		if status.RepairCategory != repair.CategoryUnroutedNet {
+			t.Fatalf("repair category = %q, want %q", status.RepairCategory, repair.CategoryUnroutedNet)
+		}
+	})
+	t.Run("repair bundle guidance", func(t *testing.T) {
+		issue := reports.Issue{Code: reports.CodePlacementOutsideBoard, Severity: reports.SeverityError, Path: "components.U1.position", Message: "fixed placement is outside usable board area", Refs: []string{"U1"}}
+		workflow := designworkflow.WorkflowResult{Stages: []designworkflow.StageResult{{
+			Name:   designworkflow.StagePlacement,
+			Status: designworkflow.StageStatusBlocked,
+			Issues: []reports.Issue{issue},
+		}}}
+		artifacts := []reports.Artifact{{Path: "project/.kicadai/repair-bundle.json"}}
+		status := buildAILaneStatus(intentplanner.PlanResult{Status: intentplanner.PlanStatusReady}, &workflow, []reports.Issue{issue}, artifacts)
+		if status.Status != aiLaneStatusBlocked || status.Stage != "placement" || !status.RetryAllowed {
+			t.Fatalf("status = %#v, want retryable placement blocker", status)
+		}
+		if status.RepairCategory != repair.CategoryPlacementOutside {
+			t.Fatalf("repair category = %q, want %q", status.RepairCategory, repair.CategoryPlacementOutside)
+		}
+		if status.RepairBundlePath != "project/.kicadai/repair-bundle.json" || len(status.RepairCommandArgs) == 0 {
+			t.Fatalf("repair guidance = path %q args %#v", status.RepairBundlePath, status.RepairCommandArgs)
+		}
+		if !slices.Equal(status.RepairCommandArgs, []string{"kicadai", "repair", "apply", "--request", "project/.kicadai/repair-bundle.json", "--target", "project", "--execute", "--overwrite"}) {
+			t.Fatalf("repair command args = %#v", status.RepairCommandArgs)
+		}
+		if !strings.Contains(status.SuggestedNextAction, "rerun validation") {
+			t.Fatalf("next action = %q", status.SuggestedNextAction)
 		}
 	})
 	t.Run("candidate warning", func(t *testing.T) {
