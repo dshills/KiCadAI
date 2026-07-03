@@ -365,6 +365,9 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			} else {
 				result = Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
 			}
+			if metadata.ID == "class_ab_headphone_protected" {
+				assertDesignExampleProtectedAmplifierEvidence(t, metadata, outputDir, result)
+			}
 			report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
 			reportJSON, err := MarshalPromotionReportJSON(report)
 			if err != nil {
@@ -375,6 +378,40 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			}
 			assertDesignExamplePromotionMatchesMetadata(t, metadata, report, outputDir, result)
 		})
+	}
+}
+
+func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
+	t.Helper()
+	stage, ok := designExampleStageByName(result, StageBlockPlanning)
+	if !ok {
+		t.Fatalf("%s missing block planning stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	rawSummary, ok := stage.Summary["headphone_output_protection"]
+	if !ok {
+		t.Fatalf("%s missing headphone_output_protection summary:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	summary, ok := rawSummary.(HeadphoneOutputProtectionSummary)
+	if !ok {
+		t.Fatalf("%s headphone_output_protection summary type = %T", metadata.ID, rawSummary)
+	}
+	if summary.InstanceID != "output_protection" || summary.BlockID != "headphone_output_protection" {
+		t.Fatalf("%s protected output identity = %#v", metadata.ID, summary)
+	}
+	if summary.LoadKind != "headphone" || summary.NominalLoadOhms != "32Ω" {
+		t.Fatalf("%s protected output load = %#v", metadata.ID, summary)
+	}
+	if !summary.ACOutputCouplingPresent || summary.DCBlockingCapacitance != "220uF" {
+		t.Fatalf("%s protected output coupling = %#v", metadata.ID, summary)
+	}
+	if summary.BleedPolicyStatus != "present" || summary.SeriesResistorStatus != "omitted" {
+		t.Fatalf("%s protected output resistor policy = %#v", metadata.ID, summary)
+	}
+	if summary.ConnectorReturnStatus != "load_return_and_reference_connected" {
+		t.Fatalf("%s protected output return status = %#v", metadata.ID, summary)
+	}
+	if summary.FaultProtectionStatus != "placeholder_blocked" || summary.Readiness != "connectivity" {
+		t.Fatalf("%s protected output readiness = %#v", metadata.ID, summary)
 	}
 }
 
