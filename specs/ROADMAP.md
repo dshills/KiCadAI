@@ -249,6 +249,28 @@ loop confidence:
 - Do not report "ready" unless writer correctness, board validation, and
   configured KiCad checks agree.
 
+## Parallel Execution Model
+
+Near-term AI-generation work is tracked in the machine-readable AI readiness
+matrix under `data/ai-readiness/matrix/*.json`. Records may declare a
+`parallel_group` and sorted `depends_on` prerequisites so contributors or agents
+can split work without losing promotion order.
+
+Current groups:
+
+- `fixture_promotion`: KiCad-backed fixture promotion and validation evidence.
+- `catalog_block_expansion`: verified component, footprint, pinmap, and block
+  catalog work.
+- `engine_hardening`: placement, routing, layout, and validation engine
+  hardening.
+- `intent_ai_ux`: intent planner and AI orchestration workflow polish.
+- `documentation`: user and agent documentation.
+
+The Go validator rejects unknown groups, dangling dependencies, duplicate
+dependencies, self-dependencies, cycles, and `verified` records whose
+dependencies are not also `verified`. This lets the roadmap support parallel
+implementation while keeping final readiness claims conservative.
+
 ## Priority 1: Verified Component And Part Intelligence
 
 ### Objective

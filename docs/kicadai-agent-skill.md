@@ -368,6 +368,27 @@ Stop and report blockers when:
 Do not work around blockers by editing KiCad files manually unless the user
 explicitly asks for low-level writer changes.
 
+## Parallel Workstreams
+
+Before splitting work across agents or worktrees, inspect
+`data/ai-readiness/matrix/*.json` and the coverage output for
+`parallel_group` and `depends_on` metadata.
+
+Current workstream groups are:
+
+- `fixture_promotion`: KiCad-backed fixture promotion and validation evidence.
+- `catalog_block_expansion`: verified component, footprint, pinmap, and block
+  catalog work.
+- `engine_hardening`: placement, routing, layout, and validation engine
+  hardening.
+- `intent_ai_ux`: intent planner and AI workflow behavior.
+- `documentation`: user and agent documentation.
+
+Treat `depends_on` as a prerequisite edge. Parallel work can begin before every
+dependency is finished, but do not claim a dependent record is `verified` unless
+all dependencies are also `verified`. Cross-group dependencies mean the streams
+need coordination before final promotion.
+
 ## Reporting Contract
 
 When returning results to a user or another agent, include:

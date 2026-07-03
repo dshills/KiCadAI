@@ -29,6 +29,11 @@ Each matrix record describes one gap or evidence target:
 - `evidence_needed`: concrete evidence required before promotion.
 - `next_task`: enum validated by `internal/aireadiness`.
 - `evidence`: required when a record is marked `verified`.
+- `parallel_group`: optional workstream owner for parallel execution planning.
+  Missing values and explicit `unassigned` values are counted as `unassigned`
+  in coverage summaries.
+- `depends_on`: optional sorted list of readiness record IDs that must exist and
+  must be `verified` before this record may be marked `verified`.
 
 Verified records must carry supporting evidence. Evidence that references a
 checked-in artifact must include either a semantic hash or git object ID.
@@ -54,6 +59,21 @@ Current `next_task` values:
 - `verify_layout`
 - `capture_kicad_evidence`
 - `write_docs`
+
+Current `parallel_group` values:
+
+- `unassigned`
+- `fixture_promotion`
+- `catalog_block_expansion`
+- `engine_hardening`
+- `intent_ai_ux`
+- `documentation`
+
+`depends_on` references must use stable record IDs, must be sorted
+alphabetically by full record ID string, must not reference the current record,
+and must form a directed acyclic graph across the fully loaded matrix.
+Cross-group dependencies are allowed, but they mean a workstream is not fully
+independent from the referenced group.
 
 Semantic hashes are intended to be hashes over canonicalized, non-volatile
 representations of generated artifacts. Until a dedicated hash command exists,
@@ -102,9 +122,12 @@ The tests validate:
 - stable ID format;
 - ID/domain/category consistency;
 - duplicate IDs;
+- valid parallel groups;
+- dependency references, ordering, duplicate entries, cycles, and verified
+  dependency readiness;
 - verified records requiring evidence;
 - amplifier requirement coverage;
-- domain coverage summaries.
+- domain coverage summaries, including `by_parallel_group`.
 
 ## Contributor Flow
 
@@ -117,3 +140,5 @@ When adding a component, block, or layout capability for AI generation:
 4. Promote readiness in small steps: `missing` -> `draft` -> `connectivity` ->
    `candidate` -> `verified`.
 5. Keep `requirements/*.json` updated when a domain has mandatory coverage.
+6. Assign `parallel_group` when the record belongs to a known workstream, and
+   use `depends_on` for real prerequisites instead of burying ordering in prose.
