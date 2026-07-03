@@ -1,0 +1,156 @@
+{
+  "id": "class_ab_output_stage_headphone",
+  "block_id": "class_ab_output_stage",
+  "description": "Diode-biased complementary Class AB output stage for a headphone-class load.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "hp_out",
+    "params": {
+      "topology": "diode_string",
+      "supply_voltage": "9V",
+      "load_impedance": "32Ω"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["D1", "D2", "R1", "R2", "R3", "R4", "Q1", "Q2", "TP1"],
+    "components": [
+      {
+        "role": "bias_upper",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D",
+        "footprint_id": "Diode_SMD:D_SOD-123"
+      },
+      {
+        "role": "bias_lower",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D",
+        "footprint_id": "Diode_SMD:D_SOD-123"
+      },
+      {
+        "role": "upper_bias_feed",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "lower_bias_feed",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "upper_emitter_resistor",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_1206_3216Metric"
+      },
+      {
+        "role": "lower_emitter_resistor",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_1206_3216Metric"
+      },
+      {
+        "role": "upper_output",
+        "ref_prefix": "Q",
+        "symbol_id": "Device:Q_NPN_BEC",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23"
+      },
+      {
+        "role": "lower_output",
+        "ref_prefix": "Q",
+        "symbol_id": "Device:Q_PNP_BEC",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23"
+      },
+      {
+        "role": "load_reference",
+        "ref_prefix": "TP",
+        "symbol_id": "Connector:TestPoint",
+        "footprint_id": "TestPoint:TestPoint_Pad_D1.0mm"
+      }
+    ],
+    "ports": [
+      {"name": "DRIVER_OUT", "direction": "input", "net": "hp_out_driver"},
+      {"name": "VCC", "direction": "power", "net": "hp_out_vcc"},
+      {"name": "VEE", "direction": "power", "net": "hp_out_vee"},
+      {"name": "AMP_OUT", "direction": "output", "net": "hp_out_amp_out"},
+      {"name": "LOAD_REF", "direction": "passive", "net": "hp_out_load_ref"}
+    ],
+    "nets": [
+      {
+        "name": "hp_out_driver",
+        "visibility": "exported",
+        "pins": [
+          {"role": "bias_upper", "pin": "2"},
+          {"role": "bias_lower", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_out_upper_drive",
+        "visibility": "local",
+        "pins": [
+          {"role": "upper_bias_feed", "pin": "2"},
+          {"role": "bias_upper", "pin": "1"},
+          {"role": "upper_output", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_out_lower_drive",
+        "visibility": "exported",
+        "pins": [
+          {"role": "bias_lower", "pin": "2"},
+          {"role": "lower_output", "pin": "1"},
+          {"role": "lower_bias_feed", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_out_amp_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "upper_emitter_resistor", "pin": "2"},
+          {"role": "lower_emitter_resistor", "pin": "2"}
+        ]
+      },
+      {
+        "name": "hp_out_upper_emitter",
+        "visibility": "local",
+        "pins": [
+          {"role": "upper_output", "pin": "2"},
+          {"role": "upper_emitter_resistor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_out_lower_emitter",
+        "visibility": "local",
+        "pins": [
+          {"role": "lower_output", "pin": "2"},
+          {"role": "lower_emitter_resistor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_out_vcc",
+        "visibility": "exported",
+        "pins": [
+          {"role": "upper_output", "pin": "3"},
+          {"role": "upper_bias_feed", "pin": "1"}
+        ]
+      },
+      {
+        "name": "hp_out_vee",
+        "visibility": "exported",
+        "pins": [
+          {"role": "lower_output", "pin": "3"},
+          {"role": "lower_bias_feed", "pin": "2"}
+        ]
+      },
+      {
+        "name": "hp_out_load_ref",
+        "visibility": "exported",
+        "pins": [
+          {"role": "load_reference", "pin": "1"}
+        ]
+      }
+    ]
+  }
+}

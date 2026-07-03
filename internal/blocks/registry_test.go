@@ -21,6 +21,7 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 	}
 	want := []string{
 		"canned_oscillator",
+		"class_ab_output_stage",
 		"connector_breakout",
 		"crystal_oscillator",
 		"esd_protection",
@@ -104,6 +105,7 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 		structuralBlocks := map[string]bool{
 			"connector_breakout":          true,
 			"canned_oscillator":           true,
+			"class_ab_output_stage":       true,
 			"crystal_oscillator":          true,
 			"esd_protection":              true,
 			"i2c_sensor":                  true,

@@ -18,6 +18,7 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 	got := manifestIDs(manifests)
 	want := []string{
 		"canned_oscillator_default",
+		"class_ab_output_stage_headphone",
 		"connector_breakout_4pin",
 		"crystal_oscillator_default",
 		"esd_protection_5v",

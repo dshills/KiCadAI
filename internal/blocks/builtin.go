@@ -25,6 +25,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		usbCPowerDefinition(),
 		i2cSensorDefinition(),
 		opampGainStageDefinition(),
+		classABOutputStageDefinition(),
 		connectorBreakoutDefinition(),
 	}
 }

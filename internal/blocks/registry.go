@@ -46,6 +46,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 	registry.instantiators = map[string]BlockInstantiator{
 		"connector_breakout":          instantiateConnectorBreakout,
 		"canned_oscillator":           instantiateCannedOscillator,
+		"class_ab_output_stage":       instantiateClassABOutputStage,
 		"crystal_oscillator":          instantiateCrystalOscillator,
 		"esd_protection":              instantiateESDProtection,
 		"i2c_sensor":                  instantiateI2CSensor,

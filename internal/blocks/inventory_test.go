@@ -62,9 +62,16 @@ func TestAmplifierInventoryDeclaresUnsupportedGaps(t *testing.T) {
 }
 
 func unsupportedAmplifierRoadmapIDs() []string {
+	implemented := map[string]bool{}
+	for _, summary := range NewBuiltinRegistry().ListBlocks() {
+		implemented[summary.ID] = true
+	}
 	var ids []string
 	for _, family := range roadmapBlockFamilies {
 		if len(family.Gaps) == 0 {
+			continue
+		}
+		if implemented[family.ID] {
 			continue
 		}
 		if slices.Contains(family.Tags, "amplifier") {
