@@ -491,6 +491,27 @@ func TestSelectConcreteMLCCBlocksFabricationCandidateWithoutDeratingProof(t *tes
 	assertIssuePath(t, result.Issues, "component.capacitor.murata.grm21br61a106ke19l.0805.capacitor_evidence.effective_capacitance_review")
 }
 
+func TestSelectAmplifierOutputBlocksFabricationCandidateReviewGaps(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "bjt", Package: "sot23", Text: "mmbt3904"},
+		Acceptance:        AcceptanceFabricationCandidate,
+		RequireConcrete:   true,
+		RequireCompanions: true,
+		RequiredRatings: []RequiredRating{
+			{Kind: "collector_current", Value: "20", Unit: "mA"},
+			{Kind: "collector_emitter_voltage", Value: "12", Unit: "V"},
+		},
+	})
+	if result.OK {
+		t.Fatal("expected amplifier output fabrication-candidate selection to block on review evidence")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
+	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.power_dissipation_status")
+	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.thermal_review")
+	assertIssuePath(t, result.Issues, "component.bjt.onsemi.mmbt3904.sot23.amplifier_output_evidence.safe_operating_area_status")
+}
+
 func TestSelectRejectsRegulatorOverCurrent(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	_, result := Select(context.Background(), catalog, SelectionRequest{

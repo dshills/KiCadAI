@@ -596,6 +596,31 @@ func structuredEvidenceReviewIssues(record ComponentRecord, severity reports.Sev
 			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".capacitor_evidence."+review.path, "capacitor "+review.label+" evidence is not proven: "+value))
 		}
 	}
+	if record.AmplifierOutput != nil {
+		if record.AmplifierOutput.FabricationCandidateBlocks {
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".amplifier_output_evidence.fabrication_candidate_blocks", "amplifier output evidence blocks fabrication-candidate use until review is complete"))
+		}
+		for _, review := range []struct {
+			path  string
+			label string
+			value string
+		}{
+			{path: "voltage_rating_status", label: "voltage-rating", value: record.AmplifierOutput.VoltageRatingStatus},
+			{path: "current_rating_status", label: "current-rating", value: record.AmplifierOutput.CurrentRatingStatus},
+			{path: "power_dissipation_status", label: "power-dissipation", value: record.AmplifierOutput.PowerDissipationStatus},
+			{path: "thermal_review", label: "thermal", value: record.AmplifierOutput.ThermalReview},
+			{path: "safe_operating_area_status", label: "SOA", value: record.AmplifierOutput.SafeOperatingAreaStatus},
+		} {
+			value := review.value
+			if value == reviewStatusProven || value == reviewStatusNotApplicable {
+				continue
+			}
+			if value == "" {
+				value = reviewStatusUnknown
+			}
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".amplifier_output_evidence."+review.path, "amplifier output "+review.label+" evidence is not proven: "+value))
+		}
+	}
 	return issues
 }
 

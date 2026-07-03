@@ -130,6 +130,23 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm21br71h104ka01l.0805"), "X7R", true)
 	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm188r71h104ka93d.0603"), "X7R", true)
 	requireCapacitorEvidence(t, requireCatalogRecord(t, catalog, "capacitor.murata.grm21br61a106ke19l.0805"), "X5R", true)
+
+	npn := requireCatalogRecord(t, catalog, "bjt.onsemi.mmbt3904.sot23")
+	requireAmplifierOutputEvidence(t, npn, "npn", true)
+	requireRatingMax(t, npn, "collector_current", "200", "mA")
+	requireRatingMax(t, npn, "collector_emitter_voltage", "40", "V")
+	requireRatingMax(t, npn, "power_dissipation_max", "300", "mW")
+	requireCompanionRole(t, npn, "emitter_resistor")
+
+	pnp := requireCatalogRecord(t, catalog, "bjt.onsemi.mmbt3906.sot23")
+	requireAmplifierOutputEvidence(t, pnp, "pnp", true)
+	requireCompanionRole(t, pnp, "emitter_resistor")
+
+	placeholder := requireCatalogRecord(t, catalog, "bjt.placeholder.npn_power_output.to220")
+	requireAmplifierOutputEvidence(t, placeholder, "npn", true)
+	if placeholder.Verification.Confidence != ConfidenceBlocked {
+		t.Fatalf("power output placeholder confidence = %q, want blocked", placeholder.Verification.Confidence)
+	}
 }
 
 func checkedInCatalogDir(t *testing.T) string {
@@ -246,6 +263,29 @@ func requireCapacitorEvidence(t *testing.T, record *ComponentRecord, dielectric 
 	}
 	if record.Capacitor.FabricationCandidateBlocks != blocksFabrication {
 		t.Fatalf("%s fabrication block = %t, want %t", record.ID, record.Capacitor.FabricationCandidateBlocks, blocksFabrication)
+	}
+}
+
+func requireAmplifierOutputEvidence(t *testing.T, record *ComponentRecord, polarity string, blocksFabrication bool) {
+	t.Helper()
+	if record.AmplifierOutput == nil {
+		t.Fatalf("%s missing amplifier output evidence", record.ID)
+	}
+	evidence := record.AmplifierOutput
+	if evidence.DeviceClass != "bjt" {
+		t.Fatalf("%s device class = %q, want bjt", record.ID, evidence.DeviceClass)
+	}
+	if evidence.Polarity != polarity {
+		t.Fatalf("%s polarity = %q, want %q", record.ID, evidence.Polarity, polarity)
+	}
+	if evidence.Package == "" || evidence.SymbolID == "" || evidence.FootprintID == "" || evidence.PinmapEvidence == "" {
+		t.Fatalf("%s missing package/symbol/footprint/pinmap evidence: %+v", record.ID, evidence)
+	}
+	if evidence.ControlTerminal == "" || evidence.UpperOrLowerTerminal == "" || evidence.OutputTerminal == "" {
+		t.Fatalf("%s missing terminal role mapping: %+v", record.ID, evidence)
+	}
+	if evidence.FabricationCandidateBlocks != blocksFabrication {
+		t.Fatalf("%s fabrication block = %t, want %t", record.ID, evidence.FabricationCandidateBlocks, blocksFabrication)
 	}
 }
 
@@ -706,6 +746,126 @@ func TestValidateCatalogCapacitorEvidenceRejectsMalformedMetadata(t *testing.T) 
 	}
 }
 
+func TestValidateCatalogAmplifierOutputEvidenceRejectsMalformedMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(record *ComponentRecord)
+		path   string
+	}{
+		{
+			name: "missing symbol",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.SymbolID = ""
+			},
+			path: "records[0].amplifier_output_evidence.symbol_id",
+		},
+		{
+			name: "invalid polarity",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.Polarity = "sideways"
+			},
+			path: "records[0].amplifier_output_evidence.polarity",
+		},
+		{
+			name: "missing intended role",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.IntendedRoles = nil
+			},
+			path: "records[0].amplifier_output_evidence.intended_roles",
+		},
+		{
+			name: "invalid thermal status",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.ThermalReview = "maybe"
+			},
+			path: "records[0].amplifier_output_evidence.thermal_review",
+		},
+		{
+			name: "symbol does not match binding",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.SymbolID = "Device:Q_PNP_BEC"
+			},
+			path: "records[0].amplifier_output_evidence.symbol_id",
+		},
+		{
+			name: "footprint does not match package",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.FootprintID = "Package_TO_SOT_THT:TO-220-3_Vertical"
+			},
+			path: "records[0].amplifier_output_evidence.footprint_id",
+		},
+		{
+			name: "pinmap evidence does not match sources",
+			mutate: func(record *ComponentRecord) {
+				record.AmplifierOutput = validAmplifierOutputEvidence()
+				record.AmplifierOutput.PinmapEvidence = "builtin_pinmap:missing"
+			},
+			path: "records[0].amplifier_output_evidence.pinmap_evidence",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			catalog.Records[0].Family = "bjt"
+			catalog.Families = append(catalog.Families, FamilyDefinition{ID: "bjt", Name: "BJT"})
+			catalog.Records[0].Symbols = []SymbolBinding{{
+				SymbolID: "Device:Q_NPN_BEC",
+				FunctionPins: []FunctionPin{
+					{Function: "BASE", SymbolPin: "1", Required: true},
+					{Function: "EMITTER", SymbolPin: "2", Required: true},
+					{Function: "COLLECTOR", SymbolPin: "3", Required: true},
+				},
+				Verification: VerificationRecord{Confidence: ConfidenceVerified, Sources: []string{"builtin_pinmap:Device:Q_NPN_BEC"}, PinMapChecked: true},
+			}}
+			catalog.Records[0].Packages = []PackageVariant{{
+				ID:          "sot23",
+				Name:        "SOT-23",
+				FootprintID: "Package_TO_SOT_SMD:SOT-23",
+				PadFunctions: []PadFunction{
+					{Function: "BASE", Pad: "1"},
+					{Function: "EMITTER", Pad: "2"},
+					{Function: "COLLECTOR", Pad: "3"},
+				},
+				Verification: VerificationRecord{Confidence: ConfidenceVerified, Sources: []string{"builtin_pinmap:Device:Q_NPN_BEC"}, PinMapChecked: true},
+			}}
+			tt.mutate(&catalog.Records[0])
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected validation to fail")
+			}
+			assertIssueCode(t, result.Issues, CodeInvalidMetadata)
+			assertIssuePath(t, result.Issues, tt.path)
+		})
+	}
+}
+
+func validAmplifierOutputEvidence() *AmplifierOutputEvidence {
+	return &AmplifierOutputEvidence{
+		DeviceClass:                "bjt",
+		Polarity:                   "npn",
+		IntendedRoles:              []string{"headphone_output"},
+		Package:                    "SOT-23",
+		SymbolID:                   "Device:Q_NPN_BEC",
+		FootprintID:                "Package_TO_SOT_SMD:SOT-23",
+		PinmapEvidence:             "builtin_pinmap:Device:Q_NPN_BEC",
+		ControlTerminal:            "BASE",
+		UpperOrLowerTerminal:       "COLLECTOR",
+		OutputTerminal:             "EMITTER",
+		VoltageRatingStatus:        "proven",
+		CurrentRatingStatus:        "proven",
+		PowerDissipationStatus:     "review_required",
+		ThermalReview:              "review_required",
+		SafeOperatingAreaStatus:    "review_required",
+		FabricationCandidateBlocks: true,
+	}
+}
+
 func validCatalog() Catalog {
 	return Catalog{
 		Version: CatalogVersion,
@@ -729,7 +889,7 @@ func validCatalog() Catalog {
 					{Function: "A", SymbolPin: "1", Required: true},
 					{Function: "B", SymbolPin: "2", Required: true},
 				},
-				Verification: VerificationRecord{Confidence: ConfidenceRuleInferred},
+				Verification: VerificationRecord{Confidence: ConfidenceRuleInferred, Sources: []string{"builtin_pinmap:Device:R"}},
 			}},
 			Packages: []PackageVariant{{
 				ID:          "0805",
@@ -739,9 +899,9 @@ func validCatalog() Catalog {
 					{Function: "A", Pad: "1"},
 					{Function: "B", Pad: "2"},
 				},
-				Verification: VerificationRecord{Confidence: ConfidenceRuleInferred},
+				Verification: VerificationRecord{Confidence: ConfidenceRuleInferred, Sources: []string{"builtin_pinmap:Device:R"}},
 			}},
-			Verification: VerificationRecord{Confidence: ConfidenceRuleInferred},
+			Verification: VerificationRecord{Confidence: ConfidenceRuleInferred, Sources: []string{"builtin_pinmap:Device:R"}},
 		}},
 	}
 }

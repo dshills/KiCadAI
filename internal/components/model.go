@@ -72,33 +72,34 @@ type FamilyDefinition struct {
 }
 
 type ComponentRecord struct {
-	ID              string                 `json:"id"`
-	Family          string                 `json:"family"`
-	Name            string                 `json:"name"`
-	Description     string                 `json:"description,omitempty"`
-	Generic         bool                   `json:"generic"`
-	Manufacturer    string                 `json:"manufacturer,omitempty"`
-	MPN             string                 `json:"mpn,omitempty"`
-	Lifecycle       string                 `json:"lifecycle,omitempty"`
-	Equivalence     *EquivalenceMetadata   `json:"equivalence,omitempty"`
-	Tags            []string               `json:"tags,omitempty"`
-	Values          []ValueConstraint      `json:"values,omitempty"`
-	Ratings         []RatingConstraint     `json:"ratings,omitempty"`
-	Tolerances      []ToleranceConstraint  `json:"tolerances,omitempty"`
-	Temperature     *TemperatureRange      `json:"temperature,omitempty"`
-	ElectricalRoles []ElectricalRole       `json:"electrical_roles,omitempty"`
-	Symbols         []SymbolBinding        `json:"symbols,omitempty"`
-	Packages        []PackageVariant       `json:"packages,omitempty"`
-	Companions      []CompanionRequirement `json:"companions,omitempty"`
-	DeratingRules   []DeratingRule         `json:"derating_rules,omitempty"`
-	Regulator       *RegulatorEvidence     `json:"regulator_evidence,omitempty"`
-	Capacitor       *CapacitorEvidence     `json:"capacitor_evidence,omitempty"`
-	PlacementHints  []PlacementHint        `json:"placement_hints,omitempty"`
-	RoutingHints    []RoutingHint          `json:"routing_hints,omitempty"`
-	Properties      []SchematicProperty    `json:"properties,omitempty"`
-	SelectionRules  []SelectionRule        `json:"selection_rules,omitempty"`
-	Verification    VerificationRecord     `json:"verification"`
-	SearchText      string                 `json:"-"`
+	ID              string                   `json:"id"`
+	Family          string                   `json:"family"`
+	Name            string                   `json:"name"`
+	Description     string                   `json:"description,omitempty"`
+	Generic         bool                     `json:"generic"`
+	Manufacturer    string                   `json:"manufacturer,omitempty"`
+	MPN             string                   `json:"mpn,omitempty"`
+	Lifecycle       string                   `json:"lifecycle,omitempty"`
+	Equivalence     *EquivalenceMetadata     `json:"equivalence,omitempty"`
+	Tags            []string                 `json:"tags,omitempty"`
+	Values          []ValueConstraint        `json:"values,omitempty"`
+	Ratings         []RatingConstraint       `json:"ratings,omitempty"`
+	Tolerances      []ToleranceConstraint    `json:"tolerances,omitempty"`
+	Temperature     *TemperatureRange        `json:"temperature,omitempty"`
+	ElectricalRoles []ElectricalRole         `json:"electrical_roles,omitempty"`
+	Symbols         []SymbolBinding          `json:"symbols,omitempty"`
+	Packages        []PackageVariant         `json:"packages,omitempty"`
+	Companions      []CompanionRequirement   `json:"companions,omitempty"`
+	DeratingRules   []DeratingRule           `json:"derating_rules,omitempty"`
+	Regulator       *RegulatorEvidence       `json:"regulator_evidence,omitempty"`
+	Capacitor       *CapacitorEvidence       `json:"capacitor_evidence,omitempty"`
+	AmplifierOutput *AmplifierOutputEvidence `json:"amplifier_output_evidence,omitempty"`
+	PlacementHints  []PlacementHint          `json:"placement_hints,omitempty"`
+	RoutingHints    []RoutingHint            `json:"routing_hints,omitempty"`
+	Properties      []SchematicProperty      `json:"properties,omitempty"`
+	SelectionRules  []SelectionRule          `json:"selection_rules,omitempty"`
+	Verification    VerificationRecord       `json:"verification"`
+	SearchText      string                   `json:"-"`
 }
 
 type EquivalenceMetadata struct {
@@ -242,6 +243,26 @@ type CapacitorEvidence struct {
 	FabricationProof           bool   `json:"fabrication_proof,omitempty"`
 	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string `json:"review_note,omitempty"`
+}
+
+type AmplifierOutputEvidence struct {
+	DeviceClass                string   `json:"device_class,omitempty"`
+	Polarity                   string   `json:"polarity,omitempty"`
+	IntendedRoles              []string `json:"intended_roles,omitempty"`
+	Package                    string   `json:"package,omitempty"`
+	SymbolID                   string   `json:"symbol_id,omitempty"`
+	FootprintID                string   `json:"footprint_id,omitempty"`
+	PinmapEvidence             string   `json:"pinmap_evidence,omitempty"`
+	ControlTerminal            string   `json:"control_terminal,omitempty"`
+	UpperOrLowerTerminal       string   `json:"upper_or_lower_terminal,omitempty"`
+	OutputTerminal             string   `json:"output_terminal,omitempty"`
+	VoltageRatingStatus        string   `json:"voltage_rating_status,omitempty"`
+	CurrentRatingStatus        string   `json:"current_rating_status,omitempty"`
+	PowerDissipationStatus     string   `json:"power_dissipation_status,omitempty"`
+	ThermalReview              string   `json:"thermal_review,omitempty"`
+	SafeOperatingAreaStatus    string   `json:"safe_operating_area_status,omitempty"`
+	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string   `json:"review_note,omitempty"`
 }
 
 type PlacementHint struct {

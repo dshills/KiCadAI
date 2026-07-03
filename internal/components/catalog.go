@@ -118,7 +118,8 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 	}
 	seen := map[string]int{}
 	equivalenceGroups := map[string][]equivalenceMember{}
-	for i, record := range catalog.Records {
+	for i := range catalog.Records {
+		record := &catalog.Records[i]
 		path := fmt.Sprintf("records[%d]", i)
 		if strings.TrimSpace(record.ID) == "" {
 			issues = append(issues, NewIssue(CodeInvalidComponentID, reports.SeverityBlocked, path+".id", "component id is required"))
@@ -152,6 +153,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateDeratingRules(path+".derating_rules", record.DeratingRules)...)
 		issues = append(issues, validateRegulatorEvidence(path+".regulator_evidence", record.Regulator)...)
 		issues = append(issues, validateCapacitorEvidence(path+".capacitor_evidence", record.Generic, record.Capacitor)...)
+		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
 		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
 		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
 		issues = append(issues, validateSchematicProperties(path+".properties", record.Properties)...)
@@ -162,7 +164,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 				path:      path,
 				recordID:  record.ID,
 				role:      record.Equivalence.Role,
-				signature: equivalenceSignatureForRecord(record),
+				signature: equivalenceSignatureForRecord(*record),
 			})
 		}
 	}
@@ -246,6 +248,32 @@ type genericConstraint struct {
 	typ  string
 	max  string
 	unit string
+}
+
+type evidenceTextField struct {
+	pathSuffix string
+	value      func(*AmplifierOutputEvidence) string
+	label      string
+}
+
+var amplifierOutputRequiredFields = []evidenceTextField{
+	{pathSuffix: "device_class", value: func(e *AmplifierOutputEvidence) string { return e.DeviceClass }, label: "amplifier output device class"},
+	{pathSuffix: "polarity", value: func(e *AmplifierOutputEvidence) string { return e.Polarity }, label: "amplifier output polarity"},
+	{pathSuffix: "package", value: func(e *AmplifierOutputEvidence) string { return e.Package }, label: "amplifier output package"},
+	{pathSuffix: "symbol_id", value: func(e *AmplifierOutputEvidence) string { return e.SymbolID }, label: "amplifier output symbol ID"},
+	{pathSuffix: "footprint_id", value: func(e *AmplifierOutputEvidence) string { return e.FootprintID }, label: "amplifier output footprint ID"},
+	{pathSuffix: "pinmap_evidence", value: func(e *AmplifierOutputEvidence) string { return e.PinmapEvidence }, label: "amplifier output pinmap evidence"},
+	{pathSuffix: "control_terminal", value: func(e *AmplifierOutputEvidence) string { return e.ControlTerminal }, label: "amplifier output control terminal"},
+	{pathSuffix: "upper_or_lower_terminal", value: func(e *AmplifierOutputEvidence) string { return e.UpperOrLowerTerminal }, label: "amplifier output upper/lower terminal"},
+	{pathSuffix: "output_terminal", value: func(e *AmplifierOutputEvidence) string { return e.OutputTerminal }, label: "amplifier output output terminal"},
+}
+
+var amplifierOutputStatusFields = []evidenceTextField{
+	{pathSuffix: "voltage_rating_status", value: func(e *AmplifierOutputEvidence) string { return e.VoltageRatingStatus }, label: "voltage rating"},
+	{pathSuffix: "current_rating_status", value: func(e *AmplifierOutputEvidence) string { return e.CurrentRatingStatus }, label: "current rating"},
+	{pathSuffix: "power_dissipation_status", value: func(e *AmplifierOutputEvidence) string { return e.PowerDissipationStatus }, label: "power dissipation"},
+	{pathSuffix: "thermal_review", value: func(e *AmplifierOutputEvidence) string { return e.ThermalReview }, label: "thermal review"},
+	{pathSuffix: "safe_operating_area_status", value: func(e *AmplifierOutputEvidence) string { return e.SafeOperatingAreaStatus }, label: "safe operating area"},
 }
 
 func valueConstraintsAsGeneric(values []ValueConstraint) []genericConstraint {
@@ -452,6 +480,114 @@ func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvi
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "generic capacitor records cannot carry fabrication proof"))
 	}
 	return issues
+}
+
+func validateAmplifierOutputEvidence(path string, record *ComponentRecord) []reports.Issue {
+	evidence := record.AmplifierOutput
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	for _, required := range amplifierOutputRequiredFields {
+		fieldPath := path + "." + required.pathSuffix
+		value := required.value(evidence)
+		if issue, ok := validateTrimmedMetadata(fieldPath, value, required.label); ok {
+			issues = append(issues, issue)
+		} else if value == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, fieldPath, required.label+" is required"))
+		}
+	}
+	switch evidence.DeviceClass {
+	case "bjt", "mosfet":
+	default:
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".device_class", "invalid amplifier output device class: "+evidence.DeviceClass))
+	}
+	switch evidence.Polarity {
+	case "npn", "pnp", "n_channel", "p_channel":
+	default:
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".polarity", "invalid amplifier output polarity: "+evidence.Polarity))
+	}
+	if evidence.SymbolID != "" && !recordHasSymbol(record, evidence.SymbolID) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".symbol_id", "amplifier output symbol_id must match a component symbol binding"))
+	}
+	if evidence.FootprintID != "" && !recordHasFootprint(record, evidence.FootprintID) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".footprint_id", "amplifier output footprint_id must match a component package variant"))
+	}
+	if evidence.PinmapEvidence != "" && !strings.HasPrefix(strings.ToLower(evidence.PinmapEvidence), "blocked:") && !recordHasPinmapEvidence(record, evidence.SymbolID, evidence.FootprintID, evidence.PinmapEvidence) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".pinmap_evidence", "amplifier output pinmap_evidence must match the referenced symbol or package verification sources"))
+	}
+	for i, role := range evidence.IntendedRoles {
+		rolePath := fmt.Sprintf("%s.intended_roles[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(rolePath, role, "amplifier output intended role"); ok {
+			issues = append(issues, issue)
+			continue
+		}
+		switch role {
+		case "headphone_output", "bias", "small_signal_driver", "blocked_power_output":
+		case "":
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rolePath, "amplifier output intended role is required"))
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rolePath, "invalid amplifier output intended role: "+role))
+		}
+	}
+	if len(evidence.IntendedRoles) == 0 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".intended_roles", "amplifier output evidence requires at least one intended role"))
+	}
+	for _, status := range amplifierOutputStatusFields {
+		fieldPath := path + "." + status.pathSuffix
+		value := status.value(evidence)
+		if strings.TrimSpace(value) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, fieldPath, "amplifier output "+status.label+" status is required"))
+			continue
+		}
+		issues = append(issues, validateReviewStatus(fieldPath, value, "amplifier output "+status.label)...)
+	}
+	return issues
+}
+
+func recordHasSymbol(record *ComponentRecord, symbolID string) bool {
+	for _, symbol := range record.Symbols {
+		if symbol.SymbolID == symbolID {
+			return true
+		}
+	}
+	return false
+}
+
+func recordHasFootprint(record *ComponentRecord, footprintID string) bool {
+	for _, pkg := range record.Packages {
+		if pkg.FootprintID == footprintID {
+			return true
+		}
+	}
+	return false
+}
+
+func recordHasPinmapEvidence(record *ComponentRecord, symbolID string, footprintID string, source string) bool {
+	symbolHasSource := false
+	for _, symbol := range record.Symbols {
+		if symbol.SymbolID == symbolID && verificationHasSource(symbol.Verification, source) {
+			symbolHasSource = true
+			break
+		}
+	}
+	packageHasSource := false
+	for _, pkg := range record.Packages {
+		if pkg.FootprintID == footprintID && verificationHasSource(pkg.Verification, source) {
+			packageHasSource = true
+			break
+		}
+	}
+	return symbolHasSource && packageHasSource
+}
+
+func verificationHasSource(verification VerificationRecord, source string) bool {
+	for _, candidate := range verification.Sources {
+		if strings.EqualFold(candidate, source) {
+			return true
+		}
+	}
+	return false
 }
 
 func validateEvidenceEngineeringValue(path string, value string, unitPath string, unit string, label string) []reports.Issue {

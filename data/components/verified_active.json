@@ -57,8 +57,29 @@
       "tags": ["bjt", "npn", "small_signal", "sot23", "amplifier_seed"],
       "ratings": [
         {"kind": "collector_current", "max": "200", "unit": "mA"},
-        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"}
+        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
+        {"kind": "power_dissipation_max", "max": "300", "unit": "mW"}
       ],
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
+      "amplifier_output_evidence": {
+        "device_class": "bjt",
+        "polarity": "npn",
+        "intended_roles": ["headphone_output", "small_signal_driver"],
+        "package": "SOT-23",
+        "symbol_id": "Device:Q_NPN_BEC",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "pinmap_evidence": "builtin_pinmap:Device:Q_NPN_BEC",
+        "control_terminal": "BASE",
+        "upper_or_lower_terminal": "COLLECTOR",
+        "output_terminal": "EMITTER",
+        "voltage_rating_status": "proven",
+        "current_rating_status": "proven",
+        "power_dissipation_status": "review_required",
+        "thermal_review": "review_required",
+        "safe_operating_area_status": "review_required",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Low-current headphone or bias seed only; SOA, thermal dissipation, and distortion remain design-specific before fabrication-candidate use."
+      },
       "symbols": [{
         "symbol_id": "Device:Q_NPN_BEC",
         "function_pins": [
@@ -98,8 +119,29 @@
       "tags": ["bjt", "pnp", "small_signal", "sot23", "amplifier_seed"],
       "ratings": [
         {"kind": "collector_current", "max": "200", "unit": "mA"},
-        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"}
+        {"kind": "collector_emitter_voltage", "max": "40", "unit": "V"},
+        {"kind": "power_dissipation_max", "max": "300", "unit": "mW"}
       ],
+      "companions": [{"id": "amplifier.output_emitter_resistor", "family": "resistor", "role": "emitter_resistor", "required": true, "description": "Emitter resistor or equivalent output-current sharing/current-limit review is required for Class AB output stages."}],
+      "amplifier_output_evidence": {
+        "device_class": "bjt",
+        "polarity": "pnp",
+        "intended_roles": ["headphone_output", "small_signal_driver"],
+        "package": "SOT-23",
+        "symbol_id": "Device:Q_PNP_BEC",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23",
+        "pinmap_evidence": "builtin_pinmap:Device:Q_PNP_BEC",
+        "control_terminal": "BASE",
+        "upper_or_lower_terminal": "COLLECTOR",
+        "output_terminal": "EMITTER",
+        "voltage_rating_status": "proven",
+        "current_rating_status": "proven",
+        "power_dissipation_status": "review_required",
+        "thermal_review": "review_required",
+        "safe_operating_area_status": "review_required",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Low-current headphone or bias seed only; SOA, thermal dissipation, and distortion remain design-specific before fabrication-candidate use."
+      },
       "symbols": [{
         "symbol_id": "Device:Q_PNP_BEC",
         "function_pins": [
@@ -134,6 +176,25 @@
       "generic": true,
       "lifecycle": "unknown",
       "tags": ["bjt", "npn", "power_output", "to220", "blocked", "amplifier_seed"],
+      "amplifier_output_evidence": {
+        "device_class": "bjt",
+        "polarity": "npn",
+        "intended_roles": ["blocked_power_output"],
+        "package": "TO-220",
+        "symbol_id": "Device:Q_NPN_BEC",
+        "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
+        "pinmap_evidence": "blocked:power_bjt_needs_pinout_thermal_soa",
+        "control_terminal": "BASE",
+        "upper_or_lower_terminal": "COLLECTOR",
+        "output_terminal": "EMITTER",
+        "voltage_rating_status": "blocked",
+        "current_rating_status": "blocked",
+        "power_dissipation_status": "blocked",
+        "thermal_review": "blocked",
+        "safe_operating_area_status": "blocked",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Placeholder documents the required evidence for future power-output parts and must not be selected for fabrication."
+      },
       "symbols": [{
         "symbol_id": "Device:Q_NPN_BEC",
         "function_pins": [
