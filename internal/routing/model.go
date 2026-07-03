@@ -165,11 +165,12 @@ type Endpoint struct {
 }
 
 type ExistingCopper struct {
-	Kind     CopperKind `json:"kind"`
-	Net      string     `json:"net,omitempty"`
-	Layer    string     `json:"layer,omitempty"`
-	Geometry Shape      `json:"geometry"`
-	Fixed    bool       `json:"fixed,omitempty"`
+	Kind       CopperKind `json:"kind"`
+	Net        string     `json:"net,omitempty"`
+	Layer      string     `json:"layer,omitempty"`
+	Geometry   Shape      `json:"geometry"`
+	Centerline []Point    `json:"centerline,omitempty"`
+	Fixed      bool       `json:"fixed,omitempty"`
 }
 
 type Obstacle struct {

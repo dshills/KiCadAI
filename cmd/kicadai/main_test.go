@@ -519,30 +519,55 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	}
 }
 
-func TestRunIntentCreateLEDPromptGoldenReachesRouting(t *testing.T) {
+func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "led_project")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	err := run([]string{"--json", "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
-	if err == nil {
-		t.Fatal("expected current routing validation to report issues")
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 	}
 	var payload struct {
-		Data struct {
+		Data *struct {
 			AIStatus *aiLaneStatus `json:"ai_status"`
 		} `json:"data"`
+		Artifacts []reports.Artifact `json:"artifacts"`
 	}
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &payload); decodeErr != nil {
 		t.Fatalf("decode result: %v\nstdout=%s", decodeErr, stdout.String())
 	}
-	if payload.Data.AIStatus == nil {
+	if payload.Data == nil || payload.Data.AIStatus == nil {
 		t.Fatalf("missing ai_status: %s", stdout.String())
 	}
-	if payload.Data.AIStatus.Status != aiLaneStatusBlocked || payload.Data.AIStatus.Stage != "routing" || payload.Data.AIStatus.IssueCode != reports.CodeValidationFailed {
+	if payload.Data.AIStatus.Status != aiLaneStatusCandidate || payload.Data.AIStatus.Stage != "validation" {
 		t.Fatalf("ai_status = %#v", payload.Data.AIStatus)
 	}
+	if payload.Data.AIStatus.RetryAllowed {
+		t.Fatalf("candidate ai_status unexpectedly allows retry: %#v", payload.Data.AIStatus)
+	}
+	if payload.Data.AIStatus.MaxAutomaticRetryAttempts != 0 || payload.Data.AIStatus.IssueCode != "" {
+		t.Fatalf("candidate ai_status still exposes retry/blocker fields: %#v", payload.Data.AIStatus)
+	}
+	if !hasCLIArtifact(payload.Artifacts, reports.ArtifactPromotionReport, designworkflow.PromotionReportArtifactPath) {
+		t.Fatalf("promotion artifact missing from CLI result: %#v", payload.Artifacts)
+	}
+	for _, relPath := range []string{
+		"led_indicator.kicad_pro",
+		"led_indicator.kicad_sch",
+		"led_indicator.kicad_pcb",
+		".kicadai/design-promotion.json",
+		".kicadai/transaction.json",
+		".kicadai/validation-summary.json",
+		".kicadai/workflow-result.json",
+	} {
+		if _, err := os.Stat(filepath.Join(output, filepath.FromSlash(relPath))); err != nil {
+			t.Fatalf("missing generated artifact %s: %v", relPath, err)
+		}
+	}
 	var workflow struct {
-		Stages []workflowEvidenceStage `json:"stages"`
+		Stages    []workflowEvidenceStage          `json:"stages"`
+		Promotion *designworkflow.PromotionSummary `json:"promotion,omitempty"`
+		Artifacts []reports.Artifact               `json:"artifacts"`
 	}
 	readJSONFile(t, filepath.Join(output, ".kicadai", "workflow-result.json"), &workflow)
 	wantStages := map[string]string{
@@ -551,18 +576,37 @@ func TestRunIntentCreateLEDPromptGoldenReachesRouting(t *testing.T) {
 		"schematic_electrical": string(designworkflow.StageStatusOK),
 		"pcb_realization":      string(designworkflow.StageStatusOK),
 		"placement":            string(designworkflow.StageStatusWarning),
-		"routing":              string(designworkflow.StageStatusBlocked),
+		"routing":              string(designworkflow.StageStatusWarning),
+		"project_write":        string(designworkflow.StageStatusOK),
+		"writer_correctness":   string(designworkflow.StageStatusWarning),
+		"validation":           string(designworkflow.StageStatusWarning),
 	}
 	for stage, wantStatus := range wantStages {
 		if got := workflowStageStatus(workflow.Stages, stage); got != wantStatus {
 			t.Fatalf("stage %s status = %q, want %q; stages = %#v", stage, got, wantStatus, workflow.Stages)
 		}
 	}
+	if workflow.Promotion == nil || workflow.Promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked {
+		t.Fatalf("workflow promotion = %#v", workflow.Promotion)
+	}
 	if stageHasIssue(workflow.Stages, "placement", reports.CodePlacementOutsideBoard) {
 		t.Fatalf("placement still reports outside-board blocker: %#v", workflow.Stages)
 	}
-	if !stageHasIssueForNet(workflow.Stages, "routing", reports.CodeValidationFailed, "LED_SIG_indicator", "no legal two-layer path found") {
-		t.Fatalf("routing stage missing LED signal route blocker: %#v", workflow.Stages)
+	if stageHasIssue(workflow.Stages, "routing", reports.CodeValidationFailed) {
+		t.Fatalf("routing still reports validation blocker: %#v", workflow.Stages)
+	}
+	if stageHasIssue(workflow.Stages, "validation", reports.CodeDisconnectedPad) {
+		t.Fatalf("validation still reports disconnected pads: %#v", workflow.Stages)
+	}
+	var status aiLaneStatus
+	readJSONFile(t, filepath.Join(output, ".kicadai", "validation-summary.json"), &status)
+	if status.Status != aiLaneStatusCandidate || status.Stage != "validation" {
+		t.Fatalf("validation summary status = %#v", status)
+	}
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked || promotion.Status != designworkflow.PromotionStatusFailed {
+		t.Fatalf("promotion report = %#v", promotion)
 	}
 }
 

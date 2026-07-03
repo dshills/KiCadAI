@@ -159,7 +159,7 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
 	case "Package_TO_SOT_SMD:SOT-23-5":
 		return verifiedPadTemplateRecord{
-			Bounds: placement.Bounds{WidthMM: 3.7, HeightMM: 3.0, Source: placement.BoundsEstimated},
+			Bounds: centeredEstimatedBounds(3.7, 3.0),
 			Pads: []placement.PadSummary{
 				{Name: "1", XMM: -1.5, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
 				{Name: "2", XMM: -1.5, YMM: 0, WidthMM: 0.7, HeightMM: 0.8},
@@ -169,15 +169,13 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 			},
 		}, true
 	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
-		return verifiedPadTemplateRecord{
-			Bounds: placement.Bounds{WidthMM: 6.7, HeightMM: 7.0, Source: placement.BoundsEstimated},
-			Pads: []placement.PadSummary{
-				{Name: "1", XMM: -2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
-				{Name: "2", XMM: 0, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
-				{Name: "3", XMM: 2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
-				{Name: "2", XMM: 0, YMM: -2.1, WidthMM: 3.8, HeightMM: 2.4},
-			},
-		}, true
+		pads := []placement.PadSummary{
+			{Name: "1", XMM: -2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
+			{Name: "2", XMM: 0, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
+			{Name: "3", XMM: 2.3, YMM: 2.4, WidthMM: 1.2, HeightMM: 1.5},
+			{Name: "2", XMM: 0, YMM: -2.1, WidthMM: 3.8, HeightMM: 2.4},
+		}
+		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
 		return rowPadTemplate(5.9, 4.9, 1.27, 0.7, 0.9, []string{"1", "2", "3", "4"}, []string{"8", "7", "6", "5"}), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
@@ -197,7 +195,7 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 
 func twoPadTemplate(envelopeWidth, envelopeHeight, padWidth, padHeight, pitch float64) verifiedPadTemplateRecord {
 	return verifiedPadTemplateRecord{
-		Bounds: placement.Bounds{WidthMM: envelopeWidth, HeightMM: envelopeHeight, Source: placement.BoundsEstimated},
+		Bounds: centeredEstimatedBounds(envelopeWidth, envelopeHeight),
 		Pads: []placement.PadSummary{
 			{Name: "1", XMM: -pitch / 2, YMM: 0, WidthMM: padWidth, HeightMM: padHeight},
 			{Name: "2", XMM: pitch / 2, YMM: 0, WidthMM: padWidth, HeightMM: padHeight},
@@ -214,7 +212,7 @@ func rowPadTemplate(centerSpanWidth, bodyHeight, pitch, padWidth, padHeight floa
 	for index, name := range rightNames {
 		pads = append(pads, placement.PadSummary{Name: name, XMM: centerSpanWidth / 2, YMM: rowPadY(index, rows, pitch), WidthMM: padWidth, HeightMM: padHeight})
 	}
-	return verifiedPadTemplateRecord{Bounds: placement.Bounds{WidthMM: centerSpanWidth + padWidth, HeightMM: bodyHeight + padHeight, Source: placement.BoundsEstimated}, Pads: pads}
+	return verifiedPadTemplateRecord{Bounds: centeredEstimatedBounds(centerSpanWidth+padWidth, bodyHeight+padHeight), Pads: pads}
 }
 
 func rowPadY(index int, count int, pitch float64) float64 {
@@ -236,7 +234,43 @@ func pinHeaderTemplate(count int) verifiedPadTemplateRecord {
 			HeightMM: 1.7,
 		})
 	}
-	return verifiedPadTemplateRecord{Bounds: placement.Bounds{WidthMM: 2.54, HeightMM: height, Source: placement.BoundsEstimated}, Pads: pads}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.54, height), Pads: pads}
+}
+
+// centeredEstimatedBounds matches verified fallback templates whose pads are centered around the footprint origin.
+func centeredEstimatedBounds(width, height float64) placement.Bounds {
+	return placement.Bounds{
+		WidthMM:      width,
+		HeightMM:     height,
+		AnchorOffset: placement.Point{XMM: width / 2, YMM: height / 2},
+		Source:       placement.BoundsEstimated,
+	}
+}
+
+func padEnvelopeBounds(pads []placement.PadSummary, minWidth, minHeight float64) placement.Bounds {
+	if len(pads) == 0 {
+		return centeredEstimatedBounds(minWidth, minHeight)
+	}
+	minX := pads[0].XMM - pads[0].WidthMM/2
+	maxX := pads[0].XMM + pads[0].WidthMM/2
+	minY := pads[0].YMM - pads[0].HeightMM/2
+	maxY := pads[0].YMM + pads[0].HeightMM/2
+	for _, pad := range pads[1:] {
+		minX = min(minX, pad.XMM-pad.WidthMM/2)
+		maxX = max(maxX, pad.XMM+pad.WidthMM/2)
+		minY = min(minY, pad.YMM-pad.HeightMM/2)
+		maxY = max(maxY, pad.YMM+pad.HeightMM/2)
+	}
+	width := max(minWidth, maxX-minX)
+	height := max(minHeight, maxY-minY)
+	left := minX - (width-(maxX-minX))/2
+	bottom := minY - (height-(maxY-minY))/2
+	return placement.Bounds{
+		WidthMM:      width,
+		HeightMM:     height,
+		AnchorOffset: placement.Point{XMM: -left, YMM: -bottom},
+		Source:       placement.BoundsEstimated,
+	}
 }
 
 type padNetAssignment struct {

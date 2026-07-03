@@ -189,6 +189,34 @@ func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
 	}
 }
 
+func TestVerifiedPadTemplateBoundsAreCenteredOnPads(t *testing.T) {
+	for _, footprintID := range []string{
+		"Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+		"Resistor_SMD:R_0805_2012Metric",
+		"Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+		"Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+	} {
+		t.Run(footprintID, func(t *testing.T) {
+			template, ok := verifiedPadTemplate(footprintID)
+			if !ok {
+				t.Fatal("missing template")
+			}
+			if template.Bounds.AnchorOffset.XMM <= 0 || template.Bounds.AnchorOffset.YMM <= 0 {
+				t.Fatalf("bounds are not centered: %#v", template.Bounds)
+			}
+			minX := -template.Bounds.AnchorOffset.XMM
+			maxX := minX + template.Bounds.WidthMM
+			minY := -template.Bounds.AnchorOffset.YMM
+			maxY := minY + template.Bounds.HeightMM
+			for _, pad := range template.Pads {
+				if pad.XMM-pad.WidthMM/2 < minX || pad.XMM+pad.WidthMM/2 > maxX || pad.YMM-pad.HeightMM/2 < minY || pad.YMM+pad.HeightMM/2 > maxY {
+					t.Fatalf("pad outside centered bounds: bounds=%#v pad=%#v", template.Bounds, pad)
+				}
+			}
+		})
+	}
+}
+
 func TestSOT223TemplateMapsDuplicatePinTwoPads(t *testing.T) {
 	template, ok := verifiedPadTemplate("Package_TO_SOT_SMD:SOT-223-3_TabPin2")
 	if !ok {

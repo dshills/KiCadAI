@@ -4,6 +4,7 @@ import (
 	"cmp"
 	"context"
 	"fmt"
+	// geometry helpers for route access point sampling and deduplication
 	"math"
 	"slices"
 	"strings"
@@ -32,6 +33,7 @@ const routeTreeNearObstaclePressureMM = 1.5
 const routeTreeMaxPolygonCopperAccessPoints = 16
 const routeTreeSameNetExistingCopperSource = "same_net_existing_copper"
 const routeTreeGeneratedSameNetCopperNonPreferredRankPenalty = 3
+const routeTreeAccessDedupeUnitsPerMM = 1e6
 
 type InterBlockBranchRoutingResult struct {
 	NetName        string                            `json:"net_name"`
@@ -588,7 +590,7 @@ func routeTreeEndpointAccessWithSameNetCopper(access []RouteTreeEndpointAccess, 
 			continue
 		}
 		layer := normalizeContactLayer(copper.Layer)
-		for _, point := range routeTreeExistingCopperAccessPoints(copper.Geometry) {
+		for _, point := range routeTreeExistingCopperAccessPoints(copper) {
 			out = append(out, RouteTreeEndpointAccess{
 				Role:   RouteTreeAccessSameNetCopper,
 				Net:    trimmedNetName,
@@ -615,7 +617,11 @@ func routeTreePrefersSameNetCopperAccess(nets []routing.Net, netName string) boo
 	return false
 }
 
-func routeTreeExistingCopperAccessPoints(shape routing.Shape) []routing.Point {
+func routeTreeExistingCopperAccessPoints(copper routing.ExistingCopper) []routing.Point {
+	if len(copper.Centerline) >= 2 {
+		return uniqueRouteTreeCopperAccessPoints(copper.Centerline)
+	}
+	shape := copper.Geometry
 	if shape.Rect != nil {
 		rect := normalizeRoutingRect(*shape.Rect)
 		center := routing.Point{
@@ -648,7 +654,7 @@ func routeTreeExistingCopperAccessPoints(shape routing.Shape) []routing.Point {
 	// large polygons, sample deterministic boundary vertices to keep access
 	// pair generation bounded.
 	if len(shape.Polygon) <= routeTreeMaxPolygonCopperAccessPoints {
-		return append([]routing.Point(nil), shape.Polygon...)
+		return uniqueRouteTreeCopperAccessPoints(shape.Polygon)
 	}
 	points := make([]routing.Point, 0, routeTreeMaxPolygonCopperAccessPoints)
 	denominator := max(1, routeTreeMaxPolygonCopperAccessPoints-1)
@@ -656,20 +662,28 @@ func routeTreeExistingCopperAccessPoints(shape routing.Shape) []routing.Point {
 		sourceIndex := int(math.Round(float64(index) * float64(len(shape.Polygon)-1) / float64(denominator)))
 		points = append(points, shape.Polygon[sourceIndex])
 	}
-	return points
+	return uniqueRouteTreeCopperAccessPoints(points)
 }
 
+// uniqueRouteTreeCopperAccessPoints keeps centerline/shape access candidates deterministic.
 func uniqueRouteTreeCopperAccessPoints(points []routing.Point) []routing.Point {
 	seen := map[[2]int64]struct{}{}
 	out := make([]routing.Point, 0, len(points))
 	for _, point := range points {
-		key := [2]int64{routeTreeMicronKey(point.XMM), routeTreeMicronKey(point.YMM)}
+		if math.IsNaN(point.XMM) || math.IsNaN(point.YMM) || math.IsInf(point.XMM, 0) || math.IsInf(point.YMM, 0) {
+			continue
+		}
+		key := [2]int64{
+			int64(math.Round(point.XMM * routeTreeAccessDedupeUnitsPerMM)),
+			int64(math.Round(point.YMM * routeTreeAccessDedupeUnitsPerMM)),
+		}
 		if _, exists := seen[key]; exists {
 			continue
 		}
 		seen[key] = struct{}{}
 		out = append(out, point)
 	}
+	// Return the filtered slice, not the caller-owned input.
 	return out
 }
 
@@ -988,10 +1002,11 @@ func existingCopperFromRoutedBranches(routes []routing.Route, defaultLayer strin
 		}
 		for _, segment := range route.Segments {
 			existing = append(existing, routing.ExistingCopper{
-				Kind:     routing.CopperSegment,
-				Net:      segment.Net,
-				Layer:    routeBranchCanonicalLayer(segment.Layer, defaultLayer),
-				Geometry: routeBranchSegmentShape(segment, rules),
+				Kind:       routing.CopperSegment,
+				Net:        segment.Net,
+				Layer:      routeBranchCanonicalLayer(segment.Layer, defaultLayer),
+				Geometry:   routeBranchSegmentShape(segment, rules),
+				Centerline: []routing.Point{segment.Start, segment.End},
 			})
 		}
 		for _, via := range route.Vias {

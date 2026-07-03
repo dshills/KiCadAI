@@ -494,6 +494,49 @@ func TestRouteTreeEndpointAccessWithSameNetCopperIgnoresOtherNetCopper(t *testin
 	}
 }
 
+func TestRouteTreeEndpointAccessWithSameNetCopperPrefersCenterline(t *testing.T) {
+	access := routeTreeEndpointAccessWithSameNetCopper(nil, []routing.ExistingCopper{{
+		Kind:  routing.CopperSegment,
+		Net:   "GND",
+		Layer: "F.Cu",
+		Geometry: routing.Shape{Rect: &routing.Rect{
+			Min: routing.Point{XMM: 5, YMM: 7},
+			Max: routing.Point{XMM: 8, YMM: 9},
+		}},
+		Centerline: []routing.Point{
+			{XMM: 5.25, YMM: 8.5},
+			{XMM: 6, YMM: 8.5},
+		},
+	}}, "GND")
+	if len(access) != 2 {
+		t.Fatalf("access = %#v, want centerline endpoints only", access)
+	}
+	for _, item := range access {
+		if item.YMM != 8.5 || (item.XMM != 5.25 && item.XMM != 6) {
+			t.Fatalf("access sampled off-centerline point: %#v", access)
+		}
+	}
+}
+
+func TestRouteTreeEndpointAccessWithSameNetCopperFallsBackForIncompleteCenterline(t *testing.T) {
+	access := routeTreeEndpointAccessWithSameNetCopper(nil, []routing.ExistingCopper{{
+		Kind:  routing.CopperSegment,
+		Net:   "GND",
+		Layer: "F.Cu",
+		Geometry: routing.Shape{Rect: &routing.Rect{
+			Min: routing.Point{XMM: 5, YMM: 7},
+			Max: routing.Point{XMM: 8, YMM: 9},
+		}},
+		Centerline: []routing.Point{{XMM: 5.25, YMM: 8.5}},
+	}}, "GND")
+	if len(access) == 0 {
+		t.Fatalf("access = %#v, want geometry fallback points", access)
+	}
+	if !routeTreeAccessContainsPoint(access, 6.5, 8) {
+		t.Fatalf("access = %#v, want center of fallback geometry", access)
+	}
+}
+
 func TestRouteTreePrefersSameNetCopperAccessOnlyForPowerNets(t *testing.T) {
 	nets := []routing.Net{
 		{Name: "VCC", Role: routing.NetPower},
@@ -510,6 +553,15 @@ func TestRouteTreePrefersSameNetCopperAccessOnlyForPowerNets(t *testing.T) {
 	if routeTreePrefersSameNetCopperAccess(nets, "SIG") {
 		t.Fatalf("SIG should not use same-net copper in VCC closeout path")
 	}
+}
+
+func routeTreeAccessContainsPoint(access []RouteTreeEndpointAccess, xMM float64, yMM float64) bool {
+	for _, item := range access {
+		if math.Abs(item.XMM-xMM) <= 1e-9 && math.Abs(item.YMM-yMM) <= 1e-9 {
+			return true
+		}
+	}
+	return false
 }
 
 func TestRouteTreeAccessBranchRequestRoutesSyntheticAccessPoints(t *testing.T) {

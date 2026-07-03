@@ -356,8 +356,8 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 {
 		t.Fatalf("route-tree repair summary = %#v, want repairable branch/contact failures", repair)
 	}
-	if !stringSliceContains(repair.Nets, "VCC") || stringSliceContains(repair.Nets, "SDA") {
-		t.Fatalf("route-tree repair nets = %#v, want narrowed VCC-only blocker evidence", repair.Nets)
+	if stringSliceContains(repair.Nets, "VCC") || !stringSliceContains(repair.Nets, "GND") {
+		t.Fatalf("route-tree repair nets = %#v, want remaining non-VCC warning evidence", repair.Nets)
 	}
 }
 
@@ -392,11 +392,8 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 	if interBlock.MissingRequired != 0 {
 		t.Fatalf("inter-block route-tree missing endpoints = %#v, want target resolution complete", interBlock)
 	}
-	// Phase 1 intentionally documents the pre-implementation failure boundary.
-	// Later multi-endpoint routing phases should invert this assertion when the
-	// I2C route groups become graph-complete.
 	if interBlock.RoutesCompleted >= interBlock.Candidates || interBlock.PartialNets+interBlock.UnroutedNets == 0 {
-		t.Fatalf("inter-block summary = %#v, want current multi-endpoint route completion blocker", interBlock)
+		t.Fatalf("inter-block summary = %#v, want remaining multi-endpoint route warnings", interBlock)
 	}
 	if interBlock.IssueCount == 0 {
 		t.Fatalf("inter-block summary = %#v, want actionable route/contact issues", interBlock)
@@ -413,12 +410,12 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 		t.Fatalf("contact summary = %#v, want no net-alias mismatch after I2C alias hydration", contacts)
 	}
 	vccIssues := routeTreeIssuesForNet(result.Stage.Issues, "VCC")
-	if !routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) {
-		t.Fatalf("VCC issues = %#v, want graph-split contact blocker", vccIssues)
+	if routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) || routeTreeIssuesContainCode(vccIssues, reports.CodeRouteContactMiss) || routeTreeIssuesContainMessage(vccIssues, "no legal") {
+		t.Fatalf("VCC issues = %#v, want no graph-split, contact-miss, or pathfinding blocker", vccIssues)
 	}
 	repair := requireRouteTreeRepairSummary(t, result.Stage)
-	if repair.HintCount == 0 || !stringSliceContains(repair.Nets, "VCC") || stringSliceContains(repair.Nets, "SDA") {
-		t.Fatalf("route-tree repair summary = %#v, want narrowed VCC repair hints", repair)
+	if repair.HintCount == 0 || stringSliceContains(repair.Nets, "VCC") || !stringSliceContains(repair.Nets, "GND") {
+		t.Fatalf("route-tree repair summary = %#v, want remaining non-VCC repair hints", repair)
 	}
 
 	blockedNets := issueNetSet(result.Stage.Issues)
@@ -438,8 +435,8 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 		}
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(result.Stage.Issues)
-	if len(branchPaths["VCC"]) == 0 || len(branchPaths["SDA"]) != 0 || len(branchPaths["SCL"]) != 0 {
-		t.Fatalf("route-tree branch issue paths by net = %#v, want VCC blocker without SDA/SCL regression", branchPaths)
+	if len(branchPaths["VCC"]) != 0 {
+		t.Fatalf("route-tree branch issue paths by net = %#v, want no VCC blocker paths", branchPaths)
 	}
 }
 
@@ -469,30 +466,22 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 			t.Fatalf("access nets = %#v, want managed net %s", access.Nets, net)
 		}
 	}
-	// These exact counts intentionally freeze the current access-driven routing
-	// gap after failed route branches stopped contributing contact evidence:
-	// access/contact graph evidence exists, but branch execution is not fully
-	// using it yet. Later phases should update this baseline when the router
-	// proves more endpoints or completes the partial groups.
 	if contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
 		t.Fatalf("contact graph = %#v, want 9 proven endpoints, 1 complete group, 3 partial groups", contactGraph)
 	}
-	if retry.Attempts != 2 || retry.Applied != 1 || len(retry.AttemptHistory) != 2 {
-		t.Fatalf("retry = %#v, want one bounded retry attempt", retry)
+	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 {
+		t.Fatalf("retry = %#v, want initial routed attempt without repair retry", retry)
 	}
-	if retry.AttemptHistory[0].Selected {
-		t.Fatalf("retry history = %#v, want initial failed-route-filtered attempt to remain unselected", retry.AttemptHistory)
-	}
-	if retry.AttemptHistory[1].RouteTreeProvenEndpoints != 9 || retry.AttemptHistory[1].RouteTreeBranchesRouted != 6 || !retry.AttemptHistory[1].Selected {
-		t.Fatalf("retry history = %#v, want second attempt selected by routed route-tree branch count", retry.AttemptHistory)
+	if !retry.AttemptHistory[0].Selected || retry.AttemptHistory[0].RouteTreeProvenEndpoints != 9 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
+		t.Fatalf("retry history = %#v, want initial attempt selected with centerline contact evidence", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
-	if len(branchPaths["VCC"]) == 0 || len(branchPaths["SDA"]) != 0 || len(branchPaths["SCL"]) != 0 {
-		t.Fatalf("branch paths = %#v, want selected-attempt VCC blocker without SDA/SCL regression", branchPaths)
+	if len(branchPaths["VCC"]) != 0 {
+		t.Fatalf("branch paths = %#v, want no selected-attempt VCC blocker evidence", branchPaths)
 	}
 }
 
-func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
+func TestCreateI2CSensorBreakoutLocksResolvedVCCProofGap(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
@@ -504,53 +493,20 @@ func TestCreateI2CSensorBreakoutLocksVCCProofGap(t *testing.T) {
 	}
 	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
 	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
-		t.Fatalf("contact graph = %#v, want required=12 proven=9 complete=1 partial=3 failed-route-filtered baseline", contactGraph)
+		t.Fatalf("contact graph = %#v, want required=12 proven=9 complete=1 partial=3 centerline baseline", contactGraph)
 	}
 	repair := requireRouteTreeRepairSummary(t, routingStage)
-	if !stringSliceContains(repair.Nets, "VCC") {
-		t.Fatalf("route-tree repair summary = %#v, want VCC blocker evidence", repair)
+	if stringSliceContains(repair.Nets, "VCC") {
+		t.Fatalf("route-tree repair summary = %#v, want VCC proof gap resolved", repair)
 	}
 	if repair.HintCount == 0 || repair.RepairableFailures == 0 {
-		t.Fatalf("route-tree repair summary = %#v, want repairable VCC route-tree hints", repair)
+		t.Fatalf("route-tree repair summary = %#v, want remaining repairable route-tree hints", repair)
 	}
 	vccIssues := routeTreeIssuesForNet(routingStage.Issues, "VCC")
-	if len(vccIssues) == 0 {
-		t.Fatalf("routing issues = %#v, want VCC route-tree/contact issues", routingStage.Issues)
-	}
-	if !routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) &&
-		!routeTreeIssuesContainCode(vccIssues, reports.CodeRouteContactMiss) &&
-		!routeTreeIssuesContainMessage(vccIssues, "no legal") {
-		t.Fatalf("VCC issues = %#v, want graph-split, contact-miss, or pathfinding blocker", vccIssues)
-	}
-	vccBranches := requireRouteTreeBranchesForNet(t, routingStage, "VCC")
-	if len(vccBranches) == 0 {
-		t.Fatalf("route-tree branches missing VCC evidence")
-	}
-	failingWithAttempts := 0
-	for _, branch := range vccBranches {
-		if branch.Status == routing.StatusRouted {
-			continue
-		}
-		if branch.BlockingIssueCount == 0 {
-			t.Fatalf("VCC branch = %#v, want blocking issue count for failing branch", branch)
-		}
-		if branch.AccessPairCount == 0 || branch.AccessPairLimit == 0 || len(branch.AccessAttempts) == 0 {
-			t.Fatalf("VCC branch = %#v, want access audit and attempt evidence", branch)
-		}
-		if branch.AccessPairsTried == 0 {
-			t.Fatalf("VCC branch = %#v, want attempted access evidence", branch)
-		}
-		auditAttempt := branch.AccessAttempts[0]
-		if auditAttempt.SameNetPads == 0 || auditAttempt.SameNetAnchors == 0 {
-			t.Fatalf("VCC branch attempt = %#v, want same-net pad and local-anchor audit", auditAttempt)
-		}
-		if auditAttempt.ObstacleKind == "" && !routeTreeIssuesContainMessage(vccIssues, "no legal") {
-			t.Fatalf("VCC branch attempt = %#v, want obstacle audit or pathfinding issue", auditAttempt)
-		}
-		failingWithAttempts++
-	}
-	if failingWithAttempts == 0 {
-		t.Fatalf("VCC branches = %#v, want failing branch with access attempts", vccBranches)
+	if routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) ||
+		routeTreeIssuesContainCode(vccIssues, reports.CodeRouteContactMiss) ||
+		routeTreeIssuesContainMessage(vccIssues, "no legal") {
+		t.Fatalf("VCC issues = %#v, want no graph-split, contact-miss, or pathfinding blocker", vccIssues)
 	}
 }
 

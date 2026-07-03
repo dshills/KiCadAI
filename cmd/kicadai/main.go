@@ -3550,7 +3550,22 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if err != nil {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
-	workflow := designworkflow.Create(ctx, *plan.GeneratedRequest, createOpts)
+	if plan.GeneratedRequest == nil {
+		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "generated_request", Message: "intent plan did not produce a design request"})
+	}
+	request := *plan.GeneratedRequest
+	workflow := designworkflow.Create(ctx, request, createOpts)
+	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
+	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
+	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
+	var promotionArtifacts []reports.Artifact
+	var promotionIssues []reports.Issue
+	if promotionIssue != nil {
+		promotionIssues = append(promotionIssues, *promotionIssue)
+	}
+	if strings.TrimSpace(promotionArtifact.Path) != "" {
+		promotionArtifacts = append(promotionArtifacts, promotionArtifact)
+	}
 	artifactDir := filepath.Join(opts.output, ".kicadai")
 	plan, artifactIssues := intentplanner.WriteArtifacts(plan, intentplanner.ArtifactOptions{OutputDir: artifactDir, Overwrite: true})
 	if draft != nil {
@@ -3561,10 +3576,12 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	allIssues := append([]reports.Issue(nil), issues...)
 	allIssues = append(allIssues, plan.Issues...)
 	allIssues = append(allIssues, artifactIssues...)
+	allIssues = append(allIssues, promotionIssues...)
 	allIssues = append(allIssues, rationaleIssues...)
 	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
 	artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
+	artifacts = append(artifacts, promotionArtifacts...)
 	artifacts = append(artifacts, rationaleArtifacts...)
 	aiStatus := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
 	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, draft, sourceText, aiStatus, artifacts)
@@ -3834,6 +3851,7 @@ func designWorkflowReport(workflow designworkflow.WorkflowResult, extraIssues []
 	}
 }
 
+// designPromotionFixture converts a completed CLI workflow into promotion gates.
 func designPromotionFixture(opts cliOptions, request designworkflow.Request, workflow designworkflow.WorkflowResult) designworkflow.PromotionFixture {
 	requestName := filepath.Base(opts.requestPath)
 	readiness := designworkflow.PromotionReadinessCandidate
@@ -3861,6 +3879,7 @@ func designPromotionExpectedStages(workflow designworkflow.WorkflowResult) []des
 	return stages
 }
 
+// promotionSummaryPointer stores promotion summaries on optional result fields.
 func promotionSummaryPointer(summary designworkflow.PromotionSummary) *designworkflow.PromotionSummary {
 	return &summary
 }
