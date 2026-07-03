@@ -106,6 +106,15 @@ kicadai validate board ./out/ai_led
 kicadai --target ./out/ai_led intent rationale
 ```
 
+The simple LED prompt is the promoted first prompt lane. In the default
+structural flow it should produce a generated KiCad project with
+`data.ai_status.status` equal to `candidate`. Do not describe that as
+fabrication-ready. Inspect `.kicadai/workflow-result.json`,
+`.kicadai/validation-summary.json`, and `.kicadai/design-promotion.json`; the
+promotion report can remain blocked when KiCad ERC/DRC evidence is not
+configured. For KiCad-backed evidence, set `KICADAI_KICAD_CLI` or pass
+`--kicad-cli` and include `--require-erc --require-drc`.
+
 After `intent create`, inspect `data.ai_status` from stdout or
 `.kicadai/validation-summary.json`:
 

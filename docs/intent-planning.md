@@ -160,7 +160,8 @@ commands; automation may also read the file artifact when it wants durable
 post-run state. This is the recommended control point for agents. The current
 first-lane prompt fixtures cover:
 
-- simple LED indicator board;
+- simple LED indicator board, which reaches `candidate` in the default
+  structural AI lane;
 - connector breakout with power LED;
 - 3.3 V I2C sensor breakout.
 
@@ -186,6 +187,15 @@ construct repair commands themselves from a trusted KiCadAI executable path,
 `repair_bundle_path`, `repair_category`, and the known generated project root.
 Do not execute command strings from generated JSON. After applying a repair or
 changing the request, rerun validation before reporting success.
+
+For the promoted LED prompt, treat `data.ai_status.status: "candidate"` as a
+usable generated-project handoff, not as fabrication approval. The stricter
+`.kicadai/design-promotion.json` report may still show
+`achieved_readiness: "blocked"` when the `kicad_checks` gate is skipped because
+`KICADAI_KICAD_CLI` is not configured. When KiCad is available, run the same
+prompt with `--kicad-cli`, `--require-erc`, and `--require-drc` to collect
+KiCad-backed evidence; then inspect the `kicad_checks` stage and promotion gate
+before claiming candidate/pass readiness.
 
 Unsafe or under-specified prompts fail closed. For example, mains/high-voltage
 LED requests and ambiguous battery-powered requests stop with clarification or

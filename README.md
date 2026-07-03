@@ -253,10 +253,13 @@ The shortest current path for an AI agent is prompt-driven `intent create`.
 First-lane prompts include simple LED indicator, connector breakout with power
 LED, and 3.3 V I2C sensor breakout requests. "First-lane" means deterministic,
 instrumented, and fail-closed; it does not guarantee `ready` status yet. The
-current LED prompt may stop at a precise placement blocker that requires repair
-or request revision. The command drafts the intent, plans supported blocks,
-runs the deterministic design workflow, and writes `.kicadai/` evidence
-artifacts even when blocked:
+simple LED prompt now emits a KiCad project with `data.ai_status.status` set to
+`candidate` in the default structural lane; stricter promotion evidence still
+records warning-level gaps until KiCad ERC/DRC and catalog-backed evidence are
+available. Broader prompts can still stop at precise placement, routing,
+validation, clarification, unsupported, or tool blockers. The command drafts the
+intent, plans supported blocks, runs the deterministic design workflow, and
+writes `.kicadai/` evidence artifacts even when blocked:
 
 ```sh
 kicadai --text "make a simple LED indicator board" --output ./out/ai_led --overwrite intent create

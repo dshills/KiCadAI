@@ -899,8 +899,11 @@ intent:
   `tool_error`.
 - The first AI-controlled prompt lane is locked down by golden tests for simple
   LED indicator, connector breakout with power LED, and 3.3 V I2C sensor
-  breakout prompts. Unsafe mains/high-voltage and ambiguous battery prompts
-  fail closed instead of receiving guessed low-voltage defaults.
+  breakout prompts. The simple LED indicator text prompt now reaches
+  AI-lane `candidate` with generated project, schematic, PCB, workflow,
+  validation, retry, rationale, manifest, and promotion artifacts. Unsafe
+  mains/high-voltage and ambiguous battery prompts fail closed instead of
+  receiving guessed low-voltage defaults.
 - Retryable blockers now include deterministic `retry_key`, repair category,
   and optional repair bundle path when a generated repair bundle exists.
   Agents should construct repair apply commands from trusted executable and
@@ -922,9 +925,9 @@ intent:
 
 - Broaden natural-language coverage beyond deterministic seed phrases and add
   future LLM adapter auditing against the draft result shape.
-- Promote the first prompt-driven LED lane from current precise placement
-  blocker to passing/candidate once placement repair or board sizing policy can
-  close the generated placement issue.
+- Promote the first prompt-driven LED lane from AI-lane `candidate` to strict
+  promotion `candidate`/`pass` by closing warning-level catalog/pinmap evidence
+  and collecting required KiCad ERC/DRC evidence in the promotion gate.
 - Expand semantic synthesis beyond the seed MCU template, especially
   resolver-backed MCU alternate functions, additional bus peripherals,
   supported GPIO assignment, and safe external-clock topology generation.
