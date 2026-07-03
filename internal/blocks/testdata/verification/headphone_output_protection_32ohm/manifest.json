@@ -1,0 +1,27 @@
+{
+  "id": "headphone_output_protection_32ohm",
+  "block_id": "headphone_output_protection",
+  "description": "Connectivity-level headphone output-protection model for a 32 ohm AC-coupled load.",
+  "acceptance": "draft",
+  "request": {
+    "instance_id": "hp_protect",
+    "params": {
+      "load_kind": "headphone",
+      "nominal_load_ohms": "32Ω",
+      "coupling": "ac_coupled_required",
+      "dc_blocking_capacitance": "220uF",
+      "bleed_resistor_ohms": "100kΩ",
+      "connector_return_policy": "load_ref",
+      "fault_protection_status": "placeholder_blocked"
+    }
+  },
+  "expected": {
+    "evidence_level": "definition_only",
+    "ports": [
+      {"name": "AMP_OUT", "direction": "input"},
+      {"name": "HP_OUT", "direction": "output"},
+      {"name": "LOAD_RET", "direction": "passive"},
+      {"name": "LOAD_REF", "direction": "passive"}
+    ]
+  }
+}

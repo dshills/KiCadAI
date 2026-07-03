@@ -2,7 +2,7 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 14,
+    "count": 15,
     "results": [
       {
         "case_id": "canned_oscillator_default",
@@ -157,6 +157,26 @@
           {
             "name": "erc_drc",
             "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "headphone_output_protection_32ohm",
+        "block_id": "headphone_output_protection",
+        "evidence_level": "definition_only",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
           }
         ]
       },
