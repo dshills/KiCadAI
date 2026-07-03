@@ -235,6 +235,44 @@ func TestRunIntentDraftFromText(t *testing.T) {
 	}
 }
 
+func TestRunIntentDraftFirstLanePromptGoldens(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		text string
+		want []string
+	}{
+		{
+			name: "led_indicator",
+			text: "make a simple LED indicator board",
+			want: []string{`"name": "led_indicator"`, `"kind": "breakout"`, `"kind": "gpio"`, `"kind": "indicator"`, `"voltage": "3.3V"`},
+		},
+		{
+			name: "connector_power_led",
+			text: "make a connector breakout with power LED",
+			want: []string{`"kind": "breakout"`, `"kind": "gpio"`, `"kind": "indicator"`, `"voltage": "3.3V"`},
+		},
+		{
+			name: "i2c_sensor",
+			text: "make a 3.3V I2C temperature sensor breakout",
+			want: []string{`"kind": "sensor_node"`, `"kind": "i2c"`, `"kind": "sensor"`, `"source_hash"`},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			if err := run([]string{"--json", "--text", tc.text, "intent", "draft"}, &stdout, &stderr); err != nil {
+				t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+			}
+			output := stdout.String()
+			for _, want := range tc.want {
+				if !strings.Contains(output, want) {
+					t.Fatalf("expected %q in output:\n%s", want, output)
+				}
+			}
+		})
+	}
+}
+
 func TestRunIntentDraftWritesArtifacts(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "draft")
 	var stdout bytes.Buffer
@@ -455,6 +493,46 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateLEDPromptGoldenReachesPlacement(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "led_project")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected current placement validation to report issues")
+	}
+	var payload struct {
+		Data struct {
+			AIStatus *aiLaneStatus `json:"ai_status"`
+		} `json:"data"`
+	}
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &payload); decodeErr != nil {
+		t.Fatalf("decode result: %v\nstdout=%s", decodeErr, stdout.String())
+	}
+	if payload.Data.AIStatus == nil {
+		t.Fatalf("missing ai_status: %s", stdout.String())
+	}
+	if payload.Data.AIStatus.Status != aiLaneStatusBlocked || payload.Data.AIStatus.Stage != "placement" || payload.Data.AIStatus.IssueCode != reports.CodePlacementOutsideBoard {
+		t.Fatalf("ai_status = %#v", payload.Data.AIStatus)
+	}
+	var workflow struct {
+		Stages []workflowEvidenceStage `json:"stages"`
+	}
+	readJSONFile(t, filepath.Join(output, ".kicadai", "workflow-result.json"), &workflow)
+	wantStages := map[string]string{
+		"block_planning":       string(designworkflow.StageStatusOK),
+		"schematic":            string(designworkflow.StageStatusOK),
+		"schematic_electrical": string(designworkflow.StageStatusOK),
+		"pcb_realization":      string(designworkflow.StageStatusOK),
+		"placement":            string(designworkflow.StageStatusBlocked),
+	}
+	for stage, wantStatus := range wantStages {
+		if got := workflowStageStatus(workflow.Stages, stage); got != wantStatus {
+			t.Fatalf("stage %s status = %q, want %q; stages = %#v", stage, got, wantStatus, workflow.Stages)
+		}
+	}
+}
+
 func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "sensor_breakout")
 	requestPath := filepath.Join("..", "..", "examples", "intent", "sensor_breakout.json")
@@ -579,7 +657,17 @@ func readJSONFile(t *testing.T, path string, target any) {
 
 type workflowEvidenceStage struct {
 	Name    string         `json:"name"`
+	Status  string         `json:"status"`
 	Summary map[string]any `json:"summary"`
+}
+
+func workflowStageStatus(stages []workflowEvidenceStage, name string) string {
+	for _, stage := range stages {
+		if stage.Name == name {
+			return stage.Status
+		}
+	}
+	return ""
 }
 
 type componentEvidenceOverride struct {
@@ -654,6 +742,33 @@ func TestRunIntentCreateTextBlocksClarification(t *testing.T) {
 		t.Fatal("expected clarification error")
 	}
 	if !strings.Contains(stdout.String(), "battery chemistry") {
+		t.Fatalf("stdout = %s", stdout.String())
+	}
+}
+
+func TestRunIntentCreateHighVoltagePromptBlocksBeforeGeneration(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "project")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a mains powered LED board", "--output", output, "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected high-voltage prompt to block")
+	}
+	var payload struct {
+		Data struct {
+			AIStatus *aiLaneStatus `json:"ai_status"`
+		} `json:"data"`
+	}
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &payload); decodeErr != nil {
+		t.Fatalf("decode result: %v\nstdout=%s", decodeErr, stdout.String())
+	}
+	if payload.Data.AIStatus == nil {
+		t.Fatalf("missing ai_status: %s", stdout.String())
+	}
+	if payload.Data.AIStatus.Status != aiLaneStatusNeedsClarification || payload.Data.AIStatus.Stage != "plan" || !payload.Data.AIStatus.UserClarificationRequired {
+		t.Fatalf("ai_status = %#v", payload.Data.AIStatus)
+	}
+	if !strings.Contains(stdout.String(), "Mains and high-voltage designs are not supported") {
 		t.Fatalf("stdout = %s", stdout.String())
 	}
 }

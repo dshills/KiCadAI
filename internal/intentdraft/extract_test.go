@@ -60,6 +60,45 @@ func TestDraftExtractsPowerModule(t *testing.T) {
 	}
 }
 
+func TestDraftExtractsLEDIndicatorDefaultSupply(t *testing.T) {
+	result := Draft("make a simple LED indicator board", Options{})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if result.Request.Kind != intentplanner.IntentBreakout {
+		t.Fatalf("kind = %q", result.Request.Kind)
+	}
+	if result.Request.Name != "led_indicator" {
+		t.Fatalf("name = %q", result.Request.Name)
+	}
+	if len(result.Request.Functions) != 1 || result.Request.Functions[0].Kind != "indicator" {
+		t.Fatalf("functions = %#v", result.Request.Functions)
+	}
+	if len(result.Request.Interfaces) != 1 || result.Request.Interfaces[0].Kind != "gpio" || result.Request.Interfaces[0].Voltage != "3.3V" {
+		t.Fatalf("interfaces = %#v", result.Request.Interfaces)
+	}
+	if len(result.Request.Power.Inputs) != 1 || result.Request.Power.Inputs[0].Kind != "external" || result.Request.Power.Inputs[0].Voltage != "3.3V" {
+		t.Fatalf("power inputs = %#v", result.Request.Power.Inputs)
+	}
+	if len(result.Request.Power.Rails) != 1 || result.Request.Power.Rails[0].Voltage != "3.3V" {
+		t.Fatalf("power rails = %#v", result.Request.Power.Rails)
+	}
+}
+
+func TestDraftDoesNotTreatControlledAsLEDIndicator(t *testing.T) {
+	result := Draft("make a controlled power supply with 5V input", Options{})
+	for _, function := range result.Request.Functions {
+		if function.Kind == "indicator" {
+			t.Fatalf("unexpected indicator function = %#v", result.Request.Functions)
+		}
+	}
+	for _, iface := range result.Request.Interfaces {
+		if iface.Kind == "gpio" {
+			t.Fatalf("unexpected gpio interface = %#v", result.Request.Interfaces)
+		}
+	}
+}
+
 func TestDraftExtractsClassABHeadphoneAmplifier(t *testing.T) {
 	result := Draft("build a class AB headphone amplifier with gain 2 for 64 ohms headphones on 12V", Options{})
 	if len(result.Issues) != 0 {

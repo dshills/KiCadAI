@@ -10,7 +10,12 @@ import (
 	"kicadai/internal/intentplanner"
 )
 
-const nearbyVoltageThresholdBytes = 24
+const (
+	nearbyVoltageThresholdBytes = 24
+	defaultIndicatorVoltage     = "3.3V"
+)
+
+var ledIndicatorPhrases = []string{"led", "status light", "indicator"}
 
 func extractStructuredIntent(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {
 	request.Name = deriveName(normalized)
@@ -51,6 +56,7 @@ func extractStructuredIntent(source string, normalized string, request *intentpl
 	extractPower(source, normalized, request, extraction)
 	extractInterfaces(source, normalized, request, extraction)
 	extractFunctions(source, normalized, request, extraction)
+	defaultIndicatorSupply(source, normalized, request, extraction)
 }
 
 func extractPower(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {
@@ -90,6 +96,14 @@ func extractInterfaces(source string, normalized string, request *intentplanner.
 		request.Interfaces = append(request.Interfaces, iface)
 		addField(extraction, fmt.Sprintf("interfaces[%d].kind", len(request.Interfaces)-1), iface.Kind, source, findFirstPhrase(source, []string{"i2c", "iic", "qwiic", "stemma"}), confidenceRegexHigh, "keyword.interface")
 	}
+	if ledIndicatorRequested(normalized) && !containsAny(normalized, "i2c", "qwiic", "stemma", "spi", "uart") && !requestHasInterface(request, "gpio") {
+		iface := intentplanner.InterfaceIntent{Kind: "gpio", Voltage: inferredInterfaceVoltage(request)}
+		if iface.Voltage == "" {
+			iface.Voltage = defaultIndicatorVoltage
+		}
+		request.Interfaces = append(request.Interfaces, iface)
+		addField(extraction, fmt.Sprintf("interfaces[%d].kind", len(request.Interfaces)-1), iface.Kind, source, findFirstPhrase(source, ledIndicatorPhrases), confidenceRegexMedium, "inferred.interface")
+	}
 	if containsAny(normalized, "uart") {
 		iface := intentplanner.InterfaceIntent{Kind: "uart", Voltage: inferredInterfaceVoltage(request)}
 		request.Interfaces = append(request.Interfaces, iface)
@@ -126,6 +140,11 @@ func extractFunctions(source string, normalized string, request *intentplanner.R
 		request.Functions = append(request.Functions, function)
 		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, []string{"regulator", "ldo", "buck"}), confidenceRegexHigh, "keyword.function")
 	}
+	if ledIndicatorRequested(normalized) {
+		function := intentplanner.FunctionIntent{Kind: "indicator"}
+		request.Functions = append(request.Functions, function)
+		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, ledIndicatorPhrases), confidenceRegexHigh, "keyword.function")
+	}
 	if containsAny(normalized, "amplifier", "op amp", "op-amp", "gain stage", "headphone", "headphones") {
 		function := intentplanner.FunctionIntent{Kind: "amplifier", Family: "op_amp_gain_stage"}
 		if containsAny(normalized, "class ab", "class-ab") && containsAny(normalized, "headphone", "headphones") {
@@ -154,6 +173,49 @@ func extractFunctions(source string, normalized string, request *intentplanner.R
 		request.Protection.ReversePolarity = intentplanner.StrengthRequired
 		addField(extraction, "protection.reverse_polarity", request.Protection.ReversePolarity, source, findFirstPhrase(source, []string{"reverse polarity", "reverse-polarity"}), confidenceRegexHigh, "keyword.protection")
 	}
+}
+
+func defaultIndicatorSupply(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {
+	if !requestHasFunction(request, "indicator") || len(request.Power.Inputs) > 0 || len(request.Power.Rails) > 0 {
+		return
+	}
+	if containsAny(normalized, highVoltagePhrases...) {
+		return
+	}
+	voltage := inferredInterfaceVoltage(request)
+	if voltage == "" {
+		voltage = defaultIndicatorVoltage
+	}
+	input := intentplanner.PowerInputIntent{Kind: "external", Voltage: voltage}
+	request.Power.Inputs = append(request.Power.Inputs, input)
+	inputIndex := len(request.Power.Inputs) - 1
+	addField(extraction, fmt.Sprintf("power.inputs[%d].kind", inputIndex), input.Kind, source, ExtractedField{}, confidenceRegexLow, "default.power_input")
+	rail := intentplanner.PowerRailIntent{Name: "VCC", Voltage: voltage, Alias: voltageAlias(voltage), SuppliedTargets: []intentplanner.TargetRef{{Role: "indicator"}}}
+	request.Power.Rails = append(request.Power.Rails, rail)
+	railIndex := len(request.Power.Rails) - 1
+	addField(extraction, fmt.Sprintf("power.rails[%d].voltage", railIndex), rail.Voltage, source, ExtractedField{}, confidenceRegexLow, "default.power_rail")
+}
+
+func requestHasFunction(request *intentplanner.Request, kind string) bool {
+	for _, function := range request.Functions {
+		if function.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func requestHasInterface(request *intentplanner.Request, kind string) bool {
+	for _, iface := range request.Interfaces {
+		if iface.Kind == kind {
+			return true
+		}
+	}
+	return false
+}
+
+func ledIndicatorRequested(normalized string) bool {
+	return containsAny(normalized, ledIndicatorPhrases...)
 }
 
 func classABHeadphoneParamsFromSource(source string) map[string]any {
@@ -204,6 +266,8 @@ func deriveKind(normalized string) intentplanner.IntentKind {
 		return intentplanner.IntentMCUMinimal
 	case containsAny(normalized, "sensor", "temperature", "humidity", "pressure"):
 		return intentplanner.IntentSensorNode
+	case ledIndicatorRequested(normalized):
+		return intentplanner.IntentBreakout
 	case containsAny(normalized, "breakout", "adapter", "connector"):
 		return intentplanner.IntentBreakout
 	default:
@@ -225,6 +289,9 @@ func deriveName(normalized string) string {
 		}
 		return "sensor_node"
 	case intentplanner.IntentBreakout:
+		if ledIndicatorRequested(normalized) {
+			return "led_indicator"
+		}
 		return "connector_breakout"
 	default:
 		return "natural_language_intent"

@@ -12,6 +12,19 @@ func TestDraftClarifiesBatteryVoltage(t *testing.T) {
 	}
 }
 
+func TestDraftClarifiesHighVoltageUnsupported(t *testing.T) {
+	result := Draft("make a mains powered LED board", Options{})
+	if !BlockingClarifications(result.Clarifications) {
+		t.Fatalf("clarifications = %#v", result.Clarifications)
+	}
+	if result.Clarifications[0].ID != "intent.power.high_voltage_unsupported" {
+		t.Fatalf("clarifications = %#v", result.Clarifications)
+	}
+	if len(result.Request.Power.Inputs) != 0 || len(result.Request.Power.Rails) != 0 {
+		t.Fatalf("unexpected defaulted power = %#v", result.Request.Power)
+	}
+}
+
 func TestDraftClarifiesUnsupportedInterface(t *testing.T) {
 	result := Draft("make a CAN sensor board with 5V input", Options{})
 	if !BlockingClarifications(result.Clarifications) {

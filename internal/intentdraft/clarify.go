@@ -12,6 +12,8 @@ var unsupportedInterfacePatterns = []*regexp.Regexp{
 	regexp.MustCompile(`\bCAN(?:[- ]?)(?:adapter|bus|interface|transceiver|sensor|board|connector|controller|node|shield|breakout|port)\b`),
 }
 
+var highVoltagePhrases = []string{"mains", "line voltage", "high voltage", "ac power", "ac mains", "ac line", "line ac", "110v", "120v", "220v", "230v", "240v", "110 v", "120 v", "220 v", "230 v", "240 v"}
+
 func clarifyDraft(source string, normalized string, request intentplanner.Request, extraction ExtractionReport) []Clarification {
 	var clarifications []Clarification
 	finder := newPhraseFinder(source)
@@ -24,6 +26,17 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 			Options:    []string{"3.7V Li-ion", "2xAA", "external regulated input"},
 			Evidence:   []ExtractedField{finder.findPhrase("battery")},
 			Suggestion: "Specify the battery voltage or chemistry.",
+		})
+	}
+	if containsAny(normalized, highVoltagePhrases...) {
+		clarifications = append(clarifications, Clarification{
+			ID:         "intent.power.high_voltage_unsupported",
+			Path:       "power.inputs",
+			Severity:   ClarificationBlocking,
+			Question:   "Mains and high-voltage designs are not supported by the current autonomous generation lane.",
+			Options:    []string{"use isolated low-voltage input", "stop generation"},
+			Evidence:   []ExtractedField{finder.findFirstPhrase(highVoltagePhrases)},
+			Suggestion: "Use a verified isolated low-voltage input before generating schematics or PCB files.",
 		})
 	}
 	if unsupportedInterfaceClarificationRequested(source, normalized) {
