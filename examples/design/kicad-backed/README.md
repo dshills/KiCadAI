@@ -46,7 +46,7 @@ kicadai \
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `candidate` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment, routed inter-block endpoint contact evidence, and candidate promotion coverage. |
 | `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, and route-tree repair retry; current blockers are selected-attempt VCC/SDA graph splits plus VCC/GND pathfinding gaps with 9/12 required contacts proven after failed-route branches are excluded. |
-| `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft amplifier seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, output DC-blocking/protection realization, analog layout proof, and KiCad ERC/DRC promotion evidence. |
+| `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
 ## Interpreting Results
 

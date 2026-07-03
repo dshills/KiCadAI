@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "name": "class_ab_headphone_driver",
   "intent": {
-    "summary": "Connectivity-level Class AB headphone driver seed with op-amp voltage gain, diode-biased complementary output stage, explicit rails, and output DC blocking.",
+    "summary": "Connectivity-level Class AB headphone driver seed with op-amp voltage gain, diode-biased complementary output stage, explicit rails, and headphone_output_protection with AC coupling.",
     "category": "amplifier"
   },
   "board": {

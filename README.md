@@ -87,12 +87,14 @@ intent fixtures, a draft generated op-amp headphone-buffer design request, and
 an optional KiCad-backed `expected_fail` fabrication-candidate fixture. These
 fixtures are regression and evidence tools only. The generator now has a
 connectivity-level Class AB headphone output-stage path with deterministic
-MMBT3904/MMBT3906 selection, diode-string biasing, DC-blocking capacitor
-support, and workflow diagnostics that block unsafe single-supply headphone
-outputs without AC output coupling through a DC-blocking capacitor. Generated
-amplifier designs are not fabrication-ready until verified load safety, output
-fault protection, SOA and thermal evidence, analog stability/layout rules, and
-KiCad ERC/DRC-clean proof are available.
+MMBT3904/MMBT3906 selection, diode-string biasing, and single-supply AC output
+coupling through `headphone_output_protection`. That block models the
+DC-blocking capacitor, required bleed/reference policy, optional series output
+resistor, connector return/reference diagnostics, and blocked
+speaker/bridge/power-amplifier scope. Generated amplifier
+designs are not fabrication-ready until active output fault protection, SOA and
+thermal evidence, analog stability/layout rules, and KiCad ERC/DRC-clean proof
+are available.
 
 ## Requirements
 
@@ -250,9 +252,11 @@ Amplifier intents currently produce explicit partial or blocked evidence unless
 they map to supported low-voltage headphone slices. The Class AB headphone
 output-stage path is connectivity-level only: it can select the seeded
 MMBT3904/MMBT3906 pair, realize the diode-biased output stage, require
-single-supply AC output coupling through a DC-blocking capacitor, and explain
-remaining blockers. Class A output stages, stability networks, speaker loads,
-and power-amplifier thermal/current proof remain roadmap work.
+single-supply AC output coupling through `headphone_output_protection`, and
+explain bleed/reference, connector-return, optional series-resistor, and fault
+protection assumptions. Class A output stages, stability networks, speaker
+loads, active fault protection, and power-amplifier thermal/current proof
+remain roadmap work.
 
 See [Intent Planning And AI Workflow](docs/intent-planning.md) for details.
 

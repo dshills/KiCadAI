@@ -43,6 +43,21 @@ as fabrication-ready. The input path requests the op-amp block's AC-coupled
 single-supply bias network; practical output offset management is still future
 work.
 
+## Class AB Headphone Driver
+
+```sh
+kicadai --request examples/design/amplifier/class_ab_headphone_driver.json --output ./out/class_ab_headphone_driver --overwrite design create
+```
+
+This connectivity-level amplifier seed uses `opamp_gain_stage`,
+`class_ab_output_stage`, and `headphone_output_protection`. The protected output
+path includes a DC-blocking capacitor for single-supply AC coupling, required
+bleed/reference policy, connector return/reference diagnostics, and a
+placeholder fault-protection status. It is headphone-only; speaker, bridge, and
+power-amplifier loads remain blocked. This example is not fabrication-ready
+until active fault protection, SOA/thermal evidence, stability/layout proof, and
+KiCad ERC/DRC promotion evidence exist.
+
 Generated artifacts include:
 
 - `<output>/<name>.kicad_pro`

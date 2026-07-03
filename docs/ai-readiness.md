@@ -107,10 +107,14 @@ The `amplifier` matrix covers:
 Several amplifier records have now reached `connectivity` for the narrow
 low-voltage headphone slice: seeded MMBT3904/MMBT3906 output devices,
 diode-string Class AB output-stage realization, single-supply DC-blocking
-diagnostics, and AI-facing design-limit notes. These are not claims that
-amplifier generation is fabrication-ready. The remaining queue is SOA and
-thermal evidence, load-safety and fault-protection policy, analog
-stability/layout proof, and KiCad ERC/DRC promotion evidence.
+diagnostics, an explicit `headphone_output_protection` block, and AI-facing
+design-limit notes. The protection block covers AC output coupling through a
+DC-blocking capacitor, required bleed/reference policy, optional series output
+resistance, and connector return/reference diagnostics for headphone-only
+loads. These are not claims that amplifier generation is fabrication-ready.
+The remaining queue is SOA and thermal evidence, active fault-protection
+policy, speaker/bridge/power-amplifier load safety, analog stability/layout
+proof, and KiCad ERC/DRC promotion evidence.
 
 ## Validation
 

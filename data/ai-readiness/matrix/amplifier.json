@@ -31,7 +31,7 @@
       "readiness": "connectivity",
       "blocker": "A diode-string Class AB headphone output-stage block can be realized, but quiescent-current calculation, temperature compensation, Vbe multiplier support, and layout-coupled thermal evidence are not verified.",
       "evidence_needed": ["quiescent-current calculation", "temperature compensation evidence", "Vbe multiplier topology generator", "thermal coupling/layout constraints"],
-      "next_task": "add_block",
+      "next_task": "capture_kicad_evidence",
       "parallel_group": "catalog_block_expansion",
       "depends_on": ["amplifier.component.output_transistor"]
     },
@@ -39,12 +39,13 @@
       "id": "amplifier.block.output_protection",
       "category": "block",
       "domain": "amplifier",
-      "title": "Headphone DC blocking and output protection",
+      "title": "headphone_output_protection block",
       "readiness": "connectivity",
-      "blocker": "A reusable DC-blocking capacitor block exists and planner diagnostics require it for single-supply Class AB headphone outputs, but load safety, bleed policy, and output fault protection are not verified.",
-      "evidence_needed": ["bleed/load resistor policy", "output connector safety constraints", "fault/protection component evidence", "KiCad-backed validation of single-supply AC output coupling through a DC-blocking capacitor"],
-      "next_task": "add_block",
-      "parallel_group": "catalog_block_expansion"
+      "blocker": "Active fault protection, speaker/bridge/power-amplifier load safety, and fabrication promotion remain unverified for headphone output protection.",
+      "evidence_needed": ["fault/protection component evidence", "KiCad-backed ERC/DRC validation of protected Class AB headphone examples", "SOA and thermal proof for selected output devices", "speaker, bridge, and power-amplifier load-safety constraints"],
+      "next_task": "capture_kicad_evidence",
+      "parallel_group": "catalog_block_expansion",
+      "depends_on": ["amplifier.block.bias_network", "amplifier.component.output_transistor"]
     },
     {
       "id": "amplifier.layout.thermal_current",
