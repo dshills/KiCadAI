@@ -281,6 +281,9 @@ func requireAmplifierOutputEvidence(t *testing.T, record *ComponentRecord, polar
 	if evidence.Package == "" || evidence.SymbolID == "" || evidence.FootprintID == "" || evidence.PinmapEvidence == "" {
 		t.Fatalf("%s missing package/symbol/footprint/pinmap evidence: %+v", record.ID, evidence)
 	}
+	if evidence.ComplementaryGroup == "" {
+		t.Fatalf("%s missing complementary group: %+v", record.ID, evidence)
+	}
 	if evidence.ControlTerminal == "" || evidence.UpperOrLowerTerminal == "" || evidence.OutputTerminal == "" {
 		t.Fatalf("%s missing terminal role mapping: %+v", record.ID, evidence)
 	}
@@ -854,6 +857,7 @@ func validAmplifierOutputEvidence() *AmplifierOutputEvidence {
 		SymbolID:                   "Device:Q_NPN_BEC",
 		FootprintID:                "Package_TO_SOT_SMD:SOT-23",
 		PinmapEvidence:             "builtin_pinmap:Device:Q_NPN_BEC",
+		ComplementaryGroup:         "mmbt390x_sot23",
 		ControlTerminal:            "BASE",
 		UpperOrLowerTerminal:       "COLLECTOR",
 		OutputTerminal:             "EMITTER",

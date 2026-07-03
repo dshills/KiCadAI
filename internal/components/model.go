@@ -49,19 +49,26 @@ const (
 )
 
 type Catalog struct {
-	Version      string                         `json:"version"`
-	GeneratedAt  *time.Time                     `json:"generated_at,omitempty"`
-	Records      []ComponentRecord              `json:"records"`
-	Families     []FamilyDefinition             `json:"families"`
-	Diagnostics  []reports.Issue                `json:"diagnostics,omitempty"`
-	mu           sync.RWMutex                   `json:"-"`
-	recordIndex  map[string]int                 `json:"-"`
-	variantIndex map[string]CatalogVariantIndex `json:"-"`
+	Version              string                                     `json:"version"`
+	GeneratedAt          *time.Time                                 `json:"generated_at,omitempty"`
+	Records              []ComponentRecord                          `json:"records"`
+	Families             []FamilyDefinition                         `json:"families"`
+	Diagnostics          []reports.Issue                            `json:"diagnostics,omitempty"`
+	mu                   sync.RWMutex                               `json:"-"`
+	recordIndex          map[string]int                             `json:"-"`
+	variantIndex         map[string]CatalogVariantIndex             `json:"-"`
+	amplifierOutputIndex map[string][]amplifierOutputIndexCandidate `json:"-"`
 }
 
 type CatalogVariantIndex struct {
 	Record  int
 	Variant int
+}
+
+type amplifierOutputIndexCandidate struct {
+	Record    int
+	Variant   int
+	Candidate Candidate
 }
 
 type FamilyDefinition struct {
@@ -253,6 +260,7 @@ type AmplifierOutputEvidence struct {
 	SymbolID                   string   `json:"symbol_id,omitempty"`
 	FootprintID                string   `json:"footprint_id,omitempty"`
 	PinmapEvidence             string   `json:"pinmap_evidence,omitempty"`
+	ComplementaryGroup         string   `json:"complementary_group,omitempty"`
 	ControlTerminal            string   `json:"control_terminal,omitempty"`
 	UpperOrLowerTerminal       string   `json:"upper_or_lower_terminal,omitempty"`
 	OutputTerminal             string   `json:"output_terminal,omitempty"`
@@ -406,14 +414,76 @@ func RebuildCatalogIndexes(catalog *Catalog) {
 func rebuildCatalogIndexesLocked(catalog *Catalog) {
 	catalog.recordIndex = map[string]int{}
 	catalog.variantIndex = map[string]CatalogVariantIndex{}
+	catalog.amplifierOutputIndex = map[string][]amplifierOutputIndexCandidate{}
 	for i, record := range catalog.Records {
 		catalog.Records[i].SearchText = strings.ToLower(record.ID + " " + record.Name + " " + record.Description + " " + strings.Join(record.Tags, " "))
 		catalog.recordIndex[record.ID] = i
 		for j, variant := range record.Packages {
 			catalog.Records[i].Packages[j].SearchText = strings.ToLower(variant.ID + " " + variant.Name + " " + variant.PackageType + " " + variant.FootprintID)
 			catalog.variantIndex[record.ID+"\x00"+variant.ID] = CatalogVariantIndex{Record: i, Variant: j}
+			if amplifierOutputVariantIndexed(&catalog.Records[i], &catalog.Records[i].Packages[j]) {
+				polarity := strings.ToLower(strings.TrimSpace(record.AmplifierOutput.Polarity))
+				score := 100
+				if record.Generic {
+					score -= 25
+				}
+				catalog.amplifierOutputIndex[polarity] = append(catalog.amplifierOutputIndex[polarity], amplifierOutputIndexCandidate{
+					Record:  i,
+					Variant: j,
+					Candidate: Candidate{
+						ComponentID: record.ID,
+						VariantID:   variant.ID,
+						Family:      record.Family,
+						Name:        record.Name,
+						FootprintID: variant.FootprintID,
+						Confidence:  record.Verification.Confidence,
+						Score:       score,
+						Generic:     record.Generic,
+						Reasons:     []string{"amplifier_output_evidence", "polarity:" + polarity, "role:headphone_output"},
+					},
+				})
+			}
 		}
 	}
+	for polarity := range catalog.amplifierOutputIndex {
+		sort.SliceStable(catalog.amplifierOutputIndex[polarity], func(i, j int) bool {
+			left := catalog.amplifierOutputIndex[polarity][i].Candidate
+			right := catalog.amplifierOutputIndex[polarity][j].Candidate
+			if left.Score == right.Score {
+				return left.ComponentID < right.ComponentID
+			}
+			return left.Score > right.Score
+		})
+	}
+}
+
+func amplifierOutputVariantIndexed(record *ComponentRecord, variant *PackageVariant) bool {
+	if record.AmplifierOutput == nil {
+		return false
+	}
+	if !containsString(record.AmplifierOutput.IntendedRoles, "headphone_output") {
+		return false
+	}
+	if strings.TrimSpace(record.AmplifierOutput.Polarity) == "" {
+		return false
+	}
+	if !amplifierOutputSupportsComplementaryBJT(record.AmplifierOutput) {
+		return false
+	}
+	if record.AmplifierOutput.FootprintID != "" && variant.FootprintID != record.AmplifierOutput.FootprintID {
+		return false
+	}
+	return true
+}
+
+func amplifierOutputSupportsComplementaryBJT(evidence *AmplifierOutputEvidence) bool {
+	if evidence == nil {
+		return false
+	}
+	return strings.EqualFold(evidence.DeviceClass, "bjt") &&
+		strings.EqualFold(evidence.ControlTerminal, "BASE") &&
+		strings.EqualFold(evidence.UpperOrLowerTerminal, "COLLECTOR") &&
+		strings.EqualFold(evidence.OutputTerminal, "EMITTER")
 }
 
 func NewIssue(code reports.Code, severity reports.Severity, path string, message string) reports.Issue {

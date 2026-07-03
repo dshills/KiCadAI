@@ -513,6 +513,9 @@ func validateAmplifierOutputEvidence(path string, record *ComponentRecord) []rep
 	if evidence.FootprintID != "" && !recordHasFootprint(record, evidence.FootprintID) {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".footprint_id", "amplifier output footprint_id must match a component package variant"))
 	}
+	if issue, ok := validateTrimmedMetadata(path+".complementary_group", evidence.ComplementaryGroup, "amplifier output complementary group"); ok {
+		issues = append(issues, issue)
+	}
 	if evidence.PinmapEvidence != "" && !strings.HasPrefix(strings.ToLower(evidence.PinmapEvidence), "blocked:") && !recordHasPinmapEvidence(record, evidence.SymbolID, evidence.FootprintID, evidence.PinmapEvidence) {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".pinmap_evidence", "amplifier output pinmap_evidence must match the referenced symbol or package verification sources"))
 	}
