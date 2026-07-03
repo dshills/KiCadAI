@@ -2,7 +2,7 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 12,
+    "count": 14,
     "results": [
       {
         "case_id": "canned_oscillator_default",
@@ -33,6 +33,26 @@
           {
             "name": "erc_drc",
             "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "class_ab_output_stage_headphone",
+        "block_id": "class_ab_output_stage",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
           }
         ]
       },
@@ -85,6 +105,26 @@
           {
             "name": "erc_drc",
             "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "dc_blocking_capacitor_220uf",
+        "block_id": "dc_blocking_capacitor",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
           }
         ]
       },

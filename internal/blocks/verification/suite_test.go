@@ -21,6 +21,7 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 		"class_ab_output_stage_headphone",
 		"connector_breakout_4pin",
 		"crystal_oscillator_default",
+		"dc_blocking_capacitor_220uf",
 		"esd_protection_5v",
 		"i2c_sensor_pullups",
 		"led_indicator_default",

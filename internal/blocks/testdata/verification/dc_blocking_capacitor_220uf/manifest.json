@@ -1,0 +1,45 @@
+{
+  "id": "dc_blocking_capacitor_220uf",
+  "block_id": "dc_blocking_capacitor",
+  "description": "Series 220 uF DC blocking capacitor for headphone-class AC coupling.",
+  "acceptance": "draft",
+  "request": {
+    "instance_id": "coup",
+    "params": {
+      "capacitance": "220uF",
+      "capacitor_footprint": "Capacitor_SMD:C_1210_3225Metric"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["C1"],
+    "components": [
+      {
+        "role": "coupling_capacitor",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C_Polarized",
+        "footprint_id": "Capacitor_SMD:C_1210_3225Metric"
+      }
+    ],
+    "ports": [
+      {"name": "IN", "direction": "passive", "net": "coup_in"},
+      {"name": "OUT", "direction": "passive", "net": "coup_out"}
+    ],
+    "nets": [
+      {
+        "name": "coup_in",
+        "visibility": "exported",
+        "pins": [
+          {"role": "coupling_capacitor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "coup_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "coupling_capacitor", "pin": "2"}
+        ]
+      }
+    ]
+  }
+}

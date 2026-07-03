@@ -1,0 +1,88 @@
+{
+  "version": "0.1.0",
+  "name": "class_ab_headphone_driver",
+  "intent": {
+    "summary": "Connectivity-level Class AB headphone driver seed with op-amp voltage gain, diode-biased complementary output stage, explicit rails, and output DC blocking.",
+    "category": "amplifier"
+  },
+  "board": {
+    "width_mm": 85,
+    "height_mm": 50,
+    "layers": 2
+  },
+  "component_policy": {
+    "minimum_confidence": "verified",
+    "acceptance": "connectivity"
+  },
+  "blocks": [
+    {
+      "id": "input",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["SIG", "GND"]
+      }
+    },
+    {
+      "id": "gain",
+      "block_id": "opamp_gain_stage",
+      "params": {
+        "topology": "non_inverting",
+        "gain": 2,
+        "single_supply": true,
+        "input_coupling": "ac",
+        "include_output_resistor": true
+      }
+    },
+    {
+      "id": "output",
+      "block_id": "class_ab_output_stage",
+      "params": {
+        "topology": "diode_string",
+        "supply_voltage": "9V",
+        "load_impedance": "32Ω"
+      }
+    },
+    {
+      "id": "headphones",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["SIG", "RET"]
+      }
+    },
+    {
+      "id": "output_coupling",
+      "block_id": "dc_blocking_capacitor",
+      "params": {
+        "capacitance": "220uF",
+        "capacitor_footprint": "Capacitor_SMD:C_1210_3225Metric"
+      }
+    },
+    {
+      "id": "power",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": ["VCC", "LOAD_REF"]
+      }
+    }
+  ],
+  "connections": [
+    {"from": "input.SIG", "to": "gain.IN", "net_alias": "AUDIO_IN"},
+    {"from": "input.GND", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"},
+    {"from": "gain.OUT", "to": "output.DRIVER_OUT", "net_alias": "DRIVER_OUT"},
+    {"from": "gain.VCC", "to": "output.VCC", "net_alias": "VCC"},
+    {"from": "gain.GND", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"},
+    {"from": "output.AMP_OUT", "to": "output_coupling.IN", "net_alias": "AMP_OUT_DC_BIASED"},
+    {"from": "output_coupling.OUT", "to": "headphones.SIG", "net_alias": "HP_OUT"},
+    {"from": "output.LOAD_REF", "to": "headphones.RET", "net_alias": "LOAD_REF"},
+    {"from": "power.VCC", "to": "gain.VCC", "net_alias": "VCC"},
+    {"from": "power.VCC", "to": "output.VCC", "net_alias": "VCC"},
+    {"from": "power.LOAD_REF", "to": "gain.GND", "net_alias": "LOAD_REF"},
+    {"from": "power.LOAD_REF", "to": "output.VEE", "net_alias": "LOAD_REF"},
+    {"from": "power.LOAD_REF", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"}
+  ],
+  "validation": {
+    "acceptance": "connectivity",
+    "skip_routing": true,
+    "skip_kicad_checks": true
+  }
+}

@@ -19,7 +19,8 @@ func TestAmplifierDesignFixturesPlanToDeclaredAcceptance(t *testing.T) {
 		t.Fatal("no amplifier design fixtures found")
 	}
 	expectedAcceptance := map[string]AcceptanceLevel{
-		"opamp_headphone_buffer": AcceptanceDraft,
+		"class_ab_headphone_driver": AcceptanceConnectivity,
+		"opamp_headphone_buffer":    AcceptanceDraft,
 	}
 	sort.Strings(paths)
 	for _, path := range paths {

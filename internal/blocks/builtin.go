@@ -26,6 +26,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		i2cSensorDefinition(),
 		opampGainStageDefinition(),
 		classABOutputStageDefinition(),
+		dcBlockingCapacitorDefinition(),
 		connectorBreakoutDefinition(),
 	}
 }

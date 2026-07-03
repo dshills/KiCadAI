@@ -48,6 +48,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 		"canned_oscillator":           instantiateCannedOscillator,
 		"class_ab_output_stage":       instantiateClassABOutputStage,
 		"crystal_oscillator":          instantiateCrystalOscillator,
+		"dc_blocking_capacitor":       instantiateDCBlockingCapacitor,
 		"esd_protection":              instantiateESDProtection,
 		"i2c_sensor":                  instantiateI2CSensor,
 		"led_indicator":               instantiateLEDIndicator,
