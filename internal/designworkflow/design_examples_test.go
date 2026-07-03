@@ -13,6 +13,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
@@ -413,6 +415,104 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if summary.FaultProtectionStatus != "placeholder_blocked" || summary.Readiness != "connectivity" {
 		t.Fatalf("%s protected output readiness = %#v", metadata.ID, summary)
 	}
+	schematicElectrical, ok := designExampleStageByName(result, StageSchematicElectrical)
+	if !ok {
+		t.Fatalf("%s missing schematic electrical stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if schematicElectrical.Status != StageStatusBlocked {
+		t.Fatalf("%s schematic electrical status = %q, want blocked:\n%s", metadata.ID, schematicElectrical.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	for _, labels := range []string{
+		"headphones_SIG,output_amp_out",
+		"output_lower_emitter,output_upper_emitter",
+	} {
+		if !designExampleIssuesContainNet(schematicElectrical.Issues, labels) {
+			t.Fatalf("%s missing schematic label conflict %q in:\n%s", metadata.ID, labels, formatDesignExampleIssues(schematicElectrical.Issues))
+		}
+	}
+	for _, stageName := range []StageName{StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks} {
+		stage, ok := designExampleStageByName(result, stageName)
+		if !ok {
+			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
+		}
+		if stage.Status != StageStatusSkipped {
+			t.Fatalf("%s downstream stage %q status = %q, want skipped:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	}
+}
+
+func designExampleIssuesContainNet(issues []reports.Issue, labels string) bool {
+	var targets []string
+	for _, target := range strings.Split(labels, ",") {
+		if target = strings.TrimSpace(target); target != "" {
+			targets = append(targets, target)
+		}
+	}
+	if len(targets) == 0 {
+		return false
+	}
+	for _, issue := range issues {
+		matched := true
+		for _, target := range targets {
+			if !designExampleIssueContainsNet(issue, target) {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func designExampleIssueContainsNet(issue reports.Issue, target string) bool {
+	for _, net := range issue.Nets {
+		for _, token := range strings.Split(net, ",") {
+			if strings.TrimSpace(token) == target {
+				return true
+			}
+		}
+	}
+	return containsDelimitedToken(issue.Message, target)
+}
+
+func containsDelimitedToken(text string, target string) bool {
+	if target == "" {
+		return false
+	}
+	for start := 0; ; {
+		index := strings.Index(text[start:], target)
+		if index < 0 {
+			return false
+		}
+		index += start
+		end := index + len(target)
+		if isTokenPrefixBoundary(text[:index]) && isTokenSuffixBoundary(text[end:]) {
+			return true
+		}
+		start = end
+	}
+}
+
+func isTokenPrefixBoundary(prefix string) bool {
+	if prefix == "" {
+		return true
+	}
+	r, _ := utf8.DecodeLastRuneInString(prefix)
+	return !isWordRune(r)
+}
+
+func isTokenSuffixBoundary(suffix string) bool {
+	if suffix == "" {
+		return true
+	}
+	r, _ := utf8.DecodeRuneInString(suffix)
+	return !isWordRune(r)
+}
+
+func isWordRune(r rune) bool {
+	return unicode.IsLetter(r) || unicode.IsDigit(r) || strings.ContainsRune("_.[]/-+", r)
 }
 
 func TestDesignExampleMetadataValidation(t *testing.T) {
