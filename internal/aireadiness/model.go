@@ -42,21 +42,34 @@ const (
 	TaskWriteDocs            TaskType = "write_docs"
 )
 
+type ParallelGroup string
+
+const (
+	ParallelGroupUnassigned            ParallelGroup = "unassigned"
+	ParallelGroupFixturePromotion      ParallelGroup = "fixture_promotion"
+	ParallelGroupCatalogBlockExpansion ParallelGroup = "catalog_block_expansion"
+	ParallelGroupEngineHardening       ParallelGroup = "engine_hardening"
+	ParallelGroupIntentAIUX            ParallelGroup = "intent_ai_ux"
+	ParallelGroupDocumentation         ParallelGroup = "documentation"
+)
+
 type MatrixFile struct {
 	Version string   `json:"version"`
 	Records []Record `json:"records"`
 }
 
 type Record struct {
-	ID             string     `json:"id"`
-	Category       Category   `json:"category"`
-	Domain         string     `json:"domain"`
-	Title          string     `json:"title"`
-	Readiness      Readiness  `json:"readiness"`
-	Blocker        string     `json:"blocker"`
-	EvidenceNeeded []string   `json:"evidence_needed"`
-	NextTask       TaskType   `json:"next_task"`
-	Evidence       []Evidence `json:"evidence,omitempty"`
+	ID             string        `json:"id"`
+	Category       Category      `json:"category"`
+	Domain         string        `json:"domain"`
+	Title          string        `json:"title"`
+	Readiness      Readiness     `json:"readiness"`
+	Blocker        string        `json:"blocker"`
+	EvidenceNeeded []string      `json:"evidence_needed"`
+	NextTask       TaskType      `json:"next_task"`
+	Evidence       []Evidence    `json:"evidence,omitempty"`
+	ParallelGroup  ParallelGroup `json:"parallel_group,omitempty"`
+	DependsOn      []string      `json:"depends_on,omitempty"`
 }
 
 type Evidence struct {
@@ -131,7 +144,7 @@ func LoadRequirement(path string) (RequirementFile, error) {
 }
 
 func Validate(matrix Matrix) error {
-	seen := map[string]struct{}{}
+	recordsByID := make(map[string]Record, len(matrix.Records))
 	for _, record := range matrix.Records {
 		if !recordIDPattern.MatchString(record.ID) {
 			return fmt.Errorf("record %q must use <domain>.<category>.<slug> id format", record.ID)
@@ -143,10 +156,10 @@ func Validate(matrix Matrix) error {
 		if idParts[1] != string(record.Category) {
 			return fmt.Errorf("record %s category must match id category", record.ID)
 		}
-		if _, exists := seen[record.ID]; exists {
+		if _, exists := recordsByID[record.ID]; exists {
 			return fmt.Errorf("duplicate record id %q", record.ID)
 		}
-		seen[record.ID] = struct{}{}
+		recordsByID[record.ID] = record
 		if !validCategory(record.Category) {
 			return fmt.Errorf("record %s has unsupported category %q", record.ID, record.Category)
 		}
@@ -171,6 +184,23 @@ func Validate(matrix Matrix) error {
 		if !validTaskType(record.NextTask) {
 			return fmt.Errorf("record %s has unsupported next_task %q", record.ID, record.NextTask)
 		}
+		if record.ParallelGroup != "" && !validParallelGroup(record.ParallelGroup) {
+			return fmt.Errorf("record %s has unsupported parallel_group %q", record.ID, record.ParallelGroup)
+		}
+		if !sort.StringsAreSorted(record.DependsOn) {
+			return fmt.Errorf("record %s depends_on must be sorted", record.ID)
+		}
+		for i, dependencyID := range record.DependsOn {
+			if strings.TrimSpace(dependencyID) == "" {
+				return fmt.Errorf("record %s depends_on contains an empty record id", record.ID)
+			}
+			if dependencyID == record.ID {
+				return fmt.Errorf("record %s must not depend on itself", record.ID)
+			}
+			if i > 0 && dependencyID == record.DependsOn[i-1] {
+				return fmt.Errorf("record %s depends_on contains duplicate record id %s", record.ID, dependencyID)
+			}
+		}
 		for _, evidence := range record.Evidence {
 			if strings.TrimSpace(evidence.Kind) == "" {
 				return fmt.Errorf("record %s evidence kind is required", record.ID)
@@ -179,6 +209,20 @@ func Validate(matrix Matrix) error {
 				return fmt.Errorf("record %s evidence %s must include semantic_hash or git_object_id", record.ID, evidence.Path)
 			}
 		}
+	}
+	for _, record := range matrix.Records {
+		for _, dependencyID := range record.DependsOn {
+			dependency, exists := recordsByID[dependencyID]
+			if !exists {
+				return fmt.Errorf("record %s depends on unknown record %s", record.ID, dependencyID)
+			}
+			if record.Readiness == ReadinessVerified && dependency.Readiness != ReadinessVerified {
+				return fmt.Errorf("record %s is verified but dependency %s is %s", record.ID, dependencyID, dependency.Readiness)
+			}
+		}
+	}
+	if err := validateDependencyDAG(matrix, recordsByID); err != nil {
+		return err
 	}
 	return nil
 }
@@ -246,6 +290,47 @@ func validTaskType(task TaskType) bool {
 	default:
 		return false
 	}
+}
+
+func validParallelGroup(group ParallelGroup) bool {
+	switch group {
+	case ParallelGroupUnassigned, ParallelGroupFixturePromotion, ParallelGroupCatalogBlockExpansion, ParallelGroupEngineHardening, ParallelGroupIntentAIUX, ParallelGroupDocumentation:
+		return true
+	default:
+		return false
+	}
+}
+
+func validateDependencyDAG(matrix Matrix, recordsByID map[string]Record) error {
+	const (
+		unvisited = 0
+		visiting  = 1
+		visited   = 2
+	)
+	state := make(map[string]int, len(recordsByID))
+	var visit func(string) error
+	visit = func(recordID string) error {
+		switch state[recordID] {
+		case visited:
+			return nil
+		case visiting:
+			return fmt.Errorf("dependency cycle includes record %s", recordID)
+		}
+		state[recordID] = visiting
+		for _, dependencyID := range recordsByID[recordID].DependsOn {
+			if err := visit(dependencyID); err != nil {
+				return err
+			}
+		}
+		state[recordID] = visited
+		return nil
+	}
+	for _, record := range matrix.Records {
+		if err := visit(record.ID); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func hasNonEmptyString(values []string) bool {

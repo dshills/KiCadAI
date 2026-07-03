@@ -3,11 +3,12 @@ package aireadiness
 import "sort"
 
 type DomainCoverage struct {
-	Domain      string              `json:"domain"`
-	Total       int                 `json:"total"`
-	ByCategory  []CategoryCoverage  `json:"by_category"`
-	ByReadiness []ReadinessCoverage `json:"by_readiness"`
-	NextTasks   []TaskCoverage      `json:"next_tasks"`
+	Domain          string                  `json:"domain"`
+	Total           int                     `json:"total"`
+	ByCategory      []CategoryCoverage      `json:"by_category"`
+	ByReadiness     []ReadinessCoverage     `json:"by_readiness"`
+	ByParallelGroup []ParallelGroupCoverage `json:"by_parallel_group"`
+	NextTasks       []TaskCoverage          `json:"next_tasks"`
 }
 
 type CategoryCoverage struct {
@@ -25,10 +26,16 @@ type TaskCoverage struct {
 	Count int      `json:"count"`
 }
 
+type ParallelGroupCoverage struct {
+	ParallelGroup ParallelGroup `json:"parallel_group"`
+	Count         int           `json:"count"`
+}
+
 func SummarizeDomain(matrix Matrix, domain string) DomainCoverage {
 	categoryCounts := map[Category]int{}
 	readinessCounts := map[Readiness]int{}
 	taskCounts := map[TaskType]int{}
+	parallelGroupCounts := map[ParallelGroup]int{}
 	summary := DomainCoverage{Domain: domain}
 	for _, record := range matrix.Records {
 		if record.Domain != domain {
@@ -38,9 +45,15 @@ func SummarizeDomain(matrix Matrix, domain string) DomainCoverage {
 		categoryCounts[record.Category]++
 		readinessCounts[record.Readiness]++
 		taskCounts[record.NextTask]++
+		parallelGroup := record.ParallelGroup
+		if parallelGroup == "" {
+			parallelGroup = ParallelGroupUnassigned
+		}
+		parallelGroupCounts[parallelGroup]++
 	}
 	summary.ByCategory = categoryCoverageList(categoryCounts)
 	summary.ByReadiness = readinessCoverageList(readinessCounts)
+	summary.ByParallelGroup = parallelGroupCoverageList(parallelGroupCounts)
 	summary.NextTasks = taskCoverageList(taskCounts)
 	return summary
 }
@@ -74,6 +87,17 @@ func taskCoverageList(counts map[TaskType]int) []TaskCoverage {
 	}
 	sort.Slice(items, func(i, j int) bool {
 		return items[i].Task < items[j].Task
+	})
+	return items
+}
+
+func parallelGroupCoverageList(counts map[ParallelGroup]int) []ParallelGroupCoverage {
+	items := make([]ParallelGroupCoverage, 0, len(counts))
+	for group, count := range counts {
+		items = append(items, ParallelGroupCoverage{ParallelGroup: group, Count: count})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].ParallelGroup < items[j].ParallelGroup
 	})
 	return items
 }
