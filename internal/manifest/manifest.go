@@ -22,6 +22,15 @@ type Manifest struct {
 	Artifacts        []reports.Artifact `json:"artifacts"`
 	FileHashes       map[string]string  `json:"file_hashes"`
 	Provenance       *ProvenanceRef     `json:"provenance,omitempty"`
+	AILane           *AILaneSummary     `json:"ai_lane,omitempty"`
+}
+
+type AILaneSummary struct {
+	Status         string `json:"status,omitempty"`
+	Stage          string `json:"stage,omitempty"`
+	SourceHash     string `json:"source_hash,omitempty"`
+	RequestHash    string `json:"request_hash,omitempty"`
+	RetryStatePath string `json:"retry_state_path,omitempty"`
 }
 
 type ProvenanceRef struct {

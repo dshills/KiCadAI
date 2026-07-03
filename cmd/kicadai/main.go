@@ -38,6 +38,7 @@ import (
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/manifest"
 	"kicadai/internal/pinmap"
 	"kicadai/internal/placement"
 	"kicadai/internal/rationale"
@@ -2997,6 +2998,174 @@ func writeWorkflowResultArtifact(outputDir string, workflow designworkflow.Workf
 	return nil
 }
 
+func writeAILaneArtifacts(outputDir string, plan intentplanner.PlanResult, draft *intentDraftOutput, sourceText string, status aiLaneStatus, artifacts []reports.Artifact) ([]reports.Artifact, []reports.Issue) {
+	if strings.TrimSpace(outputDir) == "" {
+		return nil, nil
+	}
+	artifactDir := filepath.Join(outputDir, ".kicadai")
+	if err := os.MkdirAll(artifactDir, 0o755); err != nil {
+		return nil, []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: err.Error()}}
+	}
+	var written []reports.Artifact
+	var issues []reports.Issue
+	if plan.GeneratedRequest != nil {
+		if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "design-request.json"), plan.GeneratedRequest, reports.ArtifactPreview, ".kicadai/design-request.json", "AI lane design workflow request"); issue != nil {
+			issues = append(issues, *issue)
+		} else {
+			written = append(written, artifact)
+		}
+	}
+	if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "validation-summary.json"), status, reports.ArtifactValidationReport, ".kicadai/validation-summary.json", "AI lane status summary"); issue != nil {
+		issues = append(issues, *issue)
+	} else {
+		written = append(written, artifact)
+	}
+	retryState := map[string]any{
+		"retry_allowed":                   status.RetryAllowed,
+		"retry_key":                       status.RetryKey,
+		"max_automatic_retry_attempts":    status.MaxAutomaticRetryAttempts,
+		"user_clarification_required":     status.UserClarificationRequired,
+		"current_automatic_retry_attempt": aiLaneRetryAttempt(artifactDir, status.RetryKey),
+	}
+	if artifact, issue := writeJSONArtifact(filepath.Join(artifactDir, "retry-state.json"), retryState, reports.ArtifactValidationReport, ".kicadai/retry-state.json", "AI lane retry state"); issue != nil {
+		issues = append(issues, *issue)
+	} else {
+		written = append(written, artifact)
+	}
+	manifestArtifacts := append([]reports.Artifact(nil), artifacts...)
+	manifestArtifacts = append(manifestArtifacts, written...)
+	if artifact, issue := writeAILaneManifest(outputDir, plan, draft, sourceText, status, manifestArtifacts); issue != nil {
+		issues = append(issues, *issue)
+	} else {
+		written = append(written, artifact)
+	}
+	return written, issues
+}
+
+func writeJSONArtifact(path string, value any, kind reports.ArtifactKind, relPath string, description string) (reports.Artifact, *reports.Issue) {
+	data, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: relPath, Message: err.Error()}
+	}
+	if issue := writeLocalArtifact(path, append(data, '\n'), true); issue != nil {
+		issue.Path = relPath
+		return reports.Artifact{}, issue
+	}
+	return reports.Artifact{Kind: kind, Path: relPath, Description: description}, nil
+}
+
+func aiLaneRetryAttempt(artifactDir string, retryKey string) int {
+	if strings.TrimSpace(retryKey) == "" {
+		return 0
+	}
+	data, err := os.ReadFile(filepath.Join(artifactDir, "retry-state.json"))
+	if err != nil {
+		return 0
+	}
+	var previous struct {
+		RetryKey                string `json:"retry_key"`
+		CurrentAutomaticAttempt int    `json:"current_automatic_retry_attempt"`
+	}
+	if err := json.Unmarshal(data, &previous); err != nil {
+		return 0
+	}
+	if previous.RetryKey != retryKey {
+		return 0
+	}
+	return previous.CurrentAutomaticAttempt + 1
+}
+
+func writeAILaneManifest(outputDir string, plan intentplanner.PlanResult, draft *intentDraftOutput, sourceText string, status aiLaneStatus, artifacts []reports.Artifact) (reports.Artifact, *reports.Issue) {
+	current, _, err := manifest.Read(outputDir)
+	if err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: manifest.RelativePath, Message: "read existing manifest: " + err.Error()}
+	}
+	current.ProjectName = designworkflow.NormalizeProjectName(plan.Intent.Name)
+	if current.ProjectName == "" && plan.GeneratedRequest != nil {
+		current.ProjectName = designworkflow.NormalizeProjectName(plan.GeneratedRequest.Name)
+	}
+	current.GeneratorVersion = reports.Version
+	current.Artifacts = mergeArtifacts(current.Artifacts, normalizeManifestArtifacts(outputDir, artifacts))
+	current.AILane = &manifest.AILaneSummary{
+		Status:         string(status.Status),
+		Stage:          status.Stage,
+		SourceHash:     aiLaneSourceHash(draft, sourceText),
+		RequestHash:    aiLaneRequestHash(plan),
+		RetryStatePath: ".kicadai/retry-state.json",
+	}
+	if err := os.MkdirAll(filepath.Join(outputDir, ".kicadai"), 0o755); err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: manifest.RelativePath, Message: err.Error()}
+	}
+	artifact, err := manifest.Write(outputDir, current)
+	if err != nil {
+		return reports.Artifact{}, &reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: manifest.RelativePath, Message: err.Error()}
+	}
+	artifact.Path = manifest.RelativePath
+	return artifact, nil
+}
+
+func mergeArtifacts(existing []reports.Artifact, incoming []reports.Artifact) []reports.Artifact {
+	merged := make([]reports.Artifact, 0, len(existing)+len(incoming))
+	seen := map[string]bool{}
+	for _, group := range [][]reports.Artifact{incoming, existing} {
+		for _, artifact := range group {
+			path := filepath.ToSlash(strings.TrimSpace(artifact.Path))
+			if path == "" || seen[path] {
+				continue
+			}
+			artifact.Path = path
+			seen[path] = true
+			merged = append(merged, artifact)
+		}
+	}
+	return merged
+}
+
+func normalizeManifestArtifacts(outputDir string, artifacts []reports.Artifact) []reports.Artifact {
+	normalized := make([]reports.Artifact, 0, len(artifacts))
+	for _, artifact := range artifacts {
+		path := strings.TrimSpace(artifact.Path)
+		if path == "" || filepath.IsAbs(path) {
+			normalized = append(normalized, artifact)
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(outputDir, path)); err == nil {
+			artifact.Path = filepath.ToSlash(path)
+			normalized = append(normalized, artifact)
+			continue
+		}
+		metaPath := filepath.ToSlash(filepath.Join(".kicadai", path))
+		if _, err := os.Stat(filepath.Join(outputDir, metaPath)); err == nil {
+			artifact.Path = metaPath
+		}
+		normalized = append(normalized, artifact)
+	}
+	return normalized
+}
+
+func aiLaneSourceHash(draft *intentDraftOutput, sourceText string) string {
+	if draft != nil && strings.TrimSpace(draft.Extraction.SourceHash) != "" {
+		return draft.Extraction.SourceHash
+	}
+	if strings.TrimSpace(sourceText) == "" {
+		return ""
+	}
+	sum := sha256.Sum256([]byte(sourceText))
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func aiLaneRequestHash(plan intentplanner.PlanResult) string {
+	if plan.GeneratedRequest == nil {
+		return ""
+	}
+	data, err := json.Marshal(plan.GeneratedRequest)
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(data)
+	return fmt.Sprintf("%x", sum[:])
+}
+
 func buildAILaneStatus(plan intentplanner.PlanResult, workflow *designworkflow.WorkflowResult, issues []reports.Issue, artifacts []reports.Artifact) aiLaneStatus {
 	status := aiLaneStatus{
 		Status:              aiLaneStatusReady,
@@ -3304,6 +3473,10 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 		artifacts = append(artifacts, rationaleArtifacts...)
 		aiStatus := buildAILaneStatus(plan, nil, allIssues, artifacts)
+		aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, draft, sourceText, aiStatus, artifacts)
+		allIssues = append(allIssues, aiArtifactIssues...)
+		artifacts = append(artifacts, aiArtifacts...)
+		aiStatus.ArtifactPaths = artifactPaths(artifacts)
 		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Draft: draft, Rationale: &report, AIStatus: &aiStatus}, allIssues, artifacts)
 		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
 			return writeErr
@@ -3335,6 +3508,10 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
 	artifacts = append(artifacts, rationaleArtifacts...)
 	aiStatus := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
+	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, draft, sourceText, aiStatus, artifacts)
+	allIssues = append(allIssues, aiArtifactIssues...)
+	artifacts = append(artifacts, aiArtifacts...)
+	aiStatus.ArtifactPaths = artifactPaths(artifacts)
 	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow, Draft: draft, Rationale: &rationaleReport, AIStatus: &aiStatus}, allIssues, artifacts)
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err

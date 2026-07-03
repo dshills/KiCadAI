@@ -22,6 +22,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/manifest"
 	"kicadai/internal/provenance"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
@@ -437,10 +438,20 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected downstream workflow validation to report issues for this draft")
 	}
-	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json", "workflow-result.json", "design-rationale.json"} {
+	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json", "design-request.json", "workflow-result.json", "design-rationale.json", "validation-summary.json", "retry-state.json", "manifest.json"} {
 		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
 			t.Fatalf("missing artifact %s: %v", name, err)
 		}
+	}
+	generatedManifest, status, err := manifest.Read(output)
+	if err != nil {
+		t.Fatalf("read manifest: %v", err)
+	}
+	if !status.Present || status.Stale {
+		t.Fatalf("manifest status = %#v", status)
+	}
+	if generatedManifest.AILane == nil || generatedManifest.AILane.Status == "" || generatedManifest.AILane.RetryStatePath != ".kicadai/retry-state.json" {
+		t.Fatalf("manifest AI lane summary = %#v", generatedManifest.AILane)
 	}
 }
 
