@@ -324,6 +324,122 @@ func TestPlanRecordsValueCalculationResults(t *testing.T) {
 	}
 }
 
+func TestPlanMapsClassABHeadphoneIntentToProtectedOutputPath(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "class_ab_headphone",
+		Kind:    IntentAmplifier,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "9V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "amplifier", Family: "class_ab_headphone", Params: map[string]any{"gain": 2, "load_impedance": "32Ω", "supply_voltage": "9V"}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "analog", Connector: "audio_input", Voltage: "1V"}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	for _, blockID := range []string{"opamp_gain_stage", "class_ab_output_stage", "headphone_output_protection", "connector_breakout"} {
+		if !hasWorkflowBlock(*plan.GeneratedRequest, blockID) {
+			t.Fatalf("generated request missing block %s: %#v", blockID, plan.GeneratedRequest.Blocks)
+		}
+	}
+	for _, connection := range []struct {
+		from string
+		to   string
+	}{
+		{"amplifier.OUT", "output.DRIVER_OUT"},
+		{"output.AMP_OUT", "output_protection.AMP_OUT"},
+		{"output_protection.HP_OUT", "headphones.SIG"},
+		{"output.LOAD_REF", "output_protection.LOAD_REF"},
+		{"output_protection.LOAD_RET", "headphones.RET"},
+		{"power_header.GND", "amplifier.GND"},
+		{"power_header.GND", "output.VEE"},
+	} {
+		if !hasConnection(*plan.GeneratedRequest, connection.from, connection.to) {
+			t.Fatalf("missing connection %s -> %s: %#v", connection.from, connection.to, plan.GeneratedRequest.Connections)
+		}
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "headphone_output_protection", "nominal_load_ohms"); got != "32Ω" {
+		t.Fatalf("nominal_load_ohms = %q", got)
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanBlocksUnsafeClassABHeadphoneIntent(t *testing.T) {
+	for _, tt := range []struct {
+		name   string
+		params map[string]any
+	}{
+		{name: "speaker", params: map[string]any{"load_kind": "speaker", "load_impedance": "8Ω"}},
+		{name: "bridge", params: map[string]any{"load_kind": "bridge", "load_impedance": "32Ω"}},
+		{name: "unknown_load", params: map[string]any{"load_impedance": "unknown"}},
+		{name: "output_power", params: map[string]any{"output_power_w": "1W", "load_impedance": "32Ω"}},
+		{name: "bipolar_supply", params: map[string]any{"single_supply": false, "load_impedance": "32Ω"}},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			plan := Plan(Request{
+				Version: "0.1.0",
+				Name:    "blocked_" + tt.name,
+				Kind:    IntentAmplifier,
+				Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "9V"}}},
+				Functions: []FunctionIntent{
+					{Kind: "amplifier", Family: "class_ab_headphone", Params: tt.params},
+				},
+			})
+			if plan.Status != PlanStatusBlocked {
+				t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+			}
+			if plan.GeneratedRequest != nil && hasWorkflowBlock(*plan.GeneratedRequest, "headphone_output_protection") {
+				t.Fatalf("unsafe intent should not emit output protection path: %#v", plan.GeneratedRequest.Blocks)
+			}
+		})
+	}
+}
+
+func TestPlanBlocksClassABHeadphoneIntentWithoutGroundSource(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "class_ab_headphone_no_ground",
+		Kind:    IntentAmplifier,
+		Functions: []FunctionIntent{
+			{Kind: "amplifier", Family: "class_ab_headphone", Params: map[string]any{"load_impedance": "32Ω"}},
+		},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasIssuePath(plan.Issues, "functions[0].power.ground") {
+		t.Fatalf("missing ground issue: %#v", plan.Issues)
+	}
+}
+
+func TestPlanMapsMultipleClassABHeadphoneIntentsWithDistinctOutputNets(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "dual_class_ab_headphone",
+		Kind:    IntentAmplifier,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "9V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "amplifier", Family: "class_ab_headphone", Quantity: 2, Params: map[string]any{"load_impedance": "32Ω"}},
+		},
+		Interfaces: []InterfaceIntent{
+			{Kind: "analog", Connector: "audio_input", Voltage: "1V"},
+			{Kind: "analog", Connector: "audio_input", Voltage: "1V"},
+		},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "output.AMP_OUT", "output_protection.AMP_OUT", "AMP_OUT_DC_BIASED_output_protection") {
+		t.Fatalf("missing first scoped output net: %#v", plan.GeneratedRequest.Connections)
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "output_2.AMP_OUT", "output_protection_2.AMP_OUT", "AMP_OUT_DC_BIASED_output_protection_2") {
+		t.Fatalf("missing second scoped output net: %#v", plan.GeneratedRequest.Connections)
+	}
+}
+
 func TestPlanBlocksInvalidExplicitLEDCalculation(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",

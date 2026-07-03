@@ -37,7 +37,7 @@ func clarifyDraft(source string, normalized string, request intentplanner.Reques
 			Suggestion: "Use a supported interface or wait for a block that implements this interface.",
 		})
 	}
-	if containsAny(normalized, "headphone") {
+	if containsAny(normalized, "headphone", "headphones") && !containsAny(normalized, "class ab", "class-ab") {
 		clarifications = append(clarifications, Clarification{
 			ID:         "intent.function.headphone_amplifier_unverified",
 			Path:       "functions",

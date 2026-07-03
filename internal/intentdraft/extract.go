@@ -126,18 +126,25 @@ func extractFunctions(source string, normalized string, request *intentplanner.R
 		request.Functions = append(request.Functions, function)
 		addField(extraction, fmt.Sprintf("functions[%d].kind", len(request.Functions)-1), function.Kind, source, findFirstPhrase(source, []string{"regulator", "ldo", "buck"}), confidenceRegexHigh, "keyword.function")
 	}
-	if containsAny(normalized, "amplifier", "op amp", "op-amp", "gain stage", "headphone") {
+	if containsAny(normalized, "amplifier", "op amp", "op-amp", "gain stage", "headphone", "headphones") {
 		function := intentplanner.FunctionIntent{Kind: "amplifier", Family: "op_amp_gain_stage"}
+		if containsAny(normalized, "class ab", "class-ab") && containsAny(normalized, "headphone", "headphones") {
+			function.Family = "class_ab_headphone"
+			function.Params = classABHeadphoneParamsFromSource(source)
+		}
 		gains := findGains(source)
 		if len(gains) > 0 {
-			function.Params = map[string]any{"gain": gains[0].FloatValue}
+			if function.Params == nil {
+				function.Params = map[string]any{}
+			}
+			function.Params["gain"] = gains[0].FloatValue
 		}
 		request.Functions = append(request.Functions, function)
 		index := len(request.Functions) - 1
 		if len(gains) > 0 {
 			addField(extraction, fmt.Sprintf("functions[%d].params.gain", index), gains[0].FloatValue, source, gains[0].Field, confidenceRegexMedium, "regex.gain")
 		}
-		addField(extraction, fmt.Sprintf("functions[%d].kind", index), function.Kind, source, findFirstPhrase(source, []string{"amplifier", "op amp", "op-amp", "gain stage", "headphone"}), confidenceRegexHigh, "keyword.function")
+		addField(extraction, fmt.Sprintf("functions[%d].kind", index), function.Kind, source, findFirstPhrase(source, []string{"amplifier", "op amp", "op-amp", "gain stage", "headphone", "headphones"}), confidenceRegexHigh, "keyword.function")
 	}
 	if containsAny(normalized, "esd") {
 		request.Protection.ESD = intentplanner.StrengthRequired
@@ -149,9 +156,47 @@ func extractFunctions(source string, normalized string, request *intentplanner.R
 	}
 }
 
+func classABHeadphoneParamsFromSource(source string) map[string]any {
+	params := map[string]any{
+		"load_kind":               "headphone",
+		"load_impedance":          "32Ω",
+		"supply_voltage":          "9V",
+		"fault_protection_status": "placeholder_blocked",
+	}
+	if voltage := firstExtractedVoltage(source); voltage != "" {
+		params["supply_voltage"] = voltage
+	}
+	if load := firstExtractedHeadphoneLoad(source); load != "" {
+		params["load_impedance"] = load
+	}
+	return params
+}
+
+func firstExtractedVoltage(source string) string {
+	voltages := findVoltages(source)
+	if len(voltages) == 0 {
+		return ""
+	}
+	return voltages[0].TextValue
+}
+
+func firstExtractedHeadphoneLoad(source string) string {
+	for _, value := range findRCValues(source) {
+		normalized := strings.ToLower(strings.ReplaceAll(value.TextValue, " ", ""))
+		normalized = strings.TrimSuffix(normalized, "s")
+		switch {
+		case strings.HasSuffix(normalized, "ohm"):
+			return strings.TrimSuffix(normalized, "ohm") + "Ω"
+		case strings.HasSuffix(normalized, "r"):
+			return strings.TrimSuffix(normalized, "r") + "Ω"
+		}
+	}
+	return ""
+}
+
 func deriveKind(normalized string) intentplanner.IntentKind {
 	switch {
-	case containsAny(normalized, "amplifier", "op amp", "op-amp", "gain stage", "headphone"):
+	case containsAny(normalized, "amplifier", "op amp", "op-amp", "gain stage", "headphone", "headphones"):
 		return intentplanner.IntentAmplifier
 	case containsAny(normalized, "power module", "power supply", "regulator", "ldo", "buck"):
 		return intentplanner.IntentPowerModule
@@ -216,7 +261,7 @@ func addField(extraction *ExtractionReport, path string, value any, source strin
 }
 
 func findKindEvidence(source string, normalized string) ExtractedField {
-	return findFirstPhrase(source, []string{"amplifier", "op amp", "op-amp", "gain stage", "headphone", "power module", "power supply", "regulator", "ldo", "buck", "mcu", "microcontroller", "atmega", "arduino", "programmer", "programming", "sensor", "temperature", "humidity", "pressure", "breakout", "adapter", "connector"})
+	return findFirstPhrase(source, []string{"amplifier", "op amp", "op-amp", "gain stage", "headphone", "headphones", "power module", "power supply", "regulator", "ldo", "buck", "mcu", "microcontroller", "atmega", "arduino", "programmer", "programming", "sensor", "temperature", "humidity", "pressure", "breakout", "adapter", "connector"})
 }
 
 type phraseFinder struct {

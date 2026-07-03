@@ -125,6 +125,7 @@ type planBuilder struct {
 	orderedPowerInputs []powerSource
 	ledIDs             []string
 	amplifierIDs       []string
+	classABOutputIDs   []string
 	clockIDs           []string
 	poweredClockIDs    []string
 	programmingIDs     []string
@@ -422,6 +423,10 @@ func (builder *planBuilder) mapFunctions() {
 				builder.mcuIDs = appendIfNotEmpty(builder.mcuIDs, id)
 				builder.recordInstanceSupply(id, function.Supply)
 			case "amplifier":
+				if normalizeToken(function.Family) == "class_ab_headphone" {
+					builder.mapClassABHeadphoneAmplifier(reqID, fmt.Sprintf("functions[%d]", index), function)
+					continue
+				}
 				id := builder.addBlock(reqID, "amplifier", "opamp_gain_stage", function.Params, "op-amp gain stage implements requested amplifier")
 				builder.amplifierIDs = appendIfNotEmpty(builder.amplifierIDs, id)
 				builder.recordInstanceSupply(id, function.Supply)
@@ -587,6 +592,140 @@ func (builder *planBuilder) connectPowerAndSignals() {
 			builder.signalConnectorGap(esdID)
 		}
 	}
+}
+
+func (builder *planBuilder) mapClassABHeadphoneAmplifier(reqID string, path string, function FunctionIntent) {
+	if reason := unsupportedClassABHeadphoneIntent(function); reason != "" {
+		builder.addIssue(path+".params", reason, "request a bounded headphone load with a supported load impedance and no speaker, bridge, or power-amplifier output requirement")
+		return
+	}
+	gainID := builder.addBlock(reqID, "amplifier", "opamp_gain_stage", function.Params, "op-amp gain stage drives the Class AB headphone output stage")
+	outputParams := classABOutputParams(function.Params)
+	outputID := builder.addBlock(reqID, "output", "class_ab_output_stage", outputParams, "Class AB output stage buffers the op-amp for headphone-class load drive")
+	protectionID := builder.addBlock(reqID, "output_protection", "headphone_output_protection", headphoneOutputProtectionParams(function.Params), "AC-coupled headphone output protection captures load-safety assumptions")
+	headphonesID := builder.addBlock(reqID, "headphones", "connector_breakout", map[string]any{"pin_names": []string{"SIG", "RET"}}, "headphone connector exposes protected output and return")
+	if gainID == "" || outputID == "" || protectionID == "" || headphonesID == "" {
+		return
+	}
+	builder.amplifierIDs = appendIfNotEmpty(builder.amplifierIDs, gainID)
+	builder.classABOutputIDs = appendIfNotEmpty(builder.classABOutputIDs, outputID)
+	builder.recordInstanceSupply(gainID, function.Supply)
+	builder.recordInstanceSupply(outputID, function.Supply)
+	builder.addConnection(gainID+".OUT", outputID+".DRIVER_OUT", signalNetAlias("AMP_DRIVER", outputID), "op-amp output drives Class AB bias string")
+	builder.addConnection(outputID+".AMP_OUT", protectionID+".AMP_OUT", signalNetAlias("AMP_OUT_DC_BIASED", protectionID), "Class AB output feeds AC-coupled headphone protection")
+	builder.addConnection(protectionID+".HP_OUT", headphonesID+".SIG", signalNetAlias("HP_OUT", headphonesID), "protected AC-coupled output feeds headphone connector")
+	builder.addConnection(outputID+".LOAD_REF", protectionID+".LOAD_REF", signalNetAlias("LOAD_REF", protectionID), "Class AB load reference feeds headphone output protection")
+	builder.addConnection(protectionID+".LOAD_RET", headphonesID+".RET", signalNetAlias("HP_RET", headphonesID), "headphone connector return is tracked separately from load reference")
+	if groundSource := firstNonEmpty(firstID(builder.usbPowerIDs), firstID(builder.regulatorIDs), firstID(builder.connectorIDs)); groundSource != "" {
+		builder.addConnection(groundSource+".GND", gainID+".GND", "GND", "single-supply op-amp gain stage returns to ground")
+		builder.addConnection(groundSource+".GND", outputID+".VEE", "GND", "single-supply Class AB lower rail returns to ground")
+	} else {
+		builder.addIssue(path+".power.ground", "Class AB headphone output stage requires a ground source for VEE", "declare an external, USB, or regulated power source with ground")
+	}
+	builder.recordAmplifierInstanceGap(reqID, gainID)
+	builder.recordClassABHeadphoneChainGap(reqID, outputID, protectionID)
+}
+
+func (builder *planBuilder) recordClassABHeadphoneChainGap(reqID string, outputID string, protectionID string) {
+	if outputID != "" {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+			ID:         reqID + "." + normalizeToken(outputID) + ".class_ab_output_stage_review",
+			Path:       "blocks." + outputID,
+			Message:    "Class AB output-stage connectivity is supported for headphone-class intent, but thermal, quiescent-current, stability, and PCB-current evidence remain unverified",
+			Suggestion: "keep acceptance at connectivity until KiCad ERC/DRC, thermal, and analog stability evidence are available",
+		})
+	}
+	if protectionID != "" {
+		builder.plan.KnownGaps = append(builder.plan.KnownGaps, PlanNote{
+			ID:         reqID + "." + normalizeToken(protectionID) + ".headphone_output_protection_review",
+			Path:       "blocks." + protectionID,
+			Message:    "Headphone output protection captures AC coupling and return policy, but active fault protection and fabrication readiness remain unverified",
+			Suggestion: "review output-protection diagnostics before promoting beyond connectivity",
+		})
+	}
+}
+
+func unsupportedClassABHeadphoneIntent(function FunctionIntent) string {
+	params := function.Params
+	loadKind := normalizeToken(paramText(params, "load_kind"))
+	if loadKind == "" {
+		loadKind = "headphone"
+	}
+	switch loadKind {
+	case "headphone":
+	case "speaker", "bridge", "power", "power_amplifier":
+		return "Class AB headphone mapping does not support speaker, bridge, or power-amplifier loads"
+	default:
+		return "Class AB headphone mapping requires an explicit headphone load kind"
+	}
+	load := firstNonEmpty(paramText(params, "nominal_load_ohms"), paramText(params, "load_impedance"), "32Ω")
+	if normalizeToken(load) == "unknown" {
+		return "Class AB headphone mapping requires a known headphone load impedance"
+	}
+	if firstNonEmpty(paramText(params, "output_power_w"), paramText(params, "power_w"), paramText(params, "output_power")) != "" {
+		return "Class AB headphone mapping does not support output-power requests yet"
+	}
+	if classABHeadphoneRequestsBipolarSupply(params) {
+		return "Class AB headphone mapping currently supports only single-supply output stages"
+	}
+	return ""
+}
+
+func classABHeadphoneRequestsBipolarSupply(params map[string]any) bool {
+	if value, ok := params["single_supply"].(bool); ok && !value {
+		return true
+	}
+	supplyMode := normalizeToken(firstNonEmpty(paramText(params, "supply_mode"), paramText(params, "supply_topology")))
+	if supplyMode == "dual" || supplyMode == "bipolar" || supplyMode == "split" || supplyMode == "dual_rail" || supplyMode == "split_rail" {
+		return true
+	}
+	return firstNonEmpty(paramText(params, "negative_supply_voltage"), paramText(params, "vee"), paramText(params, "v-")) != ""
+}
+
+func classABOutputParams(params map[string]any) map[string]any {
+	out := map[string]any{
+		"topology":       "diode_string",
+		"supply_voltage": firstNonEmpty(paramText(params, "supply_voltage"), "9V"),
+		"load_impedance": headphoneLoadParam(params),
+	}
+	for _, key := range []string{"upper_output_component_id", "lower_output_component_id", "emitter_resistor_value", "bias_feed_resistor_value"} {
+		if value, ok := params[key]; ok {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func headphoneOutputProtectionParams(params map[string]any) map[string]any {
+	out := map[string]any{
+		"load_kind":               "headphone",
+		"nominal_load_ohms":       headphoneLoadParam(params),
+		"dc_blocking_capacitance": firstNonEmpty(paramText(params, "dc_blocking_capacitance"), "220uF"),
+		"bleed_resistor_ohms":     firstNonEmpty(paramText(params, "bleed_resistor_ohms"), "100kΩ"),
+		"connector_return_policy": firstNonEmpty(paramText(params, "connector_return_policy"), "load_ref"),
+		"fault_protection_status": firstNonEmpty(paramText(params, "fault_protection_status"), "placeholder_blocked"),
+	}
+	for _, key := range []string{"coupling", "bleed_required", "series_resistor_ohms"} {
+		if value, ok := params[key]; ok {
+			out[key] = value
+		}
+	}
+	return out
+}
+
+func headphoneLoadParam(params map[string]any) string {
+	return firstNonEmpty(paramText(params, "load_impedance"), paramText(params, "nominal_load_ohms"), "32Ω")
+}
+
+func paramText(params map[string]any, key string) string {
+	if params == nil {
+		return ""
+	}
+	value, ok := params[key]
+	if !ok || value == nil {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
 }
 
 func (builder *planBuilder) signalConnectorGap(instanceID string) {
@@ -1053,6 +1192,9 @@ func (builder *planBuilder) powerTargets() []struct{ id, port string } {
 		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
 	}
 	for _, id := range builder.amplifierIDs {
+		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+	}
+	for _, id := range builder.classABOutputIDs {
 		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
 	}
 	for _, id := range builder.poweredClockIDs {

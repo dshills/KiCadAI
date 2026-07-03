@@ -28,7 +28,7 @@ var (
 	layerPattern     = regexp.MustCompile(`(?i)\b(\d+|one|two|four)\s*[- ]?\s*layers?\b`)
 	frequencyPattern = regexp.MustCompile(`(?i)\b(\d+(?:\.\d+)?)\s*(mhz|khz|hz)\b`)
 	gainPattern      = regexp.MustCompile(`(?i)\b(?:gain(?:\s+of)?|x)\s*(\d+(?:\.\d+)?)\b|\b(\d+(?:\.\d+)?)\s*x\s+gain\b`)
-	rcValuePattern   = regexp.MustCompile(`(?i)\b(\d+(?:\.\d+)?)\s*(k|r|ohm|kohm|nf|uf|pf)\b`)
+	rcValuePattern   = regexp.MustCompile(`(?i)\b(\d+(?:\.\d+)?)\s*(k|r|ohms?|kohms?|nf|uf|pf)\b`)
 	digitVDigit      = regexp.MustCompile(`^\d+V\d+$`)
 )
 

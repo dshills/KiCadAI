@@ -59,3 +59,26 @@ func TestDraftExtractsPowerModule(t *testing.T) {
 		t.Fatalf("power rails = %#v", result.Request.Power.Rails)
 	}
 }
+
+func TestDraftExtractsClassABHeadphoneAmplifier(t *testing.T) {
+	result := Draft("build a class AB headphone amplifier with gain 2 for 64 ohms headphones on 12V", Options{})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if result.Request.Kind != intentplanner.IntentAmplifier {
+		t.Fatalf("kind = %q", result.Request.Kind)
+	}
+	if len(result.Request.Functions) != 1 {
+		t.Fatalf("functions = %#v", result.Request.Functions)
+	}
+	function := result.Request.Functions[0]
+	if function.Kind != "amplifier" || function.Family != "class_ab_headphone" {
+		t.Fatalf("function = %#v", function)
+	}
+	if function.Params["load_kind"] != "headphone" || function.Params["load_impedance"] != "64Ω" || function.Params["supply_voltage"] != "12V" {
+		t.Fatalf("params = %#v", function.Params)
+	}
+	if len(result.Clarifications) != 0 {
+		t.Fatalf("unexpected clarifications = %#v", result.Clarifications)
+	}
+}
