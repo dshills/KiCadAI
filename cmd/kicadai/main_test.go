@@ -16,6 +16,7 @@ import (
 
 	"kicadai/internal/config"
 	"kicadai/internal/designworkflow"
+	"kicadai/internal/intentplanner"
 	"kicadai/internal/kiapi"
 	commontypes "kicadai/internal/kiapi/gen/common/types"
 	"kicadai/internal/kicadfiles"
@@ -374,6 +375,58 @@ func TestRunIntentCreateReportsBlockedPlan(t *testing.T) {
 	if result.OK || len(result.Issues) == 0 {
 		t.Fatalf("result = %#v", result)
 	}
+	var payload struct {
+		Data struct {
+			AIStatus aiLaneStatus `json:"ai_status"`
+		} `json:"data"`
+	}
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &payload); decodeErr != nil {
+		t.Fatalf("decode ai status: %v\n%s", decodeErr, stdout.String())
+	}
+	if payload.Data.AIStatus.Status != aiLaneStatusUnsupported {
+		t.Fatalf("ai status = %#v, want unsupported", payload.Data.AIStatus)
+	}
+	if payload.Data.AIStatus.Stage != "plan" || payload.Data.AIStatus.RetryAllowed {
+		t.Fatalf("ai status should point to non-retryable plan blocker: %#v", payload.Data.AIStatus)
+	}
+}
+
+func TestAILaneStatusMapping(t *testing.T) {
+	t.Run("needs clarification", func(t *testing.T) {
+		issue := reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "power.voltage", Message: "voltage is ambiguous"}
+		status := buildAILaneStatus(intentplanner.PlanResult{Status: intentplanner.PlanStatusNeedsClarification}, nil, []reports.Issue{issue}, nil)
+		if status.Status != aiLaneStatusNeedsClarification || !status.UserClarificationRequired {
+			t.Fatalf("status = %#v, want needs_clarification with user prompt", status)
+		}
+		if status.RetryKey == "" {
+			t.Fatalf("retry key is empty: %#v", status)
+		}
+	})
+	t.Run("routing retry", func(t *testing.T) {
+		issue := reports.Issue{Code: reports.CodeRouteGraphIncomplete, Severity: reports.SeverityError, Path: "routing.SDA", Message: "route graph incomplete", Nets: []string{"SDA"}}
+		workflow := designworkflow.WorkflowResult{Stages: []designworkflow.StageResult{{
+			Name:   designworkflow.StageRouting,
+			Status: designworkflow.StageStatusBlocked,
+			Issues: []reports.Issue{issue},
+		}}}
+		status := buildAILaneStatus(intentplanner.PlanResult{Status: intentplanner.PlanStatusReady}, &workflow, []reports.Issue{issue}, nil)
+		if status.Status != aiLaneStatusBlocked || status.Stage != "routing" || !status.RetryAllowed || status.MaxAutomaticRetryAttempts != 1 {
+			t.Fatalf("status = %#v, want retryable routing blocker", status)
+		}
+	})
+	t.Run("candidate warning", func(t *testing.T) {
+		workflow := designworkflow.WorkflowResult{Stages: []designworkflow.StageResult{{
+			Name:   designworkflow.StageKiCadChecks,
+			Status: designworkflow.StageStatusWarning,
+		}}}
+		status := buildAILaneStatus(intentplanner.PlanResult{Status: intentplanner.PlanStatusReady}, &workflow, nil, []reports.Artifact{{Path: ".kicadai/design-promotion.json"}})
+		if status.Status != aiLaneStatusCandidate || status.Stage != "validation" {
+			t.Fatalf("status = %#v, want candidate warning", status)
+		}
+		if len(status.ArtifactPaths) != 1 || status.ArtifactPaths[0] != ".kicadai/design-promotion.json" {
+			t.Fatalf("artifact paths = %#v", status.ArtifactPaths)
+		}
+	})
 }
 
 func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {

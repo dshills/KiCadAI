@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -2658,6 +2659,32 @@ type intentCreateResult struct {
 	Workflow  designworkflow.WorkflowResult `json:"workflow,omitempty"`
 	Draft     *intentDraftOutput            `json:"draft,omitempty"`
 	Rationale *rationale.Report             `json:"rationale,omitempty"`
+	AIStatus  *aiLaneStatus                 `json:"ai_status,omitempty"`
+}
+
+type aiLaneStatusValue string
+
+const (
+	aiLaneStatusReady              aiLaneStatusValue = "ready"
+	aiLaneStatusCandidate          aiLaneStatusValue = "candidate"
+	aiLaneStatusBlocked            aiLaneStatusValue = "blocked"
+	aiLaneStatusNeedsClarification aiLaneStatusValue = "needs_clarification"
+	aiLaneStatusUnsupported        aiLaneStatusValue = "unsupported"
+	aiLaneStatusToolError          aiLaneStatusValue = "tool_error"
+)
+
+type aiLaneStatus struct {
+	Status                    aiLaneStatusValue `json:"status"`
+	Stage                     string            `json:"stage"`
+	IssueCode                 reports.Code      `json:"issue_code,omitempty"`
+	Message                   string            `json:"message"`
+	Detail                    string            `json:"detail,omitempty"`
+	ArtifactPaths             []string          `json:"artifact_paths,omitempty"`
+	SuggestedNextAction       string            `json:"suggested_next_action,omitempty"`
+	RetryAllowed              bool              `json:"retry_allowed"`
+	RetryKey                  string            `json:"retry_key,omitempty"`
+	MaxAutomaticRetryAttempts int               `json:"max_automatic_retry_attempts"`
+	UserClarificationRequired bool              `json:"user_clarification_required"`
 }
 
 func runIntent(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -2970,6 +2997,290 @@ func writeWorkflowResultArtifact(outputDir string, workflow designworkflow.Workf
 	return nil
 }
 
+func buildAILaneStatus(plan intentplanner.PlanResult, workflow *designworkflow.WorkflowResult, issues []reports.Issue, artifacts []reports.Artifact) aiLaneStatus {
+	status := aiLaneStatus{
+		Status:              aiLaneStatusReady,
+		Stage:               "validation",
+		Message:             "generated project satisfies the requested lane checks",
+		ArtifactPaths:       artifactPaths(artifacts),
+		RetryAllowed:        false,
+		SuggestedNextAction: "review generated KiCad project and evidence artifacts",
+	}
+	if plan.Status == intentplanner.PlanStatusNeedsClarification {
+		status.Status = aiLaneStatusNeedsClarification
+		status.Stage = "plan"
+		status.Message = "user clarification is required before generation can continue"
+		status.SuggestedNextAction = "ask the user for the missing design choice"
+		status.UserClarificationRequired = true
+		issue, ok := firstBlockingIssue(issues, plan.Issues, nil)
+		fillAILaneIssue(&status, issue, ok)
+		return status
+	}
+	statusIssues := [][]reports.Issue{issues, plan.Issues, workflowIssuesForStatus(workflow)}
+	if issue, ok := firstBlockingIssueByCode(reports.CodeUnsupportedOperation, statusIssues...); ok {
+		status.Status = aiLaneStatusUnsupported
+		status.Stage = aiLaneStageForIssue(issue, workflow)
+		status.Message = issue.Message
+		status.Detail = issue.Suggestion
+		status.SuggestedNextAction = "choose a supported first-lane prompt or structured intent"
+		status.RetryAllowed = false
+		status.MaxAutomaticRetryAttempts = 0
+		fillAILaneIssue(&status, issue, ok)
+		return status
+	}
+	if issue, ok := firstBlockingIssueByCode(reports.CodeKiCadCLIFailed, statusIssues...); ok {
+		status.Status = aiLaneStatusToolError
+		status.Stage = aiLaneStageForIssue(issue, workflow)
+		status.Message = issue.Message
+		status.Detail = issue.Suggestion
+		status.SuggestedNextAction = "fix the local tool or file path and rerun"
+		status.RetryAllowed = false
+		status.MaxAutomaticRetryAttempts = 0
+		fillAILaneIssue(&status, issue, ok)
+		return status
+	}
+	if issue, ok := firstBlockingIssueByCode(reports.CodeMissingFile, statusIssues...); ok {
+		status.Status = aiLaneStatusToolError
+		status.Stage = aiLaneStageForIssue(issue, workflow)
+		status.Message = issue.Message
+		status.Detail = issue.Suggestion
+		status.SuggestedNextAction = "fix the local tool or file path and rerun"
+		status.RetryAllowed = false
+		status.MaxAutomaticRetryAttempts = 0
+		fillAILaneIssue(&status, issue, ok)
+		return status
+	}
+	if issue, ok := firstBlockingIssue(statusIssues...); ok {
+		status.Status = aiLaneStatusBlocked
+		status.Stage = aiLaneStageForIssue(issue, workflow)
+		status.Message = issue.Message
+		status.Detail = issue.Suggestion
+		status.SuggestedNextAction = aiLaneNextAction(issue)
+		status.RetryAllowed = aiLaneRetryAllowed(issue)
+		if status.RetryAllowed {
+			status.MaxAutomaticRetryAttempts = 1
+		}
+		fillAILaneIssue(&status, issue, ok)
+		return status
+	}
+	if workflow != nil && workflowHasWarning(*workflow, issues) {
+		status.Status = aiLaneStatusCandidate
+		status.Stage = "validation"
+		status.Message = "generated project is ready for review with warning-level evidence"
+		status.SuggestedNextAction = "inspect warnings before treating the project as ready"
+		return status
+	}
+	if plan.Status == intentplanner.PlanStatusPartial {
+		status.Status = aiLaneStatusCandidate
+		status.Stage = "plan"
+		status.Message = "intent plan is partial but not blocked"
+		status.SuggestedNextAction = "review known gaps before generating fabrication evidence"
+	}
+	return status
+}
+
+func artifactPaths(artifacts []reports.Artifact) []string {
+	paths := make([]string, 0, len(artifacts))
+	seen := map[string]bool{}
+	for _, artifact := range artifacts {
+		path := strings.TrimSpace(artifact.Path)
+		if path != "" && !seen[path] {
+			seen[path] = true
+			paths = append(paths, path)
+		}
+	}
+	return paths
+}
+
+func workflowIssuesForStatus(workflow *designworkflow.WorkflowResult) []reports.Issue {
+	if workflow == nil {
+		return nil
+	}
+	return designworkflow.WorkflowIssues(*workflow)
+}
+
+func firstBlockingIssue(groups ...[]reports.Issue) (reports.Issue, bool) {
+	for _, group := range groups {
+		for _, issue := range group {
+			if issue.Blocking() {
+				return issue, true
+			}
+		}
+	}
+	return reports.Issue{}, false
+}
+
+func firstBlockingIssueByCode(code reports.Code, groups ...[]reports.Issue) (reports.Issue, bool) {
+	for _, group := range groups {
+		for _, issue := range group {
+			if issue.Code == code && issue.Blocking() {
+				return issue, true
+			}
+		}
+	}
+	return reports.Issue{}, false
+}
+
+func fillAILaneIssue(status *aiLaneStatus, issue reports.Issue, ok bool) {
+	if !ok {
+		return
+	}
+	status.IssueCode = issue.Code
+	if status.Message == "" {
+		status.Message = issue.Message
+	}
+	if status.Detail == "" {
+		status.Detail = issue.Suggestion
+	}
+	status.RetryKey = aiLaneRetryKey(status.Stage, issue)
+}
+
+func aiLaneStageForIssue(issue reports.Issue, workflow *designworkflow.WorkflowResult) string {
+	if issue.Code == reports.CodeUnsupportedOperation {
+		return "plan"
+	}
+	if workflow != nil {
+		for _, stage := range workflow.Stages {
+			for _, stageIssue := range stage.Issues {
+				if stageIssue.Code == issue.Code && stageIssue.Path == issue.Path {
+					return aiLaneNormalizeStage(string(stage.Name))
+				}
+			}
+		}
+	}
+	path := strings.ToLower(issue.Path)
+	switch {
+	case strings.Contains(path, "draft"), strings.Contains(path, "text"):
+		return "draft"
+	case strings.Contains(path, "plan"), strings.Contains(path, "intent"), strings.Contains(path, "blocks"):
+		return "plan"
+	case strings.Contains(path, "schematic"):
+		return "schematic"
+	case strings.Contains(path, "pcb"):
+		return "pcb"
+	case strings.Contains(path, "placement"):
+		return "placement"
+	case strings.Contains(path, "routing"), strings.Contains(path, "route"):
+		return "routing"
+	case strings.Contains(path, "kicad"):
+		return "kicad_checks"
+	case strings.Contains(path, "artifact"):
+		return "manifest_generation"
+	default:
+		return "orchestration"
+	}
+}
+
+func aiLaneNormalizeStage(stage string) string {
+	switch designworkflow.StageName(stage) {
+	case designworkflow.StageSchematic, designworkflow.StageSchematicElectrical:
+		return "schematic"
+	case designworkflow.StagePCBRealization, designworkflow.StageSchematicToPCB:
+		return "pcb"
+	case designworkflow.StagePlacement:
+		return "placement"
+	case designworkflow.StageRouting:
+		return "routing"
+	case designworkflow.StageValidation, designworkflow.StageWriterCorrect, designworkflow.StageFabricationReady:
+		return "validation"
+	case designworkflow.StageKiCadChecks:
+		return "kicad_checks"
+	case designworkflow.StageValidationRepair:
+		return "repair"
+	case designworkflow.StageProjectWrite:
+		return "manifest_generation"
+	default:
+		return "orchestration"
+	}
+}
+
+func aiLaneNextAction(issue reports.Issue) string {
+	if strings.TrimSpace(issue.Suggestion) != "" {
+		return issue.Suggestion
+	}
+	switch issue.Code {
+	case reports.CodeUnsupportedOperation:
+		return "choose a supported first-lane prompt or block family"
+	case reports.CodeMissingFootprint, reports.CodeUnknownFootprintLibrary, reports.CodePinmapUnverified:
+		return "select a verified component and footprint mapping"
+	case reports.CodePlacementCollision, reports.CodePlacementOutsideBoard:
+		return "retry with placement repair or relax board constraints"
+	case reports.CodeRouteGraphIncomplete, reports.CodeRouteCompletionPartial, reports.CodeRouteContactMiss, reports.CodeRouteContactMissingTarget:
+		return "retry with routing repair or simplify the board"
+	case reports.CodeKiCadCLIFailed, reports.CodeSkippedExternalTool:
+		return "configure KiCad CLI or lower the requested acceptance"
+	default:
+		return "inspect the referenced stage evidence and revise the request"
+	}
+}
+
+func aiLaneRetryAllowed(issue reports.Issue) bool {
+	switch issue.Code {
+	case reports.CodePlacementCollision, reports.CodePlacementOutsideBoard, reports.CodeRouteGraphIncomplete, reports.CodeRouteCompletionPartial, reports.CodeRouteContactMiss, reports.CodeRouteContactMissingTarget:
+		return true
+	default:
+		return false
+	}
+}
+
+func aiLaneRetryKey(stage string, issue reports.Issue) string {
+	nets := append([]string(nil), issue.Nets...)
+	refs := append([]string(nil), issue.Refs...)
+	uuids := append([]string(nil), issue.UUIDs...)
+	slices.Sort(nets)
+	slices.Sort(refs)
+	slices.Sort(uuids)
+	parts := []string{
+		stage,
+		string(issue.Code),
+		aiLaneRetryPath(issue.Path),
+		strings.Join(nets, ","),
+		strings.Join(refs, ","),
+		strings.Join(uuids, ","),
+		strings.Join(strings.Fields(issue.Message), " "),
+	}
+	sum := sha256.Sum256([]byte(strings.Join(parts, "|")))
+	return fmt.Sprintf("%x", sum[:])
+}
+
+func aiLaneRetryPath(path string) string {
+	path = filepath.Clean(strings.TrimSpace(path))
+	if path == "." {
+		return ""
+	}
+	if filepath.IsAbs(path) {
+		if cwd, err := os.Getwd(); err == nil {
+			if rel, relErr := filepath.Rel(cwd, path); relErr == nil && !strings.HasPrefix(rel, "..") {
+				path = rel
+			} else {
+				path = filepath.Base(path)
+			}
+		} else {
+			path = filepath.Base(path)
+		}
+	}
+	return filepath.ToSlash(path)
+}
+
+func workflowHasWarning(workflow designworkflow.WorkflowResult, issues []reports.Issue) bool {
+	for _, issue := range issues {
+		if issue.Severity == reports.SeverityWarning {
+			return true
+		}
+	}
+	for _, stage := range workflow.Stages {
+		if stage.Status == designworkflow.StageStatusWarning || stage.Status == designworkflow.StageStatusSkipped {
+			return true
+		}
+		for _, issue := range stage.Issues {
+			if issue.Severity == reports.SeverityWarning {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !opts.jsonOutput {
 		return fmt.Errorf("intent create requires --format json")
@@ -2992,7 +3303,8 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 		allIssues = append(allIssues, rationaleIssues...)
 		artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 		artifacts = append(artifacts, rationaleArtifacts...)
-		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Draft: draft, Rationale: &report}, allIssues, artifacts)
+		aiStatus := buildAILaneStatus(plan, nil, allIssues, artifacts)
+		result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Draft: draft, Rationale: &report, AIStatus: &aiStatus}, allIssues, artifacts)
 		if writeErr := writeReportJSON(stdout, result); writeErr != nil {
 			return writeErr
 		}
@@ -3022,7 +3334,8 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	artifacts := append([]reports.Artifact(nil), plan.Artifacts...)
 	artifacts = append(artifacts, designworkflow.WorkflowArtifacts(workflow)...)
 	artifacts = append(artifacts, rationaleArtifacts...)
-	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow, Draft: draft, Rationale: &rationaleReport}, allIssues, artifacts)
+	aiStatus := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
+	result := reports.ResultWithIssues("intent", intentCreateResult{Plan: plan, Workflow: workflow, Draft: draft, Rationale: &rationaleReport, AIStatus: &aiStatus}, allIssues, artifacts)
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}
