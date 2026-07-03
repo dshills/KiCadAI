@@ -180,6 +180,42 @@ func TestBuildWithWorkflowComponentHintEvidence(t *testing.T) {
 	}
 }
 
+func TestBuildWithWorkflowHeadphoneOutputProtectionEvidence(t *testing.T) {
+	workflow := designworkflow.BuildWorkflowResult(
+		designworkflow.ProjectSummary{Name: "demo"},
+		designworkflow.AcceptanceConnectivity,
+		[]designworkflow.StageResult{{
+			Name:   designworkflow.StageBlockPlanning,
+			Status: designworkflow.StageStatusOK,
+			Summary: map[string]any{
+				"headphone_output_protections": []designworkflow.HeadphoneOutputProtectionSummary{{
+					InstanceID:              "protection",
+					BlockID:                 "headphone_output_protection",
+					LoadKind:                "headphone",
+					NominalLoadOhms:         "32Ω",
+					ACOutputCouplingPresent: true,
+					DCBlockingCapacitance:   "220uF",
+					BleedPolicyStatus:       "present",
+					SeriesResistorStatus:    "omitted",
+					ConnectorReturnStatus:   "load_return_and_reference_connected",
+					FaultProtectionStatus:   "placeholder_blocked",
+					Readiness:               "connectivity",
+				}},
+			},
+		}},
+	)
+	report := Build(BuildOptions{Source: SourceSummary{Mode: "request"}, Workflow: &workflow})
+	if !hasEvidenceKind(report, "headphone_output_protection") {
+		t.Fatalf("headphone output protection evidence missing from %#v", report.Evidence)
+	}
+	if !hasEvidenceSummary(report, "readiness=connectivity") {
+		t.Fatalf("headphone output protection readiness missing from %#v", report.Evidence)
+	}
+	if !hasEvidenceNote(report, "fault_protection=placeholder_blocked") {
+		t.Fatalf("headphone output protection notes missing from %#v", report.Evidence)
+	}
+}
+
 func TestBuildFromPlanMapsSynthesisTrace(t *testing.T) {
 	plan := intentplanner.Plan(intentplanner.Request{
 		Version: intentplanner.RequestVersion,

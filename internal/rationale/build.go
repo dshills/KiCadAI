@@ -479,6 +479,7 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 		report.Evidence = append(report.Evidence, procurementEvidenceFromStage(stage)...)
 		report.Evidence = append(report.Evidence, stabilityEvidenceFromStage(stage)...)
 		report.Evidence = append(report.Evidence, componentHintEvidenceFromStage(stage)...)
+		report.Evidence = append(report.Evidence, headphoneOutputProtectionEvidenceFromStage(stage)...)
 		for index, issue := range stage.Issues {
 			report.Evidence = append(report.Evidence, EvidenceRecord{
 				ID:      fmt.Sprintf("stage_issue:%s:%03d", stage.Name, index+1),
@@ -501,6 +502,81 @@ func applyWorkflow(report *Report, workflow designworkflow.WorkflowResult) {
 			Action:   repair.SuggestedAction,
 			Reason:   repair.Message,
 		})
+	}
+}
+
+func headphoneOutputProtectionEvidenceFromStage(stage designworkflow.StageResult) []EvidenceRecord {
+	raw, ok := stage.Summary["headphone_output_protections"]
+	if !ok {
+		if single, singleOK := stage.Summary["headphone_output_protection"]; singleOK {
+			raw = []any{single}
+			ok = true
+		}
+	}
+	if !ok {
+		return nil
+	}
+	switch values := raw.(type) {
+	case []designworkflow.HeadphoneOutputProtectionSummary:
+		out := make([]EvidenceRecord, 0, len(values))
+		for index, summary := range values {
+			out = append(out, headphoneOutputProtectionEvidenceRecord(stage.Name, index, summary))
+		}
+		return out
+	case []any:
+		out := make([]EvidenceRecord, 0, len(values))
+		for _, value := range values {
+			if row, ok := summaryMap(value); ok && row != nil {
+				if summary, decodeOK := headphoneOutputProtectionSummaryFromMap(row); decodeOK {
+					out = append(out, headphoneOutputProtectionEvidenceRecord(stage.Name, len(out), summary))
+				}
+			}
+		}
+		return out
+	default:
+		return nil
+	}
+}
+
+func headphoneOutputProtectionSummaryFromMap(row map[string]any) (designworkflow.HeadphoneOutputProtectionSummary, bool) {
+	return designworkflow.HeadphoneOutputProtectionSummary{
+		InstanceID:              summaryString(row["instance_id"]),
+		BlockID:                 summaryString(row["block_id"]),
+		LoadKind:                summaryString(row["load_kind"]),
+		NominalLoadOhms:         summaryString(row["nominal_load_ohms"]),
+		ACOutputCouplingPresent: summaryBool(row["ac_output_coupling_present"]),
+		DCBlockingCapacitance:   summaryString(row["dc_blocking_capacitance"]),
+		BleedPolicyStatus:       summaryString(row["bleed_policy_status"]),
+		SeriesResistorStatus:    summaryString(row["series_resistor_status"]),
+		ConnectorReturnStatus:   summaryString(row["connector_return_status"]),
+		FaultProtectionStatus:   summaryString(row["fault_protection_status"]),
+		Readiness:               summaryString(row["readiness"]),
+		Notes:                   summaryStringSlice(row["notes"]),
+		Blockers:                summaryStringSlice(row["blockers"]),
+	}, true
+}
+
+func headphoneOutputProtectionEvidenceRecord(stageName designworkflow.StageName, index int, summary designworkflow.HeadphoneOutputProtectionSummary) EvidenceRecord {
+	id := summary.InstanceID
+	if id == "" {
+		id = fmt.Sprintf("%03d", index+1)
+	}
+	notes := compactStrings(append([]string{
+		"load_kind=" + summary.LoadKind,
+		"nominal_load=" + summary.NominalLoadOhms,
+		"dc_blocking_capacitance=" + summary.DCBlockingCapacitance,
+		"bleed=" + summary.BleedPolicyStatus,
+		"series_resistor=" + summary.SeriesResistorStatus,
+		"connector_return=" + summary.ConnectorReturnStatus,
+		"fault_protection=" + summary.FaultProtectionStatus,
+	}, summary.Notes...))
+	notes = append(notes, summary.Blockers...)
+	return EvidenceRecord{
+		ID:      fmt.Sprintf("headphone_output_protection:%s:%s", stageName, id),
+		Kind:    "headphone_output_protection",
+		Path:    string(stageName),
+		Summary: fmt.Sprintf("%s readiness=%s ac_coupling=%t", id, summary.Readiness, summary.ACOutputCouplingPresent),
+		Notes:   notes,
 	}
 }
 
@@ -747,6 +823,28 @@ func summaryString(value any) string {
 		return strings.TrimSpace(typed.String())
 	default:
 		return strings.TrimSpace(fmt.Sprint(typed))
+	}
+}
+
+func summaryBool(value any) bool {
+	typed, ok := value.(bool)
+	return ok && typed
+}
+
+func summaryStringSlice(value any) []string {
+	switch typed := value.(type) {
+	case []string:
+		return append([]string(nil), typed...)
+	case []any:
+		out := make([]string, 0, len(typed))
+		for _, item := range typed {
+			if text := summaryString(item); text != "" {
+				out = append(out, text)
+			}
+		}
+		return out
+	default:
+		return nil
 	}
 }
 

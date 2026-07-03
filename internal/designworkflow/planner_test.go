@@ -323,6 +323,150 @@ func TestPlanBlocksAcceptsFractionalHeadphoneProtectionCapacitance(t *testing.T)
 	}
 }
 
+func TestPlanBlocksSummarizesSupportedHeadphoneOutputProtection(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_headphone_output",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "output", BlockID: "class_ab_output_stage", Params: map[string]any{"topology": "diode_string", "supply_voltage": "9V", "load_impedance": "32Ω"}},
+			{ID: "protection", BlockID: "headphone_output_protection", Params: map[string]any{
+				"load_kind":               "headphone",
+				"nominal_load_ohms":       "32Ω",
+				"dc_blocking_capacitance": "220uF",
+				"bleed_resistor_ohms":     "100kΩ",
+				"connector_return_policy": "load_ref",
+				"fault_protection_status": "placeholder_blocked",
+				"series_resistor_ohms":    "47Ω",
+				"bleed_required":          true,
+			}},
+			{ID: "headphones", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []string{"SIG", "RET"}}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "output.AMP_OUT", To: "protection.AMP_OUT", NetAlias: "AMP_OUT_DC_BIASED"},
+			{From: "protection.HP_OUT", To: "headphones.SIG", NetAlias: "HP_OUT"},
+			{From: "output.LOAD_REF", To: "protection.LOAD_REF", NetAlias: "LOAD_REF"},
+			{From: "protection.LOAD_RET", To: "headphones.RET", NetAlias: "HP_RET"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["headphone_output_protection"].(HeadphoneOutputProtectionSummary)
+	if summary.Readiness != "connectivity" || !summary.ACOutputCouplingPresent {
+		t.Fatalf("summary = %#v", summary)
+	}
+	if summary.BleedPolicyStatus != "present" || summary.SeriesResistorStatus != "present" || summary.ConnectorReturnStatus != "load_return_and_reference_connected" {
+		t.Fatalf("summary statuses = %#v", summary)
+	}
+	if len(summary.Blockers) != 0 {
+		t.Fatalf("blockers = %#v", summary.Blockers)
+	}
+	if !strings.Contains(strings.Join(summary.Notes, "\n"), "Fault protection") {
+		t.Fatalf("notes = %#v", summary.Notes)
+	}
+}
+
+func TestPlanBlocksSummarizesMissingHeadphoneReturnReference(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_headphone_output_missing_return",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "protection", BlockID: "headphone_output_protection"},
+		},
+		Connections: []ConnectionSpec{
+			{From: "protection.HP_OUT", NetAlias: "HP_OUT"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["headphone_output_protection"].(HeadphoneOutputProtectionSummary)
+	if summary.Readiness != "blocked" || summary.ConnectorReturnStatus != "missing_return_and_reference_connections" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksSummarizesMissingRequiredBleedPolicy(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_headphone_output_missing_bleed",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "protection", BlockID: "headphone_output_protection", Params: map[string]any{"bleed_required": true, "bleed_resistor_ohms": "0Ω"}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "protection.LOAD_REF", NetAlias: "LOAD_REF"},
+			{From: "protection.LOAD_RET", NetAlias: "HP_RET"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["headphone_output_protection"].(HeadphoneOutputProtectionSummary)
+	if summary.Readiness != "blocked" || summary.BleedPolicyStatus != "shorted" {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksSummarizesFaultProtectionCandidateBlocker(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_headphone_output_fault_placeholder",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "protection", BlockID: "headphone_output_protection", Params: map[string]any{"fault_protection_status": "not_modeled"}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "protection.LOAD_REF", NetAlias: "LOAD_REF"},
+			{From: "protection.LOAD_RET", NetAlias: "HP_RET"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["headphone_output_protection"].(HeadphoneOutputProtectionSummary)
+	if summary.Readiness != "connectivity" || !strings.Contains(strings.Join(summary.Notes, "\n"), "higher-readiness warning") {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
+func TestPlanBlocksSummarizesDualRailProtectionReview(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_headphone_output_dual_rail",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "protection", BlockID: "headphone_output_protection", Params: map[string]any{"coupling": "dual_rail_direct_review_required"}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "protection.LOAD_REF", NetAlias: "LOAD_REF"},
+			{From: "protection.LOAD_RET", NetAlias: "HP_RET"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["headphone_output_protection"].(HeadphoneOutputProtectionSummary)
+	if summary.Readiness != "blocked" || !strings.Contains(strings.Join(summary.Blockers, "\n"), "dual-rail direct-coupled") {
+		t.Fatalf("summary = %#v", summary)
+	}
+	if strings.Contains(strings.Join(summary.Blockers, "\n"), "single-supply") {
+		t.Fatalf("misleading blockers = %#v", summary.Blockers)
+	}
+}
+
+func TestPlanBlocksSummarizesUnsupportedSpeakerOutputProtection(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "protected_speaker_output",
+		Board:   BoardSpec{WidthMM: 70, HeightMM: 40, Layers: 2},
+		Blocks: []BlockInstanceSpec{
+			{ID: "protection", BlockID: "headphone_output_protection", Params: map[string]any{"load_kind": "speaker", "nominal_load_ohms": "8Ω"}},
+		},
+		Connections: []ConnectionSpec{
+			{From: "protection.LOAD_REF", NetAlias: "LOAD_REF"},
+			{From: "protection.LOAD_RET", NetAlias: "HP_RET"},
+		},
+	}
+	result := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	summary := result.Stage.Summary["headphone_output_protection"].(HeadphoneOutputProtectionSummary)
+	if summary.Readiness != "blocked" || !strings.Contains(strings.Join(summary.Blockers, "\n"), "only headphone loads are supported") {
+		t.Fatalf("summary = %#v", summary)
+	}
+}
+
 func TestPlanBlocksRejectsScientificZeroProtectionCapacitance(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,
