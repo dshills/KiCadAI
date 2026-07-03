@@ -610,6 +610,56 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateLEDPromptOptionalKiCadSmoke(t *testing.T) {
+	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
+	if cliPath == "" {
+		t.Skipf("set %s to run optional KiCad-backed LED prompt smoke", checks.EnvKiCadCLI)
+	}
+	output := filepath.Join(t.TempDir(), "led_project")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cliPath, "--require-erc", "--require-drc", "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if stdout.Len() == 0 {
+		t.Fatalf("run returned no JSON: err=%v stderr=%s", err, stderr.String())
+	}
+	var payload struct {
+		OK   bool `json:"ok"`
+		Data *struct {
+			AIStatus *aiLaneStatus `json:"ai_status"`
+		} `json:"data"`
+		Issues []reports.Issue `json:"issues"`
+	}
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &payload); decodeErr != nil {
+		t.Fatalf("decode result: %v\nstdout=%s\nstderr=%s", decodeErr, stdout.String(), stderr.String())
+	}
+	if err != nil && len(payload.Issues) == 0 {
+		t.Fatalf("run returned error without structured issues: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	if !payload.OK && len(payload.Issues) == 0 {
+		t.Fatalf("run reported failure without structured issues: stdout=%s\nstderr=%s", stdout.String(), stderr.String())
+	}
+	if payload.Data == nil || payload.Data.AIStatus == nil {
+		t.Fatalf("missing ai_status: %s", stdout.String())
+	}
+	if payload.Data.AIStatus.Status == aiLaneStatusToolError && payload.Data.AIStatus.IssueCode == reports.CodeSkippedExternalTool {
+		t.Fatalf("KiCad smoke skipped despite configured %s=%s: %#v", checks.EnvKiCadCLI, cliPath, payload.Data.AIStatus)
+	}
+	var workflow struct {
+		Stages []workflowEvidenceStage `json:"stages"`
+	}
+	readJSONFile(t, filepath.Join(output, ".kicadai", "workflow-result.json"), &workflow)
+	kicadStage := workflowStageByName(workflow.Stages, string(designworkflow.StageKiCadChecks))
+	if kicadStage == nil || kicadStage.Status == string(designworkflow.StageStatusSkipped) {
+		t.Fatalf("kicad_checks stage = %#v, want KiCad-backed evidence", kicadStage)
+	}
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	gate := promotionGateByName(promotion.Gates, string(designworkflow.StageKiCadChecks))
+	if gate == nil || gate.Status == designworkflow.PromotionGateStatusSkipped || gate.Status == designworkflow.PromotionGateStatusNotRun {
+		t.Fatalf("promotion kicad_checks gate = %#v", gate)
+	}
+}
+
 func TestRunIntentCreateSensorBreakoutPersistsRegulatorEvidence(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "sensor_breakout")
 	requestPath := filepath.Join("..", "..", "examples", "intent", "sensor_breakout.json")
@@ -740,12 +790,29 @@ type workflowEvidenceStage struct {
 }
 
 func workflowStageStatus(stages []workflowEvidenceStage, name string) string {
-	for _, stage := range stages {
-		if stage.Name == name {
-			return stage.Status
+	stage := workflowStageByName(stages, name)
+	if stage == nil {
+		return ""
+	}
+	return stage.Status
+}
+
+func workflowStageByName(stages []workflowEvidenceStage, name string) *workflowEvidenceStage {
+	for index := range stages {
+		if stages[index].Name == name {
+			return &stages[index]
 		}
 	}
-	return ""
+	return nil
+}
+
+func promotionGateByName(gates []designworkflow.PromotionGate, name string) *designworkflow.PromotionGate {
+	for index := range gates {
+		if gates[index].ID == name {
+			return &gates[index]
+		}
+	}
+	return nil
 }
 
 func stageHasIssue(stages []workflowEvidenceStage, name string, code reports.Code) bool {
