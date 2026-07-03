@@ -857,8 +857,13 @@ evidence. I2C now reaches route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
 still blocks on selected-attempt VCC graph-split/pathfinding evidence; the
-amplifier fixture remains blocked by broader verified
-amplifier realization and KiCad evidence gaps.
+protected Class AB headphone amplifier fixture now verifies the
+`headphone_output_protection` block summary and verified
+LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical
+validation on expected label-alias conflicts (`headphones_SIG` versus
+`output_amp_out` and `output_lower_emitter` versus `output_upper_emitter`). The
+next amplifier promotion task is schematic alias cleanup so PCB realization and
+real KiCad ERC/DRC evidence can run.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:

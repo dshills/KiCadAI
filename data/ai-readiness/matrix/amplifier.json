@@ -41,8 +41,8 @@
       "domain": "amplifier",
       "title": "headphone_output_protection block",
       "readiness": "connectivity",
-      "blocker": "Active fault protection, speaker/bridge/power-amplifier load safety, and fabrication promotion remain unverified for headphone output protection.",
-      "evidence_needed": ["fault/protection component evidence", "KiCad-backed ERC/DRC validation of protected Class AB headphone examples", "SOA and thermal proof for selected output devices", "speaker, bridge, and power-amplifier load-safety constraints"],
+      "blocker": "Protected Class AB headphone fixture reaches schematic electrical validation, but label-alias conflicts stop PCB realization before real KiCad ERC/DRC evidence can be captured.",
+      "evidence_needed": ["schematic label-alias conflict resolution: headphones_SIG vs output_amp_out", "schematic label-alias conflict resolution: output_lower_emitter vs output_upper_emitter", "fault/protection component evidence", "KiCad-backed ERC/DRC validation of protected Class AB headphone examples", "SOA and thermal proof for selected output devices", "speaker, bridge, and power-amplifier load-safety constraints"],
       "next_task": "capture_kicad_evidence",
       "parallel_group": "catalog_block_expansion",
       "depends_on": ["amplifier.block.bias_network", "amplifier.component.output_transistor"]
@@ -77,8 +77,8 @@
       "domain": "amplifier",
       "title": "KiCad-backed amplifier promotion",
       "readiness": "missing",
-      "blocker": "Amplifier KiCad-backed fixture is expected_fail and blocks before fabrication-candidate evidence.",
-      "evidence_needed": ["real KiCad ERC report", "real KiCad DRC report", "promotion report candidate/pass status", "repair guidance for remaining blockers"],
+      "blocker": "Protected amplifier KiCad-backed fixture is expected_fail and blocks at schematic label-conflict validation before PCB, routing, writer-correctness, or KiCad-check stages.",
+      "evidence_needed": ["schematic label-alias conflict resolution", "real KiCad ERC report", "real KiCad DRC report", "promotion report candidate/pass status", "repair guidance for remaining blockers"],
       "next_task": "capture_kicad_evidence",
       "parallel_group": "fixture_promotion",
       "depends_on": ["amplifier.block.bias_network", "amplifier.block.output_protection", "amplifier.layout.stability_feedback", "amplifier.layout.thermal_current"]

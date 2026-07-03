@@ -105,16 +105,20 @@ The `amplifier` matrix covers:
 - AI-facing amplifier design-limit documentation.
 
 Several amplifier records have now reached `connectivity` for the narrow
-low-voltage headphone slice: seeded MMBT3904/MMBT3906 output devices,
-diode-string Class AB output-stage realization, single-supply DC-blocking
-diagnostics, an explicit `headphone_output_protection` block, and AI-facing
-design-limit notes. The protection block covers AC output coupling through a
-DC-blocking capacitor, required bleed/reference policy, optional series output
-resistance, and connector return/reference diagnostics for headphone-only
-loads. These are not claims that amplifier generation is fabrication-ready.
-The remaining queue is SOA and thermal evidence, active fault-protection
-policy, speaker/bridge/power-amplifier load safety, analog stability/layout
-proof, and KiCad ERC/DRC promotion evidence.
+low-voltage headphone slice: verified LMV321 op-amp selection for the gain
+stage, seeded MMBT3904/MMBT3906 output devices, diode-string Class AB
+output-stage realization, single-supply DC-blocking diagnostics, an explicit
+`headphone_output_protection` block, and AI-facing design-limit notes. The
+protection block covers AC output coupling through a DC-blocking capacitor,
+required bleed/reference policy, optional series output resistance, and
+connector return/reference diagnostics for headphone-only loads. The optional
+protected KiCad-backed fixture is still `expected_fail`: it reaches schematic
+electrical validation and currently stops on known label-alias conflicts before
+PCB realization, routing, writer correctness, or real KiCad ERC/DRC checks.
+These are not claims that amplifier generation is fabrication-ready. The
+remaining queue is schematic alias cleanup, SOA and thermal evidence, active
+fault-protection policy, speaker/bridge/power-amplifier load safety, analog
+stability/layout proof, and KiCad ERC/DRC promotion evidence.
 
 ## Validation
 
