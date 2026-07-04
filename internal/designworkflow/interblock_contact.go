@@ -290,6 +290,8 @@ func newInterBlockContactGraph(operations []decodedContactRouteOperation) interB
 		byKey:         map[interBlockContactGraphKey][]int{},
 		segmentsByKey: map[interBlockContactGraphKey][]int{},
 	}
+	segmentKeySeen := map[interBlockContactGraphKey]struct{}{}
+	var segmentKeyBuf []interBlockContactGraphKey
 	for _, operation := range operations {
 		previous := -1
 		layer := normalizeContactLayer(operation.Layer)
@@ -297,7 +299,7 @@ func newInterBlockContactGraph(operations []decodedContactRouteOperation) interB
 			node := graph.add(point, layer)
 			if previous != -1 {
 				graph.union(previous, node)
-				graph.addSegment(previous, node, layer)
+				graph.addSegment(previous, node, layer, segmentKeySeen, &segmentKeyBuf)
 			}
 			previous = node
 		}
@@ -318,26 +320,38 @@ func (graph *interBlockContactGraph) add(point transactions.Point, layer string)
 	return index
 }
 
-func (graph *interBlockContactGraph) addSegment(left int, right int, layer string) {
+func (graph *interBlockContactGraph) addSegment(left int, right int, layer string, segmentKeySeen map[interBlockContactGraphKey]struct{}, segmentKeyBuf *[]interBlockContactGraphKey) {
+	layer = normalizeContactLayer(layer)
+	graph.union(left, right)
+	leftPoint := graph.nodes[left].Point
+	rightPoint := graph.nodes[right].Point
+	segmentKeys := contactGraphSegmentQueryKeys(leftPoint, rightPoint, layer, interBlockContactToleranceMM, segmentKeySeen, segmentKeyBuf)
+	graph.nextSegmentMarkGeneration()
+	for _, key := range segmentKeys {
+		for _, segmentIndex := range graph.segmentsByKey[key] {
+			if segmentIndex < 0 || segmentIndex >= len(graph.segments) {
+				continue
+			}
+			if graph.segmentMarks[segmentIndex] == graph.markGeneration {
+				continue
+			}
+			graph.segmentMarks[segmentIndex] = graph.markGeneration
+			segment := graph.segments[segmentIndex]
+			if !sameLayer(segment.Layer, layer) {
+				continue
+			}
+			segmentLeft := graph.nodes[segment.Left].Point
+			segmentRight := graph.nodes[segment.Right].Point
+			if segmentsContactWithinTolerance(leftPoint, rightPoint, segmentLeft, segmentRight, interBlockContactToleranceMM) {
+				graph.union(left, segment.Left)
+				graph.union(right, segment.Right)
+			}
+		}
+	}
 	index := len(graph.segments)
 	graph.segments = append(graph.segments, interBlockContactGraphSegment{Left: left, Right: right, Layer: layer})
 	graph.segmentMarks = append(graph.segmentMarks, 0)
-	leftPoint := graph.nodes[left].Point
-	rightPoint := graph.nodes[right].Point
-	dx := rightPoint.XMM - leftPoint.XMM
-	dy := rightPoint.YMM - leftPoint.YMM
-	steps := int(math.Ceil(math.Max(math.Abs(dx), math.Abs(dy)) / (interBlockContactSegmentBucketMM / 2)))
-	if steps < 1 {
-		steps = 1
-	}
-	seenKeys := make(map[interBlockContactGraphKey]struct{}, steps+1)
-	for step := 0; step <= steps; step++ {
-		t := float64(step) / float64(steps)
-		point := transactions.Point{XMM: leftPoint.XMM + dx*t, YMM: leftPoint.YMM + dy*t}
-		key := contactGraphSegmentKey(point, layer)
-		seenKeys[key] = struct{}{}
-	}
-	for key := range seenKeys {
+	for _, key := range segmentKeys {
 		graph.segmentsByKey[key] = append(graph.segmentsByKey[key], index)
 	}
 }
@@ -474,11 +488,53 @@ func contactGraphKey(point transactions.Point, layer string) interBlockContactGr
 }
 
 func contactGraphSegmentKey(point transactions.Point, layer string) interBlockContactGraphKey {
+	return contactGraphSegmentKeyForNormalizedLayer(point, normalizeContactLayer(layer))
+}
+
+func contactGraphSegmentKeyForNormalizedLayer(point transactions.Point, layer string) interBlockContactGraphKey {
 	return interBlockContactGraphKey{
 		layer: layer,
 		x:     int64(math.Round(point.XMM / interBlockContactSegmentBucketMM)),
 		y:     int64(math.Round(point.YMM / interBlockContactSegmentBucketMM)),
 	}
+}
+
+func contactGraphSegmentQueryKeys(left transactions.Point, right transactions.Point, layer string, tolerance float64, seen map[interBlockContactGraphKey]struct{}, buf *[]interBlockContactGraphKey) []interBlockContactGraphKey {
+	if seen == nil {
+		seen = map[interBlockContactGraphKey]struct{}{}
+	}
+	clear(seen)
+	if buf == nil {
+		local := make([]interBlockContactGraphKey, 0)
+		buf = &local
+	}
+	*buf = (*buf)[:0]
+	dx := right.XMM - left.XMM
+	dy := right.YMM - left.YMM
+	steps := int(math.Ceil(math.Max(math.Abs(dx), math.Abs(dy)) / (interBlockContactSegmentBucketMM / 2)))
+	if steps < 1 {
+		steps = 1
+	}
+	radius := int64(math.Ceil(tolerance / interBlockContactSegmentBucketMM))
+	if radius < 1 {
+		radius = 1
+	}
+	for step := 0; step <= steps; step++ {
+		t := float64(step) / float64(steps)
+		point := transactions.Point{XMM: left.XMM + dx*t, YMM: left.YMM + dy*t}
+		key := contactGraphSegmentKeyForNormalizedLayer(point, layer)
+		for offsetX := -radius; offsetX <= radius; offsetX++ {
+			for offsetY := -radius; offsetY <= radius; offsetY++ {
+				candidate := interBlockContactGraphKey{layer: key.layer, x: key.x + offsetX, y: key.y + offsetY}
+				if _, ok := seen[candidate]; ok {
+					continue
+				}
+				seen[candidate] = struct{}{}
+				*buf = append(*buf, candidate)
+			}
+		}
+	}
+	return *buf
 }
 
 func normalizeContactLayer(layer string) string {
@@ -726,6 +782,69 @@ func proveContactTargetOnOperation(target InterBlockContactTarget, operation dec
 
 func pointToSegmentDistanceMM(point transactions.Point, left transactions.Point, right transactions.Point) float64 {
 	return pointDistanceMM(point, closestPointOnSegment(point, left, right))
+}
+
+func segmentsContactWithinTolerance(leftA transactions.Point, rightA transactions.Point, leftB transactions.Point, rightB transactions.Point, tolerance float64) bool {
+	if segmentBoundingBoxesSeparated(leftA, rightA, leftB, rightB, tolerance) {
+		return false
+	}
+	if segmentsIntersectWithinTolerance(leftA, rightA, leftB, rightB, tolerance) {
+		return true
+	}
+	return pointToSegmentDistanceMM(leftA, leftB, rightB) <= tolerance ||
+		pointToSegmentDistanceMM(rightA, leftB, rightB) <= tolerance ||
+		pointToSegmentDistanceMM(leftB, leftA, rightA) <= tolerance ||
+		pointToSegmentDistanceMM(rightB, leftA, rightA) <= tolerance
+}
+
+func segmentBoundingBoxesSeparated(leftA transactions.Point, rightA transactions.Point, leftB transactions.Point, rightB transactions.Point, tolerance float64) bool {
+	minAX, maxAX := math.Min(leftA.XMM, rightA.XMM), math.Max(leftA.XMM, rightA.XMM)
+	minAY, maxAY := math.Min(leftA.YMM, rightA.YMM), math.Max(leftA.YMM, rightA.YMM)
+	minBX, maxBX := math.Min(leftB.XMM, rightB.XMM), math.Max(leftB.XMM, rightB.XMM)
+	minBY, maxBY := math.Min(leftB.YMM, rightB.YMM), math.Max(leftB.YMM, rightB.YMM)
+	return maxAX+tolerance < minBX ||
+		maxBX+tolerance < minAX ||
+		maxAY+tolerance < minBY ||
+		maxBY+tolerance < minAY
+}
+
+func segmentsIntersectWithinTolerance(leftA transactions.Point, rightA transactions.Point, leftB transactions.Point, rightB transactions.Point, tolerance float64) bool {
+	orientationToleranceA := tolerance * pointDistanceMM(leftA, rightA)
+	orientationToleranceB := tolerance * pointDistanceMM(leftB, rightB)
+	o1 := segmentOrientation(leftA, rightA, leftB)
+	o2 := segmentOrientation(leftA, rightA, rightB)
+	o3 := segmentOrientation(leftB, rightB, leftA)
+	o4 := segmentOrientation(leftB, rightB, rightA)
+	if math.Abs(o1) <= orientationToleranceA && pointOnSegmentWithinTolerance(leftB, leftA, rightA, tolerance) {
+		return true
+	}
+	if math.Abs(o2) <= orientationToleranceA && pointOnSegmentWithinTolerance(rightB, leftA, rightA, tolerance) {
+		return true
+	}
+	if math.Abs(o3) <= orientationToleranceB && pointOnSegmentWithinTolerance(leftA, leftB, rightB, tolerance) {
+		return true
+	}
+	if math.Abs(o4) <= orientationToleranceB && pointOnSegmentWithinTolerance(rightA, leftB, rightB, tolerance) {
+		return true
+	}
+	return ((o1 > orientationToleranceA && o2 < -orientationToleranceA) || (o1 < -orientationToleranceA && o2 > orientationToleranceA)) &&
+		((o3 > orientationToleranceB && o4 < -orientationToleranceB) || (o3 < -orientationToleranceB && o4 > orientationToleranceB))
+}
+
+func segmentOrientation(left transactions.Point, right transactions.Point, point transactions.Point) float64 {
+	return (right.XMM-left.XMM)*(point.YMM-left.YMM) - (right.YMM-left.YMM)*(point.XMM-left.XMM)
+}
+
+func pointOnSegmentWithinTolerance(point transactions.Point, left transactions.Point, right transactions.Point, tolerance float64) bool {
+	if pointToSegmentDistanceMM(point, left, right) > tolerance {
+		return false
+	}
+	minX, maxX := math.Min(left.XMM, right.XMM), math.Max(left.XMM, right.XMM)
+	minY, maxY := math.Min(left.YMM, right.YMM), math.Max(left.YMM, right.YMM)
+	return point.XMM+tolerance >= minX &&
+		point.XMM-tolerance <= maxX &&
+		point.YMM+tolerance >= minY &&
+		point.YMM-tolerance <= maxY
 }
 
 func closestPointOnSegment(point transactions.Point, left transactions.Point, right transactions.Point) transactions.Point {

@@ -84,6 +84,60 @@ func TestSummarizeRouteTreeContactGraphMergesAllMatchingSegmentsAtInteriorJuncti
 	}
 }
 
+func TestSummarizeRouteTreeContactGraphMergesCrossingSameNetSegmentsWithoutJunctionTarget(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTarget("SIG", "U2", "1", 5, -5),
+		routeTreeGraphTarget("SIG", "U3", "1", 5, 5),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 5, YMM: -5}, {XMM: 5, YMM: 5}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 4 || summary.CompleteGroups != 1 || summary.Components != 1 {
+		t.Fatalf("summary = %#v, want crossing same-net segments to complete one graph component", summary)
+	}
+}
+
+func TestSummarizeRouteTreeContactGraphMergesOverlappingSameNetSegments(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTarget("SIG", "U2", "1", 4, 0),
+		routeTreeGraphTarget("SIG", "U3", "1", 12, 0),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 4, YMM: 0}, {XMM: 12, YMM: 0}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 4 || summary.CompleteGroups != 1 || summary.Components != 1 {
+		t.Fatalf("summary = %#v, want overlapping same-net segments to complete one graph component", summary)
+	}
+}
+
+func TestSummarizeRouteTreeContactGraphKeepsNearMissSameNetSegmentsSplit(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTarget("SIG", "U2", "1", 5, 0.01),
+		routeTreeGraphTarget("SIG", "U3", "1", 5, 5),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 5, YMM: 0.01}, {XMM: 5, YMM: 5}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 4 || summary.CompleteGroups != 0 || summary.PartialGroups != 1 || summary.Components != 2 {
+		t.Fatalf("summary = %#v, want near-miss same-net segments to remain split", summary)
+	}
+}
+
 func TestSummarizeRouteTreeContactGraphCountsBranchToLocalRouteMerge(t *testing.T) {
 	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
 		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
