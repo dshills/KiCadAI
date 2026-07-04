@@ -44,6 +44,39 @@ func TestSummarizeRouteTreeContactGraphCountsBranchToPadContact(t *testing.T) {
 	}
 }
 
+func TestSummarizeRouteTreeContactGraphCountsSegmentInteriorContact(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 5, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 2 || summary.CompleteGroups != 1 || summary.Components != 1 {
+		t.Fatalf("summary = %#v, want segment-interior contact to complete same-net group", summary)
+	}
+}
+
+func TestSummarizeRouteTreeContactGraphMergesAllMatchingSegmentsAtInteriorJunction(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTarget("SIG", "U2", "1", 5, 0),
+		routeTreeGraphTarget("SIG", "U3", "1", 5, 5),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 5, YMM: -5}, {XMM: 5, YMM: 5}}),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 4 || summary.CompleteGroups != 1 || summary.Components != 1 {
+		t.Fatalf("summary = %#v, want same-net interior junction to merge all matching segments", summary)
+	}
+}
+
 func TestSummarizeRouteTreeContactGraphCountsBranchToLocalRouteMerge(t *testing.T) {
 	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
 		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),

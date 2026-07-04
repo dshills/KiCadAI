@@ -111,6 +111,42 @@ func TestValidateInterBlockRouteEndpointContactsProvesDirectHit(t *testing.T) {
 	}
 }
 
+func TestValidateInterBlockRouteEndpointContactsProvesSegmentInteriorHit(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operations := []transactions.Operation{mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 0, YMM: 10},
+		transactions.Point{XMM: 15, YMM: 10},
+	)}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Issues) != 0 {
+		t.Fatalf("issues = %#v", evidence.Issues)
+	}
+	if len(evidence.Proofs) != 2 {
+		t.Fatalf("proofs = %#v, want two endpoint proofs", evidence.Proofs)
+	}
+	var segmentProofs int
+	for _, proof := range evidence.Proofs {
+		if proof.Status != InterBlockContactProven {
+			t.Fatalf("proof = %#v, want proven", proof)
+		}
+		if proof.EndpointSide == "segment" {
+			segmentProofs++
+		}
+	}
+	if segmentProofs != 1 {
+		t.Fatalf("proofs = %#v, want one segment-interior contact proof", evidence.Proofs)
+	}
+}
+
 func TestValidateInterBlockRouteEndpointContactsReportsMiss(t *testing.T) {
 	placed := interBlockContactPlaced("SIG", "SIG")
 	candidates := []InterBlockRouteCandidate{{

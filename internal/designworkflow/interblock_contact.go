@@ -112,6 +112,8 @@ type InterBlockContactSummary struct {
 // intended pad/access target.
 const interBlockContactToleranceMM = 1e-4
 
+const interBlockContactSegmentBucketMM = 1.0
+
 // BuildInterBlockContactTargets resolves route-candidate endpoints into
 // physical contact targets using placed, hydrated pad evidence. It does not
 // populate Proofs because contact proof requires emitted route geometry.
@@ -256,14 +258,24 @@ func interBlockConnectedNetsFromDecoded(targetsByNet map[string][]InterBlockCont
 }
 
 type interBlockContactGraph struct {
-	parent []int
-	rank   []int
-	nodes  []interBlockContactGraphNode
-	byKey  map[interBlockContactGraphKey][]int
+	parent         []int
+	rank           []int
+	nodes          []interBlockContactGraphNode
+	segments       []interBlockContactGraphSegment
+	segmentMarks   []uint32
+	markGeneration uint32
+	byKey          map[interBlockContactGraphKey][]int
+	segmentsByKey  map[interBlockContactGraphKey][]int
 }
 
 type interBlockContactGraphNode struct {
 	Point transactions.Point
+	Layer string
+}
+
+type interBlockContactGraphSegment struct {
+	Left  int
+	Right int
 	Layer string
 }
 
@@ -274,7 +286,10 @@ type interBlockContactGraphKey struct {
 }
 
 func newInterBlockContactGraph(operations []decodedContactRouteOperation) interBlockContactGraph {
-	graph := interBlockContactGraph{byKey: map[interBlockContactGraphKey][]int{}}
+	graph := interBlockContactGraph{
+		byKey:         map[interBlockContactGraphKey][]int{},
+		segmentsByKey: map[interBlockContactGraphKey][]int{},
+	}
 	for _, operation := range operations {
 		previous := -1
 		layer := normalizeContactLayer(operation.Layer)
@@ -282,6 +297,7 @@ func newInterBlockContactGraph(operations []decodedContactRouteOperation) interB
 			node := graph.add(point, layer)
 			if previous != -1 {
 				graph.union(previous, node)
+				graph.addSegment(previous, node, layer)
 			}
 			previous = node
 		}
@@ -300,6 +316,30 @@ func (graph *interBlockContactGraph) add(point transactions.Point, layer string)
 	key := contactGraphKey(point, layer)
 	graph.byKey[key] = append(graph.byKey[key], index)
 	return index
+}
+
+func (graph *interBlockContactGraph) addSegment(left int, right int, layer string) {
+	index := len(graph.segments)
+	graph.segments = append(graph.segments, interBlockContactGraphSegment{Left: left, Right: right, Layer: layer})
+	graph.segmentMarks = append(graph.segmentMarks, 0)
+	leftPoint := graph.nodes[left].Point
+	rightPoint := graph.nodes[right].Point
+	dx := rightPoint.XMM - leftPoint.XMM
+	dy := rightPoint.YMM - leftPoint.YMM
+	steps := int(math.Ceil(math.Max(math.Abs(dx), math.Abs(dy)) / (interBlockContactSegmentBucketMM / 2)))
+	if steps < 1 {
+		steps = 1
+	}
+	seenKeys := make(map[interBlockContactGraphKey]struct{}, steps+1)
+	for step := 0; step <= steps; step++ {
+		t := float64(step) / float64(steps)
+		point := transactions.Point{XMM: leftPoint.XMM + dx*t, YMM: leftPoint.YMM + dy*t}
+		key := contactGraphSegmentKey(point, layer)
+		seenKeys[key] = struct{}{}
+	}
+	for key := range seenKeys {
+		graph.segmentsByKey[key] = append(graph.segmentsByKey[key], index)
+	}
 }
 
 func (graph *interBlockContactGraph) connectedTargets(targets []InterBlockContactTarget) bool {
@@ -322,7 +362,59 @@ func (graph *interBlockContactGraph) connectedTargets(targets []InterBlockContac
 }
 
 func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarget) (int, bool) {
-	return graph.nearbyNode(target.Point, normalizeContactLayer(target.Layer))
+	layer := normalizeContactLayer(target.Layer)
+	if node, ok := graph.nearbyNode(target.Point, layer); ok {
+		return node, true
+	}
+	tolerance := contactToleranceForTarget(target)
+	graph.nextSegmentMarkGeneration()
+	seenSegments := make([]int, 0)
+	key := contactGraphSegmentKey(target.Point, layer)
+	radius := int64(math.Ceil(tolerance / interBlockContactSegmentBucketMM))
+	if radius < 1 {
+		radius = 1
+	}
+	for dx := -radius; dx <= radius; dx++ {
+		for dy := -radius; dy <= radius; dy++ {
+			candidateKey := interBlockContactGraphKey{layer: key.layer, x: key.x + dx, y: key.y + dy}
+			for _, segmentIndex := range graph.segmentsByKey[candidateKey] {
+				if segmentIndex < 0 || segmentIndex >= len(graph.segmentMarks) || graph.segmentMarks[segmentIndex] == graph.markGeneration {
+					continue
+				}
+				graph.segmentMarks[segmentIndex] = graph.markGeneration
+				seenSegments = append(seenSegments, segmentIndex)
+			}
+		}
+	}
+	node := -1
+	for _, segmentIndex := range seenSegments {
+		segment := graph.segments[segmentIndex]
+		if !sameLayer(segment.Layer, layer) {
+			continue
+		}
+		left := graph.nodes[segment.Left]
+		right := graph.nodes[segment.Right]
+		if pointToSegmentDistanceMM(target.Point, left.Point, right.Point) > tolerance {
+			continue
+		}
+		if node == -1 {
+			node = graph.add(target.Point, layer)
+		}
+		graph.union(node, segment.Left)
+		graph.union(node, segment.Right)
+	}
+	return node, node != -1
+}
+
+func (graph *interBlockContactGraph) nextSegmentMarkGeneration() {
+	graph.markGeneration++
+	if graph.markGeneration != 0 {
+		return
+	}
+	for index := range graph.segmentMarks {
+		graph.segmentMarks[index] = 0
+	}
+	graph.markGeneration = 1
 }
 
 func (graph *interBlockContactGraph) nearbyNode(point transactions.Point, layer string) (int, bool) {
@@ -378,6 +470,14 @@ func contactGraphKey(point transactions.Point, layer string) interBlockContactGr
 		layer: layer,
 		x:     int64(math.Round(point.XMM / interBlockContactToleranceMM)),
 		y:     int64(math.Round(point.YMM / interBlockContactToleranceMM)),
+	}
+}
+
+func contactGraphSegmentKey(point transactions.Point, layer string) interBlockContactGraphKey {
+	return interBlockContactGraphKey{
+		layer: layer,
+		x:     int64(math.Round(point.XMM / interBlockContactSegmentBucketMM)),
+		y:     int64(math.Round(point.YMM / interBlockContactSegmentBucketMM)),
 	}
 }
 
@@ -547,42 +647,18 @@ func proveContactTarget(target InterBlockContactTarget, operations []decodedCont
 		if len(operation.Points) == 0 {
 			continue
 		}
-		endpoints := []struct {
-			side  string
-			point transactions.Point
-		}{
-			{side: "start", point: operation.Points[0]},
-			{side: "end", point: operation.Points[len(operation.Points)-1]},
-		}
-		for _, endpoint := range endpoints {
-			distance := pointDistanceMM(endpoint.point, target.Point)
-			if distance <= target.ToleranceMM && !sameLayer(operation.Layer, target.Layer) {
+		if proof, candidate, ok := proveContactTargetOnOperation(target, operation); ok {
+			return proof
+		} else if candidate.DistanceMM < bestDistance {
+			bestDistance = candidate.DistanceMM
+			point := candidate.Point
+			best.OperationID = operation.OperationID
+			best.EndpointSide = candidate.Side
+			best.EmittedPoint = &point
+			best.Layer = operation.Layer
+			best.DistanceMM = candidate.DistanceMM
+			if candidate.DistanceMM <= contactToleranceForTarget(target) && !sameLayer(operation.Layer, target.Layer) {
 				layerCoordinateMatch = true
-			}
-			if distance < bestDistance {
-				bestDistance = distance
-				point := endpoint.point
-				best.OperationID = operation.OperationID
-				best.EndpointSide = endpoint.side
-				best.EmittedPoint = &point
-				best.Layer = operation.Layer
-				best.DistanceMM = distance
-			}
-			if distance <= target.ToleranceMM && sameLayer(operation.Layer, target.Layer) {
-				point := endpoint.point
-				return InterBlockContactProof{
-					OperationID:  operation.OperationID,
-					RouteClass:   "inter_block",
-					NetName:      target.NetName,
-					NetCode:      target.NetCode,
-					EndpointSide: endpoint.side,
-					EmittedPoint: &point,
-					Layer:        operation.Layer,
-					Target:       target,
-					DistanceMM:   distance,
-					ToleranceMM:  target.ToleranceMM,
-					Status:       InterBlockContactProven,
-				}
 			}
 		}
 	}
@@ -591,6 +667,88 @@ func proveContactTarget(target InterBlockContactTarget, operations []decodedCont
 		best.Suggestion = "route to the contact target on the target copper layer or insert a validated via"
 	}
 	return best
+}
+
+type interBlockContactProofCandidate struct {
+	Side       string
+	Point      transactions.Point
+	DistanceMM float64
+}
+
+func proveContactTargetOnOperation(target InterBlockContactTarget, operation decodedContactRouteOperation) (InterBlockContactProof, interBlockContactProofCandidate, bool) {
+	bestDistance := math.Inf(1)
+	bestSide := ""
+	var bestPoint transactions.Point
+	record := func(side string, point transactions.Point, distance float64) {
+		if distance >= bestDistance {
+			return
+		}
+		bestDistance = distance
+		bestSide = side
+		bestPoint = point
+	}
+	for index, point := range operation.Points {
+		side := "vertex"
+		switch index {
+		case 0:
+			side = "start"
+		case len(operation.Points) - 1:
+			side = "end"
+		}
+		record(side, point, pointDistanceMM(point, target.Point))
+	}
+	for index := 1; index < len(operation.Points); index++ {
+		left := operation.Points[index-1]
+		right := operation.Points[index]
+		closest := closestPointOnSegment(target.Point, left, right)
+		distance := pointDistanceMM(target.Point, closest)
+		record("segment", closest, distance)
+	}
+	candidate := interBlockContactProofCandidate{Side: bestSide, Point: bestPoint, DistanceMM: bestDistance}
+	if bestDistance > contactToleranceForTarget(target) || !sameLayer(operation.Layer, target.Layer) {
+		return InterBlockContactProof{}, candidate, false
+	}
+	point := bestPoint
+	return InterBlockContactProof{
+		OperationID:  operation.OperationID,
+		RouteClass:   "inter_block",
+		NetName:      target.NetName,
+		NetCode:      target.NetCode,
+		EndpointSide: bestSide,
+		EmittedPoint: &point,
+		Layer:        operation.Layer,
+		Target:       target,
+		DistanceMM:   bestDistance,
+		ToleranceMM:  target.ToleranceMM,
+		Status:       InterBlockContactProven,
+	}, candidate, true
+}
+
+func pointToSegmentDistanceMM(point transactions.Point, left transactions.Point, right transactions.Point) float64 {
+	return pointDistanceMM(point, closestPointOnSegment(point, left, right))
+}
+
+func closestPointOnSegment(point transactions.Point, left transactions.Point, right transactions.Point) transactions.Point {
+	dx := right.XMM - left.XMM
+	dy := right.YMM - left.YMM
+	lengthSquared := dx*dx + dy*dy
+	if lengthSquared < 1e-12 {
+		return left
+	}
+	t := ((point.XMM-left.XMM)*dx + (point.YMM-left.YMM)*dy) / lengthSquared
+	if t < 0 {
+		t = 0
+	} else if t > 1 {
+		t = 1
+	}
+	return transactions.Point{XMM: left.XMM + t*dx, YMM: left.YMM + t*dy}
+}
+
+func contactToleranceForTarget(target InterBlockContactTarget) float64 {
+	if target.ToleranceMM > 0 {
+		return target.ToleranceMM
+	}
+	return interBlockContactToleranceMM
 }
 
 func interBlockContactTargetsByNet(targets []InterBlockContactTarget) map[string][]InterBlockContactTarget {
