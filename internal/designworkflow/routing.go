@@ -339,17 +339,21 @@ func summarizeInterBlockRouteCompletionWithGraphOperations(candidates []InterBlo
 	graphComponents := interBlockGraphComponentCountsFromDecoded(targetsByNet, operationsByNet, operationIssues)
 	routeSegmentsByNet := routeSegmentCountsByNet(routeOperations)
 	issueCountsByNet := issueCountsByNet(issues)
+	blockingIssueCountsByNet := blockingIssueCountsByNet(issues)
 	for _, issue := range groupIssues {
 		for _, net := range issue.Nets {
 			net = interBlockSummaryNetKey(net)
 			if net != "" {
 				issueCountsByNet[net]++
+				if issue.Blocking() {
+					blockingIssueCountsByNet[net]++
+				}
 			}
 		}
 	}
 	connectedNets := interBlockConnectedNetsFromDecoded(targetsByNet, operationsByNet, operationIssues)
 	treeByNet := interBlockRouteTreeByNet(trees)
-	summarizeInterBlockRouteGroups(&summary, groups, treeByNet, provenEndpoints, graphComponents, routeSegmentsByNet, issueCountsByNet, connectedNets)
+	summarizeInterBlockRouteGroups(&summary, groups, treeByNet, provenEndpoints, graphComponents, routeSegmentsByNet, blockingIssueCountsByNet, connectedNets)
 	for _, candidate := range candidates {
 		netName := interBlockSummaryNetKey(candidate.NetName)
 		summary.EndpointsResolved += len(candidate.Endpoints)
@@ -358,8 +362,9 @@ func summarizeInterBlockRouteCompletionWithGraphOperations(candidates []InterBlo
 		summary.EmittedSegments += segments
 		netIssueCount := issueCountsByNet[netName]
 		summary.IssueCount += netIssueCount
+		blockingIssueCount := blockingIssueCountsByNet[netName]
 		switch {
-		case connectedNets[netName] && netIssueCount == 0:
+		case connectedNets[netName] && blockingIssueCount == 0:
 			summary.RoutesCompleted++
 		case segments > 0:
 			summary.PartialNets++
@@ -645,6 +650,22 @@ func excludeManagedInterBlockNets(nets []routing.Net, managed []string) []routin
 func issueCountsByNet(issues []reports.Issue) map[string]int {
 	counts := map[string]int{}
 	for _, issue := range issues {
+		for _, net := range issue.Nets {
+			net = interBlockSummaryNetKey(net)
+			if net != "" {
+				counts[net]++
+			}
+		}
+	}
+	return counts
+}
+
+func blockingIssueCountsByNet(issues []reports.Issue) map[string]int {
+	counts := map[string]int{}
+	for _, issue := range issues {
+		if !issue.Blocking() {
+			continue
+		}
 		for _, net := range issue.Nets {
 			net = interBlockSummaryNetKey(net)
 			if net != "" {

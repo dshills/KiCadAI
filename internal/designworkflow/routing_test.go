@@ -560,14 +560,14 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 	if interBlock.MultiEndpointNets != 4 || interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 9 {
 		t.Fatalf("inter-block summary = %#v, want 4 managed I2C nets and 9/12 proven endpoints", interBlock)
 	}
-	if interBlock.CompleteGroups != 0 || interBlock.PartialGroups != 4 || interBlock.BlockedGroups != 0 {
-		t.Fatalf("inter-block groups = %#v, want four partial route-completion groups", interBlock)
+	if interBlock.CompleteGroups != 1 || interBlock.PartialGroups != 3 || interBlock.BlockedGroups != 0 {
+		t.Fatalf("inter-block groups = %#v, want one complete and three partial graph-derived route-completion groups", interBlock)
 	}
 	if interBlock.BranchesAttempted != 8 || interBlock.BranchesCompleted != 3 {
 		t.Fatalf("inter-block branches = %#v, want current 8 attempted and 3 completed baseline", interBlock)
 	}
-	if interBlock.RoutesCompleted != 0 || interBlock.PartialNets != 4 || interBlock.UnroutedNets != 0 {
-		t.Fatalf("inter-block route completion = %#v, want four partial route-tree nets", interBlock)
+	if interBlock.RoutesCompleted != 1 || interBlock.PartialNets != 3 || interBlock.UnroutedNets != 0 {
+		t.Fatalf("inter-block route completion = %#v, want one complete and three partial route-tree nets", interBlock)
 	}
 
 	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routingStage)

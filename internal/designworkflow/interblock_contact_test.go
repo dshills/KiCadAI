@@ -294,6 +294,37 @@ func TestInterBlockRouteCompletionUsesContactGraph(t *testing.T) {
 	}
 }
 
+func TestInterBlockRouteCompletionIgnoresNonBlockingRouteTreeIssues(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operation := mustContactRouteOperation(t, "SIG", "F.Cu",
+		transactions.Point{XMM: 5, YMM: 10},
+		transactions.Point{XMM: 15, YMM: 10},
+	)
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, []transactions.Operation{operation}, &placed)
+	issues := []reports.Issue{{
+		Code:     reports.CodeFixedNetSkipped,
+		Severity: reports.SeverityInfo,
+		Nets:     []string{"SIG"},
+		Message:  "fixed net preserved",
+	}}
+
+	summary := summarizeInterBlockRouteCompletion(candidates, []transactions.Operation{operation}, issues, evidence)
+	if summary.RoutesCompleted != 1 || summary.PartialNets != 0 || summary.CompleteGroups != 1 {
+		t.Fatalf("summary = %#v, want graph-complete route despite non-blocking issue", summary)
+	}
+	if summary.IssueCount != 1 {
+		t.Fatalf("summary = %#v, want total issue diagnostics preserved", summary)
+	}
+}
+
 func interBlockContactPlaced(firstNet string, secondNet string) PlacementStageResult {
 	return PlacementStageResult{
 		Request: placement.Request{
