@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"kicadai/internal/transactions"
@@ -26,6 +27,12 @@ func TestSummarizeRouteTreeContactGraphCountsCompleteAndPartialGroups(t *testing
 	}
 	if summary.CompleteGroups != 1 || summary.PartialGroups != 1 || summary.BlockedGroups != 0 {
 		t.Fatalf("summary = %#v, want one complete and one partial group", summary)
+	}
+	if len(summary.Groups) != 2 {
+		t.Fatalf("summary groups = %#v, want two sorted per-net groups", summary.Groups)
+	}
+	if summary.Groups[0].NetName != "GND" || summary.Groups[0].Status != RouteTreeContactGraphGroupPartial || !slices.Equal(summary.Groups[0].MissingEndpointIDs, []string{"U1.2"}) {
+		t.Fatalf("summary groups = %#v, want sorted per-net partial evidence", summary.Groups)
 	}
 }
 
@@ -133,7 +140,24 @@ func TestSummarizeRouteTreeContactGraphRejectsWrongNetAndWrongLayerContacts(t *t
 
 func TestRouteTreeContactGraphSummaryJSONStable(t *testing.T) {
 	summary := RouteTreeContactGraphSummary{
-		Nets:              []string{"GND", "SIG"},
+		Nets: []string{"GND", "SIG"},
+		Groups: []RouteTreeContactGraphGroupSummary{
+			{
+				NetName:            "GND",
+				Status:             RouteTreeContactGraphGroupPartial,
+				RequiredEndpoints:  2,
+				ProvenEndpoints:    1,
+				Components:         1,
+				MissingEndpointIDs: []string{"U1.2"},
+			},
+			{
+				NetName:           "SIG",
+				Status:            RouteTreeContactGraphGroupComplete,
+				RequiredEndpoints: 2,
+				ProvenEndpoints:   2,
+				Components:        1,
+			},
+		},
 		RequiredEndpoints: 4,
 		ProvenEndpoints:   3,
 		Components:        2,
@@ -147,7 +171,7 @@ func TestRouteTreeContactGraphSummaryJSONStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"nets":["GND","SIG"],"required_endpoints":4,"proven_endpoints":3,"components":2,"complete_groups":1,"partial_groups":1,"blocked_groups":0,"same_net_merges":1,"local_route_merges":2}`
+	want := `{"nets":["GND","SIG"],"groups":[{"net_name":"GND","status":"partial","required_endpoints":2,"proven_endpoints":1,"components":1,"missing_endpoint_ids":["U1.2"]},{"net_name":"SIG","status":"complete","required_endpoints":2,"proven_endpoints":2,"components":1}],"required_endpoints":4,"proven_endpoints":3,"components":2,"complete_groups":1,"partial_groups":1,"blocked_groups":0,"same_net_merges":1,"local_route_merges":2}`
 	if string(data) != want {
 		t.Fatalf("summary JSON = %q, want %q", data, want)
 	}

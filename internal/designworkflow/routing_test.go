@@ -470,6 +470,25 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 	if contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
 		t.Fatalf("contact graph = %#v, want 9 proven endpoints, 1 complete group, 3 partial groups", contactGraph)
 	}
+	wantGraphGroups := map[string]RouteTreeContactGraphGroupSummary{
+		"GND": {Status: RouteTreeContactGraphGroupPartial, RequiredEndpoints: 3, ProvenEndpoints: 2, Components: 2, MissingEndpointIDs: []string{"io.2"}},
+		"SCL": {Status: RouteTreeContactGraphGroupPartial, RequiredEndpoints: 3, ProvenEndpoints: 2, Components: 2, MissingEndpointIDs: []string{"io.4"}},
+		"SDA": {Status: RouteTreeContactGraphGroupPartial, RequiredEndpoints: 3, ProvenEndpoints: 2, Components: 2, MissingEndpointIDs: []string{"io.3"}},
+		"VCC": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
+	}
+	for _, group := range contactGraph.Groups {
+		expected, ok := wantGraphGroups[group.NetName]
+		if !ok {
+			t.Fatalf("contact graph groups = %#v, unexpected net %s", contactGraph.Groups, group.NetName)
+		}
+		if group.Status != expected.Status || group.RequiredEndpoints != expected.RequiredEndpoints || group.ProvenEndpoints != expected.ProvenEndpoints || group.Components != expected.Components || !slices.Equal(group.MissingEndpointIDs, expected.MissingEndpointIDs) {
+			t.Fatalf("contact graph group[%s] = %#v, want %#v", group.NetName, group, expected)
+		}
+		delete(wantGraphGroups, group.NetName)
+	}
+	if len(wantGraphGroups) != 0 {
+		t.Fatalf("contact graph groups = %#v, missing expected groups %#v", contactGraph.Groups, wantGraphGroups)
+	}
 	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 {
 		t.Fatalf("retry = %#v, want initial routed attempt without repair retry", retry)
 	}
