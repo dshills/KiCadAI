@@ -111,9 +111,11 @@ structural flow it should produce a generated KiCad project with
 `data.ai_status.status` equal to `candidate`. Do not describe that as
 fabrication-ready. Inspect `.kicadai/workflow-result.json`,
 `.kicadai/validation-summary.json`, and `.kicadai/design-promotion.json`; the
-promotion report can remain blocked when KiCad ERC/DRC evidence is not
-configured. For KiCad-backed evidence, set `KICADAI_KICAD_CLI` or pass
-`--kicad-cli` and include `--require-erc --require-drc`.
+promotion report should reach `candidate` in the default structural lane while
+clearly labeling missing KiCad evidence. For KiCad-backed evidence, set
+`KICADAI_KICAD_CLI` or pass `--kicad-cli` and include
+`--require-erc --require-drc`; clean KiCad checks promote the LED report to
+`pass`, while KiCad findings remain blockers.
 
 After `intent create`, inspect `data.ai_status` from stdout or
 `.kicadai/validation-summary.json`:
@@ -408,7 +410,9 @@ Success requires:
 - generated files exist;
 - validation artifacts exist when requested;
 - rationale or plan explains assumptions and gaps;
-- any skipped optional KiCad checks are clearly labeled optional.
+- any skipped optional KiCad checks are clearly labeled optional;
+- `pass` promotion claims include clean required KiCad ERC/DRC evidence when
+  those checks are requested.
 
 ## Stop Conditions
 

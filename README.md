@@ -45,10 +45,12 @@ geometry, and broader example regeneration.
 Generated design PCB net assignment now propagates pad and copper net names
 through placement/project write, resolves KiCad 10 name-only net references
 during PCB readback, and reports net-assignment evidence in the `design create`
-workflow. The LED and connector/LED KiCad-backed examples have been promoted to
-candidate readiness with warning-only KiCad evidence, while richer I2C and
-amplifier fixtures remain expected-fail. Generated block-local routes now bind
-to physical same-net pad anchors and report route-connectivity evidence.
+workflow. The simple LED prompt now reaches strict promotion `candidate` in the
+default structural lane without requiring local KiCad, and promotes to `pass`
+when required KiCad ERC/DRC and writer round-trip evidence are clean. The
+connector/LED KiCad-backed example remains candidate-level, while richer I2C
+and amplifier fixtures remain expected-fail. Generated block-local routes now
+bind to physical same-net pad anchors and report route-connectivity evidence.
 Generated inter-block route candidates now promote connector/LED and I2C
 breakout request connections into placement/routing evidence. Routing summaries
 now distinguish candidates, attempted routes, endpoint-contact evidence,
@@ -254,10 +256,13 @@ First-lane prompts include simple LED indicator, connector breakout with power
 LED, and 3.3 V I2C sensor breakout requests. "First-lane" means deterministic,
 instrumented, and fail-closed; it does not guarantee `ready` status yet. The
 simple LED prompt now emits a KiCad project with `data.ai_status.status` set to
-`candidate` in the default structural lane; stricter promotion evidence still
-records warning-level gaps until KiCad ERC/DRC and catalog-backed evidence are
-available. Broader prompts can still stop at precise placement, routing,
-validation, clarification, unsupported, or tool blockers. The command drafts the
+`candidate` in the default structural lane, and
+`.kicadai/design-promotion.json` now records `achieved_readiness: candidate`
+with explicit missing-KiCad evidence. When rerun with `--kicad-cli`,
+`--require-erc`, and `--require-drc`, clean KiCad evidence promotes that report
+to `pass`; KiCad findings remain precise blockers. Broader prompts can still
+stop at placement, routing, validation, clarification, unsupported, or tool
+blockers. The command drafts the
 intent, plans supported blocks, runs the deterministic design workflow, and
 writes `.kicadai/` evidence artifacts even when blocked:
 
@@ -283,6 +288,7 @@ Run KiCad-backed checks when `kicad-cli` is available:
 ```sh
 kicadai check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
 kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
+kicadai --kicad-cli /path/to/kicad-cli --require-erc --require-drc --text "make a simple LED indicator board" --output ./out/ai_led_kicad --overwrite intent create
 ```
 
 ## Intent Planning

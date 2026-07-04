@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-02
+Date: 2026-07-04
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -139,11 +139,14 @@ from validation feedback to safe automatic repair.
 - KiCad-backed design promotion reports now exist for generated design
   workflows and optional fixture runs. `.kicadai/design-promotion.json`
   records declared vs achieved readiness, metadata/stage/writer/connectivity/
-  KiCad/route/physical/artifact gates, referenced artifacts, issue codes, and
-  repair guidance. `design create` includes a compact `data.promotion` summary
-  when the report artifact is written. Current KiCad-backed fixtures are
-  classified as `expected_fail` with explicit promotion blockers rather than
-  silently skipped or accidentally promoted.
+  KiCad/route/physical/artifact gates, referenced artifacts, KiCad version/path
+  evidence, issue codes, and repair guidance. `design create` includes a
+  compact `data.promotion` summary when the report artifact is written. The
+  simple LED prompt now reaches strict promotion `candidate` in the default
+  structural lane and `pass` when required KiCad ERC/DRC plus writer
+  round-trip evidence are clean. Richer KiCad-backed fixtures remain
+  `expected_fail` with explicit promotion blockers rather than silently skipped
+  or accidentally promoted.
 - Multi-endpoint generated inter-block routing now models route groups,
   resolves deterministic route trees, routes branch requests with same-net
   copper evidence, and reports group-level completion semantics. The
@@ -203,9 +206,11 @@ loop confidence:
   narrow, and broader topology synthesis is still intentionally limited.
   Deterministic rationale reports now explain supported planner decisions and
   blockers, but they do not replace broader synthesis.
-- the default design examples are intentionally small LED workflows. LED and
-  connector/LED optional KiCad-backed scenarios are now candidate fixtures with
-  warning-only KiCad evidence. I2C sensor breakout and amplifier
+- the default design examples are intentionally small LED workflows. The simple
+  LED prompt is now a strict-promotion candidate without local KiCad and a
+  pass-capable KiCad-backed lane when `--require-erc --require-drc` evidence is
+  clean. Connector/LED optional KiCad-backed scenarios remain candidate
+  fixtures with warning-only KiCad evidence. I2C sensor breakout and amplifier
   fabrication-candidate scenarios remain `expected_fail` fixtures. They now
   progress past the previous writer-correctness pad/copper net-code blocker,
   and the I2C fixture now progresses past stale routing-skip and local
@@ -901,9 +906,11 @@ intent:
   LED indicator, connector breakout with power LED, and 3.3 V I2C sensor
   breakout prompts. The simple LED indicator text prompt now reaches
   AI-lane `candidate` with generated project, schematic, PCB, workflow,
-  validation, retry, rationale, manifest, and promotion artifacts. Unsafe
-  mains/high-voltage and ambiguous battery prompts fail closed instead of
-  receiving guessed low-voltage defaults.
+  validation, retry, rationale, manifest, and promotion artifacts. Its
+  promotion report reaches structural `candidate` by default and KiCad-backed
+  `pass` when required ERC/DRC evidence is clean. Unsafe mains/high-voltage and
+  ambiguous battery prompts fail closed instead of receiving guessed low-voltage
+  defaults.
 - Retryable blockers now include deterministic `retry_key`, repair category,
   and optional repair bundle path when a generated repair bundle exists.
   Agents should construct repair apply commands from trusted executable and

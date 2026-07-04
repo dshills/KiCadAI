@@ -85,6 +85,9 @@ evidence, route completion, physical-rule evidence, and expected artifacts.
 Agents should use the promotion report when deciding whether a generated
 project can be treated as a promoted KiCad-backed fixture. A skipped KiCad gate
 means external evidence was not produced; it is not proof of ERC/DRC success.
+For the simple LED prompt, skipped optional KiCad evidence leaves the promotion
+report at `candidate`; required clean KiCad ERC/DRC evidence promotes it to
+`pass`, and real KiCad findings block promotion with exact issue codes.
 
 
 ### Intent Planner
@@ -190,12 +193,12 @@ changing the request, rerun validation before reporting success.
 
 For the promoted LED prompt, treat `data.ai_status.status: "candidate"` as a
 usable generated-project handoff, not as fabrication approval. The stricter
-`.kicadai/design-promotion.json` report may still show
-`achieved_readiness: "blocked"` when the `kicad_checks` gate is skipped because
-`KICADAI_KICAD_CLI` is not configured. When KiCad is available, run the same
-prompt with `--kicad-cli`, `--require-erc`, and `--require-drc` to collect
-KiCad-backed evidence; then inspect the `kicad_checks` stage and promotion gate
-before claiming candidate/pass readiness.
+`.kicadai/design-promotion.json` report should show
+`achieved_readiness: "candidate"` in the default structural lane while still
+recording skipped KiCad evidence. When KiCad is available, run the same prompt
+with `--kicad-cli`, `--require-erc`, and `--require-drc` to collect
+KiCad-backed evidence. Clean KiCad evidence promotes the report to `pass`;
+dirty KiCad evidence keeps precise blockers in the `kicad_checks` gate.
 
 Unsafe or under-specified prompts fail closed. For example, mains/high-voltage
 LED requests and ambiguous battery-powered requests stop with clarification or

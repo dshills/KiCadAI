@@ -21,11 +21,12 @@ Promotion gates currently cover:
 - Expected artifacts.
 
 Each report includes declared and achieved readiness, gate statuses, referenced
-artifacts, machine-readable issue codes, and repair guidance. Required KiCad
-ERC/DRC checks are optional to run in environments without `kicad-cli`, but
-they must produce evidence before a fixture can reach `candidate` or `pass`.
-Missing `kicad-cli` is visible as skipped external evidence and blocks
-promotion when those checks are required.
+artifacts, machine-readable issue codes, and repair guidance. KiCad ERC/DRC
+checks are skipped by default in environments without `kicad-cli` unless the
+request or fixture requires them. Optional skipped KiCad evidence can still
+allow structural `candidate` readiness when all non-KiCad gates pass. Clean
+KiCad evidence is needed for `pass`, and missing or dirty required KiCad checks
+block promotion with explicit issue codes.
 
 Readiness values are `expected_fail`, `candidate`, `pass`, and `blocked`.
 Promotion statuses include `pass`, `warn`, `failed`, `expected_fail`,
@@ -40,16 +41,15 @@ Minimal report shape:
 
 ```json
 {
-  "id": "led_indicator_kicad_smoke",
-  "declared_readiness": "expected_fail",
-  "achieved_readiness": "expected_fail",
-  "status": "expected_fail",
+  "id": "led_indicator",
+  "declared_readiness": "candidate",
+  "achieved_readiness": "candidate",
+  "status": "warn",
   "gates": [
     {
       "id": "kicad_checks",
       "status": "skipped",
-      "required_for": ["candidate", "pass"],
-      "issue_codes": ["kicad_checks_missing"]
+      "required_for": ["pass"]
     }
   ],
   "artifacts": [
@@ -61,10 +61,11 @@ Minimal report shape:
   ],
   "issues": [
     {
-      "code": "kicad_checks_missing",
-      "severity": "blocked",
-      "stage": "kicad_checks",
-      "repair": "configure kicad-cli and preserve the required ERC/DRC report evidence"
+      "code": "validation_skipped_external_tool",
+      "severity": "warning",
+      "stage": "validation",
+      "message": "DRC validation is available through the check command and is not run by default during structural evaluation",
+      "repair": "run KiCad DRC with --kicad-cli and --require-drc before claiming pass readiness"
     }
   ]
 }
@@ -72,7 +73,9 @@ Minimal report shape:
 
 Use promotion reports for fixture readiness and AI workflow gating. Use
 `validate board`, `writer check`, and KiCad ERC/DRC reports for the underlying
-technical evidence.
+technical evidence. When required KiCad checks run cleanly, the report records
+`kicad_version`, `external_evidence`, and ERC/DRC report artifacts on the
+`kicad_checks` gate.
 
 ### Generated Schematic Semantic Checks
 
