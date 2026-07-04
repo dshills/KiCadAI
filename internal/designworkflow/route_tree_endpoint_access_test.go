@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"kicadai/internal/transactions"
@@ -52,6 +53,9 @@ func TestRouteTreeAccessCandidatesPreferLocalRouteAnchor(t *testing.T) {
 	}
 	if candidates[0].Access.Role != RouteTreeAccessLocalRouteAnchor {
 		t.Fatalf("candidates = %#v, want local-route anchor first", candidates)
+	}
+	if !strings.Contains(candidates[0].RankReason, "preferred_local_route_anchor") || !strings.Contains(candidates[0].RankReason, "distance_ranked") {
+		t.Fatalf("rank reason = %q, want local-route and distance evidence", candidates[0].RankReason)
 	}
 }
 
@@ -112,6 +116,23 @@ func TestRouteTreeAccessDistanceRankPenalizesMissingOpposite(t *testing.T) {
 	rank := routeTreeAccessDistanceRank(RouteTreeEndpointAccess{Net: "SDA", XMM: 0, YMM: 0}, RouteTreeEndpointAccess{})
 	if rank != routeTreeAccessMissingDistance {
 		t.Fatalf("rank = %d, want missing-distance penalty", rank)
+	}
+}
+
+func TestRouteTreeAccessCandidatesReportMissingOppositeReason(t *testing.T) {
+	candidates := routeTreeAccessCandidatesForEndpoint([]RouteTreeEndpointAccess{{
+		EndpointID: "U1.1",
+		Role:       RouteTreeAccessTargetPad,
+		Ref:        "U1",
+		Pad:        "1",
+		Net:        "SDA",
+		Layer:      "F.CU",
+		XMM:        10,
+		YMM:        0,
+		Source:     "pad",
+	}}, "U1.1", "SDA", RouteTreeEndpointAccess{})
+	if len(candidates) != 1 || !strings.Contains(candidates[0].RankReason, "opposite_missing") {
+		t.Fatalf("candidates = %#v, want missing opposite rank reason", candidates)
 	}
 }
 

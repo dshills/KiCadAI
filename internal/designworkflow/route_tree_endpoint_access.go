@@ -56,6 +56,7 @@ type routeTreeBranchAccessCandidate struct {
 	DistanceRank int64
 	LayerRank    int
 	ObstacleRank int
+	RankReason   string
 }
 
 type routeTreeBranchAccessPair struct {
@@ -80,12 +81,16 @@ func routeTreeAccessCandidatesForEndpoint(access []RouteTreeEndpointAccess, endp
 		if endpointID != "" && item.EndpointID != "" && item.EndpointID != endpointID {
 			continue
 		}
+		roleRank := routeTreeAccessRoleRank(item.Role)
+		layerRank := routeTreeAccessLayerRank(item)
+		distanceRank := routeTreeAccessDistanceRank(item, opposite)
 		candidates = append(candidates, routeTreeBranchAccessCandidate{
 			Access:       item,
-			RoleRank:     routeTreeAccessRoleRank(item.Role),
-			DistanceRank: routeTreeAccessDistanceRank(item, opposite),
-			LayerRank:    routeTreeAccessLayerRank(item),
+			RoleRank:     roleRank,
+			DistanceRank: distanceRank,
+			LayerRank:    layerRank,
 			ObstacleRank: 0,
+			RankReason:   routeTreeAccessRankReason(item, layerRank, distanceRank),
 		})
 	}
 	slices.SortFunc(candidates, compareRouteTreeAccessCandidate)
@@ -148,6 +153,42 @@ func routeTreeAccessLayerRank(item RouteTreeEndpointAccess) int {
 		return routeTreeAccessMissingLayerRank
 	}
 	return routeTreeAccessPreferredLayerRank
+}
+
+func routeTreeAccessRankReason(item RouteTreeEndpointAccess, layerRank int, distanceRank int64) string {
+	reasons := []string{string(item.Role)}
+	switch item.Role {
+	case RouteTreeAccessLocalRouteAnchor:
+		reasons = append(reasons, "preferred_local_route_anchor")
+	case RouteTreeAccessSameNetCopper:
+		reasons = append(reasons, "same_net_copper_merge_candidate")
+	case RouteTreeAccessSourcePad, RouteTreeAccessTargetPad:
+		reasons = append(reasons, "pad_access_fallback")
+	case RouteTreeAccessExternalAnchor:
+		reasons = append(reasons, "external_anchor_fallback")
+	}
+	if layerRank == routeTreeAccessPreferredLayerRank {
+		reasons = append(reasons, "layer_known")
+	} else {
+		reasons = append(reasons, "layer_missing")
+	}
+	if distanceRank == routeTreeAccessMissingDistance {
+		reasons = append(reasons, "opposite_missing")
+	} else {
+		reasons = append(reasons, "distance_ranked")
+	}
+	return joinRouteTreeAccessRankReasons(reasons)
+}
+
+func joinRouteTreeAccessRankReasons(reasons []string) string {
+	if len(reasons) == 0 {
+		return ""
+	}
+	out := reasons[0]
+	for _, reason := range reasons[1:] {
+		out += "," + reason
+	}
+	return out
 }
 
 func compareRouteTreeAccessCandidate(left, right routeTreeBranchAccessCandidate) int {

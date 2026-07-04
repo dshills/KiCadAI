@@ -623,6 +623,49 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 	}
 }
 
+func TestI2CSensorBreakoutRouteTreeEndpointAccessCandidatesStable(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	targetEvidence := BuildInterBlockContactTargets(candidates, &placed)
+	if len(targetEvidence.Issues) != 0 {
+		t.Fatalf("target evidence issues = %#v", targetEvidence.Issues)
+	}
+	routed := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	access := BuildRouteTreeEndpointAccess(targetEvidence, routed.Operations)
+	if len(access) == 0 {
+		t.Fatalf("access = %#v, want route-tree endpoint access", access)
+	}
+
+	i2cNets := connectionAliasSet(request.Connections)
+	targetsByNet := interBlockContactTargetsByNet(targetEvidence.Targets)
+	for net := range i2cNets {
+		targets := targetsByNet[net]
+		if len(targets) == 0 {
+			t.Fatalf("targets by net = %#v, want targets for %s", targetsByNet, net)
+		}
+		for _, target := range targets {
+			candidates := routeTreeAccessCandidatesForEndpoint(access, target.EndpointID, net, RouteTreeEndpointAccess{Net: net, XMM: target.Point.XMM + 1, YMM: target.Point.YMM})
+			if len(candidates) == 0 {
+				t.Fatalf("access = %#v, want candidates for %s %s", access, net, target.EndpointID)
+			}
+			switch candidates[0].Access.Role {
+			case RouteTreeAccessLocalRouteAnchor, RouteTreeAccessTargetPad, RouteTreeAccessSourcePad, RouteTreeAccessSameNetCopper:
+			default:
+				t.Fatalf("candidates = %#v, want stable physical access role for %s", candidates, target.EndpointID)
+			}
+			if candidates[0].RankReason == "" {
+				t.Fatalf("candidates = %#v, want ranking reason for selected %s", candidates, target.EndpointID)
+			}
+		}
+	}
+}
+
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 	nets := map[string]bool{}
 	for _, connection := range connections {
