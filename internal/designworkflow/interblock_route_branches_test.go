@@ -380,6 +380,32 @@ func TestRouteTreeBranchesForRoutingOrdersShortConstrainedBranchesFirst(t *testi
 	}
 }
 
+func TestRouteTreeBranchesForRoutingWithAccessOrdersConstrainedBranchesFirst(t *testing.T) {
+	branches := []InterBlockRouteTreeBranch{
+		{Index: 0, StartEndpointID: "J1.1", EndEndpointID: "U1.1", PlannedDistanceMM: 5},
+		{Index: 1, StartEndpointID: "J1.1", EndEndpointID: "U2.1", PlannedDistanceMM: 20},
+	}
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.1", Role: RouteTreeAccessTargetPad, Net: "SIG", Layer: "F.Cu", XMM: 0, YMM: 0},
+		{EndpointID: "J1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "SIG", Layer: "F.Cu", XMM: 1, YMM: 0},
+		{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Net: "SIG", Layer: "F.Cu", XMM: 5, YMM: 0},
+		{EndpointID: "U1.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "SIG", Layer: "F.Cu", XMM: 6, YMM: 0},
+		{EndpointID: "U2.1", Role: RouteTreeAccessTargetPad, Net: "SIG", Layer: "F.Cu", XMM: 20, YMM: 0},
+	}
+
+	ordered := routeTreeBranchesForRoutingWithAccess(branches, access, "SIG", routeTreeAccessCandidateCache{})
+	got := []int{}
+	for _, branch := range ordered {
+		got = append(got, branch.Index)
+	}
+	want := []int{1, 0}
+	for index := range want {
+		if got[index] != want[index] {
+			t.Fatalf("branch order = %v, want constrained branch first %v", got, want)
+		}
+	}
+}
+
 func TestRouteInterBlockTreeBranchesDoesNotEmitCopperForFailedBranch(t *testing.T) {
 	group := routeTreeTestGroup("SIG",
 		InterBlockRouteEndpoint{Ref: "J1", Pin: "1"},

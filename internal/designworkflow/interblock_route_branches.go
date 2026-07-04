@@ -127,11 +127,11 @@ func RouteInterBlockTreeBranchesWithAccess(ctx context.Context, base routing.Req
 	rules := routeBranchEffectiveRules(base.Rules)
 	currentExisting := make([]routing.ExistingCopper, 0, len(base.Existing)+len(tree.Branches)*routeBranchExistingCopperCapacityPerBranch)
 	currentExisting = append(currentExisting, base.Existing...)
-	orderedBranches := routeTreeBranchesForRouting(tree.Branches)
 	branchAccess := access
 	preferSameNetCopperMerge := routeTreePrefersSameNetCopperAccess(base.Nets, tree.NetName)
 	branchAccess = routeTreeEndpointAccessWithSameNetCopper(branchAccess, base.Existing, tree.NetName)
 	accessCandidateCache := routeTreeAccessCandidateCache{}
+	orderedBranches := routeTreeBranchesForRoutingWithAccess(tree.Branches, branchAccess, tree.NetName, accessCandidateCache)
 	mergeAuditBase := routeTreeMergeAuditBaseForRequest(base, tree.NetName, preferSameNetCopperMerge)
 	for branchPosition, branch := range orderedBranches {
 		evidence := InterBlockBranchRoutingEvidence{
@@ -910,6 +910,44 @@ func routeTreeBranchesForRouting(branches []InterBlockRouteTreeBranch) []InterBl
 	ordered := slices.Clone(branches)
 	slices.SortFunc(ordered, compareRouteTreeBranchForRouting)
 	return ordered
+}
+
+func routeTreeBranchesForRoutingWithAccess(branches []InterBlockRouteTreeBranch, access []RouteTreeEndpointAccess, netName string, cache routeTreeAccessCandidateCache) []InterBlockRouteTreeBranch {
+	if len(branches) == 0 {
+		return nil
+	}
+	ranked := make([]routeTreeRankedBranchForRouting, 0, len(branches))
+	for _, branch := range branches {
+		ranked = append(ranked, routeTreeRankedBranchForRouting{
+			Branch: branch,
+			Rank:   routeTreeBranchAccessConstraintRank(branch, access, netName, cache),
+		})
+	}
+	slices.SortFunc(ranked, func(left, right routeTreeRankedBranchForRouting) int {
+		if compare := cmp.Compare(left.Rank, right.Rank); compare != 0 {
+			return compare
+		}
+		return compareRouteTreeBranchForRouting(left.Branch, right.Branch)
+	})
+	ordered := make([]InterBlockRouteTreeBranch, 0, len(ranked))
+	for _, item := range ranked {
+		ordered = append(ordered, item.Branch)
+	}
+	return ordered
+}
+
+type routeTreeRankedBranchForRouting struct {
+	Branch InterBlockRouteTreeBranch
+	Rank   int
+}
+
+func routeTreeBranchAccessConstraintRank(branch InterBlockRouteTreeBranch, access []RouteTreeEndpointAccess, netName string, cache routeTreeAccessCandidateCache) int {
+	sourceCandidates := routeTreeCachedAccessCandidates(cache, access, branch.StartEndpointID, netName, RouteTreeEndpointAccess{})
+	targetCandidates := routeTreeCachedAccessCandidates(cache, access, branch.EndEndpointID, netName, RouteTreeEndpointAccess{})
+	if len(sourceCandidates) == 0 || len(targetCandidates) == 0 {
+		return int(^uint(0) >> 1)
+	}
+	return len(sourceCandidates) + len(targetCandidates)
 }
 
 func compareRouteTreeBranchForRouting(left, right InterBlockRouteTreeBranch) int {
