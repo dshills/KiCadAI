@@ -742,6 +742,23 @@ func TestCreateI2CSensorBreakoutWritesProjectArtifactsAfterRouteTreeProof(t *tes
 	if writerCorrect.Status != StageStatusWarning {
 		t.Fatalf("writer_correctness status = %s issues=%#v, want current warning-only library evidence blocker", writerCorrect.Status, writerCorrect.Issues)
 	}
+	if reports.HasBlockingIssue(writerCorrect.Issues) {
+		t.Fatalf("writer_correctness issues = %#v, want warning-only accepted evidence", writerCorrect.Issues)
+	}
+	for _, code := range []reports.Code{
+		reports.CodeUnknownFootprintLibrary,
+		reports.CodeUnknownSymbolLibrary,
+		reports.CodeSkippedExternalTool,
+	} {
+		if !stageHasIssueCodeForRoutingTest(writerCorrect, code) {
+			t.Fatalf("writer_correctness issues = %#v, want accepted warning code %s", writerCorrect.Issues, code)
+		}
+	}
+	for _, blockedCode := range []reports.Code{reports.CodeDisconnectedPad, reports.CodeValidationFailed} {
+		if stageHasIssueCodeForRoutingTest(writerCorrect, blockedCode) {
+			t.Fatalf("writer_correctness issues = %#v, want no pad/copper readback blocker %s", writerCorrect.Issues, blockedCode)
+		}
+	}
 	validation, ok := stagesByName[StageValidation]
 	if !ok {
 		t.Fatalf("stages = %#v, want downstream stage %s after project_write", result.Stages, StageValidation)
