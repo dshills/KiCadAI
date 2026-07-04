@@ -729,6 +729,61 @@ func TestI2CSensorBreakoutCapturesCurrentContactGraphGaps(t *testing.T) {
 	}
 }
 
+func TestI2CSensorBreakoutCapturesMissingConnectorEndpointGeometry(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	routed := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	if err := ctx.Err(); err != nil {
+		t.Fatalf("RoutePlacement context error: %v", err)
+	}
+	contactEvidence := ValidateInterBlockRouteEndpointContacts(candidates, routed.Operations, &placed)
+	diagnostics := routeTreeMissingEndpointGeometryForRoutingTest(t, contactEvidence, routed.Operations)
+
+	wantEndpointByNet := map[string]string{"GND": "io.2", "SDA": "io.3", "SCL": "io.4"}
+	if len(diagnostics) != len(wantEndpointByNet) {
+		t.Fatalf("diagnostics = %#v, want one missing connector endpoint for each of %#v", diagnostics, wantEndpointByNet)
+	}
+	wantNearest := map[string]transactions.Point{
+		"GND": {XMM: 4, YMM: 6.75},
+		"SDA": {XMM: 6.5, YMM: 8.25},
+		"SCL": {XMM: 4.171536, YMM: 13.788839},
+	}
+	wantDistance := map[string]float64{
+		"GND": 1.574929,
+		"SDA": 4.279065,
+		"SCL": 2.231815,
+	}
+	for _, net := range []string{"GND", "SDA", "SCL"} {
+		net := net
+		t.Run(net, func(t *testing.T) {
+			netDiagnostics := diagnostics[net]
+			if len(netDiagnostics) != 1 {
+				t.Fatalf("diagnostics = %#v, want net %s", diagnostics, net)
+			}
+			diagnostic := netDiagnostics[0]
+			if diagnostic.EndpointID != wantEndpointByNet[net] || diagnostic.InstanceID != "io" {
+				t.Fatalf("diagnostic[%s] = %#v, want missing connector endpoint %s", net, diagnostic, wantEndpointByNet[net])
+			}
+			if diagnostic.Ref == "" || diagnostic.Pad == "" || diagnostic.Layer == "" {
+				t.Fatalf("diagnostic[%s] = %#v, want ref, pad, and layer", net, diagnostic)
+			}
+			nearestCopperOutsideTolerance := diagnostic.NearestDistanceMM > diagnostic.ToleranceMM
+			if diagnostic.NearestOperationID == "" || diagnostic.NearestLayer == "" || !nearestCopperOutsideTolerance {
+				t.Fatalf("diagnostic[%s] = %#v, want nearest same-net copper outside contact tolerance", net, diagnostic)
+			}
+			if diagnostic.NearestLayer != "F.Cu" || pointDistanceMM(transactions.Point{XMM: diagnostic.NearestXMM, YMM: diagnostic.NearestYMM}, wantNearest[net]) > 1e-3 || math.Abs(diagnostic.NearestDistanceMM-wantDistance[net]) > 1e-3 {
+				t.Fatalf("diagnostic[%s] = %#v, want nearest F.Cu copper at %#v with distance %.12f", net, diagnostic, wantNearest[net], wantDistance[net])
+			}
+		})
+	}
+}
+
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 	nets := map[string]bool{}
 	for _, connection := range connections {
@@ -838,6 +893,23 @@ type routeTreeContactGraphGapForRoutingTest struct {
 	MissingEndpointIDs []string
 }
 
+type routeTreeMissingEndpointGeometryDetailForRoutingTest struct {
+	EndpointID         string
+	Ref                string
+	Pad                string
+	InstanceID         string
+	BlockID            string
+	Layer              string
+	XMM                float64
+	YMM                float64
+	ToleranceMM        float64
+	NearestOperationID string
+	NearestLayer       string
+	NearestXMM         float64
+	NearestYMM         float64
+	NearestDistanceMM  float64
+}
+
 func routeTreeContactGraphGapsForRoutingTest(t *testing.T, evidence InterBlockContactEvidence, operations []transactions.Operation) map[string]routeTreeContactGraphGapForRoutingTest {
 	t.Helper()
 	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
@@ -863,6 +935,74 @@ func routeTreeContactGraphGapsForRoutingTest(t *testing.T, evidence InterBlockCo
 		}
 	}
 	return gaps
+}
+
+func routeTreeMissingEndpointGeometryForRoutingTest(t *testing.T, evidence InterBlockContactEvidence, operations []transactions.Operation) map[string][]routeTreeMissingEndpointGeometryDetailForRoutingTest {
+	t.Helper()
+	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
+	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
+	if len(operationIssues) != 0 {
+		t.Fatalf("operation decode issues = %#v", operationIssues)
+	}
+	diagnostics := map[string][]routeTreeMissingEndpointGeometryDetailForRoutingTest{}
+	for netName, targets := range targetsByNet {
+		graph := newInterBlockContactGraph(operationsByNet[netName])
+		for _, target := range targets {
+			if _, ok := graph.findTargetNode(target); ok {
+				continue
+			}
+			nearest := nearestSameNetCopperForRoutingTest(target, operationsByNet[netName])
+			diagnostic := routeTreeMissingEndpointGeometryDetailForRoutingTest{
+				EndpointID:         routeTreeContactGraphTargetStableIDForRoutingTest(target),
+				Ref:                target.Ref,
+				Pad:                target.Pad,
+				InstanceID:         target.InstanceID,
+				BlockID:            target.BlockID,
+				Layer:              target.Layer,
+				XMM:                target.Point.XMM,
+				YMM:                target.Point.YMM,
+				ToleranceMM:        contactToleranceForTarget(target),
+				NearestOperationID: nearest.OperationID,
+				NearestLayer:       nearest.Layer,
+				NearestXMM:         nearest.Point.XMM,
+				NearestYMM:         nearest.Point.YMM,
+				NearestDistanceMM:  nearest.DistanceMM,
+			}
+			diagnostics[netName] = append(diagnostics[netName], diagnostic)
+		}
+		slices.SortFunc(diagnostics[netName], func(left routeTreeMissingEndpointGeometryDetailForRoutingTest, right routeTreeMissingEndpointGeometryDetailForRoutingTest) int {
+			return strings.Compare(left.EndpointID, right.EndpointID)
+		})
+	}
+	return diagnostics
+}
+
+type nearestSameNetCopperForRoutingTestResult struct {
+	OperationID string
+	Layer       string
+	Point       transactions.Point
+	DistanceMM  float64
+}
+
+func nearestSameNetCopperForRoutingTest(target InterBlockContactTarget, operations []decodedContactRouteOperation) nearestSameNetCopperForRoutingTestResult {
+	best := nearestSameNetCopperForRoutingTestResult{DistanceMM: math.Inf(1)}
+	for _, operation := range operations {
+		if len(operation.Points) == 1 {
+			distance := pointDistanceMM(target.Point, operation.Points[0])
+			if distance < best.DistanceMM {
+				best = nearestSameNetCopperForRoutingTestResult{OperationID: operation.OperationID, Layer: operation.Layer, Point: operation.Points[0], DistanceMM: distance}
+			}
+			continue
+		}
+		for index := 1; index < len(operation.Points); index++ {
+			closestPoint := closestPointOnSegment(target.Point, operation.Points[index-1], operation.Points[index])
+			distance := pointDistanceMM(target.Point, closestPoint)
+			if distance < best.DistanceMM {
+				best = nearestSameNetCopperForRoutingTestResult{OperationID: operation.OperationID, Layer: operation.Layer, Point: closestPoint, DistanceMM: distance}
+			}
+		}
+	}
+	return best
 }
 
 func routeTreeContactGraphTargetStableIDForRoutingTest(target InterBlockContactTarget) string {
