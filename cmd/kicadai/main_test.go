@@ -575,7 +575,7 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 		"schematic":            string(designworkflow.StageStatusOK),
 		"schematic_electrical": string(designworkflow.StageStatusOK),
 		"pcb_realization":      string(designworkflow.StageStatusOK),
-		"placement":            string(designworkflow.StageStatusWarning),
+		"placement":            string(designworkflow.StageStatusOK),
 		"routing":              string(designworkflow.StageStatusWarning),
 		"project_write":        string(designworkflow.StageStatusOK),
 		"writer_correctness":   string(designworkflow.StageStatusWarning),
@@ -643,7 +643,6 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 		path    string
 		message string
 	}{
-		{stage: designworkflow.StagePlacement, path: "design.inter_block_routing.connections[0].to", message: "connection endpoint does not resolve to a generated PCB pad"},
 		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[0].nets.GND.class", message: "power or high-current net has no explicit net class"},
 		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[1].nets.GND.class", message: "power or high-current net has no explicit net class"},
 		{stage: designworkflow.StageWriterCorrect, path: "schematic_to_pcb", message: "schematic-to-PCB transfer has no pad net hints"},
@@ -658,6 +657,9 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 
 	if !promotionHasIssueCodePrefix(promotion.Issues, designworkflow.StageRouting, "routing_fixed_net_skipped_") {
 		t.Fatalf("promotion issues missing fixed-net skipped baseline evidence: %#v", promotion.Issues)
+	}
+	if promotionHasIssue(promotion.Issues, designworkflow.StagePlacement, "design.inter_block_routing.connections[0].to", "connection endpoint does not resolve to a generated PCB pad") {
+		t.Fatalf("endpoint-to-pad warning should be closed: %#v", promotion.Issues)
 	}
 	if promotionHasIssue(promotion.Issues, designworkflow.StageComponentSelection, "component_selection.power_header.connector", "block component has no component_id or component_query") ||
 		promotionHasIssue(promotion.Issues, designworkflow.StageComponentSelection, "component_selection.connector.connector", "block component has no component_id or component_query") {

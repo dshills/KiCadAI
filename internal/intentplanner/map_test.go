@@ -324,6 +324,58 @@ func TestPlanRecordsValueCalculationResults(t *testing.T) {
 	}
 }
 
+func TestPlanDoesNotPowerDefaultActiveHighLEDVCCPort(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "led_indicator",
+		Kind:    IntentBreakout,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "3.3V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V"}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "gpio", Voltage: "3.3V"}},
+		Functions:  []FunctionIntent{{Kind: "indicator"}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	if hasConnection(*plan.GeneratedRequest, "power_header.VIN", "indicator.VCC") {
+		t.Fatalf("default active-high LED should not get an unresolved VCC endpoint: %#v", plan.GeneratedRequest.Connections)
+	}
+	if !hasConnection(*plan.GeneratedRequest, "connector.SIG", "indicator.IN") {
+		t.Fatalf("missing connector signal connection: %#v", plan.GeneratedRequest.Connections)
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanPowersExplicitActiveLowLEDVCCPort(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "active_low_led",
+		Kind:    IntentBreakout,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "external", Voltage: "3.3V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V"}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "gpio", Voltage: "3.3V"}},
+		Functions:  []FunctionIntent{{Kind: "indicator", Params: map[string]any{"active_high": false}}},
+	})
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasConnection(*plan.GeneratedRequest, "power_header.VIN", "indicator.VCC") {
+		t.Fatalf("active-low LED should keep VCC power endpoint: %#v", plan.GeneratedRequest.Connections)
+	}
+	if !hasConnection(*plan.GeneratedRequest, "connector.SIG", "indicator.IN") {
+		t.Fatalf("missing connector signal connection: %#v", plan.GeneratedRequest.Connections)
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
 func TestPlanMapsClassABHeadphoneIntentToProtectedOutputPath(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",

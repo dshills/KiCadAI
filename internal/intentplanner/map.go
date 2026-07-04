@@ -1182,31 +1182,93 @@ func (builder *planBuilder) paramString(instanceID string, key string) string {
 
 func (builder *planBuilder) powerTargets() []struct{ id, port string } {
 	var targets []struct{ id, port string }
+	appendTarget := func(id string) {
+		if port := strings.TrimSpace(builder.powerPortFor(id)); port != "" {
+			targets = append(targets, struct{ id, port string }{id: id, port: port})
+		}
+	}
 	for _, id := range builder.sensorIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	for _, id := range builder.mcuIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	for _, id := range builder.ledIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		if port := builder.ledIndicatorPowerTargetPort(id); port != "" {
+			targets = append(targets, struct{ id, port string }{id: id, port: port})
+		}
 	}
 	for _, id := range builder.amplifierIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	for _, id := range builder.classABOutputIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	for _, id := range builder.poweredClockIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	for _, id := range builder.programmingIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	for _, id := range builder.powerConnectorIDs {
-		targets = append(targets, struct{ id, port string }{id: id, port: builder.powerPortFor(id)})
+		appendTarget(id)
 	}
 	return targets
+}
+
+func (builder *planBuilder) ledIndicatorPowerTargetPort(instanceID string) string {
+	port := strings.TrimSpace(builder.powerPortFor(instanceID))
+	if builder.instanceBlockIDs[instanceID] != "led_indicator" {
+		return port
+	}
+	if builder.ledIndicatorActiveHigh(instanceID) {
+		return ""
+	}
+	return port
+}
+
+func (builder *planBuilder) ledIndicatorActiveHigh(instanceID string) bool {
+	params := builder.instanceParams[instanceID]
+	value, ok := params["active_high"]
+	if !ok {
+		return true
+	}
+	switch typed := value.(type) {
+	case bool:
+		return typed
+	case string:
+		normalized := strings.ToLower(strings.TrimSpace(typed))
+		if normalized == "false" || normalized == "0" || normalized == "no" || normalized == "off" || normalized == "disabled" {
+			return false
+		}
+		return true
+	case int:
+		return typed != 0
+	case int8:
+		return typed != 0
+	case int16:
+		return typed != 0
+	case int32:
+		return typed != 0
+	case int64:
+		return typed != 0
+	case uint:
+		return typed != 0
+	case uint8:
+		return typed != 0
+	case uint16:
+		return typed != 0
+	case uint32:
+		return typed != 0
+	case uint64:
+		return typed != 0
+	case float32:
+		return math.Abs(float64(typed)) > 1e-9
+	case float64:
+		return math.Abs(typed) > 1e-9
+	default:
+		return true
+	}
 }
 
 func (builder *planBuilder) powerPortFor(instanceID string) string {
