@@ -156,6 +156,34 @@ func TestSummarizeRouteTreeContactGraphCountsBranchToLocalRouteMerge(t *testing.
 	}
 }
 
+func TestRouteTreeContactGraphCompletesThroughLocalRouteAnchorOperations(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
+		routeTreeGraphTarget("SIG", "U1", "1", 10, 0),
+		routeTreeGraphTarget("SIG", "U2", "1", 20, 0),
+	}}
+	localOperations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}),
+	}
+	routeTreeOperations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperation(t, "SIG", []transactions.Point{{XMM: 10, YMM: 0}, {XMM: 20, YMM: 0}}),
+	}
+
+	access, issues := BuildRouteTreeEndpointAccessWithIssues(targets, localOperations)
+	if len(issues) != 0 {
+		t.Fatalf("access issues = %#v", issues)
+	}
+	accessSummary := SummarizeRouteTreeEndpointAccess(access)
+	if accessSummary.LocalRouteAnchors == 0 {
+		t.Fatalf("access summary = %#v, want local route anchor evidence", accessSummary)
+	}
+	contactGraphOperations := append(slices.Clone(routeTreeOperations), localOperations...)
+	summary := SummarizeRouteTreeContactGraph(targets, contactGraphOperations, access)
+	if summary.ProvenEndpoints != 3 || summary.CompleteGroups != 1 || summary.Components != 1 || summary.LocalRouteMerges == 0 {
+		t.Fatalf("summary = %#v, want contact graph completion through local-route anchor operations", summary)
+	}
+}
+
 func TestSummarizeRouteTreeContactGraphCountsBranchToSameNetCopperMerge(t *testing.T) {
 	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
 		routeTreeGraphTarget("VCC", "J1", "1", 0, 0),
