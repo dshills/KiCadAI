@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -666,6 +667,49 @@ func TestI2CSensorBreakoutRouteTreeEndpointAccessCandidatesStable(t *testing.T) 
 	}
 }
 
+func TestI2CSensorBreakoutCapturesCurrentContactGraphGaps(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	candidates, candidateIssues := BuildInterBlockRouteCandidates(fragments, placed)
+	if len(candidateIssues) != 0 {
+		t.Fatalf("candidate issues = %#v", candidateIssues)
+	}
+	targetEvidence := BuildInterBlockContactTargets(candidates, &placed)
+	if len(targetEvidence.Issues) != 0 {
+		t.Fatalf("target evidence issues = %#v", targetEvidence.Issues)
+	}
+	routed := RoutePlacement(ctx, request, fragments, placed, RoutingOptions{})
+	if err := ctx.Err(); err != nil {
+		t.Fatalf("RoutePlacement context error: %v", err)
+	}
+	if routed.Stage.Name != StageRouting || len(routed.Operations) == 0 {
+		t.Fatalf("routed stage=%#v operations=%d, want routing result with operations", routed.Stage, len(routed.Operations))
+	}
+	contactEvidence := ValidateInterBlockRouteEndpointContacts(candidates, routed.Operations, &placed)
+	gaps := routeTreeContactGraphGapsForRoutingTest(t, contactEvidence, routed.Operations)
+
+	want := map[string]routeTreeContactGraphGapForRoutingTest{
+		"GND": {Required: 3, Proven: 2, Components: 2, MissingEndpointIDs: []string{"io.2"}},
+		"SCL": {Required: 3, Proven: 2, Components: 2, MissingEndpointIDs: []string{"io.4"}},
+		"SDA": {Required: 3, Proven: 2, Components: 2, MissingEndpointIDs: []string{"io.3"}},
+	}
+	if len(gaps) != len(want) {
+		t.Fatalf("gaps = %#v, want %#v", gaps, want)
+	}
+	for _, net := range []string{"GND", "SCL", "SDA"} {
+		expected := want[net]
+		got, ok := gaps[net]
+		if !ok {
+			t.Fatalf("gaps = %#v, want net %s", gaps, net)
+		}
+		if got.Required != expected.Required || got.Proven != expected.Proven || got.Components != expected.Components || !slices.Equal(got.MissingEndpointIDs, expected.MissingEndpointIDs) {
+			t.Fatalf("gap[%s] = %#v, want %#v", net, got, expected)
+		}
+	}
+}
+
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 	nets := map[string]bool{}
 	for _, connection := range connections {
@@ -766,6 +810,50 @@ func routeTreeBranchIssuePathsByNet(issues []reports.Issue) map[string][]string 
 		sort.Strings(paths[net])
 	}
 	return paths
+}
+
+type routeTreeContactGraphGapForRoutingTest struct {
+	Required           int
+	Proven             int
+	Components         int
+	MissingEndpointIDs []string
+}
+
+func routeTreeContactGraphGapsForRoutingTest(t *testing.T, evidence InterBlockContactEvidence, operations []transactions.Operation) map[string]routeTreeContactGraphGapForRoutingTest {
+	t.Helper()
+	targetsByNet := interBlockContactTargetsByNet(evidence.Targets)
+	operationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
+	if len(operationIssues) != 0 {
+		t.Fatalf("operation decode issues = %#v", operationIssues)
+	}
+	componentCounts := interBlockGraphComponentCountsFromDecoded(targetsByNet, operationsByNet, operationIssues)
+	gaps := map[string]routeTreeContactGraphGapForRoutingTest{}
+	for netName, targets := range targetsByNet {
+		graph := newInterBlockContactGraph(operationsByNet[netName])
+		gap := routeTreeContactGraphGapForRoutingTest{Required: len(targets), Components: componentCounts[netName]}
+		for _, target := range targets {
+			if _, ok := graph.findTargetNode(target); ok {
+				gap.Proven++
+				continue
+			}
+			gap.MissingEndpointIDs = append(gap.MissingEndpointIDs, routeTreeContactGraphTargetStableIDForRoutingTest(target))
+		}
+		sort.Strings(gap.MissingEndpointIDs)
+		if gap.Proven != gap.Required {
+			gaps[netName] = gap
+		}
+	}
+	return gaps
+}
+
+func routeTreeContactGraphTargetStableIDForRoutingTest(target InterBlockContactTarget) string {
+	if target.InstanceID != "" && target.Pad != "" {
+		return target.InstanceID + "." + target.Pad
+	}
+	if target.EndpointID != "" {
+		return target.EndpointID
+	}
+	return interBlockEndpointKey(target.Ref, target.Pad)
 }
 
 // requireRouteOperationsForNet decodes every transaction route operation for a
