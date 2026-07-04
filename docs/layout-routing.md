@@ -133,13 +133,13 @@ nets. It reports required/proven endpoint counts, graph component counts,
 complete/partial/blocked group counts, and same-net/local-route merge evidence.
 This graph evidence lets generated block-local routes participate in
 route-tree contact proof without inflating inter-block emitted-segment counts.
-The I2C fixture currently proves 9 of 12 required endpoint contacts after
-failed route branches are excluded from contact proof. It remains an
-`expected_fail` fixture because the latest selected retry attempt still has
-VCC/SDA same-net graph splits plus VCC/GND branch-scoped `no legal two-layer
-path` blockers after bounded retry; one route-tree group is complete and three
-are partial. Fixed-net skip notices and missing-net-class warnings are reported
-separately and do not inflate `route_tree_repair.branch_failures`.
+The I2C fixture currently emits all 8 route-tree branches, proves 9 of 12
+required endpoint contacts, and reports one graph-complete route-tree net plus
+three partial route-tree nets. It remains an `expected_fail` fixture because
+the three partial groups still need same-net contact graph proof before project
+write and KiCad ERC/DRC promotion can run. Fixed-net skip notices and
+missing-net-class warnings are reported separately and do not inflate
+`route_tree_repair.branch_failures`.
 
 Placement is still a deterministic heuristic, not a production-grade constraint
 solver. Advanced placement rules are placement-level heuristics and evidence,

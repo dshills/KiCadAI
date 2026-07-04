@@ -226,17 +226,18 @@ loop confidence:
   evidence, and snap-exempt local-anchor route operations. Route-tree endpoint
   access and contact graph summaries now expose pad access, local-route merge
   anchors, required/proven endpoints, and graph group completion evidence.
-  Route-tree repair classifies branch/contact failures, emits repairable
+  Route-tree repair classifies contact failures, emits repairable
   hints, feeds bounded placement retry, and selects attempts using route-tree
-  completion evidence. The latest selected attempt proves 9 of 12 required
-  contacts after failed route branches are excluded from contact proof, with
-  one complete route-tree contact group and three partial groups. The current
-  selected-attempt blockers are VCC/SDA same-net graph splits plus VCC/GND
-  branch-scoped pathfinding blockers. Route-tree diagnostics now separate
+  completion evidence. The latest selected attempt emits all 8 route-tree
+  branches, proves 9 of 12 required contacts, and reports one graph-complete
+  route-tree net plus three partial route-tree nets. The current
+  selected-attempt blockers are same-net contact graph proof gaps for the
+  three partial groups rather than stale routing skips, local alias failures,
+  or selected-attempt branch pathfinding blockers. Route-tree diagnostics now separate
   fixed-net skip notices and missing-net-class warnings from repairable
-  blockers. The remaining layout-quality blockers are route-tree branch
-  pathfinding/contact graph proof for VCC/GND/SDA, richer generated-board
-  validation, and KiCad ERC/DRC-clean evidence.
+  blockers. The remaining layout-quality blockers are route-tree contact graph
+  proof for VCC/GND/SDA, richer generated-board validation, and KiCad
+  ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
@@ -477,8 +478,8 @@ Implemented foundation with a documented first AI-controlled generation lane.
   route-tree-managed inter-block nets, endpoint-access evidence, local-route
   and same-net copper merge evidence, contact graph completion evidence,
   classified route-tree repair hints, retry selection based on route-tree
-  completion evidence, and explicit selected-attempt VCC/SDA graph-split plus
-  VCC/GND branch pathfinding blockers. The
+  completion evidence, one graph-complete route-tree net, and explicit contact
+  graph proof gaps for the three partial route-tree nets. The
   `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
   even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
@@ -861,7 +862,9 @@ while richer I2C and amplifier generated boards still record `expected_fail`
 evidence. I2C now reaches route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
-still blocks on selected-attempt VCC graph-split/pathfinding evidence; the
+now emits all route-tree branches and records one graph-complete route-tree net
+plus three partial nets, but still blocks on contact graph proof for the partial
+I2C groups; the
 protected Class AB headphone amplifier fixture now verifies the
 `headphone_output_protection` block summary and verified
 LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical
