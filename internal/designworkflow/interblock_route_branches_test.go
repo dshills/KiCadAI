@@ -79,6 +79,12 @@ func TestRouteInterBlockTreeBranchesWithAccessReportsSelectedAccessPair(t *testi
 	if branch.SelectedSourceRole != RouteTreeAccessLocalRouteAnchor || branch.SelectedTargetRole != RouteTreeAccessTargetPad {
 		t.Fatalf("branch = %#v, want selected local-anchor to pad access roles", branch)
 	}
+	if branch.SelectedSourceEndpointID != "J1.1" || branch.SelectedTargetEndpointID != "U1.1" {
+		t.Fatalf("branch = %#v, want source endpoint J1.1 and target endpoint U1.1", branch)
+	}
+	if !strings.Contains(branch.SelectedSourceReason, "preferred_local_route_anchor") || !strings.Contains(branch.SelectedTargetReason, "pad_access_fallback") {
+		t.Fatalf("branch = %#v, want selected access rank reasons", branch)
+	}
 	if branch.SelectedSourceLayer != "F.Cu" || branch.SelectedTargetLayer != "F.Cu" {
 		t.Fatalf("branch = %#v, want selected access layers", branch)
 	}
@@ -97,6 +103,12 @@ func TestRouteInterBlockTreeBranchesWithAccessReportsSelectedAccessPair(t *testi
 	attempt := branch.AccessAttempts[0]
 	if attempt.PairRank != 0 || attempt.SourceRole != RouteTreeAccessLocalRouteAnchor || attempt.TargetRole != RouteTreeAccessTargetPad || attempt.Status != routing.StatusRouted {
 		t.Fatalf("first access attempt = %#v, want routed local-anchor to pad attempt", attempt)
+	}
+	if attempt.SourceEndpointID != "J1.1" || attempt.TargetEndpointID != "U1.1" {
+		t.Fatalf("first access attempt = %#v, want endpoint evidence for selected source and target", attempt)
+	}
+	if !strings.Contains(attempt.SourceReason, "preferred_local_route_anchor") || !strings.Contains(attempt.TargetReason, "pad_access_fallback") {
+		t.Fatalf("first access attempt = %#v, want rank reason evidence", attempt)
 	}
 	if attempt.SameNetPads != 2 || attempt.SameNetAnchors != 1 || attempt.SameNetCopper != 0 {
 		t.Fatalf("first access attempt = %#v, want same-net pad/local-anchor merge audit", attempt)
@@ -151,6 +163,9 @@ func TestRouteTreeBranchAccessCandidateAuditReportsVCCLimitTruncation(t *testing
 	}
 	if evidence.SelectedSourceRole != RouteTreeAccessLocalRouteAnchor || evidence.SelectedTargetRole != RouteTreeAccessLocalRouteAnchor {
 		t.Fatalf("branch evidence = %#v, want selected local-anchor VCC pair", evidence)
+	}
+	if evidence.SelectedSourceReason == "" || evidence.SelectedTargetReason == "" {
+		t.Fatalf("branch evidence = %#v, want selected access ranking reasons", evidence)
 	}
 }
 

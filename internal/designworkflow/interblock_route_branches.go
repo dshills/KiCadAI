@@ -44,61 +44,69 @@ type InterBlockBranchRoutingResult struct {
 }
 
 type InterBlockBranchRoutingEvidence struct {
-	BranchIndex          int                                    `json:"branch_index"`
-	StartEndpointID      string                                 `json:"start_endpoint_id"`
-	EndEndpointID        string                                 `json:"end_endpoint_id"`
-	Status               routing.Status                         `json:"status"`
-	OperationCount       int                                    `json:"operation_count"`
-	IssueCount           int                                    `json:"issue_count"`
-	BlockingIssueCount   int                                    `json:"blocking_issue_count,omitempty"`
-	WarningIssueCount    int                                    `json:"warning_issue_count,omitempty"`
-	InfoIssueCount       int                                    `json:"info_issue_count,omitempty"`
-	FixedNetSkipNotices  int                                    `json:"fixed_net_skip_notices,omitempty"`
-	AccessPairsTried     int                                    `json:"access_pairs_tried,omitempty"`
-	AccessSourceCount    int                                    `json:"access_source_count,omitempty"`
-	AccessTargetCount    int                                    `json:"access_target_count,omitempty"`
-	AccessPairCount      int                                    `json:"access_pair_count,omitempty"`
-	AccessPairLimit      int                                    `json:"access_pair_limit,omitempty"`
-	AccessPairsTruncated bool                                   `json:"access_pairs_truncated,omitempty"`
-	SelectedSourceRole   RouteTreeEndpointAccessRole            `json:"selected_source_role,omitempty"`
-	SelectedTargetRole   RouteTreeEndpointAccessRole            `json:"selected_target_role,omitempty"`
-	SelectedSourceRef    string                                 `json:"selected_source_ref,omitempty"`
-	SelectedSourcePad    string                                 `json:"selected_source_pad,omitempty"`
-	SelectedSourceLayer  string                                 `json:"selected_source_layer,omitempty"`
-	SelectedSourceXMM    float64                                `json:"selected_source_x_mm"`
-	SelectedSourceYMM    float64                                `json:"selected_source_y_mm"`
-	SelectedTargetRef    string                                 `json:"selected_target_ref,omitempty"`
-	SelectedTargetPad    string                                 `json:"selected_target_pad,omitempty"`
-	SelectedTargetLayer  string                                 `json:"selected_target_layer,omitempty"`
-	SelectedTargetXMM    float64                                `json:"selected_target_x_mm"`
-	SelectedTargetYMM    float64                                `json:"selected_target_y_mm"`
-	SnapExemptRoute      bool                                   `json:"snap_exempt_route,omitempty"`
-	AccessAttempts       []RouteTreeBranchAccessAttemptEvidence `json:"access_attempts,omitempty"`
+	BranchIndex              int                                    `json:"branch_index"`
+	StartEndpointID          string                                 `json:"start_endpoint_id"`
+	EndEndpointID            string                                 `json:"end_endpoint_id"`
+	Status                   routing.Status                         `json:"status"`
+	OperationCount           int                                    `json:"operation_count"`
+	IssueCount               int                                    `json:"issue_count"`
+	BlockingIssueCount       int                                    `json:"blocking_issue_count,omitempty"`
+	WarningIssueCount        int                                    `json:"warning_issue_count,omitempty"`
+	InfoIssueCount           int                                    `json:"info_issue_count,omitempty"`
+	FixedNetSkipNotices      int                                    `json:"fixed_net_skip_notices,omitempty"`
+	AccessPairsTried         int                                    `json:"access_pairs_tried,omitempty"`
+	AccessSourceCount        int                                    `json:"access_source_count,omitempty"`
+	AccessTargetCount        int                                    `json:"access_target_count,omitempty"`
+	AccessPairCount          int                                    `json:"access_pair_count,omitempty"`
+	AccessPairLimit          int                                    `json:"access_pair_limit,omitempty"`
+	AccessPairsTruncated     bool                                   `json:"access_pairs_truncated,omitempty"`
+	SelectedSourceRole       RouteTreeEndpointAccessRole            `json:"selected_source_role,omitempty"`
+	SelectedTargetRole       RouteTreeEndpointAccessRole            `json:"selected_target_role,omitempty"`
+	SelectedSourceEndpointID string                                 `json:"selected_source_endpoint_id,omitempty"`
+	SelectedTargetEndpointID string                                 `json:"selected_target_endpoint_id,omitempty"`
+	SelectedSourceRef        string                                 `json:"selected_source_ref,omitempty"`
+	SelectedSourcePad        string                                 `json:"selected_source_pad,omitempty"`
+	SelectedSourceLayer      string                                 `json:"selected_source_layer,omitempty"`
+	SelectedSourceXMM        float64                                `json:"selected_source_x_mm"`
+	SelectedSourceYMM        float64                                `json:"selected_source_y_mm"`
+	SelectedTargetRef        string                                 `json:"selected_target_ref,omitempty"`
+	SelectedTargetPad        string                                 `json:"selected_target_pad,omitempty"`
+	SelectedTargetLayer      string                                 `json:"selected_target_layer,omitempty"`
+	SelectedTargetXMM        float64                                `json:"selected_target_x_mm"`
+	SelectedTargetYMM        float64                                `json:"selected_target_y_mm"`
+	SelectedSourceReason     string                                 `json:"selected_source_reason,omitempty"`
+	SelectedTargetReason     string                                 `json:"selected_target_reason,omitempty"`
+	SnapExemptRoute          bool                                   `json:"snap_exempt_route,omitempty"`
+	AccessAttempts           []RouteTreeBranchAccessAttemptEvidence `json:"access_attempts,omitempty"`
 }
 
 type RouteTreeBranchAccessAttemptEvidence struct {
-	PairRank       int                         `json:"pair_rank"`
-	SourceRole     RouteTreeEndpointAccessRole `json:"source_role,omitempty"`
-	TargetRole     RouteTreeEndpointAccessRole `json:"target_role,omitempty"`
-	SourceLayer    string                      `json:"source_layer,omitempty"`
-	TargetLayer    string                      `json:"target_layer,omitempty"`
-	SourceXMM      float64                     `json:"source_x_mm"`
-	SourceYMM      float64                     `json:"source_y_mm"`
-	TargetXMM      float64                     `json:"target_x_mm"`
-	TargetYMM      float64                     `json:"target_y_mm"`
-	Status         routing.Status              `json:"status"`
-	IssueCount     int                         `json:"issue_count,omitempty"`
-	PrimaryCode    reports.Code                `json:"primary_code,omitempty"`
-	PrimaryMessage string                      `json:"primary_message,omitempty"`
-	PrimaryRef     string                      `json:"primary_ref,omitempty"`
-	PrimaryNet     string                      `json:"primary_net,omitempty"`
-	SameNetPads    int                         `json:"same_net_pads,omitempty"`
-	SameNetAnchors int                         `json:"same_net_local_route_anchors,omitempty"`
-	SameNetCopper  int                         `json:"same_net_existing_copper,omitempty"`
-	ObstacleKind   string                      `json:"nearest_obstacle_kind,omitempty"`
-	ObstacleRef    string                      `json:"nearest_obstacle_ref,omitempty"`
-	ObstacleNet    string                      `json:"nearest_obstacle_net,omitempty"`
-	ObstacleDistMM float64                     `json:"nearest_obstacle_distance_mm,omitempty"`
+	PairRank         int                         `json:"pair_rank"`
+	SourceRole       RouteTreeEndpointAccessRole `json:"source_role,omitempty"`
+	TargetRole       RouteTreeEndpointAccessRole `json:"target_role,omitempty"`
+	SourceEndpointID string                      `json:"source_endpoint_id,omitempty"`
+	TargetEndpointID string                      `json:"target_endpoint_id,omitempty"`
+	SourceLayer      string                      `json:"source_layer,omitempty"`
+	TargetLayer      string                      `json:"target_layer,omitempty"`
+	SourceXMM        float64                     `json:"source_x_mm"`
+	SourceYMM        float64                     `json:"source_y_mm"`
+	TargetXMM        float64                     `json:"target_x_mm"`
+	TargetYMM        float64                     `json:"target_y_mm"`
+	SourceReason     string                      `json:"source_reason,omitempty"`
+	TargetReason     string                      `json:"target_reason,omitempty"`
+	Status           routing.Status              `json:"status"`
+	IssueCount       int                         `json:"issue_count,omitempty"`
+	PrimaryCode      reports.Code                `json:"primary_code,omitempty"`
+	PrimaryMessage   string                      `json:"primary_message,omitempty"`
+	PrimaryRef       string                      `json:"primary_ref,omitempty"`
+	PrimaryNet       string                      `json:"primary_net,omitempty"`
+	SameNetPads      int                         `json:"same_net_pads,omitempty"`
+	SameNetAnchors   int                         `json:"same_net_local_route_anchors,omitempty"`
+	SameNetCopper    int                         `json:"same_net_existing_copper,omitempty"`
+	ObstacleKind     string                      `json:"nearest_obstacle_kind,omitempty"`
+	ObstacleRef      string                      `json:"nearest_obstacle_ref,omitempty"`
+	ObstacleNet      string                      `json:"nearest_obstacle_net,omitempty"`
+	ObstacleDistMM   float64                     `json:"nearest_obstacle_distance_mm,omitempty"`
 }
 
 type routeTreeAccessCandidateCache map[routeTreeAccessCandidateCacheKey][]routeTreeBranchAccessCandidate
@@ -269,17 +277,21 @@ func populateSelectedRouteTreeAccessEvidence(evidence *InterBlockBranchRoutingEv
 	source := pair.Source.Access
 	target := pair.Target.Access
 	evidence.SelectedSourceRole = source.Role
+	evidence.SelectedSourceEndpointID = source.EndpointID
 	evidence.SelectedSourceRef = source.Ref
 	evidence.SelectedSourcePad = source.Pad
 	evidence.SelectedSourceLayer = source.Layer
 	evidence.SelectedSourceXMM = source.XMM
 	evidence.SelectedSourceYMM = source.YMM
+	evidence.SelectedSourceReason = pair.Source.RankReason
 	evidence.SelectedTargetRole = target.Role
+	evidence.SelectedTargetEndpointID = target.EndpointID
 	evidence.SelectedTargetRef = target.Ref
 	evidence.SelectedTargetPad = target.Pad
 	evidence.SelectedTargetLayer = target.Layer
 	evidence.SelectedTargetXMM = target.XMM
 	evidence.SelectedTargetYMM = target.YMM
+	evidence.SelectedTargetReason = pair.Target.RankReason
 }
 
 func populateRouteTreeAccessAuditEvidence(evidence *InterBlockBranchRoutingEvidence, audit routeTreeBranchAccessAudit) {
@@ -297,17 +309,21 @@ func populateRouteTreeAccessAuditEvidence(evidence *InterBlockBranchRoutingEvide
 
 func routeTreeBranchAccessAttemptEvidenceFor(mergeAudit routeTreeMergeAudit, netName string, pair routeTreeBranchAccessPair, result routing.Result) RouteTreeBranchAccessAttemptEvidence {
 	attempt := RouteTreeBranchAccessAttemptEvidence{
-		PairRank:    pair.Rank,
-		SourceRole:  pair.Source.Access.Role,
-		TargetRole:  pair.Target.Access.Role,
-		SourceLayer: pair.Source.Access.Layer,
-		TargetLayer: pair.Target.Access.Layer,
-		SourceXMM:   pair.Source.Access.XMM,
-		SourceYMM:   pair.Source.Access.YMM,
-		TargetXMM:   pair.Target.Access.XMM,
-		TargetYMM:   pair.Target.Access.YMM,
-		Status:      result.Status,
-		IssueCount:  len(result.Issues),
+		PairRank:         pair.Rank,
+		SourceRole:       pair.Source.Access.Role,
+		TargetRole:       pair.Target.Access.Role,
+		SourceEndpointID: pair.Source.Access.EndpointID,
+		TargetEndpointID: pair.Target.Access.EndpointID,
+		SourceLayer:      pair.Source.Access.Layer,
+		TargetLayer:      pair.Target.Access.Layer,
+		SourceXMM:        pair.Source.Access.XMM,
+		SourceYMM:        pair.Source.Access.YMM,
+		TargetXMM:        pair.Target.Access.XMM,
+		TargetYMM:        pair.Target.Access.YMM,
+		SourceReason:     pair.Source.RankReason,
+		TargetReason:     pair.Target.RankReason,
+		Status:           result.Status,
+		IssueCount:       len(result.Issues),
 	}
 	populateRouteTreeSameNetMergeAudit(&attempt, mergeAudit, netName, pair)
 	if len(result.Issues) != 0 {
