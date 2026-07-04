@@ -24,13 +24,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Routing is now enabled and bounded placement retry legalizes the generated sensor, pull-up, decoupling, and connector placements, but inter-block route completion still blocks promotion.",
-    "Block-local route net names are rewritten to composed aliases so VCC/GND/SDA/SCL local route contact proof no longer fails on sensor_* instance-net mismatches.",
-    "Current route-tree repair evidence manages all 4 VCC/GND/SDA/SCL nets, excludes them from fallback net-level routing, classifies branch/contact failures, and feeds repairable route-tree hints into bounded placement retry.",
-    "The latest route-tree run selects the initial attempt without applying a placement retry. Access evidence exists for all required VCC/GND/SDA/SCL endpoints, and all 8 route-tree branches emit before contact proof.",
-    "Route-tree completion is now derived from same-net contact graph evidence instead of total route-tree issue count. The contact graph models same-net segment intersections/overlaps, local-route anchor operations, and via layer transitions. The current run still reports 1 complete route-tree net, 3 partial route-tree nets, 9 of 12 required contacts proven, fixed-net preservation notices, and missing-net-class warnings that no longer block the complete group.",
-    "Remaining blockers are contact-graph splits/misses for the three partial I2C route-tree groups: GND is missing io.2, SDA is missing io.3, and SCL is missing io.4. Branch pathfinding no longer reports selected-attempt branch blockers for the current baseline.",
-    "Project write, writer correctness, validation, and KiCad checks remain skipped until the routing stage emits complete same-net contact graph evidence for every required I2C breakout endpoint."
+    "Project-write, writer-correctness, validation, and KiCad ERC/DRC evidence are still required before this block-composition fixture can move from expected_fail readiness to candidate readiness.",
+    "The promotion harness now guards route completion separately, but downstream acceptance still needs generated project artifacts and KiCad validation reports."
   ],
-  "notes": "Tracks the richer sensor breakout scenario after placement and block-local net-alias blockers; the remaining expected failure is multi-endpoint inter-block route completion."
+  "notes": "Tracks the richer sensor breakout scenario after placement, block-local net-alias blockers, and connector endpoint route-tree contact proof. Route-tree routing now proves all required VCC/GND/SDA/SCL contacts; the remaining expected failure is downstream project-write and KiCad validation evidence."
 }
