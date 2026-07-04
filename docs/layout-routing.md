@@ -94,8 +94,9 @@ These fields are intended for AI repair loops and fixture promotion decisions.
 They prove endpoint grouping, target resolution, branch planning, contact proof,
 and graph-level completion status. They do not yet mean KiCad DRC-clean routing
 for richer generated boards; the I2C breakout fixture remains an
-`expected_fail` case until every VCC/GND/SDA/SCL route group is graph-complete
-and KiCad-backed evidence passes.
+`expected_fail` case even though every VCC/GND/SDA/SCL route group is now
+graph-complete. Candidate/pass promotion still requires downstream project
+write, writer-correctness, validation, and KiCad-backed ERC/DRC evidence.
 
 The routing stage also exposes `inter_block_route_trees` when generated
 inter-block nets are managed by route-tree execution instead of the fallback
@@ -135,12 +136,11 @@ It also models same-net segment intersections/overlaps and via layer
 transitions, so generated block-local routes and routed copper can participate
 in route-tree contact proof without inflating inter-block emitted-segment
 counts.
-The I2C fixture currently emits all 8 route-tree branches, proves 9 of 12
-required endpoint contacts, and reports one graph-complete route-tree net plus
-three partial route-tree nets. It remains an `expected_fail` fixture because
-the three partial groups still need same-net contact graph proof for
-GND (`io.2`), SDA (`io.3`), and SCL (`io.4`) before project write and KiCad
-ERC/DRC promotion can run.
+The I2C fixture currently emits all 8 route-tree branches, proves all 12
+required endpoint contacts, and reports four graph-complete route-tree nets. It
+remains an `expected_fail` fixture because downstream project-write,
+writer-correctness, validation, and KiCad ERC/DRC evidence must still run
+cleanly before candidate/pass promotion.
 Fixed-net skip notices and missing-net-class warnings are reported separately
 and do not inflate
 `route_tree_repair.branch_failures`.

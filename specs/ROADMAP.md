@@ -231,15 +231,16 @@ loop confidence:
   Route-tree repair classifies contact failures, emits repairable
   hints, feeds bounded placement retry, and selects attempts using route-tree
   completion evidence. The latest selected attempt emits all 8 route-tree
-  branches, proves 9 of 12 required contacts, and reports one graph-complete
-  route-tree net plus three partial route-tree nets. The current
-  selected-attempt blockers are same-net contact graph proof gaps for GND
-  (`io.2`), SDA (`io.3`), and SCL (`io.4`) rather than stale routing skips,
-  local alias failures, or selected-attempt branch pathfinding blockers.
+  branches, proves all 12 required contacts, and reports four graph-complete
+  route-tree nets. The previous selected-attempt contact graph gaps for GND
+  (`io.2`), SDA (`io.3`), and SCL (`io.4`) are closed; the current blockers
+  are downstream project-write, writer-correctness, validation, and KiCad
+  ERC/DRC evidence rather than stale routing skips, local alias failures, or
+  selected-attempt branch pathfinding blockers.
   Route-tree diagnostics now separate fixed-net skip notices and
   missing-net-class warnings from repairable blockers. The remaining
-  layout-quality blockers are route-tree contact graph proof for GND/SDA/SCL,
-  richer generated-board validation, and KiCad ERC/DRC-clean evidence.
+  layout-quality blockers are richer generated-board validation, generated
+  project artifact proof, and KiCad ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
@@ -449,8 +450,10 @@ Implemented foundation with a documented first AI-controlled generation lane.
   and LED local-route contact proof. Both are candidate fixtures, not pass
   fixtures, because KiCad still reports warning-level evidence.
   `i2c_sensor_breakout_candidate` now enables routing and bounded retry, proves
-  block-local VCC/GND/SDA/SCL alias propagation into local routes, and remains
-  expected-fail on incomplete multi-endpoint inter-block route completion.
+  block-local VCC/GND/SDA/SCL alias propagation into local routes, proves
+  route-tree contact completion for its multi-endpoint inter-block nets, and
+  remains `expected_fail` on downstream project-write and KiCad validation
+  evidence.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -480,8 +483,7 @@ Implemented foundation with a documented first AI-controlled generation lane.
   route-tree-managed inter-block nets, endpoint-access evidence, local-route
   and same-net copper merge evidence, contact graph completion evidence,
   classified route-tree repair hints, retry selection based on route-tree
-  completion evidence, one graph-complete route-tree net, and explicit contact
-  graph proof gaps for the three partial route-tree nets. The
+  completion evidence, and four graph-complete route-tree nets. The
   `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
   even though its current readiness is `expected_fail`.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
@@ -864,9 +866,9 @@ while richer I2C and amplifier generated boards still record `expected_fail`
 evidence. I2C now reaches route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
-now emits all route-tree branches and records one graph-complete route-tree net
-plus three partial nets, but still blocks on contact graph proof for the partial
-I2C groups; the
+now emits all route-tree branches, records four graph-complete route-tree nets,
+and remains `expected_fail` on downstream project-write and KiCad validation
+evidence; the
 protected Class AB headphone amplifier fixture now verifies the
 `headphone_output_protection` block summary and verified
 LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical

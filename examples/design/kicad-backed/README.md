@@ -45,7 +45,7 @@ kicadai \
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `candidate` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment, routed inter-block endpoint contact evidence, and candidate promotion coverage. |
-| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, and route-tree repair retry; current blockers are contact-graph splits for GND (`io.2`), SDA (`io.3`), and SCL (`io.4`), leaving 9/12 required contacts proven. |
+| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, and route-tree repair retry; route-tree contact proof is now complete, and current blockers are downstream project-write, writer-correctness, validation, and KiCad ERC/DRC evidence. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; current blockers are schematic label conflicts before PCB realization, placeholder fault protection, missing HP_RET/LOAD_REF policy and LOAD_REF/GND net-tie evidence, and unpromoted thermal/SOA evidence. KiCad ERC is required for future promotion but currently remains unreachable because schematic electrical validation blocks first; DRC is not required until PCB realization runs. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
@@ -72,17 +72,15 @@ endpoint binding. The I2C fixture also exposes route-tree evidence for its
 multi-endpoint VCC/GND/SDA/SCL nets, including managed nets, planned branches,
 attempted branches, proven endpoints, graph components, and group completion
 counts. The current run keeps the fixture in `expected_fail`: route-tree
-execution owns the four I2C nets, emits all 8 route-tree branches, and records
-route-tree repair hints. Route-tree contact graph evidence now reports one
-complete contact-graph group, three partial contact-graph groups, local-route
-merge evidence, same-net segment intersection/overlap merges, via
-layer transitions, and 9 of 12 required contacts proven. The current
-selected attempt reports remaining GND/SDA/SCL contact-graph gaps at `io.2`,
-`io.3`, and `io.4`. Route-tree
-diagnostics also separate fixed-net preservation notices and missing-net-class
-warnings from repairable blockers. The next layout-quality blockers are
-route-tree contact graph completion for GND/SDA/SCL, full inter-block routing
-coverage for richer boards, and KiCad ERC/DRC-clean evidence.
+execution owns the four I2C nets, emits all 8 route-tree branches, and proves
+all required connector and block-local endpoint contacts. Route-tree contact
+graph evidence now reports four complete contact-graph groups, local-route
+merge evidence, same-net segment intersection/overlap merges, and via layer
+transitions. Route-tree diagnostics also separate fixed-net preservation
+notices and missing-net-class warnings from repairable blockers. The next
+layout-quality blockers are downstream generated-project artifacts,
+writer-correctness/validation evidence, broader rich-board routing coverage,
+and KiCad ERC/DRC-clean evidence.
 
 Promotion gates currently include metadata, stages, writer correctness,
 connectivity, KiCad checks, route completion, physical rules, and artifacts.

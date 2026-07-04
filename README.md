@@ -49,7 +49,7 @@ workflow. The simple LED prompt now reaches strict promotion `candidate` in the
 default structural lane without requiring local KiCad, and promotes to `pass`
 when required KiCad ERC/DRC and writer round-trip evidence are clean. The
 connector/LED KiCad-backed example remains candidate-level, while richer I2C
-and amplifier fixtures remain expected-fail. Generated block-local routes now
+and amplifier fixtures remain `expected_fail`. Generated block-local routes now
 bind to physical same-net pad anchors and report route-connectivity evidence.
 Generated inter-block route candidates now promote connector/LED and I2C
 breakout request connections into placement/routing evidence. Routing summaries
@@ -62,17 +62,16 @@ access-selected route endpoints out of post-route pad snapping, and records
 selected access roles in branch evidence. Route-tree contact graph evidence now
 includes local-route anchors, same-net segment intersection/overlap merges,
 same-net copper merge evidence, and via layer transitions. The I2C
-fixture now emits all 8 route-tree branches, proves 9 of 12 required contacts,
-and reports one graph-complete route-tree net plus three partial route-tree
-nets. It remains `expected_fail` because GND (`io.2`), SDA (`io.3`), and SCL
-(`io.4`) still need complete same-net contact graph proof before project write,
-KiCad ERC, and KiCad DRC promotion can run. Route-tree repair classifies contact
-blockers, feeds repairable hints into bounded placement retry, and ranks
-selected attempts by route-tree completion evidence. Route-tree
-diagnostics now separate fixed-net skip notices and missing-net-class warnings
-from repairable blockers. The next blocker is completing route-tree contact
-graph proof for GND/SDA/SCL before KiCad ERC/DRC-clean layout proof can be
-claimed.
+fixture now emits all 8 route-tree branches, proves all 12 required contacts,
+and reports four graph-complete route-tree nets. It remains `expected_fail`
+because project-write, writer-correctness, validation, and KiCad ERC/DRC
+evidence still need to run cleanly before candidate/pass promotion can be
+claimed. Route-tree repair classifies contact blockers, feeds repairable hints
+into bounded placement retry, and ranks selected attempts by route-tree
+completion evidence. Route-tree diagnostics now separate fixed-net skip notices
+and missing-net-class warnings from repairable blockers. The next blockers are
+downstream project-write, writer-correctness, validation, broader rich-board
+routing coverage, and KiCad ERC/DRC-clean evidence.
 
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, polygonal copper width and
