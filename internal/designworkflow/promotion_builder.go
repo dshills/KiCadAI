@@ -351,7 +351,7 @@ func (builder *promotionReportBuilder) statusForAchieved(achieved PromotionReadi
 		return PromotionStatusPass
 	case PromotionReadinessCandidate:
 		for _, gate := range builder.gates {
-			if gate.Status == PromotionGateStatusWarn {
+			if promotionGateWarnsCandidateStatus(gate) {
 				return PromotionStatusWarn
 			}
 		}
@@ -418,10 +418,29 @@ func (builder *promotionReportBuilder) requiredForStage(stageName StageName) []P
 }
 
 func (builder *promotionReportBuilder) requiredForKiCadChecks() []PromotionReadiness {
-	if builder.fixture.RequireERC || builder.fixture.RequireDRC || builder.stageRelevant(StageKiCadChecks) {
+	if builder.fixtureRequiresKiCadCandidateEvidence() {
 		return []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass}
 	}
+	if builder.stageRelevant(StageKiCadChecks) {
+		return []PromotionReadiness{PromotionReadinessPass}
+	}
 	return nil
+}
+
+func (builder *promotionReportBuilder) fixtureRequiresKiCadCandidateEvidence() bool {
+	if builder.fixture.RequireERC || builder.fixture.RequireDRC {
+		return true
+	}
+	return builder.fixture.Acceptance == AcceptanceERCDRC || builder.fixture.Acceptance == AcceptanceFabricationCandidate
+}
+
+func promotionGateWarnsCandidateStatus(gate PromotionGate) bool {
+	if gate.Status == PromotionGateStatusWarn || gate.Status == PromotionGateStatusFailed {
+		return true
+	}
+	return (gateRequiresReadiness(gate, PromotionReadinessCandidate) ||
+		gateRequiresReadiness(gate, PromotionReadinessPass)) &&
+		gate.Status != PromotionGateStatusPass
 }
 
 func (builder *promotionReportBuilder) stageRelevant(stageName StageName) bool {

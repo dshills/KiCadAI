@@ -346,6 +346,39 @@ func TestBuildPromotionReportKiCadChecksMissingCLIBlocksCandidate(t *testing.T) 
 	}
 }
 
+func TestBuildPromotionReportStructuralSkippedKiCadAllowsCandidate(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "structural_kicad_optional",
+		Request:           "structural_kicad_optional.json",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceStructural,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageKiCadChecks},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "structural_kicad_optional"}, AcceptanceStructural, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{Name: StageKiCadChecks, Status: StageStatusSkipped, Issues: []reports.Issue{{
+			Code:     reports.CodeSkippedExternalTool,
+			Severity: reports.SeverityWarning,
+			Message:  "kicad-cli not configured",
+		}}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "kicad_checks")
+	if gate.Status != PromotionGateStatusSkipped {
+		t.Fatalf("kicad gate status = %q, want skipped", gate.Status)
+	}
+	if len(gate.RequiredFor) != 1 || gate.RequiredFor[0] != PromotionReadinessPass {
+		t.Fatalf("kicad gate required_for = %#v, want pass-only", gate.RequiredFor)
+	}
+	if report.AchievedReadiness != PromotionReadinessCandidate {
+		t.Fatalf("achieved readiness = %q, want candidate", report.AchievedReadiness)
+	}
+	if report.Status != PromotionStatusWarn {
+		t.Fatalf("status = %q, want warn", report.Status)
+	}
+}
+
 func TestBuildPromotionReportKiCadChecksCleanEvidencePasses(t *testing.T) {
 	fixture := PromotionFixture{
 		ID:                "clean_kicad",

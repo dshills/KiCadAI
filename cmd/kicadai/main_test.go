@@ -586,7 +586,7 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 			t.Fatalf("stage %s status = %q, want %q; stages = %#v", stage, got, wantStatus, workflow.Stages)
 		}
 	}
-	if workflow.Promotion == nil || workflow.Promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked {
+	if workflow.Promotion == nil || workflow.Promotion.AchievedReadiness != designworkflow.PromotionReadinessCandidate {
 		t.Fatalf("workflow promotion = %#v", workflow.Promotion)
 	}
 	if stageHasIssue(workflow.Stages, "placement", reports.CodePlacementOutsideBoard) {
@@ -605,12 +605,12 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 	}
 	var promotion designworkflow.PromotionReport
 	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
-	if promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked || promotion.Status != designworkflow.PromotionStatusFailed {
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessCandidate || promotion.Status != designworkflow.PromotionStatusWarn {
 		t.Fatalf("promotion report = %#v", promotion)
 	}
 }
 
-func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
+func TestRunIntentCreateLEDPromptStrictPromotionCandidate(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "led_project")
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -621,8 +621,8 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 
 	var promotion designworkflow.PromotionReport
 	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
-	if promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked || promotion.Status != designworkflow.PromotionStatusFailed {
-		t.Fatalf("promotion report = %#v, want blocked baseline", promotion)
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessCandidate || promotion.Status != designworkflow.PromotionStatusWarn {
+		t.Fatalf("promotion report = %#v, want strict candidate with missing-KiCad warning", promotion)
 	}
 
 	wantGates := map[string]designworkflow.PromotionGateStatus{
