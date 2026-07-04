@@ -510,6 +510,119 @@ func TestCreateI2CSensorBreakoutLocksResolvedVCCProofGap(t *testing.T) {
 	}
 }
 
+func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	result := Create(ctx, request, CreateOptions{})
+	promotion := BuildInternalPromotionReport(PromotionFixture{
+		ID:                "i2c_sensor_breakout_candidate",
+		Request:           "i2c_sensor_breakout_candidate.json",
+		Tier:              "block-composition",
+		DeclaredReadiness: PromotionReadinessExpectedFail,
+		Acceptance:        AcceptanceERCDRC,
+		RequireERC:        true,
+		RequireDRC:        true,
+		ExpectedStages: []StageName{
+			StageBlockPlanning,
+			StageComponentSelection,
+			StageSchematic,
+			StageSchematicElectrical,
+			StagePCBRealization,
+			StagePlacement,
+			StageRouting,
+			StageProjectWrite,
+			StageWriterCorrect,
+			StageValidation,
+			StageKiCadChecks,
+		},
+	}, result)
+	if promotion.Status != PromotionStatusExpectedFail || promotion.AchievedReadiness != PromotionReadinessExpectedFail || !promotion.MatchesExpectation {
+		t.Fatalf("promotion = %#v, want expected-fail inventory match", promotion)
+	}
+	routeGate, ok := promotionGateByIDForRoutingTest(promotion, "route_completion")
+	if !ok || routeGate.Status != PromotionGateStatusFailed || len(routeGate.IssueCodes) == 0 {
+		t.Fatalf("route gate = %#v, ok=%v, want failed route issue codes", routeGate, ok)
+	}
+	stageGate, ok := promotionGateByIDForRoutingTest(promotion, "stages")
+	if !ok || stageGate.Status != PromotionGateStatusFailed || len(stageGate.IssueCodes) == 0 {
+		t.Fatalf("stage gate = %#v, ok=%v, want blocked stage issue codes", stageGate, ok)
+	}
+
+	routingStage, ok := workflowStageForRoutingTest(result, StageRouting)
+	if !ok {
+		t.Fatalf("stages = %#v, want routing stage", result.Stages)
+	}
+	interBlock := requireInterBlockRouteSummary(t, routingStage)
+	// Phase 1 intentionally locks exact counts so later route-tree promotion
+	// phases can prove a real movement from the captured baseline.
+	if interBlock.MultiEndpointNets != 4 || interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 9 {
+		t.Fatalf("inter-block summary = %#v, want 4 managed I2C nets and 9/12 proven endpoints", interBlock)
+	}
+	if interBlock.CompleteGroups != 0 || interBlock.PartialGroups != 4 || interBlock.BlockedGroups != 0 {
+		t.Fatalf("inter-block groups = %#v, want four partial route-completion groups", interBlock)
+	}
+	if interBlock.BranchesAttempted != 8 || interBlock.BranchesCompleted != 3 {
+		t.Fatalf("inter-block branches = %#v, want current 8 attempted and 3 completed baseline", interBlock)
+	}
+	if interBlock.RoutesCompleted != 0 || interBlock.PartialNets != 4 || interBlock.UnroutedNets != 0 {
+		t.Fatalf("inter-block route completion = %#v, want four partial route-tree nets", interBlock)
+	}
+
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routingStage)
+	i2cNets := connectionAliasSet(request.Connections)
+	for net := range i2cNets {
+		if !stringSliceContains(routeTrees.ManagedNets, net) {
+			t.Fatalf("route-tree managed nets = %#v, want %s", routeTrees.ManagedNets, net)
+		}
+	}
+	if routeTrees.GroupsComplete != 4 || routeTrees.GroupsPartial != 0 || routeTrees.GroupsBlocked != 0 || routeTrees.BranchesRouted != 8 || routeTrees.BranchesBlocked != 0 {
+		t.Fatalf("route-tree execution = %#v, want all route-tree branches emitted before contact proof", routeTrees)
+	}
+	if routeTrees.FixedNetSkipNotices == 0 {
+		t.Fatalf("route-tree execution = %#v, want fixed-net preservation notices in promotion inventory", routeTrees)
+	}
+
+	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
+	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 9 || contactGraph.Components == 0 {
+		t.Fatalf("contact graph = %#v, want required/proven endpoint and component inventory", contactGraph)
+	}
+	if contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 || contactGraph.BlockedGroups != 0 {
+		t.Fatalf("contact graph groups = %#v, want current complete/partial baseline", contactGraph)
+	}
+
+	retry := requireStageSummary[placementRoutingRetrySummary](t, routingStage, "routing_retry")
+	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 || !retry.AttemptHistory[0].Selected {
+		t.Fatalf("retry = %#v, want selected initial attempt without applied retry", retry)
+	}
+	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 9 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
+		t.Fatalf("retry history = %#v, want selected attempt route-tree evidence", retry.AttemptHistory)
+	}
+
+	blockedNets := issueNetSet(routingStage.Issues)
+	for net := range blockedNets {
+		if !i2cNets[net] {
+			t.Fatalf("blocked net %q is outside I2C route-tree nets %#v", net, i2cNets)
+		}
+	}
+	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
+	if len(branchPaths) != 0 {
+		t.Fatalf("branch paths = %#v, want no selected-attempt branch blockers", branchPaths)
+	}
+	for _, issue := range routingStage.Issues {
+		if issue.Severity != reports.SeverityBlocked && issue.Severity != reports.SeverityError {
+			continue
+		}
+		if len(issue.Nets) == 0 {
+			continue
+		}
+		if !strings.Contains(issue.Path, "design.inter_block_route_groups") && !strings.Contains(issue.Path, "design.inter_block_contact") {
+			t.Fatalf("unexpected high-severity net issue outside route-tree evidence paths: %#v", issue)
+		}
+	}
+}
+
 func connectionAliasSet(connections []ConnectionSpec) map[string]bool {
 	nets := map[string]bool{}
 	for _, connection := range connections {
@@ -527,6 +640,15 @@ func workflowStageForRoutingTest(result WorkflowResult, name StageName) (StageRe
 		}
 	}
 	return StageResult{}, false
+}
+
+func promotionGateByIDForRoutingTest(report PromotionReport, id string) (PromotionGate, bool) {
+	for _, gate := range report.Gates {
+		if gate.ID == id {
+			return gate, true
+		}
+	}
+	return PromotionGate{}, false
 }
 
 func i2cSensorBreakoutRoutingFixture(t *testing.T, ctx context.Context) (Request, PCBFragmentResult, PlacementStageResult) {
