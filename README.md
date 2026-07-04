@@ -60,17 +60,18 @@ reports branch-level path/contact evidence. Route-tree branch execution now
 ranks pad and local-route access candidates, tries bounded access pairs, keeps
 access-selected route endpoints out of post-route pad snapping, and records
 selected access roles in branch evidence. Route-tree contact graph evidence now
-includes local-route and same-net copper merge anchors. The I2C fixture now
-emits all 8 route-tree branches, proves 9 of 12 required contacts, and reports
-one graph-complete route-tree net plus three partial route-tree nets. It
-remains expected-fail because the three partial groups still need same-net
-contact graph proof before project write, KiCad ERC, and KiCad DRC promotion
-can run. Route-tree repair classifies contact blockers, feeds repairable hints
-into bounded placement retry, and ranks selected attempts by route-tree
-completion evidence. Route-tree
+includes local-route anchors, same-net segment intersection/overlap merges,
+same-net copper merge evidence, and via layer transitions. The I2C
+fixture now emits all 8 route-tree branches, proves 9 of 12 required contacts,
+and reports one graph-complete route-tree net plus three partial route-tree
+nets. It remains `expected_fail` because GND (`io.2`), SDA (`io.3`), and SCL
+(`io.4`) still need complete same-net contact graph proof before project write,
+KiCad ERC, and KiCad DRC promotion can run. Route-tree repair classifies contact
+blockers, feeds repairable hints into bounded placement retry, and ranks
+selected attempts by route-tree completion evidence. Route-tree
 diagnostics now separate fixed-net skip notices and missing-net-class warnings
 from repairable blockers. The next blocker is completing route-tree contact
-graph proof for VCC/GND/SDA before KiCad ERC/DRC-clean layout proof can be
+graph proof for GND/SDA/SCL before KiCad ERC/DRC-clean layout proof can be
 claimed.
 
 Fabrication readiness now includes expanded deterministic physical-rule

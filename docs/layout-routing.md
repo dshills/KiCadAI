@@ -131,14 +131,18 @@ endpoints, routed branches, contact misses, and issue counts.
 The routing stage also emits `route_tree_contact_graph` for route-tree-managed
 nets. It reports required/proven endpoint counts, graph component counts,
 complete/partial/blocked group counts, and same-net/local-route merge evidence.
-This graph evidence lets generated block-local routes participate in
-route-tree contact proof without inflating inter-block emitted-segment counts.
+It also models same-net segment intersections/overlaps and via layer
+transitions, so generated block-local routes and routed copper can participate
+in route-tree contact proof without inflating inter-block emitted-segment
+counts.
 The I2C fixture currently emits all 8 route-tree branches, proves 9 of 12
 required endpoint contacts, and reports one graph-complete route-tree net plus
 three partial route-tree nets. It remains an `expected_fail` fixture because
-the three partial groups still need same-net contact graph proof before project
-write and KiCad ERC/DRC promotion can run. Fixed-net skip notices and
-missing-net-class warnings are reported separately and do not inflate
+the three partial groups still need same-net contact graph proof for
+GND (`io.2`), SDA (`io.3`), and SCL (`io.4`) before project write and KiCad
+ERC/DRC promotion can run.
+Fixed-net skip notices and missing-net-class warnings are reported separately
+and do not inflate
 `route_tree_repair.branch_failures`.
 
 Placement is still a deterministic heuristic, not a production-grade constraint
@@ -158,8 +162,9 @@ isolation:
 - `route_tree_access` reports whether generated pads and local-route anchors
   were available as physical access evidence.
 - `route_tree_contact_graph` reports same-net graph connectivity, including
-  local-route and same-net copper merge evidence, without inflating emitted
-  inter-block route segment counts.
+  local-route anchors, same-net segment intersection/overlap merges, same-net
+  copper merge evidence, and via layer transitions, without inflating
+  emitted inter-block route segment counts.
 - `route_tree_repair` reports classified branch/contact blockers and retry
   hint inputs.
 
@@ -171,7 +176,7 @@ Common blocker meanings:
   but not all required endpoints are in one same-net component.
 - A same-net merge gap means pads/local routes are known but the branch router
   did not legally reach or merge into them.
-- Same-net merge evidence means pads, generated local routes, or existing
+- Same-net merge evidence means pads, generated local routes, vias, or existing
   same-net copper were found as legal graph/contact candidates. It is internal
   route-tree evidence, not a claim that KiCad ERC/DRC now passes.
 - An other-net obstacle means placement, fanout, clearance, or layer access

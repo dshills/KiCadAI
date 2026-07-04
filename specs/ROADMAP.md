@@ -225,19 +225,21 @@ loop confidence:
   candidates, bounded synthetic access-pad attempts, selected access-role
   evidence, and snap-exempt local-anchor route operations. Route-tree endpoint
   access and contact graph summaries now expose pad access, local-route merge
-  anchors, required/proven endpoints, and graph group completion evidence.
+  anchors, same-net segment intersection/overlap merges, via layer
+  transitions, required/proven endpoints, per-net missing endpoints, and graph
+  group completion evidence.
   Route-tree repair classifies contact failures, emits repairable
   hints, feeds bounded placement retry, and selects attempts using route-tree
   completion evidence. The latest selected attempt emits all 8 route-tree
   branches, proves 9 of 12 required contacts, and reports one graph-complete
   route-tree net plus three partial route-tree nets. The current
-  selected-attempt blockers are same-net contact graph proof gaps for the
-  three partial groups rather than stale routing skips, local alias failures,
-  or selected-attempt branch pathfinding blockers. Route-tree diagnostics now separate
-  fixed-net skip notices and missing-net-class warnings from repairable
-  blockers. The remaining layout-quality blockers are route-tree contact graph
-  proof for VCC/GND/SDA, richer generated-board validation, and KiCad
-  ERC/DRC-clean evidence.
+  selected-attempt blockers are same-net contact graph proof gaps for GND
+  (`io.2`), SDA (`io.3`), and SCL (`io.4`) rather than stale routing skips,
+  local alias failures, or selected-attempt branch pathfinding blockers.
+  Route-tree diagnostics now separate fixed-net skip notices and
+  missing-net-class warnings from repairable blockers. The remaining
+  layout-quality blockers are route-tree contact graph proof for GND/SDA/SCL,
+  richer generated-board validation, and KiCad ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
