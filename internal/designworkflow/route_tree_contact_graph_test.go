@@ -202,6 +202,24 @@ func TestSummarizeRouteTreeContactGraphCountsBranchToSameNetCopperMerge(t *testi
 	}
 }
 
+func TestSummarizeRouteTreeContactGraphConnectsViaLayerTransitions(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		routeTreeGraphTargetOnLayer("SIG", "J1", "1", 0, 0, "F.Cu"),
+		routeTreeGraphTargetOnLayer("SIG", "U1", "1", 5, 5, "B.Cu"),
+	}}
+	operations := []transactions.Operation{
+		mustRouteTreeAccessRouteOperationWithVias(t, "SIG", "F.Cu", []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 5, YMM: 0}}, []transactions.RouteViaSpec{
+			{At: transactions.Point{XMM: 5, YMM: 0}, DiameterMM: 0.8, DrillMM: 0.4, Layers: []string{"F.Cu", "B.Cu"}},
+		}),
+		mustRouteTreeAccessRouteOperationWithVias(t, "SIG", "B.Cu", []transactions.Point{{XMM: 5, YMM: -5}, {XMM: 5, YMM: 5}}, nil),
+	}
+
+	summary := SummarizeRouteTreeContactGraph(targets, operations, nil)
+	if summary.ProvenEndpoints != 2 || summary.CompleteGroups != 1 || summary.Components != 1 {
+		t.Fatalf("summary = %#v, want via-connected cross-layer route graph", summary)
+	}
+}
+
 func TestSummarizeRouteTreeContactGraphRejectsWrongNetAndWrongLayerContacts(t *testing.T) {
 	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
 		routeTreeGraphTarget("SIG", "J1", "1", 0, 0),
@@ -274,4 +292,14 @@ func routeTreeGraphTargetOnLayer(net string, ref string, pad string, x float64, 
 		Layer:      layer,
 		Confidence: InterBlockContactConfidenceHigh,
 	}
+}
+
+func mustRouteTreeAccessRouteOperationWithVias(t *testing.T, net string, layer string, points []transactions.Point, vias []transactions.RouteViaSpec) transactions.Operation {
+	t.Helper()
+	payload := transactions.RouteOperation{Op: transactions.OpRoute, NetName: net, Layer: layer, Points: points, Vias: vias}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions.Operation{Op: transactions.OpRoute, Net: net, Raw: raw}
 }

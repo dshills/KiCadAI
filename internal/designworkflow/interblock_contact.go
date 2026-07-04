@@ -304,6 +304,22 @@ func newInterBlockContactGraph(operations []decodedContactRouteOperation) interB
 			previous = node
 		}
 	}
+	for _, operation := range operations {
+		for _, via := range operation.Vias {
+			first := -1
+			for _, viaLayer := range via.Layers {
+				node, ok := graph.connectPointToSegments(via.At, viaLayer, interBlockContactToleranceMM)
+				if !ok {
+					node = graph.add(via.At, viaLayer)
+				}
+				if first == -1 {
+					first = node
+					continue
+				}
+				graph.union(first, node)
+			}
+		}
+	}
 	return graph
 }
 
@@ -380,10 +396,17 @@ func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarg
 	if node, ok := graph.nearbyNode(target.Point, layer); ok {
 		return node, true
 	}
-	tolerance := contactToleranceForTarget(target)
+	return graph.connectPointToSegments(target.Point, layer, contactToleranceForTarget(target))
+}
+
+func (graph *interBlockContactGraph) connectPointToSegments(point transactions.Point, layer string, tolerance float64) (int, bool) {
+	node := -1
+	if existing, ok := graph.nearbyNode(point, layer); ok {
+		node = existing
+	}
 	graph.nextSegmentMarkGeneration()
 	seenSegments := make([]int, 0)
-	key := contactGraphSegmentKey(target.Point, layer)
+	key := contactGraphSegmentKey(point, layer)
 	radius := int64(math.Ceil(tolerance / interBlockContactSegmentBucketMM))
 	if radius < 1 {
 		radius = 1
@@ -400,7 +423,6 @@ func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarg
 			}
 		}
 	}
-	node := -1
 	for _, segmentIndex := range seenSegments {
 		segment := graph.segments[segmentIndex]
 		if !sameLayer(segment.Layer, layer) {
@@ -408,11 +430,11 @@ func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarg
 		}
 		left := graph.nodes[segment.Left]
 		right := graph.nodes[segment.Right]
-		if pointToSegmentDistanceMM(target.Point, left.Point, right.Point) > tolerance {
+		if pointToSegmentDistanceMM(point, left.Point, right.Point) > tolerance {
 			continue
 		}
 		if node == -1 {
-			node = graph.add(target.Point, layer)
+			node = graph.add(point, layer)
 		}
 		graph.union(node, segment.Left)
 		graph.union(node, segment.Right)
@@ -615,6 +637,12 @@ type decodedContactRouteOperation struct {
 	NetName     string
 	Layer       string
 	Points      []transactions.Point
+	Vias        []decodedContactRouteVia
+}
+
+type decodedContactRouteVia struct {
+	At     transactions.Point
+	Layers []string
 }
 
 func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[string][]decodedContactRouteOperation, []reports.Issue) {
@@ -677,9 +705,40 @@ func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[s
 			NetName:     netName,
 			Layer:       strings.TrimSpace(payload.Layer),
 			Points:      append([]transactions.Point(nil), payload.Points...),
+			Vias:        decodedContactRouteVias(index, payload.Vias, &issues),
 		})
 	}
 	return byNet, issues
+}
+
+func decodedContactRouteVias(operationIndex int, vias []transactions.RouteViaSpec, issues *[]reports.Issue) []decodedContactRouteVia {
+	decoded := make([]decodedContactRouteVia, 0, len(vias))
+	for viaIndex, via := range vias {
+		layerSet := map[string]struct{}{}
+		layers := make([]string, 0, len(via.Layers))
+		for _, layer := range via.Layers {
+			normalized := normalizeContactLayer(layer)
+			if normalized == "" {
+				continue
+			}
+			if _, ok := layerSet[normalized]; ok {
+				continue
+			}
+			layerSet[normalized] = struct{}{}
+			layers = append(layers, normalized)
+		}
+		if len(layers) < 2 {
+			*issues = append(*issues, reports.Issue{
+				Code:     reports.CodeRouteContactUnsupported,
+				Severity: reports.SeverityBlocked,
+				Path:     fmt.Sprintf("design.inter_block_contact.operations[%d].vias[%d].layers", operationIndex, viaIndex),
+				Message:  "route via requires at least two copper layers for contact graph validation",
+			})
+			continue
+		}
+		decoded = append(decoded, decodedContactRouteVia{At: via.At, Layers: layers})
+	}
+	return decoded
 }
 
 func proveContactTarget(target InterBlockContactTarget, operations []decodedContactRouteOperation) InterBlockContactProof {
