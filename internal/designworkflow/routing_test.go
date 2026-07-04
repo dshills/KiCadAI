@@ -681,6 +681,65 @@ func TestCreateI2CSensorBreakoutCapturesDownstreamPromotionBlocker(t *testing.T)
 	}
 }
 
+func TestCreateI2CSensorBreakoutContinuesAfterRouteTreeProofWithOutputDir(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
+	outputDir := t.TempDir()
+
+	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+	stagesByName := map[StageName]StageResult{}
+	for _, stage := range result.Stages {
+		stagesByName[stage.Name] = stage
+	}
+
+	routingStage, ok := stagesByName[StageRouting]
+	if !ok {
+		t.Fatalf("stages = %#v, want routing stage", result.Stages)
+	}
+	if routingStage.Status != StageStatusOK {
+		t.Fatalf("routing status = %s issues=%#v, want %s", routingStage.Status, routingStage.Issues, StageStatusOK)
+	}
+	interBlock := requireInterBlockRouteSummary(t, routingStage)
+	if interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 12 || interBlock.CompleteGroups != 4 {
+		t.Fatalf("inter-block summary = %#v, want complete 12/12 endpoint route-tree proof", interBlock)
+	}
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routingStage)
+	if routeTrees.GroupsComplete != 4 || routeTrees.BranchesRouted != 8 || routeTrees.BranchesBlocked != 0 {
+		t.Fatalf("route-tree execution = %#v, want all I2C route-tree branches complete", routeTrees)
+	}
+
+	projectWrite, ok := stagesByName[StageProjectWrite]
+	if !ok {
+		t.Fatalf("stages = %#v, want project_write stage after route-tree proof", result.Stages)
+	}
+	if issue, ok := issueByCodeAndPathForRoutingTest(projectWrite.Issues, reports.CodeInvalidArgument, "output"); ok {
+		t.Fatalf("project_write still reports missing output blocker: %#v", issue)
+	}
+	if projectWrite.Status != StageStatusBlocked {
+		t.Fatalf("project_write status = %s issues=%#v, want current downstream operation validation blocker", projectWrite.Status, projectWrite.Issues)
+	}
+	var operationIssue reports.Issue
+	for _, issue := range projectWrite.Issues {
+		if issue.Code == reports.CodeValidationFailed && strings.HasPrefix(issue.Path, "operations[") && strings.Contains(issue.Message, "does not match a symbol pin") {
+			operationIssue = issue
+			break
+		}
+	}
+	if operationIssue.Code == "" {
+		t.Fatalf("project_write issues = %#v, want current symbol/footprint pad mismatch blocker after output-dir continuation", projectWrite.Issues)
+	}
+	for _, name := range []StageName{StageWriterCorrect, StageValidation, StageKiCadChecks} {
+		stage, ok := stagesByName[name]
+		if !ok {
+			t.Fatalf("stages = %#v, want downstream stage %s after project_write", result.Stages, name)
+		}
+		if stage.Status != StageStatusSkipped {
+			t.Fatalf("%s status = %s issues=%#v, want skipped until project_write pad mismatch is resolved", name, stage.Status, stage.Issues)
+		}
+	}
+}
+
 func TestI2CSensorBreakoutRouteTreeEndpointAccessCandidatesStable(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
