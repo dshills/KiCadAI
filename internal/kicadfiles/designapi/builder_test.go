@@ -254,7 +254,26 @@ func TestBuilderPlaceFootprintAcceptsLibraryGeometry(t *testing.T) {
 	}
 }
 
-func TestBuilderRejectsCustomPadWithoutSymbolPin(t *testing.T) {
+func TestBuilderAllowsUnconnectedCustomPadWithoutSymbolPin(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+
+	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{
+			{Name: "1"},
+			{Name: "2"},
+			{Name: "9"},
+		},
+		AllowUnmatchedUnconnectedPads: true,
+	}); err != nil {
+		t.Fatalf("PlaceFootprint returned error for unconnected package-only pad: %v", err)
+	}
+}
+
+func TestBuilderRejectsUnconnectedCustomPadWithoutSymbolPinByDefault(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
 	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
@@ -264,11 +283,35 @@ func TestBuilderRejectsCustomPadWithoutSymbolPin(t *testing.T) {
 	_, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
 		Pads: []PadSpec{
 			{Name: "1"},
+			{Name: "2"},
 			{Name: "9"},
 		},
 	})
 	if err == nil {
 		t.Fatal("expected unknown pad error")
+	}
+	if !strings.Contains(err.Error(), "does not match a symbol pin") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestBuilderRejectsNettedCustomPadWithoutSymbolPin(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+
+	_, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{
+			{Name: "1"},
+			{Name: "2"},
+			{Name: "9", Net: "SIG"},
+		},
+		AllowUnmatchedUnconnectedPads: true,
+	})
+	if err == nil {
+		t.Fatal("expected netted unknown pad error")
 	}
 	if !strings.Contains(err.Error(), "does not match a symbol pin") {
 		t.Fatalf("error = %v", err)

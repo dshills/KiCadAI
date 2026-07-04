@@ -222,15 +222,16 @@ type AssignFootprintOperation struct {
 }
 
 type PlaceFootprintOperation struct {
-	Op          OperationKind `json:"op"`
-	Ref         string        `json:"ref"`
-	Role        string        `json:"role,omitempty"`
-	FootprintID string        `json:"footprint_id,omitempty"`
-	Value       string        `json:"value,omitempty"`
-	At          Point         `json:"at"`
-	Rotation    float64       `json:"rotation_deg,omitempty"`
-	Layer       string        `json:"layer,omitempty"`
-	Pads        []PadSpec     `json:"pads,omitempty"`
+	Op                            OperationKind `json:"op"`
+	Ref                           string        `json:"ref"`
+	Role                          string        `json:"role,omitempty"`
+	FootprintID                   string        `json:"footprint_id,omitempty"`
+	Value                         string        `json:"value,omitempty"`
+	At                            Point         `json:"at"`
+	Rotation                      float64       `json:"rotation_deg,omitempty"`
+	Layer                         string        `json:"layer,omitempty"`
+	Pads                          []PadSpec     `json:"pads,omitempty"`
+	AllowUnmatchedUnconnectedPads bool          `json:"allow_unmatched_unconnected_pads"`
 }
 
 type RouteOperation struct {

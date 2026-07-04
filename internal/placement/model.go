@@ -98,21 +98,22 @@ type BoardPlacementArea struct {
 }
 
 type Component struct {
-	Ref         string
-	Value       string
-	FootprintID string
-	Role        string
-	Bounds      Bounds
-	Pads        []PadSummary
-	Fixed       bool
-	Position    *Placement
-	Side        SideConstraint
-	Rotation    RotationConstraint
-	Edge        EdgeConstraint
-	GroupID     string
-	Priority    int
-	Hints       []Hint
-	Mobility    MobilityPolicy
+	Ref                           string
+	Value                         string
+	FootprintID                   string
+	Role                          string
+	Bounds                        Bounds
+	Pads                          []PadSummary
+	AllowUnmatchedUnconnectedPads bool
+	Fixed                         bool
+	Position                      *Placement
+	Side                          SideConstraint
+	Rotation                      RotationConstraint
+	Edge                          EdgeConstraint
+	GroupID                       string
+	Priority                      int
+	Hints                         []Hint
+	Mobility                      MobilityPolicy
 }
 
 type Bounds struct {

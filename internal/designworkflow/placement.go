@@ -283,6 +283,7 @@ func hydratePlacementRequestPads(request placement.Request, index *libraryresolv
 		}
 		if len(hydrated.Pads) != 0 {
 			component.Bounds = hydrated.Bounds
+			component.AllowUnmatchedUnconnectedPads = hasPackageOnlyPads(component.Ref, hydrated.Pads, netAssignments)
 		}
 		pads, netIssues := assignPadNetsFromIndex(component.Ref, hydrated.Pads, netAssignments)
 		component.Pads = pads
@@ -292,6 +293,26 @@ func hydratePlacementRequestPads(request placement.Request, index *libraryresolv
 		issues = append(issues, netIssues...)
 	}
 	return request, entries, issues
+}
+
+func hasPackageOnlyPads(ref string, pads []placement.PadSummary, assignments padNetAssignmentIndex) bool {
+	assignedPins := map[string]struct{}{}
+	for _, assignment := range assignments[strings.ToUpper(strings.TrimSpace(ref))] {
+		pin := strings.TrimSpace(assignment.Pin)
+		if pin != "" {
+			assignedPins[pin] = struct{}{}
+		}
+	}
+	for _, pad := range pads {
+		name := strings.TrimSpace(pad.Name)
+		if name == "" {
+			continue
+		}
+		if _, ok := assignedPins[name]; !ok {
+			return true
+		}
+	}
+	return false
 }
 
 func addPlacementRouteNet(request *placement.Request, indexes map[string]int, route blocks.RealizedPCBLocalRoute) {

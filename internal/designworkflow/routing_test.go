@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"math"
+	"os"
+	"path/filepath"
 	"slices"
 	"sort"
 	"strings"
@@ -681,7 +683,7 @@ func TestCreateI2CSensorBreakoutCapturesDownstreamPromotionBlocker(t *testing.T)
 	}
 }
 
-func TestCreateI2CSensorBreakoutContinuesAfterRouteTreeProofWithOutputDir(t *testing.T) {
+func TestCreateI2CSensorBreakoutWritesProjectArtifactsAfterRouteTreeProof(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
@@ -716,27 +718,46 @@ func TestCreateI2CSensorBreakoutContinuesAfterRouteTreeProofWithOutputDir(t *tes
 	if issue, ok := issueByCodeAndPathForRoutingTest(projectWrite.Issues, reports.CodeInvalidArgument, "output"); ok {
 		t.Fatalf("project_write still reports missing output blocker: %#v", issue)
 	}
-	if projectWrite.Status != StageStatusBlocked {
-		t.Fatalf("project_write status = %s issues=%#v, want current downstream operation validation blocker", projectWrite.Status, projectWrite.Issues)
+	if projectWrite.Status != StageStatusOK {
+		t.Fatalf("project_write status = %s issues=%#v, want %s", projectWrite.Status, projectWrite.Issues, StageStatusOK)
 	}
-	var operationIssue reports.Issue
-	for _, issue := range projectWrite.Issues {
-		if issue.Code == reports.CodeValidationFailed && strings.HasPrefix(issue.Path, "operations[") && strings.Contains(issue.Message, "does not match a symbol pin") {
-			operationIssue = issue
-			break
+	for _, filename := range []string{
+		"i2c_sensor_breakout_candidate.kicad_pro",
+		"i2c_sensor_breakout_candidate.kicad_sch",
+		"i2c_sensor_breakout_candidate.kicad_pcb",
+		".kicadai/transaction.json",
+		".kicadai/manifest.json",
+	} {
+		if _, err := os.Stat(filepath.Join(outputDir, filename)); err != nil {
+			t.Fatalf("missing generated artifact %s: %v", filename, err)
 		}
 	}
-	if operationIssue.Code == "" {
-		t.Fatalf("project_write issues = %#v, want current symbol/footprint pad mismatch blocker after output-dir continuation", projectWrite.Issues)
+	if len(projectWrite.Artifacts) == 0 {
+		t.Fatalf("project_write artifacts = %#v, want emitted KiCad project artifacts", projectWrite.Artifacts)
 	}
-	for _, name := range []StageName{StageWriterCorrect, StageValidation, StageKiCadChecks} {
-		stage, ok := stagesByName[name]
-		if !ok {
-			t.Fatalf("stages = %#v, want downstream stage %s after project_write", result.Stages, name)
-		}
-		if stage.Status != StageStatusSkipped {
-			t.Fatalf("%s status = %s issues=%#v, want skipped until project_write pad mismatch is resolved", name, stage.Status, stage.Issues)
-		}
+	writerCorrect, ok := stagesByName[StageWriterCorrect]
+	if !ok {
+		t.Fatalf("stages = %#v, want downstream stage %s after project_write", result.Stages, StageWriterCorrect)
+	}
+	if writerCorrect.Status != StageStatusWarning {
+		t.Fatalf("writer_correctness status = %s issues=%#v, want current warning-only library evidence blocker", writerCorrect.Status, writerCorrect.Issues)
+	}
+	validation, ok := stagesByName[StageValidation]
+	if !ok {
+		t.Fatalf("stages = %#v, want downstream stage %s after project_write", result.Stages, StageValidation)
+	}
+	if validation.Status != StageStatusBlocked {
+		t.Fatalf("validation status = %s issues=%#v, want current structural validation blockers", validation.Status, validation.Issues)
+	}
+	if !stageHasIssueCodeForRoutingTest(validation, reports.CodeValidationFailed) || !stageHasIssueCodeForRoutingTest(validation, reports.CodeDisconnectedPad) {
+		t.Fatalf("validation issues = %#v, want current label/connectivity blockers after artifact proof", validation.Issues)
+	}
+	kicadChecks, ok := stagesByName[StageKiCadChecks]
+	if !ok {
+		t.Fatalf("stages = %#v, want kicad_checks stage after project_write", result.Stages)
+	}
+	if kicadChecks.Status != StageStatusSkipped {
+		t.Fatalf("kicad_checks status = %s issues=%#v, want skipped until KiCad CLI evidence is configured", kicadChecks.Status, kicadChecks.Issues)
 	}
 }
 
@@ -874,6 +895,15 @@ func promotionIssueCodeByStageAndPathForRoutingTest(issues []PromotionIssue, sta
 		}
 	}
 	return "", false
+}
+
+func stageHasIssueCodeForRoutingTest(stage StageResult, code reports.Code) bool {
+	for _, issue := range stage.Issues {
+		if issue.Code == code {
+			return true
+		}
+	}
+	return false
 }
 
 func i2cSensorBreakoutPromotionFixtureForRoutingTest() PromotionFixture {

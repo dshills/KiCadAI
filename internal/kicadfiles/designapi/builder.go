@@ -78,17 +78,18 @@ type Endpoint struct {
 }
 
 type PlaceFootprintOptions struct {
-	Position           kicadfiles.Point
-	Rotation           kicadfiles.Angle
-	Layer              kicadfiles.BoardLayer
-	Description        string
-	Tags               string
-	Attributes         []string
-	MetadataProperties []pcb.FootprintMetadataProperty
-	Texts              []pcb.FootprintText
-	Graphics           []pcb.FootprintGraphic
-	Models             []pcb.Model3D
-	Pads               []PadSpec
+	Position                      kicadfiles.Point
+	Rotation                      kicadfiles.Angle
+	Layer                         kicadfiles.BoardLayer
+	Description                   string
+	Tags                          string
+	Attributes                    []string
+	MetadataProperties            []pcb.FootprintMetadataProperty
+	Texts                         []pcb.FootprintText
+	Graphics                      []pcb.FootprintGraphic
+	Models                        []pcb.Model3D
+	Pads                          []PadSpec
+	AllowUnmatchedUnconnectedPads bool
 }
 
 type PadSpec struct {
@@ -530,7 +531,7 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 	if len(padSpecs) == 0 {
 		padSpecs = builder.defaultPadSpecs(state, options.Layer, defaultPadType)
 	}
-	if err := builder.validatePadSpecs(reference, state, padSpecs); err != nil {
+	if err := builder.validatePadSpecs(reference, state, padSpecs, options.AllowUnmatchedUnconnectedPads); err != nil {
 		return FootprintHandle{}, err
 	}
 	footprint := pcb.Footprint{
@@ -920,7 +921,7 @@ func (builder *Builder) defaultPadSpecs(state *symbolState, layer kicadfiles.Boa
 	return specs
 }
 
-func (builder *Builder) validatePadSpecs(reference string, state *symbolState, padSpecs []PadSpec) error {
+func (builder *Builder) validatePadSpecs(reference string, state *symbolState, padSpecs []PadSpec, allowUnmatchedUnconnected bool) error {
 	seen := make(map[string]struct{}, len(padSpecs))
 	for _, padSpec := range padSpecs {
 		name := strings.TrimSpace(padSpec.Name)
@@ -928,7 +929,8 @@ func (builder *Builder) validatePadSpecs(reference string, state *symbolState, p
 			return fmt.Errorf("pad name required")
 		}
 		seen[name] = struct{}{}
-		if _, ok := state.pins[name]; !ok {
+		netted := strings.TrimSpace(padSpec.Net) != ""
+		if _, ok := state.pins[name]; !ok && (netted || !allowUnmatchedUnconnected) {
 			return fmt.Errorf("pad %s on %s does not match a symbol pin", name, reference)
 		}
 	}

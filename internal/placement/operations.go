@@ -9,15 +9,17 @@ import (
 )
 
 func PlacementOperation(component Component, placement PlacementResult) (transactions.Operation, error) {
+	pads := padSpecs(component.Pads)
 	payload := transactions.PlaceFootprintOperation{
-		Op:          transactions.OpPlaceFootprint,
-		Ref:         firstNonEmpty(component.Ref, placement.Ref),
-		FootprintID: firstNonEmpty(placement.FootprintID, component.FootprintID),
-		Value:       component.Value,
-		At:          transactions.Point{XMM: placement.Position.XMM, YMM: placement.Position.YMM},
-		Rotation:    placement.Position.RotationDeg,
-		Layer:       placement.Position.Layer,
-		Pads:        padSpecs(component.Pads),
+		Op:                            transactions.OpPlaceFootprint,
+		Ref:                           firstNonEmpty(component.Ref, placement.Ref),
+		FootprintID:                   firstNonEmpty(placement.FootprintID, component.FootprintID),
+		Value:                         component.Value,
+		At:                            transactions.Point{XMM: placement.Position.XMM, YMM: placement.Position.YMM},
+		Rotation:                      placement.Position.RotationDeg,
+		Layer:                         placement.Position.Layer,
+		Pads:                          pads,
+		AllowUnmatchedUnconnectedPads: component.AllowUnmatchedUnconnectedPads,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
