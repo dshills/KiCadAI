@@ -3,6 +3,7 @@ package designapi
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 
@@ -331,9 +332,38 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	builder.assignPinNet(from, netName)
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
-	builder.addSchematicWire(netName, from, to, start, end)
+	if schematicConnectionShouldUseLabels(netName, start, end) {
+		builder.addSchematicLabelStub(netName, from, start, labelStubOffset(start, end))
+		builder.addSchematicLabelStub(netName, to, end, labelStubOffset(end, start))
+	} else {
+		builder.addSchematicWire(netName, from, to, start, end)
+	}
 	builder.syncPCBNets()
 	return nil
+}
+
+func schematicConnectionShouldUseLabels(netName string, start, end kicadfiles.Point) bool {
+	const generatedIOAliasPrefix = "io_"
+	longSchematicWireLabelThreshold := kicadfiles.MM(40)
+	if strings.HasPrefix(strings.TrimSpace(netName), generatedIOAliasPrefix) {
+		return true
+	}
+	dx := start.X - end.X
+	if dx < 0 {
+		dx = -dx
+	}
+	dy := start.Y - end.Y
+	if dy < 0 {
+		dy = -dy
+	}
+	return dx+dy > longSchematicWireLabelThreshold
+}
+
+func labelStubOffset(from, to kicadfiles.Point) kicadfiles.Point {
+	if to.X >= from.X {
+		return kicadfiles.Point{Y: -kicadfiles.MM(1.27)}
+	}
+	return kicadfiles.Point{Y: kicadfiles.MM(1.27)}
 }
 
 func (builder *Builder) AddNoConnect(endpoint Endpoint) error {
@@ -375,6 +405,100 @@ func (builder *Builder) AddLabel(text string, position kicadfiles.Point, kind sc
 		position,
 	))
 	return nil
+}
+
+func (builder *Builder) addSchematicLabelStub(netName string, endpoint Endpoint, anchor kicadfiles.Point, offset kicadfiles.Point) {
+	if builder == nil {
+		return
+	}
+	if offset.X == 0 && offset.Y == 0 {
+		offset.X = kicadfiles.MM(1.27)
+	}
+	offset = builder.safeSchematicLabelStubOffset(anchor, offset)
+	labelPoint := kicadfiles.Point{X: anchor.X + offset.X, Y: anchor.Y + offset.Y}
+	builder.addSchematicWire(netName, endpoint, endpoint, anchor, labelPoint)
+	_ = builder.AddLabel(netName, labelPoint, schematic.LabelLocal)
+}
+
+func (builder *Builder) safeSchematicLabelStubOffset(anchor kicadfiles.Point, preferred kicadfiles.Point) kicadfiles.Point {
+	if builder == nil {
+		return preferred
+	}
+	grid := kicadfiles.MM(1.27)
+	directions := []kicadfiles.Point{preferred}
+	for _, direction := range []kicadfiles.Point{
+		{X: grid},
+		{X: -grid},
+		{Y: -grid},
+		{Y: grid},
+	} {
+		duplicate := false
+		for _, candidate := range directions {
+			if candidate == direction {
+				duplicate = true
+				break
+			}
+		}
+		if !duplicate {
+			directions = append(directions, direction)
+		}
+	}
+	for _, scale := range []kicadfiles.IU{1, 2, 4} {
+		for _, direction := range directions {
+			candidate := kicadfiles.Point{X: direction.X * scale, Y: direction.Y * scale}
+			labelPoint := kicadfiles.Point{X: anchor.X + candidate.X, Y: anchor.Y + candidate.Y}
+			if !schematicStubTouchesExistingWire(anchor, labelPoint, builder.design.Schematic.Wires) {
+				return candidate
+			}
+		}
+	}
+	return preferred
+}
+
+func schematicStubTouchesExistingWire(anchor kicadfiles.Point, labelPoint kicadfiles.Point, wires []schematic.Wire) bool {
+	for _, wire := range wires {
+		for index := 1; index < len(wire.Points); index++ {
+			a := wire.Points[index-1]
+			b := wire.Points[index]
+			if pointOnSchematicSegment(labelPoint, a, b) && !samePoint(labelPoint, anchor) {
+				return true
+			}
+			if pointOnSchematicSegment(a, anchor, labelPoint) && !samePoint(a, anchor) {
+				return true
+			}
+			if pointOnSchematicSegment(b, anchor, labelPoint) && !samePoint(b, anchor) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func pointOnSchematicSegment(point kicadfiles.Point, a kicadfiles.Point, b kicadfiles.Point) bool {
+	dxSegment := b.X - a.X
+	dySegment := b.Y - a.Y
+	dxPoint := point.X - a.X
+	dyPoint := point.Y - a.Y
+	if !sameSchematicCrossProduct(dxPoint, dySegment, dyPoint, dxSegment) {
+		return false
+	}
+	return betweenSchematicInclusive(point.X, a.X, b.X) &&
+		betweenSchematicInclusive(point.Y, a.Y, b.Y)
+}
+
+func sameSchematicCrossProduct(a kicadfiles.IU, b kicadfiles.IU, c kicadfiles.IU, d kicadfiles.IU) bool {
+	var left big.Int
+	left.Mul(big.NewInt(int64(a)), big.NewInt(int64(b)))
+	var right big.Int
+	right.Mul(big.NewInt(int64(c)), big.NewInt(int64(d)))
+	return left.Cmp(&right) == 0
+}
+
+func betweenSchematicInclusive(value kicadfiles.IU, a kicadfiles.IU, b kicadfiles.IU) bool {
+	if a > b {
+		a, b = b, a
+	}
+	return value >= a && value <= b
 }
 
 func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, start, end kicadfiles.Point) {

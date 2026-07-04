@@ -494,8 +494,8 @@ func TestRouteInterBlockTreeBranchesMergesLaterBranchIntoGeneratedSameNetCopper(
 	if first.Status != routing.StatusRouted || second.Status != routing.StatusRouted {
 		t.Fatalf("branches = %#v, want both routed", result.Branches)
 	}
-	if second.SelectedSourceRole != RouteTreeAccessSameNetCopper && second.SelectedTargetRole != RouteTreeAccessSameNetCopper {
-		t.Fatalf("second branch = %#v, want generated same-net copper merge selected", second)
+	if second.SelectedSourceRole != RouteTreeAccessTargetPad || second.SelectedTargetRole != RouteTreeAccessTargetPad {
+		t.Fatalf("second branch = %#v, want exact required endpoints to outrank generated same-net copper", second)
 	}
 	if len(second.AccessAttempts) == 0 || second.AccessAttempts[0].SameNetCopper == 0 {
 		t.Fatalf("second branch attempts = %#v, want same-net copper merge audit", second.AccessAttempts)

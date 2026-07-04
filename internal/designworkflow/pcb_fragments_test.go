@@ -2,12 +2,14 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestRealizePCBFragmentsCreatesLEDFragment(t *testing.T) {
@@ -70,6 +72,27 @@ func TestRealizePCBFragmentsAppliesConnectionAliasesToLocalRoutes(t *testing.T) 
 	for _, stale := range []string{"sensor_vcc", "sensor_gnd", "sensor_sda", "sensor_scl"} {
 		if nets[stale] {
 			t.Fatalf("local route nets = %#v, still include stale instance net %s", nets, stale)
+		}
+	}
+	operationNets := map[string]bool{}
+	for _, operation := range result.Fragments[0].Realization.Operations {
+		if operation.Op == transactions.OpRoute {
+			operationNets[operation.Net] = true
+			var payload transactions.RouteOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				t.Fatalf("route operation raw = %s: %v", string(operation.Raw), err)
+			}
+			operationNets[payload.NetName] = true
+		}
+	}
+	for _, want := range []string{"VCC", "GND", "SDA", "SCL"} {
+		if !operationNets[want] {
+			t.Fatalf("route operation nets = %#v, missing alias %s", operationNets, want)
+		}
+	}
+	for _, stale := range []string{"sensor_vcc", "sensor_gnd", "sensor_sda", "sensor_scl"} {
+		if operationNets[stale] {
+			t.Fatalf("route operation nets = %#v, still include stale instance net %s", operationNets, stale)
 		}
 	}
 }

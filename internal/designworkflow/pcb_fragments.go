@@ -71,8 +71,7 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 			continue
 		}
 		originX, originY := fragmentOrigin(index, columns)
-		realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{OriginXMM: originX, OriginYMM: originY})
-		applyFragmentNetAliases(aliasMaps[aliasInstanceKey(instance.ID)], &realization)
+		realization := blocks.RealizeBlockPCB(definition, output, blocks.PCBRealizationOptions{OriginXMM: originX, OriginYMM: originY, NetAliases: aliasMaps[aliasInstanceKey(instance.ID)]})
 		realizationPath := fmt.Sprintf("blocks[%d].pcb_realization", index)
 		realizationIssues := cloneIssues(realization.Issues)
 		realizationIssues = append(realizationIssues, timingEvidenceIssues(realization)...)
@@ -103,24 +102,6 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		"timing_results":  timingCount,
 	}
 	return PCBFragmentResult{Fragments: fragments, Stage: stage}
-}
-
-func applyFragmentNetAliases(aliases map[string]string, realization *blocks.BlockPCBRealizationResult) {
-	if realization == nil {
-		return
-	}
-	for index := range realization.LocalRoutes {
-		netName := strings.TrimSpace(realization.LocalRoutes[index].NetName)
-		if alias := aliases[netName]; alias != "" {
-			realization.LocalRoutes[index].NetName = alias
-		}
-	}
-	for index := range realization.EntryAnchors {
-		netName := strings.TrimSpace(realization.EntryAnchors[index].NetName)
-		if alias := aliases[netName]; alias != "" {
-			realization.EntryAnchors[index].NetName = alias
-		}
-	}
 }
 
 func fragmentNetAliases(instanceID string, request Request) (map[string]string, []reports.Issue) {

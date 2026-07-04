@@ -2,6 +2,10 @@ package blocks
 
 import (
 	"context"
+	"fmt"
+	"math"
+	"strconv"
+	"strings"
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
@@ -26,6 +30,7 @@ func SelectDefinitionComponents(ctx context.Context, definition BlockDefinition,
 			report.Issues = append(report.Issues, reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityBlocked, Path: "block." + definition.ID, Message: err.Error()})
 			return report
 		}
+		component = componentWithParamDrivenPins(component, params)
 		if !ComponentActiveForParams(component, params) {
 			continue
 		}
@@ -71,6 +76,7 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 	}
 	if component.ComponentQuery != nil {
 		query := *component.ComponentQuery
+		defaultPackage := packageQueryFromFootprint(component.FootprintID)
 		if query.MinimumConfidence == "" {
 			query.MinimumConfidence = component.MinimumConfidence
 		}
@@ -86,13 +92,66 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 			query.Value = component.Value
 		}
 		if component.ComponentValueParam != "" {
-			if value := stringParam(params, component.ComponentValueParam); value != "" {
+			if value := selectionValueParam(params, component.ComponentValueParam); value != "" {
 				query.Value = value
+			}
+		}
+		if query.ValueKind == "pin_count" && query.Value != "" && (query.Package == "" || query.Package == defaultPackage) {
+			if packageQuery := connectorPinCountPackage(query.Value, component.ComponentPackageTemplate); packageQuery != "" {
+				query.Package = packageQuery
 			}
 		}
 		return components.SelectionRequest{Query: query, Acceptance: acceptance}, true
 	}
 	return components.SelectionRequest{}, false
+}
+
+func selectionValueParam(params map[string]any, name string) string {
+	if value := stringParam(params, name); value != "" {
+		return value
+	}
+	if value, ok := numericValue(params[name]); ok {
+		return strconv.FormatFloat(value, 'f', -1, 64)
+	}
+	return ""
+}
+
+func componentWithParamDrivenPins(component BlockComponent, params map[string]any) BlockComponent {
+	if component.ComponentPinsParam == "" {
+		return component
+	}
+	count, ok := numericValue(params[component.ComponentPinsParam])
+	if !ok || count <= 0 || math.Trunc(count) != count {
+		return component
+	}
+	countInt := int(count)
+	component.Pins = connectorSymbolPins(countInt)
+	if symbolID := formattedPinCountTemplate(component.ComponentSymbolTemplate, countInt); symbolID != "" {
+		component.SymbolID = symbolID
+	}
+	return component
+}
+
+func connectorPinCountPackage(value string, template string) string {
+	template = strings.TrimSpace(template)
+	if template == "" {
+		return ""
+	}
+	count, err := strconv.ParseFloat(value, 64)
+	if err != nil || count <= 0 || math.Trunc(count) != count {
+		return ""
+	}
+	return formattedPinCountTemplate(template, int(count))
+}
+
+func formattedPinCountTemplate(template string, count int) string {
+	template = strings.TrimSpace(template)
+	if template == "" || count <= 0 {
+		return ""
+	}
+	result := strings.ReplaceAll(template, "%02d", fmt.Sprintf("%02d", count))
+	result = strings.ReplaceAll(result, "%d", strconv.Itoa(count))
+	return result
 }
 
 func ComponentActiveForParams(component BlockComponent, params map[string]any) bool {

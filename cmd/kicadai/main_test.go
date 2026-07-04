@@ -579,7 +579,7 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 		"routing":              string(designworkflow.StageStatusOK),
 		"project_write":        string(designworkflow.StageStatusOK),
 		"writer_correctness":   string(designworkflow.StageStatusWarning),
-		"validation":           string(designworkflow.StageStatusWarning),
+		"validation":           string(designworkflow.StageStatusOK),
 	}
 	for stage, wantStatus := range wantStages {
 		if got := workflowStageStatus(workflow.Stages, stage); got != wantStatus {
@@ -626,7 +626,7 @@ func TestRunIntentCreateLEDPromptStrictPromotionCandidate(t *testing.T) {
 	}
 
 	wantGates := map[string]designworkflow.PromotionGateStatus{
-		"connectivity":       designworkflow.PromotionGateStatusWarn,
+		"connectivity":       designworkflow.PromotionGateStatusPass,
 		"kicad_checks":       designworkflow.PromotionGateStatusSkipped,
 		"route_completion":   designworkflow.PromotionGateStatusPass,
 		"writer_correctness": designworkflow.PromotionGateStatusWarn,

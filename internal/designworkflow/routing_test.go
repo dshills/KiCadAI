@@ -466,14 +466,14 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 			t.Fatalf("access nets = %#v, want managed net %s", access.Nets, net)
 		}
 	}
-	if contactGraph.ProvenEndpoints != 12 || contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 {
-		t.Fatalf("contact graph = %#v, want 12 proven endpoints and 4 complete groups", contactGraph)
+	if contactGraph.ProvenEndpoints != 14 || contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 {
+		t.Fatalf("contact graph = %#v, want 14 proven endpoints and 4 complete groups", contactGraph)
 	}
 	wantGraphGroups := map[string]RouteTreeContactGraphGroupSummary{
 		"GND": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
 		"SCL": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
 		"SDA": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
-		"VCC": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
+		"VCC": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 5, ProvenEndpoints: 5, Components: 1},
 	}
 	for _, group := range contactGraph.Groups {
 		expected, ok := wantGraphGroups[group.NetName]
@@ -491,7 +491,7 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 {
 		t.Fatalf("retry = %#v, want initial routed attempt without repair retry", retry)
 	}
-	if !retry.AttemptHistory[0].Selected || retry.AttemptHistory[0].RouteTreeProvenEndpoints != 12 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
+	if !retry.AttemptHistory[0].Selected || retry.AttemptHistory[0].RouteTreeProvenEndpoints != 14 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 10 {
 		t.Fatalf("retry history = %#v, want initial attempt selected with complete route-tree contact evidence", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
@@ -511,8 +511,8 @@ func TestCreateI2CSensorBreakoutLocksResolvedVCCProofGap(t *testing.T) {
 		t.Fatalf("stages = %#v, want routing stage", result.Stages)
 	}
 	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
-	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 12 || contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 {
-		t.Fatalf("contact graph = %#v, want required=12 proven=12 complete=4 partial=0", contactGraph)
+	if contactGraph.RequiredEndpoints != 14 || contactGraph.ProvenEndpoints != 14 || contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 {
+		t.Fatalf("contact graph = %#v, want required=14 proven=14 complete=4 partial=0", contactGraph)
 	}
 	repair := requireRouteTreeRepairSummary(t, routingStage)
 	if repair.HintCount != 0 || repair.RepairableFailures != 0 || len(repair.Nets) != 0 {
@@ -550,14 +550,14 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 		t.Fatalf("stages = %#v, want routing stage", result.Stages)
 	}
 	interBlock := requireInterBlockRouteSummary(t, routingStage)
-	if interBlock.MultiEndpointNets != 4 || interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 12 {
-		t.Fatalf("inter-block summary = %#v, want 4 managed I2C nets and 12/12 proven endpoints", interBlock)
+	if interBlock.MultiEndpointNets != 4 || interBlock.RequiredEndpoints != 14 || interBlock.ProvenEndpoints != 14 {
+		t.Fatalf("inter-block summary = %#v, want 4 managed I2C nets and 14/14 proven endpoints", interBlock)
 	}
 	if interBlock.CompleteGroups != 4 || interBlock.PartialGroups != 0 || interBlock.BlockedGroups != 0 {
 		t.Fatalf("inter-block groups = %#v, want four complete graph-derived route-completion groups", interBlock)
 	}
-	if interBlock.BranchesAttempted != 8 || interBlock.BranchesCompleted != 8 {
-		t.Fatalf("inter-block branches = %#v, want all eight route-tree branches completed", interBlock)
+	if interBlock.BranchesAttempted != 10 || interBlock.BranchesCompleted != 10 {
+		t.Fatalf("inter-block branches = %#v, want all ten route-tree branches completed", interBlock)
 	}
 	if interBlock.RoutesCompleted != 4 || interBlock.PartialNets != 0 || interBlock.UnroutedNets != 0 {
 		t.Fatalf("inter-block route completion = %#v, want four complete route-tree nets", interBlock)
@@ -570,7 +570,7 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 			t.Fatalf("route-tree managed nets = %#v, want %s", routeTrees.ManagedNets, net)
 		}
 	}
-	if routeTrees.GroupsComplete != 4 || routeTrees.GroupsPartial != 0 || routeTrees.GroupsBlocked != 0 || routeTrees.BranchesRouted != 8 || routeTrees.BranchesBlocked != 0 {
+	if routeTrees.GroupsComplete != 4 || routeTrees.GroupsPartial != 0 || routeTrees.GroupsBlocked != 0 || routeTrees.BranchesRouted != 10 || routeTrees.BranchesBlocked != 0 {
 		t.Fatalf("route-tree execution = %#v, want all route-tree branches emitted before contact proof", routeTrees)
 	}
 	if routeTrees.FixedNetSkipNotices == 0 {
@@ -578,7 +578,7 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 	}
 
 	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
-	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 12 || contactGraph.Components == 0 {
+	if contactGraph.RequiredEndpoints != 14 || contactGraph.ProvenEndpoints != 14 || contactGraph.Components == 0 {
 		t.Fatalf("contact graph = %#v, want required/proven endpoint and component inventory", contactGraph)
 	}
 	if contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 || contactGraph.BlockedGroups != 0 {
@@ -589,7 +589,7 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 || !retry.AttemptHistory[0].Selected {
 		t.Fatalf("retry = %#v, want selected initial attempt without applied retry", retry)
 	}
-	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 12 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
+	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 14 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 10 {
 		t.Fatalf("retry history = %#v, want selected attempt route-tree evidence", retry.AttemptHistory)
 	}
 
@@ -703,11 +703,11 @@ func TestCreateI2CSensorBreakoutWritesProjectArtifactsAfterRouteTreeProof(t *tes
 		t.Fatalf("routing status = %s issues=%#v, want %s", routingStage.Status, routingStage.Issues, StageStatusOK)
 	}
 	interBlock := requireInterBlockRouteSummary(t, routingStage)
-	if interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 12 || interBlock.CompleteGroups != 4 {
-		t.Fatalf("inter-block summary = %#v, want complete 12/12 endpoint route-tree proof", interBlock)
+	if interBlock.RequiredEndpoints != 14 || interBlock.ProvenEndpoints != 14 || interBlock.CompleteGroups != 4 {
+		t.Fatalf("inter-block summary = %#v, want complete 14/14 endpoint route-tree proof", interBlock)
 	}
 	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routingStage)
-	if routeTrees.GroupsComplete != 4 || routeTrees.BranchesRouted != 8 || routeTrees.BranchesBlocked != 0 {
+	if routeTrees.GroupsComplete != 4 || routeTrees.BranchesRouted != 10 || routeTrees.BranchesBlocked != 0 {
 		t.Fatalf("route-tree execution = %#v, want all I2C route-tree branches complete", routeTrees)
 	}
 
@@ -763,11 +763,18 @@ func TestCreateI2CSensorBreakoutWritesProjectArtifactsAfterRouteTreeProof(t *tes
 	if !ok {
 		t.Fatalf("stages = %#v, want downstream stage %s after project_write", result.Stages, StageValidation)
 	}
-	if validation.Status != StageStatusBlocked {
-		t.Fatalf("validation status = %s issues=%#v, want current structural validation blockers", validation.Status, validation.Issues)
+	if validation.Status != StageStatusOK {
+		t.Fatalf("validation status = %s issues=%#v, want clean default local validation", validation.Status, validation.Issues)
 	}
-	if !stageHasIssueCodeForRoutingTest(validation, reports.CodeValidationFailed) || !stageHasIssueCodeForRoutingTest(validation, reports.CodeDisconnectedPad) {
-		t.Fatalf("validation issues = %#v, want current label/connectivity blockers after artifact proof", validation.Issues)
+	for _, blockedCode := range []reports.Code{reports.CodeValidationFailed, reports.CodeDisconnectedPad} {
+		if stageHasIssueCodeForRoutingTest(validation, blockedCode) {
+			t.Fatalf("validation issues = %#v, want no structural blocker %s", validation.Issues, blockedCode)
+		}
+	}
+	for _, issue := range validation.Issues {
+		if issue.Code == reports.CodeSkippedExternalTool && issue.Severity != reports.SeverityInfo {
+			t.Fatalf("validation issues = %#v, want skipped external checks to remain informational", validation.Issues)
+		}
 	}
 	kicadChecks, ok := stagesByName[StageKiCadChecks]
 	if !ok {
@@ -953,9 +960,9 @@ func i2cSensorBreakoutRoutingFixture(t *testing.T, ctx context.Context) (Request
 	request := Request{
 		Version: RequestVersion,
 		Name:    "i2c_sensor_breakout_candidate",
-		Board:   BoardSpec{WidthMM: 90, HeightMM: 60, Layers: 2},
+		Board:   BoardSpec{WidthMM: 55, HeightMM: 35, Layers: 2},
 		Blocks: []BlockInstanceSpec{
-			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"i2c_address": "0x48", "include_pullups": true}},
+			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"i2c_address": "0x48", "include_pullups": true, "supply_voltage": "3.3V", "pullup_value": "4k7"}},
 			{ID: "io", BlockID: "connector_breakout", Params: map[string]any{"pin_count": 4, "pin_names": []string{"VCC", "GND", "SDA", "SCL"}}},
 		},
 		Connections: []ConnectionSpec{

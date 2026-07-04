@@ -773,10 +773,12 @@ func routeTreeAccessCandidatesWithMergePriority(candidates []routeTreeBranchAcce
 	for index := range ranked {
 		if routeTreeAccessIsGeneratedSameNetCopper(ranked[index].Access) {
 			if mergeAuditBase.PreferSameNetCopperMerge {
-				ranked[index].EndpointRank = routeTreeAccessExactEndpointRank
 				ranked[index].RoleRank = routeTreeAccessPreferredRoleRank
 				ranked[index].RankReason = joinRouteTreeAccessRankReasons([]string{ranked[index].RankReason, "preferred_same_net_copper_merge"})
 			} else {
+				// Same-net generated copper remains merge evidence, but it must not
+				// outrank an exact target pad when the branch still has a specific
+				// endpoint to prove.
 				ranked[index].RoleRank += routeTreeGeneratedSameNetCopperNonPreferredRankPenalty
 			}
 		}

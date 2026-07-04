@@ -14,9 +14,10 @@ import (
 )
 
 type PCBRealizationOptions struct {
-	OriginXMM float64 `json:"origin_x_mm,omitempty"`
-	OriginYMM float64 `json:"origin_y_mm,omitempty"`
-	Layer     string  `json:"layer,omitempty"`
+	OriginXMM  float64           `json:"origin_x_mm,omitempty"`
+	OriginYMM  float64           `json:"origin_y_mm,omitempty"`
+	Layer      string            `json:"layer,omitempty"`
+	NetAliases map[string]string `json:"net_aliases,omitempty"`
 }
 
 type BlockPCBRealizationResult struct {
@@ -231,17 +232,19 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			Description: anchor.Description,
 		}
 		if strings.TrimSpace(anchor.NetTemplate) != "" {
-			realized.NetName = InstanceNetName(output.Instance.InstanceID, anchor.NetTemplate)
+			realized.NetName = aliasedRealizationNetName(opts.NetAliases, InstanceNetName(output.Instance.InstanceID, anchor.NetTemplate))
 		}
 		result.EntryAnchors = append(result.EntryAnchors, realized)
 	}
 	anchors := realizedAnchorMap(result.EntryAnchors)
 	anchorsByPort := realizedAnchorsByPort(result.EntryAnchors)
 	componentByRole := blockComponentByRole(definition.Components)
+	activeRouteIDs := map[string]struct{}{}
 	for _, route := range definition.PCBRealization.LocalRoutes {
 		if !realizationWhenMatches(route.When, output.Instance.Params) {
 			continue
 		}
+		activeRouteIDs[route.ID] = struct{}{}
 		from, fromIssues := resolveRealizedRouteEndpoint(route.ID, "from", route.From, roleRefs, placements, componentByRole, anchors, anchorsByPort)
 		to, toIssues := resolveRealizedRouteEndpoint(route.ID, "to", route.To, roleRefs, placements, componentByRole, anchors, anchorsByPort)
 		if len(fromIssues) != 0 || len(toIssues) != 0 {
@@ -249,7 +252,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			result.Issues = append(result.Issues, toIssues...)
 			continue
 		}
-		netName := InstanceNetName(output.Instance.InstanceID, route.NetTemplate)
+		netName := aliasedRealizationNetName(opts.NetAliases, InstanceNetName(output.Instance.InstanceID, route.NetTemplate))
 		realizedRoute := RealizedPCBLocalRoute{
 			ID:      route.ID,
 			NetName: netName,
@@ -274,6 +277,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		result.LocalRoutes = append(result.LocalRoutes, realizedRoute)
 		result.Operations = append(result.Operations, operation)
 	}
+	result.Validation.RequiredRoutes = activeRequiredRoutes(result.Validation.RequiredRoutes, activeRouteIDs)
 	result.Timing = buildTimingFixtureEvidence(activeTimingFixtures(definition.PCBRealization.TimingFixtures, output.Instance.Params), output, result.Components, result.LocalRoutes)
 	if result.Metadata == nil {
 		result.Metadata = map[string]RealizationMetric{}
@@ -478,6 +482,19 @@ func realizedRoutesByID(routes []RealizedPCBLocalRoute) map[string]RealizedPCBLo
 		}
 	}
 	return byID
+}
+
+func activeRequiredRoutes(required []string, active map[string]struct{}) []string {
+	if len(required) == 0 {
+		return required
+	}
+	filtered := make([]string, 0, len(required))
+	for _, routeID := range required {
+		if _, ok := active[routeID]; ok {
+			filtered = append(filtered, routeID)
+		}
+	}
+	return filtered
 }
 
 func placementDistance(first RelativePlacement, second RelativePlacement) float64 {
@@ -858,6 +875,13 @@ func routePoints(route PCBLocalRoute, from transactions.Point, to transactions.P
 	}
 	points = append(points, to)
 	return points
+}
+
+func aliasedRealizationNetName(aliases map[string]string, netName string) string {
+	if alias := aliases[strings.TrimSpace(netName)]; alias != "" {
+		return alias
+	}
+	return netName
 }
 
 func routePointLength(points []transactions.Point) float64 {

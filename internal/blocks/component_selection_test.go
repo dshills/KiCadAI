@@ -51,6 +51,36 @@ func TestSelectDefinitionComponentsForConnectorBreakout(t *testing.T) {
 	}
 }
 
+func TestConnectorBreakoutSelectionRequestUsesPinCountParam(t *testing.T) {
+	definition, ok := NewBuiltinRegistry().GetBlock("connector_breakout")
+	if !ok {
+		t.Fatal("missing connector_breakout definition")
+	}
+	component := definition.Components[0]
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{"pin_count": 4})
+	if !ok {
+		t.Fatal("expected connector selection request")
+	}
+	if request.Query.ValueKind != "pin_count" || request.Query.Value != "4" || request.Query.Package != "1x04" {
+		t.Fatalf("selection query = %+v, want four-pin connector query", request.Query)
+	}
+}
+
+func TestConnectorBreakoutSelectionRequestPreservesPackageParam(t *testing.T) {
+	definition, ok := NewBuiltinRegistry().GetBlock("connector_breakout")
+	if !ok {
+		t.Fatal("missing connector_breakout definition")
+	}
+	component := definition.Components[0]
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{"pin_count": 4, "connector_footprint": "Connector_PinHeader_2.54mm:PinHeader_2x02_P2.54mm_Vertical"})
+	if !ok {
+		t.Fatal("expected connector selection request")
+	}
+	if request.Query.Package != "pinheader_2x02_p2.54mm_vertical" {
+		t.Fatalf("selection query = %+v, want explicit package query to win", request.Query)
+	}
+}
+
 func TestSelectDefinitionComponentsForVoltageRegulator(t *testing.T) {
 	catalog := loadBlockTestCatalog(t)
 	definition := voltageRegulatorDefinition()

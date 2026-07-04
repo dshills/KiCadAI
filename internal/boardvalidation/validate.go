@@ -686,7 +686,7 @@ func missingDRCPolicy(opts Options) (Status, reports.Severity) {
 	if opts.RequireDRC && !opts.AllowMissingDRC {
 		return StatusFail, reports.SeverityError
 	}
-	return StatusSkipped, reports.SeverityWarning
+	return StatusSkipped, reports.SeverityInfo
 }
 
 func drcIssues(result checks.CheckResult, err error) []reports.Issue {

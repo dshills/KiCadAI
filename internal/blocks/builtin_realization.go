@@ -50,16 +50,20 @@ func ledIndicatorPCBRealization() *PCBRealization {
 
 func connectorBreakoutComponents() []BlockComponent {
 	return []BlockComponent{{
-		Role:                  "connector",
-		RefPrefix:             "J",
-		Value:                 "Connector",
-		SymbolID:              defaultConnectorSymbol,
-		FootprintID:           defaultConnectorFootprint,
-		Pins:                  connectorSymbolPins(2),
-		ComponentQuery:        &components.Query{Family: "connector", Package: "1x02", ValueKind: "pin_count", Value: "2"},
-		ComponentPackageParam: "connector_footprint",
-		MinimumConfidence:     components.ConfidenceVerified,
-		Acceptance:            components.AcceptanceConnectivity,
+		Role:                     "connector",
+		RefPrefix:                "J",
+		Value:                    "Connector",
+		SymbolID:                 defaultConnectorSymbol,
+		FootprintID:              defaultConnectorFootprint,
+		Pins:                     connectorSymbolPins(2),
+		ComponentQuery:           &components.Query{Family: "connector", ValueKind: "pin_count", Value: "2"},
+		ComponentValueParam:      "pin_count",
+		ComponentPackageParam:    "connector_footprint",
+		ComponentPackageTemplate: "1x%02d",
+		ComponentPinsParam:       "pin_count",
+		ComponentSymbolTemplate:  "Connector:Conn_01x%02d",
+		MinimumConfidence:        components.ConfidenceVerified,
+		Acceptance:               components.AcceptanceConnectivity,
 	}}
 }
 
@@ -124,36 +128,40 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 }
 
 func i2cSensorComponents() []BlockComponent {
+	pullupsEnabled := RealizationWhen{Params: map[string]any{"include_pullups": true}}
 	return []BlockComponent{
 		{Role: "sensor", RefPrefix: "U", Value: "I2C Sensor", SymbolID: defaultI2CSensorSymbol, FootprintID: "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", Pins: i2cSensorPins(genericI2CSensorPins)},
 		{Role: "decoupling_capacitor", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "sda_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "scl_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
+		{Role: "sda_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), When: pullupsEnabled},
+		{Role: "scl_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), When: pullupsEnabled},
 	}
 }
 
 func i2cSensorPCBRealization() *PCBRealization {
+	pullupsEnabled := RealizationWhen{Params: map[string]any{"include_pullups": true}}
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
 			{ComponentRole: "sensor", FootprintParam: "sensor_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
 			{ComponentRole: "decoupling_capacitor", FootprintParam: "decoupling_footprint", Placement: RelativePlacement{XMM: -5, YMM: -4, Layer: "F.Cu"}},
-			{ComponentRole: "sda_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 6, YMM: -5, Layer: "F.Cu"}},
-			{ComponentRole: "scl_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 6, YMM: 0, Layer: "F.Cu"}},
+			{ComponentRole: "sda_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 6, YMM: -5, Layer: "F.Cu"}, When: pullupsEnabled},
+			{ComponentRole: "scl_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 6, YMM: 0, Layer: "F.Cu"}, When: pullupsEnabled},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "sensor_core", ComponentRoles: []string{"sensor", "decoupling_capacitor", "sda_pullup", "scl_pullup"}, AnchorRole: "sensor", Bounds: &RelativeBounds{MinXMM: -8, MinYMM: -8, MaxXMM: 10, MaxYMM: 5}}},
 		LocalRoutes: []PCBLocalRoute{
 			{ID: "vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 			{ID: "gnd_decoupling", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.GND}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
-			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
-			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "sda_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "i2c_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"sensor", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Sensor decoupling capacitor should remain close to the sensor supply pins."},
 			{ID: "i2c_bus_pullup_group", Kind: "shared_bus_pullup", AppliesTo: []string{"sda_pullup", "scl_pullup"}, Description: "SDA and SCL pull-ups must be owned once per bus."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "sda", "scl"}, RequiredRoutes: []string{"vcc_decoupling", "gnd_decoupling", "sda_pullup", "scl_pullup"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "sda", "scl"}, RequiredRoutes: []string{"vcc_decoupling", "gnd_decoupling", "sda_pullup_vcc", "scl_pullup_vcc", "sda_pullup", "scl_pullup"}},
 	}
 }
 

@@ -70,6 +70,85 @@ func TestRealizeBlockPCBMatchesComponentsByEmittedRole(t *testing.T) {
 	}
 }
 
+func TestRealizeBlockPCBI2CPullupVCCRoutesResolvePullupRefs(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("i2c_sensor")
+	if !ok {
+		t.Fatal("missing i2c_sensor")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "i2c_sensor",
+		InstanceID: "sensor1",
+		Params: map[string]any{
+			"i2c_address":     "0x48",
+			"include_pullups": true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	rolesByRef := addSymbolRolesByRef(t, output.Operations)
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	routeByID := map[string]RealizedPCBLocalRoute{}
+	for _, route := range result.LocalRoutes {
+		routeByID[route.ID] = route
+	}
+	sdaVCC := routeByID["sda_pullup_vcc"]
+	sclVCC := routeByID["scl_pullup_vcc"]
+	if sdaVCC.ID == "" || sclVCC.ID == "" {
+		t.Fatalf("routes = %#v, want pull-up VCC local routes", result.LocalRoutes)
+	}
+	if got := rolesByRef[sdaVCC.From.Ref]; got != "sda_pullup" {
+		t.Fatalf("SDA pull-up VCC route starts at ref %s role %q, want sda_pullup; routes = %#v", sdaVCC.From.Ref, got, result.LocalRoutes)
+	}
+	if got := rolesByRef[sclVCC.From.Ref]; got != "scl_pullup" {
+		t.Fatalf("SCL pull-up VCC route starts at ref %s role %q, want scl_pullup; routes = %#v", sclVCC.From.Ref, got, result.LocalRoutes)
+	}
+	if sdaVCC.From == sclVCC.From {
+		t.Fatalf("pull-up VCC routes share from endpoint %#v, want distinct pull-up refs", sdaVCC.From)
+	}
+}
+
+func TestRealizeBlockPCBI2COmitsPullupRoutesWhenDisabled(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("i2c_sensor")
+	if !ok {
+		t.Fatal("missing i2c_sensor")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "i2c_sensor",
+		InstanceID: "sensor1",
+		Params: map[string]any{
+			"i2c_address":     "0x48",
+			"include_pullups": false,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	routeByID := map[string]bool{}
+	for _, route := range result.LocalRoutes {
+		routeByID[route.ID] = true
+	}
+	for _, omitted := range []string{"sda_pullup_vcc", "scl_pullup_vcc", "sda_pullup", "scl_pullup"} {
+		if routeByID[omitted] {
+			t.Fatalf("routes = %#v, want %s omitted when pull-ups disabled", result.LocalRoutes, omitted)
+		}
+		for _, required := range result.Validation.RequiredRoutes {
+			if required == omitted {
+				t.Fatalf("required routes = %#v, want %s omitted when pull-ups disabled", result.Validation.RequiredRoutes, omitted)
+			}
+		}
+	}
+}
+
 func TestRealizeBlockPCBOffsetsRouteWaypoints(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.Components[0].Pins = twoTerminalHorizontalPins()
