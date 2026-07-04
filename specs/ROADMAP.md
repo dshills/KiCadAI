@@ -211,7 +211,7 @@ loop confidence:
   pass-capable KiCad-backed lane when `--require-erc --require-drc` evidence is
   clean. Connector/LED optional KiCad-backed scenarios remain candidate
   fixtures with warning-only KiCad evidence. I2C sensor breakout and amplifier
-  fabrication-candidate scenarios remain `expected_fail` fixtures. They now
+  fabrication-candidate scenarios remain `expected_fail` fixtures. These paths now
   progress past the previous writer-correctness pad/copper net-code blocker,
   and the I2C fixture now progresses past stale routing-skip and local
   sensor_* net-alias blockers. LED and connector/LED fixtures also prove
@@ -234,9 +234,11 @@ loop confidence:
   branches, proves all 12 required contacts, and reports four graph-complete
   route-tree nets. The previous selected-attempt contact graph gaps for GND
   (`io.2`), SDA (`io.3`), and SCL (`io.4`) are closed; the current blockers
-  are downstream project-write, writer-correctness, validation, and KiCad
-  ERC/DRC evidence rather than stale routing skips, local alias failures, or
-  selected-attempt branch pathfinding blockers.
+  are required KiCad ERC schematic connectivity findings, later KiCad DRC/pass
+  evidence, and broader rich-board routing coverage rather than stale routing
+  skips, local alias failures, downstream project generation,
+  writer-correctness, validation, or selected-attempt branch pathfinding
+  blockers.
   Route-tree diagnostics now separate fixed-net skip notices and
   missing-net-class warnings from repairable blockers. The remaining
   layout-quality blockers are richer generated-board validation, generated
@@ -452,8 +454,9 @@ Implemented foundation with a documented first AI-controlled generation lane.
   `i2c_sensor_breakout_candidate` now enables routing and bounded retry, proves
   block-local VCC/GND/SDA/SCL alias propagation into local routes, proves
   route-tree contact completion for its multi-endpoint inter-block nets, and
-  remains `expected_fail` on downstream project-write and KiCad validation
-  evidence.
+  reaches project-write, writer-correctness, and structural validation
+  evidence. It remains `expected_fail` only because required KiCad ERC evidence
+  reports generated schematic connectivity findings.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -472,7 +475,8 @@ Implemented foundation with a documented first AI-controlled generation lane.
   optional `skip` candidates to required `pass` candidates as generated PCB
   quality improves, and broaden DRC-clean evidence beyond the initial smoke
   tier.
-- Promote optional design examples from `expected_fail` to `candidate` and then
+- Promote optional design examples from `candidate` to `pass` and remaining
+  `expected_fail` examples to `candidate`, then
   `pass` by closing full inter-block routing, richer route-completion
   validation, and KiCad-clean layout blockers. Generated PCB pad/copper net
   assignment now has workflow evidence and no longer blocks the LED smoke
@@ -483,9 +487,10 @@ Implemented foundation with a documented first AI-controlled generation lane.
   route-tree-managed inter-block nets, endpoint-access evidence, local-route
   and same-net copper merge evidence, contact graph completion evidence,
   classified route-tree repair hints, retry selection based on route-tree
-  completion evidence, and four graph-complete route-tree nets. The
-  `i2c_sensor_breakout_candidate` name identifies it as a promotion candidate
-  even though its current readiness is `expected_fail`.
+  completion evidence, four graph-complete route-tree nets, project-write,
+  writer-correctness, and structural validation evidence. It remains
+  `expected_fail` only on required KiCad ERC schematic connectivity evidence;
+  pass readiness still depends on clean KiCad ERC/DRC evidence.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
@@ -867,8 +872,9 @@ evidence. I2C now reaches route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
 now emits all route-tree branches, records four graph-complete route-tree nets,
-and remains `expected_fail` on downstream project-write and KiCad validation
-evidence; the
+and reaches project-write, writer-correctness, and structural validation
+evidence; the remaining expected-fail blocker is required KiCad ERC schematic
+connectivity evidence. The
 protected Class AB headphone amplifier fixture now verifies the
 `headphone_output_protection` block summary and verified
 LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical

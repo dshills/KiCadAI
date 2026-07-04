@@ -48,7 +48,7 @@ during PCB readback, and reports net-assignment evidence in the `design create`
 workflow. The simple LED prompt now reaches strict promotion `candidate` in the
 default structural lane without requiring local KiCad, and promotes to `pass`
 when required KiCad ERC/DRC and writer round-trip evidence are clean. The
-connector/LED KiCad-backed example remains candidate-level, while richer I2C
+connector/LED KiCad-backed examples remain candidate-level, while richer I2C
 and amplifier fixtures remain `expected_fail`. Generated block-local routes now
 bind to physical same-net pad anchors and report route-connectivity evidence.
 Generated inter-block route candidates now promote connector/LED and I2C
@@ -63,15 +63,15 @@ selected access roles in branch evidence. Route-tree contact graph evidence now
 includes local-route anchors, same-net segment intersection/overlap merges,
 same-net copper merge evidence, and via layer transitions. The I2C
 fixture now emits all 8 route-tree branches, proves all 12 required contacts,
-and reports four graph-complete route-tree nets. It remains `expected_fail`
-because project-write, writer-correctness, validation, and KiCad ERC/DRC
-evidence still need to run cleanly before candidate/pass promotion can be
-claimed. Route-tree repair classifies contact blockers, feeds repairable hints
+and reports four graph-complete route-tree nets. It now reaches project-write,
+writer-correctness, and structural validation evidence; the remaining
+expected-fail blocker is required KiCad ERC evidence for generated schematic
+connectivity. Route-tree repair classifies contact blockers, feeds repairable hints
 into bounded placement retry, and ranks selected attempts by route-tree
 completion evidence. Route-tree diagnostics now separate fixed-net skip notices
 and missing-net-class warnings from repairable blockers. The next blockers are
-downstream project-write, writer-correctness, validation, broader rich-board
-routing coverage, and KiCad ERC/DRC-clean evidence.
+generated schematic connectivity/readability sufficient to clear KiCad ERC,
+broader rich-board routing coverage, and KiCad DRC-clean pass evidence.
 
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, polygonal copper width and

@@ -93,10 +93,13 @@ multi-endpoint route-tree evidence:
 These fields are intended for AI repair loops and fixture promotion decisions.
 They prove endpoint grouping, target resolution, branch planning, contact proof,
 and graph-level completion status. They do not yet mean KiCad DRC-clean routing
-for richer generated boards; the I2C breakout fixture remains an
-`expected_fail` case even though every VCC/GND/SDA/SCL route group is now
-graph-complete. Candidate/pass promotion still requires downstream project
-write, writer-correctness, validation, and KiCad-backed ERC/DRC evidence.
+for richer generated boards; the I2C breakout fixture is still an
+`expected_fail` case only because required KiCad ERC evidence reports generated
+schematic connectivity findings. Every VCC/GND/SDA/SCL route group is
+graph-complete, and project-write, writer-correctness, and structural
+validation evidence is present. Candidate promotion now requires clearing the
+KiCad ERC connectivity findings; pass promotion also requires clean KiCad DRC
+evidence.
 
 The routing stage also exposes `inter_block_route_trees` when generated
 inter-block nets are managed by route-tree execution instead of the fallback
@@ -138,9 +141,10 @@ in route-tree contact proof without inflating inter-block emitted-segment
 counts.
 The I2C fixture currently emits all 8 route-tree branches, proves all 12
 required endpoint contacts, and reports four graph-complete route-tree nets. It
-remains an `expected_fail` fixture because downstream project-write,
-writer-correctness, validation, and KiCad ERC/DRC evidence must still run
-cleanly before candidate/pass promotion.
+remains an `expected_fail` fixture only because required KiCad ERC evidence
+still reports generated schematic connectivity findings. Project-write,
+writer-correctness, and structural validation evidence are present; pass
+requires clean KiCad ERC/DRC reports from a configured `kicad-cli`.
 Fixed-net skip notices and missing-net-class warnings are reported separately
 and do not inflate
 `route_tree_repair.branch_failures`.
