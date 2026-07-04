@@ -112,12 +112,16 @@ func StageStatusForIssues(issues []reports.Issue) StageStatus {
 	if len(issues) == 0 {
 		return StageStatusOK
 	}
+	status := StageStatusOK
 	for _, issue := range issues {
 		if issue.Blocking() {
 			return StageStatusBlocked
 		}
+		if issue.Severity == reports.SeverityWarning || issue.Severity == reports.SeverityError {
+			status = StageStatusWarning
+		}
 	}
-	return StageStatusWarning
+	return status
 }
 
 func BuildWorkflowResult(project ProjectSummary, requested AcceptanceLevel, stages []StageResult) WorkflowResult {

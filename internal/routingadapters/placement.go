@@ -9,6 +9,16 @@ import (
 	"kicadai/internal/routing"
 )
 
+const (
+	defaultSignalTraceWidthMM = 0.25
+	defaultSignalClearanceMM  = 0.20
+	defaultSignalViaMM        = 0.60
+	defaultSignalViaDrillMM   = 0.30
+	defaultPowerTraceWidthMM  = 0.40
+	defaultPowerViaMM         = 0.70
+	defaultPowerViaDrillMM    = 0.35
+)
+
 func RequestFromPlacement(placementRequest placement.Request, placementResult placement.Result) (routing.Request, []reports.Issue) {
 	issues := []reports.Issue{}
 	placements := map[string]placement.PlacementResult{}
@@ -32,9 +42,11 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		Strategy: routing.Strategy{Mode: routing.ModeTwoLayer, TreatZonesAs: routing.ZoneObstacle, AllowPartial: true},
 		Seed:     placementRequest.Seed,
 	}
+	request.Rules.NetClasses = defaultRoutingNetClasses()
 	if !placementRequest.Rules.AllowBackLayer {
 		request.Rules.AllowBackLayer = boolPtr(false)
 	}
+	request.Nets = make([]routing.Net, 0, len(placementRequest.Nets))
 	for _, component := range placementRequest.Components {
 		placed, ok := placements[normalizeKey(component.Ref)]
 		if !ok && component.Position == nil {
@@ -72,10 +84,15 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		})
 	}
 	for _, net := range placementRequest.Nets {
+		netClass := routingNetClass(net)
+		if _, ok := request.Rules.NetClasses[netClass]; !ok {
+			request.Rules.NetClasses[netClass] = defaultSignalRoutingNetClass()
+		}
 		request.Nets = append(request.Nets, routing.Net{
 			Name:      net.Name,
 			Endpoints: routingEndpointsFromPlacement(net.Endpoints),
 			Role:      routingNetRole(net.Role),
+			Class:     netClass,
 			Priority:  net.Weight,
 		})
 	}
@@ -98,6 +115,39 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		}
 	}
 	return request, issues
+}
+
+func defaultRoutingNetClasses() map[string]routing.NetClass {
+	return map[string]routing.NetClass{
+		"signal": defaultSignalRoutingNetClass(),
+		"clock":  defaultSignalRoutingNetClass(),
+		"power":  defaultPowerRoutingNetClass(),
+		"ground": defaultPowerRoutingNetClass(),
+	}
+}
+
+func defaultSignalRoutingNetClass() routing.NetClass {
+	return routing.NetClass{TraceWidthMM: defaultSignalTraceWidthMM, ClearanceMM: defaultSignalClearanceMM, ViaDiameterMM: defaultSignalViaMM, ViaDrillMM: defaultSignalViaDrillMM}
+}
+
+func defaultPowerRoutingNetClass() routing.NetClass {
+	return routing.NetClass{TraceWidthMM: defaultPowerTraceWidthMM, ClearanceMM: defaultSignalClearanceMM, ViaDiameterMM: defaultPowerViaMM, ViaDrillMM: defaultPowerViaDrillMM}
+}
+
+func routingNetClass(net placement.Net) string {
+	if class := strings.ToLower(strings.TrimSpace(net.WidthClass)); class != "" {
+		return class
+	}
+	switch net.Role {
+	case placement.NetPower:
+		return "power"
+	case placement.NetGround:
+		return "ground"
+	case placement.NetClock:
+		return "clock"
+	default:
+		return "signal"
+	}
 }
 
 func routingPadsFromPlacement(component placement.Component, layer string) []routing.Pad {

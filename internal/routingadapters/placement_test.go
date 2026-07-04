@@ -27,6 +27,40 @@ func TestRequestFromPlacementBuildsRoutingRequest(t *testing.T) {
 	if request.Components[0].Pads[0].Layers[0] != "F.Cu" {
 		t.Fatalf("pad layers = %#v", request.Components[0].Pads[0].Layers)
 	}
+	if request.Nets[0].Class != "signal" {
+		t.Fatalf("net class = %q, want signal", request.Nets[0].Class)
+	}
+	if request.Rules.NetClasses["signal"].TraceWidthMM == 0 || request.Rules.NetClasses["power"].TraceWidthMM == 0 {
+		t.Fatalf("missing default routing net classes: %#v", request.Rules.NetClasses)
+	}
+}
+
+func TestRequestFromPlacementAssignsRoleBasedNetClasses(t *testing.T) {
+	placementRequest := placementAdapterRequest()
+	placementRequest.Nets = []placement.Net{
+		{Name: "GND", Role: placement.NetGround, Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}}},
+		{Name: "VCC", Role: placement.NetPower, Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}}},
+		{Name: "SCL", Role: placement.NetClock, Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}}},
+		{Name: "AUDIO", Role: placement.NetSignal, WidthClass: " audio ", Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}}},
+	}
+	placementResult := placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", FootprintID: "Connector:J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", FootprintID: "Connector:J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placementResult)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	want := map[string]string{"GND": "ground", "VCC": "power", "SCL": "clock", "AUDIO": "audio"}
+	for _, net := range request.Nets {
+		if net.Class != want[net.Name] {
+			t.Fatalf("net %s class = %q, want %q; nets=%#v", net.Name, net.Class, want[net.Name], request.Nets)
+		}
+	}
+	if request.Rules.NetClasses["audio"].TraceWidthMM == 0 {
+		t.Fatalf("custom width class missing default routing rules: %#v", request.Rules.NetClasses)
+	}
 }
 
 func TestRequestFromPlacementUsesPlacementLayerForPads(t *testing.T) {

@@ -576,7 +576,7 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 		"schematic_electrical": string(designworkflow.StageStatusOK),
 		"pcb_realization":      string(designworkflow.StageStatusOK),
 		"placement":            string(designworkflow.StageStatusOK),
-		"routing":              string(designworkflow.StageStatusWarning),
+		"routing":              string(designworkflow.StageStatusOK),
 		"project_write":        string(designworkflow.StageStatusOK),
 		"writer_correctness":   string(designworkflow.StageStatusWarning),
 		"validation":           string(designworkflow.StageStatusWarning),
@@ -628,7 +628,7 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 	wantGates := map[string]designworkflow.PromotionGateStatus{
 		"connectivity":       designworkflow.PromotionGateStatusWarn,
 		"kicad_checks":       designworkflow.PromotionGateStatusSkipped,
-		"route_completion":   designworkflow.PromotionGateStatusWarn,
+		"route_completion":   designworkflow.PromotionGateStatusPass,
 		"writer_correctness": designworkflow.PromotionGateStatusWarn,
 	}
 	for gateID, wantStatus := range wantGates {
@@ -643,8 +643,6 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 		path    string
 		message string
 	}{
-		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[0].nets.GND.class", message: "power or high-current net has no explicit net class"},
-		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[1].nets.GND.class", message: "power or high-current net has no explicit net class"},
 		{stage: designworkflow.StageWriterCorrect, path: "schematic_to_pcb", message: "schematic-to-PCB transfer has no pad net hints"},
 		{stage: designworkflow.StageWriterCorrect, path: "library_index", message: "library index not provided"},
 		{stage: designworkflow.StageValidation, path: "kicad_drc", message: "KiCad DRC was not run because no KiCad CLI path was configured"},
@@ -657,6 +655,10 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 
 	if !promotionHasIssueCodePrefix(promotion.Issues, designworkflow.StageRouting, "routing_fixed_net_skipped_") {
 		t.Fatalf("promotion issues missing fixed-net skipped baseline evidence: %#v", promotion.Issues)
+	}
+	if promotionHasIssue(promotion.Issues, designworkflow.StageRouting, "design.inter_block_route_groups[\"GND\"].branches[0].nets.GND.class", "power or high-current net has no explicit net class") ||
+		promotionHasIssue(promotion.Issues, designworkflow.StageRouting, "design.inter_block_route_groups[\"GND\"].branches[1].nets.GND.class", "power or high-current net has no explicit net class") {
+		t.Fatalf("missing-net-class warnings should be closed: %#v", promotion.Issues)
 	}
 	if promotionHasIssue(promotion.Issues, designworkflow.StagePlacement, "design.inter_block_routing.connections[0].to", "connection endpoint does not resolve to a generated PCB pad") {
 		t.Fatalf("endpoint-to-pad warning should be closed: %#v", promotion.Issues)

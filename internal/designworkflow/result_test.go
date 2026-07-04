@@ -14,8 +14,14 @@ func TestStageStatusForIssues(t *testing.T) {
 	if got := StageStatusForIssues([]reports.Issue{{Severity: reports.SeverityWarning}}); got != StageStatusWarning {
 		t.Fatalf("warning status = %q", got)
 	}
+	if got := StageStatusForIssues([]reports.Issue{{Severity: reports.SeverityInfo}}); got != StageStatusOK {
+		t.Fatalf("info status = %q", got)
+	}
 	if got := StageStatusForIssues([]reports.Issue{{Severity: reports.SeverityError}}); got != StageStatusBlocked {
 		t.Fatalf("error status = %q", got)
+	}
+	if got := StageStatusForIssues([]reports.Issue{{Severity: reports.SeverityWarning}, {Severity: reports.SeverityError}}); got != StageStatusBlocked {
+		t.Fatalf("mixed warning/error status = %q", got)
 	}
 }
 
