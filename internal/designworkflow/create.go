@@ -14,6 +14,7 @@ import (
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/transactions"
+	"kicadai/internal/writercorrectness"
 )
 
 type CreateOptions struct {
@@ -26,6 +27,7 @@ type CreateOptions struct {
 	Routing       RoutingOptions
 	Validation    ValidationOptions
 	KiCadChecks   KiCadCheckOptions
+	Writer        writercorrectness.Options
 	Repair        repair.Options
 	PostRepair    repair.PostValidationOptions
 	BlockRegistry blocks.Registry
@@ -103,7 +105,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		stages = append(stages, skippedWorkflowStages("project write did not complete", StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
-	writerChecked := CheckWriterCorrectness(ctx, &written)
+	writerChecked := CheckWriterCorrectnessWithOptions(ctx, &written, opts.Writer)
 	stages = append(stages, writerChecked.Stage)
 	if workflowStageBlocked(writerChecked.Stage) {
 		stages = append(stages, skippedWorkflowStages("writer correctness check did not complete", StageValidation, StageKiCadChecks)...)
@@ -117,7 +119,10 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	}
 	validated := ValidateProject(ctx, &normalized, &written, opts.Validation)
 	stages = append(stages, validated.Stage)
-	checked := RunKiCadChecks(ctx, &normalized, &written, opts.KiCadChecks)
+	kicadCheckOpts := opts.KiCadChecks
+	kicadCheckOpts.RequireERC = kicadCheckOpts.RequireERC || normalized.Validation.RequireERC
+	kicadCheckOpts.RequireDRC = kicadCheckOpts.RequireDRC || normalized.Validation.RequireDRC
+	checked := RunKiCadChecks(ctx, &normalized, &written, kicadCheckOpts)
 	stages = append(stages, checked.Stage)
 	fabricationStage := FabricationReadinessStage(ctx, &normalized, &written)
 	if fabricationStage.Name != "" {

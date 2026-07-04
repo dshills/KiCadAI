@@ -13,6 +13,10 @@ type WriterCorrectnessStageResult struct {
 }
 
 func CheckWriterCorrectness(ctx context.Context, write *ProjectWriteResult) WriterCorrectnessStageResult {
+	return CheckWriterCorrectnessWithOptions(ctx, write, writercorrectness.Options{})
+}
+
+func CheckWriterCorrectnessWithOptions(ctx context.Context, write *ProjectWriteResult, opts writercorrectness.Options) WriterCorrectnessStageResult {
 	if ctx == nil {
 		return WriterCorrectnessStageResult{Stage: NewStageResult(StageWriterCorrect, []reports.Issue{{
 			Code:     reports.CodeInvalidArgument,
@@ -49,7 +53,7 @@ func CheckWriterCorrectness(ctx context.Context, write *ProjectWriteResult) Writ
 			Message:  "project root is required for writer correctness",
 		}})}
 	}
-	writer := writercorrectness.Validate(ctx, projectRoot, writercorrectness.Options{})
+	writer := writercorrectness.Validate(ctx, projectRoot, opts)
 	stage := NewStageResult(StageWriterCorrect, writer.Issues)
 	stage.Summary = map[string]any{
 		"ok":             writer.OK,

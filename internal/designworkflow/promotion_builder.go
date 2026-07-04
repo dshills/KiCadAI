@@ -265,6 +265,7 @@ func (builder *promotionReportBuilder) report() PromotionReport {
 	})
 	achieved := builder.achievedReadiness()
 	status := builder.statusForAchieved(achieved)
+	kicadVersion, externalEvidence := builder.kiCadEvidenceSummary()
 	return NormalizePromotionReport(PromotionReport{
 		ID:                 builder.fixture.ID,
 		Request:            builder.fixture.Request,
@@ -281,9 +282,11 @@ func (builder *promotionReportBuilder) report() PromotionReport {
 			Reached:   builder.reachedStageList(),
 			StoppedAt: builder.stoppedStage(),
 		},
-		Issues:      issues,
-		NextActions: builder.nextActions(),
-		Artifacts:   artifacts,
+		Issues:           issues,
+		NextActions:      builder.nextActions(),
+		Artifacts:        artifacts,
+		KiCadVersion:     kicadVersion,
+		ExternalEvidence: externalEvidence,
 	})
 }
 
@@ -432,6 +435,39 @@ func (builder *promotionReportBuilder) fixtureRequiresKiCadCandidateEvidence() b
 		return true
 	}
 	return builder.fixture.Acceptance == AcceptanceERCDRC || builder.fixture.Acceptance == AcceptanceFabricationCandidate
+}
+
+func (builder *promotionReportBuilder) kiCadEvidenceSummary() (string, string) {
+	stage, ok := builder.stages[StageKiCadChecks]
+	if !ok {
+		return "", ""
+	}
+	for _, key := range []string{promotionKiCadERCSummaryKey, promotionKiCadDRCSummaryKey} {
+		check, ok := promotionKiCadCheckResult(stage.Summary[key])
+		if !ok || strings.TrimSpace(check.KiCadVersion) == "" {
+			continue
+		}
+		evidence := "kicad-cli " + strings.TrimSpace(check.KiCadVersion)
+		if path := strings.TrimSpace(check.KiCadCLIPath); path != "" {
+			evidence += " at " + path
+		}
+		return check.KiCadVersion, evidence
+	}
+	return "", ""
+}
+
+func promotionKiCadCheckResult(value any) (checks.CheckResult, bool) {
+	switch check := value.(type) {
+	case checks.CheckResult:
+		return check, true
+	case *checks.CheckResult:
+		if check == nil {
+			return checks.CheckResult{}, false
+		}
+		return *check, true
+	default:
+		return checks.CheckResult{}, false
+	}
 }
 
 func promotionGateWarnsCandidateStatus(gate PromotionGate) bool {

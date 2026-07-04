@@ -671,6 +671,68 @@ func TestRunIntentCreateLEDPromptStrictPromotionCandidate(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateLEDPromptFakeKiCadPromotesPass(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "led_project")
+	artifactDir := filepath.Join(t.TempDir(), "artifacts")
+	cli := fakeWorkflowKiCadCLI(t, 0, `{"coordinate_units":"mm","violations":[],"sheets":[]}`)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "--require-erc", "--require-drc", "--keep-artifacts", "--artifact-dir", artifactDir, "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if stdout.Len() == 0 {
+		t.Fatalf("run returned no JSON: err=%v stderr=%s", err, stderr.String())
+	}
+
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessPass || promotion.Status != designworkflow.PromotionStatusPass {
+		t.Fatalf("promotion report = %#v, want pass", promotion)
+	}
+	if promotion.KiCadVersion != "10.0.0" || !strings.Contains(promotion.ExternalEvidence, cli) {
+		t.Fatalf("KiCad evidence = version %q external %q, want fake CLI path and version", promotion.KiCadVersion, promotion.ExternalEvidence)
+	}
+	kicadGate := promotionGateByName(promotion.Gates, "kicad_checks")
+	if kicadGate == nil || kicadGate.Status != designworkflow.PromotionGateStatusPass {
+		t.Fatalf("kicad_checks gate = %#v, want pass", kicadGate)
+	}
+	if len(kicadGate.RequiredFor) != 2 {
+		t.Fatalf("kicad_checks required_for = %#v, want candidate/pass", kicadGate.RequiredFor)
+	}
+	if len(kicadGate.Artifacts) != 2 {
+		t.Fatalf("kicad artifacts = %#v, want ERC and DRC reports", kicadGate.Artifacts)
+	}
+	writerGate := promotionGateByName(promotion.Gates, "writer_correctness")
+	if writerGate == nil || writerGate.Status != designworkflow.PromotionGateStatusPass {
+		t.Fatalf("writer gate = %#v, want pass with supplied KiCad CLI", writerGate)
+	}
+}
+
+func TestRunIntentCreateLEDPromptFakeKiCadFindingsBlockPromotion(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "led_project")
+	cli := fakeWorkflowKiCadCLI(t, 1, `{"coordinate_units":"mm","violations":[{"description":"clearance violation","severity":"error","type":"clearance","items":[{"description":"Track / Pad","uuid":"11111111-1111-4111-8111-111111111111"}]}],"sheets":[]}`)
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--kicad-cli", cli, "--require-erc", "--require-drc", "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected KiCad finding to report issues")
+	}
+	if stdout.Len() == 0 {
+		t.Fatalf("run returned no JSON: err=%v stderr=%s", err, stderr.String())
+	}
+
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked || promotion.Status != designworkflow.PromotionStatusFailed {
+		t.Fatalf("promotion report = %#v, want blocked failed", promotion)
+	}
+	kicadGate := promotionGateByName(promotion.Gates, "kicad_checks")
+	if kicadGate == nil || kicadGate.Status != designworkflow.PromotionGateStatusFailed || len(kicadGate.IssueCodes) == 0 {
+		t.Fatalf("kicad_checks gate = %#v, want failed with issue codes", kicadGate)
+	}
+	if !promotionHasIssue(promotion.Issues, designworkflow.StageKiCadChecks, "", "clearance violation") {
+		t.Fatalf("promotion issues missing KiCad DRC finding: %#v", promotion.Issues)
+	}
+}
+
 func TestRunIntentCreateLEDPromptOptionalKiCadSmoke(t *testing.T) {
 	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
 	if cliPath == "" {
@@ -718,6 +780,16 @@ func TestRunIntentCreateLEDPromptOptionalKiCadSmoke(t *testing.T) {
 	gate := promotionGateByName(promotion.Gates, string(designworkflow.StageKiCadChecks))
 	if gate == nil || gate.Status == designworkflow.PromotionGateStatusSkipped || gate.Status == designworkflow.PromotionGateStatusNotRun {
 		t.Fatalf("promotion kicad_checks gate = %#v", gate)
+	}
+	if gate.Status == designworkflow.PromotionGateStatusPass {
+		if promotion.AchievedReadiness != designworkflow.PromotionReadinessPass || promotion.Status != designworkflow.PromotionStatusPass {
+			t.Fatalf("clean KiCad gate did not promote to pass: %#v", promotion)
+		}
+		if promotion.KiCadVersion == "" || promotion.ExternalEvidence == "" || len(gate.Artifacts) == 0 {
+			t.Fatalf("promotion missing KiCad evidence: promotion=%#v gate=%#v", promotion, gate)
+		}
+	} else if len(gate.IssueCodes) == 0 {
+		t.Fatalf("dirty KiCad gate lacks precise issue codes: %#v", gate)
 	}
 }
 
@@ -3810,6 +3882,34 @@ func fakeCheckCLI(t *testing.T, exitCode int, reportJSON string) string {
 		"exit " + strconv.Itoa(exitCode) + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
 		t.Fatalf("write fake check CLI: %v", err)
+	}
+	return path
+}
+
+func fakeWorkflowKiCadCLI(t *testing.T, checkExitCode int, reportJSON string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "kicad-cli")
+	if runtime.GOOS == "windows" {
+		path += ".bat"
+		t.Skip("fake workflow KiCad CLI helper is implemented for POSIX shells")
+	}
+	body := "#!/bin/sh\n" +
+		"if [ \"$1\" = \"--version\" ]; then echo 10.0.0; exit 0; fi\n" +
+		"out=''\n" +
+		"prev=''\n" +
+		"for arg in \"$@\"; do\n" +
+		"  if [ \"$prev\" = \"--output\" ]; then out=\"$arg\"; fi\n" +
+		"  prev=\"$arg\"\n" +
+		"done\n" +
+		"if { [ \"$1\" = \"sch\" ] && [ \"$2\" = \"erc\" ]; } || { [ \"$1\" = \"pcb\" ] && [ \"$2\" = \"drc\" ]; }; then\n" +
+		"  if [ -n \"$out\" ]; then cat > \"$out\" <<'EOF'\n" +
+		reportJSON + "\nEOF\n" +
+		"  fi\n" +
+		"  exit " + strconv.Itoa(checkExitCode) + "\n" +
+		"fi\n" +
+		"exit 0\n"
+	if err := os.WriteFile(path, []byte(body), 0o755); err != nil {
+		t.Fatalf("write fake workflow KiCad CLI: %v", err)
 	}
 	return path
 }
