@@ -610,6 +610,59 @@ func TestRunIntentCreateLEDPromptGoldenCandidate(t *testing.T) {
 	}
 }
 
+func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "led_project")
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := run([]string{"--json", "--text", "make a simple LED indicator board", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("run returned error: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessBlocked || promotion.Status != designworkflow.PromotionStatusFailed {
+		t.Fatalf("promotion report = %#v, want blocked baseline", promotion)
+	}
+
+	wantGates := map[string]designworkflow.PromotionGateStatus{
+		"connectivity":       designworkflow.PromotionGateStatusWarn,
+		"kicad_checks":       designworkflow.PromotionGateStatusSkipped,
+		"route_completion":   designworkflow.PromotionGateStatusWarn,
+		"writer_correctness": designworkflow.PromotionGateStatusWarn,
+	}
+	for gateID, wantStatus := range wantGates {
+		gate := promotionGateByName(promotion.Gates, gateID)
+		if gate == nil || gate.Status != wantStatus {
+			t.Fatalf("promotion gate %s = %#v, want %q", gateID, gate, wantStatus)
+		}
+	}
+
+	wantIssues := []struct {
+		stage   designworkflow.StageName
+		path    string
+		message string
+	}{
+		{stage: designworkflow.StageComponentSelection, path: "component_selection.power_header.connector", message: "block component has no component_id or component_query"},
+		{stage: designworkflow.StageComponentSelection, path: "component_selection.connector.connector", message: "block component has no component_id or component_query"},
+		{stage: designworkflow.StagePlacement, path: "design.inter_block_routing.connections[0].to", message: "connection endpoint does not resolve to a generated PCB pad"},
+		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[0].nets.GND.class", message: "power or high-current net has no explicit net class"},
+		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[1].nets.GND.class", message: "power or high-current net has no explicit net class"},
+		{stage: designworkflow.StageWriterCorrect, path: "schematic_to_pcb", message: "schematic-to-PCB transfer has no pad net hints"},
+		{stage: designworkflow.StageWriterCorrect, path: "library_index", message: "library index not provided"},
+		{stage: designworkflow.StageValidation, path: "kicad_drc", message: "KiCad DRC was not run because no KiCad CLI path was configured"},
+	}
+	for _, want := range wantIssues {
+		if !promotionHasIssue(promotion.Issues, want.stage, want.path, want.message) {
+			t.Fatalf("promotion issues missing stage=%q path=%q message containing %q\nissues=%#v", want.stage, want.path, want.message, promotion.Issues)
+		}
+	}
+
+	if !promotionHasIssueCodePrefix(promotion.Issues, designworkflow.StageRouting, "routing_fixed_net_skipped_") {
+		t.Fatalf("promotion issues missing fixed-net skipped baseline evidence: %#v", promotion.Issues)
+	}
+}
+
 func TestRunIntentCreateLEDPromptOptionalKiCadSmoke(t *testing.T) {
 	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
 	if cliPath == "" {
@@ -813,6 +866,24 @@ func promotionGateByName(gates []designworkflow.PromotionGate, name string) *des
 		}
 	}
 	return nil
+}
+
+func promotionHasIssue(issues []designworkflow.PromotionIssue, stage designworkflow.StageName, path string, message string) bool {
+	for _, issue := range issues {
+		if issue.Stage == stage && issue.Path == path && strings.Contains(issue.Message, message) {
+			return true
+		}
+	}
+	return false
+}
+
+func promotionHasIssueCodePrefix(issues []designworkflow.PromotionIssue, stage designworkflow.StageName, codePrefix string) bool {
+	for _, issue := range issues {
+		if issue.Stage == stage && strings.HasPrefix(issue.Code, codePrefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func stageHasIssue(stages []workflowEvidenceStage, name string, code reports.Code) bool {
