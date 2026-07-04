@@ -643,8 +643,6 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 		path    string
 		message string
 	}{
-		{stage: designworkflow.StageComponentSelection, path: "component_selection.power_header.connector", message: "block component has no component_id or component_query"},
-		{stage: designworkflow.StageComponentSelection, path: "component_selection.connector.connector", message: "block component has no component_id or component_query"},
 		{stage: designworkflow.StagePlacement, path: "design.inter_block_routing.connections[0].to", message: "connection endpoint does not resolve to a generated PCB pad"},
 		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[0].nets.GND.class", message: "power or high-current net has no explicit net class"},
 		{stage: designworkflow.StageRouting, path: "design.inter_block_route_groups[\"GND\"].branches[1].nets.GND.class", message: "power or high-current net has no explicit net class"},
@@ -660,6 +658,10 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 
 	if !promotionHasIssueCodePrefix(promotion.Issues, designworkflow.StageRouting, "routing_fixed_net_skipped_") {
 		t.Fatalf("promotion issues missing fixed-net skipped baseline evidence: %#v", promotion.Issues)
+	}
+	if promotionHasIssue(promotion.Issues, designworkflow.StageComponentSelection, "component_selection.power_header.connector", "block component has no component_id or component_query") ||
+		promotionHasIssue(promotion.Issues, designworkflow.StageComponentSelection, "component_selection.connector.connector", "block component has no component_id or component_query") {
+		t.Fatalf("component-selection placeholder warnings should be closed: %#v", promotion.Issues)
 	}
 }
 

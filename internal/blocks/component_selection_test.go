@@ -29,6 +29,28 @@ func TestSelectDefinitionComponentsForLED(t *testing.T) {
 	}
 }
 
+func TestSelectDefinitionComponentsForConnectorBreakout(t *testing.T) {
+	catalog := loadBlockTestCatalog(t)
+	definition, ok := NewBuiltinRegistry().GetBlock("connector_breakout")
+	if !ok {
+		t.Fatal("missing connector_breakout definition")
+	}
+	report := SelectDefinitionComponents(context.Background(), definition, catalog, components.AcceptanceConnectivity)
+	if len(report.Issues) != 0 {
+		t.Fatalf("unexpected issues: %+v", report.Issues)
+	}
+	if len(report.Selections) != 1 {
+		t.Fatalf("expected one connector selection, got %+v", report.Selections)
+	}
+	selection := report.Selections[0]
+	if selection.Selection.Component.ID == "" {
+		t.Fatalf("selection = %+v, want resolved connector catalog component", selection)
+	}
+	if selection.Role != "connector" || selection.Selection.Component.Family != "connector" {
+		t.Fatalf("selection = %+v, want connector catalog selection", selection)
+	}
+}
+
 func TestSelectDefinitionComponentsForVoltageRegulator(t *testing.T) {
 	catalog := loadBlockTestCatalog(t)
 	definition := voltageRegulatorDefinition()

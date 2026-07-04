@@ -49,7 +49,18 @@ func ledIndicatorPCBRealization() *PCBRealization {
 }
 
 func connectorBreakoutComponents() []BlockComponent {
-	return []BlockComponent{{Role: "connector", RefPrefix: "J", Value: "Connector", SymbolID: defaultConnectorSymbol, FootprintID: defaultConnectorFootprint, Pins: connectorSymbolPins(2)}}
+	return []BlockComponent{{
+		Role:                  "connector",
+		RefPrefix:             "J",
+		Value:                 "Connector",
+		SymbolID:              defaultConnectorSymbol,
+		FootprintID:           defaultConnectorFootprint,
+		Pins:                  connectorSymbolPins(2),
+		ComponentQuery:        &components.Query{Family: "connector", Package: "1x02", ValueKind: "pin_count", Value: "2"},
+		ComponentPackageParam: "connector_footprint",
+		MinimumConfidence:     components.ConfidenceVerified,
+		Acceptance:            components.AcceptanceConnectivity,
+	}}
 }
 
 func connectorBreakoutPCBRealization() *PCBRealization {
