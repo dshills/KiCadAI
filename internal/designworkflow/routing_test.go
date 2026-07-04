@@ -354,11 +354,11 @@ func TestRoutePlacementI2CSensorBreakoutReportsInterBlockContactEvidence(t *test
 		t.Fatalf("inter-block contact counts = required %d resolved %d, want %d", contacts.ContactsRequired, contacts.ContactsProven+contacts.ContactsFailed, expectedEndpoints)
 	}
 	repair := requireRouteTreeRepairSummary(t, result.Stage)
-	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 {
-		t.Fatalf("route-tree repair summary = %#v, want repairable branch/contact failures", repair)
+	if repair.BranchFailures != 0 || repair.RepairableFailures != 0 || repair.HintCount != 0 {
+		t.Fatalf("route-tree repair summary = %#v, want no route-tree branch/contact failures", repair)
 	}
-	if stringSliceContains(repair.Nets, "VCC") || !stringSliceContains(repair.Nets, "GND") {
-		t.Fatalf("route-tree repair nets = %#v, want remaining non-VCC warning evidence", repair.Nets)
+	if len(repair.Nets) != 0 {
+		t.Fatalf("route-tree repair nets = %#v, want no route-tree repair nets", repair.Nets)
 	}
 }
 
@@ -393,19 +393,19 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 	if interBlock.MissingRequired != 0 {
 		t.Fatalf("inter-block route-tree missing endpoints = %#v, want target resolution complete", interBlock)
 	}
-	if interBlock.RoutesCompleted >= interBlock.Candidates || interBlock.PartialNets+interBlock.UnroutedNets == 0 {
-		t.Fatalf("inter-block summary = %#v, want remaining multi-endpoint route warnings", interBlock)
+	if interBlock.RoutesCompleted != interBlock.Candidates || interBlock.PartialNets != 0 || interBlock.UnroutedNets != 0 {
+		t.Fatalf("inter-block summary = %#v, want all multi-endpoint I2C routes complete", interBlock)
 	}
 	if interBlock.IssueCount == 0 {
-		t.Fatalf("inter-block summary = %#v, want actionable route/contact issues", interBlock)
+		t.Fatalf("inter-block summary = %#v, want fixed-net preservation notices retained as routing evidence", interBlock)
 	}
 
 	contacts := requireInterBlockContactSummary(t, result.Stage)
 	if contacts.ContactsRequired != interBlock.EndpointsResolved {
 		t.Fatalf("contact summary = %#v, inter-block summary = %#v, want contact targets for every resolved endpoint", contacts, interBlock)
 	}
-	if contacts.ContactsFailed == 0 {
-		t.Fatalf("contact summary = %#v, want current VCC contact blocker", contacts)
+	if contacts.ContactsFailed != 0 {
+		t.Fatalf("contact summary = %#v, want all inter-block contacts proven", contacts)
 	}
 	if contacts.NetMismatches != 0 {
 		t.Fatalf("contact summary = %#v, want no net-alias mismatch after I2C alias hydration", contacts)
@@ -415,8 +415,8 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 		t.Fatalf("VCC issues = %#v, want no graph-split, contact-miss, or pathfinding blocker", vccIssues)
 	}
 	repair := requireRouteTreeRepairSummary(t, result.Stage)
-	if repair.HintCount == 0 || stringSliceContains(repair.Nets, "VCC") || !stringSliceContains(repair.Nets, "GND") {
-		t.Fatalf("route-tree repair summary = %#v, want remaining non-VCC repair hints", repair)
+	if repair.HintCount != 0 || len(repair.Nets) != 0 {
+		t.Fatalf("route-tree repair summary = %#v, want no route-tree repair hints", repair)
 	}
 
 	blockedNets := issueNetSet(result.Stage.Issues)
@@ -426,9 +426,6 @@ func TestRoutePlacementI2CSensorBreakoutAuditsMultiEndpointBlocker(t *testing.T)
 		if !stringSliceContains(routeTrees.ManagedNets, net) {
 			t.Fatalf("route-tree managed nets = %#v, want %s", routeTrees.ManagedNets, net)
 		}
-	}
-	if len(blockedNets) == 0 {
-		t.Fatalf("issues = %#v, want named I2C net blockers", result.Stage.Issues)
 	}
 	for net := range blockedNets {
 		if !i2cNets[net] {
@@ -467,13 +464,13 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 			t.Fatalf("access nets = %#v, want managed net %s", access.Nets, net)
 		}
 	}
-	if contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
-		t.Fatalf("contact graph = %#v, want 9 proven endpoints, 1 complete group, 3 partial groups", contactGraph)
+	if contactGraph.ProvenEndpoints != 12 || contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 {
+		t.Fatalf("contact graph = %#v, want 12 proven endpoints and 4 complete groups", contactGraph)
 	}
 	wantGraphGroups := map[string]RouteTreeContactGraphGroupSummary{
-		"GND": {Status: RouteTreeContactGraphGroupPartial, RequiredEndpoints: 3, ProvenEndpoints: 2, Components: 2, MissingEndpointIDs: []string{"io.2"}},
-		"SCL": {Status: RouteTreeContactGraphGroupPartial, RequiredEndpoints: 3, ProvenEndpoints: 2, Components: 2, MissingEndpointIDs: []string{"io.4"}},
-		"SDA": {Status: RouteTreeContactGraphGroupPartial, RequiredEndpoints: 3, ProvenEndpoints: 2, Components: 2, MissingEndpointIDs: []string{"io.3"}},
+		"GND": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
+		"SCL": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
+		"SDA": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
 		"VCC": {Status: RouteTreeContactGraphGroupComplete, RequiredEndpoints: 3, ProvenEndpoints: 3, Components: 1},
 	}
 	for _, group := range contactGraph.Groups {
@@ -492,8 +489,8 @@ func TestCreateI2CSensorBreakoutCapturesAccessDrivenBaseline(t *testing.T) {
 	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 {
 		t.Fatalf("retry = %#v, want initial routed attempt without repair retry", retry)
 	}
-	if !retry.AttemptHistory[0].Selected || retry.AttemptHistory[0].RouteTreeProvenEndpoints != 9 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
-		t.Fatalf("retry history = %#v, want initial attempt selected with centerline contact evidence", retry.AttemptHistory)
+	if !retry.AttemptHistory[0].Selected || retry.AttemptHistory[0].RouteTreeProvenEndpoints != 12 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
+		t.Fatalf("retry history = %#v, want initial attempt selected with complete route-tree contact evidence", retry.AttemptHistory)
 	}
 	branchPaths := routeTreeBranchIssuePathsByNet(routingStage.Issues)
 	if len(branchPaths["VCC"]) != 0 {
@@ -512,15 +509,12 @@ func TestCreateI2CSensorBreakoutLocksResolvedVCCProofGap(t *testing.T) {
 		t.Fatalf("stages = %#v, want routing stage", result.Stages)
 	}
 	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
-	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 9 || contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 {
-		t.Fatalf("contact graph = %#v, want required=12 proven=9 complete=1 partial=3 centerline baseline", contactGraph)
+	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 12 || contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 {
+		t.Fatalf("contact graph = %#v, want required=12 proven=12 complete=4 partial=0", contactGraph)
 	}
 	repair := requireRouteTreeRepairSummary(t, routingStage)
-	if stringSliceContains(repair.Nets, "VCC") {
-		t.Fatalf("route-tree repair summary = %#v, want VCC proof gap resolved", repair)
-	}
-	if repair.HintCount == 0 || repair.RepairableFailures == 0 {
-		t.Fatalf("route-tree repair summary = %#v, want remaining repairable route-tree hints", repair)
+	if repair.HintCount != 0 || repair.RepairableFailures != 0 || len(repair.Nets) != 0 {
+		t.Fatalf("route-tree repair summary = %#v, want all route-tree proof gaps resolved", repair)
 	}
 	vccIssues := routeTreeIssuesForNet(routingStage.Issues, "VCC")
 	if routeTreeIssuesContainCode(vccIssues, reports.CodeRouteGraphIncomplete) ||
@@ -562,8 +556,8 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 		t.Fatalf("promotion = %#v, want expected-fail inventory match", promotion)
 	}
 	routeGate, ok := promotionGateByIDForRoutingTest(promotion, "route_completion")
-	if !ok || routeGate.Status != PromotionGateStatusFailed || len(routeGate.IssueCodes) == 0 {
-		t.Fatalf("route gate = %#v, ok=%v, want failed route issue codes", routeGate, ok)
+	if !ok || routeGate.Status != PromotionGateStatusPass {
+		t.Fatalf("route gate = %#v, ok=%v, want passing route-completion gate", routeGate, ok)
 	}
 	stageGate, ok := promotionGateByIDForRoutingTest(promotion, "stages")
 	if !ok || stageGate.Status != PromotionGateStatusFailed || len(stageGate.IssueCodes) == 0 {
@@ -575,19 +569,17 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 		t.Fatalf("stages = %#v, want routing stage", result.Stages)
 	}
 	interBlock := requireInterBlockRouteSummary(t, routingStage)
-	// Phase 1 intentionally locks exact counts so later route-tree promotion
-	// phases can prove a real movement from the captured baseline.
-	if interBlock.MultiEndpointNets != 4 || interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 9 {
-		t.Fatalf("inter-block summary = %#v, want 4 managed I2C nets and 9/12 proven endpoints", interBlock)
+	if interBlock.MultiEndpointNets != 4 || interBlock.RequiredEndpoints != 12 || interBlock.ProvenEndpoints != 12 {
+		t.Fatalf("inter-block summary = %#v, want 4 managed I2C nets and 12/12 proven endpoints", interBlock)
 	}
-	if interBlock.CompleteGroups != 1 || interBlock.PartialGroups != 3 || interBlock.BlockedGroups != 0 {
-		t.Fatalf("inter-block groups = %#v, want one complete and three partial graph-derived route-completion groups", interBlock)
+	if interBlock.CompleteGroups != 4 || interBlock.PartialGroups != 0 || interBlock.BlockedGroups != 0 {
+		t.Fatalf("inter-block groups = %#v, want four complete graph-derived route-completion groups", interBlock)
 	}
-	if interBlock.BranchesAttempted != 8 || interBlock.BranchesCompleted != 3 {
-		t.Fatalf("inter-block branches = %#v, want current 8 attempted and 3 completed baseline", interBlock)
+	if interBlock.BranchesAttempted != 8 || interBlock.BranchesCompleted != 8 {
+		t.Fatalf("inter-block branches = %#v, want all eight route-tree branches completed", interBlock)
 	}
-	if interBlock.RoutesCompleted != 1 || interBlock.PartialNets != 3 || interBlock.UnroutedNets != 0 {
-		t.Fatalf("inter-block route completion = %#v, want one complete and three partial route-tree nets", interBlock)
+	if interBlock.RoutesCompleted != 4 || interBlock.PartialNets != 0 || interBlock.UnroutedNets != 0 {
+		t.Fatalf("inter-block route completion = %#v, want four complete route-tree nets", interBlock)
 	}
 
 	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routingStage)
@@ -605,18 +597,18 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 	}
 
 	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routingStage, "route_tree_contact_graph")
-	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 9 || contactGraph.Components == 0 {
+	if contactGraph.RequiredEndpoints != 12 || contactGraph.ProvenEndpoints != 12 || contactGraph.Components == 0 {
 		t.Fatalf("contact graph = %#v, want required/proven endpoint and component inventory", contactGraph)
 	}
-	if contactGraph.CompleteGroups != 1 || contactGraph.PartialGroups != 3 || contactGraph.BlockedGroups != 0 {
-		t.Fatalf("contact graph groups = %#v, want current complete/partial baseline", contactGraph)
+	if contactGraph.CompleteGroups != 4 || contactGraph.PartialGroups != 0 || contactGraph.BlockedGroups != 0 {
+		t.Fatalf("contact graph groups = %#v, want complete route-tree contact baseline", contactGraph)
 	}
 
 	retry := requireStageSummary[placementRoutingRetrySummary](t, routingStage, "routing_retry")
 	if retry.Attempts != 1 || retry.Applied != 0 || len(retry.AttemptHistory) != 1 || !retry.AttemptHistory[0].Selected {
 		t.Fatalf("retry = %#v, want selected initial attempt without applied retry", retry)
 	}
-	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 9 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
+	if retry.AttemptHistory[0].RouteTreeProvenEndpoints != 12 || retry.AttemptHistory[0].RouteTreeBranchesRouted != 8 {
 		t.Fatalf("retry history = %#v, want selected attempt route-tree evidence", retry.AttemptHistory)
 	}
 
@@ -686,7 +678,7 @@ func TestI2CSensorBreakoutRouteTreeEndpointAccessCandidatesStable(t *testing.T) 
 	}
 }
 
-func TestI2CSensorBreakoutCapturesCurrentContactGraphGaps(t *testing.T) {
+func TestI2CSensorBreakoutCompletesConnectorEndpointContactGraph(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
@@ -708,28 +700,12 @@ func TestI2CSensorBreakoutCapturesCurrentContactGraphGaps(t *testing.T) {
 	}
 	contactEvidence := ValidateInterBlockRouteEndpointContacts(candidates, routed.Operations, &placed)
 	gaps := routeTreeContactGraphGapsForRoutingTest(t, contactEvidence, routed.Operations)
-
-	want := map[string]routeTreeContactGraphGapForRoutingTest{
-		"GND": {Required: 3, Proven: 2, Components: 2, MissingEndpointIDs: []string{"io.2"}},
-		"SCL": {Required: 3, Proven: 2, Components: 2, MissingEndpointIDs: []string{"io.4"}},
-		"SDA": {Required: 3, Proven: 2, Components: 2, MissingEndpointIDs: []string{"io.3"}},
-	}
-	if len(gaps) != len(want) {
-		t.Fatalf("gaps = %#v, want %#v", gaps, want)
-	}
-	for _, net := range []string{"GND", "SCL", "SDA"} {
-		expected := want[net]
-		got, ok := gaps[net]
-		if !ok {
-			t.Fatalf("gaps = %#v, want net %s", gaps, net)
-		}
-		if got.Required != expected.Required || got.Proven != expected.Proven || got.Components != expected.Components || !slices.Equal(got.MissingEndpointIDs, expected.MissingEndpointIDs) {
-			t.Fatalf("gap[%s] = %#v, want %#v", net, got, expected)
-		}
+	if len(gaps) != 0 {
+		t.Fatalf("gaps = %#v, want all I2C connector endpoints proven", gaps)
 	}
 }
 
-func TestI2CSensorBreakoutCapturesMissingConnectorEndpointGeometry(t *testing.T) {
+func TestI2CSensorBreakoutHasNoMissingConnectorEndpointGeometry(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	request, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
@@ -744,43 +720,8 @@ func TestI2CSensorBreakoutCapturesMissingConnectorEndpointGeometry(t *testing.T)
 	}
 	contactEvidence := ValidateInterBlockRouteEndpointContacts(candidates, routed.Operations, &placed)
 	diagnostics := routeTreeMissingEndpointGeometryForRoutingTest(t, contactEvidence, routed.Operations)
-
-	wantEndpointByNet := map[string]string{"GND": "io.2", "SDA": "io.3", "SCL": "io.4"}
-	if len(diagnostics) != len(wantEndpointByNet) {
-		t.Fatalf("diagnostics = %#v, want one missing connector endpoint for each of %#v", diagnostics, wantEndpointByNet)
-	}
-	wantNearest := map[string]transactions.Point{
-		"GND": {XMM: 4, YMM: 6.75},
-		"SDA": {XMM: 6.5, YMM: 8.25},
-		"SCL": {XMM: 4.171536, YMM: 13.788839},
-	}
-	wantDistance := map[string]float64{
-		"GND": 1.574929,
-		"SDA": 4.279065,
-		"SCL": 2.231815,
-	}
-	for _, net := range []string{"GND", "SDA", "SCL"} {
-		net := net
-		t.Run(net, func(t *testing.T) {
-			netDiagnostics := diagnostics[net]
-			if len(netDiagnostics) != 1 {
-				t.Fatalf("diagnostics = %#v, want net %s", diagnostics, net)
-			}
-			diagnostic := netDiagnostics[0]
-			if diagnostic.EndpointID != wantEndpointByNet[net] || diagnostic.InstanceID != "io" {
-				t.Fatalf("diagnostic[%s] = %#v, want missing connector endpoint %s", net, diagnostic, wantEndpointByNet[net])
-			}
-			if diagnostic.Ref == "" || diagnostic.Pad == "" || diagnostic.Layer == "" {
-				t.Fatalf("diagnostic[%s] = %#v, want ref, pad, and layer", net, diagnostic)
-			}
-			nearestCopperOutsideTolerance := diagnostic.NearestDistanceMM > diagnostic.ToleranceMM
-			if diagnostic.NearestOperationID == "" || diagnostic.NearestLayer == "" || !nearestCopperOutsideTolerance {
-				t.Fatalf("diagnostic[%s] = %#v, want nearest same-net copper outside contact tolerance", net, diagnostic)
-			}
-			if diagnostic.NearestLayer != "F.Cu" || pointDistanceMM(transactions.Point{XMM: diagnostic.NearestXMM, YMM: diagnostic.NearestYMM}, wantNearest[net]) > 1e-3 || math.Abs(diagnostic.NearestDistanceMM-wantDistance[net]) > 1e-3 {
-				t.Fatalf("diagnostic[%s] = %#v, want nearest F.Cu copper at %#v with distance %.12f", net, diagnostic, wantNearest[net], wantDistance[net])
-			}
-		})
+	if len(diagnostics) != 0 {
+		t.Fatalf("diagnostics = %#v, want no missing connector endpoint geometry", diagnostics)
 	}
 }
 

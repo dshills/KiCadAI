@@ -45,6 +45,12 @@ type RouteTreeEndpointAccessSummary struct {
 const routeTreeBranchAccessPairLimit = 8
 
 const (
+	routeTreeAccessExactEndpointRank    int = 0
+	routeTreeAccessFallbackEndpointRank int = 1
+	routeTreeAccessPreferredRoleRank    int = 0
+)
+
+const (
 	routeTreeAccessPreferredLayerRank int   = 0
 	routeTreeAccessMissingLayerRank   int   = 1
 	routeTreeAccessMissingDistance    int64 = 1<<63 - 1
@@ -52,6 +58,7 @@ const (
 
 type routeTreeBranchAccessCandidate struct {
 	Access       RouteTreeEndpointAccess
+	EndpointRank int
 	RoleRank     int
 	DistanceRank int64
 	LayerRank    int
@@ -72,28 +79,31 @@ func BuildRouteTreeEndpointAccess(targetEvidence InterBlockContactEvidence, rout
 
 func routeTreeAccessCandidatesForEndpoint(access []RouteTreeEndpointAccess, endpointID string, netName string, opposite RouteTreeEndpointAccess) []routeTreeBranchAccessCandidate {
 	var candidates []routeTreeBranchAccessCandidate
-	endpointID = strings.TrimSpace(endpointID)
+	normalizedEndpointID := strings.TrimSpace(endpointID)
 	netName = strings.TrimSpace(netName)
 	for _, item := range access {
 		if netName != "" && item.Net != netName {
 			continue
 		}
-		if endpointID != "" && item.EndpointID != "" && item.EndpointID != endpointID {
+		itemEndpointID := strings.TrimSpace(item.EndpointID)
+		if normalizedEndpointID != "" && itemEndpointID != "" && itemEndpointID != normalizedEndpointID {
 			continue
 		}
+		endpointRank := routeTreeAccessEndpointRank(itemEndpointID, normalizedEndpointID)
 		roleRank := routeTreeAccessRoleRank(item.Role)
 		layerRank := routeTreeAccessLayerRank(item)
 		distanceRank := routeTreeAccessDistanceRank(item, opposite)
 		candidates = append(candidates, routeTreeBranchAccessCandidate{
 			Access:       item,
+			EndpointRank: endpointRank,
 			RoleRank:     roleRank,
 			DistanceRank: distanceRank,
 			LayerRank:    layerRank,
 			ObstacleRank: 0,
-			RankReason:   routeTreeAccessRankReason(item, layerRank, distanceRank),
+			RankReason:   routeTreeAccessRankReason(item, itemEndpointID, endpointRank, layerRank, distanceRank),
 		})
 	}
-	slices.SortFunc(candidates, compareRouteTreeAccessCandidate)
+	slices.SortStableFunc(candidates, compareRouteTreeAccessCandidate)
 	return candidates
 }
 
@@ -139,6 +149,16 @@ func routeTreeAccessRoleRank(role RouteTreeEndpointAccessRole) int {
 	}
 }
 
+func routeTreeAccessEndpointRank(itemEndpointID string, endpointID string) int {
+	if endpointID == "" {
+		return routeTreeAccessExactEndpointRank
+	}
+	if itemEndpointID == endpointID {
+		return routeTreeAccessExactEndpointRank
+	}
+	return routeTreeAccessFallbackEndpointRank
+}
+
 func routeTreeAccessDistanceRank(item RouteTreeEndpointAccess, opposite RouteTreeEndpointAccess) int64 {
 	if opposite.Net == "" && opposite.XMM == 0 && opposite.YMM == 0 {
 		return routeTreeAccessMissingDistance
@@ -155,8 +175,20 @@ func routeTreeAccessLayerRank(item RouteTreeEndpointAccess) int {
 	return routeTreeAccessPreferredLayerRank
 }
 
-func routeTreeAccessRankReason(item RouteTreeEndpointAccess, layerRank int, distanceRank int64) string {
+func routeTreeAccessRankReason(item RouteTreeEndpointAccess, itemEndpointID string, endpointRank int, layerRank int, distanceRank int64) string {
 	reasons := []string{string(item.Role)}
+	switch endpointRank {
+	case routeTreeAccessExactEndpointRank:
+		if itemEndpointID != "" {
+			reasons = append(reasons, "exact_endpoint")
+		} else {
+			reasons = append(reasons, "endpoint_unscoped")
+		}
+	case routeTreeAccessFallbackEndpointRank:
+		reasons = append(reasons, "net_scoped_fallback")
+	default:
+		reasons = append(reasons, "endpoint_rank_unknown")
+	}
 	switch item.Role {
 	case RouteTreeAccessLocalRouteAnchor:
 		reasons = append(reasons, "preferred_local_route_anchor")
@@ -192,6 +224,9 @@ func joinRouteTreeAccessRankReasons(reasons []string) string {
 }
 
 func compareRouteTreeAccessCandidate(left, right routeTreeBranchAccessCandidate) int {
+	if compare := cmp.Compare(left.EndpointRank, right.EndpointRank); compare != 0 {
+		return compare
+	}
 	if compare := cmp.Compare(left.RoleRank, right.RoleRank); compare != 0 {
 		return compare
 	}

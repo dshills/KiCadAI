@@ -54,8 +54,29 @@ func TestRouteTreeAccessCandidatesPreferLocalRouteAnchor(t *testing.T) {
 	if candidates[0].Access.Role != RouteTreeAccessLocalRouteAnchor {
 		t.Fatalf("candidates = %#v, want local-route anchor first", candidates)
 	}
-	if !strings.Contains(candidates[0].RankReason, "preferred_local_route_anchor") || !strings.Contains(candidates[0].RankReason, "distance_ranked") {
-		t.Fatalf("rank reason = %q, want local-route and distance evidence", candidates[0].RankReason)
+	if candidates[0].EndpointRank != 0 || !strings.Contains(candidates[0].RankReason, "exact_endpoint") || !strings.Contains(candidates[0].RankReason, "preferred_local_route_anchor") || !strings.Contains(candidates[0].RankReason, "distance_ranked") {
+		t.Fatalf("candidate = %#v, want exact endpoint local-route and distance evidence", candidates[0])
+	}
+}
+
+func TestRouteTreeAccessCandidatesPreferExactEndpointPadOverEndpointlessAnchor(t *testing.T) {
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "J1.4", Role: RouteTreeAccessTargetPad, Ref: "J1", Pad: "4", Net: "SCL", Layer: "F.Cu", XMM: 2.5, YMM: 12.31, Source: "pad"},
+		{Role: RouteTreeAccessLocalRouteAnchor, Net: "SCL", Layer: "F.Cu", XMM: 4.1, YMM: 13.7, Source: "local_route"},
+		{Role: RouteTreeAccessSameNetCopper, Net: "SCL", Layer: "F.Cu", XMM: 4.2, YMM: 13.8, Source: routeTreeSameNetExistingCopperSource},
+	}
+	candidates := routeTreeAccessCandidatesForEndpoint(access, "J1.4", "SCL", RouteTreeEndpointAccess{Net: "SCL", XMM: 8, YMM: 12})
+	if len(candidates) != 3 {
+		t.Fatalf("candidates = %#v, want three", candidates)
+	}
+	if candidates[0].Access.Role != RouteTreeAccessTargetPad || candidates[0].Access.EndpointID != "J1.4" {
+		t.Fatalf("candidates = %#v, want exact endpoint pad before endpointless copper", candidates)
+	}
+	if candidates[0].EndpointRank != 0 || candidates[1].EndpointRank != 1 || candidates[2].EndpointRank != 1 {
+		t.Fatalf("candidates = %#v, want exact endpoint before net-scoped fallback candidates", candidates)
+	}
+	if !strings.Contains(candidates[0].RankReason, "exact_endpoint") || !strings.Contains(candidates[1].RankReason, "net_scoped_fallback") {
+		t.Fatalf("candidates = %#v, want endpoint rank reasons", candidates)
 	}
 }
 

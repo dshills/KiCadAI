@@ -1,7 +1,7 @@
 {
   "name": "generated_sensor_multiblock",
   "request": "request.json",
-  "intent": "Generated multi-block I2C sensor and connector fixture that proves pad hydration, inter-block net intent, and generated mobility ownership reach placement before routing retry.",
+  "intent": "Generated multi-block I2C sensor and connector fixture that proves pad hydration, inter-block net intent, generated mobility ownership, and complete route-tree endpoint closure.",
   "fixture_class": "generated_multiblock_mobility_boundary",
   "expected_categories": [],
   "expected_stop_reason": "",
@@ -9,13 +9,13 @@
   "expected_improved_metric": "none_placement_boundary",
   "preserve_constraints": ["net_assignments"],
   "preserve_fixed_refs": [],
-  "expected_routing_status": "blocked",
-  "expected_baseline_status": "blocked",
-  "expected_final_status": "blocked",
+  "expected_routing_status": "ok",
+  "expected_baseline_status": "ok",
+  "expected_final_status": "ok",
   "expected_min_attempts": 1,
   "expected_min_applied": 0,
   "expect_pad_hydration": true,
   "expected_min_hydrated_pads": 14,
   "expect_project_write": false,
-  "determinism": "generated multi-block request hydrates pads, exposes generated placement mobility ownership, and reaches deterministic routing blockers while preserving inter-block net aliases"
+  "determinism": "generated multi-block request hydrates pads, exposes generated placement mobility ownership, and proves connector route-tree endpoints while preserving inter-block net aliases"
 }

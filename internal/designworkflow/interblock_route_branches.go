@@ -756,7 +756,7 @@ func routeTreeBranchAccessAuditForBranchWithMergeAudit(access []RouteTreeEndpoin
 }
 
 func routeTreeAccessCandidatesWithMergePriority(candidates []routeTreeBranchAccessCandidate, mergeAuditBase routeTreeMergeAuditBase) []routeTreeBranchAccessCandidate {
-	if mergeAuditBase.PreferSameNetCopperMerge || len(candidates) == 0 {
+	if len(candidates) == 0 {
 		return candidates
 	}
 	hasGeneratedCopper := false
@@ -772,7 +772,13 @@ func routeTreeAccessCandidatesWithMergePriority(candidates []routeTreeBranchAcce
 	ranked := slices.Clone(candidates)
 	for index := range ranked {
 		if routeTreeAccessIsGeneratedSameNetCopper(ranked[index].Access) {
-			ranked[index].RoleRank += routeTreeGeneratedSameNetCopperNonPreferredRankPenalty
+			if mergeAuditBase.PreferSameNetCopperMerge {
+				ranked[index].EndpointRank = routeTreeAccessExactEndpointRank
+				ranked[index].RoleRank = routeTreeAccessPreferredRoleRank
+				ranked[index].RankReason = joinRouteTreeAccessRankReasons([]string{ranked[index].RankReason, "preferred_same_net_copper_merge"})
+			} else {
+				ranked[index].RoleRank += routeTreeGeneratedSameNetCopperNonPreferredRankPenalty
+			}
 		}
 	}
 	slices.SortStableFunc(ranked, compareRouteTreeAccessCandidate)
