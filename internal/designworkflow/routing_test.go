@@ -530,28 +530,7 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
 
 	result := Create(ctx, request, CreateOptions{})
-	promotion := BuildInternalPromotionReport(PromotionFixture{
-		ID:                "i2c_sensor_breakout_candidate",
-		Request:           "i2c_sensor_breakout_candidate.json",
-		Tier:              "block-composition",
-		DeclaredReadiness: PromotionReadinessExpectedFail,
-		Acceptance:        AcceptanceERCDRC,
-		RequireERC:        true,
-		RequireDRC:        true,
-		ExpectedStages: []StageName{
-			StageBlockPlanning,
-			StageComponentSelection,
-			StageSchematic,
-			StageSchematicElectrical,
-			StagePCBRealization,
-			StagePlacement,
-			StageRouting,
-			StageProjectWrite,
-			StageWriterCorrect,
-			StageValidation,
-			StageKiCadChecks,
-		},
-	}, result)
+	promotion := BuildInternalPromotionReport(i2cSensorBreakoutPromotionFixtureForRoutingTest(), result)
 	if promotion.Status != PromotionStatusExpectedFail || promotion.AchievedReadiness != PromotionReadinessExpectedFail || !promotion.MatchesExpectation {
 		t.Fatalf("promotion = %#v, want expected-fail inventory match", promotion)
 	}
@@ -632,6 +611,73 @@ func TestCreateI2CSensorBreakoutCapturesPromotionInventory(t *testing.T) {
 		if !strings.Contains(issue.Path, "design.inter_block_route_groups") && !strings.Contains(issue.Path, "design.inter_block_contact") {
 			t.Fatalf("unexpected high-severity net issue outside route-tree evidence paths: %#v", issue)
 		}
+	}
+}
+
+func TestCreateI2CSensorBreakoutCapturesDownstreamPromotionBlocker(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	request, _, _ := i2cSensorBreakoutRoutingFixture(t, ctx)
+
+	result := Create(ctx, request, CreateOptions{})
+	promotion := BuildInternalPromotionReport(i2cSensorBreakoutPromotionFixtureForRoutingTest(), result)
+	stagesByName := map[StageName]StageResult{}
+	for _, stage := range result.Stages {
+		stagesByName[stage.Name] = stage
+	}
+
+	wantStages := []struct {
+		name      StageName
+		status    StageStatus
+		issueCode reports.Code
+		issuePath string
+	}{
+		{name: StageRouting, status: StageStatusOK},
+		{name: StageProjectWrite, status: StageStatusBlocked, issueCode: reports.CodeInvalidArgument, issuePath: "output"},
+		{name: StageWriterCorrect, status: StageStatusSkipped},
+		{name: StageValidation, status: StageStatusSkipped},
+		{name: StageKiCadChecks, status: StageStatusSkipped},
+	}
+	var projectWriteIssue reports.Issue
+	for _, want := range wantStages {
+		stage, ok := stagesByName[want.name]
+		if !ok {
+			t.Fatalf("stages = %#v, want stage %s", result.Stages, want.name)
+		}
+		if stage.Status != want.status {
+			t.Fatalf("%s status = %s issues=%#v, want %s", want.name, stage.Status, stage.Issues, want.status)
+		}
+		if want.issueCode != "" {
+			issue, ok := issueByCodeAndPathForRoutingTest(stage.Issues, want.issueCode, want.issuePath)
+			if !ok {
+				t.Fatalf("%s issues = %#v, want %s at %s", want.name, stage.Issues, want.issueCode, want.issuePath)
+			}
+			if want.name == StageProjectWrite {
+				projectWriteIssue = issue
+			}
+		}
+	}
+	if projectWriteIssue.Code == "" {
+		t.Fatalf("project_write issue was not captured from stage checks")
+	}
+
+	routeGate, ok := promotionGateByIDForRoutingTest(promotion, "route_completion")
+	if !ok || routeGate.Status != PromotionGateStatusPass {
+		t.Fatalf("route gate = %#v, ok=%v, want route completion pass", routeGate, ok)
+	}
+	stageGate, ok := promotionGateByIDForRoutingTest(promotion, "stages")
+	if !ok || stageGate.Status != PromotionGateStatusFailed {
+		t.Fatalf("stage gate = %#v, ok=%v, want downstream stage failure", stageGate, ok)
+	}
+	expectedProjectWriteCode, ok := promotionIssueCodeByStageAndPathForRoutingTest(promotion.Issues, StageProjectWrite, projectWriteIssue.Path)
+	if !ok {
+		t.Fatalf("promotion issues = %#v, want project_write promotion issue for %s", promotion.Issues, projectWriteIssue.Path)
+	}
+	if !slices.Contains(stageGate.IssueCodes, expectedProjectWriteCode) {
+		t.Fatalf("stage gate issue codes = %#v, want exact project_write blocker %s", stageGate.IssueCodes, expectedProjectWriteCode)
+	}
+	if promotion.AchievedReadiness != PromotionReadinessExpectedFail || promotion.Status != PromotionStatusExpectedFail {
+		t.Fatalf("promotion = %#v, want expected-fail due downstream stage blockers", promotion)
 	}
 }
 
@@ -751,6 +797,49 @@ func promotionGateByIDForRoutingTest(report PromotionReport, id string) (Promoti
 		}
 	}
 	return PromotionGate{}, false
+}
+
+func issueByCodeAndPathForRoutingTest(issues []reports.Issue, code reports.Code, path string) (reports.Issue, bool) {
+	for _, issue := range issues {
+		if issue.Code == code && issue.Path == path {
+			return issue, true
+		}
+	}
+	return reports.Issue{}, false
+}
+
+func promotionIssueCodeByStageAndPathForRoutingTest(issues []PromotionIssue, stage StageName, path string) (string, bool) {
+	for _, issue := range issues {
+		if issue.Stage == stage && issue.Path == path {
+			return issue.Code, true
+		}
+	}
+	return "", false
+}
+
+func i2cSensorBreakoutPromotionFixtureForRoutingTest() PromotionFixture {
+	return PromotionFixture{
+		ID:                "i2c_sensor_breakout_candidate",
+		Request:           "i2c_sensor_breakout_candidate.json",
+		Tier:              "block-composition",
+		DeclaredReadiness: PromotionReadinessExpectedFail,
+		Acceptance:        AcceptanceERCDRC,
+		RequireERC:        true,
+		RequireDRC:        true,
+		ExpectedStages: []StageName{
+			StageBlockPlanning,
+			StageComponentSelection,
+			StageSchematic,
+			StageSchematicElectrical,
+			StagePCBRealization,
+			StagePlacement,
+			StageRouting,
+			StageProjectWrite,
+			StageWriterCorrect,
+			StageValidation,
+			StageKiCadChecks,
+		},
+	}
 }
 
 func i2cSensorBreakoutRoutingFixture(t *testing.T, ctx context.Context) (Request, PCBFragmentResult, PlacementStageResult) {
