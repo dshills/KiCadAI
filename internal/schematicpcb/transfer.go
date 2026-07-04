@@ -6,6 +6,7 @@ import (
 	"math"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -83,13 +84,12 @@ func FromDesign(design kicaddesign.Design, opts Options) Result {
 	components := schematicComponents(files, &result)
 	result.SymbolCount = symbolCount(files)
 	result.AssignedCount = len(components)
-	if opts.LibraryIndex == nil {
-		result.RequiresLibraries = true
-		result.Issues = append(result.Issues, issue(reports.CodeValidationFailed, reports.SeverityWarning, "library_index", "library index not provided; generated placement transaction will omit pad net hints"))
-	}
+	result.RequiresLibraries = opts.LibraryIndex == nil
 	netHints := map[string]map[string]string{}
 	if opts.LibraryIndex != nil {
 		netHints = inferPinNetHints(files, components, *opts.LibraryIndex, &result)
+	} else {
+		netHints = inferPinNetHints(files, components, libraryresolver.LibraryIndex{}, &result)
 	}
 	ops := make([]transactions.Operation, 0, len(components)+1)
 	layout := normalizeLayout(opts)
@@ -108,9 +108,15 @@ func FromDesign(design kicaddesign.Design, opts Options) Result {
 		if opts.LibraryIndex != nil {
 			if footprint, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, component.FootprintID); ok {
 				payload.Pads = padSpecsWithNetHints(footprint, netHints[component.Ref])
+			} else if pads, templateOK := verifiedTransferPadSpecs(component.FootprintID, netHints[component.Ref]); templateOK {
+				payload.Pads = pads
 			} else {
 				result.Issues = append(result.Issues, issue(reports.CodeUnknownFootprintLibrary, reports.SeverityWarning, "footprint."+component.Ref, "footprint record not found for "+component.FootprintID))
 			}
+		} else if pads, ok := verifiedTransferPadSpecs(component.FootprintID, netHints[component.Ref]); ok {
+			payload.Pads = pads
+		} else {
+			result.Issues = append(result.Issues, issue(reports.CodeUnknownFootprintLibrary, reports.SeverityWarning, "footprint."+component.Ref, "no library index provided and no verified footprint template for "+component.FootprintID))
 		}
 		result.NetHintCount += countPadNetHints(payload.Pads)
 		op, err := newOperation(transactions.OpPlaceFootprint, payload, component.Ref)
@@ -431,6 +437,19 @@ func collectPinAnchors(components []component, index libraryresolver.LibraryInde
 			symbol := componentSymbol.Symbol
 			record, ok := libraryresolver.ResolveSymbol(index, symbol.LibraryID)
 			if !ok {
+				if templatePins, templateOK := schematic.EmbeddedSymbolPinOffsets(symbol.LibraryID); templateOK {
+					for _, pin := range templatePins {
+						if strings.TrimSpace(pin.Number) == "" {
+							continue
+						}
+						anchors = append(anchors, pinAnchor{
+							Ref:   component.Ref,
+							Pin:   pin.Number,
+							Point: addPoint(symbol.Position, transformPinPoint(pin.Offset, symbol.Mirror, symbol.Rotation)),
+						})
+					}
+					continue
+				}
 				result.Issues = append(result.Issues, issue(reports.CodeUnknownSymbolLibrary, reports.SeverityWarning, "symbol."+component.Ref, "symbol record not found for "+symbol.LibraryID))
 				continue
 			}
@@ -503,6 +522,64 @@ func padSpecsWithNetHints(footprint libraryresolver.FootprintRecord, hints map[s
 		pads = append(pads, spec)
 	}
 	return pads
+}
+
+func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]transactions.PadSpec, bool) {
+	switch strings.TrimSpace(footprintID) {
+	case "Resistor_SMD:R_0603_1608Metric", "Capacitor_SMD:C_0603_1608Metric":
+		return twoTransferPads(0.85, 0.95, 1.7, hints), true
+	case "Resistor_SMD:R_0805_2012Metric",
+		"Capacitor_SMD:C_0805_2012Metric",
+		"LED_SMD:LED_0805_2012Metric",
+		"Diode_SMD:D_SOD-323":
+		return twoTransferPads(1.15, 1.45, 2.0, hints), true
+	case "Diode_SMD:D_SOD-123":
+		return twoTransferPads(1.35, 1.55, 3.0, hints), true
+	case "Fuse:Fuse_1206_3216Metric":
+		return twoTransferPads(1.75, 1.9, 3.6, hints), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
+		return pinHeaderTransferPads(1, hints), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical":
+		return pinHeaderTransferPads(2, hints), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical":
+		return pinHeaderTransferPads(3, hints), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical":
+		return pinHeaderTransferPads(4, hints), true
+	case "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical":
+		return pinHeaderTransferPads(5, hints), true
+	default:
+		return nil, false
+	}
+}
+
+func twoTransferPads(widthMM float64, heightMM float64, pitchMM float64, hints map[string]string) []transactions.PadSpec {
+	return []transactions.PadSpec{
+		transferPadSpec("1", -pitchMM/2, 0, widthMM, heightMM, hints),
+		transferPadSpec("2", pitchMM/2, 0, widthMM, heightMM, hints),
+	}
+}
+
+func pinHeaderTransferPads(count int, hints map[string]string) []transactions.PadSpec {
+	if count <= 0 {
+		return nil
+	}
+	pads := make([]transactions.PadSpec, 0, count)
+	offset := float64(count-1) * 2.54 / 2.0
+	for i := 1; i <= count; i++ {
+		pads = append(pads, transferPadSpec(strconv.Itoa(i), 0, float64(i-1)*2.54-offset, 1.7, 1.7, hints))
+	}
+	return pads
+}
+
+func transferPadSpec(name string, xMM float64, yMM float64, widthMM float64, heightMM float64, hints map[string]string) transactions.PadSpec {
+	spec := transactions.PadSpec{Name: name, XMM: xMM, YMM: yMM, WidthMM: widthMM, HeightMM: heightMM}
+	if hints == nil {
+		return spec
+	}
+	if net := strings.TrimSpace(hints[name]); net != "" {
+		spec.Net = &net
+	}
+	return spec
 }
 
 func countPadNetHints(pads []transactions.PadSpec) int {

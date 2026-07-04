@@ -643,8 +643,6 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 		path    string
 		message string
 	}{
-		{stage: designworkflow.StageWriterCorrect, path: "schematic_to_pcb", message: "schematic-to-PCB transfer has no pad net hints"},
-		{stage: designworkflow.StageWriterCorrect, path: "library_index", message: "library index not provided"},
 		{stage: designworkflow.StageValidation, path: "kicad_drc", message: "KiCad DRC was not run because no KiCad CLI path was configured"},
 	}
 	for _, want := range wantIssues {
@@ -659,6 +657,10 @@ func TestRunIntentCreateLEDPromptStrictPromotionBaseline(t *testing.T) {
 	if promotionHasIssue(promotion.Issues, designworkflow.StageRouting, "design.inter_block_route_groups[\"GND\"].branches[0].nets.GND.class", "power or high-current net has no explicit net class") ||
 		promotionHasIssue(promotion.Issues, designworkflow.StageRouting, "design.inter_block_route_groups[\"GND\"].branches[1].nets.GND.class", "power or high-current net has no explicit net class") {
 		t.Fatalf("missing-net-class warnings should be closed: %#v", promotion.Issues)
+	}
+	if promotionHasIssue(promotion.Issues, designworkflow.StageWriterCorrect, "schematic_to_pcb", "schematic-to-PCB transfer has no pad net hints") ||
+		promotionHasIssue(promotion.Issues, designworkflow.StageWriterCorrect, "library_index", "library index not provided") {
+		t.Fatalf("writer pinmap/library-index warnings should be closed: %#v", promotion.Issues)
 	}
 	if promotionHasIssue(promotion.Issues, designworkflow.StagePlacement, "design.inter_block_routing.connections[0].to", "connection endpoint does not resolve to a generated PCB pad") {
 		t.Fatalf("endpoint-to-pad warning should be closed: %#v", promotion.Issues)
