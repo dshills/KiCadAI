@@ -542,6 +542,11 @@ Review and commit:
 
 Goal: prove the new amplifier family did not regress existing generation lanes.
 
+Status: Complete. The full Go test suite passes after Phases 12-14. Optional
+KiCad-backed amplifier checks were skipped because `kicad-cli` was not available
+on `PATH` in this environment. The worktree was clean before recording this
+final regression status.
+
 Tasks:
 
 - Run:
