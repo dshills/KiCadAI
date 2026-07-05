@@ -1,0 +1,107 @@
+{
+  "id": "amplifier_bias_network_headphone",
+  "block_id": "amplifier_bias_network",
+  "description": "Two-diode Class AB headphone bias network with rail feed resistors and output anchor.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "bias",
+    "params": {
+      "topology": "diode_string",
+      "application": "headphone",
+      "diode_count": 2,
+      "emitter_resistor_value": "0.47Ω",
+      "bias_feed_resistor_value": "10kΩ"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["R1", "D1", "D2", "R2", "TP1"],
+    "components": [
+      {
+        "role": "upper_bias_feed",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "bias_upper",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D",
+        "footprint_id": "Diode_SMD:D_SOD-123"
+      },
+      {
+        "role": "bias_lower",
+        "ref_prefix": "D",
+        "symbol_id": "Device:D",
+        "footprint_id": "Diode_SMD:D_SOD-123"
+      },
+      {
+        "role": "lower_bias_feed",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "amp_out_anchor",
+        "ref_prefix": "TP",
+        "symbol_id": "Connector:TestPoint",
+        "footprint_id": "TestPoint:TestPoint_Pad_D1.0mm"
+      }
+    ],
+    "ports": [
+      {"name": "DRIVER_OUT", "direction": "input", "net": "bias_driver"},
+      {"name": "BIAS_P", "direction": "output", "net": "bias_bias_p"},
+      {"name": "BIAS_N", "direction": "output", "net": "bias_bias_n"},
+      {"name": "AMP_OUT", "direction": "passive", "net": "bias_amp_out"},
+      {"name": "VCC", "direction": "power", "net": "bias_vcc"},
+      {"name": "VEE", "direction": "power", "net": "bias_vee"}
+    ],
+    "nets": [
+      {
+        "name": "bias_bias_p",
+        "visibility": "exported",
+        "pins": [
+          {"role": "upper_bias_feed", "pin": "2"},
+          {"role": "bias_upper", "pin": "2"}
+        ]
+      },
+      {
+        "name": "bias_driver",
+        "visibility": "exported",
+        "pins": [
+          {"role": "bias_upper", "pin": "1"},
+          {"role": "bias_lower", "pin": "2"}
+        ]
+      },
+      {
+        "name": "bias_bias_n",
+        "visibility": "exported",
+        "pins": [
+          {"role": "bias_lower", "pin": "1"},
+          {"role": "lower_bias_feed", "pin": "1"}
+        ]
+      },
+      {
+        "name": "bias_vcc",
+        "visibility": "power",
+        "pins": [
+          {"role": "upper_bias_feed", "pin": "1"}
+        ]
+      },
+      {
+        "name": "bias_vee",
+        "visibility": "power",
+        "pins": [
+          {"role": "lower_bias_feed", "pin": "2"}
+        ]
+      },
+      {
+        "name": "bias_amp_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "amp_out_anchor", "pin": "1"}
+        ]
+      }
+    ]
+  }
+}

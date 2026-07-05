@@ -1,0 +1,57 @@
+{
+  "id": "amplifier_supply_decoupling_single_supply",
+  "block_id": "amplifier_supply_decoupling",
+  "description": "Single-supply amplifier rail decoupling with ceramic and bulk capacitors.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "amp_decouple",
+    "params": {
+      "rail_mode": "single_supply",
+      "rail_voltage": "9V",
+      "ceramic_capacitance": "100nF",
+      "bulk_capacitance": "10uF",
+      "include_bulk": true,
+      "capacitor_voltage_rating": "16V"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["C1", "C2"],
+    "components": [
+      {
+        "role": "vcc_ceramic",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "vcc_bulk",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C_Polarized",
+        "footprint_id": "Capacitor_SMD:C_1210_3225Metric"
+      }
+    ],
+    "ports": [
+      {"name": "VCC", "direction": "power", "net": "amp_decouple_vcc"},
+      {"name": "GND", "direction": "power", "net": "amp_decouple_gnd"}
+    ],
+    "nets": [
+      {
+        "name": "amp_decouple_vcc",
+        "visibility": "exported",
+        "pins": [
+          {"role": "vcc_ceramic", "pin": "1"},
+          {"role": "vcc_bulk", "pin": "1"}
+        ]
+      },
+      {
+        "name": "amp_decouple_gnd",
+        "visibility": "exported",
+        "pins": [
+          {"role": "vcc_ceramic", "pin": "2"},
+          {"role": "vcc_bulk", "pin": "2"}
+        ]
+      }
+    ]
+  }
+}

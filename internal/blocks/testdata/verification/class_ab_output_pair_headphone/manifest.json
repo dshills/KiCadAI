@@ -1,0 +1,120 @@
+{
+  "id": "class_ab_output_pair_headphone",
+  "block_id": "class_ab_output_pair",
+  "description": "Complementary MMBT3904/MMBT3906 emitter-follower output pair for headphone-class loads.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "out_pair",
+    "params": {
+      "supply_voltage": "9V",
+      "load_impedance": "32Ω",
+      "application": "headphone",
+      "emitter_resistor_value": "0.47Ω"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["Q1", "Q2", "R1", "R2", "TP1"],
+    "components": [
+      {
+        "role": "upper_output",
+        "ref_prefix": "Q",
+        "symbol_id": "Device:Q_NPN_BEC",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23"
+      },
+      {
+        "role": "lower_output",
+        "ref_prefix": "Q",
+        "symbol_id": "Device:Q_PNP_BEC",
+        "footprint_id": "Package_TO_SOT_SMD:SOT-23"
+      },
+      {
+        "role": "upper_emitter_resistor",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_1206_3216Metric"
+      },
+      {
+        "role": "lower_emitter_resistor",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_1206_3216Metric"
+      },
+      {
+        "role": "load_reference",
+        "ref_prefix": "TP",
+        "symbol_id": "Connector:TestPoint",
+        "footprint_id": "TestPoint:TestPoint_Pad_D1.0mm"
+      }
+    ],
+    "ports": [
+      {"name": "BIAS_P", "direction": "input", "net": "out_pair_bias_p"},
+      {"name": "BIAS_N", "direction": "input", "net": "out_pair_bias_n"},
+      {"name": "VCC", "direction": "power", "net": "out_pair_vcc"},
+      {"name": "VEE", "direction": "power", "net": "out_pair_vee"},
+      {"name": "AMP_OUT", "direction": "output", "net": "out_pair_amp_out"},
+      {"name": "LOAD_REF", "direction": "passive", "net": "out_pair_load_ref"}
+    ],
+    "nets": [
+      {
+        "name": "out_pair_bias_p",
+        "visibility": "exported",
+        "pins": [
+          {"role": "upper_output", "pin": "1"}
+        ]
+      },
+      {
+        "name": "out_pair_bias_n",
+        "visibility": "exported",
+        "pins": [
+          {"role": "lower_output", "pin": "1"}
+        ]
+      },
+      {
+        "name": "out_pair_upper_emitter",
+        "visibility": "local",
+        "pins": [
+          {"role": "upper_output", "pin": "2"},
+          {"role": "upper_emitter_resistor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "out_pair_lower_emitter",
+        "visibility": "local",
+        "pins": [
+          {"role": "lower_output", "pin": "2"},
+          {"role": "lower_emitter_resistor", "pin": "1"}
+        ]
+      },
+      {
+        "name": "out_pair_amp_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "upper_emitter_resistor", "pin": "2"},
+          {"role": "lower_emitter_resistor", "pin": "2"}
+        ]
+      },
+      {
+        "name": "out_pair_vcc",
+        "visibility": "power",
+        "pins": [
+          {"role": "upper_output", "pin": "3"}
+        ]
+      },
+      {
+        "name": "out_pair_vee",
+        "visibility": "power",
+        "pins": [
+          {"role": "lower_output", "pin": "3"}
+        ]
+      },
+      {
+        "name": "out_pair_load_ref",
+        "visibility": "exported",
+        "pins": [
+          {"role": "load_reference", "pin": "1"}
+        ]
+      }
+    ]
+  }
+}

@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "name": "class_ab_headphone_driver",
   "intent": {
-    "summary": "Connectivity-level Class AB headphone driver seed with op-amp voltage gain, diode-biased complementary output stage, explicit rails, and headphone_output_protection with AC coupling.",
+    "summary": "Connectivity-level Class AB headphone driver seed with input conditioning, op-amp gain, explicit diode bias network, complementary output pair, local decoupling, AC-coupled protection, and headphone connector.",
     "category": "amplifier"
   },
   "board": {
@@ -23,30 +23,64 @@
       }
     },
     {
+      "id": "input_buffer",
+      "block_id": "amplifier_input_buffer",
+      "params": {
+        "input_impedance": "100kΩ",
+        "coupling_capacitance": "1uF",
+        "input_stopper_value": "100Ω"
+      }
+    },
+    {
       "id": "gain",
       "block_id": "opamp_gain_stage",
       "params": {
         "topology": "non_inverting",
         "gain": 2,
         "single_supply": true,
-        "input_coupling": "ac",
+        "input_coupling": "dc",
         "include_output_resistor": true
       }
     },
     {
-      "id": "output",
-      "block_id": "class_ab_output_stage",
+      "id": "supply_decoupling",
+      "block_id": "amplifier_supply_decoupling",
+      "params": {
+        "rail_mode": "single_supply",
+        "rail_voltage": "9V",
+        "ceramic_capacitance": "100nF",
+        "bulk_capacitance": "10uF",
+        "include_bulk": true,
+        "capacitor_voltage_rating": "16V"
+      }
+    },
+    {
+      "id": "bias",
+      "block_id": "amplifier_bias_network",
       "params": {
         "topology": "diode_string",
+        "application": "headphone",
+        "diode_count": 2,
+        "emitter_resistor_value": "0.47Ω",
+        "bias_feed_resistor_value": "10kΩ",
+        "thermal_coupling_policy": "adjacent_to_output_pair"
+      }
+    },
+    {
+      "id": "output",
+      "block_id": "class_ab_output_pair",
+      "params": {
         "supply_voltage": "9V",
-        "load_impedance": "32Ω"
+        "load_impedance": "32Ω",
+        "application": "headphone",
+        "emitter_resistor_value": "0.47Ω"
       }
     },
     {
       "id": "headphones",
-      "block_id": "connector_breakout",
+      "block_id": "headphone_output_connector",
       "params": {
-        "pin_names": ["SIG", "RET"]
+        "load_kind": "headphone"
       }
     },
     {
@@ -70,18 +104,26 @@
     }
   ],
   "connections": [
-    {"from": "input.SIG", "to": "gain.IN", "net_alias": "AUDIO_IN"},
-    {"from": "input.GND", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"},
-    {"from": "gain.OUT", "to": "output.DRIVER_OUT", "net_alias": "DRIVER_OUT"},
-    {"from": "gain.VCC", "to": "output.VCC", "net_alias": "VCC"},
-    {"from": "gain.GND", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"},
+    {"from": "input.SIG", "to": "input_buffer.IN", "net_alias": "AUDIO_IN"},
+    {"from": "input_buffer.OUT", "to": "gain.IN", "net_alias": "AMP_IN_BIASED"},
+    {"from": "gain.OUT", "to": "bias.DRIVER_OUT", "net_alias": "DRIVER_OUT"},
+    {"from": "bias.BIAS_P", "to": "output.BIAS_P", "net_alias": "BIAS_P"},
+    {"from": "bias.BIAS_N", "to": "output.BIAS_N", "net_alias": "BIAS_N"},
+    {"from": "bias.AMP_OUT", "to": "output.AMP_OUT", "net_alias": "AMP_OUT_DC_BIASED"},
     {"from": "output.AMP_OUT", "to": "output_protection.AMP_OUT", "net_alias": "AMP_OUT_DC_BIASED"},
-    {"from": "output_protection.HP_OUT", "to": "headphones.SIG", "net_alias": "HP_OUT"},
+    {"from": "output_protection.HP_OUT", "to": "headphones.HP_OUT", "net_alias": "HP_OUT"},
     {"from": "output.LOAD_REF", "to": "output_protection.LOAD_REF", "net_alias": "LOAD_REF"},
-    {"from": "output_protection.LOAD_RET", "to": "headphones.RET", "net_alias": "HP_RET"},
+    {"from": "output_protection.LOAD_RET", "to": "headphones.LOAD_RET", "net_alias": "HP_RET"},
+    {"from": "output_protection.LOAD_REF", "to": "headphones.LOAD_REF", "net_alias": "LOAD_REF"},
+    {"from": "power.VCC", "to": "input_buffer.VCC", "net_alias": "VCC"},
     {"from": "power.VCC", "to": "gain.VCC", "net_alias": "VCC"},
+    {"from": "power.VCC", "to": "supply_decoupling.VCC", "net_alias": "VCC"},
+    {"from": "power.VCC", "to": "bias.VCC", "net_alias": "VCC"},
     {"from": "power.VCC", "to": "output.VCC", "net_alias": "VCC"},
+    {"from": "power.LOAD_REF", "to": "input_buffer.GND", "net_alias": "LOAD_REF"},
     {"from": "power.LOAD_REF", "to": "gain.GND", "net_alias": "LOAD_REF"},
+    {"from": "power.LOAD_REF", "to": "supply_decoupling.GND", "net_alias": "LOAD_REF"},
+    {"from": "power.LOAD_REF", "to": "bias.VEE", "net_alias": "LOAD_REF"},
     {"from": "power.LOAD_REF", "to": "output.VEE", "net_alias": "LOAD_REF"},
     {"from": "power.LOAD_REF", "to": "output.LOAD_REF", "net_alias": "LOAD_REF"}
   ],

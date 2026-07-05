@@ -1,0 +1,53 @@
+{
+  "id": "headphone_output_connector_mono_trs",
+  "block_id": "headphone_output_connector",
+  "description": "Mono three-pin headphone output connector exposing signal, load return, and load reference.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "headphones",
+    "params": {
+      "connector_mode": "mono_trs",
+      "load_kind": "headphone"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["J1"],
+    "components": [
+      {
+        "role": "headphone_connector",
+        "ref_prefix": "J",
+        "symbol_id": "Connector_Generic:Conn_01x03",
+        "footprint_id": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical"
+      }
+    ],
+    "ports": [
+      {"name": "HP_OUT", "direction": "input", "net": "headphones_hp_out"},
+      {"name": "LOAD_RET", "direction": "passive", "net": "headphones_load_ret"},
+      {"name": "LOAD_REF", "direction": "passive", "net": "headphones_load_ref"}
+    ],
+    "nets": [
+      {
+        "name": "headphones_hp_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "headphone_connector", "pin": "1"}
+        ]
+      },
+      {
+        "name": "headphones_load_ret",
+        "visibility": "exported",
+        "pins": [
+          {"role": "headphone_connector", "pin": "2"}
+        ]
+      },
+      {
+        "name": "headphones_load_ref",
+        "visibility": "exported",
+        "pins": [
+          {"role": "headphone_connector", "pin": "3"}
+        ]
+      }
+    ]
+  }
+}

@@ -599,28 +599,58 @@ func (builder *planBuilder) mapClassABHeadphoneAmplifier(reqID string, path stri
 		builder.addIssue(path+".params", reason, "request a bounded headphone load with a supported load impedance and no speaker, bridge, or power-amplifier output requirement")
 		return
 	}
-	gainID := builder.addBlock(reqID, "amplifier", "opamp_gain_stage", function.Params, "op-amp gain stage drives the Class AB headphone output stage")
-	outputParams := classABOutputParams(function.Params)
-	outputID := builder.addBlock(reqID, "output", "class_ab_output_stage", outputParams, "Class AB output stage buffers the op-amp for headphone-class load drive")
+	amplifierSupply := function.Supply
+	amplifierSupplyVoltage := firstNonEmpty(paramText(function.Params, "supply_voltage"), "9V")
+	singleSupply := !classABHeadphoneRequestsBipolarSupply(function.Params)
+	inputBufferID := builder.addBlock(reqID, "input_buffer", "amplifier_input_buffer", classABInputBufferParams(function.Params), "AC-coupled input buffer sets input impedance and biases the gain-stage input")
+	gainID := builder.addBlock(reqID, "amplifier", "opamp_gain_stage", classABGainStageParams(function.Params, singleSupply), "op-amp gain stage provides requested voltage gain before the Class AB driver")
+	decouplingID := builder.addBlock(reqID, "supply_decoupling", "amplifier_supply_decoupling", classABSupplyDecouplingParams(function.Params, amplifierSupplyVoltage, singleSupply), "local rail decoupling evidence supports the active gain and output stages")
+	biasID := builder.addBlock(reqID, "bias", "amplifier_bias_network", classABBiasNetworkParams(function.Params), "two-diode Class AB bias string generates complementary output-pair bias nodes")
+	outputParams := classABOutputPairParams(function.Params, amplifierSupplyVoltage)
+	outputID := builder.addBlock(reqID, "output", "class_ab_output_pair", outputParams, "complementary emitter follower buffers the op-amp for headphone-class load drive")
 	protectionID := builder.addBlock(reqID, "output_protection", "headphone_output_protection", headphoneOutputProtectionParams(function.Params), "AC-coupled headphone output protection captures load-safety assumptions")
-	headphonesID := builder.addBlock(reqID, "headphones", "connector_breakout", map[string]any{"pin_names": []string{"SIG", "RET"}}, "headphone connector exposes protected output and return")
-	if gainID == "" || outputID == "" || protectionID == "" || headphonesID == "" {
+	headphonesID := builder.addBlock(reqID, "headphones", "headphone_output_connector", map[string]any{"load_kind": "headphone"}, "headphone connector exposes protected output, return, and load reference")
+	if inputBufferID == "" || gainID == "" || decouplingID == "" || biasID == "" || outputID == "" || protectionID == "" || headphonesID == "" {
 		return
 	}
-	builder.amplifierIDs = appendIfNotEmpty(builder.amplifierIDs, gainID)
+	builder.amplifierIDs = appendIfNotEmpty(builder.amplifierIDs, inputBufferID)
 	builder.classABOutputIDs = appendIfNotEmpty(builder.classABOutputIDs, outputID)
-	builder.recordInstanceSupply(gainID, function.Supply)
-	builder.recordInstanceSupply(outputID, function.Supply)
-	builder.addConnection(gainID+".OUT", outputID+".DRIVER_OUT", signalNetAlias("AMP_DRIVER", outputID), "op-amp output drives Class AB bias string")
+	builder.recordInstanceSupply(inputBufferID, amplifierSupply)
+	builder.recordInstanceSupply(gainID, amplifierSupply)
+	builder.recordInstanceSupply(decouplingID, amplifierSupply)
+	builder.recordInstanceSupply(biasID, amplifierSupply)
+	builder.recordInstanceSupply(outputID, amplifierSupply)
+	builder.addConnection(inputBufferID+".OUT", gainID+".IN", signalNetAlias("AMP_IN_BIASED", gainID), "input buffer feeds the op-amp gain stage")
+	builder.addConnection(gainID+".OUT", biasID+".DRIVER_OUT", signalNetAlias("AMP_DRIVER", biasID), "op-amp output drives Class AB bias string")
+	builder.addConnection(biasID+".BIAS_P", outputID+".BIAS_P", signalNetAlias("BIAS_P", outputID), "upper bias node drives the NPN output device")
+	builder.addConnection(biasID+".BIAS_N", outputID+".BIAS_N", signalNetAlias("BIAS_N", outputID), "lower bias node drives the PNP output device")
+	builder.addConnection(biasID+".AMP_OUT", outputID+".AMP_OUT", signalNetAlias("AMP_OUT_DC_BIASED", protectionID), "bias network output anchor aligns with the output-pair emitter node")
 	builder.addConnection(outputID+".AMP_OUT", protectionID+".AMP_OUT", signalNetAlias("AMP_OUT_DC_BIASED", protectionID), "Class AB output feeds AC-coupled headphone protection")
-	builder.addConnection(protectionID+".HP_OUT", headphonesID+".SIG", signalNetAlias("HP_OUT", headphonesID), "protected AC-coupled output feeds headphone connector")
-	builder.addConnection(outputID+".LOAD_REF", protectionID+".LOAD_REF", signalNetAlias("LOAD_REF", protectionID), "Class AB load reference feeds headphone output protection")
-	builder.addConnection(protectionID+".LOAD_RET", headphonesID+".RET", signalNetAlias("HP_RET", headphonesID), "headphone connector return is tracked separately from load reference")
+	builder.addConnection(protectionID+".HP_OUT", headphonesID+".HP_OUT", signalNetAlias("HP_OUT", headphonesID), "protected AC-coupled output feeds headphone connector")
+	builder.addConnection(outputID+".LOAD_REF", protectionID+".LOAD_REF", "GND", "Class AB load reference feeds headphone output protection")
+	builder.addConnection(protectionID+".LOAD_RET", headphonesID+".LOAD_RET", signalNetAlias("HP_RET", headphonesID), "headphone connector return is tracked separately from load reference")
+	builder.addConnection(protectionID+".LOAD_REF", headphonesID+".LOAD_REF", "GND", "headphone connector carries explicit load reference")
 	if groundSource := firstNonEmpty(firstID(builder.usbPowerIDs), firstID(builder.regulatorIDs), firstID(builder.connectorIDs)); groundSource != "" {
-		builder.addConnection(groundSource+".GND", gainID+".GND", "GND", "single-supply op-amp gain stage returns to ground")
-		builder.addConnection(groundSource+".GND", outputID+".VEE", "GND", "single-supply Class AB lower rail returns to ground")
+		groundPort := builder.groundPortFor(groundSource)
+		builder.addConnection(groundSource+"."+groundPort, inputBufferID+".GND", "GND", "input buffer bias divider returns to ground")
+		builder.addConnection(groundSource+"."+groundPort, gainID+".GND", "GND", "single-supply op-amp gain stage returns to ground")
+		builder.addConnection(groundSource+"."+groundPort, decouplingID+".GND", "GND", "local amplifier decoupling returns to ground")
+		if singleSupply {
+			builder.addConnection(groundSource+"."+groundPort, biasID+".VEE", "GND", "single-supply Class AB bias lower rail returns to ground")
+			builder.addConnection(groundSource+"."+groundPort, outputID+".VEE", "GND", "single-supply Class AB lower rail returns to ground")
+		} else {
+			builder.addIssue(path+".power.vee", "Class AB headphone mapping currently rejects bipolar supplies before composition", "use a single-supply headphone request until negative-rail mapping is implemented")
+		}
+		builder.addConnection(groundSource+"."+groundPort, outputID+".LOAD_REF", "GND", "headphone load reference is tied to the single-supply return")
 	} else {
-		builder.addIssue(path+".power.ground", "Class AB headphone output stage requires a ground source for VEE", "declare an external, USB, or regulated power source with ground")
+		builder.addIssue(path+".power.ground", "Class AB headphone output stage requires a ground source", "declare an external, USB, or regulated power source with ground")
+	}
+	if supplySource, supplyPort := builder.supplySourceForTarget(gainID); supplySource != "" {
+		builder.addConnection(supplySource+"."+supplyPort, inputBufferID+".VCC", builder.supplyNetAlias(supplySource), "input buffer bias divider uses the amplifier rail")
+		builder.addConnection(supplySource+"."+supplyPort, gainID+".VCC", builder.supplyNetAlias(supplySource), "op-amp gain stage uses the amplifier rail")
+		builder.addConnection(supplySource+"."+supplyPort, decouplingID+".VCC", builder.supplyNetAlias(supplySource), "local decoupling is tied to the amplifier rail")
+		builder.addConnection(supplySource+"."+supplyPort, biasID+".VCC", builder.supplyNetAlias(supplySource), "bias network upper rail uses the amplifier rail")
+		builder.addConnection(supplySource+"."+supplyPort, outputID+".VCC", builder.supplyNetAlias(supplySource), "Class AB output pair uses the amplifier rail")
 	}
 	builder.recordAmplifierInstanceGap(reqID, gainID)
 	builder.recordClassABHeadphoneChainGap(reqID, outputID, protectionID)
@@ -682,18 +712,75 @@ func classABHeadphoneRequestsBipolarSupply(params map[string]any) bool {
 	return firstNonEmpty(paramText(params, "negative_supply_voltage"), paramText(params, "vee"), paramText(params, "v-")) != ""
 }
 
-func classABOutputParams(params map[string]any) map[string]any {
+func classABInputBufferParams(params map[string]any) map[string]any {
 	out := map[string]any{
-		"topology":       "diode_string",
-		"supply_voltage": firstNonEmpty(paramText(params, "supply_voltage"), "9V"),
-		"load_impedance": headphoneLoadParam(params),
+		"input_impedance":      firstNonEmpty(paramText(params, "input_impedance"), "100kΩ"),
+		"coupling_capacitance": firstNonEmpty(paramText(params, "input_coupling_capacitance"), paramText(params, "coupling_capacitance"), "1uF"),
+		"input_stopper_value":  firstNonEmpty(paramText(params, "input_stopper_value"), "100Ω"),
 	}
-	for _, key := range []string{"upper_output_component_id", "lower_output_component_id", "emitter_resistor_value", "bias_feed_resistor_value"} {
+	return out
+}
+
+func classABGainStageParams(params map[string]any, singleSupply bool) map[string]any {
+	out := cloneParams(params)
+	out["topology"] = "non_inverting"
+	out["gain"] = firstNonEmptyNumber(params["gain"], 2.0)
+	out["single_supply"] = singleSupply
+	out["input_coupling"] = "dc"
+	out["include_output_resistor"] = true
+	return out
+}
+
+func classABSupplyDecouplingParams(params map[string]any, railVoltage string, singleSupply bool) map[string]any {
+	railMode := "single_supply"
+	if !singleSupply {
+		railMode = "dual_supply"
+	}
+	return map[string]any{
+		"rail_mode":                railMode,
+		"rail_voltage":             firstNonEmpty(railVoltage, "9V"),
+		"ceramic_capacitance":      firstNonEmpty(paramText(params, "decoupling_capacitance"), "100nF"),
+		"bulk_capacitance":         firstNonEmpty(paramText(params, "bulk_capacitance"), "10uF"),
+		"include_bulk":             true,
+		"capacitor_voltage_rating": firstNonEmpty(paramText(params, "decoupling_voltage_rating"), paramText(params, "capacitor_voltage_rating"), "16V"),
+	}
+}
+
+func classABBiasNetworkParams(params map[string]any) map[string]any {
+	out := map[string]any{
+		"topology":                 "diode_string",
+		"application":              "headphone",
+		"diode_count":              firstNonEmptyNumber(params["diode_count"], 2.0),
+		"emitter_resistor_value":   firstNonEmpty(paramText(params, "emitter_resistor_value"), "0.47Ω"),
+		"bias_feed_resistor_value": firstNonEmpty(paramText(params, "bias_feed_resistor_value"), "10kΩ"),
+		"thermal_coupling_policy":  firstNonEmpty(paramText(params, "thermal_coupling_policy"), "adjacent_to_output_pair"),
+	}
+	return out
+}
+
+func classABOutputPairParams(params map[string]any, supplyVoltage string) map[string]any {
+	out := map[string]any{
+		"supply_voltage":         firstNonEmpty(supplyVoltage, "9V"),
+		"load_impedance":         headphoneLoadParam(params),
+		"application":            "headphone",
+		"emitter_resistor_value": firstNonEmpty(paramText(params, "emitter_resistor_value"), "0.47Ω"),
+	}
+	for _, key := range []string{"upper_output_component_id", "lower_output_component_id"} {
 		if value, ok := params[key]; ok {
 			out[key] = value
 		}
 	}
 	return out
+}
+
+func firstNonEmptyNumber(value any, fallback float64) any {
+	if value == nil {
+		return fallback
+	}
+	if text := strings.TrimSpace(fmt.Sprint(value)); text != "" {
+		return value
+	}
+	return fallback
 }
 
 func headphoneOutputProtectionParams(params map[string]any) map[string]any {
@@ -1294,6 +1381,40 @@ func (builder *planBuilder) powerPortFor(instanceID string) string {
 		}
 	}
 	return "VCC"
+}
+
+func (builder *planBuilder) groundPortFor(instanceID string) string {
+	for _, pin := range stringListParam(builder.instanceParams[instanceID]["pin_names"]) {
+		if isGroundPortName(pin) {
+			return pin
+		}
+	}
+	definition, ok := builder.registry.GetBlock(builder.instanceBlockIDs[instanceID])
+	if !ok {
+		return "GND"
+	}
+	for _, preferred := range []string{"GND", "VSS", "0V", "LOAD_REF", "RET"} {
+		for _, port := range definition.Ports {
+			if strings.EqualFold(port.Name, preferred) {
+				return port.Name
+			}
+		}
+	}
+	for _, port := range definition.Ports {
+		if port.Direction == blocks.PortPower && strings.EqualFold(port.Name, "GND") {
+			return port.Name
+		}
+	}
+	return "GND"
+}
+
+func isGroundPortName(name string) bool {
+	switch strings.ToUpper(strings.TrimSpace(name)) {
+	case "GND", "VSS", "0V", "LOAD_REF", "RET":
+		return true
+	default:
+		return false
+	}
 }
 
 func (builder *planBuilder) groundTargets() []string {

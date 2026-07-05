@@ -17,12 +17,17 @@ func TestLoadSuiteDiscoversBuiltInCorpus(t *testing.T) {
 	}
 	got := manifestIDs(manifests)
 	want := []string{
+		"amplifier_bias_network_headphone",
+		"amplifier_input_buffer_default",
+		"amplifier_supply_decoupling_single_supply",
 		"canned_oscillator_default",
+		"class_ab_output_pair_headphone",
 		"class_ab_output_stage_headphone",
 		"connector_breakout_4pin",
 		"crystal_oscillator_default",
 		"dc_blocking_capacitor_220uf",
 		"esd_protection_5v",
+		"headphone_output_connector_mono_trs",
 		"headphone_output_protection_32ohm",
 		"i2c_sensor_pullups",
 		"led_indicator_default",

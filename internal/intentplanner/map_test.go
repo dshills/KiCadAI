@@ -390,7 +390,7 @@ func TestPlanMapsClassABHeadphoneIntentToProtectedOutputPath(t *testing.T) {
 	if plan.GeneratedRequest == nil {
 		t.Fatalf("GeneratedRequest missing: status=%s issues=%#v", plan.Status, plan.Issues)
 	}
-	for _, blockID := range []string{"opamp_gain_stage", "class_ab_output_stage", "headphone_output_protection", "connector_breakout"} {
+	for _, blockID := range []string{"amplifier_input_buffer", "opamp_gain_stage", "amplifier_supply_decoupling", "amplifier_bias_network", "class_ab_output_pair", "headphone_output_protection", "headphone_output_connector"} {
 		if !hasWorkflowBlock(*plan.GeneratedRequest, blockID) {
 			t.Fatalf("generated request missing block %s: %#v", blockID, plan.GeneratedRequest.Blocks)
 		}
@@ -399,13 +399,27 @@ func TestPlanMapsClassABHeadphoneIntentToProtectedOutputPath(t *testing.T) {
 		from string
 		to   string
 	}{
-		{"amplifier.OUT", "output.DRIVER_OUT"},
+		{"connector.SIG", "input_buffer.IN"},
+		{"input_buffer.OUT", "amplifier.IN"},
+		{"amplifier.OUT", "bias.DRIVER_OUT"},
+		{"bias.BIAS_P", "output.BIAS_P"},
+		{"bias.BIAS_N", "output.BIAS_N"},
+		{"bias.AMP_OUT", "output.AMP_OUT"},
 		{"output.AMP_OUT", "output_protection.AMP_OUT"},
-		{"output_protection.HP_OUT", "headphones.SIG"},
+		{"output_protection.HP_OUT", "headphones.HP_OUT"},
 		{"output.LOAD_REF", "output_protection.LOAD_REF"},
-		{"output_protection.LOAD_RET", "headphones.RET"},
+		{"output_protection.LOAD_RET", "headphones.LOAD_RET"},
+		{"output_protection.LOAD_REF", "headphones.LOAD_REF"},
+		{"power_header.GND", "input_buffer.GND"},
 		{"power_header.GND", "amplifier.GND"},
+		{"power_header.GND", "supply_decoupling.GND"},
+		{"power_header.GND", "bias.VEE"},
 		{"power_header.GND", "output.VEE"},
+		{"power_header.VIN", "input_buffer.VCC"},
+		{"power_header.VIN", "amplifier.VCC"},
+		{"power_header.VIN", "supply_decoupling.VCC"},
+		{"power_header.VIN", "bias.VCC"},
+		{"power_header.VIN", "output.VCC"},
 	} {
 		if !hasConnection(*plan.GeneratedRequest, connection.from, connection.to) {
 			t.Fatalf("missing connection %s -> %s: %#v", connection.from, connection.to, plan.GeneratedRequest.Connections)

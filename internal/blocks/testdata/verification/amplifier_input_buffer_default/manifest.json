@@ -1,0 +1,90 @@
+{
+  "id": "amplifier_input_buffer_default",
+  "block_id": "amplifier_input_buffer",
+  "description": "Passive AC-coupled headphone-amplifier input conditioning with bias divider and input stopper.",
+  "acceptance": "connectivity",
+  "request": {
+    "instance_id": "input_buffer",
+    "params": {
+      "input_impedance": "100kΩ",
+      "coupling_capacitance": "1uF",
+      "input_stopper_value": "100Ω"
+    }
+  },
+  "expected": {
+    "evidence_level": "schematic_verified",
+    "references": ["R1", "C1", "R2", "R3"],
+    "components": [
+      {
+        "role": "input_stopper",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "input_coupling",
+        "ref_prefix": "C",
+        "symbol_id": "Device:C",
+        "footprint_id": "Capacitor_SMD:C_0805_2012Metric"
+      },
+      {
+        "role": "bias_top",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      },
+      {
+        "role": "bias_bottom",
+        "ref_prefix": "R",
+        "symbol_id": "Device:R",
+        "footprint_id": "Resistor_SMD:R_0805_2012Metric"
+      }
+    ],
+    "ports": [
+      {"name": "IN", "direction": "input", "net": "input_buffer_in"},
+      {"name": "OUT", "direction": "output", "net": "input_buffer_out"},
+      {"name": "VCC", "direction": "power", "net": "input_buffer_vcc"},
+      {"name": "GND", "direction": "power", "net": "input_buffer_gnd"}
+    ],
+    "nets": [
+      {
+        "name": "input_buffer_in",
+        "visibility": "exported",
+        "pins": [
+          {"role": "input_stopper", "pin": "1"}
+        ]
+      },
+      {
+        "name": "input_buffer_pre_coupling",
+        "visibility": "local",
+        "pins": [
+          {"role": "input_stopper", "pin": "2"},
+          {"role": "input_coupling", "pin": "1"}
+        ]
+      },
+      {
+        "name": "input_buffer_out",
+        "visibility": "exported",
+        "pins": [
+          {"role": "input_coupling", "pin": "2"},
+          {"role": "bias_top", "pin": "2"},
+          {"role": "bias_bottom", "pin": "1"}
+        ]
+      },
+      {
+        "name": "input_buffer_vcc",
+        "visibility": "power",
+        "pins": [
+          {"role": "bias_top", "pin": "1"}
+        ]
+      },
+      {
+        "name": "input_buffer_gnd",
+        "visibility": "power",
+        "pins": [
+          {"role": "bias_bottom", "pin": "2"}
+        ]
+      }
+    ]
+  }
+}

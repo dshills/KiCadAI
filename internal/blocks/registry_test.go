@@ -20,12 +20,17 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 		got = append(got, summary.ID)
 	}
 	want := []string{
+		"amplifier_bias_network",
+		"amplifier_input_buffer",
+		"amplifier_supply_decoupling",
 		"canned_oscillator",
+		"class_ab_output_pair",
 		"class_ab_output_stage",
 		"connector_breakout",
 		"crystal_oscillator",
 		"dc_blocking_capacitor",
 		"esd_protection",
+		"headphone_output_connector",
 		"headphone_output_protection",
 		"i2c_sensor",
 		"led_indicator",
@@ -40,7 +45,7 @@ func TestBuiltinRegistryListsInitialBlocksSorted(t *testing.T) {
 		t.Fatalf("IDs = %#v, want %#v", got, want)
 	}
 	summaries[0].ID = "mutated"
-	if registry.ListBlocks()[0].ID != "canned_oscillator" {
+	if registry.ListBlocks()[0].ID != "amplifier_bias_network" {
 		t.Fatalf("ListBlocks returned mutable backing slice")
 	}
 }
@@ -105,12 +110,17 @@ func TestBuiltinPlaceholdersHaveMetadata(t *testing.T) {
 			t.Fatalf("%s missing component or PCB realization metadata: %#v", definition.ID, definition)
 		}
 		structuralBlocks := map[string]bool{
+			"amplifier_bias_network":      true,
+			"amplifier_input_buffer":      true,
+			"amplifier_supply_decoupling": true,
 			"connector_breakout":          true,
 			"canned_oscillator":           true,
+			"class_ab_output_pair":        true,
 			"class_ab_output_stage":       true,
 			"crystal_oscillator":          true,
 			"dc_blocking_capacitor":       true,
 			"esd_protection":              true,
+			"headphone_output_connector":  true,
 			"headphone_output_protection": true,
 			"i2c_sensor":                  true,
 			"led_indicator":               true,

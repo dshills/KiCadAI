@@ -2,8 +2,68 @@
   "ok": true,
   "command": "block",
   "data": {
-    "count": 15,
+    "count": 20,
     "results": [
+      {
+        "case_id": "amplifier_bias_network_headphone",
+        "block_id": "amplifier_bias_network",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "amplifier_input_buffer_default",
+        "block_id": "amplifier_input_buffer",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
+      {
+        "case_id": "amplifier_supply_decoupling_single_supply",
+        "block_id": "amplifier_supply_decoupling",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
+          }
+        ]
+      },
       {
         "case_id": "canned_oscillator_default",
         "block_id": "canned_oscillator",
@@ -33,6 +93,26 @@
           {
             "name": "erc_drc",
             "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "class_ab_output_pair_headphone",
+        "block_id": "class_ab_output_pair",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
           }
         ]
       },
@@ -157,6 +237,26 @@
           {
             "name": "erc_drc",
             "status": "skipped"
+          }
+        ]
+      },
+      {
+        "case_id": "headphone_output_connector_mono_trs",
+        "block_id": "headphone_output_connector",
+        "evidence_level": "schematic_verified",
+        "status": "pass",
+        "stages": [
+          {
+            "name": "manifest",
+            "status": "pass"
+          },
+          {
+            "name": "instantiate",
+            "status": "pass"
+          },
+          {
+            "name": "semantic_assertions",
+            "status": "pass"
           }
         ]
       },
