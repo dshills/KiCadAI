@@ -747,7 +747,6 @@ func TestCreateI2CSensorBreakoutWritesProjectArtifactsAfterRouteTreeProof(t *tes
 	}
 	for _, code := range []reports.Code{
 		reports.CodeUnknownFootprintLibrary,
-		reports.CodeUnknownSymbolLibrary,
 		reports.CodeSkippedExternalTool,
 	} {
 		if !stageHasIssueCodeForRoutingTest(writerCorrect, code) {

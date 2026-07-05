@@ -1,6 +1,7 @@
 package schematic
 
 import (
+	"strconv"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -23,6 +24,7 @@ type embeddedTemplate struct {
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
+	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4)},
 	"device:c":                     {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
 	"device:d":                     {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
 	"device:led":                   {bodyName: "LED", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceLEDSymbol},
@@ -44,6 +46,17 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"power:vdd": powerTemplate("VDD", 5.08),
 	"power:vee": powerTemplate("VEE", -5.08),
 	"power:vss": powerTemplate("VSS", -5.08),
+	"sensor:generic_i2c": {
+		bodyName: "Generic_I2C",
+		pinType:  "bidirectional",
+		pins: []TemplatePin{
+			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
+			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},
+			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}},
+			{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}},
+			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: 0}},
+		},
+	},
 }
 
 // EmbeddedSymbolTemplate returns a KiCad-native embedded lib symbol body for
@@ -72,6 +85,20 @@ func twoPinTemplatePins() []TemplatePin {
 		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: 0}},
 		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: 0}},
 	}
+}
+
+func connectorTemplatePins(count int) []TemplatePin {
+	pins := make([]TemplatePin, count)
+	for index := 0; index < count; index++ {
+		pins[index] = TemplatePin{
+			Number: strconv.Itoa(index + 1),
+			Offset: kicadfiles.Point{
+				X: kicadfiles.MM(-5.08),
+				Y: -kicadfiles.MM(2.54 * float64(index)),
+			},
+		}
+	}
+	return pins
 }
 
 func powerTemplate(bodyName string, pinX float64) embeddedTemplate {
@@ -187,6 +214,9 @@ func twoPinSymbolBody(libraryID, bodyName, pinType string) sexpr.List {
 func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []TemplatePin) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(libraryID)}
 	pinNodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(bodyName + "_1_1")}
+	if body := embeddedTemplateBody(pins); len(body) > 0 {
+		pinNodes = append(pinNodes, body)
+	}
 	for _, pin := range pins {
 		pinNodes = append(pinNodes, embeddedTemplatePin(pinType, pin))
 	}
@@ -197,6 +227,56 @@ func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []Temp
 		sexpr.L(sexpr.A("embedded_fonts"), sexpr.A("no")),
 	)
 	return sexpr.L(nodes...)
+}
+
+func embeddedTemplateBody(pins []TemplatePin) sexpr.List {
+	if len(pins) == 0 {
+		return nil
+	}
+	minX, maxX := pins[0].Offset.X, pins[0].Offset.X
+	minY, maxY := pins[0].Offset.Y, pins[0].Offset.Y
+	for _, pin := range pins[1:] {
+		if pin.Offset.X < minX {
+			minX = pin.Offset.X
+		}
+		if pin.Offset.X > maxX {
+			maxX = pin.Offset.X
+		}
+		if pin.Offset.Y < minY {
+			minY = pin.Offset.Y
+		}
+		if pin.Offset.Y > maxY {
+			maxY = pin.Offset.Y
+		}
+	}
+	padding := kicadfiles.MM(1.27)
+	bodyMinX, bodyMaxX := embeddedTemplateBodyAxis(minX, maxX, padding)
+	bodyMinY, bodyMaxY := embeddedTemplateBodyAxis(minY, maxY, padding)
+	return sexpr.L(
+		sexpr.A("rectangle"),
+		sexpr.L(sexpr.A("start"), sexpr.F(templatePinMM(bodyMinX)), sexpr.F(templatePinMM(bodyMinY))),
+		sexpr.L(sexpr.A("end"), sexpr.F(templatePinMM(bodyMaxX)), sexpr.F(templatePinMM(bodyMaxY))),
+		sexpr.L(
+			sexpr.A("stroke"),
+			sexpr.L(sexpr.A("width"), sexpr.X("0.254")),
+			sexpr.L(sexpr.A("type"), sexpr.A("default")),
+		),
+		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("type"), sexpr.A("none"))),
+	)
+}
+
+func embeddedTemplateBodyAxis(minimum, maximum, padding kicadfiles.IU) (kicadfiles.IU, kicadfiles.IU) {
+	if minimum != maximum {
+		return minimum, maximum
+	}
+	switch {
+	case minimum < 0:
+		return minimum, minimum + 2*padding
+	case minimum > 0:
+		return minimum - 2*padding, minimum
+	default:
+		return minimum - padding, minimum + padding
+	}
 }
 
 func powerSymbolBody(libraryID, bodyName, pinType string, pinX float64) sexpr.List {

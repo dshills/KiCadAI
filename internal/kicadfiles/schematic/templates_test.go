@@ -78,6 +78,14 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || len(connectorPins) != 2 || connectorPins[0].Offset.Y != 0 || connectorPins[1].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected connector offsets: %#v ok=%v", connectorPins, ok)
 	}
+	connector4Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x04")
+	if !ok || len(connector4Pins) != 4 || connector4Pins[3].Number != "4" || connector4Pins[3].Offset.Y != kicadfiles.MM(-7.62) {
+		t.Fatalf("unexpected 4-pin connector offsets: %#v ok=%v", connector4Pins, ok)
+	}
+	i2cPins, ok := EmbeddedSymbolPinOffsets("Sensor:Generic_I2C")
+	if !ok || len(i2cPins) != 5 || i2cPins[0].Number != "1" || i2cPins[0].Offset.Y != kicadfiles.MM(-3.81) || i2cPins[4].Number != "5" || i2cPins[4].Offset.X != kicadfiles.MM(2.54) {
+		t.Fatalf("unexpected generic I2C sensor offsets: %#v ok=%v", i2cPins, ok)
+	}
 	pins[0].Number = "BROKEN"
 	freshPins, ok := EmbeddedSymbolPinOffsets("Device:R")
 	if !ok || freshPins[0].Number != "1" {
@@ -142,6 +150,20 @@ func TestEmbeddedSymbolTemplateRendersTemplatePinOffsets(t *testing.T) {
 	output = buf.String()
 	if !strings.Contains(output, "(at -5.08 0 0)") || !strings.Contains(output, "(at -5.08 -2.54 0)") {
 		t.Fatalf("connector template did not render KiCad pin anchors:\n%s", output)
+	}
+
+	connector4, ok := EmbeddedSymbolTemplate("Connector_Generic:Conn_01x04")
+	if !ok {
+		t.Fatal("Connector_Generic:Conn_01x04 template missing")
+	}
+	schematic.LibSymbols = []EmbeddedSymbol{connector4}
+	buf.Reset()
+	if err := Write(&buf, schematic); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+	output = buf.String()
+	if !strings.Contains(output, "(rectangle") || !strings.Contains(output, "(at -5.08 -7.62 0)") {
+		t.Fatalf("4-pin connector template did not render body and pins:\n%s", output)
 	}
 }
 
