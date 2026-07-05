@@ -75,33 +75,38 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		}, true
 	}
 	if component.ComponentQuery != nil {
-		query := *component.ComponentQuery
+		queryCopy := *component.ComponentQuery
 		defaultPackage := packageQueryFromFootprint(component.FootprintID)
-		if query.MinimumConfidence == "" {
-			query.MinimumConfidence = component.MinimumConfidence
+		if queryCopy.MinimumConfidence == "" {
+			queryCopy.MinimumConfidence = component.MinimumConfidence
 		}
-		if query.Package == "" {
-			query.Package = component.ComponentVariant
+		if queryCopy.Package == "" {
+			queryCopy.Package = component.ComponentVariant
 		}
 		if component.ComponentPackageParam != "" {
 			if value := stringParam(params, component.ComponentPackageParam); value != "" {
-				query.Package = packageQueryFromFootprint(value)
+				queryCopy.Package = packageQueryFromFootprint(value)
 			}
 		}
-		if query.Value == "" {
-			query.Value = component.Value
+		if queryCopy.Value == "" {
+			queryCopy.Value = component.Value
 		}
 		if component.ComponentValueParam != "" {
 			if value := selectionValueParam(params, component.ComponentValueParam); value != "" {
-				query.Value = value
+				queryCopy.Value = value
 			}
 		}
-		if query.ValueKind == "pin_count" && query.Value != "" && (query.Package == "" || query.Package == defaultPackage) {
-			if packageQuery := connectorPinCountPackage(query.Value, component.ComponentPackageTemplate); packageQuery != "" {
-				query.Package = packageQuery
+		if component.ComponentVoltageParam != "" {
+			if value, ok := parseUnit(params[component.ComponentVoltageParam], "V", voltageMultipliers()); ok {
+				queryCopy.MinVoltageV = value
 			}
 		}
-		return components.SelectionRequest{Query: query, Acceptance: acceptance}, true
+		if queryCopy.ValueKind == "pin_count" && queryCopy.Value != "" && (queryCopy.Package == "" || queryCopy.Package == defaultPackage) {
+			if packageQuery := connectorPinCountPackage(queryCopy.Value, component.ComponentPackageTemplate); packageQuery != "" {
+				queryCopy.Package = packageQuery
+			}
+		}
+		return components.SelectionRequest{Query: queryCopy, Acceptance: acceptance}, true
 	}
 	return components.SelectionRequest{}, false
 }

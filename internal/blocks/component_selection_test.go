@@ -158,6 +158,30 @@ func TestSelectionRequestForVoltageRegulatorUsesInstanceParams(t *testing.T) {
 	}
 }
 
+func TestSelectionRequestUsesVoltageParamWithoutMutatingComponentQuery(t *testing.T) {
+	definition := amplifierSupplyDecouplingDefinition()
+	params := ApplyParameterDefaults(definition, map[string]any{
+		"ceramic_capacitance":      "220nF",
+		"capacitor_voltage_rating": "25V",
+		"ceramic_footprint":        "Capacitor_SMD:C_0603_1608Metric",
+	})
+	componentsByRole := map[string]BlockComponent{}
+	for _, component := range definition.Components {
+		componentsByRole[component.Role] = component
+	}
+	component := componentsByRole["vcc_ceramic"]
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, params)
+	if !ok {
+		t.Fatal("missing capacitor selection request")
+	}
+	if request.Query.Value != "220nF" || request.Query.MinVoltageV != 25 || request.Query.Package != "0603" {
+		t.Fatalf("query = %+v", request.Query)
+	}
+	if component.ComponentQuery.Value != "" || component.ComponentQuery.MinVoltageV != 0 {
+		t.Fatalf("component query was mutated: %+v", component.ComponentQuery)
+	}
+}
+
 func TestSelectDefinitionComponentsBlocksPlaceholderAtConnectivity(t *testing.T) {
 	catalog := loadBlockTestCatalog(t)
 	definition := opampGainStageDefinition()

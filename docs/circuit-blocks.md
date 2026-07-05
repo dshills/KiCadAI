@@ -58,6 +58,13 @@ The connector block provides a mono three-pin board-edge interface with
 unsupported until active DC fault protection, current, and thermal evidence are
 available.
 
+`amplifier_supply_decoupling` provides the local rail evidence slice for active
+amplifier stages. It emits VCC-to-GND ceramic decoupling, optional local bulk
+capacitors, and dual-supply VEE decoupling when requested. The block checks rail
+polarity assumptions through positive rail-voltage validation and requires
+capacitor voltage rating to be at least 1.5x the rail voltage. This is
+structural placement/connectivity evidence, not full power-integrity proof.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator

@@ -62,6 +62,7 @@ type Query struct {
 	Package           string          `json:"package,omitempty"`
 	ValueKind         string          `json:"value_kind,omitempty"`
 	Value             string          `json:"value,omitempty"`
+	MinVoltageV       float64         `json:"min_voltage_v,omitempty"`
 	MinimumConfidence ConfidenceLevel `json:"minimum_confidence,omitempty"`
 	Limit             int             `json:"limit,omitempty"`
 }
