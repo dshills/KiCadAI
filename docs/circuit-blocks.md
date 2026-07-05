@@ -17,6 +17,17 @@ readiness gaps. `design create` includes that block readiness in its
 `block_planning` stage so agents can explain selected blocks, missing evidence,
 required local routes, and known limitations before writing a project.
 
+Amplifier inventory is intentionally broader than the currently implemented
+amplifier blocks. The roadmap-backed family now names input buffer, gain stage,
+bias network, Class AB output pair, output protection, supply decoupling,
+headphone output, and speaker output entries. Several of those entries are
+explicit `unsupported` readiness records that point to the existing narrow
+`opamp_gain_stage`, `class_ab_output_stage`, or `headphone_output_protection`
+implementations where appropriate. Treat those entries as AI-facing capability
+boundaries: headphone-scale slices may be modeled, while speaker and power
+amplifier requests remain blocked until SOA, thermal, protection, layout, and
+KiCad-backed evidence are implemented.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator

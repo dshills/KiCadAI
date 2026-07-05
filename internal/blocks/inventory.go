@@ -52,14 +52,25 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 	{ID: "opamp_gain_stage", Name: "Op-Amp Gain Stage", Category: "analog", Tags: []string{"amplifier"}},
 	{ID: "connector_breakout", Name: "Connector Breakout", Category: "interconnect"},
 	{
-		ID:       "amplifier_input_stage",
-		Name:     "Amplifier Input Stage",
+		ID:       "amplifier_input_buffer",
+		Name:     "Amplifier Input Buffer",
 		Category: "analog",
 		Tags:     []string{"amplifier"},
 		Gaps: []string{
-			"Requires audio input impedance and coupling policy",
-			"Requires noise and source-impedance assumptions",
-			"Requires PCB input shielding and separation constraints",
+			"Requires input impedance, coupling, and bias policy",
+			"Requires source-impedance and noise assumptions",
+			"Requires PCB input shielding and input/output separation constraints",
+		},
+	},
+	{
+		ID:       "amplifier_gain_stage",
+		Name:     "Amplifier Gain Stage",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Use opamp_gain_stage for the current narrow LMV321 non-inverting implementation",
+			"Requires output-drive, bandwidth, and stability evidence before broader amplifier use",
+			"Requires feedback layout and decoupling proof for candidate readiness",
 		},
 	},
 	{
@@ -74,6 +85,28 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 		},
 	},
 	{
+		ID:       "amplifier_bias_network",
+		Name:     "Amplifier Bias Network",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"A diode-string Class AB headphone path exists inside class_ab_output_stage",
+			"Requires quiescent-current, Vbe-multiplier, and thermal-coupling evidence",
+			"Requires KiCad-backed schematic and layout promotion before candidate readiness",
+		},
+	},
+	{
+		ID:       "class_ab_output_pair",
+		Name:     "Class AB Output Pair",
+		Category: "analog",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Use class_ab_output_stage for the current low-current headphone seed implementation",
+			"Requires output-device SOA and thermal evidence before power-amplifier use",
+			"Requires high-current rail/output routing constraints and KiCad DRC proof",
+		},
+	},
+	{
 		ID:       "class_ab_output_stage",
 		Name:     "Class AB Output Stage",
 		Category: "analog",
@@ -82,6 +115,28 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 			"Requires complementary output-device bias verification",
 			"Requires crossover distortion and stability review",
 			"Requires high-current output routing constraints",
+		},
+	},
+	{
+		ID:       "amplifier_output_protection",
+		Name:     "Amplifier Output Protection",
+		Category: "protection",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Use headphone_output_protection for the current headphone-only AC-coupled path",
+			"Requires active DC fault, relay/mute, and speaker-load protection policy",
+			"Requires KiCad-backed ERC/DRC evidence before promotion",
+		},
+	},
+	{
+		ID:       "amplifier_supply_decoupling",
+		Name:     "Amplifier Supply Decoupling",
+		Category: "power",
+		Tags:     []string{"amplifier"},
+		Gaps: []string{
+			"Requires active-device-specific decoupling policy",
+			"Requires local placement and return-current proof",
+			"Requires rail voltage and capacitor rating checks",
 		},
 	},
 	{
@@ -104,6 +159,7 @@ var roadmapBlockFamilies = []roadmapBlockFamily{
 			"Requires high-current connector and terminal-block selection",
 			"Requires polarity labeling and net-class policy",
 			"Requires clearance and creepage policy for requested output power",
+			"Remains blocked until speaker-load current, protection, and thermal evidence are modeled",
 		},
 	},
 	{

@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"slices"
+	"strings"
 	"testing"
 )
 
@@ -12,11 +13,16 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 		got = append(got, family.ID)
 	}
 	want := []string{
-		"amplifier_input_stage",
+		"amplifier_bias_network",
+		"amplifier_gain_stage",
+		"amplifier_input_buffer",
+		"amplifier_output_protection",
 		"amplifier_power_entry",
 		"amplifier_stability_network",
+		"amplifier_supply_decoupling",
 		"canned_oscillator",
 		"class_a_output_stage",
+		"class_ab_output_pair",
 		"class_ab_output_stage",
 		"connector_breakout",
 		"crystal_oscillator",
@@ -33,8 +39,38 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 		"voltage_regulator",
 	}
 	slices.Sort(got)
+	slices.Sort(want)
 	if !slices.Equal(got, want) {
 		t.Fatalf("families = %#v, want %#v", got, want)
+	}
+}
+
+func TestAmplifierFamilyInventoryMatchesVerifiedBlockPlan(t *testing.T) {
+	inventory := NewBuiltinRegistry().Inventory()
+	want := map[string]string{
+		"amplifier_input_buffer":      "input",
+		"amplifier_gain_stage":        "opamp_gain_stage",
+		"amplifier_bias_network":      "quiescent",
+		"class_ab_output_pair":        "SOA",
+		"amplifier_output_protection": "headphone_output_protection",
+		"amplifier_supply_decoupling": "decoupling",
+		"headphone_output_connector":  "TRS",
+		"speaker_output_connector":    "high-current",
+	}
+	for id, gapFragment := range want {
+		family, ok := inventoryFamily(inventory, id)
+		if !ok {
+			t.Fatalf("missing verified amplifier family inventory entry %s", id)
+		}
+		if family.Implemented {
+			t.Fatalf("%s should be explicit planned/unsupported entry until its contract is implemented: %#v", id, family)
+		}
+		if family.Readiness != BlockReadinessUnsupported {
+			t.Fatalf("%s readiness = %q", id, family.Readiness)
+		}
+		if !inventoryGapsContain(family.Gaps, gapFragment) {
+			t.Fatalf("%s gaps = %#v, want fragment %q", id, family.Gaps, gapFragment)
+		}
 	}
 }
 
@@ -59,6 +95,15 @@ func TestAmplifierInventoryDeclaresUnsupportedGaps(t *testing.T) {
 			t.Fatalf("%s missing unsupported gap detail", id)
 		}
 	}
+}
+
+func inventoryGapsContain(gaps []string, fragment string) bool {
+	for _, gap := range gaps {
+		if strings.Contains(gap, fragment) {
+			return true
+		}
+	}
+	return false
 }
 
 func unsupportedAmplifierRoadmapIDs() []string {

@@ -95,6 +95,9 @@ minimum matrix coverage expected for a domain.
 
 The `amplifier` matrix covers:
 
+- family-level block contracts for input buffer, gain stage, bias network,
+  Class AB output pair, output protection, supply decoupling, and load
+  connectors;
 - verified op-amp drive and stability choices;
 - Class A/Class AB output devices;
 - Class AB bias networks;
@@ -119,6 +122,11 @@ These are not claims that amplifier generation is fabrication-ready. The
 remaining queue is schematic alias cleanup, SOA and thermal evidence, active
 fault-protection policy, speaker/bridge/power-amplifier load safety, analog
 stability/layout proof, and KiCad ERC/DRC promotion evidence.
+
+The circuit-block inventory now exposes the full verified-amplifier family as
+roadmap entries. Entries that do not have a safe implementation are marked
+unsupported with explicit gaps instead of being hidden; this lets AI agents
+explain why broad speaker or power-amplifier requests are blocked.
 
 ## Validation
 
