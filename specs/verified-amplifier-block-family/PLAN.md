@@ -463,6 +463,11 @@ Review and commit:
 Goal: use simulation evidence to promote supported amplifier designs beyond
 static structural checks.
 
+Status: Complete. Amplifier simulation is now an opt-in runner/evaluator layer
+with deterministic pass/fail diagnostics, normalized `.kicadai/` simulation
+artifacts, a `simulation` workflow stage, and a promotion gate that only affects
+candidate/pass readiness when simulation evidence is expected or produced.
+
 Tasks:
 
 - Add optional simulator runner abstraction.

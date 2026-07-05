@@ -46,6 +46,7 @@ func BuildInternalPromotionReport(fixture PromotionFixture, result WorkflowResul
 	builder.addWriterGate()
 	builder.addConnectivityGate()
 	builder.addKiCadGate()
+	builder.addSimulationGate()
 	builder.addRouteGate()
 	builder.addPhysicalGate()
 	builder.addArtifactGate()
@@ -196,6 +197,25 @@ func (builder *promotionReportBuilder) addRouteGate() {
 		Status:      status,
 		RequiredFor: builder.requiredForStage(StageRouting),
 		IssueCodes:  builder.issueCodesForStage(StageRouting),
+	})
+}
+
+func (builder *promotionReportBuilder) addSimulationGate() {
+	stage, ok := builder.stages[StageSimulation]
+	if !ok {
+		builder.gates = append(builder.gates, PromotionGate{
+			ID:          "simulation",
+			Status:      PromotionGateStatusNotRun,
+			RequiredFor: builder.requiredForStage(StageSimulation),
+		})
+		return
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID:          "simulation",
+		Status:      promotionGateStatusForStage(stage),
+		RequiredFor: builder.requiredForStage(StageSimulation),
+		IssueCodes:  builder.issueCodesForStage(StageSimulation),
+		Artifacts:   promotionStageArtifactPaths(stage),
 	})
 }
 
@@ -703,6 +723,8 @@ func promotionActionText(gate PromotionGate) string {
 		return "run required KiCad ERC/DRC checks and resolve or document every finding"
 	case "route_completion":
 		return "complete same-net route endpoint contacts or adjust placement/routing constraints"
+	case "simulation":
+		return "resolve the simulation blockers by adjusting bias, gain, coupling, or stability compensation"
 	case "physical_rules":
 		return "satisfy fabrication, physical-rule, and package evidence gates"
 	case "artifacts":
@@ -854,7 +876,7 @@ func promotionStageArtifactPaths(stage StageResult) []string {
 	var paths []string
 	for _, artifact := range stage.Artifacts {
 		switch artifact.Kind {
-		case reports.ArtifactERCReport, reports.ArtifactDRCReport:
+		case reports.ArtifactERCReport, reports.ArtifactDRCReport, reports.ArtifactSimulationReport:
 			if path := strings.TrimSpace(artifact.Path); path != "" {
 				paths = append(paths, path)
 			}

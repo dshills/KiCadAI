@@ -24,9 +24,14 @@ const (
 	defaultHeadphoneGain          = 2
 	defaultHighPassCutoffHz       = 22.6
 	defaultOutputCouplingFarads   = 220e-6
+	defaultLoadDCMaxAbsV          = 0.05
 	maxOutputCouplingFarads       = 0.1
 	defaultFeedbackReferenceOhms  = 10000
+	defaultAttenuationTopOhms     = 1e6
+	minAttenuationTopOhms         = 100e3
 	minFeedbackOhms               = 1e-6
+	maxAttenuationResistorOhms    = 10e6
+	unityGainEpsilon              = 1e-4
 	defaultHeadphoneSupplyVoltage = "9"
 )
 
@@ -38,6 +43,7 @@ type SimulationExpectation struct {
 	OutputCurrentMA      RangeExpectation          `json:"output_current_ma"`
 	StabilityMarginDeg   RangeExpectation          `json:"stability_margin_deg"`
 	LoadImpedanceOhms    float64                   `json:"load_impedance_ohms,omitempty"`
+	LoadDCMaxAbsV        *float64                  `json:"load_dc_max_abs_v,omitempty"`
 	SupplyVoltage        string                    `json:"supply_voltage,omitempty"`
 	RequiredMeasurements []string                  `json:"required_measurements,omitempty"`
 }
@@ -80,7 +86,8 @@ func ClassABHeadphoneSimulationExpectation() SimulationExpectation {
 		OutputCurrentMA:      RangeExpectation{Min: 1, Max: 100},
 		StabilityMarginDeg:   RangeExpectation{Min: 45, Max: 180},
 		LoadImpedanceOhms:    32,
-		SupplyVoltage:        "9V",
+		LoadDCMaxAbsV:        float64Ptr(defaultLoadDCMaxAbsV),
+		SupplyVoltage:        defaultHeadphoneSupplyVoltage + "V",
 		RequiredMeasurements: []string{"operating_point", "ac_gain", "high_pass_cutoff", "output_swing", "load_current", "stability_margin"},
 	}
 }
@@ -110,15 +117,21 @@ func ClassABHeadphoneSPICENetlist(reference string, expectation SimulationExpect
 	}
 	supplyVoltage := spiceVoltageValue(expectation.SupplyVoltage, defaultHeadphoneSupplyVoltage)
 	loadOhms := expectation.LoadImpedanceOhms
-	if loadOhms <= 0 {
+	if loadOhms <= 0 || simulationInvalidFloat(loadOhms) {
 		loadOhms = defaultHeadphoneLoadOhms
 	}
+	requestedGain := simulationRequestedGain(expectation)
+	feedbackGain := requestedGain
+	if feedbackGain < 1 {
+		feedbackGain = 1
+	}
 	rgOhms := float64(defaultFeedbackReferenceOhms)
-	rfOhms := (simulationGain(expectation) - 1) * rgOhms
+	rfOhms := (feedbackGain - 1) * rgOhms
 	if rfOhms < minFeedbackOhms {
 		rfOhms = minFeedbackOhms
 	}
 	outputCapFarads := outputCouplingCapFarads(expectation, loadOhms)
+	inputNode, attenuationLines := simulationInputAttenuation(requestedGain)
 	header := []string{
 		"* KiCadAI amplifier simulation artifact: " + reference,
 		"* status: " + string(SimulationStatusNotRun),
@@ -138,7 +151,10 @@ func ClassABHeadphoneSPICENetlist(reference string, expectation SimulationExpect
 		"RIN vin bias_in 100",
 		"CIN bias_in amp_in 1u",
 		"RBIAS_IN amp_in vbias 100k",
-		"XU1 amp_in feedback driver_out vcc 0 OPAMP",
+	}
+	body = append(body, attenuationLines...)
+	body = append(body, []string{
+		"XU1 " + inputNode + " feedback driver_out vcc 0 OPAMP",
 		fmt.Sprintf("RF hp_drive feedback %.6g", rfOhms),
 		fmt.Sprintf("RG feedback vbias %.6g", rgOhms),
 		"RBIASP vcc bias_p 10k",
@@ -150,8 +166,8 @@ func ClassABHeadphoneSPICENetlist(reference string, expectation SimulationExpect
 		"RE1 e1 hp_drive 0.47",
 		"RE2 e2 hp_drive 0.47",
 		fmt.Sprintf("COUT hp_drive hp_out %.6g", outputCapFarads),
-		fmt.Sprintf("RLOAD hp_out 0 %.3g", loadOhms),
-	}
+		fmt.Sprintf("RLOAD hp_out 0 %.6g", loadOhms),
+	}...)
 	footer := []string{
 		".subckt OPAMP noninv inv out vcc vee",
 		"EGAIN internal vee value={1e5*(V(noninv)-V(inv))}",
@@ -174,20 +190,23 @@ func ClassABHeadphoneSPICENetlist(reference string, expectation SimulationExpect
 
 func (expectation SimulationExpectation) Validate() []string {
 	var issues []string
-	if invalidFloat(expectation.OperatingPoint.OutputDCMinV) || invalidFloat(expectation.OperatingPoint.OutputDCMaxV) {
+	if simulationInvalidFloat(expectation.OperatingPoint.OutputDCMinV) || simulationInvalidFloat(expectation.OperatingPoint.OutputDCMaxV) {
 		issues = append(issues, "operating_point output DC bounds must be finite")
 	}
 	if expectation.OperatingPoint.OutputDCMinV > expectation.OperatingPoint.OutputDCMaxV {
 		issues = append(issues, "operating_point output DC min exceeds max")
 	}
-	if invalidFloat(expectation.OperatingPoint.IdleMinMA) || invalidFloat(expectation.OperatingPoint.IdleMaxMA) {
+	if simulationInvalidFloat(expectation.OperatingPoint.IdleMinMA) || simulationInvalidFloat(expectation.OperatingPoint.IdleMaxMA) {
 		issues = append(issues, "operating_point idle current bounds must be finite")
 	}
 	if expectation.OperatingPoint.IdleMinMA > expectation.OperatingPoint.IdleMaxMA {
 		issues = append(issues, "operating_point idle current min exceeds max")
 	}
-	if invalidFloat(expectation.ACGain.Min) || invalidFloat(expectation.ACGain.Nominal) || invalidFloat(expectation.ACGain.Max) {
+	if simulationInvalidFloat(expectation.ACGain.Min) || simulationInvalidFloat(expectation.ACGain.Nominal) || simulationInvalidFloat(expectation.ACGain.Max) {
 		issues = append(issues, "ac_gain values must be finite")
+	}
+	if expectation.ACGain.Nominal <= 0 {
+		issues = append(issues, "ac_gain nominal must be positive")
 	}
 	if expectation.ACGain.Min > expectation.ACGain.Nominal || expectation.ACGain.Nominal > expectation.ACGain.Max {
 		issues = append(issues, "ac_gain must satisfy min <= nominal <= max")
@@ -196,17 +215,25 @@ func (expectation SimulationExpectation) Validate() []string {
 	issues = appendRangeIssue(issues, "output_swing_vpp", expectation.OutputSwingVPP)
 	issues = appendRangeIssue(issues, "output_current_ma", expectation.OutputCurrentMA)
 	issues = appendRangeIssue(issues, "stability_margin_deg", expectation.StabilityMarginDeg)
-	if invalidFloat(expectation.LoadImpedanceOhms) {
+	if simulationInvalidFloat(expectation.LoadImpedanceOhms) {
 		issues = append(issues, "load_impedance_ohms must be finite")
 	}
 	if expectation.LoadImpedanceOhms <= 0 {
 		issues = append(issues, "load_impedance_ohms must be positive")
 	}
+	if expectation.LoadDCMaxAbsV != nil {
+		if simulationInvalidFloat(*expectation.LoadDCMaxAbsV) {
+			issues = append(issues, "load_dc_max_abs_v must be finite")
+		}
+		if *expectation.LoadDCMaxAbsV < 0 {
+			issues = append(issues, "load_dc_max_abs_v must be non-negative")
+		}
+	}
 	return issues
 }
 
 func appendRangeIssue(issues []string, name string, value RangeExpectation) []string {
-	if invalidFloat(value.Min) || invalidFloat(value.Max) {
+	if simulationInvalidFloat(value.Min) || simulationInvalidFloat(value.Max) {
 		return append(issues, name+" bounds must be finite")
 	}
 	if value.Min > value.Max {
@@ -215,24 +242,51 @@ func appendRangeIssue(issues []string, name string, value RangeExpectation) []st
 	return issues
 }
 
-func invalidFloat(value float64) bool {
+func simulationInvalidFloat(value float64) bool {
 	return math.IsNaN(value) || math.IsInf(value, 0)
 }
 
-func simulationGain(expectation SimulationExpectation) float64 {
-	if invalidFloat(expectation.ACGain.Nominal) || expectation.ACGain.Nominal < 1 {
+func float64Ptr(value float64) *float64 {
+	return &value
+}
+
+func simulationRequestedGain(expectation SimulationExpectation) float64 {
+	if simulationInvalidFloat(expectation.ACGain.Nominal) || expectation.ACGain.Nominal <= 0 {
 		return defaultHeadphoneGain
 	}
 	return expectation.ACGain.Nominal
 }
 
+func simulationInputAttenuation(requestedGain float64) (string, []string) {
+	if requestedGain <= 0 || requestedGain >= 1-unityGainEpsilon {
+		return "amp_in", nil
+	}
+	topOhms := float64(defaultAttenuationTopOhms)
+	bottomOhms := requestedGain * topOhms / (1 - requestedGain)
+	if simulationInvalidFloat(bottomOhms) || bottomOhms <= 0 {
+		return "amp_in", nil
+	}
+	if bottomOhms > maxAttenuationResistorOhms {
+		ratio := bottomOhms / topOhms
+		bottomOhms = maxAttenuationResistorOhms
+		topOhms = bottomOhms / ratio
+		if topOhms < minAttenuationTopOhms {
+			return "amp_in", nil
+		}
+	}
+	return "atten_in", []string{
+		fmt.Sprintf("RATTEN_TOP amp_in atten_in %.6g", topOhms),
+		fmt.Sprintf("RATTEN_BOTTOM atten_in vbias %.6g", bottomOhms),
+	}
+}
+
 func outputCouplingCapFarads(expectation SimulationExpectation, loadOhms float64) float64 {
 	cutoffHz := simulationHighPassCutoffHz(expectation)
-	if loadOhms <= 0 || invalidFloat(loadOhms) || cutoffHz <= 0 {
+	if loadOhms <= 0 || simulationInvalidFloat(loadOhms) || cutoffHz <= 0 {
 		return defaultOutputCouplingFarads
 	}
 	capFarads := 1 / (2 * math.Pi * loadOhms * cutoffHz)
-	if invalidFloat(capFarads) || capFarads <= 0 || capFarads > maxOutputCouplingFarads {
+	if simulationInvalidFloat(capFarads) || capFarads <= 0 || capFarads > maxOutputCouplingFarads {
 		return defaultOutputCouplingFarads
 	}
 	return capFarads
@@ -241,11 +295,11 @@ func outputCouplingCapFarads(expectation SimulationExpectation, loadOhms float64
 func simulationHighPassCutoffHz(expectation SimulationExpectation) float64 {
 	minHz := expectation.HighPassCutoffHz.Min
 	maxHz := expectation.HighPassCutoffHz.Max
-	if invalidFloat(minHz) || invalidFloat(maxHz) || minHz <= 0 || maxHz <= 0 {
+	if simulationInvalidFloat(minHz) || simulationInvalidFloat(maxHz) || minHz <= 0 || maxHz <= 0 {
 		return defaultHighPassCutoffHz
 	}
 	cutoffHz := math.Exp((math.Log(minHz) + math.Log(maxHz)) / 2)
-	if invalidFloat(cutoffHz) || cutoffHz <= 0 {
+	if simulationInvalidFloat(cutoffHz) || cutoffHz <= 0 {
 		return defaultHighPassCutoffHz
 	}
 	return cutoffHz

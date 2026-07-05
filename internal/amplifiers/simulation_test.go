@@ -32,6 +32,15 @@ func TestClassABHeadphoneSimulationNetlistUsesExpectationSupplyVoltage(t *testin
 	}
 }
 
+func TestClassABHeadphoneSimulationNetlistDefaultsInvalidLoadImpedance(t *testing.T) {
+	expectation := ClassABHeadphoneSimulationExpectation()
+	expectation.LoadImpedanceOhms = math.NaN()
+	netlist := ClassABHeadphoneSPICENetlist("demo", expectation)
+	if strings.Contains(netlist, "NaN") || !strings.Contains(netlist, "RLOAD hp_out 0 32") {
+		t.Fatalf("netlist did not default invalid load impedance:\n%s", netlist)
+	}
+}
+
 func TestClassABHeadphoneSimulationArtifactEmitsStableNetlist(t *testing.T) {
 	artifact := BuildClassABHeadphoneSimulationArtifact("demo")
 	if artifact.Status != SimulationStatusNotRun || artifact.Format != "spice-like-netlist.v0" {
@@ -89,6 +98,40 @@ func TestClassABHeadphoneSimulationNetlistAllowsUnityGain(t *testing.T) {
 	}
 }
 
+func TestClassABHeadphoneSimulationNetlistAllowsSubUnityGain(t *testing.T) {
+	expectation := ClassABHeadphoneSimulationExpectation()
+	expectation.ACGain.Nominal = 0.5
+	netlist := ClassABHeadphoneSPICENetlist("demo", expectation)
+	for _, want := range []string{
+		"RATTEN_TOP amp_in atten_in 1e+06",
+		"RATTEN_BOTTOM atten_in vbias 1e+06",
+		"XU1 atten_in feedback driver_out vcc 0 OPAMP",
+		"RF hp_drive feedback 1e-06",
+	} {
+		if !strings.Contains(netlist, want) {
+			t.Fatalf("netlist missing %q:\n%s", want, netlist)
+		}
+	}
+}
+
+func TestClassABHeadphoneSimulationNetlistSkipsNearUnityAttenuation(t *testing.T) {
+	expectation := ClassABHeadphoneSimulationExpectation()
+	expectation.ACGain.Nominal = 0.99995
+	netlist := ClassABHeadphoneSPICENetlist("demo", expectation)
+	if strings.Contains(netlist, "RATTEN_TOP") || strings.Contains(netlist, "RATTEN_BOTTOM") {
+		t.Fatalf("netlist added unstable near-unity attenuation:\n%s", netlist)
+	}
+}
+
+func TestClassABHeadphoneSimulationNetlistScalesHighRatioAttenuation(t *testing.T) {
+	expectation := ClassABHeadphoneSimulationExpectation()
+	expectation.ACGain.Nominal = 0.99
+	netlist := ClassABHeadphoneSPICENetlist("demo", expectation)
+	if !strings.Contains(netlist, "RATTEN_TOP amp_in atten_in 101010") || !strings.Contains(netlist, "RATTEN_BOTTOM atten_in vbias 1e+07") {
+		t.Fatalf("netlist did not scale attenuation divider:\n%s", netlist)
+	}
+}
+
 func TestClassABHeadphoneSimulationNetlistDefaultsNonFiniteOutputCoupling(t *testing.T) {
 	expectation := ClassABHeadphoneSimulationExpectation()
 	expectation.HighPassCutoffHz = RangeExpectation{Min: math.SmallestNonzeroFloat64, Max: math.SmallestNonzeroFloat64}
@@ -123,6 +166,14 @@ func TestSimulationExpectationValidateReportsInvalidRanges(t *testing.T) {
 	}
 	if !strings.Contains(netlist, "* expectation_issue: output_swing_vpp min exceeds max") {
 		t.Fatalf("netlist did not include expectation issue:\n%s", netlist)
+	}
+}
+
+func TestSimulationExpectationValidateReportsNonPositiveGain(t *testing.T) {
+	expectation := ClassABHeadphoneSimulationExpectation()
+	expectation.ACGain.Nominal = 0
+	if !stringSliceContains(expectation.Validate(), "ac_gain nominal must be positive") {
+		t.Fatalf("issues = %#v, want non-positive gain issue", expectation.Validate())
 	}
 }
 

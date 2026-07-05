@@ -116,6 +116,83 @@ func TestBuildPromotionReportIncludesSchematicElectricalGate(t *testing.T) {
 	}
 }
 
+func TestBuildPromotionReportSimulationGateOptionalWhenNotExpected(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "simulation_optional",
+		Request:           "LED",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceConnectivity,
+		ExpectedStages:    []StageName{StageBlockPlanning},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "led"}, AcceptanceConnectivity, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "simulation")
+	if gate.Status != PromotionGateStatusNotRun || len(gate.RequiredFor) != 0 {
+		t.Fatalf("simulation gate = %#v, want optional not_run", gate)
+	}
+}
+
+func TestBuildPromotionReportSimulationGatePassesWithEvidence(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "simulation_pass",
+		Request:           "Class AB headphone amplifier",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceConnectivity,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageSimulation},
+		ExpectedArtifacts: []string{".kicadai/amplifier-simulation.json"},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "amp"}, AcceptanceConnectivity, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{Name: StageSimulation, Status: StageStatusOK, Artifacts: []reports.Artifact{{
+			Path: ".kicadai/amplifier-simulation.json",
+			Kind: reports.ArtifactSimulationReport,
+		}}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "simulation")
+	if gate.Status != PromotionGateStatusPass || len(gate.Artifacts) != 1 {
+		t.Fatalf("simulation gate = %#v, want pass with artifact", gate)
+	}
+	if _, err := MarshalPromotionReportJSON(report); err != nil {
+		t.Fatalf("promotion report validation failed: %v", err)
+	}
+}
+
+func TestBuildPromotionReportSimulationGateBlocksCandidate(t *testing.T) {
+	fixture := PromotionFixture{
+		ID:                "simulation_fail",
+		Request:           "Class AB headphone amplifier",
+		Tier:              "candidate",
+		DeclaredReadiness: PromotionReadinessCandidate,
+		Acceptance:        AcceptanceConnectivity,
+		ExpectedStages:    []StageName{StageBlockPlanning, StageSimulation},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "amp"}, AcceptanceConnectivity, []StageResult{
+		{Name: StageBlockPlanning, Status: StageStatusOK},
+		{Name: StageSimulation, Status: StageStatusBlocked, Issues: []reports.Issue{{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Message:    "simulation ac_gain 0.5 is outside 1.8..2.2",
+			Suggestion: "adjust feedback ratio",
+		}}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "simulation")
+	if gate.Status != PromotionGateStatusFailed {
+		t.Fatalf("simulation gate = %#v, want failed", gate)
+	}
+	if report.AchievedReadiness != PromotionReadinessBlocked {
+		t.Fatalf("readiness = %q, want blocked", report.AchievedReadiness)
+	}
+	if !promotionReportHasNextAction(report, "simulation", "resolve the simulation blockers") {
+		t.Fatalf("missing simulation next action in %#v", report.NextActions)
+	}
+}
+
 func TestBuildInternalPromotionReportMissingExpectedArtifact(t *testing.T) {
 	fixture := PromotionFixture{
 		ID:                "led_indicator_kicad_smoke",

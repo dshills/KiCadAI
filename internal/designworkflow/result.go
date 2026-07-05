@@ -25,6 +25,7 @@ const (
 	StageValidation          StageName = "validation"
 	StageValidationRepair    StageName = "validation_repair"
 	StageKiCadChecks         StageName = "kicad_checks"
+	StageSimulation          StageName = "simulation"
 	StageFabricationReady    StageName = "fabrication_readiness"
 	StageFeedback            StageName = "feedback"
 )

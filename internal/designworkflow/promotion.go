@@ -565,7 +565,7 @@ func validPromotionAcceptance(acceptance AcceptanceLevel) bool {
 
 func validPromotionStageName(stage StageName) bool {
 	switch stage {
-	case StageParseRequest, StageLibraryContext, StageBlockPlanning, StageComponentSelection, StageSchematic, StageSchematicElectrical, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageValidationRepair, StageKiCadChecks, StageFabricationReady, StageFeedback:
+	case StageParseRequest, StageLibraryContext, StageBlockPlanning, StageComponentSelection, StageSchematic, StageSchematicElectrical, StagePCBRealization, StageSchematicToPCB, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageValidationRepair, StageKiCadChecks, StageSimulation, StageFabricationReady, StageFeedback:
 		return true
 	default:
 		return false
@@ -574,7 +574,7 @@ func validPromotionStageName(stage StageName) bool {
 
 func validPromotionArtifactKind(kind reports.ArtifactKind) bool {
 	switch kind {
-	case reports.ArtifactKiCadProject, reports.ArtifactSchematic, reports.ArtifactPCB, reports.ArtifactSymbolLibraryTable, reports.ArtifactFootprintLibraryTable, reports.ArtifactValidationReport, reports.ArtifactPromotionReport, reports.ArtifactRoundTripReport, reports.ArtifactDRCReport, reports.ArtifactERCReport, reports.ArtifactPreview, reports.ArtifactBOM, reports.ArtifactCPL, reports.ArtifactGerber, reports.ArtifactDrill, reports.ArtifactFabricationPackage:
+	case reports.ArtifactKiCadProject, reports.ArtifactSchematic, reports.ArtifactPCB, reports.ArtifactSymbolLibraryTable, reports.ArtifactFootprintLibraryTable, reports.ArtifactValidationReport, reports.ArtifactSimulationReport, reports.ArtifactPromotionReport, reports.ArtifactRoundTripReport, reports.ArtifactDRCReport, reports.ArtifactERCReport, reports.ArtifactPreview, reports.ArtifactBOM, reports.ArtifactCPL, reports.ArtifactGerber, reports.ArtifactDrill, reports.ArtifactFabricationPackage:
 		return true
 	default:
 		return false
