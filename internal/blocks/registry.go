@@ -44,6 +44,7 @@ func NewBuiltinRegistry() BuiltinRegistry {
 func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 	registry := NewRegistry(BuiltinDefinitions())
 	registry.instantiators = map[string]BlockInstantiator{
+		"amplifier_input_buffer":      instantiateAmplifierInputBuffer,
 		"connector_breakout":          instantiateConnectorBreakout,
 		"canned_oscillator":           instantiateCannedOscillator,
 		"class_ab_output_stage":       instantiateClassABOutputStage,

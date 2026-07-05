@@ -28,6 +28,13 @@ boundaries: headphone-scale slices may be modeled, while speaker and power
 amplifier requests remain blocked until SOA, thermal, protection, layout, and
 KiCad-backed evidence are implemented.
 
+`amplifier_input_buffer` is the first implemented family-level front-end
+contract. It emits a passive AC-coupled input conditioning and bias-reference
+fragment with input impedance and high-pass cutoff evidence. It is structural
+connectivity evidence only; active buffering, noise review, source impedance
+matching, and fabrication-readiness claims remain blocked until later amplifier
+phases.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator

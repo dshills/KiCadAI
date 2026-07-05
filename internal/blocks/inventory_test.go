@@ -48,7 +48,6 @@ func TestBuiltinInventoryIncludesRoadmapFamilies(t *testing.T) {
 func TestAmplifierFamilyInventoryMatchesVerifiedBlockPlan(t *testing.T) {
 	inventory := NewBuiltinRegistry().Inventory()
 	want := map[string]string{
-		"amplifier_input_buffer":      "input",
 		"amplifier_gain_stage":        "opamp_gain_stage",
 		"amplifier_bias_network":      "quiescent",
 		"class_ab_output_pair":        "SOA",

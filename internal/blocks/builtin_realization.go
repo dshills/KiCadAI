@@ -165,6 +165,47 @@ func i2cSensorPCBRealization() *PCBRealization {
 	}
 }
 
+func amplifierInputBufferComponents() []BlockComponent {
+	return []BlockComponent{
+		{Role: "input_coupling", RefPrefix: "C", Value: "1uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "coupling_capacitance", ComponentPackageParam: "capacitor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
+		{Role: "bias_top", RefPrefix: "R", Value: "100k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "resistor", ValueKind: "resistance"}, ComponentPackageParam: "resistor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
+		{Role: "bias_bottom", RefPrefix: "R", Value: "100k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "resistor", ValueKind: "resistance"}, ComponentPackageParam: "resistor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
+		{Role: "input_stopper", RefPrefix: "R", Value: "100", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "resistor", ValueKind: "resistance"}, ComponentValueParam: "input_stopper_value", ComponentPackageParam: "resistor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
+	}
+}
+
+func amplifierInputBufferPCBRealization() *PCBRealization {
+	return &PCBRealization{
+		Version:           "0.1.0",
+		VerificationLevel: PCBVerificationPlacementVerified,
+		Components: []PCBComponentRealization{
+			{ComponentRole: "input_stopper", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: -8, YMM: 0, Layer: "F.Cu"}},
+			{ComponentRole: "input_coupling", FootprintParam: "capacitor_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
+			{ComponentRole: "bias_top", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: 6, YMM: -5, Layer: "F.Cu"}},
+			{ComponentRole: "bias_bottom", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: 6, YMM: 5, Layer: "F.Cu"}},
+		},
+		EntryAnchors: []PCBEntryAnchor{
+			{ID: "input", Port: "IN", NetTemplate: "in", Placement: RelativePlacement{XMM: -12, YMM: 0, Layer: "F.Cu"}, Description: "Audio input side before coupling."},
+			{ID: "output", Port: "OUT", NetTemplate: "out", Placement: RelativePlacement{XMM: 12, YMM: 0, Layer: "F.Cu"}, Description: "Biased signal output to the gain stage."},
+		},
+		PlacementGroups: []PCBPlacementGroup{{ID: "input_conditioning", ComponentRoles: []string{"input_stopper", "input_coupling", "bias_top", "bias_bottom"}, AnchorRole: "input_coupling", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -8, MaxXMM: 14, MaxYMM: 8}}},
+		LocalRoutes: []PCBLocalRoute{
+			{ID: "input_to_stopper", NetTemplate: "in", From: RouteEndpoint{Port: "IN"}, To: RouteEndpoint{ComponentRole: "input_stopper", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "stopper_to_coupling", NetTemplate: "pre_coupling", From: RouteEndpoint{ComponentRole: "input_stopper", Pin: "2"}, To: RouteEndpoint{ComponentRole: "input_coupling", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "coupled_output", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "input_coupling", Pin: "2"}, To: RouteEndpoint{Port: "OUT"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "bias_reference", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "bias_top", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_bottom", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "bias_to_signal", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "bias_top", Pin: "2"}, To: RouteEndpoint{ComponentRole: "input_coupling", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "bias_vcc", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "bias_top", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "bias_gnd", NetTemplate: "gnd", From: RouteEndpoint{Port: "GND"}, To: RouteEndpoint{ComponentRole: "bias_bottom", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+		},
+		Constraints: []PCBConstraint{
+			{ID: "amplifier_input_left_to_right", Kind: "signal_flow", AppliesTo: []string{"input_stopper", "input_coupling"}, Description: "Place input conditioning before active gain stages."},
+			{ID: "amplifier_input_output_separation", Kind: "analog_separation", AppliesTo: []string{"input_coupling", "bias_top", "bias_bottom"}, ClearanceMM: 3, Description: "Keep high-impedance input nodes away from output-current copper."},
+		},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"in", "pre_coupling", "out", "vcc", "gnd"}, RequiredRoutes: []string{"input_to_stopper", "stopper_to_coupling", "coupled_output", "bias_reference", "bias_to_signal", "bias_vcc", "bias_gnd"}},
+	}
+}
+
 func opAmpGainStageComponents() []BlockComponent {
 	return []BlockComponent{
 		{Role: "opamp", RefPrefix: "U", Value: "LMV321", SymbolID: defaultOpAmpSymbol, FootprintID: "Package_TO_SOT_SMD:SOT-23-5", Pins: opAmpPins(lmv321Pins), ComponentQuery: &components.Query{Text: "LMV321", Family: "opamp", Package: "sot23_5"}, Acceptance: components.AcceptanceConnectivity},

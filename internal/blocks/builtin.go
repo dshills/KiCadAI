@@ -24,6 +24,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		reversePolarityProtectionDefinition(),
 		usbCPowerDefinition(),
 		i2cSensorDefinition(),
+		amplifierInputBufferDefinition(),
 		opampGainStageDefinition(),
 		classABOutputStageDefinition(),
 		headphoneOutputProtectionDefinition(),
@@ -309,6 +310,45 @@ func i2cSensorDefinition() BlockDefinition {
 		Verification: VerificationRecord{
 			Level: VerificationStructural,
 			Notes: []string{"Uses an explicit generic I2C sensor pin-role template; real part-specific symbols require future pin-role metadata."},
+		},
+	}
+}
+
+func amplifierInputBufferDefinition() BlockDefinition {
+	return BlockDefinition{
+		ID:          "amplifier_input_buffer",
+		Name:        "Amplifier Input Buffer",
+		Description: "Passive AC-coupled amplifier input conditioning and bias reference block.",
+		Version:     "0.1.0",
+		Category:    "analog",
+		Parameters: []BlockParameter{
+			{Name: "input_impedance", Type: ParameterResistance, Default: "100k", Description: "Target input impedance and bias resistance."},
+			{Name: "coupling_capacitance", Type: ParameterCapacitance, Default: "1uF", Description: "Input coupling capacitor value."},
+			{Name: "resistor_footprint", Type: ParameterFootprintID, Default: "Resistor_SMD:R_0805_2012Metric", Description: "Bias resistor footprint ID."},
+			{Name: "capacitor_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Input coupling capacitor footprint ID."},
+			{Name: "input_stopper_value", Type: ParameterResistance, Default: "100", Description: "Series input stopper resistor value before the coupling capacitor."},
+		},
+		Ports: []BlockPort{
+			{Name: "IN", Direction: PortInput, Description: "Audio input source."},
+			{Name: "OUT", Direction: PortOutput, Description: "Biased signal output to the gain stage."},
+			{Name: "VCC", Direction: PortPower, Description: "Positive supply rail for the bias divider."},
+			{Name: "GND", Direction: PortPower, Description: "Ground or negative rail reference."},
+		},
+		RequiredLibraries: []LibraryRequirement{
+			{Kind: "symbol", ID: "Device:R", Required: true, Description: "Input stopper and bias resistors."},
+			{Kind: "symbol", ID: "Device:C", Required: true, Description: "Input coupling capacitor."},
+		},
+		Components:     amplifierInputBufferComponents(),
+		PCBRealization: amplifierInputBufferPCBRealization(),
+		ValidationRules: []BlockValidationRule{
+			{ID: "amplifier.input.impedance.valid", Severity: BlockValidationSeverityBlocked, Description: "Input impedance must be a valid positive resistance."},
+			{ID: "amplifier.input.coupling.valid", Severity: BlockValidationSeverityBlocked, Description: "Input coupling capacitance must be a valid capacitance."},
+			{ID: "amplifier.input.bias.defined", Severity: BlockValidationSeverityBlocked, Description: "AC-coupled input must define a bias/reference path."},
+			{ID: "amplifier.input.layout.separated", Severity: BlockValidationSeverityBlocked, Description: "Input conditioning should stay left of the active gain/output stages."},
+		},
+		Verification: VerificationRecord{
+			Level: VerificationStructural,
+			Notes: []string{"Passive headphone-amplifier input conditioning only; noise, source impedance, and active buffering remain future evidence."},
 		},
 	}
 }
