@@ -65,17 +65,7 @@ func TestAmplifierDesignFixturesPlanToDeclaredAcceptance(t *testing.T) {
 }
 
 func TestClassABHeadphoneFixtureSchematicReadability(t *testing.T) {
-	repoRoot := designExampleRepoRoot(t)
-	path := filepath.Join(repoRoot, "examples", "design", "amplifier", "class_ab_headphone_driver.json")
-	file, err := os.Open(path)
-	if err != nil {
-		t.Fatalf("open amplifier fixture: %v", err)
-	}
-	defer file.Close()
-	request, issues := DecodeRequestStrict(file)
-	if len(issues) != 0 {
-		t.Fatalf("decode issues:\n%s", formatDesignExampleIssues(issues))
-	}
+	request := readClassABHeadphoneFixture(t)
 	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
 	if reports.HasBlockingIssue(plan.Stage.Issues) {
 		t.Fatalf("plan issues:\n%s", formatDesignExampleIssues(plan.Stage.Issues))
@@ -93,4 +83,63 @@ func TestClassABHeadphoneFixtureSchematicReadability(t *testing.T) {
 			t.Fatalf("%s = %d, want 0; summary=%#v", key, got, readability)
 		}
 	}
+}
+
+func TestClassABHeadphoneFixturePCBPlacementRoutingEvidence(t *testing.T) {
+	request := readClassABHeadphoneFixture(t)
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues:\n%s", formatDesignExampleIssues(plan.Stage.Issues))
+	}
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+	if workflowStageBlocked(fragments.Stage) {
+		t.Fatalf("PCB realization status = %s issues:\n%s", fragments.Stage.Status, formatDesignExampleIssues(fragments.Stage.Issues))
+	}
+	placed := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if workflowStageBlocked(placed.Stage) {
+		t.Fatalf("placement status = %s issues:\n%s", placed.Stage.Status, formatDesignExampleIssues(placed.Stage.Issues))
+	}
+	allowPartial := true
+	routed := RoutePlacement(context.Background(), request, fragments, placed, RoutingOptions{AllowPartial: &allowPartial})
+	local := requireStageSummary[LocalRouteConnectivitySummary](t, routed.Stage, "route_connectivity")
+	if local.RoutesAttempted == 0 || local.EndpointContactsProven < local.RoutesAttempted*2 || local.IssueCount != 0 {
+		t.Fatalf("local route connectivity = %#v, want clean local contact evidence", local)
+	}
+	interBlock := requireInterBlockRouteSummary(t, routed.Stage)
+	if interBlock.Candidates == 0 || interBlock.RequiredEndpoints == 0 || interBlock.EndpointsResolved != interBlock.RequiredEndpoints {
+		t.Fatalf("inter-block routing = %#v, want resolved amplifier inter-block endpoints", interBlock)
+	}
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routed.Stage)
+	if routeTrees.GroupsPlanned == 0 || routeTrees.BranchesRouted == 0 {
+		t.Fatalf("route-tree execution = %#v, want routed amplifier branch evidence", routeTrees)
+	}
+	access := requireStageSummary[RouteTreeEndpointAccessSummary](t, routed.Stage, "route_tree_access")
+	if access.PadAccess == 0 || access.LocalRouteAnchors == 0 {
+		t.Fatalf("route-tree access = %#v, want pad and local-route anchor access evidence", access)
+	}
+	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routed.Stage, "route_tree_contact_graph")
+	if contactGraph.RequiredEndpoints == 0 || contactGraph.ProvenEndpoints == 0 || contactGraph.LocalRouteMerges == 0 {
+		t.Fatalf("route-tree contact graph = %#v, want proven amplifier contact graph evidence", contactGraph)
+	}
+	contacts := requireInterBlockContactSummary(t, routed.Stage)
+	if contacts.ContactsRequired == 0 || contacts.ContactsProven == 0 {
+		t.Fatalf("inter-block contacts = %#v, want proven amplifier contact evidence", contacts)
+	}
+}
+
+func readClassABHeadphoneFixture(t *testing.T) Request {
+	t.Helper()
+	repoRoot := designExampleRepoRoot(t)
+	path := filepath.Join(repoRoot, "examples", "design", "amplifier", "class_ab_headphone_driver.json")
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open amplifier fixture: %v", err)
+	}
+	defer file.Close()
+	request, issues := DecodeRequestStrict(file)
+	if len(issues) != 0 {
+		t.Fatalf("decode issues:\n%s", formatDesignExampleIssues(issues))
+	}
+	return request
 }

@@ -32,7 +32,7 @@ func TestAmplifierBiasNetworkInstantiatesDiodeString(t *testing.T) {
 	if len(output.Instance.Refs) != 5 {
 		t.Fatalf("refs = %#v, want bias feeds, two diodes, and output anchor", output.Instance.Refs)
 	}
-	for _, net := range []string{"bias_bias_p", "bias_driver", "bias_bias_n", "bias_vcc", "bias_vee", "bias_amp_out"} {
+	for _, net := range []string{"bias_bias_p", "bias_driver_out", "bias_bias_n", "bias_vcc", "bias_vee", "bias_amp_out"} {
 		if !slices.Contains(output.Instance.Nets, net) {
 			t.Fatalf("nets = %#v, want %s", output.Instance.Nets, net)
 		}

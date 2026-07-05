@@ -6,8 +6,8 @@
     "category": "amplifier"
   },
   "board": {
-    "width_mm": 85,
-    "height_mm": 50,
+    "width_mm": 125,
+    "height_mm": 80,
     "layers": 2
   },
   "component_policy": {
@@ -129,7 +129,7 @@
   ],
   "validation": {
     "acceptance": "connectivity",
-    "skip_routing": true,
+    "skip_routing": false,
     "skip_kicad_checks": true
   }
 }

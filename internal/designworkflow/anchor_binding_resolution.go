@@ -134,7 +134,11 @@ func resolveAnchorBinding(anchor collectedEntryAnchor, endpointIndex physicalEnd
 			binding.IssueIDs = append(binding.IssueIDs, issue.ID)
 			return binding, []AnchorBindingIssue{issue}
 		}
-		issue := NewAnchorBindingIssue(AnchorBindingIssueAmbiguousEndpoint, reports.SeverityError, anchor.BlockInstanceID, anchor.ID, "", "multiple physical endpoints match entry anchor "+anchor.ID, "add explicit connector pad or interface-group intent for this anchor")
+		severity := reports.SeverityWarning
+		if AnchorBindingRequired(false, anchor.Policy) {
+			severity = reports.SeverityError
+		}
+		issue := NewAnchorBindingIssue(AnchorBindingIssueAmbiguousEndpoint, severity, anchor.BlockInstanceID, anchor.ID, "", "multiple physical endpoints match entry anchor "+anchor.ID, "add explicit connector pad or interface-group intent for this anchor")
 		binding.Status = AnchorBindingStatusAmbiguous
 		binding.IssueIDs = append(binding.IssueIDs, issue.ID)
 		return binding, []AnchorBindingIssue{issue}

@@ -149,6 +149,10 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		"LED_SMD:LED_0805_2012Metric",
 		"Diode_SMD:D_SOD-323":
 		return twoPadTemplate(2.0, 1.25, 0.7, 0.8, 1.2), true
+	case "Resistor_SMD:R_1206_3216Metric":
+		return twoPadTemplate(3.2, 1.6, 1.2, 1.2, 2.4), true
+	case "Capacitor_SMD:C_1210_3225Metric":
+		return twoPadTemplate(3.2, 2.5, 1.2, 2.5, 2.4), true
 	case "Capacitor_SMD:C_0603_1608Metric":
 		return twoPadTemplate(1.6, 0.8, 0.6, 0.6, 1.0), true
 	case "Diode_SMD:D_SOD-123":
@@ -166,6 +170,15 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 				{Name: "3", XMM: -1.5, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
 				{Name: "5", XMM: 1.5, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
 				{Name: "4", XMM: 1.5, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
+			},
+		}, true
+	case "Package_TO_SOT_SMD:SOT-23":
+		return verifiedPadTemplateRecord{
+			Bounds: centeredEstimatedBounds(3.0, 2.8),
+			Pads: []placement.PadSummary{
+				{Name: "1", XMM: -0.95, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "2", XMM: -0.95, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "3", XMM: 0.95, YMM: 0, WidthMM: 0.7, HeightMM: 0.8},
 			},
 		}, true
 	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
@@ -188,6 +201,13 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return pinHeaderTemplate(4), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x05_P2.54mm_Vertical":
 		return pinHeaderTemplate(5), true
+	case "TestPoint:TestPoint_Pad_D1.0mm":
+		return verifiedPadTemplateRecord{
+			Bounds: centeredEstimatedBounds(1.6, 1.6),
+			Pads: []placement.PadSummary{
+				{Name: "1", XMM: 0, YMM: 0, WidthMM: 1.0, HeightMM: 1.0},
+			},
+		}, true
 	default:
 		return verifiedPadTemplateRecord{}, false
 	}

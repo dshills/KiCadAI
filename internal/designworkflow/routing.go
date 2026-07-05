@@ -761,8 +761,8 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		summary.IssueCount = 1
 		return transactions.Operation{}, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route net name is required", nil)}, summary, false
 	}
-	from, fromIssues, fromOK, fromNetMismatch := resolveLocalRouteEndpoint(path+".from", netName, route.From, resolver)
-	to, toIssues, toOK, toNetMismatch := resolveLocalRouteEndpoint(path+".to", netName, route.To, resolver)
+	from, fromIssues, fromOK, fromNetMismatch := resolveLocalRouteEndpoint(fragment, path+".from", netName, route.From, resolver)
+	to, toIssues, toOK, toNetMismatch := resolveLocalRouteEndpoint(fragment, path+".to", netName, route.To, resolver)
 	issues = append(issues, fromIssues...)
 	issues = append(issues, toIssues...)
 	if fromNetMismatch {
@@ -813,11 +813,19 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	return operation, issues, summary, true
 }
 
-func resolveLocalRouteEndpoint(path string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool, bool) {
+func resolveLocalRouteEndpoint(fragment BlockFragment, path string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool, bool) {
 	ref := strings.TrimSpace(endpoint.Ref)
 	pin := strings.TrimSpace(endpoint.Pin)
 	if ref == "" || pin == "" {
 		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(path, "local route endpoint requires ref and pin", nil)}, false, false
+	}
+	if anchor, ok := resolveLocalRouteAnchorEndpoint(fragment, ref, pin); ok {
+		if strings.TrimSpace(anchor.NetName) != "" && !strings.EqualFold(anchor.NetName, netName) {
+			return anchor, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route anchor net "+anchor.NetName+" does not match route net "+netName, []string{ref})}, false, true
+		}
+		anchor.NetName = netName
+		anchor.NetCodeResolved = true
+		return anchor, nil, true, false
 	}
 	resolved, ok := resolver.ResolveNormalized(strings.ToUpper(ref), strings.ToUpper(pin))
 	if !ok {
@@ -834,6 +842,47 @@ func resolveLocalRouteEndpoint(path string, netName string, endpoint transaction
 		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route endpoint pad net "+padNet+" does not match route net "+netName, []string{ref})}, false, true
 	}
 	return resolved, nil, true, false
+}
+
+func resolveLocalRouteAnchorEndpoint(fragment BlockFragment, ref string, pin string) (PlacedPadEndpoint, bool) {
+	anchorID, ok := localRouteAnchorID(ref)
+	if !ok {
+		return PlacedPadEndpoint{}, false
+	}
+	for _, anchor := range fragment.Realization.EntryAnchors {
+		if !strings.EqualFold(strings.TrimSpace(anchor.ID), anchorID) {
+			continue
+		}
+		anchorPin := strings.TrimSpace(firstNonEmpty(anchor.Port, anchor.ID))
+		if anchorPin != "" && pin != "" && !strings.EqualFold(anchorPin, pin) {
+			continue
+		}
+		layer := firstNonEmpty(anchor.Placement.Layer, "F.Cu")
+		// RealizeBlockPCB offsets entry anchors by the fragment origin before
+		// they are stored here, so these coordinates are already board-level.
+		return PlacedPadEndpoint{
+			Ref:             strings.TrimSpace(ref),
+			Pad:             strings.TrimSpace(pin),
+			NetName:         strings.TrimSpace(anchor.NetName),
+			NetCodeResolved: true,
+			Point:           transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM},
+			Layer:           layer,
+			ComponentAt:     transactions.Point{XMM: anchor.Placement.XMM, YMM: anchor.Placement.YMM},
+			Source:          "pcb_realization.entry_anchor",
+			Confidence:      PhysicalEndpointConfidenceHigh,
+		}, true
+	}
+	return PlacedPadEndpoint{}, false
+}
+
+func localRouteAnchorID(ref string) (string, bool) {
+	ref = strings.TrimSpace(ref)
+	const prefix = "@anchor:"
+	if !strings.HasPrefix(strings.ToLower(ref), prefix) {
+		return "", false
+	}
+	id := strings.TrimSpace(ref[len(prefix):])
+	return id, id != ""
 }
 
 func localRouteBindingIssue(path string, message string, refs []string) reports.Issue {

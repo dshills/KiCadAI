@@ -320,16 +320,20 @@ func addPlacementRouteNet(request *placement.Request, indexes map[string]int, ro
 	if name == "" {
 		return
 	}
-	endpoints := []placement.Endpoint{
-		{Ref: route.From.Ref, Pin: route.From.Pin},
-		{Ref: route.To.Ref, Pin: route.To.Pin},
-	}
+	endpoints := placementPhysicalEndpoints(
+		placement.Endpoint{Ref: route.From.Ref, Pin: route.From.Pin},
+		placement.Endpoint{Ref: route.To.Ref, Pin: route.To.Pin},
+	)
 	addPlacementNet(request, indexes, name, netRoleFromName(name), 10, endpoints...)
 }
 
 func addPlacementNet(request *placement.Request, indexes map[string]int, name string, role placement.NetRole, weight int, endpoints ...placement.Endpoint) {
 	name = strings.TrimSpace(name)
 	if request == nil || name == "" {
+		return
+	}
+	endpoints = placementPhysicalEndpoints(endpoints...)
+	if len(endpoints) == 0 {
 		return
 	}
 	key := strings.ToUpper(name)
@@ -355,6 +359,10 @@ func addPlacementNet(request *placement.Request, indexes map[string]int, name st
 func addPlacementNetWithEndpointMerges(request *placement.Request, indexes map[string]int, name string, role placement.NetRole, weight int, endpoints ...placement.Endpoint) {
 	name = strings.TrimSpace(name)
 	if request == nil || name == "" {
+		return
+	}
+	endpoints = placementPhysicalEndpoints(endpoints...)
+	if len(endpoints) == 0 {
 		return
 	}
 	merged := appendUniquePlacementEndpoints(make([]placement.Endpoint, 0, len(endpoints)), endpoints...)
@@ -384,6 +392,23 @@ func addPlacementNetWithEndpointMerges(request *placement.Request, indexes map[s
 	request.Nets = remaining
 	rebuildPlacementNetIndexes(indexes, request.Nets)
 	addPlacementNet(request, indexes, name, role, weight, merged...)
+}
+
+func placementPhysicalEndpoints(endpoints ...placement.Endpoint) []placement.Endpoint {
+	filtered := make([]placement.Endpoint, 0, len(endpoints))
+	for _, endpoint := range endpoints {
+		if placementEndpointIsPseudoAnchor(endpoint) {
+			// Entry anchors are logical routing targets, not placeable physical
+			// components. Local-route binding preserves them for route-tree access.
+			continue
+		}
+		filtered = append(filtered, endpoint)
+	}
+	return filtered
+}
+
+func placementEndpointIsPseudoAnchor(endpoint placement.Endpoint) bool {
+	return strings.HasPrefix(strings.ToLower(strings.TrimSpace(endpoint.Ref)), "@anchor:")
 }
 
 func placementNetSharesEndpointKeys(net placement.Net, keys map[string]struct{}) bool {
@@ -639,6 +664,9 @@ func proximityRulesFromFragment(fragment BlockFragment) []placement.ProximityRul
 		})
 	}
 	for _, route := range fragment.Realization.LocalRoutes {
+		if placementEndpointIsPseudoAnchor(placement.Endpoint{Ref: route.From.Ref}) || placementEndpointIsPseudoAnchor(placement.Endpoint{Ref: route.To.Ref}) {
+			continue
+		}
 		role := placementRoleFromNetName(route.NetName)
 		rules = append(rules, placement.ProximityRule{
 			ID:            blockPlacementGroupID(fragment, route.ID) + ".route",

@@ -48,7 +48,7 @@ func amplifierBiasNetworkDefinition() BlockDefinition {
 		PCBRealization: amplifierBiasNetworkPCBRealization(),
 		Nets: []BlockNet{
 			{NameTemplate: "bias_p", Visibility: "exported", Role: "upper_output_bias", Pins: []NetPin{{ComponentRole: "upper_bias_feed", Pin: "2"}, {ComponentRole: "bias_upper", Pin: "2"}}},
-			{NameTemplate: "driver", Visibility: "exported", Role: "driver_output", Pins: []NetPin{{ComponentRole: "bias_upper", Pin: "1"}, {ComponentRole: "bias_lower", Pin: "2"}}},
+			{NameTemplate: "driver_out", Visibility: "exported", Role: "driver_output", Pins: []NetPin{{ComponentRole: "bias_upper", Pin: "1"}, {ComponentRole: "bias_lower", Pin: "2"}}},
 			{NameTemplate: "bias_n", Visibility: "exported", Role: "lower_output_bias", Pins: []NetPin{{ComponentRole: "bias_lower", Pin: "1"}, {ComponentRole: "lower_bias_feed", Pin: "1"}}},
 			{NameTemplate: "vcc", Visibility: "exported", Role: "positive_rail", Pins: []NetPin{{ComponentRole: "upper_bias_feed", Pin: "1"}}},
 			{NameTemplate: "vee", Visibility: "exported", Role: "negative_rail", Pins: []NetPin{{ComponentRole: "lower_bias_feed", Pin: "2"}}},
@@ -163,7 +163,7 @@ func amplifierBiasNetworkPCBRealization() *PCBRealization {
 			{ComponentRole: "amp_out_anchor", FootprintID: "TestPoint:TestPoint_Pad_D1.0mm", Placement: RelativePlacement{XMM: 14, YMM: 0, Layer: "F.Cu"}},
 		},
 		EntryAnchors: []PCBEntryAnchor{
-			{ID: "driver", Port: "DRIVER_OUT", NetTemplate: "driver", Placement: RelativePlacement{XMM: -2, YMM: 0, Layer: "F.Cu"}, Description: "Driver midpoint entering the diode string."},
+			{ID: "driver", Port: "DRIVER_OUT", NetTemplate: "driver_out", Placement: RelativePlacement{XMM: -2, YMM: 0, Layer: "F.Cu"}, Description: "Driver midpoint entering the diode string."},
 			{ID: "bias_p", Port: "BIAS_P", NetTemplate: "bias_p", Placement: RelativePlacement{XMM: 10, YMM: -3, Layer: "F.Cu"}, Description: "Upper output device bias node."},
 			{ID: "bias_n", Port: "BIAS_N", NetTemplate: "bias_n", Placement: RelativePlacement{XMM: 10, YMM: 3, Layer: "F.Cu"}, Description: "Lower output device bias node."},
 			{ID: "amp_out", Port: "AMP_OUT", NetTemplate: "amp_out", Placement: RelativePlacement{XMM: 14, YMM: 0, Layer: "F.Cu"}, Description: "Output-pair placement anchor."},
@@ -174,8 +174,8 @@ func amplifierBiasNetworkPCBRealization() *PCBRealization {
 		LocalRoutes: []PCBLocalRoute{
 			{ID: "vcc_to_upper_feed", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "upper_bias_feed", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "upper_feed_to_bias_p", NetTemplate: "bias_p", From: RouteEndpoint{ComponentRole: "upper_bias_feed", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bias_upper", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
-			{ID: "driver_midpoint", NetTemplate: "driver", From: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, To: RouteEndpoint{ComponentRole: "bias_lower", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
-			{ID: "driver_port", NetTemplate: "driver", From: RouteEndpoint{Port: "DRIVER_OUT"}, To: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "driver_midpoint", NetTemplate: "driver_out", From: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, To: RouteEndpoint{ComponentRole: "bias_lower", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "driver_port", NetTemplate: "driver_out", From: RouteEndpoint{Port: "DRIVER_OUT"}, To: RouteEndpoint{ComponentRole: "bias_upper", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "bias_n_to_lower_feed", NetTemplate: "bias_n", From: RouteEndpoint{ComponentRole: "bias_lower", Pin: "1"}, To: RouteEndpoint{ComponentRole: "lower_bias_feed", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "lower_feed_to_vee", NetTemplate: "vee", From: RouteEndpoint{ComponentRole: "lower_bias_feed", Pin: "2"}, To: RouteEndpoint{Port: "VEE"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "amp_out_anchor", NetTemplate: "amp_out", From: RouteEndpoint{Port: "AMP_OUT"}, To: RouteEndpoint{ComponentRole: "amp_out_anchor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
@@ -183,7 +183,7 @@ func amplifierBiasNetworkPCBRealization() *PCBRealization {
 		Constraints: []PCBConstraint{
 			{ID: "bias_string_thermal_coupling", Kind: "max_spacing", AppliesTo: []string{"bias_upper", "bias_lower", "amp_out_anchor"}, MaxLengthMM: 5, Description: "Bias diodes must stay near the output-pair thermal region represented by AMP_OUT."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"bias_p", "driver", "bias_n", "vcc", "vee", "amp_out"}, RequiredRoutes: []string{"vcc_to_upper_feed", "upper_feed_to_bias_p", "driver_midpoint", "driver_port", "bias_n_to_lower_feed", "lower_feed_to_vee", "amp_out_anchor"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"bias_p", "driver_out", "bias_n", "vcc", "vee", "amp_out"}, RequiredRoutes: []string{"vcc_to_upper_feed", "upper_feed_to_bias_p", "driver_midpoint", "driver_port", "bias_n_to_lower_feed", "lower_feed_to_vee", "amp_out_anchor"}},
 		UnsupportedBehaviors: []string{
 			"VBE multiplier bias is not implemented",
 			"numeric quiescent-current targets are not verified",

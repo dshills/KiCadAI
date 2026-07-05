@@ -181,7 +181,7 @@ func amplifierInputBufferPCBRealization() *PCBRealization {
 		Components: []PCBComponentRealization{
 			{ComponentRole: "input_stopper", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: -8, YMM: 0, Layer: "F.Cu"}},
 			{ComponentRole: "input_coupling", FootprintParam: "capacitor_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
-			{ComponentRole: "bias_top", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: 6, YMM: -5, Layer: "F.Cu"}},
+			{ComponentRole: "bias_top", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: 6, YMM: -3, Layer: "F.Cu"}},
 			{ComponentRole: "bias_bottom", FootprintParam: "resistor_footprint", Placement: RelativePlacement{XMM: 6, YMM: 5, Layer: "F.Cu"}},
 		},
 		EntryAnchors: []PCBEntryAnchor{
@@ -225,9 +225,9 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
 			{ComponentRole: "opamp", FootprintParam: "opamp_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
-			{ComponentRole: "feedback", FootprintParam: "feedback_footprint", Placement: RelativePlacement{XMM: -4, YMM: -5, Layer: "F.Cu"}},
+			{ComponentRole: "feedback", FootprintParam: "feedback_footprint", Placement: RelativePlacement{XMM: -4, YMM: -3, Layer: "F.Cu"}},
 			{ComponentRole: "gain_to_ground", FootprintParam: "feedback_footprint", Placement: RelativePlacement{XMM: -4, YMM: 5, Layer: "F.Cu"}},
-			{ComponentRole: "decoupling_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 4, YMM: -5, Layer: "F.Cu"}},
+			{ComponentRole: "decoupling_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 4, YMM: -3, Layer: "F.Cu"}},
 			{ComponentRole: "output_resistor", FootprintParam: "feedback_footprint", Placement: RelativePlacement{XMM: 8, YMM: 0, Layer: "F.Cu"}},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "opamp_core", ComponentRoles: []string{"opamp", "feedback", "gain_to_ground", "decoupling_capacitor"}, AnchorRole: "opamp", Bounds: &RelativeBounds{MinXMM: -8, MinYMM: -8, MaxXMM: 8, MaxYMM: 8}}},
