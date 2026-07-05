@@ -456,6 +456,60 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 	}
 }
 
+func TestI2CDesignExampleFakeCleanKiCadEvidencePassesCandidateGate(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping I2C fake KiCad promotion integration test in short mode")
+	}
+	repoRoot := designExampleRepoRoot(t)
+	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "i2c_sensor_breakout_candidate.metadata.json")
+	metadata, err := loadDesignExampleMetadataPath(metadataPath)
+	if err != nil {
+		t.Fatalf("load %s: %v", metadataPath, err)
+	}
+	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+	if err != nil {
+		t.Fatalf("%s request path: %v", metadata.ID, err)
+	}
+	request, issues := loadDesignExampleRequestPath(t, requestPath)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
+	}
+	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(metadata.ID))
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{
+		OutputDir: outputDir,
+		Overwrite: true,
+		KiCadChecks: KiCadCheckOptions{
+			KiCadCLI:      fakeKiCadCheckCLI(t),
+			RequireERC:    true,
+			RequireDRC:    true,
+			KeepArtifacts: true,
+			ArtifactDir:   filepath.Join(outputDir, ".kicadai", "checks"),
+		},
+	})
+	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
+	if !ok {
+		t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if kicadChecks.Status != StageStatusOK {
+		t.Fatalf("%s fake clean kicad_checks status = %q, want ok:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	fixture := promotionFixtureFromDesignExampleMetadata(metadata)
+	fixture.DeclaredReadiness = PromotionReadinessCandidate
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, string(StageKiCadChecks))
+	if gate.Status != PromotionGateStatusPass {
+		t.Fatalf("%s fake clean KiCad gate = %q, want pass:\n%s", metadata.ID, gate.Status, formatDesignExamplePromotionIssues(report.Issues))
+	}
+	if !designExamplePromotionGateHasArtifactPath(gate, "erc") {
+		t.Errorf("%s fake clean KiCad artifacts = %#v, missing ERC report", metadata.ID, gate.Artifacts)
+	}
+	if !designExamplePromotionGateHasArtifactPath(gate, "drc") {
+		t.Errorf("%s fake clean KiCad artifacts = %#v, missing DRC report", metadata.ID, gate.Artifacts)
+	}
+}
+
 func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
 	t.Helper()
 	stage, ok := designExampleStageByName(result, StageBlockPlanning)
@@ -1519,6 +1573,16 @@ func designExamplePromotionHasIssueMessage(report PromotionReport, stage StageNa
 func designExamplePromotionHasBlockingStage(report PromotionReport, stage StageName) bool {
 	for _, issue := range report.Issues {
 		if issue.Stage == stage && (issue.Severity == reports.SeverityError || issue.Severity == reports.SeverityBlocked) {
+			return true
+		}
+	}
+	return false
+}
+
+func designExamplePromotionGateHasArtifactPath(gate PromotionGate, fragment string) bool {
+	fragment = strings.ToLower(fragment)
+	for _, artifact := range gate.Artifacts {
+		if strings.Contains(strings.ToLower(artifact), fragment) {
 			return true
 		}
 	}
