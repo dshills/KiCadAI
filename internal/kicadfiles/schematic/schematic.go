@@ -206,6 +206,10 @@ type Color struct {
 // without masking intentional grid-separated endpoints.
 const connectivityNearMissDistance = kicadfiles.IU(254000)
 
+// KiCad ERC connection-grid warnings are usually triggered by objects that are
+// not aligned to the 50 mil schematic grid used by symbol pins.
+const generatedConnectivityGrid = kicadfiles.IU(1270000)
+
 type Sheet struct {
 	UUID             kicadfiles.UUID
 	Name             string
@@ -291,21 +295,49 @@ type GeneratedConnectivityIssue struct {
 	Message string `json:"message"`
 }
 
+// GeneratedConnectivityDiagnostic identifies a concrete generated schematic
+// object involved in connectivity evidence.
+type GeneratedConnectivityDiagnostic struct {
+	Kind      string `json:"kind"`
+	Path      string `json:"path"`
+	Reference string `json:"reference,omitempty"`
+	Pin       string `json:"pin,omitempty"`
+	Net       string `json:"net,omitempty"`
+	Point     string `json:"point,omitempty"`
+	Message   string `json:"message,omitempty"`
+}
+
+// GeneratedConnectivityComponent summarizes an exact-coordinate schematic
+// connectivity component before KiCad ERC runs.
+type GeneratedConnectivityComponent struct {
+	Index      int      `json:"index"`
+	PointCount int      `json:"point_count"`
+	Labels     []string `json:"labels,omitempty"`
+	References []string `json:"references,omitempty"`
+}
+
 // GeneratedConnectivityReport records schematic semantic evidence before KiCad
 // ERC runs, allowing generated designs to fail on structural connectivity
 // issues without requiring a KiCad CLI invocation.
 type GeneratedConnectivityReport struct {
-	Status               GeneratedConnectivityStatus  `json:"status"`
-	SymbolCount          int                          `json:"symbol_count"`
-	WireCount            int                          `json:"wire_count"`
-	LabelCount           int                          `json:"label_count"`
-	NoConnectCount       int                          `json:"no_connect_count"`
-	SymbolPinAnchorCount int                          `json:"symbol_pin_anchor_count"`
-	PowerSymbolCount     int                          `json:"power_symbol_count"`
-	PowerFlagCount       int                          `json:"power_flag_count"`
-	PowerPolicy          GeneratedPowerPolicyStatus   `json:"power_policy"`
-	IssueCount           int                          `json:"issue_count"`
-	Issues               []GeneratedConnectivityIssue `json:"issues,omitempty"`
+	Status                       GeneratedConnectivityStatus       `json:"status"`
+	SymbolCount                  int                               `json:"symbol_count"`
+	WireCount                    int                               `json:"wire_count"`
+	LabelCount                   int                               `json:"label_count"`
+	NoConnectCount               int                               `json:"no_connect_count"`
+	SymbolPinAnchorCount         int                               `json:"symbol_pin_anchor_count"`
+	PowerSymbolCount             int                               `json:"power_symbol_count"`
+	PowerFlagCount               int                               `json:"power_flag_count"`
+	PowerPolicy                  GeneratedPowerPolicyStatus        `json:"power_policy"`
+	ConnectedComponentCount      int                               `json:"connected_component_count"`
+	ConnectedComponents          []GeneratedConnectivityComponent  `json:"connected_components,omitempty"`
+	DanglingWireEndpoints        []GeneratedConnectivityDiagnostic `json:"dangling_wire_endpoints,omitempty"`
+	FloatingLabels               []GeneratedConnectivityDiagnostic `json:"floating_labels,omitempty"`
+	DisconnectedSymbolPinAnchors []GeneratedConnectivityDiagnostic `json:"disconnected_symbol_pin_anchors,omitempty"`
+	OffGridObjects               []GeneratedConnectivityDiagnostic `json:"off_grid_objects,omitempty"`
+	DiagnosticCount              int                               `json:"diagnostic_count"`
+	IssueCount                   int                               `json:"issue_count"`
+	Issues                       []GeneratedConnectivityIssue      `json:"issues,omitempty"`
 }
 
 type RawSchematicItemKind string
@@ -479,6 +511,14 @@ func InspectGeneratedConnectivity(schematic SchematicFile) GeneratedConnectivity
 	}
 	report.PowerSymbolCount, report.PowerFlagCount = countPowerSymbols(schematic)
 	report.PowerPolicy = generatedPowerPolicyStatus(report.PowerSymbolCount, report.PowerFlagCount)
+	anchors := schematicConnectivityAnchors(schematic)
+	report.ConnectedComponents = generatedConnectivityComponents(schematic)
+	report.ConnectedComponentCount = len(report.ConnectedComponents)
+	report.DanglingWireEndpoints = generatedDanglingWireEndpointDiagnostics(schematic, anchors)
+	report.FloatingLabels = generatedFloatingLabelDiagnostics(schematic, anchors)
+	report.DisconnectedSymbolPinAnchors = generatedDisconnectedSymbolPinDiagnostics(schematic, anchors)
+	report.OffGridObjects = generatedOffGridDiagnostics(schematic)
+	report.DiagnosticCount = len(report.DanglingWireEndpoints) + len(report.FloatingLabels) + len(report.DisconnectedSymbolPinAnchors) + len(report.OffGridObjects)
 	for _, err := range validateGeneratedConnectivityErrors(schematic) {
 		report.Issues = append(report.Issues, GeneratedConnectivityIssue{Path: strings.Trim(strings.TrimPrefix(err.Section+"."+err.Field, "."), "."), Message: err.Message})
 	}
@@ -497,6 +537,7 @@ func validateGeneratedConnectivityErrors(schematic SchematicFile) kicadfiles.Val
 		return kicadfiles.ValidationErrors{fieldError("", err.Error())}
 	}
 	anchors := schematicConnectivityAnchors(schematic)
+	nonLabelAnchors := schematicNonLabelConnectivityAnchors(schematic, anchors)
 	anchorIndex := newAnchorIndex(anchors)
 	symbolAnchors := schematicSymbolPinAnchorSet(schematic)
 	var errs kicadfiles.ValidationErrors
@@ -515,7 +556,7 @@ func validateGeneratedConnectivityErrors(schematic SchematicFile) kicadfiles.Val
 		}
 	}
 	for labelIndex, label := range schematic.Labels {
-		if anchors[label.Position] <= 1 {
+		if nonLabelAnchors[label.Position] == 0 {
 			errs = append(errs, fieldError(indexed("labels", labelIndex, "position"), "label is not connected to a known anchor"))
 		}
 	}
@@ -632,10 +673,315 @@ func schematicConnectivityAnchors(schematic SchematicFile) map[kicadfiles.Point]
 	return anchors
 }
 
+func schematicNonLabelConnectivityAnchors(schematic SchematicFile, anchors map[kicadfiles.Point]int) map[kicadfiles.Point]int {
+	nonLabelAnchors := make(map[kicadfiles.Point]int, len(anchors))
+	for point, count := range anchors {
+		nonLabelAnchors[point] = count
+	}
+	for _, label := range schematic.Labels {
+		if nonLabelAnchors[label.Position] > 0 {
+			nonLabelAnchors[label.Position]--
+		}
+	}
+	return nonLabelAnchors
+}
+
 func addAnchorPoints(anchors map[kicadfiles.Point]int, points map[kicadfiles.Point]struct{}) {
 	for point := range points {
 		anchors[point]++
 	}
+}
+
+func generatedDanglingWireEndpointDiagnostics(schematic SchematicFile, anchors map[kicadfiles.Point]int) []GeneratedConnectivityDiagnostic {
+	var diagnostics []GeneratedConnectivityDiagnostic
+	for wireIndex, wire := range schematic.Wires {
+		// Generated schematic wires are validated as line segments. If imported
+		// data contains a polyline, only terminal vertices can be dangling endpoints.
+		for _, endpoint := range wireEndpoints(wire) {
+			if anchors[endpoint.point] > 1 {
+				continue
+			}
+			path := indexed("wires", wireIndex, "points") + "[" + strconv.Itoa(endpoint.index) + "]"
+			diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+				Kind:    "wire_endpoint",
+				Path:    path,
+				Point:   formatPoint(endpoint.point),
+				Message: "wire endpoint is not on a symbol pin, label, junction, sheet pin, or no-connect marker",
+			})
+		}
+	}
+	return diagnostics
+}
+
+func generatedFloatingLabelDiagnostics(schematic SchematicFile, anchors map[kicadfiles.Point]int) []GeneratedConnectivityDiagnostic {
+	var diagnostics []GeneratedConnectivityDiagnostic
+	nonLabelAnchors := schematicNonLabelConnectivityAnchors(schematic, anchors)
+	for labelIndex, label := range schematic.Labels {
+		if nonLabelAnchors[label.Position] > 0 {
+			continue
+		}
+		diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+			Kind:    "label",
+			Path:    indexed("labels", labelIndex, "position"),
+			Net:     label.Text,
+			Point:   formatPoint(label.Position),
+			Message: "label is not connected to a wire, symbol pin, junction, sheet pin, or no-connect marker",
+		})
+	}
+	return diagnostics
+}
+
+func generatedDisconnectedSymbolPinDiagnostics(schematic SchematicFile, anchors map[kicadfiles.Point]int) []GeneratedConnectivityDiagnostic {
+	var diagnostics []GeneratedConnectivityDiagnostic
+	for symbolIndex, symbol := range schematic.Symbols {
+		for pinIndex, point := range symbol.PinAnchors {
+			if anchors[point] > 1 {
+				continue
+			}
+			diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+				Kind:      "symbol_pin_anchor",
+				Path:      indexed("symbols", symbolIndex, "pin_anchors") + "[" + strconv.Itoa(pinIndex) + "]",
+				Reference: symbol.Reference,
+				Pin:       generatedSymbolPinNumber(symbol, pinIndex),
+				Point:     formatPoint(point),
+				Message:   "symbol pin anchor has no connected wire, label, junction, sheet pin, or no-connect marker",
+			})
+		}
+	}
+	return diagnostics
+}
+
+func generatedOffGridDiagnostics(schematic SchematicFile) []GeneratedConnectivityDiagnostic {
+	var diagnostics []GeneratedConnectivityDiagnostic
+	for wireIndex, wire := range schematic.Wires {
+		for pointIndex, point := range wire.Points {
+			if generatedConnectivityOnGrid(point) {
+				continue
+			}
+			diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+				Kind:    "wire_point",
+				Path:    indexed("wires", wireIndex, "points") + "[" + strconv.Itoa(pointIndex) + "]",
+				Point:   formatPoint(point),
+				Message: "wire point is off the 50 mil connection grid",
+			})
+		}
+	}
+	for labelIndex, label := range schematic.Labels {
+		if generatedConnectivityOnGrid(label.Position) {
+			continue
+		}
+		diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+			Kind:    "label",
+			Path:    indexed("labels", labelIndex, "position"),
+			Net:     label.Text,
+			Point:   formatPoint(label.Position),
+			Message: "label position is off the 50 mil connection grid",
+		})
+	}
+	for symbolIndex, symbol := range schematic.Symbols {
+		for pinIndex, point := range symbol.PinAnchors {
+			if generatedConnectivityOnGrid(point) {
+				continue
+			}
+			diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+				Kind:      "symbol_pin_anchor",
+				Path:      indexed("symbols", symbolIndex, "pin_anchors") + "[" + strconv.Itoa(pinIndex) + "]",
+				Reference: symbol.Reference,
+				Pin:       generatedSymbolPinNumber(symbol, pinIndex),
+				Point:     formatPoint(point),
+				Message:   "symbol pin anchor is off the 50 mil connection grid",
+			})
+		}
+	}
+	for junctionIndex, junction := range schematic.Junctions {
+		if generatedConnectivityOnGrid(junction.Position) {
+			continue
+		}
+		diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+			Kind:    "junction",
+			Path:    indexed("junctions", junctionIndex, "position"),
+			Point:   formatPoint(junction.Position),
+			Message: "junction position is off the 50 mil connection grid",
+		})
+	}
+	for noConnectIndex, noConnect := range schematic.NoConnects {
+		if generatedConnectivityOnGrid(noConnect.Position) {
+			continue
+		}
+		diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+			Kind:    "no_connect",
+			Path:    indexed("no_connects", noConnectIndex, "position"),
+			Point:   formatPoint(noConnect.Position),
+			Message: "no-connect marker is off the 50 mil connection grid",
+		})
+	}
+	for sheetIndex, sheet := range schematic.Sheets {
+		for pinIndex, pin := range sheet.Pins {
+			if generatedConnectivityOnGrid(pin.Position) {
+				continue
+			}
+			diagnostics = append(diagnostics, GeneratedConnectivityDiagnostic{
+				Kind:    "sheet_pin",
+				Path:    indexed(indexed("sheets", sheetIndex, "pins"), pinIndex, "position"),
+				Net:     pin.Text,
+				Point:   formatPoint(pin.Position),
+				Message: "sheet pin is off the 50 mil connection grid",
+			})
+		}
+	}
+	return diagnostics
+}
+
+func generatedConnectivityOnGrid(point kicadfiles.Point) bool {
+	return point.X%generatedConnectivityGrid == 0 && point.Y%generatedConnectivityGrid == 0
+}
+
+func generatedSymbolPinNumber(symbol SchematicSymbol, pinIndex int) string {
+	if pinIndex >= 0 && pinIndex < len(symbol.Pins) {
+		return symbol.Pins[pinIndex].Number
+	}
+	return ""
+}
+
+func generatedConnectivityComponents(schematic SchematicFile) []GeneratedConnectivityComponent {
+	points := generatedConnectivityPointSet(schematic)
+	if len(points) == 0 {
+		return nil
+	}
+	parent := make(map[kicadfiles.Point]kicadfiles.Point, len(points))
+	for point := range points {
+		parent[point] = point
+	}
+	find := func(point kicadfiles.Point) kicadfiles.Point {
+		root := point
+		for parent[root] != root {
+			root = parent[root]
+		}
+		for parent[point] != point {
+			next := parent[point]
+			parent[point] = root
+			point = next
+		}
+		return root
+	}
+	union := func(a, b kicadfiles.Point) {
+		aRoot := find(a)
+		bRoot := find(b)
+		if aRoot == bRoot {
+			return
+		}
+		if pointLess(bRoot, aRoot) {
+			aRoot, bRoot = bRoot, aRoot
+		}
+		parent[bRoot] = aRoot
+	}
+	for _, wire := range schematic.Wires {
+		for i := 1; i < len(wire.Points); i++ {
+			union(wire.Points[i-1], wire.Points[i])
+		}
+	}
+	type componentAccumulator struct {
+		points     map[kicadfiles.Point]struct{}
+		labels     map[string]struct{}
+		references map[string]struct{}
+	}
+	accumulators := map[kicadfiles.Point]*componentAccumulator{}
+	componentFor := func(point kicadfiles.Point) *componentAccumulator {
+		root := find(point)
+		component := accumulators[root]
+		if component == nil {
+			component = &componentAccumulator{
+				points:     map[kicadfiles.Point]struct{}{},
+				labels:     map[string]struct{}{},
+				references: map[string]struct{}{},
+			}
+			accumulators[root] = component
+		}
+		return component
+	}
+	for point := range points {
+		componentFor(point).points[point] = struct{}{}
+	}
+	for _, label := range schematic.Labels {
+		if _, ok := points[label.Position]; ok && strings.TrimSpace(label.Text) != "" {
+			componentFor(label.Position).labels[label.Text] = struct{}{}
+		}
+	}
+	for _, symbol := range schematic.Symbols {
+		if strings.TrimSpace(symbol.Reference) == "" {
+			continue
+		}
+		for _, point := range symbol.PinAnchors {
+			if _, ok := points[point]; ok {
+				componentFor(point).references[symbol.Reference] = struct{}{}
+			}
+		}
+	}
+	roots := make([]kicadfiles.Point, 0, len(accumulators))
+	for root := range accumulators {
+		roots = append(roots, root)
+	}
+	slices.SortFunc(roots, func(a, b kicadfiles.Point) int {
+		if pointLess(a, b) {
+			return -1
+		}
+		if pointLess(b, a) {
+			return 1
+		}
+		return 0
+	})
+	components := make([]GeneratedConnectivityComponent, 0, len(roots))
+	for _, root := range roots {
+		component := accumulators[root]
+		components = append(components, GeneratedConnectivityComponent{
+			Index:      len(components),
+			PointCount: len(component.points),
+			Labels:     sortedConnectivityStrings(component.labels),
+			References: sortedConnectivityStrings(component.references),
+		})
+	}
+	return components
+}
+
+func generatedConnectivityPointSet(schematic SchematicFile) map[kicadfiles.Point]struct{} {
+	points := map[kicadfiles.Point]struct{}{}
+	for _, wire := range schematic.Wires {
+		for _, point := range wire.Points {
+			points[point] = struct{}{}
+		}
+	}
+	for _, label := range schematic.Labels {
+		points[label.Position] = struct{}{}
+	}
+	for _, junction := range schematic.Junctions {
+		points[junction.Position] = struct{}{}
+	}
+	for _, noConnect := range schematic.NoConnects {
+		points[noConnect.Position] = struct{}{}
+	}
+	for _, symbol := range schematic.Symbols {
+		for _, point := range symbol.PinAnchors {
+			points[point] = struct{}{}
+		}
+	}
+	for _, sheet := range schematic.Sheets {
+		for _, pin := range sheet.Pins {
+			points[pin.Position] = struct{}{}
+		}
+	}
+	return points
+}
+
+func sortedConnectivityStrings(values map[string]struct{}) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(values))
+	for value := range values {
+		result = append(result, value)
+	}
+	slices.Sort(result)
+	return result
 }
 
 type wireEndpoint struct {

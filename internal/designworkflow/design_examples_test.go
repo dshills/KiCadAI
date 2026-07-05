@@ -429,12 +429,24 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
+	schematicPath := filepath.Join(outputDir, NormalizeProjectName(request.Name)+".kicad_sch")
+	schematicFile, err := schematic.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatalf("%s generated schematic is not readable for connectivity diagnostics: %v", metadata.ID, err)
+	}
+	connectivityReport := schematic.InspectGeneratedConnectivity(schematicFile)
+	if connectivityReport.ConnectedComponentCount == 0 {
+		t.Fatalf("%s generated schematic produced no connectivity components:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+	}
+	if len(connectivityReport.OffGridObjects) == 0 {
+		t.Fatalf("%s expected generated schematic off-grid diagnostics for KiCad ERC blocker:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+	}
 	if kicadChecks.Status != StageStatusBlocked {
-		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad ERC connectivity:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad ERC connectivity:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result), formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
 	for _, want := range []string{"Label not connected", "Pin not connected", "Symbol pin or wire end off connection grid", "Unconnected wire endpoint"} {
 		if !designExampleStageHasIssueMessage(kicadChecks, want) && !designExamplePromotionHasIssueMessage(report, StageKiCadChecks, want) {
-			t.Errorf("%s missing ERC blocker %q\nstage issues:\n%s\npromotion issues:\n%s", metadata.ID, want, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues))
+			t.Errorf("%s missing ERC blocker %q\nstage issues:\n%s\npromotion issues:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, want, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues), formatGeneratedConnectivityDiagnostics(connectivityReport))
 		}
 	}
 	for _, stageName := range ercDependencyStages {
@@ -1511,6 +1523,77 @@ func designExamplePromotionHasBlockingStage(report PromotionReport, stage StageN
 		}
 	}
 	return false
+}
+
+func formatGeneratedConnectivityDiagnostics(report schematic.GeneratedConnectivityReport) string {
+	var builder strings.Builder
+	fmt.Fprintf(&builder, "status=%s symbols=%d wires=%d labels=%d components=%d diagnostics=%d issues=%d", report.Status, report.SymbolCount, report.WireCount, report.LabelCount, report.ConnectedComponentCount, report.DiagnosticCount, report.IssueCount)
+	writeDiagnostics := func(title string, diagnostics []schematic.GeneratedConnectivityDiagnostic) {
+		if len(diagnostics) == 0 {
+			return
+		}
+		builder.WriteByte('\n')
+		builder.WriteString(title)
+		builder.WriteByte(':')
+		for _, diagnostic := range diagnostics {
+			builder.WriteString("\n- ")
+			builder.WriteString(diagnostic.Kind)
+			if diagnostic.Reference != "" {
+				builder.WriteString(" ")
+				builder.WriteString(diagnostic.Reference)
+			}
+			if diagnostic.Pin != "" {
+				builder.WriteString(" pin ")
+				builder.WriteString(diagnostic.Pin)
+			}
+			if diagnostic.Net != "" {
+				builder.WriteString(" net ")
+				builder.WriteString(diagnostic.Net)
+			}
+			if diagnostic.Path != "" {
+				builder.WriteString(" at ")
+				builder.WriteString(diagnostic.Path)
+			}
+			if diagnostic.Point != "" {
+				builder.WriteString(" ")
+				builder.WriteString(diagnostic.Point)
+			}
+			if diagnostic.Message != "" {
+				builder.WriteString(": ")
+				builder.WriteString(diagnostic.Message)
+			}
+		}
+	}
+	writeDiagnostics("off-grid objects", report.OffGridObjects)
+	writeDiagnostics("floating labels", report.FloatingLabels)
+	writeDiagnostics("dangling wire endpoints", report.DanglingWireEndpoints)
+	writeDiagnostics("disconnected symbol pins", report.DisconnectedSymbolPinAnchors)
+	if len(report.Issues) > 0 {
+		builder.WriteString("\ngenerated connectivity issues:")
+		for _, issue := range report.Issues {
+			builder.WriteString("\n- ")
+			if issue.Path != "" {
+				builder.WriteString(issue.Path)
+				builder.WriteString(": ")
+			}
+			builder.WriteString(issue.Message)
+		}
+	}
+	if len(report.ConnectedComponents) > 0 {
+		builder.WriteString("\nconnected components:")
+		for _, component := range report.ConnectedComponents {
+			fmt.Fprintf(&builder, "\n- #%d points=%d", component.Index, component.PointCount)
+			if len(component.Labels) > 0 {
+				builder.WriteString(" labels=")
+				builder.WriteString(strings.Join(component.Labels, ","))
+			}
+			if len(component.References) > 0 {
+				builder.WriteString(" refs=")
+				builder.WriteString(strings.Join(component.References, ","))
+			}
+		}
+	}
+	return builder.String()
 }
 
 func formatDesignExamplePromotionIssues(issues []PromotionIssue) string {

@@ -962,6 +962,9 @@ func TestValidateGeneratedConnectivityAcceptsKnownAnchors(t *testing.T) {
 	if report.Status != GeneratedConnectivityClean || report.IssueCount != 0 || report.SymbolPinAnchorCount != 0 || report.WireCount != 1 {
 		t.Fatalf("report = %#v, want clean connectivity evidence", report)
 	}
+	if report.ConnectedComponentCount != 1 || len(report.ConnectedComponents) != 1 || report.ConnectedComponents[0].PointCount != 2 {
+		t.Fatalf("connected components = %#v, want one two-point component", report.ConnectedComponents)
+	}
 }
 
 func TestValidateGeneratedConnectivityAcceptsSymbolPinAnchors(t *testing.T) {
@@ -993,6 +996,47 @@ func TestValidateGeneratedConnectivityAcceptsSymbolPinAnchors(t *testing.T) {
 	report := InspectGeneratedConnectivity(schematic)
 	if report.Status != GeneratedConnectivityClean || report.IssueCount != 0 || report.SymbolPinAnchorCount != 1 || report.WireCount != 1 {
 		t.Fatalf("report = %#v, want clean symbol pin anchor evidence", report)
+	}
+}
+
+func TestInspectGeneratedConnectivityCountsSharedWireVertices(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Wires = []Wire{{
+		UUID: kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(10.16), Y: kicadfiles.MM(10.16)},
+			{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(10.16)},
+		},
+	}, {
+		UUID: kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Points: []kicadfiles.Point{
+			{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(10.16)},
+			{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(10.16)},
+		},
+	}}
+	schematic.Labels = []Label{{
+		UUID:     kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+		Text:     "MID",
+		Kind:     LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(10.16)},
+	}}
+	schematic.Junctions = []Junction{{
+		UUID:     kicadfiles.UUID("55555555-5555-4555-8555-555555555555"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(10.16), Y: kicadfiles.MM(10.16)},
+	}, {
+		UUID:     kicadfiles.UUID("66666666-6666-4666-8666-666666666666"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(10.16)},
+	}}
+
+	report := InspectGeneratedConnectivity(schematic)
+	if report.Status != GeneratedConnectivityClean || report.IssueCount != 0 {
+		t.Fatalf("report = %#v, want shared vertex label treated as connected", report)
+	}
+	if len(report.FloatingLabels) != 0 || len(report.DanglingWireEndpoints) != 0 {
+		t.Fatalf("floating labels=%#v dangling endpoints=%#v, want none", report.FloatingLabels, report.DanglingWireEndpoints)
+	}
+	if report.ConnectedComponentCount != 1 || report.ConnectedComponents[0].PointCount != 3 {
+		t.Fatalf("connected components = %#v, want one three-point wire component", report.ConnectedComponents)
 	}
 }
 
@@ -1065,6 +1109,116 @@ func TestValidateGeneratedConnectivityRejectsOpenEndpointAndNearMiss(t *testing.
 	if report.Issues[0].Path == "" || report.Issues[0].Message == "" {
 		t.Fatalf("report issue missing path/message: %#v", report.Issues)
 	}
+	if len(report.DanglingWireEndpoints) != 2 {
+		t.Fatalf("dangling wire endpoints = %#v, want two endpoints", report.DanglingWireEndpoints)
+	}
+	if len(report.FloatingLabels) != 1 || report.FloatingLabels[0].Net != "IN" {
+		t.Fatalf("floating labels = %#v, want IN label", report.FloatingLabels)
+	}
+	if !generatedConnectivityTestHasDiagnostic(report.OffGridObjects, "label", "labels[0].position") {
+		t.Fatalf("off-grid objects = %#v, want label diagnostic", report.OffGridObjects)
+	}
+	if report.DiagnosticCount != len(report.DanglingWireEndpoints)+len(report.FloatingLabels)+len(report.DisconnectedSymbolPinAnchors)+len(report.OffGridObjects) {
+		t.Fatalf("diagnostic count = %d, diagnostics=%#v/%#v/%#v/%#v", report.DiagnosticCount, report.DanglingWireEndpoints, report.FloatingLabels, report.DisconnectedSymbolPinAnchors, report.OffGridObjects)
+	}
+}
+
+func TestValidateGeneratedConnectivityRejectsSamePointLabelCluster(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Labels = []Label{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Text:     "SDA",
+		Kind:     LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(10.16), Y: kicadfiles.MM(10.16)},
+	}, {
+		UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Text:     "SCL",
+		Kind:     LabelLocal,
+		Position: kicadfiles.Point{X: kicadfiles.MM(10.16), Y: kicadfiles.MM(10.16)},
+	}}
+
+	err := ValidateGeneratedConnectivity(schematic)
+	if err == nil {
+		t.Fatal("expected same-point labels without a non-label anchor to fail connectivity validation")
+	}
+	report := InspectGeneratedConnectivity(schematic)
+	if report.Status != GeneratedConnectivityBlocked || len(report.FloatingLabels) != 2 {
+		t.Fatalf("report = %#v, want both co-located labels reported as floating", report)
+	}
+}
+
+func TestInspectGeneratedConnectivityReportsDisconnectedSymbolPinAnchors(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Symbols = []SchematicSymbol{{
+		UUID:       kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		LibraryID:  "Device:R",
+		Reference:  "R1",
+		Value:      "1k",
+		Pins:       []SymbolPin{{Number: "1"}},
+		PinAnchors: []kicadfiles.Point{{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}},
+	}}
+
+	report := InspectGeneratedConnectivity(schematic)
+	if report.Status != GeneratedConnectivityBlocked || report.IssueCount != 1 {
+		t.Fatalf("report = %#v, want one disconnected pin issue", report)
+	}
+	if len(report.DisconnectedSymbolPinAnchors) != 1 {
+		t.Fatalf("disconnected pins = %#v, want one diagnostic", report.DisconnectedSymbolPinAnchors)
+	}
+	got := report.DisconnectedSymbolPinAnchors[0]
+	if got.Reference != "R1" || got.Pin != "1" || got.Kind != "symbol_pin_anchor" {
+		t.Fatalf("disconnected pin diagnostic = %#v, want R1 pin 1", got)
+	}
+}
+
+func TestInspectGeneratedConnectivityReportsOffGridConnectivityObjects(t *testing.T) {
+	schematic := minimalSchematic()
+	schematic.Junctions = []Junction{{
+		UUID:     kicadfiles.UUID("11111111-1111-4111-8111-111111111111"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(10.1), Y: kicadfiles.MM(10)},
+	}}
+	schematic.NoConnects = []NoConnect{{
+		UUID:     kicadfiles.UUID("22222222-2222-4222-8222-222222222222"),
+		Position: kicadfiles.Point{X: kicadfiles.MM(12.8), Y: kicadfiles.MM(10)},
+	}}
+	schematic.Sheets = []Sheet{{
+		UUID:     kicadfiles.UUID("33333333-3333-4333-8333-333333333333"),
+		Name:     "child",
+		Filename: "child.kicad_sch",
+		Position: kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)},
+		Size:     kicadfiles.Point{X: kicadfiles.MM(10.16), Y: kicadfiles.MM(10.16)},
+		Pins: []SheetPin{{
+			UUID:     kicadfiles.UUID("44444444-4444-4444-8444-444444444444"),
+			Text:     "SDA",
+			Kind:     SheetPinBidirectional,
+			Position: kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(22)},
+		}},
+	}}
+
+	report := InspectGeneratedConnectivity(schematic)
+	for _, want := range []string{"junction", "no_connect", "sheet_pin"} {
+		if !generatedConnectivityTestHasDiagnosticKind(report.OffGridObjects, want) {
+			t.Fatalf("off-grid diagnostics = %#v, missing kind %q", report.OffGridObjects, want)
+		}
+	}
+}
+
+func generatedConnectivityTestHasDiagnostic(diagnostics []GeneratedConnectivityDiagnostic, kind string, path string) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Kind == kind && diagnostic.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func generatedConnectivityTestHasDiagnosticKind(diagnostics []GeneratedConnectivityDiagnostic, kind string) bool {
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Kind == kind {
+			return true
+		}
+	}
+	return false
 }
 
 func TestValidateRejectsInvalidSymbolDetails(t *testing.T) {
