@@ -44,6 +44,18 @@ var capacitorEvidenceReviewChecks = []struct {
 	{path: "esr_review", label: "ESR", get: func(evidence *CapacitorEvidence) string { return evidence.ESRReview }},
 }
 
+var opAmpEvidenceReviewChecks = []struct {
+	path  string
+	label string
+	get   func(*OpAmpEvidence) string
+}{
+	{path: "output_drive_status", label: "output-drive", get: func(evidence *OpAmpEvidence) string { return evidence.OutputDriveStatus }},
+	{path: "load_compatibility_status", label: "load-compatibility", get: func(evidence *OpAmpEvidence) string { return evidence.LoadCompatibilityStatus }},
+	{path: "gain_bandwidth_status", label: "gain-bandwidth", get: func(evidence *OpAmpEvidence) string { return evidence.GainBandwidthStatus }},
+	{path: "stability_status", label: "stability", get: func(evidence *OpAmpEvidence) string { return evidence.StabilityStatus }},
+	{path: "input_common_mode_status", label: "input-common-mode", get: func(evidence *OpAmpEvidence) string { return evidence.InputCommonModeStatus }},
+}
+
 type Query struct {
 	Text              string          `json:"text,omitempty"`
 	Family            string          `json:"family,omitempty"`
@@ -594,6 +606,21 @@ func structuredEvidenceReviewIssues(record ComponentRecord, severity reports.Sev
 				value = reviewStatusUnknown
 			}
 			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".capacitor_evidence."+review.path, "capacitor "+review.label+" evidence is not proven: "+value))
+		}
+	}
+	if record.OpAmp != nil {
+		if record.OpAmp.FabricationCandidateBlocks {
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".opamp_evidence.fabrication_candidate_blocks", "op-amp evidence blocks fabrication-candidate use until review is complete"))
+		}
+		for _, review := range opAmpEvidenceReviewChecks {
+			value := review.get(record.OpAmp)
+			if value == reviewStatusProven || value == reviewStatusNotApplicable {
+				continue
+			}
+			if value == "" {
+				value = reviewStatusUnknown
+			}
+			issues = append(issues, NewIssue(CodeComponentReviewRequired, severity, basePath+".opamp_evidence."+review.path, "op-amp "+review.label+" evidence is not proven: "+value))
 		}
 	}
 	if record.AmplifierOutput != nil {

@@ -100,6 +100,7 @@ type ComponentRecord struct {
 	DeratingRules   []DeratingRule           `json:"derating_rules,omitempty"`
 	Regulator       *RegulatorEvidence       `json:"regulator_evidence,omitempty"`
 	Capacitor       *CapacitorEvidence       `json:"capacitor_evidence,omitempty"`
+	OpAmp           *OpAmpEvidence           `json:"opamp_evidence,omitempty"`
 	AmplifierOutput *AmplifierOutputEvidence `json:"amplifier_output_evidence,omitempty"`
 	PlacementHints  []PlacementHint          `json:"placement_hints,omitempty"`
 	RoutingHints    []RoutingHint            `json:"routing_hints,omitempty"`
@@ -250,6 +251,18 @@ type CapacitorEvidence struct {
 	FabricationProof           bool   `json:"fabrication_proof,omitempty"`
 	FabricationCandidateBlocks bool   `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string `json:"review_note,omitempty"`
+}
+
+type OpAmpEvidence struct {
+	IntendedRoles              []string `json:"intended_roles,omitempty"`
+	SupplyMode                 string   `json:"supply_mode,omitempty"`
+	OutputDriveStatus          string   `json:"output_drive_status,omitempty"`
+	LoadCompatibilityStatus    string   `json:"load_compatibility_status,omitempty"`
+	GainBandwidthStatus        string   `json:"gain_bandwidth_status,omitempty"`
+	StabilityStatus            string   `json:"stability_status,omitempty"`
+	InputCommonModeStatus      string   `json:"input_common_mode_status,omitempty"`
+	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
+	ReviewNote                 string   `json:"review_note,omitempty"`
 }
 
 type AmplifierOutputEvidence struct {

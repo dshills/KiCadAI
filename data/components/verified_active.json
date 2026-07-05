@@ -13,6 +13,17 @@
       "ratings": [{"kind": "supply_voltage", "min": "2.7", "max": "5.5", "unit": "V"}],
       "temperature": {"min": "-40", "max": "125", "unit": "C"},
       "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place supply decoupling capacitor close to V+ and V- pins."}],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage", "small_signal_driver"],
+        "supply_mode": "rail_to_rail_single_supply",
+        "output_drive_status": "review_required",
+        "load_compatibility_status": "review_required",
+        "gain_bandwidth_status": "review_required",
+        "stability_status": "review_required",
+        "input_common_mode_status": "proven",
+        "fabrication_candidate_blocks": true,
+        "review_note": "LMV321 is selected as a low-voltage connectivity seed. Headphone-drive load, gain-bandwidth, compensation, and stability remain design-specific before fabrication-candidate use."
+      },
       "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm"}],
       "symbols": [{
         "symbol_id": "Amplifier_Operational:LMV321",

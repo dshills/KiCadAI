@@ -153,6 +153,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateDeratingRules(path+".derating_rules", record.DeratingRules)...)
 		issues = append(issues, validateRegulatorEvidence(path+".regulator_evidence", record.Regulator)...)
 		issues = append(issues, validateCapacitorEvidence(path+".capacitor_evidence", record.Generic, record.Capacitor)...)
+		issues = append(issues, validateOpAmpEvidence(path+".opamp_evidence", record.OpAmp)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
 		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
 		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
@@ -274,6 +275,20 @@ var amplifierOutputStatusFields = []evidenceTextField{
 	{pathSuffix: "power_dissipation_status", value: func(e *AmplifierOutputEvidence) string { return e.PowerDissipationStatus }, label: "power dissipation"},
 	{pathSuffix: "thermal_review", value: func(e *AmplifierOutputEvidence) string { return e.ThermalReview }, label: "thermal review"},
 	{pathSuffix: "safe_operating_area_status", value: func(e *AmplifierOutputEvidence) string { return e.SafeOperatingAreaStatus }, label: "safe operating area"},
+}
+
+type opAmpEvidenceTextField struct {
+	pathSuffix string
+	value      func(*OpAmpEvidence) string
+	label      string
+}
+
+var opAmpStatusFields = []opAmpEvidenceTextField{
+	{pathSuffix: "output_drive_status", value: func(e *OpAmpEvidence) string { return e.OutputDriveStatus }, label: "op-amp output-drive"},
+	{pathSuffix: "load_compatibility_status", value: func(e *OpAmpEvidence) string { return e.LoadCompatibilityStatus }, label: "op-amp load compatibility"},
+	{pathSuffix: "gain_bandwidth_status", value: func(e *OpAmpEvidence) string { return e.GainBandwidthStatus }, label: "op-amp gain-bandwidth"},
+	{pathSuffix: "stability_status", value: func(e *OpAmpEvidence) string { return e.StabilityStatus }, label: "op-amp stability"},
+	{pathSuffix: "input_common_mode_status", value: func(e *OpAmpEvidence) string { return e.InputCommonModeStatus }, label: "op-amp input common-mode"},
 }
 
 func valueConstraintsAsGeneric(values []ValueConstraint) []genericConstraint {
@@ -478,6 +493,45 @@ func validateCapacitorEvidence(path string, generic bool, evidence *CapacitorEvi
 	}
 	if generic && evidence.FabricationProof {
 		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".fabrication_proof", "generic capacitor records cannot carry fabrication proof"))
+	}
+	return issues
+}
+
+func validateOpAmpEvidence(path string, evidence *OpAmpEvidence) []reports.Issue {
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	switch evidence.SupplyMode {
+	case "single_supply", "dual_supply", "rail_to_rail_single_supply":
+	case "":
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".supply_mode", "op-amp supply mode is required"))
+	default:
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".supply_mode", "invalid op-amp supply mode: "+evidence.SupplyMode))
+	}
+	for i, role := range evidence.IntendedRoles {
+		rolePath := fmt.Sprintf("%s.intended_roles[%d]", path, i)
+		if issue, ok := validateTrimmedMetadata(rolePath, role, "op-amp intended role"); ok {
+			issues = append(issues, issue)
+			continue
+		}
+		switch role {
+		case "input_buffer", "gain_stage", "headphone_driver", "small_signal_driver":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, rolePath, "invalid op-amp intended role: "+role))
+		}
+	}
+	if len(evidence.IntendedRoles) == 0 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".intended_roles", "op-amp evidence requires at least one intended role"))
+	}
+	for _, status := range opAmpStatusFields {
+		fieldPath := path + "." + status.pathSuffix
+		value := status.value(evidence)
+		if strings.TrimSpace(value) == "" {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, fieldPath, status.label+" status is required"))
+			continue
+		}
+		issues = append(issues, validateReviewStatus(fieldPath, value, status.label)...)
 	}
 	return issues
 }

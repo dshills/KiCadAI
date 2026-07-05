@@ -39,30 +39,32 @@ type ComponentSelectionResult struct {
 }
 
 type ComponentSelectionEntry struct {
-	InstanceID      string                            `json:"instance_id"`
-	BlockID         string                            `json:"block_id"`
-	Role            string                            `json:"role"`
-	ComponentID     string                            `json:"component_id"`
-	VariantID       string                            `json:"variant_id"`
-	Manufacturer    string                            `json:"manufacturer,omitempty"`
-	MPN             string                            `json:"mpn,omitempty"`
-	ComponentClass  string                            `json:"component_class,omitempty"`
-	SymbolID        string                            `json:"symbol_id,omitempty"`
-	FunctionPins    []components.FunctionPin          `json:"function_pins,omitempty"`
-	Value           string                            `json:"value,omitempty"`
-	FootprintID     string                            `json:"footprint_id,omitempty"`
-	PinMapID        string                            `json:"pinmap_id,omitempty"`
-	Confidence      components.ConfidenceLevel        `json:"confidence"`
-	ResolverChecked bool                              `json:"resolver_checked,omitempty"`
-	PinMapChecked   bool                              `json:"pinmap_checked,omitempty"`
-	Companions      []components.CompanionRequirement `json:"companions,omitempty"`
-	Regulator       *components.RegulatorEvidence     `json:"regulator_evidence,omitempty"`
-	Capacitor       *components.CapacitorEvidence     `json:"capacitor_evidence,omitempty"`
-	PlacementHints  []components.PlacementHint        `json:"placement_hints,omitempty"`
-	RoutingHints    []components.RoutingHint          `json:"routing_hints,omitempty"`
-	Procurement     *components.ProcurementEvidence   `json:"procurement,omitempty"`
-	Rejected        []components.CandidateRejection   `json:"rejected,omitempty"`
-	Warnings        []reports.Issue                   `json:"warnings,omitempty"`
+	InstanceID      string                              `json:"instance_id"`
+	BlockID         string                              `json:"block_id"`
+	Role            string                              `json:"role"`
+	ComponentID     string                              `json:"component_id"`
+	VariantID       string                              `json:"variant_id"`
+	Manufacturer    string                              `json:"manufacturer,omitempty"`
+	MPN             string                              `json:"mpn,omitempty"`
+	ComponentClass  string                              `json:"component_class,omitempty"`
+	SymbolID        string                              `json:"symbol_id,omitempty"`
+	FunctionPins    []components.FunctionPin            `json:"function_pins,omitempty"`
+	Value           string                              `json:"value,omitempty"`
+	FootprintID     string                              `json:"footprint_id,omitempty"`
+	PinMapID        string                              `json:"pinmap_id,omitempty"`
+	Confidence      components.ConfidenceLevel          `json:"confidence"`
+	ResolverChecked bool                                `json:"resolver_checked,omitempty"`
+	PinMapChecked   bool                                `json:"pinmap_checked,omitempty"`
+	Companions      []components.CompanionRequirement   `json:"companions,omitempty"`
+	Regulator       *components.RegulatorEvidence       `json:"regulator_evidence,omitempty"`
+	Capacitor       *components.CapacitorEvidence       `json:"capacitor_evidence,omitempty"`
+	OpAmp           *components.OpAmpEvidence           `json:"opamp_evidence,omitempty"`
+	AmplifierOutput *components.AmplifierOutputEvidence `json:"amplifier_output_evidence,omitempty"`
+	PlacementHints  []components.PlacementHint          `json:"placement_hints,omitempty"`
+	RoutingHints    []components.RoutingHint            `json:"routing_hints,omitempty"`
+	Procurement     *components.ProcurementEvidence     `json:"procurement,omitempty"`
+	Rejected        []components.CandidateRejection     `json:"rejected,omitempty"`
+	Warnings        []reports.Issue                     `json:"warnings,omitempty"`
 }
 
 func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, plan BlockPlanResult, opts ComponentSelectionOptions) ComponentSelectionResult {
@@ -162,6 +164,8 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 					Companions:      append([]components.CompanionRequirement(nil), selection.Component.Companions...),
 					Regulator:       cloneRegulatorEvidence(selection.Component.Regulator),
 					Capacitor:       cloneCapacitorEvidence(selection.Component.Capacitor),
+					OpAmp:           cloneOpAmpEvidence(selection.Component.OpAmp),
+					AmplifierOutput: cloneAmplifierOutputEvidence(selection.Component.AmplifierOutput),
 					PlacementHints:  append([]components.PlacementHint(nil), selection.Component.PlacementHints...),
 					RoutingHints:    append([]components.RoutingHint(nil), selection.Component.RoutingHints...),
 					Procurement:     cloneProcurementEvidence(selection.Procurement),
@@ -751,6 +755,12 @@ func selectedComponentSummary(selections []ComponentSelectionEntry) []map[string
 		if selection.Capacitor != nil {
 			item["capacitor_evidence"] = capacitorEvidenceSummary(selection.Capacitor)
 		}
+		if selection.OpAmp != nil {
+			item["opamp_evidence"] = opAmpEvidenceSummary(selection.OpAmp)
+		}
+		if selection.AmplifierOutput != nil {
+			item["amplifier_output_evidence"] = amplifierOutputEvidenceSummary(selection.AmplifierOutput)
+		}
 		if selection.Procurement != nil {
 			item["procurement"] = selection.Procurement
 		}
@@ -829,6 +839,23 @@ func cloneCapacitorEvidence(evidence *components.CapacitorEvidence) *components.
 	return &clone
 }
 
+func cloneOpAmpEvidence(evidence *components.OpAmpEvidence) *components.OpAmpEvidence {
+	if evidence == nil {
+		return nil
+	}
+	clone := *evidence
+	clone.IntendedRoles = append([]string(nil), evidence.IntendedRoles...)
+	return &clone
+}
+
+func cloneAmplifierOutputEvidence(evidence *components.AmplifierOutputEvidence) *components.AmplifierOutputEvidence {
+	if evidence == nil {
+		return nil
+	}
+	clone := *evidence
+	return &clone
+}
+
 func regulatorEvidenceSummary(evidence *components.RegulatorEvidence) map[string]any {
 	out := map[string]any{
 		"thermal_review": evidence.ThermalReview,
@@ -852,6 +879,36 @@ func capacitorEvidenceSummary(evidence *components.CapacitorEvidence) map[string
 		"esr_review":                   evidence.ESRReview,
 		"fabrication_candidate_blocks": evidence.FabricationCandidateBlocks,
 		"fabrication_proof":            evidence.FabricationProof,
+		"review_note":                  evidence.ReviewNote,
+	}
+}
+
+func opAmpEvidenceSummary(evidence *components.OpAmpEvidence) map[string]any {
+	return map[string]any{
+		"intended_roles":               append([]string(nil), evidence.IntendedRoles...),
+		"supply_mode":                  evidence.SupplyMode,
+		"output_drive_status":          evidence.OutputDriveStatus,
+		"load_compatibility_status":    evidence.LoadCompatibilityStatus,
+		"gain_bandwidth_status":        evidence.GainBandwidthStatus,
+		"stability_status":             evidence.StabilityStatus,
+		"input_common_mode_status":     evidence.InputCommonModeStatus,
+		"fabrication_candidate_blocks": evidence.FabricationCandidateBlocks,
+		"review_note":                  evidence.ReviewNote,
+	}
+}
+
+func amplifierOutputEvidenceSummary(evidence *components.AmplifierOutputEvidence) map[string]any {
+	return map[string]any{
+		"device_class":                 evidence.DeviceClass,
+		"polarity":                     evidence.Polarity,
+		"package":                      evidence.Package,
+		"complementary_group":          evidence.ComplementaryGroup,
+		"voltage_rating_status":        evidence.VoltageRatingStatus,
+		"current_rating_status":        evidence.CurrentRatingStatus,
+		"power_dissipation_status":     evidence.PowerDissipationStatus,
+		"thermal_review":               evidence.ThermalReview,
+		"safe_operating_area_status":   evidence.SafeOperatingAreaStatus,
+		"fabrication_candidate_blocks": evidence.FabricationCandidateBlocks,
 		"review_note":                  evidence.ReviewNote,
 	}
 }

@@ -667,6 +667,15 @@ func cloneSelectionTestRecord(record ComponentRecord) ComponentRecord {
 		equivalence.Notes = append([]string(nil), record.Equivalence.Notes...)
 		clone.Equivalence = &equivalence
 	}
+	if record.OpAmp != nil {
+		opamp := *record.OpAmp
+		opamp.IntendedRoles = append([]string(nil), record.OpAmp.IntendedRoles...)
+		clone.OpAmp = &opamp
+	}
+	if record.AmplifierOutput != nil {
+		output := *record.AmplifierOutput
+		clone.AmplifierOutput = &output
+	}
 	return clone
 }
 
@@ -702,6 +711,25 @@ func TestSelectRejectsOpAmpBelowMinimumSupplyRange(t *testing.T) {
 		t.Fatal("expected opamp under-voltage request to fail")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectBlocksOpAmpFabricationCandidateWithoutDriveAndStabilityEvidence(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Text: "ti", Family: "opamp", Package: "sot23_5"},
+		Acceptance: AcceptanceFabricationCandidate,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "supply_voltage",
+			Value: "3.3",
+			Unit:  "V",
+		}},
+	})
+	if result.OK {
+		t.Fatal("expected opamp fabrication-candidate selection to block on review evidence")
+	}
+	assertIssuePath(t, result.Issues, "component.opamp.ti.lmv321.sot23_5.opamp_evidence.fabrication_candidate_blocks")
+	assertIssuePath(t, result.Issues, "component.opamp.ti.lmv321.sot23_5.opamp_evidence.output_drive_status")
+	assertIssuePath(t, result.Issues, "component.opamp.ti.lmv321.sot23_5.opamp_evidence.stability_status")
 }
 
 func TestSelectConcreteNPNBJTByPackageAndFunctions(t *testing.T) {

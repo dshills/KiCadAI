@@ -848,6 +848,69 @@ func TestValidateCatalogAmplifierOutputEvidenceRejectsMalformedMetadata(t *testi
 	}
 }
 
+func TestValidateCatalogOpAmpEvidenceRejectsMalformedMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(record *ComponentRecord)
+		path   string
+	}{
+		{
+			name: "missing intended role",
+			mutate: func(record *ComponentRecord) {
+				record.OpAmp = validOpAmpEvidence()
+				record.OpAmp.IntendedRoles = nil
+			},
+			path: "records[0].opamp_evidence.intended_roles",
+		},
+		{
+			name: "missing supply mode",
+			mutate: func(record *ComponentRecord) {
+				record.OpAmp = validOpAmpEvidence()
+				record.OpAmp.SupplyMode = ""
+			},
+			path: "records[0].opamp_evidence.supply_mode",
+		},
+		{
+			name: "invalid supply mode",
+			mutate: func(record *ComponentRecord) {
+				record.OpAmp = validOpAmpEvidence()
+				record.OpAmp.SupplyMode = "battery_magic"
+			},
+			path: "records[0].opamp_evidence.supply_mode",
+		},
+		{
+			name: "invalid status",
+			mutate: func(record *ComponentRecord) {
+				record.OpAmp = validOpAmpEvidence()
+				record.OpAmp.StabilityStatus = "probably"
+			},
+			path: "records[0].opamp_evidence.stability_status",
+		},
+		{
+			name: "missing output drive status",
+			mutate: func(record *ComponentRecord) {
+				record.OpAmp = validOpAmpEvidence()
+				record.OpAmp.OutputDriveStatus = ""
+			},
+			path: "records[0].opamp_evidence.output_drive_status",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			catalog.Records[0].Family = "opamp"
+			catalog.Families = append(catalog.Families, FamilyDefinition{ID: "opamp", Name: "Op-Amp"})
+			tt.mutate(&catalog.Records[0])
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected validation to fail")
+			}
+			assertIssueCode(t, result.Issues, CodeInvalidMetadata)
+			assertIssuePath(t, result.Issues, tt.path)
+		})
+	}
+}
+
 func validAmplifierOutputEvidence() *AmplifierOutputEvidence {
 	return &AmplifierOutputEvidence{
 		DeviceClass:                "bjt",
@@ -866,6 +929,19 @@ func validAmplifierOutputEvidence() *AmplifierOutputEvidence {
 		PowerDissipationStatus:     "review_required",
 		ThermalReview:              "review_required",
 		SafeOperatingAreaStatus:    "review_required",
+		FabricationCandidateBlocks: true,
+	}
+}
+
+func validOpAmpEvidence() *OpAmpEvidence {
+	return &OpAmpEvidence{
+		IntendedRoles:              []string{"gain_stage"},
+		SupplyMode:                 "rail_to_rail_single_supply",
+		OutputDriveStatus:          "review_required",
+		LoadCompatibilityStatus:    "review_required",
+		GainBandwidthStatus:        "review_required",
+		StabilityStatus:            "review_required",
+		InputCommonModeStatus:      "proven",
 		FabricationCandidateBlocks: true,
 	}
 }
