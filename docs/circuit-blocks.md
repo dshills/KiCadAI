@@ -35,6 +35,13 @@ connectivity evidence only; active buffering, noise review, source impedance
 matching, and fabrication-readiness claims remain blocked until later amplifier
 phases.
 
+`amplifier_bias_network` is implemented as a structural two-diode Class AB
+headphone bias string with rail feed resistors, exported `BIAS_P`/`BIAS_N`
+nodes, and an `AMP_OUT` placement anchor for downstream output-pair alignment.
+It intentionally blocks VBE multiplier requests, speaker or power-amplifier
+use, numeric quiescent-current claims, and unconstrained thermal placement
+until simulation-backed and KiCad-backed evidence exists.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator
