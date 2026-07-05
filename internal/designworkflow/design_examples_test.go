@@ -383,6 +383,67 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 	}
 }
 
+func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping I2C KiCad ERC classification integration test in short mode")
+	}
+	if strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) != "" {
+		t.Skipf("set %s: local KiCad evidence may differ from default fake/internal ERC classification", checks.EnvKiCadCLI)
+	}
+	repoRoot := designExampleRepoRoot(t)
+	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "i2c_sensor_breakout_candidate.metadata.json")
+	metadata, err := loadDesignExampleMetadataPath(metadataPath)
+	if err != nil {
+		t.Fatalf("load %s: %v", metadataPath, err)
+	}
+	if metadata.Readiness != "expected_fail" {
+		t.Fatalf("%s readiness = %q, want expected_fail until KiCad ERC connectivity is clean", metadata.ID, metadata.Readiness)
+	}
+	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+	if err != nil {
+		t.Fatalf("%s request path: %v", metadata.ID, err)
+	}
+	request, issues := loadDesignExampleRequestPath(t, requestPath)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
+	}
+	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(metadata.ID))
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+	if report.Status != PromotionStatusExpectedFail || report.AchievedReadiness != PromotionReadinessExpectedFail {
+		t.Fatalf("%s promotion status=%q achieved=%q, want expected_fail\n%s", metadata.ID, report.Status, report.AchievedReadiness, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	ercDependencyStages := []StageName{StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation}
+	for _, stageName := range ercDependencyStages {
+		stage, ok := designExampleStageByName(result, stageName)
+		if !ok {
+			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
+		}
+		if stage.Status == StageStatusBlocked || stage.Status == StageStatusSkipped {
+			t.Fatalf("%s stage %q status = %q, want progressed evidence before ERC blocker:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	}
+	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
+	if !ok {
+		t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if kicadChecks.Status != StageStatusBlocked {
+		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad ERC connectivity:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	for _, want := range []string{"Label not connected", "Pin not connected", "Symbol pin or wire end off connection grid", "Unconnected wire endpoint"} {
+		if !designExampleStageHasIssueMessage(kicadChecks, want) && !designExamplePromotionHasIssueMessage(report, StageKiCadChecks, want) {
+			t.Errorf("%s missing ERC blocker %q\nstage issues:\n%s\npromotion issues:\n%s", metadata.ID, want, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues))
+		}
+	}
+	for _, stageName := range ercDependencyStages {
+		if designExamplePromotionHasBlockingStage(report, stageName) {
+			t.Fatalf("%s promotion issues include stale downstream blocking issue at %s:\n%s", metadata.ID, stageName, formatDesignExamplePromotionIssues(report.Issues))
+		}
+	}
+}
+
 func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
 	t.Helper()
 	stage, ok := designExampleStageByName(result, StageBlockPlanning)
@@ -1417,6 +1478,60 @@ func formatDesignExampleIssues(issues []reports.Issue) string {
 		builder.WriteString(string(issue.Code))
 		if issue.Path != "" {
 			builder.WriteString(" at ")
+			builder.WriteString(issue.Path)
+		}
+		builder.WriteString(": ")
+		builder.WriteString(issue.Message)
+	}
+	return builder.String()
+}
+
+func designExampleStageHasIssueMessage(stage StageResult, message string) bool {
+	for _, issue := range stage.Issues {
+		if strings.Contains(issue.Message, message) {
+			return true
+		}
+	}
+	return false
+}
+
+func designExamplePromotionHasIssueMessage(report PromotionReport, stage StageName, message string) bool {
+	for _, issue := range report.Issues {
+		if issue.Stage == stage && strings.Contains(issue.Message, message) {
+			return true
+		}
+	}
+	return false
+}
+
+func designExamplePromotionHasBlockingStage(report PromotionReport, stage StageName) bool {
+	for _, issue := range report.Issues {
+		if issue.Stage == stage && (issue.Severity == reports.SeverityError || issue.Severity == reports.SeverityBlocked) {
+			return true
+		}
+	}
+	return false
+}
+
+func formatDesignExamplePromotionIssues(issues []PromotionIssue) string {
+	if len(issues) == 0 {
+		return "(none)"
+	}
+	var builder strings.Builder
+	for _, issue := range issues {
+		if builder.Len() > 0 {
+			builder.WriteByte('\n')
+		}
+		builder.WriteString("- ")
+		builder.WriteString(string(issue.Severity))
+		builder.WriteByte(' ')
+		builder.WriteString(issue.Code)
+		if issue.Stage != "" {
+			builder.WriteString(" at ")
+			builder.WriteString(string(issue.Stage))
+		}
+		if issue.Path != "" {
+			builder.WriteString(" ")
 			builder.WriteString(issue.Path)
 		}
 		builder.WriteString(": ")
