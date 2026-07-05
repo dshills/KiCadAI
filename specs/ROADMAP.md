@@ -209,9 +209,9 @@ loop confidence:
 - the default design examples are intentionally small LED workflows. The simple
   LED prompt is now a strict-promotion candidate without local KiCad and a
   pass-capable KiCad-backed lane when `--require-erc --require-drc` evidence is
-  clean. Connector/LED optional KiCad-backed scenarios remain candidate
-  fixtures with warning-only KiCad evidence. I2C sensor breakout and amplifier
-  fabrication-candidate scenarios remain `expected_fail` fixtures. These paths now
+  clean. Optional KiCad-backed LED, connector/LED, I2C sensor breakout, and
+  amplifier fabrication-candidate scenarios remain `expected_fail` fixtures
+  until their required KiCad ERC/DRC evidence is clean. These paths now
   progress past the previous writer-correctness pad/copper net-code blocker,
   and the I2C fixture now progresses past stale routing-skip and local
   sensor_* net-alias blockers. LED and connector/LED fixtures also prove
@@ -234,8 +234,8 @@ loop confidence:
   branches, proves all 12 required contacts, and reports four graph-complete
   route-tree nets. The previous selected-attempt contact graph gaps for GND
   (`io.2`), SDA (`io.3`), and SCL (`io.4`) are closed; the current blockers
-  are required KiCad ERC schematic connectivity findings, later KiCad DRC/pass
-  evidence, and broader rich-board routing coverage rather than stale routing
+  are required KiCad ERC schematic pin/endpoint connectivity findings, later
+  KiCad DRC/pass evidence, and broader rich-board routing coverage rather than stale routing
   skips, local alias failures, downstream project generation,
   writer-correctness, validation, or selected-attempt branch pathfinding
   blockers.
@@ -439,18 +439,19 @@ Implemented foundation with a documented first AI-controlled generation lane.
   exercise full generated-design workflows with metadata-declared readiness,
   expected stages, expected artifacts, and required ERC/DRC policy. Current
   readiness:
-  - `expected_fail`: `i2c_sensor_breakout_candidate` and
+  - `expected_fail`: `led_indicator_kicad_smoke`,
+    `connector_led_kicad_smoke`, `i2c_sensor_breakout_candidate`, and
     `opamp_headphone_buffer_kicad_candidate`;
-  - `candidate`: `led_indicator_kicad_smoke` and
-    `connector_led_kicad_smoke`;
+  - `candidate`: none yet;
   - `pass`: none yet;
   - `blocked`: none yet.
 - `connector_led_kicad_smoke` now has routing-enabled regression coverage for
   promoted inter-block route candidates, endpoint-contact diagnostics, and
   same-net contact graph completion semantics. `led_indicator_kicad_smoke`
   now exercises standalone exported-port labels, schematic electrical checks,
-  and LED local-route contact proof. Both are candidate fixtures, not pass
-  fixtures, because KiCad still reports warning-level evidence.
+  and LED local-route contact proof. Both are currently `expected_fail` fixtures
+  because required KiCad ERC evidence reports blocking generated schematic
+  connectivity findings.
   `i2c_sensor_breakout_candidate` now enables routing and bounded retry, proves
   block-local VCC/GND/SDA/SCL alias propagation into local routes, proves
   route-tree contact completion for its multi-endpoint inter-block nets, and
@@ -489,8 +490,11 @@ Implemented foundation with a documented first AI-controlled generation lane.
   classified route-tree repair hints, retry selection based on route-tree
   completion evidence, four graph-complete route-tree nets, project-write,
   writer-correctness, and structural validation evidence. It remains
-  `expected_fail` only on required KiCad ERC schematic connectivity evidence;
-  pass readiness still depends on clean KiCad ERC/DRC evidence.
+  `expected_fail` only on required KiCad ERC schematic pin/endpoint
+  connectivity evidence. Generated label stubs are now grid-safe, and a
+  logic-only unit test covers the promotion decision path with mocked clean
+  KiCad results. Candidate/pass readiness still depends on clean real KiCad
+  ERC/DRC evidence.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
@@ -866,15 +870,17 @@ for `design create`. The default set exercises supported LED workflows and
 proves that checked-in examples remain aligned with the current request schema,
 block contracts, project writer, schematic/PCB readers, and component identity
 property propagation. Optional KiCad-backed design examples now live under
-`examples/design/kicad-backed/`; LED and connector/LED are candidate fixtures,
-while richer I2C and amplifier generated boards still record `expected_fail`
-evidence. I2C now reaches route-tree-managed inter-block routing with clean
+`examples/design/kicad-backed/`; LED, connector/LED, I2C, and amplifier
+generated boards currently record `expected_fail` evidence while required
+KiCad ERC/DRC blockers remain open. I2C now reaches route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
 now emits all route-tree branches, records four graph-complete route-tree nets,
 and reaches project-write, writer-correctness, and structural validation
 evidence; the remaining expected-fail blocker is required KiCad ERC schematic
-connectivity evidence. The
+pin/endpoint connectivity evidence. Generated label stubs are grid-safe, and a
+logic-only unit test covers the promotion decision path with mocked clean KiCad
+results. The
 protected Class AB headphone amplifier fixture now verifies the
 `headphone_output_protection` block summary and verified
 LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical

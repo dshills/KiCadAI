@@ -48,8 +48,10 @@ during PCB readback, and reports net-assignment evidence in the `design create`
 workflow. The simple LED prompt now reaches strict promotion `candidate` in the
 default structural lane without requiring local KiCad, and promotes to `pass`
 when required KiCad ERC/DRC and writer round-trip evidence are clean. The
-connector/LED KiCad-backed examples remain candidate-level, while richer I2C
-and amplifier fixtures remain `expected_fail`. Generated block-local routes now
+optional KiCad-backed LED and connector/LED fixtures have been demoted back to
+`expected_fail` after stricter generated schematic connectivity checks exposed
+blocking ERC evidence; I2C and amplifier fixtures also remain `expected_fail`
+until their required KiCad ERC/DRC evidence is clean. Generated block-local routes now
 bind to physical same-net pad anchors and report route-connectivity evidence.
 Generated inter-block route candidates now promote connector/LED and I2C
 breakout request connections into placement/routing evidence. Routing summaries
@@ -66,7 +68,10 @@ fixture now emits all 8 route-tree branches, proves all 12 required contacts,
 and reports four graph-complete route-tree nets. It now reaches project-write,
 writer-correctness, and structural validation evidence; the remaining
 expected-fail blocker is required KiCad ERC evidence for generated schematic
-connectivity. Route-tree repair classifies contact blockers, feeds repairable hints
+pin/endpoint connectivity. Generated schematic label stubs are grid-safe. A
+logic-only unit test exercises the promotion decision path with mocked clean
+KiCad results, but production candidate/pass promotion still requires real
+KiCad CLI evidence. Route-tree repair classifies contact blockers, feeds repairable hints
 into bounded placement retry, and ranks selected attempts by route-tree
 completion evidence. Route-tree diagnostics now separate fixed-net skip notices
 and missing-net-class warnings from repairable blockers. The next blockers are

@@ -2,7 +2,7 @@
   "id": "connector_led_kicad_smoke",
   "request": "connector_led_kicad_smoke.json",
   "tier": "block-composition",
-  "readiness": "candidate",
+  "readiness": "expected_fail",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -26,8 +26,11 @@
     "kicad_checks"
   ],
   "known_gaps": [
+    "Required KiCad ERC evidence reports a blocking pin-not-connected finding for the generated connector/LED schematic.",
+    "Required KiCad ERC evidence reports one-pin label warnings for the generated connector/LED schematic.",
+    "Required KiCad ERC evidence reports unconnected-wire-endpoint warnings for the generated connector/LED schematic.",
     "Local KiCad 10.0.3 DRC currently exits abnormally with no parsed findings for this generated board and the existing DRC-pass sample; promotion records this as warning evidence until the external tool crash is isolated.",
-    "The candidate still carries non-blocking warnings for explicit GND net-class policy and missing resolver-backed library-index evidence."
+    "The fixture still carries non-blocking warnings for explicit GND net-class policy and missing resolver-backed library-index evidence."
   ],
-  "notes": "Design-level multi-block PCB output now carries KiCad-native net declarations, exact embedded KiCad seed symbols for ERC-clean schematics, routed connector-to-LED endpoint contact evidence, and candidate promotion coverage."
+  "notes": "Design-level multi-block PCB output carries KiCad-native net declarations, exact embedded KiCad seed symbols, and routed connector-to-LED endpoint contact evidence. Blocked until required KiCad ERC evidence is clean again."
 }

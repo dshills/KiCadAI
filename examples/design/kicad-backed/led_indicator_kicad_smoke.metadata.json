@@ -2,7 +2,7 @@
   "id": "led_indicator_kicad_smoke",
   "request": "led_indicator_kicad_smoke.json",
   "tier": "smoke",
-  "readiness": "candidate",
+  "readiness": "expected_fail",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -26,9 +26,10 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "KiCad ERC reports only warning-level one-pin label findings for exported standalone LED ports.",
+    "Current generated schematic validation reports conflicting input/status labels on the LED input net.",
+    "Required KiCad ERC evidence reports a blocking pin-not-connected finding for the generated LED schematic.",
     "KiCad DRC reports warning-level footprint-library mismatch and silkscreen clearance findings for generated footprint copies.",
     "Writer correctness still warns when no resolver library index or external round-trip evidence is configured."
   ],
-  "notes": "Smallest optional design-create fixture promoted to candidate with schematic electrical checks, LED local-route contact proof, writer correctness, board validation, and warning-only KiCad ERC/DRC evidence."
+  "notes": "Smallest optional design-create fixture with schematic electrical checks, LED local-route contact proof, writer correctness, and board validation. It is currently expected_fail until generated LED schematic labels and required KiCad ERC pin connectivity are clean again."
 }
