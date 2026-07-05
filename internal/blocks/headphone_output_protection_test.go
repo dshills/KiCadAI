@@ -42,6 +42,38 @@ func TestHeadphoneOutputProtectionInstantiatesWithDefaults(t *testing.T) {
 	}
 }
 
+func TestHeadphoneOutputProtectionCalculatesHighPassAndBlocksVoltageUnderrating(t *testing.T) {
+	output, issues := NewBuiltinRegistry().Instantiate(context.Background(), BlockRequest{
+		BlockID:    "headphone_output_protection",
+		InstanceID: "protect",
+		Params: map[string]any{
+			"nominal_load_ohms":                 "32Ω",
+			"dc_blocking_capacitance":           "220uF",
+			"max_dc_bias_voltage":               "4.5V",
+			"coupling_capacitor_voltage_rating": "16V",
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if cutoff, ok := output.Instance.Params["output_high_pass_cutoff_hz"].(float64); !ok || cutoff <= 0 {
+		t.Fatalf("cutoff = %#v", output.Instance.Params["output_high_pass_cutoff_hz"])
+	}
+	_, issues = NewBuiltinRegistry().Instantiate(context.Background(), BlockRequest{
+		BlockID:    "headphone_output_protection",
+		InstanceID: "bad_protect",
+		Params: map[string]any{
+			"nominal_load_ohms":                 "32Ω",
+			"dc_blocking_capacitance":           "220uF",
+			"max_dc_bias_voltage":               "9V",
+			"coupling_capacitor_voltage_rating": "6.3V",
+		},
+	})
+	if !reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v, want voltage rating blocker", issues)
+	}
+}
+
 func TestHeadphoneOutputProtectionAcceptsSupportedLoadClasses(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	for _, load := range []string{"16Ω", "32Ω", "64Ω"} {

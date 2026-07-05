@@ -51,7 +51,6 @@ func TestAmplifierFamilyInventoryMatchesVerifiedBlockPlan(t *testing.T) {
 		"amplifier_gain_stage":        "opamp_gain_stage",
 		"amplifier_output_protection": "headphone_output_protection",
 		"amplifier_supply_decoupling": "decoupling",
-		"headphone_output_connector":  "TRS",
 		"speaker_output_connector":    "high-current",
 	}
 	for id, gapFragment := range want {
@@ -100,6 +99,19 @@ func TestClassABOutputPairInventoryIsImplementedButNotFabricationReady(t *testin
 	}
 	if family.VerificationLevel.AllowsFabricationReadinessClaim() {
 		t.Fatalf("verification level = %s, did not expect fabrication readiness", family.VerificationLevel)
+	}
+}
+
+func TestHeadphoneOutputConnectorInventoryIsImplementedButNotFabricationReady(t *testing.T) {
+	family, ok := inventoryFamily(NewBuiltinRegistry().Inventory(), "headphone_output_connector")
+	if !ok {
+		t.Fatal("missing headphone_output_connector inventory")
+	}
+	if !family.Implemented || family.Readiness != BlockReadinessPartial {
+		t.Fatalf("family = %#v, want implemented partial readiness", family)
+	}
+	if !slices.Contains(family.ExportedPorts, "HP_OUT") || !slices.Contains(family.ExportedPorts, "LOAD_RET") {
+		t.Fatalf("ports = %#v", family.ExportedPorts)
 	}
 }
 

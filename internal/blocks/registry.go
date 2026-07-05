@@ -54,6 +54,7 @@ func NewBuiltinRegistryChecked() (BuiltinRegistry, []reports.Issue) {
 		"dc_blocking_capacitor":       instantiateDCBlockingCapacitor,
 		"esd_protection":              instantiateESDProtection,
 		"headphone_output_protection": instantiateHeadphoneOutputProtection,
+		"headphone_output_connector":  instantiateHeadphoneOutputConnector,
 		"i2c_sensor":                  instantiateI2CSensor,
 		"led_indicator":               instantiateLEDIndicator,
 		"mcu_minimal":                 instantiateMCUMinimal,

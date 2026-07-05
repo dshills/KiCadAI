@@ -1,7 +1,6 @@
 package blocks
 
 import (
-	"math"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -11,6 +10,8 @@ import (
 const headphoneOutputProtectionID = "headphone_output_protection"
 
 var supportedHeadphoneLoadOhms = []float64{16, 32, 64}
+
+const twoPi = 6.283185307179586
 
 func headphoneOutputProtectionDefinition() BlockDefinition {
 	return BlockDefinition{
@@ -24,6 +25,9 @@ func headphoneOutputProtectionDefinition() BlockDefinition {
 			{Name: "nominal_load_ohms", Type: ParameterResistance, Default: "32Ω", Description: "Nominal headphone load impedance. Supported classes are 16Ω, 32Ω, and 64Ω."},
 			{Name: "coupling", Type: ParameterEnum, Default: "ac_coupled_required", Allowed: []any{"ac_coupled_required", "ac_coupled_present", "dual_rail_direct_review_required"}, Description: "Output coupling policy."},
 			{Name: "dc_blocking_capacitance", Type: ParameterCapacitance, Default: "220uF", Description: "DC-blocking capacitor value for single-supply AC output coupling."},
+			{Name: "max_dc_bias_voltage", Type: ParameterVoltage, Default: "4.5V", Description: "Maximum expected DC bias across the output coupling capacitor."},
+			{Name: "coupling_capacitor_voltage_rating", Type: ParameterVoltage, Default: "16V", Description: "Rated voltage of the output coupling capacitor."},
+			{Name: "output_high_pass_cutoff_hz", Type: ParameterNumber, Default: 0.0, Description: "Calculated cutoff of the output coupling capacitor and nominal load."},
 			{Name: "bleed_resistor_ohms", Type: ParameterResistance, Default: "100kΩ", Description: "Reference or bleed resistor value for the AC-coupled output."},
 			{Name: "bleed_required", Type: ParameterBool, Default: true, Description: "Require an explicit bleed/reference resistor policy."},
 			{Name: "series_resistor_ohms", Type: ParameterResistance, Default: "0Ω", Description: "Series output resistor value; 0Ω represents a populated jumper until omission support is implemented."},
@@ -94,6 +98,12 @@ func instantiateHeadphoneOutputProtection(definition BlockDefinition, request Bl
 		output := dryRunBlockOutput(definition, request, nil, issues)
 		output.Instance.Params = defaulted
 		return output
+	}
+	if loadOhms, loadOK := parseUnit(defaulted["nominal_load_ohms"], "Ω", resistanceMultipliers()); loadOK && loadOhms > 0 {
+		if capacitance, capacitanceOK := parseUnit(defaulted["dc_blocking_capacitance"], "F", capacitanceMultipliers()); capacitanceOK && capacitance > 0 {
+			seriesOhms, _ := parseUnit(defaulted["series_resistor_ohms"], "Ω", resistanceMultipliers())
+			defaulted["output_high_pass_cutoff_hz"] = 1 / (twoPi * (loadOhms + seriesOhms) * capacitance)
+		}
 	}
 	operations, refs, nets, operationIssues := headphoneOutputProtectionOperations(definition, request, defaulted)
 	issues = append(issues, operationIssues...)
@@ -239,8 +249,18 @@ func validateHeadphoneOutputProtectionParams(params map[string]any) []reports.Is
 	if coupling != "ac_coupled_required" && coupling != "ac_coupled_present" {
 		issues = append(issues, blockIssue("params.coupling", "single-supply headphone outputs require AC coupling through a DC-blocking capacitor"))
 	}
-	if _, ok := parseUnit(params["dc_blocking_capacitance"], "F", capacitanceMultipliers()); !ok {
+	capacitance, capacitanceOK := parseUnit(params["dc_blocking_capacitance"], "F", capacitanceMultipliers())
+	if !capacitanceOK {
 		issues = append(issues, blockIssue("params.dc_blocking_capacitance", "dc_blocking_capacitance must be a capacitance literal"))
+	} else if capacitance <= 0 {
+		issues = append(issues, blockIssue("params.dc_blocking_capacitance", "dc_blocking_capacitance must be positive"))
+	}
+	if biasVoltage, biasOK := parseUnit(params["max_dc_bias_voltage"], "V", voltageMultipliers()); !biasOK {
+		issues = append(issues, blockIssue("params.max_dc_bias_voltage", "max_dc_bias_voltage must be a voltage literal"))
+	} else if ratingVoltage, ratingOK := parseUnit(params["coupling_capacitor_voltage_rating"], "V", voltageMultipliers()); !ratingOK {
+		issues = append(issues, blockIssue("params.coupling_capacitor_voltage_rating", "coupling_capacitor_voltage_rating must be a voltage literal"))
+	} else if ratingVoltage < biasVoltage*1.5 {
+		issues = append(issues, blockIssue("params.coupling_capacitor_voltage_rating", "coupling capacitor voltage rating must be at least 1.5x the expected DC bias"))
 	}
 	if boolParam(params, "bleed_required", true) {
 		bleedOhms, bleedOK := parseUnit(params["bleed_resistor_ohms"], "Ω", resistanceMultipliers())
@@ -268,9 +288,16 @@ func validateHeadphoneOutputProtectionParams(params map[string]any) []reports.Is
 
 func supportedHeadphoneLoad(loadOhms float64) bool {
 	for _, supported := range supportedHeadphoneLoadOhms {
-		if math.Abs(loadOhms-supported) < 0.001 {
+		if absFloat(loadOhms-supported) < 0.001 {
 			return true
 		}
 	}
 	return false
+}
+
+func absFloat(value float64) float64 {
+	if value < 0 {
+		return -value
+	}
+	return value
 }

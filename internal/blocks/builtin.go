@@ -30,6 +30,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		classABOutputPairDefinition(),
 		classABOutputStageDefinition(),
 		headphoneOutputProtectionDefinition(),
+		headphoneOutputConnectorDefinition(),
 		dcBlockingCapacitorDefinition(),
 		connectorBreakoutDefinition(),
 	}

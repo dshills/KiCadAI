@@ -49,6 +49,15 @@ peak output current and resistor dissipation for evidence reporting, but blocks
 speaker/power-amplifier use and any request outside the derated low-current
 envelope until SOA, thermal, copper-width, and protection evidence mature.
 
+`headphone_output_protection` and `headphone_output_connector` now form the
+load-interface slice for headphone designs. The protection block emits an
+AC-coupled output fragment, calculates output high-pass cutoff, checks coupling
+capacitor voltage margin, and blocks speaker/bridge/fault-protection claims.
+The connector block provides a mono three-pin board-edge interface with
+`HP_OUT`, `LOAD_RET`, and `LOAD_REF` anchors. Speaker output connectors remain
+unsupported until active DC fault protection, current, and thermal evidence are
+available.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator
