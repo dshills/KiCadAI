@@ -438,13 +438,13 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 	if connectivityReport.ConnectedComponentCount == 0 {
 		t.Fatalf("%s generated schematic produced no connectivity components:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
-	if len(connectivityReport.OffGridObjects) == 0 {
-		t.Fatalf("%s expected generated schematic off-grid diagnostics for KiCad ERC blocker:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+	if len(connectivityReport.OffGridObjects) != 0 {
+		t.Fatalf("%s generated schematic still has off-grid connectivity diagnostics:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
 	if kicadChecks.Status != StageStatusBlocked {
 		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad ERC connectivity:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result), formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
-	for _, want := range []string{"Label not connected", "Pin not connected", "Symbol pin or wire end off connection grid", "Unconnected wire endpoint"} {
+	for _, want := range []string{"Pin not connected", "Unconnected wire endpoint"} {
 		if !designExampleStageHasIssueMessage(kicadChecks, want) && !designExamplePromotionHasIssueMessage(report, StageKiCadChecks, want) {
 			t.Errorf("%s missing ERC blocker %q\nstage issues:\n%s\npromotion issues:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, want, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues), formatGeneratedConnectivityDiagnostics(connectivityReport))
 		}

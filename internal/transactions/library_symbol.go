@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/libraryresolver"
 )
 
@@ -38,6 +39,32 @@ func symbolRecordPins(record libraryresolver.SymbolRecord) ([]PinSpec, error) {
 }
 
 func resolveSymbolPins(pins []PinSpec, index *libraryresolver.LibraryIndex, libraryID string) ([]PinSpec, error) {
+	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(libraryID); ok {
+		templateByNumber := make(map[string]PinSpec, len(templatePins))
+		for _, pin := range templatePins {
+			templateByNumber[strings.TrimSpace(pin.Number)] = PinSpec{
+				Number: pin.Number,
+				XMM:    iuToMM(pin.Offset.X),
+				YMM:    iuToMM(pin.Offset.Y),
+			}
+		}
+		if len(pins) == 0 {
+			resolved := make([]PinSpec, 0, len(templatePins))
+			for _, pin := range templatePins {
+				resolved = append(resolved, templateByNumber[strings.TrimSpace(pin.Number)])
+			}
+			return resolved, nil
+		}
+		resolved := make([]PinSpec, 0, len(pins))
+		for _, pin := range pins {
+			if templatePin, ok := templateByNumber[strings.TrimSpace(pin.Number)]; ok {
+				pin.XMM = templatePin.XMM
+				pin.YMM = templatePin.YMM
+			}
+			resolved = append(resolved, pin)
+		}
+		return resolved, nil
+	}
 	if len(pins) > 0 || index == nil {
 		return pins, nil
 	}

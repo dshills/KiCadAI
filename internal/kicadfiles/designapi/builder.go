@@ -25,8 +25,11 @@ type Builder struct {
 	netParents map[string]string
 	symbols    map[string]*symbolState
 	symbolKeys map[string]string
-	footprints map[string]int
-	pads       map[string]map[string][]int
+	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
+	// grid snapping can avoid creating exact anchor collisions between symbols.
+	schematicPinAnchors map[kicadfiles.Point]struct{}
+	footprints          map[string]int
+	pads                map[string]map[string][]int
 }
 
 type Options struct {
@@ -133,6 +136,8 @@ type symbolState struct {
 	footprintID string
 }
 
+const schematicConnectionGrid = kicadfiles.IU(1270000)
+
 func New(options Options) (*Builder, error) {
 	name := strings.TrimSpace(options.Name)
 	if name == "" {
@@ -151,14 +156,15 @@ func New(options Options) (*Builder, error) {
 		paper.Name = "A4"
 	}
 	builder := &Builder{
-		name:       name,
-		generator:  generator,
-		nets:       pcb.NewNetRegistry(),
-		netParents: map[string]string{},
-		symbols:    map[string]*symbolState{},
-		symbolKeys: map[string]string{},
-		footprints: map[string]int{},
-		pads:       map[string]map[string][]int{},
+		name:                name,
+		generator:           generator,
+		nets:                pcb.NewNetRegistry(),
+		netParents:          map[string]string{},
+		symbols:             map[string]*symbolState{},
+		symbolKeys:          map[string]string{},
+		schematicPinAnchors: map[kicadfiles.Point]struct{}{},
+		footprints:          map[string]int{},
+		pads:                map[string]map[string][]int{},
 	}
 	builder.design = kicaddesign.Design{
 		Name: name,
@@ -223,7 +229,9 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	if value == "" {
 		value = reference
 	}
-	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", key), libraryID, reference, value, options.Position)
+	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
+	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs)
+	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", key), libraryID, reference, value, position)
 	symbol.Rotation = options.Rotation
 	symbol.Path = "root.component." + key
 	if strings.EqualFold(strings.TrimSpace(options.Role), "generated_terminal") {
@@ -235,7 +243,6 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		symbol.InPositionFile = &inPositionFile
 	}
 	symbol.Properties = schematic.MergeProperties(symbol.Properties, options.Properties)
-	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
 	symbol.Pins = make([]schematic.SymbolPin, 0, len(pinSpecs))
 	pins := make(map[string]kicadfiles.Point, len(pinSpecs))
 	pinNets := make(map[string]string, len(pinSpecs))
@@ -248,8 +255,9 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		if _, ok := pins[number]; ok {
 			return SymbolHandle{}, fmt.Errorf("duplicate pin %s on %s", number, reference)
 		}
-		anchor := addPoint(options.Position, pin.Offset)
+		anchor := schematicSymbolPinAnchor(position, pin.Offset)
 		pins[number] = anchor
+		builder.schematicPinAnchors[anchor] = struct{}{}
 		pinOrder = append(pinOrder, number)
 		symbol.PinAnchors = append(symbol.PinAnchors, anchor)
 		symbol.Pins = append(symbol.Pins, schematic.SymbolPin{
@@ -1302,6 +1310,96 @@ func referenceKey(reference string) string {
 
 func addPoint(point, offset kicadfiles.Point) kicadfiles.Point {
 	return kicadfiles.Point{X: point.X + offset.X, Y: point.Y + offset.Y}
+}
+
+func snapSchematicPointToConnectionGrid(point kicadfiles.Point) kicadfiles.Point {
+	return kicadfiles.Point{
+		X: snapSchematicIUToConnectionGrid(point.X),
+		Y: snapSchematicIUToConnectionGrid(point.Y),
+	}
+}
+
+func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec) kicadfiles.Point {
+	position := snapSchematicPointToConnectionGrid(requested)
+	if builder == nil {
+		return position
+	}
+	occupied := builder.schematicPinAnchors
+	if !schematicSymbolPinAnchorsCollide(position, pins, occupied) {
+		return position
+	}
+	for radius := kicadfiles.IU(1); radius <= 8; radius++ {
+		for _, offset := range schematicGridPerimeterOffsets(radius) {
+			candidate := addPoint(position, offset)
+			if !schematicSymbolPinAnchorsCollide(candidate, pins, occupied) {
+				return candidate
+			}
+		}
+	}
+	return position
+}
+
+func schematicSymbolPinAnchorsCollide(position kicadfiles.Point, pins []PinSpec, occupied map[kicadfiles.Point]struct{}) bool {
+	if len(pins) == 0 || len(occupied) == 0 {
+		return false
+	}
+	for _, pin := range pins {
+		if _, ok := occupied[schematicSymbolPinAnchor(position, pin.Offset)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicGridPerimeterOffsets(radius kicadfiles.IU) []kicadfiles.Point {
+	if radius <= 0 {
+		return nil
+	}
+	offsets := make([]kicadfiles.Point, 0, int(radius)*8)
+	step := schematicConnectionGrid
+	addOffset := func(x, y kicadfiles.IU) {
+		offsets = append(offsets, kicadfiles.Point{X: x * step, Y: y * step})
+	}
+	for x := -radius; x <= radius; x++ {
+		addOffset(x, -radius)
+	}
+	for y := -radius + 1; y <= radius; y++ {
+		addOffset(radius, y)
+	}
+	for x := radius - 1; x >= -radius; x-- {
+		addOffset(x, radius)
+	}
+	for y := radius - 1; y > -radius; y-- {
+		addOffset(-radius, y)
+	}
+	return offsets
+}
+
+func schematicSymbolPinAnchor(position, offset kicadfiles.Point) kicadfiles.Point {
+	return snapSchematicPointToConnectionGrid(addPoint(position, offset))
+}
+
+func snapSchematicIUToConnectionGrid(value kicadfiles.IU) kicadfiles.IU {
+	remainder := value % schematicConnectionGrid
+	if remainder == 0 {
+		return value
+	}
+	down := value - remainder
+	up := down + schematicConnectionGrid
+	if value < 0 {
+		up = down - schematicConnectionGrid
+	}
+	if absSchematicIU(value-down) <= absSchematicIU(up-value) {
+		return down
+	}
+	return up
+}
+
+func absSchematicIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func defaultIU(value, fallback kicadfiles.IU) kicadfiles.IU {

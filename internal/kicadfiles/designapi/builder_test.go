@@ -103,12 +103,12 @@ func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 	}
 	wantSegments := [][2]kicadfiles.Point{
 		{
-			{X: kicadfiles.MM(25), Y: kicadfiles.MM(20)},
-			{X: kicadfiles.MM(25), Y: kicadfiles.MM(32)},
+			{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(20.32)},
+			{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(31.75)},
 		},
 		{
-			{X: kicadfiles.MM(25), Y: kicadfiles.MM(32)},
-			{X: kicadfiles.MM(35), Y: kicadfiles.MM(32)},
+			{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(31.75)},
+			{X: kicadfiles.MM(34.29), Y: kicadfiles.MM(31.75)},
 		},
 	}
 	for wireIndex, wire := range builder.design.Schematic.Wires {
@@ -122,7 +122,7 @@ func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 			t.Fatalf("wire %d is diagonal: %#v", wireIndex, wire.Points)
 		}
 	}
-	if label := builder.design.Schematic.Labels[0]; label.Text != "SIG" || label.Position != (kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(32)}) {
+	if label := builder.design.Schematic.Labels[0]; label.Text != "SIG" || label.Position != (kicadfiles.Point{X: kicadfiles.MM(25.4), Y: kicadfiles.MM(31.75)}) {
 		t.Fatalf("dogleg label = %#v, want SIG at bend", label)
 	}
 	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG"); err != nil {
@@ -137,6 +137,64 @@ func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 	if got := len(builder.design.Schematic.Labels); got != 1 {
 		t.Fatalf("duplicate connect added label count = %d, want 1", got)
 	}
+}
+
+func TestBuilderLongNetLabelStubsAreConnectionGridSafe(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(80), Y: kicadfiles.MM(22)})
+
+	if err := builder.Connect(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "LONG_SIG"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Labels) != 2 {
+		t.Fatalf("labels = %#v, want two long-net label stubs", design.Schematic.Labels)
+	}
+	assertSchematicConnectivityGridSafe(t, design.Schematic)
+	report := schematic.InspectGeneratedConnectivity(*design.Schematic)
+	if len(report.OffGridObjects) != 0 {
+		t.Fatalf("off-grid diagnostics = %#v, want none", report.OffGridObjects)
+	}
+}
+
+func TestBuilderGeneratedIOAliasLabelStubsAreConnectionGridSafe(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "J1", "Connector_Generic:Conn_01x02", "IN", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)})
+	addTwoPinSymbol(t, builder, "U1", "Device:R", "load", kicadfiles.Point{X: kicadfiles.MM(28), Y: kicadfiles.MM(10)})
+
+	if err := builder.Connect(Endpoint{Reference: "J1", Pin: "1"}, Endpoint{Reference: "U1", Pin: "1"}, "io_sda"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Labels) != 2 {
+		t.Fatalf("labels = %#v, want two io_ alias label stubs", design.Schematic.Labels)
+	}
+	assertSchematicConnectivityGridSafe(t, design.Schematic)
+	report := schematic.InspectGeneratedConnectivity(*design.Schematic)
+	if len(report.OffGridObjects) != 0 {
+		t.Fatalf("off-grid diagnostics = %#v, want none", report.OffGridObjects)
+	}
+}
+
+func TestBuilderGridSnapAvoidsAdjacentSymbolPinAnchorCollision(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "4k7", kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(-10)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "4k7", kicadfiles.Point{X: kicadfiles.MM(35), Y: kicadfiles.MM(-10)})
+
+	design := builder.Design()
+	seen := map[kicadfiles.Point]string{}
+	for _, symbol := range design.Schematic.Symbols {
+		for pinIndex, anchor := range symbol.PinAnchors {
+			if existing := seen[anchor]; existing != "" {
+				t.Fatalf("%s pin %d anchor %#v collides with %s", symbol.Reference, pinIndex, anchor, existing)
+			}
+			seen[anchor] = symbol.Reference
+		}
+	}
+	assertSchematicConnectivityGridSafe(t, design.Schematic)
 }
 
 func TestBuilderDefaultPaperNamePreservesCustomSize(t *testing.T) {
@@ -894,6 +952,39 @@ func assertSchematicPinNet(t *testing.T, builder *Builder, endpoint Endpoint, ne
 	if net := builder.assignedPinNet(endpoint); net != netName {
 		t.Fatalf("%s pin %s net = %q, want %q", endpoint.Reference, endpoint.Pin, net, netName)
 	}
+}
+
+func assertSchematicConnectivityGridSafe(t *testing.T, schematicFile *schematic.SchematicFile) {
+	t.Helper()
+	if schematicFile == nil {
+		t.Fatal("schematic required")
+	}
+	for symbolIndex, symbol := range schematicFile.Symbols {
+		if !schematicPointOnConnectionGrid(symbol.Position) {
+			t.Fatalf("symbol %d %s position = %#v, want connection-grid aligned", symbolIndex, symbol.Reference, symbol.Position)
+		}
+		for pinIndex, anchor := range symbol.PinAnchors {
+			if !schematicPointOnConnectionGrid(anchor) {
+				t.Fatalf("symbol %d %s pin anchor %d = %#v, want connection-grid aligned", symbolIndex, symbol.Reference, pinIndex, anchor)
+			}
+		}
+	}
+	for wireIndex, wire := range schematicFile.Wires {
+		for pointIndex, point := range wire.Points {
+			if !schematicPointOnConnectionGrid(point) {
+				t.Fatalf("wire %d point %d = %#v, want connection-grid aligned", wireIndex, pointIndex, point)
+			}
+		}
+	}
+	for labelIndex, label := range schematicFile.Labels {
+		if !schematicPointOnConnectionGrid(label.Position) {
+			t.Fatalf("label %d %s = %#v, want connection-grid aligned", labelIndex, label.Text, label.Position)
+		}
+	}
+}
+
+func schematicPointOnConnectionGrid(point kicadfiles.Point) bool {
+	return point.X%schematicConnectionGrid == 0 && point.Y%schematicConnectionGrid == 0
 }
 
 func assertPadNet(t *testing.T, footprints []pcb.Footprint, reference, padName, netName string) {
