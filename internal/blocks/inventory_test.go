@@ -49,7 +49,6 @@ func TestAmplifierFamilyInventoryMatchesVerifiedBlockPlan(t *testing.T) {
 	inventory := NewBuiltinRegistry().Inventory()
 	want := map[string]string{
 		"amplifier_gain_stage":        "opamp_gain_stage",
-		"class_ab_output_pair":        "SOA",
 		"amplifier_output_protection": "headphone_output_protection",
 		"amplifier_supply_decoupling": "decoupling",
 		"headphone_output_connector":  "TRS",
@@ -82,6 +81,22 @@ func TestAmplifierBiasNetworkInventoryIsImplementedButNotFabricationReady(t *tes
 	}
 	if !slices.Contains(family.ExportedPorts, "BIAS_P") || !slices.Contains(family.ExportedPorts, "BIAS_N") {
 		t.Fatalf("ports = %#v", family.ExportedPorts)
+	}
+	if family.VerificationLevel.AllowsFabricationReadinessClaim() {
+		t.Fatalf("verification level = %s, did not expect fabrication readiness", family.VerificationLevel)
+	}
+}
+
+func TestClassABOutputPairInventoryIsImplementedButNotFabricationReady(t *testing.T) {
+	family, ok := inventoryFamily(NewBuiltinRegistry().Inventory(), "class_ab_output_pair")
+	if !ok {
+		t.Fatal("missing class_ab_output_pair inventory")
+	}
+	if !family.Implemented || family.Readiness != BlockReadinessPartial {
+		t.Fatalf("family = %#v, want implemented partial readiness", family)
+	}
+	if !slices.Contains(family.RequiredRoles, "upper_output") || !slices.Contains(family.RequiredRoles, "lower_output") {
+		t.Fatalf("roles = %#v", family.RequiredRoles)
 	}
 	if family.VerificationLevel.AllowsFabricationReadinessClaim() {
 		t.Fatalf("verification level = %s, did not expect fabrication readiness", family.VerificationLevel)

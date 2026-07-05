@@ -27,6 +27,7 @@ func BuiltinDefinitions() []BlockDefinition {
 		amplifierInputBufferDefinition(),
 		opampGainStageDefinition(),
 		amplifierBiasNetworkDefinition(),
+		classABOutputPairDefinition(),
 		classABOutputStageDefinition(),
 		headphoneOutputProtectionDefinition(),
 		dcBlockingCapacitorDefinition(),

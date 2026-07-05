@@ -42,6 +42,13 @@ It intentionally blocks VBE multiplier requests, speaker or power-amplifier
 use, numeric quiescent-current claims, and unconstrained thermal placement
 until simulation-backed and KiCad-backed evidence exists.
 
+`class_ab_output_pair` is implemented as a structural headphone-class
+complementary emitter follower using the verified MMBT3904/MMBT3906 seed pair,
+emitter resistors, rail connections, and load-reference anchoring. It estimates
+peak output current and resistor dissipation for evidence reporting, but blocks
+speaker/power-amplifier use and any request outside the derated low-current
+envelope until SOA, thermal, copper-width, and protection evidence mature.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator
