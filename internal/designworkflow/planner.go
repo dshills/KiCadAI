@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/amplifiers"
 	"kicadai/internal/blocks"
 	"kicadai/internal/reports"
 )
@@ -83,16 +84,17 @@ func populateBlockPlanningSummaries(stage *StageResult, request Request, issues 
 }
 
 type AmplifierOutputStageSummary struct {
-	InstanceID        string   `json:"instance_id"`
-	BlockID           string   `json:"block_id"`
-	Topology          string   `json:"topology,omitempty"`
-	SupplyVoltage     string   `json:"supply_voltage,omitempty"`
-	LoadImpedance     string   `json:"load_impedance,omitempty"`
-	OutputDevices     []string `json:"output_devices,omitempty"`
-	DCBlockingPresent bool     `json:"dc_blocking_present"`
-	Readiness         string   `json:"readiness"`
-	Notes             []string `json:"notes,omitempty"`
-	Blockers          []string `json:"blockers,omitempty"`
+	InstanceID        string                      `json:"instance_id"`
+	BlockID           string                      `json:"block_id"`
+	Topology          string                      `json:"topology,omitempty"`
+	SupplyVoltage     string                      `json:"supply_voltage,omitempty"`
+	LoadImpedance     string                      `json:"load_impedance,omitempty"`
+	OutputDevices     []string                    `json:"output_devices,omitempty"`
+	DCBlockingPresent bool                        `json:"dc_blocking_present"`
+	SimulationStatus  amplifiers.SimulationStatus `json:"simulation_status"`
+	Readiness         string                      `json:"readiness"`
+	Notes             []string                    `json:"notes,omitempty"`
+	Blockers          []string                    `json:"blockers,omitempty"`
 }
 
 type HeadphoneOutputProtectionSummary struct {
@@ -116,7 +118,7 @@ func amplifierOutputStageSummaries(request Request, issues []reports.Issue) []Am
 	blocksByInstance := blocksByInstanceID(request)
 	for index, instance := range request.Blocks {
 		switch instance.BlockID {
-		case "class_ab_output_stage":
+		case "class_ab_output_stage", "class_ab_output_pair":
 			summaries = append(summaries, amplifierOutputStageSummary(request, issues, instance, index, blocksByInstance))
 		}
 	}
@@ -204,6 +206,7 @@ func amplifierOutputStageSummary(request Request, issues []reports.Issue, stage 
 			stringParamSummaryDefault(stage.Params, "lower_output_component_id", "bjt.onsemi.mmbt3906.sot23"),
 		},
 		DCBlockingPresent: dcBlockingPresent,
+		SimulationStatus:  amplifiers.SimulationStatusNotRun,
 		Readiness:         "headphone_connectivity",
 	}
 	summary.Notes = []string{

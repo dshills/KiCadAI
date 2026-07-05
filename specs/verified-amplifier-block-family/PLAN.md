@@ -420,6 +420,11 @@ Review and commit:
 Goal: prepare simulator-backed amplifier validation without making it a default
 dependency.
 
+Status: Complete. The amplifier package now has a simulator-neutral expectation
+model and deterministic SPICE-like Class AB headphone artifact with
+`simulation_status: not_run`; amplifier planning summaries expose the same
+status without requiring an external simulator.
+
 Tasks:
 
 - Define a simulator-neutral amplifier validation model:
