@@ -2,7 +2,7 @@
   "version": "0.1.0",
   "name": "class_ab_headphone_driver",
   "intent": {
-    "summary": "Connectivity-level Class AB headphone driver seed with input conditioning, op-amp gain, explicit diode bias network, complementary output pair, local decoupling, AC-coupled protection, and headphone connector.",
+    "summary": "KiCad-backed Class AB headphone driver seed with input conditioning, op-amp gain, explicit diode bias network, complementary output pair, local decoupling, AC-coupled protection, and headphone connector.",
     "category": "amplifier"
   },
   "board": {
@@ -131,6 +131,6 @@
   "validation": {
     "acceptance": "connectivity",
     "skip_routing": false,
-    "skip_kicad_checks": true
+    "skip_kicad_checks": false
   }
 }

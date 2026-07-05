@@ -1,0 +1,25 @@
+{
+  "id": "class_ab_headphone_driver",
+  "request": "class_ab_headphone_driver.json",
+  "tier": "block-composition",
+  "readiness": "expected_fail",
+  "acceptance": "connectivity",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [
+    ".kicadai/design-promotion.json"
+  ],
+  "expected_stages": [
+    "block_planning",
+    "component_selection"
+  ],
+  "known_gaps": [
+    "The full design workflow currently stops at component selection because verified/rule-inferred selections are missing for 1210 bulk/DC-blocking capacitors and 0.47-ohm 1206 emitter resistors.",
+    "The lower-level Class AB headphone lane emits clean local-route contact evidence and partial route-tree/contact evidence, but full VCC and LOAD_REF route completion still has blocked route/contact graph branches.",
+    "Real KiCad ERC/DRC promotion remains expected-fail until component selection reaches schematic/PCB generation, the partial route-tree blockers are repaired, and kicad_checks reaches clean evidence with configured kicad-cli.",
+    "Output protection remains connectivity-level: fault_protection_status is placeholder_blocked and active fault protection, thermal bias validation, quiescent current adjustment, and simulation evidence are not implemented.",
+    "Amplifier output transistor evidence remains warning-only for fabrication promotion: power dissipation, thermal review, safe operating area, and bias-diode thermal placement evidence are still review_required."
+  ],
+  "notes": "KiCad-backed Class AB headphone amplifier fixture for the first generated amplifier PCB promotion lane. This fixture is intentionally expected_fail until component catalog coverage, remaining route/contact graph blockers, and real KiCad ERC/DRC evidence are closed."
+}

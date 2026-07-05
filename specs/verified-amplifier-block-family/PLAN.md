@@ -382,6 +382,11 @@ Review and commit:
 Goal: promote the first amplifier fixture through real KiCad evidence as far as
 the output supports.
 
+Status: Complete. A KiCad-backed Class AB headphone driver fixture now records
+the current expected-fail promotion point: component-selection gaps for 1210
+capacitors and 0.47-ohm emitter resistors block full workflow promotion before
+real ERC/DRC can run.
+
 Tasks:
 
 - Add KiCad-backed fixture metadata for the supported headphone amplifier lane.

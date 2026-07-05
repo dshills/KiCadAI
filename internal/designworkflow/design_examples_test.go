@@ -370,6 +370,9 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			if metadata.ID == "class_ab_headphone_protected" {
 				assertDesignExampleProtectedAmplifierEvidence(t, metadata, outputDir, result)
 			}
+			if metadata.ID == "class_ab_headphone_driver" {
+				assertDesignExampleClassABDriverEvidence(t, metadata, outputDir, result)
+			}
 			report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
 			reportJSON, err := MarshalPromotionReportJSON(report)
 			if err != nil {
@@ -568,6 +571,42 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	}
 }
 
+func assertDesignExampleClassABDriverEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
+	t.Helper()
+	componentSelection, ok := designExampleStageByName(result, StageComponentSelection)
+	if !ok {
+		t.Fatalf("%s missing component selection stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if componentSelection.Status != StageStatusBlocked {
+		t.Fatalf("%s component selection status = %q, want blocked:\n%s", metadata.ID, componentSelection.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	for _, path := range []string{
+		"component_selection.supply_decoupling.vcc_bulk",
+		"component_selection.output.upper_emitter_resistor",
+		"component_selection.output.lower_emitter_resistor",
+	} {
+		if !designExampleIssuesContainPath(componentSelection.Issues, path) {
+			t.Fatalf("%s component selection issues missing %s:\n%s", metadata.ID, path, formatDesignExampleIssues(componentSelection.Issues))
+		}
+	}
+	for _, stageName := range []StageName{StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks} {
+		stage, ok := designExampleStageByName(result, stageName)
+		if !ok {
+			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
+		}
+		if stage.Status != StageStatusSkipped {
+			t.Fatalf("%s downstream stage %q status = %q, want skipped:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	}
+	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+	if report.Status != PromotionStatusExpectedFail || !report.MatchesExpectation {
+		t.Fatalf("%s promotion = %#v, want matched expected_fail", metadata.ID, report)
+	}
+	if !promotionReportHasStageIssue(report, StageComponentSelection, "COMPONENT_NOT_FOUND") {
+		t.Fatalf("%s promotion issues missing component selection blocker:\n%s", metadata.ID, formatDesignExamplePromotionIssues(report.Issues))
+	}
+}
+
 func designExampleIssuesContainNet(issues []reports.Issue, labels string) bool {
 	var targets []string
 	for _, target := range strings.Split(labels, ",") {
@@ -587,6 +626,15 @@ func designExampleIssuesContainNet(issues []reports.Issue, labels string) bool {
 			}
 		}
 		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func designExampleIssuesContainPath(issues []reports.Issue, path string) bool {
+	for _, issue := range issues {
+		if issue.Path == path {
 			return true
 		}
 	}
@@ -1685,6 +1733,17 @@ func formatDesignExamplePromotionIssues(issues []PromotionIssue) string {
 		builder.WriteString(issue.Message)
 	}
 	return builder.String()
+}
+
+func promotionReportHasStageIssue(report PromotionReport, stage StageName, code string) bool {
+	want := strings.ToLower(strings.TrimSpace(code))
+	for _, issue := range report.Issues {
+		got := strings.ToLower(strings.TrimSpace(issue.Code))
+		if issue.Stage == stage && (got == want || strings.Contains(got, want)) {
+			return true
+		}
+	}
+	return false
 }
 
 func designExampleStageByName(result WorkflowResult, name StageName) (StageResult, bool) {
