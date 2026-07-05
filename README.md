@@ -107,6 +107,22 @@ fabrication-ready until those schematic conflicts, active output fault
 protection, SOA and thermal evidence, analog stability/layout rules, and KiCad
 ERC/DRC-clean proof are available.
 
+Amplifier simulation support is now available as an opt-in evidence layer for
+Go-level and test-harness integrations; a stable CLI flag or environment
+variable for external simulator execution is not exposed yet. Runners are
+currently injected programmatically through the Go API or exercised by the test
+suites. The Class AB headphone simulation module can:
+
+- emit a deterministic SPICE3/ngspice-oriented netlist;
+- run through an injected simulation runner;
+- normalize gain, high-pass cutoff, output DC offset, quiescent current, load
+  current, output swing, and stability margin measurements;
+- write `.kicadai/amplifier-simulation*` artifacts.
+
+Passing simulation evidence can feed the promotion report through a
+`simulation` gate, but it is still evidence for the narrow low-voltage
+headphone slice, not a power-amplifier or fabrication-readiness claim.
+
 ## Requirements
 
 - Go 1.22 or newer.
@@ -309,9 +325,10 @@ output-stage path is connectivity-level only: it can select the seeded
 MMBT3904/MMBT3906 pair, realize the diode-biased output stage, require
 single-supply AC output coupling through `headphone_output_protection`, and
 explain bleed/reference, connector-return, optional series-resistor, and fault
-protection assumptions. Class A output stages, stability networks, speaker
-loads, active fault protection, and power-amplifier thermal/current proof
-remain roadmap work.
+protection assumptions. Simulation-backed promotion can now be attached when a
+local runner is configured and the generated evidence stays inside the modeled
+headphone limits. Class A output stages, speaker loads, active fault
+protection, and power-amplifier thermal/current proof remain roadmap work.
 
 See [Intent Planning And AI Workflow](docs/intent-planning.md) for details.
 

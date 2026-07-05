@@ -104,6 +104,7 @@ The `amplifier` matrix covers:
 - headphone DC blocking and output protection;
 - thermal and high-current layout constraints;
 - feedback, decoupling, and stability layout;
+- simulation-backed Class AB headphone promotion evidence;
 - KiCad-backed amplifier promotion evidence;
 - AI-facing amplifier design-limit documentation.
 
@@ -118,6 +119,11 @@ connector return/reference diagnostics for headphone-only loads. The optional
 protected KiCad-backed fixture is still `expected_fail`: it reaches schematic
 electrical validation and currently stops on known label-alias conflicts before
 PCB realization, routing, writer correctness, or real KiCad ERC/DRC checks.
+The new simulation evidence layer can emit a SPICE-like Class AB headphone
+artifact, normalize runner measurements, write `.kicadai/amplifier-simulation*`
+files, and feed a `simulation` promotion gate when configured. Missing
+simulator configuration remains a clean skip/not-supported result unless a
+fixture explicitly requires simulation evidence.
 These are not claims that amplifier generation is fabrication-ready. The
 remaining queue is schematic alias cleanup, SOA and thermal evidence, active
 fault-protection policy, speaker/bridge/power-amplifier load safety, analog

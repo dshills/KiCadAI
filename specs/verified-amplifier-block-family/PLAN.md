@@ -501,6 +501,11 @@ Review and commit:
 
 Goal: make amplifier generation safe for AI agents to use.
 
+Status: Complete. README, circuit-block, intent-planning, AI readiness, agent
+skill, and roadmap docs now describe the supported low-voltage headphone
+amplifier slice, optional simulation artifacts/gates, required evidence for
+candidate/pass claims, and blocked speaker/power-amplifier scope.
+
 Tasks:
 
 - Update:

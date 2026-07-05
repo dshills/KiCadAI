@@ -123,6 +123,9 @@ from validation feedback to safe automatic repair.
   constraint/routing evidence checks for feedback, decoupling, input/output
   separation, high-current output width, and thermal review; and an optional
   KiCad-backed `expected_fail` fabrication-candidate amplifier fixture.
+  Class AB headphone simulation now has a deterministic SPICE-like artifact,
+  optional runner/evaluator, normalized `.kicadai/amplifier-simulation*`
+  evidence, and a promotion-report `simulation` gate.
 - Runnable `examples/design/*.json` requests are now covered by automated
   regression tests that strict-decode each request, run `design create`, verify
   generated project artifacts, read back generated schematic/PCB files, and
@@ -247,9 +250,10 @@ loop confidence:
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
-  stability networks, verified output-device selection, load-drive limits,
-  thermal/current layout proof, and optional KiCad ERC/DRC-clean promotion are
-  still open blockers.
+  stability networks, verified output-device selection, load-drive limits, and
+  simulation artifacts are still limited to the narrow low-voltage headphone
+  slice. Thermal/current layout proof, active protection, speaker/power loads,
+  and optional KiCad ERC/DRC-clean promotion are still open blockers.
 
 ## Roadmap Principles
 
@@ -887,8 +891,10 @@ protected Class AB headphone amplifier fixture now verifies the
 LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical
 validation on expected label-alias conflicts (`headphones_SIG` versus
 `output_amp_out` and `output_lower_emitter` versus `output_upper_emitter`). The
-next amplifier promotion task is schematic alias cleanup so PCB realization and
-real KiCad ERC/DRC evidence can run.
+simulation foundation can now write and evaluate Class AB headphone SPICE-like
+artifacts and feed a `simulation` promotion gate when a runner is configured.
+The next amplifier promotion task is schematic alias cleanup so PCB realization
+and real KiCad ERC/DRC evidence can run.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:

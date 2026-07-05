@@ -36,6 +36,11 @@ the workflow evidence explicitly supports that claim.
   expected to succeed.
 - Treat `kicad-cli` checks as optional unless the request or acceptance policy
   requires ERC/DRC evidence.
+- Treat amplifier simulation as optional unless the fixture or workflow
+  explicitly requires a `simulation` promotion gate. Missing simulator
+  configuration should be reported as skipped/not-supported, not guessed. There
+  is not yet a stable CLI flag or environment variable for external simulator
+  execution; current simulation runners are Go-level/test-harness integrations.
 - Treat `examples/design/kicad-backed/` as an opt-in evidence tier. Do not
   claim those fixtures pass unless `KICADAI_KICAD_CLI` was configured and
   KiCad report artifacts were produced; current fixtures intentionally record
@@ -56,6 +61,8 @@ Current strong paths:
 - writer correctness checks;
 - connectivity-first board validation;
 - optional KiCad ERC/DRC checks through `kicad-cli`;
+- opt-in Class AB headphone amplifier simulation artifacts and promotion gates
+  for the narrow low-voltage headphone slice;
 - deterministic repair planning and generated-project repair apply;
 - design rationale reports.
 
@@ -63,6 +70,9 @@ Current weak or blocked paths:
 
 - arbitrary natural-language-to-board synthesis;
 - arbitrary imported project mutation;
+- speaker, bridge, mains, or power-amplifier generation claims without SOA,
+  thermal, active fault protection, simulation, KiCad ERC/DRC, and physical-rule
+  evidence;
 - live schematic/PCB mutation through KiCad IPC;
 - production layout quality for large or unfamiliar boards without KiCad-backed
   validation evidence;
@@ -469,6 +479,10 @@ When returning results to a user or another agent, include:
 
 Avoid saying "fabrication ready" unless fabrication readiness, writer
 correctness, board validation, and required ERC/DRC evidence all support it.
+For amplifier work, distinguish simulation evidence from fabrication evidence:
+a passing `.kicadai/amplifier-simulation.json` can support a narrow
+headphone-slice promotion gate, but it does not prove speaker or
+power-amplifier safety.
 
 ## Common Safe Commands
 

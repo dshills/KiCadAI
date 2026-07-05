@@ -332,9 +332,24 @@ Current intent-planner gaps:
   linear-regulator slice. Broader analog synthesis remains limited to explicit
   requirement evidence until blocks expose safe parameters and catalog ratings
   cover the target checks;
+- amplifier requests are safest when phrased as low-voltage headphone designs
+  using the supported input/gain/bias/Class AB output/protection/decoupling
+  slices. A request for a "Class AB headphone amplifier" may produce
+  schematic/PCB structure plus optional simulation evidence. Requests for
+  speaker outputs, bridge outputs, mains supplies, high power, thermal claims,
+  or active fault protection remain blocked or partial until those blocks have
+  KiCad and simulation-backed promotion evidence;
 - fabrication-focused intent maps to stricter validation/component/routing
   policy, but external manufacturer acceptance remains a downstream
   fabrication-readiness concern.
+
+Simulation-backed amplifier evidence is opt-in. The generated simulation stage
+does not run unless a runner is configured by the caller or test harness. When
+it does run, `.kicadai/amplifier-simulation.json` records normalized
+measurements and `.kicadai/design-promotion.json` includes a `simulation` gate.
+Treat `simulation: pass` as narrow headphone-slice evidence only; fabrication
+or power-amplifier claims still require clean KiCad ERC/DRC, physical-rule,
+SOA, thermal, and protection evidence.
 
 Current gaps for autonomous one-shot schematic + PCB generation:
 

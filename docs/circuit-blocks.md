@@ -65,6 +65,21 @@ polarity assumptions through positive rail-voltage validation and requires
 capacitor voltage rating to be at least 1.5x the rail voltage. This is
 structural placement/connectivity evidence, not full power-integrity proof.
 
+The amplifier package also provides a simulator-neutral Class AB headphone
+simulation model. The current output artifact is a SPICE3/ngspice-oriented
+netlist with parameter-derived feedback, output-coupling, load, rail, and
+simple op-amp/output-device models; an optional runner can normalize
+measurements for gain, high-pass cutoff, output DC offset, quiescent current,
+load current, output swing, and stability margin. When a workflow includes a
+`simulation` stage, the promotion process uses that evidence to gate
+candidate/pass readiness. The simulation stage artifacts are
+`.kicadai/amplifier-simulation-netlist.cir`,
+`.kicadai/amplifier-simulation.json`, and optional raw simulator output at
+`.kicadai/amplifier-simulation-raw.txt`. Missing simulator configuration skips
+cleanly unless the fixture or workflow explicitly requires simulation. This is
+not a substitute for KiCad ERC/DRC, SOA/thermal analysis, or
+speaker/power-amplifier protection proof.
+
 ```sh
 kicadai block list
 kicadai block show led_indicator
