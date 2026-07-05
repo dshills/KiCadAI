@@ -8,6 +8,12 @@ import (
 	"kicadai/internal/transactions"
 )
 
+const (
+	schematicReadabilityCodeDiagonalWire   = "diagonal_wire"
+	schematicReadabilityCodeStageOrder     = "stage_order"
+	schematicReadabilityCodePowerPlacement = "power_placement"
+)
+
 func schematicReadabilitySummary(operations []transactions.Operation) map[string]any {
 	request := schematiclayout.Request{
 		Sheet: schematiclayout.Sheet{Width: kicadfiles.MM(297), Height: kicadfiles.MM(210), Margin: kicadfiles.MM(10.16)},
@@ -51,37 +57,75 @@ func schematicReadabilitySummary(operations []transactions.Operation) map[string
 	}
 	result := schematiclayout.Layout(request)
 	ruleProfile := schematiclayout.RuleProfileForLayoutProfile(result.Report.Profile)
+	diagnostics := result.Diagnostics
+	if schematicReadabilityHasAmplifierRoles(refRoles) {
+		ruleProfile = schematiclayout.RuleProfileAmplifier
+		diagnostics = schematiclayout.AmplifierLayoutDiagnostics(result)
+	}
 	ruleCount := schematiclayout.RuleCountForProfile(ruleProfile)
-	repairGuidanceCount := schematicReadabilityRepairGuidanceCount(result.Diagnostics)
+	counts := schematicReadabilityDiagnosticCounts(diagnostics)
 	return map[string]any{
 		"profile":                         result.Report.Profile,
 		"rule_profile":                    ruleProfile,
 		"rule_count":                      ruleCount,
 		"repair_guidance_available":       ruleCount > 0,
-		"repair_guidance_count":           repairGuidanceCount,
-		"passed":                          result.Report.Passed,
+		"repair_guidance_count":           counts.repairGuidance,
+		"passed":                          counts.errors == 0,
 		"component_count":                 result.Report.ComponentCount,
 		"routed_net_count":                result.Report.RoutedNetCount,
 		"label_fallback_count":            result.Report.LabelFallbackCount,
-		"diagonal_wire_count":             result.Report.DiagonalWireCount,
-		"stage_order_violation_count":     result.Report.StageOrderViolationCount,
-		"power_placement_violation_count": result.Report.PowerPlacementViolations,
-		"diagnostic_count":                result.Report.DiagnosticCount,
-		"error_count":                     result.Report.ErrorCount,
-		"warning_count":                   result.Report.WarningCount,
+		"diagonal_wire_count":             counts.diagonalWires,
+		"stage_order_violation_count":     counts.stageOrderViolations,
+		"power_placement_violation_count": counts.powerPlacementViolations,
+		"diagnostic_count":                len(diagnostics),
+		"error_count":                     counts.errors,
+		"warning_count":                   counts.warnings,
 		"decode_error_count":              decodeErrors,
 		"roles":                           refRoles,
 	}
 }
 
-func schematicReadabilityRepairGuidanceCount(diagnostics []schematiclayout.Diagnostic) int {
-	count := 0
-	for _, diagnostic := range diagnostics {
-		if diagnostic.Repair != "" {
-			count++
+func schematicReadabilityHasAmplifierRoles(refRoles map[string]string) bool {
+	for _, role := range refRoles {
+		switch role {
+		case "opamp", "input_coupling", "input_stopper", "bias_top", "bias_bottom", "upper_bias_feed", "bias_upper", "bias_lower", "lower_bias_feed", "amp_out_anchor", "upper_output", "lower_output", "upper_emitter_resistor", "lower_emitter_resistor", "dc_blocking_capacitor", "headphone_connector":
+			return true
 		}
 	}
-	return count
+	return false
+}
+
+type schematicReadabilityCounts struct {
+	repairGuidance           int
+	errors                   int
+	warnings                 int
+	diagonalWires            int
+	stageOrderViolations     int
+	powerPlacementViolations int
+}
+
+func schematicReadabilityDiagnosticCounts(diagnostics []schematiclayout.Diagnostic) schematicReadabilityCounts {
+	var counts schematicReadabilityCounts
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Repair != "" {
+			counts.repairGuidance++
+		}
+		switch diagnostic.Severity {
+		case schematiclayout.SeverityError:
+			counts.errors++
+		case schematiclayout.SeverityWarning:
+			counts.warnings++
+		}
+		switch diagnostic.Code {
+		case schematicReadabilityCodeDiagonalWire:
+			counts.diagonalWires++
+		case schematicReadabilityCodeStageOrder:
+			counts.stageOrderViolations++
+		case schematicReadabilityCodePowerPlacement:
+			counts.powerPlacementViolations++
+		}
+	}
+	return counts
 }
 
 func pointFromTransaction(point transactions.Point) kicadfiles.Point {

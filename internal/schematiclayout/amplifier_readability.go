@@ -26,6 +26,21 @@ func ValidateAmplifierReadability(file *schematic.SchematicFile) []Diagnostic {
 	return NormalizeDiagnostics(diagnostics, maxAmplifierReadabilityDiagnostics)
 }
 
+func ValidateAmplifierLayout(result Result) []Diagnostic {
+	return NormalizeDiagnostics(AmplifierLayoutDiagnostics(result), maxAmplifierReadabilityDiagnostics)
+}
+
+func AmplifierLayoutDiagnostics(result Result) []Diagnostic {
+	diagnostics := strictAmplifierDiagnostics(result)
+	for _, diagnostic := range result.Diagnostics {
+		if isParsedGeometryArtifact(diagnostic.Code) {
+			continue
+		}
+		diagnostics = append(diagnostics, diagnostic)
+	}
+	return diagnostics
+}
+
 func isParsedGeometryArtifact(code string) bool {
 	switch code {
 	case "wire_symbol_overlap", "symbol_overlap":

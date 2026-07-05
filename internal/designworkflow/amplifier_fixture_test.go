@@ -7,6 +7,10 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"kicadai/internal/blocks"
+	"kicadai/internal/reports"
+	"kicadai/internal/schematiclayout"
 )
 
 func TestAmplifierDesignFixturesPlanToDeclaredAcceptance(t *testing.T) {
@@ -57,5 +61,36 @@ func TestAmplifierDesignFixturesPlanToDeclaredAcceptance(t *testing.T) {
 				t.Fatalf("block planning status = %q issues:\n%s", stage.Status, formatDesignExampleIssues(stage.Issues))
 			}
 		})
+	}
+}
+
+func TestClassABHeadphoneFixtureSchematicReadability(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	path := filepath.Join(repoRoot, "examples", "design", "amplifier", "class_ab_headphone_driver.json")
+	file, err := os.Open(path)
+	if err != nil {
+		t.Fatalf("open amplifier fixture: %v", err)
+	}
+	defer file.Close()
+	request, issues := DecodeRequestStrict(file)
+	if len(issues) != 0 {
+		t.Fatalf("decode issues:\n%s", formatDesignExampleIssues(issues))
+	}
+	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues:\n%s", formatDesignExampleIssues(plan.Stage.Issues))
+	}
+	stage := schematicStageFromPlan(plan)
+	readability, ok := stage.Summary["readability"].(map[string]any)
+	if !ok {
+		t.Fatalf("readability summary missing: %#v", stage.Summary)
+	}
+	if readability["rule_profile"] != schematiclayout.RuleProfileAmplifier {
+		t.Fatalf("rule_profile = %#v, want amplifier; summary=%#v", readability["rule_profile"], readability)
+	}
+	for _, key := range []string{"diagonal_wire_count", "stage_order_violation_count", "power_placement_violation_count"} {
+		if got := summaryInt(t, readability, key); got != 0 {
+			t.Fatalf("%s = %d, want 0; summary=%#v", key, got, readability)
+		}
 	}
 }
