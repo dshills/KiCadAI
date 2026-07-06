@@ -39,12 +39,13 @@ type InterBlockBranchRepairHint struct {
 }
 
 type InterBlockRouteTreeRepairSummary struct {
-	BranchFailures       int      `json:"branch_failures"`
-	RepairableFailures   int      `json:"repairable_failures"`
-	UnrepairableFailures int      `json:"unrepairable_failures"`
-	HintCount            int      `json:"hint_count"`
-	Nets                 []string `json:"nets,omitempty"`
-	Refs                 []string `json:"refs,omitempty"`
+	BranchFailures       int                          `json:"branch_failures"`
+	RepairableFailures   int                          `json:"repairable_failures"`
+	UnrepairableFailures int                          `json:"unrepairable_failures"`
+	HintCount            int                          `json:"hint_count"`
+	Nets                 []string                     `json:"nets,omitempty"`
+	Refs                 []string                     `json:"refs,omitempty"`
+	Hints                []InterBlockBranchRepairHint `json:"hints,omitempty"`
 }
 
 func BuildRouteTreeRepairHints(issues []reports.Issue) []InterBlockBranchRepairHint {
@@ -67,11 +68,16 @@ func BuildRouteTreeRepairHints(issues []reports.Issue) []InterBlockBranchRepairH
 }
 
 func SummarizeRouteTreeRepair(hints []InterBlockBranchRepairHint) InterBlockRouteTreeRepairSummary {
-	summary := InterBlockRouteTreeRepairSummary{}
+	summary := InterBlockRouteTreeRepairSummary{
+		BranchFailures: len(hints),
+	}
+	if len(hints) != 0 {
+		summary.Hints = make([]InterBlockBranchRepairHint, 0, len(hints))
+	}
 	netSet := map[string]struct{}{}
 	refSet := map[string]struct{}{}
 	for _, hint := range hints {
-		summary.BranchFailures++
+		summary.Hints = append(summary.Hints, routeTreeRepairHintCopy(hint))
 		if hint.Repairable {
 			summary.RepairableFailures++
 			summary.HintCount++
@@ -96,7 +102,14 @@ func SummarizeRouteTreeRepair(hints []InterBlockBranchRepairHint) InterBlockRout
 	}
 	summary.Nets = sortedSetKeys(netSet)
 	summary.Refs = sortedSetKeys(refSet)
+	slices.SortFunc(summary.Hints, compareRouteTreeRepairHint)
 	return summary
+}
+
+func routeTreeRepairHintCopy(hint InterBlockBranchRepairHint) InterBlockBranchRepairHint {
+	hint.Refs = routeTreeSortedStringsCopy(hint.Refs)
+	hint.Nets = routeTreeSortedStringsCopy(hint.Nets)
+	return hint
 }
 
 func BuildRouteTreePlacementRetryHints(issues []reports.Issue) []PlacementRetryHint {

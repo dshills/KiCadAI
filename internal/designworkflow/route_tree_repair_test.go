@@ -80,12 +80,31 @@ func TestRouteTreeRepairSummaryJSONStable(t *testing.T) {
 		HintCount:            1,
 		Nets:                 []string{"SDA", "VCC"},
 		Refs:                 []string{"J1", "U1"},
+		Hints: []InterBlockBranchRepairHint{{
+			Category:   InterBlockBranchFailureGraphSplit,
+			NetName:    "VCC",
+			Refs:       []string{"J1", "U1"},
+			Nets:       []string{"VCC"},
+			RetryScope: RetryScopeRouting,
+			Action:     "connect same-net graph components for this route group",
+			Path:       `design.inter_block_contact.nets[0].endpoints[1].end`,
+			Repairable: true,
+		}, {
+			Category:   InterBlockBranchFailureUnsupported,
+			NetName:    "SDA",
+			Refs:       []string{"J1"},
+			Nets:       []string{"SDA"},
+			RetryScope: RetryScopeRouting,
+			Action:     "manual route-tree repair review required",
+			Path:       `design.inter_block_route_groups["SDA"].branches[0]`,
+			Repairable: false,
+		}},
 	}
 	data, err := json.Marshal(summary)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := `{"branch_failures":2,"repairable_failures":1,"unrepairable_failures":1,"hint_count":1,"nets":["SDA","VCC"],"refs":["J1","U1"]}`
+	want := `{"branch_failures":2,"repairable_failures":1,"unrepairable_failures":1,"hint_count":1,"nets":["SDA","VCC"],"refs":["J1","U1"],"hints":[{"category":"graph_split","net_name":"VCC","refs":["J1","U1"],"nets":["VCC"],"retry_scope":"routing","action":"connect same-net graph components for this route group","path":"design.inter_block_contact.nets[0].endpoints[1].end","repairable":true},{"category":"unsupported","net_name":"SDA","refs":["J1"],"nets":["SDA"],"retry_scope":"routing","action":"manual route-tree repair review required","path":"design.inter_block_route_groups[\"SDA\"].branches[0]","repairable":false}]}`
 	if string(data) != want {
 		t.Fatalf("summary JSON = %q, want %q", data, want)
 	}

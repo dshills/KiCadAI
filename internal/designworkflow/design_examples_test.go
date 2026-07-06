@@ -662,6 +662,20 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 || repair.UnrepairableFailures != 0 || !slices.Equal(repair.Nets, []string{"VCC"}) {
 		t.Fatalf("%s route-tree repair summary = %#v, want repairable VCC-only blocker", metadata.ID, repair)
 	}
+	foundVCCRepairHint := false
+	for _, hint := range repair.Hints {
+		if hint.NetName == "VCC" &&
+			hint.Category == InterBlockBranchFailureGraphSplit &&
+			hint.RetryScope == RetryScopeRouting &&
+			hint.Repairable &&
+			strings.Contains(hint.Path, "design.inter_block_contact") &&
+			strings.Contains(hint.Action, "connect same-net graph components") {
+			foundVCCRepairHint = true
+		}
+	}
+	if !foundVCCRepairHint {
+		t.Fatalf("%s route-tree repair hints = %#v, want repairable VCC graph-split action", metadata.ID, repair.Hints)
+	}
 	if !designExampleIssuesContainNet(routing.Issues, "VCC") {
 		t.Fatalf("%s routing blocker does not identify VCC:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
 	}
