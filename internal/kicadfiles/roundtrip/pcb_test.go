@@ -85,16 +85,23 @@ func TestComparePCBFilesTreatsKiCad10NameOnlyNetsAsEquivalent(t *testing.T) {
   (net 0 "")
   (net 1 "SIG")
   (footprint "Test:Part"
+    (path "root.component.u1")
     (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu") (net 1 "SIG"))
   )
   (segment (start 0 0) (end 1 0) (width 0.25) (layer "F.Cu") (net 1))
+  (segment (start 1 0) (end 2 0) (width 0.25) (layer "F.Cu") (net 1))
 )`)
 	writeTestFile(t, roundTripped, `(kicad_pcb
   (version 20260206)
   (footprint "Test:Part"
+    (path "/5991df0c-20ec-460b-9847-b60005471f56")
+    (duplicate_pad_numbers_are_jumpers no)
     (pad "1" smd rect (at 0 0) (size 1 1) (layers "F.Cu") (net "SIG"))
+    (embedded_fonts no)
   )
+  (segment (start 1 0) (end 2 0) (width 0.25) (layer "F.Cu") (net "SIG"))
   (segment (start 0 0) (end 1 0) (width 0.25) (layer "F.Cu") (net "SIG"))
+  (embedded_fonts no)
 )`)
 
 	result, err := ComparePCBFiles(original, roundTripped, Options{})
@@ -108,7 +115,7 @@ func TestComparePCBFilesTreatsKiCad10NameOnlyNetsAsEquivalent(t *testing.T) {
 
 func TestEquivalentPCBSummariesIgnoresOnlyNetTableCount(t *testing.T) {
 	original := Summary{Sections: map[string]int{"net": 2, "footprint": 1, "segment": 1}}
-	roundTripped := Summary{Sections: map[string]int{"footprint": 1, "segment": 1}}
+	roundTripped := Summary{Sections: map[string]int{"embedded_fonts": 1, "footprint": 1, "segment": 1}}
 
 	if !equivalentPCBSummaries(original, roundTripped) {
 		t.Fatal("expected summaries to match after omitting net table")

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,7 @@ import (
 )
 
 const pcbSummaryNetSection = "net"
+const pcbSummaryEmbeddedFontsSection = "embedded_fonts"
 
 func ComparePCBFiles(originalPath, roundTrippedPath string, opts Options) (Result, error) {
 	return compareFilesWithNormalizer(originalPath, roundTrippedPath, opts, NormalizePCBBytes)
@@ -157,12 +159,16 @@ func normalizePCBNetNode(node sexpr.ParsedNode, netNames map[int]string, root bo
 	if !node.IsList {
 		return node.Node()
 	}
+	parentHead := node.Head()
 	children := make([]sexpr.Node, 0, len(node.Children))
 	for _, child := range node.Children {
 		if root {
 			if _, _, ok := pcbNumericNetDeclaration(child); ok {
 				continue
 			}
+		}
+		if skipPCBKiCad10Default(parentHead, child) {
+			continue
 		}
 		if child.IsList && child.Head() == "net" {
 			if normalized, ok := normalizePCBNetReference(child, netNames); ok {
@@ -172,7 +178,109 @@ func normalizePCBNetNode(node sexpr.ParsedNode, netNames map[int]string, root bo
 		}
 		children = append(children, normalizePCBNetNode(child, netNames, false))
 	}
+	children = normalizePCBChildOrder(parentHead, children)
 	return sexpr.L(children...)
+}
+
+func skipPCBKiCad10Default(parentHead string, child sexpr.ParsedNode) bool {
+	if !child.IsList {
+		return false
+	}
+	switch child.Head() {
+	case "path":
+		return parentHead == "footprint"
+	case "duplicate_pad_numbers_are_jumpers", "embedded_fonts":
+		if len(child.Children) < 2 {
+			return false
+		}
+		return child.ListValue(1) == "no"
+	default:
+		return false
+	}
+}
+
+func normalizePCBChildOrder(parentHead string, children []sexpr.Node) []sexpr.Node {
+	switch parentHead {
+	case "kicad_pcb":
+		return normalizePCBRootChildOrder(children)
+	case "footprint":
+		return normalizePCBSortableChildOrder(children)
+	default:
+		return children
+	}
+}
+
+func normalizePCBRootChildOrder(children []sexpr.Node) []sexpr.Node {
+	if len(children) <= 2 {
+		return children
+	}
+	result := make([]sexpr.Node, 0, len(children))
+	result = append(result, children[0])
+	sortable := make([]sexpr.Node, 0)
+	for _, child := range children[1:] {
+		if sortablePCBRootChild(child) {
+			sortable = append(sortable, child)
+			continue
+		}
+		result = append(result, child)
+	}
+	result = append(result, sortedPCBNodes(sortable)...)
+	return result
+}
+
+func normalizePCBSortableChildOrder(children []sexpr.Node) []sexpr.Node {
+	if len(children) <= 2 {
+		return children
+	}
+	result := make([]sexpr.Node, 0, len(children))
+	result = append(result, children[0])
+	result = append(result, sortedPCBNodes(children[1:])...)
+	return result
+}
+
+func sortedPCBNodes(children []sexpr.Node) []sexpr.Node {
+	ordered := make([]sortablePCBNode, 0, len(children))
+	for _, child := range children {
+		ordered = append(ordered, sortablePCBNode{node: child, key: pcbSortKey(child)})
+	}
+	sort.SliceStable(ordered, func(i, j int) bool {
+		return ordered[i].key < ordered[j].key
+	})
+	result := make([]sexpr.Node, 0, len(children))
+	for _, child := range ordered {
+		result = append(result, child.node)
+	}
+	return result
+}
+
+func sortablePCBRootChild(node sexpr.Node) bool {
+	list, ok := node.(sexpr.List)
+	if !ok || len(list) == 0 {
+		return false
+	}
+	head, ok := list[0].(sexpr.Atom)
+	if !ok {
+		return false
+	}
+	switch string(head) {
+	case "footprint", "gr_line", "gr_rect", "gr_circle", "gr_arc", "gr_poly", "gr_curve", "gr_text", "segment", "arc", "via", "zone", "dimension":
+		return true
+	default:
+		return false
+	}
+}
+
+type sortablePCBNode struct {
+	node sexpr.Node
+	key  string
+}
+
+func pcbSortKey(node sexpr.Node) string {
+	text, err := sexpr.Format(node)
+	if err != nil {
+		return fmt.Sprintf("%T", node)
+	}
+	return text
 }
 
 func pcbNumericNetDeclaration(node sexpr.ParsedNode) (int, string, bool) {
@@ -209,8 +317,8 @@ func normalizePCBNetReference(node sexpr.ParsedNode, netNames map[int]string) (s
 }
 
 func equivalentPCBSummaries(original Summary, roundTripped Summary) bool {
-	originalSections := summarySectionsWithout(original, pcbSummaryNetSection)
-	roundTrippedSections := summarySectionsWithout(roundTripped, pcbSummaryNetSection)
+	originalSections := summarySectionsWithout(original, pcbSummaryNetSection, pcbSummaryEmbeddedFontsSection)
+	roundTrippedSections := summarySectionsWithout(roundTripped, pcbSummaryNetSection, pcbSummaryEmbeddedFontsSection)
 	if len(originalSections) != len(roundTrippedSections) {
 		return false
 	}
@@ -222,10 +330,14 @@ func equivalentPCBSummaries(original Summary, roundTripped Summary) bool {
 	return true
 }
 
-func summarySectionsWithout(summary Summary, omitted string) map[string]int {
+func summarySectionsWithout(summary Summary, omitted ...string) map[string]int {
 	sections := make(map[string]int, len(summary.Sections))
+	omittedSet := map[string]struct{}{}
+	for _, section := range omitted {
+		omittedSet[section] = struct{}{}
+	}
 	for section, count := range summary.Sections {
-		if section == omitted {
+		if _, skip := omittedSet[section]; skip {
 			continue
 		}
 		sections[section] = count
