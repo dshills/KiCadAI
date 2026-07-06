@@ -101,12 +101,13 @@ diode-string biasing, and single-supply AC output coupling through
 required bleed/reference policy, optional series output resistor, connector
 return/reference diagnostics, and blocked speaker/bridge/power-amplifier
 scope. The protected KiCad-backed fixture now passes schematic electrical
-checks, PCB realization, placement, endpoint binding, project write, and
-writer-correctness evidence. It now stops on structural validation evidence for
-schematic label/connectivity issues and unrouted or partially routed PCB nets
-before real KiCad ERC/DRC promotion. Generated amplifier designs are not
-fabrication-ready until validation blockers, routing policy, active output
-fault protection, speaker/bridge/power-amplifier load safety, SOA and thermal
+checks, PCB realization, placement, endpoint binding, and routing enablement.
+It now stops at route completion before project write: all 20 block-local
+routes bind to physical same-net pad anchors, six required inter-block nets are
+graph-complete, and the remaining blocking evidence is a partial VCC route-tree
+contact group with `output.3` unproven. Generated amplifier designs are not
+fabrication-ready until that required-net blocker, active output fault
+protection, speaker/bridge/power-amplifier load safety, SOA and thermal
 evidence, analog stability/layout rules, and KiCad ERC/DRC-clean proof are
 available.
 

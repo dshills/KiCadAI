@@ -448,10 +448,17 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 	if kicadChecks.Status != StageStatusBlocked {
 		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad ERC connectivity:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result), formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
-	for _, want := range []string{"Pin not connected", "Unconnected wire endpoint"} {
-		if !designExampleStageHasIssueMessage(kicadChecks, want) && !designExamplePromotionHasIssueMessage(report, StageKiCadChecks, want) {
-			t.Errorf("%s missing ERC blocker %q\nstage issues:\n%s\npromotion issues:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, want, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues), formatGeneratedConnectivityDiagnostics(connectivityReport))
+	// KiCad versions report the same ERC connectivity blocker with different wording.
+	acceptedERCConnectivityMessages := []string{"Pin not connected", "Unconnected wire endpoint"}
+	foundERCConnectivityBlocker := false
+	for _, want := range acceptedERCConnectivityMessages {
+		if designExampleStageHasIssueMessage(kicadChecks, want) || designExamplePromotionHasIssueMessage(report, StageKiCadChecks, want) {
+			foundERCConnectivityBlocker = true
+			break
 		}
+	}
+	if !foundERCConnectivityBlocker {
+		t.Errorf("%s missing ERC connectivity blocker matching one of %v\nstage issues:\n%s\npromotion issues:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, acceptedERCConnectivityMessages, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues), formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
 	for _, stageName := range ercDependencyStages {
 		if designExamplePromotionHasBlockingStage(report, stageName) {

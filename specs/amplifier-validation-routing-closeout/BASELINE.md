@@ -23,67 +23,58 @@ The protected Class AB headphone fixture reaches:
 - `schematic_electrical`: `ok`
 - `pcb_realization`: `ok`
 - `placement`: `ok`
-- `routing`: `skipped`
-- `project_write`: `ok`
-- `writer_correctness`: `warning`
-- `validation`: `blocked`
+- `routing`: `blocked`
+- `project_write`: `skipped`
+- `writer_correctness`: `skipped`
+- `validation`: `skipped`
 - `kicad_checks`: `skipped`
 
-Promotion currently stops at `validation`. This confirms the previous PCB
-realization, placement, endpoint-binding, project-write, and writer-correctness
-closeout work is still effective enough to reach structural validation.
+Promotion currently stops at `routing`. This confirms the previous schematic,
+PCB realization, placement, and endpoint-binding closeout work is still
+effective enough to attempt required inter-block route-tree completion.
 
-## Current Routing Policy Evidence
+## Current Routing Evidence
 
 Fixture request state:
 
-- `validation.skip_routing`: `true`
+- `validation.skip_routing`: `false`
 - `validation.skip_kicad_checks`: `true`
 
 The routing stage reports:
 
-- reason: `routing skipped`
 - route connectivity endpoints resolved: `40`
 - route connectivity unresolved endpoints: `0`
 - endpoint contacts proven: `40`
 - local routes bound: `20`
 - emitted track segments: `20`
-- graph-complete route groups: `0`
-- blocked route groups: `7`
-- missing required endpoints in route-tree evidence: `24`
+- required inter-block nets: `7`
+- graph-complete required inter-block nets: `6`
+- partial required inter-block nets: `1`
+- proven required inter-block endpoints: `23 / 24`
+- required-net classification missing endpoints: `1`
+- repairable route-tree failures: `2`
 
-The next implementation phases should replace this stale skip policy with an
-explicit routing decision. Routing may run only when the route request has
-concrete endpoint anchors and required-net classification.
+## Current Route-Completion Blocker
 
-## Current Validation Blockers
+Routing is enabled and reports explicit required-net classification:
 
-Structural validation reports disconnected pads, dangling generated route
-endpoints, and partially routed or unconnected nets. The key current net-level
-blockers are:
+- `AMP_OUT_DC_BIASED`: complete, `2 / 2` endpoints proven
+- `AUDIO_IN`: complete, `2 / 2` endpoints proven
+- `DRIVER_OUT`: complete, `2 / 2` endpoints proven
+- `HP_OUT`: complete, `2 / 2` endpoints proven
+- `HP_RET`: complete, `2 / 2` endpoints proven
+- `LOAD_REF`: complete, `9 / 9` endpoints proven
+- `VCC`: partial, `4 / 5` endpoints proven, missing `output.3`
 
-- `AMP_OUT_DC_BIASED`: partially routed
-- `HP_OUT`: partially routed
-- `VCC`: partially routed
-- `LOAD_REF`: partially routed
-- `AUDIO_IN`: partially routed
-- `DRIVER_OUT`: partially routed
-- `HP_RET`: partially routed
-- `output_upper_drive`: unconnected
-- `output_lower_drive`: unconnected
-- `output_upper_emitter`: unconnected
-- `output_lower_emitter`: unconnected
+The first remaining blocker is VCC route-tree/contact completion:
 
-Generated track endpoint blockers currently appear on:
+- `ROUTE_GRAPH_INCOMPLETE` on
+  `design.inter_block_contact.nets[5].endpoints[1].segment`
+- `VALIDATION_FAILED` on
+  `design.inter_block_route_groups["VCC"].branches[1].nets.VCC`
 
-- `tracks.3.start` on `LOAD_REF`
-- `tracks.5.end` on `LOAD_REF`
-- `tracks.10.start` on `VCC`
-- `tracks.15.start` on `AMP_OUT_DC_BIASED`
-- `tracks.16.end` on `HP_OUT`
-- `tracks.17.start` on `HP_RET`
-- `tracks.18.end` on `DRIVER_OUT`
-- `tracks.19.start` on `AUDIO_IN`
+Project write, writer correctness, structural validation, and KiCad checks are
+skipped with reason `routing did not complete` until this blocker is resolved.
 
 ## Current KiCad Evidence
 
