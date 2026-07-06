@@ -513,6 +513,90 @@ func TestI2CDesignExampleFakeCleanKiCadEvidencePassesCandidateGate(t *testing.T)
 	}
 }
 
+func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping protected amplifier validation/routing integration baseline in short mode")
+	}
+	if strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) != "" {
+		t.Skipf("set %s: local KiCad evidence may move the first blocker", checks.EnvKiCadCLI)
+	}
+	repoRoot := designExampleRepoRoot(t)
+	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "class_ab_headphone_protected.metadata.json")
+	metadata, err := loadDesignExampleMetadataPath(metadataPath)
+	if err != nil {
+		t.Fatalf("load %s: %v", metadataPath, err)
+	}
+	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
+	if err != nil {
+		t.Fatalf("%s request path: %v", metadata.ID, err)
+	}
+	request, issues := loadDesignExampleRequestPath(t, requestPath)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
+	}
+	if !request.Validation.SkipRouting {
+		t.Fatalf("%s baseline expects fixture-level skip_routing until route policy closeout", metadata.ID)
+	}
+	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(metadata.ID))
+	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
+	defer cancel()
+	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
+
+	for _, stageName := range []StageName{StagePCBRealization, StagePlacement, StageProjectWrite, StageWriterCorrect, StageValidation} {
+		stage, ok := designExampleStageByName(result, stageName)
+		if !ok {
+			t.Fatalf("%s missing stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
+		}
+		if stage.Status == StageStatusSkipped {
+			t.Fatalf("%s stage %q unexpectedly skipped:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
+		}
+	}
+	routing, ok := designExampleStageByName(result, StageRouting)
+	if !ok {
+		t.Fatalf("%s missing routing stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if routing.Status != StageStatusSkipped {
+		t.Fatalf("%s routing status = %q, want skipped baseline:\n%s", metadata.ID, routing.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if reason, _ := routing.Summary["reason"].(string); reason != "routing skipped" {
+		t.Fatalf("%s routing reason = %#v, want routing skipped:\n%s", metadata.ID, routing.Summary["reason"], formatDesignExampleRun(metadata, outputDir, result))
+	}
+	routeConnectivity := requireRouteConnectivitySummary(t, routing)
+	if routeConnectivity.EndpointsUnresolved != 0 || routeConnectivity.EndpointNetMismatches != 0 {
+		t.Fatalf("%s routing endpoint baseline regressed: %#v", metadata.ID, routeConnectivity)
+	}
+	validation, _ := designExampleStageByName(result, StageValidation)
+	if validation.Status != StageStatusBlocked {
+		t.Fatalf("%s validation status = %q, want blocked baseline:\n%s", metadata.ID, validation.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	for _, net := range []string{"AMP_OUT_DC_BIASED", "HP_OUT", "VCC", "LOAD_REF", "AUDIO_IN", "DRIVER_OUT", "HP_RET"} {
+		if !designExampleIssuesContainNet(validation.Issues, net) {
+			t.Fatalf("%s validation baseline missing net %q:\n%s", metadata.ID, net, formatDesignExampleIssues(validation.Issues))
+		}
+	}
+	for _, path := range []string{
+		"tracks.3.start",
+		"tracks.5.end",
+		"tracks.10.start",
+		"tracks.15.start",
+		"tracks.16.end",
+		"tracks.17.start",
+		"tracks.18.end",
+		"tracks.19.start",
+	} {
+		if !designExampleIssuesContainPath(validation.Issues, path) {
+			t.Fatalf("%s validation baseline missing route endpoint path %q:\n%s", metadata.ID, path, formatDesignExampleIssues(validation.Issues))
+		}
+	}
+	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
+	if !ok {
+		t.Fatalf("%s missing kicad_checks stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if kicadChecks.Status != StageStatusSkipped {
+		t.Fatalf("%s kicad_checks status = %q, want skipped until validation/routing closeout:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+}
+
 func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
 	t.Helper()
 	stage, ok := designExampleStageByName(result, StageBlockPlanning)
