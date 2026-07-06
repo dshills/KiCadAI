@@ -888,13 +888,15 @@ logic-only unit test covers the promotion decision path with mocked clean KiCad
 results. The
 protected Class AB headphone amplifier fixture now verifies the
 `headphone_output_protection` block summary and verified
-LMV321/MMBT3904/MMBT3906 selection path, then stops at schematic electrical
-validation on expected label-alias conflicts (`headphones_SIG` versus
-`output_amp_out` and `output_lower_emitter` versus `output_upper_emitter`). The
-simulation foundation can now write and evaluate Class AB headphone SPICE-like
-artifacts and feed a `simulation` promotion gate when a runner is configured.
-The next amplifier promotion task is schematic alias cleanup so PCB realization
-and real KiCad ERC/DRC evidence can run.
+LMV321/MMBT3904/MMBT3906 selection path, passes schematic electrical
+validation after alias cleanup, and now stops at PCB placement and
+endpoint-realization because generated output-stage placements exceed the current board
+outline and several inter-block route endpoints do not yet resolve to generated
+PCB pads. The simulation foundation can now write and evaluate Class AB
+headphone SPICE-like artifacts and feed a `simulation` promotion gate when a
+runner is configured. The next amplifier promotion task is PCB realization
+closeout so routing, writer correctness, board validation, and real KiCad
+ERC/DRC evidence can run.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:

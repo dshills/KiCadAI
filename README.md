@@ -100,12 +100,14 @@ diode-string biasing, and single-supply AC output coupling through
 `headphone_output_protection`. That block models the DC-blocking capacitor,
 required bleed/reference policy, optional series output resistor, connector
 return/reference diagnostics, and blocked speaker/bridge/power-amplifier
-scope. The protected KiCad-backed fixture now reaches schematic electrical
-checks and stops on expected label-alias conflicts before PCB realization or
-real KiCad ERC/DRC evidence. Generated amplifier designs are not
-fabrication-ready until those schematic conflicts, active output fault
-protection, SOA and thermal evidence, analog stability/layout rules, and KiCad
-ERC/DRC-clean proof are available.
+scope. The protected KiCad-backed fixture now passes schematic electrical
+checks and reaches PCB realization, where it stops on expected placement and
+endpoint-realization blockers before routing, writer correctness, board
+validation, or real KiCad ERC/DRC evidence. Generated amplifier designs are not
+fabrication-ready until those PCB realization blockers are resolved and active
+output fault protection, speaker/bridge/power-amplifier load safety, SOA and
+thermal evidence, analog stability/layout rules, and KiCad ERC/DRC-clean proof
+are available.
 
 Amplifier simulation support is now available as an opt-in evidence layer for
 Go-level and test-harness integrations; a stable CLI flag or environment

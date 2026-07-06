@@ -116,18 +116,20 @@ output-stage realization, single-supply DC-blocking diagnostics, an explicit
 protection block covers AC output coupling through a DC-blocking capacitor,
 required bleed/reference policy, optional series output resistance, and
 connector return/reference diagnostics for headphone-only loads. The optional
-protected KiCad-backed fixture is still `expected_fail`: it reaches schematic
-electrical validation and currently stops on known label-alias conflicts before
-PCB realization, routing, writer correctness, or real KiCad ERC/DRC checks.
+protected KiCad-backed fixture is still `expected_fail`: it passes schematic
+electrical validation and currently stops on PCB placement and
+endpoint-realization blockers before routing, writer correctness, board
+validation, or real KiCad ERC/DRC checks.
 The new simulation evidence layer can emit a SPICE-like Class AB headphone
 artifact, normalize runner measurements, write `.kicadai/amplifier-simulation*`
 files, and feed a `simulation` promotion gate when configured. Missing
 simulator configuration remains a clean skip/not-supported result unless a
 fixture explicitly requires simulation evidence.
 These are not claims that amplifier generation is fabrication-ready. The
-remaining queue is schematic alias cleanup, SOA and thermal evidence, active
-fault-protection policy, speaker/bridge/power-amplifier load safety, analog
-stability/layout proof, and KiCad ERC/DRC promotion evidence.
+remaining queue is PCB placement and endpoint-realization for the protected
+amplifier fixture, SOA and thermal evidence, active output fault protection,
+speaker/bridge/power-amplifier load safety, analog stability/layout proof, and
+KiCad ERC/DRC promotion evidence.
 
 The circuit-block inventory now exposes the full verified-amplifier family as
 roadmap entries. Entries that do not have a safe implementation are marked
