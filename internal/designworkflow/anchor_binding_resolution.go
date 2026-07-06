@@ -30,6 +30,7 @@ type collectedEntryAnchor struct {
 }
 
 const defaultAnchorBindingMaxProximityMM = 10
+const anchorBindingDistanceEpsilonMM = 1e-9
 
 var defaultRequiredAnchorBindingBlockIDs = map[string]bool{"esd_protection": true, "reverse_polarity_protection": true}
 var defaultExternalEndpointBlockIDs = map[string]bool{"esd_protection": true, "reverse_polarity_protection": true}
@@ -112,6 +113,11 @@ func resolveAnchorBinding(anchor collectedEntryAnchor, endpointIndex physicalEnd
 	}
 	nearbyEndpoints := endpointIndex.Near(anchor.Point)
 	candidates := endpointCandidatesForAnchor(anchor, nearbyEndpoints, maxDistanceMM)
+	if exact := exactEndpointCandidates(candidates); len(exact) != 0 {
+		candidates = exact
+	} else if nearest := uniqueNearestEndpointCandidate(candidates); len(nearest) != 0 {
+		candidates = nearest
+	}
 	switch len(candidates) {
 	case 0:
 		issue := missingEndpointIssue(anchor, nearbyEndpoints, maxDistanceMM)
@@ -148,6 +154,41 @@ func resolveAnchorBinding(anchor collectedEntryAnchor, endpointIndex physicalEnd
 type endpointCandidate struct {
 	endpoint   PhysicalEndpoint
 	distanceMM float64
+}
+
+func exactEndpointCandidates(candidates []endpointCandidate) []endpointCandidate {
+	exact := []endpointCandidate{}
+	for _, candidate := range candidates {
+		if math.Abs(candidate.distanceMM) <= anchorBindingDistanceEpsilonMM {
+			exact = append(exact, candidate)
+		}
+	}
+	return exact
+}
+
+func uniqueNearestEndpointCandidate(candidates []endpointCandidate) []endpointCandidate {
+	if len(candidates) <= 1 {
+		return candidates
+	}
+	if equivalentEndpointCandidates(candidates) {
+		return nil
+	}
+	nearestIndex := 0
+	secondDistance := math.Inf(1)
+	for index := 1; index < len(candidates); index++ {
+		if candidates[index].distanceMM < candidates[nearestIndex].distanceMM {
+			secondDistance = candidates[nearestIndex].distanceMM
+			nearestIndex = index
+			continue
+		}
+		if candidates[index].distanceMM < secondDistance {
+			secondDistance = candidates[index].distanceMM
+		}
+	}
+	if secondDistance-candidates[nearestIndex].distanceMM <= anchorBindingDistanceEpsilonMM {
+		return nil
+	}
+	return []endpointCandidate{candidates[nearestIndex]}
 }
 
 type physicalEndpointGrid struct {

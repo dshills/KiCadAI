@@ -236,8 +236,8 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 		EntryAnchors: []PCBEntryAnchor{
 			{ID: "in", Port: "IN", NetTemplate: "in", Placement: RelativePlacement{XMM: -14, YMM: 0, Layer: "F.Cu"}, Description: "Input signal entry before optional AC coupling."},
 			{ID: "out", Port: "OUT", NetTemplate: "out", Placement: RelativePlacement{XMM: 10, YMM: 0, Layer: "F.Cu"}, Description: "Gain-stage output after optional output resistor."},
-			{ID: "vcc", Port: "VCC", NetTemplate: "vcc", Placement: RelativePlacement{XMM: 0, YMM: -6, Layer: "F.Cu"}, Description: "Positive supply entry."},
-			{ID: "gnd", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: 0, YMM: 6, Layer: "F.Cu"}, Description: "Reference or negative supply entry."},
+			{ID: "vcc", Port: "VCC", NetTemplate: "vcc", Placement: RelativePlacement{XMM: 0, YMM: -2.54, Layer: "F.Cu"}, Description: "Positive supply interface point aligned to the supported LMV321 VCC pad offset."},
+			{ID: "gnd", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: 0, YMM: 2.54, Layer: "F.Cu"}, Description: "Reference or negative supply interface point aligned to the supported LMV321 VEE pad offset."},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "opamp_core", ComponentRoles: []string{"opamp", "feedback", "gain_to_ground", "decoupling_capacitor", "input_coupling", "bias_top", "bias_bottom", "output_resistor"}, AnchorRole: "opamp", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -8, MaxXMM: 10, MaxYMM: 8}}},
 		LocalRoutes: []PCBLocalRoute{
@@ -246,8 +246,10 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 			{ID: "ac_input_bias", NetTemplate: "bias", From: RouteEndpoint{ComponentRole: "input_coupling", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INP}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
 			{ID: "bias_top", NetTemplate: "bias", From: RouteEndpoint{ComponentRole: "bias_top", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INP}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
 			{ID: "bias_bottom", NetTemplate: "bias", From: RouteEndpoint{ComponentRole: "bias_bottom", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INP}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
-			{ID: "bias_vcc", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "bias_top", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
-			{ID: "bias_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "bias_bottom", Pin: "2"}, To: RouteEndpoint{Port: "GND"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
+			{ID: "bias_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "bias_top", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VCC}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
+			{ID: "bias_gnd", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "bias_bottom", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"input_coupling": "ac"}}},
+			{ID: "opamp_vcc_entry", NetTemplate: "vcc", From: RouteEndpoint{Port: "VCC"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VCC}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "opamp_gnd_entry", NetTemplate: "gnd", From: RouteEndpoint{Port: "GND"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 			{ID: "feedback_output", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.OUT}, To: RouteEndpoint{ComponentRole: "feedback", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"include_output_resistor": false}}},
 			{ID: "feedback_output_drive", NetTemplate: "out_drive", From: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.OUT}, To: RouteEndpoint{ComponentRole: "feedback", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: RealizationWhen{Params: map[string]any{"include_output_resistor": true}}},
 			{ID: "opamp_output_direct", NetTemplate: "out", From: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.OUT}, To: RouteEndpoint{Port: "OUT"}, Layer: "F.Cu", WidthMM: 0.3, Required: true, When: RealizationWhen{Params: map[string]any{"include_output_resistor": false}}},
@@ -257,6 +259,7 @@ func opAmpGainStagePCBRealization() *PCBRealization {
 			{ID: "gain_reference", NetTemplate: "feedback", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.INN}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "gain_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "gain_to_ground", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "supply_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VCC}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "supply_decoupling_return", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "opamp", Pin: lmv321Pins.VEE}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "opamp_feedback_proximity", Kind: "proximity", NetTemplate: "feedback", AppliesTo: []string{"opamp", "feedback", "gain_to_ground"}, MaxLengthMM: 6, Description: "Feedback network should remain close to the op-amp inverting input."},

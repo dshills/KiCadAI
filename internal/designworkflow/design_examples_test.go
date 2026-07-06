@@ -609,6 +609,13 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 			t.Fatalf("%s downstream stage %q status = %q, want %q:\n%s", metadata.ID, expectation.stage, stage.Status, expectation.status, formatDesignExampleRun(metadata, outputDir, result))
 		}
 	}
+	routing, ok := designExampleStageByName(result, StageRouting)
+	if !ok {
+		t.Fatalf("%s missing routing stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if len(routing.Issues) != 0 {
+		t.Fatalf("%s routing handoff still has issues despite skip_routing policy:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
+	}
 }
 
 func assertDesignExampleClassABDriverEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {

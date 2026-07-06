@@ -90,6 +90,26 @@ func TestResolveAnchorBindingsReportsAmbiguousEndpoints(t *testing.T) {
 	}
 }
 
+func TestResolveAnchorBindingsPrefersExactEndpointOverNearbySameNet(t *testing.T) {
+	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
+		ID: "supply_entry", Port: "VCC", NetName: "VCC", Placement: blocks.RelativePlacement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+	})
+	endpoints := []PhysicalEndpoint{
+		testConnectorEndpoint("J1", "1", "VCC", 10, 10),
+		testConnectorEndpoint("J2", "1", "VCC", 12, 10),
+	}
+
+	summary := ResolveAnchorBindings(fragments, endpoints, AnchorBindingOptions{})
+
+	if summary.Bound != 1 || len(summary.Issues) != 0 {
+		t.Fatalf("summary = %#v", summary)
+	}
+	binding := summary.Bindings[0]
+	if binding.EndpointRef != "J1" || binding.EndpointPad != "1" {
+		t.Fatalf("binding = %#v", binding)
+	}
+}
+
 func TestResolveAnchorBindingsSelectsEquivalentSameConnectorEndpoint(t *testing.T) {
 	fragments := testAnchorFragments("esd_protection", blocks.RealizedPCBEntryAnchor{
 		ID: "ground_return", Port: "GND", NetName: "GND", Placement: blocks.RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
