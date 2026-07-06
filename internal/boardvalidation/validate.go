@@ -11,6 +11,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/reportartifacts"
 	"kicadai/internal/reports"
 )
 
@@ -712,10 +713,7 @@ func drcIssues(result checks.CheckResult, err error) []reports.Issue {
 }
 
 func drcArtifacts(result checks.CheckResult) []reports.Artifact {
-	if strings.TrimSpace(result.ReportPath) == "" {
-		return nil
-	}
-	return []reports.Artifact{{Kind: reports.ArtifactDRCReport, Path: filepath.ToSlash(result.ReportPath), Description: "drc JSON report"}}
+	return reportartifacts.ExistingReportArtifact(reports.ArtifactDRCReport, result.ReportPath, string(checks.CheckKindDRC)+" JSON report")
 }
 
 func codeForDRCFinding(finding checks.CheckFinding) reports.Code {

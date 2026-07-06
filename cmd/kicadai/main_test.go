@@ -54,6 +54,16 @@ func TestRunRejectsInvalidFormatWithoutCommand(t *testing.T) {
 	}
 }
 
+func TestCheckArtifactsSkipsMissingReport(t *testing.T) {
+	artifacts := checkArtifacts(checks.CheckResult{
+		Kind:       checks.CheckKindDRC,
+		ReportPath: filepath.Join(t.TempDir(), "missing-drc.json"),
+	})
+	if len(artifacts) != 0 {
+		t.Fatalf("artifacts = %#v, want none for missing report", artifacts)
+	}
+}
+
 func TestRunConfigDefaultsToJSON(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

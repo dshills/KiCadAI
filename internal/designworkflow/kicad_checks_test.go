@@ -85,6 +85,22 @@ func TestWorkflowCheckResultWithIssuesDowngradesZeroFindingToolError(t *testing.
 	}
 }
 
+func TestWorkflowCheckResultWithIssuesSkipsMissingReportArtifact(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:       checks.CheckKindDRC,
+		Status:     checks.CheckStatusError,
+		TargetPath: "demo.kicad_pcb",
+		ExitCode:   -1,
+		ReportPath: filepath.Join(t.TempDir(), "missing-drc.json"),
+	}
+
+	_, _, artifacts := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code -1"))
+
+	if len(artifacts) != 0 {
+		t.Fatalf("artifacts = %#v, want none for missing DRC report", artifacts)
+	}
+}
+
 func TestWorkflowCheckResultWithIssuesKeepsGenericToolErrorBlocking(t *testing.T) {
 	result := checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, TargetPath: "demo.kicad_pcb", ExitCode: 2}
 

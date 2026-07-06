@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/reportartifacts"
 	"kicadai/internal/reports"
 )
 
@@ -286,12 +287,9 @@ func addWorkflowFindingNet(nets *[]string, seen map[string]struct{}, net string)
 }
 
 func workflowCheckArtifacts(result checks.CheckResult) []reports.Artifact {
-	if strings.TrimSpace(result.ReportPath) == "" {
-		return nil
-	}
 	kind := reports.ArtifactERCReport
 	if result.Kind == checks.CheckKindDRC {
 		kind = reports.ArtifactDRCReport
 	}
-	return []reports.Artifact{{Kind: kind, Path: filepath.ToSlash(result.ReportPath), Description: string(result.Kind) + " JSON report"}}
+	return reportartifacts.ExistingReportArtifact(kind, result.ReportPath, string(result.Kind)+" JSON report")
 }

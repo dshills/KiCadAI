@@ -2,10 +2,12 @@ package boardvalidation
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/checks"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/reports"
 )
@@ -316,6 +318,16 @@ func TestValidateBoardRequiredDRCMissingFails(t *testing.T) {
 	}
 	if !hasIssueCode(result.Issues, reports.CodeSkippedExternalTool) {
 		t.Fatalf("missing skipped DRC issue: %#v", result.Issues)
+	}
+}
+
+func TestDRCArtifactsSkipsMissingReport(t *testing.T) {
+	artifacts := drcArtifacts(checks.CheckResult{
+		Kind:       checks.CheckKindDRC,
+		ReportPath: filepath.Join(t.TempDir(), "missing-drc.json"),
+	})
+	if len(artifacts) != 0 {
+		t.Fatalf("artifacts = %#v, want none for missing report", artifacts)
 	}
 }
 

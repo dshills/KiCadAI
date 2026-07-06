@@ -43,6 +43,7 @@ import (
 	"kicadai/internal/placement"
 	"kicadai/internal/rationale"
 	"kicadai/internal/repair"
+	"kicadai/internal/reportartifacts"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/schematic"
@@ -4100,18 +4101,11 @@ func checkSeverity(severity string) reports.Severity {
 }
 
 func checkArtifacts(result checks.CheckResult) []reports.Artifact {
-	if strings.TrimSpace(result.ReportPath) == "" {
-		return nil
-	}
 	kind := reports.ArtifactERCReport
 	if result.Kind == checks.CheckKindDRC {
 		kind = reports.ArtifactDRCReport
 	}
-	return []reports.Artifact{{
-		Kind:        kind,
-		Path:        filepath.ToSlash(result.ReportPath),
-		Description: string(result.Kind) + " JSON report",
-	}}
+	return reportartifacts.ExistingReportArtifact(kind, result.ReportPath, string(result.Kind)+" JSON report")
 }
 
 type roundTripReport struct {
