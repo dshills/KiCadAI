@@ -640,6 +640,24 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if firstAttempt.Status != "partial" || firstAttempt.PrimaryCode == "" || firstAttempt.ObstacleKind == "" {
 		t.Fatalf("%s first partial VCC attempt lacks blocker evidence: %#v", metadata.ID, firstAttempt)
 	}
+	foundSameNetCopperAttempt := false
+	for index, attempt := range partialVCCBranch.AccessAttempts {
+		if index > 0 && attempt.PairRank < partialVCCBranch.AccessAttempts[index-1].PairRank {
+			t.Fatalf("%s partial VCC attempts not sorted by pair rank: %#v", metadata.ID, partialVCCBranch.AccessAttempts)
+		}
+		if index > 0 && attempt.SourceRole == RouteTreeAccessTargetPad && attempt.TargetRole == RouteTreeAccessSameNetCopper {
+			foundSameNetCopperAttempt = true
+			if attempt.SameNetCopper == 0 {
+				t.Fatalf("%s VCC same-net copper attempt lacks merge audit: %#v", metadata.ID, attempt)
+			}
+			if attempt.PrimaryCode == "" || attempt.ObstacleKind == "" {
+				t.Fatalf("%s VCC same-net copper attempt lacks blocker evidence: %#v", metadata.ID, attempt)
+			}
+		}
+	}
+	if !foundSameNetCopperAttempt {
+		t.Fatalf("%s partial VCC branch attempts = %#v, want same-net copper alternatives after exact pad attempt", metadata.ID, partialVCCBranch.AccessAttempts)
+	}
 	repair := requireRouteTreeRepairSummary(t, routing)
 	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 || repair.UnrepairableFailures != 0 || !slices.Equal(repair.Nets, []string{"VCC"}) {
 		t.Fatalf("%s route-tree repair summary = %#v, want repairable VCC-only blocker", metadata.ID, repair)
