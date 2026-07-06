@@ -648,17 +648,8 @@ func TestRunIntentCreateLEDPromptStrictPromotionCandidate(t *testing.T) {
 		}
 	}
 
-	wantIssues := []struct {
-		stage   designworkflow.StageName
-		path    string
-		message string
-	}{
-		{stage: designworkflow.StageValidation, path: "kicad_drc", message: "KiCad DRC was not run because no KiCad CLI path was configured"},
-	}
-	for _, want := range wantIssues {
-		if !promotionHasIssue(promotion.Issues, want.stage, want.path, want.message) {
-			t.Fatalf("promotion issues missing stage=%q path=%q message containing %q\nissues=%#v", want.stage, want.path, want.message, promotion.Issues)
-		}
+	if promotionHasIssue(promotion.Issues, designworkflow.StageValidation, "kicad_drc", "KiCad DRC was not run because no KiCad CLI path was configured") {
+		t.Fatalf("optional DRC should not report missing CLI as a validation issue: %#v", promotion.Issues)
 	}
 
 	if !promotionHasIssueCodePrefix(promotion.Issues, designworkflow.StageRouting, "routing_fixed_net_skipped_") {

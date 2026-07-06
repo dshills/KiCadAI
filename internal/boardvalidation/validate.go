@@ -632,6 +632,9 @@ func validateZones(board *pcbfiles.PCBFile, opts Options) ([]ZoneStatus, []repor
 
 func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 	if strings.TrimSpace(opts.KiCadCLI) == "" {
+		if !opts.RequireDRC {
+			return Check{Name: CheckKiCadDRC, Required: false, Status: StatusSkipped}
+		}
 		status, severity := missingDRCPolicy(opts)
 		return Check{
 			Name:     CheckKiCadDRC,
@@ -648,6 +651,20 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 	}
 	cli, cliErr := checks.DiscoverCLI(opts.KiCadCLI)
 	if cliErr != nil {
+		if !opts.RequireDRC {
+			return Check{
+				Name:     CheckKiCadDRC,
+				Required: false,
+				Status:   StatusSkipped,
+				Issues: []reports.Issue{{
+					Code:       reports.CodeSkippedExternalTool,
+					Severity:   reports.SeverityInfo,
+					Path:       "kicad_drc",
+					Message:    cliErr.Error(),
+					Suggestion: "set --kicad-cli when DRC evidence is required",
+				}},
+			}
+		}
 		status, severity := missingDRCPolicy(opts)
 		return Check{
 			Name:     CheckKiCadDRC,
@@ -673,6 +690,9 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 	}
 	drc, err := checks.RunDRC(ctx, cli, targetPath, checkOpts)
 	issues := drcIssues(drc, err)
+	if err != nil && !slices.ContainsFunc(issues, func(issue reports.Issue) bool { return issue.Code == reports.CodeKiCadCLIFailed }) {
+		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: reports.SeverityError, Path: targetPath, Message: err.Error()})
+	}
 	artifacts := drcArtifacts(drc)
 	status := StatusPass
 	if err != nil {
@@ -680,7 +700,29 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 	} else if len(issues) > 0 {
 		status = StatusFail
 	}
+	if !opts.RequireDRC {
+		if status == StatusError {
+			return Check{Name: CheckKiCadDRC, Required: false, Status: StatusSkipped, Issues: demoteOptionalDRCIssues(issues), Artifacts: artifacts, Evidence: drc.ReportPath}
+		}
+		if status == StatusFail {
+			return Check{Name: CheckKiCadDRC, Required: false, Status: StatusPass, Issues: demoteOptionalDRCIssues(issues), Artifacts: artifacts, Evidence: drc.ReportPath}
+		}
+	}
 	return Check{Name: CheckKiCadDRC, Required: opts.RequireDRC, Status: status, Issues: issues, Artifacts: artifacts, Evidence: drc.ReportPath}
+}
+
+func demoteOptionalDRCIssues(issues []reports.Issue) []reports.Issue {
+	if len(issues) == 0 {
+		return nil
+	}
+	demoted := make([]reports.Issue, len(issues))
+	copy(demoted, issues)
+	for index := range demoted {
+		if demoted[index].Severity == reports.SeverityError || demoted[index].Severity == reports.SeverityBlocked {
+			demoted[index].Severity = reports.SeverityWarning
+		}
+	}
+	return demoted
 }
 
 func missingDRCPolicy(opts Options) (Status, reports.Severity) {

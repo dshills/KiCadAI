@@ -321,6 +321,21 @@ func TestValidateBoardRequiredDRCMissingFails(t *testing.T) {
 	}
 }
 
+func TestValidateBoardOptionalDRCMissingCLISkipsCleanly(t *testing.T) {
+	board := twoPadBoard(t)
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	check := findCheck(t, result, CheckKiCadDRC)
+	if check.Status != StatusSkipped {
+		t.Fatalf("DRC status = %q, want skipped; issues=%#v", check.Status, check.Issues)
+	}
+	if len(check.Issues) != 0 {
+		t.Fatalf("optional missing DRC issues = %#v, want none", check.Issues)
+	}
+	if result.Status != StatusPass {
+		t.Fatalf("result status = %q, want pass; issues=%#v", result.Status, result.Issues)
+	}
+}
+
 func TestDRCArtifactsSkipsMissingReport(t *testing.T) {
 	artifacts := drcArtifacts(checks.CheckResult{
 		Kind:       checks.CheckKindDRC,
@@ -421,6 +436,17 @@ func findNetStatus(t *testing.T, result Result, name string) NetStatus {
 	}
 	t.Fatalf("net status %q not found in %#v", name, result.Nets)
 	return NetStatus{}
+}
+
+func findCheck(t *testing.T, result Result, name string) Check {
+	t.Helper()
+	for _, check := range result.Checks {
+		if check.Name == name {
+			return check
+		}
+	}
+	t.Fatalf("check %q not found in %#v", name, result.Checks)
+	return Check{}
 }
 
 func hasIssueCode(issues []reports.Issue, code reports.Code) bool {

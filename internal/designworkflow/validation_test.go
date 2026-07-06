@@ -40,6 +40,22 @@ func TestValidateProjectStrictUnroutedAcceptsRoutedFixture(t *testing.T) {
 	}
 }
 
+func TestBoardValidationOptionsPassesKiCadCLI(t *testing.T) {
+	request := Request{}
+	opts := ValidationOptions{KiCadCLI: filepath.Join(t.TempDir(), "kicad-cli")}
+
+	optional := boardValidationOptions(&request, opts)
+	if optional.KiCadCLI != opts.KiCadCLI || optional.RequireDRC {
+		t.Fatalf("optional board validation opts = %#v, want KiCad CLI and no required DRC", optional)
+	}
+
+	opts.RequireDRC = true
+	required := boardValidationOptions(&request, opts)
+	if required.KiCadCLI != opts.KiCadCLI || !required.RequireDRC {
+		t.Fatalf("required board validation opts = %#v, want KiCad CLI and required DRC", required)
+	}
+}
+
 func writeValidationFixture(t *testing.T) (Request, ProjectWriteResult) {
 	t.Helper()
 	request := Request{
