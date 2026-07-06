@@ -14,7 +14,7 @@ import (
 const (
 	defaultFragmentSpacingXMM = 25.0
 	defaultFragmentSpacingYMM = 18.0
-	defaultFragmentMarginMM   = 5.0
+	defaultFragmentMarginMM   = 8.0
 )
 
 type PCBFragmentResult struct {

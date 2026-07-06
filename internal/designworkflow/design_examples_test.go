@@ -565,36 +565,54 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if !ok {
 		t.Fatalf("%s missing PCB realization stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if pcbRealization.Status != StageStatusWarning {
-		t.Fatalf("%s PCB realization status = %q, want warning:\n%s", metadata.ID, pcbRealization.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if pcbRealization.Status != StageStatusOK {
+		t.Fatalf("%s PCB realization status = %q, want ok after board envelope fit:\n%s", metadata.ID, pcbRealization.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if !designExampleIssuesContainPath(pcbRealization.Issues, "pcb_realization.output") {
-		t.Fatalf("%s PCB realization missing output placement warning:\n%s", metadata.ID, formatDesignExampleIssues(pcbRealization.Issues))
+	if designExampleIssuesContainPath(pcbRealization.Issues, "pcb_realization.output") {
+		t.Fatalf("%s PCB realization still has output placement warning:\n%s", metadata.ID, formatDesignExampleIssues(pcbRealization.Issues))
 	}
 	placement, ok := designExampleStageByName(result, StagePlacement)
 	if !ok {
 		t.Fatalf("%s missing placement stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if placement.Status != StageStatusBlocked {
-		t.Fatalf("%s placement status = %q, want blocked:\n%s", metadata.ID, placement.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if placement.Status != StageStatusWarning {
+		t.Fatalf("%s placement status = %q, want warning after component bounds fit:\n%s", metadata.ID, placement.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	for _, path := range []string{
 		"components.Qccde149e001.position",
 		"components.Qccde149e002.position",
-		"design.inter_block_routing.connections[5].to",
-		"design.inter_block_routing.connections[6].from",
 	} {
-		if !designExampleIssuesContainPath(placement.Issues, path) {
-			t.Fatalf("%s placement issues missing %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
+		if designExampleIssuesContainPath(placement.Issues, path) {
+			t.Fatalf("%s placement still has out-of-board issue %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
 		}
 	}
-	for _, stageName := range []StageName{StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks} {
-		stage, ok := designExampleStageByName(result, stageName)
-		if !ok {
-			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
+	for _, path := range []string{
+		"design.inter_block_routing.connections[0].to",
+		"design.inter_block_routing.connections[5].to",
+		"design.inter_block_routing.connections[6].from",
+		"design.inter_block_routing.connections[7].to",
+		"design.inter_block_routing.connections[8].from",
+	} {
+		if !designExampleIssuesContainPath(placement.Issues, path) {
+			t.Fatalf("%s placement issues missing endpoint warning %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
 		}
-		if stage.Status != StageStatusSkipped {
-			t.Fatalf("%s downstream stage %q status = %q, want skipped:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	for _, expectation := range []struct {
+		stage  StageName
+		status StageStatus
+	}{
+		{StageRouting, StageStatusSkipped},
+		{StageProjectWrite, StageStatusOK},
+		{StageWriterCorrect, StageStatusWarning},
+		{StageValidation, StageStatusBlocked},
+		{StageKiCadChecks, StageStatusSkipped},
+	} {
+		stage, ok := designExampleStageByName(result, expectation.stage)
+		if !ok {
+			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, expectation.stage, formatDesignExampleRun(metadata, outputDir, result))
+		}
+		if stage.Status != expectation.status {
+			t.Fatalf("%s downstream stage %q status = %q, want %q:\n%s", metadata.ID, expectation.stage, stage.Status, expectation.status, formatDesignExampleRun(metadata, outputDir, result))
 		}
 	}
 }

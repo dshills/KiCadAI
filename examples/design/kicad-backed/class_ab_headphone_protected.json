@@ -6,8 +6,8 @@
     "category": "amplifier"
   },
   "board": {
-    "width_mm": 80,
-    "height_mm": 55,
+    "width_mm": 160,
+    "height_mm": 100,
     "layers": 2
   },
   "component_policy": {
