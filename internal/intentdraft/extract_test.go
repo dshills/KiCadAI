@@ -14,6 +14,12 @@ func TestDraftExtractsI2CSensorBreakout(t *testing.T) {
 	if result.Request.Kind != intentplanner.IntentSensorNode {
 		t.Fatalf("kind = %q", result.Request.Kind)
 	}
+	if len(result.Request.Power.Inputs) != 0 {
+		t.Fatalf("voltage-only breakout should not infer a separate power input: %#v", result.Request.Power.Inputs)
+	}
+	if len(result.Request.Power.Rails) != 1 || result.Request.Power.Rails[0].Voltage != "3.3V" {
+		t.Fatalf("power rails = %#v", result.Request.Power.Rails)
+	}
 	if len(result.Request.Interfaces) != 1 || result.Request.Interfaces[0].Kind != "i2c" {
 		t.Fatalf("interfaces = %#v", result.Request.Interfaces)
 	}
@@ -25,6 +31,18 @@ func TestDraftExtractsI2CSensorBreakout(t *testing.T) {
 	}
 	if result.Extraction.Confidence.Fields == 0 {
 		t.Fatalf("missing extraction confidence: %#v", result.Extraction)
+	}
+}
+
+func TestDraftKeepsExplicitBreakoutPowerInput(t *testing.T) {
+	for _, prompt := range []string{
+		"make a 3.3V I2C sensor breakout with barrel jack power input",
+		"make a 3.3V I2C sensor breakout with screw terminal power pins",
+	} {
+		result := Draft(prompt, Options{})
+		if len(result.Request.Power.Inputs) == 0 {
+			t.Fatalf("expected explicit breakout power input for %q", prompt)
+		}
 	}
 }
 

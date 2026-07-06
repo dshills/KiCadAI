@@ -258,6 +258,47 @@ func TestPlanMapsMCUI2CBus(t *testing.T) {
 	}
 }
 
+func TestPlanUsesI2CConnectorAsVoltageOnlyBreakoutPowerSource(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "i2c_sensor_breakout",
+		Kind:    IntentSensorNode,
+		Power: PowerIntent{
+			Rails: []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", Alias: "3v3"}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V", Bus: "i2c1"}},
+		Functions: []FunctionIntent{
+			{Kind: "sensor", Family: "i2c_sensor", Bus: "i2c1", Supply: "3v3"},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if hasWorkflowBlock(*plan.GeneratedRequest, "connector_breakout") && hasWorkflowInstance(*plan.GeneratedRequest, "power_header") {
+		t.Fatalf("voltage-only breakout should not add a separate power header: %#v", plan.GeneratedRequest.Blocks)
+	}
+	if got := workflowBlockParam(*plan.GeneratedRequest, "connector_breakout", "pin_names"); fmt.Sprint(got) != "[VCC GND SDA SCL]" {
+		t.Fatalf("i2c connector pin_names = %#v, want [VCC GND SDA SCL]", got)
+	}
+	for _, connection := range []struct {
+		from string
+		to   string
+		net  string
+	}{
+		{from: "i2c_connector.VCC", to: "sensor.VCC", net: "VCC"},
+		{from: "i2c_connector.GND", to: "sensor.GND", net: "GND"},
+		{from: "i2c_connector.SDA", to: "sensor.SDA", net: "SDA"},
+		{from: "i2c_connector.SCL", to: "sensor.SCL", net: "SCL"},
+	} {
+		if !hasConnectionWithNet(*plan.GeneratedRequest, connection.from, connection.to, connection.net) {
+			t.Fatalf("missing connection %s -> %s net %s: %#v", connection.from, connection.to, connection.net, plan.GeneratedRequest.Connections)
+		}
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
 func TestPlanBlocksTargetedGPIOAssignment(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",
@@ -1096,6 +1137,15 @@ func TestPlanDerivesPackagePreferencesAndRatings(t *testing.T) {
 func hasWorkflowBlock(request designworkflow.Request, blockID string) bool {
 	for _, block := range request.Blocks {
 		if block.BlockID == blockID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasWorkflowInstance(request designworkflow.Request, instanceID string) bool {
+	for _, block := range request.Blocks {
+		if block.ID == instanceID {
 			return true
 		}
 	}

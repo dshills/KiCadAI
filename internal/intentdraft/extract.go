@@ -74,7 +74,7 @@ func extractPower(source string, normalized string, request *intentplanner.Reque
 		request.Power.Inputs = append(request.Power.Inputs, input)
 		addField(extraction, fmt.Sprintf("power.inputs[%d].kind", len(request.Power.Inputs)-1), input.Kind, source, findPhrase(source, "battery"), confidenceRegexHigh, "keyword.power_input")
 	}
-	if len(request.Power.Inputs) == 0 && len(voltages) > 0 {
+	if len(request.Power.Inputs) == 0 && len(voltages) > 0 && !voltageOnlyBreakoutPower(normalized) {
 		input := intentplanner.PowerInputIntent{Kind: "external", Voltage: voltages[0].TextValue}
 		request.Power.Inputs = append(request.Power.Inputs, input)
 		addField(extraction, fmt.Sprintf("power.inputs[%d].kind", len(request.Power.Inputs)-1), input.Kind, source, voltages[0].Field, confidenceRegexLow, "inferred.power_input")
@@ -88,6 +88,13 @@ func extractPower(source string, normalized string, request *intentplanner.Reque
 		request.Power.Rails = append(request.Power.Rails, rail)
 		addField(extraction, fmt.Sprintf("power.rails[%d].voltage", len(request.Power.Rails)-1), rail.Voltage, source, voltages[len(voltages)-1].Field, confidenceRegexHigh, "regex.voltage")
 	}
+}
+
+func voltageOnlyBreakoutPower(normalized string) bool {
+	if !containsAny(normalized, "breakout", "adapter") {
+		return false
+	}
+	return !containsAny(normalized, "external power", "power input", "power pins", "power connector", "power header", "input header", "supply header", "vcc pin", "vcc pins", "vin", "pwr", "usb", "usb-c", "usb c", "usbc", "battery", "dc jack", "barrel jack", "terminal block", "screw terminal", "jst")
 }
 
 func extractInterfaces(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {

@@ -499,8 +499,8 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 	err := run([]string{"--json", "--text", "make a 3.3V I2C temperature sensor breakout", "--output", output, "--overwrite", "intent", "create"}, &stdout, &stderr)
-	if err == nil {
-		t.Fatal("expected downstream workflow validation to report issues for this draft")
+	if err != nil {
+		t.Fatalf("intent create failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 	}
 	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json", "design-request.json", "workflow-result.json", "design-rationale.json", "validation-summary.json", "retry-state.json", "manifest.json"} {
 		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {

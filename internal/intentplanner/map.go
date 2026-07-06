@@ -471,9 +471,12 @@ func (builder *planBuilder) mapInterfaces() {
 		for count := 0; count < iface.Quantity; count++ {
 			switch iface.Kind {
 			case "i2c":
-				id := builder.addConnector(reqID, "i2c_connector", []string{"SDA", "SCL", "VCC", "GND"}, iface.Strength)
+				id := builder.addConnector(reqID, "i2c_connector", []string{"VCC", "GND", "SDA", "SCL"}, iface.Strength)
 				builder.connectorIDs = appendIfNotEmpty(builder.connectorIDs, id)
 				builder.i2cConnectorIDs = appendIfNotEmpty(builder.i2cConnectorIDs, id)
+				if id != "" && iface.Voltage != "" {
+					builder.instanceVoltages[id] = iface.Voltage
+				}
 				builder.recordI2CBus(id, iface.Bus)
 			case "analog":
 				pins := interfaceSignalConnectorPins(iface)
@@ -993,9 +996,9 @@ func (builder *planBuilder) connectI2CBuses() {
 		buses[builder.i2cBusFor(id)] = struct{}{}
 	}
 	for _, bus := range sortedSetKeys(buses) {
-		sdaNet := builder.busNetAlias(bus, "SDA")
-		sclNet := builder.busNetAlias(bus, "SCL")
 		mcuID, hasMCU := builder.i2cMCUTarget(bus)
+		sdaNet := builder.i2cSignalNetAlias(bus, "SDA", hasMCU)
+		sclNet := builder.i2cSignalNetAlias(bus, "SCL", hasMCU)
 		for _, sensorID := range builder.instancesOnI2CBus(builder.sensorIDs, bus) {
 			if hasMCU {
 				builder.addConnection(mcuID+".SDA", sensorID+".SDA", sdaNet, "I2C data connects MCU to sensor on "+bus)
@@ -1015,6 +1018,13 @@ func (builder *planBuilder) connectI2CBuses() {
 			}
 		}
 	}
+}
+
+func (builder *planBuilder) i2cSignalNetAlias(bus string, signal string, hasMCU bool) string {
+	if !hasMCU && len(builder.i2cConnectorIDs) == 1 {
+		return strings.ToUpper(strings.TrimSpace(signal))
+	}
+	return builder.busNetAlias(bus, signal)
 }
 
 func sortedSetKeys(values map[string]struct{}) []string {
@@ -1173,6 +1183,9 @@ func (builder *planBuilder) supplySourceForTarget(targetID string) (string, stri
 }
 
 func (builder *planBuilder) supplyNetAlias(sourceID string) string {
+	if builder.instanceBlockIDs[sourceID] == "connector_breakout" {
+		return builder.powerPortFor(sourceID)
+	}
 	if voltage := firstNonEmpty(builder.paramString(sourceID, "output_voltage"), builder.inputVoltageForInstance(sourceID)); voltage != "" {
 		return "VCC_" + normalizeToken(strings.ReplaceAll(voltage, ".", "V"))
 	}
@@ -1189,6 +1202,8 @@ func (builder *planBuilder) rawPowerSourceForVoltage(voltage string) (string, st
 	}{
 		{ids: builder.usbPowerIDs, port: "VBUS_OUT"},
 		{ids: builder.inputPowerIDs, port: "VIN"},
+		{ids: builder.i2cConnectorIDs, port: "VCC"},
+		{ids: builder.powerConnectorIDs, port: "VCC"},
 	} {
 		for _, id := range source.ids {
 			if voltagesEquivalent(builder.inputVoltageForInstance(id), voltage) {
@@ -1619,6 +1634,9 @@ func (builder *planBuilder) nextID(prefix string) string {
 }
 
 func needsRegulator(inputs []PowerInputIntent, rail PowerRailIntent) bool {
+	if len(inputs) == 0 {
+		return false
+	}
 	railVoltage, railOK := parseVoltage(rail.Voltage)
 	if !railOK {
 		return true
