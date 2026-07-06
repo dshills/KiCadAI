@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"math"
 	"slices"
 	"strings"
 
@@ -57,6 +58,38 @@ type RequiredNetClassification struct {
 }
 
 const RequiredNetKindInterBlock = "required_inter_block"
+
+type RouteTreeMissingEndpointTraceSummary struct {
+	MissingEndpoints int                             `json:"missing_endpoints"`
+	Items            []RouteTreeMissingEndpointTrace `json:"items,omitempty"`
+}
+
+type RouteTreeMissingEndpointTrace struct {
+	NetName             string                       `json:"net_name"`
+	EndpointID          string                       `json:"endpoint_id"`
+	Ref                 string                       `json:"ref,omitempty"`
+	Pad                 string                       `json:"pad,omitempty"`
+	InstanceID          string                       `json:"instance_id,omitempty"`
+	BlockID             string                       `json:"block_id,omitempty"`
+	Layer               string                       `json:"layer,omitempty"`
+	XMM                 float64                      `json:"x_mm"`
+	YMM                 float64                      `json:"y_mm"`
+	Status              InterBlockContactProofStatus `json:"status"`
+	Suggestion          string                       `json:"suggestion,omitempty"`
+	NearestAccess       *RouteTreeNearestAccessTrace `json:"nearest_access,omitempty"`
+	NearestAccessDistMM *float64                     `json:"nearest_access_distance_mm,omitempty"`
+}
+
+type RouteTreeNearestAccessTrace struct {
+	Role       RouteTreeEndpointAccessRole `json:"role"`
+	EndpointID string                      `json:"endpoint_id,omitempty"`
+	Ref        string                      `json:"ref,omitempty"`
+	Pad        string                      `json:"pad,omitempty"`
+	Layer      string                      `json:"layer,omitempty"`
+	XMM        float64                     `json:"x_mm"`
+	YMM        float64                     `json:"y_mm"`
+	Source     string                      `json:"source,omitempty"`
+}
 
 func SummarizeRouteTreeContactGraph(targetEvidence InterBlockContactEvidence, operations []transactions.Operation, access []RouteTreeEndpointAccess) RouteTreeContactGraphSummary {
 	targetsByNet := normalizedContactGraphTargetsByNet(targetEvidence.Targets)
@@ -124,6 +157,46 @@ func SummarizeRouteTreeContactGraph(targetEvidence InterBlockContactEvidence, op
 	return summary
 }
 
+func SummarizeRouteTreeMissingEndpointTrace(evidence InterBlockContactEvidence, access []RouteTreeEndpointAccess) RouteTreeMissingEndpointTraceSummary {
+	summary := RouteTreeMissingEndpointTraceSummary{}
+	accessByNet := routeTreeAccessByNet(access)
+	for _, proof := range evidence.Proofs {
+		if proof.Status == InterBlockContactProven {
+			continue
+		}
+		target := proof.Target
+		netName := strings.TrimSpace(target.NetName)
+		netKey := routeTreeTraceNetKey(target.NetName)
+		targetID := routeTreeContactGraphTargetID(target)
+		trace := RouteTreeMissingEndpointTrace{
+			NetName:    netName,
+			EndpointID: targetID,
+			Ref:        target.Ref,
+			Pad:        target.Pad,
+			InstanceID: target.InstanceID,
+			BlockID:    target.BlockID,
+			Layer:      target.Layer,
+			XMM:        target.Point.XMM,
+			YMM:        target.Point.YMM,
+			Status:     proof.Status,
+			Suggestion: proof.Suggestion,
+		}
+		if nearest, distance, ok := nearestRouteTreeAccessForMissingEndpoint(target, targetID, accessByNet[netKey]); ok {
+			trace.NearestAccess = &nearest
+			trace.NearestAccessDistMM = &distance
+		}
+		summary.Items = append(summary.Items, trace)
+	}
+	slices.SortFunc(summary.Items, func(left RouteTreeMissingEndpointTrace, right RouteTreeMissingEndpointTrace) int {
+		if cmp := strings.Compare(left.NetName, right.NetName); cmp != 0 {
+			return cmp
+		}
+		return strings.Compare(left.EndpointID, right.EndpointID)
+	})
+	summary.MissingEndpoints = len(summary.Items)
+	return summary
+}
+
 func SummarizeRequiredNetClassification(graph *RouteTreeContactGraphSummary) RequiredNetClassificationSummary {
 	summary := RequiredNetClassificationSummary{}
 	if graph == nil {
@@ -160,7 +233,59 @@ func SummarizeRequiredNetClassification(graph *RouteTreeContactGraphSummary) Req
 	return summary
 }
 
+func routeTreeAccessByNet(access []RouteTreeEndpointAccess) map[string][]RouteTreeEndpointAccess {
+	byNet := make(map[string][]RouteTreeEndpointAccess)
+	for _, candidate := range access {
+		netName := routeTreeTraceNetKey(candidate.Net)
+		if netName == "" {
+			continue
+		}
+		byNet[netName] = append(byNet[netName], candidate)
+	}
+	return byNet
+}
+
+func routeTreeTraceNetKey(netName string) string {
+	return strings.ToUpper(strings.TrimSpace(netName))
+}
+
+func nearestRouteTreeAccessForMissingEndpoint(target InterBlockContactTarget, targetID string, access []RouteTreeEndpointAccess) (RouteTreeNearestAccessTrace, float64, bool) {
+	var best RouteTreeEndpointAccess
+	bestDistanceSquared := math.Inf(1)
+	for _, candidate := range access {
+		if targetID != "" && candidate.EndpointID != "" && strings.EqualFold(candidate.EndpointID, targetID) {
+			continue
+		}
+		if candidate.Ref != "" && candidate.Pad != "" && strings.EqualFold(candidate.Ref, target.Ref) && strings.EqualFold(candidate.Pad, target.Pad) {
+			continue
+		}
+		dx := candidate.XMM - target.Point.XMM
+		dy := candidate.YMM - target.Point.YMM
+		distanceSquared := dx*dx + dy*dy
+		if distanceSquared >= bestDistanceSquared {
+			continue
+		}
+		best = candidate
+		bestDistanceSquared = distanceSquared
+	}
+	if math.IsInf(bestDistanceSquared, 1) {
+		return RouteTreeNearestAccessTrace{}, 0, false
+	}
+	return RouteTreeNearestAccessTrace{
+		Role:       best.Role,
+		EndpointID: best.EndpointID,
+		Ref:        best.Ref,
+		Pad:        best.Pad,
+		Layer:      best.Layer,
+		XMM:        best.XMM,
+		YMM:        best.YMM,
+		Source:     best.Source,
+	}, math.Sqrt(bestDistanceSquared), true
+}
+
 func routeTreeContactGraphTargetID(target InterBlockContactTarget) string {
+	// Prefer the stable logical block endpoint over the physical footprint
+	// endpoint ID so diagnostics stay meaningful across component selection.
 	if target.InstanceID != "" && target.Pad != "" {
 		return target.InstanceID + "." + target.Pad
 	}

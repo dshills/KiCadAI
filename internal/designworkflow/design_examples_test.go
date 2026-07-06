@@ -601,6 +601,17 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if !vccClassified {
 		t.Fatalf("%s required-net classification missing partial VCC blocker: %#v", metadata.ID, requiredNets.Nets)
 	}
+	missingEndpointTrace := requireStageSummary[RouteTreeMissingEndpointTraceSummary](t, routing, "route_tree_missing_endpoints")
+	if missingEndpointTrace.MissingEndpoints != 1 || len(missingEndpointTrace.Items) != 1 {
+		t.Fatalf("%s missing endpoint trace = %#v, want exactly one missing endpoint", metadata.ID, missingEndpointTrace)
+	}
+	missingVCC := missingEndpointTrace.Items[0]
+	if missingVCC.NetName != "VCC" || missingVCC.EndpointID != "output.3" || missingVCC.InstanceID != "output" || missingVCC.Status != InterBlockContactGraphSplit {
+		t.Fatalf("%s missing endpoint trace = %#v, want VCC output.3 graph split", metadata.ID, missingVCC)
+	}
+	if missingVCC.NearestAccess == nil {
+		t.Fatalf("%s missing endpoint trace lacks nearest same-net access: %#v", metadata.ID, missingVCC)
+	}
 	vccBranches := requireRouteTreeBranchesForNet(t, routing, "VCC")
 	var partialVCCBranch *InterBlockBranchRoutingEvidence
 	for index := range vccBranches {

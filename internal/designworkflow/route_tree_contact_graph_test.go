@@ -351,6 +351,85 @@ func TestRequiredNetClassificationSummaryJSONStable(t *testing.T) {
 	}
 }
 
+func TestSummarizeRouteTreeMissingEndpointTrace(t *testing.T) {
+	evidence := InterBlockContactEvidence{Proofs: []InterBlockContactProof{
+		{
+			NetName: "VCC",
+			Status:  InterBlockContactGraphSplit,
+			Target: InterBlockContactTarget{
+				NetName:    "VCC",
+				Ref:        "Q1",
+				Pad:        "3",
+				InstanceID: "output",
+				BlockID:    "class_ab_output_stage",
+				Point:      transactions.Point{XMM: 10, YMM: 5},
+				Layer:      "F.Cu",
+			},
+			Suggestion: "bridge the same-net route graph component to the isolated contact target",
+		},
+		{
+			NetName: "AUDIO_IN",
+			Status:  InterBlockContactProven,
+			Target:  InterBlockContactTarget{NetName: "AUDIO_IN", EndpointID: "input.1"},
+		},
+	}}
+	access := []RouteTreeEndpointAccess{
+		{EndpointID: "output.3", Role: RouteTreeAccessTargetPad, Net: "VCC", Layer: "F.Cu", XMM: 10, YMM: 5, Source: "pad"},
+		{EndpointID: "far.1", Role: RouteTreeAccessTargetPad, Net: "VCC", Layer: "F.Cu", XMM: 20, YMM: 5, Source: "pad"},
+		{EndpointID: "near.1", Role: RouteTreeAccessLocalRouteAnchor, Net: "VCC", Layer: "F.Cu", XMM: 12, YMM: 5, Source: "local_route"},
+		{EndpointID: "other.1", Role: RouteTreeAccessTargetPad, Net: "GND", Layer: "F.Cu", XMM: 10, YMM: 5, Source: "pad"},
+	}
+
+	summary := SummarizeRouteTreeMissingEndpointTrace(evidence, access)
+	if summary.MissingEndpoints != 1 || len(summary.Items) != 1 {
+		t.Fatalf("missing endpoint trace = %#v, want one missing VCC endpoint", summary)
+	}
+	item := summary.Items[0]
+	if item.NetName != "VCC" || item.EndpointID != "output.3" || item.Ref != "Q1" || item.Pad != "3" || item.Status != InterBlockContactGraphSplit {
+		t.Fatalf("missing endpoint trace item = %#v, want output.3 graph split", item)
+	}
+	if item.NearestAccess == nil || item.NearestAccess.EndpointID != "near.1" || item.NearestAccess.Role != RouteTreeAccessLocalRouteAnchor || item.NearestAccessDistMM == nil || *item.NearestAccessDistMM != 2 {
+		t.Fatalf("nearest access trace = %#v distance=%v, want nearest same-net local route anchor", item.NearestAccess, item.NearestAccessDistMM)
+	}
+}
+
+func TestRouteTreeMissingEndpointTraceSummaryJSONStable(t *testing.T) {
+	nearestDistance := 2.0
+	summary := RouteTreeMissingEndpointTraceSummary{
+		MissingEndpoints: 1,
+		Items: []RouteTreeMissingEndpointTrace{{
+			NetName:    "VCC",
+			EndpointID: "output.3",
+			Ref:        "Q1",
+			Pad:        "3",
+			InstanceID: "output",
+			BlockID:    "class_ab_output_stage",
+			Layer:      "F.Cu",
+			XMM:        10,
+			YMM:        5,
+			Status:     InterBlockContactGraphSplit,
+			Suggestion: "bridge",
+			NearestAccess: &RouteTreeNearestAccessTrace{
+				Role:       RouteTreeAccessLocalRouteAnchor,
+				EndpointID: "near.1",
+				Layer:      "F.Cu",
+				XMM:        12,
+				YMM:        5,
+				Source:     "local_route",
+			},
+			NearestAccessDistMM: &nearestDistance,
+		}},
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"missing_endpoints":1,"items":[{"net_name":"VCC","endpoint_id":"output.3","ref":"Q1","pad":"3","instance_id":"output","block_id":"class_ab_output_stage","layer":"F.Cu","x_mm":10,"y_mm":5,"status":"graph_split","suggestion":"bridge","nearest_access":{"role":"local_route_anchor","endpoint_id":"near.1","layer":"F.Cu","x_mm":12,"y_mm":5,"source":"local_route"},"nearest_access_distance_mm":2}]}`
+	if string(data) != want {
+		t.Fatalf("summary JSON = %q, want %q", data, want)
+	}
+}
+
 func routeTreeGraphTarget(net string, ref string, pad string, x float64, y float64) InterBlockContactTarget {
 	return routeTreeGraphTargetOnLayer(net, ref, pad, x, y, "F.Cu")
 }
