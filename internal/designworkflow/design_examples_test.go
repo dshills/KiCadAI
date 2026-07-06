@@ -700,12 +700,19 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if report.AchievedReadiness != PromotionReadinessExpectedFail {
 		t.Fatalf("%s promotion report achieved readiness = %q, want %q", metadata.ID, report.AchievedReadiness, PromotionReadinessExpectedFail)
 	}
+	if report.Stages.StoppedAt != StageRouting || !slices.Contains(report.Stages.Reached, StageRouting) {
+		t.Fatalf("%s promotion stages = %#v, want stopped at routing with routing reached", metadata.ID, report.Stages)
+	}
+	if !designExamplePromotionHasNextActionForGate(report, "route_completion") {
+		t.Fatalf("%s promotion next actions = %#v, want route-completion repair action", metadata.ID, report.NextActions)
+	}
 	for _, expectation := range []struct {
-		id             string
-		status         PromotionGateStatus
-		wantIssueCodes bool
+		id                  string
+		status              PromotionGateStatus
+		wantIssueCodes      bool
+		wantIssueCodePrefix string
 	}{
-		{id: "route_completion", status: PromotionGateStatusFailed, wantIssueCodes: true},
+		{id: "route_completion", status: PromotionGateStatusFailed, wantIssueCodes: true, wantIssueCodePrefix: "routing_route_graph_incomplete_"},
 		{id: "kicad_checks", status: PromotionGateStatusSkipped},
 		{id: "writer_correctness", status: PromotionGateStatusSkipped},
 		{id: "connectivity", status: PromotionGateStatusSkipped},
@@ -718,11 +725,32 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 			if expectation.wantIssueCodes && len(gate.IssueCodes) == 0 {
 				t.Errorf("%s gate issue code count = 0, want issue evidence: %#v", expectation.id, gate)
 			}
+			if expectation.wantIssueCodePrefix != "" && !designExamplePromotionIssueCodesContainPrefix(gate.IssueCodes, expectation.wantIssueCodePrefix) {
+				t.Errorf("%s gate issue codes = %#v, want issue code prefix %q", expectation.id, gate.IssueCodes, expectation.wantIssueCodePrefix)
+			}
 			if !expectation.wantIssueCodes && len(gate.IssueCodes) > 0 {
 				t.Errorf("%s gate issue code count = %d, want 0 with status %q: %#v", expectation.id, len(gate.IssueCodes), gate.Status, gate)
 			}
 		})
 	}
+}
+
+func designExamplePromotionHasNextActionForGate(report PromotionReport, gateID string) bool {
+	for _, action := range report.NextActions {
+		if action.Gate == gateID {
+			return true
+		}
+	}
+	return false
+}
+
+func designExamplePromotionIssueCodesContainPrefix(codes []string, prefix string) bool {
+	for _, code := range codes {
+		if strings.HasPrefix(code, prefix) {
+			return true
+		}
+	}
+	return false
 }
 
 func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
