@@ -575,26 +575,20 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if !ok {
 		t.Fatalf("%s missing placement stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if placement.Status != StageStatusWarning {
-		t.Fatalf("%s placement status = %q, want warning after component bounds fit:\n%s", metadata.ID, placement.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if placement.Status != StageStatusOK {
+		t.Fatalf("%s placement status = %q, want ok after endpoint binding:\n%s", metadata.ID, placement.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	for _, path := range []string{
 		"components.Qccde149e001.position",
 		"components.Qccde149e002.position",
-	} {
-		if designExampleIssuesContainPath(placement.Issues, path) {
-			t.Fatalf("%s placement still has out-of-board issue %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
-		}
-	}
-	for _, path := range []string{
 		"design.inter_block_routing.connections[0].to",
 		"design.inter_block_routing.connections[5].to",
 		"design.inter_block_routing.connections[6].from",
 		"design.inter_block_routing.connections[7].to",
 		"design.inter_block_routing.connections[8].from",
 	} {
-		if !designExampleIssuesContainPath(placement.Issues, path) {
-			t.Fatalf("%s placement issues missing endpoint warning %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
+		if designExampleIssuesContainPath(placement.Issues, path) {
+			t.Fatalf("%s placement still has resolved blocker %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
 		}
 	}
 	for _, expectation := range []struct {

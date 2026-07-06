@@ -40,6 +40,38 @@ func TestHeadphoneOutputProtectionInstantiatesWithDefaults(t *testing.T) {
 	}
 }
 
+func TestHeadphoneOutputProtectionRealizesDefaultPCBEndpoints(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock(headphoneOutputProtectionID)
+	if !ok {
+		t.Fatal("missing headphone output protection definition")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    headphoneOutputProtectionID,
+		InstanceID: "hp_protect",
+		Params: map[string]any{
+			"bleed_required": true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{OriginXMM: 20, OriginYMM: 10})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realization issues = %#v", realized.Issues)
+	}
+	for _, role := range []string{"dc_blocking_capacitor", "bleed_resistor", "load_return_anchor"} {
+		if realized.RoleRefs[role] == "" {
+			t.Fatalf("role refs = %#v, missing %s", realized.RoleRefs, role)
+		}
+	}
+	for _, routeID := range []string{"amp_out_to_coupling", "hp_out_from_coupling", "bleed_reference", "load_return"} {
+		if !realizedRouteExists(realized, routeID) {
+			t.Fatalf("routes = %#v, missing %s", realized.LocalRoutes, routeID)
+		}
+	}
+}
+
 func TestHeadphoneOutputProtectionCalculatesHighPassAndBlocksVoltageUnderrating(t *testing.T) {
 	output, issues := NewBuiltinRegistry().Instantiate(context.Background(), BlockRequest{
 		BlockID:    "headphone_output_protection",
@@ -281,6 +313,15 @@ func headphoneProtectionHasLabel(t *testing.T, operations []transactions.Operati
 func slicesContainString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
+			return true
+		}
+	}
+	return false
+}
+
+func realizedRouteExists(realized BlockPCBRealizationResult, routeID string) bool {
+	for _, route := range realized.LocalRoutes {
+		if route.ID == routeID {
 			return true
 		}
 	}

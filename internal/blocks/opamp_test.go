@@ -71,6 +71,55 @@ func TestOpAmpGainStageACCouplingAddsBiasNetwork(t *testing.T) {
 	}
 }
 
+func TestOpAmpGainStageACCouplingRealizesPCBInputRoles(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("opamp_gain_stage")
+	if !ok {
+		t.Fatal("missing opamp gain stage definition")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "opamp_gain_stage",
+		InstanceID: "amp",
+		Params: map[string]any{
+			"input_coupling": "ac",
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{OriginXMM: 20, OriginYMM: 10})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realization issues = %#v", realized.Issues)
+	}
+	for _, role := range []string{"input_coupling", "bias_top", "bias_bottom"} {
+		if realized.RoleRefs[role] == "" {
+			t.Fatalf("role refs = %#v, missing %s", realized.RoleRefs, role)
+		}
+	}
+}
+
+func TestOpAmpGainStageDCCouplingRealizesPCBInputRoute(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("opamp_gain_stage")
+	if !ok {
+		t.Fatal("missing opamp gain stage definition")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "opamp_gain_stage",
+		InstanceID: "amp",
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{OriginXMM: 20, OriginYMM: 10})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realization issues = %#v", realized.Issues)
+	}
+	if !realizedRouteExists(realized, "dc_input") {
+		t.Fatalf("routes = %#v, missing dc_input", realized.LocalRoutes)
+	}
+}
+
 func TestOpAmpGainStageSchematicLayoutIsReadable(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{
@@ -142,8 +191,40 @@ func TestOpAmpGainStageOptionalOutputResistor(t *testing.T) {
 	if reports.HasBlockingIssue(issues) {
 		t.Fatalf("issues = %#v", issues)
 	}
-	if got := output.Instance.Nets; len(got) != 6 || got[5] != "amp_out_series" {
+	if got := output.Instance.Nets; len(got) != 6 || got[5] != "amp_out_drive" {
 		t.Fatalf("nets = %#v", got)
+	}
+	outputResistorRef := output.Instance.Refs[len(output.Instance.Refs)-1]
+	pinNets := map[string]string{}
+	for _, operation := range output.Operations {
+		if operation.Op != transactions.OpConnect {
+			continue
+		}
+		var connect transactions.ConnectOperation
+		if err := decodeBlockOperation(operation, &connect); err != nil {
+			t.Fatalf("decode connect: %v", err)
+		}
+		for _, endpoint := range []transactions.Endpoint{connect.From, connect.To} {
+			if endpoint.Ref == outputResistorRef {
+				pinNets[endpoint.Pin] = connect.NetName
+			}
+		}
+	}
+	if pinNets["1"] == "" || pinNets["2"] == "" || pinNets["1"] == pinNets["2"] {
+		t.Fatalf("output resistor pin nets = %#v, want distinct drive and output nets", pinNets)
+	}
+	definition, ok := registry.GetBlock("opamp_gain_stage")
+	if !ok {
+		t.Fatal("missing opamp gain stage definition")
+	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{OriginXMM: 20, OriginYMM: 10})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realization issues = %#v", realized.Issues)
+	}
+	for _, routeID := range []string{"output_resistor_input", "output_resistor_output"} {
+		if !realizedRouteExists(realized, routeID) {
+			t.Fatalf("routes = %#v, missing %s", realized.LocalRoutes, routeID)
+		}
 	}
 }
 

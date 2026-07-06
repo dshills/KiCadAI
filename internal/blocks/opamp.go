@@ -80,40 +80,46 @@ func instantiateOpAmpGainStage(definition BlockDefinition, request BlockRequest,
 	}
 	inNet := InstanceNetName(request.InstanceID, "in")
 	outNet := InstanceNetName(request.InstanceID, "out")
+	includeOutputResistor := boolParam(params, "include_output_resistor", false)
+	opampOutputNet := outNet
+	if includeOutputResistor {
+		opampOutputNet = InstanceNetName(request.InstanceID, "out_drive")
+	}
 	feedbackNet := InstanceNetName(request.InstanceID, "feedback")
 	vccNet := InstanceNetName(request.InstanceID, "vcc")
 	gndNet := InstanceNetName(request.InstanceID, "gnd")
 	if stringParam(params, "input_coupling") == "dc" {
 		appendConnectOperation(&operations, &issuesOut, request.InstanceID, "IN", opampRef, lmv321Pins.INP, inNet)
 	}
-	if !boolParam(params, "include_output_resistor", false) {
+	if !includeOutputResistor {
 		appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.OUT, request.InstanceID, "OUT", outNet)
 	}
 	appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.VCC, request.InstanceID, "VCC", vccNet)
 	appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.VEE, request.InstanceID, "GND", gndNet)
 	appendConnectOperation(&operations, &issuesOut, rgRef, "1", opampRef, lmv321Pins.INN, feedbackNet)
 	appendConnectOperation(&operations, &issuesOut, rgRef, "2", opampRef, lmv321Pins.VEE, gndNet)
-	appendConnectOperation(&operations, &issuesOut, rfRef, "1", opampRef, lmv321Pins.OUT, outNet)
+	appendConnectOperation(&operations, &issuesOut, rfRef, "1", opampRef, lmv321Pins.OUT, opampOutputNet)
 	appendConnectOperation(&operations, &issuesOut, rfRef, "2", opampRef, lmv321Pins.INN, feedbackNet)
 	appendConnectOperation(&operations, &issuesOut, decouplingRef, "1", opampRef, lmv321Pins.VCC, vccNet)
 	appendConnectOperation(&operations, &issuesOut, decouplingRef, "2", opampRef, lmv321Pins.VEE, gndNet)
 
 	refs := []string{opampRef, rgRef, rfRef, decouplingRef}
 	nets := []string{inNet, outNet, feedbackNet, vccNet, gndNet}
+	if includeOutputResistor {
+		nets = append(nets, opampOutputNet)
+	}
 	if stringParam(params, "input_coupling") == "ac" {
 		refs, nets, operations = appendOpAmpBiasNetwork(request.InstanceID, allocator, feedbackFootprint, opampRef, refs, nets, operations, &issuesOut)
 	}
-	if boolParam(params, "include_output_resistor", false) {
+	if includeOutputResistor {
 		outRef := allocator.Next("R")
 		component := BlockComponent{Role: "output_resistor", RefPrefix: "R", Value: "100", SymbolID: "Device:R", FootprintID: feedbackFootprint, Pins: twoTerminalHorizontalPins()}
 		componentOps, componentIssues := ComponentOperations(component, outRef, transactions.Point{XMM: 72, YMM: 25})
 		issuesOut = append(issuesOut, componentIssues...)
 		operations = append(operations, componentOps...)
-		seriesNet := InstanceNetName(request.InstanceID, "out_series")
-		appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.OUT, outRef, "1", outNet)
-		appendConnectOperation(&operations, &issuesOut, outRef, "2", request.InstanceID, "OUT", seriesNet)
+		appendConnectOperation(&operations, &issuesOut, opampRef, lmv321Pins.OUT, outRef, "1", opampOutputNet)
+		appendConnectOperation(&operations, &issuesOut, outRef, "2", request.InstanceID, "OUT", outNet)
 		refs = append(refs, outRef)
-		nets = append(nets, seriesNet)
 	}
 	output := dryRunBlockOutput(definition, request, operations, issuesOut)
 	output.Instance.Params = params
