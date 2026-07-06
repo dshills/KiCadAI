@@ -187,22 +187,24 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	stage := NewStageResult(StageRouting, issues)
 	stage.Issues = cloneIssues(issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
+	routeTreeContactGraph := SummarizeRouteTreeContactGraph(interBlockContactEvidence, contactGraphOperations, routeTreeAccess)
 	stage.Summary = map[string]any{
-		"local_route_operations":   len(localOperations),
-		"route_operations":         len(result.Operations),
-		"routed_nets":              result.Metrics.RoutedNetCount,
-		"failed_nets":              result.Metrics.FailedNetCount,
-		"status":                   result.Status,
-		"repair_diagnostics":       len(routeDiagnostics),
-		"local_route_mobility":     localRouteMobility,
-		"route_connectivity":       localRouteConnectivity,
-		"inter_block_routing":      summarizeInterBlockRouteCompletionWithGraphOperations(interBlockCandidates, routeOperations, contactGraphOperations, issues, interBlockContactEvidence),
-		"inter_block_route_trees":  routeTreeExecution.Summary,
-		"route_tree_branches":      routeTreeExecution.Branches,
-		"route_tree_access":        SummarizeRouteTreeEndpointAccess(routeTreeAccess),
-		"route_tree_contact_graph": SummarizeRouteTreeContactGraph(interBlockContactEvidence, contactGraphOperations, routeTreeAccess),
-		"route_tree_repair":        SummarizeRouteTreeRepair(routeTreeRepairHints),
-		"inter_block_contacts":     SummarizeInterBlockContacts(interBlockContactEvidence),
+		"local_route_operations":      len(localOperations),
+		"route_operations":            len(result.Operations),
+		"routed_nets":                 result.Metrics.RoutedNetCount,
+		"failed_nets":                 result.Metrics.FailedNetCount,
+		"status":                      result.Status,
+		"repair_diagnostics":          len(routeDiagnostics),
+		"local_route_mobility":        localRouteMobility,
+		"route_connectivity":          localRouteConnectivity,
+		"inter_block_routing":         summarizeInterBlockRouteCompletionWithGraphOperations(interBlockCandidates, routeOperations, contactGraphOperations, issues, interBlockContactEvidence),
+		"inter_block_route_trees":     routeTreeExecution.Summary,
+		"route_tree_branches":         routeTreeExecution.Branches,
+		"route_tree_access":           SummarizeRouteTreeEndpointAccess(routeTreeAccess),
+		"route_tree_contact_graph":    routeTreeContactGraph,
+		"required_net_classification": SummarizeRequiredNetClassification(&routeTreeContactGraph),
+		"route_tree_repair":           SummarizeRouteTreeRepair(routeTreeRepairHints),
+		"inter_block_contacts":        SummarizeInterBlockContacts(interBlockContactEvidence),
 	}
 	if len(anchorOperations) > 0 {
 		stage.Summary["anchor_binding_route_operations"] = len(anchorOperations)

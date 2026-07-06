@@ -37,6 +37,27 @@ type RouteTreeContactGraphGroupSummary struct {
 	MissingEndpointIDs []string                         `json:"missing_endpoint_ids,omitempty"`
 }
 
+type RequiredNetClassificationSummary struct {
+	Nets               []RequiredNetClassification `json:"nets,omitempty"`
+	RequiredInterBlock int                         `json:"required_inter_block"`
+	Complete           int                         `json:"complete"`
+	Partial            int                         `json:"partial"`
+	Blocked            int                         `json:"blocked"`
+	MissingEndpoints   int                         `json:"missing_endpoints"`
+}
+
+type RequiredNetClassification struct {
+	NetName            string                           `json:"net_name"`
+	Kind               string                           `json:"kind"`
+	Status             RouteTreeContactGraphGroupStatus `json:"status"`
+	RequiredEndpoints  int                              `json:"required_endpoints"`
+	ProvenEndpoints    int                              `json:"proven_endpoints"`
+	MissingEndpointIDs []string                         `json:"missing_endpoint_ids,omitempty"`
+	Blocking           bool                             `json:"blocking"`
+}
+
+const RequiredNetKindInterBlock = "required_inter_block"
+
 func SummarizeRouteTreeContactGraph(targetEvidence InterBlockContactEvidence, operations []transactions.Operation, access []RouteTreeEndpointAccess) RouteTreeContactGraphSummary {
 	targetsByNet := normalizedContactGraphTargetsByNet(targetEvidence.Targets)
 	decodedOperationsByNet, operationIssues := decodeInterBlockRouteOperations(operations)
@@ -100,6 +121,42 @@ func SummarizeRouteTreeContactGraph(targetEvidence InterBlockContactEvidence, op
 		}
 	}
 	summary.Nets = netNames
+	return summary
+}
+
+func SummarizeRequiredNetClassification(graph *RouteTreeContactGraphSummary) RequiredNetClassificationSummary {
+	summary := RequiredNetClassificationSummary{}
+	if graph == nil {
+		return summary
+	}
+	summary.Nets = make([]RequiredNetClassification, 0, len(graph.Groups))
+	for _, group := range graph.Groups {
+		if group.RequiredEndpoints == 0 {
+			continue
+		}
+		item := RequiredNetClassification{
+			NetName:            group.NetName,
+			Kind:               RequiredNetKindInterBlock,
+			Status:             group.Status,
+			RequiredEndpoints:  group.RequiredEndpoints,
+			ProvenEndpoints:    group.ProvenEndpoints,
+			MissingEndpointIDs: append([]string(nil), group.MissingEndpointIDs...),
+			Blocking:           group.Status != RouteTreeContactGraphGroupComplete,
+		}
+		summary.Nets = append(summary.Nets, item)
+		summary.RequiredInterBlock++
+		summary.MissingEndpoints += len(group.MissingEndpointIDs)
+		switch group.Status {
+		case RouteTreeContactGraphGroupComplete:
+			summary.Complete++
+		case RouteTreeContactGraphGroupPartial:
+			summary.Partial++
+		case RouteTreeContactGraphGroupBlocked:
+			summary.Blocked++
+		default:
+			summary.Blocked++
+		}
+	}
 	return summary
 }
 

@@ -277,6 +277,80 @@ func TestRouteTreeContactGraphSummaryJSONStable(t *testing.T) {
 	}
 }
 
+func TestSummarizeRequiredNetClassification(t *testing.T) {
+	graph := RouteTreeContactGraphSummary{
+		Groups: []RouteTreeContactGraphGroupSummary{
+			{
+				NetName:           "AUDIO_IN",
+				Status:            RouteTreeContactGraphGroupComplete,
+				RequiredEndpoints: 2,
+				ProvenEndpoints:   2,
+			},
+			{
+				NetName:            "VCC",
+				Status:             RouteTreeContactGraphGroupPartial,
+				RequiredEndpoints:  5,
+				ProvenEndpoints:    4,
+				MissingEndpointIDs: []string{"output.3"},
+			},
+			{
+				NetName:           "UNUSED",
+				Status:            RouteTreeContactGraphGroupBlocked,
+				RequiredEndpoints: 0,
+			},
+		},
+	}
+
+	summary := SummarizeRequiredNetClassification(&graph)
+	if summary.RequiredInterBlock != 2 || summary.Complete != 1 || summary.Partial != 1 || summary.Blocked != 0 || summary.MissingEndpoints != 1 {
+		t.Fatalf("classification = %#v, want one complete and one partial required inter-block net", summary)
+	}
+	if len(summary.Nets) != 2 {
+		t.Fatalf("classification nets = %#v, want only required nets", summary.Nets)
+	}
+	if summary.Nets[0].NetName != "AUDIO_IN" || summary.Nets[0].Blocking {
+		t.Fatalf("classification nets = %#v, want complete AUDIO_IN first and non-blocking", summary.Nets)
+	}
+	if summary.Nets[1].NetName != "VCC" || !summary.Nets[1].Blocking || len(summary.Nets[1].MissingEndpointIDs) != 1 || summary.Nets[1].MissingEndpointIDs[0] != "output.3" {
+		t.Fatalf("classification nets = %#v, want partial blocking VCC evidence", summary.Nets)
+	}
+}
+
+func TestRequiredNetClassificationSummaryJSONStable(t *testing.T) {
+	summary := RequiredNetClassificationSummary{
+		Nets: []RequiredNetClassification{
+			{
+				NetName:           "SIG",
+				Kind:              RequiredNetKindInterBlock,
+				Status:            RouteTreeContactGraphGroupComplete,
+				RequiredEndpoints: 2,
+				ProvenEndpoints:   2,
+			},
+			{
+				NetName:            "VCC",
+				Kind:               RequiredNetKindInterBlock,
+				Status:             RouteTreeContactGraphGroupPartial,
+				RequiredEndpoints:  5,
+				ProvenEndpoints:    4,
+				MissingEndpointIDs: []string{"U1.5"},
+				Blocking:           true,
+			},
+		},
+		RequiredInterBlock: 2,
+		Complete:           1,
+		Partial:            1,
+		MissingEndpoints:   1,
+	}
+	data, err := json.Marshal(summary)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `{"nets":[{"net_name":"SIG","kind":"required_inter_block","status":"complete","required_endpoints":2,"proven_endpoints":2,"blocking":false},{"net_name":"VCC","kind":"required_inter_block","status":"partial","required_endpoints":5,"proven_endpoints":4,"missing_endpoint_ids":["U1.5"],"blocking":true}],"required_inter_block":2,"complete":1,"partial":1,"blocked":0,"missing_endpoints":1}`
+	if string(data) != want {
+		t.Fatalf("summary JSON = %q, want %q", data, want)
+	}
+}
+
 func routeTreeGraphTarget(net string, ref string, pad string, x float64, y float64) InterBlockContactTarget {
 	return routeTreeGraphTargetOnLayer(net, ref, pad, x, y, "F.Cu")
 }

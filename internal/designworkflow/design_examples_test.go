@@ -9,6 +9,7 @@ import (
 	pathpkg "path"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -580,6 +581,19 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if contactGraph.RequiredEndpoints == 0 || contactGraph.ProvenEndpoints == 0 || contactGraph.PartialGroups == 0 {
 		t.Fatalf("%s route-tree contact graph missing explicit partial-route evidence: %#v", metadata.ID, contactGraph)
 	}
+	requiredNets := requireStageSummary[RequiredNetClassificationSummary](t, routing, "required_net_classification")
+	if requiredNets.RequiredInterBlock != 7 || requiredNets.Complete != 6 || requiredNets.Partial != 1 || requiredNets.MissingEndpoints != 1 {
+		t.Fatalf("%s required-net classification = %#v, want six complete nets and one partial blocker", metadata.ID, requiredNets)
+	}
+	vccClassified := false
+	for _, item := range requiredNets.Nets {
+		if item.NetName == "VCC" && item.Kind == RequiredNetKindInterBlock && item.Status == RouteTreeContactGraphGroupPartial && item.Blocking && slices.Equal(item.MissingEndpointIDs, []string{"output.3"}) {
+			vccClassified = true
+		}
+	}
+	if !vccClassified {
+		t.Fatalf("%s required-net classification missing partial VCC blocker: %#v", metadata.ID, requiredNets.Nets)
+	}
 	if !designExampleIssuesContainNet(routing.Issues, "VCC") {
 		t.Fatalf("%s routing blocker does not identify VCC:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
 	}
@@ -724,6 +738,10 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routing)
 	if routeTrees.GroupsAttempted == 0 || routeTrees.BlockingIssueCount == 0 {
 		t.Fatalf("%s routing lacks explicit route-tree blocker evidence: %#v", metadata.ID, routeTrees)
+	}
+	requiredNets := requireStageSummary[RequiredNetClassificationSummary](t, routing, "required_net_classification")
+	if requiredNets.RequiredInterBlock == 0 || requiredNets.Partial == 0 || requiredNets.MissingEndpoints == 0 {
+		t.Fatalf("%s routing lacks required-net classification evidence: %#v", metadata.ID, requiredNets)
 	}
 }
 
