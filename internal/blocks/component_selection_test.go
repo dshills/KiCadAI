@@ -66,6 +66,25 @@ func TestConnectorBreakoutSelectionRequestUsesPinCountParam(t *testing.T) {
 	}
 }
 
+func TestConnectorBreakoutSelectionRequestInfersPinCountFromPinNames(t *testing.T) {
+	definition, ok := NewBuiltinRegistry().GetBlock("connector_breakout")
+	if !ok {
+		t.Fatal("missing connector_breakout definition")
+	}
+	component := definition.Components[0]
+	params := map[string]any{"pin_names": []string{"VCC", "GND", "SDA", "SCL"}}
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, params)
+	if !ok {
+		t.Fatal("expected connector selection request")
+	}
+	if request.Query.ValueKind != "pin_count" || request.Query.Value != "4" || request.Query.Package != "1x04" {
+		t.Fatalf("selection query = %+v, want inferred four-pin connector query", request.Query)
+	}
+	if _, ok := params["pin_count"]; ok {
+		t.Fatalf("input params mutated: %+v", params)
+	}
+}
+
 func TestConnectorBreakoutSelectionRequestPreservesPackageParam(t *testing.T) {
 	definition, ok := NewBuiltinRegistry().GetBlock("connector_breakout")
 	if !ok {

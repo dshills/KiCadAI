@@ -91,6 +91,7 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		if queryCopy.Value == "" {
 			queryCopy.Value = component.Value
 		}
+		params = paramsWithInferredConnectorPinCount(component, params)
 		if component.ComponentValueParam != "" {
 			if value := selectionValueParam(params, component.ComponentValueParam); value != "" {
 				queryCopy.Value = value
@@ -109,6 +110,25 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		return components.SelectionRequest{Query: queryCopy, Acceptance: acceptance}, true
 	}
 	return components.SelectionRequest{}, false
+}
+
+func paramsWithInferredConnectorPinCount(component BlockComponent, params map[string]any) map[string]any {
+	if component.ComponentValueParam != "pin_count" && component.ComponentPinsParam != "pin_count" {
+		return params
+	}
+	if _, ok := params["pin_count"]; ok {
+		return params
+	}
+	pinNames := stringListParam(params, "pin_names")
+	if len(pinNames) == 0 {
+		return params
+	}
+	out := make(map[string]any, len(params)+1)
+	for key, value := range params {
+		out[key] = value
+	}
+	out["pin_count"] = strconv.Itoa(len(pinNames))
+	return out
 }
 
 func selectionValueParam(params map[string]any, name string) string {

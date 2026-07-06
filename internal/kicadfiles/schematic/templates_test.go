@@ -11,6 +11,7 @@ import (
 func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 	tests := []string{
 		"Connector_Generic:Conn_01x02",
+		"Connector_Generic:Conn_01x03",
 		"Device:R",
 		"Device:C",
 		"Device:D",
@@ -81,6 +82,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	connector4Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x04")
 	if !ok || len(connector4Pins) != 4 || connector4Pins[3].Number != "4" || connector4Pins[3].Offset.Y != kicadfiles.MM(-7.62) {
 		t.Fatalf("unexpected 4-pin connector offsets: %#v ok=%v", connector4Pins, ok)
+	}
+	connector3Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x03")
+	if !ok || len(connector3Pins) != 3 || connector3Pins[2].Number != "3" || connector3Pins[2].Offset.Y != kicadfiles.MM(-5.08) {
+		t.Fatalf("unexpected 3-pin connector offsets: %#v ok=%v", connector3Pins, ok)
 	}
 	i2cPins, ok := EmbeddedSymbolPinOffsets("Sensor:Generic_I2C")
 	if !ok || len(i2cPins) != 5 || i2cPins[0].Number != "1" || i2cPins[0].Offset.Y != kicadfiles.MM(-3.81) || i2cPins[4].Number != "5" || i2cPins[4].Offset.X != kicadfiles.MM(2.54) {

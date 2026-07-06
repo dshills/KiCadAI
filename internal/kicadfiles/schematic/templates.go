@@ -31,6 +31,7 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		{Number: "5", Offset: kicadfiles.Point{Y: kicadfiles.MM(-2.54)}},
 	}},
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
+	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", pins: connectorTemplatePins(3)},
 	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4)},
 	"device:c":                     {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
 	"device:c_polarized":           {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},

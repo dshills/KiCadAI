@@ -167,6 +167,42 @@ func TestCompareFilesReportsNormalizedDifference(t *testing.T) {
 	}
 }
 
+func TestCompareSchematicFilesIgnoresLibSymbolOrdering(t *testing.T) {
+	dir := t.TempDir()
+	original := filepath.Join(dir, "original.kicad_sch")
+	roundTripped := filepath.Join(dir, "roundtripped.kicad_sch")
+	writeTestFile(t, original, `(kicad_sch
+  (version 20260206)
+  (lib_symbols
+    (symbol "Sensor:Generic_I2C" (property "Value" "Generic_I2C"))
+    (symbol "Connector_Generic:Conn_01x02" (property "Value" "Conn_01x02"))
+  )
+  (symbol (lib_id "Connector_Generic:Conn_01x02")
+    (pin "3" (uuid "11111111-1111-5111-8111-111111111111"))
+    (instances (project "fixture" (path "/" (reference "J1") (value "Conn_01x02"))))
+  )
+)`)
+	writeTestFile(t, roundTripped, `(kicad_sch
+  (version 20260206)
+  (lib_symbols
+    (symbol "Connector_Generic:Conn_01x02" (property "Value" "Conn_01x02"))
+    (symbol "Sensor:Generic_I2C" (property "Value" "Generic_I2C"))
+  )
+  (symbol (lib_id "Connector_Generic:Conn_01x02")
+    (pin "3" (uuid "22222222-2222-5222-8222-222222222222"))
+    (instances (project "fixture" (path "/" (reference "J1"))))
+  )
+)`)
+
+	result, err := CompareSchematicFiles(original, roundTripped, Options{})
+	if err != nil {
+		t.Fatalf("CompareSchematicFiles returned error: %v", err)
+	}
+	if !result.Equal {
+		t.Fatalf("Equal = false, differences = %#v", result.Differences)
+	}
+}
+
 func TestCompareFilesWritesArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	original := filepath.Join(dir, "original.kicad_pcb")
