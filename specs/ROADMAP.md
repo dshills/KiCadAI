@@ -882,21 +882,21 @@ local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
 now emits all route-tree branches, records four graph-complete route-tree nets,
 and reaches project-write, writer-correctness, and structural validation
-evidence; the remaining expected-fail blocker is required KiCad ERC schematic
+evidence; the remaining expected_fail blocker is required KiCad ERC schematic
 pin/endpoint connectivity evidence. Generated label stubs are grid-safe, and a
 logic-only unit test covers the promotion decision path with mocked clean KiCad
 results. The
 protected Class AB headphone amplifier fixture now verifies the
 `headphone_output_protection` block summary and verified
 LMV321/MMBT3904/MMBT3906 selection path, passes schematic electrical
-validation after alias cleanup, and now stops at PCB placement and
-endpoint-realization because generated output-stage placements exceed the current board
-outline and several inter-block route endpoints do not yet resolve to generated
-PCB pads. The simulation foundation can now write and evaluate Class AB
+validation after alias cleanup, and now reaches PCB realization, placement,
+endpoint binding, project write, writer-correctness evidence, and structural
+validation. The current expected_fail blocker is generated schematic
+label/connectivity evidence plus unrouted or partially routed PCB net evidence
+before real KiCad ERC/DRC promotion. The simulation foundation can now write and evaluate Class AB
 headphone SPICE-like artifacts and feed a `simulation` promotion gate when a
-runner is configured. The next amplifier promotion task is PCB realization
-closeout so routing, writer correctness, board validation, and real KiCad
-ERC/DRC evidence can run.
+runner is configured. The next amplifier promotion task is validation and route
+policy closeout so real KiCad ERC/DRC evidence can run.
 
 Structured semantic mapping is now implemented for target, bus, and supply
 intent:
