@@ -53,6 +53,8 @@ The routing stage reports:
 - proven required inter-block endpoints: `23 / 24`
 - required-net classification missing endpoints: `1`
 - repairable route-tree failures: `2`
+- route-tree missing endpoint traces: `1`
+- route-tree repair hints: VCC-only, repairable `graph_split`
 
 ## Current Route-Completion Blocker
 
@@ -72,9 +74,16 @@ The first remaining blocker is VCC route-tree/contact completion:
   `design.inter_block_contact.nets[5].endpoints[1].segment`
 - `VALIDATION_FAILED` on
   `design.inter_block_route_groups["VCC"].branches[1].nets.VCC`
+- missing endpoint trace: `VCC` endpoint `output.3`, instance `output`, graph
+  status `split`, with nearest same-net access evidence
+- route-tree repair action: repairable `graph_split` hint for `VCC`, scoped to
+  routing, with action `connect same-net graph components for this route group`
 
 Project write, writer correctness, structural validation, and KiCad checks are
 skipped with reason `routing did not complete` until this blocker is resolved.
+Promotion keeps `route_completion` as the failed gate and reports downstream
+writer, connectivity, and KiCad gates as skipped until the VCC route-tree
+contact graph is complete.
 
 ## Current KiCad Evidence
 

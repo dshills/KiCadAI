@@ -27,9 +27,10 @@
     "The board envelope is intentionally larger for this fixture so realized amplifier block placements remain inside the outline without weakening placement validation for undersized boards.",
     "Routing is now enabled for this fixture and produces explicit route-tree evidence instead of a stale skip policy.",
     "The current hard blocker is the VCC route-tree/contact-graph handoff: local routes are bound and endpoint/net matching is clean, but required VCC endpoint output.3 remains unproven before project write.",
+    "Routing summaries now expose missing endpoint trace evidence for VCC output.3 and a repairable graph_split route-tree hint so AI repair loops can target same-net contact graph completion.",
     "Output protection remains connectivity-level: fault_protection_status is placeholder_blocked, active fault protection is not implemented, HP_RET-to-LOAD_REF load-return policy is not promoted, and separated LOAD_REF-to-GND net-tie evidence is not proven.",
     "Amplifier output transistor evidence remains warning-only for fabrication promotion: power dissipation, thermal review, safe operating area, and bias-diode thermal placement evidence are still review_required.",
     "Real KiCad ERC/DRC evidence remains skipped until the VCC route-tree/contact-graph blocker is resolved and project write can run."
   ],
-  "notes": "Optional protected Class AB headphone amplifier fixture that captures the first KiCad-backed evidence gap after schematic alias cleanup, placement fit, endpoint binding, and routing enablement: route-tree contact completion before project write. Configuring KICADAI_KICAD_CLI should not promote this fixture until it reaches kicad_checks. DRC is intentionally not required while the fixture stops before routed PCB validation."
+  "notes": "Optional protected Class AB headphone amplifier fixture that captures the first KiCad-backed evidence gap after schematic alias cleanup, placement fit, endpoint binding, and routing enablement: VCC route-tree contact completion before project write. Configuring KICADAI_KICAD_CLI should not promote this fixture until route_completion passes and it reaches kicad_checks. DRC is intentionally not required while the fixture stops before routed PCB validation."
 }

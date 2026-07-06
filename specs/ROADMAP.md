@@ -244,7 +244,11 @@ loop confidence:
   writer-correctness, validation, or selected-attempt branch pathfinding
   blockers.
   Route-tree diagnostics now separate fixed-net skip notices and
-  missing-net-class warnings from repairable blockers. The remaining
+  missing-net-class warnings from repairable blockers. Amplifier route
+  diagnostics also expose the current protected fixture's missing VCC endpoint
+  (`output.3`), nearest same-net access, selected access attempts, and
+  repairable `graph_split` hint so AI workflows can distinguish a concrete
+  same-net contact repair from an opaque route failure. The remaining
   layout-quality blockers are richer generated-board validation, generated
   project artifact proof, and KiCad ERC/DRC-clean evidence.
 - amplifier generation is currently evidence-oriented rather than
@@ -893,7 +897,10 @@ validation after alias cleanup, and now reaches PCB realization, placement,
 endpoint binding, and routing enablement. The current expected_fail blocker is
 required-net route completion before project write: six inter-block nets are
 graph-complete, but the VCC route-tree/contact graph is partial with
-`output.3` unproven and a blocked same-net branch. The simulation foundation can now write and evaluate Class AB
+`output.3` unproven and a blocked same-net branch. Promotion now keeps
+`route_completion` as the first failed gate, skips downstream writer,
+validation, and KiCad evidence gates because routing did not complete, and
+surfaces a VCC-specific repair hint for the AI repair loop. The simulation foundation can now write and evaluate Class AB
 headphone SPICE-like artifacts and feed a `simulation` promotion gate when a
 runner is configured. The next amplifier promotion task is VCC route-tree
 completion so project write, writer correctness, structural validation, and real

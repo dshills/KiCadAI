@@ -105,11 +105,13 @@ checks, PCB realization, placement, endpoint binding, and routing enablement.
 It now stops at route completion before project write: all 20 block-local
 routes bind to physical same-net pad anchors, six required inter-block nets are
 graph-complete, and the remaining blocking evidence is a partial VCC route-tree
-contact group with `output.3` unproven. Generated amplifier designs are not
-fabrication-ready until that required-net blocker, active output fault
-protection, speaker/bridge/power-amplifier load safety, SOA and thermal
-evidence, analog stability/layout rules, and KiCad ERC/DRC-clean proof are
-available.
+contact group with `output.3` unproven. Routing summaries now include compact
+missing-endpoint trace evidence plus a repairable `graph_split` VCC hint that
+points AI callers at the same-net contact graph repair instead of a generic
+failure. Generated amplifier designs are not fabrication-ready until that
+required-net blocker, active output fault protection,
+speaker/bridge/power-amplifier load safety, SOA and thermal evidence, analog
+stability/layout rules, and KiCad ERC/DRC-clean proof are available.
 
 Amplifier simulation support is now available as an opt-in evidence layer for
 Go-level and test-harness integrations; a stable CLI flag or environment
