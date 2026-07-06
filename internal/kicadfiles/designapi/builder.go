@@ -131,6 +131,7 @@ type ZoneOptions struct {
 
 type symbolState struct {
 	symbolIndex int
+	libraryID   string
 	position    kicadfiles.Point
 	pins        map[string]kicadfiles.Point
 	pinOrder    []string
@@ -278,6 +279,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, symbol)
 	builder.symbols[reference] = &symbolState{
 		symbolIndex: len(builder.design.Schematic.Symbols) - 1,
+		libraryID:   libraryID,
 		position:    position,
 		pins:        pins,
 		pinOrder:    pinOrder,
@@ -1034,9 +1036,20 @@ func (builder *Builder) pinAnchor(endpoint Endpoint) (kicadfiles.Point, error) {
 	if pin == "" {
 		return kicadfiles.Point{}, fmt.Errorf("pin required")
 	}
+	return builder.pinAnchorForState(state, endpoint.Reference, pin)
+}
+
+func (builder *Builder) pinAnchorForState(state *symbolState, reference string, pin string) (kicadfiles.Point, error) {
+	pin = strings.TrimSpace(pin)
+	if pin == "" {
+		return kicadfiles.Point{}, fmt.Errorf("pin required")
+	}
 	anchor, ok := state.pins[pin]
 	if !ok {
-		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", endpoint.Reference, pin)
+		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", reference, pin)
+	}
+	if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
+		return schematicSymbolPinAnchor(state.position, offset), nil
 	}
 	return anchor, nil
 }
@@ -1046,8 +1059,12 @@ func (builder *Builder) pinAnchorOffset(endpoint Endpoint) (kicadfiles.Point, bo
 	if err != nil {
 		return kicadfiles.Point{}, false
 	}
-	anchor, ok := state.pins[strings.TrimSpace(endpoint.Pin)]
-	if !ok {
+	pin := strings.TrimSpace(endpoint.Pin)
+	if pin == "" {
+		return kicadfiles.Point{}, false
+	}
+	anchor, err := builder.pinAnchorForState(state, endpoint.Reference, pin)
+	if err != nil {
 		return kicadfiles.Point{}, false
 	}
 	return kicadfiles.Point{X: anchor.X - state.position.X, Y: anchor.Y - state.position.Y}, true

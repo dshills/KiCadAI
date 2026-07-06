@@ -656,6 +656,39 @@ func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "C1", Pin: "1"}, "FILTER")
 }
 
+func TestBuilderConn01x04Pin4UsesKiCadERCConnectionAnchor(t *testing.T) {
+	builder := newTestBuilder(t)
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "J1",
+		LibraryID: "Connector_Generic:Conn_01x04",
+		Value:     "I2C",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(91.44), Y: 0},
+	}); err != nil {
+		t.Fatalf("AddSymbol J1 returned error: %v", err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "R1",
+		LibraryID: "Device:R",
+		Value:     "4.7k",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(10), Y: 0},
+	}); err != nil {
+		t.Fatalf("AddSymbol R1 returned error: %v", err)
+	}
+	if err := builder.Connect(Endpoint{Reference: "J1", Pin: "4"}, Endpoint{Reference: "R1", Pin: "1"}, "SCL"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	wantStart := kicadfiles.Point{X: kicadfiles.MM(86.36), Y: kicadfiles.MM(5.08)}
+	wantEnd := kicadfiles.Point{X: kicadfiles.MM(85.09), Y: kicadfiles.MM(5.08)}
+	for _, wire := range design.Schematic.Wires {
+		if len(wire.Points) == 2 && wire.Points[0] == wantStart && wire.Points[1] == wantEnd {
+			return
+		}
+	}
+	t.Fatalf("missing Conn_01x04 pin 4 KiCad ERC stub %v -> %v: %#v", wantStart, wantEnd, design.Schematic.Wires)
+}
+
 func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	builder := newTestBuilder(t)
 	points := []kicadfiles.Point{

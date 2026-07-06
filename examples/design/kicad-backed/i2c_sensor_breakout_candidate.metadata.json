@@ -24,8 +24,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Required KiCad ERC evidence still blocks candidate promotion with generated schematic pin-not-connected and unconnected-wire-endpoint findings.",
-    "Real KiCad DRC/pass evidence should be revisited after the remaining ERC pin/endpoint blockers are fixed."
+    "Required KiCad DRC evidence still blocks candidate promotion with PCB shorts, clearance violations, and track-crossing findings.",
+    "Real KiCad DRC/pass evidence should be revisited after the remaining PCB connectivity and spacing blockers are fixed."
   ],
-  "notes": "Tracks the richer sensor breakout scenario after placement, route-tree contact proof, project-write, writer-correctness, and structural validation. Real KiCad ERC pin/endpoint evidence still blocks promotion."
+  "notes": "Tracks the richer sensor breakout scenario after placement, route-tree contact proof, project-write, writer-correctness, structural validation, and ERC connectivity cleanup. Real KiCad DRC evidence still blocks promotion."
 }

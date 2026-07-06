@@ -14,12 +14,13 @@ type TemplatePin struct {
 }
 
 type embeddedTemplate struct {
-	bodyName string
-	pinType  string
-	pinX     float64
-	power    bool
-	pins     []TemplatePin
-	rawBody  string
+	bodyName              string
+	pinType               string
+	pinX                  float64
+	power                 bool
+	pins                  []TemplatePin
+	connectionPinOverride map[string]kicadfiles.Point
+	rawBody               string
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
@@ -32,7 +33,7 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	}},
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
 	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", pins: connectorTemplatePins(3)},
-	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4)},
+	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
 	"device:c":                     {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
 	"device:c_polarized":           {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},
 	"device:d":                     {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
@@ -98,6 +99,18 @@ func EmbeddedSymbolPinOffsets(libraryID string) ([]TemplatePin, bool) {
 		return nil, false
 	}
 	return cloneTemplatePins(template.pins), true
+}
+
+// EmbeddedSymbolConnectionPinOffset returns a KiCad-validated connection
+// anchor override for symbols whose ERC-resolved connection point differs from
+// the canonical raw symbol primitive used for library-body compatibility.
+func EmbeddedSymbolConnectionPinOffset(libraryID string, pinNumber string) (kicadfiles.Point, bool) {
+	template, ok := embeddedSymbolTemplates[strings.ToLower(strings.TrimSpace(libraryID))]
+	if !ok || len(template.connectionPinOverride) == 0 {
+		return kicadfiles.Point{}, false
+	}
+	offset, ok := template.connectionPinOverride[strings.TrimSpace(pinNumber)]
+	return offset, ok
 }
 
 func twoPinTemplatePins() []TemplatePin {
@@ -512,6 +525,34 @@ const rawConnectorGenericConn01x02Symbol = `(symbol "Connector_Generic:Conn_01x0
     (rectangle (start -1.27 -2.413) (end 0 -2.667) (stroke (width 0.1524) (type default)) (fill (type none)))
     (pin passive line (at -5.08 0 0) (length 3.81) (name "Pin_1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
     (pin passive line (at -5.08 -2.54 0) (length 3.81) (name "Pin_2" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`
+
+const rawConnectorGenericConn01x04Symbol = `(symbol "Connector_Generic:Conn_01x04"
+  (pin_names (offset 1.016) (hide yes))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "J" (at 0 5.08 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Value" "Conn_01x04" (at 0 -7.62 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Footprint" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Generic connector, single row, 01x04, script generated (kicad-library-utils/schlib/autogen/connector/)" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "connector" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "Connector*:*_1x??_*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "Conn_01x04_1_1"
+    (rectangle (start -1.27 3.81) (end 1.27 -6.35) (stroke (width 0.254) (type default)) (fill (type background)))
+    (rectangle (start -1.27 2.667) (end 0 2.413) (stroke (width 0.1524) (type default)) (fill (type none)))
+    (rectangle (start -1.27 0.127) (end 0 -0.127) (stroke (width 0.1524) (type default)) (fill (type none)))
+    (rectangle (start -1.27 -2.413) (end 0 -2.667) (stroke (width 0.1524) (type default)) (fill (type none)))
+    (rectangle (start -1.27 -4.953) (end 0 -5.207) (stroke (width 0.1524) (type default)) (fill (type none)))
+    (pin passive line (at -5.08 2.54 0) (length 3.81) (name "Pin_1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at -5.08 0 0) (length 3.81) (name "Pin_2" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at -5.08 -2.54 0) (length 3.81) (name "Pin_3" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at -5.08 -5.08 0) (length 3.81) (name "Pin_4" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))
   )
   (embedded_fonts no)
 )`

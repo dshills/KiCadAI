@@ -215,6 +215,9 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 			if metadata.Readiness == "blocked" {
 				t.Skipf("%s blocked: %s", metadata.ID, strings.Join(metadata.KnownGaps, "; "))
 			}
+			if designExampleExpectedFailRequiresKiCadCLI(metadata) && strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) == "" {
+				t.Skipf("%s expected-fail blocker requires real KiCad DRC evidence", metadata.ID)
+			}
 			requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
 			if err != nil {
 				t.Fatalf("%s request path: %v", metadata.ID, err)
@@ -344,6 +347,9 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			if metadata.Readiness == "blocked" {
 				t.Skipf("%s blocked: %s", metadata.ID, strings.Join(metadata.KnownGaps, "; "))
 			}
+			if designExampleExpectedFailRequiresKiCadCLI(metadata) && strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) == "" {
+				t.Skipf("%s expected-fail blocker requires real KiCad DRC evidence", metadata.ID)
+			}
 			requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
 			if err != nil {
 				t.Fatalf("%s request path: %v", metadata.ID, err)
@@ -387,12 +393,12 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 	}
 }
 
-func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
+func TestI2CDesignExampleExpectedFailIsKiCadDRCConnectivity(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping I2C KiCad ERC classification integration test in short mode")
+		t.Skip("skipping I2C KiCad DRC classification integration test in short mode")
 	}
-	if strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) != "" {
-		t.Skipf("set %s: local KiCad evidence may differ from default fake/internal ERC classification", checks.EnvKiCadCLI)
+	if strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) == "" {
+		t.Skipf("unset %s: I2C DRC classification requires real KiCad evidence", checks.EnvKiCadCLI)
 	}
 	repoRoot := designExampleRepoRoot(t)
 	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "i2c_sensor_breakout_candidate.metadata.json")
@@ -401,7 +407,7 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 		t.Fatalf("load %s: %v", metadataPath, err)
 	}
 	if metadata.Readiness != "expected_fail" {
-		t.Fatalf("%s readiness = %q, want expected_fail until KiCad ERC connectivity is clean", metadata.ID, metadata.Readiness)
+		t.Fatalf("%s readiness = %q, want expected_fail until KiCad DRC connectivity is clean", metadata.ID, metadata.Readiness)
 	}
 	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
 	if err != nil {
@@ -419,14 +425,14 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 	if report.Status != PromotionStatusExpectedFail || report.AchievedReadiness != PromotionReadinessExpectedFail {
 		t.Fatalf("%s promotion status=%q achieved=%q, want expected_fail\n%s", metadata.ID, report.Status, report.AchievedReadiness, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	ercDependencyStages := []StageName{StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation}
-	for _, stageName := range ercDependencyStages {
+	drcDependencyStages := []StageName{StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation}
+	for _, stageName := range drcDependencyStages {
 		stage, ok := designExampleStageByName(result, stageName)
 		if !ok {
 			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
 		}
 		if stage.Status == StageStatusBlocked || stage.Status == StageStatusSkipped {
-			t.Fatalf("%s stage %q status = %q, want progressed evidence before ERC blocker:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
+			t.Fatalf("%s stage %q status = %q, want progressed evidence before DRC blocker:\n%s", metadata.ID, stageName, stage.Status, formatDesignExampleRun(metadata, outputDir, result))
 		}
 	}
 	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
@@ -446,21 +452,21 @@ func TestI2CDesignExampleExpectedFailIsKiCadERCConnectivity(t *testing.T) {
 		t.Fatalf("%s generated schematic still has off-grid connectivity diagnostics:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
 	if kicadChecks.Status != StageStatusBlocked {
-		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad ERC connectivity:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result), formatGeneratedConnectivityDiagnostics(connectivityReport))
+		t.Fatalf("%s kicad_checks status = %q, want blocked by KiCad DRC connectivity:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result), formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
-	// KiCad versions report the same ERC connectivity blocker with different wording.
-	acceptedERCConnectivityMessages := []string{"Pin not connected", "Unconnected wire endpoint"}
-	foundERCConnectivityBlocker := false
-	for _, want := range acceptedERCConnectivityMessages {
+	// KiCad versions report the same PCB connectivity blocker with different wording.
+	acceptedDRCConnectivityMessages := []string{"Items shorting two nets", "Clearance violation", "Tracks crossing"}
+	foundDRCConnectivityBlocker := false
+	for _, want := range acceptedDRCConnectivityMessages {
 		if designExampleStageHasIssueMessage(kicadChecks, want) || designExamplePromotionHasIssueMessage(report, StageKiCadChecks, want) {
-			foundERCConnectivityBlocker = true
+			foundDRCConnectivityBlocker = true
 			break
 		}
 	}
-	if !foundERCConnectivityBlocker {
-		t.Errorf("%s missing ERC connectivity blocker matching one of %v\nstage issues:\n%s\npromotion issues:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, acceptedERCConnectivityMessages, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues), formatGeneratedConnectivityDiagnostics(connectivityReport))
+	if !foundDRCConnectivityBlocker {
+		t.Errorf("%s missing DRC connectivity blocker matching one of %v\nstage issues:\n%s\npromotion issues:\n%s\nschematic connectivity diagnostics:\n%s", metadata.ID, acceptedDRCConnectivityMessages, formatDesignExampleIssues(kicadChecks.Issues), formatDesignExamplePromotionIssues(report.Issues), formatGeneratedConnectivityDiagnostics(connectivityReport))
 	}
-	for _, stageName := range ercDependencyStages {
+	for _, stageName := range drcDependencyStages {
 		if designExamplePromotionHasBlockingStage(report, stageName) {
 			t.Fatalf("%s promotion issues include stale downstream blocking issue at %s:\n%s", metadata.ID, stageName, formatDesignExamplePromotionIssues(report.Issues))
 		}
@@ -1594,6 +1600,19 @@ func designExampleMetadataExpectsPCB(metadata designExampleMetadata) bool {
 	}
 	for _, artifact := range metadata.ExpectedArtifacts {
 		if strings.HasSuffix(strings.ToLower(artifact), ".kicad_pcb") {
+			return true
+		}
+	}
+	return false
+}
+
+func designExampleExpectedFailRequiresKiCadCLI(metadata designExampleMetadata) bool {
+	if metadata.Readiness != "expected_fail" {
+		return false
+	}
+	for _, gap := range metadata.KnownGaps {
+		normalized := strings.ToLower(gap)
+		if strings.Contains(normalized, "required kicad") && strings.Contains(normalized, "evidence") {
 			return true
 		}
 	}
