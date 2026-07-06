@@ -87,7 +87,7 @@
   ],
   "validation": {
     "acceptance": "connectivity",
-    "skip_routing": true,
+    "skip_routing": false,
     "skip_kicad_checks": true
   }
 }

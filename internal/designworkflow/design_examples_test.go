@@ -534,15 +534,15 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if len(issues) != 0 {
 		t.Fatalf("decode %s issues:\n%s", requestPath, formatDesignExampleIssues(issues))
 	}
-	if !request.Validation.SkipRouting {
-		t.Fatalf("%s baseline expects fixture-level skip_routing until route policy closeout", metadata.ID)
+	if request.Validation.SkipRouting {
+		t.Fatalf("%s route policy still has fixture-level skip_routing after routing closeout", metadata.ID)
 	}
 	outputDir := filepath.Join(t.TempDir(), NormalizeProjectName(metadata.ID))
 	ctx, cancel := context.WithTimeout(context.Background(), designExampleCreateTimeout(t))
 	defer cancel()
 	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
 
-	for _, stageName := range []StageName{StagePCBRealization, StagePlacement, StageProjectWrite, StageWriterCorrect, StageValidation} {
+	for _, stageName := range []StageName{StagePCBRealization, StagePlacement} {
 		stage, ok := designExampleStageByName(result, stageName)
 		if !ok {
 			t.Fatalf("%s missing stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))
@@ -555,38 +555,40 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s missing routing stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if routing.Status != StageStatusSkipped {
-		t.Fatalf("%s routing status = %q, want skipped baseline:\n%s", metadata.ID, routing.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if routing.Status != StageStatusBlocked {
+		t.Fatalf("%s routing status = %q, want blocked with explicit route evidence:\n%s", metadata.ID, routing.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if reason, _ := routing.Summary["reason"].(string); reason != "routing skipped" {
-		t.Fatalf("%s routing reason = %#v, want routing skipped:\n%s", metadata.ID, routing.Summary["reason"], formatDesignExampleRun(metadata, outputDir, result))
+	if reason, ok := routing.Summary["reason"].(string); ok && reason == "routing skipped" {
+		t.Fatalf("%s routing still reports stale skip reason:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	routeConnectivity := requireRouteConnectivitySummary(t, routing)
 	if routeConnectivity.EndpointsUnresolved != 0 || routeConnectivity.EndpointNetMismatches != 0 {
 		t.Fatalf("%s routing endpoint baseline regressed: %#v", metadata.ID, routeConnectivity)
 	}
-	validation, _ := designExampleStageByName(result, StageValidation)
-	if validation.Status != StageStatusBlocked {
-		t.Fatalf("%s validation status = %q, want blocked baseline:\n%s", metadata.ID, validation.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if routeConnectivity.RoutesAttempted == 0 || routeConnectivity.RoutesBound == 0 || routeConnectivity.EndpointContactsProven == 0 {
+		t.Fatalf("%s routing did not attempt bound local routes: %#v", metadata.ID, routeConnectivity)
 	}
-	for _, net := range []string{"AMP_OUT_DC_BIASED", "HP_OUT", "VCC", "LOAD_REF", "AUDIO_IN", "DRIVER_OUT", "HP_RET"} {
-		if !designExampleIssuesContainNet(validation.Issues, net) {
-			t.Fatalf("%s validation baseline missing net %q:\n%s", metadata.ID, net, formatDesignExampleIssues(validation.Issues))
-		}
+	interBlock := requireInterBlockRouteSummary(t, routing)
+	if interBlock.EndpointsUnresolved != 0 || interBlock.MissingRequired != 0 || interBlock.RequiredEndpoints == 0 || interBlock.ProvenEndpoints == 0 {
+		t.Fatalf("%s inter-block routing handoff is not endpoint-complete enough to route: %#v", metadata.ID, interBlock)
 	}
-	for _, path := range []string{
-		"tracks.3.start",
-		"tracks.5.end",
-		"tracks.10.start",
-		"tracks.15.start",
-		"tracks.16.end",
-		"tracks.17.start",
-		"tracks.18.end",
-		"tracks.19.start",
-	} {
-		if !designExampleIssuesContainPath(validation.Issues, path) {
-			t.Fatalf("%s validation baseline missing route endpoint path %q:\n%s", metadata.ID, path, formatDesignExampleIssues(validation.Issues))
-		}
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routing)
+	if routeTrees.GroupsAttempted == 0 || routeTrees.FixedNetSkipNotices == 0 || routeTrees.BlockingIssueCount == 0 {
+		t.Fatalf("%s route-tree policy evidence missing fixed-net/blocking details: %#v", metadata.ID, routeTrees)
+	}
+	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routing, "route_tree_contact_graph")
+	if contactGraph.RequiredEndpoints == 0 || contactGraph.ProvenEndpoints == 0 || contactGraph.PartialGroups == 0 {
+		t.Fatalf("%s route-tree contact graph missing explicit partial-route evidence: %#v", metadata.ID, contactGraph)
+	}
+	if !designExampleIssuesContainNet(routing.Issues, "VCC") {
+		t.Fatalf("%s routing blocker does not identify VCC:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
+	}
+	projectWrite, ok := designExampleStageByName(result, StageProjectWrite)
+	if !ok {
+		t.Fatalf("%s missing project_write stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if projectWrite.Status != StageStatusSkipped {
+		t.Fatalf("%s project_write status = %q, want skipped after explicit routing blocker:\n%s", metadata.ID, projectWrite.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 	if !ok {
@@ -637,13 +639,22 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 		t.Fatalf("%s schematic electrical status = %q, want ok after alias cleanup:\n%s", metadata.ID, schematicElectrical.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	schematicPath := filepath.Join(outputDir, NormalizeProjectName(metadata.ID)+".kicad_sch")
-	schematicFile, err := schematic.ReadFile(schematicPath)
-	if err != nil {
-		t.Fatalf("%s generated schematic is not readable for label/connectivity diagnostics: %v", metadata.ID, err)
-	}
-	connectivityReport := schematic.InspectGeneratedConnectivity(schematicFile)
-	if len(connectivityReport.FloatingLabels) != 0 || len(connectivityReport.OffGridObjects) != 0 || len(connectivityReport.DanglingWireEndpoints) != 0 {
-		t.Fatalf("%s generated schematic label/connectivity diagnostics are not clean:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+	if _, err := os.Stat(schematicPath); err == nil {
+		schematicFile, err := schematic.ReadFile(schematicPath)
+		if err != nil {
+			t.Fatalf("%s generated schematic is not readable for label/connectivity diagnostics: %v", metadata.ID, err)
+		}
+		connectivityReport := schematic.InspectGeneratedConnectivity(schematicFile)
+		if len(connectivityReport.FloatingLabels) != 0 || len(connectivityReport.OffGridObjects) != 0 || len(connectivityReport.DanglingWireEndpoints) != 0 {
+			t.Fatalf("%s generated schematic label/connectivity diagnostics are not clean:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+		}
+	} else if errors.Is(err, os.ErrNotExist) {
+		projectWrite, ok := designExampleStageByName(result, StageProjectWrite)
+		if !ok || projectWrite.Status != StageStatusSkipped {
+			t.Fatalf("%s generated schematic is missing without a skipped project write stage: %v", metadata.ID, err)
+		}
+	} else {
+		t.Fatalf("%s generated schematic stat failed: %v", metadata.ID, err)
 	}
 	for _, labels := range []string{
 		"headphones_SIG,output_amp_out",
@@ -688,10 +699,10 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 		stage  StageName
 		status StageStatus
 	}{
-		{StageRouting, StageStatusSkipped},
-		{StageProjectWrite, StageStatusOK},
-		{StageWriterCorrect, StageStatusWarning},
-		{StageValidation, StageStatusBlocked},
+		{StageRouting, StageStatusBlocked},
+		{StageProjectWrite, StageStatusSkipped},
+		{StageWriterCorrect, StageStatusSkipped},
+		{StageValidation, StageStatusSkipped},
 		{StageKiCadChecks, StageStatusSkipped},
 	} {
 		stage, ok := designExampleStageByName(result, expectation.stage)
@@ -706,8 +717,13 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if !ok {
 		t.Fatalf("%s missing routing stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if len(routing.Issues) != 0 {
-		t.Fatalf("%s routing handoff still has issues despite skip_routing policy:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
+	routeConnectivity := requireRouteConnectivitySummary(t, routing)
+	if routeConnectivity.EndpointsUnresolved != 0 || routeConnectivity.EndpointNetMismatches != 0 {
+		t.Fatalf("%s routing endpoint handoff regressed: %#v\n%s", metadata.ID, routeConnectivity, formatDesignExampleIssues(routing.Issues))
+	}
+	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routing)
+	if routeTrees.GroupsAttempted == 0 || routeTrees.BlockingIssueCount == 0 {
+		t.Fatalf("%s routing lacks explicit route-tree blocker evidence: %#v", metadata.ID, routeTrees)
 	}
 }
 

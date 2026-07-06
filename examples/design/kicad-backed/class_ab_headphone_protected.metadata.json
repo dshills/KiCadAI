@@ -25,11 +25,11 @@
   "known_gaps": [
     "The protected Class AB headphone path now passes schematic electrical validation, PCB realization, placement, and endpoint binding with verified LMV321 op-amp, diode, and output-transistor component selections.",
     "The board envelope is intentionally larger for this fixture so realized amplifier block placements remain inside the outline without weakening placement validation for undersized boards.",
-    "Routing remains intentionally skipped by fixture policy, but the placement-to-routing handoff no longer reports unresolved endpoint or local-route blocker issues.",
-    "The current hard blocker is structural validation after project write: generated schematic label attachment/conflict evidence and generated PCB route/connectivity evidence still need promotion-quality proof.",
+    "Routing is now enabled for this fixture and produces explicit route-tree evidence instead of a stale skip policy.",
+    "The current hard blocker is the VCC route-tree/contact-graph handoff: local routes are bound and endpoint/net matching is clean, but one required VCC endpoint remains unproven before project write.",
     "Output protection remains connectivity-level: fault_protection_status is placeholder_blocked, active fault protection is not implemented, HP_RET-to-LOAD_REF load-return policy is not promoted, and separated LOAD_REF-to-GND net-tie evidence is not proven.",
     "Amplifier output transistor evidence remains warning-only for fabrication promotion: power dissipation, thermal review, safe operating area, and bias-diode thermal placement evidence are still review_required.",
     "Real KiCad ERC/DRC evidence remains skipped until routing policy and validation blockers are resolved."
   ],
-  "notes": "Optional protected Class AB headphone amplifier fixture that captures the first KiCad-backed evidence gap after schematic alias cleanup, placement fit, and endpoint binding: structural validation before KiCad checks. Configuring KICADAI_KICAD_CLI should not promote this fixture until it reaches kicad_checks. DRC is intentionally not required while the fixture stops before routed PCB validation."
+  "notes": "Optional protected Class AB headphone amplifier fixture that captures the first KiCad-backed evidence gap after schematic alias cleanup, placement fit, endpoint binding, and routing enablement: route-tree contact completion before project write. Configuring KICADAI_KICAD_CLI should not promote this fixture until it reaches kicad_checks. DRC is intentionally not required while the fixture stops before routed PCB validation."
 }
