@@ -167,6 +167,10 @@ func platformCandidates() []string {
 }
 
 func CompareFiles(originalPath, roundTrippedPath string, opts Options) (Result, error) {
+	return compareFilesWithNormalizer(originalPath, roundTrippedPath, opts, NormalizeBytes)
+}
+
+func compareFilesWithNormalizer(originalPath, roundTrippedPath string, opts Options, normalize func([]byte) string) (Result, error) {
 	original, err := os.ReadFile(originalPath)
 	if err != nil {
 		return Result{}, fmt.Errorf("read original %s: %w", originalPath, err)
@@ -176,8 +180,8 @@ func CompareFiles(originalPath, roundTrippedPath string, opts Options) (Result, 
 		return Result{}, fmt.Errorf("read round-tripped %s: %w", roundTrippedPath, err)
 	}
 
-	normalizedOriginal := NormalizeBytes(original)
-	normalizedRoundTripped := NormalizeBytes(roundTripped)
+	normalizedOriginal := normalize(original)
+	normalizedRoundTripped := normalize(roundTripped)
 	normalizedDiff := unifiedDiff(originalPath+" (normalized)", roundTrippedPath+" (normalized)", normalizedOriginal, normalizedRoundTripped)
 
 	result := Result{
