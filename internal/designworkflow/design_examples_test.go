@@ -601,6 +601,38 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if !vccClassified {
 		t.Fatalf("%s required-net classification missing partial VCC blocker: %#v", metadata.ID, requiredNets.Nets)
 	}
+	vccBranches := requireRouteTreeBranchesForNet(t, routing, "VCC")
+	var partialVCCBranch *InterBlockBranchRoutingEvidence
+	for index := range vccBranches {
+		branch := &vccBranches[index]
+		if branch.Status == "partial" && branch.StartEndpointID == "QCCDE149E001.3" && branch.EndEndpointID == "CD0952D00001.1" {
+			partialVCCBranch = branch
+			break
+		}
+	}
+	if partialVCCBranch == nil {
+		t.Fatalf("%s VCC branches = %#v, want partial branch from QCCDE149E001.3 to CD0952D00001.1", metadata.ID, vccBranches)
+	}
+	if partialVCCBranch.BranchIndex != 1 || partialVCCBranch.OperationCount != 0 || partialVCCBranch.BlockingIssueCount == 0 {
+		t.Fatalf("%s partial VCC branch evidence = %#v, want branch index 1 with blocking evidence and no emitted operation", metadata.ID, *partialVCCBranch)
+	}
+	if partialVCCBranch.AccessPairsTried == 0 || partialVCCBranch.AccessPairLimit == 0 || partialVCCBranch.AccessPairsTried > partialVCCBranch.AccessPairLimit || !partialVCCBranch.AccessPairsTruncated {
+		t.Fatalf("%s partial VCC branch access evidence = %#v, want bounded truncated attempt evidence", metadata.ID, *partialVCCBranch)
+	}
+	if len(partialVCCBranch.AccessAttempts) != partialVCCBranch.AccessPairsTried {
+		t.Fatalf("%s partial VCC branch attempts = %#v, want one attempt record per tried pair", metadata.ID, partialVCCBranch.AccessAttempts)
+	}
+	firstAttempt := partialVCCBranch.AccessAttempts[0]
+	if firstAttempt.SourceRole != RouteTreeAccessTargetPad || firstAttempt.TargetRole != RouteTreeAccessTargetPad || firstAttempt.SourceEndpointID != "QCCDE149E001.3" || firstAttempt.TargetEndpointID != "CD0952D00001.1" {
+		t.Fatalf("%s first partial VCC attempt = %#v, want exact pad-to-pad endpoint attempt", metadata.ID, firstAttempt)
+	}
+	if firstAttempt.Status != "partial" || firstAttempt.PrimaryCode == "" || firstAttempt.ObstacleKind == "" {
+		t.Fatalf("%s first partial VCC attempt lacks blocker evidence: %#v", metadata.ID, firstAttempt)
+	}
+	repair := requireRouteTreeRepairSummary(t, routing)
+	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 || repair.UnrepairableFailures != 0 || !slices.Equal(repair.Nets, []string{"VCC"}) {
+		t.Fatalf("%s route-tree repair summary = %#v, want repairable VCC-only blocker", metadata.ID, repair)
+	}
 	if !designExampleIssuesContainNet(routing.Issues, "VCC") {
 		t.Fatalf("%s routing blocker does not identify VCC:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
 	}
