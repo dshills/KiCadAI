@@ -611,6 +611,36 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if kicadChecks.Status != StageStatusSkipped {
 		t.Fatalf("%s kicad_checks status = %q, want skipped until validation/routing closeout:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
+	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+	if report.Status != PromotionStatusExpectedFail {
+		t.Fatalf("%s promotion report status = %q, want %q", metadata.ID, report.Status, PromotionStatusExpectedFail)
+	}
+	if report.AchievedReadiness != PromotionReadinessExpectedFail {
+		t.Fatalf("%s promotion report achieved readiness = %q, want %q", metadata.ID, report.AchievedReadiness, PromotionReadinessExpectedFail)
+	}
+	for _, expectation := range []struct {
+		id             string
+		status         PromotionGateStatus
+		wantIssueCodes bool
+	}{
+		{id: "route_completion", status: PromotionGateStatusFailed, wantIssueCodes: true},
+		{id: "kicad_checks", status: PromotionGateStatusSkipped},
+		{id: "writer_correctness", status: PromotionGateStatusSkipped},
+		{id: "connectivity", status: PromotionGateStatusSkipped},
+	} {
+		t.Run("promotion_gate_"+expectation.id, func(t *testing.T) {
+			gate := promotionGateByID(t, report, expectation.id)
+			if gate.Status != expectation.status {
+				t.Errorf("%s gate status = %q, want %q: %#v", expectation.id, gate.Status, expectation.status, gate)
+			}
+			if expectation.wantIssueCodes && len(gate.IssueCodes) == 0 {
+				t.Errorf("%s gate issue code count = 0, want issue evidence: %#v", expectation.id, gate)
+			}
+			if !expectation.wantIssueCodes && len(gate.IssueCodes) > 0 {
+				t.Errorf("%s gate issue code count = %d, want 0 with status %q: %#v", expectation.id, len(gate.IssueCodes), gate.Status, gate)
+			}
+		})
+	}
 }
 
 func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata designExampleMetadata, outputDir string, result WorkflowResult) {
