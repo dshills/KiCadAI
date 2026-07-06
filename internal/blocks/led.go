@@ -136,15 +136,6 @@ func ledPins() []transactions.PinSpec {
 	}
 }
 
-func twoTerminalHorizontalPins() []transactions.PinSpec {
-	// Generic schematic anchors for two-terminal symbols that do not yet have
-	// symbol-specific KiCad 10 pin geometry.
-	return []transactions.PinSpec{
-		{Number: "1", XMM: -5.08, YMM: 0},
-		{Number: "2", XMM: 5.08, YMM: 0},
-	}
-}
-
 func appendConnectOperation(operations *[]transactions.Operation, issues *[]reports.Issue, fromRef string, fromPin string, toRef string, toPin string, netName string) {
 	connect, connectIssues := ConnectOperation(fromRef, fromPin, toRef, toPin, netName)
 	*issues = append(*issues, connectIssues...)

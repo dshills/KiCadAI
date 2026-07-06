@@ -549,18 +549,46 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if !ok {
 		t.Fatalf("%s missing schematic electrical stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if schematicElectrical.Status != StageStatusBlocked {
-		t.Fatalf("%s schematic electrical status = %q, want blocked:\n%s", metadata.ID, schematicElectrical.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if schematicElectrical.Status != StageStatusOK {
+		t.Fatalf("%s schematic electrical status = %q, want ok after alias cleanup:\n%s", metadata.ID, schematicElectrical.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	for _, labels := range []string{
 		"headphones_SIG,output_amp_out",
 		"output_lower_emitter,output_upper_emitter",
+		"AMP_OUT_DC_BIASED,HP_OUT",
 	} {
-		if !designExampleIssuesContainNet(schematicElectrical.Issues, labels) {
-			t.Fatalf("%s missing schematic label conflict %q in:\n%s", metadata.ID, labels, formatDesignExampleIssues(schematicElectrical.Issues))
+		if designExampleIssuesContainNet(schematicElectrical.Issues, labels) {
+			t.Fatalf("%s still has schematic label conflict %q in:\n%s", metadata.ID, labels, formatDesignExampleIssues(schematicElectrical.Issues))
 		}
 	}
-	for _, stageName := range []StageName{StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks} {
+	pcbRealization, ok := designExampleStageByName(result, StagePCBRealization)
+	if !ok {
+		t.Fatalf("%s missing PCB realization stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if pcbRealization.Status != StageStatusWarning {
+		t.Fatalf("%s PCB realization status = %q, want warning:\n%s", metadata.ID, pcbRealization.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if !designExampleIssuesContainPath(pcbRealization.Issues, "pcb_realization.output") {
+		t.Fatalf("%s PCB realization missing output placement warning:\n%s", metadata.ID, formatDesignExampleIssues(pcbRealization.Issues))
+	}
+	placement, ok := designExampleStageByName(result, StagePlacement)
+	if !ok {
+		t.Fatalf("%s missing placement stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if placement.Status != StageStatusBlocked {
+		t.Fatalf("%s placement status = %q, want blocked:\n%s", metadata.ID, placement.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	for _, path := range []string{
+		"components.Qccde149e001.position",
+		"components.Qccde149e002.position",
+		"design.inter_block_routing.connections[5].to",
+		"design.inter_block_routing.connections[6].from",
+	} {
+		if !designExampleIssuesContainPath(placement.Issues, path) {
+			t.Fatalf("%s placement issues missing %s:\n%s", metadata.ID, path, formatDesignExampleIssues(placement.Issues))
+		}
+	}
+	for _, stageName := range []StageName{StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks} {
 		stage, ok := designExampleStageByName(result, stageName)
 		if !ok {
 			t.Fatalf("%s missing downstream stage %q:\n%s", metadata.ID, stageName, formatDesignExampleRun(metadata, outputDir, result))

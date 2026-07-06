@@ -319,9 +319,9 @@ func instantiateClassABOutputStage(definition BlockDefinition, request BlockRequ
 		"upper_bias_feed":        {XMM: 8, YMM: -7.62},
 		"lower_bias_feed":        {XMM: 8, YMM: 12.7},
 		"upper_emitter_resistor": {XMM: 56, YMM: 0},
-		"lower_emitter_resistor": {XMM: 56, YMM: 5.08},
+		"lower_emitter_resistor": {XMM: 56, YMM: 10.16},
 		"upper_output":           {XMM: 45, YMM: 0},
-		"lower_output":           {XMM: 45, YMM: 5.08},
+		"lower_output":           {XMM: 45, YMM: 10.16},
 		"load_reference":         {XMM: 65, YMM: 12},
 	}
 	var operations []transactions.Operation

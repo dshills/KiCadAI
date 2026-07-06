@@ -49,7 +49,7 @@ func headphoneOutputProtectionDefinition() BlockDefinition {
 			{Kind: "footprint", ID: "TestPoint:TestPoint_Pad_D1.0mm", Required: true, Description: "Default load-return anchor footprint."},
 		},
 		Components: []BlockComponent{
-			{Role: "dc_blocking_capacitor", RefPrefix: "C", Value: "220uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalHorizontalPins(), PlacementGroup: "output_protection"},
+			{Role: "dc_blocking_capacitor", RefPrefix: "C", Value: "220uF", SymbolID: "Device:C_Polarized", FootprintID: "Capacitor_SMD:C_1210_3225Metric", Pins: twoTerminalVerticalPins(), PlacementGroup: "output_protection"},
 			{Role: "bleed_resistor", RefPrefix: "R", Value: "100kΩ", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), PlacementGroup: "output_protection"},
 			{Role: "series_resistor", RefPrefix: "R", Value: "0Ω", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), PlacementGroup: "output_protection"},
 			{Role: "load_return_anchor", RefPrefix: "TP", Value: "LOAD_RET", SymbolID: "Connector:TestPoint", FootprintID: "TestPoint:TestPoint_Pad_D1.0mm", Pins: []transactions.PinSpec{{Number: "1"}}, PlacementGroup: "output_protection"},
@@ -196,8 +196,6 @@ func headphoneOutputProtectionOperations(definition BlockDefinition, request Blo
 		text string
 		at   transactions.Point
 	}{
-		{text: ampNet, at: transactions.Point{XMM: 0, YMM: -3}},
-		{text: hpNet, at: transactions.Point{XMM: 36, YMM: -3}},
 		{text: loadRefNet, at: transactions.Point{XMM: 30, YMM: 17}},
 		{text: loadRetNet, at: transactions.Point{XMM: 38, YMM: 10}},
 	} {

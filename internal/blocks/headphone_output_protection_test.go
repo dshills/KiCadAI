@@ -34,9 +34,7 @@ func TestHeadphoneOutputProtectionInstantiatesWithDefaults(t *testing.T) {
 	if countHeadphoneProtectionOperations(output.Operations, transactions.OpConnect) != 5 {
 		t.Fatalf("operations = %#v, want five default connects", output.Operations)
 	}
-	if !headphoneProtectionHasLabel(t, output.Operations, "hp_protect_amp_out_dc_biased") ||
-		!headphoneProtectionHasLabel(t, output.Operations, "hp_protect_hp_out") ||
-		!headphoneProtectionHasLabel(t, output.Operations, "hp_protect_load_ref") ||
+	if !headphoneProtectionHasLabel(t, output.Operations, "hp_protect_load_ref") ||
 		!headphoneProtectionHasLabel(t, output.Operations, "hp_protect_load_ret") {
 		t.Fatalf("missing expected labels in operations: %#v", output.Operations)
 	}

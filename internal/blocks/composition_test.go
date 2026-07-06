@@ -177,6 +177,34 @@ func TestComposeBlocksAppliesAliasToConnectedGroup(t *testing.T) {
 	}
 }
 
+func TestComposeBlocksRewritesLocalLabelsForConnectionAliases(t *testing.T) {
+	output := ComposeBlocks(context.Background(), NewBuiltinRegistry(), CompositionRequest{
+		Instances: []CompositionInstance{
+			{ID: "headphones", BlockID: "headphone_output_connector"},
+			{ID: "header", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []string{"SIG", "RET", "LOAD_REF"}}},
+		},
+		Connections: []CompositionConnection{
+			{From: PortRef{InstanceID: "headphones", Port: "HP_OUT"}, To: PortRef{InstanceID: "header", Port: "SIG"}, NetAlias: "HP_OUT"},
+			{From: PortRef{InstanceID: "headphones", Port: "LOAD_RET"}, To: PortRef{InstanceID: "header", Port: "RET"}, NetAlias: "HP_RET"},
+			{From: PortRef{InstanceID: "headphones", Port: "LOAD_REF"}, To: PortRef{InstanceID: "header", Port: "LOAD_REF"}, NetAlias: "LOAD_REF"},
+		},
+	})
+	if len(output.Issues) != 0 {
+		t.Fatalf("issues = %#v", output.Issues)
+	}
+	labels := compositionLabels(t, output.Operations)
+	for _, old := range []string{"headphones_hp_out", "headphones_load_ret", "headphones_load_ref"} {
+		if labels[old] {
+			t.Fatalf("local label %s was not canonicalized: %#v", old, labels)
+		}
+	}
+	for _, canonical := range []string{"HP_OUT", "HP_RET", "LOAD_REF"} {
+		if !labels[canonical] {
+			t.Fatalf("missing canonical label %s in %#v", canonical, labels)
+		}
+	}
+}
+
 func TestComposeBlocksSanitizesAliases(t *testing.T) {
 	registry := NewRegistry([]BlockDefinition{
 		testSignalBlock("a"),
@@ -201,6 +229,22 @@ func TestComposeBlocksSanitizesAliases(t *testing.T) {
 	if connect.NetName != "A_BUS" {
 		t.Fatalf("connect = %#v", connect)
 	}
+}
+
+func compositionLabels(t *testing.T, operations []transactions.Operation) map[string]bool {
+	t.Helper()
+	labels := map[string]bool{}
+	for _, operation := range operations {
+		if operation.Op != transactions.OpAddLabel {
+			continue
+		}
+		var payload transactions.AddLabelOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("decode add_label: %v", err)
+		}
+		labels[payload.Text] = true
+	}
+	return labels
 }
 
 func TestComposeBlocksReportsCanceledContext(t *testing.T) {

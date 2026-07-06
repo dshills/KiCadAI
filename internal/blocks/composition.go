@@ -2,7 +2,10 @@ package blocks
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"regexp"
+	"strings"
 
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
@@ -122,6 +125,12 @@ func ComposeBlocks(ctx context.Context, registry Registry, request CompositionRe
 			voltageByRoot[root] = port.Voltage
 		}
 	}
+	if !reports.HasBlockingIssue(output.Issues) {
+		resolutions, resolutionIssues := ResolveCompositionNetAliases(request)
+		output.Issues = append(output.Issues, resolutionIssues...)
+		rewriteIssues := applyCompositionNetAliasResolutions(output.Operations, resolutions)
+		output.Issues = append(output.Issues, rewriteIssues...)
+	}
 	for index, connection := range request.Connections {
 		if contextIssue := compositionContextIssue(ctx); contextIssue != nil {
 			output.Issues = append(output.Issues, *contextIssue)
@@ -155,6 +164,171 @@ func ComposeBlocks(ctx context.Context, registry Registry, request CompositionRe
 	}
 	output.Issues = append(output.Issues, validateI2CAddressCollisions(output.Instances, netGroups)...)
 	return output
+}
+
+func compositionAliasMatcher(aliases map[string]string) *regexp.Regexp {
+	patterns := make([]string, 0, len(aliases))
+	for local := range aliases {
+		quoted, _ := json.Marshal(local)
+		patterns = append(patterns, regexp.QuoteMeta(string(quoted)))
+	}
+	if len(patterns) == 0 {
+		return regexp.MustCompile("$.^")
+	}
+	return regexp.MustCompile(strings.Join(patterns, "|"))
+}
+
+func compositionOperationRawContainsAlias(operation transactions.Operation, aliasMatcher *regexp.Regexp) bool {
+	return aliasMatcher.Match(operation.Raw)
+}
+
+func compositionStringPtr(value string) *string {
+	out := value
+	return &out
+}
+
+func compositionOperationWithMetadata(original, updated transactions.Operation, net string) transactions.Operation {
+	out := original
+	out.Op = updated.Op
+	out.Raw = updated.Raw
+	if updated.Ref != "" {
+		out.Ref = updated.Ref
+	}
+	if net != "" {
+		out.Net = net
+	}
+	return out
+}
+
+func applyCompositionNetAliasResolutions(operations []transactions.Operation, resolutions []CompositionNetAliasResolution) []reports.Issue {
+	if len(operations) == 0 || len(resolutions) == 0 {
+		return nil
+	}
+	aliases := map[string]string{}
+	for _, resolution := range resolutions {
+		if resolution.LocalNet != "" && resolution.CanonicalNet != "" {
+			aliases[resolution.LocalNet] = resolution.CanonicalNet
+		}
+	}
+	if len(aliases) == 0 {
+		return nil
+	}
+	aliasMatcher := compositionAliasMatcher(aliases)
+	updates := map[int]transactions.Operation{}
+	var issues []reports.Issue
+	for index := range operations {
+		operation := operations[index]
+		netIsAlias := operation.Net != "" && aliases[operation.Net] != ""
+		if !netIsAlias && !compositionOperationRawContainsAlias(operation, aliasMatcher) {
+			continue
+		}
+		switch operation.Op {
+		case transactions.OpConnect:
+			var payload transactions.ConnectOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode connect for net alias resolution: "+err.Error()))
+				continue
+			}
+			if canonical := aliases[payload.NetName]; canonical != "" {
+				payload.NetName = canonical
+				updated, err := wrapOperation(transactions.OpConnect, payload)
+				if err != nil {
+					issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode connect for net alias resolution: "+err.Error()))
+					continue
+				}
+				updated = compositionOperationWithMetadata(operation, updated, canonical)
+				updates[index] = updated
+			}
+		case transactions.OpAddLabel:
+			var payload transactions.AddLabelOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode add_label for net alias resolution: "+err.Error()))
+				continue
+			}
+			labelNet := operation.Net
+			if labelNet == "" {
+				labelNet = payload.Text
+			}
+			if canonical := aliases[labelNet]; canonical != "" {
+				payload.Text = canonical
+				updated, err := wrapOperation(transactions.OpAddLabel, payload)
+				if err != nil {
+					issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode add_label for net alias resolution: "+err.Error()))
+					continue
+				}
+				updated = compositionOperationWithMetadata(operation, updated, canonical)
+				updates[index] = updated
+			}
+		case transactions.OpRoute:
+			// RouteOperation's only net-bearing field is NetName; vias, layers, and geometry are net-neutral.
+			var payload transactions.RouteOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode route for net alias resolution: "+err.Error()))
+				continue
+			}
+			if canonical := aliases[payload.NetName]; canonical != "" {
+				payload.NetName = canonical
+				updated, err := wrapOperation(transactions.OpRoute, payload)
+				if err != nil {
+					issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode route for net alias resolution: "+err.Error()))
+					continue
+				}
+				updated = compositionOperationWithMetadata(operation, updated, canonical)
+				updates[index] = updated
+			}
+		case transactions.OpAddZone:
+			// AddZoneOperation's only net-bearing field is NetName; layers and polygon points are net-neutral.
+			var payload transactions.AddZoneOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode add_zone for net alias resolution: "+err.Error()))
+				continue
+			}
+			if payload.NetName != nil {
+				if canonical := aliases[*payload.NetName]; canonical != "" {
+					payload.NetName = compositionStringPtr(canonical)
+					updated, err := wrapOperation(transactions.OpAddZone, payload)
+					if err != nil {
+						issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode add_zone for net alias resolution: "+err.Error()))
+						continue
+					}
+					updated = compositionOperationWithMetadata(operation, updated, canonical)
+					updates[index] = updated
+				}
+			}
+		case transactions.OpPlaceFootprint:
+			var payload transactions.PlaceFootprintOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "decode place_footprint for net alias resolution: "+err.Error()))
+				continue
+			}
+			changed := false
+			for padIndex := range payload.Pads {
+				if payload.Pads[padIndex].Net == nil {
+					continue
+				}
+				if canonical := aliases[*payload.Pads[padIndex].Net]; canonical != "" {
+					payload.Pads[padIndex].Net = compositionStringPtr(canonical)
+					changed = true
+				}
+			}
+			if changed {
+				updated, err := wrapOperation(transactions.OpPlaceFootprint, payload)
+				if err != nil {
+					issues = append(issues, blockIssue(fmt.Sprintf("operations[%d]", index), "encode place_footprint for net alias resolution: "+err.Error()))
+					continue
+				}
+				updated = compositionOperationWithMetadata(operation, updated, operation.Net)
+				updates[index] = updated
+			}
+		}
+	}
+	if len(issues) != 0 {
+		return issues
+	}
+	for index, operation := range updates {
+		operations[index] = operation
+	}
+	return nil
 }
 
 func offsetCompositionOperations(operations []transactions.Operation, xOffsetMM float64, yOffsetMM float64) ([]transactions.Operation, []reports.Issue) {

@@ -228,6 +228,7 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 				return projectEndpointLess(pseudoEndpoints[i], pseudoEndpoints[j])
 			})
 			labelEndpoint := preferredProjectLabelEndpoint(endpoints, groupPseudoLabelEndpoints[root])
+			labelEndpoint = preferredProjectMaterializedLabelEndpoint(labelEndpoint, endpoints, len(pseudoEndpoints), anchors)
 			label, err := materializedPortLabel(labelEndpoint, pseudoEndpoints[0], groupNetNames[root], len(pseudoEndpoints), anchors)
 			if err != nil {
 				return nil, err
@@ -342,6 +343,34 @@ func materializedPortLabel(endpoint projectEndpointKey, pseudoEndpoint projectEn
 		At:   transactions.Point{XMM: anchor.xMM, YMM: anchor.yMM},
 		Kind: "local",
 	})
+}
+
+func preferredProjectMaterializedLabelEndpoint(preferred projectEndpointKey, endpoints []projectEndpointKey, pseudoEndpointCount int, anchors map[projectEndpointKey]projectPoint) projectEndpointKey {
+	anchor, ok := anchors[preferred]
+	if !ok || !projectEndpointSuppressesMaterializedLabel(anchor.role, pseudoEndpointCount) {
+		return preferred
+	}
+	for _, endpoint := range endpoints {
+		candidate, ok := anchors[endpoint]
+		if !ok || projectEndpointIsExternalTerminal(candidate.role) || projectEndpointSuppressesMaterializedLabel(candidate.role, pseudoEndpointCount) {
+			continue
+		}
+		return endpoint
+	}
+	return preferred
+}
+
+func projectEndpointSuppressesMaterializedLabel(role string, pseudoEndpointCount int) bool {
+	if pseudoEndpointCount < 2 {
+		return false
+	}
+	role = strings.ToLower(strings.TrimSpace(role))
+	switch role {
+	case "dc_blocking_capacitor", "decoupling_capacitor", "input_coupling", "output_coupling":
+		return true
+	default:
+		return false
+	}
 }
 
 func projectEndpointIsExternalTerminal(role string) bool {

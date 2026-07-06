@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"fmt"
+	"strings"
 
 	"kicadai/internal/reports"
 )
@@ -52,28 +53,29 @@ func ResolveCompositionNetAliases(request CompositionRequest) ([]CompositionNetA
 				continue
 			}
 			seenPorts[ref] = struct{}{}
-			local := InstanceNetName(ref.InstanceID, ref.Port)
-			if local == "" || local == canonical {
-				continue
+			for _, local := range compositionPortLocalNetCandidates(ref) {
+				if local == "" || local == canonical {
+					continue
+				}
+				resolution := CompositionNetAliasResolution{
+					LocalNet:     local,
+					CanonicalNet: canonical,
+					InstanceID:   ref.InstanceID,
+					Port:         ref.Port,
+				}
+				if existing := resolutionByLocal[local]; existing.CanonicalNet != "" && existing.CanonicalNet != canonical {
+					issues = append(issues, reports.Issue{
+						Code:       reports.CodeValidationFailed,
+						Severity:   reports.SeverityError,
+						Path:       "net_aliases." + local,
+						Message:    "conflicting canonical net aliases for " + local + ": " + existing.CanonicalNet + " and " + canonical,
+						Nets:       []string{existing.CanonicalNet, canonical},
+						Suggestion: "use one net_alias for each connected instance port",
+					})
+					continue
+				}
+				resolutionByLocal[local] = resolution
 			}
-			resolution := CompositionNetAliasResolution{
-				LocalNet:     local,
-				CanonicalNet: canonical,
-				InstanceID:   ref.InstanceID,
-				Port:         ref.Port,
-			}
-			if existing := resolutionByLocal[local]; existing.CanonicalNet != "" && existing.CanonicalNet != canonical {
-				issues = append(issues, reports.Issue{
-					Code:       reports.CodeValidationFailed,
-					Severity:   reports.SeverityError,
-					Path:       "net_aliases." + local,
-					Message:    "conflicting canonical net aliases for " + local + ": " + existing.CanonicalNet + " and " + canonical,
-					Nets:       []string{existing.CanonicalNet, canonical},
-					Suggestion: "use one net_alias for each connected instance port",
-				})
-				continue
-			}
-			resolutionByLocal[local] = resolution
 		}
 	}
 	if len(issues) != 0 {
@@ -84,4 +86,13 @@ func ResolveCompositionNetAliases(request CompositionRequest) ([]CompositionNetA
 		resolutions = append(resolutions, resolution)
 	}
 	return resolutions, nil
+}
+
+func compositionPortLocalNetCandidates(ref PortRef) []string {
+	port := strings.TrimSpace(ref.Port)
+	candidates := []string{InstanceNetName(ref.InstanceID, port)}
+	if lower := strings.ToLower(port); lower != "" && lower != port {
+		candidates = append(candidates, InstanceNetName(ref.InstanceID, lower))
+	}
+	return candidates
 }

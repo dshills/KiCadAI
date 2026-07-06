@@ -237,6 +237,116 @@ func TestProjectTransactionLabelsOneOfMultiplePseudoPorts(t *testing.T) {
 	}
 }
 
+func TestProjectTransactionFallsBackToCapacitorLabelWhenNoOtherAnchorExists(t *testing.T) {
+	componentOps, issues := ComponentOperations(BlockComponent{
+		Role:      "dc_blocking_capacitor",
+		RefPrefix: "C",
+		Value:     "220uF",
+		SymbolID:  "Device:C",
+		Pins:      twoTerminalHorizontalPins(),
+	}, "C1", transactions.Point{XMM: 10, YMM: 20})
+	if len(issues) != 0 {
+		t.Fatalf("component issues: %#v", issues)
+	}
+	operations := append([]transactions.Operation{}, componentOps...)
+	for _, pair := range []struct {
+		from transactions.Endpoint
+		to   transactions.Endpoint
+		net  string
+	}{
+		{from: transactions.Endpoint{Ref: "protect", Pin: "AMP_OUT"}, to: transactions.Endpoint{Ref: "C1", Pin: "1"}, net: "AMP_OUT_DC_BIASED"},
+		{from: transactions.Endpoint{Ref: "source", Pin: "AMP_OUT"}, to: transactions.Endpoint{Ref: "C1", Pin: "1"}, net: "AMP_OUT_DC_BIASED"},
+		{from: transactions.Endpoint{Ref: "C1", Pin: "2"}, to: transactions.Endpoint{Ref: "protect", Pin: "HP_OUT"}, net: "HP_OUT"},
+		{from: transactions.Endpoint{Ref: "C1", Pin: "2"}, to: transactions.Endpoint{Ref: "sink", Pin: "HP_OUT"}, net: "HP_OUT"},
+	} {
+		connect, issues := ConnectOperation(pair.from.Ref, pair.from.Pin, pair.to.Ref, pair.to.Pin, pair.net)
+		if len(issues) != 0 {
+			t.Fatalf("connect issues: %#v", issues)
+		}
+		operations = append(operations, connect)
+	}
+	tx, err := projectTransaction("protect", operations, map[string]struct{}{"C1": {}}, map[string]struct{}{"protect": {}, "source": {}, "sink": {}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels := map[string]bool{}
+	for _, operation := range tx.Operations {
+		if operation.Op == transactions.OpAddLabel {
+			var payload transactions.AddLabelOperation
+			if err := decodeBlockOperation(operation, &payload); err != nil {
+				t.Fatal(err)
+			}
+			labels[payload.Text] = true
+		}
+	}
+	for _, label := range []string{"AMP_OUT_DC_BIASED", "HP_OUT"} {
+		if !labels[label] {
+			t.Fatalf("missing fallback label %s in %#v", label, labels)
+		}
+	}
+}
+
+func TestProjectTransactionPrefersNonCapacitorMaterializedLabelAnchor(t *testing.T) {
+	capOps, issues := ComponentOperations(BlockComponent{
+		Role:      "dc_blocking_capacitor",
+		RefPrefix: "C",
+		Value:     "220uF",
+		SymbolID:  "Device:C",
+		Pins:      twoTerminalHorizontalPins(),
+	}, "C1", transactions.Point{XMM: 10, YMM: 20})
+	if len(issues) != 0 {
+		t.Fatalf("capacitor issues: %#v", issues)
+	}
+	resistorOps, issues := ComponentOperations(BlockComponent{
+		Role:      "load_resistor",
+		RefPrefix: "R",
+		Value:     "33",
+		SymbolID:  "Device:R",
+		Pins:      twoTerminalHorizontalPins(),
+	}, "R1", transactions.Point{XMM: 30, YMM: 20})
+	if len(issues) != 0 {
+		t.Fatalf("resistor issues: %#v", issues)
+	}
+	operations := append([]transactions.Operation{}, capOps...)
+	operations = append(operations, resistorOps...)
+	for _, pair := range []struct {
+		from transactions.Endpoint
+		to   transactions.Endpoint
+		net  string
+	}{
+		{from: transactions.Endpoint{Ref: "protect", Pin: "AMP_OUT"}, to: transactions.Endpoint{Ref: "C1", Pin: "1"}, net: "AMP_OUT_DC_BIASED"},
+		{from: transactions.Endpoint{Ref: "source", Pin: "AMP_OUT"}, to: transactions.Endpoint{Ref: "R1", Pin: "1"}, net: "AMP_OUT_DC_BIASED"},
+		{from: transactions.Endpoint{Ref: "C1", Pin: "1"}, to: transactions.Endpoint{Ref: "R1", Pin: "1"}, net: "AMP_OUT_DC_BIASED"},
+	} {
+		connect, issues := ConnectOperation(pair.from.Ref, pair.from.Pin, pair.to.Ref, pair.to.Pin, pair.net)
+		if len(issues) != 0 {
+			t.Fatalf("connect issues: %#v", issues)
+		}
+		operations = append(operations, connect)
+	}
+	tx, err := projectTransaction("protect", operations, map[string]struct{}{"C1": {}, "R1": {}}, map[string]struct{}{"protect": {}, "source": {}}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, operation := range tx.Operations {
+		if operation.Op != transactions.OpAddLabel {
+			continue
+		}
+		var payload transactions.AddLabelOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Text != "AMP_OUT_DC_BIASED" {
+			continue
+		}
+		if math.Abs(payload.At.XMM-24.92) > 0.001 || math.Abs(payload.At.YMM-20) > 0.001 {
+			t.Fatalf("label should move to resistor pin anchor, got %#v", payload.At)
+		}
+		return
+	}
+	t.Fatal("missing AMP_OUT_DC_BIASED label")
+}
+
 func TestProjectEndpointAnchorsApplySymbolRotation(t *testing.T) {
 	operation, err := wrapOperation(transactions.OpAddSymbol, transactions.AddSymbolOperation{
 		Op:        transactions.OpAddSymbol,
