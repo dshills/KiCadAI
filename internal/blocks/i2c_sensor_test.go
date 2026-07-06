@@ -30,8 +30,11 @@ func TestI2CSensorInstantiatesDefaultOperations(t *testing.T) {
 	if len(output.Instance.Ports) != 4 {
 		t.Fatalf("ports = %#v", output.Instance.Ports)
 	}
-	if len(output.Operations) != 22 {
+	if len(output.Operations) != 23 {
 		t.Fatalf("operations = %#v", output.Operations)
+	}
+	if !hasNoConnect(output.Operations, output.Instance.Refs[0], genericI2CSensorPins.INT) {
+		t.Fatalf("operations missing no-connect for disabled INT pin: %#v", output.Operations)
 	}
 	validation := transactions.Validate(transactions.Transaction{Operations: output.Operations})
 	if len(validation.Issues) != 0 {

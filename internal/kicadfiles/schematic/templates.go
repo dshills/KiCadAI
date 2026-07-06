@@ -114,11 +114,18 @@ func connectorTemplatePins(count int) []TemplatePin {
 			Number: strconv.Itoa(index + 1),
 			Offset: kicadfiles.Point{
 				X: kicadfiles.MM(-5.08),
-				Y: -kicadfiles.MM(2.54 * float64(index)),
+				Y: connectorTemplatePinY(count, index),
 			},
 		}
 	}
 	return pins
+}
+
+func connectorTemplatePinY(count int, zeroBasedPin int) kicadfiles.IU {
+	if count <= 2 {
+		return -kicadfiles.MM(2.54 * float64(zeroBasedPin))
+	}
+	return kicadfiles.MM(2.54 - 2.54*float64(zeroBasedPin))
 }
 
 func powerTemplate(bodyName string, pinX float64) embeddedTemplate {
@@ -233,12 +240,19 @@ func twoPinSymbolBody(libraryID, bodyName, pinType string) sexpr.List {
 
 func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []TemplatePin) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(libraryID)}
+	if isConnectorTemplateBodyName(bodyName) {
+		nodes = append(nodes, sexpr.L(
+			sexpr.A("pin_names"),
+			sexpr.L(sexpr.A("offset"), sexpr.X("1.016")),
+			sexpr.L(sexpr.A("hide"), sexpr.A("yes")),
+		))
+	}
 	pinNodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(bodyName + "_1_1")}
-	if body := embeddedTemplateBody(pins); len(body) > 0 {
+	if body := embeddedTemplateBody(bodyName, pins); len(body) > 0 {
 		pinNodes = append(pinNodes, body)
 	}
 	for _, pin := range pins {
-		pinNodes = append(pinNodes, embeddedTemplatePin(pinType, pin))
+		pinNodes = append(pinNodes, embeddedTemplatePin(bodyName, pinType, pin))
 	}
 	nodes = append(nodes, embeddedSymbolDefaults()...)
 	nodes = append(nodes,
@@ -249,9 +263,12 @@ func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []Temp
 	return sexpr.L(nodes...)
 }
 
-func embeddedTemplateBody(pins []TemplatePin) sexpr.List {
+func embeddedTemplateBody(bodyName string, pins []TemplatePin) sexpr.List {
 	if len(pins) == 0 {
 		return nil
+	}
+	if isConnectorTemplateBodyName(bodyName) {
+		return connectorTemplateBody(pins)
 	}
 	minX, maxX := pins[0].Offset.X, pins[0].Offset.X
 	minY, maxY := pins[0].Offset.Y, pins[0].Offset.Y
@@ -282,6 +299,30 @@ func embeddedTemplateBody(pins []TemplatePin) sexpr.List {
 			sexpr.L(sexpr.A("type"), sexpr.A("default")),
 		),
 		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("type"), sexpr.A("none"))),
+	)
+}
+
+func connectorTemplateBody(pins []TemplatePin) sexpr.List {
+	minY, maxY := pins[0].Offset.Y, pins[0].Offset.Y
+	for _, pin := range pins[1:] {
+		if pin.Offset.Y < minY {
+			minY = pin.Offset.Y
+		}
+		if pin.Offset.Y > maxY {
+			maxY = pin.Offset.Y
+		}
+	}
+	padding := kicadfiles.MM(1.27)
+	return sexpr.L(
+		sexpr.A("rectangle"),
+		sexpr.L(sexpr.A("start"), sexpr.F(-1.27), sexpr.F(templatePinMM(maxY+padding))),
+		sexpr.L(sexpr.A("end"), sexpr.F(1.27), sexpr.F(templatePinMM(minY-padding))),
+		sexpr.L(
+			sexpr.A("stroke"),
+			sexpr.L(sexpr.A("width"), sexpr.X("0.254")),
+			sexpr.L(sexpr.A("type"), sexpr.A("default")),
+		),
+		sexpr.L(sexpr.A("fill"), sexpr.L(sexpr.A("type"), sexpr.A("background"))),
 	)
 }
 
@@ -355,16 +396,26 @@ func embeddedPin(pinType string, pinX float64, rotation int64, name string, numb
 	)
 }
 
-func embeddedTemplatePin(pinType string, pin TemplatePin) sexpr.List {
+func embeddedTemplatePin(bodyName string, pinType string, pin TemplatePin) sexpr.List {
+	pinLength := "2.54"
+	pinName := "~"
+	if isConnectorTemplateBodyName(bodyName) {
+		pinLength = "3.81"
+		pinName = "Pin_" + pin.Number
+	}
 	return sexpr.L(
 		sexpr.A("pin"),
 		sexpr.A(pinType),
 		sexpr.A("line"),
 		sexpr.L(sexpr.A("at"), sexpr.F(templatePinMM(pin.Offset.X)), sexpr.F(templatePinMM(pin.Offset.Y)), sexpr.I(templatePinRotation(pin.Offset))),
-		sexpr.L(sexpr.A("length"), sexpr.X("2.54")),
-		sexpr.L(sexpr.A("name"), sexpr.S("~"), renderEffects(false)),
+		sexpr.L(sexpr.A("length"), sexpr.X(pinLength)),
+		sexpr.L(sexpr.A("name"), sexpr.S(pinName), renderEffects(false)),
 		sexpr.L(sexpr.A("number"), sexpr.S(pin.Number), renderEffects(false)),
 	)
+}
+
+func isConnectorTemplateBodyName(bodyName string) bool {
+	return strings.HasPrefix(bodyName, "Conn_01x")
 }
 
 func templatePinRotation(offset kicadfiles.Point) int64 {

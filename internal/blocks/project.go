@@ -261,17 +261,16 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 			sort.Slice(pseudoEndpoints, func(i, j int) bool {
 				return projectEndpointLess(pseudoEndpoints[i], pseudoEndpoints[j])
 			})
-			if projectGroupSuppressesMaterializedLabel(endpoints, anchors) {
-				continue
-			}
-			labelEndpoint := preferredProjectLabelEndpoint(endpoints, groupPseudoLabelEndpoints[root])
-			labelEndpoint = preferredProjectMaterializedLabelEndpoint(labelEndpoint, endpoints, len(pseudoEndpoints), len(endpoints), anchors)
-			label, err := materializedPortLabel(labelEndpoint, pseudoEndpoints[0], groupNetNames[root], len(pseudoEndpoints), anchors)
-			if err != nil {
-				return nil, err
-			}
-			if label.Op != "" {
-				out = append(out, label)
+			if !projectGroupSuppressesMaterializedLabel(endpoints, anchors) {
+				labelEndpoint := preferredProjectLabelEndpoint(endpoints, groupPseudoLabelEndpoints[root])
+				labelEndpoint = preferredProjectMaterializedLabelEndpoint(labelEndpoint, endpoints, len(pseudoEndpoints), len(endpoints), anchors)
+				label, err := materializedPortLabel(labelEndpoint, pseudoEndpoints[0], groupNetNames[root], len(pseudoEndpoints), anchors)
+				if err != nil {
+					return nil, err
+				}
+				if label.Op != "" {
+					out = append(out, label)
+				}
 			}
 		}
 		if len(endpoints) < 2 {

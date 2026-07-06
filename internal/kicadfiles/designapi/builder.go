@@ -28,6 +28,7 @@ type Builder struct {
 	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
 	// grid snapping can avoid creating exact anchor collisions between symbols.
 	schematicPinAnchors map[kicadfiles.Point]struct{}
+	schematicWireEnds   map[kicadfiles.Point]struct{}
 	footprints          map[string]int
 	pads                map[string]map[string][]int
 }
@@ -130,6 +131,7 @@ type ZoneOptions struct {
 
 type symbolState struct {
 	symbolIndex int
+	position    kicadfiles.Point
 	pins        map[string]kicadfiles.Point
 	pinOrder    []string
 	pinNets     map[string]string
@@ -163,6 +165,7 @@ func New(options Options) (*Builder, error) {
 		symbols:             map[string]*symbolState{},
 		symbolKeys:          map[string]string{},
 		schematicPinAnchors: map[kicadfiles.Point]struct{}{},
+		schematicWireEnds:   map[kicadfiles.Point]struct{}{},
 		footprints:          map[string]int{},
 		pads:                map[string]map[string][]int{},
 	}
@@ -275,6 +278,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, symbol)
 	builder.symbols[reference] = &symbolState{
 		symbolIndex: len(builder.design.Schematic.Symbols) - 1,
+		position:    position,
 		pins:        pins,
 		pinOrder:    pinOrder,
 		pinNets:     pinNets,
@@ -341,8 +345,8 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
 	if schematicConnectionShouldUseLabels(netName, start, end) {
-		builder.addSchematicLabelStub(netName, from, start, labelStubOffset(start, end))
-		builder.addSchematicLabelStub(netName, to, end, labelStubOffset(end, start))
+		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
+		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
 	} else {
 		builder.addSchematicWire(netName, from, to, start, end)
 	}
@@ -367,7 +371,22 @@ func schematicConnectionShouldUseLabels(netName string, start, end kicadfiles.Po
 	return dx+dy > longSchematicWireLabelThreshold
 }
 
-func labelStubOffset(from, to kicadfiles.Point) kicadfiles.Point {
+func (builder *Builder) labelStubOffset(endpoint Endpoint, from, to kicadfiles.Point) kicadfiles.Point {
+	if builder != nil {
+		if offset, ok := builder.pinAnchorOffset(endpoint); ok {
+			grid := kicadfiles.MM(1.27)
+			switch {
+			case offset.X < 0:
+				return kicadfiles.Point{X: -grid}
+			case offset.X > 0:
+				return kicadfiles.Point{X: grid}
+			case offset.Y < 0:
+				return kicadfiles.Point{Y: -grid}
+			case offset.Y > 0:
+				return kicadfiles.Point{Y: grid}
+			}
+		}
+	}
 	if to.X >= from.X {
 		return kicadfiles.Point{Y: -kicadfiles.MM(1.27)}
 	}
@@ -417,6 +436,9 @@ func (builder *Builder) AddLabel(text string, position kicadfiles.Point, kind sc
 
 func (builder *Builder) addSchematicLabelStub(netName string, endpoint Endpoint, anchor kicadfiles.Point, offset kicadfiles.Point) {
 	if builder == nil {
+		return
+	}
+	if builder.schematicWireEndpointExists(anchor) {
 		return
 	}
 	if offset.X == 0 && offset.Y == 0 {
@@ -518,12 +540,16 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 		if samePoint(points[index], points[index+1]) || hasSchematicWireSegment(builder.design.Schematic.Wires, points[index], points[index+1]) {
 			continue
 		}
+		builder.addSchematicEndpointJunction(netName, points[index])
+		builder.addSchematicEndpointJunction(netName, points[index+1])
 		wireOffset := len(builder.design.Schematic.Wires)
 		builder.design.Schematic.Wires = append(builder.design.Schematic.Wires, schematic.NewWire(
 			builder.generator.New("root.schematic.wire", netName, fmt.Sprintf("%d", wireOffset), fmt.Sprintf("%d", index), from.Reference, from.Pin, to.Reference, to.Pin),
 			points[index],
 			points[index+1],
 		))
+		builder.indexSchematicWireEndpoint(points[index])
+		builder.indexSchematicWireEndpoint(points[index+1])
 	}
 	for index := 1; index < len(points)-1; index++ {
 		if !hasSchematicJunction(builder.design.Schematic.Junctions, points[index]) {
@@ -542,6 +568,37 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 			points[index],
 		))
 	}
+}
+
+func (builder *Builder) addSchematicEndpointJunction(netName string, position kicadfiles.Point) {
+	if builder == nil || hasSchematicJunction(builder.design.Schematic.Junctions, position) {
+		return
+	}
+	if !builder.schematicWireEndpointExists(position) {
+		return
+	}
+	builder.design.Schematic.Junctions = append(builder.design.Schematic.Junctions, schematic.Junction{
+		UUID:     builder.generator.New("root.schematic.endpoint_junction", netName, formatPoint(position)),
+		Position: position,
+	})
+}
+
+func (builder *Builder) schematicWireEndpointExists(position kicadfiles.Point) bool {
+	if builder == nil {
+		return false
+	}
+	_, ok := builder.schematicWireEnds[position]
+	return ok
+}
+
+func (builder *Builder) indexSchematicWireEndpoint(position kicadfiles.Point) {
+	if builder == nil {
+		return
+	}
+	if builder.schematicWireEnds == nil {
+		builder.schematicWireEnds = map[kicadfiles.Point]struct{}{}
+	}
+	builder.schematicWireEnds[position] = struct{}{}
 }
 
 func hasNoConnect(noConnects []schematic.NoConnect, position kicadfiles.Point) bool {
@@ -982,6 +1039,18 @@ func (builder *Builder) pinAnchor(endpoint Endpoint) (kicadfiles.Point, error) {
 		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", endpoint.Reference, pin)
 	}
 	return anchor, nil
+}
+
+func (builder *Builder) pinAnchorOffset(endpoint Endpoint) (kicadfiles.Point, bool) {
+	state, err := builder.symbolState(endpoint.Reference)
+	if err != nil {
+		return kicadfiles.Point{}, false
+	}
+	anchor, ok := state.pins[strings.TrimSpace(endpoint.Pin)]
+	if !ok {
+		return kicadfiles.Point{}, false
+	}
+	return kicadfiles.Point{X: anchor.X - state.position.X, Y: anchor.Y - state.position.Y}, true
 }
 
 func (builder *Builder) assignedPinNet(endpoint Endpoint) string {

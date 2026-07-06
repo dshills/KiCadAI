@@ -132,8 +132,8 @@ func i2cSensorComponents() []BlockComponent {
 	return []BlockComponent{
 		{Role: "sensor", RefPrefix: "U", Value: "I2C Sensor", SymbolID: defaultI2CSensorSymbol, FootprintID: "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", Pins: i2cSensorPins(genericI2CSensorPins)},
 		{Role: "decoupling_capacitor", RefPrefix: "C", Value: "100nF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "sda_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), When: pullupsEnabled},
-		{Role: "scl_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins(), When: pullupsEnabled},
+		{Role: "sda_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: deviceRTemplatePins(), When: pullupsEnabled},
+		{Role: "scl_pullup", RefPrefix: "R", Value: "4.7k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: deviceRTemplatePins(), When: pullupsEnabled},
 	}
 }
 

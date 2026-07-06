@@ -105,6 +105,8 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	if boolParam(params, "include_interrupt", false) {
 		appendConnectOperation(&operations, &issuesOut, sensorRef, genericI2CSensorPins.INT, request.InstanceID, "INT", InstanceNetName(request.InstanceID, "int"))
 		nets = append(nets, InstanceNetName(request.InstanceID, "int"))
+	} else {
+		appendNoConnectOperation(&operations, &issuesOut, sensorRef, genericI2CSensorPins.INT)
 	}
 	if boolParam(params, "include_decoupling", true) {
 		capRef := allocator.Next("C")
@@ -127,7 +129,7 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 			{role: "scl_pullup", net: sclNet, pin: genericI2CSensorPins.SCL, xmm: 35},
 		} {
 			ref := allocator.Next("R")
-			component := BlockComponent{Role: pullup.role, RefPrefix: "R", Value: stringParam(params, "pullup_value"), SymbolID: "Device:R", FootprintID: stringParam(params, "pullup_footprint"), Pins: twoTerminalHorizontalPins()}
+			component := BlockComponent{Role: pullup.role, RefPrefix: "R", Value: stringParam(params, "pullup_value"), SymbolID: "Device:R", FootprintID: stringParam(params, "pullup_footprint"), Pins: deviceRTemplatePins()}
 			pullupOps, pullupIssues := ComponentOperations(component, ref, transactions.Point{XMM: pullup.xmm, YMM: -10})
 			issuesOut = append(issuesOut, pullupIssues...)
 			operations = append(operations, pullupOps...)

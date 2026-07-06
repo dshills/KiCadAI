@@ -95,6 +95,40 @@ func TestProjectTransactionForConnectorFiltersPseudoPortConnections(t *testing.T
 	}
 }
 
+func TestProjectTransactionForI2CBreakoutMaterializesInternalNets(t *testing.T) {
+	output := ComposeBlocks(context.Background(), NewBuiltinRegistry(), CompositionRequest{
+		ProjectName: "i2c_sensor_breakout",
+		Instances: []CompositionInstance{
+			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"i2c_address": "0x48"}},
+			{ID: "i2c_connector", BlockID: "connector_breakout", Params: map[string]any{"pin_names": []string{"VCC", "GND", "SDA", "SCL"}}},
+		},
+		Connections: []CompositionConnection{
+			{From: PortRef{InstanceID: "i2c_connector", Port: "VCC"}, To: PortRef{InstanceID: "sensor", Port: "VCC"}, NetAlias: "VCC"},
+			{From: PortRef{InstanceID: "i2c_connector", Port: "GND"}, To: PortRef{InstanceID: "sensor", Port: "GND"}, NetAlias: "GND"},
+			{From: PortRef{InstanceID: "i2c_connector", Port: "SDA"}, To: PortRef{InstanceID: "sensor", Port: "SDA"}, NetAlias: "SDA"},
+			{From: PortRef{InstanceID: "i2c_connector", Port: "SCL"}, To: PortRef{InstanceID: "sensor", Port: "SCL"}, NetAlias: "SCL"},
+		},
+	})
+	if reports.HasBlockingIssue(output.Issues) {
+		t.Fatalf("compose issues: %#v", output.Issues)
+	}
+	tx, err := ProjectTransactionForCompositionOutput("i2c_sensor_breakout", output, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connectsByNet := map[string]int{}
+	for _, operation := range tx.Operations {
+		if operation.Op == transactions.OpConnect {
+			connectsByNet[operation.Net]++
+		}
+	}
+	for _, net := range []string{"VCC", "GND", "SDA", "SCL"} {
+		if connectsByNet[net] == 0 {
+			t.Fatalf("connects by net = %#v, want materialized connect for %s", connectsByNet, net)
+		}
+	}
+}
+
 func TestProjectTransactionLabelsExportedMultiEndpointNet(t *testing.T) {
 	resistor := BlockComponent{
 		Role:      "series_resistor",
