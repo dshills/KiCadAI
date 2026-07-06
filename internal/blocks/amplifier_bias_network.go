@@ -280,20 +280,6 @@ func instantiateAmplifierBiasNetwork(definition BlockDefinition, request BlockRe
 	}
 
 	nets := appendAmplifierBiasNetworkConnections(definition, request.InstanceID, refs, &operations, &issues)
-	for _, label := range []struct {
-		text string
-		at   transactions.Point
-	}{
-		{text: "VCC", at: transactions.Point{XMM: 8, YMM: -18}},
-		{text: "BIAS_P", at: transactions.Point{XMM: 30, YMM: -2.54}},
-		{text: "DRIVER_OUT", at: transactions.Point{XMM: 8, YMM: 2.54}},
-		{text: "BIAS_N", at: transactions.Point{XMM: 30, YMM: 7.62}},
-		{text: "AMP_OUT", at: transactions.Point{XMM: 46, YMM: 2.54}},
-		{text: "VEE", at: transactions.Point{XMM: 8, YMM: 24}},
-	} {
-		appendLabelOperation(&operations, &issues, label.text, label.at)
-	}
-
 	output := dryRunBlockOutput(definition, request, operations, issues)
 	output.Instance.Params = params
 	output.Instance.Refs = []string{refs["upper_bias_feed"], refs["bias_upper"], refs["bias_lower"], refs["lower_bias_feed"], refs["amp_out_anchor"]}

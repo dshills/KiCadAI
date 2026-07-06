@@ -33,8 +33,8 @@ func TestProjectTransactionForLEDMaterializesExportedPorts(t *testing.T) {
 	if tx.Operations[0].Op != transactions.OpCreateProject || tx.Operations[len(tx.Operations)-1].Op != transactions.OpWriteProject {
 		t.Fatalf("transaction must be bracketed by create/write: %#v", tx.Operations)
 	}
-	connects := 0
 	labels := 0
+	connects := 0
 	for _, operation := range tx.Operations {
 		if operation.Op == transactions.OpAddLabel {
 			var payload transactions.AddLabelOperation
@@ -163,7 +163,7 @@ func TestProjectTransactionLabelsExportedMultiEndpointNet(t *testing.T) {
 				t.Fatal(err)
 			}
 			labels++
-			if payload.Text != "IN" || math.Abs(payload.At.XMM-6.19) > 0.000001 || math.Abs(payload.At.YMM-20) > 0.000001 {
+			if payload.Text != "IN" || math.Abs(payload.At.XMM-6.35) > 0.000001 || math.Abs(payload.At.YMM-20.32) > 0.000001 {
 				t.Fatalf("unexpected exported label: %#v", payload)
 			}
 		case transactions.OpConnect:
@@ -177,11 +177,11 @@ func TestProjectTransactionLabelsExportedMultiEndpointNet(t *testing.T) {
 			}
 		}
 	}
-	if labels != 1 {
-		t.Fatalf("labels = %d, want 1", labels)
-	}
 	if connects != 1 {
 		t.Fatalf("connects = %d, want 1", connects)
+	}
+	if labels != 1 {
+		t.Fatalf("labels = %d, want 1", labels)
 	}
 }
 
@@ -329,22 +329,10 @@ func TestProjectTransactionPrefersNonCapacitorMaterializedLabelAnchor(t *testing
 		t.Fatal(err)
 	}
 	for _, operation := range tx.Operations {
-		if operation.Op != transactions.OpAddLabel {
-			continue
+		if operation.Op == transactions.OpAddLabel {
+			t.Fatalf("multi-endpoint protection net should not emit redundant materialized label: %#v", operation)
 		}
-		var payload transactions.AddLabelOperation
-		if err := decodeBlockOperation(operation, &payload); err != nil {
-			t.Fatal(err)
-		}
-		if payload.Text != "AMP_OUT_DC_BIASED" {
-			continue
-		}
-		if math.Abs(payload.At.XMM-24.92) > 0.001 || math.Abs(payload.At.YMM-20) > 0.001 {
-			t.Fatalf("label should move to resistor pin anchor, got %#v", payload.At)
-		}
-		return
 	}
-	t.Fatal("missing AMP_OUT_DC_BIASED label")
 }
 
 func TestProjectEndpointAnchorsApplySymbolRotation(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 )
 
 const DefaultGeneratedProjectName = "generated_blocks"
+const projectSchematicGridMM = 1.27
 
 func ProjectTransactionForBlockOutput(projectName string, output BlockOutput, overwrite bool) (transactions.Transaction, error) {
 	return ProjectTransactionForBlockOutputPtr(projectName, &output, overwrite)
@@ -73,6 +74,10 @@ func projectTransaction(projectName string, operations []transactions.Operation,
 		return transactions.Transaction{}, err
 	}
 	tx := transactions.Transaction{Name: projectName, Project: projectName, Operations: []transactions.Operation{create}}
+	operations, err = normalizeProjectSchematicSymbolPositions(operations)
+	if err != nil {
+		return transactions.Transaction{}, err
+	}
 	materializedConnects, err := materializedGeneratedConnects(operations, generatedRefs, pseudoRefs)
 	if err != nil {
 		return transactions.Transaction{}, err
@@ -86,6 +91,35 @@ func projectTransaction(projectName string, operations []transactions.Operation,
 	tx.Operations = append(tx.Operations, materializedConnects...)
 	tx.Operations = append(tx.Operations, write)
 	return tx, nil
+}
+
+func normalizeProjectSchematicSymbolPositions(operations []transactions.Operation) ([]transactions.Operation, error) {
+	normalized := append([]transactions.Operation(nil), operations...)
+	occupied := map[projectPointKey]struct{}{}
+	for index, operation := range normalized {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			return nil, fmt.Errorf("decode add_symbol operation %d: %w", index, err)
+		}
+		position := safeProjectSchematicSymbolPosition(payload.At, payload.Pins, payload.Rotation, occupied)
+		payload.At = position
+		updated, err := wrapOperation(transactions.OpAddSymbol, payload)
+		if err != nil {
+			return nil, fmt.Errorf("encode normalized add_symbol operation %d: %w", index, err)
+		}
+		normalized[index] = updated
+		for _, pin := range payload.Pins {
+			if strings.TrimSpace(pin.Number) == "" {
+				continue
+			}
+			xMM, yMM := rotatedProjectPinOffset(pin.XMM, pin.YMM, payload.Rotation)
+			occupied[projectPointKeyFromMM(position.XMM+xMM, position.YMM+yMM)] = struct{}{}
+		}
+	}
+	return normalized, nil
 }
 
 type projectEndpointKey struct {
@@ -227,8 +261,11 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 			sort.Slice(pseudoEndpoints, func(i, j int) bool {
 				return projectEndpointLess(pseudoEndpoints[i], pseudoEndpoints[j])
 			})
+			if projectGroupSuppressesMaterializedLabel(endpoints, anchors) {
+				continue
+			}
 			labelEndpoint := preferredProjectLabelEndpoint(endpoints, groupPseudoLabelEndpoints[root])
-			labelEndpoint = preferredProjectMaterializedLabelEndpoint(labelEndpoint, endpoints, len(pseudoEndpoints), anchors)
+			labelEndpoint = preferredProjectMaterializedLabelEndpoint(labelEndpoint, endpoints, len(pseudoEndpoints), len(endpoints), anchors)
 			label, err := materializedPortLabel(labelEndpoint, pseudoEndpoints[0], groupNetNames[root], len(pseudoEndpoints), anchors)
 			if err != nil {
 				return nil, err
@@ -304,14 +341,77 @@ func projectEndpointAnchors(operations []transactions.Operation) (map[projectEnd
 				continue
 			}
 			xMM, yMM := rotatedProjectPinOffset(pin.XMM, pin.YMM, payload.Rotation)
-			anchors[projectEndpointKey{ref: strings.TrimSpace(payload.Ref), pin: number}] = projectPoint{
+			anchor := projectPoint{
 				xMM:  payload.At.XMM + xMM,
 				yMM:  payload.At.YMM + yMM,
 				role: strings.TrimSpace(payload.Role),
 			}
+			anchors[projectEndpointKey{ref: strings.TrimSpace(payload.Ref), pin: number}] = anchor
 		}
 	}
 	return anchors, nil
+}
+
+type projectPointKey struct {
+	X int64
+	Y int64
+}
+
+func projectPointKeyFromMM(xMM float64, yMM float64) projectPointKey {
+	const scale = 1_000_000
+	return projectPointKey{X: int64(math.Round(xMM * scale)), Y: int64(math.Round(yMM * scale))}
+}
+
+func safeProjectSchematicSymbolPosition(requested transactions.Point, pins []transactions.PinSpec, rotationDeg float64, occupied map[projectPointKey]struct{}) transactions.Point {
+	position := transactions.Point{XMM: snapProjectSchematicMM(requested.XMM), YMM: snapProjectSchematicMM(requested.YMM)}
+	if !projectSymbolPinAnchorsCollide(position, pins, rotationDeg, occupied) {
+		return position
+	}
+	for radius := 1; radius <= 8; radius++ {
+		for _, offset := range projectGridPerimeterOffsets(radius) {
+			candidate := transactions.Point{XMM: position.XMM + offset.XMM, YMM: position.YMM + offset.YMM}
+			if !projectSymbolPinAnchorsCollide(candidate, pins, rotationDeg, occupied) {
+				return candidate
+			}
+		}
+	}
+	return position
+}
+
+func projectSymbolPinAnchorsCollide(position transactions.Point, pins []transactions.PinSpec, rotationDeg float64, occupied map[projectPointKey]struct{}) bool {
+	if len(pins) == 0 || len(occupied) == 0 {
+		return false
+	}
+	for _, pin := range pins {
+		if strings.TrimSpace(pin.Number) == "" {
+			continue
+		}
+		xMM, yMM := rotatedProjectPinOffset(pin.XMM, pin.YMM, rotationDeg)
+		if _, ok := occupied[projectPointKeyFromMM(position.XMM+xMM, position.YMM+yMM)]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func projectGridPerimeterOffsets(radius int) []transactions.Point {
+	if radius <= 0 {
+		return nil
+	}
+	offsets := make([]transactions.Point, 0, radius*8)
+	for dx := -radius; dx <= radius; dx++ {
+		offsets = append(offsets, transactions.Point{XMM: float64(dx) * projectSchematicGridMM, YMM: float64(-radius) * projectSchematicGridMM})
+		offsets = append(offsets, transactions.Point{XMM: float64(dx) * projectSchematicGridMM, YMM: float64(radius) * projectSchematicGridMM})
+	}
+	for dy := -radius + 1; dy <= radius-1; dy++ {
+		offsets = append(offsets, transactions.Point{XMM: float64(-radius) * projectSchematicGridMM, YMM: float64(dy) * projectSchematicGridMM})
+		offsets = append(offsets, transactions.Point{XMM: float64(radius) * projectSchematicGridMM, YMM: float64(dy) * projectSchematicGridMM})
+	}
+	return offsets
+}
+
+func snapProjectSchematicMM(value float64) float64 {
+	return math.Round(value/projectSchematicGridMM) * projectSchematicGridMM
 }
 
 func rotatedProjectPinOffset(xMM float64, yMM float64, rotationDeg float64) (float64, float64) {
@@ -345,14 +445,14 @@ func materializedPortLabel(endpoint projectEndpointKey, pseudoEndpoint projectEn
 	})
 }
 
-func preferredProjectMaterializedLabelEndpoint(preferred projectEndpointKey, endpoints []projectEndpointKey, pseudoEndpointCount int, anchors map[projectEndpointKey]projectPoint) projectEndpointKey {
+func preferredProjectMaterializedLabelEndpoint(preferred projectEndpointKey, endpoints []projectEndpointKey, pseudoEndpointCount int, concreteEndpointCount int, anchors map[projectEndpointKey]projectPoint) projectEndpointKey {
 	anchor, ok := anchors[preferred]
-	if !ok || !projectEndpointSuppressesMaterializedLabel(anchor.role, pseudoEndpointCount) {
+	if !ok || !projectEndpointSuppressesMaterializedLabel(anchor.role, pseudoEndpointCount, concreteEndpointCount) {
 		return preferred
 	}
 	for _, endpoint := range endpoints {
 		candidate, ok := anchors[endpoint]
-		if !ok || projectEndpointIsExternalTerminal(candidate.role) || projectEndpointSuppressesMaterializedLabel(candidate.role, pseudoEndpointCount) {
+		if !ok || projectEndpointIsExternalTerminal(candidate.role) || projectEndpointSuppressesMaterializedLabel(candidate.role, pseudoEndpointCount, concreteEndpointCount) {
 			continue
 		}
 		return endpoint
@@ -360,8 +460,8 @@ func preferredProjectMaterializedLabelEndpoint(preferred projectEndpointKey, end
 	return preferred
 }
 
-func projectEndpointSuppressesMaterializedLabel(role string, pseudoEndpointCount int) bool {
-	if pseudoEndpointCount < 2 {
+func projectEndpointSuppressesMaterializedLabel(role string, pseudoEndpointCount int, concreteEndpointCount int) bool {
+	if pseudoEndpointCount < 2 && concreteEndpointCount < 2 {
 		return false
 	}
 	role = strings.ToLower(strings.TrimSpace(role))
@@ -371,6 +471,22 @@ func projectEndpointSuppressesMaterializedLabel(role string, pseudoEndpointCount
 	default:
 		return false
 	}
+}
+
+func projectGroupSuppressesMaterializedLabel(endpoints []projectEndpointKey, anchors map[projectEndpointKey]projectPoint) bool {
+	if len(endpoints) < 2 {
+		return false
+	}
+	for _, endpoint := range endpoints {
+		anchor, ok := anchors[endpoint]
+		if !ok {
+			continue
+		}
+		if projectEndpointSuppressesMaterializedLabel(anchor.role, 0, len(endpoints)) {
+			return true
+		}
+	}
+	return false
 }
 
 func projectEndpointIsExternalTerminal(role string) bool {

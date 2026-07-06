@@ -34,9 +34,8 @@ func TestHeadphoneOutputProtectionInstantiatesWithDefaults(t *testing.T) {
 	if countHeadphoneProtectionOperations(output.Operations, transactions.OpConnect) != 5 {
 		t.Fatalf("operations = %#v, want five default connects", output.Operations)
 	}
-	if !headphoneProtectionHasLabel(t, output.Operations, "hp_protect_load_ref") ||
-		!headphoneProtectionHasLabel(t, output.Operations, "hp_protect_load_ret") {
-		t.Fatalf("missing expected labels in operations: %#v", output.Operations)
+	if labels := headphoneProtectionLabels(t, output.Operations); len(labels) != 0 {
+		t.Fatalf("headphone output protection should not emit decorative standalone labels: %#v", labels)
 	}
 }
 
@@ -293,8 +292,9 @@ func countHeadphoneProtectionOperations(operations []transactions.Operation, kin
 	return count
 }
 
-func headphoneProtectionHasLabel(t *testing.T, operations []transactions.Operation, label string) bool {
+func headphoneProtectionLabels(t *testing.T, operations []transactions.Operation) []string {
 	t.Helper()
+	var labels []string
 	for _, operation := range operations {
 		if operation.Op != transactions.OpAddLabel {
 			continue
@@ -303,11 +303,9 @@ func headphoneProtectionHasLabel(t *testing.T, operations []transactions.Operati
 		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
 			t.Fatalf("unmarshal label: %v", err)
 		}
-		if payload.Text == label {
-			return true
-		}
+		labels = append(labels, payload.Text)
 	}
-	return false
+	return labels
 }
 
 func slicesContainString(values []string, want string) bool {

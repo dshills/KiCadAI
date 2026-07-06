@@ -211,15 +211,6 @@ func headphoneOutputProtectionOperations(definition BlockDefinition, request Blo
 	}
 	appendConnectOperation(&operations, &issues, request.InstanceID, "LOAD_RET", loadReturnRef, "1", loadRetNet)
 
-	for _, label := range []struct {
-		text string
-		at   transactions.Point
-	}{
-		{text: loadRefNet, at: transactions.Point{XMM: 30, YMM: 17}},
-		{text: loadRetNet, at: transactions.Point{XMM: 38, YMM: 10}},
-	} {
-		appendLabelOperation(&operations, &issues, label.text, label.at)
-	}
 	nets := []string{ampNet, hpNet, loadRetNet}
 	if includeSeries {
 		nets = append(nets, coupledNet)

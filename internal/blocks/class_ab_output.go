@@ -374,20 +374,6 @@ func instantiateClassABOutputStage(definition BlockDefinition, request BlockRequ
 	appendConnectOperation(&operations, &issues, refs["lower_bias_feed"], "2", refs["lower_output"], "3", veeNet)
 	appendConnectOperation(&operations, &issues, request.InstanceID, "LOAD_REF", refs["load_reference"], "1", loadRefNet)
 
-	for _, label := range []struct {
-		text string
-		at   transactions.Point
-	}{
-		{text: "DRIVER_OUT", at: transactions.Point{XMM: 8, YMM: 0}},
-		{text: "BIAS", at: transactions.Point{XMM: 24, YMM: 2.54}},
-		{text: "VCC", at: transactions.Point{XMM: 45, YMM: -20}},
-		{text: "AMP_OUT", at: transactions.Point{XMM: 62, YMM: 2.54}},
-		{text: "VEE", at: transactions.Point{XMM: 45, YMM: 30}},
-		{text: "LOAD_REF", at: transactions.Point{XMM: 72, YMM: 12}},
-	} {
-		appendLabelOperation(&operations, &issues, label.text, label.at)
-	}
-
 	output := dryRunBlockOutput(definition, request, operations, issues)
 	output.Instance.Params = params
 	output.Instance.Refs = []string{refs["bias_upper"], refs["bias_lower"], refs["upper_bias_feed"], refs["lower_bias_feed"], refs["upper_emitter_resistor"], refs["lower_emitter_resistor"], refs["upper_output"], refs["lower_output"], refs["load_reference"]}

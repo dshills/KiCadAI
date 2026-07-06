@@ -61,11 +61,8 @@ func TestClassABOutputStageInstantiation(t *testing.T) {
 	if got := classABOperationCount(output.Operations, transactions.OpConnect); got < 15 {
 		t.Fatalf("connect operations = %d, want at least 15", got)
 	}
-	labels := classABLabels(t, output.Operations)
-	for _, label := range []string{"DRIVER_OUT", "BIAS", "VCC", "AMP_OUT", "VEE", "LOAD_REF"} {
-		if !slices.Contains(labels, label) {
-			t.Fatalf("missing label %q in %#v", label, labels)
-		}
+	if labels := classABLabels(t, output.Operations); len(labels) != 0 {
+		t.Fatalf("class AB output stage should not emit decorative standalone labels: %#v", labels)
 	}
 }
 

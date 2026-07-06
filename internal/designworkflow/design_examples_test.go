@@ -636,6 +636,15 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 	if schematicElectrical.Status != StageStatusOK {
 		t.Fatalf("%s schematic electrical status = %q, want ok after alias cleanup:\n%s", metadata.ID, schematicElectrical.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
+	schematicPath := filepath.Join(outputDir, NormalizeProjectName(metadata.ID)+".kicad_sch")
+	schematicFile, err := schematic.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatalf("%s generated schematic is not readable for label/connectivity diagnostics: %v", metadata.ID, err)
+	}
+	connectivityReport := schematic.InspectGeneratedConnectivity(schematicFile)
+	if len(connectivityReport.FloatingLabels) != 0 || len(connectivityReport.OffGridObjects) != 0 || len(connectivityReport.DanglingWireEndpoints) != 0 {
+		t.Fatalf("%s generated schematic label/connectivity diagnostics are not clean:\n%s", metadata.ID, formatGeneratedConnectivityDiagnostics(connectivityReport))
+	}
 	for _, labels := range []string{
 		"headphones_SIG,output_amp_out",
 		"output_lower_emitter,output_upper_emitter",
