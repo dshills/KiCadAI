@@ -93,16 +93,12 @@ multi-endpoint route-tree evidence:
 These fields are intended for AI repair loops and fixture promotion decisions.
 They prove endpoint grouping, target resolution, branch planning, contact proof,
 and graph-level completion status. They do not yet mean KiCad DRC-clean routing
-for richer generated boards; the I2C breakout fixture is still an
-`expected_fail` case only because required KiCad ERC evidence reports generated
-schematic pin/endpoint connectivity findings. Every VCC/GND/SDA/SCL route
-group is graph-complete, generated label stubs are grid-safe, and
-project-write, writer-correctness, and structural validation evidence is
-present. The suite keeps mocked KiCad evidence in logic-only promotion tests:
-those tests exercise readiness decision code, not production readiness. The
-KiCad-backed integration lane still requires real `kicad-cli` ERC evidence and
-clearing the KiCad ERC connectivity findings before candidate promotion; pass
-promotion also requires clean real KiCad DRC evidence.
+for richer generated boards; the I2C breakout fixture is now a structural
+`candidate`, with every VCC/GND/SDA/SCL route group graph-complete, generated
+label stubs grid-safe, and project-write, writer-correctness, and structural
+validation evidence present. The suite keeps mocked KiCad evidence in logic-only
+promotion tests: those tests exercise readiness decision code, not production
+pass readiness. Pass promotion still requires clean real KiCad DRC evidence.
 
 The routing stage also exposes `inter_block_route_trees` when generated
 inter-block nets are managed by route-tree execution instead of the fallback
@@ -144,11 +140,8 @@ in route-tree contact proof without inflating inter-block emitted-segment
 counts.
 The I2C fixture currently emits all 8 route-tree branches, proves all 12
 required endpoint contacts, and reports four graph-complete route-tree nets. It
-remains an `expected_fail` fixture only because required KiCad ERC evidence
-still reports generated schematic pin/endpoint connectivity findings. Generated
-label stubs are grid-safe, and project-write, writer-correctness, and structural
-validation evidence are present; pass requires clean KiCad ERC/DRC reports from
-a configured `kicad-cli`.
+is now a checked-in structural `candidate`; pass requires clean KiCad ERC/DRC
+reports from a stable configured `kicad-cli`.
 Fixed-net skip notices and missing-net-class warnings are reported separately
 and do not inflate
 `route_tree_repair.branch_failures`.

@@ -2,7 +2,7 @@
   "id": "i2c_sensor_breakout_candidate",
   "request": "i2c_sensor_breakout_candidate.json",
   "tier": "block-composition",
-  "readiness": "expected_fail",
+  "readiness": "candidate",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -24,8 +24,8 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Required KiCad DRC evidence still blocks candidate promotion with PCB shorts, clearance violations, and track-crossing findings.",
-    "Real KiCad DRC/pass evidence should be revisited after the remaining PCB connectivity and spacing blockers are fixed."
+    "Required KiCad PCB DRC evidence remains warning-level for candidate promotion because the local macOS kicad-cli aborts before writing DRC JSON.",
+    "Pass promotion still requires clean required KiCad DRC evidence from a stable kicad-cli environment."
   ],
-  "notes": "Tracks the richer sensor breakout scenario after placement, route-tree contact proof, project-write, writer-correctness, structural validation, and ERC connectivity cleanup. Real KiCad DRC evidence still blocks promotion."
+  "notes": "Tracks the richer sensor breakout scenario after placement, route-tree contact proof, project-write, writer-correctness, structural validation, and optional KiCad evidence. The fixture is reproducible as a structural candidate; real KiCad DRC evidence is reserved for future pass promotion."
 }

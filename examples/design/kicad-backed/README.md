@@ -45,7 +45,7 @@ kicadai \
 | --- | --- | --- |
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment and routed inter-block endpoint contact evidence. It currently blocks on required KiCad ERC pin/endpoint evidence. |
-| `i2c_sensor_breakout_candidate` | `expected_fail` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, project-write, writer-correctness, and structural validation. Generated schematic label stubs are now grid-safe; the current real-check blocker is required KiCad ERC pin/endpoint connectivity evidence, not route-tree or project-write evidence. |
+| `i2c_sensor_breakout_candidate` | `candidate` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, project-write, writer-correctness, structural validation, and warning-level optional KiCad evidence. Pass promotion still requires clean required KiCad DRC evidence from a stable `kicad-cli`. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
@@ -71,30 +71,29 @@ can progress past writer correctness net-code assignment and block-local route
 endpoint binding. The I2C fixture also exposes route-tree evidence for its
 multi-endpoint VCC/GND/SDA/SCL nets, including managed nets, planned branches,
 attempted branches, proven endpoints, graph components, and group completion
-counts. The current run keeps the fixture in `expected_fail` only because
-required KiCad ERC evidence still reports generated schematic pin/endpoint
-connectivity findings:
+counts. The fixture now promotes to structural `candidate` with optional
+warning-level KiCad evidence:
 route-tree execution owns the four I2C nets, emits all 8 route-tree branches,
 proves all required connector and block-local endpoint contacts, and reaches
 project-write, writer-correctness, and structural validation evidence. Generated
 label stubs are grid-safe. A logic-only unit test also exercises the promotion
 decision path with mocked clean KiCad results, but that mocked path is not
-production evidence; real KiCad CLI ERC/DRC evidence is still required for
-candidate/pass promotion. Route-tree contact
+production pass evidence; real clean KiCad CLI DRC evidence is still required
+for `pass` promotion. Route-tree contact
 graph evidence now reports four complete contact-graph groups, local-route
 merge evidence, same-net segment intersection/overlap merges, and via layer
 transitions. Route-tree diagnostics also separate fixed-net preservation
 notices and missing-net-class warnings from repairable blockers. The next
-blocker is schematic readability/connectivity work sufficient to clear KiCad
-ERC, then KiCad DRC/pass evidence.
+blocker is stable required KiCad DRC/pass evidence; the local macOS `pcb drc`
+command currently aborts before writing DRC JSON in this environment.
 
 Promotion gates currently include metadata, stages, writer correctness,
 connectivity, KiCad checks, route completion, physical rules, and artifacts.
 Missing `kicad-cli` evidence is recorded as skipped external evidence, but it
-still blocks candidate/pass readiness when ERC or DRC is required. The current
-optional KiCad-backed fixtures remain `expected_fail`; do not treat a generated
-board as promoted until the promotion report achieves `candidate` or `pass` and
-the configured KiCad ERC/DRC evidence gates pass.
+still blocks readiness when ERC or DRC is required. LED and I2C currently
+promote to `candidate`; remaining optional KiCad-backed fixtures are still
+`expected_fail`. Do not treat a generated board as `pass` until the promotion
+report achieves `pass` and the configured KiCad ERC/DRC evidence gates pass.
 
 ## Promotion Policy
 

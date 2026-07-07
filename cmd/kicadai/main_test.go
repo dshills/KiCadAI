@@ -512,6 +512,24 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("intent create failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
 	}
+	var payload struct {
+		Data *struct {
+			AIStatus *aiLaneStatus `json:"ai_status"`
+		} `json:"data"`
+		Artifacts []reports.Artifact `json:"artifacts"`
+	}
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &payload); decodeErr != nil {
+		t.Fatalf("decode result: %v\nstdout=%s", decodeErr, stdout.String())
+	}
+	if payload.Data == nil || payload.Data.AIStatus == nil {
+		t.Fatalf("missing ai_status: %s", stdout.String())
+	}
+	if payload.Data.AIStatus.Status != aiLaneStatusCandidate || payload.Data.AIStatus.Stage != string(designworkflow.StageValidation) {
+		t.Fatalf("ai_status = %#v", payload.Data.AIStatus)
+	}
+	if !hasCLIArtifact(payload.Artifacts, reports.ArtifactPromotionReport, designworkflow.PromotionReportArtifactPath) {
+		t.Fatalf("promotion artifact missing from CLI result: %#v", payload.Artifacts)
+	}
 	for _, name := range []string{"intent-source.txt", "intent-draft.json", "intent-extraction.json", "intent-clarifications.json", "intent-plan.json", "generated-request.json", "design-request.json", "workflow-result.json", "design-rationale.json", "validation-summary.json", "retry-state.json", "manifest.json"} {
 		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
 			t.Fatalf("missing artifact %s: %v", name, err)
@@ -526,6 +544,11 @@ func TestRunIntentCreateFromTextPersistsDraftArtifacts(t *testing.T) {
 	}
 	if generatedManifest.AILane == nil || generatedManifest.AILane.Status == "" || generatedManifest.AILane.RetryStatePath != ".kicadai/retry-state.json" {
 		t.Fatalf("manifest AI lane summary = %#v", generatedManifest.AILane)
+	}
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "design-promotion.json"), &promotion)
+	if promotion.AchievedReadiness != designworkflow.PromotionReadinessCandidate || !promotion.MatchesExpectation {
+		t.Fatalf("promotion report = %#v", promotion)
 	}
 }
 
