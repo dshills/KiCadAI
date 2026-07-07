@@ -295,7 +295,13 @@ func (builder *planBuilder) mapPower() {
 		builder.addRequirement(RequirementRecord{ID: reqID, Path: fmt.Sprintf("power.inputs[%d]", index), Type: "power_input", Strength: input.Strength, Value: input.Kind, Implementation: input.Kind})
 		switch input.Kind {
 		case "usb_c":
-			id := builder.addBlock(reqID, "usb_power", "usb_c_power", map[string]any{}, "USB-C power input satisfies power input requirement")
+			id := builder.addBlock(reqID, "usb_power", "usb_c_power", map[string]any{
+				"include_bulk_capacitor": false,
+				"include_fuse":           false,
+				"include_power_led":      false,
+				"include_tvs":            false,
+				"shield_policy":          "floating",
+			}, "USB-C power input satisfies power input requirement")
 			builder.usbPowerIDs = appendIfNotEmpty(builder.usbPowerIDs, id)
 			if id != "" {
 				builder.instanceVoltages[id] = input.Voltage

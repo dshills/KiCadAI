@@ -271,7 +271,11 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		if _, ok := pins[number]; ok {
 			return SymbolHandle{}, fmt.Errorf("duplicate pin %s on %s", number, reference)
 		}
-		anchor := schematicSymbolPinAnchor(position, pin.Offset)
+		anchorOffset := pin.Offset
+		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
+			anchorOffset = offset
+		}
+		anchor := schematicSymbolPinAnchor(position, anchorOffset)
 		pins[number] = anchor
 		builder.schematicPinAnchors[anchor] = struct{}{}
 		pinOrder = append(pinOrder, number)

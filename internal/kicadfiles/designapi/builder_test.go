@@ -679,6 +679,9 @@ func TestBuilderConn01x04Pin4UsesKiCadERCConnectionAnchor(t *testing.T) {
 	}
 
 	design := builder.Design()
+	if got := design.Schematic.Symbols[0].PinAnchors[3]; got != (kicadfiles.Point{X: kicadfiles.MM(86.36), Y: kicadfiles.MM(5.08)}) {
+		t.Fatalf("Conn_01x04 pin 4 metadata anchor = %v, want KiCad ERC connection anchor", got)
+	}
 	wantStart := kicadfiles.Point{X: kicadfiles.MM(86.36), Y: kicadfiles.MM(5.08)}
 	wantEnd := kicadfiles.Point{X: kicadfiles.MM(85.09), Y: kicadfiles.MM(5.08)}
 	for _, wire := range design.Schematic.Wires {

@@ -54,6 +54,28 @@ func TestUSBCPowerSymbolPinsFollowPowerOnlyRoleMap(t *testing.T) {
 	}
 }
 
+func TestUSBCPowerSymbolPinsMatchKiCadERCConnectionGeometry(t *testing.T) {
+	pins := usbCSymbolPins(usbCPowerPins)
+	got := map[string]transactions.Point{}
+	for _, pin := range pins {
+		got[pin.Number] = transactions.Point{XMM: pin.XMM, YMM: pin.YMM}
+	}
+	want := map[string]transactions.Point{
+		"A5":  {XMM: 15.24, YMM: 5.08},
+		"A9":  {XMM: 15.24, YMM: -7.62},
+		"A12": {XMM: 0, YMM: 17.78},
+		"B5":  {XMM: 15.24, YMM: 7.62},
+		"B9":  {XMM: 15.24, YMM: -7.62},
+		"B12": {XMM: 0, YMM: 17.78},
+		"SH":  {XMM: -7.62, YMM: 17.78},
+	}
+	for pin, position := range want {
+		if got[pin] != position {
+			t.Fatalf("pin %s = %#v, want %#v", pin, got[pin], position)
+		}
+	}
+}
+
 func TestUSBCPowerCCPullDownsArePresent(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{BlockID: "usb_c_power", InstanceID: "usb"})
@@ -139,15 +161,19 @@ func TestUSBCPowerFloatingShieldIsNotExported(t *testing.T) {
 	if reports.HasBlockingIssue(issues) {
 		t.Fatalf("issues = %#v", issues)
 	}
-	if warningCount(issues) != 2 {
-		t.Fatalf("expected no-connect and floating shield warnings, got %#v", issues)
+	if warningCount(issues) != 1 {
+		t.Fatalf("expected only data-mode no-connect warning, got %#v", issues)
 	}
 	data, err := json.Marshal(output.Operations)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if strings.Contains(string(data), `"pin":"SH"`) || strings.Contains(string(data), `"SHIELD"`) {
-		t.Fatalf("floating shield should not be connected: %s", string(data))
+	text := string(data)
+	if !strings.Contains(text, `"op":"add_no_connect"`) || !strings.Contains(text, `"pin":"SH"`) {
+		t.Fatalf("floating shield should emit SH no-connect: %s", text)
+	}
+	if strings.Contains(text, `"SHIELD"`) {
+		t.Fatalf("floating shield should not export SHIELD net: %s", text)
 	}
 }
 

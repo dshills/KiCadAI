@@ -125,6 +125,44 @@ func TestReadSchematicRecoversRotatedPinAnchors(t *testing.T) {
 	}
 }
 
+func TestReadSchematicRecoversConnectionOverridePinAnchors(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.3")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (symbol`,
+		`    (lib_id "Connector:USB_C_Receptacle_PowerOnly_6P")`,
+		`    (at 0 0 0)`,
+		`    (uuid "33333333-3333-5333-8333-333333333333")`,
+		`    (property "Reference" "J1")`,
+		`    (property "Value" "USB-C")`,
+		`    (pin "A5" (uuid "44444444-4444-5444-8444-444444444444"))`,
+		`    (pin "SH" (uuid "55555555-5555-5555-8555-555555555555"))`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 {
+		t.Fatalf("symbols = %#v", read.Symbols)
+	}
+	anchors := read.Symbols[0].PinAnchors
+	if len(anchors) != 2 {
+		t.Fatalf("pin anchors = %#v, want two recovered anchors", anchors)
+	}
+	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(5.08)}) {
+		t.Fatalf("A5 anchor = %#v, want connection override anchor", anchors[0])
+	}
+	if anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(17.78)}) {
+		t.Fatalf("SH anchor = %#v, want connection override anchor", anchors[1])
+	}
+}
+
 func TestReadSchematicReadsEmbeddedLibSymbols(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,

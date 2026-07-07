@@ -442,6 +442,9 @@ func TestPlanConnectsUSBCPoweredActiveHighLEDInput(t *testing.T) {
 	if hasWorkflowBlock(*plan.GeneratedRequest, "connector_breakout") {
 		t.Fatalf("powered-only LED should not require a connector block: %#v", plan.GeneratedRequest.Blocks)
 	}
+	if params := workflowBlockParams(*plan.GeneratedRequest, "usb_power"); params["include_tvs"] != false || params["include_bulk_capacitor"] != false || params["include_power_led"] != false || params["include_fuse"] != false || params["shield_policy"] != "floating" {
+		t.Fatalf("USB-C LED fixture should use minimal USB-C power params: %#v", params)
+	}
 	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
 		t.Fatalf("generated request validation issues = %#v", issues)
 	}
@@ -1207,6 +1210,15 @@ func hasWorkflowInstance(request designworkflow.Request, instanceID string) bool
 		}
 	}
 	return false
+}
+
+func workflowBlockParams(request designworkflow.Request, instanceID string) map[string]any {
+	for _, block := range request.Blocks {
+		if block.ID == instanceID {
+			return block.Params
+		}
+	}
+	return nil
 }
 
 func workflowBlockParam(request designworkflow.Request, blockID string, key string) string {

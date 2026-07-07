@@ -12,10 +12,14 @@ func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 	tests := []string{
 		"Connector_Generic:Conn_01x02",
 		"Connector_Generic:Conn_01x03",
+		"Connector:USB_C_Receptacle_PowerOnly_6P",
 		"Device:R",
 		"Device:C",
 		"Device:D",
+		"Device:D_TVS",
+		"Device:Fuse",
 		"Device:LED",
+		"kicadai:USB_CC_R",
 		"power:GND",
 		"power:VCC",
 		"power:+3.3V",
@@ -91,9 +95,25 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || connector4Pin4Connection.X != kicadfiles.MM(-5.08) || connector4Pin4Connection.Y != kicadfiles.MM(5.08) {
 		t.Fatalf("unexpected 4-pin connector connection override: %#v ok=%v", connector4Pin4Connection, ok)
 	}
+	usbA5Connection, ok := EmbeddedSymbolConnectionPinOffset("Connector:USB_C_Receptacle_PowerOnly_6P", "A5")
+	if !ok || usbA5Connection.X != kicadfiles.MM(15.24) || usbA5Connection.Y != kicadfiles.MM(5.08) {
+		t.Fatalf("unexpected USB-C A5 connection override: %#v ok=%v", usbA5Connection, ok)
+	}
 	connector3Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x03")
 	if !ok || len(connector3Pins) != 3 || connector3Pins[0].Offset.Y != kicadfiles.MM(2.54) || connector3Pins[2].Number != "3" || connector3Pins[2].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected 3-pin connector offsets: %#v ok=%v", connector3Pins, ok)
+	}
+	usbPins, ok := EmbeddedSymbolPinOffsets("Connector:USB_C_Receptacle_PowerOnly_6P")
+	if !ok || len(usbPins) != 7 || usbPins[0].Number != "A5" || usbPins[0].Offset.Y != kicadfiles.MM(-5.08) || usbPins[6].Number != "SH" || usbPins[6].Offset.X != kicadfiles.MM(-7.62) {
+		t.Fatalf("unexpected USB-C power-only offsets: %#v ok=%v", usbPins, ok)
+	}
+	fusePins, ok := EmbeddedSymbolPinOffsets("Device:Fuse")
+	if !ok || len(fusePins) != 2 || fusePins[0].Offset.Y != kicadfiles.MM(3.81) || fusePins[1].Offset.Y != kicadfiles.MM(-3.81) {
+		t.Fatalf("unexpected fuse offsets: %#v ok=%v", fusePins, ok)
+	}
+	tvsPins, ok := EmbeddedSymbolPinOffsets("Device:D_TVS")
+	if !ok || len(tvsPins) != 2 || tvsPins[0].Offset.X != kicadfiles.MM(-3.81) || tvsPins[1].Offset.X != kicadfiles.MM(3.81) {
+		t.Fatalf("unexpected TVS offsets: %#v ok=%v", tvsPins, ok)
 	}
 	i2cPins, ok := EmbeddedSymbolPinOffsets("Sensor:Generic_I2C")
 	if !ok || len(i2cPins) != 5 || i2cPins[0].Number != "1" || i2cPins[0].Offset.Y != kicadfiles.MM(-3.81) || i2cPins[4].Number != "5" || i2cPins[4].Offset.X != kicadfiles.MM(2.54) {

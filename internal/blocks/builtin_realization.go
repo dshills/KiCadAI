@@ -375,8 +375,8 @@ func defaultMCUAREFPin() string {
 func usbCPowerComponents() []BlockComponent {
 	return []BlockComponent{
 		{Role: "usb_c_receptacle", RefPrefix: "J", Value: "USB-C Power", SymbolID: defaultUSBCSymbol, FootprintID: defaultUSBCFootprint, Pins: usbCSymbolPins(usbCPowerPins)},
-		{Role: "cc1_rd", RefPrefix: "R", Value: "5.1k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
-		{Role: "cc2_rd", RefPrefix: "R", Value: "5.1k", SymbolID: "Device:R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: twoTerminalHorizontalPins()},
+		{Role: "cc1_rd", RefPrefix: "R", Value: "5.1k", SymbolID: "kicadai:USB_CC_R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: usbVerticalTwoTerminalPins()},
+		{Role: "cc2_rd", RefPrefix: "R", Value: "5.1k", SymbolID: "kicadai:USB_CC_R", FootprintID: "Resistor_SMD:R_0805_2012Metric", Pins: usbVerticalTwoTerminalPins()},
 		{Role: "vbus_fuse", RefPrefix: "F", Value: "Fuse", SymbolID: "Device:Fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Pins: twoTerminalHorizontalPins()},
 		{Role: "vbus_tvs", RefPrefix: "D", Value: "VBUS TVS", SymbolID: "Device:D_TVS", FootprintID: "Diode_SMD:D_SOD-323", Pins: twoTerminalHorizontalPins()},
 		{Role: "bulk_capacitor", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: twoTerminalHorizontalPins()},

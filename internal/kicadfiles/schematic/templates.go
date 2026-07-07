@@ -36,10 +36,42 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
 	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", pins: connectorTemplatePins(3)},
 	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
-	"device:c":                     {bodyName: "C", pinType: "passive", pins: deviceCTemplatePins(), rawBody: rawDeviceCSymbol},
-	"device:c_polarized":           {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},
-	"device:d":                     {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:led":                   {bodyName: "LED", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceLEDSymbol},
+	"connector:usb_c_receptacle_poweronly_6p": {
+		bodyName: "USB_C_Receptacle_PowerOnly_6P",
+		pinType:  "passive",
+		pins: []TemplatePin{
+			{Number: "A5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-5.08)}},
+			{Number: "A9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}},
+			{Number: "A12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-17.78)}},
+			{Number: "B5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-7.62)}},
+			{Number: "B9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}},
+			{Number: "B12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-17.78)}},
+			{Number: "SH", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-17.78)}},
+		},
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"A5":  {X: kicadfiles.MM(15.24), Y: kicadfiles.MM(5.08)},
+			"A9":  {X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-7.62)},
+			"A12": {Y: kicadfiles.MM(17.78)},
+			"B5":  {X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)},
+			"B9":  {X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-7.62)},
+			"B12": {Y: kicadfiles.MM(17.78)},
+			"SH":  {X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(17.78)},
+		},
+	},
+	"device:c":           {bodyName: "C", pinType: "passive", pins: deviceCTemplatePins(), rawBody: rawDeviceCSymbol},
+	"device:c_polarized": {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},
+	"device:d":           {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:d_tvs":       {bodyName: "D_TVS", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}},
+	"device:fuse": {
+		bodyName: "Fuse",
+		pinType:  "passive",
+		pins:     deviceRTemplatePins(),
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"1": {Y: kicadfiles.MM(-3.81)},
+			"2": {Y: kicadfiles.MM(3.81)},
+		},
+	},
+	"device:led": {bodyName: "LED", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceLEDSymbol},
 	"device:q_npn_bec": {bodyName: "Q_NPN_BEC", pinType: "passive", pins: []TemplatePin{
 		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
 		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)}},
@@ -50,6 +82,12 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-2.54)}},
 		{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)}},
 	}},
+	"kicadai:usb_cc_r": {
+		bodyName:     "USB_CC_R",
+		pinType:      "passive",
+		localLibrary: true,
+		pins:         deviceRTemplatePins(),
+	},
 	"device:r":            {bodyName: "R", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}}}, rawBody: rawDeviceRSymbol},
 	"connector:testpoint": {bodyName: "TestPoint", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}},
 	"power:+3.3v":         powerTemplate("+3.3V", 5.08),
@@ -169,6 +207,13 @@ func twoPinTemplatePins() []TemplatePin {
 }
 
 func deviceCTemplatePins() []TemplatePin {
+	return []TemplatePin{
+		{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}},
+		{Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}},
+	}
+}
+
+func deviceRTemplatePins() []TemplatePin {
 	return []TemplatePin{
 		{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}},
 		{Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}},

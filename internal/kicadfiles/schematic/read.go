@@ -308,7 +308,7 @@ func templatePinsForReadSymbol(symbol SchematicSymbol) []TemplatePin {
 		return nil
 	}
 	if len(symbol.Pins) == 0 {
-		return templatePins
+		return readConnectionTemplatePins(symbol.LibraryID, templatePins)
 	}
 	allowed := map[string]struct{}{}
 	for _, pin := range symbol.Pins {
@@ -323,7 +323,21 @@ func templatePinsForReadSymbol(symbol SchematicSymbol) []TemplatePin {
 			filtered = append(filtered, pin)
 		}
 	}
-	return filtered
+	return readConnectionTemplatePins(symbol.LibraryID, filtered)
+}
+
+func readConnectionTemplatePins(libraryID string, pins []TemplatePin) []TemplatePin {
+	if len(pins) == 0 {
+		return nil
+	}
+	resolved := make([]TemplatePin, len(pins))
+	copy(resolved, pins)
+	for index := range resolved {
+		if offset, ok := EmbeddedSymbolConnectionPinOffset(libraryID, resolved[index].Number); ok {
+			resolved[index].Offset = offset
+		}
+	}
+	return resolved
 }
 
 func readYesNoChild(node sexpr.ParsedNode, head string) (bool, bool) {

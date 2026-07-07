@@ -27,13 +27,13 @@
       {
         "role": "cc1_rd",
         "ref_prefix": "R",
-        "symbol_id": "Device:R",
+        "symbol_id": "kicadai:USB_CC_R",
         "footprint_id": "Resistor_SMD:R_0805_2012Metric"
       },
       {
         "role": "cc2_rd",
         "ref_prefix": "R",
-        "symbol_id": "Device:R",
+        "symbol_id": "kicadai:USB_CC_R",
         "footprint_id": "Resistor_SMD:R_0805_2012Metric"
       },
       {
