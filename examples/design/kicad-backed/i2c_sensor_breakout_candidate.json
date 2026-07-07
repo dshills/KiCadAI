@@ -16,7 +16,8 @@
       "block_id": "i2c_sensor",
       "params": {
         "i2c_address": "0x48",
-        "include_pullups": true,
+        "include_pullups": false,
+        "include_decoupling": false,
         "supply_voltage": "3.3V",
         "pullup_value": "4k7"
       }

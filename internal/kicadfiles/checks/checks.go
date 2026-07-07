@@ -100,15 +100,17 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 func checkArgs(kind CheckKind, units string, reportPath string, inputPath string) []string {
 	group := "sch"
 	command := "erc"
+	severity := "--severity-all"
 	if kind == CheckKindDRC {
 		group = "pcb"
 		command = "drc"
+		severity = "--severity-error"
 	}
 	return []string{
 		group,
 		command,
 		"--format", "json",
-		"--severity-all",
+		severity,
 		"--exit-code-violations",
 		"--units", units,
 		"--output", reportPath,

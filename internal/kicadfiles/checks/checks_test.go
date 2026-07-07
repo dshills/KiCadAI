@@ -106,6 +106,23 @@ func TestRunDRCWithRunnerViolationReportIsNotToolError(t *testing.T) {
 	}
 }
 
+func TestCheckArgsUsesErrorSeverityForDRC(t *testing.T) {
+	args := checkArgs(CheckKindDRC, "mm", "/tmp/report.json", "/tmp/demo.kicad_pcb")
+	if !testArgsContain(args, "--severity-error") {
+		t.Fatalf("DRC args = %#v, want --severity-error", args)
+	}
+	if testArgsContain(args, "--severity-all") {
+		t.Fatalf("DRC args = %#v, did not expect --severity-all", args)
+	}
+}
+
+func TestCheckArgsUsesAllSeveritiesForERC(t *testing.T) {
+	args := checkArgs(CheckKindERC, "mm", "/tmp/report.json", "/tmp/demo.kicad_sch")
+	if !testArgsContain(args, "--severity-all") {
+		t.Fatalf("ERC args = %#v, want --severity-all", args)
+	}
+}
+
 func TestRunDRCProjectCopiesContext(t *testing.T) {
 	dir := t.TempDir()
 	writeCheckTestFile(t, filepath.Join(dir, "demo.kicad_pro"), "{}")
@@ -137,6 +154,15 @@ func TestRunDRCProjectCopiesContext(t *testing.T) {
 	if result.Status != CheckStatusPass || result.ProjectContext != ProjectContextFull {
 		t.Fatalf("unexpected result: %#v", result)
 	}
+}
+
+func testArgsContain(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 type fakeRunner struct {
