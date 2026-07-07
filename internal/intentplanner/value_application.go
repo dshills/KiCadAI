@@ -258,11 +258,11 @@ func (builder *planBuilder) applyLEDRatingOverrides(instanceID string) {
 	forward, forwardOK := parseVoltage(paramValue(params, "led_forward_voltage"))
 	currentMA, currentOK := ledCurrentMA(params)
 	if supplyOK && forwardOK && currentOK && currentMA > 0 && supply > forward {
-		powerW := (supply - forward) * (currentMA / 1000)
+		powerW := (supply - forward) * (currentMA / 1000.0)
 		builder.appendComponentRequiredRating(instanceID, "resistor", components.RequiredRating{Kind: "power", Value: formatScaledLiteral(powerW), Unit: "W"})
 	}
 	if currentOK && currentMA > 0 {
-		builder.appendComponentRequiredRating(instanceID, "led", components.RequiredRating{Kind: "current", Value: formatScaledLiteral(currentMA / 1000), Unit: "A"})
+		builder.appendComponentRequiredRating(instanceID, "led", components.RequiredRating{Kind: "forward_current", Value: formatScaledLiteral(currentMA), Unit: "mA"})
 	}
 }
 

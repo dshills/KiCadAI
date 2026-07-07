@@ -12,6 +12,7 @@
         {"kind": "forward_voltage", "typ": "2", "unit": "V"},
         {"kind": "forward_current", "typ": "10", "unit": "mA"}
       ],
+      "ratings": [{"kind": "forward_current", "max": "20", "unit": "mA"}],
       "symbols": [{
         "symbol_id": "Device:LED",
         "function_pins": [
@@ -45,6 +46,7 @@
         {"kind": "forward_voltage", "typ": "2", "unit": "V"},
         {"kind": "forward_current", "typ": "10", "unit": "mA"}
       ],
+      "ratings": [{"kind": "forward_current", "max": "20", "unit": "mA"}],
       "symbols": [{
         "symbol_id": "Device:LED",
         "function_pins": [

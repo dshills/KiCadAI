@@ -357,8 +357,8 @@ func TestPlanRecordsValueCalculationResults(t *testing.T) {
 	if !workflowRequiredRating(*plan.GeneratedRequest, "indicator.resistor", "power") {
 		t.Fatalf("missing LED resistor power rating override: %#v", plan.GeneratedRequest.Components.Overrides)
 	}
-	if !workflowRequiredRating(*plan.GeneratedRequest, "indicator.led", "current") {
-		t.Fatalf("missing LED current rating override: %#v", plan.GeneratedRequest.Components.Overrides)
+	if !workflowRequiredRating(*plan.GeneratedRequest, "indicator.led", "forward_current") {
+		t.Fatalf("missing LED forward_current rating override: %#v", plan.GeneratedRequest.Components.Overrides)
 	}
 	if got := synthesisCalculationResult(plan, "opamp_gain", "rf_over_rg"); got != "10.00" {
 		t.Fatalf("opamp gain result = %q; calculations=%#v", got, plan.Synthesis.Calculations)

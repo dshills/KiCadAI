@@ -649,6 +649,54 @@ func TestSelectVerifiedOpAmpBySupplyRange(t *testing.T) {
 	}
 }
 
+func TestSelectLEDForwardCurrentMatchesLegacyCurrentRating(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	record := cloneSelectionTestRecord(*requireCatalogRecord(t, catalog, "led.generic.0805"))
+	record.ID = "led.legacy.current.0805"
+	record.Ratings = []RatingConstraint{{Kind: "current", Max: "20", Unit: "mA"}}
+	catalog.Records = []ComponentRecord{record}
+
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "led", Package: "0805"},
+		Acceptance: AcceptanceStructural,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "forward_current",
+			Value: "0.005",
+			Unit:  "A",
+		}},
+	})
+	if !result.OK {
+		t.Fatalf("select legacy LED current rating failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "led.legacy.current.0805" {
+		t.Fatalf("unexpected LED selection: %+v", selection.Candidate)
+	}
+}
+
+func TestSelectLEDLegacyCurrentMatchesForwardCurrentRating(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	record := cloneSelectionTestRecord(*requireCatalogRecord(t, catalog, "led.generic.0805"))
+	record.ID = "led.forward.current.0805"
+	record.Ratings = []RatingConstraint{{Kind: "forward_current", Max: "20", Unit: "mA"}}
+	catalog.Records = []ComponentRecord{record}
+
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:      Query{Family: "led", Package: "0805"},
+		Acceptance: AcceptanceStructural,
+		RequiredRatings: []RequiredRating{{
+			Kind:  "current",
+			Value: "0.005",
+			Unit:  "A",
+		}},
+	})
+	if !result.OK {
+		t.Fatalf("select LED forward_current rating with legacy requirement failed: %+v", result.Issues)
+	}
+	if selection.Component.ID != "led.forward.current.0805" {
+		t.Fatalf("unexpected LED selection: %+v", selection.Candidate)
+	}
+}
+
 func cloneSelectionTestRecord(record ComponentRecord) ComponentRecord {
 	clone := record
 	clone.Values = append([]ValueConstraint(nil), record.Values...)

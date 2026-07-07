@@ -32,6 +32,7 @@ const (
 	reviewStatusProven        = "proven"
 	reviewStatusNotApplicable = "not_applicable"
 	reviewStatusUnknown       = "unknown"
+	componentFamilyLED        = "led"
 )
 
 var capacitorEvidenceReviewChecks = []struct {
@@ -841,8 +842,9 @@ func recordSatisfiesRating(record ComponentRecord, required RequiredRating) (boo
 		return false, true
 	}
 	found := false
+	ledFamily := isLEDFamily(record.Family)
 	for _, rating := range record.Ratings {
-		if rating.Kind != required.Kind {
+		if !ratingKindMatches(ledFamily, rating.Kind, required.Kind) {
 			continue
 		}
 		found = true
@@ -869,6 +871,21 @@ func recordSatisfiesRating(record ComponentRecord, required RequiredRating) (boo
 		}
 	}
 	return false, found
+}
+
+func ratingKindMatches(ledFamily bool, actual string, required string) bool {
+	if actual == required {
+		return true
+	}
+	if ledFamily {
+		return (actual == "current" && required == "forward_current") ||
+			(actual == "forward_current" && required == "current")
+	}
+	return false
+}
+
+func isLEDFamily(family string) bool {
+	return family == componentFamilyLED
 }
 
 func parseValueWithUnit(value string, unit string) (float64, bool) {
