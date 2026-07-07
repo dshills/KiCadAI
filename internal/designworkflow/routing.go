@@ -789,20 +789,26 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		return transactions.Operation{}, issues, summary, false
 	}
 	layer := firstNonEmpty(route.Layer, from.Layer, to.Layer, "F.Cu")
-	if !strings.EqualFold(layer, from.Layer) || !strings.EqualFold(layer, to.Layer) {
+	vias, viaOK := localRouteEndpointVias(layer, from, to)
+	if !viaOK {
 		issues = append(issues, localRouteBindingIssue(path+".layer", "local route layer "+layer+" does not match endpoint layers "+from.Layer+" and "+to.Layer, []string{from.Ref, to.Ref}))
 		summary.IssueCount = len(issues)
 		return transactions.Operation{}, issues, summary, false
+	}
+	points := []transactions.Point{
+		from.Point,
+		to.Point,
+	}
+	if routedPoints, ok := placedLocalRoutePoints(route.Points, from.Point, to.Point); ok {
+		points = routedPoints
 	}
 	operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
 		Op:      transactions.OpRoute,
 		NetName: netName,
 		Layer:   layer,
 		WidthMM: route.WidthMM,
-		Points: []transactions.Point{
-			from.Point,
-			to.Point,
-		},
+		Points:  points,
+		Vias:    vias,
 	})
 	if err != nil {
 		issues = append(issues, localRouteBindingIssue(path, err.Error(), []string{from.Ref, to.Ref}))
@@ -811,9 +817,125 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	}
 	summary.RoutesBound = 1
 	summary.EndpointContactsProven = 2
-	summary.EmittedTrackSegments = 1
+	summary.EmittedTrackSegments = max(1, len(points)-1)
 	summary.IssueCount = len(issues)
 	return operation, issues, summary, true
+}
+
+func localRouteEndpointVias(layer string, from PlacedPadEndpoint, to PlacedPadEndpoint) ([]transactions.RouteViaSpec, bool) {
+	routeLayer := canonicalCopperLayer(layer)
+	fromLayer := canonicalCopperLayer(from.Layer)
+	toLayer := canonicalCopperLayer(to.Layer)
+	if !localRouteCopperLayer(routeLayer) || !localRouteCopperLayer(fromLayer) || !localRouteCopperLayer(toLayer) {
+		return nil, false
+	}
+	var vias []transactions.RouteViaSpec
+	if !strings.EqualFold(routeLayer, fromLayer) {
+		vias = append(vias, localRouteEndpointVia(from.Point, fromLayer, routeLayer))
+	}
+	if !strings.EqualFold(routeLayer, toLayer) && !sameRoutePoint(from.Point, to.Point) {
+		vias = append(vias, localRouteEndpointVia(to.Point, toLayer, routeLayer))
+	}
+	return vias, true
+}
+
+func localRouteCopperLayer(layer string) bool {
+	return strings.HasSuffix(strings.ToUpper(strings.TrimSpace(layer)), ".CU")
+}
+
+const (
+	defaultLocalRouteViaDiameterMM = 0.6
+	defaultLocalRouteViaDrillMM    = 0.3
+)
+
+func localRouteEndpointVia(point transactions.Point, endpointLayer string, routeLayer string) transactions.RouteViaSpec {
+	return transactions.RouteViaSpec{
+		At:         point,
+		DiameterMM: defaultLocalRouteViaDiameterMM,
+		DrillMM:    defaultLocalRouteViaDrillMM,
+		Layers:     []string{canonicalCopperLayer(endpointLayer), canonicalCopperLayer(routeLayer)},
+	}
+}
+
+func sameRoutePoint(a transactions.Point, b transactions.Point) bool {
+	const toleranceMM = 0.001
+	return math.Hypot(a.XMM-b.XMM, a.YMM-b.YMM) <= toleranceMM
+}
+
+func placedLocalRoutePoints(points []transactions.Point, from transactions.Point, to transactions.Point) ([]transactions.Point, bool) {
+	if transformed, ok := transformedLocalRoutePoints(points, from, to); ok {
+		return compactRoutePoints(transformed), true
+	}
+	if len(points) < 3 {
+		return nil, false
+	}
+	if authoredRoutePointsNearPlacedEndpoints(points, from, to) {
+		routed := make([]transactions.Point, 0, len(points))
+		routed = append(routed, from)
+		routed = append(routed, points[1:len(points)-1]...)
+		routed = append(routed, to)
+		return compactRoutePoints(routed), true
+	}
+	return compactRoutePoints([]transactions.Point{from, to}), true
+}
+
+func authoredRoutePointsNearPlacedEndpoints(points []transactions.Point, from transactions.Point, to transactions.Point) bool {
+	if len(points) < 3 {
+		return false
+	}
+	minX := math.Min(from.XMM, to.XMM)
+	maxX := math.Max(from.XMM, to.XMM)
+	minY := math.Min(from.YMM, to.YMM)
+	maxY := math.Max(from.YMM, to.YMM)
+	const marginMM = 25.0
+	for _, point := range points[1 : len(points)-1] {
+		if point.XMM < minX-marginMM || point.XMM > maxX+marginMM || point.YMM < minY-marginMM || point.YMM > maxY+marginMM {
+			return false
+		}
+	}
+	return true
+}
+
+func compactRoutePoints(points []transactions.Point) []transactions.Point {
+	if len(points) < 2 {
+		return points
+	}
+	const toleranceMM = 0.001
+	compacted := make([]transactions.Point, 0, len(points))
+	for _, point := range points {
+		if len(compacted) == 0 {
+			compacted = append(compacted, point)
+			continue
+		}
+		previous := compacted[len(compacted)-1]
+		if math.Hypot(previous.XMM-point.XMM, previous.YMM-point.YMM) <= toleranceMM {
+			continue
+		}
+		compacted = append(compacted, point)
+	}
+	if len(compacted) < 2 {
+		compacted = append(compacted, points[len(points)-1])
+	}
+	return compacted
+}
+
+func transformedLocalRoutePoints(points []transactions.Point, from transactions.Point, to transactions.Point) ([]transactions.Point, bool) {
+	if len(points) < 2 {
+		return nil, false
+	}
+	const toleranceMM = 0.001
+	first := points[0]
+	last := points[len(points)-1]
+	fromDelta := transactions.Point{XMM: from.XMM - first.XMM, YMM: from.YMM - first.YMM}
+	toDelta := transactions.Point{XMM: to.XMM - last.XMM, YMM: to.YMM - last.YMM}
+	if math.Hypot(fromDelta.XMM-toDelta.XMM, fromDelta.YMM-toDelta.YMM) > toleranceMM {
+		return nil, false
+	}
+	transformed := make([]transactions.Point, len(points))
+	for index, point := range points {
+		transformed[index] = transactions.Point{XMM: point.XMM + fromDelta.XMM, YMM: point.YMM + fromDelta.YMM}
+	}
+	return transformed, true
 }
 
 func resolveLocalRouteEndpoint(fragment BlockFragment, path string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool, bool) {

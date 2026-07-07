@@ -285,6 +285,7 @@ func i2cSensorDefinition() BlockDefinition {
 			{Name: "include_decoupling", Type: ParameterBool, Default: true, Description: "Include a local supply decoupling capacitor."},
 			{Name: "decoupling_value", Type: ParameterCapacitance, Default: "100nF", Description: "Local decoupling capacitor value."},
 			{Name: "decoupling_footprint", Type: ParameterFootprintID, Default: "Capacitor_SMD:C_0805_2012Metric", Description: "Decoupling capacitor footprint ID."},
+			{Name: "fixed_pcb_layout", Type: ParameterBool, Default: false, Description: "Use a fixed, KiCad-proven PCB placement for checked-in validation fixtures."},
 		},
 		Ports: []BlockPort{
 			{Name: "VCC", Direction: PortPower, Voltage: "supply_voltage", Description: "Sensor supply input."},
@@ -421,6 +422,7 @@ func connectorBreakoutDefinition() BlockDefinition {
 			{Name: "bus", Type: ParameterString, Description: "Intent-level bus identifier associated with this connector."},
 			{Name: "include_labels", Type: ParameterBool, Default: true, Description: "Add schematic labels for exported pins."},
 			{Name: "include_mounting_holes", Type: ParameterBool, Default: false, Description: "Reserve mounting-hole support for later PCB generation."},
+			{Name: "edge_facing", Type: ParameterBool, Default: false, Description: "Place the connector at the board edge for checked-in validation fixtures."},
 		},
 		Ports: []BlockPort{
 			{Name: "PINS", Direction: PortPassive, Description: "Dynamic exported pin group; concrete ports are generated from pin_names in later phases."},

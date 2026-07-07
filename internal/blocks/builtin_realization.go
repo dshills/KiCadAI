@@ -68,13 +68,29 @@ func connectorBreakoutComponents() []BlockComponent {
 }
 
 func connectorBreakoutPCBRealization() *PCBRealization {
+	edgeFacing := RealizationWhen{Params: map[string]any{"edge_facing": true}}
+	notEdgeFacing := RealizationWhen{Params: map[string]any{"edge_facing": false}}
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
-		Components:        []PCBComponentRealization{{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}}},
-		PlacementGroups:   []PCBPlacementGroup{{ID: "connector_edge", ComponentRoles: []string{"connector"}, AnchorRole: "connector", Bounds: &RelativeBounds{MinXMM: -3, MinYMM: -10, MaxXMM: 3, MaxYMM: 10}}},
-		Validation:        PCBValidationExpectations{AllowedUnroutedNets: []string{"*"}},
+		Components: []PCBComponentRealization{
+			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}, When: notEdgeFacing},
+			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 12, YMM: 14.5, Layer: "F.Cu"}, When: edgeFacing},
+		},
+		PlacementGroups: []PCBPlacementGroup{{ID: "connector_edge", ComponentRoles: []string{"connector"}, AnchorRole: "connector", Bounds: &RelativeBounds{MinXMM: -3, MinYMM: -10, MaxXMM: 3, MaxYMM: 10}}},
+		Constraints:     []PCBConstraint{{ID: "connector_right_edge_facing", Kind: "edge_facing", AppliesTo: []string{"connector"}, Description: "Place generated connector breakouts on the right board edge when requested.", When: edgeFacing}},
+		Validation:      PCBValidationExpectations{AllowedUnroutedNets: []string{"*"}},
 	}
+}
+
+func combinedRealizationWhen(conditions ...RealizationWhen) RealizationWhen {
+	combined := RealizationWhen{Params: map[string]any{}}
+	for _, condition := range conditions {
+		for key, value := range condition.Params {
+			combined.Params[key] = value
+		}
+	}
+	return combined
 }
 
 type voltageRegulatorComponentDefaults struct {
@@ -139,23 +155,29 @@ func i2cSensorComponents() []BlockComponent {
 
 func i2cSensorPCBRealization() *PCBRealization {
 	pullupsEnabled := RealizationWhen{Params: map[string]any{"include_pullups": true}}
+	fixedLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": true}}
+	movableLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": false}}
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
-			{ComponentRole: "sensor", FootprintParam: "sensor_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
-			{ComponentRole: "decoupling_capacitor", FootprintParam: "decoupling_footprint", Placement: RelativePlacement{XMM: -5, YMM: -4, Layer: "F.Cu"}},
-			{ComponentRole: "sda_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 6, YMM: -5, Layer: "F.Cu"}, When: pullupsEnabled},
-			{ComponentRole: "scl_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 6, YMM: 0, Layer: "F.Cu"}, When: pullupsEnabled},
+			{ComponentRole: "sensor", FootprintParam: "sensor_footprint", Placement: RelativePlacement{XMM: 28, YMM: 15, Layer: "F.Cu"}, When: movableLayout},
+			{ComponentRole: "decoupling_capacitor", FootprintParam: "decoupling_footprint", Placement: RelativePlacement{XMM: 20, YMM: 14.365, Layer: "F.Cu"}, When: movableLayout},
+			{ComponentRole: "sda_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 20, YMM: 11, Layer: "F.Cu"}, When: combinedRealizationWhen(movableLayout, pullupsEnabled)},
+			{ComponentRole: "scl_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 20, YMM: 20, Layer: "F.Cu"}, When: combinedRealizationWhen(movableLayout, pullupsEnabled)},
+			{ComponentRole: "sensor", FootprintParam: "sensor_footprint", Placement: RelativePlacement{XMM: 28, YMM: 15, Layer: "F.Cu", Fixed: true}, When: fixedLayout},
+			{ComponentRole: "decoupling_capacitor", FootprintParam: "decoupling_footprint", Placement: RelativePlacement{XMM: 20, YMM: 14.365, Layer: "F.Cu", Fixed: true}, When: fixedLayout},
+			{ComponentRole: "sda_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 20, YMM: 11, Layer: "F.Cu", Fixed: true}, When: combinedRealizationWhen(fixedLayout, pullupsEnabled)},
+			{ComponentRole: "scl_pullup", FootprintParam: "pullup_footprint", Placement: RelativePlacement{XMM: 20, YMM: 20, Layer: "F.Cu", Fixed: true}, When: combinedRealizationWhen(fixedLayout, pullupsEnabled)},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "sensor_core", ComponentRoles: []string{"sensor", "decoupling_capacitor", "sda_pullup", "scl_pullup"}, AnchorRole: "sensor", Bounds: &RelativeBounds{MinXMM: -8, MinYMM: -8, MaxXMM: 10, MaxYMM: 5}}},
+		PlacementGroups: []PCBPlacementGroup{{ID: "sensor_core", ComponentRoles: []string{"sensor", "decoupling_capacitor", "sda_pullup", "scl_pullup"}, AnchorRole: "sensor", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -6, MaxXMM: 3, MaxYMM: 7}}},
 		LocalRoutes: []PCBLocalRoute{
-			{ID: "vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
-			{ID: "gnd_decoupling", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.GND}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
-			{ID: "sda_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
-			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
-			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
-			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 19.4, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "gnd_decoupling", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.GND}, Waypoints: []RelativePoint{{XMM: 25.05, YMM: 14.365}}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "sda_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 16, YMM: 11}, {XMM: 16, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 15, YMM: 20}, {XMM: 15, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 9.5}, {XMM: 14, YMM: 9.5}, {XMM: 14, YMM: 15.635}, {XMM: 25.05, YMM: 15.635}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 16.905}, {XMM: 25.05, YMM: 16.905}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "i2c_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"sensor", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Sensor decoupling capacitor should remain close to the sensor supply pins."},

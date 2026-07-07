@@ -162,7 +162,7 @@ func TestBuildInterBlockRouteTreesSelectsDuplicateTargetsDeterministically(t *te
 	}
 }
 
-func TestBuildInterBlockRouteTreesI2CSensorBreakoutProducesRouteTrees(t *testing.T) {
+func TestBuildInterBlockRouteTreesI2CSensorBreakoutPrunesLocallyRoutedPassives(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	_, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
@@ -186,8 +186,8 @@ func TestBuildInterBlockRouteTreesI2CSensorBreakoutProducesRouteTrees(t *testing
 		if tree.RootEndpointID == "" {
 			t.Fatalf("tree = %#v, want deterministic root", tree)
 		}
-		if tree.RequiredEndpointCount < 3 || tree.TargetCount != tree.RequiredEndpointCount {
-			t.Fatalf("tree = %#v, want full I2C multi-endpoint target coverage", tree)
+		if tree.RequiredEndpointCount != 2 || tree.TargetCount != tree.RequiredEndpointCount {
+			t.Fatalf("tree = %#v, want connector-to-sensor target coverage with locally routed passives pruned", tree)
 		}
 		if len(tree.Branches) != tree.RequiredEndpointCount-1 {
 			t.Fatalf("tree = %#v, want one branch per non-root endpoint", tree)

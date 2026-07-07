@@ -188,6 +188,9 @@ func TestRealizeBlockPCBOffsetsRouteWaypoints(t *testing.T) {
 	if len(route.Points) != 3 || route.Points[1].XMM != 12 || route.Points[1].YMM != 22 {
 		t.Fatalf("route points = %#v, want offset waypoint at 12,22", route.Points)
 	}
+	if len(result.LocalRoutes[0].Points) != 3 || result.LocalRoutes[0].Points[1].XMM != 12 || result.LocalRoutes[0].Points[1].YMM != 22 {
+		t.Fatalf("realized local route points = %#v, want offset waypoint at 12,22", result.LocalRoutes[0].Points)
+	}
 }
 
 func TestRealizeBlockPCBProducesEntryAnchorRoutes(t *testing.T) {

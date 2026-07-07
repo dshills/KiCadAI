@@ -87,7 +87,7 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		if definition.PCBRealization != nil {
 			fragment.PlacementGroups = clonePCBPlacementGroups(definition.PCBRealization.PlacementGroups)
 			fragment.Keepouts = clonePCBKeepouts(definition.PCBRealization.Keepouts)
-			fragment.Constraints = clonePCBConstraints(definition.PCBRealization.Constraints)
+			fragment.Constraints = activePCBConstraints(definition.PCBRealization.Constraints, output.Instance.Params)
 		}
 		fragments = append(fragments, fragment)
 	}
@@ -232,6 +232,17 @@ func clonePCBConstraints(constraints []blocks.PCBConstraint) []blocks.PCBConstra
 		out[i].AppliesTo = append([]string(nil), constraints[i].AppliesTo...)
 	}
 	return out
+}
+
+func activePCBConstraints(constraints []blocks.PCBConstraint, params map[string]any) []blocks.PCBConstraint {
+	var active []blocks.PCBConstraint
+	for _, constraint := range constraints {
+		if !blocks.RealizationWhenMatches(constraint.When, params) {
+			continue
+		}
+		active = append(active, constraint)
+	}
+	return clonePCBConstraints(active)
 }
 
 func fragmentColumnCount(request Request) int {

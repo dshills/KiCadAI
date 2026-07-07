@@ -16,10 +16,11 @@
       "block_id": "i2c_sensor",
       "params": {
         "i2c_address": "0x48",
-        "include_pullups": false,
-        "include_decoupling": false,
+        "include_pullups": true,
+        "include_decoupling": true,
         "supply_voltage": "3.3V",
-        "pullup_value": "4k7"
+        "pullup_value": "4k7",
+        "fixed_pcb_layout": true
       }
     },
     {
@@ -27,7 +28,8 @@
       "block_id": "connector_breakout",
       "params": {
         "pin_count": 4,
-        "pin_names": ["VCC", "GND", "SDA", "SCL"]
+        "pin_names": ["VCC", "GND", "SDA", "SCL"],
+        "edge_facing": true
       }
     }
   ],

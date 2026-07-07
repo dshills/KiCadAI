@@ -61,6 +61,7 @@ type RealizedPCBLocalRoute struct {
 	NetName  string                `json:"net_name"`
 	From     transactions.Endpoint `json:"from"`
 	To       transactions.Endpoint `json:"to"`
+	Points   []transactions.Point  `json:"points,omitempty"`
 	Layer    string                `json:"layer,omitempty"`
 	WidthMM  float64               `json:"width_mm,omitempty"`
 	LengthMM float64               `json:"length_mm,omitempty"`
@@ -262,6 +263,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			WidthMM: route.WidthMM,
 		}
 		points := routePoints(route, from.Point, to.Point, opts)
+		realizedRoute.Points = points
 		realizedRoute.LengthMM = routePointLength(points)
 		operation, err := wrapOperation(transactions.OpRoute, transactions.RouteOperation{
 			Op:      transactions.OpRoute,
@@ -309,6 +311,11 @@ func realizationWhenMatches(condition RealizationWhen, params map[string]any) bo
 		}
 	}
 	return true
+}
+
+// RealizationWhenMatches reports whether a conditional realization item is active.
+func RealizationWhenMatches(condition RealizationWhen, params map[string]any) bool {
+	return realizationWhenMatches(condition, params)
 }
 
 func parameterValuesEqual(got any, want any) bool {

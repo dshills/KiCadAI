@@ -7,6 +7,7 @@ import (
 
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 type InterBlockRouteStatus string
@@ -36,11 +37,11 @@ type InterBlockRouteEndpoint struct {
 }
 
 func BuildInterBlockRouteCandidates(fragments PCBFragmentResult, placed PlacementStageResult) ([]InterBlockRouteCandidate, []reports.Issue) {
-	refIndex := generatedComponentFragmentIndex(fragments)
+	componentRefIndex := generatedComponentFragmentIndex(fragments)
 	var candidates []InterBlockRouteCandidate
 	var issues []reports.Issue
 	for netIndex, net := range placed.Request.Nets {
-		candidate, netIssues, ok := interBlockCandidateFromPlacementNet(netIndex, net, refIndex)
+		candidate, netIssues, ok := interBlockCandidateFromPlacementNet(netIndex, net, componentRefIndex)
 		issues = append(issues, netIssues...)
 		if ok {
 			candidates = append(candidates, candidate)
@@ -49,7 +50,7 @@ func BuildInterBlockRouteCandidates(fragments PCBFragmentResult, placed Placemen
 	return candidates, issues
 }
 
-func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex map[string]BlockFragment) (InterBlockRouteCandidate, []reports.Issue, bool) {
+func interBlockCandidateFromPlacementNet(index int, net placement.Net, componentRefIndex map[string]BlockFragment) (InterBlockRouteCandidate, []reports.Issue, bool) {
 	instanceSet := map[string]struct{}{}
 	blockSet := map[string]struct{}{}
 	var endpoints []InterBlockRouteEndpoint
@@ -61,7 +62,7 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex 
 		if ref == "" || pin == "" {
 			continue
 		}
-		fragment, ok := refIndex[strings.ToUpper(ref)]
+		fragment, ok := componentRefIndex[strings.ToUpper(ref)]
 		if !ok {
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodeValidationFailed,
@@ -86,6 +87,7 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex 
 	if len(instanceSet) < 2 {
 		return InterBlockRouteCandidate{}, issues, false
 	}
+	endpoints = pruneLocalRouteInternalEndpoints(net.Name, endpoints, componentRefIndex)
 	return InterBlockRouteCandidate{
 		NetName:     net.Name,
 		Status:      InterBlockRouteCandidateRoutable,
@@ -94,6 +96,117 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, refIndex 
 		BlockIDs:    sortedStringSet(blockSet),
 		Unresolved:  unresolved,
 	}, issues, true
+}
+
+func pruneLocalRouteInternalEndpoints(netName string, endpoints []InterBlockRouteEndpoint, componentRefIndex map[string]BlockFragment) []InterBlockRouteEndpoint {
+	if len(endpoints) < 3 {
+		return endpoints
+	}
+	islandByEndpoint := map[string]string{}
+	seenInstances := map[string]struct{}{}
+	for _, fragment := range componentRefIndex {
+		if _, seen := seenInstances[fragment.InstanceID]; seen {
+			continue
+		}
+		seenInstances[fragment.InstanceID] = struct{}{}
+		for islandIndex, island := range localRouteEndpointIslands(netName, fragment) {
+			islandKey := fmt.Sprintf("%s:%d", fragment.InstanceID, islandIndex)
+			for _, endpointKey := range island {
+				islandByEndpoint[fragment.InstanceID+"|"+endpointKey] = islandKey
+			}
+		}
+	}
+	if len(islandByEndpoint) == 0 {
+		return endpoints
+	}
+	pruned := make([]InterBlockRouteEndpoint, 0, len(endpoints))
+	keptIslands := map[string]struct{}{}
+	for _, endpoint := range endpoints {
+		endpointKey := endpoint.InstanceID + "|" + normalizedRouteGroupEndpointKey(endpoint.Ref, endpoint.Pin)
+		islandKey, inIsland := islandByEndpoint[endpointKey]
+		if !inIsland {
+			pruned = append(pruned, endpoint)
+			continue
+		}
+		if _, kept := keptIslands[islandKey]; kept {
+			continue
+		}
+		pruned = append(pruned, endpoint)
+		keptIslands[islandKey] = struct{}{}
+	}
+	return pruned
+}
+
+func localRouteEndpointIslands(netName string, fragment BlockFragment) [][]string {
+	parent := map[string]string{}
+	find := func(key string) string {
+		if parent[key] == "" {
+			parent[key] = key
+			return key
+		}
+		root := key
+		for parent[root] != root {
+			root = parent[root]
+		}
+		for parent[key] != key {
+			next := parent[key]
+			parent[key] = root
+			key = next
+		}
+		return root
+	}
+	union := func(a string, b string) {
+		rootA := find(a)
+		rootB := find(b)
+		if rootA != rootB {
+			parent[rootB] = rootA
+		}
+	}
+	for _, route := range fragment.Realization.LocalRoutes {
+		if !strings.EqualFold(strings.TrimSpace(route.NetName), strings.TrimSpace(netName)) {
+			continue
+		}
+		fromKey := localRouteEndpointKey(route.From)
+		toKey := localRouteEndpointKey(route.To)
+		if fromKey == "" || toKey == "" {
+			continue
+		}
+		union(fromKey, toKey)
+	}
+	if len(parent) == 0 {
+		return nil
+	}
+	byRoot := map[string][]string{}
+	for key := range parent {
+		root := find(key)
+		byRoot[root] = append(byRoot[root], key)
+	}
+	roots := make([]string, 0, len(byRoot))
+	for root := range byRoot {
+		roots = append(roots, root)
+	}
+	slices.Sort(roots)
+	islands := make([][]string, 0, len(roots))
+	for _, root := range roots {
+		island := byRoot[root]
+		slices.Sort(island)
+		islands = append(islands, island)
+	}
+	return islands
+}
+
+func localRouteEndpointKey(endpoint transactions.Endpoint) string {
+	ref := strings.TrimSpace(endpoint.Ref)
+	pin := strings.TrimSpace(endpoint.Pin)
+	if ref == "" || pin == "" {
+		return ""
+	}
+	return normalizedRouteGroupEndpointKey(ref, pin)
+}
+
+func localRouteEndpointMatches(routeEndpoint transactions.Endpoint, endpoint InterBlockRouteEndpoint) bool {
+	return strings.EqualFold(strings.TrimSpace(routeEndpoint.Ref), strings.TrimSpace(endpoint.Ref)) &&
+		strings.TrimSpace(routeEndpoint.Pin) == strings.TrimSpace(endpoint.Pin)
 }
 
 func generatedComponentFragmentIndex(fragments PCBFragmentResult) map[string]BlockFragment {

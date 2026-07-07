@@ -24,8 +24,7 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "Optional I2C pull-up and local decoupling routing remains outside this first pass fixture; reintroduce those passives after verified local-route geometry avoids connector-route DRC collisions.",
     "KiCad DRC pass evidence is gathered with error-severity gating, so warning-only silkscreen/library-parity cleanup remains fabrication-readiness follow-up work."
   ],
-  "notes": "Promoted KiCad-backed I2C sensor breakout candidate with connector-to-sensor VCC, GND, SDA, and SCL routing. Required KiCad ERC passes with all severities, and required KiCad PCB DRC passes with error-severity gating and zero unconnected items."
+  "notes": "Promoted KiCad-backed I2C sensor breakout candidate with connector-to-sensor VCC, GND, SDA, and SCL routing plus verified local decoupling and I2C pull-up routing. Required KiCad ERC passes with all severities, and required KiCad PCB DRC passes with error-severity gating and zero unconnected items."
 }

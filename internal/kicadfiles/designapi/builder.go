@@ -111,6 +111,14 @@ type PadSpec struct {
 type RouteOptions struct {
 	Layer kicadfiles.BoardLayer
 	Width kicadfiles.IU
+	Vias  []RouteViaSpec
+}
+
+type RouteViaSpec struct {
+	At     kicadfiles.Point
+	Size   kicadfiles.IU
+	Drill  kicadfiles.IU
+	Layers []kicadfiles.BoardLayer
 }
 
 type RouteBoardOptions struct {
@@ -918,6 +926,29 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 			NetName: net.Name,
 		})
 		added++
+	}
+	for viaIndex, via := range options.Vias {
+		layers := append([]kicadfiles.BoardLayer(nil), via.Layers...)
+		if len(layers) == 0 {
+			layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
+		}
+		size := via.Size
+		if size == 0 {
+			size = kicadfiles.MM(0.6)
+		}
+		drill := via.Drill
+		if drill == 0 {
+			drill = kicadfiles.MM(0.3)
+		}
+		builder.design.PCB.Vias = append(builder.design.PCB.Vias, pcb.Via{
+			UUID:     builder.generator.New("root.pcb.route.via", netName, fmt.Sprintf("%d", viaIndex), formatPoint(via.At), formatLayers(layers)),
+			Position: via.At,
+			Size:     size,
+			Drill:    drill,
+			NetCode:  net.Code,
+			NetName:  net.Name,
+			Layers:   layers,
+		})
 	}
 	builder.syncPCBNets()
 	return RouteHandle{NetName: net.Name, Count: added}, nil

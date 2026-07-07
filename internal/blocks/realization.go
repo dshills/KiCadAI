@@ -172,14 +172,15 @@ type PCBKeepout struct {
 }
 
 type PCBConstraint struct {
-	ID          string   `json:"id"`
-	Kind        string   `json:"kind"`
-	NetTemplate string   `json:"net_template,omitempty"`
-	AppliesTo   []string `json:"applies_to,omitempty"`
-	MinWidthMM  float64  `json:"min_width_mm,omitempty"`
-	ClearanceMM float64  `json:"clearance_mm,omitempty"`
-	MaxLengthMM float64  `json:"max_length_mm,omitempty"`
-	Description string   `json:"description,omitempty"`
+	ID          string          `json:"id"`
+	Kind        string          `json:"kind"`
+	NetTemplate string          `json:"net_template,omitempty"`
+	AppliesTo   []string        `json:"applies_to,omitempty"`
+	MinWidthMM  float64         `json:"min_width_mm,omitempty"`
+	ClearanceMM float64         `json:"clearance_mm,omitempty"`
+	MaxLengthMM float64         `json:"max_length_mm,omitempty"`
+	Description string          `json:"description,omitempty"`
+	When        RealizationWhen `json:"when,omitempty"`
 }
 
 type PCBValidationExpectations struct {
@@ -465,6 +466,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			!finite(constraint.MinWidthMM) || !finite(constraint.ClearanceMM) || !finite(constraint.MaxLengthMM) {
 			issues = append(issues, blockIssue(constraintPath, "constraint dimensions must be finite and non-negative"))
 		}
+		issues = append(issues, validateRealizationWhen(constraintPath+".when", constraint.When, parameters)...)
 	}
 	return issues
 }
@@ -793,6 +795,7 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.Constraints = append([]PCBConstraint(nil), realization.Constraints...)
 	for i := range clone.Constraints {
 		clone.Constraints[i].AppliesTo = append([]string(nil), realization.Constraints[i].AppliesTo...)
+		clone.Constraints[i].When = cloneRealizationWhen(realization.Constraints[i].When)
 	}
 	clone.Validation.RequiredNets = append([]string(nil), realization.Validation.RequiredNets...)
 	clone.Validation.RequiredRoutes = append([]string(nil), realization.Validation.RequiredRoutes...)

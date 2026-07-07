@@ -655,7 +655,20 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		for _, p := range payload.Points {
 			points = append(points, point(p.XMM, p.YMM))
 		}
-		_, err := builder.Route(payload.NetName, points, designapi.RouteOptions{Layer: boardLayer(payload.Layer), Width: kicadfiles.MM(payload.WidthMM)})
+		vias := make([]designapi.RouteViaSpec, 0, len(payload.Vias))
+		for _, via := range payload.Vias {
+			layers := make([]kicadfiles.BoardLayer, 0, len(via.Layers))
+			for _, layer := range via.Layers {
+				layers = append(layers, boardLayer(layer))
+			}
+			vias = append(vias, designapi.RouteViaSpec{
+				At:     point(via.At.XMM, via.At.YMM),
+				Size:   kicadfiles.MM(via.DiameterMM),
+				Drill:  kicadfiles.MM(via.DrillMM),
+				Layers: layers,
+			})
+		}
+		_, err := builder.Route(payload.NetName, points, designapi.RouteOptions{Layer: boardLayer(payload.Layer), Width: kicadfiles.MM(payload.WidthMM), Vias: vias})
 		return nil, err
 	case OpAddZone:
 		var payload AddZoneOperation

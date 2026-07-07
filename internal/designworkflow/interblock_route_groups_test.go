@@ -193,7 +193,7 @@ func TestBuildInterBlockRouteGroupsReportsMissingNetName(t *testing.T) {
 	}
 }
 
-func TestBuildInterBlockRouteGroupsI2CSensorBreakoutIncludesMultidropEndpoints(t *testing.T) {
+func TestBuildInterBlockRouteGroupsI2CSensorBreakoutPrunesLocallyRoutedPassives(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	_, fragments, placed := i2cSensorBreakoutRoutingFixture(t, ctx)
@@ -211,8 +211,15 @@ func TestBuildInterBlockRouteGroupsI2CSensorBreakoutIncludesMultidropEndpoints(t
 		if !ok {
 			t.Fatalf("groups = %#v, missing %s", groups, net)
 		}
-		if len(group.RequiredEndpoints) < 3 {
-			t.Fatalf("%s group = %#v, want multi-endpoint sensor, connector, and companion endpoint coverage", net, group)
+		if len(group.RequiredEndpoints) != 2 {
+			t.Fatalf("%s group = %#v, want connector and sensor endpoints with locally routed passives pruned", net, group)
+		}
+		refs := map[string]bool{}
+		for _, endpoint := range group.RequiredEndpoints {
+			refs[endpoint.InstanceID] = true
+		}
+		if !refs["io"] || !refs["sensor"] {
+			t.Fatalf("%s group = %#v, want io and sensor endpoint coverage", net, group)
 		}
 	}
 }

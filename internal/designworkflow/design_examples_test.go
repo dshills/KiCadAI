@@ -562,8 +562,8 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if !ok {
 		t.Fatalf("%s missing routing stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if routing.Status != StageStatusBlocked {
-		t.Fatalf("%s routing status = %q, want blocked with explicit route evidence:\n%s", metadata.ID, routing.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if routing.Status != StageStatusOK {
+		t.Fatalf("%s routing status = %q, want ok before routed-board validation:\n%s", metadata.ID, routing.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	if reason, ok := routing.Summary["reason"].(string); ok && reason == "routing skipped" {
 		t.Fatalf("%s routing still reports stale skip reason:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
@@ -580,110 +580,22 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 		t.Fatalf("%s inter-block routing handoff is not endpoint-complete enough to route: %#v", metadata.ID, interBlock)
 	}
 	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routing)
-	if routeTrees.GroupsAttempted == 0 || routeTrees.FixedNetSkipNotices == 0 || routeTrees.BlockingIssueCount == 0 {
-		t.Fatalf("%s route-tree policy evidence missing fixed-net/blocking details: %#v", metadata.ID, routeTrees)
-	}
-	contactGraph := requireStageSummary[RouteTreeContactGraphSummary](t, routing, "route_tree_contact_graph")
-	if contactGraph.RequiredEndpoints == 0 || contactGraph.ProvenEndpoints == 0 || contactGraph.PartialGroups == 0 {
-		t.Fatalf("%s route-tree contact graph missing explicit partial-route evidence: %#v", metadata.ID, contactGraph)
-	}
-	requiredNets := requireStageSummary[RequiredNetClassificationSummary](t, routing, "required_net_classification")
-	if requiredNets.RequiredInterBlock != 7 || requiredNets.Complete != 6 || requiredNets.Partial != 1 || requiredNets.MissingEndpoints != 1 {
-		t.Fatalf("%s required-net classification = %#v, want six complete nets and one partial blocker", metadata.ID, requiredNets)
-	}
-	vccClassified := false
-	for _, item := range requiredNets.Nets {
-		if item.NetName == "VCC" && item.Kind == RequiredNetKindInterBlock && item.Status == RouteTreeContactGraphGroupPartial && item.Blocking && slices.Equal(item.MissingEndpointIDs, []string{"output.3"}) {
-			vccClassified = true
-		}
-	}
-	if !vccClassified {
-		t.Fatalf("%s required-net classification missing partial VCC blocker: %#v", metadata.ID, requiredNets.Nets)
-	}
-	missingEndpointTrace := requireStageSummary[RouteTreeMissingEndpointTraceSummary](t, routing, "route_tree_missing_endpoints")
-	if missingEndpointTrace.MissingEndpoints != 1 || len(missingEndpointTrace.Items) != 1 {
-		t.Fatalf("%s missing endpoint trace = %#v, want exactly one missing endpoint", metadata.ID, missingEndpointTrace)
-	}
-	missingVCC := missingEndpointTrace.Items[0]
-	if missingVCC.NetName != "VCC" || missingVCC.EndpointID != "output.3" || missingVCC.InstanceID != "output" || missingVCC.Status != InterBlockContactGraphSplit {
-		t.Fatalf("%s missing endpoint trace = %#v, want VCC output.3 graph split", metadata.ID, missingVCC)
-	}
-	if missingVCC.NearestAccess == nil {
-		t.Fatalf("%s missing endpoint trace lacks nearest same-net access: %#v", metadata.ID, missingVCC)
-	}
-	vccBranches := requireRouteTreeBranchesForNet(t, routing, "VCC")
-	var partialVCCBranch *InterBlockBranchRoutingEvidence
-	for index := range vccBranches {
-		branch := &vccBranches[index]
-		if branch.Status == "partial" && branch.StartEndpointID == "QCCDE149E001.3" && branch.EndEndpointID == "CD0952D00001.1" {
-			partialVCCBranch = branch
-			break
-		}
-	}
-	if partialVCCBranch == nil {
-		t.Fatalf("%s VCC branches = %#v, want partial branch from QCCDE149E001.3 to CD0952D00001.1", metadata.ID, vccBranches)
-	}
-	if partialVCCBranch.BranchIndex != 1 || partialVCCBranch.OperationCount != 0 || partialVCCBranch.BlockingIssueCount == 0 {
-		t.Fatalf("%s partial VCC branch evidence = %#v, want branch index 1 with blocking evidence and no emitted operation", metadata.ID, *partialVCCBranch)
-	}
-	if partialVCCBranch.AccessPairsTried == 0 || partialVCCBranch.AccessPairLimit == 0 || partialVCCBranch.AccessPairsTried > partialVCCBranch.AccessPairLimit || !partialVCCBranch.AccessPairsTruncated {
-		t.Fatalf("%s partial VCC branch access evidence = %#v, want bounded truncated attempt evidence", metadata.ID, *partialVCCBranch)
-	}
-	if len(partialVCCBranch.AccessAttempts) != partialVCCBranch.AccessPairsTried {
-		t.Fatalf("%s partial VCC branch attempts = %#v, want one attempt record per tried pair", metadata.ID, partialVCCBranch.AccessAttempts)
-	}
-	firstAttempt := partialVCCBranch.AccessAttempts[0]
-	if firstAttempt.SourceRole != RouteTreeAccessTargetPad || firstAttempt.TargetRole != RouteTreeAccessTargetPad || firstAttempt.SourceEndpointID != "QCCDE149E001.3" || firstAttempt.TargetEndpointID != "CD0952D00001.1" {
-		t.Fatalf("%s first partial VCC attempt = %#v, want exact pad-to-pad endpoint attempt", metadata.ID, firstAttempt)
-	}
-	if firstAttempt.Status != "partial" || firstAttempt.PrimaryCode == "" || firstAttempt.ObstacleKind == "" {
-		t.Fatalf("%s first partial VCC attempt lacks blocker evidence: %#v", metadata.ID, firstAttempt)
-	}
-	foundSameNetCopperAttempt := false
-	for index, attempt := range partialVCCBranch.AccessAttempts {
-		if index > 0 && attempt.PairRank < partialVCCBranch.AccessAttempts[index-1].PairRank {
-			t.Fatalf("%s partial VCC attempts not sorted by pair rank: %#v", metadata.ID, partialVCCBranch.AccessAttempts)
-		}
-		if index > 0 && attempt.SourceRole == RouteTreeAccessTargetPad && attempt.TargetRole == RouteTreeAccessSameNetCopper {
-			foundSameNetCopperAttempt = true
-			if attempt.SameNetCopper == 0 {
-				t.Fatalf("%s VCC same-net copper attempt lacks merge audit: %#v", metadata.ID, attempt)
-			}
-			if attempt.PrimaryCode == "" || attempt.ObstacleKind == "" {
-				t.Fatalf("%s VCC same-net copper attempt lacks blocker evidence: %#v", metadata.ID, attempt)
-			}
-		}
-	}
-	if !foundSameNetCopperAttempt {
-		t.Fatalf("%s partial VCC branch attempts = %#v, want same-net copper alternatives after exact pad attempt", metadata.ID, partialVCCBranch.AccessAttempts)
-	}
-	repair := requireRouteTreeRepairSummary(t, routing)
-	if repair.BranchFailures == 0 || repair.RepairableFailures == 0 || repair.UnrepairableFailures != 0 || !slices.Equal(repair.Nets, []string{"VCC"}) {
-		t.Fatalf("%s route-tree repair summary = %#v, want repairable VCC-only blocker", metadata.ID, repair)
-	}
-	foundVCCRepairHint := false
-	for _, hint := range repair.Hints {
-		if hint.NetName == "VCC" &&
-			hint.Category == InterBlockBranchFailureGraphSplit &&
-			hint.RetryScope == RetryScopeRouting &&
-			hint.Repairable &&
-			strings.Contains(hint.Path, "design.inter_block_contact") &&
-			strings.Contains(hint.Action, "connect same-net graph components") {
-			foundVCCRepairHint = true
-		}
-	}
-	if !foundVCCRepairHint {
-		t.Fatalf("%s route-tree repair hints = %#v, want repairable VCC graph-split action", metadata.ID, repair.Hints)
-	}
-	if !designExampleIssuesContainNet(routing.Issues, "VCC") {
-		t.Fatalf("%s routing blocker does not identify VCC:\n%s", metadata.ID, formatDesignExampleIssues(routing.Issues))
+	if routeTrees.GroupsAttempted == 0 || routeTrees.FixedNetSkipNotices == 0 {
+		t.Fatalf("%s route-tree policy evidence missing fixed-net details: %#v", metadata.ID, routeTrees)
 	}
 	projectWrite, ok := designExampleStageByName(result, StageProjectWrite)
 	if !ok {
 		t.Fatalf("%s missing project_write stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	if projectWrite.Status != StageStatusSkipped {
-		t.Fatalf("%s project_write status = %q, want skipped after explicit routing blocker:\n%s", metadata.ID, projectWrite.Status, formatDesignExampleRun(metadata, outputDir, result))
+	if projectWrite.Status != StageStatusOK {
+		t.Fatalf("%s project_write status = %q, want ok before validation blocker:\n%s", metadata.ID, projectWrite.Status, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	validation, ok := designExampleStageByName(result, StageValidation)
+	if !ok {
+		t.Fatalf("%s missing validation stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if validation.Status != StageStatusBlocked || !designExampleIssuesContainCode(validation.Issues, "DISCONNECTED_PAD") {
+		t.Fatalf("%s validation status/issues = %q, want disconnected-pad blocker:\n%s", metadata.ID, validation.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	kicadChecks, ok := designExampleStageByName(result, StageKiCadChecks)
 	if !ok {
@@ -699,11 +611,8 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 	if report.AchievedReadiness != PromotionReadinessExpectedFail {
 		t.Fatalf("%s promotion report achieved readiness = %q, want %q", metadata.ID, report.AchievedReadiness, PromotionReadinessExpectedFail)
 	}
-	if report.Stages.StoppedAt != StageRouting || !slices.Contains(report.Stages.Reached, StageRouting) {
-		t.Fatalf("%s promotion stages = %#v, want stopped at routing with routing reached", metadata.ID, report.Stages)
-	}
-	if !designExamplePromotionHasNextActionForGate(report, "route_completion") {
-		t.Fatalf("%s promotion next actions = %#v, want route-completion repair action", metadata.ID, report.NextActions)
+	if report.Stages.StoppedAt != StageValidation || !slices.Contains(report.Stages.Reached, StageValidation) {
+		t.Fatalf("%s promotion stages = %#v, want stopped at validation with validation reached", metadata.ID, report.Stages)
 	}
 	for _, expectation := range []struct {
 		id                  string
@@ -711,10 +620,10 @@ func TestProtectedAmplifierValidationRoutingBaseline(t *testing.T) {
 		wantIssueCodes      bool
 		wantIssueCodePrefix string
 	}{
-		{id: "route_completion", status: PromotionGateStatusFailed, wantIssueCodes: true, wantIssueCodePrefix: "routing_route_graph_incomplete_"},
+		{id: "route_completion", status: PromotionGateStatusPass, wantIssueCodes: true, wantIssueCodePrefix: "routing_fixed_net_skipped_"},
 		{id: "kicad_checks", status: PromotionGateStatusSkipped},
-		{id: "writer_correctness", status: PromotionGateStatusSkipped},
-		{id: "connectivity", status: PromotionGateStatusSkipped},
+		{id: "writer_correctness", status: PromotionGateStatusWarn, wantIssueCodes: true, wantIssueCodePrefix: "writer_correctness_"},
+		{id: "connectivity", status: PromotionGateStatusFailed, wantIssueCodes: true, wantIssueCodePrefix: "validation_disconnected_pad"},
 	} {
 		t.Run("promotion_gate_"+expectation.id, func(t *testing.T) {
 			gate := promotionGateByID(t, report, expectation.id)
@@ -852,10 +761,10 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 		stage  StageName
 		status StageStatus
 	}{
-		{StageRouting, StageStatusBlocked},
-		{StageProjectWrite, StageStatusSkipped},
-		{StageWriterCorrect, StageStatusSkipped},
-		{StageValidation, StageStatusSkipped},
+		{StageRouting, StageStatusOK},
+		{StageProjectWrite, StageStatusOK},
+		{StageWriterCorrect, StageStatusWarning},
+		{StageValidation, StageStatusBlocked},
 		{StageKiCadChecks, StageStatusSkipped},
 	} {
 		stage, ok := designExampleStageByName(result, expectation.stage)
@@ -875,12 +784,19 @@ func assertDesignExampleProtectedAmplifierEvidence(t *testing.T, metadata design
 		t.Fatalf("%s routing endpoint handoff regressed: %#v\n%s", metadata.ID, routeConnectivity, formatDesignExampleIssues(routing.Issues))
 	}
 	routeTrees := requireInterBlockRouteTreeExecutionSummary(t, routing)
-	if routeTrees.GroupsAttempted == 0 || routeTrees.BlockingIssueCount == 0 {
-		t.Fatalf("%s routing lacks explicit route-tree blocker evidence: %#v", metadata.ID, routeTrees)
+	if routeTrees.GroupsAttempted == 0 {
+		t.Fatalf("%s routing lacks explicit route-tree evidence: %#v", metadata.ID, routeTrees)
 	}
 	requiredNets := requireStageSummary[RequiredNetClassificationSummary](t, routing, "required_net_classification")
-	if requiredNets.RequiredInterBlock == 0 || requiredNets.Partial == 0 || requiredNets.MissingEndpoints == 0 {
+	if requiredNets.RequiredInterBlock == 0 {
 		t.Fatalf("%s routing lacks required-net classification evidence: %#v", metadata.ID, requiredNets)
+	}
+	validation, ok := designExampleStageByName(result, StageValidation)
+	if !ok {
+		t.Fatalf("%s missing validation stage:\n%s", metadata.ID, formatDesignExampleRun(metadata, outputDir, result))
+	}
+	if !designExampleIssuesContainCode(validation.Issues, "DISCONNECTED_PAD") {
+		t.Fatalf("%s validation lacks routed-board connectivity blocker evidence:\n%s", metadata.ID, formatDesignExampleIssues(validation.Issues))
 	}
 }
 
@@ -948,6 +864,15 @@ func designExampleIssuesContainNet(issues []reports.Issue, labels string) bool {
 func designExampleIssuesContainPath(issues []reports.Issue, path string) bool {
 	for _, issue := range issues {
 		if issue.Path == path {
+			return true
+		}
+	}
+	return false
+}
+
+func designExampleIssuesContainCode(issues []reports.Issue, code string) bool {
+	for _, issue := range issues {
+		if string(issue.Code) == code {
 			return true
 		}
 	}
