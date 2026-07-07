@@ -151,6 +151,7 @@ type symbolState struct {
 }
 
 const schematicConnectionGrid = kicadfiles.IU(1270000)
+const usbCPowerOnlyConnectorLibraryID = "Connector:USB_C_Receptacle_PowerOnly_6P"
 
 func New(options Options) (*Builder, error) {
 	name := strings.TrimSpace(options.Name)
@@ -362,7 +363,14 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	builder.assignPinNet(from, netName)
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
-	if schematicConnectionShouldUseLabels(netName, start, end) {
+	if builder.schematicConnectionShouldUseDirectLabels(from, to) {
+		if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
+			return err
+		}
+		if err := builder.AddLabel(netName, end, schematic.LabelLocal); err != nil {
+			return err
+		}
+	} else if schematicConnectionShouldUseLabels(netName, start, end) {
 		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
 		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
 	} else {
@@ -370,6 +378,22 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	}
 	builder.syncPCBNets()
 	return nil
+}
+
+func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoint) bool {
+	return builder.endpointIsUSBCPowerOnlyCC(from) || builder.endpointIsUSBCPowerOnlyCC(to)
+}
+
+func (builder *Builder) endpointIsUSBCPowerOnlyCC(endpoint Endpoint) bool {
+	pin := strings.TrimSpace(endpoint.Pin)
+	if !strings.EqualFold(pin, "A5") && !strings.EqualFold(pin, "B5") {
+		return false
+	}
+	state, err := builder.symbolState(endpoint.Reference)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(strings.TrimSpace(state.libraryID), usbCPowerOnlyConnectorLibraryID)
 }
 
 func schematicConnectionShouldUseLabels(netName string, start, end kicadfiles.Point) bool {

@@ -692,6 +692,54 @@ func TestBuilderConn01x04Pin4UsesKiCadERCConnectionAnchor(t *testing.T) {
 	t.Fatalf("missing Conn_01x04 pin 4 KiCad ERC stub %v -> %v: %#v", wantStart, wantEnd, design.Schematic.Wires)
 }
 
+func TestBuilderUSBCPowerCCConnectionUsesDirectLabels(t *testing.T) {
+	builder := newTestBuilder(t)
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "J1",
+		LibraryID: "Connector:USB_C_Receptacle_PowerOnly_6P",
+		Value:     "USB-C",
+		Position:  kicadfiles.Point{},
+	}); err != nil {
+		t.Fatalf("AddSymbol J1 returned error: %v", err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "R1",
+		LibraryID: "kicadai:USB_CC_R",
+		Value:     "5.1k",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(1.27)},
+		Pins: []PinSpec{
+			{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}},
+			{Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}},
+		},
+	}); err != nil {
+		t.Fatalf("AddSymbol R1 returned error: %v", err)
+	}
+	if err := builder.Connect(Endpoint{Reference: "J1", Pin: "A5"}, Endpoint{Reference: "R1", Pin: "1"}, "USB_CC1"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Wires) != 0 {
+		t.Fatalf("CC connection emitted wires = %#v, want direct labels only", design.Schematic.Wires)
+	}
+	wantLabels := map[kicadfiles.Point]bool{
+		{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(5.08)}: false,
+		{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(5.08)}: false,
+	}
+	for _, label := range design.Schematic.Labels {
+		if label.Text == "USB_CC1" {
+			if _, ok := wantLabels[label.Position]; ok {
+				wantLabels[label.Position] = true
+			}
+		}
+	}
+	for point, found := range wantLabels {
+		if !found {
+			t.Fatalf("missing USB_CC1 label at %v: %#v", point, design.Schematic.Labels)
+		}
+	}
+}
+
 func TestBuilderAvoidsRoutingThroughOtherSymbolPinAnchor(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{
