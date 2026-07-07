@@ -417,6 +417,63 @@ func TestPlanPowersExplicitActiveLowLEDVCCPort(t *testing.T) {
 	}
 }
 
+func TestPlanConnectsUSBCPoweredActiveHighLEDInput(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "usb_c_led_indicator",
+		Kind:    IntentBreakout,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "indicator"},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing")
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "usb_power.VBUS_OUT", "indicator.IN", "VCC_5v") {
+		t.Fatalf("missing USB-C VBUS to LED input connection: %#v", plan.GeneratedRequest.Connections)
+	}
+	if !hasConnection(*plan.GeneratedRequest, "usb_power.GND", "indicator.GND") {
+		t.Fatalf("missing USB-C ground to LED ground connection: %#v", plan.GeneratedRequest.Connections)
+	}
+	if hasWorkflowBlock(*plan.GeneratedRequest, "connector_breakout") {
+		t.Fatalf("powered-only LED should not require a connector block: %#v", plan.GeneratedRequest.Blocks)
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
+func TestPlanConnectsUSBCPoweredActiveLowLEDInput(t *testing.T) {
+	plan := Plan(Request{
+		Version: "0.1.0",
+		Name:    "usb_c_active_low_led_indicator",
+		Kind:    IntentBreakout,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}}},
+		Functions: []FunctionIntent{
+			{Kind: "indicator", Params: map[string]any{"active_high": false}},
+		},
+	})
+	if plan.Status == PlanStatusBlocked {
+		t.Fatalf("plan blocked: %#v", plan.Issues)
+	}
+	if plan.GeneratedRequest == nil {
+		t.Fatalf("GeneratedRequest missing")
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "usb_power.VBUS_OUT", "indicator.VCC", "VCC_5v") {
+		t.Fatalf("missing USB-C VBUS to active-low LED VCC connection: %#v", plan.GeneratedRequest.Connections)
+	}
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "usb_power.GND", "indicator.IN", "GND") {
+		t.Fatalf("missing USB-C ground to active-low LED input connection: %#v", plan.GeneratedRequest.Connections)
+	}
+	if issues := designworkflow.ValidateRequest(*plan.GeneratedRequest); len(issues) != 0 {
+		t.Fatalf("generated request validation issues = %#v", issues)
+	}
+}
+
 func TestPlanMapsClassABHeadphoneIntentToProtectedOutputPath(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",

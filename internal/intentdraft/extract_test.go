@@ -103,6 +103,22 @@ func TestDraftExtractsLEDIndicatorDefaultSupply(t *testing.T) {
 	}
 }
 
+func TestDraftKeepsUSBCPoweredLEDIndicatorPowerOnly(t *testing.T) {
+	result := Draft("make a USB-C powered LED indicator board", Options{})
+	if len(result.Issues) != 0 {
+		t.Fatalf("issues = %#v", result.Issues)
+	}
+	if len(result.Request.Power.Inputs) != 1 || result.Request.Power.Inputs[0].Kind != "usb_c" || result.Request.Power.Inputs[0].Voltage != "5V" {
+		t.Fatalf("power inputs = %#v", result.Request.Power.Inputs)
+	}
+	if len(result.Request.Functions) != 1 || result.Request.Functions[0].Kind != "indicator" {
+		t.Fatalf("functions = %#v", result.Request.Functions)
+	}
+	if len(result.Request.Interfaces) != 0 {
+		t.Fatalf("powered-only LED should not infer a GPIO connector: %#v", result.Request.Interfaces)
+	}
+}
+
 func TestDraftDoesNotTreatControlledAsLEDIndicator(t *testing.T) {
 	result := Draft("make a controlled power supply with 5V input", Options{})
 	for _, function := range result.Request.Functions {

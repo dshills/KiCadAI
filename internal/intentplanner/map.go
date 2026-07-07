@@ -70,6 +70,7 @@ func Plan(request Request) PlanResult {
 		railAliasVoltage:   map[string]string{},
 		requirementIndex:   map[string]int{},
 		selectedBlockIndex: map[string]int{},
+		workflowBlockIndex: map[string]int{},
 	}
 	builder.applyBoardDefaults()
 	builder.applyPolicyDefaults()
@@ -110,6 +111,7 @@ type planBuilder struct {
 	railAliasVoltage   map[string]string
 	requirementIndex   map[string]int
 	selectedBlockIndex map[string]int
+	workflowBlockIndex map[string]int
 	i2cDefaultNoted    bool
 	i2cMultiBusBlocked bool
 	usbPowerIDs        []string
@@ -551,6 +553,11 @@ func (builder *planBuilder) connectPowerAndSignals() {
 		}
 	}
 	for _, target := range builder.powerTargets() {
+		if builder.instanceBlockIDs[target.id] == "led_indicator" && !builder.ledIndicatorActiveHigh(target.id) && paramText(builder.instanceParams[target.id], "supply_voltage") == "" {
+			if source, ok := builder.powerSourceForPoweredLED(target.id); ok {
+				builder.applyInferredLEDDefaults(target.id, source.voltage)
+			}
+		}
 		supplySource, supplyPort := builder.supplySourceForTarget(target.id)
 		if supplySource != "" && target.id == supplySource {
 			continue
@@ -576,6 +583,8 @@ func (builder *planBuilder) connectPowerAndSignals() {
 	for index, ledID := range builder.ledIDs {
 		if gpioConnectorID := builder.signalConnectorAt(index); gpioConnectorID != "" {
 			builder.addConnection(gpioConnectorID+".SIG", ledID+".IN", signalNetAlias("LED_SIG", ledID), "connector signal drives LED indicator")
+		} else if source, ok := builder.powerSourceForPoweredLED(ledID); ok {
+			builder.connectPoweredLED(source, ledID)
 		} else {
 			builder.signalConnectorGap(ledID)
 		}
@@ -1182,6 +1191,52 @@ func (builder *planBuilder) supplySourceForTarget(targetID string) (string, stri
 	return "", ""
 }
 
+func (builder *planBuilder) powerSourceForPoweredLED(instanceID string) (powerSource, bool) {
+	if builder.instanceBlockIDs[instanceID] != "led_indicator" {
+		return powerSource{}, false
+	}
+	if voltage := paramText(builder.instanceParams[instanceID], "supply_voltage"); voltage != "" {
+		sourceID, port := builder.supplySourceForTarget(instanceID)
+		if sourceID == "" {
+			return powerSource{}, false
+		}
+		return powerSource{id: sourceID, port: port, voltage: voltage}, true
+	}
+	if len(builder.orderedPowerInputs) == 1 {
+		return builder.orderedPowerInputs[0], true
+	}
+	sources := builder.availablePowerSources()
+	if len(sources) == 1 {
+		return sources[0], true
+	}
+	return powerSource{}, false
+}
+
+func (builder *planBuilder) connectPoweredLED(source powerSource, ledID string) {
+	netAlias := builder.supplyNetAlias(source.id)
+	if builder.ledIndicatorActiveHigh(ledID) {
+		builder.applyInferredLEDDefaults(ledID, source.voltage)
+		builder.addConnection(source.id+"."+source.port, ledID+".IN", netAlias, "power source drives active-high LED indicator")
+	} else {
+		builder.addConnection(source.id+"."+builder.groundPortFor(source.id), ledID+".IN", "GND", "ground drives active-low LED indicator on")
+	}
+	builder.appendRequirementEvidenceForInstance(ledID, "supply:"+source.id+"."+source.port)
+	builder.appendRequirementEvidenceForInstance(ledID, "net:"+netAlias)
+}
+
+func (builder *planBuilder) applyInferredLEDDefaults(ledID string, voltage string) {
+	if voltage != "" && paramText(builder.instanceParams[ledID], "supply_voltage") == "" {
+		builder.updateWorkflowBlockParam(ledID, "supply_voltage", voltage)
+	}
+	for _, key := range []string{"led_forward_voltage", "led_current"} {
+		if paramText(builder.instanceParams[ledID], key) == "" {
+			if value := builder.paramString(ledID, key); value != "" {
+				builder.updateWorkflowBlockParam(ledID, key, value)
+			}
+		}
+	}
+}
+
 func (builder *planBuilder) supplyNetAlias(sourceID string) string {
 	if builder.instanceBlockIDs[sourceID] == "connector_breakout" {
 		return builder.powerPortFor(sourceID)
@@ -1497,9 +1552,24 @@ func (builder *planBuilder) addBlock(reqID string, prefix string, blockID string
 	}
 	id := builder.nextID(prefix)
 	clonedParams := cloneParams(params)
+	if builder.instanceBlockIDs == nil {
+		builder.instanceBlockIDs = map[string]string{}
+	}
+	if builder.instanceParams == nil {
+		builder.instanceParams = map[string]map[string]any{}
+	}
+	if builder.instanceReqIDs == nil {
+		builder.instanceReqIDs = map[string]string{}
+	}
 	builder.instanceBlockIDs[id] = blockID
 	builder.instanceParams[id] = clonedParams
 	builder.instanceReqIDs[id] = reqID
+	if builder.workflowBlockIndex == nil {
+		// Some focused unit tests construct planBuilder directly instead of
+		// going through Plan, so keep addBlock resilient.
+		builder.workflowBlockIndex = map[string]int{}
+	}
+	builder.workflowBlockIndex[id] = len(builder.workflow.Blocks)
 	builder.workflow.Blocks = append(builder.workflow.Blocks, designworkflow.BlockInstanceSpec{ID: id, BlockID: blockID, Params: clonedParams})
 	record := SelectedBlockRecord{
 		RequirementIDs: []string{reqID},
@@ -1536,6 +1606,26 @@ func (builder *planBuilder) updateSelectedBlockParam(instanceID string, key stri
 		builder.plan.SelectedBlocks[index].Params = map[string]any{}
 	}
 	builder.plan.SelectedBlocks[index].Params[key] = value
+}
+
+func (builder *planBuilder) updateWorkflowBlockParam(instanceID string, key string, value any) {
+	index, ok := builder.workflowBlockIndex[instanceID]
+	if !ok || index < 0 || index >= len(builder.workflow.Blocks) {
+		return
+	}
+	params := builder.instanceParams[instanceID]
+	if params == nil {
+		params = map[string]any{}
+		builder.instanceParams[instanceID] = params
+		builder.workflow.Blocks[index].Params = params
+	}
+	params[key] = value
+	if selectedIndex, ok := builder.selectedBlockIndex[instanceID]; ok && selectedIndex >= 0 && selectedIndex < len(builder.plan.SelectedBlocks) {
+		if builder.plan.SelectedBlocks[selectedIndex].Params == nil {
+			builder.plan.SelectedBlocks[selectedIndex].Params = params
+		}
+		builder.plan.SelectedBlocks[selectedIndex].Params[key] = value
+	}
 }
 
 func (builder *planBuilder) addRequirement(record RequirementRecord) {

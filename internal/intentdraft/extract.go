@@ -53,8 +53,10 @@ func extractStructuredIntent(source string, normalized string, request *intentpl
 		addField(extraction, "board.mounting_holes", request.Board.MountingHoles, source, findFirstPhrase(source, []string{"mounting holes", "mount holes"}), confidenceRegexHigh, "keyword.mounting_holes")
 	}
 
+	// Interface extraction depends on power inputs to distinguish powered-only
+	// indicators from GPIO-controlled LED indicators.
 	extractPower(source, normalized, request, extraction)
-	extractInterfaces(source, normalized, request, extraction)
+	extractInterfaces(source, normalized, request, extraction, len(request.Power.Inputs) > 0)
 	extractFunctions(source, normalized, request, extraction)
 	defaultIndicatorSupply(source, normalized, request, extraction)
 }
@@ -97,13 +99,13 @@ func voltageOnlyBreakoutPower(normalized string) bool {
 	return !containsAny(normalized, "external power", "power input", "power pins", "power connector", "power header", "input header", "supply header", "vcc pin", "vcc pins", "vin", "pwr", "usb", "usb-c", "usb c", "usbc", "battery", "dc jack", "barrel jack", "terminal block", "screw terminal", "jst")
 }
 
-func extractInterfaces(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {
+func extractInterfaces(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport, hasPowerInput bool) {
 	if containsAny(normalized, "i2c", "iic", "qwiic", "stemma") {
 		iface := intentplanner.InterfaceIntent{Kind: "i2c", Voltage: inferredInterfaceVoltage(request), Bus: "i2c1"}
 		request.Interfaces = append(request.Interfaces, iface)
 		addField(extraction, fmt.Sprintf("interfaces[%d].kind", len(request.Interfaces)-1), iface.Kind, source, findFirstPhrase(source, []string{"i2c", "iic", "qwiic", "stemma"}), confidenceRegexHigh, "keyword.interface")
 	}
-	if ledIndicatorRequested(normalized) && !containsAny(normalized, "i2c", "qwiic", "stemma", "spi", "uart") && !requestHasInterface(request, "gpio") {
+	if ledIndicatorRequested(normalized) && !poweredOnlyIndicatorRequest(normalized, hasPowerInput) && !containsAny(normalized, "i2c", "qwiic", "stemma", "spi", "uart") && !requestHasInterface(request, "gpio") {
 		iface := intentplanner.InterfaceIntent{Kind: "gpio", Voltage: inferredInterfaceVoltage(request)}
 		if iface.Voltage == "" {
 			iface.Voltage = defaultIndicatorVoltage
@@ -116,6 +118,13 @@ func extractInterfaces(source string, normalized string, request *intentplanner.
 		request.Interfaces = append(request.Interfaces, iface)
 		addField(extraction, fmt.Sprintf("interfaces[%d].kind", len(request.Interfaces)-1), iface.Kind, source, findPhrase(source, "uart"), confidenceRegexHigh, "keyword.interface")
 	}
+}
+
+func poweredOnlyIndicatorRequest(normalized string, hasPowerInput bool) bool {
+	if !hasPowerInput {
+		return false
+	}
+	return !containsAny(normalized, "gpio", "controlled", "control", "signal")
 }
 
 func extractFunctions(source string, normalized string, request *intentplanner.Request, extraction *ExtractionReport) {
