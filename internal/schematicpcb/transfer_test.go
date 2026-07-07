@@ -324,6 +324,22 @@ func TestVerifiedTransferPinHeaderPadsAreCentered(t *testing.T) {
 	}
 }
 
+func TestVerifiedTransferSOIC8PadsProvideNetHints(t *testing.T) {
+	pads, ok := verifiedTransferPadSpecs("Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", map[string]string{"3": "SDA", "4": "SCL"})
+	if !ok || len(pads) != 8 {
+		t.Fatalf("pads = %#v ok=%v, want SOIC-8 verified transfer pads", pads, ok)
+	}
+	if pads[0].WidthMM != 1.55 || pads[0].HeightMM != 0.6 {
+		t.Fatalf("SOIC pad size = %.2fx%.2f, want 1.55x0.60", pads[0].WidthMM, pads[0].HeightMM)
+	}
+	if pads[2].Name != "3" || pads[2].Net == nil || *pads[2].Net != "SDA" {
+		t.Fatalf("pad 3 = %#v, want SDA net hint", pads[2])
+	}
+	if pads[7].Name != "5" {
+		t.Fatalf("right row order pads = %#v, want KiCad SOIC descending right-side pad names", pads)
+	}
+}
+
 func TestFromDesignFallsBackToVerifiedTemplatesWhenIndexMissesFootprint(t *testing.T) {
 	trueValue := true
 	point := func(x, y float64) kicadfiles.Point {

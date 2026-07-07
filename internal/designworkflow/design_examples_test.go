@@ -23,6 +23,7 @@ import (
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
+	"kicadai/internal/writercorrectness"
 )
 
 const designExamplePlanningTimeout = 15 * time.Second
@@ -233,6 +234,7 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 			result := Create(ctx, request, CreateOptions{
 				OutputDir: outputDir,
 				Overwrite: true,
+				Writer:    designExampleWriterOptionsForMetadata(metadata, cliPath, outputDir),
 				KiCadChecks: KiCadCheckOptions{
 					KiCadCLI:      cliPath,
 					Timeout:       createTimeout,
@@ -388,26 +390,33 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			if len(reportJSON) == 0 {
 				t.Fatalf("%s promotion report JSON is empty", metadata.ID)
 			}
+			if metadata.Readiness == "pass" {
+				if report.AchievedReadiness != PromotionReadinessCandidate || report.MatchesExpectation {
+					t.Fatalf("%s no-KiCad promotion status=%q achieved=%q matches=%v, want candidate evidence below pass expectation\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, formatDesignExampleRun(metadata, outputDir, result))
+				}
+				return
+			}
 			assertDesignExamplePromotionMatchesMetadata(t, metadata, report, outputDir, result)
 		})
 	}
 }
 
-func TestI2CDesignExamplePromotesToCandidate(t *testing.T) {
+func TestI2CDesignExampleStructuralLaneReachesCandidate(t *testing.T) {
 	if testing.Short() {
-		t.Skip("skipping I2C candidate promotion integration test in short mode")
+		t.Skip("skipping I2C structural-lane promotion integration test in short mode")
 	}
 	t.Setenv(checks.EnvKiCadCLI, "")
-	// This regression intentionally proves checked-in candidate promotion without
-	// local KiCad. Required real KiCad DRC remains a pass-level follow-up.
+	// This regression intentionally proves the no-KiCad structural lane remains
+	// candidate-capable. The checked-in fixture's declared pass readiness is
+	// proven only when real or fake clean KiCad evidence is supplied.
 	repoRoot := designExampleRepoRoot(t)
 	metadataPath := filepath.Join(repoRoot, "examples", "design", "kicad-backed", "i2c_sensor_breakout_candidate.metadata.json")
 	metadata, err := loadDesignExampleMetadataPath(metadataPath)
 	if err != nil {
 		t.Fatalf("load %s: %v", metadataPath, err)
 	}
-	if metadata.Readiness != "candidate" {
-		t.Fatalf("%s readiness = %q, want candidate", metadata.ID, metadata.Readiness)
+	if metadata.Readiness != "pass" {
+		t.Fatalf("%s readiness = %q, want pass", metadata.ID, metadata.Readiness)
 	}
 	requestPath, err := designExampleRequestPathForMetadata(metadataPath, metadata)
 	if err != nil {
@@ -422,8 +431,8 @@ func TestI2CDesignExamplePromotesToCandidate(t *testing.T) {
 	defer cancel()
 	result := Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
 	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
-	if report.AchievedReadiness != PromotionReadinessCandidate || !report.MatchesExpectation {
-		t.Fatalf("%s promotion status=%q achieved=%q matches=%v, want candidate match\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, formatDesignExampleRun(metadata, outputDir, result))
+	if report.AchievedReadiness != PromotionReadinessCandidate || report.MatchesExpectation {
+		t.Fatalf("%s promotion status=%q achieved=%q matches=%v, want structural candidate below pass expectation\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, formatDesignExampleRun(metadata, outputDir, result))
 	}
 	requiredStages := []StageName{
 		StageBlockPlanning,
@@ -466,7 +475,7 @@ func TestI2CDesignExamplePromotesToCandidate(t *testing.T) {
 	}
 }
 
-func TestI2CDesignExampleFakeCleanKiCadEvidencePassesCandidateGate(t *testing.T) {
+func TestI2CDesignExampleFakeCleanKiCadEvidencePassesKiCadGate(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping I2C fake KiCad promotion integration test in short mode")
 	}
@@ -505,9 +514,10 @@ func TestI2CDesignExampleFakeCleanKiCadEvidencePassesCandidateGate(t *testing.T)
 	if kicadChecks.Status != StageStatusOK {
 		t.Fatalf("%s fake clean kicad_checks status = %q, want ok:\n%s", metadata.ID, kicadChecks.Status, formatDesignExampleRun(metadata, outputDir, result))
 	}
-	fixture := promotionFixtureFromDesignExampleMetadata(metadata)
-	fixture.DeclaredReadiness = PromotionReadinessCandidate
-	report := BuildInternalPromotionReport(fixture, result)
+	report := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
+	if report.AchievedReadiness != PromotionReadinessCandidate || report.MatchesExpectation {
+		t.Fatalf("%s fake clean KiCad promotion status=%q achieved=%q matches=%v, want candidate below real pass evidence:\n%s", metadata.ID, report.Status, report.AchievedReadiness, report.MatchesExpectation, formatDesignExampleRun(metadata, outputDir, result))
+	}
 	gate := promotionGateByID(t, report, string(StageKiCadChecks))
 	if gate.Status != PromotionGateStatusPass {
 		t.Fatalf("%s fake clean KiCad gate = %q, want pass:\n%s", metadata.ID, gate.Status, formatDesignExamplePromotionIssues(report.Issues))
@@ -1535,6 +1545,18 @@ func designExampleExpectedFailRequiresKiCadCLI(metadata designExampleMetadata) b
 		}
 	}
 	return false
+}
+
+func designExampleWriterOptionsForMetadata(metadata designExampleMetadata, cliPath string, outputDir string) writercorrectness.Options {
+	if metadata.Readiness != "pass" {
+		return writercorrectness.Options{}
+	}
+	return writercorrectness.Options{
+		RequireKiCadRoundTrip: true,
+		KiCadCLI:              cliPath,
+		KeepArtifacts:         true,
+		ArtifactDir:           filepath.Join(outputDir, ".kicadai", "checks"),
+	}
 }
 
 func validateDesignExampleArtifactPaths(paths []string) error {

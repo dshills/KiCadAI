@@ -450,9 +450,8 @@ Implemented foundation with a documented first AI-controlled generation lane.
   readiness:
   - `expected_fail`: `connector_led_kicad_smoke` and
     `opamp_headphone_buffer_kicad_candidate`;
-  - `candidate`: `led_indicator_kicad_smoke` and
-    `i2c_sensor_breakout_candidate`;
-  - `pass`: none yet;
+  - `candidate`: `led_indicator_kicad_smoke`;
+  - `pass`: `i2c_sensor_breakout_candidate`;
   - `blocked`: none yet.
 - `connector_led_kicad_smoke` now has routing-enabled regression coverage for
   promoted inter-block route candidates, endpoint-contact diagnostics, and
@@ -466,8 +465,8 @@ Implemented foundation with a documented first AI-controlled generation lane.
   block-local VCC/GND/SDA/SCL alias propagation into local routes, proves
   route-tree contact completion for its multi-endpoint inter-block nets, and
   reaches project-write, writer-correctness, and structural validation
-  evidence. It is now a checked-in structural candidate; pass promotion remains
-  gated on clean required KiCad ERC/DRC evidence from a stable `kicad-cli`.
+  evidence. It is now a checked-in `pass` fixture when required KiCad ERC/DRC
+  evidence is produced by `kicad-cli`.
 - A named opt-in KiCad block corpus now exists in `block verify` through
   `--kicad-corpus` and `--kicad-corpus-tier`. The initial smoke corpus includes
   `led_indicator_default` and `connector_breakout_4pin`, reports selected
@@ -499,10 +498,11 @@ Implemented foundation with a documented first AI-controlled generation lane.
   and same-net copper merge evidence, contact graph completion evidence,
   classified route-tree repair hints, retry selection based on route-tree
   completion evidence, four graph-complete route-tree nets, project-write,
-  writer-correctness, and structural validation evidence. It is now a
-  checked-in candidate. Generated label stubs are grid-safe, and a logic-only
-  unit test covers the promotion decision path with mocked clean KiCad results.
-  Pass readiness still depends on clean real KiCad ERC/DRC evidence.
+  writer-correctness, structural validation evidence, and clean required
+  KiCad ERC/DRC evidence in the optional KiCad-backed fixture lane. It is now a
+  checked-in `pass` fixture. Generated label stubs are grid-safe, and a
+  logic-only unit test covers the promotion decision path with mocked clean
+  KiCad results.
 - Broaden board-edge/imported-mechanical anchor binding proof with larger
   KiCad-backed generated fixtures and repair suggestions for bad endpoint
   declarations.
@@ -878,14 +878,16 @@ for `design create`. The default set exercises supported LED workflows and
 proves that checked-in examples remain aligned with the current request schema,
 block contracts, project writer, schematic/PCB readers, and component identity
 property propagation. Optional KiCad-backed design examples now live under
-`examples/design/kicad-backed/`; LED and I2C are candidate-level, while
-connector/LED and amplifier generated boards currently record `expected_fail`
-evidence while required KiCad ERC/DRC blockers remain open. I2C now reaches route-tree-managed inter-block routing with clean
+`examples/design/kicad-backed/`; I2C is a checked-in pass fixture, LED is
+candidate-level, and connector/LED plus amplifier generated boards currently
+record `expected_fail` evidence while required KiCad ERC/DRC blockers remain
+open. I2C now reaches route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
 now emits all route-tree branches, records four graph-complete route-tree nets,
-and reaches project-write, writer-correctness, and structural validation
-evidence and now has checked-in candidate promotion coverage. Generated label
+and reaches project-write, writer-correctness, structural validation, and clean
+required KiCad ERC/DRC evidence in the optional KiCad-backed fixture lane.
+Generated label
 stubs are grid-safe, and a
 logic-only unit test covers the promotion decision path with mocked clean KiCad
 results. The

@@ -537,6 +537,8 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 		return twoTransferPads(1.35, 1.55, 3.0, hints), true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoTransferPads(1.75, 1.9, 3.6, hints), true
+	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
+		return soic8NarrowTransferTemplate.pads(hints), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
 		return pinHeaderTransferPads(1, hints), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical":
@@ -552,11 +554,48 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 	}
 }
 
+type rowPadTemplate struct {
+	rowSpacingMM float64
+	pitchMM      float64
+	padSizeXMM   float64
+	padSizeYMM   float64
+	leftNames    []string
+	rightNames   []string
+}
+
+var soic8NarrowTransferTemplate = rowPadTemplate{
+	rowSpacingMM: 5.9,
+	pitchMM:      1.27,
+	padSizeXMM:   1.55,
+	padSizeYMM:   0.6,
+	leftNames:    []string{"1", "2", "3", "4"},
+	rightNames:   []string{"8", "7", "6", "5"},
+}
+
+func (template rowPadTemplate) pads(hints map[string]string) []transactions.PadSpec {
+	return rowTransferPads(template.rowSpacingMM, template.pitchMM, template.padSizeXMM, template.padSizeYMM, template.leftNames, template.rightNames, hints)
+}
+
 func twoTransferPads(widthMM float64, heightMM float64, pitchMM float64, hints map[string]string) []transactions.PadSpec {
 	return []transactions.PadSpec{
 		transferPadSpec("1", -pitchMM/2, 0, widthMM, heightMM, hints),
 		transferPadSpec("2", pitchMM/2, 0, widthMM, heightMM, hints),
 	}
+}
+
+// rowTransferPads emits centered coordinates for verified KiCad library footprints.
+func rowTransferPads(rowSpacingMM float64, pitchMM float64, padSizeXMM float64, padSizeYMM float64, leftNames []string, rightNames []string, hints map[string]string) []transactions.PadSpec {
+	pads := make([]transactions.PadSpec, 0, len(leftNames)+len(rightNames))
+	rowX := rowSpacingMM / 2
+	leftStart := -float64(len(leftNames)-1) * pitchMM / 2
+	for index, name := range leftNames {
+		pads = append(pads, transferPadSpec(name, -rowX, leftStart+float64(index)*pitchMM, padSizeXMM, padSizeYMM, hints))
+	}
+	rightStart := -float64(len(rightNames)-1) * pitchMM / 2
+	for index, name := range rightNames {
+		pads = append(pads, transferPadSpec(name, rowX, rightStart+float64(index)*pitchMM, padSizeXMM, padSizeYMM, hints))
+	}
+	return pads
 }
 
 func pinHeaderTransferPads(count int, hints map[string]string) []transactions.PadSpec {

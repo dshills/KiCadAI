@@ -48,8 +48,9 @@ during PCB readback, and reports net-assignment evidence in the `design create`
 workflow. The simple LED prompt now reaches strict promotion `candidate` in the
 default structural lane without requiring local KiCad, and promotes to `pass`
 when required KiCad ERC/DRC and writer round-trip evidence are clean. The
-optional KiCad-backed LED and I2C fixtures are now candidate-level, while
-connector/LED and amplifier fixtures remain `expected_fail` until their
+optional KiCad-backed I2C fixture is now a checked-in `pass` fixture when
+required KiCad ERC/DRC evidence is clean; the LED fixture remains
+candidate-level, while connector/LED and amplifier fixtures remain `expected_fail` until their
 required KiCad ERC/DRC evidence is clean. Generated block-local routes now
 bind to physical same-net pad anchors and report route-connectivity evidence.
 Generated inter-block route candidates now promote connector/LED and I2C
@@ -65,11 +66,7 @@ includes local-route anchors, same-net segment intersection/overlap merges,
 same-net copper merge evidence, and via layer transitions. The I2C
 fixture now emits all 8 route-tree branches, proves all 12 required contacts,
 reports four graph-complete route-tree nets, and is reproducible as a checked-in
-structural candidate. It reaches project-write, writer-correctness, structural
-validation, and warning-level optional KiCad evidence. Pass promotion still
-requires clean required KiCad DRC evidence from a stable `kicad-cli`; the local
-macOS `pcb drc` command currently aborts before writing DRC JSON in this
-environment. Route-tree repair classifies contact blockers, feeds repairable hints
+KiCad-backed `pass` fixture with clean required ERC/DRC evidence. Route-tree repair classifies contact blockers, feeds repairable hints
 into bounded placement retry, and ranks selected attempts by route-tree
 completion evidence. Route-tree diagnostics now separate fixed-net skip notices
 and missing-net-class warnings from repairable blockers. The next blockers are

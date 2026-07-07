@@ -58,15 +58,17 @@ Examples live in `examples/design/`:
 
 Optional KiCad-backed design examples live in
 `examples/design/kicad-backed/`. They are run only when `KICADAI_KICAD_CLI` is
-configured. The richer fixture set mixes candidate and expected-fail cases:
-LED and I2C are structural candidates, while remaining richer boards document
+configured. The richer fixture set mixes pass, candidate, and expected-fail
+cases: I2C is a checked-in pass fixture with required KiCad ERC/DRC evidence,
+LED is a structural candidate, and remaining richer boards document
 blockers before KiCad ERC/DRC verification can complete. Do not report a
 fixture as passing unless the optional test or manual command produced
 successful KiCad report artifacts and the fixture readiness is `pass`.
 
 The multi-block I2C sensor breakout is covered by block and intent fixtures
 plus the optional KiCad-backed `i2c_sensor_breakout_candidate` design example.
-It is a structural candidate, not a DRC-clean pass fixture.
+It is now a reproducible KiCad-backed pass fixture when run with configured
+required ERC/DRC evidence.
 
 The top-level JSON result uses requested acceptance as the success contract. A
 request for `structural` acceptance can return `ok: true` while still including

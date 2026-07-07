@@ -93,12 +93,13 @@ multi-endpoint route-tree evidence:
 These fields are intended for AI repair loops and fixture promotion decisions.
 They prove endpoint grouping, target resolution, branch planning, contact proof,
 and graph-level completion status. They do not yet mean KiCad DRC-clean routing
-for richer generated boards; the I2C breakout fixture is now a structural
-`candidate`, with every VCC/GND/SDA/SCL route group graph-complete, generated
-label stubs grid-safe, and project-write, writer-correctness, and structural
-validation evidence present. The suite keeps mocked KiCad evidence in logic-only
-promotion tests: those tests exercise readiness decision code, not production
-pass readiness. Pass promotion still requires clean real KiCad DRC evidence.
+for richer generated boards; the I2C breakout fixture is now a KiCad-backed
+`pass` fixture, with every VCC/GND/SDA/SCL route group graph-complete, generated
+label stubs grid-safe, project-write, writer-correctness, structural validation
+evidence, and required clean KiCad ERC/DRC evidence. The suite keeps mocked
+KiCad evidence in logic-only promotion tests for promotion decision coverage,
+while the optional KiCad-backed fixture lane proves real pass evidence when
+`KICADAI_KICAD_CLI` is configured.
 
 The routing stage also exposes `inter_block_route_trees` when generated
 inter-block nets are managed by route-tree execution instead of the fallback
