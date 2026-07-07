@@ -1,0 +1,28 @@
+{
+  "id": "usb_c_led_indicator_pass",
+  "request": "usb_c_led_indicator_pass.json",
+  "tier": "block-composition",
+  "readiness": "pass",
+  "acceptance": "erc-drc",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [
+    ".kicadai/design-promotion.json"
+  ],
+  "expected_stages": [
+    "block_planning",
+    "component_selection",
+    "schematic",
+    "schematic_electrical",
+    "pcb_realization",
+    "placement",
+    "routing",
+    "project_write",
+    "writer_correctness",
+    "validation",
+    "kicad_checks"
+  ],
+  "known_gaps": [],
+  "notes": "Promoted KiCad-backed USB-C powered LED indicator pass fixture with project-local USB-C schematic symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence."
+}
