@@ -96,14 +96,56 @@ func TestPlacedLocalRoutePointsGuardsStaleAuthoredWaypoints(t *testing.T) {
 		t.Fatalf("nearby route = %#v ok=%v, want authored bends preserved", nearby, ok)
 	}
 
+	farTo := transactions.Point{XMM: 170, YMM: 100}
 	stale, ok := placedLocalRoutePoints([]transactions.Point{
 		{XMM: 0, YMM: 0},
 		{XMM: 2, YMM: 2},
 		{XMM: 8, YMM: 2},
 		{XMM: 20, YMM: 0},
-	}, from, to)
-	if !ok || len(stale) != 2 || stale[0] != from || stale[1] != to {
+	}, from, farTo)
+	if !ok || len(stale) != 2 || stale[0] != from || stale[1] != farTo {
 		t.Fatalf("stale route = %#v ok=%v, want direct endpoint fallback", stale, ok)
+	}
+}
+
+func TestPlacedLocalRoutePointsTransformsAuthoredShape(t *testing.T) {
+	from := transactions.Point{XMM: 20, YMM: 50}
+	to := transactions.Point{XMM: 16, YMM: 50}
+
+	routed, ok := placedLocalRoutePoints([]transactions.Point{
+		{XMM: 5, YMM: 0},
+		{XMM: 5, YMM: 2},
+		{XMM: 0, YMM: 2},
+		{XMM: 0, YMM: 0},
+	}, from, to)
+	if !ok || len(routed) != 4 {
+		t.Fatalf("route = %#v ok=%v, want transformed dogleg", routed, ok)
+	}
+	if math.Abs(routed[1].YMM-52) > 1e-9 || math.Abs(routed[2].YMM-52) > 1e-9 {
+		t.Fatalf("route = %#v, want dogleg above placed endpoints", routed)
+	}
+	if routed[0] != from || routed[len(routed)-1] != to {
+		t.Fatalf("route endpoints = %#v, want %#v -> %#v", routed, from, to)
+	}
+}
+
+func TestPlacedLocalRoutePointsTransformsSingleAuthoredWaypoint(t *testing.T) {
+	from := transactions.Point{XMM: 20, YMM: 50}
+	to := transactions.Point{XMM: 16, YMM: 50}
+
+	routed, ok := placedLocalRoutePoints([]transactions.Point{
+		{XMM: 5, YMM: 0},
+		{XMM: 2.5, YMM: 2},
+		{XMM: 0, YMM: 0},
+	}, from, to)
+	if !ok || len(routed) != 3 {
+		t.Fatalf("route = %#v ok=%v, want transformed one-waypoint shape", routed, ok)
+	}
+	if math.Abs(routed[1].XMM-18) > 1e-9 || math.Abs(routed[1].YMM-52) > 1e-9 {
+		t.Fatalf("route = %#v, want transformed midpoint dogleg", routed)
+	}
+	if routed[0] != from || routed[len(routed)-1] != to {
+		t.Fatalf("route endpoints = %#v, want %#v -> %#v", routed, from, to)
 	}
 }
 

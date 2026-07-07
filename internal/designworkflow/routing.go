@@ -34,6 +34,8 @@ type RoutingStageResult struct {
 
 const interBlockRouteSnapMaxDistanceMM = 0.75
 
+const localRouteShapeEndpointDeltaMismatchMaxMM = 25.0
+
 type LocalRouteConnectivitySummary struct {
 	RoutesAttempted        int `json:"routes_attempted"`
 	RoutesBound            int `json:"routes_bound"`
@@ -863,6 +865,8 @@ func sameRoutePoint(a transactions.Point, b transactions.Point) bool {
 }
 
 func placedLocalRoutePoints(points []transactions.Point, from transactions.Point, to transactions.Point) ([]transactions.Point, bool) {
+	// Realized local-route points include authored source/destination anchors:
+	// [source endpoint, zero or more waypoints, destination endpoint].
 	if transformed, ok := transformedLocalRoutePoints(points, from, to); ok {
 		return compactRoutePoints(transformed), true
 	}
@@ -875,6 +879,9 @@ func placedLocalRoutePoints(points []transactions.Point, from transactions.Point
 		routed = append(routed, points[1:len(points)-1]...)
 		routed = append(routed, to)
 		return compactRoutePoints(routed), true
+	}
+	if transformed, ok := transformedLocalRouteShape(points, from, to); ok {
+		return compactRoutePoints(transformed), true
 	}
 	return compactRoutePoints([]transactions.Point{from, to}), true
 }
@@ -935,6 +942,52 @@ func transformedLocalRoutePoints(points []transactions.Point, from transactions.
 	for index, point := range points {
 		transformed[index] = transactions.Point{XMM: point.XMM + fromDelta.XMM, YMM: point.YMM + fromDelta.YMM}
 	}
+	return transformed, true
+}
+
+func transformedLocalRouteShape(points []transactions.Point, from transactions.Point, to transactions.Point) ([]transactions.Point, bool) {
+	// Shape transforms require at least the authored source anchor, one
+	// waypoint, and the authored destination anchor.
+	if len(points) < 3 {
+		return nil, false
+	}
+	first := points[0]
+	last := points[len(points)-1]
+	fromDelta := transactions.Point{XMM: from.XMM - first.XMM, YMM: from.YMM - first.YMM}
+	toDelta := transactions.Point{XMM: to.XMM - last.XMM, YMM: to.YMM - last.YMM}
+	if math.Hypot(fromDelta.XMM-toDelta.XMM, fromDelta.YMM-toDelta.YMM) > localRouteShapeEndpointDeltaMismatchMaxMM {
+		return nil, false
+	}
+	sourceX := last.XMM - first.XMM
+	sourceY := last.YMM - first.YMM
+	sourceLength := math.Hypot(sourceX, sourceY)
+	destinationX := to.XMM - from.XMM
+	destinationY := to.YMM - from.YMM
+	destinationLength := math.Hypot(destinationX, destinationY)
+	const toleranceMM = 0.001
+	if sourceLength <= toleranceMM || destinationLength <= toleranceMM {
+		return nil, false
+	}
+	sourceLengthSquared := sourceLength * sourceLength
+	destinationUnitX := destinationX / destinationLength
+	destinationUnitY := destinationY / destinationLength
+	destinationPerpX := -destinationUnitY
+	destinationPerpY := destinationUnitX
+	transformed := make([]transactions.Point, 0, len(points))
+	transformed = append(transformed, from)
+	for _, point := range points[1 : len(points)-1] {
+		relativeX := point.XMM - first.XMM
+		relativeY := point.YMM - first.YMM
+		progress := (relativeX*sourceX + relativeY*sourceY) / sourceLengthSquared
+		// Keep perpendicular dogleg offsets in authored millimeters so clearance
+		// intent is preserved when only endpoint spacing changes.
+		perpendicularOffset := (relativeY*sourceX - relativeX*sourceY) / sourceLength
+		transformed = append(transformed, transactions.Point{
+			XMM: from.XMM + progress*destinationX + perpendicularOffset*destinationPerpX,
+			YMM: from.YMM + progress*destinationY + perpendicularOffset*destinationPerpY,
+		})
+	}
+	transformed = append(transformed, to)
 	return transformed, true
 }
 

@@ -735,6 +735,14 @@ func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	if _, err := builder.Route("POWER", points, RouteOptions{Layer: kicadfiles.LayerBCu}); err != nil {
 		t.Fatalf("back Route returned error: %v", err)
 	}
+	viaPoint := kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)}
+	via := RouteViaSpec{At: viaPoint, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}}
+	if _, err := builder.Route("POWER", points, RouteOptions{Layer: kicadfiles.LayerBCu, Vias: []RouteViaSpec{via}}); err != nil {
+		t.Fatalf("first via Route returned error: %v", err)
+	}
+	if _, err := builder.Route("POWER", points, RouteOptions{Layer: kicadfiles.LayerBCu, Vias: []RouteViaSpec{via}}); err != nil {
+		t.Fatalf("second via Route returned error: %v", err)
+	}
 	polygon := []kicadfiles.Point{
 		{X: kicadfiles.MM(5), Y: kicadfiles.MM(5)},
 		{X: kicadfiles.MM(25), Y: kicadfiles.MM(5)},
@@ -749,11 +757,17 @@ func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	}
 
 	design := builder.Design()
-	if len(design.PCB.Tracks) != 2 {
-		t.Fatalf("tracks = %d, want 2", len(design.PCB.Tracks))
+	if len(design.PCB.Tracks) != 4 {
+		t.Fatalf("tracks = %d, want 4", len(design.PCB.Tracks))
 	}
 	if design.PCB.Tracks[0].UUID == design.PCB.Tracks[1].UUID {
 		t.Fatalf("duplicate route UUID %s", design.PCB.Tracks[0].UUID)
+	}
+	if len(design.PCB.Vias) != 2 {
+		t.Fatalf("vias = %d, want 2", len(design.PCB.Vias))
+	}
+	if design.PCB.Vias[0].UUID == design.PCB.Vias[1].UUID {
+		t.Fatalf("duplicate via UUID %s", design.PCB.Vias[0].UUID)
 	}
 	if len(design.PCB.Zones) != 2 {
 		t.Fatalf("zones = %d, want 2", len(design.PCB.Zones))

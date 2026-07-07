@@ -17,6 +17,8 @@ import (
 	"kicadai/internal/routing"
 )
 
+// Builder accumulates a KiCad design through ordered mutations. It is not
+// safe for concurrent use by multiple goroutines.
 type Builder struct {
 	name       string
 	generator  kicadfiles.DeterministicIDGenerator
@@ -31,6 +33,7 @@ type Builder struct {
 	schematicWireEnds   map[kicadfiles.Point]struct{}
 	footprints          map[string]int
 	pads                map[string]map[string][]int
+	routeViaCounts      map[string]int
 }
 
 type Options struct {
@@ -177,6 +180,7 @@ func New(options Options) (*Builder, error) {
 		schematicWireEnds:   map[kicadfiles.Point]struct{}{},
 		footprints:          map[string]int{},
 		pads:                map[string]map[string][]int{},
+		routeViaCounts:      map[string]int{},
 	}
 	builder.design = kicaddesign.Design{
 		Name: name,
@@ -911,6 +915,8 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 	}
 	net := builder.nets.EnsureNet(netName)
 	added := 0
+	// Track UUIDs use the existing board track count so repeated Route calls
+	// cannot reuse the same per-call segment index.
 	trackOffset := len(builder.design.PCB.Tracks)
 	for i := 0; i < len(points)-1; i++ {
 		if points[i] == points[i+1] {
@@ -927,7 +933,10 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 		})
 		added++
 	}
-	for viaIndex, via := range options.Vias {
+	routeSeed := formatPoints(points)
+	for _, via := range options.Vias {
+		viaOrdinal := builder.routeViaCounts[net.Name]
+		builder.routeViaCounts[net.Name] = viaOrdinal + 1
 		layers := append([]kicadfiles.BoardLayer(nil), via.Layers...)
 		if len(layers) == 0 {
 			layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
@@ -941,7 +950,7 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 			drill = kicadfiles.MM(0.3)
 		}
 		builder.design.PCB.Vias = append(builder.design.PCB.Vias, pcb.Via{
-			UUID:     builder.generator.New("root.pcb.route.via", netName, fmt.Sprintf("%d", viaIndex), formatPoint(via.At), formatLayers(layers)),
+			UUID:     builder.generator.New("root.pcb.route.via", net.Name, fmt.Sprintf("%d", viaOrdinal), routeSeed, formatPoint(via.At), formatLayers(layers)),
 			Position: via.At,
 			Size:     size,
 			Drill:    drill,

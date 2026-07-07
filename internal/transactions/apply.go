@@ -342,7 +342,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			for p := 0; p < len(points)-1; p++ {
 				design.PCB.Tracks = append(design.PCB.Tracks, pcb.Track{
-					UUID:    generator.New("imported.pcb.route", routeSeed, payload.NetName, strconv.Itoa(p), pointSeed(points[p]), pointSeed(points[p+1])),
+					UUID:    generator.New("imported.pcb.route", strconv.Itoa(i), routeSeed, payload.NetName, strconv.Itoa(p), pointSeed(points[p]), pointSeed(points[p+1])),
 					Start:   points[p],
 					End:     points[p+1],
 					Width:   kicadfiles.MM(payload.WidthMM),
@@ -356,7 +356,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 					layers = append(layers, boardLayer(layer))
 				}
 				design.PCB.Vias = append(design.PCB.Vias, pcb.Via{
-					UUID:     generator.New("imported.pcb.via", routeSeed, payload.NetName, strconv.Itoa(viaIndex), pointSeed(point(via.At.XMM, via.At.YMM)), strings.Join(via.Layers, ",")),
+					UUID:     generator.New("imported.pcb.via", strconv.Itoa(i), routeSeed, payload.NetName, strconv.Itoa(viaIndex), pointSeed(point(via.At.XMM, via.At.YMM)), strings.Join(via.Layers, ",")),
 					Position: point(via.At.XMM, via.At.YMM),
 					Size:     kicadfiles.MM(via.DiameterMM),
 					Drill:    kicadfiles.MM(via.DrillMM),
