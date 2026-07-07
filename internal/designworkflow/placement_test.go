@@ -48,6 +48,29 @@ func TestPlaceFragmentsPlacesRealizedLED(t *testing.T) {
 	}
 }
 
+func TestPlacementKeepoutsPreserveAppliedRoleAsExemptRef(t *testing.T) {
+	fragment := BlockFragment{
+		InstanceID: "usb_power",
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"usb_c_receptacle": "J1", "alternate_connector_role": "j1"},
+		},
+		Keepouts: []blocks.PCBKeepout{{
+			ID:        "usb_c_edge_keepout",
+			Layer:     "F.Cu",
+			Bounds:    blocks.RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 3, MaxYMM: 8},
+			AppliesTo: []string{"usb_c_receptacle", "alternate_connector_role"},
+		}},
+	}
+
+	keepouts := placementKeepoutsFromFragment(fragment)
+	if len(keepouts) != 1 {
+		t.Fatalf("keepouts = %#v", keepouts)
+	}
+	if got := keepouts[0].ExemptRefs; len(got) != 1 || got[0] != "J1" {
+		t.Fatalf("exempt refs = %#v, want J1", got)
+	}
+}
+
 func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

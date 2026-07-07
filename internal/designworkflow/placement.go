@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"context"
 	"math"
+	"slices"
 	"strings"
 	"unicode"
 
@@ -618,13 +619,34 @@ func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 	keepouts := make([]placement.Keepout, 0, len(fragment.Keepouts))
 	for _, keepout := range fragment.Keepouts {
 		keepouts = append(keepouts, placement.Keepout{
-			ID:     blockPlacementGroupID(fragment, keepout.ID),
-			Bounds: relativeBoundsToPlacementRect(fragment, keepout.Bounds),
-			Layers: []string{keepout.Layer},
-			Reason: keepout.Description,
+			ID:         blockPlacementGroupID(fragment, keepout.ID),
+			Bounds:     relativeBoundsToPlacementRect(fragment, keepout.Bounds),
+			Layers:     []string{keepout.Layer},
+			ExemptRefs: keepoutExemptRefsFromFragment(fragment, keepout),
+			Reason:     keepout.Description,
 		})
 	}
 	return keepouts
+}
+
+func keepoutExemptRefsFromFragment(fragment BlockFragment, keepout blocks.PCBKeepout) []string {
+	refs := make([]string, 0, len(keepout.AppliesTo))
+	seen := map[string]struct{}{}
+	for _, role := range keepout.AppliesTo {
+		ref := fragment.Realization.RoleRefs[strings.TrimSpace(role)]
+		ref = strings.TrimSpace(ref)
+		if ref == "" {
+			continue
+		}
+		key := strings.ToUpper(ref)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		refs = append(refs, key)
+	}
+	slices.Sort(refs)
+	return refs
 }
 
 func proximityRulesFromFragment(fragment BlockFragment) []placement.ProximityRule {

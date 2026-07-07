@@ -3,6 +3,7 @@ package placement
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -173,8 +174,12 @@ func (o *occupancy) FirstConflict(candidate PlacementResult) (string, bool) {
 func (o *occupancy) FirstConflictDetail(candidate PlacementResult) (occupancyConflict, bool) {
 	candidate.Position = normalizePlacementLayer(candidate.Position)
 	candidateLayer := candidate.Position.Layer
+	candidateRef := strings.ToUpper(strings.TrimSpace(candidate.Ref))
 	for _, keepout := range o.keepouts {
 		if keepout.Optional {
+			continue
+		}
+		if keepoutExemptsNormalizedRef(keepout, candidateRef) {
 			continue
 		}
 		if keepoutAppliesToLayer(keepout, candidateLayer) && keepout.Bounds.Intersects(candidate.Bounds) {
@@ -303,6 +308,18 @@ func keepoutAppliesToLayer(keepout Keepout, layer string) bool {
 		}
 	}
 	return false
+}
+
+func keepoutExemptsRef(keepout Keepout, ref string) bool {
+	return keepoutExemptsNormalizedRef(keepout, strings.ToUpper(strings.TrimSpace(ref)))
+}
+
+func keepoutExemptsNormalizedRef(keepout Keepout, ref string) bool {
+	if ref == "" {
+		return false
+	}
+	_, found := slices.BinarySearch(keepout.ExemptRefs, ref)
+	return found
 }
 
 func nearlyEqual(a float64, b float64) bool {

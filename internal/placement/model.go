@@ -168,6 +168,7 @@ type Keepout struct {
 	ID         string
 	Bounds     Rect
 	Layers     []string
+	ExemptRefs []string
 	Reason     string
 	Optional   bool
 	Mechanical bool `json:"Mechanical,omitempty"`
@@ -681,6 +682,7 @@ func NormalizeRequest(request Request) Request {
 			continue
 		}
 		request.Keepouts[i].Layers = slices.Clone(request.Keepouts[i].Layers)
+		request.Keepouts[i].ExemptRefs = sortedTrimmedStrings(request.Keepouts[i].ExemptRefs)
 		request.Keepouts[i].ID = strings.TrimSpace(request.Keepouts[i].ID)
 		keepouts = append(keepouts, request.Keepouts[i])
 	}
@@ -1706,4 +1708,23 @@ func issue(path string, message string) reports.Issue {
 		Path:     path,
 		Message:  message,
 	}
+}
+
+func sortedTrimmedStrings(values []string) []string {
+	out := make([]string, 0, len(values))
+	seen := map[string]struct{}{}
+	for _, value := range values {
+		trimmed := strings.TrimSpace(value)
+		if trimmed == "" {
+			continue
+		}
+		key := strings.ToUpper(trimmed)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		out = append(out, key)
+	}
+	slices.Sort(out)
+	return out
 }

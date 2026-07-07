@@ -711,7 +711,7 @@ func fanoutAvailableSides(board BoardPlacementArea, keepouts []Keepout, placemen
 		if candidate.space < clearance {
 			continue
 		}
-		if fanoutSideBlockedByKeepout(candidate.name, placement.Bounds, keepouts, clearance) {
+		if fanoutSideBlockedByKeepout(candidate.name, placement, keepouts, clearance) {
 			continue
 		}
 		available = append(available, candidate.name)
@@ -719,7 +719,9 @@ func fanoutAvailableSides(board BoardPlacementArea, keepouts []Keepout, placemen
 	return available
 }
 
-func fanoutSideBlockedByKeepout(side string, bounds Rect, keepouts []Keepout, clearance float64) bool {
+func fanoutSideBlockedByKeepout(side string, placement PlacementResult, keepouts []Keepout, clearance float64) bool {
+	bounds := placement.Bounds
+	placementRef := strings.ToUpper(strings.TrimSpace(placement.Ref))
 	probe := expandedRect(bounds, clearance)
 	switch side {
 	case "left":
@@ -732,6 +734,9 @@ func fanoutSideBlockedByKeepout(side string, bounds Rect, keepouts []Keepout, cl
 		probe.Min.YMM = bounds.Max.YMM
 	}
 	for _, keepout := range keepouts {
+		if keepoutExemptsNormalizedRef(keepout, placementRef) {
+			continue
+		}
 		if !keepout.Optional && keepout.Bounds.Intersects(probe) {
 			return true
 		}
@@ -756,7 +761,7 @@ func fanoutEdgePressure(board BoardPlacementArea, bounds Rect, clearance float64
 func fanoutKeepoutPressure(keepouts []Keepout, placement PlacementResult, clearance float64) float64 {
 	pressure := 0.0
 	for _, side := range []string{"left", "right", "bottom", "top"} {
-		if fanoutSideBlockedByKeepout(side, placement.Bounds, keepouts, clearance) {
+		if fanoutSideBlockedByKeepout(side, placement, keepouts, clearance) {
 			pressure++
 		}
 	}
@@ -1207,6 +1212,9 @@ func keepoutViolationReports(keepouts []Keepout, placements []PlacementResult) [
 	for _, keepout := range keepouts {
 		report := KeepoutReport{ID: keepout.ID, Reason: keepout.Reason, Optional: keepout.Optional}
 		for _, placement := range placements {
+			if keepoutExemptsRef(keepout, placement.Ref) {
+				continue
+			}
 			if keepoutAppliesToLayer(keepout, placement.Position.Layer) && keepout.Bounds.Intersects(placement.Bounds) {
 				report.Refs = append(report.Refs, placement.Ref)
 			}

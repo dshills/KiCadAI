@@ -566,6 +566,24 @@ func TestQualityReportMechanicalScoreIgnoresComponentOverlap(t *testing.T) {
 	}
 }
 
+func TestQualityReportIgnoresKeepoutExemptRefs(t *testing.T) {
+	req := minimalRequest()
+	req.Keepouts = []Keepout{{
+		ID:         "connector_edge",
+		Bounds:     Rect{Min: Point{XMM: 4, YMM: 4}, Max: Point{XMM: 8, YMM: 8}},
+		ExemptRefs: []string{"R1"},
+	}}
+	result := Result{
+		Status:     StatusPlaced,
+		Placements: []PlacementResult{mustPlacementResultForTest(t, req.Components[0], Placement{XMM: 5, YMM: 5})},
+	}
+
+	quality := BuildQualityReport(req, result)
+	if quality.RequiredKeepoutViolations != 0 || len(quality.KeepoutReports) != 0 {
+		t.Fatalf("quality reported exempt keepout overlap: %#v", quality)
+	}
+}
+
 func TestQualityReportMissingProximityTargetMarshalsJSON(t *testing.T) {
 	req := minimalRequest()
 	req.ProximityRules = []ProximityRule{{
