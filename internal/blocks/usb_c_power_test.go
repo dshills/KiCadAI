@@ -94,6 +94,128 @@ func TestUSBCPowerCCPullDownsArePresent(t *testing.T) {
 	}
 }
 
+func TestUSBCPowerProtectedTVSUsesShortWideBulkGroundReturn(t *testing.T) {
+	realization := usbCPowerPCBRealization()
+	routes := map[string]PCBLocalRoute{}
+	for _, candidate := range realization.LocalRoutes {
+		routes[candidate.ID] = candidate
+	}
+	route := routes["tvs_ground"]
+	if route.ID == "" {
+		t.Fatalf("tvs_ground route missing")
+	}
+	if route.To.ComponentRole != "bulk_capacitor" || route.To.Pin != "2" {
+		t.Fatalf("tvs_ground route endpoint = %#v, want bulk_capacitor pin 2", route.To)
+	}
+	if len(route.Waypoints) != 0 {
+		t.Fatalf("tvs_ground waypoints = %#v, want direct short return", route.Waypoints)
+	}
+	if route.Layer != "F.Cu" {
+		t.Fatalf("tvs_ground layer = %q, want F.Cu short return", route.Layer)
+	}
+	if route.WidthMM < 0.8 {
+		t.Fatalf("tvs_ground width = %g, want >= 0.8mm", route.WidthMM)
+	}
+	if route.When.Params["include_tvs"] != true || route.When.Params["include_bulk_capacitor"] != true {
+		t.Fatalf("tvs_ground conditions = %#v, want protected TVS+bulk path", route.When.Params)
+	}
+	bulk := routes["bulk_ground"]
+	if bulk.ID == "" || bulk.WidthMM < 0.8 {
+		t.Fatalf("bulk_ground route = %#v, want >= 0.8mm continuation", bulk)
+	}
+	if bulk.Layer != "F.Cu" {
+		t.Fatalf("bulk_ground layer = %q, want F.Cu return", bulk.Layer)
+	}
+	if bulk.To.ComponentRole != "cc2_rd" || bulk.To.Pin != "2" {
+		t.Fatalf("bulk endpoint = %#v, want local CC2 ground hub", bulk.To)
+	}
+	fallback := routes["tvs_ground_fallback"]
+	if fallback.ID == "" {
+		t.Fatalf("tvs_ground_fallback route missing")
+	}
+	if fallback.To.ComponentRole != "cc2_rd" || fallback.To.Pin != "2" {
+		t.Fatalf("fallback endpoint = %#v, want local CC2 ground hub", fallback.To)
+	}
+	if fallback.WidthMM < 0.8 {
+		t.Fatalf("fallback width = %g, want >= 0.8mm", fallback.WidthMM)
+	}
+	if fallback.Layer != "F.Cu" {
+		t.Fatalf("fallback layer = %q, want F.Cu return", fallback.Layer)
+	}
+	if fallback.When.Params["include_tvs"] != true || fallback.When.Params["include_bulk_capacitor"] != false {
+		t.Fatalf("fallback conditions = %#v, want TVS-only path", fallback.When.Params)
+	}
+}
+
+func TestUSBCPowerTVSOnlyRealizationKeepsGroundRoute(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("usb_c_power")
+	if !ok {
+		t.Fatal("missing usb_c_power")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "usb_c_power",
+		InstanceID: "usb",
+		Params: map[string]any{
+			"include_bulk_capacitor": false,
+			"include_tvs":            true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	rolesByRef := addSymbolRolesByRef(t, output.Operations)
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realize issues = %#v", realized.Issues)
+	}
+	routeIDs := map[string]bool{}
+	for _, route := range realized.LocalRoutes {
+		routeIDs[route.ID] = true
+		if route.ID == "tvs_ground_fallback" && (rolesByRef[route.To.Ref] != "cc2_rd" || route.To.Pin != "2") {
+			t.Fatalf("fallback route = %#v, want local CC2 ground endpoint", route)
+		}
+	}
+	if !routeIDs["tvs_ground_fallback"] {
+		t.Fatalf("routes = %#v, want tvs_ground_fallback", realized.LocalRoutes)
+	}
+	if routeIDs["tvs_ground"] {
+		t.Fatalf("routes = %#v, want bulk TVS route omitted without bulk capacitor", realized.LocalRoutes)
+	}
+	if routeIDs["bulk_ground"] {
+		t.Fatalf("routes = %#v, want bulk ground route omitted without bulk capacitor", realized.LocalRoutes)
+	}
+}
+
+func TestUSBCPowerDefaultRealizationUsesBulkTVSGroundRoute(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("usb_c_power")
+	if !ok {
+		t.Fatal("missing usb_c_power")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "usb_c_power",
+		InstanceID: "usb",
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	realized := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(realized.Issues) {
+		t.Fatalf("realize issues = %#v", realized.Issues)
+	}
+	routeIDs := map[string]bool{}
+	for _, route := range realized.LocalRoutes {
+		routeIDs[route.ID] = true
+	}
+	if !routeIDs["tvs_ground"] || !routeIDs["bulk_ground"] {
+		t.Fatalf("default routes = %#v, want tvs_ground and bulk_ground active", realized.LocalRoutes)
+	}
+	if routeIDs["tvs_ground_fallback"] {
+		t.Fatalf("default routes = %#v, want fallback omitted when bulk capacitor defaults active", realized.LocalRoutes)
+	}
+}
+
 func TestUSBCPowerPowerLEDIsForwardBiased(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{
