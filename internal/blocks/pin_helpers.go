@@ -18,6 +18,13 @@ func twoTerminalVerticalPins() []transactions.PinSpec {
 	}
 }
 
+func deviceCTemplatePins() []transactions.PinSpec {
+	return []transactions.PinSpec{
+		{Number: "1", XMM: 0, YMM: 3.81},
+		{Number: "2", XMM: 0, YMM: -3.81},
+	}
+}
+
 func deviceRTemplatePins() []transactions.PinSpec {
 	return []transactions.PinSpec{
 		{Number: "1", XMM: 0, YMM: 3.81},

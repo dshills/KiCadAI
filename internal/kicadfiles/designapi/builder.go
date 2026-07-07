@@ -537,7 +537,7 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 	if builder == nil {
 		return
 	}
-	points := orthogonalSchematicWirePoints(start, end)
+	points := builder.orthogonalSchematicWirePoints(start, end)
 	for index := 0; index < len(points)-1; index++ {
 		if samePoint(points[index], points[index+1]) || hasSchematicWireSegment(builder.design.Schematic.Wires, points[index], points[index+1]) {
 			continue
@@ -570,6 +570,80 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 			points[index],
 		))
 	}
+}
+
+func (builder *Builder) orthogonalSchematicWirePoints(start, end kicadfiles.Point) []kicadfiles.Point {
+	points := orthogonalSchematicWirePoints(start, end)
+	if builder == nil || !builder.schematicPathTouchesOtherPinAnchor(points, start, end) {
+		return points
+	}
+	grid := kicadfiles.MM(1.27)
+	var candidates [][]kicadfiles.Point
+	if start.X != end.X && start.Y != end.Y {
+		candidates = append(candidates, []kicadfiles.Point{
+			start,
+			{X: end.X, Y: start.Y},
+			end,
+		})
+		xOffset := grid
+		if end.X < start.X {
+			xOffset = -xOffset
+		}
+		candidates = append(candidates, []kicadfiles.Point{
+			start,
+			{X: start.X + xOffset, Y: start.Y},
+			{X: start.X + xOffset, Y: end.Y},
+			end,
+		})
+	} else if start.X == end.X {
+		for _, xOffset := range []kicadfiles.IU{grid, -grid} {
+			candidates = append(candidates, []kicadfiles.Point{
+				start,
+				{X: start.X + xOffset, Y: start.Y},
+				{X: end.X + xOffset, Y: end.Y},
+				end,
+			})
+		}
+	} else {
+		for _, yOffset := range []kicadfiles.IU{grid, -grid} {
+			candidates = append(candidates, []kicadfiles.Point{
+				start,
+				{X: start.X, Y: start.Y + yOffset},
+				{X: end.X, Y: end.Y + yOffset},
+				end,
+			})
+		}
+	}
+	for _, candidate := range candidates {
+		if !builder.schematicPathTouchesOtherPinAnchor(candidate, start, end) {
+			return candidate
+		}
+	}
+	return points
+}
+
+func (builder *Builder) schematicPathTouchesOtherPinAnchor(points []kicadfiles.Point, start, end kicadfiles.Point) bool {
+	for index := 1; index < len(points); index++ {
+		if builder.schematicSegmentTouchesOtherPinAnchor(points[index-1], points[index], start, end) {
+			return true
+		}
+	}
+	return false
+}
+
+func (builder *Builder) schematicSegmentTouchesOtherPinAnchor(a, b, start, end kicadfiles.Point) bool {
+	if builder == nil {
+		return false
+	}
+	for anchor := range builder.schematicPinAnchors {
+		if samePoint(anchor, start) || samePoint(anchor, end) {
+			continue
+		}
+		if pointOnSchematicSegment(anchor, a, b) {
+			return true
+		}
+	}
+	return false
 }
 
 func (builder *Builder) addSchematicEndpointJunction(netName string, position kicadfiles.Point) {
@@ -1024,7 +1098,74 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 	if builder == nil {
 		return kicaddesign.WriteResult{}, fmt.Errorf("builder required")
 	}
-	return kicaddesign.WriteProjectDirectory(root, builder.Design(), options)
+	design := builder.Design()
+	ensureGeneratedLocalSymbolLibraries(&design)
+	return kicaddesign.WriteProjectDirectory(root, design, options)
+}
+
+func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design) {
+	if design == nil || design.Schematic == nil {
+		return
+	}
+	seenLibraries := map[string]struct{}{}
+	for _, entry := range design.SymbolTables {
+		seenLibraries[strings.ToLower(strings.TrimSpace(entry.Name))] = struct{}{}
+	}
+	seenArtifacts := map[string]struct{}{}
+	for _, artifact := range design.AssetFiles {
+		seenArtifacts[strings.ToLower(strings.TrimSpace(artifact.Path))] = struct{}{}
+	}
+	libraryIDsByNickname := map[string][]string{}
+	var nicknameOrder []string
+	for _, libraryID := range generatedLocalSymbolLibraryIDs(design.Schematic) {
+		nickname := libraryNickname(libraryID)
+		if nickname == "" {
+			continue
+		}
+		nicknameKey := strings.ToLower(nickname)
+		if _, ok := libraryIDsByNickname[nicknameKey]; !ok {
+			nicknameOrder = append(nicknameOrder, nickname)
+		}
+		libraryIDsByNickname[nicknameKey] = appendUnique(libraryIDsByNickname[nicknameKey], libraryID)
+	}
+	for _, nickname := range nicknameOrder {
+		nicknameKey := strings.ToLower(nickname)
+		assetPath := "lib/kicadai_" + strings.ToLower(nickname) + ".kicad_sym"
+		contents, ok := schematic.LocalSymbolLibraryForIDs(libraryIDsByNickname[nicknameKey])
+		if !ok {
+			continue
+		}
+		if _, ok := seenLibraries[strings.ToLower(nickname)]; !ok {
+			design.SymbolTables = append(design.SymbolTables, library.TableEntry{
+				Name:        nickname,
+				Type:        "KiCad",
+				URI:         "${KIPRJMOD}/" + assetPath,
+				Description: "Generated symbols for " + nickname,
+			})
+			seenLibraries[strings.ToLower(nickname)] = struct{}{}
+		}
+		if _, ok := seenArtifacts[strings.ToLower(assetPath)]; !ok {
+			design.AssetFiles = append(design.AssetFiles, kicaddesign.TextArtifact{
+				Path:     assetPath,
+				Contents: contents,
+			})
+			seenArtifacts[strings.ToLower(assetPath)] = struct{}{}
+		}
+	}
+}
+
+func generatedLocalSymbolLibraryIDs(file *schematic.SchematicFile) []string {
+	if file == nil {
+		return nil
+	}
+	var ids []string
+	for _, symbol := range file.Symbols {
+		libraryID := strings.TrimSpace(symbol.LibraryID)
+		if _, ok := schematic.LocalSymbolLibrary(libraryID); ok {
+			ids = appendUnique(ids, libraryID)
+		}
+	}
+	return ids
 }
 
 func (builder *Builder) pinAnchor(endpoint Endpoint) (kicadfiles.Point, error) {

@@ -75,6 +75,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if pins[0].Number != "1" || pins[0].Offset.Y != kicadfiles.MM(3.81) || pins[1].Number != "2" || pins[1].Offset.Y != kicadfiles.MM(-3.81) {
 		t.Fatalf("unexpected two-pin offsets: %#v", pins)
 	}
+	capacitorPins, ok := EmbeddedSymbolPinOffsets("Device:C")
+	if !ok || len(capacitorPins) != 2 || capacitorPins[0].Offset.X != 0 || capacitorPins[0].Offset.Y != kicadfiles.MM(3.81) || capacitorPins[1].Offset.X != 0 || capacitorPins[1].Offset.Y != kicadfiles.MM(-3.81) {
+		t.Fatalf("unexpected capacitor offsets: %#v ok=%v", capacitorPins, ok)
+	}
 	connectorPins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x02")
 	if !ok || len(connectorPins) != 2 || connectorPins[0].Offset.Y != 0 || connectorPins[1].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected connector offsets: %#v ok=%v", connectorPins, ok)
@@ -114,6 +118,33 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	}
 	if _, ok := EmbeddedSymbolPinOffsets("Custom:Block"); ok {
 		t.Fatal("unexpected custom block template pins")
+	}
+}
+
+func TestLocalSymbolLibraryRendersUnqualifiedSyntheticSymbol(t *testing.T) {
+	contents, ok := LocalSymbolLibrary("Sensor:Generic_I2C")
+	if !ok {
+		t.Fatal("expected project-local generic I2C sensor library")
+	}
+	output := string(contents)
+	if !strings.Contains(output, "(kicad_symbol_lib") || !strings.Contains(output, `"Generic_I2C"`) {
+		t.Fatalf("local symbol library missing expected symbol body:\n%s", output)
+	}
+	if strings.Contains(output, `"Sensor:Generic_I2C"`) {
+		t.Fatalf("local symbol library should use unqualified symbol name:\n%s", output)
+	}
+	if _, ok := LocalSymbolLibrary("power:GND"); ok {
+		t.Fatal("power symbols should not produce local libraries")
+	}
+	if _, ok := LocalSymbolLibrary("Custom:Missing"); ok {
+		t.Fatal("unsupported symbols should not produce local libraries")
+	}
+	grouped, ok := LocalSymbolLibraryForIDs([]string{"Sensor:Generic_I2C", "Sensor:Generic_I2C", "Device:C"})
+	if !ok {
+		t.Fatal("expected grouped local symbol library")
+	}
+	if strings.Count(string(grouped), `"Generic_I2C"`) != 1 || strings.Contains(string(grouped), `"Device:C"`) {
+		t.Fatalf("grouped local symbol library should deduplicate eligible symbols only:\n%s", grouped)
 	}
 }
 

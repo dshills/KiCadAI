@@ -42,6 +42,36 @@ func TestI2CSensorInstantiatesDefaultOperations(t *testing.T) {
 	}
 }
 
+func TestI2CSensorDecouplingUsesKiCadCapacitorPinAnchors(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "i2c_sensor",
+		InstanceID: "temp",
+		Params: map[string]any{
+			"i2c_address": "0x48",
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	capRef := output.Instance.Refs[1]
+	for _, operation := range output.Operations {
+		if operation.Op != transactions.OpAddSymbol || operation.Ref != capRef {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("unmarshal add-symbol operation: %v", err)
+		}
+		pins := payload.Pins
+		if len(pins) != 2 || pins[0].Number != "1" || pins[0].XMM != 0 || pins[0].YMM != 3.81 || pins[1].Number != "2" || pins[1].XMM != 0 || pins[1].YMM != -3.81 {
+			t.Fatalf("decoupling capacitor pins = %#v, want KiCad Device:C anchors", pins)
+		}
+		return
+	}
+	t.Fatalf("missing decoupling capacitor add-symbol operation for %s: %#v", capRef, output.Operations)
+}
+
 func TestI2CSensorWithoutPullupsStillExportsBus(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{

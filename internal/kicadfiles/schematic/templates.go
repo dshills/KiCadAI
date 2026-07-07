@@ -1,6 +1,7 @@
 package schematic
 
 import (
+	"bytes"
 	"strconv"
 	"strings"
 
@@ -18,6 +19,7 @@ type embeddedTemplate struct {
 	pinType               string
 	pinX                  float64
 	power                 bool
+	localLibrary          bool
 	pins                  []TemplatePin
 	connectionPinOverride map[string]kicadfiles.Point
 	rawBody               string
@@ -34,7 +36,7 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
 	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", pins: connectorTemplatePins(3)},
 	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
-	"device:c":                     {bodyName: "C", pinType: "passive", pins: twoPinTemplatePins()},
+	"device:c":                     {bodyName: "C", pinType: "passive", pins: deviceCTemplatePins(), rawBody: rawDeviceCSymbol},
 	"device:c_polarized":           {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},
 	"device:d":                     {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
 	"device:led":                   {bodyName: "LED", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceLEDSymbol},
@@ -68,8 +70,9 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"power:vee": powerTemplate("VEE", -5.08),
 	"power:vss": powerTemplate("VSS", -5.08),
 	"sensor:generic_i2c": {
-		bodyName: "Generic_I2C",
-		pinType:  "bidirectional",
+		bodyName:     "Generic_I2C",
+		pinType:      "bidirectional",
+		localLibrary: true,
 		pins: []TemplatePin{
 			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
 			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},
@@ -101,6 +104,51 @@ func EmbeddedSymbolPinOffsets(libraryID string) ([]TemplatePin, bool) {
 	return cloneTemplatePins(template.pins), true
 }
 
+// LocalSymbolLibrary renders a project-local KiCad symbol library containing
+// the known embedded template for libraryID. The returned library uses the
+// unqualified symbol name because KiCad resolves the nickname through
+// sym-lib-table.
+func LocalSymbolLibrary(libraryID string) ([]byte, bool) {
+	return LocalSymbolLibraryForIDs([]string{libraryID})
+}
+
+// LocalSymbolLibraryForIDs renders one project-local KiCad symbol library for
+// the subset of library IDs whose templates require project-local resolution.
+func LocalSymbolLibraryForIDs(libraryIDs []string) ([]byte, bool) {
+	bodies := make([]sexpr.Node, 0, len(libraryIDs))
+	seen := map[string]struct{}{}
+	for _, libraryID := range libraryIDs {
+		libraryID = strings.TrimSpace(libraryID)
+		template, ok := embeddedSymbolTemplates[strings.ToLower(libraryID)]
+		if !ok || !template.localLibrary || len(template.pins) == 0 {
+			continue
+		}
+		if _, ok := seen[strings.ToLower(template.bodyName)]; ok {
+			continue
+		}
+		seen[strings.ToLower(template.bodyName)] = struct{}{}
+		bodies = append(bodies, symbolBodyFromTemplatePins(template.bodyName, template.bodyName, template.pinType, template.pins))
+	}
+	if len(bodies) == 0 {
+		return nil, false
+	}
+	nodes := []sexpr.Node{
+		sexpr.A("kicad_symbol_lib"),
+		sexpr.L(sexpr.A("version"), sexpr.I(kicadfiles.KiCadSchematicFormatWithGeneratorVersion)),
+		sexpr.L(sexpr.A("generator"), sexpr.S("kicadai")),
+		sexpr.L(sexpr.A("generator_version"), sexpr.S("10.0")),
+	}
+	nodes = append(nodes, bodies...)
+	root := sexpr.L(
+		nodes...,
+	)
+	var buf bytes.Buffer
+	if err := sexpr.Render(&buf, root); err != nil {
+		return nil, false
+	}
+	return buf.Bytes(), true
+}
+
 // EmbeddedSymbolConnectionPinOffset returns a KiCad-validated connection
 // anchor override for symbols whose ERC-resolved connection point differs from
 // the canonical raw symbol primitive used for library-body compatibility.
@@ -117,6 +165,13 @@ func twoPinTemplatePins() []TemplatePin {
 	return []TemplatePin{
 		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: 0}},
 		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: 0}},
+	}
+}
+
+func deviceCTemplatePins() []TemplatePin {
+	return []TemplatePin{
+		{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}},
+		{Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}},
 	}
 }
 
@@ -471,6 +526,32 @@ const rawDeviceRSymbol = `(symbol "Device:R"
   (symbol "R_1_1"
     (pin passive line (at 0 3.81 270) (length 1.27) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
     (pin passive line (at 0 -3.81 90) (length 1.27) (name "" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`
+
+const rawDeviceCSymbol = `(symbol "Device:C"
+  (pin_numbers (hide yes))
+  (pin_names (offset 0.254))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "C" (at 0.635 2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27)) (justify left)))
+  (property "Value" "C" (at 0.635 -2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27)) (justify left)))
+  (property "Footprint" "" (at 0.9652 -3.81 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Unpolarized capacitor" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "cap capacitor" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "C_*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "C_0_1"
+    (polyline (pts (xy -2.032 0.762) (xy 2.032 0.762)) (stroke (width 0.508) (type default)) (fill (type none)))
+    (polyline (pts (xy -2.032 -0.762) (xy 2.032 -0.762)) (stroke (width 0.508) (type default)) (fill (type none)))
+  )
+  (symbol "C_1_1"
+    (pin passive line (at 0 3.81 270) (length 2.794) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at 0 -3.81 90) (length 2.794) (name "" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
   )
   (embedded_fonts no)
 )`

@@ -110,7 +110,7 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	}
 	if boolParam(params, "include_decoupling", true) {
 		capRef := allocator.Next("C")
-		capacitor := BlockComponent{Role: "decoupling_capacitor", RefPrefix: "C", Value: stringParam(params, "decoupling_value"), SymbolID: "Device:C", FootprintID: stringParam(params, "decoupling_footprint"), Pins: twoTerminalHorizontalPins()}
+		capacitor := BlockComponent{Role: "decoupling_capacitor", RefPrefix: "C", Value: stringParam(params, "decoupling_value"), SymbolID: "Device:C", FootprintID: stringParam(params, "decoupling_footprint"), Pins: deviceCTemplatePins()}
 		capOps, capIssues := ComponentOperations(capacitor, capRef, transactions.Point{XMM: 0, YMM: 10})
 		issuesOut = append(issuesOut, capIssues...)
 		operations = append(operations, capOps...)
