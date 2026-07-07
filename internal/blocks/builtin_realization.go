@@ -6,6 +6,10 @@ import (
 	"kicadai/internal/components"
 )
 
+func boolPtr(value bool) *bool {
+	return &value
+}
+
 func ledIndicatorComponents() []BlockComponent {
 	return []BlockComponent{
 		{
@@ -382,7 +386,7 @@ func usbCPowerComponents() []BlockComponent {
 }
 
 func usbCPowerPCBRealization() *PCBRealization {
-	edgeKeepoutBlocksRoute := false
+	usbPowerRoles := []string{"usb_c_receptacle", "cc1_rd", "cc2_rd", "vbus_fuse", "vbus_tvs", "bulk_capacitor"}
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
@@ -394,9 +398,10 @@ func usbCPowerPCBRealization() *PCBRealization {
 			{ComponentRole: "vbus_tvs", FootprintID: "Diode_SMD:D_SOD-323", Placement: RelativePlacement{XMM: 18, YMM: 6, Layer: "F.Cu"}},
 			{ComponentRole: "bulk_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: 0, Layer: "F.Cu"}},
 		},
-		PlacementGroups: []PCBPlacementGroup{{ID: "usb_c_power_entry", ComponentRoles: []string{"usb_c_receptacle", "cc1_rd", "cc2_rd", "vbus_fuse", "vbus_tvs", "bulk_capacitor"}, AnchorRole: "usb_c_receptacle", Bounds: &RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 22, MaxYMM: 10}}},
+		PlacementGroups: []PCBPlacementGroup{{ID: "usb_c_power_entry", ComponentRoles: append([]string(nil), usbPowerRoles...), AnchorRole: "usb_c_receptacle", Bounds: &RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 22, MaxYMM: 10}}},
 		Keepouts: []PCBKeepout{
-			{ID: "usb_c_edge_keepout", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 3, MaxYMM: 8}, AppliesTo: []string{"usb_c_receptacle"}, BlocksRoute: &edgeKeepoutBlocksRoute, Description: "Reserve board-edge clearance around the USB-C receptacle."},
+			{ID: "usb_c_edge_keepout", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 3, MaxYMM: 8}, AppliesTo: []string{"usb_c_receptacle"}, BlocksRoute: boolPtr(false), Description: "Reserve board-edge clearance around the USB-C receptacle."},
+			{ID: "usb_c_power_entry_placement", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 23, MaxYMM: 12}, AppliesTo: append([]string(nil), usbPowerRoles...), BlocksRoute: boolPtr(false), Description: "Reserve placement area for USB-C power-entry companions."},
 		},
 		LocalRoutes: []PCBLocalRoute{
 			{ID: "cc1_pull_down", NetTemplate: "cc1", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC1}, To: RouteEndpoint{ComponentRole: "cc1_rd", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.25, Required: true},

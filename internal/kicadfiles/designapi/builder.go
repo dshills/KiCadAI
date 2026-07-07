@@ -984,14 +984,14 @@ func (builder *Builder) RouteBoard(request routing.Request, options RouteBoardOp
 				NetName: net.Name,
 			})
 		}
-		for _, via := range route.Vias {
+		for viaIndex, via := range route.Vias {
 			position := pointFromRoutingPoint(via.At)
 			layers := make([]kicadfiles.BoardLayer, 0, len(via.Layers))
 			for _, layer := range via.Layers {
 				layers = append(layers, boardLayerFromRouting(layer))
 			}
 			builder.design.PCB.Vias = append(builder.design.PCB.Vias, pcb.Via{
-				UUID:     builder.generator.New("root.pcb.route_board.via", route.Net, formatPoint(position), formatLayers(layers)),
+				UUID:     builder.generator.New("root.pcb.route_board.via", route.Net, strconv.Itoa(viaIndex), formatPoint(position), formatLayers(layers)),
 				Position: position,
 				Size:     kicadfiles.MM(via.DiameterMM),
 				Drill:    kicadfiles.MM(via.DrillMM),
