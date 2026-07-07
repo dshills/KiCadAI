@@ -163,7 +163,7 @@ func instantiateUSBCPower(definition BlockDefinition, request BlockRequest, para
 	if boolParam(params, "include_bulk_capacitor", true) {
 		capRef := allocator.Next("C")
 		cap := BlockComponent{Role: "bulk_capacitor", RefPrefix: "C", Value: "10uF", SymbolID: "Device:C", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Pins: deviceCTemplatePins()}
-		capOps, capIssues := ComponentOperations(cap, capRef, transactions.Point{XMM: 45, YMM: -10.16})
+		capOps, capIssues := ComponentOperations(cap, capRef, transactions.Point{XMM: 55, YMM: -10.16})
 		issuesOut = append(issuesOut, capIssues...)
 		operations = append(operations, capOps...)
 		appendConnectOperation(&operations, &issuesOut, capRef, "1", protectedRef, protectedPin, vbusOutNet)
