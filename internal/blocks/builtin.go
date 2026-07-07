@@ -9,7 +9,8 @@ const (
 	defaultMCUSymbol          = "MCU_Microchip_ATmega:ATmega328P-A"
 	defaultMCUFootprint       = "Package_QFP:TQFP-32_7x7mm_P0.8mm"
 	defaultOpAmpSymbol        = "Amplifier_Operational:LMV321"
-	defaultUSBCSymbol         = "Connector:USB_C_Receptacle_USB2.0_16P"
+	defaultUSBCSymbol         = "Connector:USB_C_Receptacle_PowerOnly_6P"
+	defaultUSBCFootprint      = "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal"
 )
 
 func BuiltinDefinitions() []BlockDefinition {
@@ -211,7 +212,7 @@ func usbCPowerDefinition() BlockDefinition {
 		Version:     "0.1.0",
 		Category:    "power",
 		Parameters: []BlockParameter{
-			{Name: "connector_footprint", Type: ParameterFootprintID, Default: "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", Description: "USB-C receptacle footprint ID."},
+			{Name: "connector_footprint", Type: ParameterFootprintID, Default: defaultUSBCFootprint, Description: "USB-C receptacle footprint ID."},
 			{Name: "current_limit", Type: ParameterCurrent, Default: "500mA", Description: "Expected maximum VBUS current."},
 			{Name: "include_fuse", Type: ParameterBool, Default: true, Description: "Include a resettable fuse on VBUS."},
 			{Name: "include_tvs", Type: ParameterBool, Default: true, Description: "Include VBUS ESD/TVS protection."},
@@ -231,7 +232,7 @@ func usbCPowerDefinition() BlockDefinition {
 			{Kind: "symbol", ID: "Device:Fuse", Required: false, Description: "Optional VBUS fuse."},
 			{Kind: "symbol", ID: "Device:D_TVS", Required: false, Description: "Optional VBUS TVS diode."},
 			{Kind: "symbol", ID: "Device:C", Required: false, Description: "Optional VBUS bulk capacitor."},
-			{Kind: "footprint", ID: "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12", Required: false, Description: "Default USB-C receptacle footprint when connector_footprint is not overridden."},
+			{Kind: "footprint", ID: defaultUSBCFootprint, Required: false, Description: "Default USB-C receptacle footprint when connector_footprint is not overridden."},
 		},
 		Components:     usbCPowerComponents(),
 		PCBRealization: usbCPowerPCBRealization(),

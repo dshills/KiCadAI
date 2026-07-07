@@ -19,12 +19,19 @@ type usbCPinRoleMap struct {
 }
 
 var usbCPowerPins = usbCPinRoleMap{
-	VBUS: []string{"A4", "A9", "B4", "B9"},
-	GND:  []string{"A1", "A12", "B1", "B12"},
+	VBUS: []string{"A9", "B9"},
+	GND:  []string{"A12", "B12"},
 	CC1:  "A5",
 	CC2:  "B5",
-	// KiCad 10 Connector:USB_C_Receptacle_USB2.0_16P names the shield pin SH.
+	// KiCad 10 Connector:USB_C_Receptacle_PowerOnly_6P names the shield pin SH.
 	Shield: "SH",
+}
+
+func usbCPowerPinAt(pins []string, index int, fallback string) string {
+	if index >= 0 && index < len(pins) && pins[index] != "" {
+		return pins[index]
+	}
+	return fallback
 }
 
 func instantiateUSBCPower(definition BlockDefinition, request BlockRequest, params map[string]any, issues []reports.Issue) BlockOutput {
@@ -193,27 +200,25 @@ func instantiateUSBCPower(definition BlockDefinition, request BlockRequest, para
 
 func usbCSymbolPins(roles usbCPinRoleMap) []transactions.PinSpec {
 	positions := map[string]transactions.Point{
-		"A1":  {XMM: 0, YMM: -22.86},
-		"A4":  {XMM: 15.24, YMM: 15.24},
 		"A5":  {XMM: 15.24, YMM: 10.16},
-		"A6":  {XMM: 15.24, YMM: -2.54},
-		"A7":  {XMM: 15.24, YMM: 2.54},
-		"A8":  {XMM: 15.24, YMM: -12.7},
 		"A9":  {XMM: 15.24, YMM: 15.24},
 		"A12": {XMM: 0, YMM: -22.86},
-		"B1":  {XMM: 0, YMM: -22.86},
-		"B4":  {XMM: 15.24, YMM: 15.24},
 		"B5":  {XMM: 15.24, YMM: 7.62},
-		"B6":  {XMM: 15.24, YMM: -5.08},
-		"B7":  {XMM: 15.24, YMM: 0},
-		"B8":  {XMM: 15.24, YMM: -15.24},
-		"B9":  {XMM: 15.24, YMM: 15.24},
-		"B12": {XMM: 0, YMM: -22.86},
+		"B9":  {XMM: 15.24, YMM: 12.7},
+		"B12": {XMM: 0, YMM: -25.4},
 		"SH":  {XMM: -7.62, YMM: -22.86},
 	}
-	pinOrder := []string{"A1", "A4", roles.CC1, "A6", "A7", "A8", "A9", "A12", "B1", "B4", roles.CC2, "B6", "B7", "B8", "B9", "B12", roles.Shield}
+	pinOrder := append([]string{}, roles.CC1)
+	pinOrder = append(pinOrder, roles.VBUS...)
+	pinOrder = append(pinOrder, roles.GND...)
+	pinOrder = append(pinOrder, roles.CC2, roles.Shield)
 	pins := make([]transactions.PinSpec, 0, len(pinOrder))
+	seen := map[string]struct{}{}
 	for _, pin := range pinOrder {
+		if _, exists := seen[pin]; exists {
+			continue
+		}
+		seen[pin] = struct{}{}
 		position, ok := positions[pin]
 		if !ok {
 			continue

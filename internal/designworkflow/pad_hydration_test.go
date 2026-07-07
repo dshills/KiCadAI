@@ -275,6 +275,39 @@ func TestUSBCHROTemplateHydratesPowerOnlyPads(t *testing.T) {
 	}
 }
 
+func TestUSBCGCTPowerOnlyTemplateHydratesVerifiedPads(t *testing.T) {
+	template, ok := verifiedPadTemplate("Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal")
+	if !ok {
+		t.Fatal("missing USB-C GCT template")
+	}
+	if len(template.Pads) != 10 {
+		t.Fatalf("pad count = %d, want 10", len(template.Pads))
+	}
+	for _, name := range []string{"A5", "A9", "A12", "B5", "B9", "B12", "SH", "SH2", "SH3", "SH4"} {
+		if !padTemplateHasName(template.Pads, name) {
+			t.Fatalf("missing USB-C GCT pad %s in %#v", name, padTemplateNames(template.Pads))
+		}
+	}
+	if duplicated := duplicatePadTemplateNames(template.Pads); len(duplicated) != 0 {
+		t.Fatalf("routing template contains duplicate pad names: %#v", duplicated)
+	}
+
+	index := buildPadNetAssignmentIndex([]placement.Net{{Name: "SHIELD", Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "SH"}}}})
+	pads, issues := assignPadNetsFromIndex("J1", template.Pads, index)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	var shieldCount int
+	for _, pad := range pads {
+		if strings.HasPrefix(pad.Name, "SH") && pad.Net == "SHIELD" {
+			shieldCount++
+		}
+	}
+	if shieldCount != 4 {
+		t.Fatalf("shield pads assigned = %d, pads=%#v", shieldCount, pads)
+	}
+}
+
 func TestUSBShieldPadMatcherRequiresNumericSuffix(t *testing.T) {
 	padByName := map[string][]int{
 		"SH":      {1},

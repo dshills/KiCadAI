@@ -36,6 +36,24 @@ func TestUSBCPowerInstantiatesDefaultSink(t *testing.T) {
 	}
 }
 
+func TestUSBCPowerSymbolPinsFollowPowerOnlyRoleMap(t *testing.T) {
+	pins := usbCSymbolPins(usbCPowerPins)
+	got := map[string]bool{}
+	for _, pin := range pins {
+		got[pin.Number] = true
+	}
+	for _, want := range []string{"A5", "A9", "A12", "B5", "B9", "B12", "SH"} {
+		if !got[want] {
+			t.Fatalf("missing power-only USB-C pin %s in %#v", want, pins)
+		}
+	}
+	for _, forbidden := range []string{"A1", "A4", "A6", "A7", "A8", "B1", "B4", "B6", "B7", "B8"} {
+		if got[forbidden] {
+			t.Fatalf("unexpected 16-pin USB-C pin %s in %#v", forbidden, pins)
+		}
+	}
+}
+
 func TestUSBCPowerCCPullDownsArePresent(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{BlockID: "usb_c_power", InstanceID: "usb"})

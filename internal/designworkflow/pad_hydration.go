@@ -161,6 +161,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return twoPadTemplate(6.2, 3.0, 1.5, 1.7, 4.4), true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
+	case "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal":
+		return usbCGCTUSB4125PowerOnlyTemplate(), true
 	case "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
 		return usbCHROTypeC31M12Template(), true
 	case "Package_TO_SOT_SMD:SOT-23-5":
@@ -239,6 +241,22 @@ func usbCHROTypeC31M12Template() verifiedPadTemplateRecord {
 		{Name: "SH4", XMM: 4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
 	}
 	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.0, 7.5), Pads: pads}
+}
+
+func usbCGCTUSB4125PowerOnlyTemplate() verifiedPadTemplateRecord {
+	pads := []placement.PadSummary{
+		{Name: "A5", XMM: -0.5, YMM: -3.08, WidthMM: 0.7, HeightMM: 1.2},
+		{Name: "A9", XMM: 1.52, YMM: -3.08, WidthMM: 0.76, HeightMM: 1.2},
+		{Name: "A12", XMM: 2.75, YMM: -3.08, WidthMM: 0.8, HeightMM: 1.2},
+		{Name: "B5", XMM: 0.5, YMM: -3.08, WidthMM: 0.7, HeightMM: 1.2},
+		{Name: "B9", XMM: -1.52, YMM: -3.08, WidthMM: 0.76, HeightMM: 1.2},
+		{Name: "B12", XMM: -2.75, YMM: -3.08, WidthMM: 0.8, HeightMM: 1.2},
+		{Name: "SH", XMM: -4.32, YMM: -3.0, WidthMM: 1.1, HeightMM: 1.7},
+		{Name: "SH2", XMM: -4.32, YMM: 0.8, WidthMM: 1.1, HeightMM: 1.7},
+		{Name: "SH3", XMM: 4.32, YMM: -3.0, WidthMM: 1.1, HeightMM: 1.7},
+		{Name: "SH4", XMM: 4.32, YMM: 0.8, WidthMM: 1.1, HeightMM: 1.7},
+	}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.0, 6.9), Pads: pads}
 }
 
 func twoPadTemplate(envelopeWidth, envelopeHeight, padWidth, padHeight, pitch float64) verifiedPadTemplateRecord {
