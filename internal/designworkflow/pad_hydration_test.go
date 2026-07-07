@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"reflect"
+	"strings"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -262,12 +263,33 @@ func TestUSBCHROTemplateHydratesPowerOnlyPads(t *testing.T) {
 	}
 	var shieldCount int
 	for _, pad := range pads {
-		if pad.Name == "SH" && pad.Net == "SHIELD" {
+		if strings.HasPrefix(pad.Name, "SH") && pad.Net == "SHIELD" {
 			shieldCount++
 		}
 	}
 	if shieldCount != 4 {
 		t.Fatalf("shield pads assigned = %d, pads=%#v", shieldCount, pads)
+	}
+	if duplicated := duplicatePadTemplateNames(template.Pads); len(duplicated) != 0 {
+		t.Fatalf("routing template contains duplicate pad names: %#v", duplicated)
+	}
+}
+
+func TestUSBShieldPadMatcherRequiresNumericSuffix(t *testing.T) {
+	padByName := map[string][]int{
+		"SH":      {1},
+		"SH2":     {2},
+		"SHIELD":  {3},
+		"SHIELD1": {4},
+		"SHUNT":   {5},
+	}
+	got := matchingPadIndexesForPin(padByName, " sh ")
+	if !reflect.DeepEqual(got, []int{1, 2, 3, 4}) {
+		t.Fatalf("shield pad matches = %#v, want SH/SH2/SHIELD only", got)
+	}
+	got = matchingPadIndexesForPin(padByName, "SHIELD")
+	if !reflect.DeepEqual(got, []int{1, 2, 3, 4}) {
+		t.Fatalf("shield alias pad matches = %#v, want SH/SH2/SHIELD only", got)
 	}
 }
 
@@ -286,6 +308,19 @@ func padTemplateHasName(pads []placement.PadSummary, name string) bool {
 		}
 	}
 	return false
+}
+
+func duplicatePadTemplateNames(pads []placement.PadSummary) []string {
+	seen := map[string]struct{}{}
+	duplicates := []string{}
+	for _, pad := range pads {
+		if _, exists := seen[pad.Name]; exists {
+			duplicates = append(duplicates, pad.Name)
+			continue
+		}
+		seen[pad.Name] = struct{}{}
+	}
+	return duplicates
 }
 
 func TestAssignPadNetsMapsEndpointPinsToPads(t *testing.T) {

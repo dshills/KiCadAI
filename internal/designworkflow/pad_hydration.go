@@ -234,9 +234,9 @@ func usbCHROTypeC31M12Template() verifiedPadTemplateRecord {
 		{Name: "B9", XMM: -2.45, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
 		{Name: "B12", XMM: -3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
 		{Name: "SH", XMM: -4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
-		{Name: "SH", XMM: -4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
-		{Name: "SH", XMM: 4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
-		{Name: "SH", XMM: 4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
+		{Name: "SH2", XMM: -4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
+		{Name: "SH3", XMM: 4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
+		{Name: "SH4", XMM: 4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
 	}
 	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.0, 7.5), Pads: pads}
 }
@@ -354,17 +354,18 @@ func assignPadNetsFromIndex(ref string, pads []placement.PadSummary, assignments
 		name := strings.TrimSpace(pad.Name)
 		out[index].Name = name
 		if name != "" {
-			padByName[name] = append(padByName[name], index)
+			normalizedName := strings.ToUpper(name)
+			padByName[normalizedName] = append(padByName[normalizedName], index)
 		}
 	}
 	var issues []reports.Issue
 	for _, assignment := range assignments[strings.ToUpper(ref)] {
-		pin := assignment.Pin
+		pin := strings.TrimSpace(assignment.Pin)
 		if pin == "" {
 			issues = append(issues, padHydrationIssue(ref, "", "nets."+assignment.NetName, "net endpoint pin is required for pad assignment"))
 			continue
 		}
-		padIndexes := padByName[pin]
+		padIndexes := matchingPadIndexesForPin(padByName, pin)
 		if len(padIndexes) == 0 {
 			issues = append(issues, padHydrationIssue(ref, "", "nets."+assignment.NetName+"."+pin, "net endpoint pin has no matching footprint pad"))
 			continue
@@ -378,6 +379,39 @@ func assignPadNetsFromIndex(ref string, pads []placement.PadSummary, assignments
 		}
 	}
 	return out, issues
+}
+
+func matchingPadIndexesForPin(padByName map[string][]int, pin string) []int {
+	normalizedPin := strings.ToUpper(strings.TrimSpace(pin))
+	if normalizedPin != "SH" && normalizedPin != "SHIELD" {
+		return padByName[normalizedPin]
+	}
+	matches := []int{}
+	for padName, padIndexes := range padByName {
+		if isUSBShieldPadName(padName) {
+			matches = append(matches, padIndexes...)
+		}
+	}
+	sort.Ints(matches)
+	return matches
+}
+
+func isUSBShieldPadName(name string) bool {
+	if name == "SH" || name == "SHIELD" {
+		return true
+	}
+	prefix := "SH"
+	if strings.HasPrefix(name, "SHIELD") {
+		prefix = "SHIELD"
+	} else if !strings.HasPrefix(name, "SH") {
+		return false
+	}
+	for _, char := range name[len(prefix):] {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 func padHydrationResultForRef(base padHydrationResult, ref string) padHydrationResult {
