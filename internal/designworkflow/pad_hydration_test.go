@@ -238,12 +238,54 @@ func TestSOT223TemplateMapsDuplicatePinTwoPads(t *testing.T) {
 	}
 }
 
+func TestUSBCHROTemplateHydratesPowerOnlyPads(t *testing.T) {
+	template, ok := verifiedPadTemplate("Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12")
+	if !ok {
+		t.Fatal("missing USB-C HRO template")
+	}
+	if len(template.Pads) != 20 {
+		t.Fatalf("pad count = %d, want 20", len(template.Pads))
+	}
+	for _, name := range []string{"A1", "A4", "A5", "A9", "A12", "B1", "B4", "B5", "B9", "B12", "SH"} {
+		if !padTemplateHasName(template.Pads, name) {
+			t.Fatalf("missing USB-C pad %s in %#v", name, padTemplateNames(template.Pads))
+		}
+	}
+	if template.Bounds.WidthMM < 9.6 || template.Bounds.HeightMM < 7.0 {
+		t.Fatalf("USB-C bounds too small: %#v", template.Bounds)
+	}
+
+	index := buildPadNetAssignmentIndex([]placement.Net{{Name: "SHIELD", Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "SH"}}}})
+	pads, issues := assignPadNetsFromIndex("J1", template.Pads, index)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	var shieldCount int
+	for _, pad := range pads {
+		if pad.Name == "SH" && pad.Net == "SHIELD" {
+			shieldCount++
+		}
+	}
+	if shieldCount != 4 {
+		t.Fatalf("shield pads assigned = %d, pads=%#v", shieldCount, pads)
+	}
+}
+
 func padTemplateNames(pads []placement.PadSummary) []string {
 	names := make([]string, 0, len(pads))
 	for _, pad := range pads {
 		names = append(names, pad.Name)
 	}
 	return names
+}
+
+func padTemplateHasName(pads []placement.PadSummary, name string) bool {
+	for _, pad := range pads {
+		if pad.Name == name {
+			return true
+		}
+	}
+	return false
 }
 
 func TestAssignPadNetsMapsEndpointPinsToPads(t *testing.T) {

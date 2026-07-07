@@ -161,6 +161,8 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return twoPadTemplate(6.2, 3.0, 1.5, 1.7, 4.4), true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoPadTemplate(4.5, 2.6, 1.6, 1.6, 2.8), true
+	case "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12":
+		return usbCHROTypeC31M12Template(), true
 	case "Package_TO_SOT_SMD:SOT-23-5":
 		return verifiedPadTemplateRecord{
 			Bounds: centeredEstimatedBounds(3.7, 3.0),
@@ -211,6 +213,32 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 	default:
 		return verifiedPadTemplateRecord{}, false
 	}
+}
+
+func usbCHROTypeC31M12Template() verifiedPadTemplateRecord {
+	pads := []placement.PadSummary{
+		{Name: "A1", XMM: -3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "A4", XMM: -2.45, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "A5", XMM: -1.25, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "A6", XMM: -0.25, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "A7", XMM: 0.25, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "A8", XMM: 1.25, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "A9", XMM: 2.45, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "A12", XMM: 3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "B1", XMM: 3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "B4", XMM: 2.45, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "B5", XMM: 1.75, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "B6", XMM: 0.75, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "B7", XMM: -0.75, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "B8", XMM: -1.75, YMM: -4.045, WidthMM: 0.3, HeightMM: 1.45},
+		{Name: "B9", XMM: -2.45, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "B12", XMM: -3.25, YMM: -4.045, WidthMM: 0.6, HeightMM: 1.45},
+		{Name: "SH", XMM: -4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
+		{Name: "SH", XMM: -4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
+		{Name: "SH", XMM: 4.32, YMM: -3.13, WidthMM: 1.0, HeightMM: 2.1},
+		{Name: "SH", XMM: 4.32, YMM: 1.05, WidthMM: 1.0, HeightMM: 1.6},
+	}
+	return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 10.0, 7.5), Pads: pads}
 }
 
 func twoPadTemplate(envelopeWidth, envelopeHeight, padWidth, padHeight, pitch float64) verifiedPadTemplateRecord {
