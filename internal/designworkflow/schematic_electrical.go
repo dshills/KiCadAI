@@ -75,8 +75,8 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 				Position:   position,
 				PinAnchors: schematicElectricalPinAnchors(position, payload.Pins),
 			}
-			file.Symbols = append(file.Symbols, symbol)
 			symbolPins[payload.Ref] = schematicElectricalPinMap(position, payload.Pins)
+			file.Symbols = append(file.Symbols, symbol)
 			if strings.TrimSpace(payload.Value) != "" || !strings.HasPrefix(strings.TrimSpace(payload.Ref), "#") {
 				opts.ValueChecks = append(opts.ValueChecks, schematicrules.ValueCheck{
 					Reference: payload.Ref,
@@ -125,12 +125,29 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 			}
 			file.NoConnects = append(file.NoConnects, schematic.NoConnect{Position: point})
 			opts.PinIntents = append(opts.PinIntents, schematicrules.PinIntent{Reference: payload.Endpoint.Ref, Pin: payload.Endpoint.Pin, Position: schematicElectricalIntentPointIU(point), Kind: schematicrules.PinIntentNoConnect})
+		case transactions.OpAddLabel:
+			var payload transactions.AddLabelOperation
+			if err := decodeSchematicElectricalOperation(operation, &payload); err != nil {
+				return file, opts, []reports.Issue{schematicElectricalDecodeIssue(index, err)}
+			}
+			file.Labels = append(file.Labels, schematic.Label{Text: payload.Text, Kind: schematicElectricalLabelKind(payload.Kind), Position: schematicElectricalPoint(payload.At)})
 		}
 	}
 	if len(issues) != 0 {
 		return file, opts, issues
 	}
 	return file, opts, nil
+}
+
+func schematicElectricalLabelKind(value string) schematic.LabelKind {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "global":
+		return schematic.LabelGlobal
+	case "hierarchical":
+		return schematic.LabelHierarchical
+	default:
+		return schematic.LabelLocal
+	}
 }
 
 func decodeSchematicElectricalOperation(operation transactions.Operation, target any) error {

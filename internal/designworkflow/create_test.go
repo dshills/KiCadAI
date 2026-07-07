@@ -15,6 +15,7 @@ import (
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicrules"
 	"kicadai/internal/transactions"
 )
 
@@ -119,6 +120,35 @@ func TestSchematicElectricalStageBlocksUnresolvedEndpoint(t *testing.T) {
 	}
 	if len(stage.Issues) != 1 || stage.Issues[0].Path != "operations[2].to" {
 		t.Fatalf("unexpected endpoint issues: %#v", stage.Issues)
+	}
+}
+
+func TestSchematicElectricalStageAllowsProtectedUSBCPower(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), blocks.BlockRequest{
+		BlockID:    "usb_c_power",
+		InstanceID: "usb",
+		Params: map[string]any{
+			"include_bulk_capacitor": true,
+			"include_fuse":           true,
+			"include_power_led":      false,
+			"include_tvs":            true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	tx, err := blocks.ProjectTransactionForBlockOutput("usb_power", output, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	file, opts, inputIssues := schematicElectricalInputsFromTransaction(tx)
+	if len(inputIssues) != 0 {
+		t.Fatalf("schematic electrical input issues = %#v", inputIssues)
+	}
+	report := schematicrules.Inspect(file, opts)
+	if report.Status != schematicrules.StatusClean {
+		t.Fatalf("protected USB-C schematic electrical status = %s findings = %#v labels = %#v wires = %#v", report.Status, report.Findings, file.Labels, file.Wires)
 	}
 }
 

@@ -273,12 +273,15 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 				}
 			}
 		}
+		netName := groupNetNames[root]
+		if netName == "" && len(endpoints) > 0 {
+			netName = "NET_" + endpoints[0].ref + "_" + endpoints[0].pin
+		}
+		if pseudoNetName, ok := projectPseudoEndpointNetName(pseudoEndpoints, netName); ok {
+			netName = pseudoNetName
+		}
 		if len(endpoints) < 2 {
 			continue
-		}
-		netName := groupNetNames[root]
-		if netName == "" {
-			netName = "NET_" + endpoints[0].ref + "_" + endpoints[0].pin
 		}
 		first := endpoints[0]
 		for _, endpoint := range endpoints[1:] {
@@ -294,6 +297,19 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		}
 	}
 	return out, nil
+}
+
+func projectPseudoEndpointNetName(pseudoEndpoints []projectEndpointKey, fallback string) (string, bool) {
+	if len(pseudoEndpoints) == 0 {
+		return "", false
+	}
+	netName := terminalValue(pseudoEndpoints[0], fallback)
+	for _, endpoint := range pseudoEndpoints[1:] {
+		if terminalValue(endpoint, fallback) != netName {
+			return "", false
+		}
+	}
+	return netName, true
 }
 
 func isProjectPseudoRef(ref string, pseudoRefs map[string]struct{}) bool {
