@@ -2,6 +2,7 @@ package boardvalidation
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -343,6 +344,122 @@ func TestDRCArtifactsSkipsMissingReport(t *testing.T) {
 	})
 	if len(artifacts) != 0 {
 		t.Fatalf("artifacts = %#v, want none for missing report", artifacts)
+	}
+}
+
+func TestDRCNoOutputCrashWarnsAndMarksCheckError(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:          checks.CheckKindDRC,
+		Status:        checks.CheckStatusError,
+		TargetPath:    "demo",
+		ToolErrorKind: checks.ToolErrorNoOutputCrash,
+	}
+
+	issues := drcIssues(result, errors.New("drc check failed with exit code -1"), "demo")
+
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one tool issue", issues)
+	}
+	if issues[0].Code != reports.CodeKiCadCLIFailed || issues[0].Severity != reports.SeverityWarning {
+		t.Fatalf("tool issue = %#v, want warning KiCad CLI failure", issues[0])
+	}
+	if status := drcCheckStatus(result, errors.New("drc check failed with exit code -1"), issues); status != StatusError {
+		t.Fatalf("status = %q, want error because DRC did not complete", status)
+	}
+}
+
+func TestDRCFindingsStillFailBoardValidation(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:     checks.CheckKindDRC,
+		Status:   checks.CheckStatusFail,
+		ExitCode: 5,
+		Findings: []checks.CheckFinding{{
+			Kind:           checks.CheckKindDRC,
+			Severity:       "error",
+			Message:        "unconnected pad",
+			RepairCategory: checks.RepairConnectivity,
+		}},
+	}
+
+	issues := drcIssues(result, nil, "demo")
+
+	if len(issues) != 1 || issues[0].Code != reports.CodeDisconnectedPad {
+		t.Fatalf("issues = %#v, want disconnected pad validation issue", issues)
+	}
+	if status := drcCheckStatus(result, nil, issues); status != StatusFail {
+		t.Fatalf("status = %q, want fail for real DRC findings", status)
+	}
+}
+
+func TestDRCUntypedErrorIsReported(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:       checks.CheckKindDRC,
+		Status:     checks.CheckStatusError,
+		TargetPath: "demo",
+	}
+
+	issues := drcIssues(result, errors.New("context deadline exceeded"), "demo")
+
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one fallback tool issue", issues)
+	}
+	if issues[0].Code != reports.CodeKiCadCLIFailed || issues[0].Severity != reports.SeverityError {
+		t.Fatalf("tool issue = %#v, want error KiCad CLI failure", issues[0])
+	}
+	if status := drcCheckStatus(result, errors.New("context deadline exceeded"), issues); status != StatusError {
+		t.Fatalf("status = %q, want error", status)
+	}
+}
+
+func TestDRCViolationExitWithFindingsDoesNotAddToolError(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:     checks.CheckKindDRC,
+		Status:   checks.CheckStatusFail,
+		ExitCode: 5,
+		Findings: []checks.CheckFinding{{
+			Kind:           checks.CheckKindDRC,
+			Severity:       "error",
+			Message:        "clearance violation",
+			RepairCategory: checks.RepairClearance,
+		}},
+	}
+
+	issues := drcIssues(result, errors.New("drc check failed with exit code 5"), "demo")
+
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want only DRC finding", issues)
+	}
+	if issues[0].Code == reports.CodeKiCadCLIFailed {
+		t.Fatalf("issues = %#v, did not expect tool failure for DRC finding exit", issues)
+	}
+	if status := drcCheckStatus(result, errors.New("drc check failed with exit code 5"), issues); status != StatusFail {
+		t.Fatalf("status = %q, want fail for DRC finding exit", status)
+	}
+}
+
+func TestDRCPartialFindingsWithAbnormalErrorReportsToolError(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:     checks.CheckKindDRC,
+		Status:   checks.CheckStatusError,
+		ExitCode: -1,
+		Findings: []checks.CheckFinding{{
+			Kind:           checks.CheckKindDRC,
+			Severity:       "error",
+			Message:        "partial clearance violation",
+			RepairCategory: checks.RepairClearance,
+		}},
+	}
+
+	issues := drcIssues(result, errors.New("signal: killed"), "demo")
+
+	if len(issues) != 2 {
+		t.Fatalf("issues = %#v, want tool issue and partial finding", issues)
+	}
+	if issues[0].Code != reports.CodeKiCadCLIFailed {
+		t.Fatalf("issues = %#v, want tool issue first", issues)
+	}
+	if status := drcCheckStatus(result, errors.New("signal: killed"), issues); status != StatusError {
+		t.Fatalf("status = %q, want error for abnormal execution with partial findings", status)
 	}
 }
 

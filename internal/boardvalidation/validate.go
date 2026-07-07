@@ -689,17 +689,9 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 		targetPath = target.ProjectDir
 	}
 	drc, err := checks.RunDRC(ctx, cli, targetPath, checkOpts)
-	issues := drcIssues(drc, err)
-	if err != nil && !slices.ContainsFunc(issues, func(issue reports.Issue) bool { return issue.Code == reports.CodeKiCadCLIFailed }) {
-		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: reports.SeverityError, Path: targetPath, Message: err.Error()})
-	}
+	issues := drcIssues(drc, err, targetPath)
 	artifacts := drcArtifacts(drc)
-	status := StatusPass
-	if err != nil {
-		status = StatusError
-	} else if len(issues) > 0 {
-		status = StatusFail
-	}
+	status := drcCheckStatus(drc, err, issues)
 	if !opts.RequireDRC {
 		if status == StatusError {
 			return Check{Name: CheckKiCadDRC, Required: false, Status: StatusSkipped, Issues: demoteOptionalDRCIssues(issues), Artifacts: artifacts, Evidence: drc.ReportPath}
@@ -709,6 +701,16 @@ func runDRCCheck(ctx context.Context, target Target, opts Options) Check {
 		}
 	}
 	return Check{Name: CheckKiCadDRC, Required: opts.RequireDRC, Status: status, Issues: issues, Artifacts: artifacts, Evidence: drc.ReportPath}
+}
+
+func drcCheckStatus(result checks.CheckResult, err error, issues []reports.Issue) Status {
+	if drcToolErrorIsBlocking(result, err) {
+		return StatusError
+	}
+	if len(issues) > 0 {
+		return StatusFail
+	}
+	return StatusPass
 }
 
 func demoteOptionalDRCIssues(issues []reports.Issue) []reports.Issue {
@@ -732,8 +734,11 @@ func missingDRCPolicy(opts Options) (Status, reports.Severity) {
 	return StatusSkipped, reports.SeverityInfo
 }
 
-func drcIssues(result checks.CheckResult, err error) []reports.Issue {
+func drcIssues(result checks.CheckResult, err error, targetPath string) []reports.Issue {
 	var issues []reports.Issue
+	if drcToolErrorShouldReport(result, err) {
+		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: drcToolErrorSeverity(result), Path: firstNonEmpty(result.TargetPath, targetPath, "kicad_drc"), Message: drcToolErrorMessage(result, err), Suggestion: drcToolErrorSuggestion(result)})
+	}
 	for _, finding := range result.Findings {
 		issues = append(issues, reports.Issue{
 			Code:       codeForDRCFinding(finding),
@@ -746,12 +751,84 @@ func drcIssues(result checks.CheckResult, err error) []reports.Issue {
 		})
 	}
 	for _, parserIssue := range result.ParserIssues {
-		issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: result.ReportPath, Message: parserIssue.Message})
-	}
-	if err != nil {
-		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: reports.SeverityError, Path: result.TargetPath, Message: err.Error()})
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   reports.SeverityError,
+			Path:       result.ReportPath,
+			Message:    parserIssue.Message,
+			Suggestion: "Keep the KiCad DRC report artifact and update the parser for this KiCad report shape",
+		})
 	}
 	return issues
+}
+
+func drcToolErrorIsNoOutputCrash(result checks.CheckResult) bool {
+	return result.Kind == checks.CheckKindDRC &&
+		result.ToolErrorKind == checks.ToolErrorNoOutputCrash &&
+		len(result.Findings) == 0 &&
+		len(result.ParserIssues) == 0
+}
+
+func drcToolErrorIsBlocking(result checks.CheckResult, err error) bool {
+	if result.ToolErrorKind != checks.ToolErrorNone && !drcToolErrorIsNoOutputCrash(result) {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	return !drcErrorIsFindingExit(result)
+}
+
+func drcToolErrorShouldReport(result checks.CheckResult, err error) bool {
+	if result.ToolErrorKind != checks.ToolErrorNone {
+		return true
+	}
+	if err == nil {
+		return false
+	}
+	return !drcErrorIsFindingExit(result)
+}
+
+func drcErrorIsFindingExit(result checks.CheckResult) bool {
+	return result.ExitCode > 0 && len(result.Findings) > 0 && len(result.ParserIssues) == 0
+}
+
+func drcToolErrorSeverity(result checks.CheckResult) reports.Severity {
+	if drcToolErrorIsNoOutputCrash(result) {
+		return reports.SeverityWarning
+	}
+	return reports.SeverityError
+}
+
+func drcToolErrorMessage(result checks.CheckResult, err error) string {
+	message := "drc check failed"
+	switch result.ToolErrorKind {
+	case checks.ToolErrorMissingReport:
+		message = "drc check failed without producing the requested report"
+	case checks.ToolErrorNoOutputCrash:
+		message = "drc check exited before writing a report"
+	case checks.ToolErrorReportParse:
+		message = "drc check produced an unparseable KiCad report"
+	case checks.ToolErrorCommandFailed:
+		message = "drc check command failed"
+	}
+	if err != nil {
+		return message + ": " + err.Error()
+	}
+	return message
+}
+
+func drcToolErrorSuggestion(result checks.CheckResult) string {
+	if drcToolErrorIsNoOutputCrash(result) {
+		return "KiCad DRC exited before writing a report; verify kicad-cli outside this process or use a stable KiCad CLI before requiring pass evidence"
+	}
+	if result.ToolErrorKind == checks.ToolErrorMissingReport {
+		return "KiCad CLI failed without producing the requested DRC report; rerun with --keep-artifacts and inspect stdout/stderr"
+	}
+	if result.ToolErrorKind == checks.ToolErrorReportParse {
+		return "KiCad CLI produced a DRC report that KiCadAI could not parse; keep the report artifact and update the parser for this KiCad report shape"
+	}
+	return "Inspect KiCad CLI stdout/stderr and rerun the same DRC command outside KiCadAI to separate design findings from tool/runtime failures"
 }
 
 func drcArtifacts(result checks.CheckResult) []reports.Artifact {
