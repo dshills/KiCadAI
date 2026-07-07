@@ -62,15 +62,19 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"device:c":           {bodyName: "C", pinType: "passive", pins: deviceCTemplatePins(), rawBody: rawDeviceCSymbol},
 	"device:c_polarized": {bodyName: "C_Polarized", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(5.08)}}}},
 	"device:d":           {bodyName: "D", pinType: "passive", pins: twoPinTemplatePins()},
-	"device:d_tvs":       {bodyName: "D_TVS", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}},
+	"device:d_tvs":       {bodyName: "D_TVS", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceDTVSSymbol},
 	"device:fuse": {
 		bodyName: "Fuse",
 		pinType:  "passive",
 		pins:     deviceRTemplatePins(),
+		// Keep these anchors aligned with KiCad ERC behavior for the embedded
+		// Device:Fuse body. They intentionally differ from the raw library pin
+		// offsets used for symbol-body compatibility.
 		connectionPinOverride: map[string]kicadfiles.Point{
 			"1": {Y: kicadfiles.MM(-3.81)},
 			"2": {Y: kicadfiles.MM(3.81)},
 		},
+		rawBody: rawDeviceFuseSymbol,
 	},
 	"device:led": {bodyName: "LED", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-3.81)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}, rawBody: rawDeviceLEDSymbol},
 	"device:q_npn_bec": {bodyName: "Q_NPN_BEC", pinType: "passive", pins: []TemplatePin{
@@ -628,6 +632,59 @@ const rawDeviceLEDSymbol = `(symbol "Device:LED"
   (symbol "LED_1_1"
     (pin passive line (at -3.81 0 0) (length 2.54) (name "K" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
     (pin passive line (at 3.81 0 180) (length 2.54) (name "A" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`
+
+const rawDeviceDTVSSymbol = `(symbol "Device:D_TVS"
+  (pin_numbers (hide yes))
+  (pin_names (offset 1.016) (hide yes))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "D" (at 0 2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Value" "D_TVS" (at 0 -2.54 0) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Footprint" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Bidirectional transient-voltage-suppression diode" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "diode TVS thyrector" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "TO-???* *_Diode_* *SingleDiode* D_*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "D_TVS_0_1"
+    (polyline (pts (xy -2.54 1.27) (xy -2.54 -1.27) (xy 2.54 1.27) (xy 2.54 -1.27) (xy -2.54 1.27)) (stroke (width 0.254) (type default)) (fill (type none)))
+    (polyline (pts (xy 0.508 1.27) (xy 0 1.27) (xy 0 -1.27) (xy -0.508 -1.27)) (stroke (width 0.254) (type default)) (fill (type none)))
+    (polyline (pts (xy 1.27 0) (xy -1.27 0)) (stroke (width 0) (type default)) (fill (type none)))
+  )
+  (symbol "D_TVS_1_1"
+    (pin passive line (at -3.81 0 0) (length 2.54) (name "A1" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at 3.81 0 180) (length 2.54) (name "A2" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+  )
+  (embedded_fonts no)
+)`
+
+const rawDeviceFuseSymbol = `(symbol "Device:Fuse"
+  (pin_numbers (hide yes))
+  (pin_names (offset 0))
+  (exclude_from_sim no)
+  (in_bom yes)
+  (on_board yes)
+  (in_pos_files yes)
+  (duplicate_pin_numbers_are_jumpers no)
+  (property "Reference" "F" (at 2.032 0 90) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Value" "Fuse" (at -1.905 0 90) (show_name no) (do_not_autoplace no) (effects (font (size 1.27 1.27))))
+  (property "Footprint" "" (at -1.778 0 90) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Datasheet" "" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "Description" "Fuse" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_keywords" "fuse" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (property "ki_fp_filters" "*Fuse*" (at 0 0 0) (show_name no) (do_not_autoplace no) (hide yes) (effects (font (size 1.27 1.27))))
+  (symbol "Fuse_0_1"
+    (rectangle (start -0.762 -2.54) (end 0.762 2.54) (stroke (width 0.254) (type default)) (fill (type none)))
+    (polyline (pts (xy 0 2.54) (xy 0 -2.54)) (stroke (width 0) (type default)) (fill (type none)))
+  )
+  (symbol "Fuse_1_1"
+    (pin passive line (at 0 3.81 270) (length 1.27) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+    (pin passive line (at 0 -3.81 90) (length 1.27) (name "" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
   )
   (embedded_fonts no)
 )`

@@ -413,6 +413,11 @@ func schematicConnectionShouldUseLabels(netName string, start, end kicadfiles.Po
 	return dx+dy > longSchematicWireLabelThreshold
 }
 
+func schematicConnectionSuppressesBendLabels(netName string) bool {
+	normalized := strings.ToLower(strings.TrimSpace(netName))
+	return strings.HasSuffix(normalized, "_vbus_connector")
+}
+
 func (builder *Builder) labelStubOffset(endpoint Endpoint, from, to kicadfiles.Point) kicadfiles.Point {
 	if builder != nil {
 		if offset, ok := builder.pinAnchorOffset(endpoint); ok {
@@ -593,12 +598,16 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 		builder.indexSchematicWireEndpoint(points[index])
 		builder.indexSchematicWireEndpoint(points[index+1])
 	}
+	suppressBendLabels := schematicConnectionSuppressesBendLabels(netName)
 	for index := 1; index < len(points)-1; index++ {
 		if !hasSchematicJunction(builder.design.Schematic.Junctions, points[index]) {
 			builder.design.Schematic.Junctions = append(builder.design.Schematic.Junctions, schematic.Junction{
 				UUID:     builder.generator.New("root.schematic.junction", netName, fmt.Sprintf("%d", index), formatPoint(points[index])),
 				Position: points[index],
 			})
+		}
+		if suppressBendLabels {
+			continue
 		}
 		if hasSchematicLabel(builder.design.Schematic.Labels, netName, points[index]) {
 			continue

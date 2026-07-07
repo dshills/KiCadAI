@@ -392,11 +392,11 @@ func usbCPowerPCBRealization() *PCBRealization {
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
 			{ComponentRole: "usb_c_receptacle", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}},
-			{ComponentRole: "cc1_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 7, YMM: -5, Layer: "F.Cu"}},
-			{ComponentRole: "cc2_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 7, YMM: 0, Layer: "F.Cu"}},
-			{ComponentRole: "vbus_fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Placement: RelativePlacement{XMM: 12, YMM: 6, Layer: "F.Cu"}},
-			{ComponentRole: "vbus_tvs", FootprintID: "Diode_SMD:D_SOD-323", Placement: RelativePlacement{XMM: 18, YMM: 6, Layer: "F.Cu"}},
-			{ComponentRole: "bulk_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: 0, Layer: "F.Cu"}},
+			{ComponentRole: "cc1_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 4.5, YMM: 3.5, Layer: "F.Cu", Fixed: true}},
+			{ComponentRole: "cc2_rd", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 6.5, YMM: 1, Layer: "F.Cu", Fixed: true}},
+			{ComponentRole: "vbus_fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Placement: RelativePlacement{XMM: 13, YMM: 1.5, Layer: "F.Cu", Fixed: true}},
+			{ComponentRole: "vbus_tvs", FootprintID: "Diode_SMD:D_SOD-323", Placement: RelativePlacement{XMM: 18, YMM: 4, Layer: "F.Cu", Fixed: true}},
+			{ComponentRole: "bulk_capacitor", FootprintID: "Capacitor_SMD:C_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: -1, Layer: "F.Cu", Fixed: true}},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "usb_c_power_entry", ComponentRoles: append([]string(nil), usbPowerRoles...), AnchorRole: "usb_c_receptacle", Bounds: &RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 22, MaxYMM: 10}}},
 		Keepouts: []PCBKeepout{
@@ -408,15 +408,19 @@ func usbCPowerPCBRealization() *PCBRealization {
 			{ID: "cc2_pull_down", NetTemplate: "cc2", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC2}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 0.5, YMM: -2.0}, {XMM: 4.8, YMM: -2.0}, {XMM: 4.8, YMM: 5.5}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
 			// B.Cu local routes intentionally rely on designworkflow endpoint-via
 			// binding to connect top-side SMD pads to bottom-side escape traces.
-			{ID: "vbus_entry_a", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 0, "A9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 1.52, YMM: -4.0}, {XMM: 6.6, YMM: -4.0}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
-			{ID: "vbus_entry_b", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 1, "B9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -1.52, YMM: -4.8}, {XMM: 6.6, YMM: -4.8}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
+			{ID: "vbus_entry_a", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 0, "A9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 1.52, YMM: -4.0}, {XMM: 11.6, YMM: -4.0}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
+			{ID: "vbus_entry_b", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 1, "B9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -1.52, YMM: -4.8}, {XMM: 11.6, YMM: -4.8}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
+			{ID: "vbus_tvs", NetTemplate: "vbus_out", From: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "2"}, To: RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, When: RealizationWhen{Params: map[string]any{"include_tvs": true}}},
+			{ID: "vbus_bulk", NetTemplate: "vbus_out", From: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bulk_capacitor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.6, Required: true, When: RealizationWhen{Params: map[string]any{"include_bulk_capacitor": true}}},
+			{ID: "tvs_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "2"}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 20, YMM: 4}, {XMM: 20, YMM: -2.5}, {XMM: 7.1, YMM: -2.5}}, Layer: "F.Cu", WidthMM: 0.5, Required: true, When: RealizationWhen{Params: map[string]any{"include_tvs": true}}},
+			{ID: "bulk_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "bulk_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 18, YMM: -2.5}, {XMM: 7.1, YMM: -2.5}}, Layer: "F.Cu", WidthMM: 0.5, Required: true, When: RealizationWhen{Params: map[string]any{"include_bulk_capacitor": true}}},
 			{ID: "gnd_receptacle_pair", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 0, "A12")}, To: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 1, "B12")}, Waypoints: []RelativePoint{{XMM: 2.75, YMM: -5.8}, {XMM: -2.75, YMM: -5.8}}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "usb_c_vbus_width", Kind: "min_width", NetTemplate: "vbus_connector", MinWidthMM: 0.75, Description: "VBUS entry path should support requested current."},
 			{ID: "usb_c_edge_facing", Kind: "edge_facing", AppliesTo: []string{"usb_c_receptacle"}, Description: "USB-C receptacle should be placed at the board edge."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"vbus_connector", "vbus_out", "gnd", "cc1", "cc2"}, RequiredRoutes: []string{"cc1_pull_down", "cc2_pull_down", "vbus_entry_a", "vbus_entry_b", "gnd_receptacle_pair"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"vbus_connector", "vbus_out", "gnd", "cc1", "cc2"}, RequiredRoutes: []string{"cc1_pull_down", "cc2_pull_down", "vbus_entry_a", "vbus_entry_b", "vbus_tvs", "vbus_bulk", "tvs_ground", "bulk_ground", "gnd_receptacle_pair"}},
 		UnsupportedBehaviors: []string{
 			"USB2 data no-connect markers remain schematic metadata only",
 			"shield policy routing depends on project grounding strategy",

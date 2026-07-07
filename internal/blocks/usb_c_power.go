@@ -134,12 +134,15 @@ func instantiateUSBCPower(definition BlockDefinition, request BlockRequest, para
 	protectedPin := usbCPowerPins.VBUS[0]
 	if includeFuse {
 		fuseRef := allocator.Next("F")
-		fuse := BlockComponent{Role: "vbus_fuse", RefPrefix: "F", Value: currentLimitLabel(currentLimit, currentOK), SymbolID: "Device:Fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Pins: usbVerticalTwoTerminalPins()}
-		fuseOps, fuseIssues := ComponentOperations(fuse, fuseRef, transactions.Point{XMM: 20, YMM: -3.81})
+		fuse := BlockComponent{Role: "vbus_fuse", RefPrefix: "F", Value: currentLimitLabel(currentLimit, currentOK), SymbolID: "Device:Fuse", FootprintID: "Fuse:Fuse_1206_3216Metric", Pins: deviceFusePins()}
+		fuseOps, fuseIssues := ComponentOperations(fuse, fuseRef, transactions.Point{XMM: 20, YMM: -11.43})
 		issuesOut = append(issuesOut, fuseIssues...)
 		operations = append(operations, fuseOps...)
-		for _, pin := range usbCPowerPins.VBUS {
-			appendConnectOperation(&operations, &issuesOut, connectorRef, pin, fuseRef, "1", vbusConnectorNet)
+		if len(usbCPowerPins.VBUS) > 0 {
+			appendConnectOperation(&operations, &issuesOut, connectorRef, usbCPowerPins.VBUS[0], fuseRef, "1", vbusConnectorNet)
+			for _, pin := range usbCPowerPins.VBUS[1:] {
+				appendConnectOperation(&operations, &issuesOut, connectorRef, pin, connectorRef, usbCPowerPins.VBUS[0], vbusConnectorNet)
+			}
 		}
 		appendConnectOperation(&operations, &issuesOut, fuseRef, "2", request.InstanceID, "VBUS_OUT", vbusOutNet)
 		protectedRef = fuseRef

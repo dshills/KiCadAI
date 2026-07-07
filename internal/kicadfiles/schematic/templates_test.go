@@ -99,6 +99,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || usbA5Connection.X != kicadfiles.MM(15.24) || usbA5Connection.Y != kicadfiles.MM(5.08) {
 		t.Fatalf("unexpected USB-C A5 connection override: %#v ok=%v", usbA5Connection, ok)
 	}
+	usbA9Connection, ok := EmbeddedSymbolConnectionPinOffset("kicadai:USB_C_Receptacle_PowerOnly_6P", "A9")
+	if !ok || usbA9Connection.X != kicadfiles.MM(15.24) || usbA9Connection.Y != kicadfiles.MM(-7.62) {
+		t.Fatalf("unexpected USB-C A9 connection override: %#v ok=%v", usbA9Connection, ok)
+	}
 	connector3Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x03")
 	if !ok || len(connector3Pins) != 3 || connector3Pins[0].Offset.Y != kicadfiles.MM(2.54) || connector3Pins[2].Number != "3" || connector3Pins[2].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected 3-pin connector offsets: %#v ok=%v", connector3Pins, ok)

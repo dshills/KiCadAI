@@ -740,6 +740,41 @@ func TestBuilderUSBCPowerCCConnectionUsesDirectLabels(t *testing.T) {
 	}
 }
 
+func TestBuilderSuppressesUSBCPreFuseBendLabels(t *testing.T) {
+	builder := newTestBuilder(t)
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "J1",
+		LibraryID: "kicadai:USB_C_Receptacle_PowerOnly_6P",
+		Value:     "USB-C",
+		Position:  kicadfiles.Point{},
+	}); err != nil {
+		t.Fatalf("AddSymbol J1 returned error: %v", err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "F1",
+		LibraryID: "Device:Fuse",
+		Value:     "500mA",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(-11.43)},
+	}); err != nil {
+		t.Fatalf("AddSymbol F1 returned error: %v", err)
+	}
+	if err := builder.Connect(Endpoint{Reference: "J1", Pin: "A9"}, Endpoint{Reference: "F1", Pin: "1"}, "usb_power_vbus_connector"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.Schematic.Junctions) == 0 {
+		t.Fatalf("junctions = 0, want bend junction for pre-fuse VBUS")
+	}
+	for _, label := range design.Schematic.Labels {
+		if label.Text == "usb_power_vbus_connector" {
+			t.Fatalf("unexpected pre-fuse VBUS bend label: %#v", design.Schematic.Labels)
+		}
+	}
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "J1", Pin: "A9"}, "usb_power_vbus_connector")
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "F1", Pin: "1"}, "usb_power_vbus_connector")
+}
+
 func TestBuilderAvoidsRoutingThroughOtherSymbolPinAnchor(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{
