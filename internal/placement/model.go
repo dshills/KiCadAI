@@ -170,8 +170,10 @@ type Keepout struct {
 	Layers     []string
 	ExemptRefs []string
 	Reason     string
-	Optional   bool
-	Mechanical bool `json:"Mechanical,omitempty"`
+	// Nil preserves the historical default: keepouts block routing unless explicitly disabled.
+	BlocksRoute *bool `json:"blocks_route,omitempty"`
+	Optional    bool
+	Mechanical  bool `json:"Mechanical,omitempty"`
 }
 
 type MechanicalConstraint struct {
@@ -678,13 +680,18 @@ func NormalizeRequest(request Request) Request {
 	}
 	keepouts := make([]Keepout, 0, len(request.Keepouts)+len(request.Mechanical))
 	for i := range request.Keepouts {
-		if request.Keepouts[i].Mechanical {
+		keepout := request.Keepouts[i]
+		if keepout.Mechanical {
 			continue
 		}
-		request.Keepouts[i].Layers = slices.Clone(request.Keepouts[i].Layers)
-		request.Keepouts[i].ExemptRefs = sortedTrimmedStrings(request.Keepouts[i].ExemptRefs)
-		request.Keepouts[i].ID = strings.TrimSpace(request.Keepouts[i].ID)
-		keepouts = append(keepouts, request.Keepouts[i])
+		keepout.Layers = slices.Clone(keepout.Layers)
+		keepout.ExemptRefs = sortedTrimmedStrings(keepout.ExemptRefs)
+		if keepout.BlocksRoute != nil {
+			value := *keepout.BlocksRoute
+			keepout.BlocksRoute = &value
+		}
+		keepout.ID = strings.TrimSpace(keepout.ID)
+		keepouts = append(keepouts, keepout)
 	}
 	request.Keepouts = keepouts
 	request.Keepouts = slices.Grow(request.Keepouts, len(request.Mechanical))

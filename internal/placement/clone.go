@@ -36,6 +36,10 @@ func CloneRequest(request Request) Request {
 	for index := range out.Keepouts {
 		out.Keepouts[index].Layers = slices.Clone(out.Keepouts[index].Layers)
 		out.Keepouts[index].ExemptRefs = slices.Clone(out.Keepouts[index].ExemptRefs)
+		if out.Keepouts[index].BlocksRoute != nil {
+			value := *out.Keepouts[index].BlocksRoute
+			out.Keepouts[index].BlocksRoute = &value
+		}
 	}
 	out.Mechanical = slices.Clone(request.Mechanical)
 	for index := range out.Mechanical {

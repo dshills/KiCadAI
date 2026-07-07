@@ -619,14 +619,23 @@ func placementKeepoutsFromFragment(fragment BlockFragment) []placement.Keepout {
 	keepouts := make([]placement.Keepout, 0, len(fragment.Keepouts))
 	for _, keepout := range fragment.Keepouts {
 		keepouts = append(keepouts, placement.Keepout{
-			ID:         blockPlacementGroupID(fragment, keepout.ID),
-			Bounds:     relativeBoundsToPlacementRect(fragment, keepout.Bounds),
-			Layers:     []string{keepout.Layer},
-			ExemptRefs: keepoutExemptRefsFromFragment(fragment, keepout),
-			Reason:     keepout.Description,
+			ID:          blockPlacementGroupID(fragment, keepout.ID),
+			Bounds:      relativeBoundsToPlacementRect(fragment, keepout.Bounds),
+			Layers:      []string{keepout.Layer},
+			ExemptRefs:  keepoutExemptRefsFromFragment(fragment, keepout),
+			Reason:      keepout.Description,
+			BlocksRoute: cloneBoolPtr(keepout.BlocksRoute),
 		})
 	}
 	return keepouts
+}
+
+func cloneBoolPtr(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
 }
 
 func keepoutExemptRefsFromFragment(fragment BlockFragment, keepout blocks.PCBKeepout) []string {

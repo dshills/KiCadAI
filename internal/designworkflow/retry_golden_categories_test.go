@@ -230,8 +230,9 @@ func assertRetryGoldenFixedComponentPreserved(t *testing.T, before, after placem
 func assertRetryGoldenPlacementConstraintsPreserved(t *testing.T, before, after placement.Request) {
 	t.Helper()
 	assertRetryGoldenFixedComponentPreserved(t, before, after, "J1")
-	if !reflect.DeepEqual(after.Keepouts, before.Keepouts) {
-		t.Fatalf("keepouts not preserved: %#v", after.Keepouts)
+	wantKeepouts := placement.NormalizeRequest(before).Keepouts
+	if !reflect.DeepEqual(after.Keepouts, wantKeepouts) {
+		t.Fatalf("keepouts not preserved: want=%#v got=%#v", wantKeepouts, after.Keepouts)
 	}
 	beforeJ1 := retryGoldenComponentByRef(&before, "J1")
 	afterJ1 := retryGoldenComponentByRef(&after, "J1")

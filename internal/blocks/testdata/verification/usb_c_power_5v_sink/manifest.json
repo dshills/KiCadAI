@@ -21,8 +21,8 @@
       {
         "role": "usb_c_receptacle",
         "ref_prefix": "J",
-        "symbol_id": "Connector:USB_C_Receptacle_USB2.0_16P",
-        "footprint_id": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12"
+        "symbol_id": "Connector:USB_C_Receptacle_PowerOnly_6P",
+        "footprint_id": "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal"
       },
       {
         "role": "cc1_rd",
@@ -81,9 +81,7 @@
         "name": "usb_vbus_connector",
         "visibility": "local",
         "pins": [
-          {"role": "usb_c_receptacle", "pin": "A4"},
           {"role": "usb_c_receptacle", "pin": "A9"},
-          {"role": "usb_c_receptacle", "pin": "B4"},
           {"role": "usb_c_receptacle", "pin": "B9"},
           {"role": "vbus_fuse", "pin": "1"}
         ]
@@ -101,9 +99,7 @@
         "name": "usb_gnd",
         "visibility": "power",
         "pins": [
-          {"role": "usb_c_receptacle", "pin": "A1"},
           {"role": "usb_c_receptacle", "pin": "A12"},
-          {"role": "usb_c_receptacle", "pin": "B1"},
           {"role": "usb_c_receptacle", "pin": "B12"},
           {"role": "cc1_rd", "pin": "2"},
           {"role": "cc2_rd", "pin": "2"},

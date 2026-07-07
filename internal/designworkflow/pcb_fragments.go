@@ -222,6 +222,7 @@ func clonePCBKeepouts(keepouts []blocks.PCBKeepout) []blocks.PCBKeepout {
 	out := append([]blocks.PCBKeepout(nil), keepouts...)
 	for i := range out {
 		out[i].AppliesTo = append([]string(nil), keepouts[i].AppliesTo...)
+		out[i].BlocksRoute = cloneBoolPtr(keepouts[i].BlocksRoute)
 	}
 	return out
 }

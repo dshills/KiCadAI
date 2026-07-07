@@ -97,6 +97,9 @@ func RequestFromPlacement(placementRequest placement.Request, placementResult pl
 		})
 	}
 	for _, keepout := range placementRequest.Keepouts {
+		if keepout.BlocksRoute != nil && !*keepout.BlocksRoute {
+			continue
+		}
 		layers := keepout.Layers
 		if len(layers) == 0 {
 			layers = []string{"F.Cu", "B.Cu"}

@@ -168,6 +168,7 @@ type PCBKeepout struct {
 	Layer       string         `json:"layer"`
 	Bounds      RelativeBounds `json:"bounds"`
 	AppliesTo   []string       `json:"applies_to,omitempty"`
+	BlocksRoute *bool          `json:"blocks_route,omitempty"`
 	Description string         `json:"description,omitempty"`
 }
 
@@ -791,6 +792,10 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.Keepouts = append([]PCBKeepout(nil), realization.Keepouts...)
 	for i := range clone.Keepouts {
 		clone.Keepouts[i].AppliesTo = append([]string(nil), realization.Keepouts[i].AppliesTo...)
+		if clone.Keepouts[i].BlocksRoute != nil {
+			value := *clone.Keepouts[i].BlocksRoute
+			clone.Keepouts[i].BlocksRoute = &value
+		}
 	}
 	clone.Constraints = append([]PCBConstraint(nil), realization.Constraints...)
 	for i := range clone.Constraints {

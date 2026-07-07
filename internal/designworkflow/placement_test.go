@@ -71,6 +71,30 @@ func TestPlacementKeepoutsPreserveAppliedRoleAsExemptRef(t *testing.T) {
 	}
 }
 
+func TestPlacementKeepoutsPreserveRoutingPolicy(t *testing.T) {
+	blocksRoute := false
+	fragment := BlockFragment{
+		InstanceID: "usb_power",
+		Keepouts: []blocks.PCBKeepout{{
+			ID:          "usb_c_edge_keepout",
+			Layer:       "F.Cu",
+			Bounds:      blocks.RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 3, MaxYMM: 8},
+			BlocksRoute: &blocksRoute,
+		}},
+	}
+
+	keepouts := placementKeepoutsFromFragment(fragment)
+	if len(keepouts) != 1 {
+		t.Fatalf("keepouts = %#v", keepouts)
+	}
+	if keepouts[0].BlocksRoute == nil || *keepouts[0].BlocksRoute {
+		t.Fatalf("blocks route = %#v, want false", keepouts[0].BlocksRoute)
+	}
+	if keepouts[0].BlocksRoute == fragment.Keepouts[0].BlocksRoute {
+		t.Fatal("routing policy pointer should be cloned")
+	}
+}
+
 func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

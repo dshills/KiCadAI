@@ -190,6 +190,28 @@ func TestRequestFromPlacementConvertsKeepouts(t *testing.T) {
 	}
 }
 
+func TestRequestFromPlacementSkipsNonRoutingKeepouts(t *testing.T) {
+	blocksRoute := false
+	placementRequest := placementAdapterRequest()
+	placementRequest.Keepouts = []placement.Keepout{{
+		ID:          "usb_c_edge",
+		Bounds:      placement.Rect{Min: placement.Point{XMM: 1, YMM: 2}, Max: placement.Point{XMM: 3, YMM: 4}},
+		Layers:      []string{"F.Cu"},
+		BlocksRoute: &blocksRoute,
+	}}
+
+	request, issues := RequestFromPlacement(placementRequest, placement.Result{Placements: []placement.PlacementResult{
+		{Ref: "J1", Position: placement.Placement{XMM: 5, YMM: 5, Layer: "F.Cu"}},
+		{Ref: "J2", Position: placement.Placement{XMM: 15, YMM: 5, Layer: "F.Cu"}},
+	}})
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(request.Obstacles) != 0 {
+		t.Fatalf("obstacles = %#v, want none", request.Obstacles)
+	}
+}
+
 func TestRequestFromPlacementReportsMissingPadData(t *testing.T) {
 	placementRequest := placementAdapterRequest()
 	placementRequest.Components[0].Pads = nil
