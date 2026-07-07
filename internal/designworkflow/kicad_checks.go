@@ -231,8 +231,14 @@ func workflowCheckResultWithIssues(result checks.CheckResult, err error) (checks
 	for _, parserIssue := range result.ParserIssues {
 		issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: result.ReportPath, Message: parserIssue.Message})
 	}
-	if err != nil {
-		issues = append(issues, reports.Issue{Code: reports.CodeKiCadCLIFailed, Severity: workflowCheckToolErrorSeverity(result), Path: result.TargetPath, Message: err.Error()})
+	if result.ToolErrorKind != checks.ToolErrorNone {
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeKiCadCLIFailed,
+			Severity:   workflowCheckToolErrorSeverity(result),
+			Path:       result.TargetPath,
+			Message:    workflowCheckToolErrorMessage(result, err),
+			Suggestion: workflowCheckToolErrorSuggestion(result),
+		})
 	}
 	return result, issues, workflowCheckArtifacts(result)
 }
@@ -246,11 +252,33 @@ func workflowCheckToolErrorSeverity(result checks.CheckResult) reports.Severity 
 
 func workflowCheckToolErrorHasNoFindingDRCInstability(result checks.CheckResult) bool {
 	return result.Kind == checks.CheckKindDRC &&
-		result.ExitCode == -1 &&
-		len(result.Findings) == 0 &&
-		len(result.ParserIssues) == 0 &&
-		strings.TrimSpace(result.Stdout) == "" &&
-		strings.TrimSpace(result.Stderr) == ""
+		result.ToolErrorKind == checks.ToolErrorNoOutputCrash
+}
+
+func workflowCheckToolErrorMessage(result checks.CheckResult, err error) string {
+	if result.ToolErrorKind == checks.ToolErrorReportParse {
+		if err != nil {
+			return string(result.Kind) + " check produced an unparseable KiCad report: " + err.Error()
+		}
+		return string(result.Kind) + " check produced an unparseable KiCad report"
+	}
+	if err != nil {
+		return string(result.Kind) + " check failed: " + err.Error()
+	}
+	return string(result.Kind) + " check failed"
+}
+
+func workflowCheckToolErrorSuggestion(result checks.CheckResult) string {
+	if workflowCheckToolErrorHasNoFindingDRCInstability(result) {
+		return "KiCad " + string(result.Kind) + " exited before writing a report; verify kicad-cli outside this process or use a stable KiCad CLI before requiring pass evidence"
+	}
+	if result.ToolErrorKind == checks.ToolErrorMissingReport {
+		return "KiCad CLI failed without producing the requested report artifact; rerun with --keep-artifacts and inspect stdout/stderr"
+	}
+	if result.ToolErrorKind == checks.ToolErrorReportParse {
+		return "KiCad CLI produced a report that KiCadAI could not parse; keep the report artifact and update the parser for this KiCad report shape"
+	}
+	return "Inspect KiCad CLI stdout/stderr and rerun the same command outside KiCadAI to separate design findings from tool/runtime failures"
 }
 
 func workflowCheckSeverity(severity string) reports.Severity {

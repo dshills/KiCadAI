@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 
 	"kicadai/internal/inspect"
@@ -73,7 +74,13 @@ func TestKiCadCheckTargetPrefersProjectRoot(t *testing.T) {
 }
 
 func TestWorkflowCheckResultWithIssuesDowngradesZeroFindingToolError(t *testing.T) {
-	result := checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, TargetPath: "demo.kicad_pcb", ExitCode: -1}
+	result := checks.CheckResult{
+		Kind:          checks.CheckKindDRC,
+		Status:        checks.CheckStatusError,
+		TargetPath:    "demo.kicad_pcb",
+		ExitCode:      -1,
+		ToolErrorKind: checks.ToolErrorNoOutputCrash,
+	}
 
 	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code -1"))
 
@@ -82,6 +89,9 @@ func TestWorkflowCheckResultWithIssuesDowngradesZeroFindingToolError(t *testing.
 	}
 	if issues[0].Code != reports.CodeKiCadCLIFailed || issues[0].Severity != reports.SeverityWarning {
 		t.Fatalf("issue = %#v, want warning KiCad CLI failure", issues[0])
+	}
+	if !strings.Contains(issues[0].Suggestion, "exited before writing a report") {
+		t.Fatalf("suggestion = %q, want no-output crash guidance", issues[0].Suggestion)
 	}
 }
 
@@ -102,7 +112,13 @@ func TestWorkflowCheckResultWithIssuesSkipsMissingReportArtifact(t *testing.T) {
 }
 
 func TestWorkflowCheckResultWithIssuesKeepsGenericToolErrorBlocking(t *testing.T) {
-	result := checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, TargetPath: "demo.kicad_pcb", ExitCode: 2}
+	result := checks.CheckResult{
+		Kind:          checks.CheckKindDRC,
+		Status:        checks.CheckStatusError,
+		TargetPath:    "demo.kicad_pcb",
+		ExitCode:      2,
+		ToolErrorKind: checks.ToolErrorCommandFailed,
+	}
 
 	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code 2"))
 
@@ -114,12 +130,35 @@ func TestWorkflowCheckResultWithIssuesKeepsGenericToolErrorBlocking(t *testing.T
 	}
 }
 
+func TestWorkflowCheckResultWithIssuesDoesNotAddToolErrorForFindings(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:       checks.CheckKindDRC,
+		Status:     checks.CheckStatusFail,
+		TargetPath: "demo.kicad_pcb",
+		Findings: []checks.CheckFinding{{
+			Kind:     checks.CheckKindDRC,
+			Severity: "error",
+			Message:  "unconnected pad",
+		}},
+	}
+
+	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code 5"))
+
+	if len(issues) != 1 {
+		t.Fatalf("issues = %#v, want one validation issue", issues)
+	}
+	if issues[0].Code != reports.CodeValidationFailed {
+		t.Fatalf("issue = %#v, want validation failure only", issues[0])
+	}
+}
+
 func TestWorkflowCheckResultWithIssuesKeepsParserToolErrorBlocking(t *testing.T) {
 	result := checks.CheckResult{
-		Kind:         checks.CheckKindDRC,
-		Status:       checks.CheckStatusError,
-		TargetPath:   "demo.kicad_pcb",
-		ParserIssues: []checks.ParserIssue{{Message: "malformed DRC report"}},
+		Kind:          checks.CheckKindDRC,
+		Status:        checks.CheckStatusError,
+		TargetPath:    "demo.kicad_pcb",
+		ToolErrorKind: checks.ToolErrorReportParse,
+		ParserIssues:  []checks.ParserIssue{{Message: "malformed DRC report"}},
 	}
 
 	_, issues, _ := workflowCheckResultWithIssues(result, errors.New("drc check failed with exit code 2"))
@@ -129,6 +168,28 @@ func TestWorkflowCheckResultWithIssuesKeepsParserToolErrorBlocking(t *testing.T)
 	}
 	if issues[1].Code != reports.CodeKiCadCLIFailed || issues[1].Severity != reports.SeverityError {
 		t.Fatalf("tool issue = %#v, want blocking KiCad CLI failure", issues[1])
+	}
+}
+
+func TestWorkflowCheckResultWithIssuesReportsParserToolErrorWithoutCommandError(t *testing.T) {
+	result := checks.CheckResult{
+		Kind:          checks.CheckKindDRC,
+		Status:        checks.CheckStatusError,
+		TargetPath:    "demo.kicad_pcb",
+		ToolErrorKind: checks.ToolErrorReportParse,
+		ParserIssues:  []checks.ParserIssue{{Message: "malformed DRC report"}},
+	}
+
+	_, issues, _ := workflowCheckResultWithIssues(result, nil)
+
+	if len(issues) != 2 {
+		t.Fatalf("issues = %#v, want parser issue and tool issue", issues)
+	}
+	if issues[1].Code != reports.CodeKiCadCLIFailed || issues[1].Message == "" {
+		t.Fatalf("tool issue = %#v, want parser tool failure message", issues[1])
+	}
+	if !strings.Contains(issues[1].Suggestion, "could not parse") {
+		t.Fatalf("suggestion = %q, want parser guidance", issues[1].Suggestion)
 	}
 }
 

@@ -492,5 +492,8 @@ Check output includes:
 
 Current caveat: real ERC smoke testing works with local KiCad 10.0.3. The DRC
 runner and parser are implemented and covered with deterministic tests, but the
-current local KiCad CLI exits before writing DRC JSON for the generated PCB
-fixtures, so a stable real DRC fixture remains a follow-up.
+current local macOS KiCad CLI can exit before writing DRC JSON, including on
+known KiCad sample boards. KiCadAI classifies that failure as
+`tool_error_kind: "no_output_crash"` and reports it as external tool
+instability instead of design DRC evidence. A `pass` promotion still requires a
+stable `kicad-cli` run that produces a clean DRC report.

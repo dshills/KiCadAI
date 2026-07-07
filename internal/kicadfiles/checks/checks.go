@@ -2,11 +2,13 @@ package checks
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+	"unicode"
 )
 
 func RunERC(ctx context.Context, cli KiCadCLI, target string, opts Options) (CheckResult, error) {
@@ -63,7 +65,8 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 		units = opts.Units
 	}
 	remaining, allowed := FilterAllowedFindings(findings, opts.Allowlist)
-	toolError := commandIsToolError(result, parserIssues, findings)
+	toolErrorKind := classifyToolError(result, parserIssues, findings, reportPath)
+	toolError := toolErrorKind != ToolErrorNone
 	status := ClassifyStatus(toolError, false, remaining, parserIssues)
 	check := CheckResult{
 		Kind:            kind,
@@ -81,6 +84,7 @@ func runCheck(ctx context.Context, runner Runner, cli KiCadCLI, kind CheckKind, 
 		ReportPath:      filepath.ToSlash(reportPath),
 		Stdout:          result.Stdout,
 		Stderr:          result.Stderr,
+		ToolErrorKind:   toolErrorKind,
 		Findings:        remaining,
 		Allowed:         allowed,
 		ParserIssues:    parserIssues,
@@ -123,14 +127,48 @@ func parseReportIfPresent(kind CheckKind, reportPath string) ([]CheckFinding, []
 	return findings, issues, units
 }
 
-func commandIsToolError(result CommandResult, parserIssues []ParserIssue, findings []CheckFinding) bool {
+func classifyToolError(result CommandResult, parserIssues []ParserIssue, findings []CheckFinding, reportPath string) ToolErrorKind {
 	if result.Err == nil {
-		return len(parserIssues) > 0
+		if len(parserIssues) > 0 {
+			return ToolErrorReportParse
+		}
+		return ToolErrorNone
 	}
 	if result.ExitCode > 0 && len(parserIssues) == 0 && len(findings) > 0 {
+		return ToolErrorNone
+	}
+	if len(parserIssues) > 0 {
+		return ToolErrorReportParse
+	}
+	reportExists := reportFileExists(reportPath)
+	hasOutput := hasNonWhitespace(result.Stdout) || hasNonWhitespace(result.Stderr)
+	if len(findings) == 0 && !hasOutput && !reportExists {
+		return ToolErrorNoOutputCrash
+	}
+	if len(findings) == 0 && !reportExists {
+		return ToolErrorMissingReport
+	}
+	return ToolErrorCommandFailed
+}
+
+func reportFileExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
 		return false
 	}
-	return true
+	info, err := os.Stat(path)
+	if err != nil {
+		return !errors.Is(err, os.ErrNotExist)
+	}
+	return !info.IsDir()
+}
+
+func hasNonWhitespace(value string) bool {
+	for _, char := range value {
+		if !unicode.IsSpace(char) {
+			return true
+		}
+	}
+	return false
 }
 
 func contextWithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {

@@ -56,6 +56,54 @@ func TestRunDRCWithRunnerMissingReportIsToolError(t *testing.T) {
 	if result.Status != CheckStatusError {
 		t.Fatalf("status = %s, want error", result.Status)
 	}
+	if result.ToolErrorKind != ToolErrorNoOutputCrash {
+		t.Fatalf("tool error kind = %q, want %q", result.ToolErrorKind, ToolErrorNoOutputCrash)
+	}
+}
+
+func TestRunDRCWithRunnerClassifiesMissingReportWithOutput(t *testing.T) {
+	dir := t.TempDir()
+	board := filepath.Join(dir, "demo.kicad_pcb")
+	writeCheckTestFile(t, board, "(kicad_pcb)")
+	runner := fakeRunner{
+		version: "10.0.3",
+		run: func(_ context.Context, _ string, _ string, args ...string) CommandResult {
+			return CommandResult{Args: args, ExitCode: 2, Stderr: "failed to read board", Duration: time.Millisecond, Err: fmt.Errorf("failed")}
+		},
+	}
+	result, err := RunDRCWithRunner(context.Background(), runner, KiCadCLI{Path: "/bin/kicad-cli"}, board, Options{})
+	if err == nil {
+		t.Fatal("expected tool error")
+	}
+	if result.ToolErrorKind != ToolErrorMissingReport {
+		t.Fatalf("tool error kind = %q, want %q", result.ToolErrorKind, ToolErrorMissingReport)
+	}
+}
+
+func TestRunDRCWithRunnerViolationReportIsNotToolError(t *testing.T) {
+	dir := t.TempDir()
+	board := filepath.Join(dir, "demo.kicad_pcb")
+	writeCheckTestFile(t, board, "(kicad_pcb)")
+	runner := fakeRunner{
+		version: "10.0.3",
+		run: func(_ context.Context, _ string, _ string, args ...string) CommandResult {
+			report := argAfter(args, "--output")
+			if err := os.WriteFile(report, []byte(sampleDRCReport), 0o644); err != nil {
+				t.Fatalf("write report: %v", err)
+			}
+			return CommandResult{Args: args, ExitCode: 5, Duration: time.Millisecond, Err: fmt.Errorf("violations")}
+		},
+	}
+	result, err := RunDRCWithRunner(context.Background(), runner, KiCadCLI{Path: "/bin/kicad-cli"}, board, Options{})
+	if err != nil {
+		t.Fatalf("RunDRCWithRunner() error = %v", err)
+	}
+	if result.Status != CheckStatusFail {
+		t.Fatalf("status = %s, want fail", result.Status)
+	}
+	if result.ToolErrorKind != ToolErrorNone {
+		t.Fatalf("tool error kind = %q, want empty", result.ToolErrorKind)
+	}
 }
 
 func TestRunDRCProjectCopiesContext(t *testing.T) {

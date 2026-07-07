@@ -588,7 +588,12 @@ func TestBuildPromotionReportKiCadZeroFindingToolErrorWarns(t *testing.T) {
 			Name:   StageKiCadChecks,
 			Status: StageStatusWarning,
 			Summary: map[string]any{
-				"drc": checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusError, ExitCode: -1},
+				"drc": checks.CheckResult{
+					Kind:          checks.CheckKindDRC,
+					Status:        checks.CheckStatusError,
+					ExitCode:      -1,
+					ToolErrorKind: checks.ToolErrorNoOutputCrash,
+				},
 			},
 			Issues: []reports.Issue{{
 				Code:     reports.CodeKiCadCLIFailed,

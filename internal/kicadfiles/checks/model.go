@@ -30,6 +30,16 @@ const (
 	CheckStatusError   CheckStatus = "error"
 )
 
+type ToolErrorKind string
+
+const (
+	ToolErrorNone          ToolErrorKind = ""
+	ToolErrorCommandFailed ToolErrorKind = "command_failed"
+	ToolErrorMissingReport ToolErrorKind = "missing_report"
+	ToolErrorNoOutputCrash ToolErrorKind = "no_output_crash"
+	ToolErrorReportParse   ToolErrorKind = "report_parse"
+)
+
 type FileType string
 
 const (
@@ -110,6 +120,7 @@ type CheckResult struct {
 	ReportPath      string           `json:"report_path,omitempty"`
 	Stdout          string           `json:"stdout,omitempty"`
 	Stderr          string           `json:"stderr,omitempty"`
+	ToolErrorKind   ToolErrorKind    `json:"tool_error_kind,omitempty"`
 	Findings        []CheckFinding   `json:"findings,omitempty"`
 	Allowed         []CheckFinding   `json:"allowed,omitempty"`
 	ParserIssues    []ParserIssue    `json:"parser_issues,omitempty"`
