@@ -696,7 +696,7 @@ func TestBuilderUSBCPowerCCConnectionUsesDirectLabels(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{
 		Reference: "J1",
-		LibraryID: "Connector:USB_C_Receptacle_PowerOnly_6P",
+		LibraryID: "kicadai:USB_C_Receptacle_PowerOnly_6P",
 		Value:     "USB-C",
 		Position:  kicadfiles.Point{},
 	}); err != nil {

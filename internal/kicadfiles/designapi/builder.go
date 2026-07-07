@@ -151,7 +151,7 @@ type symbolState struct {
 }
 
 const schematicConnectionGrid = kicadfiles.IU(1270000)
-const usbCPowerOnlyConnectorLibraryID = "Connector:USB_C_Receptacle_PowerOnly_6P"
+const usbCPowerOnlyConnectorLibraryID = "kicadai:USB_C_Receptacle_PowerOnly_6P"
 
 func New(options Options) (*Builder, error) {
 	name := strings.TrimSpace(options.Name)

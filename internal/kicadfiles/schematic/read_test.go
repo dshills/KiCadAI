@@ -134,7 +134,7 @@ func TestReadSchematicRecoversConnectionOverridePinAnchors(t *testing.T) {
 		`  (uuid "11111111-1111-5111-8111-111111111111")`,
 		`  (paper A4)`,
 		`  (symbol`,
-		`    (lib_id "Connector:USB_C_Receptacle_PowerOnly_6P")`,
+		`    (lib_id "kicadai:USB_C_Receptacle_PowerOnly_6P")`,
 		`    (at 0 0 0)`,
 		`    (uuid "33333333-3333-5333-8333-333333333333")`,
 		`    (property "Reference" "J1")`,

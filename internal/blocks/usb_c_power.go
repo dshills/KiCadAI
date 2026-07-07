@@ -24,6 +24,7 @@ var usbCPowerPins = usbCPinRoleMap{
 	CC1:  "A5",
 	CC2:  "B5",
 	// KiCad 10 Connector:USB_C_Receptacle_PowerOnly_6P names the shield pin SH.
+	// KiCadAI uses a project-local 6-pin symbol with the same electrical pin map.
 	Shield: "SH",
 }
 

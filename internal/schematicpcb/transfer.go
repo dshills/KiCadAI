@@ -537,6 +537,8 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 		return twoTransferPads(1.35, 1.55, 3.0, hints), true
 	case "Fuse:Fuse_1206_3216Metric":
 		return twoTransferPads(1.75, 1.9, 3.6, hints), true
+	case "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal":
+		return usbCGCTUSB4125TransferPads(hints), true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
 		return soic8NarrowTransferTemplate.pads(hints), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
@@ -552,6 +554,32 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 	default:
 		return nil, false
 	}
+}
+
+func usbCGCTUSB4125TransferPads(hints map[string]string) []transactions.PadSpec {
+	pads := []transactions.PadSpec{
+		transferPadSpec("A5", -0.5, -3.08, 0.7, 1.2, hints),
+		transferPadSpec("A9", 1.52, -3.08, 0.76, 1.2, hints),
+		transferPadSpec("A12", 2.75, -3.08, 0.8, 1.2, hints),
+		transferPadSpec("B5", 0.5, -3.08, 0.7, 1.2, hints),
+		transferPadSpec("B9", -1.52, -3.08, 0.76, 1.2, hints),
+		transferPadSpec("B12", -2.75, -3.08, 0.8, 1.2, hints),
+		transferPadSpec("SH", -4.32, -3.0, 1.1, 1.7, hints),
+		transferPadSpec("SH2", -4.32, 0.8, 1.1, 1.7, hints),
+		transferPadSpec("SH3", 4.32, -3.0, 1.1, 1.7, hints),
+		transferPadSpec("SH4", 4.32, 0.8, 1.1, 1.7, hints),
+	}
+	if hints == nil {
+		return pads
+	}
+	if net := strings.TrimSpace(hints["SH"]); net != "" {
+		for i := range pads {
+			if strings.HasPrefix(pads[i].Name, "SH") {
+				pads[i].Net = &net
+			}
+		}
+	}
+	return pads
 }
 
 type rowPadTemplate struct {

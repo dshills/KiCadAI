@@ -88,6 +88,31 @@ func TestFromDesignIncludesHiddenPinsInNetHints(t *testing.T) {
 	}
 }
 
+func TestVerifiedTransferUSB4125PowerOnlyPads(t *testing.T) {
+	pads, ok := verifiedTransferPadSpecs("Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal", map[string]string{
+		"A5": "CC1",
+		"SH": "SHIELD",
+	})
+	if !ok {
+		t.Fatal("missing USB-C GCT transfer template")
+	}
+	if len(pads) != 10 {
+		t.Fatalf("pad count = %d, want 10", len(pads))
+	}
+	want := map[string]string{"A5": "CC1", "SH": "SHIELD", "SH2": "SHIELD", "SH3": "SHIELD", "SH4": "SHIELD"}
+	for _, pad := range pads {
+		if net, ok := want[pad.Name]; ok {
+			if pad.Net == nil || *pad.Net != net {
+				t.Fatalf("pad %s net = %#v, want %s in %#v", pad.Name, pad.Net, net, pads)
+			}
+			delete(want, pad.Name)
+		}
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing pads: %#v in %#v", want, pads)
+	}
+}
+
 func TestFromDesignGroupsMultiUnitSymbolsByReference(t *testing.T) {
 	design := transferFixtureDesign()
 	duplicate := design.Schematic.Symbols[1]

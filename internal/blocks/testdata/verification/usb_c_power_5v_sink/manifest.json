@@ -21,7 +21,7 @@
       {
         "role": "usb_c_receptacle",
         "ref_prefix": "J",
-        "symbol_id": "Connector:USB_C_Receptacle_PowerOnly_6P",
+        "symbol_id": "kicadai:USB_C_Receptacle_PowerOnly_6P",
         "footprint_id": "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal"
       },
       {

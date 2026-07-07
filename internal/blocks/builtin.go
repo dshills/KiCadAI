@@ -9,7 +9,7 @@ const (
 	defaultMCUSymbol          = "MCU_Microchip_ATmega:ATmega328P-A"
 	defaultMCUFootprint       = "Package_QFP:TQFP-32_7x7mm_P0.8mm"
 	defaultOpAmpSymbol        = "Amplifier_Operational:LMV321"
-	defaultUSBCSymbol         = "Connector:USB_C_Receptacle_PowerOnly_6P"
+	defaultUSBCSymbol         = "kicadai:USB_C_Receptacle_PowerOnly_6P"
 	defaultUSBCFootprint      = "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal"
 )
 
