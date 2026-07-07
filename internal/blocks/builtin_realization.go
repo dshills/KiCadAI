@@ -47,7 +47,7 @@ func ledIndicatorPCBRealization() *PCBRealization {
 			{ComponentRole: "led", FootprintParam: "led_footprint", Placement: RelativePlacement{XMM: 5, YMM: 0, RotationDeg: 180, Layer: "F.Cu"}},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "inline_indicator", ComponentRoles: []string{"resistor", "led"}, AnchorRole: "resistor", Bounds: &RelativeBounds{MinXMM: -2, MinYMM: -2, MaxXMM: 8, MaxYMM: 2}}},
-		LocalRoutes:     []PCBLocalRoute{{ID: "series", NetTemplate: "led_series", From: RouteEndpoint{ComponentRole: "resistor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "led", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 5.08, YMM: -2}, {XMM: -0.08, YMM: -2}}, Layer: "F.Cu", WidthMM: 0.25, Required: true}},
+		LocalRoutes:     []PCBLocalRoute{{ID: "series", NetTemplate: "led_series", From: RouteEndpoint{ComponentRole: "resistor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "led", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 5.08, YMM: -2}, {XMM: -0.08, YMM: -2}}, Layer: "B.Cu", WidthMM: 0.25, Required: true}},
 		Validation:      PCBValidationExpectations{RequiredNets: []string{"in", "led_series", "gnd"}, RequiredRoutes: []string{"series"}},
 	}
 }
@@ -404,13 +404,13 @@ func usbCPowerPCBRealization() *PCBRealization {
 			{ID: "usb_c_power_entry_placement", Layer: "F.Cu", Bounds: RelativeBounds{MinXMM: -5, MinYMM: -8, MaxXMM: 23, MaxYMM: 12}, AppliesTo: append([]string(nil), usbPowerRoles...), BlocksRoute: boolPtr(false), Description: "Reserve placement area for USB-C power-entry companions."},
 		},
 		LocalRoutes: []PCBLocalRoute{
-			{ID: "cc1_pull_down", NetTemplate: "cc1", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC1}, To: RouteEndpoint{ComponentRole: "cc1_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -0.5, YMM: -1.2}, {XMM: 3.2, YMM: -1.2}, {XMM: 3.2, YMM: 3.5}}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
-			{ID: "cc2_pull_down", NetTemplate: "cc2", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC2}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 0.5, YMM: -2.0}, {XMM: 3.2, YMM: -2.0}, {XMM: 3.2, YMM: 5.5}}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
+			{ID: "cc1_pull_down", NetTemplate: "cc1", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC1}, To: RouteEndpoint{ComponentRole: "cc1_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -0.5, YMM: -0.4}, {XMM: 2.4, YMM: -0.4}, {XMM: 2.4, YMM: 3.5}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
+			{ID: "cc2_pull_down", NetTemplate: "cc2", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC2}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 0.5, YMM: -2.0}, {XMM: 4.8, YMM: -2.0}, {XMM: 4.8, YMM: 5.5}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
 			// B.Cu local routes intentionally rely on designworkflow endpoint-via
 			// binding to connect top-side SMD pads to bottom-side escape traces.
 			{ID: "vbus_entry_a", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 0, "A9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 1.52, YMM: -4.0}, {XMM: 6.6, YMM: -4.0}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
 			{ID: "vbus_entry_b", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 1, "B9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -1.52, YMM: -4.8}, {XMM: 6.6, YMM: -4.8}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
-			{ID: "gnd_receptacle_pair", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 0, "A12")}, To: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 1, "B12")}, Waypoints: []RelativePoint{{XMM: 2.75, YMM: -5.8}, {XMM: -2.75, YMM: -5.8}}, Layer: "B.Cu", WidthMM: 0.5, Required: true},
+			{ID: "gnd_receptacle_pair", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 0, "A12")}, To: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 1, "B12")}, Waypoints: []RelativePoint{{XMM: 2.75, YMM: -5.8}, {XMM: -2.75, YMM: -5.8}}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "usb_c_vbus_width", Kind: "min_width", NetTemplate: "vbus_connector", MinWidthMM: 0.75, Description: "VBUS entry path should support requested current."},
