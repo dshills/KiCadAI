@@ -165,7 +165,7 @@ func validateNetToPad(board *pcbfiles.PCBFile) []reports.Issue {
 	var issues []reports.Issue
 	for footprintIndex := range board.Footprints {
 		footprint := &board.Footprints[footprintIndex]
-		seenPads := map[string]int{}
+		seenPads := map[string]seenFootprintPad{}
 		for padIndex, pad := range footprint.Pads {
 			path := fmt.Sprintf("footprints.%d.pads.%d", footprintIndex, padIndex)
 			ref := firstNonEmpty(footprint.Reference, footprint.LibraryID)
@@ -190,20 +190,29 @@ func validateNetToPad(board *pcbfiles.PCBFile) []reports.Issue {
 					Suggestion: "repair category: net_assignment",
 				})
 			}
-			if firstIndex, ok := seenPads[pad.Name]; ok && !footprintAllowsDuplicatePads(footprint) {
+			if firstPad, ok := seenPads[pad.Name]; ok && !footprintAllowsDuplicatePads(footprint) && !samePadAliasNet(firstPad.pad, pad) {
 				issues = append(issues, reports.Issue{
 					Code:       reports.CodeValidationFailed,
 					Severity:   reports.SeverityError,
 					Path:       path + ".name",
-					Message:    fmt.Sprintf("duplicate pad name %q also appears at pads.%d", pad.Name, firstIndex),
+					Message:    fmt.Sprintf("duplicate pad name %q also appears at pads.%d with a different net", pad.Name, firstPad.index),
 					Refs:       []string{ref},
 					Suggestion: "repair category: footprint",
 				})
 			}
-			seenPads[pad.Name] = padIndex
+			seenPads[pad.Name] = seenFootprintPad{index: padIndex, pad: pad}
 		}
 	}
 	return issues
+}
+
+type seenFootprintPad struct {
+	index int
+	pad   pcbfiles.Pad
+}
+
+func samePadAliasNet(first, second pcbfiles.Pad) bool {
+	return first.NetCode == second.NetCode && first.NetName == second.NetName
 }
 
 func footprintAllowsDuplicatePads(footprint *pcbfiles.Footprint) bool {

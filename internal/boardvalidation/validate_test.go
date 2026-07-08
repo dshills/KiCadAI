@@ -53,6 +53,35 @@ func TestValidateBoardAllowsNoNetPad(t *testing.T) {
 	}
 }
 
+func TestValidateBoardAllowsSameNetDuplicatePadAlias(t *testing.T) {
+	board := twoPadBoard(t)
+	duplicate := board.Footprints[0].Pads[0]
+	duplicate.UUID = testUUID("U1-pad-alias")
+	duplicate.Position = kicadfiles.Point{X: kicadfiles.MM(0.5), Y: 0}
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, duplicate)
+
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	if hasIssueMessage(result.Issues, "duplicate pad name") {
+		t.Fatalf("unexpected duplicate pad alias issue: %#v", result.Issues)
+	}
+}
+
+func TestValidateBoardRejectsDifferentNetDuplicatePadAlias(t *testing.T) {
+	board := twoPadBoard(t)
+	board.Nets = append(board.Nets, pcbfiles.Net{Code: 2, Name: "OTHER"})
+	duplicate := board.Footprints[0].Pads[0]
+	duplicate.UUID = testUUID("U1-pad-conflict")
+	duplicate.Position = kicadfiles.Point{X: kicadfiles.MM(0.5), Y: 0}
+	duplicate.NetCode = 2
+	duplicate.NetName = "OTHER"
+	board.Footprints[0].Pads = append(board.Footprints[0].Pads, duplicate)
+
+	result := ValidateBoard(context.Background(), &board, testTarget(), Options{})
+	if !hasIssueMessage(result.Issues, "duplicate pad name") {
+		t.Fatalf("missing duplicate pad conflict issue: %#v", result.Issues)
+	}
+}
+
 func TestValidateBoardUnroutedNet(t *testing.T) {
 	board := twoPadBoard(t)
 	board.Tracks = nil
