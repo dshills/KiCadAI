@@ -108,6 +108,20 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		power:    true,
 		pins:     []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}},
 	},
+	// Template keys are normalized to lowercase before lookup.
+	"regulator_linear:ams1117-3.3": {
+		bodyName: "AMS1117-3.3",
+		// Keep these pins passive and horizontally aligned with the block-level
+		// AMS1117 anchors. KiCad 10 ERC currently regresses this promoted fixture
+		// when the generated local symbol uses power_in/power_out pin typing.
+		pinType:      "passive",
+		localLibrary: true,
+		pins: []TemplatePin{
+			{Number: "1", Offset: kicadfiles.Point{}},
+			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(7.62)}},
+			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62)}},
+		},
+	},
 	"power:vcc": powerTemplate("VCC", 5.08),
 	"power:vdd": powerTemplate("VDD", 5.08),
 	"power:vee": powerTemplate("VEE", -5.08),

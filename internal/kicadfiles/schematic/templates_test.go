@@ -28,6 +28,7 @@ func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 		"power:+12V",
 		"power:-12V",
 		"power:PWR_FLAG",
+		"Regulator_Linear:AMS1117-3.3",
 		"power:VDD",
 		"power:VEE",
 		"power:VSS",
@@ -140,6 +141,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || len(powerFlagPins) != 1 || powerFlagPins[0].Number != "1" || powerFlagPins[0].Offset.X != 0 {
 		t.Fatalf("unexpected PWR_FLAG offsets: %#v ok=%v", powerFlagPins, ok)
 	}
+	ams1117Pins, ok := EmbeddedSymbolPinOffsets("Regulator_Linear:AMS1117-3.3")
+	if !ok || len(ams1117Pins) != 3 || ams1117Pins[0].Number != "1" || ams1117Pins[0].Offset.X != 0 || ams1117Pins[1].Number != "2" || ams1117Pins[1].Offset.X != kicadfiles.MM(7.62) || ams1117Pins[2].Number != "3" || ams1117Pins[2].Offset.X != kicadfiles.MM(-7.62) {
+		t.Fatalf("unexpected AMS1117 offsets: %#v ok=%v", ams1117Pins, ok)
+	}
 	if _, ok := EmbeddedSymbolPinOffsets("Custom:Block"); ok {
 		t.Fatal("unexpected custom block template pins")
 	}
@@ -159,6 +164,13 @@ func TestLocalSymbolLibraryRendersUnqualifiedSyntheticSymbol(t *testing.T) {
 	}
 	if _, ok := LocalSymbolLibrary("power:GND"); ok {
 		t.Fatal("power symbols should not produce local libraries")
+	}
+	regulatorContents, ok := LocalSymbolLibrary("Regulator_Linear:AMS1117-3.3")
+	if !ok {
+		t.Fatal("expected project-local AMS1117 symbol library")
+	}
+	if !strings.Contains(string(regulatorContents), `"AMS1117-3.3"`) || strings.Contains(string(regulatorContents), `"Regulator_Linear:AMS1117-3.3"`) {
+		t.Fatalf("regulator local symbol library should use unqualified symbol name:\n%s", regulatorContents)
 	}
 	if _, ok := LocalSymbolLibrary("Custom:Missing"); ok {
 		t.Fatal("unsupported symbols should not produce local libraries")
