@@ -86,16 +86,22 @@ type RelativeBounds struct {
 }
 
 type PCBLocalRoute struct {
-	ID          string          `json:"id"`
-	NetTemplate string          `json:"net_template"`
-	From        RouteEndpoint   `json:"from"`
-	To          RouteEndpoint   `json:"to"`
-	Waypoints   []RelativePoint `json:"waypoints,omitempty"`
-	Layer       string          `json:"layer,omitempty"`
-	WidthMM     float64         `json:"width_mm,omitempty"`
-	Required    bool            `json:"required,omitempty"`
-	Description string          `json:"description,omitempty"`
-	When        RealizationWhen `json:"when,omitempty"`
+	ID                 string                 `json:"id"`
+	NetTemplate        string                 `json:"net_template"`
+	From               RouteEndpoint          `json:"from"`
+	To                 RouteEndpoint          `json:"to"`
+	Waypoints          []RelativePoint        `json:"waypoints,omitempty"`
+	Layer              string                 `json:"layer,omitempty"`
+	WidthMM            float64                `json:"width_mm,omitempty"`
+	Required           bool                   `json:"required,omitempty"`
+	EntryAnchorDogbone *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
+	Description        string                 `json:"description,omitempty"`
+	When               RealizationWhen        `json:"when,omitempty"`
+}
+
+type PCBEntryAnchorDogbone struct {
+	TieOffset   RelativePoint `json:"tie_offset"`
+	Description string        `json:"description,omitempty"`
 }
 
 type PCBTimingRole string
@@ -297,6 +303,12 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, validateLayer(routePath+".layer", route.Layer, true)...)
 		if route.WidthMM < 0 || !finite(route.WidthMM) {
 			issues = append(issues, blockIssue(routePath+".width_mm", "route width must be finite and non-negative"))
+		}
+		if route.EntryAnchorDogbone != nil {
+			issues = append(issues, validatePoint(routePath+".entry_anchor_dogbone.tie_offset", route.EntryAnchorDogbone.TieOffset)...)
+			if zeroNear(route.EntryAnchorDogbone.TieOffset.XMM) == 0 && zeroNear(route.EntryAnchorDogbone.TieOffset.YMM) == 0 {
+				issues = append(issues, blockIssue(routePath+".entry_anchor_dogbone.tie_offset", "entry anchor dogbone tie offset must be non-zero"))
+			}
 		}
 		issues = append(issues, validateRealizationWhen(routePath+".when", route.When, parameters)...)
 		for waypointIndex, point := range route.Waypoints {
@@ -763,6 +775,10 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.LocalRoutes = append([]PCBLocalRoute(nil), realization.LocalRoutes...)
 	for i := range clone.LocalRoutes {
 		clone.LocalRoutes[i].Waypoints = append([]RelativePoint(nil), realization.LocalRoutes[i].Waypoints...)
+		if realization.LocalRoutes[i].EntryAnchorDogbone != nil {
+			dogbone := *realization.LocalRoutes[i].EntryAnchorDogbone
+			clone.LocalRoutes[i].EntryAnchorDogbone = &dogbone
+		}
 		clone.LocalRoutes[i].When = cloneRealizationWhen(realization.LocalRoutes[i].When)
 	}
 	if len(realization.TimingFixtures) > 0 {

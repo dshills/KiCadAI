@@ -821,7 +821,7 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 	for _, fragment := range fragments.Fragments {
 		for _, route := range fragment.Realization.LocalRoutes {
 			summary.RoutesAttempted++
-			operation, routeIssues, routeSummary, ok := bindLocalRouteOperation(fragment, route, resolver)
+			routeOperations, routeIssues, routeSummary, ok := bindLocalRouteOperation(fragment, route, resolver)
 			issues = append(issues, routeIssues...)
 			summary.RoutesBound += routeSummary.RoutesBound
 			summary.EndpointsResolved += routeSummary.EndpointsResolved
@@ -830,7 +830,7 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 			summary.EndpointNetMismatches += routeSummary.EndpointNetMismatches
 			summary.EmittedTrackSegments += routeSummary.EmittedTrackSegments
 			if ok {
-				operations = append(operations, operation)
+				operations = append(operations, routeOperations...)
 			}
 		}
 	}
@@ -838,18 +838,18 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 	return operations, issues, summary
 }
 
-func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver) (transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary, bool) {
+func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary, bool) {
 	var issues []reports.Issue
 	summary := LocalRouteConnectivitySummary{RoutesAttempted: 1}
 	netName := strings.TrimSpace(route.NetName)
-	path := "routes." + firstNonEmpty(fragment.InstanceID, fragment.BlockID, "fragment") + "." + firstNonEmpty(route.ID, netName, "unnamed")
+	routePath := "routes." + firstNonEmpty(fragment.InstanceID, fragment.BlockID, "fragment") + "." + firstNonEmpty(route.ID, netName, "unnamed")
 	if netName == "" {
 		summary.EndpointsUnresolved = 2
 		summary.IssueCount = 1
-		return transactions.Operation{}, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route net name is required", nil)}, summary, false
+		return nil, []reports.Issue{localRouteBindingIssue(routePath+".net_name", "local route net name is required", nil)}, summary, false
 	}
-	from, fromIssues, fromOK, fromNetMismatch := resolveLocalRouteEndpoint(fragment, path+".from", netName, route.From, resolver)
-	to, toIssues, toOK, toNetMismatch := resolveLocalRouteEndpoint(fragment, path+".to", netName, route.To, resolver)
+	from, fromIssues, fromOK, fromNetMismatch := resolveLocalRouteEndpoint(fragment, routePath+".from", netName, route.From, resolver)
+	to, toIssues, toOK, toNetMismatch := resolveLocalRouteEndpoint(fragment, routePath+".to", netName, route.To, resolver)
 	issues = append(issues, fromIssues...)
 	issues = append(issues, toIssues...)
 	if fromNetMismatch {
@@ -870,14 +870,14 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	}
 	if !fromOK || !toOK {
 		summary.IssueCount = len(issues)
-		return transactions.Operation{}, issues, summary, false
+		return nil, issues, summary, false
 	}
 	layer := firstNonEmpty(route.Layer, from.Layer, to.Layer, "F.Cu")
 	vias, viaOK := localRouteEndpointVias(layer, from, to)
 	if !viaOK {
-		issues = append(issues, localRouteBindingIssue(path+".layer", "local route layer "+layer+" does not match endpoint layers "+from.Layer+" and "+to.Layer, []string{from.Ref, to.Ref}))
+		issues = append(issues, localRouteBindingIssue(routePath+".layer", "local route layer "+layer+" does not match endpoint layers "+from.Layer+" and "+to.Layer, []string{from.Ref, to.Ref}))
 		summary.IssueCount = len(issues)
-		return transactions.Operation{}, issues, summary, false
+		return nil, issues, summary, false
 	}
 	vias = append(vias, localRouteEntryAnchorVias(layer, from, to, vias)...)
 	points := []transactions.Point{
@@ -896,15 +896,19 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		Vias:    vias,
 	})
 	if err != nil {
-		issues = append(issues, localRouteBindingIssue(path, err.Error(), []string{from.Ref, to.Ref}))
+		issues = append(issues, localRouteBindingIssue(routePath, err.Error(), []string{from.Ref, to.Ref}))
 		summary.IssueCount = len(issues)
-		return transactions.Operation{}, issues, summary, false
+		return nil, issues, summary, false
 	}
+	operations := []transactions.Operation{operation}
+	dogbones, dogboneIssues := localRouteEntryAnchorDogboneOperations(routePath, netName, layer, route.WidthMM, points, from, to, vias, route.EntryAnchorDogbone)
+	issues = append(issues, dogboneIssues...)
+	operations = append(operations, dogbones...)
 	summary.RoutesBound = 1
 	summary.EndpointContactsProven = 2
-	summary.EmittedTrackSegments = max(1, len(points)-1)
+	summary.EmittedTrackSegments = max(1, len(points)-1) + len(dogbones)
 	summary.IssueCount = len(issues)
-	return operation, issues, summary, true
+	return operations, issues, summary, true
 }
 
 func localRouteEndpointVias(layer string, from PlacedPadEndpoint, to PlacedPadEndpoint) ([]transactions.RouteViaSpec, bool) {
@@ -951,6 +955,96 @@ func localRouteEntryAnchorVias(routeLayer string, from PlacedPadEndpoint, to Pla
 		vias = append(vias, localRouteMaterializedAnchorVia(endpoint.Point, routeLayer))
 	}
 	return vias
+}
+
+func localRouteEntryAnchorDogboneOperations(routePath string, netName string, routeLayer string, widthMM float64, routePoints []transactions.Point, from PlacedPadEndpoint, to PlacedPadEndpoint, vias []transactions.RouteViaSpec, dogbone *blocks.PCBEntryAnchorDogbone) ([]transactions.Operation, []reports.Issue) {
+	if dogbone == nil {
+		return nil, nil
+	}
+	routeCopperLayer, oppositeCopperLayer, supportedLayer := localRouteEntryAnchorDogboneExternalLayers(routeLayer)
+	if !supportedLayer {
+		return nil, []reports.Issue{localRouteBindingIssue(routePath+".entry_anchor_dogbone", "entry anchor dogbones are only supported on F.Cu and B.Cu routes", []string{from.Ref, to.Ref})}
+	}
+	var operations []transactions.Operation
+	var issues []reports.Issue
+	for _, endpoint := range []PlacedPadEndpoint{from, to} {
+		if !localRouteEndpointIsEntryAnchor(endpoint) || !localRouteHasViaAt(vias, endpoint.Point) {
+			continue
+		}
+		tie, ok := localRouteEntryAnchorDogboneTiePoint(endpoint.Point, routePoints, dogbone.TieOffset)
+		if !ok {
+			issues = append(issues, localRouteBindingIssue(routePath+".entry_anchor_dogbone", "no bounded dogbone tie point is available for entry anchor", []string{endpoint.Ref}))
+			continue
+		}
+		// Virtual entry anchors need a physical copper contact for internal and
+		// KiCad connectivity evidence. The short same-net tie gives the anchor
+		// via copper on both layers without rerouting the main local route.
+		routeLayerOperation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+			Op:      transactions.OpRoute,
+			NetName: netName,
+			Layer:   routeCopperLayer,
+			WidthMM: widthMM,
+			Points:  []transactions.Point{endpoint.Point, tie},
+		})
+		if err != nil {
+			issues = append(issues, localRouteBindingIssue(routePath+".entry_anchor_dogbone", err.Error(), []string{endpoint.Ref}))
+			continue
+		}
+		oppositeLayerOperation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+			Op:      transactions.OpRoute,
+			NetName: netName,
+			Layer:   oppositeCopperLayer,
+			WidthMM: widthMM,
+			Points:  []transactions.Point{endpoint.Point, tie},
+			// The tie via is intentional: the anchor via connects one end of
+			// this stub, and the tie via gives the far end a proven endpoint for
+			// internal route-connectivity checks without changing the main route.
+			Vias: []transactions.RouteViaSpec{{
+				At:         tie,
+				DiameterMM: defaultLocalRouteViaDiameterMM,
+				DrillMM:    defaultLocalRouteViaDrillMM,
+				Layers:     []string{routeCopperLayer, oppositeCopperLayer},
+			}},
+		})
+		if err != nil {
+			issues = append(issues, localRouteBindingIssue(routePath+".entry_anchor_dogbone", err.Error(), []string{endpoint.Ref}))
+			continue
+		}
+		operations = append(operations, routeLayerOperation, oppositeLayerOperation)
+	}
+	return operations, issues
+}
+
+func localRouteEntryAnchorDogboneExternalLayers(routeLayer string) (string, string, bool) {
+	routeCopperLayer := canonicalCopperLayer(routeLayer)
+	switch {
+	case strings.EqualFold(routeCopperLayer, defaultLocalRouteTopLayer):
+		return defaultLocalRouteTopLayer, defaultLocalRouteBottomLayer, true
+	case strings.EqualFold(routeCopperLayer, defaultLocalRouteBottomLayer):
+		return defaultLocalRouteBottomLayer, defaultLocalRouteTopLayer, true
+	default:
+		return routeCopperLayer, "", false
+	}
+}
+
+func localRouteEntryAnchorDogboneTiePoint(point transactions.Point, routePoints []transactions.Point, offset blocks.RelativePoint) (transactions.Point, bool) {
+	candidate := transactions.Point{XMM: point.XMM + offset.XMM, YMM: point.YMM + offset.YMM}
+	if !localRouteEntryAnchorDogboneTiePointAllowed(point, candidate, routePoints) {
+		return transactions.Point{}, false
+	}
+	return candidate, true
+}
+
+func localRouteEntryAnchorDogboneTiePointAllowed(anchor transactions.Point, candidate transactions.Point, routePoints []transactions.Point) bool {
+	for _, point := range routePoints {
+		if sameRoutePoint(point, anchor) {
+			continue
+		}
+		if sameRoutePoint(point, candidate) {
+			return false
+		}
+	}
+	return true
 }
 
 func localRouteEndpointIsEntryAnchor(endpoint PlacedPadEndpoint) bool {
@@ -1111,15 +1205,15 @@ func transformedLocalRouteShape(points []transactions.Point, from transactions.P
 	return transformed, true
 }
 
-func resolveLocalRouteEndpoint(fragment BlockFragment, path string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool, bool) {
+func resolveLocalRouteEndpoint(fragment BlockFragment, routePath string, netName string, endpoint transactions.Endpoint, resolver PlacedPadEndpointResolver) (PlacedPadEndpoint, []reports.Issue, bool, bool) {
 	ref := strings.TrimSpace(endpoint.Ref)
 	pin := strings.TrimSpace(endpoint.Pin)
 	if ref == "" || pin == "" {
-		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(path, "local route endpoint requires ref and pin", nil)}, false, false
+		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(routePath, "local route endpoint requires ref and pin", nil)}, false, false
 	}
 	if anchor, ok := resolveLocalRouteAnchorEndpoint(fragment, ref, pin); ok {
 		if strings.TrimSpace(anchor.NetName) != "" && !strings.EqualFold(anchor.NetName, netName) {
-			return anchor, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route anchor net "+anchor.NetName+" does not match route net "+netName, []string{ref})}, false, true
+			return anchor, []reports.Issue{localRouteBindingIssue(routePath+".net_name", "local route anchor net "+anchor.NetName+" does not match route net "+netName, []string{ref})}, false, true
 		}
 		anchor.NetName = netName
 		anchor.NetCodeResolved = true
@@ -1127,17 +1221,17 @@ func resolveLocalRouteEndpoint(fragment BlockFragment, path string, netName stri
 	}
 	resolved, ok := resolver.ResolveNormalized(strings.ToUpper(ref), strings.ToUpper(pin))
 	if !ok {
-		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(path, "local route endpoint does not resolve to a placed pad", []string{ref, ref + "." + pin})}, false, false
+		return PlacedPadEndpoint{}, []reports.Issue{localRouteBindingIssue(routePath, "local route endpoint does not resolve to a placed pad", []string{ref, ref + "." + pin})}, false, false
 	}
 	if !resolved.NetCodeResolved {
-		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_code", "local route endpoint pad net code is unresolved", []string{ref})}, false, false
+		return resolved, []reports.Issue{localRouteBindingIssue(routePath+".net_code", "local route endpoint pad net code is unresolved", []string{ref})}, false, false
 	}
 	padNet := strings.TrimSpace(resolved.NetName)
 	if padNet == "" {
-		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route endpoint pad has no assigned net", []string{ref})}, false, false
+		return resolved, []reports.Issue{localRouteBindingIssue(routePath+".net_name", "local route endpoint pad has no assigned net", []string{ref})}, false, false
 	}
 	if !strings.EqualFold(padNet, netName) {
-		return resolved, []reports.Issue{localRouteBindingIssue(path+".net_name", "local route endpoint pad net "+padNet+" does not match route net "+netName, []string{ref})}, false, true
+		return resolved, []reports.Issue{localRouteBindingIssue(routePath+".net_name", "local route endpoint pad net "+padNet+" does not match route net "+netName, []string{ref})}, false, true
 	}
 	return resolved, nil, true, false
 }
@@ -1183,11 +1277,11 @@ func localRouteAnchorID(ref string) (string, bool) {
 	return id, id != ""
 }
 
-func localRouteBindingIssue(path string, message string, refs []string) reports.Issue {
+func localRouteBindingIssue(routePath string, message string, refs []string) reports.Issue {
 	return reports.Issue{
 		Code:     reports.CodeValidationFailed,
 		Severity: reports.SeverityBlocked,
-		Path:     "design.route_connectivity." + strings.Trim(path, "."),
+		Path:     "design.route_connectivity." + strings.Trim(routePath, "."),
 		Message:  message,
 		Refs:     append([]string(nil), refs...),
 	}

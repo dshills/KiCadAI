@@ -282,6 +282,9 @@ func TestLocalRouteOperationsMaterializesEntryAnchorEndpointVia(t *testing.T) {
 				To:      transactions.Endpoint{Ref: "C1", Pin: "1"},
 				Layer:   "F.Cu",
 				WidthMM: 0.5,
+				EntryAnchorDogbone: &blocks.PCBEntryAnchorDogbone{
+					TieOffset: blocks.RelativePoint{XMM: -1, YMM: 0},
+				},
 			}},
 		},
 	}}}
@@ -305,8 +308,8 @@ func TestLocalRouteOperationsMaterializesEntryAnchorEndpointVia(t *testing.T) {
 	if summary.RoutesBound != 1 || summary.EndpointContactsProven != 2 {
 		t.Fatalf("route connectivity summary = %#v, want bound route with endpoint contacts", summary)
 	}
-	if len(operations) != 1 {
-		t.Fatalf("operations = %#v, want one route", operations)
+	if len(operations) != 3 {
+		t.Fatalf("operations = %#v, want main route and two entry-anchor dogbone routes", operations)
 	}
 	var route transactions.RouteOperation
 	if err := json.Unmarshal(operations[0].Raw, &route); err != nil {
@@ -320,6 +323,47 @@ func TestLocalRouteOperationsMaterializesEntryAnchorEndpointVia(t *testing.T) {
 	}
 	if len(route.Vias[0].Layers) != 2 || route.Vias[0].Layers[0] != "F.Cu" || route.Vias[0].Layers[1] != "B.Cu" {
 		t.Fatalf("route via layers = %#v, want F.Cu/B.Cu", route.Vias[0].Layers)
+	}
+	var topDogbone transactions.RouteOperation
+	if err := json.Unmarshal(operations[1].Raw, &topDogbone); err != nil {
+		t.Fatal(err)
+	}
+	if topDogbone.Layer != "F.Cu" || len(topDogbone.Points) != 2 || len(topDogbone.Vias) != 0 {
+		t.Fatalf("top dogbone = %#v, want F.Cu two-point route without vias", topDogbone)
+	}
+	var bottomDogbone transactions.RouteOperation
+	if err := json.Unmarshal(operations[2].Raw, &bottomDogbone); err != nil {
+		t.Fatal(err)
+	}
+	if bottomDogbone.Layer != "B.Cu" || len(bottomDogbone.Points) != 2 || len(bottomDogbone.Vias) != 1 {
+		t.Fatalf("bottom dogbone = %#v, want B.Cu two-point route with tie via", bottomDogbone)
+	}
+	if bottomDogbone.Vias[0].At.XMM != 37.4 || bottomDogbone.Vias[0].At.YMM != 4 {
+		t.Fatalf("bottom dogbone vias = %#v, want tie via one millimeter from entry anchor", bottomDogbone.Vias)
+	}
+}
+
+func TestLocalRouteEntryAnchorDogboneReportsUnsupportedLayer(t *testing.T) {
+	from := PlacedPadEndpoint{Ref: "@anchor:vout", Source: localRouteEntryAnchorSource, Point: transactions.Point{XMM: 38.4, YMM: 4}}
+	to := PlacedPadEndpoint{Ref: "C1", Point: transactions.Point{XMM: 28, YMM: 31.5}}
+	vias := []transactions.RouteViaSpec{{At: from.Point, Layers: []string{"In1.Cu", "B.Cu"}}}
+	operations, issues := localRouteEntryAnchorDogboneOperations(
+		"routes.regulator.vout_entry",
+		"VCC_3v3",
+		"In1.Cu",
+		0.5,
+		[]transactions.Point{from.Point, to.Point},
+		from,
+		to,
+		vias,
+		&blocks.PCBEntryAnchorDogbone{TieOffset: blocks.RelativePoint{XMM: -1, YMM: 0}},
+	)
+
+	if len(operations) != 0 {
+		t.Fatalf("operations = %#v, want no dogbone operation for unsupported layer", operations)
+	}
+	if len(issues) != 1 || !strings.Contains(issues[0].Message, "only supported on F.Cu and B.Cu") {
+		t.Fatalf("issues = %#v, want unsupported layer diagnostic", issues)
 	}
 }
 

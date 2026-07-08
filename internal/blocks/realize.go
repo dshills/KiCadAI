@@ -57,14 +57,15 @@ type RealizedPCBEntryAnchor struct {
 }
 
 type RealizedPCBLocalRoute struct {
-	ID       string                `json:"id"`
-	NetName  string                `json:"net_name"`
-	From     transactions.Endpoint `json:"from"`
-	To       transactions.Endpoint `json:"to"`
-	Points   []transactions.Point  `json:"points,omitempty"`
-	Layer    string                `json:"layer,omitempty"`
-	WidthMM  float64               `json:"width_mm,omitempty"`
-	LengthMM float64               `json:"length_mm,omitempty"`
+	ID                 string                 `json:"id"`
+	NetName            string                 `json:"net_name"`
+	From               transactions.Endpoint  `json:"from"`
+	To                 transactions.Endpoint  `json:"to"`
+	Points             []transactions.Point   `json:"points,omitempty"`
+	Layer              string                 `json:"layer,omitempty"`
+	WidthMM            float64                `json:"width_mm,omitempty"`
+	LengthMM           float64                `json:"length_mm,omitempty"`
+	EntryAnchorDogbone *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
 }
 
 type TimingFixtureEvidence struct {
@@ -255,12 +256,13 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		}
 		netName := aliasedRealizationNetName(opts.NetAliases, InstanceNetName(output.Instance.InstanceID, route.NetTemplate))
 		realizedRoute := RealizedPCBLocalRoute{
-			ID:      route.ID,
-			NetName: netName,
-			From:    from.Endpoint,
-			To:      to.Endpoint,
-			Layer:   firstNonEmptyString(route.Layer, opts.Layer, "F.Cu"),
-			WidthMM: route.WidthMM,
+			ID:                 route.ID,
+			NetName:            netName,
+			From:               from.Endpoint,
+			To:                 to.Endpoint,
+			Layer:              firstNonEmptyString(route.Layer, opts.Layer, "F.Cu"),
+			WidthMM:            route.WidthMM,
+			EntryAnchorDogbone: route.EntryAnchorDogbone,
 		}
 		points := routePoints(route, from.Point, to.Point, opts)
 		realizedRoute.Points = points
