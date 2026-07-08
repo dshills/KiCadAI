@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -942,8 +943,11 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 		return RouteHandle{}, fmt.Errorf("net name required")
 	}
 	netName = builder.canonicalNet(netName)
-	if len(points) < 2 {
-		return RouteHandle{}, fmt.Errorf("route requires at least two points")
+	if len(points) == 1 {
+		return RouteHandle{}, fmt.Errorf("route requires at least two points when points are provided")
+	}
+	if len(points) == 0 && len(options.Vias) == 0 {
+		return RouteHandle{}, fmt.Errorf("route requires at least two points or at least one via")
 	}
 	if options.Layer == "" {
 		options.Layer = kicadfiles.LayerFCu
@@ -979,6 +983,7 @@ func (builder *Builder) Route(netName string, points []kicadfiles.Point, options
 		if len(layers) == 0 {
 			layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu}
 		}
+		layers = canonicalRouteViaLayers(layers)
 		size := via.Size
 		if size == 0 {
 			size = kicadfiles.MM(0.6)
@@ -1037,6 +1042,7 @@ func (builder *Builder) RouteBoard(request routing.Request, options RouteBoardOp
 			for _, layer := range via.Layers {
 				layers = append(layers, boardLayerFromRouting(layer))
 			}
+			layers = canonicalRouteViaLayers(layers)
 			builder.design.PCB.Vias = append(builder.design.PCB.Vias, pcb.Via{
 				UUID:     builder.generator.New("root.pcb.route_board.via", route.Net, strconv.Itoa(viaIndex), formatPoint(position), formatLayers(layers)),
 				Position: position,
@@ -1956,6 +1962,34 @@ func formatLayers(layers []kicadfiles.BoardLayer) string {
 		formatted = append(formatted, string(layer))
 	}
 	return strings.Join(formatted, ",")
+}
+
+func canonicalRouteViaLayers(layers []kicadfiles.BoardLayer) []kicadfiles.BoardLayer {
+	if len(layers) < 2 {
+		return layers
+	}
+	ordered := append([]kicadfiles.BoardLayer(nil), layers...)
+	sort.SliceStable(ordered, func(left, right int) bool {
+		return routeViaLayerRank(ordered[left]) < routeViaLayerRank(ordered[right])
+	})
+	return ordered
+}
+
+func routeViaLayerRank(layer kicadfiles.BoardLayer) int {
+	switch layer {
+	case kicadfiles.LayerFCu:
+		return 0
+	case kicadfiles.LayerBCu:
+		return 1000
+	}
+	name := string(layer)
+	if strings.HasPrefix(name, "In") && strings.HasSuffix(name, ".Cu") {
+		index, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(name, "In"), ".Cu"))
+		if err == nil {
+			return index
+		}
+	}
+	return 2000
 }
 
 func cloneDesign(source kicaddesign.Design) kicaddesign.Design {

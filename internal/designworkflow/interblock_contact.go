@@ -173,10 +173,11 @@ func ValidateInterBlockRouteEndpointContacts(candidates []InterBlockRouteCandida
 			}
 			continue
 		}
+		contactGraph := newInterBlockContactGraph(routeOperations)
 		proofs := make([]InterBlockContactProof, 0, len(targets))
 		provenTargets := 0
 		for _, target := range targets {
-			proof := proveContactTarget(target, routeOperations)
+			proof := proveContactTarget(target, routeOperations, &contactGraph)
 			if proof.Status == InterBlockContactProven {
 				provenTargets++
 			}
@@ -397,6 +398,15 @@ func (graph *interBlockContactGraph) findTargetNode(target InterBlockContactTarg
 		return node, true
 	}
 	return graph.connectPointToSegments(target.Point, layer, contactToleranceForTarget(target))
+}
+
+func (graph *interBlockContactGraph) findTargetContact(target InterBlockContactTarget) (transactions.Point, string, bool) {
+	node, ok := graph.findTargetNode(target)
+	if !ok {
+		return transactions.Point{}, "", false
+	}
+	contact := graph.nodes[node]
+	return contact.Point, contact.Layer, true
 }
 
 func (graph *interBlockContactGraph) connectPointToSegments(point transactions.Point, layer string, tolerance float64) (int, bool) {
@@ -689,12 +699,13 @@ func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[s
 			})
 			continue
 		}
-		if len(payload.Points) == 0 {
+		decodedVias := decodedContactRouteVias(index, payload.Vias, &issues)
+		if len(payload.Points) == 0 && len(decodedVias) == 0 {
 			issues = append(issues, reports.Issue{
 				Code:        reports.CodeRouteContactMissingTarget,
 				Severity:    reports.SeverityBlocked,
 				Path:        fmt.Sprintf("design.inter_block_contact.operations[%d].points", index),
-				Message:     "route operation has no points for contact validation",
+				Message:     "route operation has no points or vias for contact validation",
 				Nets:        []string{netName},
 				OperationID: contactOperationID(operation),
 			})
@@ -705,7 +716,7 @@ func decodeInterBlockRouteOperations(operations []transactions.Operation) (map[s
 			NetName:     netName,
 			Layer:       strings.TrimSpace(payload.Layer),
 			Points:      append([]transactions.Point(nil), payload.Points...),
-			Vias:        decodedContactRouteVias(index, payload.Vias, &issues),
+			Vias:        decodedVias,
 		})
 	}
 	return byNet, issues
@@ -741,7 +752,7 @@ func decodedContactRouteVias(operationIndex int, vias []transactions.RouteViaSpe
 	return decoded
 }
 
-func proveContactTarget(target InterBlockContactTarget, operations []decodedContactRouteOperation) InterBlockContactProof {
+func proveContactTarget(target InterBlockContactTarget, operations []decodedContactRouteOperation, graph *interBlockContactGraph) InterBlockContactProof {
 	best := InterBlockContactProof{
 		RouteClass:   "inter_block",
 		NetName:      target.NetName,
@@ -775,6 +786,21 @@ func proveContactTarget(target InterBlockContactTarget, operations []decodedCont
 			if candidate.DistanceMM <= contactToleranceForTarget(target) && !sameLayer(operation.Layer, target.Layer) {
 				layerCoordinateMatch = true
 			}
+		}
+	}
+	// Prefer direct operation proofs when available so diagnostics retain the
+	// exact start/end/segment contact. The graph fallback proves legitimate
+	// via-connected multi-operation routes without erasing those details.
+	if best.Status != InterBlockContactProven && graph != nil {
+		if point, layer, ok := graph.findTargetContact(target); ok {
+			best.EndpointSide = "graph"
+			best.EmittedPoint = &point
+			best.Layer = layer
+			best.DistanceMM = pointDistanceMM(point, target.Point)
+			best.Status = InterBlockContactProven
+			best.Blocking = false
+			best.Suggestion = ""
+			return best
 		}
 	}
 	if layerCoordinateMatch {

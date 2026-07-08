@@ -225,8 +225,11 @@ func validateOperation(op Operation) []reports.Issue {
 		return validateDecoded(op, &payload, func() []reports.Issue {
 			var issues []reports.Issue
 			issues = append(issues, requireNonEmpty(path+".net_name", "net name", payload.NetName)...)
-			if len(payload.Points) < 2 && len(payload.Vias) == 0 {
-				issues = append(issues, issue(reports.CodeInvalidArgument, path+".points", "route requires at least two points"))
+			if len(payload.Points) == 1 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".points", "route requires at least two points when points are provided"))
+			}
+			if len(payload.Points) == 0 && len(payload.Vias) == 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".points", "route requires at least two points or at least one via"))
 			}
 			for pointIndex, point := range payload.Points {
 				issues = append(issues, validatePoint(fmt.Sprintf("%s.points[%d]", path, pointIndex), point)...)

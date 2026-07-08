@@ -216,6 +216,37 @@ func TestValidateInterBlockRouteEndpointContactsReportsLayerMismatch(t *testing.
 	assertContactIssueCode(t, evidence.Issues, reports.CodeRouteContactLayerMismatch)
 }
 
+func TestValidateInterBlockRouteEndpointContactsProvesViaConnectedOperations(t *testing.T) {
+	placed := interBlockContactPlaced("SIG", "SIG")
+	candidates := []InterBlockRouteCandidate{{
+		NetName: "SIG",
+		Status:  InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{
+			{Ref: "J1", Pin: "1", InstanceID: "header"},
+			{Ref: "D1", Pin: "1", InstanceID: "status"},
+		},
+	}}
+	operations := []transactions.Operation{
+		mustContactRouteOperationWithVias(t, "SIG", "B.Cu",
+			[]transactions.Point{{XMM: 5, YMM: 10}, {XMM: 10, YMM: 10}},
+			[]transactions.RouteViaSpec{{At: transactions.Point{XMM: 5, YMM: 10}, Layers: []string{"F.Cu", "B.Cu"}}},
+		),
+		mustContactRouteOperationWithVias(t, "SIG", "F.Cu",
+			[]transactions.Point{{XMM: 10, YMM: 10}, {XMM: 15, YMM: 10}},
+			[]transactions.RouteViaSpec{{At: transactions.Point{XMM: 10, YMM: 10}, Layers: []string{"F.Cu", "B.Cu"}}},
+		),
+	}
+
+	evidence := ValidateInterBlockRouteEndpointContacts(candidates, operations, &placed)
+	if len(evidence.Issues) != 0 {
+		t.Fatalf("issues = %#v", evidence.Issues)
+	}
+	summary := SummarizeInterBlockContacts(evidence)
+	if summary.ContactsRequired != 2 || summary.ContactsProven != 2 || summary.ContactsFailed != 0 {
+		t.Fatalf("summary = %#v, want via-connected route contacts proven", summary)
+	}
+}
+
 func TestValidateInterBlockRouteEndpointContactsReportsMissingRouteOperation(t *testing.T) {
 	placed := interBlockContactPlaced("SIG", "SIG")
 	candidates := []InterBlockRouteCandidate{{
@@ -358,12 +389,18 @@ func interBlockContactPlaced(firstNet string, secondNet string) PlacementStageRe
 
 func mustContactRouteOperation(t *testing.T, netName string, layer string, points ...transactions.Point) transactions.Operation {
 	t.Helper()
+	return mustContactRouteOperationWithVias(t, netName, layer, points, nil)
+}
+
+func mustContactRouteOperationWithVias(t *testing.T, netName string, layer string, points []transactions.Point, vias []transactions.RouteViaSpec) transactions.Operation {
+	t.Helper()
 	raw, err := json.Marshal(transactions.RouteOperation{
 		Op:      transactions.OpRoute,
 		NetName: netName,
 		Layer:   layer,
 		WidthMM: 0.25,
 		Points:  points,
+		Vias:    vias,
 	})
 	if err != nil {
 		t.Fatal(err)

@@ -863,6 +863,46 @@ func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	}
 }
 
+func TestBuilderRouteAcceptsViaOnlyOperation(t *testing.T) {
+	builder := newTestBuilder(t)
+	via := RouteViaSpec{
+		At:     kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		Layers: []kicadfiles.BoardLayer{kicadfiles.LayerBCu, kicadfiles.LayerFCu},
+	}
+	handle, err := builder.Route("POWER", nil, RouteOptions{Vias: []RouteViaSpec{via}})
+	if err != nil {
+		t.Fatalf("Route returned error: %v", err)
+	}
+	if handle.Count != 0 {
+		t.Fatalf("handle.Count = %d, want 0 track segments", handle.Count)
+	}
+	design := builder.Design()
+	if len(design.PCB.Tracks) != 0 {
+		t.Fatalf("tracks = %d, want 0", len(design.PCB.Tracks))
+	}
+	if len(design.PCB.Vias) != 1 {
+		t.Fatalf("vias = %d, want 1", len(design.PCB.Vias))
+	}
+	if design.PCB.Vias[0].NetName != "POWER" {
+		t.Fatalf("via net = %q, want POWER", design.PCB.Vias[0].NetName)
+	}
+	if got := design.PCB.Vias[0].Layers; len(got) != 2 || got[0] != kicadfiles.LayerFCu || got[1] != kicadfiles.LayerBCu {
+		t.Fatalf("via layers = %+v, want KiCad canonical F.Cu/B.Cu order", got)
+	}
+}
+
+func TestBuilderRouteRejectsSinglePointWithVia(t *testing.T) {
+	builder := newTestBuilder(t)
+	via := RouteViaSpec{
+		At:     kicadfiles.Point{X: kicadfiles.MM(15), Y: kicadfiles.MM(10)},
+		Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerBCu},
+	}
+	_, err := builder.Route("POWER", []kicadfiles.Point{{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}}, RouteOptions{Vias: []RouteViaSpec{via}})
+	if err == nil {
+		t.Fatal("Route returned nil error for single-point route with via")
+	}
+}
+
 func TestBuilderSetRectangularBoardOutline(t *testing.T) {
 	builder := newTestBuilder(t)
 	handle, err := builder.SetRectangularBoardOutline(kicadfiles.MM(50), kicadfiles.MM(30))

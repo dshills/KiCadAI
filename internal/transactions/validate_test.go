@@ -164,6 +164,13 @@ func TestValidateAcceptsViaOnlyRoute(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsSinglePointRouteWithVia(t *testing.T) {
+	result := Validate(mustParse(t, `{"operations":[{"op":"route","net_name":"SIG","points":[{"x_mm":0,"y_mm":0}],"vias":[{"at":{"x_mm":1,"y_mm":2},"diameter_mm":0.6,"drill_mm":0.3,"layers":["F.Cu","B.Cu"]}]}]}`))
+	if len(result.Issues) == 0 {
+		t.Fatal("expected single-point route with via to be rejected")
+	}
+}
+
 func TestValidateRejectsMalformedWriteProject(t *testing.T) {
 	_, err := Parse([]byte(`{"operations":[{"op":"write_project","output_dir":42}]}`))
 	if err != nil {

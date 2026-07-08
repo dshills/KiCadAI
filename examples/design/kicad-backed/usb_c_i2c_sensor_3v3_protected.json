@@ -106,6 +106,7 @@
     }
   ],
   "constraints": {
+    "allow_back_layer": true,
     "treat_local_power_routes_as_obstacles": true
   },
   "routing_retry": {
