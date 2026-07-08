@@ -19,10 +19,12 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 	"kicadai/internal/writercorrectness"
 )
 
@@ -1366,6 +1368,60 @@ func TestKiCadBackedConnectorLEDExampleBindsLocalRoute(t *testing.T) {
 func designExamplePlanStage(ctx context.Context, request Request) StageResult {
 	planResult := PlanBlocks(ctx, blocks.NewBuiltinRegistry(), request)
 	return planResult.Stage
+}
+
+func TestUSBCI2CSensorProtectedSchematicElectricalGate(t *testing.T) {
+	repoRoot := designExampleRepoRoot(t)
+	requestName := "kicad-backed/usb_c_i2c_sensor_3v3_protected.json"
+	request, issues := loadDesignExampleRequest(t, repoRoot, requestName)
+	if len(issues) != 0 {
+		t.Fatalf("decode %s issues:\n%s", requestName, formatDesignExampleIssues(issues))
+	}
+	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues:\n%s", formatDesignExampleIssues(plan.Stage.Issues))
+	}
+	stage := SchematicElectricalStage(plan)
+	if stage.Status != StageStatusOK {
+		t.Fatalf("schematic electrical status=%s issues:\n%s\nconnects:\n%s", stage.Status, formatDesignExampleIssues(stage.Issues), formatConnectOperationsForTest(t, request.Name, plan))
+	}
+}
+
+func formatConnectOperationsForTest(t *testing.T, projectName string, plan BlockPlanResult) string {
+	t.Helper()
+	tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, plan.Output, false)
+	if err != nil {
+		return err.Error()
+	}
+	symbolPins := map[string]map[string]kicadfiles.Point{}
+	for index, operation := range tx.Operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("decode add_symbol operation %d: %v", index, err)
+		}
+		position := schematicElectricalPoint(payload.At)
+		symbolPins[payload.Ref] = schematicElectricalPinMap(position, payload.Pins)
+	}
+	var builder strings.Builder
+	for index, operation := range tx.Operations {
+		if operation.Op != transactions.OpConnect {
+			continue
+		}
+		var payload transactions.ConnectOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("decode connect operation %d: %v", index, err)
+		}
+		from, fromOK := schematicElectricalEndpointPoint(symbolPins, payload.From)
+		to, toOK := schematicElectricalEndpointPoint(symbolPins, payload.To)
+		if !fromOK || !toOK {
+			t.Fatalf("resolve connect operation %d: from=%t %s.%s to=%t %s.%s", index, fromOK, payload.From.Ref, payload.From.Pin, toOK, payload.To.Ref, payload.To.Pin)
+		}
+		fmt.Fprintf(&builder, "%03d %s %s.%s %v -> %s.%s %v\n", index, payload.NetName, payload.From.Ref, payload.From.Pin, from, payload.To.Ref, payload.To.Pin, to)
+	}
+	return builder.String()
 }
 
 func requireRouteConnectivitySummary(t *testing.T, stage StageResult) LocalRouteConnectivitySummary {

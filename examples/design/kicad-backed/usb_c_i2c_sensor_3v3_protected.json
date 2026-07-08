@@ -1,0 +1,123 @@
+{
+  "version": "0.1.0",
+  "name": "usb_c_i2c_sensor_3v3_protected",
+  "intent": {
+    "summary": "USB-C powered I2C sensor breakout with protected 5 V input and regulated 3.3 V sensor rail.",
+    "category": "sensor"
+  },
+  "board": {
+    "width_mm": 70,
+    "height_mm": 45,
+    "layers": 2
+  },
+  "component_policy": {
+    "minimum_confidence": "rule_inferred",
+    "acceptance": "structural",
+    "procurement_policy": {}
+  },
+  "blocks": [
+    {
+      "id": "usb_power",
+      "block_id": "usb_c_power",
+      "params": {
+        "include_bulk_capacitor": true,
+        "include_fuse": true,
+        "include_power_led": false,
+        "include_tvs": true,
+        "shield_policy": "floating"
+      }
+    },
+    {
+      "id": "rail3v3",
+      "block_id": "voltage_regulator",
+      "params": {
+        "input_voltage": "5V",
+        "input_voltage_min": "4.8V",
+        "input_voltage_max": "5.5V",
+        "output_voltage": "3.3V",
+        "output_current": "100mA",
+        "input_capacitance": "10uF",
+        "output_capacitance": "10uF",
+        "include_power_led": false
+      }
+    },
+    {
+      "id": "sensor",
+      "block_id": "i2c_sensor",
+      "params": {
+        "i2c_address": "0x48",
+        "include_pullups": true,
+        "include_decoupling": true,
+        "supply_voltage": "3.3V",
+        "pullup_value": "4k7",
+        "fixed_pcb_layout": true
+      }
+    },
+    {
+      "id": "io",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_count": 4,
+        "pin_names": ["VCC", "GND", "SDA", "SCL"],
+        "edge_facing": true
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "usb_power.VBUS_OUT",
+      "to": "rail3v3.VIN",
+      "net_alias": "VCC_5v"
+    },
+    {
+      "from": "usb_power.GND",
+      "to": "rail3v3.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "rail3v3.VOUT",
+      "to": "sensor.VCC",
+      "net_alias": "VCC_3v3"
+    },
+    {
+      "from": "rail3v3.VOUT",
+      "to": "io.VCC",
+      "net_alias": "VCC_3v3"
+    },
+    {
+      "from": "rail3v3.GND",
+      "to": "sensor.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "rail3v3.GND",
+      "to": "io.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "sensor.SDA",
+      "to": "io.SDA",
+      "net_alias": "SDA"
+    },
+    {
+      "from": "sensor.SCL",
+      "to": "io.SCL",
+      "net_alias": "SCL"
+    }
+  ],
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 2,
+    "allowed_hint_categories": [
+      "reduce_distance",
+      "increase_spacing",
+      "improve_fanout",
+      "move_from_edge"
+    ]
+  },
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true
+  }
+}

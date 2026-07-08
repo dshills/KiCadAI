@@ -59,6 +59,7 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 	opts := schematicrules.Options{Scope: schematicrules.ScopeGenerated, Acceptance: schematicrules.AcceptanceConnectivity}
 	symbolPins := map[string]map[string]kicadfiles.Point{}
 	labels := map[string]struct{}{}
+	var wireCandidates []schematicElectricalWireCandidate
 	var issues []reports.Issue
 	for index, operation := range tx.Operations {
 		switch operation.Op {
@@ -101,13 +102,13 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 			if !fromOK || !toOK {
 				continue
 			}
-			file.Wires = append(file.Wires, schematic.Wire{Points: []kicadfiles.Point{from, to}})
-			if strings.TrimSpace(payload.NetName) != "" {
-				labelKey := schematicElectricalLabelKey(payload.NetName, from)
-				if _, exists := labels[labelKey]; !exists {
-					file.Labels = append(file.Labels, schematic.Label{Text: payload.NetName, Kind: schematic.LabelLocal, Position: from})
-					labels[labelKey] = struct{}{}
-				}
+			netName := strings.TrimSpace(payload.NetName)
+			if netName != "" {
+				file.Labels = schematicElectricalAppendLabel(file.Labels, labels, netName, from)
+				file.Labels = schematicElectricalAppendLabel(file.Labels, labels, netName, to)
+				wireCandidates = append(wireCandidates, schematicElectricalWireCandidate{NetName: netName, From: from, To: to})
+			} else {
+				file.Wires = append(file.Wires, schematic.Wire{Points: []kicadfiles.Point{from, to}})
 			}
 			opts.PinIntents = append(opts.PinIntents,
 				schematicrules.PinIntent{Reference: payload.From.Ref, Pin: payload.From.Pin, Net: payload.NetName, Position: schematicElectricalIntentPointIU(from), Kind: schematicrules.PinIntentRequired},
@@ -136,7 +137,101 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 	if len(issues) != 0 {
 		return file, opts, issues
 	}
+	file.Wires = append(file.Wires, schematicElectricalSafeWires(wireCandidates, file.Labels)...)
 	return file, opts, nil
+}
+
+type schematicElectricalWireCandidate struct {
+	NetName string
+	From    kicadfiles.Point
+	To      kicadfiles.Point
+}
+
+func schematicElectricalAppendLabel(existing []schematic.Label, labels map[string]struct{}, netName string, point kicadfiles.Point) []schematic.Label {
+	labelKey := schematicElectricalLabelKey(netName, point)
+	if _, exists := labels[labelKey]; exists {
+		return existing
+	}
+	labels[labelKey] = struct{}{}
+	return append(existing, schematic.Label{Text: netName, Kind: schematic.LabelLocal, Position: point})
+}
+
+func schematicElectricalSafeWires(candidates []schematicElectricalWireCandidate, labels []schematic.Label) []schematic.Wire {
+	wires := make([]schematic.Wire, 0, len(candidates))
+	for _, candidate := range candidates {
+		wires = append(wires, schematicElectricalWireForCandidate(candidate, labels))
+	}
+	return wires
+}
+
+func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandidate, labels []schematic.Label) schematic.Wire {
+	direct := []kicadfiles.Point{candidate.From, candidate.To}
+	if !schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, direct, labels) {
+		return schematic.Wire{Points: direct}
+	}
+	for _, offset := range []kicadfiles.IU{kicadfiles.MM(2.54), -kicadfiles.MM(2.54), kicadfiles.MM(5.08), -kicadfiles.MM(5.08), kicadfiles.MM(7.62), -kicadfiles.MM(7.62)} {
+		yDogleg := []kicadfiles.Point{
+			candidate.From,
+			{X: candidate.From.X, Y: candidate.From.Y + offset},
+			{X: candidate.To.X, Y: candidate.From.Y + offset},
+			candidate.To,
+		}
+		if !schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, yDogleg, labels) {
+			return schematic.Wire{Points: yDogleg}
+		}
+		xDogleg := []kicadfiles.Point{
+			candidate.From,
+			{X: candidate.From.X + offset, Y: candidate.From.Y},
+			{X: candidate.From.X + offset, Y: candidate.To.Y},
+			candidate.To,
+		}
+		if !schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, xDogleg, labels) {
+			return schematic.Wire{Points: xDogleg}
+		}
+	}
+	return schematic.Wire{Points: direct}
+}
+
+func schematicElectricalPolylineCrossesOtherNetLabel(netName string, points []kicadfiles.Point, labels []schematic.Label) bool {
+	for index := 1; index < len(points); index++ {
+		if schematicElectricalSegmentCrossesOtherNetLabel(netName, points[index-1], points[index], labels) {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicElectricalSegmentCrossesOtherNetLabel(netName string, start, end kicadfiles.Point, labels []schematic.Label) bool {
+	for _, label := range labels {
+		if label.Text == netName {
+			continue
+		}
+		if schematicElectricalPointStrictlyInsideSegment(label.Position, start, end) {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicElectricalPointStrictlyInsideSegment(point, start, end kicadfiles.Point) bool {
+	if point == start || point == end {
+		return false
+	}
+	dx1 := int64(end.X) - int64(start.X)
+	dy1 := int64(end.Y) - int64(start.Y)
+	dx2 := int64(point.X) - int64(start.X)
+	dy2 := int64(point.Y) - int64(start.Y)
+	if dx1*dy2 != dy1*dx2 {
+		return false
+	}
+	return schematicElectricalBetween(point.X, start.X, end.X) && schematicElectricalBetween(point.Y, start.Y, end.Y)
+}
+
+func schematicElectricalBetween(value, first, second kicadfiles.IU) bool {
+	if first > second {
+		first, second = second, first
+	}
+	return value >= first && value <= second
 }
 
 func schematicElectricalLabelKind(value string) schematic.LabelKind {
