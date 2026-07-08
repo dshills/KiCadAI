@@ -145,6 +145,18 @@ func componentWithParamDrivenPins(component BlockComponent, params map[string]an
 	if component.ComponentPinsParam == "" {
 		return component
 	}
+	if component.ComponentPinsParam == "regulator_symbol" && component.ComponentPackageParam != "" {
+		symbol := stringParam(params, component.ComponentPinsParam)
+		footprint := stringParam(params, component.ComponentPackageParam)
+		if profile, ok := regulatorProfileFor(symbol, footprint); ok {
+			component.SymbolID = profile.Symbol
+			component.FootprintID = profile.Footprint
+			component.Pins = profile.Pins
+		} else if symbol != "" || footprint != "" {
+			component.Pins = nil
+		}
+		return component
+	}
 	count, ok := numericValue(params[component.ComponentPinsParam])
 	if !ok || count <= 0 || math.Trunc(count) != count {
 		return component

@@ -36,6 +36,21 @@ func TestVoltageRegulatorInstantiatesDefaultOperations(t *testing.T) {
 	}
 }
 
+func TestVoltageRegulatorAMS1117PinsMatchKiCadSymbol(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "voltage_regulator",
+		InstanceID: "rail3v3",
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	pins := addSymbolPinsForRole(t, output.Operations, "regulator")
+	assertPinOffset(t, pins, "1", 0, 0)
+	assertPinOffset(t, pins, "2", 7.62, 0)
+	assertPinOffset(t, pins, "3", -7.62, 0)
+}
+
 func TestVoltageRegulatorDropoutWarningDoesNotBlock(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	_, issues := registry.Instantiate(context.Background(), BlockRequest{
@@ -316,6 +331,58 @@ func hasPinOnNet(operations []transactions.Operation, ref string, pin string, ne
 		}
 	}
 	return false
+}
+
+func addSymbolPins(t *testing.T, operations []transactions.Operation, ref string) map[string]transactions.PinSpec {
+	t.Helper()
+	pins, ok := addSymbolPinsMatching(t, operations, func(payload transactions.AddSymbolOperation) bool {
+		return payload.Ref == ref
+	})
+	if !ok {
+		t.Fatalf("missing add_symbol operation for %s", ref)
+	}
+	return pins
+}
+
+func addSymbolPinsForRole(t *testing.T, operations []transactions.Operation, role string) map[string]transactions.PinSpec {
+	t.Helper()
+	pins, ok := addSymbolPinsMatching(t, operations, func(payload transactions.AddSymbolOperation) bool {
+		return payload.Role == role
+	})
+	if !ok {
+		t.Fatalf("missing add_symbol operation for role %s", role)
+	}
+	return pins
+}
+
+func addSymbolPinsMatching(t *testing.T, operations []transactions.Operation, match func(transactions.AddSymbolOperation) bool) (map[string]transactions.PinSpec, bool) {
+	t.Helper()
+	for _, op := range operations {
+		if op.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(op.Raw, &payload); err != nil || !match(payload) {
+			continue
+		}
+		pins := make(map[string]transactions.PinSpec, len(payload.Pins))
+		for _, pin := range payload.Pins {
+			pins[pin.Number] = pin
+		}
+		return pins, true
+	}
+	return nil, false
+}
+
+func assertPinOffset(t *testing.T, pins map[string]transactions.PinSpec, pin string, wantX float64, wantY float64) {
+	t.Helper()
+	got, ok := pins[pin]
+	if !ok {
+		t.Fatalf("missing pin %s in %#v", pin, pins)
+	}
+	if got.XMM != wantX || got.YMM != wantY {
+		t.Fatalf("pin %s offset = (%g, %g), want (%g, %g)", pin, got.XMM, got.YMM, wantX, wantY)
+	}
 }
 
 func hasNoConnect(operations []transactions.Operation, ref string, pin string) bool {

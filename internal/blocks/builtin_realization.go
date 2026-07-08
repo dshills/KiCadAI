@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"kicadai/internal/components"
+	"kicadai/internal/transactions"
 )
 
 func boolPtr(value bool) *bool {
@@ -101,6 +102,7 @@ type voltageRegulatorComponentDefaults struct {
 	OutputVoltage      string
 	RegulatorSymbol    string
 	RegulatorFootprint string
+	RegulatorPins      []transactions.PinSpec
 	InputCapacitance   string
 	OutputCapacitance  string
 	CapacitorFootprint string
@@ -112,7 +114,7 @@ func voltageRegulatorComponents(defaults voltageRegulatorComponentDefaults) []Bl
 	powerLEDResistorFootprint := "Resistor_SMD:R_0805_2012Metric"
 	powerLEDFootprint := "LED_SMD:LED_0805_2012Metric"
 	return []BlockComponent{
-		{Role: "regulator", RefPrefix: "U", Value: "LDO " + defaults.OutputVoltage, SymbolID: defaults.RegulatorSymbol, FootprintID: defaults.RegulatorFootprint, Pins: fixedRegulatorPins(), ComponentQuery: &components.Query{Family: "regulator", ValueKind: "output_voltage"}, ComponentValueParam: "output_voltage", ComponentPackageParam: "regulator_footprint", MinimumConfidence: components.ConfidenceVerified, Acceptance: components.AcceptanceConnectivity},
+		{Role: "regulator", RefPrefix: "U", Value: "LDO " + defaults.OutputVoltage, SymbolID: defaults.RegulatorSymbol, FootprintID: defaults.RegulatorFootprint, Pins: defaults.RegulatorPins, ComponentQuery: &components.Query{Family: "regulator", ValueKind: "output_voltage"}, ComponentValueParam: "output_voltage", ComponentPackageParam: "regulator_footprint", ComponentPinsParam: "regulator_symbol", MinimumConfidence: components.ConfidenceVerified, Acceptance: components.AcceptanceConnectivity},
 		{Role: "input_capacitor", RefPrefix: "C", Value: defaults.InputCapacitance, SymbolID: "Device:C", FootprintID: defaults.CapacitorFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "input_capacitance", ComponentPackageParam: "capacitor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
 		{Role: "output_capacitor", RefPrefix: "C", Value: defaults.OutputCapacitance, SymbolID: "Device:C", FootprintID: defaults.CapacitorFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "capacitor", ValueKind: "capacitance"}, ComponentValueParam: "output_capacitance", ComponentPackageParam: "capacitor_footprint", MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity},
 		{Role: "power_led_resistor", RefPrefix: "R", Value: defaults.PowerLEDResistor, SymbolID: "Device:R", FootprintID: powerLEDResistorFootprint, Pins: twoTerminalHorizontalPins(), ComponentQuery: &components.Query{Family: "resistor", Package: packageQueryFromFootprint(powerLEDResistorFootprint), ValueKind: "resistance", Value: powerLEDResistorQuery}, MinimumConfidence: components.ConfidenceRuleInferred, Acceptance: components.AcceptanceConnectivity, When: RealizationWhen{Params: map[string]any{"include_power_led": true}}},

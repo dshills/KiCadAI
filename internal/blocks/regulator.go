@@ -10,12 +10,14 @@ import (
 
 const (
 	defaultRegulatorSymbol     = "Regulator_Linear:AMS1117-3.3"
+	defaultRegulatorFootprint  = "Package_TO_SOT_SMD:SOT-223-3_TabPin2"
 	ams1117DropoutWarningVolts = 1.3
 	ap2112kDropoutWarningVolts = 0.5
 	sot223DissipationWarningW  = 1.0
 	sot23DissipationWarningW   = 0.25
 	powerLEDForwardVolts       = 2.0
 	powerLEDCurrentAmps        = 0.002
+	ams1117KiCadSidePinOffset  = 7.62
 )
 
 type regulatorProfile struct {
@@ -185,12 +187,12 @@ func isSupportedAMS1117Symbol(symbol string) bool {
 
 func regulatorProfileFor(symbol string, footprint string) (regulatorProfile, bool) {
 	switch {
-	case isSupportedAMS1117Symbol(symbol) && footprint == "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
+	case isSupportedAMS1117Symbol(symbol) && footprint == defaultRegulatorFootprint:
 		return regulatorProfile{
 			Name:                "ams1117_sot223",
 			Symbol:              symbol,
-			Footprint:           footprint,
-			Pins:                fixedRegulatorPins(),
+			Footprint:           defaultRegulatorFootprint,
+			Pins:                ams1117SOT223Pins(),
 			VINPin:              "3",
 			VOUTPin:             "2",
 			GNDPin:              "1",
@@ -259,11 +261,14 @@ func validateRegulatorEnableMode(profile regulatorProfile, enableMode string) []
 	}}
 }
 
-func fixedRegulatorPins() []transactions.PinSpec {
+// ams1117SOT223Pins returns KiCad ERC connection anchors for
+// Regulator_Linear:AMS1117-3.3, which inherits the AP1117 symbol body. These
+// are schematic-symbol anchors, not SOT-223 footprint pad coordinates.
+func ams1117SOT223Pins() []transactions.PinSpec {
 	return []transactions.PinSpec{
-		{Number: "1", XMM: -2.54, YMM: 2.54},
-		{Number: "2", XMM: 2.54, YMM: 0},
-		{Number: "3", XMM: -2.54, YMM: -2.54},
+		{Number: "1", XMM: 0, YMM: 0},
+		{Number: "2", XMM: ams1117KiCadSidePinOffset, YMM: 0},
+		{Number: "3", XMM: -ams1117KiCadSidePinOffset, YMM: 0},
 	}
 }
 

@@ -2,7 +2,7 @@
   "id": "usb_c_i2c_sensor_3v3_protected",
   "request": "usb_c_i2c_sensor_3v3_protected.json",
   "tier": "block-composition",
-  "readiness": "expected_fail",
+  "readiness": "candidate",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -24,9 +24,9 @@
     "kicad_checks"
   ],
   "known_gaps": [
-    "The fixture generates the intended USB-C power input, protected VBUS path, 5 V to 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and header, but route-tree geometry still emits top-layer VCC_5v, VCC_3v3, and GND branches that cross or short local USB/regulator copper.",
-    "Required KiCad DRC currently reports clearance, shorting_items, solder_mask_bridge, and tracks_crossing violations, so the fixture must remain expected_fail until route-tree geometry or layer-access policy is repaired.",
-    "Internal connectivity validation also reports VCC_3v3 partial-route evidence from the same route-tree geometry blocker."
+    "KiCad ERC still reports warning-level pin_to_pin findings for unspecified/passive schematic connections.",
+    "KiCad ERC still reports warning-level unconnected_wire_endpoint findings on regulator-area schematic stubs, but no pin_not_connected errors remain.",
+    "AMS1117 fabrication-candidate use still requires regulator stability, ESR, thermal, and selected-manufacturer review before fabrication-ready promotion."
   ],
-  "notes": "Medium-complexity AI-generated KiCad-backed fixture combining USB-C power, protected 5 V input, 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. This fixture is intentionally expected_fail until the remaining route-tree DRC/connectivity blockers are fixed and real KiCad ERC/DRC evidence is clean."
+  "notes": "Medium-complexity AI-generated KiCad-backed fixture combining USB-C power, protected 5 V input, 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. It now reaches candidate with clean blocking DRC evidence and no KiCad ERC errors; remaining promotion work is warning cleanup and fabrication-grade regulator proof."
 }

@@ -8,6 +8,7 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestSelectDefinitionComponentsForLED(t *testing.T) {
@@ -177,6 +178,44 @@ func TestSelectionRequestForVoltageRegulatorUsesInstanceParams(t *testing.T) {
 	}
 }
 
+func TestVoltageRegulatorComponentPinsFollowSelectedProfile(t *testing.T) {
+	definition := voltageRegulatorDefinition()
+	componentsByRole := map[string]BlockComponent{}
+	for _, component := range definition.Components {
+		componentsByRole[component.Role] = component
+	}
+	params := ApplyParameterDefaults(definition, map[string]any{
+		"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+		"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+	})
+
+	component := componentWithParamDrivenPins(componentsByRole["regulator"], params)
+	if component.SymbolID != "Regulator_Linear:AP2112K-3.3" || component.FootprintID != "Package_TO_SOT_SMD:SOT-23-5" {
+		t.Fatalf("component = %+v, want AP2112K profile metadata", component)
+	}
+	if len(component.Pins) != 5 {
+		t.Fatalf("pins = %+v, want AP2112K five-pin profile", component.Pins)
+	}
+	assertPinOffset(t, pinSpecsByNumber(component.Pins), "5", 2.54, -2.54)
+}
+
+func TestVoltageRegulatorComponentPinsClearForUnsupportedProfile(t *testing.T) {
+	definition := voltageRegulatorDefinition()
+	componentsByRole := map[string]BlockComponent{}
+	for _, component := range definition.Components {
+		componentsByRole[component.Role] = component
+	}
+	params := ApplyParameterDefaults(definition, map[string]any{
+		"regulator_symbol":    "Regulator_Linear:Unsupported",
+		"regulator_footprint": "Package_TO_SOT_SMD:Unsupported",
+	})
+
+	component := componentWithParamDrivenPins(componentsByRole["regulator"], params)
+	if len(component.Pins) != 0 {
+		t.Fatalf("pins = %+v, want unsupported profile to clear default pins", component.Pins)
+	}
+}
+
 func TestSelectionRequestUsesVoltageParamWithoutMutatingComponentQuery(t *testing.T) {
 	definition := amplifierSupplyDecouplingDefinition()
 	params := ApplyParameterDefaults(definition, map[string]any{
@@ -224,4 +263,12 @@ func loadBlockTestCatalog(t *testing.T) *components.Catalog {
 		t.Fatalf("load catalog: %v", err)
 	}
 	return catalog
+}
+
+func pinSpecsByNumber(pins []transactions.PinSpec) map[string]transactions.PinSpec {
+	out := make(map[string]transactions.PinSpec, len(pins))
+	for _, pin := range pins {
+		out[pin.Number] = pin
+	}
+	return out
 }
