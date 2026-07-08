@@ -79,6 +79,29 @@ func TestVoltageRegulatorDefinitionDeclaresPowerRules(t *testing.T) {
 			t.Errorf("regulator PCB constraints = %#v, missing %s", constraints, id)
 		}
 	}
+	routes := pcbLocalRoutesByID(t, definition.PCBRealization)
+	if route, ok := routes["gnd_bypass"]; !ok {
+		t.Errorf("regulator PCB routes = %#v, missing gnd_bypass", routes)
+	} else if route.Layer != "B.Cu" || route.WidthMM < 0.5 {
+		t.Errorf("regulator gnd_bypass = %#v, want direct >=0.5mm B.Cu bypass", route)
+	} else if route.Description == "" {
+		t.Errorf("regulator gnd_bypass should document its intentional bottom-layer via transition")
+	}
+}
+
+func pcbLocalRoutesByID(t *testing.T, realization *PCBRealization) map[string]PCBLocalRoute {
+	t.Helper()
+	if realization == nil {
+		return map[string]PCBLocalRoute{}
+	}
+	routes := make(map[string]PCBLocalRoute, len(realization.LocalRoutes))
+	for _, route := range realization.LocalRoutes {
+		if _, exists := routes[route.ID]; exists {
+			t.Fatalf("duplicate PCB local route ID %q", route.ID)
+		}
+		routes[route.ID] = route
+	}
+	return routes
 }
 
 func TestUSBCPowerDefinitionDeclaresPowerRules(t *testing.T) {

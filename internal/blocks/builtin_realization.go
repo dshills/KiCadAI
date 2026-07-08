@@ -143,7 +143,7 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ID: "gnd_entry", NetTemplate: "gnd", From: RouteEndpoint{Port: "GND"}, To: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, Waypoints: []RelativePoint{{XMM: -1, YMM: -4}, {XMM: -1, YMM: 13}, {XMM: -9.9, YMM: 13}}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 			{ID: "vin_bypass", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: -11.1, YMM: 11.5}, {XMM: -2.7, YMM: 11.5}}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 			{ID: "vout_bypass", NetTemplate: "vout", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
-			{ID: "gnd_bypass", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
+			{ID: "gnd_bypass", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, Layer: "B.Cu", WidthMM: 0.5, Required: true, Description: "Bottom-layer ground bypass keeps regulator return connected while avoiding top-layer VOUT/VIN crossings; local-route emission adds endpoint vias for SMD pad access."},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "regulator_power_width", Kind: "min_width", NetTemplate: "vin", MinWidthMM: 0.5, Description: "Regulator input path should use a wider local route."},
