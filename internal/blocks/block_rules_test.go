@@ -2,6 +2,7 @@ package blocks
 
 import (
 	"context"
+	"math"
 	"slices"
 	"testing"
 )
@@ -93,6 +94,18 @@ func TestVoltageRegulatorDefinitionDeclaresPowerRules(t *testing.T) {
 		t.Errorf("regulator gnd_entry = %#v, want direct >=0.5mm B.Cu entry", route)
 	} else if route.Description == "" {
 		t.Errorf("regulator gnd_entry should document its intentional bottom-layer via transition")
+	}
+	const (
+		originalRegulatorVINBypassXMM = -2.7
+		floatCompareToleranceMM       = 1e-9
+	)
+	if route, ok := routes["vin_bypass"]; !ok {
+		t.Errorf("regulator PCB routes = %#v, missing vin_bypass", routes)
+	} else if route.Layer != "F.Cu" || route.WidthMM < 0.5 || len(route.Waypoints) < 3 {
+		t.Errorf("regulator vin_bypass = %#v, want >=0.5mm F.Cu dogleg route", route)
+		return
+	} else if math.Abs(route.Waypoints[1].XMM-route.Waypoints[2].XMM) > floatCompareToleranceMM || route.Waypoints[1].XMM <= originalRegulatorVINBypassXMM || route.Description == "" {
+		t.Errorf("regulator vin_bypass = %#v, want documented outward dogleg before VIN pad", route)
 	}
 }
 
