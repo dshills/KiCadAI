@@ -45,11 +45,25 @@ func TestExistingCopperFromRouteOperationsIncludesLocalRouteSegments(t *testing.
 	}
 }
 
-func TestExistingCopperFromRouteOperationsSkipsSignalLocalRoutes(t *testing.T) {
+func TestExistingCopperFromRouteOperationsSkipsSignalLocalRoutesWithoutVias(t *testing.T) {
 	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SDA","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}]}`))
 
 	if existing := existingCopperFromRouteOperations([]transactions.Operation{operation}, "F.Cu", routing.DefaultRules()); len(existing) != 0 {
-		t.Fatalf("existing copper = %#v, want signal local routes excluded from inter-block obstacles", existing)
+		t.Fatalf("existing copper = %#v, want via-free signal local routes excluded from inter-block obstacles", existing)
+	}
+}
+
+func TestExistingCopperFromRouteOperationsIncludesSignalLocalRouteVias(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SDA","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}],"vias":[{"at":{"x_mm":6,"y_mm":2},"diameter_mm":0.6,"drill_mm":0.3,"layers":["F.Cu","B.Cu"]}]}`))
+
+	existing := existingCopperFromRouteOperations([]transactions.Operation{operation}, "F.Cu", routing.DefaultRules())
+	if len(existing) != 3 {
+		t.Fatalf("existing copper = %#v, want signal segment plus one entry per via layer", existing)
+	}
+	for _, copper := range existing {
+		if copper.Net != "SDA" {
+			t.Fatalf("existing copper net = %q, want SDA", copper.Net)
+		}
 	}
 }
 

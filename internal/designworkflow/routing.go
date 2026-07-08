@@ -707,7 +707,7 @@ func existingCopperFromRouteOperations(operations []transactions.Operation, defa
 		if err := json.Unmarshal(operation.Raw, &route); err != nil {
 			continue
 		}
-		if !routeOperationBlocksInterBlockRouting(route) {
+		if !routeOperationBlocksInterBlockRouting(&route) {
 			continue
 		}
 		layer := routeBranchCanonicalLayer(route.Layer, defaultLayer)
@@ -736,6 +736,8 @@ func existingCopperFromRouteOperations(operations []transactions.Operation, defa
 				Layers:     append([]string(nil), via.Layers...),
 			}
 			shape := routeBranchViaShape(routingVia, rules)
+			// Through-via copper blocks every participating layer, so emit one
+			// obstacle per layer even when the track segment itself is single-sided.
 			for _, viaLayer := range routingVia.Layers {
 				existing = append(existing, routing.ExistingCopper{
 					Kind:     routing.CopperVia,
@@ -749,10 +751,18 @@ func existingCopperFromRouteOperations(operations []transactions.Operation, defa
 	return existing
 }
 
-func routeOperationBlocksInterBlockRouting(route transactions.RouteOperation) bool {
+func routeOperationBlocksInterBlockRouting(route *transactions.RouteOperation) bool {
+	if route == nil {
+		return false
+	}
 	switch netRoleFromName(route.NetName) {
 	case placement.NetPower, placement.NetGround:
 		return true
+	case placement.NetSignal:
+		// Via-bearing local signal routes are fixed cross-layer copper. Keeping
+		// via-free signal traces out preserves existing routability while still
+		// preventing route-tree branches from shorting through signal vias.
+		return len(route.Vias) != 0
 	default:
 		return false
 	}
