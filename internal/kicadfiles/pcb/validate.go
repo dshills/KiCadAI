@@ -268,13 +268,15 @@ func validateFootprint(index int, footprint Footprint, netCodes map[int]struct{}
 			errs = append(errs, fieldError(prefix("texts.value"), "must match footprint value"))
 		}
 	}
-	padNames := make(map[string]struct{}, len(footprint.Pads))
+	padNames := make(map[string]string, len(footprint.Pads))
 	for padIndex, pad := range footprint.Pads {
 		errs = append(errs, validatePad(prefix("pads"), padIndex, pad, netCodes, netNames)...)
-		if _, ok := padNames[pad.Name]; ok {
-			errs = append(errs, fieldError(indexed(prefix("pads"), padIndex, "name"), "duplicate"))
+		if pad.Name != "" {
+			if priorNet, ok := padNames[pad.Name]; ok && priorNet != pad.NetName {
+				errs = append(errs, fieldError(indexed(prefix("pads"), padIndex, "name"), "duplicate"))
+			}
+			padNames[pad.Name] = pad.NetName
 		}
-		padNames[pad.Name] = struct{}{}
 	}
 	for graphicIndex, graphic := range footprint.Graphics {
 		errs = append(errs, validateGraphic(indexedValue(prefix("graphics"), graphicIndex), Drawing(graphic))...)

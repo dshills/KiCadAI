@@ -791,6 +791,43 @@ func TestValidateRejectsUnknownPadNet(t *testing.T) {
 	}
 }
 
+func TestValidateAllowsSameNetDuplicatePadAlias(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "U1")
+	footprint.Pads[0].NetName = "A"
+	duplicate := footprint.Pads[0]
+	duplicate.UUID = kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	duplicate.Position = kicadfiles.Point{X: kicadfiles.MM(2), Y: kicadfiles.MM(0)}
+	footprint.Pads = append(footprint.Pads, duplicate)
+	board.Footprints = []Footprint{footprint}
+
+	if err := Validate(board); err != nil {
+		t.Fatalf("same-net duplicate pad alias should validate: %v", err)
+	}
+}
+
+func TestValidateRejectsDifferentNetDuplicatePadAlias(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "A"}, {Code: 2, Name: "B"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "U1")
+	footprint.Pads[0].NetName = "A"
+	duplicate := footprint.Pads[0]
+	duplicate.UUID = kicadfiles.UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+	duplicate.NetCode = 2
+	duplicate.NetName = "B"
+	footprint.Pads = append(footprint.Pads, duplicate)
+	board.Footprints = []Footprint{footprint}
+
+	err := Validate(board)
+	if err == nil {
+		t.Fatal("expected duplicate pad alias error")
+	}
+	if !strings.Contains(err.Error(), "pads[1].name") {
+		t.Fatalf("error = %v", err)
+	}
+}
+
 func TestWriteRendersDrilledPadAsThruHole(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}
