@@ -393,6 +393,13 @@ func usbCPowerComponents() []BlockComponent {
 	}
 }
 
+const (
+	usbCPowerGroundReturnCorridorYMM = -5.0
+	usbCPowerTVSGroundChannelXMM     = 20.0
+	usbCPowerBulkGroundChannelXMM    = 18.0
+	usbCPowerCC2GroundHubXMM         = 7.1
+)
+
 func usbCPowerPCBRealization() *PCBRealization {
 	usbPowerRoles := []string{"usb_c_receptacle", "cc1_rd", "cc2_rd", "vbus_fuse", "vbus_tvs", "bulk_capacitor"}
 	return &PCBRealization{
@@ -421,8 +428,37 @@ func usbCPowerPCBRealization() *PCBRealization {
 			{ID: "vbus_tvs", NetTemplate: "vbus_out", From: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "2"}, To: RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.8, Required: true, When: RealizationWhen{Params: map[string]any{"include_tvs": true}}},
 			{ID: "vbus_bulk", NetTemplate: "vbus_out", From: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bulk_capacitor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.8, Required: true, When: RealizationWhen{Params: map[string]any{"include_bulk_capacitor": true}}},
 			{ID: "tvs_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "2"}, To: RouteEndpoint{ComponentRole: "bulk_capacitor", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.8, Required: true, Description: "Short, wide TVS return into the adjacent bulk-capacitor ground node.", When: RealizationWhen{Params: map[string]any{"include_tvs": true, "include_bulk_capacitor": true}}},
-			{ID: "tvs_ground_fallback", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "2"}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 20, YMM: 4}, {XMM: 20, YMM: -2.5}, {XMM: 7.1, YMM: -2.5}}, Layer: "F.Cu", WidthMM: 0.8, Required: true, Description: "Fallback wide TVS ground route when the protected bulk capacitor is disabled.", When: RealizationWhen{Params: map[string]any{"include_tvs": true, "include_bulk_capacitor": false}}},
-			{ID: "bulk_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "bulk_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 18, YMM: -2.5}, {XMM: 7.1, YMM: -2.5}}, Layer: "F.Cu", WidthMM: 0.8, Required: true, Description: "Wide ground return path from bulk capacitance into the local USB-C ground network.", When: RealizationWhen{Params: map[string]any{"include_bulk_capacitor": true}}},
+			{
+				ID:          "tvs_ground_fallback",
+				NetTemplate: "gnd",
+				From:        RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "2"},
+				To:          RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"},
+				Waypoints: []RelativePoint{
+					{XMM: usbCPowerTVSGroundChannelXMM, YMM: 4},
+					{XMM: usbCPowerTVSGroundChannelXMM, YMM: usbCPowerGroundReturnCorridorYMM},
+					{XMM: usbCPowerCC2GroundHubXMM, YMM: usbCPowerGroundReturnCorridorYMM},
+				},
+				Layer:       "F.Cu",
+				WidthMM:     0.8,
+				Required:    true,
+				Description: "Fallback wide TVS ground route when the protected bulk capacitor is disabled.",
+				When:        RealizationWhen{Params: map[string]any{"include_tvs": true, "include_bulk_capacitor": false}},
+			},
+			{
+				ID:          "bulk_ground",
+				NetTemplate: "gnd",
+				From:        RouteEndpoint{ComponentRole: "bulk_capacitor", Pin: "2"},
+				To:          RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"},
+				Waypoints: []RelativePoint{
+					{XMM: usbCPowerBulkGroundChannelXMM, YMM: usbCPowerGroundReturnCorridorYMM},
+					{XMM: usbCPowerCC2GroundHubXMM, YMM: usbCPowerGroundReturnCorridorYMM},
+				},
+				Layer:       "F.Cu",
+				WidthMM:     0.8,
+				Required:    true,
+				Description: "Wide ground return path from bulk capacitance into the local USB-C ground network.",
+				When:        RealizationWhen{Params: map[string]any{"include_bulk_capacitor": true}},
+			},
 			{ID: "gnd_receptacle_pair", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 0, "A12")}, To: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 1, "B12")}, Waypoints: []RelativePoint{{XMM: 2.75, YMM: -5.8}, {XMM: -2.75, YMM: -5.8}}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 		},
 		Constraints: []PCBConstraint{

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -129,12 +130,18 @@ func TestUSBCPowerProtectedTVSUsesShortWideBulkGroundReturn(t *testing.T) {
 	if bulk.To.ComponentRole != "cc2_rd" || bulk.To.Pin != "2" {
 		t.Fatalf("bulk endpoint = %#v, want local CC2 ground hub", bulk.To)
 	}
+	if want := []RelativePoint{{XMM: 18, YMM: -5}, {XMM: 7.1, YMM: -5}}; !reflect.DeepEqual(bulk.Waypoints, want) {
+		t.Fatalf("bulk_ground waypoints = %#v, want %#v", bulk.Waypoints, want)
+	}
 	fallback := routes["tvs_ground_fallback"]
 	if fallback.ID == "" {
 		t.Fatalf("tvs_ground_fallback route missing")
 	}
 	if fallback.To.ComponentRole != "cc2_rd" || fallback.To.Pin != "2" {
 		t.Fatalf("fallback endpoint = %#v, want local CC2 ground hub", fallback.To)
+	}
+	if want := []RelativePoint{{XMM: 20, YMM: 4}, {XMM: 20, YMM: -5}, {XMM: 7.1, YMM: -5}}; !reflect.DeepEqual(fallback.Waypoints, want) {
+		t.Fatalf("tvs_ground_fallback waypoints = %#v, want %#v", fallback.Waypoints, want)
 	}
 	if fallback.WidthMM < 0.8 {
 		t.Fatalf("fallback width = %g, want >= 0.8mm", fallback.WidthMM)
