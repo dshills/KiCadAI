@@ -76,6 +76,9 @@ func NewPlacedPadEndpointResolver(placed *PlacementStageResult, table GeneratedN
 			}
 			key := routeEndpointKeyNormalized(refKey, strings.ToUpper(endpoint.Pad))
 			if existing, exists := resolver.endpoints[key]; exists {
+				if samePlacedPadEndpointNet(existing, endpoint) {
+					continue
+				}
 				resolver.issues = append(resolver.issues, routeEndpointIssue("refs."+ref+".pads."+endpoint.Pad, fmt.Sprintf("duplicate normalized pad endpoint conflicts with %s.%s", existing.Ref, existing.Pad), []string{ref, existing.Ref}))
 				continue
 			}
@@ -84,6 +87,10 @@ func NewPlacedPadEndpointResolver(placed *PlacementStageResult, table GeneratedN
 	}
 	resolver.sorted = sortedPlacedPadEndpoints(resolver.endpoints)
 	return resolver
+}
+
+func samePlacedPadEndpointNet(first, second PlacedPadEndpoint) bool {
+	return strings.TrimSpace(first.NetName) != "" && strings.TrimSpace(first.NetName) == strings.TrimSpace(second.NetName)
 }
 
 func (resolver PlacedPadEndpointResolver) Issues() []reports.Issue {

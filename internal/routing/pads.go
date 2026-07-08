@@ -20,6 +20,10 @@ type AccessPoint struct {
 	Layer    string   `json:"layer"`
 }
 
+func samePadNet(first, second string) bool {
+	return normalizeKey(first) == normalizeKey(second)
+}
+
 // BuildPadAccess builds normalized pad and access-point lookup tables for a
 // routing request without mutating the caller's request.
 func BuildPadAccess(request Request) PadAccess {
@@ -46,6 +50,15 @@ func BuildPadAccess(request Request) PadAccess {
 			}
 			key := endpointKey(ref, pin)
 			if existing, exists := access.Pads[key]; exists {
+				if samePadNet(existing.Net, pad.Net) {
+					pad.Ref = component.Ref
+					absolutePad := pad
+					absolutePad.Position = absolutePadPoint(component, pad.Position)
+					points, issues := accessPointsForPad(component.Ref, absolutePad, routableLayers)
+					access.AccessPoints[key] = append(access.AccessPoints[key], points...)
+					access.Issues = append(access.Issues, issues...)
+					continue
+				}
 				access.Issues = append(access.Issues, reports.Issue{
 					Code:     reports.CodeInvalidArgument,
 					Severity: reports.SeverityBlocked,

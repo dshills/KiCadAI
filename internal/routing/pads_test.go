@@ -79,8 +79,26 @@ func TestBuildPadAccessBlocksPadWithoutRoutableLayer(t *testing.T) {
 
 func TestBuildPadAccessReportsDuplicateEndpoint(t *testing.T) {
 	request := minimalRequest()
-	request.Components[0].Pads = append(request.Components[0].Pads, request.Components[0].Pads[0])
+	duplicate := request.Components[0].Pads[0]
+	duplicate.Net = "OTHER"
+	request.Components[0].Pads = append(request.Components[0].Pads, duplicate)
 
 	access := BuildPadAccess(request)
 	assertIssuePath(t, access.Issues, "components[J1].pads[1]")
+}
+
+func TestBuildPadAccessAllowsSameNetDuplicatePadAlias(t *testing.T) {
+	request := minimalRequest()
+	duplicate := request.Components[0].Pads[0]
+	duplicate.Position = Point{XMM: 1.5, YMM: 0}
+	request.Components[0].Pads = append(request.Components[0].Pads, duplicate)
+
+	access := BuildPadAccess(request)
+	if len(access.Issues) != 0 {
+		t.Fatalf("issues = %#v", access.Issues)
+	}
+	points, ok := AccessPointsForEndpoint(access, Endpoint{Ref: "J1", Pin: "1"})
+	if !ok || len(points) != 4 {
+		t.Fatalf("missing access points for aliased pad: %#v", access)
+	}
 }

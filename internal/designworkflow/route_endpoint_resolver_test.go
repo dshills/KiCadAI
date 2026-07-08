@@ -101,6 +101,21 @@ func TestPlacedPadEndpointResolverEndpointsAreStable(t *testing.T) {
 	}
 }
 
+func TestPlacedPadEndpointResolverAllowsSameNetDuplicatePadAlias(t *testing.T) {
+	placed := endpointResolverPlacement(placement.Placement{XMM: 10, YMM: 20, Layer: "F.Cu"},
+		placement.PadSummary{Name: "2", Net: "SIG", XMM: 0, YMM: 1},
+		placement.PadSummary{Name: "2", Net: "SIG", XMM: 0, YMM: -1},
+	)
+	resolver := NewPlacedPadEndpointResolver(&placed, generatedNetTableFromNames("SIG"))
+
+	if len(resolver.Issues()) != 0 {
+		t.Fatalf("same-net pad alias should not create resolver issues: %#v", resolver.Issues())
+	}
+	if _, ok := resolver.Resolve(transactions.Endpoint{Ref: "R1", Pin: "2"}); !ok {
+		t.Fatalf("same-net pad alias should resolve")
+	}
+}
+
 func TestPlacedPadEndpointResolverDoesNotResolveUnknownPad(t *testing.T) {
 	placed := endpointResolverPlacement(placement.Placement{XMM: 10, YMM: 20, Layer: "F.Cu"}, placement.PadSummary{Name: "1", Net: "SIG"})
 	resolver := NewPlacedPadEndpointResolver(&placed, generatedNetTableFromNames("SIG"))

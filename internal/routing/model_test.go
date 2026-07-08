@@ -73,12 +73,29 @@ func TestValidateRejectsInvalidRules(t *testing.T) {
 func TestValidateRejectsDuplicateReferencesAndPads(t *testing.T) {
 	request := minimalRequest()
 	request.Components = append(request.Components, request.Components[0])
-	request.Components[0].Pads = append(request.Components[0].Pads, request.Components[0].Pads[0])
+	duplicate := request.Components[0].Pads[0]
+	duplicate.Net = "OTHER"
+	request.Components[0].Pads = append(request.Components[0].Pads, duplicate)
 
 	NormalizeRequest(&request)
 	issues := Validate(&request)
 	assertIssueCode(t, issues, reports.CodeDuplicateReference)
 	assertIssuePath(t, issues, "components[0].pads[1].name")
+}
+
+func TestValidateAllowsSameNetDuplicatePadAlias(t *testing.T) {
+	request := minimalRequest()
+	duplicate := request.Components[0].Pads[0]
+	duplicate.Position = Point{XMM: 1.5, YMM: 0}
+	request.Components[0].Pads = append(request.Components[0].Pads, duplicate)
+
+	NormalizeRequest(&request)
+	issues := Validate(&request)
+	for _, issue := range issues {
+		if issue.Path == "components[0].pads[1].name" {
+			t.Fatalf("same-net duplicate pad alias should not fail validation: %#v", issues)
+		}
+	}
 }
 
 func TestValidateRejectsUnknownEndpointPad(t *testing.T) {

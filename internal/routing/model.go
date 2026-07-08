@@ -578,7 +578,7 @@ func Validate(request *Request) []reports.Issue {
 			issues = append(issues, issue(reports.CodeDuplicateReference, reports.SeverityBlocked, path+".ref", "duplicate component reference"))
 		}
 		refs[ref] = struct{}{}
-		componentPadNames := map[string]struct{}{}
+		componentPadNets := map[string]string{}
 		for padIndex, pad := range component.Pads {
 			pin := normalizeKey(pad.Name)
 			padPath := fmt.Sprintf("%s.pads[%d]", path, padIndex)
@@ -586,10 +586,10 @@ func Validate(request *Request) []reports.Issue {
 				issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, padPath+".name", "pad name is required"))
 				continue
 			}
-			if _, ok := componentPadNames[pin]; ok {
+			if existingNet, ok := componentPadNets[pin]; ok && !samePadNet(existingNet, pad.Net) {
 				issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, padPath+".name", "duplicate pad name on component"))
 			}
-			componentPadNames[pin] = struct{}{}
+			componentPadNets[pin] = pad.Net
 			if len(pad.Layers) == 0 {
 				issues = append(issues, issue(reports.CodeInvalidArgument, reports.SeverityBlocked, padPath+".layers", "pad must have at least one layer"))
 			}
