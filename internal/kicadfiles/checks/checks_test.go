@@ -106,13 +106,13 @@ func TestRunDRCWithRunnerViolationReportIsNotToolError(t *testing.T) {
 	}
 }
 
-func TestCheckArgsUsesErrorSeverityForDRC(t *testing.T) {
+func TestCheckArgsUsesAllSeveritiesForDRC(t *testing.T) {
 	args := checkArgs(CheckKindDRC, "mm", "/tmp/report.json", "/tmp/demo.kicad_pcb")
-	if !testArgsContain(args, "--severity-error") {
-		t.Fatalf("DRC args = %#v, want --severity-error", args)
+	if !testArgsContain(args, "--severity-all") {
+		t.Fatalf("DRC args = %#v, want --severity-all", args)
 	}
-	if testArgsContain(args, "--severity-all") {
-		t.Fatalf("DRC args = %#v, did not expect --severity-all", args)
+	if testArgsContain(args, "--severity-error") {
+		t.Fatalf("DRC args = %#v, did not expect --severity-error", args)
 	}
 }
 

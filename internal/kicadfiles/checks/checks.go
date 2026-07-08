@@ -104,7 +104,7 @@ func checkArgs(kind CheckKind, units string, reportPath string, inputPath string
 	if kind == CheckKindDRC {
 		group = "pcb"
 		command = "drc"
-		severity = "--severity-error"
+		severity = "--severity-all"
 	}
 	return []string{
 		group,
