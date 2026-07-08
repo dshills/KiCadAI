@@ -6,8 +6,8 @@
     "category": "sensor"
   },
   "board": {
-    "width_mm": 70,
-    "height_mm": 45,
+    "width_mm": 100,
+    "height_mm": 60,
     "layers": 2
   },
   "component_policy": {
