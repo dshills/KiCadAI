@@ -260,6 +260,69 @@ func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 	}
 }
 
+func TestLocalRouteOperationsMaterializesEntryAnchorEndpointVia(t *testing.T) {
+	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "rail",
+		BlockID:    "voltage_regulator",
+		Realization: blocks.BlockPCBRealizationResult{
+			EntryAnchors: []blocks.RealizedPCBEntryAnchor{{
+				ID:      "vout",
+				Port:    "VOUT",
+				NetName: "VCC_3v3",
+				Placement: blocks.RelativePlacement{
+					XMM:   38.4,
+					YMM:   4,
+					Layer: "F.Cu",
+				},
+			}},
+			LocalRoutes: []blocks.RealizedPCBLocalRoute{{
+				ID:      "vout_entry",
+				NetName: "VCC_3v3",
+				From:    transactions.Endpoint{Ref: "@anchor:vout", Pin: "VOUT"},
+				To:      transactions.Endpoint{Ref: "C1", Pin: "1"},
+				Layer:   "F.Cu",
+				WidthMM: 0.5,
+			}},
+		},
+	}}}
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Components: []placement.Component{
+				{Ref: "C1", FootprintID: "Test:C", Pads: []placement.PadSummary{{Name: "1", Net: "VCC_3v3", XMM: -0.6, YMM: 0}}},
+			},
+			Nets: []placement.Net{{Name: "VCC_3v3", Endpoints: []placement.Endpoint{{Ref: "C1", Pin: "1"}}}},
+		},
+		Result: placement.Result{Status: placement.StatusPlaced, Placements: []placement.PlacementResult{
+			{Ref: "C1", FootprintID: "Test:C", Position: placement.Placement{XMM: 28, YMM: 31.5, Layer: "F.Cu"}},
+		}},
+		Stage: NewStageResult(StagePlacement, nil),
+	}
+
+	operations, issues, summary := localRouteOperations(fragments, &placed)
+	if len(issues) != 0 {
+		t.Fatalf("local route binding issues = %#v", issues)
+	}
+	if summary.RoutesBound != 1 || summary.EndpointContactsProven != 2 {
+		t.Fatalf("route connectivity summary = %#v, want bound route with endpoint contacts", summary)
+	}
+	if len(operations) != 1 {
+		t.Fatalf("operations = %#v, want one route", operations)
+	}
+	var route transactions.RouteOperation
+	if err := json.Unmarshal(operations[0].Raw, &route); err != nil {
+		t.Fatal(err)
+	}
+	if len(route.Vias) != 1 {
+		t.Fatalf("route vias = %#v, want materialized entry-anchor via", route.Vias)
+	}
+	if route.Vias[0].At.XMM != 38.4 || route.Vias[0].At.YMM != 4 {
+		t.Fatalf("route vias = %#v, want via at entry anchor", route.Vias)
+	}
+	if len(route.Vias[0].Layers) != 2 || route.Vias[0].Layers[0] != "F.Cu" || route.Vias[0].Layers[1] != "B.Cu" {
+		t.Fatalf("route via layers = %#v, want F.Cu/B.Cu", route.Vias[0].Layers)
+	}
+}
+
 func TestLocalRouteOperationsAddsEndpointViasForCrossLayerRoutes(t *testing.T) {
 	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
 		InstanceID: "status",

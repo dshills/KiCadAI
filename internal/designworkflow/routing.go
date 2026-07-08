@@ -37,6 +37,13 @@ const interBlockRouteSnapMaxDistanceMM = 0.75
 
 const localRouteShapeEndpointDeltaMismatchMaxMM = 25.0
 
+const localRouteEntryAnchorSource = "pcb_realization.entry_anchor"
+
+const (
+	defaultLocalRouteTopLayer    = "F.Cu"
+	defaultLocalRouteBottomLayer = "B.Cu"
+)
+
 type LocalRouteConnectivitySummary struct {
 	RoutesAttempted        int `json:"routes_attempted"`
 	RoutesBound            int `json:"routes_bound"`
@@ -872,6 +879,7 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		summary.IssueCount = len(issues)
 		return transactions.Operation{}, issues, summary, false
 	}
+	vias = append(vias, localRouteEntryAnchorVias(layer, from, to, vias)...)
 	points := []transactions.Point{
 		from.Point,
 		to.Point,
@@ -931,6 +939,43 @@ func localRouteEndpointVia(point transactions.Point, endpointLayer string, route
 		DiameterMM: defaultLocalRouteViaDiameterMM,
 		DrillMM:    defaultLocalRouteViaDrillMM,
 		Layers:     []string{canonicalCopperLayer(endpointLayer), canonicalCopperLayer(routeLayer)},
+	}
+}
+
+func localRouteEntryAnchorVias(routeLayer string, from PlacedPadEndpoint, to PlacedPadEndpoint, existing []transactions.RouteViaSpec) []transactions.RouteViaSpec {
+	var vias []transactions.RouteViaSpec
+	for _, endpoint := range []PlacedPadEndpoint{from, to} {
+		if !localRouteEndpointIsEntryAnchor(endpoint) || localRouteHasViaAt(existing, endpoint.Point) || localRouteHasViaAt(vias, endpoint.Point) {
+			continue
+		}
+		vias = append(vias, localRouteMaterializedAnchorVia(endpoint.Point, routeLayer))
+	}
+	return vias
+}
+
+func localRouteEndpointIsEntryAnchor(endpoint PlacedPadEndpoint) bool {
+	return strings.TrimSpace(endpoint.Source) == localRouteEntryAnchorSource
+}
+
+func localRouteHasViaAt(vias []transactions.RouteViaSpec, point transactions.Point) bool {
+	for _, via := range vias {
+		if sameRoutePoint(via.At, point) {
+			return true
+		}
+	}
+	return false
+}
+
+func localRouteMaterializedAnchorVia(point transactions.Point, routeLayer string) transactions.RouteViaSpec {
+	layers := []string{defaultLocalRouteTopLayer, defaultLocalRouteBottomLayer}
+	if strings.EqualFold(canonicalCopperLayer(routeLayer), defaultLocalRouteBottomLayer) {
+		layers = []string{defaultLocalRouteBottomLayer, defaultLocalRouteTopLayer}
+	}
+	return transactions.RouteViaSpec{
+		At:         point,
+		DiameterMM: defaultLocalRouteViaDiameterMM,
+		DrillMM:    defaultLocalRouteViaDrillMM,
+		Layers:     layers,
 	}
 }
 
