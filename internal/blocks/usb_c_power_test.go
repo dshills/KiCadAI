@@ -147,6 +147,35 @@ func TestUSBCPowerProtectedTVSUsesShortWideBulkGroundReturn(t *testing.T) {
 	}
 }
 
+func TestUSBCPowerProtectedPowerPathWidths(t *testing.T) {
+	realization := usbCPowerPCBRealization()
+	routes := map[string]PCBLocalRoute{}
+	for _, candidate := range realization.LocalRoutes {
+		routes[candidate.ID] = candidate
+	}
+
+	for _, routeID := range []string{"vbus_entry_a", "vbus_entry_b"} {
+		route := routes[routeID]
+		if route.ID == "" {
+			t.Errorf("%s route missing", routeID)
+			continue
+		}
+		if route.WidthMM != 0.75 {
+			t.Errorf("%s width = %g, want 0.75mm connector-entry width", routeID, route.WidthMM)
+		}
+	}
+	for _, routeID := range []string{"vbus_tvs", "vbus_bulk", "tvs_ground", "tvs_ground_fallback", "bulk_ground"} {
+		route := routes[routeID]
+		if route.ID == "" {
+			t.Errorf("%s route missing", routeID)
+			continue
+		}
+		if route.WidthMM != 0.8 {
+			t.Errorf("%s width = %g, want 0.8mm", routeID, route.WidthMM)
+		}
+	}
+}
+
 func TestUSBCPowerTVSOnlyRealizationKeepsGroundRoute(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	definition, ok := registry.GetBlock("usb_c_power")
