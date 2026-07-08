@@ -14,6 +14,14 @@ go test -v ./internal/designworkflow -run TestDesignExamplesOptionalKiCadBackedT
 `KICADAI_KICAD_CLI` must point to the `kicad-cli` executable, not the KiCad
 application bundle or install directory.
 
+On macOS, the app-bundled `kicad-cli pcb drc` may abort when run inside the
+Codex restricted command sandbox or similarly isolated CI environments because
+the DRC job path touches wx/macOS application registration. If direct DRC
+crashes with exit `134` or the workflow reports
+`tool_error_kind: no_output_crash`, rerun the same command outside that
+sandbox. This is an execution-environment issue when the same board passes DRC
+outside the sandbox.
+
 The optional tier now writes a normalized promotion report at
 `.kicadai/design-promotion.json` for each generated fixture. The report records
 declared readiness, achieved readiness, gates, stage evidence, artifacts,
@@ -47,8 +55,51 @@ kicadai \
 | `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment and routed inter-block endpoint contact evidence. It currently blocks on required KiCad ERC pin/endpoint evidence. |
 | `i2c_sensor_breakout_candidate` | `candidate` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, project-write, writer-correctness, structural validation, and warning-level optional KiCad evidence. Pass promotion still requires clean required KiCad DRC evidence from a stable `kicad-cli`. |
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
+| `usb_c_led_indicator_protected` | local `pass` evidence | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. The checked-in request is used for local evidence runs; the latest reproduced run is documented below. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
+
+## Protected USB-C LED Pass Evidence
+
+The protected USB-C LED variant was last reproduced as KiCad-backed `pass`
+evidence in this repository by running the workflow outside the restricted
+sandbox. The ERC/DRC artifacts below record the local KiCad version and report
+timestamps.
+
+Run from the repository root:
+
+```sh
+make build
+KICADAI_KICAD_CLI=/path/to/kicad-cli
+./bin/kicadai \
+  --request examples/design/kicad-backed/usb_c_led_indicator_protected.json \
+  --output examples/.generated/usb_c_led_indicator_protected \
+  --overwrite \
+  --kicad-cli "$KICADAI_KICAD_CLI" \
+  --require-erc \
+  --require-drc \
+  --require-kicad-roundtrip \
+  --keep-artifacts \
+  --artifact-dir examples/.generated/usb_c_led_indicator_protected/.kicadai/checks \
+  design create
+```
+
+Observed promotion status:
+
+- `promotion.status`: `pass`
+- `promotion.achieved_readiness`: `pass`
+- `acceptance.achieved`: `erc-drc`
+- KiCad ERC report:
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/kicadai-check-erc-4129510764/erc.json`
+- KiCad DRC report:
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/kicadai-check-drc-2807111534/drc.json`
+- PCB round-trip normalized diff:
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/pcb-roundtrip-840250900/normalized.diff`
+- Schematic round-trip normalized diff:
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/usb_c_led_indicator_protected-3948003877/normalized.diff`
+
+The ERC report has no violations. The DRC report has no violations and no
+unconnected items. Both normalized round-trip diffs are zero bytes.
 
 ## Interpreting Results
 
@@ -84,9 +135,10 @@ for `pass` promotion. Route-tree contact
 graph evidence now reports four complete contact-graph groups, local-route
 merge evidence, same-net segment intersection/overlap merges, and via layer
 transitions. Route-tree diagnostics also separate fixed-net preservation
-notices and missing-net-class warnings from repairable blockers. The next
-blocker is stable required KiCad DRC/pass evidence; the local macOS `pcb drc`
-command currently aborts before writing DRC JSON in this environment.
+notices and missing-net-class warnings from repairable blockers. The protected
+USB-C LED variant has stable required KiCad DRC/pass evidence when run outside
+the restricted sandbox; sandboxed macOS DRC aborts are tracked as an execution
+environment limitation, not a board violation.
 
 Promotion gates currently include metadata, stages, writer correctness,
 connectivity, KiCad checks, route completion, physical rules, and artifacts.

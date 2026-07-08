@@ -1,0 +1,88 @@
+{
+  "version": "0.1.0",
+  "name": "usb_c_led_indicator_protected",
+  "intent": {
+    "summary": "USB-C powered LED indicator board with a 5 V power-only sink and active-high indicator LED.",
+    "category": "breakout"
+  },
+  "board": {
+    "width_mm": 50,
+    "height_mm": 30,
+    "layers": 2
+  },
+  "component_policy": {
+    "minimum_confidence": "rule_inferred",
+    "acceptance": "structural",
+    "procurement_policy": {},
+    "overrides": {
+      "indicator.led": {
+        "required_ratings": [
+          {
+            "kind": "forward_current",
+            "value": "5",
+            "unit": "mA"
+          }
+        ]
+      },
+      "indicator.resistor": {
+        "required_ratings": [
+          {
+            "kind": "power",
+            "value": "0.063",
+            "unit": "W"
+          }
+        ]
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "usb_power",
+      "block_id": "usb_c_power",
+      "params": {
+        "include_bulk_capacitor": true,
+        "include_fuse": true,
+        "include_power_led": false,
+        "include_tvs": true,
+        "shield_policy": "floating"
+      }
+    },
+    {
+      "id": "indicator",
+      "block_id": "led_indicator",
+      "params": {
+        "led_current": "5mA",
+        "led_forward_voltage": "2.0V",
+        "resistor_value": "600",
+        "supply_voltage": "5V"
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "usb_power.GND",
+      "to": "indicator.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "usb_power.VBUS_OUT",
+      "to": "indicator.IN",
+      "net_alias": "VCC_5v"
+    }
+  ],
+  "routing_retry": {
+    "enabled": true,
+    "max_attempts": 2,
+    "allowed_hint_categories": [
+      "reduce_distance",
+      "increase_spacing",
+      "improve_fanout",
+      "move_from_edge"
+    ]
+  },
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true
+  }
+}

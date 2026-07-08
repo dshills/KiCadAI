@@ -66,12 +66,16 @@ includes local-route anchors, same-net segment intersection/overlap merges,
 same-net copper merge evidence, and via layer transitions. The I2C
 fixture now emits all 8 route-tree branches, proves all 12 required contacts,
 reports four graph-complete route-tree nets, and is reproducible as a checked-in
-KiCad-backed `pass` fixture with clean required ERC/DRC evidence. Route-tree repair classifies contact blockers, feeds repairable hints
+KiCad-backed `pass` fixture with clean required ERC/DRC evidence. The protected
+USB-C LED variant also has reproducible local KiCad-backed `pass` evidence when
+DRC is run outside the restricted sandbox used by Codex tooling.
+Route-tree repair classifies contact blockers, feeds repairable hints
 into bounded placement retry, and ranks selected attempts by route-tree
 completion evidence. Route-tree diagnostics now separate fixed-net skip notices
 and missing-net-class warnings from repairable blockers. The next blockers are
 generated schematic connectivity/readability sufficient to clear KiCad ERC,
-broader rich-board routing coverage, and KiCad DRC-clean pass evidence.
+broader rich-board routing coverage, and expanding checked-in pass evidence
+beyond the current I2C and protected USB-C LED lanes.
 
 Fabrication readiness now includes expanded deterministic physical-rule
 evidence for annular rings, copper feature widths, polygonal copper width and

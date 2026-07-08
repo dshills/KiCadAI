@@ -878,10 +878,13 @@ for `design create`. The default set exercises supported LED workflows and
 proves that checked-in examples remain aligned with the current request schema,
 block contracts, project writer, schematic/PCB readers, and component identity
 property propagation. Optional KiCad-backed design examples now live under
-`examples/design/kicad-backed/`; I2C is a checked-in pass fixture, LED is
-candidate-level, and connector/LED plus amplifier generated boards currently
-record `expected_fail` evidence while required KiCad ERC/DRC blockers remain
-open. I2C now reaches route-tree-managed inter-block routing with clean
+`examples/design/kicad-backed/`; I2C is a checked-in pass fixture, and the
+simple LED smoke fixture is candidate-level. The protected USB-C LED variant
+has reproducible local KiCad-backed pass evidence when DRC is run outside the
+restricted sandbox.
+Connector/LED plus amplifier generated boards currently record `expected_fail`
+evidence while required KiCad ERC/DRC blockers remain open. I2C now reaches
+route-tree-managed inter-block routing with clean
 local-route alias/contact proof, route-tree endpoint access, contact graph
 completion evidence, route-tree repair hints, and selected retry evidence. It
 now emits all route-tree branches, records four graph-complete route-tree nets,
