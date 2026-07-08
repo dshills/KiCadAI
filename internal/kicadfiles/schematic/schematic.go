@@ -2271,7 +2271,12 @@ func schematicFixed(value kicadfiles.IU) sexpr.Fixed {
 	if value == 0 {
 		return schematicZero
 	}
-	return sexpr.X(kicadfiles.ToMMString(value))
+	text := kicadfiles.ToMMString(value)
+	if strings.Contains(text, ".") {
+		text = strings.TrimRight(text, "0")
+		text = strings.TrimSuffix(text, ".")
+	}
+	return sexpr.X(text)
 }
 
 func indexed(collection string, index int, field string) string {

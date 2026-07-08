@@ -247,7 +247,7 @@ func TestReadWriteSchematicReadsSheetSizePinsAndInstances(t *testing.T) {
 	}
 	output := buf.String()
 	for _, want := range []string{
-		"(size 30.0 20.0)",
+		"(size 30 20)",
 		"(pin",
 		"\"IN\"",
 		"input",
@@ -317,7 +317,7 @@ func TestReadWriteSchematicPreservesSymbolAndLabelSemantics(t *testing.T) {
 		"(unit 2)",
 		"(value \"TL072\")",
 		"(shape output)",
-		"(at 30.0 20.0 180)",
+		"(at 30 20 180)",
 	} {
 		if !strings.Contains(output, want) {
 			t.Fatalf("output missing %s:\n%s", want, output)

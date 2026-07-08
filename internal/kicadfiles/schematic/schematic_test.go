@@ -228,7 +228,7 @@ func TestWriteRendersLabelShapesAndNoConnects(t *testing.T) {
 	output := buf.String()
 	for _, want := range []string{
 		"(junction",
-		"(diameter 1.0)",
+		"(diameter 1)",
 		"(color 1 2 3 4)",
 		"(no_connect",
 		"(global_label",
@@ -673,6 +673,16 @@ func TestSchematicFixedPreservesNonZeroPrecision(t *testing.T) {
 	}
 	if strings.TrimSpace(output) != "(xy 1.234567 -0.5)" {
 		t.Fatalf("formatted non-zero points = %q", strings.TrimSpace(output))
+	}
+}
+
+func TestSchematicFixedCanonicalizesIntegerMillimeters(t *testing.T) {
+	output, err := sexpr.Format(sexpr.L(sexpr.A("xy"), schematicFixed(kicadfiles.MM(10)), schematicFixed(kicadfiles.MM(-3))))
+	if err != nil {
+		t.Fatalf("Format returned error: %v", err)
+	}
+	if strings.TrimSpace(output) != "(xy 10 -3)" {
+		t.Fatalf("formatted integer points = %q", strings.TrimSpace(output))
 	}
 }
 
@@ -1279,7 +1289,7 @@ func TestWriteRendersSheet(t *testing.T) {
 		"(sheet",
 		"\"Sheetname\"\n      \"Power\"",
 		"\"Sheetfile\"\n      \"power.kicad_sch\"",
-		"(size 30.0 15.0)",
+		"(size 30 15)",
 		"(exclude_from_sim no)",
 		"(in_bom yes)",
 		"(on_board yes)",
@@ -1321,7 +1331,7 @@ func TestWriteRendersSheetPinsAndInstances(t *testing.T) {
 		"(pin",
 		"\"VIN\"",
 		"input",
-		"(at 10.0 25.0 180)",
+		"(at 10 25 180)",
 		"(instances",
 		"\"demo\"",
 		"(page \"2\")",
