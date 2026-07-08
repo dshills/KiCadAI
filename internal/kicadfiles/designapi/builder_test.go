@@ -978,6 +978,50 @@ func TestBuilderWriteProjectAddsGeneratedLocalSensorSymbolLibrary(t *testing.T) 
 	}
 }
 
+func TestBuilderDesignAddsSameNetDuplicatePadAliasTie(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "U1", "Device:R", "Alias", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.Connect(Endpoint{Reference: "U1", Pin: "1"}, Endpoint{Reference: "U1", Pin: "2"}, "OUT"); err != nil {
+		t.Fatalf("Connect returned error: %v", err)
+	}
+	if err := builder.AssignFootprint("U1", "Package_TO_SOT_SMD:SOT-223-3_TabPin2"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("U1", PlaceFootprintOptions{
+		Position: kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)},
+		Pads: []PadSpec{
+			{Name: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2), Y: 0}, Net: "GND"},
+			{Name: "2", Offset: kicadfiles.Point{X: 0, Y: kicadfiles.MM(-2)}, Net: "OUT"},
+			{Name: "2", Offset: kicadfiles.Point{X: 0, Y: kicadfiles.MM(2)}, Net: "OUT"},
+		},
+	}); err != nil {
+		t.Fatalf("PlaceFootprint returned error: %v", err)
+	}
+
+	design := builder.Design()
+	if len(design.PCB.Tracks) != 1 {
+		t.Fatalf("tracks = %#v, want one alias tie", design.PCB.Tracks)
+	}
+	track := design.PCB.Tracks[0]
+	if track.NetName != "OUT" || track.Layer != kicadfiles.LayerFCu {
+		t.Fatalf("alias tie = %#v, want OUT on F.Cu", track)
+	}
+	again := builder.Design()
+	if len(again.PCB.Tracks) != 1 {
+		t.Fatalf("second Design tracks = %#v, want one non-accumulating alias tie", again.PCB.Tracks)
+	}
+}
+
+func TestSharedPadTieLayerHandlesAllCopperAndInternalLayers(t *testing.T) {
+	layer, ok := sharedPadTieLayer(
+		&pcb.Pad{Layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu}},
+		&pcb.Pad{Layers: []kicadfiles.BoardLayer{kicadfiles.BoardLayer("In1.Cu")}},
+	)
+	if !ok || layer != kicadfiles.BoardLayer("In1.Cu") {
+		t.Fatalf("layer = %q ok=%v, want In1.Cu", layer, ok)
+	}
+}
+
 func TestBuilderRouteBoardAddsPCBTracks(t *testing.T) {
 	builder := newTestBuilder(t)
 	result, err := builder.RouteBoard(designAPIRoutingRequest(), RouteBoardOptions{})

@@ -211,7 +211,7 @@ func TestApplyWritesAddSymbolProperties(t *testing.T) {
 		}
 	}
 	text := string(data)
-	if !strings.Contains(text, `"Manufacturer"`) || !strings.Contains(text, `"Yageo"`) || !strings.Contains(text, `(at 11.0 12.0 90)`) || !strings.Contains(text, `(hide yes)`) {
+	if !strings.Contains(text, `"Manufacturer"`) || !strings.Contains(text, `"Yageo"`) || !strings.Contains(text, `(at 11 12 90)`) || !strings.Contains(text, `(hide yes)`) {
 		t.Fatalf("written schematic missing property flags:\n%s", text)
 	}
 }
