@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 )
 
 const maxOccupancyCellsPerLayer = 5_000_000
@@ -29,7 +30,33 @@ type gridPoint struct {
 }
 
 func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
+	request = cloneRequest(request)
 	NormalizeRequest(&request)
+	return buildOccupancy(request, currentNet, request.Rules.TraceWidthMM/2)
+}
+
+func BuildViaOccupancy(request Request, currentNet string) (Occupancy, error) {
+	request = cloneRequest(request)
+	NormalizeRequest(&request)
+	return buildOccupancy(request, currentNet, request.Rules.ViaDiameterMM/2)
+}
+
+func BuildTraceAndViaOccupancy(request Request, currentNet string) (Occupancy, Occupancy, error) {
+	request = cloneRequest(request)
+	NormalizeRequest(&request)
+	traceOccupancy, err := buildOccupancy(request, currentNet, request.Rules.TraceWidthMM/2)
+	if err != nil {
+		return Occupancy{}, Occupancy{}, err
+	}
+	viaOccupancy, err := buildOccupancy(request, currentNet, request.Rules.ViaDiameterMM/2)
+	if err != nil {
+		return Occupancy{}, Occupancy{}, err
+	}
+	return traceOccupancy, viaOccupancy, nil
+}
+
+func buildOccupancy(request Request, currentNet string, movingCopperRadiusMM float64) (Occupancy, error) {
+	currentNetKey := strings.TrimSpace(currentNet)
 	grid := NewGrid(Point{}, request.Rules.GridMM)
 	occupancy := Occupancy{Grid: grid, Layers: map[int]*LayerOccupancy{}}
 	layerIndexes, err := LayerIndexes(request.Board.Layers)
@@ -39,7 +66,7 @@ func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
 	usable := UsableBoardRect(request.Board, request.Rules)
 	board := BoardRect(request.Board)
 	for _, layer := range request.Board.Layers {
-		if !layer.Routable {
+		if layer.Kind != LayerCopper {
 			continue
 		}
 		layerIndex := layerIndexes[normalizeLayer(layer.Name)]
@@ -49,7 +76,7 @@ func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
 		occupancy.blockOutsideUsable(layerIndex, board, usable)
 	}
 	for _, obstacle := range request.Obstacles {
-		occupancy.addShape(layerIndexes, obstacle.Layer, obstacle.Geometry, obstacle.Clearance+request.Rules.TraceWidthMM/2, obstacle)
+		occupancy.addShape(layerIndexes, obstacle.Layer, obstacle.Geometry, obstacle.Clearance+movingCopperRadiusMM, obstacle)
 	}
 	for _, copper := range request.Existing {
 		if copper.Kind == CopperZone {
@@ -60,7 +87,7 @@ func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
 				return Occupancy{}, fmt.Errorf("zone routing policy %q is not implemented by the router", request.Strategy.TreatZonesAs)
 			}
 		}
-		if copper.Net == currentNet {
+		if sameOccupancyNet(copper.Net, currentNetKey) {
 			continue
 		}
 		kind := ObstacleExistingCopper
@@ -70,21 +97,29 @@ func BuildOccupancy(request Request, currentNet string) (Occupancy, error) {
 			source = "zone"
 		}
 		obstacle := Obstacle{Kind: kind, Layer: copper.Layer, Geometry: copper.Geometry, Clearance: request.Rules.ClearanceMM, Source: source}
-		occupancy.addShape(layerIndexes, copper.Layer, copper.Geometry, request.Rules.ClearanceMM+request.Rules.TraceWidthMM/2, obstacle)
+		occupancy.addShape(layerIndexes, copper.Layer, copper.Geometry, request.Rules.ClearanceMM+movingCopperRadiusMM, obstacle)
 	}
 	for _, component := range request.Components {
 		for _, pad := range component.Pads {
-			if pad.Net == currentNet {
+			if sameOccupancyNet(pad.Net, currentNetKey) {
 				continue
 			}
 			obstacle := Obstacle{Kind: ObstacleOtherNetPad, Geometry: padRect(component, pad), Clearance: request.Rules.ClearanceMM, Source: component.Ref + "." + pad.Name}
 			for _, layer := range padAccessLayers(pad, routableLayerNames(request.Board.Layers)) {
 				obstacle.Layer = layer
-				occupancy.addShape(layerIndexes, layer, obstacle.Geometry, request.Rules.ClearanceMM+request.Rules.TraceWidthMM/2, obstacle)
+				occupancy.addShape(layerIndexes, layer, obstacle.Geometry, request.Rules.ClearanceMM+movingCopperRadiusMM, obstacle)
 			}
 		}
 	}
 	return occupancy, nil
+}
+
+func sameOccupancyNet(left string, right string) bool {
+	left = strings.TrimSpace(left)
+	if left == "" || right == "" {
+		return false
+	}
+	return strings.EqualFold(left, right)
 }
 
 func (occupancy Occupancy) BlockedCell(coord GridCoord) bool {

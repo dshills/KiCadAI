@@ -70,9 +70,14 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			})
 		}
 		var occupancy Occupancy
+		var viaOccupancy Occupancy
 		if !netFailed {
 			var err error
-			occupancy, err = BuildOccupancy(netRequest, plan.Net.Name)
+			if netRequest.Strategy.Mode == ModeSingleLayer {
+				occupancy, err = BuildOccupancy(netRequest, plan.Net.Name)
+			} else {
+				occupancy, viaOccupancy, err = BuildTraceAndViaOccupancy(netRequest, plan.Net.Name)
+			}
 			if err != nil {
 				if issue, ok := reports.IssueFromError(err); ok {
 					route.Issues = append(route.Issues, issue)
@@ -101,7 +106,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if netFailed {
 				break
 			}
-			path, routeIssues := routePairPath(ctx, netRequest, access, occupancy, plan.Net.Name, pair)
+			path, routeIssues := routePairPath(ctx, netRequest, access, occupancy, viaOccupancy, plan.Net.Name, pair)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
@@ -201,11 +206,11 @@ func routeCanceledIssue(err error) reports.Issue {
 	}
 }
 
-func routePairPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
+func routePairPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, viaOccupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
 	if request.Strategy.Mode == ModeSingleLayer {
 		return routeSingleLayerPath(ctx, request, access, occupancy, netName, pair, request.Rules.PreferLayer)
 	}
-	return routeTwoLayerPath(ctx, request, access, occupancy, netName, pair)
+	return routeTwoLayerPath(ctx, request, access, occupancy, viaOccupancy, netName, pair)
 }
 
 func applyEffectiveRule(rules Rules, effective pcbrules.EffectiveRule) Rules {

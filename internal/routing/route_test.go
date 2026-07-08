@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"math"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -111,6 +112,78 @@ func TestRouteRequestAppliesNetClassTraceAndViaRules(t *testing.T) {
 	}
 }
 
+func TestRouteRequestKeepsViasClearOfNoNetPads(t *testing.T) {
+	request := twoLayerViaRequest()
+	request.Rules.GridMM = 0.25
+	request.Rules.TraceWidthMM = 0.25
+	request.Rules.ClearanceMM = 0.2
+	request.Rules.ViaDiameterMM = 0.6
+	request.Rules.ViaDrillMM = 0.3
+	request.Components = append(request.Components, Component{
+		Ref:      "U1",
+		Position: Placement{XMM: 15, YMM: 10, Layer: "F.Cu"},
+		Pads: []Pad{{
+			Ref:      "U1",
+			Name:     "NC",
+			Position: Point{},
+			Shape:    PadRect,
+			Type:     PadSMD,
+			Size:     Size{WidthMM: 0.7, HeightMM: 0.9},
+			Layers:   []string{"F.Cu"},
+		}},
+	})
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted {
+		t.Fatalf("status = %s issues=%#v routes=%#v", result.Status, result.Issues, result.Routes)
+	}
+	if len(result.Routes) != 1 || len(result.Routes[0].Vias) == 0 {
+		t.Fatalf("routes = %#v, want a routed via", result.Routes)
+	}
+	noNetPad := Rect{
+		Min: Point{XMM: 15 - 0.35, YMM: 10 - 0.45},
+		Max: Point{XMM: 15 + 0.35, YMM: 10 + 0.45},
+	}
+	requiredClearance := request.Rules.ViaDiameterMM/2 + request.Rules.ClearanceMM
+	for _, via := range result.Routes[0].Vias {
+		if distancePointToRect(via.At, noNetPad) < requiredClearance-1e-9 {
+			t.Fatalf("via at %#v is too close to no-net pad %#v; want clearance >= %.3f", via.At, noNetPad, requiredClearance)
+		}
+	}
+}
+
+func TestRoutableViaSpanChecksIntermediateLayers(t *testing.T) {
+	request := twoLayerViaRequest()
+	request.Board.Layers = []Layer{
+		{Name: "F.Cu", Kind: LayerCopper, Routable: true},
+		{Name: "In1.Cu", Kind: LayerCopper},
+		{Name: "B.Cu", Kind: LayerCopper, Routable: true},
+	}
+	request.Rules.GridMM = 0.25
+	request.Rules.ViaDiameterMM = 0.6
+	request.Rules.ClearanceMM = 0.2
+	request.Obstacles = []Obstacle{{
+		Kind:     ObstacleKeepout,
+		Layer:    "In1.Cu",
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 9.75, YMM: 9.75}, Max: Point{XMM: 10.25, YMM: 10.25}}},
+	}}
+	viaOccupancy, err := BuildViaOccupancy(request, "SIG")
+	if err != nil {
+		t.Fatalf("BuildViaOccupancy error: %v", err)
+	}
+	layerIndexes, err := LayerIndexes(request.Board.Layers)
+	if err != nil {
+		t.Fatalf("LayerIndexes error: %v", err)
+	}
+	coord := viaOccupancy.Grid.ToGrid(Point{XMM: 10, YMM: 10}, layerIndexes[normalizeLayer("F.Cu")])
+	target := coord
+	target.Layer = layerIndexes[normalizeLayer("B.Cu")]
+
+	if routableViaSpan(viaOccupancy, coord, target) {
+		t.Fatal("via span should be blocked by intermediate-layer keepout")
+	}
+}
+
 func TestRouteRequestAllowedLayersCanBlockRoute(t *testing.T) {
 	request := twoLayerViaRequest()
 	request.Rules.NetClasses = map[string]NetClass{
@@ -125,6 +198,12 @@ func TestRouteRequestAllowedLayersCanBlockRoute(t *testing.T) {
 	if result.Quality == nil || result.Quality.NetReports[0].Status != RouteStatusFailed {
 		t.Fatalf("expected failed quality report: %#v", result.Quality)
 	}
+}
+
+func distancePointToRect(point Point, rect Rect) float64 {
+	dx := max(max(rect.Min.XMM-point.XMM, 0), point.XMM-rect.Max.XMM)
+	dy := max(max(rect.Min.YMM-point.YMM, 0), point.YMM-rect.Max.YMM)
+	return math.Hypot(dx, dy)
 }
 
 func TestRouteQualityReportsSameNetMergeCandidates(t *testing.T) {

@@ -145,6 +145,10 @@ func routeTwoLayerFirstPair(t *testing.T, request Request) (GridPath, []reports.
 	if err != nil {
 		t.Fatalf("BuildOccupancy error: %v", err)
 	}
+	viaOccupancy, err := BuildViaOccupancy(request, "SIG")
+	if err != nil {
+		t.Fatalf("BuildViaOccupancy error: %v", err)
+	}
 	plans, issues := PlanRoutes(request, access)
 	if len(issues) != 0 {
 		t.Fatalf("plan issues = %#v", issues)
@@ -152,7 +156,7 @@ func routeTwoLayerFirstPair(t *testing.T, request Request) (GridPath, []reports.
 	if len(plans) != 1 || len(plans[0].Pairs) != 1 {
 		t.Fatalf("plans = %#v, want one pair", plans)
 	}
-	return routeTwoLayerPath(context.Background(), request, access, occupancy, "SIG", plans[0].Pairs[0])
+	return routeTwoLayerPath(context.Background(), request, access, occupancy, viaOccupancy, "SIG", plans[0].Pairs[0])
 }
 
 func twoLayerViaRequest() Request {

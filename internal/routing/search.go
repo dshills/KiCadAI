@@ -103,7 +103,7 @@ func routeSingleLayerPath(ctx context.Context, request Request, access PadAccess
 	}, nil
 }
 
-func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
+func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, occupancy Occupancy, viaOccupancy Occupancy, netName string, pair EndpointPair) (GridPath, []reports.Issue) {
 	layers := normalizedSearchLayers(request.Board.Layers)
 	rules := normalizedSearchRules(request.Rules)
 	if rules.AllowVias != nil && !*rules.AllowVias {
@@ -149,7 +149,7 @@ func routeTwoLayerPath(ctx context.Context, request Request, access PadAccess, o
 	if len(layerIDs) == 0 || len(starts) == 0 || len(targets) == 0 {
 		return GridPath{}, []reports.Issue{routeFailureIssue(netName, pair, "endpoint pair has no two-layer routing access")}
 	}
-	path, searchNodes, found, canceled := astarSearchMultiLayer(ctx, occupancy, starts, targets, rules, layerIDs, true)
+	path, searchNodes, found, canceled := astarSearchMultiLayer(ctx, occupancy, viaOccupancy, starts, targets, rules, layerIDs, true)
 	if canceled {
 		return GridPath{}, []reports.Issue{routeCanceledIssue(ctx.Err())}
 	}
@@ -246,10 +246,10 @@ func accessPointForPathCoord(access PadAccess, grid Grid, endpoint Endpoint, coo
 }
 
 func astarSearch(ctx context.Context, occupancy Occupancy, layerIndex int, starts []GridCoord, targets []GridCoord, rules Rules) ([]GridCoord, int, bool, bool) {
-	return astarSearchMultiLayer(ctx, occupancy, starts, targets, rules, []int{layerIndex}, false)
+	return astarSearchMultiLayer(ctx, occupancy, occupancy, starts, targets, rules, []int{layerIndex}, false)
 }
 
-func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool) ([]GridCoord, int, bool, bool) {
+func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, viaOccupancy Occupancy, starts []GridCoord, targets []GridCoord, rules Rules, layerIndexes []int, allowVias bool) ([]GridCoord, int, bool, bool) {
 	targetSet := make(map[GridCoord]struct{}, len(targets))
 	allowedBlocked := make(map[GridCoord]struct{}, len(starts)+len(targets))
 	for _, target := range targets {
@@ -332,6 +332,9 @@ func astarSearchMultiLayer(ctx context.Context, occupancy Occupancy, starts []Gr
 					Vias:  current.Vias + 1,
 				}
 				if !routableCell(occupancy, neighbor.Coord, allowedBlocked) {
+					continue
+				}
+				if current.Coord.Layer != neighbor.Coord.Layer && !routableViaSpan(viaOccupancy, current.Coord, neighbor.Coord) {
 					continue
 				}
 				tentative := currentNode.G + viaCostMM
@@ -438,6 +441,35 @@ func routableCell(occupancy Occupancy, coord GridCoord, allowedBlocked map[GridC
 		return true
 	}
 	return !occupancy.BlockedCell(coord)
+}
+
+func routableViaCell(occupancy Occupancy, coord GridCoord) bool {
+	layer := occupancy.Layers[coord.Layer]
+	if layer == nil {
+		return false
+	}
+	point := gridPoint{X: coord.X, Y: coord.Y}
+	if _, ok := layer.index(point); !ok {
+		return false
+	}
+	// Physical vias need the via-inflated clearance envelope even when the
+	// grid coordinate is a route endpoint. Same-net pads are omitted from the
+	// occupancy map, so any remaining blocked cell is a real clearance blocker.
+	return !occupancy.BlockedCell(coord)
+}
+
+func routableViaSpan(occupancy Occupancy, from GridCoord, to GridCoord) bool {
+	if from.X != to.X || from.Y != to.Y {
+		return false
+	}
+	minLayer := min(from.Layer, to.Layer)
+	maxLayer := max(from.Layer, to.Layer)
+	for layerIndex := minLayer; layerIndex <= maxLayer; layerIndex++ {
+		if !routableViaCell(occupancy, GridCoord{X: from.X, Y: from.Y, Layer: layerIndex}) {
+			return false
+		}
+	}
+	return true
 }
 
 func movementCost(fromDir int, toDir int, gridMM float64, turnPenaltyMM float64) float64 {
