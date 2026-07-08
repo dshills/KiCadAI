@@ -111,10 +111,11 @@ type ExternalEndpointSpec struct {
 }
 
 type ConstraintSpec struct {
-	RouteWidthMM   float64 `json:"route_width_mm,omitempty"`
-	ClearanceMM    float64 `json:"clearance_mm,omitempty"`
-	PreferTopLayer bool    `json:"prefer_top_layer,omitempty"`
-	AllowBackLayer bool    `json:"allow_back_layer,omitempty"`
+	RouteWidthMM                     float64 `json:"route_width_mm,omitempty"`
+	ClearanceMM                      float64 `json:"clearance_mm,omitempty"`
+	PreferTopLayer                   bool    `json:"prefer_top_layer,omitempty"`
+	AllowBackLayer                   bool    `json:"allow_back_layer,omitempty"`
+	TreatLocalPowerRoutesAsObstacles bool    `json:"treat_local_power_routes_as_obstacles,omitempty"`
 }
 
 type ValidationSpec struct {

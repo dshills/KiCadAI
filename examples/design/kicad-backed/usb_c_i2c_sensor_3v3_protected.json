@@ -105,6 +105,9 @@
       "net_alias": "SCL"
     }
   ],
+  "constraints": {
+    "treat_local_power_routes_as_obstacles": true
+  },
   "routing_retry": {
     "enabled": true,
     "max_attempts": 2,

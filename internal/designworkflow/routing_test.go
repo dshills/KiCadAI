@@ -19,6 +19,40 @@ import (
 	"kicadai/internal/transactions"
 )
 
+func TestExistingCopperFromRouteOperationsIncludesLocalRouteSegments(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"VCC_5v","layer":"F.Cu","width_mm":0.5,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2},{"x_mm":6,"y_mm":5}],"vias":[{"at":{"x_mm":6,"y_mm":2},"diameter_mm":0.7,"drill_mm":0.35,"layers":["F.Cu","B.Cu"]}]}`))
+
+	existing := existingCopperFromRouteOperations([]transactions.Operation{operation}, "F.Cu", routing.DefaultRules())
+
+	if len(existing) != 4 {
+		t.Fatalf("existing copper = %#v, want route segments plus one entry per via layer", existing)
+	}
+	for _, copper := range existing[:2] {
+		if copper.Net != "VCC_5v" || copper.Layer != "F.Cu" || copper.Kind != routing.CopperSegment {
+			t.Fatalf("existing copper = %#v, want VCC_5v F.Cu segment", copper)
+		}
+		if len(copper.Centerline) != 2 {
+			t.Fatalf("centerline = %#v, want segment endpoints preserved", copper.Centerline)
+		}
+		if copper.Geometry.Rect == nil {
+			t.Fatalf("geometry = %#v, want width-aware geometry", copper.Geometry)
+		}
+	}
+	for _, copper := range existing[2:] {
+		if copper.Net != "VCC_5v" || copper.Kind != routing.CopperVia || (copper.Geometry.Rect == nil && len(copper.Geometry.Polygon) == 0) {
+			t.Fatalf("via copper = %#v, want VCC_5v via geometry", copper)
+		}
+	}
+}
+
+func TestExistingCopperFromRouteOperationsSkipsSignalLocalRoutes(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SDA","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}]}`))
+
+	if existing := existingCopperFromRouteOperations([]transactions.Operation{operation}, "F.Cu", routing.DefaultRules()); len(existing) != 0 {
+		t.Fatalf("existing copper = %#v, want signal local routes excluded from inter-block obstacles", existing)
+	}
+}
+
 func TestRoutePlacementUsesGeneratedPadSummariesForLocalRoutes(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

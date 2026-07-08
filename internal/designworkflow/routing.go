@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"kicadai/internal/blocks"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/routingadapters"
@@ -160,6 +161,9 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	applyRoutingOptions(normalized, opts, &routingRequest)
 	if localRouteConnectivity.IssueCount == 0 {
 		routingRequest.Nets = excludeNetsWithRouteOperations(routingRequest.Nets, localOperations, interBlockCandidates)
+	}
+	if localRouteConnectivity.IssueCount == 0 && normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
+		routingRequest.Existing = append(routingRequest.Existing, existingCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
 	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
 	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, localOperations)
@@ -691,6 +695,67 @@ func preservedLocalRouteOperations(fragments PCBFragmentResult) []transactions.O
 		}
 	}
 	return operations
+}
+
+func existingCopperFromRouteOperations(operations []transactions.Operation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {
+	existing := []routing.ExistingCopper{}
+	for _, operation := range operations {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var route transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &route); err != nil {
+			continue
+		}
+		if !routeOperationBlocksInterBlockRouting(route) {
+			continue
+		}
+		layer := routeBranchCanonicalLayer(route.Layer, defaultLayer)
+		for index := 1; index < len(route.Points); index++ {
+			segment := routing.Segment{
+				Net:     route.NetName,
+				Layer:   layer,
+				Start:   routing.Point{XMM: route.Points[index-1].XMM, YMM: route.Points[index-1].YMM},
+				End:     routing.Point{XMM: route.Points[index].XMM, YMM: route.Points[index].YMM},
+				WidthMM: route.WidthMM,
+			}
+			existing = append(existing, routing.ExistingCopper{
+				Kind:       routing.CopperSegment,
+				Net:        segment.Net,
+				Layer:      layer,
+				Geometry:   routeBranchSegmentShape(segment, rules),
+				Centerline: []routing.Point{segment.Start, segment.End},
+			})
+		}
+		for _, via := range route.Vias {
+			routingVia := routing.Via{
+				Net:        route.NetName,
+				At:         routing.Point{XMM: via.At.XMM, YMM: via.At.YMM},
+				DiameterMM: via.DiameterMM,
+				DrillMM:    via.DrillMM,
+				Layers:     append([]string(nil), via.Layers...),
+			}
+			shape := routeBranchViaShape(routingVia, rules)
+			for _, viaLayer := range routingVia.Layers {
+				existing = append(existing, routing.ExistingCopper{
+					Kind:     routing.CopperVia,
+					Net:      routingVia.Net,
+					Layer:    routeBranchCanonicalLayer(viaLayer, defaultLayer),
+					Geometry: shape,
+				})
+			}
+		}
+	}
+	return existing
+}
+
+func routeOperationBlocksInterBlockRouting(route transactions.RouteOperation) bool {
+	switch netRoleFromName(route.NetName) {
+	case placement.NetPower, placement.NetGround:
+		return true
+	default:
+		return false
+	}
 }
 
 func preservedUnmodeledFragmentOperations(fragments PCBFragmentResult) []transactions.Operation {

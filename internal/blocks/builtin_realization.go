@@ -131,8 +131,16 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ComponentRole: "power_led_resistor", FootprintID: "Resistor_SMD:R_0805_2012Metric", Placement: RelativePlacement{XMM: 13, YMM: 0, Layer: "F.Cu"}},
 			{ComponentRole: "power_led", FootprintID: "LED_SMD:LED_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: 0, RotationDeg: 180, Layer: "F.Cu"}},
 		},
+		EntryAnchors: []PCBEntryAnchor{
+			{ID: "vin", Port: "VIN", NetTemplate: "vin", Placement: RelativePlacement{XMM: -6.6, YMM: -4, Layer: "F.Cu"}, Description: "Regulator input rail entry at the input capacitor pad."},
+			{ID: "vout", Port: "VOUT", NetTemplate: "vout", Placement: RelativePlacement{XMM: 5.4, YMM: -4, Layer: "F.Cu"}, Description: "Regulator output rail entry at the output capacitor pad."},
+			{ID: "gnd", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: -5.4, YMM: -4, Layer: "F.Cu"}, Description: "Regulator ground entry at the input capacitor return pad."},
+		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "regulator_core", ComponentRoles: []string{"regulator", "input_capacitor", "output_capacitor"}, AnchorRole: "regulator", Bounds: &RelativeBounds{MinXMM: -9, MinYMM: -7, MaxXMM: 9, MaxYMM: 5}}},
 		LocalRoutes: []PCBLocalRoute{
+			{ID: "vin_entry", NetTemplate: "vin", From: RouteEndpoint{Port: "VIN"}, To: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
+			{ID: "vout_entry", NetTemplate: "vout", From: RouteEndpoint{Port: "VOUT"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
+			{ID: "gnd_entry", NetTemplate: "gnd", From: RouteEndpoint{Port: "GND"}, To: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 			{ID: "vin_bypass", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 			{ID: "vout_bypass", NetTemplate: "vout", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 			{ID: "gnd_bypass", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
@@ -143,7 +151,7 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ID: "regulator_input_capacitor_proximity", Kind: "proximity", NetTemplate: "vin", AppliesTo: []string{"regulator", "input_capacitor"}, MaxLengthMM: 8, Description: "Input capacitor should remain close to the regulator input pin."},
 			{ID: "regulator_output_capacitor_proximity", Kind: "proximity", NetTemplate: "vout", AppliesTo: []string{"regulator", "output_capacitor"}, MaxLengthMM: 8, Description: "Output capacitor should remain close to the regulator output pin."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"vin", "vout", "gnd"}, RequiredRoutes: []string{"vin_bypass", "vout_bypass", "gnd_bypass"}},
+		Validation: PCBValidationExpectations{RequiredNets: []string{"vin", "vout", "gnd"}, RequiredRoutes: []string{"vin_entry", "vout_entry", "gnd_entry", "vin_bypass", "vout_bypass", "gnd_bypass"}},
 	}
 }
 
