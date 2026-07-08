@@ -87,6 +87,13 @@ func TestVoltageRegulatorDefinitionDeclaresPowerRules(t *testing.T) {
 	} else if route.Description == "" {
 		t.Errorf("regulator gnd_bypass should document its intentional bottom-layer via transition")
 	}
+	if route, ok := routes["gnd_entry"]; !ok {
+		t.Errorf("regulator PCB routes = %#v, missing gnd_entry", routes)
+	} else if route.Layer != "B.Cu" || route.WidthMM < 0.5 {
+		t.Errorf("regulator gnd_entry = %#v, want direct >=0.5mm B.Cu entry", route)
+	} else if route.Description == "" {
+		t.Errorf("regulator gnd_entry should document its intentional bottom-layer via transition")
+	}
 }
 
 func pcbLocalRoutesByID(t *testing.T, realization *PCBRealization) map[string]PCBLocalRoute {

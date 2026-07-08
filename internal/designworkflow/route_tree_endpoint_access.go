@@ -247,6 +247,7 @@ func BuildRouteTreeEndpointAccessWithIssues(targetEvidence InterBlockContactEvid
 	for _, target := range targetEvidence.Targets {
 		access = append(access, routeTreeEndpointAccessFromTarget(target))
 	}
+	targetsByNet := routeTreeEndpointTargetsByNet(targetEvidence)
 	operationsByNet, issues := decodeInterBlockRouteOperations(routeOperations)
 	netNames := make([]string, 0, len(operationsByNet))
 	for netName := range operationsByNet {
@@ -254,15 +255,22 @@ func BuildRouteTreeEndpointAccessWithIssues(targetEvidence InterBlockContactEvid
 	}
 	slices.Sort(netNames)
 	for _, netName := range netNames {
+		operationNet := strings.TrimSpace(netName)
+		operationNetKey := routeTreeEndpointNetKey(netName)
 		operations := operationsByNet[netName]
 		for _, operation := range operations {
 			if len(operation.Points) == 0 {
 				continue
 			}
-			for _, point := range routeTreeOperationAnchorPoints(operation.Points) {
+			anchors := routeTreeOperationAnchorPoints(operation.Points)
+			if scopedAnchors := routeTreeEndpointScopedOperationAnchors(targetsByNet, operation, anchors, operationNet, operationNetKey); len(scopedAnchors) != 0 {
+				access = append(access, scopedAnchors...)
+				continue
+			}
+			for _, point := range anchors {
 				access = append(access, RouteTreeEndpointAccess{
 					Role:   RouteTreeAccessLocalRouteAnchor,
-					Net:    strings.TrimSpace(netName),
+					Net:    operationNet,
 					Layer:  normalizeContactLayer(operation.Layer),
 					XMM:    point.XMM,
 					YMM:    point.YMM,
@@ -325,13 +333,105 @@ func routeTreeEndpointAccessFromTarget(target InterBlockContactTarget) RouteTree
 }
 
 func routeTreeOperationAnchorPoints(points []transactions.Point) []transactions.Point {
-	if len(points) == 0 {
+	switch len(points) {
+	case 0:
 		return nil
-	}
-	if len(points) == 1 {
+	case 1:
 		return []transactions.Point{points[0]}
 	}
-	return []transactions.Point{points[0], points[len(points)-1]}
+	first := points[0]
+	last := points[len(points)-1]
+	if routeTreeSamePoint(first, last) {
+		return []transactions.Point{first}
+	}
+	return []transactions.Point{first, last}
+}
+
+func routeTreeSamePoint(left transactions.Point, right transactions.Point) bool {
+	const epsilon = interBlockContactToleranceMM
+	dx := left.XMM - right.XMM
+	dy := left.YMM - right.YMM
+	return dx*dx+dy*dy <= epsilon*epsilon
+}
+
+func routeTreeEndpointTargetsByNet(targetEvidence InterBlockContactEvidence) map[string][]InterBlockContactTarget {
+	targetsByNet := make(map[string][]InterBlockContactTarget)
+	for _, target := range targetEvidence.Targets {
+		netKey := routeTreeEndpointNetKey(target.NetName)
+		if netKey == "" {
+			continue
+		}
+		targetsByNet[netKey] = append(targetsByNet[netKey], target)
+	}
+	return targetsByNet
+}
+
+func routeTreeEndpointNetKey(netName string) string {
+	return strings.ToLower(strings.TrimSpace(netName))
+}
+
+func routeTreeEndpointScopedOperationAnchors(targetsByNet map[string][]InterBlockContactTarget, operation decodedContactRouteOperation, anchors []transactions.Point, operationNet string, operationNetKey string) []RouteTreeEndpointAccess {
+	if len(anchors) == 0 {
+		return nil
+	}
+	operationLayer := normalizeContactLayer(operation.Layer)
+	matches := routeTreeOperationEndpointMatches(targetsByNet[operationNetKey], operation)
+	if len(matches) != 1 {
+		return nil
+	}
+	target := matches[0]
+	if target.Layer != "" && operationLayer != "" && normalizeContactLayer(target.Layer) != operationLayer {
+		return nil
+	}
+	out := make([]RouteTreeEndpointAccess, 0, len(anchors))
+	// When a generated local route touches exactly one route-tree endpoint, the
+	// far end of that continuous same-net route is a valid access point for the
+	// endpoint. Routes touching multiple route-tree endpoints remain unscoped to
+	// avoid assigning one endpoint's pad coordinate to another endpoint.
+	for _, anchor := range anchors {
+		out = append(out, RouteTreeEndpointAccess{
+			EndpointID: target.EndpointID,
+			Role:       RouteTreeAccessLocalRouteAnchor,
+			Ref:        target.Ref,
+			Pad:        target.Pad,
+			Net:        operationNet,
+			Layer:      operationLayer,
+			XMM:        anchor.XMM,
+			YMM:        anchor.YMM,
+			Source:     "generated_route_endpoint_binding",
+		})
+	}
+	return out
+}
+
+func routeTreeOperationEndpointMatches(targets []InterBlockContactTarget, operation decodedContactRouteOperation) []InterBlockContactTarget {
+	matches := make([]InterBlockContactTarget, 0, 1)
+	for _, target := range targets {
+		if strings.TrimSpace(target.EndpointID) == "" {
+			continue
+		}
+		if !routeTreeOperationTouchesTarget(operation.Points, target) {
+			continue
+		}
+		matches = append(matches, target)
+	}
+	return matches
+}
+
+func routeTreeOperationTouchesTarget(points []transactions.Point, target InterBlockContactTarget) bool {
+	tolerance := target.ToleranceMM
+	if tolerance <= 0 {
+		tolerance = interBlockContactToleranceMM
+	}
+	toleranceSquared := tolerance * tolerance
+	for _, point := range points {
+		dx := point.XMM - target.Point.XMM
+		dy := point.YMM - target.Point.YMM
+		if dx*dx+dy*dy <= toleranceSquared {
+			return true
+		}
+	}
+	return false
 }
 
 func uniqueRouteTreeEndpointAccess(access []RouteTreeEndpointAccess) []RouteTreeEndpointAccess {

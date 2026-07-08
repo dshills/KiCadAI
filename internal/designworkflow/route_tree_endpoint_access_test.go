@@ -29,6 +29,13 @@ func TestBuildRouteTreeEndpointAccessIncludesPadAndLocalRouteAnchors(t *testing.
 	if !stringSliceContains(summary.Nets, "SDA") || !stringSliceContains(summary.Refs, "U1") {
 		t.Fatalf("summary = %#v, want SDA/U1 evidence", summary)
 	}
+	candidates := routeTreeAccessCandidatesForEndpoint(access, "U1.1", "SDA", RouteTreeEndpointAccess{Net: "SDA", XMM: 20, YMM: 5})
+	if len(candidates) == 0 || candidates[0].Access.Role != RouteTreeAccessLocalRouteAnchor || candidates[0].Access.EndpointID != "U1.1" {
+		t.Fatalf("candidates = %#v, want endpoint-scoped local route anchor first", candidates)
+	}
+	if !strings.Contains(candidates[0].RankReason, "exact_endpoint") || !strings.Contains(candidates[0].RankReason, "preferred_local_route_anchor") {
+		t.Fatalf("candidate = %#v, want exact local-route rank evidence", candidates[0])
+	}
 }
 
 func TestBuildRouteTreeEndpointAccessReturnsDecodeIssues(t *testing.T) {
@@ -39,6 +46,55 @@ func TestBuildRouteTreeEndpointAccessReturnsDecodeIssues(t *testing.T) {
 	}})
 	if len(issues) != 1 {
 		t.Fatalf("issues = %#v, want malformed route decode issue", issues)
+	}
+}
+
+func TestBuildRouteTreeEndpointAccessDoesNotScopeMultiEndpointRoutes(t *testing.T) {
+	targets := InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		{
+			NetName:    "VCC",
+			Kind:       InterBlockContactTargetPad,
+			EndpointID: "J1.1",
+			Ref:        "J1",
+			Pad:        "1",
+			Point:      transactions.Point{XMM: 10, YMM: 5},
+			Layer:      "F.Cu",
+		},
+		{
+			NetName:    "VCC",
+			Kind:       InterBlockContactTargetPad,
+			EndpointID: "U1.1",
+			Ref:        "U1",
+			Pad:        "1",
+			Point:      transactions.Point{XMM: 30, YMM: 5},
+			Layer:      "F.Cu",
+		},
+	}}
+	route := mustRouteTreeAccessRouteOperation(t, "VCC", []transactions.Point{{XMM: 10, YMM: 5}, {XMM: 30, YMM: 5}})
+
+	access := BuildRouteTreeEndpointAccess(targets, []transactions.Operation{route})
+	candidates := routeTreeAccessCandidatesForEndpoint(access, "J1.1", "VCC", RouteTreeEndpointAccess{Net: "VCC", XMM: 40, YMM: 5})
+	if len(candidates) != 3 {
+		t.Fatalf("candidates = %#v, want two endpointless anchors and one exact pad", candidates)
+	}
+	if candidates[0].Access.Role != RouteTreeAccessTargetPad || candidates[0].Access.EndpointID != "J1.1" {
+		t.Fatalf("candidates = %#v, want exact pad before unscoped multi-endpoint route anchors", candidates)
+	}
+	for _, candidate := range candidates[1:] {
+		if candidate.Access.EndpointID != "" {
+			t.Fatalf("candidates = %#v, want multi-endpoint route anchors to remain unscoped", candidates)
+		}
+	}
+}
+
+func TestRouteTreeOperationAnchorPointsDeduplicatesClosedLoopEndpoints(t *testing.T) {
+	anchors := routeTreeOperationAnchorPoints([]transactions.Point{
+		{XMM: 10, YMM: 5},
+		{XMM: 12, YMM: 5},
+		{XMM: 10, YMM: 5},
+	})
+	if len(anchors) != 1 || anchors[0].XMM != 10 || anchors[0].YMM != 5 {
+		t.Fatalf("anchors = %#v, want single closed-loop endpoint", anchors)
 	}
 }
 
