@@ -47,6 +47,7 @@ import (
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 	"kicadai/internal/schematic"
+	"kicadai/internal/schematicir"
 	"kicadai/internal/schematicpcb"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
@@ -81,6 +82,7 @@ Commands:
   place         Run PCB placement planning
   route         Run PCB routing
   repair        Plan, export-bundle, or apply validation repair attempts
+  schematic-ir  Validate, normalize, or translate schematic design IR
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -364,6 +366,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runRoute(opts, stdout)
 	case "repair":
 		return runRepairCommand(opts, stdout)
+	case "schematic-ir":
+		return runSchematicIR(opts, stdout)
 	case "transaction":
 		return runTransaction(opts, stdout)
 	case "export":
@@ -4242,6 +4246,121 @@ func runRoundTrip(opts cliOptions, stdout io.Writer) error {
 	}
 	if !result.OK {
 		return errors.New("roundtrip reported blocking issues")
+	}
+	return nil
+}
+
+type schematicIRCLIData struct {
+	InputPath   string                         `json:"input_path"`
+	Summary     schematicIRSummary             `json:"summary"`
+	Normalized  *schematicir.Document          `json:"normalized,omitempty"`
+	Transaction *transactions.Transaction      `json:"transaction,omitempty"`
+	Validation  *transactions.ValidationResult `json:"transaction_validation,omitempty"`
+}
+
+type schematicIRSummary struct {
+	ComponentCount int `json:"component_count"`
+	NetCount       int `json:"net_count"`
+	GroupCount     int `json:"group_count"`
+	PlacementCount int `json:"placement_count"`
+	OperationCount int `json:"operation_count,omitempty"`
+}
+
+func runSchematicIR(opts cliOptions, stdout io.Writer) error {
+	if !opts.jsonOutput {
+		return fmt.Errorf("schematic-ir requires --format json")
+	}
+	if len(opts.commandArgs) != 1 {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "schematic-ir",
+			Message:  "schematic-ir requires one subcommand: validate, normalize, or transaction",
+		}
+		return writeSchematicIRResult(stdout, "schematic-ir", schematicIRCLIData{}, []reports.Issue{issue})
+	}
+	if strings.TrimSpace(opts.requestPath) == "" {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "request",
+			Message:  "schematic-ir requires --request",
+		}
+		return writeSchematicIRResult(stdout, "schematic-ir."+opts.commandArgs[0], schematicIRCLIData{}, []reports.Issue{issue})
+	}
+
+	subcommand := opts.commandArgs[0]
+	if subcommand != "validate" && subcommand != "normalize" && subcommand != "transaction" {
+		issue := reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "schematic-ir." + subcommand,
+			Message:  "unsupported schematic-ir subcommand " + subcommand,
+		}
+		return writeSchematicIRResult(stdout, "schematic-ir."+subcommand, schematicIRCLIData{InputPath: opts.requestPath}, []reports.Issue{issue})
+	}
+	document, issues := loadSchematicIRDocument(opts.requestPath)
+	data := schematicIRCLIData{InputPath: opts.requestPath}
+	if !reports.HasBlockingIssue(issues) {
+		data.Summary = schematicIRDocumentSummary(document)
+		validationIssues := schematicir.Validate(document)
+		issues = append(issues, validationIssues...)
+		if !reports.HasBlockingIssue(validationIssues) {
+			switch subcommand {
+			case "validate":
+			case "normalize":
+				normalized := schematicir.NormalizeLayoutIntent(document)
+				data.Normalized = &normalized
+				data.Summary = schematicIRDocumentSummary(normalized)
+			case "transaction":
+				normalized := schematicir.NormalizeLayoutIntent(document)
+				data.Summary = schematicIRDocumentSummary(normalized)
+				tx, adapterIssues := schematicir.ToTransaction(normalized)
+				issues = append(issues, adapterIssues...)
+				if !reports.HasBlockingIssue(adapterIssues) {
+					validation := transactions.Validate(tx)
+					data.Transaction = &tx
+					data.Validation = &validation
+					data.Summary.OperationCount = len(tx.Operations)
+					issues = append(issues, validation.Issues...)
+				}
+			}
+		}
+	}
+	return writeSchematicIRResult(stdout, "schematic-ir."+subcommand, data, issues)
+}
+
+func loadSchematicIRDocument(path string) (schematicir.Document, []reports.Issue) {
+	file, err := os.Open(path)
+	if err != nil {
+		return schematicir.Document{}, []reports.Issue{{
+			Code:     reports.CodeMissingFile,
+			Severity: reports.SeverityError,
+			Path:     path,
+			Message:  err.Error(),
+		}}
+	}
+	defer file.Close()
+	document, issues := schematicir.DecodeStrict(file)
+	return document, issues
+}
+
+func schematicIRDocumentSummary(document schematicir.Document) schematicIRSummary {
+	return schematicIRSummary{
+		ComponentCount: len(document.Circuit.Components),
+		NetCount:       len(document.Circuit.Nets),
+		GroupCount:     len(document.Layout.Groups),
+		PlacementCount: len(document.Layout.Placements),
+	}
+}
+
+func writeSchematicIRResult(stdout io.Writer, command string, data schematicIRCLIData, issues []reports.Issue) error {
+	result := reports.ResultWithIssues(command, data, issues, nil)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New(command + " reported blocking issues")
 	}
 	return nil
 }

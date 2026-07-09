@@ -4789,6 +4789,121 @@ func (c *fakeAPIClient) Close() error {
 	return c.closeErr
 }
 
+func TestSchematicIRValidateCLI(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	requestPath := filepath.Join("..", "..", "examples", "schematic-ir", "led_indicator.json")
+
+	if err := run([]string{"--request", requestPath, "schematic-ir", "validate"}, &stdout, &stderr); err != nil {
+		t.Fatalf("schematic-ir validate failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			InputPath string `json:"input_path"`
+			Summary   struct {
+				ComponentCount int `json:"component_count"`
+				NetCount       int `json:"net_count"`
+				GroupCount     int `json:"group_count"`
+				PlacementCount int `json:"placement_count"`
+			} `json:"summary"`
+		} `json:"data"`
+		Issues []reports.Issue `json:"issues"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode schematic-ir validate response: %v\n%s", err, stdout.String())
+	}
+	if !result.OK || len(result.Issues) != 0 {
+		t.Fatalf("expected ok validate response, got %+v", result)
+	}
+	if result.Data.InputPath != requestPath {
+		t.Fatalf("input path = %q, want %q", result.Data.InputPath, requestPath)
+	}
+	if result.Data.Summary.ComponentCount != 3 || result.Data.Summary.NetCount != 3 {
+		t.Fatalf("unexpected summary: %+v", result.Data.Summary)
+	}
+	if result.Data.Summary.GroupCount != 0 || result.Data.Summary.PlacementCount != 0 {
+		t.Fatalf("expected input layout summary, got %+v", result.Data.Summary)
+	}
+}
+
+func TestSchematicIRNormalizeCLI(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	requestPath := filepath.Join("..", "..", "examples", "schematic-ir", "usb_c_led_indicator.json")
+
+	if err := run([]string{"--request", requestPath, "schematic-ir", "normalize"}, &stdout, &stderr); err != nil {
+		t.Fatalf("schematic-ir normalize failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Normalized struct {
+				Layout struct {
+					Groups     []any `json:"groups"`
+					Placements []any `json:"placements"`
+				} `json:"layout"`
+			} `json:"normalized"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode schematic-ir normalize response: %v\n%s", err, stdout.String())
+	}
+	if !result.OK {
+		t.Fatalf("expected ok normalize response: %s", stdout.String())
+	}
+	if len(result.Data.Normalized.Layout.Groups) == 0 || len(result.Data.Normalized.Layout.Placements) == 0 {
+		t.Fatalf("expected normalized layout content: %s", stdout.String())
+	}
+}
+
+func TestSchematicIRTransactionCLI(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	requestPath := filepath.Join("..", "..", "examples", "schematic-ir", "i2c_sensor_3v3_regulator.json")
+
+	if err := run([]string{"--request", requestPath, "schematic-ir", "transaction"}, &stdout, &stderr); err != nil {
+		t.Fatalf("schematic-ir transaction failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Summary struct {
+				OperationCount int `json:"operation_count"`
+			} `json:"summary"`
+			Transaction transactions.Transaction `json:"transaction"`
+			Validation  struct {
+				Issues []reports.Issue `json:"issues"`
+			} `json:"transaction_validation"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode schematic-ir transaction response: %v\n%s", err, stdout.String())
+	}
+	if !result.OK {
+		t.Fatalf("expected ok transaction response: %s", stdout.String())
+	}
+	if result.Data.Summary.OperationCount == 0 || len(result.Data.Transaction.Operations) == 0 {
+		t.Fatalf("expected transaction operations: %s", stdout.String())
+	}
+	if len(result.Data.Validation.Issues) != 0 {
+		t.Fatalf("expected clean transaction validation: %+v", result.Data.Validation.Issues)
+	}
+}
+
+func TestSchematicIRRequiresRequest(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := run([]string{"schematic-ir", "validate"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("expected missing request error")
+	}
+	if !strings.Contains(stdout.String(), `"schematic-ir.validate"`) || !strings.Contains(stdout.String(), `"schematic-ir requires --request"`) {
+		t.Fatalf("unexpected missing request response:\n%s", stdout.String())
+	}
+}
+
 func appWithClientFactory(factory func(context.Context, config.Config) (apiClient, error)) app {
 	return app{newClient: factory}
 }
