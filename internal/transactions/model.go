@@ -201,6 +201,7 @@ type ConnectOperation struct {
 	To        Endpoint      `json:"to"`
 	NetName   string        `json:"net_name"`
 	UseLabels *bool         `json:"use_labels,omitempty"`
+	Waypoints []Point       `json:"waypoints,omitempty"`
 }
 
 type AddLabelOperation struct {

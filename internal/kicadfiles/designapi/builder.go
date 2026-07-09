@@ -92,6 +92,9 @@ type ConnectOptions struct {
 	// UseLabels forces label stubs when true and direct orthogonal wiring when
 	// false. Nil preserves the legacy distance- and net-name-based behavior.
 	UseLabels *bool
+	// Waypoints contains the complete absolute orthogonal path, including the
+	// source and destination anchors. It is ignored when labels are forced.
+	Waypoints []kicadfiles.Point
 }
 
 type PlaceFootprintOptions struct {
@@ -354,6 +357,11 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	if err != nil {
 		return err
 	}
+	if options.UseLabels == nil || !*options.UseLabels {
+		if err := validateSchematicWaypoints(options.Waypoints, start, end); err != nil {
+			return err
+		}
+	}
 	fromNet := builder.assignedPinNet(from)
 	toNet := builder.assignedPinNet(to)
 	netName = strings.TrimSpace(netName)
@@ -385,6 +393,8 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	if options.UseLabels != nil && *options.UseLabels {
 		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
 		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
+	} else if len(options.Waypoints) != 0 {
+		builder.addSchematicWirePoints(netName, from, to, options.Waypoints)
 	} else if options.UseLabels != nil {
 		builder.addSchematicWire(netName, from, to, start, end)
 	} else if builder.schematicConnectionShouldUseDirectLabels(from, to) {
@@ -619,6 +629,13 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 		return
 	}
 	points := builder.orthogonalSchematicWirePoints(start, end)
+	builder.addSchematicWirePoints(netName, from, to, points)
+}
+
+func (builder *Builder) addSchematicWirePoints(netName string, from, to Endpoint, points []kicadfiles.Point) {
+	if builder == nil || len(points) < 2 {
+		return
+	}
 	for index := 0; index < len(points)-1; index++ {
 		if samePoint(points[index], points[index+1]) || hasSchematicWireSegment(builder.design.Schematic.Wires, points[index], points[index+1]) {
 			continue
@@ -655,6 +672,27 @@ func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, star
 			points[index],
 		))
 	}
+}
+
+func validateSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles.Point) error {
+	if len(points) == 0 {
+		return nil
+	}
+	if len(points) < 2 {
+		return fmt.Errorf("schematic waypoints require at least source and destination")
+	}
+	if !samePoint(points[0], start) || !samePoint(points[len(points)-1], end) {
+		return fmt.Errorf("schematic waypoints must start and end at connected pin anchors")
+	}
+	for index := 1; index < len(points); index++ {
+		if samePoint(points[index-1], points[index]) {
+			return fmt.Errorf("schematic waypoints contain duplicate adjacent point")
+		}
+		if points[index-1].X != points[index].X && points[index-1].Y != points[index].Y {
+			return fmt.Errorf("schematic waypoints must be orthogonal")
+		}
+	}
+	return nil
 }
 
 func (builder *Builder) orthogonalSchematicWirePoints(start, end kicadfiles.Point) []kicadfiles.Point {

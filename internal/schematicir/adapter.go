@@ -68,6 +68,7 @@ type adapterState struct {
 	unitsByID    map[string]int
 	pointsByID   map[string]transactions.Point
 	rotationByID map[string]float64
+	routesByKey  map[string]schematiclayout.RoutedConnection
 	issues       []reports.Issue
 }
 
@@ -94,12 +95,14 @@ const (
 )
 
 func newAdapterState(document Document) (*adapterState, []reports.Issue) {
+	layoutResult := schematicLayout(document)
 	state := &adapterState{
 		document:     document,
 		refsByID:     map[string]string{},
 		unitsByID:    map[string]int{},
-		pointsByID:   layoutPoints(document),
+		pointsByID:   layoutResultPoints(layoutResult),
 		rotationByID: layoutRotations(document),
+		routesByKey:  layoutRouteHints(layoutResult),
 	}
 	refCounters := map[string]int{}
 	usedRefs := map[string]struct{}{}
@@ -186,7 +189,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 }
 
 func (state *adapterState) appendNets(tx *transactions.Transaction) {
-	for netIndex, net := range state.document.Circuit.Nets {
+	for netIndex, net := range state.orderedNetsForEmission() {
 		if net.Role == NetRoleNoConnect {
 			for endpointIndex, endpoint := range net.Connect {
 				mapped, ok := state.transactionEndpoint(endpoint, fmt.Sprintf("circuit.nets[%d].connect[%d]", netIndex, endpointIndex))
@@ -204,16 +207,60 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 		for endpointIndex := 1; endpointIndex < len(mappedEndpoints); endpointIndex++ {
 			from := mappedEndpoints[endpointIndex-1]
 			to := mappedEndpoints[endpointIndex]
+			useLabels := schematicNetLabelPreference(state.document, net)
+			var waypoints []transactions.Point
+			fromIR := net.Connect[endpointIndex-1]
+			toIR := net.Connect[endpointIndex]
+			if hint, exists := state.routesByKey[schematicRouteKey(net.Name, fromIR, toIR)]; exists {
+				if hint.UseLabels {
+					value := true
+					useLabels = &value
+				} else if len(hint.Points) != 0 {
+					value := false
+					useLabels = &value
+					points := hint.Points
+					if !schematicRouteMatches(hint, fromIR, toIR) {
+						points = reversedLayoutPoints(points)
+					}
+					waypoints = transactionPoints(points)
+				}
+			}
 			payload := transactions.ConnectOperation{
 				Op:        transactions.OpConnect,
 				From:      from,
 				To:        to,
 				NetName:   net.Name,
-				UseLabels: schematicNetLabelPreference(state.document, net),
+				UseLabels: useLabels,
+				Waypoints: waypoints,
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func (state *adapterState) orderedNetsForEmission() []Net {
+	nets := append([]Net(nil), state.document.Circuit.Nets...)
+	sort.SliceStable(nets, func(i, j int) bool {
+		left := state.netEmissionPriority(nets[i])
+		right := state.netEmissionPriority(nets[j])
+		return left < right
+	})
+	return nets
+}
+
+func (state *adapterState) netEmissionPriority(net Net) int {
+	if net.Role == NetRoleNoConnect {
+		return 3
+	}
+	for endpointIndex := 1; endpointIndex < len(net.Connect); endpointIndex++ {
+		if hint, exists := state.routesByKey[schematicRouteKey(net.Name, net.Connect[endpointIndex-1], net.Connect[endpointIndex])]; exists && !hint.UseLabels && len(hint.Points) != 0 {
+			return 0
+		}
+	}
+	if preference := schematicNetLabelPreference(state.document, net); preference != nil && *preference {
+		return 2
+	}
+	return 1
 }
 
 func schematicNetLabelPreference(document Document, net Net) *bool {
@@ -364,7 +411,10 @@ func transactionUnit(unit string) (int, bool) {
 }
 
 func layoutPoints(document Document) map[string]transactions.Point {
-	result := schematicLayout(document)
+	return layoutResultPoints(schematicLayout(document))
+}
+
+func layoutResultPoints(result schematiclayout.Result) map[string]transactions.Point {
 	points := make(map[string]transactions.Point, len(result.Components))
 	for _, component := range result.Components {
 		points[component.Ref] = transactions.Point{
@@ -373,6 +423,44 @@ func layoutPoints(document Document) map[string]transactions.Point {
 		}
 	}
 	return points
+}
+
+func layoutRouteHints(result schematiclayout.Result) map[string]schematiclayout.RoutedConnection {
+	hints := make(map[string]schematiclayout.RoutedConnection, len(result.Connections))
+	for _, connection := range result.Connections {
+		from := EndpointRef(connection.From.Ref + "." + connection.From.Pin)
+		to := EndpointRef(connection.To.Ref + "." + connection.To.Pin)
+		hints[schematicRouteKey(connection.NetName, from, to)] = connection
+	}
+	return hints
+}
+
+func schematicRouteKey(netName string, first, second EndpointRef) string {
+	left, right := string(first), string(second)
+	if right < left {
+		left, right = right, left
+	}
+	return netName + "\x00" + left + "\x00" + right
+}
+
+func schematicRouteMatches(route schematiclayout.RoutedConnection, from, to EndpointRef) bool {
+	return string(from) == route.From.Ref+"."+route.From.Pin && string(to) == route.To.Ref+"."+route.To.Pin
+}
+
+func reversedLayoutPoints(points []kicadfiles.Point) []kicadfiles.Point {
+	out := append([]kicadfiles.Point(nil), points...)
+	for left, right := 0, len(out)-1; left < right; left, right = left+1, right-1 {
+		out[left], out[right] = out[right], out[left]
+	}
+	return out
+}
+
+func transactionPoints(points []kicadfiles.Point) []transactions.Point {
+	out := make([]transactions.Point, 0, len(points))
+	for _, point := range points {
+		out = append(out, transactions.Point{XMM: float64(point.X) / 1_000_000, YMM: float64(point.Y) / 1_000_000})
+	}
+	return out
 }
 
 func schematicLayout(document Document) schematiclayout.Result {
@@ -452,7 +540,7 @@ func schematicLayout(document Document) schematiclayout.Result {
 			OriginalOrdinal: index,
 		})
 	}
-	return schematiclayout.Place(request)
+	return schematiclayout.Layout(request)
 }
 
 func schematicLayoutPins(component Component) []schematiclayout.Pin {

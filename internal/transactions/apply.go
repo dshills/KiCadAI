@@ -607,7 +607,11 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := decodeRaw(op, &payload); err != nil {
 			return nil, err
 		}
-		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{UseLabels: payload.UseLabels})
+		waypoints := make([]kicadfiles.Point, 0, len(payload.Waypoints))
+		for _, waypoint := range payload.Waypoints {
+			waypoints = append(waypoints, point(waypoint.XMM, waypoint.YMM))
+		}
+		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{UseLabels: payload.UseLabels, Waypoints: waypoints})
 	case OpAddLabel:
 		var payload AddLabelOperation
 		if err := decodeRaw(op, &payload); err != nil {

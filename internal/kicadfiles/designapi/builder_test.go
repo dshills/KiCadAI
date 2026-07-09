@@ -168,6 +168,46 @@ func TestBuilderRotatesExplicitSymbolPinAnchors(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectUsesExplicitOrthogonalWaypoints(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	start, err := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	if err != nil {
+		t.Fatalf("start anchor: %v", err)
+	}
+	end, err := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	if err != nil {
+		t.Fatalf("end anchor: %v", err)
+	}
+	waypoints := []kicadfiles.Point{start, {X: start.X, Y: kicadfiles.MM(10.16)}, {X: end.X, Y: kicadfiles.MM(10.16)}, end}
+	useLabels := false
+	if err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG", ConnectOptions{UseLabels: &useLabels, Waypoints: waypoints}); err != nil {
+		t.Fatalf("connect with waypoints: %v", err)
+	}
+	if got := len(builder.design.Schematic.Wires); got != 3 {
+		t.Fatalf("wire count = %d, want 3 explicit segments", got)
+	}
+	for index, wire := range builder.design.Schematic.Wires {
+		if wire.Points[0] != waypoints[index] || wire.Points[1] != waypoints[index+1] {
+			t.Fatalf("wire %d = %#v, want %#v -> %#v", index, wire.Points, waypoints[index], waypoints[index+1])
+		}
+	}
+}
+
+func TestBuilderConnectRejectsDiagonalWaypoints(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	useLabels := false
+	err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG", ConnectOptions{UseLabels: &useLabels, Waypoints: []kicadfiles.Point{start, end}})
+	if err == nil {
+		t.Fatal("expected diagonal waypoint rejection")
+	}
+}
+
 func TestBuilderLongNetLabelStubsAreConnectionGridSafe(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)})

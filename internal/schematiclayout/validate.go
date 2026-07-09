@@ -35,6 +35,23 @@ func Validate(result Result, request Request) Result {
 			})
 		}
 	}
+	for index, wire := range result.Wires {
+		if wire.NetName == "" {
+			continue
+		}
+		for otherIndex := index + 1; otherIndex < len(result.Wires); otherIndex++ {
+			other := result.Wires[otherIndex]
+			if other.NetName == "" || other.NetName == wire.NetName || !wireSegmentsCross(wire, other) {
+				continue
+			}
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Code:     "wire_crossing",
+				NetName:  wire.NetName,
+				Message:  fmt.Sprintf("wire crosses unrelated net %s", other.NetName),
+			})
+		}
+	}
 	for index, object := range objects {
 		if !usable.ContainsRect(object.Box) {
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{

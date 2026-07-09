@@ -128,6 +128,7 @@ const (
 
 type Result struct {
 	Components  []PlacedComponent
+	Connections []RoutedConnection
 	Wires       []WireSegment
 	Labels      []Label
 	Junctions   []Junction
@@ -144,6 +145,14 @@ type WireSegment struct {
 	NetName string
 	From    kicadfiles.Point
 	To      kicadfiles.Point
+}
+
+type RoutedConnection struct {
+	NetName   string
+	From      Endpoint
+	To        Endpoint
+	Points    []kicadfiles.Point
+	UseLabels bool
 }
 
 type Label struct {
@@ -260,6 +269,7 @@ func NormalizeRequest(request Request) Request {
 func NormalizeResult(result Result, rules Rules) Result {
 	rules = normalizeRules(rules)
 	result.Components = append([]PlacedComponent(nil), result.Components...)
+	result.Connections = append([]RoutedConnection(nil), result.Connections...)
 	result.Wires = append([]WireSegment(nil), result.Wires...)
 	result.Labels = append([]Label(nil), result.Labels...)
 	result.Junctions = append([]Junction(nil), result.Junctions...)
@@ -269,6 +279,9 @@ func NormalizeResult(result Result, rules Rules) Result {
 		sort.SliceStable(result.Components[index].Pins, func(i, j int) bool {
 			return comparePins(result.Components[index].Pins[i], result.Components[index].Pins[j]) < 0
 		})
+	}
+	for index := range result.Connections {
+		result.Connections[index].Points = append([]kicadfiles.Point(nil), result.Connections[index].Points...)
 	}
 	for index := range result.Wires {
 		if comparePoints(result.Wires[index].From, result.Wires[index].To) > 0 {
@@ -281,6 +294,9 @@ func NormalizeResult(result Result, rules Rules) Result {
 	sort.SliceStable(result.Wires, func(i, j int) bool {
 		return compareWires(result.Wires[i], result.Wires[j]) < 0
 	})
+	sort.SliceStable(result.Connections, func(i, j int) bool {
+		return compareRoutedConnections(result.Connections[i], result.Connections[j]) < 0
+	})
 	sort.SliceStable(result.Labels, func(i, j int) bool {
 		return compareLabels(result.Labels[i], result.Labels[j]) < 0
 	})
@@ -290,6 +306,16 @@ func NormalizeResult(result Result, rules Rules) Result {
 	result.Diagnostics = NormalizeDiagnostics(result.Diagnostics, rules.MaxDiagnostics)
 	result.Report = BuildReport(result, rules.Profile)
 	return result
+}
+
+func compareRoutedConnections(first, second RoutedConnection) int {
+	if value := strings.Compare(first.NetName, second.NetName); value != 0 {
+		return value
+	}
+	if value := compareEndpoints(first.From, second.From); value != 0 {
+		return value
+	}
+	return compareEndpoints(first.To, second.To)
 }
 
 func NormalizeDiagnostics(diagnostics []Diagnostic, limit int) []Diagnostic {
@@ -356,7 +382,7 @@ func BuildReport(result Result, profile Profile) Report {
 			report.StageOrderViolationCount++
 		case "power_placement":
 			report.PowerPlacementViolations++
-		case "symbol_overlap", "text_symbol_overlap", "text_wire_overlap", "label_overlap", "wire_symbol_overlap":
+		case "symbol_overlap", "text_symbol_overlap", "text_wire_overlap", "label_overlap", "wire_symbol_overlap", "wire_crossing":
 			report.OverlapCounts[diagnostic.Code]++
 		}
 	}
