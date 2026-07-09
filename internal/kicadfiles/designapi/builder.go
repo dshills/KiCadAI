@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"path"
 	"sort"
 	"strconv"
 	"strings"
@@ -37,6 +38,7 @@ type Builder struct {
 	footprints          map[string]int
 	pads                map[string]map[string][]int
 	routeViaCounts      map[string]int
+	hierarchy           *SchematicHierarchy
 }
 
 type Options struct {
@@ -86,6 +88,26 @@ type PinSpec struct {
 type Endpoint struct {
 	Reference string
 	Pin       string
+}
+
+// SchematicHierarchy describes child-sheet emission for an oversized
+// schematic. References are the emitted KiCad references, not IR component
+// IDs, so the builder can apply the hierarchy after symbol creation.
+type SchematicHierarchy struct {
+	Sheets         []SchematicSheet         `json:"sheets"`
+	CrossSheetNets []SchematicCrossSheetNet `json:"cross_sheet_nets,omitempty"`
+}
+
+type SchematicSheet struct {
+	ID         string
+	Name       string
+	Filename   string
+	References []string
+}
+
+type SchematicCrossSheetNet struct {
+	Name      string
+	Endpoints []Endpoint
 }
 
 type ConnectOptions struct {
@@ -326,6 +348,68 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	builder.addKnownSymbolLibrary(libraryID)
 	schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID)
 	return SymbolHandle{Reference: reference}, nil
+}
+
+// SetSchematicHierarchy schedules deterministic child-sheet emission during
+// the next project write. It must be called after all schematic symbols have
+// been added.
+func (builder *Builder) SetSchematicHierarchy(hierarchy SchematicHierarchy) error {
+	if builder == nil {
+		return fmt.Errorf("builder required")
+	}
+	if len(hierarchy.Sheets) < 2 {
+		return fmt.Errorf("schematic hierarchy requires at least two sheets")
+	}
+	clone := hierarchy
+	clone.Sheets = make([]SchematicSheet, len(hierarchy.Sheets))
+	for index, sheet := range hierarchy.Sheets {
+		clone.Sheets[index] = sheet
+		clone.Sheets[index].References = append([]string(nil), sheet.References...)
+	}
+	seenSheets := make(map[string]struct{}, len(hierarchy.Sheets))
+	seenFiles := make(map[string]struct{}, len(hierarchy.Sheets))
+	seenRefs := make(map[string]string)
+	for index := range clone.Sheets {
+		sheet := &clone.Sheets[index]
+		if strings.TrimSpace(sheet.ID) == "" || strings.TrimSpace(sheet.Name) == "" {
+			return fmt.Errorf("hierarchy sheet %d requires id and name", index)
+		}
+		if _, exists := seenSheets[sheet.ID]; exists {
+			return fmt.Errorf("duplicate hierarchy sheet %s", sheet.ID)
+		}
+		seenSheets[sheet.ID] = struct{}{}
+		if strings.TrimSpace(sheet.Filename) == "" {
+			sheet.Filename = "sch/" + sheet.ID + ".kicad_sch"
+		}
+		if err := validHierarchyFilename(sheet.Filename); err != nil {
+			return err
+		}
+		fileKey := strings.ToLower(path.Clean(sheet.Filename))
+		if _, exists := seenFiles[fileKey]; exists {
+			return fmt.Errorf("duplicate hierarchy sheet filename %s", sheet.Filename)
+		}
+		seenFiles[fileKey] = struct{}{}
+		for _, reference := range sheet.References {
+			if _, exists := seenRefs[reference]; exists {
+				return fmt.Errorf("reference %s assigned to multiple hierarchy sheets", reference)
+			}
+			seenRefs[reference] = sheet.ID
+		}
+	}
+	if builder.design.Schematic == nil {
+		return fmt.Errorf("schematic required")
+	}
+	for _, symbol := range builder.design.Schematic.Symbols {
+		if _, ok := seenRefs[symbol.Reference]; !ok {
+			return fmt.Errorf("reference %s is not assigned to a hierarchy sheet", symbol.Reference)
+		}
+	}
+	clone.CrossSheetNets = append([]SchematicCrossSheetNet(nil), hierarchy.CrossSheetNets...)
+	for index := range clone.CrossSheetNets {
+		clone.CrossSheetNets[index].Endpoints = append([]Endpoint(nil), clone.CrossSheetNets[index].Endpoints...)
+	}
+	builder.hierarchy = &clone
+	return nil
 }
 
 func symbolPinSpecs(libraryID string, explicit []PinSpec) []PinSpec {
@@ -1434,6 +1518,9 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 		return kicaddesign.WriteResult{}, fmt.Errorf("builder required")
 	}
 	design := builder.Design()
+	if err := builder.applySchematicHierarchy(&design); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
 	ensureGeneratedLocalSymbolLibraries(&design)
 	if err := ensureGeneratedLocalFootprintLibraries(&design); err != nil {
 		return kicaddesign.WriteResult{}, err
@@ -1448,6 +1535,9 @@ func (builder *Builder) WriteSchematicProject(root string, options kicaddesign.W
 	// Design returns a cloned design, so omitting PCB data here does not mutate
 	// the builder's accumulated board state.
 	design := builder.Design()
+	if err := builder.applySchematicHierarchy(&design); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
 	design.PCB = nil
 	design.ExpectedNets = nil
 	ensureGeneratedLocalSymbolLibraries(&design)

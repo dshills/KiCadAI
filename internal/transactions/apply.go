@@ -719,6 +719,25 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if strings.TrimSpace(output) == "" {
 			return nil, fmt.Errorf("output directory required")
 		}
+		if payload.Hierarchy != nil {
+			hierarchy := designapi.SchematicHierarchy{
+				Sheets:         make([]designapi.SchematicSheet, 0, len(payload.Hierarchy.Sheets)),
+				CrossSheetNets: make([]designapi.SchematicCrossSheetNet, 0, len(payload.Hierarchy.CrossSheetNets)),
+			}
+			for _, sheet := range payload.Hierarchy.Sheets {
+				hierarchy.Sheets = append(hierarchy.Sheets, designapi.SchematicSheet{ID: sheet.ID, Name: sheet.Name, Filename: sheet.Filename, References: append([]string(nil), sheet.References...)})
+			}
+			for _, net := range payload.Hierarchy.CrossSheetNets {
+				endpoints := make([]designapi.Endpoint, 0, len(net.Endpoints))
+				for _, endpoint := range net.Endpoints {
+					endpoints = append(endpoints, designapi.Endpoint{Reference: endpoint.Ref, Pin: endpoint.Pin})
+				}
+				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, designapi.SchematicCrossSheetNet{Name: net.Name, Endpoints: endpoints})
+			}
+			if err := builder.SetSchematicHierarchy(hierarchy); err != nil {
+				return nil, err
+			}
+		}
 		var writeResult kicaddesign.WriteResult
 		var err error
 		if payload.SchematicOnly {

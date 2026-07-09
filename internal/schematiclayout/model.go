@@ -101,6 +101,7 @@ type Group struct {
 	Role            string
 	AnchorRef       string
 	Stage           Stage
+	Inferred        bool
 	OriginalOrdinal int
 }
 

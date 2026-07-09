@@ -53,8 +53,14 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 	}
 
 	groupByRef := make(map[string]string, len(request.Components))
+	explicitGroups := make(map[string]struct{}, len(request.Groups))
+	for _, group := range request.Groups {
+		if !group.Inferred {
+			explicitGroups[group.ID] = struct{}{}
+		}
+	}
 	for _, component := range request.Components {
-		if component.GroupID != "" {
+		if _, ok := explicitGroups[component.GroupID]; ok {
 			groupByRef[component.Ref] = component.GroupID
 		}
 	}

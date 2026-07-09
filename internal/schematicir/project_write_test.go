@@ -2,11 +2,13 @@ package schematicir
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"kicadai/internal/evaluate"
+	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematiclayout"
@@ -26,6 +28,56 @@ func TestSchematicIRWritesReadableProject(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			testSchematicIRWritesReadableProject(t, tc.fileName, tc.projectName)
 		})
+	}
+}
+
+func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
+	document := loadExampleDocument(t, "led_indicator.json")
+	for index := 0; index < 80; index++ {
+		document.Circuit.Components = append(document.Circuit.Components, Component{
+			ID:        fmt.Sprintf("extra_%d", index),
+			Ref:       fmt.Sprintf("R%d", index+10),
+			Role:      ComponentRoleResistor,
+			Symbol:    "Device:R",
+			Value:     "10k",
+			Footprint: "Resistor_SMD:R_0603_1608Metric",
+			Pins:      []Pin{{Number: "1", Role: PinRoleOutput}, {Number: "2", Role: PinRoleInput}},
+		})
+	}
+	for index := 1; index < 80; index++ {
+		document.Circuit.Nets = append(document.Circuit.Nets, Net{
+			Name:    fmt.Sprintf("EXTRA_%d", index),
+			Role:    NetRoleSignal,
+			Connect: []EndpointRef{EndpointRef(fmt.Sprintf("extra_%d.1", index-1)), EndpointRef(fmt.Sprintf("extra_%d.2", index))},
+		})
+	}
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("oversized transaction issues: %+v", issues)
+	}
+	var writeOp transactions.WriteProjectOperation
+	if err := json.Unmarshal(tx.Operations[len(tx.Operations)-1].Raw, &writeOp); err != nil {
+		t.Fatal(err)
+	}
+	if writeOp.Hierarchy == nil || len(writeOp.Hierarchy.Sheets) < 2 {
+		t.Fatalf("missing hierarchy payload: %#v raw=%s", writeOp, tx.Operations[len(tx.Operations)-1].Raw)
+	}
+	outputDir := filepath.Join(t.TempDir(), "oversized")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("oversized apply issues: %+v", apply.Issues)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(outputDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if read.Schematic == nil || len(read.Schematic.Sheets) < 2 || len(read.SheetFiles) < 2 {
+		t.Fatalf("hierarchy was not written: root=%#v children=%d", read.Schematic, len(read.SheetFiles))
+	}
+	for _, child := range read.SheetFiles {
+		if err := schematic.Validate(*child); err != nil {
+			t.Fatalf("child %s validation: %v", child.Filename, err)
+		}
 	}
 }
 

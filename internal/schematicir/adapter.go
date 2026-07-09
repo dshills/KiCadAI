@@ -43,11 +43,17 @@ func ToTransaction(document Document) (transactions.Transaction, []reports.Issue
 // ToProjectTransaction converts schematic IR into a transaction that can be
 // applied to write a KiCad project directory.
 func ToProjectTransaction(document Document) (transactions.Transaction, []reports.Issue) {
+	document = NormalizeLayoutIntent(document)
 	tx, issues := ToTransaction(document)
 	if reports.HasBlockingIssue(issues) {
 		return tx, issues
 	}
-	payload := transactions.WriteProjectOperation{Op: transactions.OpWriteProject, SchematicOnly: true}
+	hierarchy, hierarchyIssues := schematicHierarchy(document)
+	issues = append(issues, hierarchyIssues...)
+	if reports.HasBlockingIssue(hierarchyIssues) {
+		return tx, issues
+	}
+	payload := transactions.WriteProjectOperation{Op: transactions.OpWriteProject, SchematicOnly: true, Hierarchy: hierarchy}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		issues = append(issues, reports.Issue{
@@ -60,6 +66,58 @@ func ToProjectTransaction(document Document) (transactions.Transaction, []report
 	}
 	tx.Operations = append(tx.Operations, transactions.NewOperation(transactions.OpWriteProject, raw))
 	return tx, issues
+}
+
+func schematicHierarchy(document Document) (*transactions.SchematicHierarchy, []reports.Issue) {
+	layout := schematicLayout(document)
+	if layout.Partition == nil || len(layout.Partition.Sheets) < 2 {
+		return nil, nil
+	}
+	state, stateIssues := newAdapterState(document)
+	if len(stateIssues) != 0 {
+		return nil, stateIssues
+	}
+	componentSheets := map[string]string{}
+	hierarchy := &transactions.SchematicHierarchy{}
+	for _, sheet := range layout.Partition.Sheets {
+		refs := make([]string, 0, len(sheet.Components))
+		for _, componentID := range sheet.Components {
+			componentSheets[componentID] = sheet.ID
+			if ref := state.refsByID[componentID]; ref != "" {
+				refs = append(refs, ref)
+			}
+		}
+		sort.Strings(refs)
+		hierarchy.Sheets = append(hierarchy.Sheets, transactions.SchematicHierarchySheet{
+			ID:         sheet.ID,
+			Name:       sheet.Name,
+			Filename:   "sch/" + sheet.ID + ".kicad_sch",
+			References: refs,
+		})
+	}
+	netsByName := make(map[string]Net, len(document.Circuit.Nets))
+	for _, net := range document.Circuit.Nets {
+		netsByName[net.Name] = net
+	}
+	for _, cross := range layout.Partition.CrossSheetNets {
+		if net, ok := netsByName[cross.Name]; ok {
+			entry := transactions.SchematicCrossSheetNet{Name: net.Name}
+			for _, endpoint := range net.Connect {
+				componentID, pin, ok := endpoint.Split()
+				if !ok || componentSheets[componentID] == "" || state.refsByID[componentID] == "" {
+					continue
+				}
+				entry.Endpoints = append(entry.Endpoints, transactions.Endpoint{Ref: state.refsByID[componentID], Pin: pin})
+			}
+			if len(entry.Endpoints) > 0 {
+				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, entry)
+			}
+		}
+	}
+	if len(hierarchy.Sheets) < 2 {
+		return nil, nil
+	}
+	return hierarchy, nil
 }
 
 type adapterState struct {
@@ -625,6 +683,7 @@ func schematicLayout(document Document) schematiclayout.Result {
 			ID:              group.ID,
 			Role:            string(group.Role),
 			Stage:           schematicStageForGroup(group.Role),
+			Inferred:        group.Inferred,
 			OriginalOrdinal: index,
 		})
 	}

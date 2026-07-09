@@ -265,8 +265,26 @@ type AddZoneOperation struct {
 }
 
 type WriteProjectOperation struct {
-	Op            OperationKind `json:"op"`
-	OutputDir     string        `json:"output_dir,omitempty"`
-	Overwrite     bool          `json:"overwrite,omitempty"`
-	SchematicOnly bool          `json:"schematic_only,omitempty"`
+	Op            OperationKind       `json:"op"`
+	OutputDir     string              `json:"output_dir,omitempty"`
+	Overwrite     bool                `json:"overwrite,omitempty"`
+	SchematicOnly bool                `json:"schematic_only,omitempty"`
+	Hierarchy     *SchematicHierarchy `json:"hierarchy,omitempty"`
+}
+
+type SchematicHierarchy struct {
+	Sheets         []SchematicHierarchySheet `json:"sheets"`
+	CrossSheetNets []SchematicCrossSheetNet  `json:"cross_sheet_nets,omitempty"`
+}
+
+type SchematicHierarchySheet struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Filename   string   `json:"filename"`
+	References []string `json:"references"`
+}
+
+type SchematicCrossSheetNet struct {
+	Name      string     `json:"name"`
+	Endpoints []Endpoint `json:"endpoints"`
 }
