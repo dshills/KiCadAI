@@ -982,6 +982,36 @@ func TestBuilderWriteProject(t *testing.T) {
 	}
 }
 
+func TestBuilderWriteSchematicProjectDoesNotMutatePCBState(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+
+	root := filepath.Join(t.TempDir(), "schematic_only")
+	result, err := builder.WriteSchematicProject(root, kicaddesign.WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteSchematicProject returned error: %v", err)
+	}
+	if len(result.WrittenFiles) != 2 {
+		t.Fatalf("written files = %v, want project and schematic only", result.WrittenFiles)
+	}
+	for _, path := range result.WrittenFiles {
+		if filepath.Ext(path) == ".kicad_pcb" {
+			t.Fatalf("schematic-only write emitted PCB file: %s", path)
+		}
+		if _, err := os.Stat(path); err != nil {
+			t.Fatalf("expected written file %s: %v", path, err)
+		}
+	}
+
+	design := builder.Design()
+	if design.PCB == nil {
+		t.Fatal("WriteSchematicProject mutated builder PCB state")
+	}
+}
+
 func TestBuilderWriteProjectAddsGeneratedLocalSensorSymbolLibrary(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{

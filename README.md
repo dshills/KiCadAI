@@ -22,11 +22,15 @@ transaction operations with:
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
+kicadai --request ./examples/schematic-ir/led_indicator.json --output ./out/ir_led --overwrite schematic-ir write
 ```
 
 This is not a natural-language parser and not KiCad S-expression syntax. It is
 the AI-facing structured handoff layer that future intent planners can emit
-before KiCadAI writes or validates KiCad-native files.
+before KiCadAI writes or validates KiCad-native files. The current `write`
+subcommand emits a schematic-only KiCad project (`.kicad_pro` and
+`.kicad_sch`) from the IR; PCB routing and block-family expansion remain
+separate workflows.
 
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 

@@ -1341,6 +1341,19 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 	return kicaddesign.WriteProjectDirectory(root, design, options)
 }
 
+func (builder *Builder) WriteSchematicProject(root string, options kicaddesign.WriteOptions) (kicaddesign.WriteResult, error) {
+	if builder == nil {
+		return kicaddesign.WriteResult{}, fmt.Errorf("builder required")
+	}
+	// Design returns a cloned design, so omitting PCB data here does not mutate
+	// the builder's accumulated board state.
+	design := builder.Design()
+	design.PCB = nil
+	design.ExpectedNets = nil
+	ensureGeneratedLocalSymbolLibraries(&design)
+	return kicaddesign.WriteProjectDirectory(root, design, options)
+}
+
 func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design) {
 	if design == nil || design.Schematic == nil {
 		return

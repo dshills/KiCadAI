@@ -303,20 +303,27 @@ func populatePlanFields(planned *PlannedOperation, op Operation, target string, 
 		}
 	case OpWriteProject:
 		planned.WillWrite = true
-		planned.Artifacts = plannedWriteArtifacts(target, projectName)
+		var payload WriteProjectOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return decodeIssue(err)
+		}
+		planned.Artifacts = plannedWriteArtifacts(target, projectName, payload.SchematicOnly)
 	}
 	return nil
 }
 
-func plannedWriteArtifacts(target string, projectName string) []reports.Artifact {
+func plannedWriteArtifacts(target string, projectName string, schematicOnly bool) []reports.Artifact {
 	if strings.TrimSpace(target) == "" {
 		target = "."
 	}
-	return []reports.Artifact{
+	artifacts := []reports.Artifact{
 		{Kind: reports.ArtifactKiCadProject, Path: filepath.ToSlash(filepath.Join(target, projectName+".kicad_pro")), Description: "planned project file"},
 		{Kind: reports.ArtifactSchematic, Path: filepath.ToSlash(filepath.Join(target, projectName+".kicad_sch")), Description: "planned schematic file"},
-		{Kind: reports.ArtifactPCB, Path: filepath.ToSlash(filepath.Join(target, projectName+".kicad_pcb")), Description: "planned PCB file"},
 	}
+	if !schematicOnly {
+		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactPCB, Path: filepath.ToSlash(filepath.Join(target, projectName+".kicad_pcb")), Description: "planned PCB file"})
+	}
+	return artifacts
 }
 
 func projectNameFromTransaction(tx Transaction) string {

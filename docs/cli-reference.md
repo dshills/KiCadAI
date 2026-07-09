@@ -75,6 +75,7 @@ kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_s
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
+kicadai --request ./examples/schematic-ir/led_indicator.json --output ./out/ir_led --overwrite schematic-ir write
 kicadai --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 kicadai --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 # For integrations that already produce a generated repair bundle:
@@ -98,6 +99,7 @@ transactions.
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
+kicadai --request ./examples/schematic-ir/led_indicator.json --output ./out/ir_led --overwrite schematic-ir write
 ```
 
 Subcommands:
@@ -107,6 +109,9 @@ Subcommands:
   schematic generation.
 - `transaction`: return the existing KiCadAI transaction stream generated from
   normalized IR.
+- `write`: write a schematic-only KiCad project directory from normalized IR.
+  This emits `.kicad_pro` and `.kicad_sch` files, preserving schematic
+  readability checks while leaving PCB routing to later workflows.
 
 Checked-in examples currently cover an LED indicator, USB-C powered LED
 indicator, and I2C sensor with 3.3 V regulator breakout. The v1 IR is intentionally

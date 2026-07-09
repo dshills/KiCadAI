@@ -4891,6 +4891,50 @@ func TestSchematicIRTransactionCLI(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWriteCLI(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	requestPath := filepath.Join("..", "..", "examples", "schematic-ir", "led_indicator.json")
+	output := filepath.Join(t.TempDir(), "led_indicator")
+
+	if err := run([]string{"--request", requestPath, "--output", output, "schematic-ir", "write"}, &stdout, &stderr); err != nil {
+		t.Fatalf("schematic-ir write failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result struct {
+		OK   bool `json:"ok"`
+		Data struct {
+			Summary struct {
+				OperationCount int `json:"operation_count"`
+			} `json:"summary"`
+			Transaction transactions.Transaction `json:"transaction"`
+			Validation  struct {
+				Issues []reports.Issue `json:"issues"`
+			} `json:"transaction_validation"`
+		} `json:"data"`
+		Issues []reports.Issue `json:"issues"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode schematic-ir write response: %v\n%s", err, stdout.String())
+	}
+	if !result.OK || len(result.Issues) != 0 || len(result.Data.Validation.Issues) != 0 {
+		t.Fatalf("expected clean write response: %s", stdout.String())
+	}
+	if result.Data.Summary.OperationCount == 0 || len(result.Data.Transaction.Operations) == 0 {
+		t.Fatalf("expected write transaction operations: %s", stdout.String())
+	}
+	if _, err := os.Stat(filepath.Join(output, "led_indicator.kicad_pro")); err != nil {
+		t.Fatalf("expected generated project file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(output, "led_indicator.kicad_sch")); err != nil {
+		t.Fatalf("expected generated schematic file: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(output, "led_indicator.kicad_pcb")); err == nil {
+		t.Fatal("schematic-ir write emitted a PCB file")
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("stat generated PCB file: %v", err)
+	}
+}
+
 func TestSchematicIRRequiresRequest(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

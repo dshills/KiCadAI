@@ -261,7 +261,8 @@ type AddZoneOperation struct {
 }
 
 type WriteProjectOperation struct {
-	Op        OperationKind `json:"op"`
-	OutputDir string        `json:"output_dir,omitempty"`
-	Overwrite bool          `json:"overwrite,omitempty"`
+	Op            OperationKind `json:"op"`
+	OutputDir     string        `json:"output_dir,omitempty"`
+	Overwrite     bool          `json:"overwrite,omitempty"`
+	SchematicOnly bool          `json:"schematic_only,omitempty"`
 }

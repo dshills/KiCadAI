@@ -122,11 +122,56 @@ func TestToTransactionAssignsFootprintsAndProperties(t *testing.T) {
 		t.Fatalf("unexpected footprint assignment: %+v", assigns[0])
 	}
 	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
-	if len(symbols[1].Properties) != 2 {
-		t.Fatalf("expected two properties, got %+v", symbols[1].Properties)
+	if len(symbols[1].Properties) != 3 {
+		t.Fatalf("expected three properties, got %+v", symbols[1].Properties)
 	}
-	if symbols[1].Properties[0].Name != "MPN" || symbols[1].Properties[1].Name != "Tolerance" {
+	if symbols[1].Properties[0].Name != "Footprint" || symbols[1].Properties[1].Name != "MPN" || symbols[1].Properties[2].Name != "Tolerance" {
 		t.Fatalf("properties are not sorted deterministically: %+v", symbols[1].Properties)
+	}
+	footprint := symbols[1].Properties[0]
+	if footprint.Name != "Footprint" || footprint.Value != "Resistor_SMD:R_0603_1608Metric" || !footprint.Hidden {
+		t.Fatalf("footprint was not emitted as a hidden symbol property: %+v", footprint)
+	}
+}
+
+func TestToTransactionPreservesGenericFootprintPropertyWithoutExplicitFootprint(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Components[1].Footprint = ""
+	doc.Circuit.Components[1].Properties = map[string]string{
+		"Footprint": "Resistor_SMD:R_0603_1608Metric",
+	}
+
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
+	if len(symbols[1].Properties) != 1 {
+		t.Fatalf("expected one property, got %+v", symbols[1].Properties)
+	}
+	footprint := symbols[1].Properties[0]
+	if footprint.Name != "Footprint" || footprint.Value != "Resistor_SMD:R_0603_1608Metric" || footprint.Hidden {
+		t.Fatalf("generic footprint property was not preserved: %+v", footprint)
+	}
+}
+
+func TestToTransactionDeduplicatesPropertyNamesCaseInsensitively(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Components[1].Properties = map[string]string{
+		"MPN": "first",
+		"mpn": "duplicate",
+	}
+
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
+	if len(symbols[1].Properties) != 1 {
+		t.Fatalf("expected one property after case-insensitive dedupe, got %+v", symbols[1].Properties)
+	}
+	if symbols[1].Properties[0].Name != "MPN" || symbols[1].Properties[0].Value != "first" {
+		t.Fatalf("unexpected deduped property: %+v", symbols[1].Properties[0])
 	}
 }
 

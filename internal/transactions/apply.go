@@ -704,7 +704,13 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if strings.TrimSpace(output) == "" {
 			return nil, fmt.Errorf("output directory required")
 		}
-		writeResult, err := builder.WriteProject(output, kicaddesign.WriteOptions{Overwrite: opts.Overwrite || payload.Overwrite})
+		var writeResult kicaddesign.WriteResult
+		var err error
+		if payload.SchematicOnly {
+			writeResult, err = builder.WriteSchematicProject(output, kicaddesign.WriteOptions{Overwrite: opts.Overwrite || payload.Overwrite})
+		} else {
+			writeResult, err = builder.WriteProject(output, kicaddesign.WriteOptions{Overwrite: opts.Overwrite || payload.Overwrite})
+		}
 		if err != nil {
 			return nil, err
 		}

@@ -11,6 +11,8 @@ import (
 	"kicadai/internal/transactions"
 )
 
+const footprintPropertyName = "Footprint"
+
 // ToTransaction converts a validated schematic IR document into the existing
 // schematic transaction operation stream.
 func ToTransaction(document Document) (transactions.Transaction, []reports.Issue) {
@@ -33,6 +35,28 @@ func ToTransaction(document Document) (transactions.Transaction, []reports.Issue
 	state.appendNets(&tx)
 
 	return tx, state.issues
+}
+
+// ToProjectTransaction converts schematic IR into a transaction that can be
+// applied to write a KiCad project directory.
+func ToProjectTransaction(document Document) (transactions.Transaction, []reports.Issue) {
+	tx, issues := ToTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		return tx, issues
+	}
+	payload := transactions.WriteProjectOperation{Op: transactions.OpWriteProject, SchematicOnly: true}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		issues = append(issues, reports.Issue{
+			Code:     reports.CodeInvalidArgument,
+			Severity: reports.SeverityError,
+			Path:     "write_project",
+			Message:  err.Error(),
+		})
+		return tx, issues
+	}
+	tx.Operations = append(tx.Operations, transactions.NewOperation(transactions.OpWriteProject, raw))
+	return tx, issues
 }
 
 type adapterState struct {
@@ -137,10 +161,13 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			LibraryID:  component.Symbol,
 			At:         state.pointsByID[component.ID],
 			Pins:       transactionPins(component.Pins),
-			Properties: transactionProperties(component.Properties),
+			Properties: transactionSymbolProperties(component),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
 		if component.Footprint != "" {
+			// Retain explicit assignment evidence for transaction consumers even
+			// though AddSymbol also carries the hidden KiCad Footprint property
+			// needed by schematic-only project writes.
 			assign := transactions.AssignFootprintOperation{
 				Op:          transactions.OpAssignFootprint,
 				Ref:         ref,
@@ -461,18 +488,41 @@ func transactionPins(pins []Pin) []transactions.PinSpec {
 	return out
 }
 
-func transactionProperties(properties map[string]string) []transactions.SymbolProperty {
-	if len(properties) == 0 {
-		return nil
-	}
-	keys := make([]string, 0, len(properties))
-	for key := range properties {
+func transactionSymbolProperties(component Component) []transactions.SymbolProperty {
+	footprint := strings.TrimSpace(component.Footprint)
+	properties := make([]transactions.SymbolProperty, 0, len(component.Properties)+1)
+	keys := make([]string, 0, len(component.Properties))
+	for key := range component.Properties {
 		keys = append(keys, key)
 	}
 	sort.Strings(keys)
-	out := make([]transactions.SymbolProperty, 0, len(keys))
+	seen := map[string]struct{}{}
 	for _, key := range keys {
-		out = append(out, transactions.SymbolProperty{Name: key, Value: properties[key]})
+		trimmedKey := strings.TrimSpace(key)
+		if footprint != "" && strings.EqualFold(trimmedKey, footprintPropertyName) {
+			continue
+		}
+		normalizedKey := strings.ToLower(trimmedKey)
+		if _, ok := seen[normalizedKey]; ok {
+			// Keep the first sorted spelling/value for deterministic output when
+			// IR producers send case-only duplicate property names.
+			continue
+		}
+		seen[normalizedKey] = struct{}{}
+		properties = append(properties, transactions.SymbolProperty{Name: trimmedKey, Value: component.Properties[key]})
 	}
-	return out
+	if footprint != "" {
+		properties = append(properties, transactions.SymbolProperty{
+			Name:   footprintPropertyName,
+			Value:  footprint,
+			Hidden: true,
+		})
+	}
+	sort.Slice(properties, func(i, j int) bool {
+		return properties[i].Name < properties[j].Name
+	})
+	if len(properties) == 0 {
+		return nil
+	}
+	return properties
 }

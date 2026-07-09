@@ -82,7 +82,7 @@ Commands:
   place         Run PCB placement planning
   route         Run PCB routing
   repair        Plan, export-bundle, or apply validation repair attempts
-  schematic-ir  Validate, normalize, or translate schematic design IR
+  schematic-ir  Validate, normalize, create transactions, or write schematic design IR
   export        Export review and fabrication artifacts
   plan-led-demo Print a deterministic LED indicator schematic plan
   ping          Check whether KiCad responds to the API
@@ -4275,7 +4275,7 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
 			Path:     "schematic-ir",
-			Message:  "schematic-ir requires one subcommand: validate, normalize, or transaction",
+			Message:  "schematic-ir requires one subcommand: validate, normalize, transaction, or write",
 		}
 		return writeSchematicIRResult(stdout, "schematic-ir", schematicIRCLIData{}, []reports.Issue{issue})
 	}
@@ -4290,7 +4290,7 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 	}
 
 	subcommand := opts.commandArgs[0]
-	if subcommand != "validate" && subcommand != "normalize" && subcommand != "transaction" {
+	if subcommand != "validate" && subcommand != "normalize" && subcommand != "transaction" && subcommand != "write" {
 		issue := reports.Issue{
 			Code:     reports.CodeInvalidArgument,
 			Severity: reports.SeverityError,
@@ -4312,17 +4312,41 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 				normalized := schematicir.NormalizeLayoutIntent(document)
 				data.Normalized = &normalized
 				data.Summary = schematicIRDocumentSummary(normalized)
-			case "transaction":
+			case "transaction", "write":
 				normalized := schematicir.NormalizeLayoutIntent(document)
 				data.Summary = schematicIRDocumentSummary(normalized)
-				tx, adapterIssues := schematicir.ToTransaction(normalized)
+				var tx transactions.Transaction
+				var adapterIssues []reports.Issue
+				transactionGenerated := false
+				if subcommand == "write" {
+					if strings.TrimSpace(opts.output) == "" {
+						adapterIssues = append(adapterIssues, reports.Issue{
+							Code:     reports.CodeInvalidArgument,
+							Severity: reports.SeverityError,
+							Path:     "output",
+							Message:  "schematic-ir write requires --output",
+						})
+					} else {
+						tx, adapterIssues = schematicir.ToProjectTransaction(normalized)
+						transactionGenerated = true
+					}
+				} else {
+					tx, adapterIssues = schematicir.ToTransaction(normalized)
+					transactionGenerated = true
+				}
 				issues = append(issues, adapterIssues...)
 				if !reports.HasBlockingIssue(adapterIssues) {
+					if transactionGenerated {
+						data.Transaction = &tx
+					}
 					validation := transactions.Validate(tx)
-					data.Transaction = &tx
 					data.Validation = &validation
 					data.Summary.OperationCount = len(tx.Operations)
 					issues = append(issues, validation.Issues...)
+					if subcommand == "write" && !reports.HasBlockingIssue(validation.Issues) {
+						apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite})
+						issues = append(issues, apply.Issues...)
+					}
 				}
 			}
 		}
