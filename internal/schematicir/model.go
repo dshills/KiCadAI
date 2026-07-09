@@ -2,7 +2,6 @@ package schematicir
 
 import (
 	"encoding/json"
-	"regexp"
 	"strings"
 )
 
@@ -14,8 +13,6 @@ const (
 	DefaultMinGroupSpacingMM     = 12.7
 	DefaultMinComponentSpacingMM = 7.62
 )
-
-var componentIDPattern = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9_-]{0,62}$`)
 
 type Document struct {
 	Schema     string                     `json:"schema"`
@@ -123,10 +120,6 @@ type EndpointRef string
 func (ref EndpointRef) Split() (componentID string, pinSelector string, ok bool) {
 	componentID, pinSelector, ok = strings.Cut(string(ref), ".")
 	return componentID, pinSelector, ok && componentID != "" && pinSelector != ""
-}
-
-func ValidComponentID(id string) bool {
-	return componentIDPattern.MatchString(id)
 }
 
 type NetRole string
@@ -347,12 +340,4 @@ func NewDocument() *Document {
 			Acceptance: AcceptanceStructural,
 		},
 	}
-}
-
-func boolPtr(value bool) *bool {
-	return &value
-}
-
-func floatPtr(value float64) *float64 {
-	return &value
 }
