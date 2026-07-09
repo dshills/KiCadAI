@@ -14,7 +14,7 @@ import (
 // ToTransaction converts a validated schematic IR document into the existing
 // schematic transaction operation stream.
 func ToTransaction(document Document) (transactions.Transaction, []reports.Issue) {
-	document = Normalize(document)
+	document = NormalizeLayoutIntent(document)
 	if issues := validateDefaulted(document); len(issues) != 0 {
 		return transactions.Transaction{}, issues
 	}
