@@ -3,6 +3,8 @@ package schematicir
 import (
 	"strings"
 	"testing"
+
+	"kicadai/internal/reports"
 )
 
 func TestDecodeStrictRejectsUnknownFields(t *testing.T) {
@@ -38,6 +40,33 @@ func TestValidateRejectsDuplicateComponentID(t *testing.T) {
 	issues := Validate(doc)
 	if len(issues) == 0 {
 		t.Fatal("expected duplicate component id issue")
+	}
+}
+
+func TestValidateRejectsUnknownPlacementReferences(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Groups = []Group{{ID: "signal", Members: []string{"r_limit"}, Rank: 1}}
+	doc.Layout.Placements = []Placement{
+		{Target: "missing_component", Group: "signal"},
+		{Target: "led", Group: "missing_group", Orientation: "upside_down"},
+		{Target: "led", Group: "signal"},
+	}
+
+	issues := Validate(doc)
+	if len(issues) < 4 {
+		t.Fatalf("expected placement reference issues, got %#v", issues)
+	}
+	if !schematicIRIssueContains(issues, "layout.placements[0].target") {
+		t.Fatalf("missing unknown target issue: %#v", issues)
+	}
+	if !schematicIRIssueContains(issues, "layout.placements[1].group") {
+		t.Fatalf("missing unknown group issue: %#v", issues)
+	}
+	if !schematicIRIssueContains(issues, "layout.placements[1].orientation") {
+		t.Fatalf("missing unsupported orientation issue: %#v", issues)
+	}
+	if !schematicIRIssueContains(issues, "layout.placements[2].target") {
+		t.Fatalf("missing duplicate target issue: %#v", issues)
 	}
 }
 
@@ -326,4 +355,13 @@ func validLEDDocument() Document {
 		{Name: "GND", Role: NetRoleGround, Connect: []EndpointRef{"led.2", "vin.2"}},
 	}
 	return doc
+}
+
+func schematicIRIssueContains(issues []reports.Issue, path string) bool {
+	for _, issue := range issues {
+		if issue.Path == path {
+			return true
+		}
+	}
+	return false
 }

@@ -33,7 +33,7 @@ func validateDefaulted(document Document) []reports.Issue {
 	portsByNet := ctx.validatePorts(netNames)
 	ctx.validateNetCardinality(netEndpoints, unnamedNetEndpointCounts, portsByNet)
 	ctx.validateGroups(componentPins)
-	validateLayout(ctx.document, ctx.add)
+	validateLayout(ctx.document, componentPins, ctx.add)
 	validatePolicy(ctx.document, ctx.add)
 	validateValues(ctx.document, ctx.add)
 	return ctx.issues
@@ -306,7 +306,7 @@ func (ctx *validationContext) validateGroups(componentPins map[string]map[string
 	}
 }
 
-func validateLayout(document Document, add func(string, string)) {
+func validateLayout(document Document, componentPins map[string]map[string]struct{}, add func(string, string)) {
 	if document.Layout.Flow != FlowLeftToRight {
 		add("layout.flow", "only left_to_right flow is supported in v1")
 	}
@@ -338,6 +338,31 @@ func validateLayout(document Document, add func(string, string)) {
 	}
 	if document.Layout.Rules.MinComponentSpacingMM != nil && *document.Layout.Rules.MinComponentSpacingMM < 0 {
 		add("layout.rules.min_component_spacing_mm", "component spacing must be non-negative")
+	}
+	groups := map[string]struct{}{}
+	for _, group := range document.Layout.Groups {
+		groups[group.ID] = struct{}{}
+	}
+	placementTargets := map[string]int{}
+	for index, placement := range document.Layout.Placements {
+		path := fmt.Sprintf("layout.placements[%d]", index)
+		if placement.Target == "" {
+			add(path+".target", "placement target is required")
+		} else if _, exists := componentPins[placement.Target]; !exists {
+			add(path+".target", "placement references unknown component "+placement.Target)
+		} else if firstIndex, exists := placementTargets[placement.Target]; exists {
+			add(path+".target", fmt.Sprintf("placement target %s is already defined at layout.placements[%d]", placement.Target, firstIndex))
+		} else {
+			placementTargets[placement.Target] = index
+		}
+		if placement.Group != "" {
+			if _, exists := groups[placement.Group]; !exists {
+				add(path+".group", "placement references unknown group "+placement.Group)
+			}
+		}
+		if placement.Orientation != "" && placement.Orientation != OrientationNormal && placement.Orientation != OrientationRotated {
+			add(path+".orientation", "placement orientation is not supported")
+		}
 	}
 }
 

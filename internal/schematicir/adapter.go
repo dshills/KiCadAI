@@ -60,11 +60,12 @@ func ToProjectTransaction(document Document) (transactions.Transaction, []report
 }
 
 type adapterState struct {
-	document   Document
-	refsByID   map[string]string
-	unitsByID  map[string]int
-	pointsByID map[string]transactions.Point
-	issues     []reports.Issue
+	document     Document
+	refsByID     map[string]string
+	unitsByID    map[string]int
+	pointsByID   map[string]transactions.Point
+	rotationByID map[string]float64
+	issues       []reports.Issue
 }
 
 const (
@@ -91,10 +92,11 @@ const (
 
 func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 	state := &adapterState{
-		document:   document,
-		refsByID:   map[string]string{},
-		unitsByID:  map[string]int{},
-		pointsByID: layoutPoints(document),
+		document:     document,
+		refsByID:     map[string]string{},
+		unitsByID:    map[string]int{},
+		pointsByID:   layoutPoints(document),
+		rotationByID: layoutRotations(document),
 	}
 	refCounters := map[string]int{}
 	usedRefs := map[string]struct{}{}
@@ -160,6 +162,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			Value:      component.Value,
 			LibraryID:  component.Symbol,
 			At:         state.pointsByID[component.ID],
+			Rotation:   state.rotationByID[component.ID],
 			Pins:       transactionPins(component.Pins),
 			Properties: transactionSymbolProperties(component),
 		}
@@ -400,6 +403,22 @@ func layoutPoints(document Document) map[string]transactions.Point {
 		points[componentID] = pointForRankLane(document, componentRanks[componentID], componentRoles[componentID], rankLaneCounts, laneTotals)
 	}
 	return points
+}
+
+func layoutRotations(document Document) map[string]float64 {
+	rotations := map[string]float64{}
+	for _, placement := range document.Layout.Placements {
+		if placement.Target == "" {
+			continue
+		}
+		switch placement.Orientation {
+		case OrientationRotated:
+			rotations[placement.Target] = 90
+		default:
+			rotations[placement.Target] = 0
+		}
+	}
+	return rotations
 }
 
 func pointForRankLane(document Document, rank int, role ComponentRole, counts map[int]map[layoutLane]int, totals map[int]map[layoutLane]int) transactions.Point {

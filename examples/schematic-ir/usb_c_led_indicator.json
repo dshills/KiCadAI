@@ -13,7 +13,7 @@
         "id": "usb_c",
         "ref": "J1",
         "role": "input_connector",
-        "symbol": "Connector:USB_C_Receptacle_USB2.0",
+        "symbol": "kicadai:usb_c_receptacle_poweronly_full",
         "footprint": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
         "pins": [
           {"number": "A4", "name": "VBUS"},
@@ -69,7 +69,7 @@
     "nets": [
       {"name": "VBUS", "role": "power", "connect": ["usb_c.A4", "usb_c.A9", "usb_c.B4", "usb_c.B9", "led_resistor.1"], "label": "VBUS"},
       {"name": "LED_A", "role": "signal", "connect": ["led_resistor.2", "power_led.1"], "label": "LED_A"},
-      {"name": "GND", "role": "ground", "connect": ["power_led.2", "cc1_rd.2", "cc2_rd.2", "usb_c.A1", "usb_c.A12", "usb_c.B1", "usb_c.B12", "usb_c.SH"], "label": "GND"},
+      {"name": "GND", "role": "ground", "connect": ["cc1_rd.2", "usb_c.A1", "usb_c.A12", "usb_c.B1", "usb_c.B12", "usb_c.SH", "power_led.2", "cc2_rd.2"], "label": "GND"},
       {"name": "CC1", "role": "signal", "connect": ["usb_c.A5", "cc1_rd.1"], "label": "CC1"},
       {"name": "CC2", "role": "signal", "connect": ["usb_c.B5", "cc2_rd.1"], "label": "CC2"}
     ]
@@ -77,6 +77,15 @@
   "layout": {
     "flow": "left_to_right",
     "origin": "centered",
+    "groups": [
+      {"id": "indicator", "label": "Indicator", "role": "output_stage", "members": ["power_led"], "rank": 3, "side": "right"}
+    ],
+    "placements": [
+      {"target": "cc1_rd", "orientation": "normal"},
+      {"target": "cc2_rd", "orientation": "normal"},
+      {"target": "led_resistor", "orientation": "rotated"},
+      {"target": "power_led", "group": "indicator", "orientation": "rotated"}
+    ],
     "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
     "rules": {
       "positive_power_top": true,

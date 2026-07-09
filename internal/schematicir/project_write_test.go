@@ -13,8 +13,25 @@ import (
 	"kicadai/internal/transactions"
 )
 
-func TestSchematicIRLEDIndicatorWritesReadableProject(t *testing.T) {
-	document := loadExampleDocument(t, "led_indicator.json")
+func TestSchematicIRWritesReadableProject(t *testing.T) {
+	tests := []struct {
+		name        string
+		fileName    string
+		projectName string
+	}{
+		{name: "LED indicator", fileName: "led_indicator.json", projectName: "led_indicator"},
+		{name: "USB-C LED indicator", fileName: "usb_c_led_indicator.json", projectName: "usb_c_led_indicator"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testSchematicIRWritesReadableProject(t, tc.fileName, tc.projectName)
+		})
+	}
+}
+
+func testSchematicIRWritesReadableProject(t *testing.T, fileName string, projectName string) {
+	t.Helper()
+	document := loadExampleDocument(t, fileName)
 	tx, issues := ToProjectTransaction(document)
 	if reports.HasBlockingIssue(issues) {
 		t.Fatalf("project transaction issues: %+v", issues)
@@ -30,19 +47,19 @@ func TestSchematicIRLEDIndicatorWritesReadableProject(t *testing.T) {
 		t.Fatalf("write_project schematic_only = false")
 	}
 
-	outputDir := filepath.Join(t.TempDir(), "led_indicator")
+	outputDir := filepath.Join(t.TempDir(), projectName)
 	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
 	if reports.HasBlockingIssue(apply.Issues) {
 		t.Fatalf("apply issues: %+v", apply.Issues)
 	}
-	projectPath := filepath.Join(outputDir, "led_indicator.kicad_pro")
-	schematicPath := filepath.Join(outputDir, "led_indicator.kicad_sch")
+	projectPath := filepath.Join(outputDir, projectName+".kicad_pro")
+	schematicPath := filepath.Join(outputDir, projectName+".kicad_sch")
 	for _, path := range []string{projectPath, schematicPath} {
 		if _, err := os.Stat(path); err != nil {
 			t.Fatalf("expected generated file %s: %v", path, err)
 		}
 	}
-	if _, err := os.Stat(filepath.Join(outputDir, "led_indicator.kicad_pcb")); err == nil {
+	if _, err := os.Stat(filepath.Join(outputDir, projectName+".kicad_pcb")); err == nil {
 		t.Fatal("schematic IR project write emitted a PCB file")
 	} else if !os.IsNotExist(err) {
 		t.Fatalf("stat generated PCB file: %v", err)
