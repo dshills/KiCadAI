@@ -2,6 +2,7 @@ package schematicir
 
 import (
 	"fmt"
+	"math"
 	"regexp"
 	"strings"
 
@@ -80,6 +81,13 @@ func (ctx *validationContext) validateComponents() (map[string]map[string]struct
 		if component.Footprint != "" && !validLibraryID(component.Footprint) {
 			ctx.add(path+".footprint", "footprint must be in Library:Name form")
 		}
+		if component.Body != nil {
+			if !finiteFloats(component.Body.MinXMM, component.Body.MinYMM, component.Body.MaxXMM, component.Body.MaxYMM) {
+				ctx.add(path+".body", "body bounds must be finite")
+			} else if component.Body.MaxXMM <= component.Body.MinXMM || component.Body.MaxYMM <= component.Body.MinYMM {
+				ctx.add(path+".body", "body bounds must satisfy max > min on both axes")
+			}
+		}
 		if !ctx.document.Policy.Repair.AllowRefAssignment && strings.TrimSpace(component.Ref) == "" {
 			ctx.add(path+".ref", "ref is required when allow_ref_assignment is false")
 		}
@@ -103,6 +111,15 @@ func (ctx *validationContext) validateComponents() (map[string]map[string]struct
 		componentPins[component.ID] = pins
 	}
 	return componentPins, componentRefs
+}
+
+func finiteFloats(values ...float64) bool {
+	for _, value := range values {
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return false
+		}
+	}
+	return true
 }
 
 func (ctx *validationContext) validateSharedRefs(componentRefs map[string][]Component) {

@@ -237,6 +237,13 @@ Component fields:
   metadata. Omitted axes inherit the resolved template value as zero; an
   explicitly provided zero is preserved. Explicit geometry takes precedence
   over template geometry for both layout and generated transaction anchors.
+- `body`: optional verified symbol graphics bounds relative to the symbol origin,
+  with `min_x_mm`, `min_y_mm`, `max_x_mm`, and `max_y_mm`. When present, these
+  bounds are used for body-aware placement, routing obstacles, field placement,
+  and readability validation. They must be finite and have positive width and
+  height. When omitted, KiCadAI uses its resolved template or conservative role
+  fallback; arbitrary external symbols should provide this field or resolver
+  evidence before strict readable acceptance.
 - `properties`: optional string map for symbol properties.
 
 Net fields:

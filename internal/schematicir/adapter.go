@@ -690,6 +690,7 @@ func schematicLayout(document Document) schematiclayout.Result {
 			RankFixed: group.ID != "" && !group.Inferred,
 			Near:      append([]string(nil), placement.Near...),
 			Rotation:  kicadfiles.Angle(rotationByID[component.ID]),
+			Body:      schematicLayoutBody(component),
 			Pins:      schematicLayoutPins(component),
 		})
 	}
@@ -716,6 +717,18 @@ func schematicLayout(document Document) schematiclayout.Result {
 		})
 	}
 	return schematiclayout.Layout(request)
+}
+
+func schematicLayoutBody(component Component) schematiclayout.Rect {
+	if component.Body == nil {
+		return schematiclayout.Rect{}
+	}
+	return schematiclayout.Rect{
+		MinX: kicadfiles.MM(component.Body.MinXMM),
+		MinY: kicadfiles.MM(component.Body.MinYMM),
+		MaxX: kicadfiles.MM(component.Body.MaxXMM),
+		MaxY: kicadfiles.MM(component.Body.MaxYMM),
+	}
 }
 
 func schematicLayoutPins(component Component) []schematiclayout.Pin {

@@ -137,6 +137,28 @@ func TestPlaceKeepsComponentBodiesSeparated(t *testing.T) {
 	}
 }
 
+func TestPlaceUsesExplicitAsymmetricBodyBounds(t *testing.T) {
+	result := Place(Request{Sheet: testSheet(), Components: []Component{
+		{Ref: "U1", Role: "ic", Body: Rect{MinX: kicadfiles.MM(-20), MinY: kicadfiles.MM(-2), MaxX: kicadfiles.MM(5), MaxY: kicadfiles.MM(8)}},
+		{Ref: "U2", Role: "ic", Body: Rect{MinX: kicadfiles.MM(-3), MinY: kicadfiles.MM(-3), MaxX: kicadfiles.MM(4), MaxY: kicadfiles.MM(4)}},
+	}})
+	var first, second Rect
+	for _, component := range result.Components {
+		switch component.Ref {
+		case "U1":
+			first = componentBody(component)
+		case "U2":
+			second = componentBody(component)
+		}
+	}
+	if first.Intersects(second) {
+		t.Fatalf("explicit bodies overlap: %#v and %#v", first, second)
+	}
+	if first.Width() != kicadfiles.MM(25) || first.Height() != kicadfiles.MM(10) {
+		t.Fatalf("explicit U1 body was not preserved: %#v", first)
+	}
+}
+
 func TestPlaceKeepsGeneratedFieldsClear(t *testing.T) {
 	result := Place(Request{
 		Sheet: testSheet(),

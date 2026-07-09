@@ -49,7 +49,18 @@ type Component struct {
 	Value      string            `json:"value,omitempty"`
 	Footprint  string            `json:"footprint,omitempty"`
 	Pins       []Pin             `json:"pins,omitempty"`
+	Body       *BodyGeometry     `json:"body,omitempty"`
 	Properties map[string]string `json:"properties,omitempty"`
+}
+
+// BodyGeometry describes the symbol graphics bounds relative to the symbol
+// origin, in millimetres. It lets arbitrary or externally resolved symbols
+// participate in obstacle-aware placement and routing without role heuristics.
+type BodyGeometry struct {
+	MinXMM float64 `json:"min_x_mm"`
+	MinYMM float64 `json:"min_y_mm"`
+	MaxXMM float64 `json:"max_x_mm"`
+	MaxYMM float64 `json:"max_y_mm"`
 }
 
 type ComponentRole string

@@ -34,6 +34,15 @@ func TestValidateRejectsUnknownEndpointPin(t *testing.T) {
 	}
 }
 
+func TestValidateRejectsInvalidBodyGeometry(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Components[1].Body = &BodyGeometry{MinXMM: 2, MinYMM: 1, MaxXMM: 2, MaxYMM: 4}
+	issues := Validate(doc)
+	if !schematicIRIssueContains(issues, "circuit.components[1].body") {
+		t.Fatalf("expected invalid body bounds issue, got %#v", issues)
+	}
+}
+
 func TestValidateRejectsDuplicateComponentID(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Circuit.Components[1].ID = doc.Circuit.Components[0].ID

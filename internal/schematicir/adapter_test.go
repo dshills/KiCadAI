@@ -5,6 +5,8 @@ import (
 	"math"
 	"testing"
 
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
 )
 
@@ -76,6 +78,23 @@ func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	if len(connects) != 1 || connects[0].From.Unit != 1 || connects[0].To.Unit != 2 {
 		t.Fatalf("connect = %#v, want unit-aware endpoints", connects)
 	}
+}
+
+func TestSchematicLayoutPropagatesExplicitBodyGeometry(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Components[1].Body = &BodyGeometry{MinXMM: -9, MinYMM: -2, MaxXMM: 4, MaxYMM: 11}
+	result := schematicLayout(doc)
+	for _, component := range result.Components {
+		if component.Ref != "r_limit" {
+			continue
+		}
+		want := schematiclayout.Rect{MinX: kicadfiles.MM(-9), MinY: kicadfiles.MM(-2), MaxX: kicadfiles.MM(4), MaxY: kicadfiles.MM(11)}
+		if component.Body != want {
+			t.Fatalf("body = %#v, want %#v", component.Body, want)
+		}
+		return
+	}
+	t.Fatal("missing r_limit layout component")
 }
 
 func TestToTransactionUsesSharedGraphLayoutAndCentersResult(t *testing.T) {
