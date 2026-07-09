@@ -230,6 +230,10 @@ func validateLocalLibraryTables(target Target, opts Options) []reports.Issue {
 			issues = append(issues, BlockingIssue(reports.CodeValidationFailed, path, err.Error()))
 			continue
 		}
+		exists := fileExists
+		if table == "fp-lib-table" {
+			exists = pathExists
+		}
 		for _, uri := range entries {
 			resolved, ok, untrusted := resolveLibraryURI(uri, dir, allowedRoots, replacements)
 			switch {
@@ -237,7 +241,7 @@ func validateLocalLibraryTables(target Target, opts Options) []reports.Issue {
 				issues = append(issues, WarningIssue(reports.CodeValidationFailed, path, fmt.Sprintf("library URI %q resolves outside allowed roots", uri)))
 			case !ok:
 				issues = append(issues, WarningIssue(reports.CodeValidationFailed, path, fmt.Sprintf("library URI %q contains unresolved variables", uri)))
-			case !fileExists(resolved):
+			case !exists(resolved):
 				issues = append(issues, BlockingIssue(reports.CodeMissingFile, resolved, "library table URI does not resolve to an existing path"))
 			}
 		}
@@ -433,4 +437,12 @@ func fileExists(path string) bool {
 	}
 	info, err := os.Stat(path)
 	return err == nil && !info.IsDir()
+}
+
+func pathExists(path string) bool {
+	if strings.TrimSpace(path) == "" {
+		return false
+	}
+	_, err := os.Stat(path)
+	return err == nil
 }

@@ -11,6 +11,8 @@ import (
 	"kicadai/internal/kicadfiles/sexpr"
 )
 
+const footprintLibraryModuleFormatVersion int64 = 20240108
+
 func Write(w io.Writer, board PCBFile) error {
 	if err := validateNetZeroForNormalization(board.Nets); err != nil {
 		return err
@@ -24,6 +26,17 @@ func Write(w io.Writer, board PCBFile) error {
 		return err
 	}
 	return sexpr.Render(w, node)
+}
+
+func WriteFootprintLibraryModule(w io.Writer, footprint *Footprint, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fieldError("footprint.name", "required")
+	}
+	if footprint == nil {
+		return fieldError("footprint", "required")
+	}
+	return sexpr.Render(w, renderFootprintLibraryModule(footprint, name))
 }
 
 func validateNetZeroForNormalization(nets []Net) error {
@@ -212,6 +225,73 @@ func renderTitleBlock(title kicadfiles.TitleBlock) sexpr.List {
 	return sexpr.L(nodes...)
 }
 
+func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List {
+	nodes := []sexpr.Node{
+		sexpr.A("footprint"),
+		sexpr.S(name),
+		sexpr.L(sexpr.A("version"), sexpr.I(footprintLibraryModuleFormatVersion)),
+		sexpr.L(sexpr.A("generator"), sexpr.S("kicadai")),
+		sexpr.L(sexpr.A("layer"), sexpr.S(string(kicadfiles.LayerFCu))),
+	}
+	if strings.TrimSpace(footprint.Description) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("descr"), sexpr.S(footprint.Description)))
+	}
+	if strings.TrimSpace(footprint.Tags) != "" {
+		nodes = append(nodes, sexpr.L(sexpr.A("tags"), sexpr.S(footprint.Tags)))
+	}
+	for _, property := range footprint.Properties {
+		nodes = append(nodes, renderFootprintLibraryProperty(property, name))
+	}
+	for _, property := range footprint.MetadataProperties {
+		nodes = append(nodes, renderFootprintMetadataProperty(property))
+	}
+	if len(footprint.Attributes) > 0 {
+		attrNodes := []sexpr.Node{sexpr.A("attr")}
+		for _, attr := range footprint.Attributes {
+			attrNodes = append(attrNodes, sexpr.A(attr))
+		}
+		nodes = append(nodes, sexpr.L(attrNodes...))
+	}
+	if len(footprint.NetTiePadGroups) > 0 {
+		groupNodes := []sexpr.Node{sexpr.A("net_tie_pad_groups")}
+		for _, group := range footprint.NetTiePadGroups {
+			groupNodes = append(groupNodes, sexpr.S(group))
+		}
+		nodes = append(nodes, sexpr.L(groupNodes...))
+	}
+	if footprint.DuplicatePadNumbersAreJumpers != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("duplicate_pad_numbers_are_jumpers"), yesNo(*footprint.DuplicatePadNumbersAreJumpers)))
+	}
+	for _, text := range footprint.Texts {
+		nodes = append(nodes, renderFootprintText(footprintLibraryText(text)))
+	}
+	for _, graphic := range footprint.Graphics {
+		nodes = append(nodes, renderFootprintGraphic(graphic))
+	}
+	for _, pad := range footprint.Pads {
+		nodes = append(nodes, renderPad(footprintLibraryPad(pad), ""))
+	}
+	if footprint.EmbeddedFonts != nil {
+		nodes = append(nodes, sexpr.L(sexpr.A("embedded_fonts"), yesNo(*footprint.EmbeddedFonts)))
+	}
+	for _, model := range footprint.Models {
+		nodes = append(nodes, renderModel3D(model))
+	}
+	return sexpr.L(nodes...)
+}
+
+func footprintLibraryText(text FootprintText) FootprintText {
+	text.UUID = ""
+	return text
+}
+
+func footprintLibraryPad(pad Pad) Pad {
+	pad.UUID = ""
+	pad.NetCode = 0
+	pad.NetName = ""
+	return pad
+}
+
 func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	nodes := []sexpr.Node{
 		sexpr.A("footprint"),
@@ -281,6 +361,31 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	for _, model := range footprint.Models {
 		nodes = append(nodes, renderModel3D(model))
 	}
+	return sexpr.L(nodes...)
+}
+
+func renderFootprintLibraryProperty(property FootprintProperty, footprintName string) sexpr.List {
+	value := property.Value
+	switch strings.TrimSpace(property.Name) {
+	case "Reference":
+		value = "REF**"
+	case "Value":
+		value = footprintName
+	}
+	nodes := []sexpr.Node{
+		sexpr.A("property"),
+		sexpr.S(property.Name),
+		sexpr.S(value),
+		renderAtWithRotation(property.Position, property.Rotation),
+	}
+	if property.Unlocked {
+		nodes = append(nodes, sexpr.L(sexpr.A("unlocked"), sexpr.A("yes")))
+	}
+	nodes = append(nodes, sexpr.L(sexpr.A("layer"), sexpr.S(string(property.Layer))))
+	if property.Hide {
+		nodes = append(nodes, sexpr.L(sexpr.A("hide"), sexpr.A("yes")))
+	}
+	nodes = append(nodes, renderEffects(property.Effects))
 	return sexpr.L(nodes...)
 }
 

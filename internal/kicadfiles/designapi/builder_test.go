@@ -1042,6 +1042,84 @@ func TestBuilderWriteProjectAddsGeneratedLocalSensorSymbolLibrary(t *testing.T) 
 	}
 }
 
+func TestBuilderWriteProjectAddsGeneratedLocalFootprintLibrary(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{
+			{Name: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-0.5), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(0.7), Y: kicadfiles.MM(0.8)}, Shape: "roundrect"},
+			{Name: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(0.5), Y: 0}, Size: kicadfiles.Point{X: kicadfiles.MM(0.7), Y: kicadfiles.MM(0.8)}, Shape: "roundrect"},
+		},
+	}); err != nil {
+		t.Fatalf("PlaceFootprint returned error: %v", err)
+	}
+
+	root := filepath.Join(t.TempDir(), "footprint_demo")
+	result, err := builder.WriteProject(root, kicaddesign.WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteProject returned error: %v", err)
+	}
+	table, err := os.ReadFile(filepath.Join(result.ProjectDir, "fp-lib-table"))
+	if err != nil {
+		t.Fatalf("expected fp-lib-table: %v", err)
+	}
+	if !strings.Contains(string(table), `"Resistor_SMD"`) || !strings.Contains(string(table), `"${KIPRJMOD}/footprints/Resistor_SMD.pretty"`) {
+		t.Fatalf("fp-lib-table missing generated Resistor_SMD library:\n%s", table)
+	}
+	modulePath := filepath.Join(result.ProjectDir, "footprints", "Resistor_SMD.pretty", "R_0805_2012Metric.kicad_mod")
+	module, err := os.ReadFile(modulePath)
+	if err != nil {
+		t.Fatalf("expected generated footprint module: %v", err)
+	}
+	moduleText := string(module)
+	for _, want := range []string{`"R_0805_2012Metric"`, `(version 20240108)`, `(generator "kicadai")`, `"Reference"`, `"REF**"`, `"Value"`, `roundrect`, `"1"`, `"2"`} {
+		if !strings.Contains(moduleText, want) {
+			t.Fatalf("generated footprint missing %q:\n%s", want, moduleText)
+		}
+	}
+	if strings.Contains(moduleText, `"R1"`) || strings.Contains(moduleText, `"10k"`) {
+		t.Fatalf("generated footprint library module should not include instance reference or value:\n%s", moduleText)
+	}
+	if strings.Contains(moduleText, "(net ") {
+		t.Fatalf("generated footprint library module should not include board net assignments:\n%s", moduleText)
+	}
+	boardFiles, err := filepath.Glob(filepath.Join(result.ProjectDir, "*.kicad_pcb"))
+	if err != nil {
+		t.Fatalf("glob PCB files: %v", err)
+	}
+	if len(boardFiles) != 1 {
+		t.Fatalf("PCB files = %v, want one", boardFiles)
+	}
+	board, err := os.ReadFile(boardFiles[0])
+	if err != nil {
+		t.Fatalf("expected PCB file: %v", err)
+	}
+	if !strings.Contains(string(board), `"Resistor_SMD:R_0805_2012Metric"`) {
+		t.Fatalf("PCB should retain qualified footprint library ID:\n%s", board)
+	}
+}
+
+func TestBuilderWriteProjectRejectsUnsafeGeneratedFootprintPath(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
+	if err := builder.AssignFootprint("R1", "Resistor_SMD:../R_0805_2012Metric"); err != nil {
+		t.Fatalf("AssignFootprint returned error: %v", err)
+	}
+	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
+		Pads: []PadSpec{{Name: "1"}, {Name: "2"}},
+	}); err != nil {
+		t.Fatalf("PlaceFootprint returned error: %v", err)
+	}
+
+	root := filepath.Join(t.TempDir(), "unsafe_footprint")
+	if _, err := builder.WriteProject(root, kicaddesign.WriteOptions{}); err == nil || !strings.Contains(err.Error(), "invalid footprint library name") {
+		t.Fatalf("WriteProject error = %v, want invalid footprint library name", err)
+	}
+}
+
 func TestBuilderDesignAddsSameNetDuplicatePadAliasTie(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "U1", "Device:R", "Alias", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})

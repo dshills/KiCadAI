@@ -1,6 +1,7 @@
 package designapi
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -1334,6 +1335,9 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 	}
 	design := builder.Design()
 	ensureGeneratedLocalSymbolLibraries(&design)
+	if err := ensureGeneratedLocalFootprintLibraries(&design); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
 	return kicaddesign.WriteProjectDirectory(root, design, options)
 }
 
@@ -1400,6 +1404,94 @@ func generatedLocalSymbolLibraryIDs(file *schematic.SchematicFile) []string {
 		}
 	}
 	return ids
+}
+
+func ensureGeneratedLocalFootprintLibraries(design *kicaddesign.Design) error {
+	if design == nil || design.PCB == nil {
+		return nil
+	}
+	seenLibraries := map[string]struct{}{}
+	for _, entry := range design.FootprintTables {
+		seenLibraries[strings.ToLower(strings.TrimSpace(entry.Name))] = struct{}{}
+	}
+	existingArtifacts := map[string]struct{}{}
+	for _, artifact := range design.AssetFiles {
+		existingArtifacts[strings.ToLower(strings.TrimSpace(artifact.Path))] = struct{}{}
+	}
+	footprintsByNickname := map[string][]generatedLocalFootprint{}
+	var nicknameOrder []string
+	for i := range design.PCB.Footprints {
+		footprint := &design.PCB.Footprints[i]
+		rawNickname := libraryNickname(footprint.LibraryID)
+		rawName := footprintLibraryName(footprint.LibraryID)
+		nickname := rawNickname
+		name := rawName
+		if nickname == "" || name == "" {
+			continue
+		}
+		var ok bool
+		nickname, ok = cleanGeneratedFootprintPathComponent(nickname)
+		if !ok {
+			return fmt.Errorf("invalid footprint library nickname %q", rawNickname)
+		}
+		name, ok = cleanGeneratedFootprintPathComponent(name)
+		if !ok {
+			return fmt.Errorf("invalid footprint library name %q", rawName)
+		}
+		nicknameKey := strings.ToLower(nickname)
+		if _, ok := footprintsByNickname[nicknameKey]; !ok {
+			nicknameOrder = append(nicknameOrder, nickname)
+		}
+		footprintsByNickname[nicknameKey] = append(footprintsByNickname[nicknameKey], generatedLocalFootprint{
+			Name:      name,
+			Footprint: footprint,
+		})
+	}
+	renderedModules := map[string][]byte{}
+	for _, nickname := range nicknameOrder {
+		nicknameKey := strings.ToLower(nickname)
+		libraryPath := "footprints/" + nickname + ".pretty"
+		if _, ok := seenLibraries[nicknameKey]; !ok {
+			design.FootprintTables = append(design.FootprintTables, library.TableEntry{
+				Name:        nickname,
+				Type:        "KiCad",
+				URI:         "${KIPRJMOD}/" + libraryPath,
+				Description: "Generated footprints for " + nickname,
+			})
+			seenLibraries[nicknameKey] = struct{}{}
+		}
+		for _, module := range footprintsByNickname[nicknameKey] {
+			footprint := module.Footprint
+			name := module.Name
+			assetPath := libraryPath + "/" + name + ".kicad_mod"
+			assetKey := strings.ToLower(assetPath)
+			if _, ok := existingArtifacts[assetKey]; ok {
+				continue
+			}
+			var contents bytes.Buffer
+			if err := pcb.WriteFootprintLibraryModule(&contents, footprint, name); err != nil {
+				return fmt.Errorf("write generated footprint module %s: %w", footprint.LibraryID, err)
+			}
+			if previous, ok := renderedModules[assetKey]; ok {
+				if !bytes.Equal(previous, contents.Bytes()) {
+					return fmt.Errorf("footprint %s has inconsistent generated geometry for local library module %s", footprint.LibraryID, assetPath)
+				}
+				continue
+			}
+			moduleContents := append([]byte(nil), contents.Bytes()...)
+			renderedModules[assetKey] = moduleContents
+			design.AssetFiles = append(design.AssetFiles, kicaddesign.TextArtifact{
+				Path:     assetPath,
+				Contents: moduleContents,
+			})
+		}
+	}
+	return nil
+}
+
+type generatedLocalFootprint struct {
+	Name      string
+	Footprint *pcb.Footprint
 }
 
 func (builder *Builder) pinAnchor(endpoint Endpoint) (kicadfiles.Point, error) {
@@ -1760,7 +1852,29 @@ func libraryNickname(libraryID string) string {
 	if !ok {
 		return libraryID
 	}
-	return before
+	return strings.TrimSpace(before)
+}
+
+func footprintLibraryName(libraryID string) string {
+	libraryID = strings.TrimSpace(libraryID)
+	_, after, ok := strings.Cut(libraryID, ":")
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(after)
+}
+
+func cleanGeneratedFootprintPathComponent(value string) (string, bool) {
+	value = strings.TrimSpace(value)
+	if value == "" || value == "." || value == ".." || strings.ContainsAny(value, `/\:<>|*?"`) {
+		return "", false
+	}
+	for _, r := range value {
+		if r < 0x20 || r == 0x7f {
+			return "", false
+		}
+	}
+	return value, true
 }
 
 func referenceKey(reference string) string {

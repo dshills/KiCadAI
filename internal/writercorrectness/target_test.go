@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"kicadai/internal/reports"
 )
 
 func TestValidateProjectStructureDirectoryTarget(t *testing.T) {
@@ -111,6 +113,45 @@ func TestValidateProjectStructureValidatesLocalLibraryTablePaths(t *testing.T) {
 	writeFile(t, filepath.Join(dir, "fp-lib-table"), `(fp_lib_table
   (version 7)
   (lib (name "Local") (type "KiCad") (uri "${KIPRJMOD}/missing.pretty") (options "") (descr ""))
+)`)
+
+	result := ValidateProjectStructure(dir, Options{})
+	if result.OK {
+		t.Fatalf("OK = true, want false")
+	}
+	assertIssueContains(t, result, "library table URI does not resolve")
+}
+
+func TestValidateProjectStructureAcceptsFootprintLibraryDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "demo.kicad_pro"), "{}")
+	writeSchematic(t, filepath.Join(dir, "demo.kicad_sch"), nil)
+	if err := os.Mkdir(filepath.Join(dir, "Local.pretty"), 0o755); err != nil {
+		t.Fatalf("mkdir local footprint library: %v", err)
+	}
+	writeFile(t, filepath.Join(dir, "fp-lib-table"), `(fp_lib_table
+  (version 7)
+  (lib (name "Local") (type "KiCad") (uri "${KIPRJMOD}/Local.pretty") (options "") (descr ""))
+)`)
+
+	result := ValidateProjectStructure(dir, Options{})
+	for _, issue := range result.Issues {
+		if issue.Code == reports.CodeMissingFile && strings.Contains(issue.Message, "library table URI") {
+			t.Fatalf("unexpected local footprint library issue: %#v", issue)
+		}
+	}
+}
+
+func TestValidateProjectStructureRejectsSymbolLibraryDirectories(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "demo.kicad_pro"), "{}")
+	writeSchematic(t, filepath.Join(dir, "demo.kicad_sch"), nil)
+	if err := os.Mkdir(filepath.Join(dir, "LocalSymbols"), 0o755); err != nil {
+		t.Fatalf("mkdir local symbol library dir: %v", err)
+	}
+	writeFile(t, filepath.Join(dir, "sym-lib-table"), `(sym_lib_table
+  (version 7)
+  (lib (name "Local") (type "KiCad") (uri "${KIPRJMOD}/LocalSymbols") (options "") (descr ""))
 )`)
 
 	result := ValidateProjectStructure(dir, Options{})

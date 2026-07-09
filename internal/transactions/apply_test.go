@@ -30,10 +30,18 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	if len(result.Issues) != 0 {
 		t.Fatalf("unexpected issues: %#v", result.Issues)
 	}
-	if len(result.Artifacts) != 5 {
+	if len(result.Artifacts) != 7 {
 		t.Fatalf("expected artifacts, got %#v", result.Artifacts)
 	}
-	for _, name := range []string{"demo.kicad_pro", "demo.kicad_sch", "demo.kicad_pcb", ".kicadai/manifest.json", ".kicadai/transaction.json"} {
+	for _, name := range []string{
+		"demo.kicad_pro",
+		"demo.kicad_sch",
+		"demo.kicad_pcb",
+		"fp-lib-table",
+		"footprints/Resistor_SMD.pretty/R_0805_2012Metric.kicad_mod",
+		".kicadai/manifest.json",
+		".kicadai/transaction.json",
+	} {
 		if _, err := os.Stat(filepath.Join(output, name)); err != nil {
 			t.Fatalf("expected %s: %v", name, err)
 		}
