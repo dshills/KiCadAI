@@ -55,13 +55,18 @@ type Rules struct {
 }
 
 type Component struct {
-	Ref             string
-	Value           string
-	LibraryID       string
-	Role            string
-	GroupID         string
-	Stage           Stage
-	Lane            Lane
+	Ref       string
+	Value     string
+	LibraryID string
+	Role      string
+	GroupID   string
+	Stage     Stage
+	Lane      Lane
+	// FlowRank is an optional left-to-right graph rank. RankFixed distinguishes
+	// an explicit rank of zero from an inferred rank.
+	FlowRank        int
+	RankFixed       bool
+	Near            []string
 	Position        kicadfiles.Point
 	Fixed           bool
 	Rotation        kicadfiles.Angle
@@ -161,19 +166,23 @@ type Diagnostic struct {
 }
 
 type Report struct {
-	Profile                  Profile        `json:"profile"`
-	Passed                   bool           `json:"passed"`
-	ComponentCount           int            `json:"component_count"`
-	GroupCount               int            `json:"group_count"`
-	RoutedNetCount           int            `json:"routed_net_count"`
-	LabelFallbackCount       int            `json:"label_fallback_count"`
-	OverlapCounts            map[string]int `json:"overlap_counts,omitempty"`
-	DiagonalWireCount        int            `json:"diagonal_wire_count"`
-	StageOrderViolationCount int            `json:"stage_order_violation_count"`
-	PowerPlacementViolations int            `json:"power_placement_violation_count"`
-	DiagnosticCount          int            `json:"diagnostic_count"`
-	ErrorCount               int            `json:"error_count"`
-	WarningCount             int            `json:"warning_count"`
+	Profile                  Profile          `json:"profile"`
+	Passed                   bool             `json:"passed"`
+	ComponentCount           int              `json:"component_count"`
+	GroupCount               int              `json:"group_count"`
+	RoutedNetCount           int              `json:"routed_net_count"`
+	LabelFallbackCount       int              `json:"label_fallback_count"`
+	OverlapCounts            map[string]int   `json:"overlap_counts,omitempty"`
+	DiagonalWireCount        int              `json:"diagonal_wire_count"`
+	StageOrderViolationCount int              `json:"stage_order_violation_count"`
+	PowerPlacementViolations int              `json:"power_placement_violation_count"`
+	IslandCount              int              `json:"island_count"`
+	RankCount                int              `json:"rank_count"`
+	OccupiedBounds           Rect             `json:"occupied_bounds"`
+	CenterOffset             kicadfiles.Point `json:"center_offset"`
+	DiagnosticCount          int              `json:"diagnostic_count"`
+	ErrorCount               int              `json:"error_count"`
+	WarningCount             int              `json:"warning_count"`
 }
 
 type TextBox struct {
@@ -224,6 +233,8 @@ func NormalizeRequest(request Request) Request {
 	request.Groups = append([]Group(nil), request.Groups...)
 	for index := range request.Components {
 		request.Components[index].Pins = append([]Pin(nil), request.Components[index].Pins...)
+		request.Components[index].Near = append([]string(nil), request.Components[index].Near...)
+		sort.Strings(request.Components[index].Near)
 		sort.SliceStable(request.Components[index].Pins, func(i, j int) bool {
 			return comparePins(request.Components[index].Pins[i], request.Components[index].Pins[j]) < 0
 		})
@@ -323,6 +334,10 @@ func BuildReport(result Result, profile Profile) Report {
 		LabelFallbackCount: len(result.Labels),
 		OverlapCounts:      map[string]int{},
 		DiagnosticCount:    len(result.Diagnostics),
+		IslandCount:        result.Report.IslandCount,
+		RankCount:          result.Report.RankCount,
+		OccupiedBounds:     result.Report.OccupiedBounds,
+		CenterOffset:       result.Report.CenterOffset,
 	}
 	for _, wire := range result.Wires {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {

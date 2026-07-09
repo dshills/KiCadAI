@@ -1,23 +1,17 @@
 package schematiclayout
 
-import "kicadai/internal/kicadfiles"
+import (
+	"sort"
+
+	"kicadai/internal/kicadfiles"
+)
 
 func Place(request Request) Result {
 	request = Classify(request)
 	rules := normalizeRules(request.Rules)
-	baseX := kicadfiles.MM(30)
-	stageSpacing := rules.MinStageSpacing
-	if stageSpacing < kicadfiles.MM(25.4) {
-		stageSpacing = kicadfiles.MM(25.4)
-	}
-	laneY := map[Lane]kicadfiles.IU{
-		LanePositiveRail: kicadfiles.MM(30),
-		LaneSignal:       kicadfiles.MM(65),
-		LaneReference:    kicadfiles.MM(90),
-		LaneGround:       kicadfiles.MM(115),
-		LaneNegativeRail: kicadfiles.MM(140),
-	}
-	cellCounts := map[Stage]map[Lane]int{}
+	cells, islandCount, rankCount := planPlacement(request)
+	rankX := placementRankX(request.Components, cells, rules)
+	positions := placementPositions(request.Components, cells, rankX, rules)
 	result := Result{Components: make([]PlacedComponent, 0, len(request.Components))}
 	for _, component := range request.Components {
 		placed := PlacedComponent{Component: component}
@@ -25,39 +19,187 @@ func Place(request Request) Result {
 			placed.PlacedAt = SnapPoint(component.Position, rules.Grid)
 			result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityInfo, Code: "fixed_component", Ref: component.Ref, Message: "fixed schematic coordinate preserved"})
 		} else {
-			stage := component.Stage
-			if stage == StageUnknown {
-				stage = StageProcessing
-			}
-			lane := component.Lane
-			if lane == LaneUnknown {
-				lane = LaneSignal
-			}
-			yBase, ok := laneY[lane]
-			if !ok {
-				yBase = laneY[LaneSignal]
-				result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "unknown_lane", Ref: component.Ref, Message: "unknown schematic lane defaulted to signal lane"})
-			}
-			if cellCounts[stage] == nil {
-				cellCounts[stage] = map[Lane]int{}
-			}
-			cellIndex := cellCounts[stage][lane]
-			stageIndex := int(stage)
-			if stageIndex < 1 {
-				stageIndex = int(StageProcessing)
-			}
-			x := baseX + kicadfiles.IU(stageIndex-1)*stageSpacing
-			y := yBase + kicadfiles.IU(cellIndex)*rules.MinGroupGutter
-			placed.PlacedAt = SnapPoint(kicadfiles.Point{X: x, Y: y}, rules.Grid)
-			cellCounts[stage][lane]++
+			placed.PlacedAt = positions[component.Ref]
 		}
 		placed.ReferenceText = defaultReferenceText(placed)
 		placed.ValueText = defaultValueText(placed)
 		result.Components = append(result.Components, placed)
 	}
+	if !hasFixedComponent(request.Components) {
+		bounds := placementBounds(result.Components)
+		offset := centerOffset(bounds, UsableSheet(request.Sheet), rules.Grid)
+		for index := range result.Components {
+			result.Components[index].PlacedAt.X += offset.X
+			result.Components[index].PlacedAt.Y += offset.Y
+			result.Components[index].ReferenceText = defaultReferenceText(result.Components[index])
+			result.Components[index].ValueText = defaultValueText(result.Components[index])
+		}
+		result.Report.CenterOffset = offset
+	}
+	result.Report.IslandCount = islandCount
+	result.Report.RankCount = rankCount
+	result.Report.OccupiedBounds = placementBounds(result.Components)
 	result = Validate(result, request)
 	result.Diagnostics = append(result.Diagnostics, placementDiagnostics(result.Components, request.Sheet)...)
 	return NormalizeResult(result, rules)
+}
+
+func placementRankX(components []Component, cells map[string]placementCell, rules Rules) map[int]kicadfiles.IU {
+	maxHalfWidth := map[int]kicadfiles.IU{}
+	var ranks []int
+	seen := map[int]struct{}{}
+	for _, component := range components {
+		cell := cells[component.Ref]
+		body := DefaultBodyFor(PlacedComponent{Component: component})
+		halfWidth := body.Width() / 2
+		if halfWidth > maxHalfWidth[cell.rank] {
+			maxHalfWidth[cell.rank] = halfWidth
+		}
+		if _, ok := seen[cell.rank]; !ok {
+			seen[cell.rank] = struct{}{}
+			ranks = append(ranks, cell.rank)
+		}
+	}
+	sort.Ints(ranks)
+	positions := map[int]kicadfiles.IU{}
+	var previous int
+	for index, rank := range ranks {
+		if index == 0 {
+			positions[rank] = maxHalfWidth[rank]
+		} else {
+			gap := rules.MinStageSpacing
+			if gap < rules.MinComponentSpacing {
+				gap = rules.MinComponentSpacing
+			}
+			positions[rank] = positions[previous] + maxHalfWidth[previous] + gap + maxHalfWidth[rank]
+		}
+		previous = rank
+	}
+	return positions
+}
+
+func placementPositions(components []Component, cells map[string]placementCell, rankX map[int]kicadfiles.IU, rules Rules) map[string]kicadfiles.Point {
+	byLane := map[Lane][]Component{}
+	for _, component := range components {
+		lane := component.Lane
+		if lane == LaneUnknown {
+			lane = LaneSignal
+		}
+		byLane[lane] = append(byLane[lane], component)
+	}
+	laneOrder := []Lane{LanePositiveRail, LaneSignal, LaneReference, LaneGround, LaneNegativeRail}
+	positions := map[string]kicadfiles.Point{}
+	y := kicadfiles.IU(0)
+	for _, lane := range laneOrder {
+		items := byLane[lane]
+		sort.SliceStable(items, func(i, j int) bool {
+			left, right := cells[items[i].Ref], cells[items[j].Ref]
+			if left.island != right.island {
+				return left.island < right.island
+			}
+			if left.order != right.order {
+				return left.order < right.order
+			}
+			if left.rank != right.rank {
+				return left.rank < right.rank
+			}
+			return items[i].Ref < items[j].Ref
+		})
+		rowByRank := map[int]int{}
+		rowHeight := map[int]kicadfiles.IU{}
+		for _, component := range items {
+			rank := cells[component.Ref].rank
+			row := rowByRank[rank]
+			rowByRank[rank]++
+			body := DefaultBodyFor(PlacedComponent{Component: component})
+			height := body.Height() + rules.MinTextSpacing*2
+			if height > rowHeight[row] {
+				rowHeight[row] = height
+			}
+		}
+		rowY := map[int]kicadfiles.IU{}
+		rows := 0
+		for _, count := range rowByRank {
+			if count > rows {
+				rows = count
+			}
+		}
+		for row := 0; row < rows; row++ {
+			height := rowHeight[row]
+			if height == 0 {
+				height = kicadfiles.MM(7.62)
+			}
+			rowY[row] = y + height/2
+			y += height + rules.MinComponentSpacing
+		}
+		usedRows := map[int]int{}
+		for _, component := range items {
+			rank := cells[component.Ref].rank
+			row := usedRows[rank]
+			usedRows[rank]++
+			positions[component.Ref] = SnapPoint(kicadfiles.Point{X: rankX[rank], Y: rowY[row]}, rules.Grid)
+		}
+		if len(items) != 0 {
+			y += rules.MinGroupGutter
+		}
+	}
+	return positions
+}
+
+func placementBounds(components []PlacedComponent) Rect {
+	var bounds Rect
+	for _, component := range components {
+		bounds = unionRect(bounds, componentBody(component))
+	}
+	return bounds
+}
+
+func unionRect(first, second Rect) Rect {
+	if first.Empty() {
+		return second
+	}
+	if second.Empty() {
+		return first
+	}
+	return Rect{
+		MinX: minIU(first.MinX, second.MinX),
+		MinY: minIU(first.MinY, second.MinY),
+		MaxX: maxIU(first.MaxX, second.MaxX),
+		MaxY: maxIU(first.MaxY, second.MaxY),
+	}
+}
+
+func centerOffset(bounds, usable Rect, grid kicadfiles.IU) kicadfiles.Point {
+	if bounds.Empty() || usable.Empty() {
+		return kicadfiles.Point{}
+	}
+	return SnapPoint(kicadfiles.Point{
+		X: (usable.MinX+usable.MaxX)/2 - (bounds.MinX+bounds.MaxX)/2,
+		Y: (usable.MinY+usable.MaxY)/2 - (bounds.MinY+bounds.MaxY)/2,
+	}, grid)
+}
+
+func hasFixedComponent(components []Component) bool {
+	for _, component := range components {
+		if component.Fixed {
+			return true
+		}
+	}
+	return false
+}
+
+func minIU(first, second kicadfiles.IU) kicadfiles.IU {
+	if first < second {
+		return first
+	}
+	return second
+}
+
+func maxIU(first, second kicadfiles.IU) kicadfiles.IU {
+	if first > second {
+		return first
+	}
+	return second
 }
 
 func defaultReferenceText(component PlacedComponent) TextBox {
