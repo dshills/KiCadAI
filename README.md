@@ -12,6 +12,22 @@ The near-term goal is to let agents build and review KiCad-native projects from 
 
 The direct-file workflow is the main functional path today. KiCadAI can generate KiCad project directories, write root schematics and PCBs, inspect and evaluate projects, run writer and board validation, select catalog-backed components with rating evidence, write selected component identity properties into generated schematic symbols, perform block-aware placement/routing, run optional KiCad ERC/DRC checks, and produce deterministic intent plans and rationale reports.
 
+KiCadAI now includes a first-version schematic design/layout IR for AI agents.
+The IR is a strict JSON contract for circuit intent, schematic layout intent,
+and validation/repair policy. It can be strict-decoded, validated, normalized
+into readable layout groups/placements, and translated into existing schematic
+transaction operations with:
+
+```sh
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
+```
+
+This is not a natural-language parser and not KiCad S-expression syntax. It is
+the AI-facing structured handoff layer that future intent planners can emit
+before KiCadAI writes or validates KiCad-native files.
+
 Live KiCad IPC support is useful for connection probes, version checks, document discovery, and capability reporting. Live schematic/PCB mutation through IPC remains limited by the write commands exposed by the current KiCad API surface, so design generation is done by writing KiCad files directly.
 
 Imported project review is now read-only by default and includes structured

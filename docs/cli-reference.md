@@ -72,6 +72,9 @@ kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_p
 kicadai --request ./examples/intent/sensor_breakout.json intent explain
 kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
 kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
 kicadai --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 kicadai --execute --overwrite --target ./out/project --request ./examples/repair/missing_footprint_stage_issues.json repair export-bundle
 # For integrations that already produce a generated repair bundle:
@@ -82,6 +85,33 @@ kicadai --request ./examples/design/led_indicator.json --output ./out/led_indica
 kicadai --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
 kicadai --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
+
+### Schematic IR Commands
+
+`schematic-ir` is the first AI-facing schematic design/layout IR entry point.
+It accepts strict JSON via `--request` and returns structured JSON by default.
+The IR separates component/net intent from layout intent and repair policy, then
+lets KiCadAI validate and normalize the result before translation to schematic
+transactions.
+
+```sh
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
+kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
+```
+
+Subcommands:
+
+- `validate`: strict-decode and validate the IR, returning summary and issues.
+- `normalize`: return normalized layout groups and placements for readable
+  schematic generation.
+- `transaction`: return the existing KiCadAI transaction stream generated from
+  normalized IR.
+
+Checked-in examples currently cover an LED indicator, USB-C powered LED
+indicator, and I2C sensor with 3.3 V regulator breakout. The v1 IR is intentionally
+bounded: it is not a free-form language parser and does not yet guarantee
+arbitrary schematic perfection.
 
 ### Evaluation Commands
 

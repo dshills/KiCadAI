@@ -95,6 +95,12 @@ from validation feedback to safe automatic repair.
   gates, amplifier examples have strict signal-flow/rail/feedback/orthogonal
   wiring gates, and generated LED/op-amp workflow paths have summary regression
   coverage.
+- Schematic design/layout IR v1 foundation with strict JSON parsing,
+  validation, deterministic layout-intent normalization, IR-to-transaction
+  conversion, checked-in LED/USB-C LED/USB-C I2C 3.3 V examples, golden tests,
+  and a `schematic-ir validate|normalize|transaction` CLI lane. This is the
+  AI-facing contract for structured schematic generation before future
+  natural-language planners emit KiCadAI operations.
 - Closed-loop validation repair foundation with planning, executors, persisted
   generated-project apply, target-based CLI support, workflow integration, and
   repair goldens.
