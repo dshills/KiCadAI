@@ -36,8 +36,8 @@ func TestRouteUsesLabelsForLongNet(t *testing.T) {
 		{Component: Component{Ref: "J1", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
 		{Component: Component{Ref: "J2", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(80), Y: kicadfiles.MM(20)}},
 	}})
-	if len(result.Labels) != 2 || len(result.Wires) != 0 {
-		t.Fatalf("labels=%#v wires=%#v, want label fallback", result.Labels, result.Wires)
+	if len(result.Labels) != 2 || len(result.Wires) != 2 {
+		t.Fatalf("labels=%#v wires=%#v, want two bounded label stubs", result.Labels, result.Wires)
 	}
 }
 

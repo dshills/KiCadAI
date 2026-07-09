@@ -69,6 +69,8 @@ type adapterState struct {
 	pointsByID   map[string]transactions.Point
 	rotationByID map[string]float64
 	routesByKey  map[string]schematiclayout.RoutedConnection
+	labelsByKey  map[string]kicadfiles.Point
+	textByID     map[string]layoutTextPlacement
 	issues       []reports.Issue
 }
 
@@ -103,6 +105,8 @@ func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 		pointsByID:   layoutResultPoints(layoutResult),
 		rotationByID: layoutRotations(document),
 		routesByKey:  layoutRouteHints(layoutResult),
+		labelsByKey:  layoutEndpointLabelHints(layoutResult),
+		textByID:     layoutTextPlacements(layoutResult),
 	}
 	refCounters := map[string]int{}
 	usedRefs := map[string]struct{}{}
@@ -170,7 +174,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			At:         state.pointsByID[component.ID],
 			Rotation:   state.rotationByID[component.ID],
 			Pins:       transactionPins(component),
-			Properties: transactionSymbolProperties(component),
+			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID]),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
 		if component.Footprint != "" {
@@ -186,6 +190,34 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			state.appendOperation(tx, transactions.OpAssignFootprint, assign, ref, "")
 		}
 	}
+}
+
+type layoutTextPlacement struct {
+	reference *transactions.Point
+	value     *transactions.Point
+}
+
+func layoutTextPlacements(result schematiclayout.Result) map[string]layoutTextPlacement {
+	placements := make(map[string]layoutTextPlacement, len(result.Components))
+	for _, component := range result.Components {
+		placement := layoutTextPlacement{}
+		if !component.ReferenceText.Box.Empty() {
+			point := transactions.Point{
+				XMM: float64(component.PlacedAt.X+component.ReferenceText.At.X) / 1_000_000,
+				YMM: float64(component.PlacedAt.Y+component.ReferenceText.At.Y) / 1_000_000,
+			}
+			placement.reference = &point
+		}
+		if !component.ValueText.Box.Empty() {
+			point := transactions.Point{
+				XMM: float64(component.PlacedAt.X+component.ValueText.At.X) / 1_000_000,
+				YMM: float64(component.PlacedAt.Y+component.ValueText.At.Y) / 1_000_000,
+			}
+			placement.value = &point
+		}
+		placements[component.Ref] = placement
+	}
+	return placements
 }
 
 func (state *adapterState) appendNets(tx *transactions.Transaction) {
@@ -209,12 +241,19 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			to := mappedEndpoints[endpointIndex]
 			useLabels := schematicNetLabelPreference(state.document, net)
 			var waypoints []transactions.Point
+			var fromLabelAt, toLabelAt *transactions.Point
 			fromIR := net.Connect[endpointIndex-1]
 			toIR := net.Connect[endpointIndex]
 			if hint, exists := state.routesByKey[schematicRouteKey(net.Name, fromIR, toIR)]; exists {
 				if hint.UseLabels {
 					value := true
 					useLabels = &value
+					fromLayout, toLayout := hint.FromLabelAt, hint.ToLabelAt
+					if !schematicRouteMatches(hint, fromIR, toIR) {
+						fromLayout, toLayout = toLayout, fromLayout
+					}
+					fromLabelAt = transactionPoint(fromLayout)
+					toLabelAt = transactionPoint(toLayout)
 				} else if len(hint.Points) != 0 {
 					value := false
 					useLabels = &value
@@ -225,13 +264,25 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					waypoints = transactionPoints(points)
 				}
 			}
+			if useLabels != nil && *useLabels {
+				if fromLabelAt == nil {
+					fromLabel, fromOK := state.labelsByKey[schematicEndpointLabelKey(net.Name, fromIR)]
+					fromLabelAt = transactionPointValue(fromLabel, fromOK)
+				}
+				if toLabelAt == nil {
+					toLabel, toOK := state.labelsByKey[schematicEndpointLabelKey(net.Name, toIR)]
+					toLabelAt = transactionPointValue(toLabel, toOK)
+				}
+			}
 			payload := transactions.ConnectOperation{
-				Op:        transactions.OpConnect,
-				From:      from,
-				To:        to,
-				NetName:   net.Name,
-				UseLabels: useLabels,
-				Waypoints: waypoints,
+				Op:          transactions.OpConnect,
+				From:        from,
+				To:          to,
+				NetName:     net.Name,
+				UseLabels:   useLabels,
+				Waypoints:   waypoints,
+				FromLabelAt: fromLabelAt,
+				ToLabelAt:   toLabelAt,
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
@@ -435,6 +486,28 @@ func layoutRouteHints(result schematiclayout.Result) map[string]schematiclayout.
 	return hints
 }
 
+func layoutEndpointLabelHints(result schematiclayout.Result) map[string]kicadfiles.Point {
+	hints := map[string]kicadfiles.Point{}
+	for _, connection := range result.Connections {
+		if !connection.UseLabels {
+			continue
+		}
+		if connection.FromLabelAt != nil {
+			endpoint := EndpointRef(connection.From.Ref + "." + connection.From.Pin)
+			hints[schematicEndpointLabelKey(connection.NetName, endpoint)] = *connection.FromLabelAt
+		}
+		if connection.ToLabelAt != nil {
+			endpoint := EndpointRef(connection.To.Ref + "." + connection.To.Pin)
+			hints[schematicEndpointLabelKey(connection.NetName, endpoint)] = *connection.ToLabelAt
+		}
+	}
+	return hints
+}
+
+func schematicEndpointLabelKey(netName string, endpoint EndpointRef) string {
+	return netName + "\x00" + string(endpoint)
+}
+
 func schematicRouteKey(netName string, first, second EndpointRef) string {
 	left, right := string(first), string(second)
 	if right < left {
@@ -461,6 +534,21 @@ func transactionPoints(points []kicadfiles.Point) []transactions.Point {
 		out = append(out, transactions.Point{XMM: float64(point.X) / 1_000_000, YMM: float64(point.Y) / 1_000_000})
 	}
 	return out
+}
+
+func transactionPoint(point *kicadfiles.Point) *transactions.Point {
+	if point == nil {
+		return nil
+	}
+	converted := transactions.Point{XMM: float64(point.X) / 1_000_000, YMM: float64(point.Y) / 1_000_000}
+	return &converted
+}
+
+func transactionPointValue(point kicadfiles.Point, exists bool) *transactions.Point {
+	if !exists {
+		return nil
+	}
+	return transactionPoint(&point)
 }
 
 func schematicLayout(document Document) schematiclayout.Result {
@@ -767,5 +855,38 @@ func transactionSymbolProperties(component Component) []transactions.SymbolPrope
 	if len(properties) == 0 {
 		return nil
 	}
+	return properties
+}
+
+func transactionSymbolPropertiesWithLayout(component Component, reference string, layout layoutTextPlacement) []transactions.SymbolProperty {
+	properties := transactionSymbolProperties(component)
+	rotation := 0.0
+	doNotAutoplace := true
+	visible := []transactions.SymbolProperty{
+		{Name: "Reference", Value: reference, At: layout.reference, Rotation: &rotation, DoNotAutoplace: &doNotAutoplace},
+	}
+	value := component.Value
+	hiddenValue := false
+	if value == "" {
+		value = reference
+		hiddenValue = true
+	}
+	visible = append(visible, transactions.SymbolProperty{Name: "Value", Value: value, Hidden: hiddenValue, At: layout.value, Rotation: &rotation, DoNotAutoplace: &doNotAutoplace})
+	for _, property := range visible {
+		replaced := false
+		for index := range properties {
+			if strings.EqualFold(strings.TrimSpace(properties[index].Name), property.Name) {
+				properties[index] = property
+				replaced = true
+				break
+			}
+		}
+		if !replaced {
+			properties = append(properties, property)
+		}
+	}
+	sort.SliceStable(properties, func(i, j int) bool {
+		return strings.ToLower(properties[i].Name) < strings.ToLower(properties[j].Name)
+	})
 	return properties
 }

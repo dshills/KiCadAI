@@ -14,7 +14,7 @@ func Route(request Request, result Result) Result {
 	request = Classify(request)
 	rules := normalizeRules(request.Rules)
 	anchors := pinAnchors(result.Components)
-	labeled := map[string]struct{}{}
+	labeled := map[string]kicadfiles.Point{}
 	for _, net := range request.Nets {
 		if len(net.Endpoints) < 2 {
 			continue
@@ -33,15 +33,15 @@ func Route(request Request, result Result) Result {
 				continue
 			}
 			if forceLabels {
-				appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start)
-				appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end)
-				result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, UseLabels: true})
+				fromLabel := appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
+				toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
+				result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, UseLabels: true, FromLabelAt: &fromLabel, ToLabelAt: &toLabel})
 			} else {
 				points, clean := routeConnectionPoints(net.Name, fromEndpoint, toEndpoint, start, end, result, request, rules)
 				if !clean && rules.LabelFallbackEnabled {
-					appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start)
-					appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end)
-					result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, UseLabels: true})
+					fromLabel := appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
+					toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
+					result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, UseLabels: true, FromLabelAt: &fromLabel, ToLabelAt: &toLabel})
 					result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityInfo, Code: "route_label_fallback", NetName: net.Name, Message: "local route obstacles required label fallback"})
 				} else {
 					result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, Points: points})
@@ -56,13 +56,88 @@ func Route(request Request, result Result) Result {
 	return NormalizeResult(result, rules)
 }
 
-func appendEndpointLabel(result *Result, seen map[string]struct{}, netName string, endpoint Endpoint, position kicadfiles.Point) {
+func appendEndpointLabel(result *Result, seen map[string]kicadfiles.Point, netName string, endpoint Endpoint, anchor kicadfiles.Point, request Request, rules Rules) kicadfiles.Point {
 	key := netName + "\x00" + endpoint.Ref + "\x00" + endpoint.Pin
-	if _, ok := seen[key]; ok {
-		return
+	if position, ok := seen[key]; ok {
+		return position
 	}
-	seen[key] = struct{}{}
+	position, clean := labelStubPoint(netName, endpoint, anchor, *result, request, rules)
+	seen[key] = position
 	result.Labels = append(result.Labels, Label{NetName: netName, Text: netName, Position: position})
+	if anchor != position {
+		result.Wires = append(result.Wires, WireSegment{NetName: netName, From: anchor, To: position})
+	}
+	if !clean {
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityWarning, Code: "label_placement_fallback", Ref: endpoint.Ref, NetName: netName, Message: "label stub required crowded fallback placement"})
+	}
+	return position
+}
+
+func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, result Result, request Request, rules Rules) (kicadfiles.Point, bool) {
+	grid := rules.MinorGrid
+	if grid <= 0 {
+		grid = kicadfiles.MM(1.27)
+	}
+	preferred := kicadfiles.Point{X: grid}
+	for _, component := range result.Components {
+		if component.Ref != endpoint.Ref {
+			continue
+		}
+		offset := kicadfiles.Point{X: anchor.X - component.PlacedAt.X, Y: anchor.Y - component.PlacedAt.Y}
+		switch {
+		case absIU(offset.X) >= absIU(offset.Y) && offset.X < 0:
+			preferred = kicadfiles.Point{X: -grid}
+		case absIU(offset.X) >= absIU(offset.Y):
+			preferred = kicadfiles.Point{X: grid}
+		case offset.Y < 0:
+			preferred = kicadfiles.Point{Y: -grid}
+		default:
+			preferred = kicadfiles.Point{Y: grid}
+		}
+		break
+	}
+	directions := []kicadfiles.Point{preferred, {X: grid}, {X: -grid}, {Y: -grid}, {Y: grid}}
+	usable := UsableSheet(request.Sheet)
+	for _, scale := range []kicadfiles.IU{2, 4, 6, 8, 12} {
+		for _, direction := range directions {
+			position := kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale}
+			segment := WireSegment{NetName: netName, From: anchor, To: position}
+			labelBox := TextEstimate(netName, position, 0, 0)
+			if !usable.ContainsRect(labelBox) || labelPlacementCollides(labelBox, segment, endpoint, result) {
+				continue
+			}
+			return position, true
+		}
+	}
+	return kicadfiles.Point{X: anchor.X + preferred.X*2, Y: anchor.Y + preferred.Y*2}, false
+}
+
+func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, result Result) bool {
+	for _, component := range result.Components {
+		body := componentBody(component)
+		if labelBox.Intersects(body) {
+			return true
+		}
+		if component.Ref != endpoint.Ref && SegmentIntersectsRect(stub, body) {
+			return true
+		}
+		for _, text := range []TextBox{component.ReferenceText, component.ValueText} {
+			if !text.Box.Empty() && labelBox.Intersects(text.Box.Translate(component.PlacedAt)) {
+				return true
+			}
+		}
+	}
+	for _, label := range result.Labels {
+		if labelBox.Intersects(TextEstimate(label.Text, label.Position, 0, 0)) {
+			return true
+		}
+	}
+	for _, wire := range result.Wires {
+		if wire.NetName != stub.NetName && wireSegmentsCross(stub, wire) {
+			return true
+		}
+	}
+	return false
 }
 
 func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules) ([]kicadfiles.Point, bool) {

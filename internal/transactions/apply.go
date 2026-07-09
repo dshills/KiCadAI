@@ -611,7 +611,12 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		for _, waypoint := range payload.Waypoints {
 			waypoints = append(waypoints, point(waypoint.XMM, waypoint.YMM))
 		}
-		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{UseLabels: payload.UseLabels, Waypoints: waypoints})
+		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{
+			UseLabels:   payload.UseLabels,
+			Waypoints:   waypoints,
+			FromLabelAt: optionalPoint(payload.FromLabelAt),
+			ToLabelAt:   optionalPoint(payload.ToLabelAt),
+		})
 	case OpAddLabel:
 		var payload AddLabelOperation
 		if err := decodeRaw(op, &payload); err != nil {
@@ -1406,6 +1411,14 @@ func validateSymbolPropertyPayload(properties []SymbolProperty) error {
 
 func point(xMM, yMM float64) kicadfiles.Point {
 	return kicadfiles.Point{X: kicadfiles.MM(xMM), Y: kicadfiles.MM(yMM)}
+}
+
+func optionalPoint(value *Point) *kicadfiles.Point {
+	if value == nil {
+		return nil
+	}
+	point := point(value.XMM, value.YMM)
+	return &point
 }
 
 func addPoints(a kicadfiles.Point, b kicadfiles.Point) kicadfiles.Point {

@@ -70,6 +70,7 @@ func Validate(result Result, request Request) Result {
 		}
 	}
 	symbolBodies := symbolValidationBodies(objects)
+	textObjects := nonSymbolValidationObjects(objects)
 	for _, wire := range result.Wires {
 		for _, object := range symbolBodies {
 			if SegmentIntersectsRect(wire, object.Box) {
@@ -82,8 +83,30 @@ func Validate(result Result, request Request) Result {
 				})
 			}
 		}
+		for _, object := range textObjects {
+			if object.Kind == "label" || !SegmentIntersectsRect(wire, object.Box) {
+				continue
+			}
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{
+				Severity: SeverityWarning,
+				Code:     "text_wire_overlap",
+				Ref:      object.Ref,
+				NetName:  wire.NetName,
+				Message:  fmt.Sprintf("wire crosses %s %q", object.Kind, object.Ref),
+			})
+		}
 	}
 	return NormalizeResult(result, rules)
+}
+
+func nonSymbolValidationObjects(objects []ValidationObject) []ValidationObject {
+	var out []ValidationObject
+	for _, object := range objects {
+		if object.Kind != "symbol" {
+			out = append(out, object)
+		}
+	}
+	return out
 }
 
 func symbolValidationBodies(objects []ValidationObject) []ValidationObject {

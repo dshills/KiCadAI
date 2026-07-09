@@ -89,6 +89,9 @@ func testSchematicIRWritesReadableProject(t *testing.T, fileName string, project
 	if readability.DiagonalWireCount != 0 || readability.ErrorCount != 0 {
 		t.Fatalf("unexpected readability counts: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
 	}
+	if readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+		t.Fatalf("generated schematic has readability warnings: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
+	}
 }
 
 func loadExampleDocument(t *testing.T, name string) Document {

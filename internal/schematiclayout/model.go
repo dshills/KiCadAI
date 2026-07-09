@@ -148,11 +148,13 @@ type WireSegment struct {
 }
 
 type RoutedConnection struct {
-	NetName   string
-	From      Endpoint
-	To        Endpoint
-	Points    []kicadfiles.Point
-	UseLabels bool
+	NetName     string
+	From        Endpoint
+	To          Endpoint
+	Points      []kicadfiles.Point
+	UseLabels   bool
+	FromLabelAt *kicadfiles.Point
+	ToLabelAt   *kicadfiles.Point
 }
 
 type Label struct {
@@ -196,6 +198,7 @@ type Report struct {
 
 type TextBox struct {
 	Text string
+	At   kicadfiles.Point
 	Box  Rect
 }
 
@@ -282,6 +285,14 @@ func NormalizeResult(result Result, rules Rules) Result {
 	}
 	for index := range result.Connections {
 		result.Connections[index].Points = append([]kicadfiles.Point(nil), result.Connections[index].Points...)
+		if result.Connections[index].FromLabelAt != nil {
+			point := *result.Connections[index].FromLabelAt
+			result.Connections[index].FromLabelAt = &point
+		}
+		if result.Connections[index].ToLabelAt != nil {
+			point := *result.Connections[index].ToLabelAt
+			result.Connections[index].ToLabelAt = &point
+		}
 	}
 	for index := range result.Wires {
 		if comparePoints(result.Wires[index].From, result.Wires[index].To) > 0 {

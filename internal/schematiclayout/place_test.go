@@ -137,11 +137,23 @@ func TestPlaceKeepsComponentBodiesSeparated(t *testing.T) {
 	}
 }
 
-func absIU(value kicadfiles.IU) kicadfiles.IU {
-	if value < 0 {
-		return -value
+func TestPlaceKeepsGeneratedFieldsClear(t *testing.T) {
+	result := Place(Request{
+		Sheet: testSheet(),
+		Components: []Component{
+			{Ref: "U1", Value: "controller", Role: "mcu", FlowRank: 1, RankFixed: true},
+			{Ref: "R1", Value: "10k", Role: "resistor", FlowRank: 1, RankFixed: true},
+			{Ref: "C1", Value: "100n", Role: "decoupling", FlowRank: 1, RankFixed: true},
+		},
+	})
+	if result.Report.OverlapCounts != nil || result.Report.WarningCount != 0 || result.Report.ErrorCount != 0 {
+		t.Fatalf("field placement report = %#v diagnostics=%#v", result.Report, result.Diagnostics)
 	}
-	return value
+	for _, component := range result.Components {
+		if component.ReferenceText.At == (kicadfiles.Point{}) || component.ValueText.At == (kicadfiles.Point{}) {
+			t.Fatalf("component %s missing explicit field anchors: %#v %#v", component.Ref, component.ReferenceText, component.ValueText)
+		}
+	}
 }
 
 func TestPlacePowerAndGroundVerticalLanes(t *testing.T) {

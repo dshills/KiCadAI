@@ -21,24 +21,23 @@ func Place(request Request) Result {
 		} else {
 			placed.PlacedAt = positions[component.Ref]
 		}
-		placed.ReferenceText = defaultReferenceText(placed)
-		placed.ValueText = defaultValueText(placed)
 		result.Components = append(result.Components, placed)
 	}
+	var textDiagnostics []Diagnostic
+	result.Components, textDiagnostics = placeComponentText(result.Components, rules)
+	result.Diagnostics = append(result.Diagnostics, textDiagnostics...)
 	if !hasFixedComponent(request.Components) {
-		bounds := placementBounds(result.Components)
+		bounds := placementDrawingBounds(result.Components)
 		offset := centerOffset(bounds, UsableSheet(request.Sheet), rules.Grid)
 		for index := range result.Components {
 			result.Components[index].PlacedAt.X += offset.X
 			result.Components[index].PlacedAt.Y += offset.Y
-			result.Components[index].ReferenceText = defaultReferenceText(result.Components[index])
-			result.Components[index].ValueText = defaultValueText(result.Components[index])
 		}
 		result.Report.CenterOffset = offset
 	}
 	result.Report.IslandCount = islandCount
 	result.Report.RankCount = rankCount
-	result.Report.OccupiedBounds = placementBounds(result.Components)
+	result.Report.OccupiedBounds = placementDrawingBounds(result.Components)
 	result = Validate(result, request)
 	result.Diagnostics = append(result.Diagnostics, placementDiagnostics(result.Components, request.Sheet)...)
 	return NormalizeResult(result, rules)
@@ -150,6 +149,19 @@ func placementBounds(components []PlacedComponent) Rect {
 	var bounds Rect
 	for _, component := range components {
 		bounds = unionRect(bounds, componentBody(component))
+	}
+	return bounds
+}
+
+func placementDrawingBounds(components []PlacedComponent) Rect {
+	bounds := placementBounds(components)
+	for _, component := range components {
+		if !component.ReferenceText.Box.Empty() {
+			bounds = unionRect(bounds, component.ReferenceText.Box.Translate(component.PlacedAt))
+		}
+		if !component.ValueText.Box.Empty() {
+			bounds = unionRect(bounds, component.ValueText.Box.Translate(component.PlacedAt))
+		}
 	}
 	return bounds
 }

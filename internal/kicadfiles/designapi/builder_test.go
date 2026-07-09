@@ -208,6 +208,26 @@ func TestBuilderConnectRejectsDiagonalWaypoints(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	fromLabel := kicadfiles.Point{X: start.X + kicadfiles.MM(5.08), Y: start.Y}
+	toLabel := kicadfiles.Point{X: end.X - kicadfiles.MM(5.08), Y: end.Y}
+	useLabels := true
+	if err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG", ConnectOptions{UseLabels: &useLabels, FromLabelAt: &fromLabel, ToLabelAt: &toLabel}); err != nil {
+		t.Fatalf("connect with label points: %v", err)
+	}
+	if len(builder.design.Schematic.Wires) != 2 || len(builder.design.Schematic.Labels) != 2 {
+		t.Fatalf("wires=%#v labels=%#v", builder.design.Schematic.Wires, builder.design.Schematic.Labels)
+	}
+	if builder.design.Schematic.Labels[0].Position != fromLabel || builder.design.Schematic.Labels[1].Position != toLabel {
+		t.Fatalf("label positions = %#v", builder.design.Schematic.Labels)
+	}
+}
+
 func TestBuilderLongNetLabelStubsAreConnectionGridSafe(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)})

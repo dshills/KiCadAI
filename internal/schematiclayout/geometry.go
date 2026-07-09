@@ -225,6 +225,13 @@ func orderedIU(first, second kicadfiles.IU) (kicadfiles.IU, kicadfiles.IU) {
 	return second, first
 }
 
+func absIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
 func segmentsIntersect(a, b, c, d kicadfiles.Point) bool {
 	o1 := orientation(a, b, c)
 	o2 := orientation(a, b, d)

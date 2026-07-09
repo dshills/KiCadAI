@@ -94,7 +94,9 @@ type ConnectOptions struct {
 	UseLabels *bool
 	// Waypoints contains the complete absolute orthogonal path, including the
 	// source and destination anchors. It is ignored when labels are forced.
-	Waypoints []kicadfiles.Point
+	Waypoints   []kicadfiles.Point
+	FromLabelAt *kicadfiles.Point
+	ToLabelAt   *kicadfiles.Point
 }
 
 type PlaceFootprintOptions struct {
@@ -361,6 +363,13 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 		if err := validateSchematicWaypoints(options.Waypoints, start, end); err != nil {
 			return err
 		}
+	} else {
+		if err := validateSchematicLabelPoint(options.FromLabelAt, start); err != nil {
+			return err
+		}
+		if err := validateSchematicLabelPoint(options.ToLabelAt, end); err != nil {
+			return err
+		}
 	}
 	fromNet := builder.assignedPinNet(from)
 	toNet := builder.assignedPinNet(to)
@@ -391,8 +400,8 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
 	if options.UseLabels != nil && *options.UseLabels {
-		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
-		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
+		builder.addSchematicLabelConnection(netName, from, start, end, options.FromLabelAt)
+		builder.addSchematicLabelConnection(netName, to, end, start, options.ToLabelAt)
 	} else if len(options.Waypoints) != 0 {
 		builder.addSchematicWirePoints(netName, from, to, options.Waypoints)
 	} else if options.UseLabels != nil {
@@ -412,6 +421,18 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	}
 	builder.syncPCBNets()
 	return nil
+}
+
+func (builder *Builder) addSchematicLabelConnection(netName string, endpoint Endpoint, anchor, other kicadfiles.Point, requested *kicadfiles.Point) {
+	if requested == nil {
+		builder.addSchematicLabelStub(netName, endpoint, anchor, builder.labelStubOffset(endpoint, anchor, other))
+		return
+	}
+	position := *requested
+	if position != anchor {
+		builder.addSchematicWirePoints(netName, endpoint, endpoint, []kicadfiles.Point{anchor, position})
+	}
+	_ = builder.AddLabel(netName, position, schematic.LabelLocal)
 }
 
 func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoint) bool {
@@ -691,6 +712,16 @@ func validateSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles
 		if points[index-1].X != points[index].X && points[index-1].Y != points[index].Y {
 			return fmt.Errorf("schematic waypoints must be orthogonal")
 		}
+	}
+	return nil
+}
+
+func validateSchematicLabelPoint(position *kicadfiles.Point, anchor kicadfiles.Point) error {
+	if position == nil || *position == anchor {
+		return nil
+	}
+	if position.X != anchor.X && position.Y != anchor.Y {
+		return fmt.Errorf("schematic label stub must be orthogonal")
 	}
 	return nil
 }
