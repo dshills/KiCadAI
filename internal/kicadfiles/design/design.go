@@ -2,6 +2,7 @@ package design
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -183,7 +184,9 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 	if design.Schematic == nil || design.PCB == nil {
 		return errs
 	}
-	symbolsByRef := map[string]*schematic.SchematicSymbol{}
+	symbolsByUnit := map[string]*schematic.SchematicSymbol{}
+	symbolRefs := map[string]struct{}{}
+	symbolReferenceByRef := map[string]string{}
 	symbolFieldsByRef := map[string]string{}
 	addSymbols := func(prefix string, file *schematic.SchematicFile) {
 		if file == nil {
@@ -194,12 +197,19 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 			if !symbolRequiresPCBFootprint(symbol) {
 				continue
 			}
-			key := referenceKey(symbol.Reference)
-			if _, exists := symbolsByRef[key]; exists {
+			key := referenceUnitKey(symbol.Reference, symbol.Unit)
+			if _, exists := symbolsByUnit[key]; exists {
 				errs = append(errs, designError(prefix+"["+strconv.Itoa(i)+"].reference", "duplicate schematic reference "+strings.TrimSpace(symbol.Reference)))
 				continue
 			}
-			symbolsByRef[key] = symbol
+			symbolsByUnit[key] = symbol
+			refKey := referenceKey(symbol.Reference)
+			if prior, exists := symbolReferenceByRef[refKey]; exists && prior != strings.TrimSpace(symbol.Reference) {
+				errs = append(errs, designError(prefix+"["+strconv.Itoa(i)+"].reference", "multi-unit reference casing must match "+prior))
+			} else {
+				symbolReferenceByRef[refKey] = strings.TrimSpace(symbol.Reference)
+			}
+			symbolRefs[refKey] = struct{}{}
 			symbolFieldsByRef[key] = prefix + "[" + strconv.Itoa(i) + "].reference"
 		}
 	}
@@ -220,17 +230,28 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 		footprintsByRef[key] = append(footprintsByRef[key], i)
 	}
 	for i, footprint := range design.PCB.Footprints {
-		if _, ok := symbolsByRef[referenceKey(footprint.Reference)]; !ok {
+		if _, ok := symbolRefs[referenceKey(footprint.Reference)]; !ok {
 			errs = append(errs, designError("pcb.footprints["+strconv.Itoa(i)+"].reference", "missing schematic symbol"))
 		}
 	}
-	for key, symbol := range symbolsByRef {
+	missingFootprintRefs := map[string]struct{}{}
+	keys := make([]string, 0, len(symbolsByUnit))
+	for key := range symbolsByUnit {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	for _, key := range keys {
+		symbol := symbolsByUnit[key]
 		if symbol.OnBoard != nil && !*symbol.OnBoard {
 			continue
 		}
-		footprintIndexes, ok := footprintsByRef[key]
+		footprintIndexes, ok := footprintsByRef[referenceKey(symbol.Reference)]
 		if !ok {
-			errs = append(errs, designError(symbolFieldsByRef[key], "missing PCB footprint for schematic reference "+symbol.Reference))
+			refKey := referenceKey(symbol.Reference)
+			if _, reported := missingFootprintRefs[refKey]; !reported {
+				errs = append(errs, designError(symbolFieldsByRef[key], "missing PCB footprint for schematic reference "+symbol.Reference))
+				missingFootprintRefs[refKey] = struct{}{}
+			}
 			continue
 		}
 		for _, footprintIndex := range footprintIndexes {
@@ -319,7 +340,7 @@ func validateDesignSchematicReferences(design Design) kicadfiles.ValidationError
 			if strings.HasPrefix(reference, "#") {
 				continue
 			}
-			key := referenceKey(reference)
+			key := referenceUnitKey(reference, symbol.Unit)
 			location := file.prefix + ".symbols[" + strconv.Itoa(i) + "].reference"
 			if prior, ok := seen[key]; ok {
 				errs = append(errs, designError(location, "duplicate schematic reference "+reference+" also used by "+prior))

@@ -56,6 +56,28 @@ func TestToTransactionLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
+	doc := *NewDocument()
+	doc.Metadata.Name = "dual_unit"
+	doc.Circuit.Components = []Component{
+		{ID: "u1a", Ref: "U1", Unit: "1", Role: ComponentRoleIC, Symbol: "Device:R", Value: "DUAL", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+		{ID: "u1b", Ref: "U1", Unit: "2", Role: ComponentRoleIC, Symbol: "Device:R", Value: "DUAL", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+	}
+	doc.Circuit.Nets = []Net{{Name: "UNIT_LINK", Role: NetRoleSignal, Connect: []EndpointRef{"u1a.2", "u1b.1"}}}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
+	if len(symbols) != 2 || symbols[0].Unit != 1 || symbols[1].Unit != 2 {
+		t.Fatalf("symbols = %#v, want units 1 and 2", symbols)
+	}
+	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
+	if len(connects) != 1 || connects[0].From.Unit != 1 || connects[0].To.Unit != 2 {
+		t.Fatalf("connect = %#v, want unit-aware endpoints", connects)
+	}
+}
+
 func TestToTransactionUsesSharedGraphLayoutAndCentersResult(t *testing.T) {
 	doc := validLEDDocument()
 	tx, issues := ToTransaction(doc)

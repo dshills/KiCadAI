@@ -2,6 +2,7 @@ package design
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/kicadfiles"
@@ -403,6 +404,13 @@ func sameLibraryID(a, b string) bool {
 
 func referenceKey(reference string) string {
 	return strings.ToUpper(strings.TrimSpace(reference))
+}
+
+func referenceUnitKey(reference string, unit int) string {
+	if unit <= 0 {
+		unit = 1
+	}
+	return referenceKey(reference) + "#" + strconv.Itoa(unit)
 }
 
 func referenceMatchesNormalizedPrefix(reference, prefix string) bool {

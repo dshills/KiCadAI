@@ -72,6 +72,35 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	}
 }
 
+func TestApplyPreservesMultiUnitSymbolsAndConnections(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "dual")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"dual"},
+	  {"op":"add_symbol","ref":"U1","unit":1,"library_id":"Device:R","at":{"x_mm":20,"y_mm":30},"pins":[{"number":"1","x_mm":-5},{"number":"2","x_mm":5}]},
+	  {"op":"add_symbol","ref":"U1","unit":2,"library_id":"Device:R","at":{"x_mm":40,"y_mm":30},"pins":[{"number":"1","x_mm":-5},{"number":"2","x_mm":5}]},
+	  {"op":"connect","from":{"ref":"U1","unit":1,"pin":"2"},"to":{"ref":"U1","unit":2,"pin":"1"},"net_name":"UNIT_LINK"},
+	  {"op":"write_project","schematic_only":true}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "dual.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	units := map[int]bool{}
+	for _, symbol := range file.Symbols {
+		units[symbol.Unit] = true
+	}
+	if len(file.Symbols) != 2 || !units[1] || !units[2] {
+		t.Fatalf("symbols = %#v, want two units", file.Symbols)
+	}
+	if len(file.Wires) == 0 {
+		t.Fatal("multi-unit connection did not emit schematic wire")
+	}
+}
+
 func TestWriteImportedProjectDoesNotPartiallyReplaceOnRenderFailure(t *testing.T) {
 	root := t.TempDir()
 	base := "demo"

@@ -24,13 +24,14 @@ import (
 // Builder accumulates a KiCad design through ordered mutations. It is not
 // safe for concurrent use by multiple goroutines.
 type Builder struct {
-	name       string
-	generator  kicadfiles.DeterministicIDGenerator
-	design     kicaddesign.Design
-	nets       *pcb.NetRegistry
-	netParents map[string]string
-	symbols    map[string]*symbolState
-	symbolKeys map[string]string
+	name        string
+	generator   kicadfiles.DeterministicIDGenerator
+	design      kicaddesign.Design
+	nets        *pcb.NetRegistry
+	netParents  map[string]string
+	symbols     map[string]*symbolState
+	symbolUnits map[string][]*symbolState
+	symbolKeys  map[string]string
 	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
 	// grid snapping can avoid creating exact anchor collisions between symbols.
 	schematicPinAnchors map[kicadfiles.Point]struct{}
@@ -71,6 +72,7 @@ type BoardOutlineHandle struct {
 
 type SymbolOptions struct {
 	Reference  string
+	Unit       int
 	Role       string
 	Value      string
 	LibraryID  string
@@ -88,6 +90,7 @@ type PinSpec struct {
 type Endpoint struct {
 	Reference string
 	Pin       string
+	Unit      int
 }
 
 // SchematicHierarchy describes child-sheet emission for an oversized
@@ -180,6 +183,8 @@ type ZoneOptions struct {
 
 type symbolState struct {
 	symbolIndex int
+	reference   string
+	unit        int
 	libraryID   string
 	position    kicadfiles.Point
 	rotation    kicadfiles.Angle
@@ -216,6 +221,7 @@ func New(options Options) (*Builder, error) {
 		nets:                pcb.NewNetRegistry(),
 		netParents:          map[string]string{},
 		symbols:             map[string]*symbolState{},
+		symbolUnits:         map[string][]*symbolState{},
 		symbolKeys:          map[string]string{},
 		schematicPinAnchors: map[kicadfiles.Point]struct{}{},
 		schematicWireEnds:   map[kicadfiles.Point]struct{}{},
@@ -271,13 +277,21 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	if reference == "" {
 		return SymbolHandle{}, fmt.Errorf("reference required")
 	}
-	if _, ok := builder.symbols[reference]; ok {
-		return SymbolHandle{}, fmt.Errorf("symbol %s already exists", reference)
+	unit := options.Unit
+	if unit <= 0 {
+		unit = 1
 	}
-	key := referenceKey(reference)
-	if existing, ok := builder.symbolKeys[key]; ok {
+	stateKey := symbolStateKey(reference, unit)
+	if _, ok := builder.symbols[stateKey]; ok {
+		return SymbolHandle{}, fmt.Errorf("symbol %s unit %d already exists", reference, unit)
+	}
+	if states := builder.symbolUnits[referenceKey(reference)]; len(states) > 0 && states[0].reference != reference {
+		return SymbolHandle{}, fmt.Errorf("multi-unit reference casing must match %s", states[0].reference)
+	}
+	if existing, ok := builder.symbolKeys[stateKey]; ok {
 		return SymbolHandle{}, fmt.Errorf("symbol %s collides with %s after KiCad key normalization", reference, existing)
 	}
+	generationKey := symbolGenerationKey(reference, unit)
 	libraryID := strings.TrimSpace(options.LibraryID)
 	if libraryID == "" {
 		return SymbolHandle{}, fmt.Errorf("library id required")
@@ -288,9 +302,10 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	}
 	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
 	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, options.Rotation)
-	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", key), libraryID, reference, value, position)
+	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", generationKey), libraryID, reference, value, position)
+	symbol.Unit = unit
 	symbol.Rotation = options.Rotation
-	symbol.Path = "root.component." + key
+	symbol.Path = "root.component." + generationKey
 	if strings.EqualFold(strings.TrimSpace(options.Role), "generated_terminal") {
 		inBOM := false
 		onBoard := false
@@ -324,19 +339,21 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		symbol.PinAnchors = append(symbol.PinAnchors, anchor)
 		symbol.Pins = append(symbol.Pins, schematic.SymbolPin{
 			Number: number,
-			UUID:   builder.generator.New("root.schematic.symbol.pin", key, number),
+			UUID:   builder.generator.New("root.schematic.symbol.pin", generationKey, number),
 		})
 	}
 	symbol.Instances = []schematic.SymbolInstance{{
 		Project:   builder.design.Project.Name,
 		Path:      "/" + string(symbol.UUID),
 		Reference: symbol.Reference,
-		Unit:      1,
+		Unit:      unit,
 		Value:     symbol.Value,
 	}}
 	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, symbol)
-	builder.symbols[reference] = &symbolState{
+	builder.symbols[stateKey] = &symbolState{
 		symbolIndex: len(builder.design.Schematic.Symbols) - 1,
+		reference:   reference,
+		unit:        unit,
 		libraryID:   libraryID,
 		position:    position,
 		rotation:    options.Rotation,
@@ -344,7 +361,16 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		pinOrder:    pinOrder,
 		pinNets:     pinNets,
 	}
-	builder.symbolKeys[key] = reference
+	refKey := referenceKey(reference)
+	states := builder.symbolUnits[refKey]
+	insertAt := sort.Search(len(states), func(index int) bool {
+		return states[index].unit >= unit
+	})
+	states = append(states, nil)
+	copy(states[insertAt+1:], states[insertAt:])
+	states[insertAt] = builder.symbols[stateKey]
+	builder.symbolUnits[refKey] = states
+	builder.symbolKeys[stateKey] = reference
 	builder.addKnownSymbolLibrary(libraryID)
 	schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID)
 	return SymbolHandle{Reference: reference}, nil
@@ -528,7 +554,7 @@ func (builder *Builder) endpointIsUSBCPowerOnlyCC(endpoint Endpoint) bool {
 	if !strings.EqualFold(pin, "A5") && !strings.EqualFold(pin, "B5") {
 		return false
 	}
-	state, err := builder.symbolState(endpoint.Reference)
+	state, err := builder.symbolStateForEndpoint(endpoint)
 	if err != nil {
 		return false
 	}
@@ -993,16 +1019,18 @@ func (builder *Builder) mergeNet(oldName, newName string) {
 }
 
 func (builder *Builder) AssignFootprint(reference, libraryID string) error {
-	state, err := builder.symbolState(reference)
-	if err != nil {
-		return err
+	states := builder.symbolStates(reference)
+	if len(states) == 0 {
+		return fmt.Errorf("unknown symbol %s", strings.TrimSpace(reference))
 	}
 	libraryID = strings.TrimSpace(libraryID)
 	if libraryID == "" {
 		return fmt.Errorf("footprint library id required")
 	}
-	state.footprintID = libraryID
-	builder.setSymbolProperty(state, "Footprint", libraryID)
+	for _, state := range states {
+		state.footprintID = libraryID
+		builder.setSymbolProperty(state, "Footprint", libraryID)
+	}
 	if footprint := builder.footprint(reference); footprint != nil {
 		footprint.LibraryID = libraryID
 	}
@@ -1698,7 +1726,7 @@ type generatedLocalFootprint struct {
 }
 
 func (builder *Builder) pinAnchor(endpoint Endpoint) (kicadfiles.Point, error) {
-	state, err := builder.symbolState(endpoint.Reference)
+	state, err := builder.symbolStateForEndpoint(endpoint)
 	if err != nil {
 		return kicadfiles.Point{}, err
 	}
@@ -1725,7 +1753,7 @@ func (builder *Builder) pinAnchorForState(state *symbolState, reference string, 
 }
 
 func (builder *Builder) pinAnchorOffset(endpoint Endpoint) (kicadfiles.Point, bool) {
-	state, err := builder.symbolState(endpoint.Reference)
+	state, err := builder.symbolStateForEndpoint(endpoint)
 	if err != nil {
 		return kicadfiles.Point{}, false
 	}
@@ -1741,9 +1769,8 @@ func (builder *Builder) pinAnchorOffset(endpoint Endpoint) (kicadfiles.Point, bo
 }
 
 func (builder *Builder) assignedPinNet(endpoint Endpoint) string {
-	reference := strings.TrimSpace(endpoint.Reference)
 	pin := strings.TrimSpace(endpoint.Pin)
-	if state, ok := builder.symbols[reference]; ok {
+	if state, err := builder.symbolStateForEndpoint(endpoint); err == nil {
 		return builder.canonicalNet(state.pinNets[pin])
 	}
 	return ""
@@ -1757,32 +1784,88 @@ func (builder *Builder) symbolState(reference string) (*symbolState, error) {
 	if reference == "" {
 		return nil, fmt.Errorf("reference required")
 	}
-	state, ok := builder.symbols[reference]
+	// Reference-only operations address one physical footprint. Preserve the
+	// legacy default of unit 1 when that unit exists; endpoint operations use
+	// symbolStateForEndpoint and never rely on this fallback.
+	if state, ok := builder.symbols[symbolStateKey(reference, 1)]; ok {
+		return state, nil
+	}
+	states := builder.symbolStates(reference)
+	if len(states) == 1 {
+		return states[0], nil
+	}
+	if len(states) > 1 {
+		return nil, fmt.Errorf("symbol %s has multiple units; unit required", reference)
+	}
+	return nil, fmt.Errorf("unknown symbol %s", reference)
+}
+
+func (builder *Builder) symbolStateForEndpoint(endpoint Endpoint) (*symbolState, error) {
+	if builder == nil {
+		return nil, fmt.Errorf("builder required")
+	}
+	reference := strings.TrimSpace(endpoint.Reference)
+	if reference == "" {
+		return nil, fmt.Errorf("reference required")
+	}
+	unit := endpoint.Unit
+	if unit <= 0 {
+		unit = 1
+	}
+	state, ok := builder.symbols[symbolStateKey(reference, unit)]
 	if !ok {
-		return nil, fmt.Errorf("unknown symbol %s", reference)
+		return nil, fmt.Errorf("unknown symbol %s unit %d", reference, unit)
 	}
 	return state, nil
 }
 
+func (builder *Builder) symbolStates(reference string) []*symbolState {
+	if builder == nil {
+		return nil
+	}
+	want := referenceKey(reference)
+	return builder.symbolUnits[want]
+}
+
+func symbolStateKey(reference string, unit int) string {
+	if unit <= 0 {
+		unit = 1
+	}
+	return referenceKey(reference) + "#" + strconv.Itoa(unit)
+}
+
+func symbolGenerationKey(reference string, unit int) string {
+	if unit <= 1 {
+		return referenceKey(reference)
+	}
+	return symbolStateKey(reference, unit)
+}
+
 func (builder *Builder) assignPinNet(endpoint Endpoint, netName string) {
-	reference := strings.TrimSpace(endpoint.Reference)
-	if state, ok := builder.symbols[reference]; ok {
-		pin := strings.TrimSpace(endpoint.Pin)
-		netName = builder.canonicalNet(netName)
-		state.pinNets[pin] = netName
-		if footprint := builder.footprint(reference); footprint != nil {
-			pads, padsOK := builder.pads[reference]
-			if padIndexes, ok := pads[pin]; padsOK && ok {
-				net := builder.nets.EnsureNet(netName)
-				for _, padIndex := range padIndexes {
-					footprint.Pads[padIndex].NetCode = net.Code
-					footprint.Pads[padIndex].NetName = net.Name
-				}
+	state, err := builder.symbolStateForEndpoint(endpoint)
+	if err != nil {
+		return
+	}
+	pin := strings.TrimSpace(endpoint.Pin)
+	netName = builder.canonicalNet(netName)
+	state.pinNets[pin] = netName
+	if footprint := builder.footprint(state.reference); footprint != nil {
+		pads, padsOK := builder.pads[state.reference]
+		if padIndexes, ok := pads[pin]; padsOK && ok {
+			net := builder.nets.EnsureNet(netName)
+			for _, padIndex := range padIndexes {
+				footprint.Pads[padIndex].NetCode = net.Code
+				footprint.Pads[padIndex].NetName = net.Name
 			}
 		}
 	}
 }
 
+/*
+The reference-only lookup is intentionally retained for legacy operations
+that address one physical footprint. Endpoint operations must use the unit-
+aware lookup above so multi-unit symbols cannot silently connect to unit 1.
+*/
 func (builder *Builder) footprint(reference string) *pcb.Footprint {
 	reference = strings.TrimSpace(reference)
 	index, ok := builder.footprints[reference]

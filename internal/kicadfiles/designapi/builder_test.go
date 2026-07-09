@@ -89,6 +89,45 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	assertPadNet(t, design.PCB.Footprints, "D1", "1", "LED_OUT")
 }
 
+func TestBuilderSupportsUnitAwareSharedReferences(t *testing.T) {
+	builder := newTestBuilder(t)
+	for unit, x := range map[int]float64{1: 20, 2: 40} {
+		if _, err := builder.AddSymbol(SymbolOptions{
+			Reference: "U1",
+			Unit:      unit,
+			LibraryID: "Device:R",
+			Value:     "DUAL",
+			Position:  kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(30)},
+			Pins: []PinSpec{
+				{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5)}},
+				{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(5)}},
+			},
+		}); err != nil {
+			t.Fatalf("AddSymbol U1 unit %d returned error: %v", unit, err)
+		}
+	}
+	if err := builder.Connect(Endpoint{Reference: "U1", Unit: 1, Pin: "2"}, Endpoint{Reference: "U1", Unit: 2, Pin: "1"}, "UNIT_LINK"); err != nil {
+		t.Fatalf("unit-aware Connect returned error: %v", err)
+	}
+	if got := builder.assignedPinNet(Endpoint{Reference: "U1", Unit: 1, Pin: "2"}); got != "UNIT_LINK" {
+		t.Fatalf("unit 1 pin net = %q, want UNIT_LINK", got)
+	}
+	if got := builder.assignedPinNet(Endpoint{Reference: "U1", Unit: 2, Pin: "1"}); got != "UNIT_LINK" {
+		t.Fatalf("unit 2 pin net = %q, want UNIT_LINK", got)
+	}
+	if err := builder.Connect(Endpoint{Reference: "U1", Pin: "1"}, Endpoint{Reference: "U1", Pin: "2"}, "AMBIGUOUS"); err != nil {
+		t.Fatalf("unit 1 default endpoint should remain backward compatible: %v", err)
+	}
+	symbols := builder.Design().Schematic.Symbols
+	units := map[int]bool{}
+	for _, symbol := range symbols {
+		units[symbol.Unit] = true
+	}
+	if len(symbols) != 2 || !units[1] || !units[2] {
+		t.Fatalf("shared-reference symbols = %#v, want units 1 and 2", symbols)
+	}
+}
+
 func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})

@@ -593,6 +593,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		}
 		_, err = builder.AddSymbol(designapi.SymbolOptions{
 			Reference:  payload.Ref,
+			Unit:       payload.Unit,
 			Role:       payload.Role,
 			Value:      payload.Value,
 			LibraryID:  payload.LibraryID,
@@ -730,7 +731,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			for _, net := range payload.Hierarchy.CrossSheetNets {
 				endpoints := make([]designapi.Endpoint, 0, len(net.Endpoints))
 				for _, endpoint := range net.Endpoints {
-					endpoints = append(endpoints, designapi.Endpoint{Reference: endpoint.Ref, Pin: endpoint.Pin})
+					endpoints = append(endpoints, designapi.Endpoint{Reference: endpoint.Ref, Pin: endpoint.Pin, Unit: endpoint.Unit})
 				}
 				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, designapi.SchematicCrossSheetNet{Name: net.Name, Endpoints: endpoints})
 			}
@@ -1365,7 +1366,7 @@ func applyIssue(index int, err error) reports.Issue {
 }
 
 func endpoint(value Endpoint) designapi.Endpoint {
-	return designapi.Endpoint{Reference: value.Ref, Pin: value.Pin}
+	return designapi.Endpoint{Reference: value.Ref, Pin: value.Pin, Unit: value.Unit}
 }
 
 func labelKind(value string) schematic.LabelKind {

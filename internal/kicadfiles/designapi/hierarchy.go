@@ -318,8 +318,8 @@ func appendCrossSheetLabels(builder *Builder, child *schematic.SchematicFile, sh
 			if refToSheet[endpoint.Reference] != sheetID {
 				continue
 			}
-			state := builder.symbols[endpoint.Reference]
-			if state == nil {
+			state, err := builder.symbolStateForEndpoint(endpoint)
+			if err != nil {
 				continue
 			}
 			position, ok := state.pins[endpoint.Pin]

@@ -107,7 +107,7 @@ func schematicHierarchy(document Document) (*transactions.SchematicHierarchy, []
 				if !ok || componentSheets[componentID] == "" || state.refsByID[componentID] == "" {
 					continue
 				}
-				entry.Endpoints = append(entry.Endpoints, transactions.Endpoint{Ref: state.refsByID[componentID], Pin: pin})
+				entry.Endpoints = append(entry.Endpoints, transactions.Endpoint{Ref: state.refsByID[componentID], Pin: pin, Unit: state.unitsByID[componentID]})
 			}
 			if len(entry.Endpoints) > 0 {
 				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, entry)
@@ -174,18 +174,32 @@ func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 	}
 	refCounters := map[string]int{}
 	usedRefs := map[string]struct{}{}
+	usedRefUnits := map[string]struct{}{}
 	invalidComponentIDs := map[string]struct{}{}
 	trimmedRefs := map[string]string{}
 	for index, component := range document.Circuit.Components {
+		unit, ok := transactionUnit(component.Unit)
+		if !ok {
+			state.addIssue(fmt.Sprintf("circuit.components[%d].unit", index), "component unit must be a non-negative integer")
+			invalidComponentIDs[component.ID] = struct{}{}
+			continue
+		}
+		state.unitsByID[component.ID] = unit
 		ref := strings.TrimSpace(component.Ref)
 		trimmedRefs[component.ID] = ref
 		if ref != "" {
-			if _, exists := usedRefs[ref]; exists {
-				state.addIssue(fmt.Sprintf("circuit.components[%d].ref", index), "duplicate component reference "+ref)
+			unitKey := strconv.Itoa(maxUnit(unit))
+			refKey := adapterReferenceKey(ref)
+			refUnitKey := refKey + "#" + unitKey
+			if _, exists := usedRefUnits[refUnitKey]; exists {
+				state.addIssue(fmt.Sprintf("circuit.components[%d].ref", index), "duplicate component reference and unit "+ref+"/"+unitKey)
 				invalidComponentIDs[component.ID] = struct{}{}
 				continue
 			}
-			usedRefs[ref] = struct{}{}
+			usedRefUnits[refUnitKey] = struct{}{}
+			if _, exists := usedRefs[refKey]; !exists {
+				usedRefs[refKey] = struct{}{}
+			}
 			seedRefCounter(refCounters, ref)
 		}
 	}
@@ -194,12 +208,6 @@ func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 			continue
 		}
 		ref := trimmedRefs[component.ID]
-		unit, ok := transactionUnit(component.Unit)
-		if !ok {
-			state.addIssue(fmt.Sprintf("circuit.components[%d].unit", index), "component unit must be a non-negative integer")
-		} else {
-			state.unitsByID[component.ID] = unit
-		}
 		if ref == "" {
 			if !document.Policy.Repair.AllowRefAssignment {
 				state.addIssue(fmt.Sprintf("circuit.components[%d].ref", index), "component reference is required when ref assignment repair is disabled")
@@ -207,7 +215,7 @@ func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 			}
 			ref = state.nextRef(component.Role, refCounters, usedRefs)
 		}
-		usedRefs[ref] = struct{}{}
+		usedRefs[adapterReferenceKey(ref)] = struct{}{}
 		state.refsByID[component.ID] = ref
 	}
 	return state, state.issues
@@ -413,7 +421,7 @@ func (state *adapterState) transactionEndpoint(endpoint EndpointRef, path string
 		state.addIssue(path, "endpoint references component without transaction reference "+componentID)
 		return transactions.Endpoint{}, false
 	}
-	return transactions.Endpoint{Ref: ref, Pin: pin}, true
+	return transactions.Endpoint{Ref: ref, Pin: pin, Unit: state.unitsByID[componentID]}, true
 }
 
 func (state *adapterState) transactionEndpoints(endpoints []EndpointRef, path string) ([]transactions.Endpoint, bool) {
@@ -444,7 +452,7 @@ func (state *adapterState) nextRef(role ComponentRole, counters map[string]int, 
 	for {
 		counters[prefix]++
 		ref := prefix + strconv.Itoa(counters[prefix])
-		if _, exists := usedRefs[ref]; !exists {
+		if _, exists := usedRefs[adapterReferenceKey(ref)]; !exists {
 			return ref
 		}
 	}
@@ -523,6 +531,17 @@ func transactionUnit(unit string) (int, bool) {
 		return 0, false
 	}
 	return parsed, true
+}
+
+func maxUnit(unit int) int {
+	if unit <= 0 {
+		return 1
+	}
+	return unit
+}
+
+func adapterReferenceKey(reference string) string {
+	return strings.ToUpper(strings.TrimSpace(reference))
 }
 
 func layoutPoints(document Document) map[string]transactions.Point {

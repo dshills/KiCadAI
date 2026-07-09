@@ -137,8 +137,9 @@ type BoardSize struct {
 }
 
 type Endpoint struct {
-	Ref string `json:"ref"`
-	Pin string `json:"pin"`
+	Ref  string `json:"ref"`
+	Pin  string `json:"pin"`
+	Unit int    `json:"unit,omitempty"`
 }
 
 type PinSpec struct {
