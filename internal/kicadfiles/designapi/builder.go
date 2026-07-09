@@ -106,6 +106,12 @@ type SchematicSheet struct {
 	Name       string
 	Filename   string
 	References []string
+	Symbols    []SchematicSymbolRef
+}
+
+type SchematicSymbolRef struct {
+	Reference string
+	Unit      int
 }
 
 type SchematicCrossSheetNet struct {
@@ -391,10 +397,12 @@ func (builder *Builder) SetSchematicHierarchy(hierarchy SchematicHierarchy) erro
 	for index, sheet := range hierarchy.Sheets {
 		clone.Sheets[index] = sheet
 		clone.Sheets[index].References = append([]string(nil), sheet.References...)
+		clone.Sheets[index].Symbols = append([]SchematicSymbolRef(nil), sheet.Symbols...)
 	}
 	seenSheets := make(map[string]struct{}, len(hierarchy.Sheets))
 	seenFiles := make(map[string]struct{}, len(hierarchy.Sheets))
 	seenRefs := make(map[string]string)
+	seenLegacyRefs := make(map[string]string)
 	for index := range clone.Sheets {
 		sheet := &clone.Sheets[index]
 		if strings.TrimSpace(sheet.ID) == "" || strings.TrimSpace(sheet.Name) == "" {
@@ -415,18 +423,29 @@ func (builder *Builder) SetSchematicHierarchy(hierarchy SchematicHierarchy) erro
 			return fmt.Errorf("duplicate hierarchy sheet filename %s", sheet.Filename)
 		}
 		seenFiles[fileKey] = struct{}{}
+		for _, symbol := range hierarchySheetSymbols(*sheet) {
+			key := symbolStateKey(symbol.Reference, symbol.Unit)
+			if _, exists := seenRefs[key]; exists {
+				return fmt.Errorf("reference %s unit %d assigned to multiple hierarchy sheets", symbol.Reference, symbol.Unit)
+			}
+			seenRefs[key] = sheet.ID
+		}
 		for _, reference := range sheet.References {
-			if _, exists := seenRefs[reference]; exists {
+			key := referenceKey(reference)
+			if _, exists := seenLegacyRefs[key]; exists {
 				return fmt.Errorf("reference %s assigned to multiple hierarchy sheets", reference)
 			}
-			seenRefs[reference] = sheet.ID
+			seenLegacyRefs[key] = sheet.ID
 		}
 	}
 	if builder.design.Schematic == nil {
 		return fmt.Errorf("schematic required")
 	}
 	for _, symbol := range builder.design.Schematic.Symbols {
-		if _, ok := seenRefs[symbol.Reference]; !ok {
+		if _, ok := seenRefs[symbolStateKey(symbol.Reference, symbol.Unit)]; !ok {
+			if _, legacy := seenLegacyRefs[referenceKey(symbol.Reference)]; legacy {
+				continue
+			}
 			return fmt.Errorf("reference %s is not assigned to a hierarchy sheet", symbol.Reference)
 		}
 	}

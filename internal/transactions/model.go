@@ -279,10 +279,16 @@ type SchematicHierarchy struct {
 }
 
 type SchematicHierarchySheet struct {
-	ID         string   `json:"id"`
-	Name       string   `json:"name"`
-	Filename   string   `json:"filename"`
-	References []string `json:"references"`
+	ID         string               `json:"id"`
+	Name       string               `json:"name"`
+	Filename   string               `json:"filename"`
+	References []string             `json:"references"`
+	Symbols    []SchematicSymbolRef `json:"symbols,omitempty"`
+}
+
+type SchematicSymbolRef struct {
+	Ref  string `json:"ref"`
+	Unit int    `json:"unit,omitempty"`
 }
 
 type SchematicCrossSheetNet struct {

@@ -46,18 +46,31 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	}
 
 	refToSheet := make(map[string]string)
+	legacyRefToSheet := make(map[string]string)
 	for _, sheet := range builder.hierarchy.Sheets {
+		for _, symbol := range hierarchySheetSymbols(sheet) {
+			refToSheet[symbolStateKey(symbol.Reference, symbol.Unit)] = sheet.ID
+		}
 		for _, reference := range sheet.References {
-			refToSheet[reference] = sheet.ID
+			legacyRefToSheet[referenceKey(reference)] = sheet.ID
 		}
 	}
 	for _, symbol := range root.Symbols {
-		if _, ok := refToSheet[symbol.Reference]; !ok {
+		if _, ok := refToSheet[symbolStateKey(symbol.Reference, symbol.Unit)]; !ok {
+			if sheetID, legacy := legacyRefToSheet[referenceKey(symbol.Reference)]; legacy {
+				refToSheet[symbolStateKey(symbol.Reference, symbol.Unit)] = sheetID
+				continue
+			}
 			return fmt.Errorf("reference %s is not assigned to a hierarchy sheet", symbol.Reference)
 		}
 	}
 
 	original := *root
+	symbolsBySheet := make(map[string][]schematic.SchematicSymbol, len(builder.hierarchy.Sheets))
+	for _, symbol := range original.Symbols {
+		sheetID := refToSheet[symbolStateKey(symbol.Reference, symbol.Unit)]
+		symbolsBySheet[sheetID] = append(symbolsBySheet[sheetID], symbol)
+	}
 	children := make([]*schematic.SchematicFile, 0, len(builder.hierarchy.Sheets))
 	root.Symbols = nil
 	root.Wires = nil
@@ -74,10 +87,6 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	root.SheetInstances = []schematic.SheetInstance{{Project: design.Project.Name, Path: "/", Page: "1"}}
 	usedItems := map[kicadfiles.UUID]struct{}{}
 	anchorToSheet := hierarchyAnchorSheets(original.Symbols, refToSheet)
-	symbolsByReference := make(map[string]schematic.SchematicSymbol, len(original.Symbols))
-	for _, symbol := range original.Symbols {
-		symbolsByReference[symbol.Reference] = symbol
-	}
 	for index, spec := range builder.hierarchy.Sheets {
 		filename := strings.TrimSpace(spec.Filename)
 		if filename == "" {
@@ -89,7 +98,7 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		*child = original
 		child.Filename = filename
 		child.UUID = childUUID
-		child.Symbols = symbolsForSheet(symbolsByReference, spec.References)
+		child.Symbols = append([]schematic.SchematicSymbol(nil), symbolsBySheet[spec.ID]...)
 		child.Wires = wiresForSheet(original.Wires, child.Symbols, usedItems, spec.ID, anchorToSheet)
 		child.Labels = labelsForSheet(original.Labels, child.Symbols, usedItems)
 		child.Junctions = junctionsForSheet(original.Junctions, child.Symbols, usedItems)
@@ -119,14 +128,21 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	return nil
 }
 
-func symbolsForSheet(symbols map[string]schematic.SchematicSymbol, references []string) []schematic.SchematicSymbol {
-	selected := make([]schematic.SchematicSymbol, 0, len(references))
-	for _, reference := range references {
-		if symbol, ok := symbols[reference]; ok {
-			selected = append(selected, symbol)
+func hierarchySheetSymbols(sheet SchematicSheet) []SchematicSymbolRef {
+	if len(sheet.Symbols) != 0 {
+		symbols := append([]SchematicSymbolRef(nil), sheet.Symbols...)
+		for index := range symbols {
+			if symbols[index].Unit <= 0 {
+				symbols[index].Unit = 1
+			}
 		}
+		return symbols
 	}
-	return selected
+	refs := make([]SchematicSymbolRef, 0, len(sheet.References))
+	for _, reference := range sheet.References {
+		refs = append(refs, SchematicSymbolRef{Reference: reference, Unit: 1})
+	}
+	return refs
 }
 
 func sheetSymbolBounds(symbols []schematic.SchematicSymbol) (kicadfiles.Point, kicadfiles.Point, bool) {
@@ -159,7 +175,7 @@ func pointInSheetBounds(point kicadfiles.Point, minPoint, maxPoint kicadfiles.Po
 func hierarchyAnchorSheets(symbols []schematic.SchematicSymbol, refToSheet map[string]string) map[kicadfiles.Point]string {
 	anchors := map[kicadfiles.Point]string{}
 	for _, symbol := range symbols {
-		sheetID := refToSheet[symbol.Reference]
+		sheetID := refToSheet[symbolStateKey(symbol.Reference, symbol.Unit)]
 		if sheetID == "" {
 			continue
 		}
@@ -315,7 +331,7 @@ func appendCrossSheetLabels(builder *Builder, child *schematic.SchematicFile, sh
 	}
 	for _, net := range builder.hierarchy.CrossSheetNets {
 		for _, endpoint := range net.Endpoints {
-			if refToSheet[endpoint.Reference] != sheetID {
+			if refToSheet[symbolStateKey(endpoint.Reference, endpoint.Unit)] != sheetID {
 				continue
 			}
 			state, err := builder.symbolStateForEndpoint(endpoint)

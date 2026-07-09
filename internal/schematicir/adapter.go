@@ -81,18 +81,27 @@ func schematicHierarchy(document Document) (*transactions.SchematicHierarchy, []
 	hierarchy := &transactions.SchematicHierarchy{}
 	for _, sheet := range layout.Partition.Sheets {
 		refs := make([]string, 0, len(sheet.Components))
+		symbols := make([]transactions.SchematicSymbolRef, 0, len(sheet.Components))
 		for _, componentID := range sheet.Components {
 			componentSheets[componentID] = sheet.ID
 			if ref := state.refsByID[componentID]; ref != "" {
 				refs = append(refs, ref)
+				symbols = append(symbols, transactions.SchematicSymbolRef{Ref: ref, Unit: state.unitsByID[componentID]})
 			}
 		}
 		sort.Strings(refs)
+		sort.SliceStable(symbols, func(i, j int) bool {
+			if symbols[i].Ref != symbols[j].Ref {
+				return symbols[i].Ref < symbols[j].Ref
+			}
+			return symbols[i].Unit < symbols[j].Unit
+		})
 		hierarchy.Sheets = append(hierarchy.Sheets, transactions.SchematicHierarchySheet{
 			ID:         sheet.ID,
 			Name:       sheet.Name,
 			Filename:   "sch/" + sheet.ID + ".kicad_sch",
 			References: refs,
+			Symbols:    symbols,
 		})
 	}
 	netsByName := make(map[string]Net, len(document.Circuit.Nets))

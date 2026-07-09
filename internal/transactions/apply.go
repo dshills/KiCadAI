@@ -726,7 +726,11 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 				CrossSheetNets: make([]designapi.SchematicCrossSheetNet, 0, len(payload.Hierarchy.CrossSheetNets)),
 			}
 			for _, sheet := range payload.Hierarchy.Sheets {
-				hierarchy.Sheets = append(hierarchy.Sheets, designapi.SchematicSheet{ID: sheet.ID, Name: sheet.Name, Filename: sheet.Filename, References: append([]string(nil), sheet.References...)})
+				symbols := make([]designapi.SchematicSymbolRef, 0, len(sheet.Symbols))
+				for _, symbol := range sheet.Symbols {
+					symbols = append(symbols, designapi.SchematicSymbolRef{Reference: symbol.Ref, Unit: symbol.Unit})
+				}
+				hierarchy.Sheets = append(hierarchy.Sheets, designapi.SchematicSheet{ID: sheet.ID, Name: sheet.Name, Filename: sheet.Filename, References: append([]string(nil), sheet.References...), Symbols: symbols})
 			}
 			for _, net := range payload.Hierarchy.CrossSheetNets {
 				endpoints := make([]designapi.Endpoint, 0, len(net.Endpoints))

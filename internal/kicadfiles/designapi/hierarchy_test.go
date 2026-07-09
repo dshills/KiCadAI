@@ -84,3 +84,74 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		}
 	}
 }
+
+func TestBuilderWritesUnitAwareGeneratedHierarchy(t *testing.T) {
+	builder, err := New(Options{
+		Name:     "unit_hierarchy_demo",
+		DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		Seed:     "unit_hierarchy_demo",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for unit, x := range map[int]float64{1: 30, 2: 300} {
+		if _, err := builder.AddSymbol(SymbolOptions{
+			Reference: "U1",
+			Unit:      unit,
+			Value:     "DUAL",
+			LibraryID: "Device:R",
+			Position:  kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(50)},
+			Pins: []PinSpec{
+				{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
+				{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+			},
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := builder.Connect(Endpoint{Reference: "U1", Unit: 1, Pin: "2"}, Endpoint{Reference: "U1", Unit: 2, Pin: "1"}, "UNIT_NET"); err != nil {
+		t.Fatal(err)
+	}
+	if err := builder.SetSchematicHierarchy(SchematicHierarchy{
+		Sheets: []SchematicSheet{
+			{ID: "unit-a", Name: "Unit A", Filename: "sch/unit-a.kicad_sch", Symbols: []SchematicSymbolRef{{Reference: "U1", Unit: 1}}},
+			{ID: "unit-b", Name: "Unit B", Filename: "sch/unit-b.kicad_sch", Symbols: []SchematicSymbolRef{{Reference: "U1", Unit: 2}}},
+		},
+		CrossSheetNets: []SchematicCrossSheetNet{{
+			Name:      "UNIT_NET",
+			Endpoints: []Endpoint{{Reference: "U1", Unit: 1, Pin: "2"}, {Reference: "U1", Unit: 2, Pin: "1"}},
+		}},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	root := filepath.Join(t.TempDir(), "unit_hierarchy_demo")
+	if _, err := builder.WriteSchematicProject(root, kicaddesign.WriteOptions{}); err != nil {
+		t.Fatal(err)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(root)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.SheetFiles) != 2 {
+		t.Fatalf("child sheets = %#v", read.SheetFiles)
+	}
+	seenUnits := map[int]bool{}
+	for _, child := range read.SheetFiles {
+		if len(child.Symbols) != 1 {
+			t.Fatalf("child %s symbols = %#v", child.Filename, child.Symbols)
+		}
+		seenUnits[child.Symbols[0].Unit] = true
+		foundLabel := false
+		for _, label := range child.Labels {
+			if label.Text == "UNIT_NET" && label.Kind == schematic.LabelGlobal {
+				foundLabel = true
+			}
+		}
+		if !foundLabel {
+			t.Fatalf("child %s missing unit-aware global label", child.Filename)
+		}
+	}
+	if !seenUnits[1] || !seenUnits[2] {
+		t.Fatalf("child units = %#v, want 1 and 2", seenUnits)
+	}
+}
