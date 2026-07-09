@@ -128,6 +128,7 @@ const (
 
 type Result struct {
 	Sheet       Sheet
+	Partition   *PartitionResult
 	Components  []PlacedComponent
 	Connections []RoutedConnection
 	Wires       []WireSegment
@@ -182,6 +183,8 @@ type Report struct {
 	Passed                   bool             `json:"passed"`
 	SelectedPaper            string           `json:"selected_paper,omitempty"`
 	PageEscalationCount      int              `json:"page_escalation_count,omitempty"`
+	PartitionCount           int              `json:"partition_count,omitempty"`
+	CrossSheetNetCount       int              `json:"cross_sheet_net_count,omitempty"`
 	ComponentCount           int              `json:"component_count"`
 	GroupCount               int              `json:"group_count"`
 	RoutedNetCount           int              `json:"routed_net_count"`
@@ -210,6 +213,28 @@ type Rect struct {
 	MinY kicadfiles.IU
 	MaxX kicadfiles.IU
 	MaxY kicadfiles.IU
+}
+
+// PartitionResult describes the deterministic hierarchy fallback for a
+// drawing that cannot fit on one standard sheet. It is layout evidence until
+// the schematic writer emits the corresponding KiCad child sheets.
+type PartitionResult struct {
+	Sheets         []PartitionSheet `json:"sheets"`
+	CrossSheetNets []CrossSheetNet  `json:"cross_sheet_nets,omitempty"`
+	Complete       bool             `json:"complete"`
+}
+
+type PartitionSheet struct {
+	ID         string   `json:"id"`
+	Name       string   `json:"name"`
+	Components []string `json:"components"`
+	Nets       []string `json:"nets,omitempty"`
+	Bounds     Rect     `json:"bounds"`
+}
+
+type CrossSheetNet struct {
+	Name   string   `json:"name"`
+	Sheets []string `json:"sheets"`
 }
 
 func ParseProfile(value string) (Profile, error) {
@@ -370,6 +395,8 @@ func BuildReport(result Result, profile Profile) Report {
 		Passed:              true,
 		SelectedPaper:       result.Report.SelectedPaper,
 		PageEscalationCount: result.Report.PageEscalationCount,
+		PartitionCount:      result.Report.PartitionCount,
+		CrossSheetNetCount:  result.Report.CrossSheetNetCount,
 		ComponentCount:      len(result.Components),
 		GroupCount:          countGroups(result.Components),
 		RoutedNetCount:      countRoutedNets(result.Wires),

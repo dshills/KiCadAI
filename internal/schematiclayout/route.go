@@ -364,6 +364,18 @@ func Layout(request Request) Result {
 		Message:  "the drawing does not fit on the largest supported standard paper",
 		Repair:   "partition the design into hierarchical sheets or provide a larger custom sheet",
 	})
+	partition := PartitionPlaced(request, last.Components)
+	last.Partition = &partition
+	last.Report.PartitionCount = len(partition.Sheets)
+	last.Report.CrossSheetNetCount = len(partition.CrossSheetNets)
+	if len(partition.Sheets) > 1 {
+		last.Diagnostics = append(last.Diagnostics, Diagnostic{
+			Severity: SeverityInfo,
+			Code:     "hierarchy_partition_required",
+			Message:  "the graph was partitioned into deterministic sheet regions",
+			Repair:   "emit KiCad hierarchical sheets and cross-sheet labels",
+		})
+	}
 	return NormalizeResult(last, request.Rules)
 }
 
