@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"encoding/json"
+	"math"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -91,6 +92,30 @@ func TestUSBCPowerCCPullDownsArePresent(t *testing.T) {
 	for _, want := range []string{`"value":"5.1k"`, `"net_name":"usb_cc1"`, `"net_name":"usb_cc2"`} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("operations missing %q: %s", want, text)
+		}
+	}
+}
+
+func TestUSBCPowerCC2PullDownUsesTopLayerEscape(t *testing.T) {
+	realization := usbCPowerPCBRealization()
+	routes := map[string]PCBLocalRoute{}
+	for _, candidate := range realization.LocalRoutes {
+		routes[candidate.ID] = candidate
+	}
+	route, ok := routes["cc2_pull_down"]
+	if !ok {
+		t.Fatalf("cc2_pull_down route missing")
+	}
+	if route.Layer != "F.Cu" {
+		t.Fatalf("cc2_pull_down layer = %q, want F.Cu to avoid a B.Cu via-in-pad copper sliver", route.Layer)
+	}
+	want := []RelativePoint{{XMM: 0.5, YMM: -0.6}, {XMM: 5.0, YMM: -0.6}}
+	if len(route.Waypoints) != len(want) {
+		t.Fatalf("cc2_pull_down waypoint count = %d, want %d", len(route.Waypoints), len(want))
+	}
+	for i := range want {
+		if !relativePointNear(route.Waypoints[i], want[i]) {
+			t.Fatalf("cc2_pull_down waypoint %d = %#v, want %#v", i, route.Waypoints[i], want[i])
 		}
 	}
 }
@@ -397,4 +422,9 @@ func warningCount(issues []reports.Issue) int {
 		}
 	}
 	return count
+}
+
+func relativePointNear(got RelativePoint, want RelativePoint) bool {
+	const toleranceMM = 1e-9
+	return math.Abs(got.XMM-want.XMM) <= toleranceMM && math.Abs(got.YMM-want.YMM) <= toleranceMM
 }

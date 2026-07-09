@@ -422,9 +422,10 @@ func usbCPowerPCBRealization() *PCBRealization {
 		},
 		LocalRoutes: []PCBLocalRoute{
 			{ID: "cc1_pull_down", NetTemplate: "cc1", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC1}, To: RouteEndpoint{ComponentRole: "cc1_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -0.5, YMM: -0.4}, {XMM: 2.4, YMM: -0.4}, {XMM: 2.4, YMM: 3.5}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
-			{ID: "cc2_pull_down", NetTemplate: "cc2", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC2}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 0.5, YMM: -2.0}, {XMM: 6.6, YMM: -2.0}, {XMM: 6.6, YMM: 5.5}}, Layer: "B.Cu", WidthMM: 0.25, Required: true},
-			// B.Cu local routes intentionally rely on designworkflow endpoint-via
-			// binding to connect top-side SMD pads to bottom-side escape traces.
+			// CC2 uses top-layer intermediate waypoints because the former B.Cu
+			// via-in-pad route to cc2_rd pin 1 triggers KiCad's copper_sliver
+			// warning in this placement.
+			{ID: "cc2_pull_down", NetTemplate: "cc2", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPins.CC2}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 0.5, YMM: -0.6}, {XMM: 5.0, YMM: -0.6}}, Layer: "F.Cu", WidthMM: 0.25, Required: true},
 			{ID: "vbus_entry_a", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 0, "A9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 1.52, YMM: -4.0}, {XMM: 11.6, YMM: -4.0}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
 			{ID: "vbus_entry_b", NetTemplate: "vbus_connector", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.VBUS, 1, "B9")}, To: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -1.52, YMM: -4.8}, {XMM: 11.6, YMM: -4.8}}, Layer: "B.Cu", WidthMM: 0.75, Required: true},
 			{ID: "vbus_tvs", NetTemplate: "vbus_out", From: RouteEndpoint{ComponentRole: "vbus_fuse", Pin: "2"}, To: RouteEndpoint{ComponentRole: "vbus_tvs", Pin: "1"}, Layer: "F.Cu", WidthMM: 0.8, Required: true, When: RealizationWhen{Params: map[string]any{"include_tvs": true}}},
