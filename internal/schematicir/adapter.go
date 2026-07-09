@@ -741,7 +741,11 @@ func schematicLayoutPins(component Component) []schematiclayout.Pin {
 	}
 	pins := make([]schematiclayout.Pin, 0, len(component.Pins))
 	for _, pin := range component.Pins {
-		pins = append(pins, schematiclayout.Pin{Number: pin.Number, Role: roles[pin.Number], At: offsets[pin.Number]})
+		offset := offsets[pin.Number]
+		if explicit, ok := explicitPinOffset(pin, offset); ok {
+			offset = explicit
+		}
+		pins = append(pins, schematiclayout.Pin{Number: pin.Number, Role: roles[pin.Number], At: offset})
 	}
 	return pins
 }
@@ -884,9 +888,26 @@ func transactionPins(component Component) []transactions.PinSpec {
 	out := make([]transactions.PinSpec, 0, len(component.Pins))
 	for _, pin := range component.Pins {
 		offset := offsets[pin.Number]
+		if explicit, ok := explicitPinOffset(pin, offset); ok {
+			offset = explicit
+		}
 		out = append(out, transactions.PinSpec{Number: pin.Number, XMM: float64(offset.X) / 1_000_000, YMM: float64(offset.Y) / 1_000_000})
 	}
 	return out
+}
+
+func explicitPinOffset(pin Pin, defaultOffset kicadfiles.Point) (kicadfiles.Point, bool) {
+	if pin.OffsetXMM == nil && pin.OffsetYMM == nil {
+		return kicadfiles.Point{}, false
+	}
+	offset := defaultOffset
+	if pin.OffsetXMM != nil {
+		offset.X = kicadfiles.MM(*pin.OffsetXMM)
+	}
+	if pin.OffsetYMM != nil {
+		offset.Y = kicadfiles.MM(*pin.OffsetYMM)
+	}
+	return offset, true
 }
 
 func transactionSymbolProperties(component Component) []transactions.SymbolProperty {

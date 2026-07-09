@@ -231,6 +231,12 @@ Component fields:
   is available, validation must ensure the role does not contradict the KiCad
   electrical pin type. If no library context is available, role/type
   compatibility is reported as unchecked evidence rather than guessed.
+- `pins[].offset_x_mm` and `pins[].offset_y_mm`: optional explicit schematic pin
+  anchor coordinates relative to the symbol origin. These are required when an
+  external or synthetic symbol is not covered by KiCadAI's verified template
+  metadata. Omitted axes inherit the resolved template value as zero; an
+  explicitly provided zero is preserved. Explicit geometry takes precedence
+  over template geometry for both layout and generated transaction anchors.
 - `properties`: optional string map for symbol properties.
 
 Net fields:

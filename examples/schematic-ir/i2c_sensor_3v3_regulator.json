@@ -16,17 +16,17 @@
         "symbol": "Connector:USB_C_Receptacle_USB2.0",
         "footprint": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
         "pins": [
-          {"number": "A4", "name": "VBUS"},
-          {"number": "A9", "name": "VBUS"},
-          {"number": "B4", "name": "VBUS"},
-          {"number": "B9", "name": "VBUS"},
-          {"number": "A1", "name": "GND"},
-          {"number": "A12", "name": "GND"},
-          {"number": "B1", "name": "GND"},
-          {"number": "B12", "name": "GND"},
-          {"number": "A5", "name": "CC1"},
-          {"number": "B5", "name": "CC2"},
-          {"number": "SH", "name": "SHIELD"}
+          {"number": "A4", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 10.16},
+          {"number": "A9", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 7.62},
+          {"number": "B4", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 5.08},
+          {"number": "B9", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 2.54},
+          {"number": "A1", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -10.16},
+          {"number": "A12", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -12.70},
+          {"number": "B1", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -15.24},
+          {"number": "B12", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -17.78},
+          {"number": "A5", "name": "CC1", "offset_x_mm": 15.24, "offset_y_mm": -5.08},
+          {"number": "B5", "name": "CC2", "offset_x_mm": 15.24, "offset_y_mm": -7.62},
+          {"number": "SH", "name": "SHIELD", "offset_x_mm": -7.62, "offset_y_mm": -20.32}
         ]
       },
       {
@@ -60,7 +60,7 @@
         "id": "regulator",
         "ref": "U1",
         "role": "regulator",
-        "symbol": "Regulator_Linear:AMS1117-3.3",
+        "symbol": "kicadai:ams1117_schematic",
         "value": "AMS1117-3.3",
         "footprint": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
         "pins": [{"number": "1", "name": "GND"}, {"number": "2", "name": "VOUT"}, {"number": "3", "name": "VIN"}]
@@ -87,18 +87,18 @@
         "id": "sensor",
         "ref": "U2",
         "role": "sensor",
-        "symbol": "Sensor:Generic_I2C",
+        "symbol": "Sensor:Generic_I2C_8P",
         "value": "I2C_SENSOR",
         "footprint": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
         "pins": [
-          {"number": "1", "name": "VCC"},
-          {"number": "2", "name": "GND"},
-          {"number": "3", "name": "SDA"},
-          {"number": "4", "name": "SCL"},
-          {"number": "5", "name": "INT"},
-          {"number": "6", "name": "NC1"},
-          {"number": "7", "name": "NC2"},
-          {"number": "8", "name": "NC3"}
+          {"number": "1", "name": "VCC", "offset_x_mm": -2.54, "offset_y_mm": -3.81},
+          {"number": "2", "name": "GND", "offset_x_mm": -2.54, "offset_y_mm": 3.81},
+          {"number": "3", "name": "SDA", "offset_x_mm": -2.54, "offset_y_mm": -1.27},
+          {"number": "4", "name": "SCL", "offset_x_mm": -2.54, "offset_y_mm": 1.27},
+          {"number": "5", "name": "INT", "offset_x_mm": 2.54, "offset_y_mm": 0},
+          {"number": "6", "name": "NC1", "offset_x_mm": 2.54, "offset_y_mm": 2.54},
+          {"number": "7", "name": "NC2", "offset_x_mm": 2.54, "offset_y_mm": 5.08},
+          {"number": "8", "name": "NC3", "offset_x_mm": 2.54, "offset_y_mm": 7.62}
         ]
       },
       {

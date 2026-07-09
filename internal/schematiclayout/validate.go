@@ -73,7 +73,7 @@ func Validate(result Result, request Request) Result {
 	textObjects := nonSymbolValidationObjects(objects)
 	for _, wire := range result.Wires {
 		for _, object := range symbolBodies {
-			if SegmentIntersectsRect(wire, object.Box) {
+			if SegmentIntersectsRect(wire, object.Box) && !wireLeavesAttachedSymbol(wire, object, result.Components) {
 				result.Diagnostics = append(result.Diagnostics, Diagnostic{
 					Severity: SeverityError,
 					Code:     "wire_symbol_overlap",
@@ -97,6 +97,47 @@ func Validate(result Result, request Request) Result {
 		}
 	}
 	return NormalizeResult(result, rules)
+}
+
+// wireLeavesAttachedSymbol permits the short wire stub that exits a symbol
+// pin. The validator must still reject a wire that enters or crosses a body;
+// only an axis-aligned segment that starts at a known pin and immediately
+// continues away from that body's bounds is exempt.
+func wireLeavesAttachedSymbol(wire WireSegment, object ValidationObject, components []PlacedComponent) bool {
+	var component *PlacedComponent
+	for index := range components {
+		if components[index].Ref == object.Ref {
+			component = &components[index]
+			break
+		}
+	}
+	if component == nil || len(component.Pins) == 0 {
+		return false
+	}
+	anchors := pinAnchors([]PlacedComponent{*component})
+	for _, endpoint := range []kicadfiles.Point{wire.From, wire.To} {
+		attached := false
+		for _, anchor := range anchors {
+			if anchor == endpoint {
+				attached = true
+				break
+			}
+		}
+		if !attached {
+			continue
+		}
+		other := wire.To
+		if endpoint == wire.To {
+			other = wire.From
+		}
+		if wire.From.X == wire.To.X && (endpoint.Y <= object.Box.MinY && other.Y <= object.Box.MinY || endpoint.Y >= object.Box.MaxY && other.Y >= object.Box.MaxY) {
+			return true
+		}
+		if wire.From.Y == wire.To.Y && (endpoint.X <= object.Box.MinX && other.X <= object.Box.MinX || endpoint.X >= object.Box.MaxX && other.X >= object.Box.MaxX) {
+			return true
+		}
+	}
+	return false
 }
 
 func nonSymbolValidationObjects(objects []ValidationObject) []ValidationObject {

@@ -156,6 +156,27 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: 0}},
 		},
 	},
+	"kicadai:ams1117_schematic": {
+		bodyName: "AMS1117_Schematic", pinType: "passive", localLibrary: true,
+		pins: []TemplatePin{
+			{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-7.62)}},
+			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(7.62)}},
+			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62)}},
+		},
+	},
+	"sensor:generic_i2c_8p": {
+		bodyName: "Generic_I2C_8P", pinType: "passive", localLibrary: true,
+		pins: []TemplatePin{
+			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
+			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},
+			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}},
+			{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}},
+			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+			{Number: "6", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)}},
+			{Number: "7", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(5.08)}},
+			{Number: "8", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(7.62)}},
+		},
+	},
 }
 
 // EmbeddedSymbolTemplate returns a KiCad-native embedded lib symbol body for
@@ -172,11 +193,27 @@ func EmbeddedSymbolTemplate(libraryID string) (EmbeddedSymbol, bool) {
 // EmbeddedSymbolPinOffsets returns template pin anchors relative to the symbol
 // origin for supported seed symbols.
 func EmbeddedSymbolPinOffsets(libraryID string) ([]TemplatePin, bool) {
-	template, ok := embeddedSymbolTemplates[strings.ToLower(strings.TrimSpace(libraryID))]
+	template, ok := pinOffsetTemplate(libraryID)
 	if !ok {
 		return nil, false
 	}
 	return cloneTemplatePins(template.pins), true
+}
+
+// pinOffsetTemplate provides connection geometry for known external symbols
+// without making the writer emit a synthetic local library body for them.
+func pinOffsetTemplate(libraryID string) (embeddedTemplate, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(libraryID))
+	if template, ok := embeddedSymbolTemplates[normalized]; ok {
+		return template, true
+	}
+	switch normalized {
+	case "connector:usb_c_receptacle_usb2.0":
+		template, ok := embeddedSymbolTemplates["kicadai:usb_c_receptacle_poweronly_full"]
+		return template, ok
+	default:
+		return embeddedTemplate{}, false
+	}
 }
 
 // LocalSymbolLibrary renders a project-local KiCad symbol library containing
@@ -228,7 +265,7 @@ func LocalSymbolLibraryForIDs(libraryIDs []string) ([]byte, bool) {
 // anchor override for symbols whose ERC-resolved connection point differs from
 // the canonical raw symbol primitive used for library-body compatibility.
 func EmbeddedSymbolConnectionPinOffset(libraryID string, pinNumber string) (kicadfiles.Point, bool) {
-	template, ok := embeddedSymbolTemplates[strings.ToLower(strings.TrimSpace(libraryID))]
+	template, ok := pinOffsetTemplate(libraryID)
 	if !ok || len(template.connectionPinOverride) == 0 {
 		return kicadfiles.Point{}, false
 	}

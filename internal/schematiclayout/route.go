@@ -335,6 +335,10 @@ func Layout(request Request) Result {
 		candidates = []Sheet{request.Sheet}
 	}
 	var last Result
+	var lastRequest Request
+	var selected Result
+	var selectedRequest Request
+	selectedFound := false
 	for index, sheet := range candidates {
 		candidateRequest := request
 		candidateRequest.Sheet = sheet
@@ -354,10 +358,19 @@ func Layout(request Request) Result {
 			})
 		}
 		last = candidate
+		lastRequest = candidateRequest
 		if !hasPageOverflow(candidate) {
-			return NormalizeResult(candidate, candidateRequest.Rules)
+			selected = candidate
+			selectedRequest = candidateRequest
+			selectedFound = true
+			break
 		}
 	}
+	if selectedFound {
+		selected = finalizeLayoutCandidate(selected, selectedRequest)
+		return NormalizeResult(selected, selectedRequest.Rules)
+	}
+	last = finalizeLayoutCandidate(last, lastRequest)
 	last.Diagnostics = append(last.Diagnostics, Diagnostic{
 		Severity: SeverityError,
 		Code:     "page_fit_exhausted",
@@ -377,6 +390,27 @@ func Layout(request Request) Result {
 		})
 	}
 	return NormalizeResult(last, request.Rules)
+}
+
+func finalizeLayoutCandidate(candidate Result, request Request) Result {
+	var textDiagnostics []Diagnostic
+	candidate.Components, textDiagnostics = reflowTextForWires(candidate.Components, candidate.Wires, request.Rules)
+	candidate.Diagnostics = filterTextDiagnostics(candidate.Diagnostics)
+	candidate.Diagnostics = append(candidate.Diagnostics, textDiagnostics...)
+	return Validate(candidate, request)
+}
+
+func filterTextDiagnostics(diagnostics []Diagnostic) []Diagnostic {
+	filtered := make([]Diagnostic, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		switch diagnostic.Code {
+		case "text_placement_fallback", "text_symbol_overlap", "text_wire_overlap":
+			continue
+		default:
+			filtered = append(filtered, diagnostic)
+		}
+	}
+	return filtered
 }
 
 func pinAnchors(components []PlacedComponent) map[Endpoint]kicadfiles.Point {

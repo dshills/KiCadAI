@@ -198,6 +198,10 @@ func RotateRect(rect Rect, angle kicadfiles.Angle) Rect {
 }
 
 func DefaultBodyFor(component PlacedComponent) Rect {
+	switch strings.ToLower(strings.TrimSpace(component.LibraryID)) {
+	case libraryIDGenericI2C, libraryIDGenericI2C8P:
+		return Rect{MinX: kicadfiles.MM(-2.54), MinY: kicadfiles.MM(-3.81), MaxX: kicadfiles.MM(2.54), MaxY: kicadfiles.MM(7.62)}
+	}
 	width := kicadfiles.MM(10.16)
 	height := kicadfiles.MM(7.62)
 	role := normalizeRole(component.Role)
@@ -217,6 +221,11 @@ func DefaultBodyFor(component PlacedComponent) Rect {
 	}
 	return Rect{MinX: -width / 2, MinY: -height / 2, MaxX: width / 2, MaxY: height / 2}
 }
+
+const (
+	libraryIDGenericI2C   = "sensor:generic_i2c"
+	libraryIDGenericI2C8P = "sensor:generic_i2c_8p"
+)
 
 func orderedIU(first, second kicadfiles.IU) (kicadfiles.IU, kicadfiles.IU) {
 	if first <= second {

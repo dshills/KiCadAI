@@ -25,6 +25,7 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 			Value:           symbol.Value,
 			LibraryID:       symbol.LibraryID,
 			Position:        symbol.Position,
+			Rotation:        symbol.Rotation,
 			OriginalOrdinal: index,
 		}
 		component.Role = InferComponentRole(component)

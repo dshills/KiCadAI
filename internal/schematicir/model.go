@@ -86,10 +86,12 @@ const (
 )
 
 type Pin struct {
-	Number    string  `json:"number"`
-	Name      string  `json:"name,omitempty"`
-	Role      PinRole `json:"role,omitempty"`
-	NoConnect bool    `json:"no_connect,omitempty"`
+	Number    string   `json:"number"`
+	Name      string   `json:"name,omitempty"`
+	Role      PinRole  `json:"role,omitempty"`
+	NoConnect bool     `json:"no_connect,omitempty"`
+	OffsetXMM *float64 `json:"offset_x_mm,omitempty"`
+	OffsetYMM *float64 `json:"offset_y_mm,omitempty"`
 }
 
 type PinRole string

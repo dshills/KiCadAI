@@ -143,6 +143,14 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || len(i2cPins) != 5 || i2cPins[0].Number != "1" || i2cPins[0].Offset.Y != kicadfiles.MM(-3.81) || i2cPins[4].Number != "5" || i2cPins[4].Offset.X != kicadfiles.MM(2.54) {
 		t.Fatalf("unexpected generic I2C sensor offsets: %#v ok=%v", i2cPins, ok)
 	}
+	i2c8Pins, ok := EmbeddedSymbolPinOffsets("Sensor:Generic_I2C_8P")
+	if !ok || len(i2c8Pins) != 8 || i2c8Pins[7].Number != "8" || i2c8Pins[7].Offset.Y != kicadfiles.MM(7.62) {
+		t.Fatalf("unexpected eight-pin generic I2C offsets: %#v ok=%v", i2c8Pins, ok)
+	}
+	externalUSBPins, ok := EmbeddedSymbolPinOffsets("Connector:USB_C_Receptacle_USB2.0")
+	if !ok || len(externalUSBPins) != 11 || externalUSBPins[0].Number != "A5" {
+		t.Fatalf("unexpected external USB-C offsets: %#v ok=%v", externalUSBPins, ok)
+	}
 	pins[0].Number = "BROKEN"
 	freshPins, ok := EmbeddedSymbolPinOffsets("Device:R")
 	if !ok || freshPins[0].Number != "1" {
@@ -163,6 +171,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	ams1117Pins, ok := EmbeddedSymbolPinOffsets("Regulator_Linear:AMS1117-3.3")
 	if !ok || len(ams1117Pins) != 3 || ams1117Pins[0].Number != "1" || ams1117Pins[0].Offset.X != 0 || ams1117Pins[1].Number != "2" || ams1117Pins[1].Offset.X != kicadfiles.MM(7.62) || ams1117Pins[2].Number != "3" || ams1117Pins[2].Offset.X != kicadfiles.MM(-7.62) {
 		t.Fatalf("unexpected AMS1117 offsets: %#v ok=%v", ams1117Pins, ok)
+	}
+	schematicAMS1117Pins, ok := EmbeddedSymbolPinOffsets("kicadai:ams1117_schematic")
+	if !ok || len(schematicAMS1117Pins) != 3 || schematicAMS1117Pins[0].Offset.Y != kicadfiles.MM(-7.62) {
+		t.Fatalf("unexpected schematic AMS1117 offsets: %#v ok=%v", schematicAMS1117Pins, ok)
 	}
 	if _, ok := EmbeddedSymbolPinOffsets("Custom:Block"); ok {
 		t.Fatal("unexpected custom block template pins")
