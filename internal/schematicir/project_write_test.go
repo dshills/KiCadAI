@@ -78,6 +78,18 @@ func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 		if err := schematic.Validate(*child); err != nil {
 			t.Fatalf("child %s validation: %v", child.Filename, err)
 		}
+		request, layoutResult := schematiclayout.AdaptSchematic(child)
+		layoutResult = schematiclayout.Validate(layoutResult, request)
+		readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+		unexpectedOverlap := false
+		for code, count := range readability.OverlapCounts {
+			if code != "text_symbol_overlap" && count > 0 {
+				unexpectedOverlap = true
+			}
+		}
+		if !readability.Passed || readability.ErrorCount != 0 || unexpectedOverlap {
+			t.Fatalf("child %s readability: %#v diagnostics=%#v", child.Filename, readability, layoutResult.Diagnostics)
+		}
 	}
 }
 

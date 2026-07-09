@@ -29,7 +29,10 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 		return PartitionResult{Sheets: []PartitionSheet{{ID: "0-0", Name: "Sheet 0-0"}}, Complete: true}
 	}
 	portrait := request.Sheet.Width > 0 && request.Sheet.Height > request.Sheet.Width
-	sheet := SheetForPaperOrientation("A0", portrait)
+	// Child sheets need enough room for their local wires and labels after the
+	// hierarchy writer recenters them. A4 keeps partitioned pages readable and
+	// lets the child layout solve smaller local graphs deterministically.
+	sheet := SheetForPaperOrientation("A4", portrait)
 	if request.Sheet.Width > sheet.Width || request.Sheet.Height > sheet.Height {
 		sheet = request.Sheet
 		if sheet.Margin <= 0 {
