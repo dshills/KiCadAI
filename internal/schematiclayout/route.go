@@ -421,7 +421,7 @@ func pinAnchors(components []PlacedComponent) map[Endpoint]kicadfiles.Point {
 			continue
 		}
 		for _, pin := range component.Pins {
-			offset := RotatePoint(pin.At, component.Rotation)
+			offset := TransformPoint(pin.At, component.Rotation, component.Mirror)
 			anchors[Endpoint{Ref: component.Ref, Pin: pin.Number}] = kicadfiles.Point{
 				X: component.PlacedAt.X + offset.X,
 				Y: component.PlacedAt.Y + offset.Y,

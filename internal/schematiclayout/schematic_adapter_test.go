@@ -49,6 +49,42 @@ func TestAdaptSchematicHandlesMissingPinAnchors(t *testing.T) {
 	}
 }
 
+func TestAdaptSchematicUsesEmbeddedBodyBounds(t *testing.T) {
+	file := &schematic.SchematicFile{Symbols: []schematic.SchematicSymbol{{
+		Reference:  "U1",
+		LibraryID:  "Custom:Block",
+		Position:   kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+		BodyBounds: &schematic.SymbolBodyBounds{Min: kicadfiles.Point{X: kicadfiles.MM(-12), Y: kicadfiles.MM(-4)}, Max: kicadfiles.Point{X: kicadfiles.MM(3), Y: kicadfiles.MM(9)}},
+	}}}
+	request, _ := AdaptSchematic(file)
+	if len(request.Components) != 1 {
+		t.Fatalf("components = %#v", request.Components)
+	}
+	want := Rect{MinX: kicadfiles.MM(-12), MinY: kicadfiles.MM(-4), MaxX: kicadfiles.MM(3), MaxY: kicadfiles.MM(9)}
+	if request.Components[0].Body != want {
+		t.Fatalf("body = %#v, want %#v", request.Components[0].Body, want)
+	}
+}
+
+func TestAdaptSchematicNormalizesRotatedPinAnchorsToLocalCoordinates(t *testing.T) {
+	file := &schematic.SchematicFile{Symbols: []schematic.SchematicSymbol{{
+		Reference:  "U1",
+		LibraryID:  "Custom:Block",
+		Position:   kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+		Rotation:   90,
+		Pins:       []schematic.SymbolPin{{Number: "1"}, {Number: "2"}},
+		PinAnchors: []kicadfiles.Point{{X: kicadfiles.MM(50), Y: kicadfiles.MM(45)}, {X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}},
+	}}}
+	request, _ := AdaptSchematic(file)
+	if len(request.Components) != 1 || len(request.Components[0].Pins) != 2 {
+		t.Fatalf("components = %#v", request.Components)
+	}
+	pins := request.Components[0].Pins
+	if pins[0].At != (kicadfiles.Point{X: kicadfiles.MM(-5), Y: 0}) || pins[1].At != (kicadfiles.Point{X: kicadfiles.MM(5), Y: 0}) {
+		t.Fatalf("local pin offsets = %#v", pins)
+	}
+}
+
 func TestAdaptSchematicPreservesLabelsAndJunctions(t *testing.T) {
 	file := &schematic.SchematicFile{
 		Labels:    []schematic.Label{{Text: "SIG", Position: kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(30)}}},

@@ -80,7 +80,88 @@ func Read(data []byte) (SchematicFile, error) {
 			}
 		}
 	}
+	recoverEmbeddedSymbolGeometry(&file)
 	return file, nil
+}
+
+func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
+	if file == nil || len(file.LibSymbols) == 0 {
+		return
+	}
+	byID := make(map[string]EmbeddedSymbol, len(file.LibSymbols))
+	for _, embedded := range file.LibSymbols {
+		byID[embedded.LibraryID] = embedded
+	}
+	type geometryKey struct {
+		libraryID string
+		unit      int
+		bodyStyle int
+	}
+	type geometryValue struct {
+		pins   []embeddedPinGeometry
+		bounds SymbolBodyBounds
+		ok     bool
+	}
+	cache := map[geometryKey]geometryValue{}
+	parsedBodies := map[string]sexpr.ParsedNode{}
+	for index := range file.Symbols {
+		symbol := &file.Symbols[index]
+		if _, known := EmbeddedSymbolPinOffsets(symbol.LibraryID); known {
+			continue
+		}
+		embedded, ok := byID[symbol.LibraryID]
+		if !ok {
+			continue
+		}
+		key := geometryKey{libraryID: symbol.LibraryID, unit: symbol.Unit, bodyStyle: symbol.BodyStyle}
+		geometry, cached := cache[key]
+		if !cached {
+			root, parsed := parsedBodies[symbol.LibraryID]
+			if !parsed {
+				root = parsedGeometryNode(embedded.Body)
+				parsedBodies[symbol.LibraryID] = root
+			}
+			pins, bounds, boundsOK := embeddedSymbolGeometry(root, symbol.Unit, symbol.BodyStyle)
+			geometry = geometryValue{pins: pins, bounds: bounds, ok: boundsOK}
+			cache[key] = geometry
+		}
+		pins, bounds, boundsOK := geometry.pins, geometry.bounds, geometry.ok
+		if len(pins) != 0 {
+			anchors := embeddedPinAnchors(pins, symbol.Pins)
+			if len(anchors) == len(symbol.Pins) {
+				for pinIndex, anchor := range anchors {
+					offset := transformedReadPinOffset(anchor, symbol.Rotation, symbol.Mirror)
+					anchors[pinIndex] = kicadfiles.Point{X: symbol.Position.X + offset.X, Y: symbol.Position.Y + offset.Y}
+				}
+				symbol.PinAnchors = anchors
+			}
+		}
+		if boundsOK {
+			symbol.BodyBounds = &bounds
+		}
+	}
+}
+
+func embeddedPinAnchors(available []embeddedPinGeometry, symbolPins []SymbolPin) []kicadfiles.Point {
+	if len(available) == 0 || len(symbolPins) == 0 {
+		return nil
+	}
+	byNumber := map[string][]kicadfiles.Point{}
+	for _, pin := range available {
+		byNumber[pin.Number] = append(byNumber[pin.Number], pin.Offset)
+	}
+	used := map[string]int{}
+	anchors := make([]kicadfiles.Point, 0, len(symbolPins))
+	for _, symbolPin := range symbolPins {
+		options := byNumber[symbolPin.Number]
+		index := used[symbolPin.Number]
+		if index >= len(options) {
+			return nil
+		}
+		anchors = append(anchors, options[index])
+		used[symbolPin.Number] = index + 1
+	}
+	return anchors
 }
 
 func readSheet(node sexpr.ParsedNode) Sheet {

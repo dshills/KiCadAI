@@ -154,13 +154,23 @@ func componentBody(component PlacedComponent) Rect {
 	if body.Empty() {
 		body = DefaultBodyFor(component)
 	}
-	body = RotateRect(body, component.Rotation)
+	body = TransformRect(body, component.Rotation, component.Mirror)
 	return body.Translate(component.PlacedAt)
 }
 
 // RotatePoint rotates a symbol-local point around the symbol origin using the
 // same clockwise-on-page coordinate convention used by KiCad's Y-down canvas.
 func RotatePoint(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Point {
+	return TransformPoint(point, angle, MirrorNone)
+}
+
+func TransformPoint(point kicadfiles.Point, angle kicadfiles.Angle, mirror Mirror) kicadfiles.Point {
+	switch mirror {
+	case MirrorX:
+		point.Y = -point.Y
+	case MirrorY:
+		point.X = -point.X
+	}
 	if angle == 0 {
 		return point
 	}
@@ -174,10 +184,27 @@ func RotatePoint(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Poin
 	}
 }
 
+func InverseTransformPoint(point kicadfiles.Point, angle kicadfiles.Angle, mirror Mirror) kicadfiles.Point {
+	point = TransformPoint(point, -angle, MirrorNone)
+	switch mirror {
+	case MirrorX:
+		point.Y = -point.Y
+	case MirrorY:
+		point.X = -point.X
+	}
+	return point
+}
+
 // RotateRect returns the axis-aligned bounds of a rotated symbol-local box.
 func RotateRect(rect Rect, angle kicadfiles.Angle) Rect {
+	return TransformRect(rect, angle, MirrorNone)
+}
+
+func TransformRect(rect Rect, angle kicadfiles.Angle, mirror Mirror) Rect {
 	if rect.Empty() || angle == 0 {
-		return rect
+		if mirror == MirrorNone {
+			return rect
+		}
 	}
 	points := []kicadfiles.Point{
 		{X: rect.MinX, Y: rect.MinY},
@@ -185,10 +212,10 @@ func RotateRect(rect Rect, angle kicadfiles.Angle) Rect {
 		{X: rect.MaxX, Y: rect.MaxY},
 		{X: rect.MinX, Y: rect.MaxY},
 	}
-	first := RotatePoint(points[0], angle)
+	first := TransformPoint(points[0], angle, mirror)
 	result := Rect{MinX: first.X, MinY: first.Y, MaxX: first.X, MaxY: first.Y}
 	for _, point := range points[1:] {
-		rotated := RotatePoint(point, angle)
+		rotated := TransformPoint(point, angle, mirror)
 		result.MinX = minIU(result.MinX, rotated.X)
 		result.MinY = minIU(result.MinY, rotated.Y)
 		result.MaxX = maxIU(result.MaxX, rotated.X)

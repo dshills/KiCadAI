@@ -74,7 +74,15 @@ type SchematicSymbol struct {
 	// PinAnchors are absolute schematic coordinates supplied by generators for
 	// connectivity validation. The writer does not derive them from libraries.
 	PinAnchors []kicadfiles.Point
+	BodyBounds *SymbolBodyBounds
 	Instances  []SymbolInstance
+}
+
+type SymbolBodyBounds struct {
+	// Bounds are in untransformed library coordinates. Schematic instances apply
+	// their mirror and rotation when adapting them for layout.
+	Min kicadfiles.Point
+	Max kicadfiles.Point
 }
 
 type Field struct {

@@ -244,6 +244,13 @@ Component fields:
   height. When omitted, KiCadAI uses its resolved template or conservative role
   fallback; arbitrary external symbols should provide this field or resolver
   evidence before strict readable acceptance.
+
+On readback, the schematic adapter uses the embedded KiCad `lib_symbols` body
+to recover pin anchors and graphics bounds for symbols without a KiCadAI
+verified template. Verified templates remain authoritative because they may
+contain deliberate connection-anchor corrections for existing generated
+fixtures. This precedence must be deterministic and must never guess pin
+geometry when neither source is available.
 - `properties`: optional string map for symbol properties.
 
 Net fields:

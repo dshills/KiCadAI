@@ -70,12 +70,23 @@ type Component struct {
 	Position        kicadfiles.Point
 	Fixed           bool
 	Rotation        kicadfiles.Angle
+	Mirror          Mirror
 	Body            Rect
 	ReferenceText   TextBox
 	ValueText       TextBox
 	Pins            []Pin
 	OriginalOrdinal int
 }
+
+type Mirror string
+
+const (
+	MirrorNone Mirror = ""
+	// MirrorX follows KiCad's mirror-x transform: reflect across the X axis.
+	MirrorX Mirror = "x"
+	// MirrorY follows KiCad's mirror-y transform: reflect across the Y axis.
+	MirrorY Mirror = "y"
+)
 
 type Pin struct {
 	Number string

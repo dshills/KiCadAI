@@ -26,7 +26,11 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 			LibraryID:       symbol.LibraryID,
 			Position:        symbol.Position,
 			Rotation:        symbol.Rotation,
+			Mirror:          Mirror(symbol.Mirror),
 			OriginalOrdinal: index,
+		}
+		if symbol.BodyBounds != nil {
+			component.Body = Rect{MinX: symbol.BodyBounds.Min.X, MinY: symbol.BodyBounds.Min.Y, MaxX: symbol.BodyBounds.Max.X, MaxY: symbol.BodyBounds.Max.Y}
 		}
 		component.Role = InferComponentRole(component)
 		component.Stage = StageForRole(component.Role)
@@ -64,7 +68,7 @@ func pinsFromSymbol(symbol schematic.SchematicSymbol) []Pin {
 	for index, pin := range symbol.Pins {
 		relative := kicadfiles.Point{}
 		if index < len(symbol.PinAnchors) {
-			relative = kicadfiles.Point{X: symbol.PinAnchors[index].X - symbol.Position.X, Y: symbol.PinAnchors[index].Y - symbol.Position.Y}
+			relative = InverseTransformPoint(kicadfiles.Point{X: symbol.PinAnchors[index].X - symbol.Position.X, Y: symbol.PinAnchors[index].Y - symbol.Position.Y}, symbol.Rotation, Mirror(symbol.Mirror))
 		}
 		pins = append(pins, Pin{Number: pin.Number, At: relative})
 	}
