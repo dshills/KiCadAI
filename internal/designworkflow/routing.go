@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"math"
 	"slices"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -197,6 +198,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	routeTreeRepairHints := BuildRouteTreeRepairHints(issues)
 	operations := append(localOperations, anchorOperations...)
 	operations = append(operations, routeOperations...)
+	operations = dedupeSameNetRouteVias(operations)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Issues = cloneIssues(issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
@@ -1342,6 +1344,251 @@ func transactionRouteOperations(operations []routing.Operation) []transactions.O
 		out = append(out, txOperation)
 	}
 	return out
+}
+
+func dedupeSameNetRouteVias(operations []transactions.Operation) []transactions.Operation {
+	if len(operations) == 0 {
+		return nil
+	}
+	routes := decodeRouteOperations(operations)
+	snapPoints := sameNetViaSnapPoints(routes)
+	seen := map[routeViaPointKey]struct{}{}
+	out := make([]transactions.Operation, 0, len(operations))
+	for _, route := range routes {
+		operation := route.operation
+		if !route.decoded {
+			out = append(out, operation)
+			continue
+		}
+		payload := route.payload
+		changed := false
+		for index := range payload.Vias {
+			if point, ok := snapPoints.vias[sameNetViaPointKey(payload.NetName, payload.Vias[index].At, payload.Vias[index].Layers)]; ok {
+				payload.Vias[index].At = point
+				changed = true
+			}
+		}
+		for index := range payload.Points {
+			if point, ok := snapPoints.layerPoints[sameNetLayerPointKey(payload.NetName, payload.Points[index], payload.Layer)]; ok {
+				payload.Points[index] = point
+				changed = true
+			}
+		}
+		filtered := payload.Vias[:0]
+		for _, via := range payload.Vias {
+			key := sameNetViaPointKey(payload.NetName, via.At, via.Layers)
+			if _, exists := seen[key]; exists {
+				changed = true
+				continue
+			}
+			seen[key] = struct{}{}
+			filtered = append(filtered, via)
+		}
+		payload.Vias = filtered
+		if !changed {
+			out = append(out, operation)
+			continue
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			out = append(out, operation)
+			continue
+		}
+		operation.Raw = raw
+		out = append(out, operation)
+	}
+	return out
+}
+
+type decodedRouteOperation struct {
+	operation transactions.Operation
+	payload   transactions.RouteOperation
+	decoded   bool
+}
+
+type routeViaRecord struct {
+	netName string
+	point   transactions.Point
+	drillMM float64
+	layers  string
+}
+
+type routeViaSnapPoints struct {
+	vias        map[routeViaPointKey]transactions.Point
+	layerPoints map[routeLayerPointKey]transactions.Point
+}
+
+type routeCoordKey struct {
+	x int64
+	y int64
+}
+
+type routeViaPointKey struct {
+	net    string
+	point  routeCoordKey
+	layers string
+}
+
+type routeLayerPointKey struct {
+	net   string
+	point routeCoordKey
+	layer string
+}
+
+type routeCellKey struct {
+	x int
+	y int
+}
+
+func decodeRouteOperations(operations []transactions.Operation) []decodedRouteOperation {
+	routes := make([]decodedRouteOperation, 0, len(operations))
+	for _, operation := range operations {
+		route := decodedRouteOperation{operation: operation}
+		if operation.Op == transactions.OpRoute && len(operation.Raw) > 0 {
+			if err := json.Unmarshal(operation.Raw, &route.payload); err == nil {
+				route.decoded = true
+			}
+		}
+		routes = append(routes, route)
+	}
+	return routes
+}
+
+func sameNetViaSnapPoints(routes []decodedRouteOperation) routeViaSnapPoints {
+	const minHoleClearanceMM = 0.25
+	snapPoints := routeViaSnapPoints{
+		vias:        map[routeViaPointKey]transactions.Point{},
+		layerPoints: map[routeLayerPointKey]transactions.Point{},
+	}
+	seen := newRouteViaSpatialIndex()
+	for _, route := range routes {
+		if !route.decoded {
+			continue
+		}
+		payload := route.payload
+		for _, via := range payload.Vias {
+			current := routeViaRecord{netName: payload.NetName, point: via.At, drillMM: via.DrillMM, layers: viaLayerSpanKey(via.Layers)}
+			if match, ok := nearestSameNetVia(current, seen, minHoleClearanceMM); ok {
+				snapPoints.vias[sameNetViaPointKey(payload.NetName, via.At, via.Layers)] = match.point
+				for _, layer := range layersForRoutePointSnap(via.Layers, payload.Layer) {
+					snapPoints.layerPoints[sameNetLayerPointKey(payload.NetName, via.At, layer)] = match.point
+				}
+				continue
+			}
+			seen.add(current)
+		}
+	}
+	return snapPoints
+}
+
+type routeViaSpatialIndex struct {
+	cellSizeMM float64
+	maxDrillMM float64
+	byNet      map[string]map[routeCellKey][]routeViaRecord
+}
+
+func newRouteViaSpatialIndex() *routeViaSpatialIndex {
+	return &routeViaSpatialIndex{
+		cellSizeMM: 1,
+		byNet:      map[string]map[routeCellKey][]routeViaRecord{},
+	}
+}
+
+func (index *routeViaSpatialIndex) add(record routeViaRecord) {
+	netKey := routeNetKey(record.netName)
+	if _, ok := index.byNet[netKey]; !ok {
+		index.byNet[netKey] = map[routeCellKey][]routeViaRecord{}
+	}
+	cellKey := index.cellKey(record.point)
+	index.byNet[netKey][cellKey] = append(index.byNet[netKey][cellKey], record)
+	if record.drillMM > index.maxDrillMM {
+		index.maxDrillMM = record.drillMM
+	}
+}
+
+func (index *routeViaSpatialIndex) candidates(record routeViaRecord, minHoleClearanceMM float64) []routeViaRecord {
+	netCells := index.byNet[routeNetKey(record.netName)]
+	if len(netCells) == 0 {
+		return nil
+	}
+	cellX, cellY := index.cell(record.point)
+	searchDistanceMM := minHoleClearanceMM + record.drillMM/2 + index.maxDrillMM/2
+	cellRange := int(math.Ceil(searchDistanceMM / index.cellSizeMM))
+	if cellRange < 1 {
+		cellRange = 1
+	}
+	var candidates []routeViaRecord
+	for x := cellX - cellRange; x <= cellX+cellRange; x++ {
+		for y := cellY - cellRange; y <= cellY+cellRange; y++ {
+			candidates = append(candidates, netCells[index.cellCoordKey(x, y)]...)
+		}
+	}
+	return candidates
+}
+
+func (index *routeViaSpatialIndex) cell(point transactions.Point) (int, int) {
+	return int(math.Floor(point.XMM / index.cellSizeMM)), int(math.Floor(point.YMM / index.cellSizeMM))
+}
+
+func (index *routeViaSpatialIndex) cellKey(point transactions.Point) routeCellKey {
+	x, y := index.cell(point)
+	return index.cellCoordKey(x, y)
+}
+
+func (index *routeViaSpatialIndex) cellCoordKey(x int, y int) routeCellKey {
+	return routeCellKey{x: x, y: y}
+}
+
+func nearestSameNetVia(current routeViaRecord, seen *routeViaSpatialIndex, minHoleClearanceMM float64) (routeViaRecord, bool) {
+	for _, existing := range seen.candidates(current, minHoleClearanceMM) {
+		if existing.layers != current.layers {
+			continue
+		}
+		if routePointKey(existing.point) == routePointKey(current.point) {
+			return existing, true
+		}
+		requiredCenterDistance := minHoleClearanceMM + existing.drillMM/2 + current.drillMM/2
+		if math.Hypot(existing.point.XMM-current.point.XMM, existing.point.YMM-current.point.YMM) < requiredCenterDistance {
+			return existing, true
+		}
+	}
+	return routeViaRecord{}, false
+}
+
+func sameNetViaPointKey(netName string, point transactions.Point, layers []string) routeViaPointKey {
+	return routeViaPointKey{net: routeNetKey(netName), point: routePointKey(point), layers: viaLayerSpanKey(layers)}
+}
+
+func sameNetLayerPointKey(netName string, point transactions.Point, layer string) routeLayerPointKey {
+	return routeLayerPointKey{net: routeNetKey(netName), point: routePointKey(point), layer: strings.ToUpper(strings.TrimSpace(layer))}
+}
+
+func routeNetKey(netName string) string {
+	return strings.ToUpper(strings.TrimSpace(netName))
+}
+
+func layersForRoutePointSnap(viaLayers []string, routeLayer string) []string {
+	if len(viaLayers) == 0 {
+		return []string{routeLayer}
+	}
+	return viaLayers
+}
+
+func viaLayerSpanKey(layers []string) string {
+	normalized := make([]string, 0, len(layers))
+	for _, layer := range layers {
+		layer = strings.TrimSpace(layer)
+		if layer == "" {
+			continue
+		}
+		normalized = append(normalized, strings.ToUpper(layer))
+	}
+	sort.Strings(normalized)
+	return strings.Join(normalized, "/")
+}
+
+func routePointKey(point transactions.Point) routeCoordKey {
+	return routeCoordKey{x: int64(math.Round(point.XMM * 1000)), y: int64(math.Round(point.YMM * 1000))}
 }
 
 func canonicalRouteOperationLayers(raw json.RawMessage) json.RawMessage {

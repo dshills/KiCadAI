@@ -1550,6 +1550,161 @@ func pointsNearlyEqual(left transactions.Point, right transactions.Point) bool {
 	return math.Abs(left.XMM-right.XMM) <= tolerance && math.Abs(left.YMM-right.YMM) <= tolerance
 }
 
+func TestDedupeSameNetRouteViasDropsDuplicateViaLocations(t *testing.T) {
+	first := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "VBUS",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 1, YMM: 0}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 1, YMM: 0},
+			DiameterMM: 0.6,
+			DrillMM:    0.3,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+	second := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "VBUS",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 2, YMM: 0}, {XMM: 1, YMM: 0}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 1, YMM: 0},
+			DiameterMM: 0.6,
+			DrillMM:    0.3,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+
+	operations := dedupeSameNetRouteVias([]transactions.Operation{first, second})
+
+	if got := routeViaCountForRoutingTest(t, operations, "VBUS"); got != 1 {
+		t.Fatalf("VBUS via count = %d, want duplicate same-net via collapsed", got)
+	}
+}
+
+func TestDedupeSameNetRouteViasSnapsTooCloseViaToExistingVia(t *testing.T) {
+	first := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 30, YMM: 20}, {XMM: 23.1, YMM: 21}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 23.1, YMM: 21},
+			DiameterMM: 0.6,
+			DrillMM:    0.3,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+	second := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 23, YMM: 20.5}, {XMM: 13, YMM: 20.5}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 23, YMM: 20.5},
+			DiameterMM: 0.7,
+			DrillMM:    0.35,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+
+	operations := dedupeSameNetRouteVias([]transactions.Operation{first, second})
+	routes := requireRouteOperationsForNet(t, operations, "GND")
+
+	if got := routeViaCountForRoutingTest(t, operations, "GND"); got != 1 {
+		t.Fatalf("GND via count = %d, want close same-net via merged", got)
+	}
+	if !pointsNearlyEqual(routes[1].Points[0], transactions.Point{XMM: 23.1, YMM: 21}) {
+		t.Fatalf("second route start = %#v, want snapped to existing same-net via", routes[1].Points[0])
+	}
+}
+
+func TestDedupeSameNetRouteViasKeepsDistinctLayerSpans(t *testing.T) {
+	first := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 0, YMM: 0}, {XMM: 1, YMM: 0}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 1, YMM: 0},
+			DiameterMM: 0.6,
+			DrillMM:    0.3,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+	second := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "In1.Cu",
+		Points:  []transactions.Point{{XMM: 2, YMM: 0}, {XMM: 1, YMM: 0}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 1, YMM: 0},
+			DiameterMM: 0.6,
+			DrillMM:    0.3,
+			Layers:     []string{"In1.Cu", "B.Cu"},
+		}},
+	})
+
+	operations := dedupeSameNetRouteVias([]transactions.Operation{first, second})
+
+	if got := routeViaCountForRoutingTest(t, operations, "GND"); got != 2 {
+		t.Fatalf("GND via count = %d, want distinct layer spans preserved", got)
+	}
+}
+
+func TestDedupeSameNetRouteViasSnapsSameLayerEndpointWithoutVia(t *testing.T) {
+	first := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 30, YMM: 20}, {XMM: 23.1, YMM: 21}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 23.1, YMM: 21},
+			DiameterMM: 0.6,
+			DrillMM:    0.3,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+	second := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 23, YMM: 20.5}, {XMM: 13, YMM: 20.5}},
+		Vias: []transactions.RouteViaSpec{{
+			At:         transactions.Point{XMM: 23, YMM: 20.5},
+			DiameterMM: 0.7,
+			DrillMM:    0.35,
+			Layers:     []string{"F.Cu", "B.Cu"},
+		}},
+	})
+	third := mustRouteOperation(t, transactions.RouteOperation{
+		Op:      transactions.OpRoute,
+		NetName: "GND",
+		Layer:   "B.Cu",
+		Points:  []transactions.Point{{XMM: 23, YMM: 20.5}, {XMM: 10, YMM: 20.5}},
+	})
+
+	operations := dedupeSameNetRouteVias([]transactions.Operation{first, second, third})
+	routes := requireRouteOperationsForNet(t, operations, "GND")
+
+	if got := routeViaCountForRoutingTest(t, operations, "GND"); got != 1 {
+		t.Fatalf("GND via count = %d, want close same-net via merged", got)
+	}
+	if !pointsNearlyEqual(routes[2].Points[0], transactions.Point{XMM: 23.1, YMM: 21}) {
+		t.Fatalf("third route start = %#v, want snapped to retained same-layer via", routes[2].Points[0])
+	}
+}
+
+func mustRouteOperation(t *testing.T, payload transactions.RouteOperation) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions.NewOperation(transactions.OpRoute, raw)
+}
+
 func TestRoutePlacementSingleLayerUsesPlacedLayer(t *testing.T) {
 	placed := simplePlacedPads()
 	placed.Result.Placements[0].Position.Layer = "B.Cu"
