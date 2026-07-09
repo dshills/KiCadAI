@@ -639,6 +639,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			Layer:                         boardLayer(payload.Layer),
 			Pads:                          pads,
 			AllowUnmatchedUnconnectedPads: payload.AllowUnmatchedUnconnectedPads,
+			HideDefaultFootprintText:      payload.HideDefaultFootprintText,
 		}
 		if opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
 			if record, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, payload.FootprintID); ok {
@@ -792,18 +793,16 @@ func upsertImportedFootprint(board *pcb.PCBFile, generator kicadfiles.IDGenerato
 		}
 	}
 	value := firstNonEmpty(payload.Value, payload.Ref)
+	layer := boardLayer(payload.Layer)
 	footprint := pcb.Footprint{
-		UUID:      generator.New("imported.pcb.footprint", payload.Ref),
-		LibraryID: strings.TrimSpace(payload.FootprintID),
-		Reference: payload.Ref,
-		Value:     value,
-		Position:  point(payload.At.XMM, payload.At.YMM),
-		Rotation:  kicadfiles.Angle(payload.Rotation),
-		Layer:     boardLayer(payload.Layer),
-		Properties: []pcb.FootprintProperty{
-			{Name: "Reference", Value: payload.Ref, Position: kicadfiles.Point{Y: kicadfiles.MM(-1.5)}, Layer: kicadfiles.LayerFSilkS, UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Reference")},
-			{Name: "Value", Value: value, Position: kicadfiles.Point{Y: kicadfiles.MM(1.5)}, Layer: kicadfiles.LayerFSilkS, UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Value")},
-		},
+		UUID:       generator.New("imported.pcb.footprint", payload.Ref),
+		LibraryID:  strings.TrimSpace(payload.FootprintID),
+		Reference:  payload.Ref,
+		Value:      value,
+		Position:   point(payload.At.XMM, payload.At.YMM),
+		Rotation:   kicadfiles.Angle(payload.Rotation),
+		Layer:      layer,
+		Properties: importedDefaultFootprintProperties(generator, payload.Ref, value, layer, payload.HideDefaultFootprintText),
 	}
 	for i, padSpec := range payload.Pads {
 		net := ""

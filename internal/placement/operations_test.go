@@ -36,6 +36,9 @@ func TestPlacementOperationPayload(t *testing.T) {
 	if len(payload.Pads) != 1 || payload.Pads[0].Name != "1" || payload.Pads[0].WidthMM != 0.4 {
 		t.Fatalf("payload pads = %#v", payload.Pads)
 	}
+	if !payload.HideDefaultFootprintText {
+		t.Fatalf("placement-generated footprint text should be hidden")
+	}
 }
 
 func TestPlacementOperationPreservesPadNetEvidence(t *testing.T) {

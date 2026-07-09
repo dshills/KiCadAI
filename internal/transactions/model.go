@@ -232,6 +232,8 @@ type PlaceFootprintOperation struct {
 	Layer                         string        `json:"layer,omitempty"`
 	Pads                          []PadSpec     `json:"pads,omitempty"`
 	AllowUnmatchedUnconnectedPads bool          `json:"allow_unmatched_unconnected_pads"`
+	// HideDefaultFootprintText hides generated KiCad Reference and Value properties.
+	HideDefaultFootprintText bool `json:"hide_default_footprint_text,omitempty"`
 }
 
 type RouteOperation struct {

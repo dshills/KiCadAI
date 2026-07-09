@@ -20,6 +20,7 @@ func PlacementOperation(component Component, placement PlacementResult) (transac
 		Layer:                         placement.Position.Layer,
 		Pads:                          pads,
 		AllowUnmatchedUnconnectedPads: component.AllowUnmatchedUnconnectedPads,
+		HideDefaultFootprintText:      true,
 	}
 	raw, err := json.Marshal(payload)
 	if err != nil {

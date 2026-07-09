@@ -82,16 +82,20 @@ func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload Place
 		Rotation:           kicadfiles.Angle(payload.Rotation),
 		Layer:              layer,
 		MetadataProperties: importedMetadataProperties(record.Properties),
-		Properties: []pcb.FootprintProperty{
-			{Name: "Reference", Value: payload.Ref, Position: kicadfiles.Point{Y: kicadfiles.MM(-1.5)}, Layer: placementLayerFor(kicadfiles.LayerFSilkS, layer), UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Reference")},
-			{Name: "Value", Value: value, Position: kicadfiles.Point{Y: kicadfiles.MM(1.5)}, Layer: placementLayerFor(kicadfiles.LayerFSilkS, layer), UUID: generator.New("imported.pcb.footprint.property", payload.Ref, "Value")},
-		},
-		Texts:    importedFootprintTexts(generator, payload.Ref, record.Texts, layer),
-		Graphics: importedFootprintGraphics(generator, payload.Ref, record.Graphics, layer),
-		Pads:     importedPadsFromRecord(generator, payload.Ref, record, layer),
-		Models:   importedModels(record.Models),
+		Properties:         importedDefaultFootprintProperties(generator, payload.Ref, value, layer, payload.HideDefaultFootprintText),
+		Texts:              importedFootprintTexts(generator, payload.Ref, record.Texts, layer),
+		Graphics:           importedFootprintGraphics(generator, payload.Ref, record.Graphics, layer),
+		Pads:               importedPadsFromRecord(generator, payload.Ref, record, layer),
+		Models:             importedModels(record.Models),
 	}
 	return footprint
+}
+
+func importedDefaultFootprintProperties(generator kicadfiles.IDGenerator, ref string, value string, layer kicadfiles.BoardLayer, hideDefaultFootprintText bool) []pcb.FootprintProperty {
+	return []pcb.FootprintProperty{
+		{Name: "Reference", Value: ref, Position: kicadfiles.DefaultFootprintPropertyPosition("Reference"), Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, layer), Hide: hideDefaultFootprintText, UUID: generator.New("imported.pcb.footprint.property", ref, "Reference")},
+		{Name: "Value", Value: value, Position: kicadfiles.DefaultFootprintPropertyPosition("Value"), Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, layer), Hide: hideDefaultFootprintText, UUID: generator.New("imported.pcb.footprint.property", ref, "Value")},
+	}
 }
 
 func importedPadsFromRecord(generator kicadfiles.IDGenerator, ref string, record libraryresolver.FootprintRecord, layer kicadfiles.BoardLayer) []pcb.Pad {
@@ -143,7 +147,7 @@ func footprintTextsFromRecord(texts []libraryresolver.FootprintText, placementLa
 			Kind:     text.Kind,
 			Text:     text.Text,
 			Position: text.Position,
-			Layer:    placementLayerFor(kicadfiles.BoardLayer(text.Layer), placementLayer),
+			Layer:    kicadfiles.BoardLayerForPlacement(kicadfiles.BoardLayer(text.Layer), placementLayer),
 		})
 	}
 	return result
@@ -185,7 +189,7 @@ func footprintGraphicFromRecord(graphic libraryresolver.FootprintGraphic, placem
 	width := footprintGraphicStrokeWidth(graphic.Width)
 	drawing := pcb.Drawing{
 		Kind:       graphic.Kind,
-		Layer:      placementLayerFor(kicadfiles.BoardLayer(graphic.Layer), placementLayer),
+		Layer:      kicadfiles.BoardLayerForPlacement(kicadfiles.BoardLayer(graphic.Layer), placementLayer),
 		StrokeType: graphic.StrokeType,
 		Fill:       graphic.Fill,
 	}
@@ -293,31 +297,7 @@ func placementLayers(layers []kicadfiles.BoardLayer, placementLayer kicadfiles.B
 	}
 	mapped := make([]kicadfiles.BoardLayer, 0, len(layers))
 	for _, layer := range layers {
-		mapped = append(mapped, placementLayerFor(layer, placementLayer))
+		mapped = append(mapped, kicadfiles.BoardLayerForPlacement(layer, placementLayer))
 	}
 	return mapped
-}
-
-func placementLayerFor(layer kicadfiles.BoardLayer, placementLayer kicadfiles.BoardLayer) kicadfiles.BoardLayer {
-	if placementLayer != kicadfiles.LayerBCu {
-		return layer
-	}
-	switch layer {
-	case kicadfiles.LayerFCu:
-		return kicadfiles.LayerBCu
-	case kicadfiles.LayerFMask:
-		return kicadfiles.LayerBMask
-	case kicadfiles.LayerFPaste:
-		return kicadfiles.LayerBPaste
-	case kicadfiles.LayerFAdhes:
-		return kicadfiles.LayerBAdhes
-	case kicadfiles.LayerFSilkS:
-		return kicadfiles.LayerBSilkS
-	case kicadfiles.LayerFFab:
-		return kicadfiles.LayerBFab
-	case kicadfiles.LayerFCrtYd:
-		return kicadfiles.LayerBCrtYd
-	default:
-		return layer
-	}
 }

@@ -74,6 +74,11 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	if len(design.PCB.Footprints) != 2 {
 		t.Fatalf("footprints = %d, want 2", len(design.PCB.Footprints))
 	}
+	for _, property := range design.PCB.Footprints[0].Properties {
+		if (property.Name == "Reference" || property.Name == "Value") && property.Hide {
+			t.Fatalf("direct builder default property %s should stay visible unless explicitly hidden: %#v", property.Name, property)
+		}
+	}
 	if len(design.PCB.Tracks) != 1 {
 		t.Fatalf("tracks = %d, want 1", len(design.PCB.Tracks))
 	}
@@ -274,10 +279,11 @@ func TestBuilderPlaceFootprintAcceptsLibraryGeometry(t *testing.T) {
 		t.Fatalf("AssignFootprint returned error: %v", err)
 	}
 	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
-		Description:        "library resistor",
-		Tags:               "resistor 0805",
-		Attributes:         []string{"smd"},
-		MetadataProperties: []pcb.FootprintMetadataProperty{{Name: "ki_description", Value: "library resistor"}},
+		Description:              "library resistor",
+		Tags:                     "resistor 0805",
+		Attributes:               []string{"smd"},
+		MetadataProperties:       []pcb.FootprintMetadataProperty{{Name: "ki_description", Value: "library resistor"}},
+		HideDefaultFootprintText: true,
 		Texts: []pcb.FootprintText{
 			{Kind: "user", Text: "LIB", Layer: kicadfiles.LayerFSilkS},
 		},
@@ -300,6 +306,11 @@ func TestBuilderPlaceFootprintAcceptsLibraryGeometry(t *testing.T) {
 	footprint := builder.Design().PCB.Footprints[0]
 	if footprint.Description != "library resistor" || footprint.Tags != "resistor 0805" {
 		t.Fatalf("metadata not preserved: %#v", footprint)
+	}
+	for _, property := range footprint.Properties {
+		if (property.Name == "Reference" || property.Name == "Value") && !property.Hide {
+			t.Fatalf("default generated property %s should be hidden to avoid silkscreen DRC noise: %#v", property.Name, property)
+		}
 	}
 	if len(footprint.Texts) != 1 || !footprint.Texts[0].UUID.Valid() {
 		t.Fatalf("texts not preserved with UUIDs: %#v", footprint.Texts)
@@ -431,8 +442,9 @@ func TestBuilderPlaceFootprintUsesSideAwareDefaultsAndAttributes(t *testing.T) {
 		t.Fatalf("AssignFootprint returned error: %v", err)
 	}
 	if _, err := builder.PlaceFootprint("J1", PlaceFootprintOptions{
-		Layer:      kicadfiles.LayerBCu,
-		Attributes: []string{"smd"},
+		Layer:                    kicadfiles.LayerBCu,
+		Attributes:               []string{"smd"},
+		HideDefaultFootprintText: true,
 	}); err != nil {
 		t.Fatalf("PlaceFootprint returned error: %v", err)
 	}
@@ -444,6 +456,18 @@ func TestBuilderPlaceFootprintUsesSideAwareDefaultsAndAttributes(t *testing.T) {
 	footprint := design.PCB.Footprints[0]
 	if len(footprint.Attributes) != 1 || footprint.Attributes[0] != "smd" {
 		t.Fatalf("attributes = %+v", footprint.Attributes)
+	}
+	for _, property := range footprint.Properties {
+		switch property.Name {
+		case "Reference", "Value":
+			if property.Layer != kicadfiles.LayerBSilkS || !property.Hide {
+				t.Fatalf("bottom-side default property = %#v, want hidden B.SilkS", property)
+			}
+		case "Datasheet", "Description":
+			if property.Layer != kicadfiles.LayerBFab || !property.Hide {
+				t.Fatalf("bottom-side metadata property = %#v, want hidden B.Fab", property)
+			}
+		}
 	}
 	for _, pad := range footprint.Pads {
 		if pad.Type != "smd" {

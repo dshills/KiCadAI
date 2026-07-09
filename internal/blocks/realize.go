@@ -195,13 +195,14 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		}
 		value := componentFacts[ref].Value
 		operation, err := wrapOperation(transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{
-			Op:          transactions.OpPlaceFootprint,
-			Ref:         ref,
-			FootprintID: footprintID,
-			Value:       value,
-			At:          transactions.Point{XMM: placement.XMM, YMM: placement.YMM},
-			Rotation:    placement.RotationDeg,
-			Layer:       placement.Layer,
+			Op:                       transactions.OpPlaceFootprint,
+			Ref:                      ref,
+			FootprintID:              footprintID,
+			Value:                    value,
+			At:                       transactions.Point{XMM: placement.XMM, YMM: placement.YMM},
+			Rotation:                 placement.RotationDeg,
+			Layer:                    placement.Layer,
+			HideDefaultFootprintText: true,
 		})
 		if err != nil {
 			result.Issues = append(result.Issues, blockIssue("pcb_realization.components."+component.ComponentRole, err.Error()))

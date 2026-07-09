@@ -340,9 +340,14 @@ func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
 	if len(specs) != 2 || !containsBoardLayer(specs[0].Layers, kicadfiles.LayerBCu) || !containsBoardLayer(specs[0].Layers, kicadfiles.LayerBMask) {
 		t.Fatalf("bottom layers not remapped: %#v", specs)
 	}
-	footprint := importedFootprintFromRecord(mustGenerator(t), PlaceFootprintOperation{Ref: "R1", FootprintID: record.FootprintID, Layer: string(kicadfiles.LayerBCu)}, record)
+	footprint := importedFootprintFromRecord(mustGenerator(t), PlaceFootprintOperation{Ref: "R1", FootprintID: record.FootprintID, Layer: string(kicadfiles.LayerBCu), HideDefaultFootprintText: true}, record)
 	if len(footprint.Properties) < 2 || footprint.Properties[0].Layer != kicadfiles.LayerBSilkS {
 		t.Fatalf("property layers not remapped: %#v", footprint.Properties)
+	}
+	for _, property := range footprint.Properties[:2] {
+		if !property.Hide {
+			t.Fatalf("default imported property %s should be hidden to avoid generated silkscreen DRC noise: %#v", property.Name, property)
+		}
 	}
 	if len(footprint.Texts) == 0 || footprint.Texts[0].Layer != kicadfiles.LayerBSilkS {
 		t.Fatalf("text layers not remapped: %#v", footprint.Texts)
@@ -854,10 +859,11 @@ func TestUpsertImportedFootprintUsesValueProperty(t *testing.T) {
 	}
 	board := &pcb.PCBFile{}
 	upsertImportedFootprint(board, generator, PlaceFootprintOperation{
-		Ref:         "R1",
-		FootprintID: "Resistor_SMD:R_0805_2012Metric",
-		Value:       "10k",
-		At:          Point{XMM: 1, YMM: 2},
+		Ref:                      "R1",
+		FootprintID:              "Resistor_SMD:R_0805_2012Metric",
+		Value:                    "10k",
+		At:                       Point{XMM: 1, YMM: 2},
+		HideDefaultFootprintText: true,
 	})
 	if len(board.Footprints) != 1 {
 		t.Fatalf("footprints = %d, want 1", len(board.Footprints))
@@ -868,6 +874,9 @@ func TestUpsertImportedFootprintUsesValueProperty(t *testing.T) {
 	}
 	for _, property := range got.Properties {
 		if property.Name == "Value" && property.Value == "10k" {
+			if !property.Hide {
+				t.Fatalf("value property should be hidden to avoid generated silkscreen DRC noise: %#v", property)
+			}
 			return
 		}
 	}

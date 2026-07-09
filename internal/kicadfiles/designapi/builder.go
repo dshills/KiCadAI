@@ -100,6 +100,8 @@ type PlaceFootprintOptions struct {
 	Models                        []pcb.Model3D
 	Pads                          []PadSpec
 	AllowUnmatchedUnconnectedPads bool
+	// HideDefaultFootprintText hides generated KiCad Reference and Value properties.
+	HideDefaultFootprintText bool
 }
 
 type PadSpec struct {
@@ -863,7 +865,7 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 		Layer:              options.Layer,
 		Attributes:         attributes,
 		MetadataProperties: cloneFootprintMetadataProperties(options.MetadataProperties),
-		Properties:         builder.footprintProperties(reference, symbol.Reference, symbol.Value),
+		Properties:         builder.footprintProperties(reference, symbol.Reference, symbol.Value, options.Layer, options.HideDefaultFootprintText),
 		Texts:              builder.footprintTextsFromOptions(reference, options.Texts),
 		Graphics:           builder.footprintGraphicsFromOptions(reference, options.Graphics),
 		Models:             cloneModels(options.Models),
@@ -1579,12 +1581,12 @@ func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSp
 	}, nil
 }
 
-func (builder *Builder) footprintProperties(key, reference, value string) []pcb.FootprintProperty {
+func (builder *Builder) footprintProperties(key, reference, value string, placementLayer kicadfiles.BoardLayer, hideDefaultFootprintText bool) []pcb.FootprintProperty {
 	return []pcb.FootprintProperty{
-		builder.footprintProperty(key, "Reference", reference, kicadfiles.Point{X: 0, Y: kicadfiles.MM(-1.5)}, kicadfiles.LayerFSilkS, false),
-		builder.footprintProperty(key, "Value", value, kicadfiles.Point{X: 0, Y: kicadfiles.MM(1.5)}, kicadfiles.LayerFSilkS, false),
-		builder.footprintProperty(key, "Datasheet", "", kicadfiles.Point{}, kicadfiles.LayerFFab, true),
-		builder.footprintProperty(key, "Description", "", kicadfiles.Point{}, kicadfiles.LayerFFab, true),
+		builder.footprintProperty(key, "Reference", reference, kicadfiles.DefaultFootprintPropertyPosition("Reference"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, placementLayer), hideDefaultFootprintText),
+		builder.footprintProperty(key, "Value", value, kicadfiles.DefaultFootprintPropertyPosition("Value"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFSilkS, placementLayer), hideDefaultFootprintText),
+		builder.footprintProperty(key, "Datasheet", "", kicadfiles.DefaultFootprintPropertyPosition("Datasheet"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFFab, placementLayer), true),
+		builder.footprintProperty(key, "Description", "", kicadfiles.DefaultFootprintPropertyPosition("Description"), kicadfiles.BoardLayerForPlacement(kicadfiles.LayerFFab, placementLayer), true),
 	}
 }
 

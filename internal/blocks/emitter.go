@@ -114,12 +114,13 @@ func ComponentOperations(component BlockComponent, ref string, at transactions.P
 		}
 		operations = append(operations, assign)
 		place, err := wrapOperation(transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{
-			Op:          transactions.OpPlaceFootprint,
-			Ref:         ref,
-			Role:        component.Role,
-			FootprintID: component.FootprintID,
-			Value:       component.Value,
-			At:          at,
+			Op:                       transactions.OpPlaceFootprint,
+			Ref:                      ref,
+			Role:                     component.Role,
+			FootprintID:              component.FootprintID,
+			Value:                    component.Value,
+			At:                       at,
+			HideDefaultFootprintText: true,
 		})
 		if err != nil {
 			return nil, []reports.Issue{blockIssue("component."+component.Role, err.Error())}
