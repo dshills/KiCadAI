@@ -1,0 +1,69 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "led_indicator",
+    "title": "LED Indicator",
+    "description": "Minimal current-limited LED indicator.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "vin",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_01x02",
+        "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "r_limit",
+        "ref": "R1",
+        "role": "current_limiter",
+        "symbol": "Device:R",
+        "value": "1k",
+        "footprint": "Resistor_SMD:R_0805_2012Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "led",
+        "ref": "D1",
+        "role": "indicator_led",
+        "symbol": "Device:LED",
+        "value": "green",
+        "footprint": "LED_SMD:LED_0805_2012Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      }
+    ],
+    "nets": [
+      {"name": "VIN", "role": "power", "connect": ["vin.1", "r_limit.1"], "label": "VIN"},
+      {"name": "LED_A", "role": "signal", "connect": ["r_limit.2", "led.1"], "label": "LED_A"},
+      {"name": "GND", "role": "ground", "connect": ["led.2", "vin.2"], "label": "GND"}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 20,
+      "min_component_spacing_mm": 10
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

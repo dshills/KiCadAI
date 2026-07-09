@@ -1,0 +1,181 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "i2c_sensor_3v3_regulator",
+    "title": "USB-C I2C Sensor Breakout with 3.3 V Regulator",
+    "description": "USB-C powered sensor breakout with fused 5 V input, 3.3 V regulator, pull-ups, and decoupling.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "usb_c",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector:USB_C_Receptacle_USB2.0",
+        "footprint": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
+        "pins": [
+          {"number": "A4", "name": "VBUS"},
+          {"number": "A9", "name": "VBUS"},
+          {"number": "B4", "name": "VBUS"},
+          {"number": "B9", "name": "VBUS"},
+          {"number": "A1", "name": "GND"},
+          {"number": "A12", "name": "GND"},
+          {"number": "B1", "name": "GND"},
+          {"number": "B12", "name": "GND"},
+          {"number": "A5", "name": "CC1"},
+          {"number": "B5", "name": "CC2"},
+          {"number": "SH", "name": "SHIELD"}
+        ]
+      },
+      {
+        "id": "cc1_rd",
+        "ref": "R1",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "5.1k",
+        "footprint": "Resistor_SMD:R_0603_1608Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "cc2_rd",
+        "ref": "R2",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "5.1k",
+        "footprint": "Resistor_SMD:R_0603_1608Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "fuse",
+        "ref": "F1",
+        "role": "fuse",
+        "symbol": "Device:Fuse",
+        "value": "500mA",
+        "footprint": "Fuse:Fuse_1206_3216Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "regulator",
+        "ref": "U1",
+        "role": "regulator",
+        "symbol": "Regulator_Linear:AMS1117-3.3",
+        "value": "AMS1117-3.3",
+        "footprint": "Package_TO_SOT_SMD:SOT-223-3_TabPin2",
+        "pins": [{"number": "1", "name": "GND"}, {"number": "2", "name": "VOUT"}, {"number": "3", "name": "VIN"}]
+      },
+      {
+        "id": "cin",
+        "ref": "C1",
+        "role": "bulk_capacitor",
+        "symbol": "Device:C",
+        "value": "22u",
+        "footprint": "Capacitor_SMD:C_0805_2012Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "cout",
+        "ref": "C2",
+        "role": "decoupling_capacitor",
+        "symbol": "Device:C",
+        "value": "10u",
+        "footprint": "Capacitor_SMD:C_0805_2012Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "sensor",
+        "ref": "U2",
+        "role": "sensor",
+        "symbol": "Sensor:Generic_I2C",
+        "value": "I2C_SENSOR",
+        "footprint": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pins": [
+          {"number": "1", "name": "VCC"},
+          {"number": "2", "name": "GND"},
+          {"number": "3", "name": "SDA"},
+          {"number": "4", "name": "SCL"},
+          {"number": "5", "name": "INT"},
+          {"number": "6", "name": "NC1"},
+          {"number": "7", "name": "NC2"},
+          {"number": "8", "name": "NC3"}
+        ]
+      },
+      {
+        "id": "sda_pullup",
+        "ref": "R3",
+        "role": "pullup",
+        "symbol": "Device:R",
+        "value": "4.7k",
+        "footprint": "Resistor_SMD:R_0603_1608Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "scl_pullup",
+        "ref": "R4",
+        "role": "pullup",
+        "symbol": "Device:R",
+        "value": "4.7k",
+        "footprint": "Resistor_SMD:R_0603_1608Metric",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "header",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_01x04",
+        "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x04_P2.54mm_Vertical",
+        "pins": [
+          {"number": "1", "name": "VCC"},
+          {"number": "2", "name": "GND"},
+          {"number": "3", "name": "SDA"},
+          {"number": "4", "name": "SCL"}
+        ]
+      }
+    ],
+    "nets": [
+      {"name": "VBUS_RAW", "role": "power", "connect": ["usb_c.A4", "usb_c.A9", "usb_c.B4", "usb_c.B9", "fuse.1"], "label": "VBUS_RAW"},
+      {"name": "VCC_5V", "role": "power", "connect": ["fuse.2", "regulator.3", "cin.1"], "label": "VCC_5V"},
+      {"name": "VCC_3V3", "role": "power", "connect": ["regulator.2", "cout.1", "sensor.1", "sda_pullup.1", "scl_pullup.1", "header.1"], "label": "VCC_3V3"},
+      {"name": "GND", "role": "ground", "connect": ["usb_c.A1", "usb_c.A12", "usb_c.B1", "usb_c.B12", "usb_c.SH", "cc1_rd.2", "cc2_rd.2", "regulator.1", "cin.2", "cout.2", "sensor.2", "header.2"], "label": "GND"},
+      {"name": "CC1", "role": "signal", "connect": ["usb_c.A5", "cc1_rd.1"], "label": "CC1"},
+      {"name": "CC2", "role": "signal", "connect": ["usb_c.B5", "cc2_rd.1"], "label": "CC2"},
+      {"name": "SDA", "role": "signal", "connect": ["sensor.3", "sda_pullup.2", "header.3"], "label": "SDA"},
+      {"name": "SCL", "role": "signal", "connect": ["sensor.4", "scl_pullup.2", "header.4"], "label": "SCL"},
+      {"name": "NC_INT", "role": "no_connect", "connect": ["sensor.5"]},
+      {"name": "NC_SENSOR_6", "role": "no_connect", "connect": ["sensor.6"]},
+      {"name": "NC_SENSOR_7", "role": "no_connect", "connect": ["sensor.7"]},
+      {"name": "NC_SENSOR_8", "role": "no_connect", "connect": ["sensor.8"]}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "usb_input", "label": "USB-C Input", "role": "input_stage", "members": ["usb_c", "cc1_rd", "cc2_rd", "fuse"], "rank": 0, "side": "left"},
+      {"id": "regulator_stage", "label": "3.3 V Rail", "role": "regulator_stage", "members": ["regulator", "cin", "cout"], "rank": 1},
+      {"id": "sensor_stage", "label": "I2C Sensor", "role": "processing_stage", "members": ["sensor", "sda_pullup", "scl_pullup"], "rank": 2},
+      {"id": "headers", "label": "Breakout Header", "role": "output_stage", "members": ["header"], "rank": 3, "side": "right"}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 24,
+      "min_component_spacing_mm": 10
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}
