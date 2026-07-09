@@ -64,6 +64,7 @@ func ToProjectTransaction(document Document) (transactions.Transaction, []report
 
 type adapterState struct {
 	document     Document
+	paper        string
 	refsByID     map[string]string
 	unitsByID    map[string]int
 	pointsByID   map[string]transactions.Point
@@ -98,8 +99,13 @@ const (
 
 func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 	layoutResult := schematicLayout(document)
+	paper := layoutResult.Sheet.Name
+	if paper == "" {
+		paper = document.Metadata.Paper
+	}
 	state := &adapterState{
 		document:     document,
+		paper:        paper,
 		refsByID:     map[string]string{},
 		unitsByID:    map[string]int{},
 		pointsByID:   layoutResultPoints(layoutResult),
@@ -153,7 +159,7 @@ func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 	payload := transactions.CreateProjectOperation{
 		Op:    transactions.OpCreateProject,
 		Name:  state.document.Metadata.Name,
-		Paper: state.document.Metadata.Paper,
+		Paper: state.paper,
 	}
 	state.appendOperation(tx, transactions.OpCreateProject, payload, "", "")
 }
@@ -572,14 +578,8 @@ func schematicLayout(document Document) schematiclayout.Result {
 	if document.Layout.Rules.PreferLabelsForLongNets != nil {
 		rules.LabelFallbackEnabled = *document.Layout.Rules.PreferLabelsForLongNets && document.Policy.Repair.AllowLabelInsertion
 	}
-	widthMM, heightMM := paperDimensionsMM(document.Metadata.Paper)
 	request := schematiclayout.Request{
-		Sheet: schematiclayout.Sheet{
-			Name:   document.Metadata.Name,
-			Width:  kicadfiles.MM(widthMM),
-			Height: kicadfiles.MM(heightMM),
-			Margin: kicadfiles.MM(10.16),
-		},
+		Sheet: schematiclayout.SheetForPaper(document.Metadata.Paper),
 		Rules: rules,
 	}
 	for _, component := range document.Circuit.Components {
@@ -671,23 +671,6 @@ func schematicStageForGroup(role GroupRole) schematiclayout.Stage {
 		return schematiclayout.StageProcessing
 	default:
 		return schematiclayout.StageUnknown
-	}
-}
-
-func paperDimensionsMM(paper string) (float64, float64) {
-	switch strings.ToUpper(strings.TrimSpace(paper)) {
-	case "A0":
-		return 1189, 841
-	case "A1":
-		return 841, 594
-	case "A2":
-		return 594, 420
-	case "A3":
-		return 420, 297
-	case "A5":
-		return 210, 148
-	default:
-		return 297, 210
 	}
 }
 

@@ -23,6 +23,13 @@ func schematicReadabilitySummary(operations []transactions.Operation) map[string
 	decodeErrors := 0
 	for index, operation := range operations {
 		switch operation.Op {
+		case transactions.OpCreateProject:
+			var payload transactions.CreateProjectOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				decodeErrors++
+				continue
+			}
+			request.Sheet = schematiclayout.SheetForPaper(payload.Paper)
 		case transactions.OpAddSymbol:
 			var payload transactions.AddSymbolOperation
 			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
@@ -66,6 +73,8 @@ func schematicReadabilitySummary(operations []transactions.Operation) map[string
 	counts := schematicReadabilityDiagnosticCounts(diagnostics)
 	return map[string]any{
 		"profile":                         result.Report.Profile,
+		"selected_paper":                  result.Report.SelectedPaper,
+		"page_escalation_count":           result.Report.PageEscalationCount,
 		"rule_profile":                    ruleProfile,
 		"rule_count":                      ruleCount,
 		"repair_guidance_available":       ruleCount > 0,

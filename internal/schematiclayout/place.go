@@ -12,7 +12,7 @@ func Place(request Request) Result {
 	cells, islandCount, rankCount := planPlacement(request)
 	rankX := placementRankX(request.Components, cells, rules)
 	positions := placementPositions(request.Components, cells, rankX, rules)
-	result := Result{Components: make([]PlacedComponent, 0, len(request.Components))}
+	result := Result{Sheet: request.Sheet, Components: make([]PlacedComponent, 0, len(request.Components))}
 	for _, component := range request.Components {
 		placed := PlacedComponent{Component: component}
 		if component.Fixed {

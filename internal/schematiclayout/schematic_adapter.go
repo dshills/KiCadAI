@@ -1,8 +1,6 @@
 package schematiclayout
 
 import (
-	"strings"
-
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/schematic"
 )
@@ -54,19 +52,10 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 }
 
 func sheetFromSchematic(file *schematic.SchematicFile) Sheet {
-	sheet := Sheet{Width: kicadfiles.MM(297), Height: kicadfiles.MM(210), Margin: kicadfiles.MM(10.16)}
 	if file == nil {
-		return sheet
+		return SheetForPaper("A4")
 	}
-	if strings.EqualFold(file.Paper.Name, "A3") {
-		sheet.Width = kicadfiles.MM(420)
-		sheet.Height = kicadfiles.MM(297)
-	}
-	if strings.EqualFold(file.Paper.Name, "A5") {
-		sheet.Width = kicadfiles.MM(210)
-		sheet.Height = kicadfiles.MM(148)
-	}
-	return sheet
+	return SheetForPaper(file.Paper.Name)
 }
 
 func pinsFromSymbol(symbol schematic.SchematicSymbol) []Pin {

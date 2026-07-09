@@ -127,6 +127,7 @@ const (
 )
 
 type Result struct {
+	Sheet       Sheet
 	Components  []PlacedComponent
 	Connections []RoutedConnection
 	Wires       []WireSegment
@@ -179,6 +180,8 @@ type Diagnostic struct {
 type Report struct {
 	Profile                  Profile          `json:"profile"`
 	Passed                   bool             `json:"passed"`
+	SelectedPaper            string           `json:"selected_paper,omitempty"`
+	PageEscalationCount      int              `json:"page_escalation_count,omitempty"`
 	ComponentCount           int              `json:"component_count"`
 	GroupCount               int              `json:"group_count"`
 	RoutedNetCount           int              `json:"routed_net_count"`
@@ -363,18 +366,20 @@ func enrichDiagnosticRepairs(diagnostics []Diagnostic) []Diagnostic {
 
 func BuildReport(result Result, profile Profile) Report {
 	report := Report{
-		Profile:            profile,
-		Passed:             true,
-		ComponentCount:     len(result.Components),
-		GroupCount:         countGroups(result.Components),
-		RoutedNetCount:     countRoutedNets(result.Wires),
-		LabelFallbackCount: len(result.Labels),
-		OverlapCounts:      map[string]int{},
-		DiagnosticCount:    len(result.Diagnostics),
-		IslandCount:        result.Report.IslandCount,
-		RankCount:          result.Report.RankCount,
-		OccupiedBounds:     result.Report.OccupiedBounds,
-		CenterOffset:       result.Report.CenterOffset,
+		Profile:             profile,
+		Passed:              true,
+		SelectedPaper:       result.Report.SelectedPaper,
+		PageEscalationCount: result.Report.PageEscalationCount,
+		ComponentCount:      len(result.Components),
+		GroupCount:          countGroups(result.Components),
+		RoutedNetCount:      countRoutedNets(result.Wires),
+		LabelFallbackCount:  len(result.Labels),
+		OverlapCounts:       map[string]int{},
+		DiagnosticCount:     len(result.Diagnostics),
+		IslandCount:         result.Report.IslandCount,
+		RankCount:           result.Report.RankCount,
+		OccupiedBounds:      result.Report.OccupiedBounds,
+		CenterOffset:        result.Report.CenterOffset,
 	}
 	for _, wire := range result.Wires {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {

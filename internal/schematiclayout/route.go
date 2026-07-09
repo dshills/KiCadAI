@@ -329,8 +329,42 @@ func firstRoutableEndpoint(net Net, anchors map[Endpoint]kicadfiles.Point) (int,
 }
 
 func Layout(request Request) Result {
-	placed := Place(request)
-	return Route(request, placed)
+	request = NormalizeRequest(request)
+	candidates := pageCandidates(request.Sheet)
+	if len(candidates) == 0 {
+		candidates = []Sheet{request.Sheet}
+	}
+	var last Result
+	for index, sheet := range candidates {
+		candidateRequest := request
+		candidateRequest.Sheet = sheet
+		candidate := Place(candidateRequest)
+		if !hasPageOverflow(candidate) {
+			candidate = Route(candidateRequest, candidate)
+		}
+		candidate.Sheet = sheet
+		candidate.Report.SelectedPaper = sheet.Name
+		candidate.Report.PageEscalationCount = index
+		if index > 0 {
+			candidate.Diagnostics = append(candidate.Diagnostics, Diagnostic{
+				Severity: SeverityInfo,
+				Code:     "page_escalated",
+				Message:  "paper size was escalated to contain the readable drawing",
+				Repair:   "retain the selected paper or provide explicit sheet constraints",
+			})
+		}
+		last = candidate
+		if !hasPageOverflow(candidate) {
+			return NormalizeResult(candidate, candidateRequest.Rules)
+		}
+	}
+	last.Diagnostics = append(last.Diagnostics, Diagnostic{
+		Severity: SeverityError,
+		Code:     "page_fit_exhausted",
+		Message:  "the drawing does not fit on the largest supported standard paper",
+		Repair:   "partition the design into hierarchical sheets or provide a larger custom sheet",
+	})
+	return NormalizeResult(last, request.Rules)
 }
 
 func pinAnchors(components []PlacedComponent) map[Endpoint]kicadfiles.Point {
