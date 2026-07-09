@@ -2,6 +2,7 @@ package schematicir
 
 import (
 	"encoding/json"
+	"math"
 	"testing"
 
 	"kicadai/internal/transactions"
@@ -52,6 +53,79 @@ func TestToTransactionLEDIndicator(t *testing.T) {
 		if !seen {
 			t.Fatalf("missing connect operation %s", key)
 		}
+	}
+}
+
+func TestToTransactionUsesSharedGraphLayoutAndCentersResult(t *testing.T) {
+	doc := validLEDDocument()
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
+	points := map[string]transactions.Point{}
+	for _, symbol := range symbols {
+		points[symbol.Ref] = symbol.At
+	}
+	if !(points["J1"].XMM < points["R1"].XMM && points["R1"].XMM < points["D1"].XMM) {
+		t.Fatalf("graph layout points = %#v, want connector-to-resistor-to-LED flow", points)
+	}
+	minX, maxX := points["J1"].XMM, points["J1"].XMM
+	for _, point := range points {
+		minX = math.Min(minX, point.XMM)
+		maxX = math.Max(maxX, point.XMM)
+	}
+	if center := (minX + maxX) / 2; math.Abs(center-148.5) > 10 {
+		t.Fatalf("layout center x = %.2f, want near A4 center", center)
+	}
+}
+
+func TestToTransactionEmitsTemplatePinOffsetsAndLabelPolicy(t *testing.T) {
+	tx, issues := ToTransaction(validLEDDocument())
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
+	for _, symbol := range symbols {
+		for _, pin := range symbol.Pins {
+			if pin.XMM == 0 && pin.YMM == 0 {
+				t.Fatalf("symbol %s pin %s has no template offset", symbol.Ref, pin.Number)
+			}
+		}
+	}
+	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
+	preferences := map[string]*bool{}
+	for _, connect := range connects {
+		preferences[connect.NetName] = connect.UseLabels
+	}
+	for _, netName := range []string{"VIN", "GND"} {
+		if preferences[netName] == nil || !*preferences[netName] {
+			t.Fatalf("%s label preference = %#v, want forced labels", netName, preferences[netName])
+		}
+	}
+	if preferences["LED_A"] != nil {
+		t.Fatalf("LED_A label preference = %#v, want automatic local routing", preferences["LED_A"])
+	}
+}
+
+func TestToTransactionSupportsAllQuarterTurnOrientations(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{
+		{Target: "vin", Orientation: OrientationNormal},
+		{Target: "r_limit", Orientation: OrientationRotated180},
+		{Target: "led", Orientation: OrientationRotated270},
+	}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	symbols := decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol)
+	rotations := map[string]float64{}
+	for _, symbol := range symbols {
+		rotations[symbol.Ref] = symbol.Rotation
+	}
+	if rotations["J1"] != 0 || rotations["R1"] != 180 || rotations["D1"] != 270 {
+		t.Fatalf("rotations = %#v", rotations)
 	}
 }
 

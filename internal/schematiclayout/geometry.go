@@ -1,6 +1,7 @@
 package schematiclayout
 
 import (
+	"math"
 	"strings"
 	"unicode/utf8"
 
@@ -153,7 +154,47 @@ func componentBody(component PlacedComponent) Rect {
 	if body.Empty() {
 		body = DefaultBodyFor(component)
 	}
+	body = RotateRect(body, component.Rotation)
 	return body.Translate(component.PlacedAt)
+}
+
+// RotatePoint rotates a symbol-local point around the symbol origin using the
+// same clockwise-on-page coordinate convention used by KiCad's Y-down canvas.
+func RotatePoint(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Point {
+	if angle == 0 {
+		return point
+	}
+	theta := float64(angle) * math.Pi / 180
+	sin, cos := math.Sincos(theta)
+	x := float64(point.X)
+	y := float64(point.Y)
+	return kicadfiles.Point{
+		X: kicadfiles.IU(math.Round(x*cos - y*sin)),
+		Y: kicadfiles.IU(math.Round(x*sin + y*cos)),
+	}
+}
+
+// RotateRect returns the axis-aligned bounds of a rotated symbol-local box.
+func RotateRect(rect Rect, angle kicadfiles.Angle) Rect {
+	if rect.Empty() || angle == 0 {
+		return rect
+	}
+	points := []kicadfiles.Point{
+		{X: rect.MinX, Y: rect.MinY},
+		{X: rect.MaxX, Y: rect.MinY},
+		{X: rect.MaxX, Y: rect.MaxY},
+		{X: rect.MinX, Y: rect.MaxY},
+	}
+	first := RotatePoint(points[0], angle)
+	result := Rect{MinX: first.X, MinY: first.Y, MaxX: first.X, MaxY: first.Y}
+	for _, point := range points[1:] {
+		rotated := RotatePoint(point, angle)
+		result.MinX = minIU(result.MinX, rotated.X)
+		result.MinY = minIU(result.MinY, rotated.Y)
+		result.MaxX = maxIU(result.MaxX, rotated.X)
+		result.MaxY = maxIU(result.MaxY, rotated.Y)
+	}
+	return result
 }
 
 func DefaultBodyFor(component PlacedComponent) Rect {

@@ -204,6 +204,9 @@ type Group struct {
 	Members []string `json:"members"`
 	Rank    int      `json:"rank"`
 	Side    Side     `json:"side,omitempty"`
+	// Inferred is runtime-only normalization evidence. Explicit groups are hard
+	// rank constraints; inferred groups remain graph-layout hints.
+	Inferred bool `json:"-"`
 }
 
 type GroupRole string
@@ -266,8 +269,11 @@ type Placement struct {
 type Orientation string
 
 const (
-	OrientationNormal  Orientation = "normal"
-	OrientationRotated Orientation = "rotated"
+	OrientationNormal     Orientation = "normal"
+	OrientationRotated    Orientation = "rotated" // Backward-compatible 90 degrees.
+	OrientationRotated90  Orientation = "rotated_90"
+	OrientationRotated180 Orientation = "rotated_180"
+	OrientationRotated270 Orientation = "rotated_270"
 )
 
 type Policy struct {

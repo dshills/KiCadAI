@@ -33,14 +33,21 @@ func buildPlacementGraph(request Request) placementGraph {
 		}
 	}
 	for _, net := range request.Nets {
-		if containsRole(net.Role, "power", "ground", "return", "shield", "negative_rail", "no_connect") {
+		if containsRole(net.Role, "no_connect") {
 			continue
 		}
 		refs := uniqueEndpointRefs(net.Endpoints, graph.components)
+		powerLike := containsRole(net.Role, "power", "ground", "return", "shield", "negative_rail")
+		// Two-terminal power paths carry useful stage topology (for example a
+		// connector feeding a regulator). High-fanout rails and returns must not
+		// collapse otherwise independent functional islands into one graph.
+		if powerLike && (len(refs) > 2 || containsRole(net.Role, "ground", "return", "shield")) {
+			continue
+		}
 		for index := 0; index < len(refs); index++ {
 			for other := index + 1; other < len(refs); other++ {
 				graph.addUndirected(refs[index], refs[other])
-				if containsRole(net.Role, "feedback") {
+				if containsRole(net.Role, "feedback") || powerLike {
 					continue
 				}
 				from, to, ok := graph.direction(refs[index], refs[other], net)

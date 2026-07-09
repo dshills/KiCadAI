@@ -7,7 +7,10 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
 )
 
@@ -163,7 +166,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			LibraryID:  component.Symbol,
 			At:         state.pointsByID[component.ID],
 			Rotation:   state.rotationByID[component.ID],
-			Pins:       transactionPins(component.Pins),
+			Pins:       transactionPins(component),
 			Properties: transactionSymbolProperties(component),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
@@ -202,14 +205,39 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			from := mappedEndpoints[endpointIndex-1]
 			to := mappedEndpoints[endpointIndex]
 			payload := transactions.ConnectOperation{
-				Op:      transactions.OpConnect,
-				From:    from,
-				To:      to,
-				NetName: net.Name,
+				Op:        transactions.OpConnect,
+				From:      from,
+				To:        to,
+				NetName:   net.Name,
+				UseLabels: schematicNetLabelPreference(state.document, net),
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func schematicNetLabelPreference(document Document, net Net) *bool {
+	if net.UseLabel != nil {
+		value := *net.UseLabel
+		return &value
+	}
+	if !document.Policy.Repair.AllowLabelInsertion {
+		return nil
+	}
+	preferLong := document.Layout.Rules.PreferLabelsForLongNets == nil || *document.Layout.Rules.PreferLabelsForLongNets
+	if !preferLong {
+		return nil
+	}
+	switch net.Role {
+	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleShield:
+		value := true
+		return &value
+	}
+	if len(net.Connect) > 2 {
+		value := true
+		return &value
+	}
+	return nil
 }
 
 func (state *adapterState) transactionEndpoint(endpoint EndpointRef, path string) (transactions.Endpoint, bool) {
@@ -336,73 +364,164 @@ func transactionUnit(unit string) (int, bool) {
 }
 
 func layoutPoints(document Document) map[string]transactions.Point {
-	points := map[string]transactions.Point{}
-	componentOrder := make([]string, 0, len(document.Circuit.Components))
-	componentRoles := map[string]ComponentRole{}
-	for _, component := range document.Circuit.Components {
-		componentOrder = append(componentOrder, component.ID)
-		componentRoles[component.ID] = component.Role
-	}
-
-	groupByID := map[string]Group{}
-	for _, group := range document.Layout.Groups {
-		groupByID[group.ID] = group
-	}
-	placementGroupByTarget := map[string]string{}
-	for _, placement := range document.Layout.Placements {
-		if placement.Target != "" && placement.Group != "" {
-			placementGroupByTarget[placement.Target] = placement.Group
+	result := schematicLayout(document)
+	points := make(map[string]transactions.Point, len(result.Components))
+	for _, component := range result.Components {
+		points[component.Ref] = transactions.Point{
+			XMM: float64(component.PlacedAt.X) / 1_000_000,
+			YMM: float64(component.PlacedAt.Y) / 1_000_000,
 		}
-	}
-
-	componentRanks := map[string]int{}
-	for _, group := range document.Layout.Groups {
-		for _, member := range group.Members {
-			if _, known := componentRoles[member]; !known {
-				continue
-			}
-			if _, exists := componentRanks[member]; exists {
-				continue
-			}
-			componentRanks[member] = group.Rank
-		}
-	}
-	for _, componentID := range componentOrder {
-		if _, exists := componentRanks[componentID]; exists {
-			continue
-		}
-		rank := inferredRank(componentRoles[componentID])
-		if groupID := placementGroupByTarget[componentID]; groupID != "" {
-			if group, exists := groupByID[groupID]; exists {
-				rank = group.Rank
-			}
-		}
-		componentRanks[componentID] = rank
-	}
-	laneTotals := map[int]map[layoutLane]int{}
-	for componentID, rank := range componentRanks {
-		incrementLaneCount(laneTotals, rank, laneForRole(componentRoles[componentID]))
-	}
-
-	rankLaneCounts := map[int]map[layoutLane]int{}
-	for _, group := range document.Layout.Groups {
-		for _, member := range group.Members {
-			if _, known := componentRoles[member]; !known {
-				continue
-			}
-			if _, exists := points[member]; exists {
-				continue
-			}
-			points[member] = pointForRankLane(document, componentRanks[member], componentRoles[member], rankLaneCounts, laneTotals)
-		}
-	}
-	for _, componentID := range componentOrder {
-		if _, exists := points[componentID]; exists {
-			continue
-		}
-		points[componentID] = pointForRankLane(document, componentRanks[componentID], componentRoles[componentID], rankLaneCounts, laneTotals)
 	}
 	return points
+}
+
+func schematicLayout(document Document) schematiclayout.Result {
+	rotationByID := layoutRotations(document)
+	groupsByID := map[string]Group{}
+	for _, group := range document.Layout.Groups {
+		groupsByID[group.ID] = group
+	}
+	placementsByID := map[string]Placement{}
+	for _, placement := range document.Layout.Placements {
+		placementsByID[placement.Target] = placement
+	}
+	rules := schematiclayout.DefaultRules(schematiclayout.ProfileStandard)
+	if document.Layout.Rules.MinComponentSpacingMM != nil {
+		rules.MinComponentSpacing = kicadfiles.MM(*document.Layout.Rules.MinComponentSpacingMM)
+	}
+	if document.Layout.Rules.MinGroupSpacingMM != nil {
+		rules.MinStageSpacing = kicadfiles.MM(*document.Layout.Rules.MinGroupSpacingMM)
+		rules.MinGroupGutter = kicadfiles.MM(*document.Layout.Rules.MinGroupSpacingMM)
+	}
+	if document.Layout.Rules.PreferLabelsForLongNets != nil {
+		rules.LabelFallbackEnabled = *document.Layout.Rules.PreferLabelsForLongNets && document.Policy.Repair.AllowLabelInsertion
+	}
+	widthMM, heightMM := paperDimensionsMM(document.Metadata.Paper)
+	request := schematiclayout.Request{
+		Sheet: schematiclayout.Sheet{
+			Name:   document.Metadata.Name,
+			Width:  kicadfiles.MM(widthMM),
+			Height: kicadfiles.MM(heightMM),
+			Margin: kicadfiles.MM(10.16),
+		},
+		Rules: rules,
+	}
+	for _, component := range document.Circuit.Components {
+		placement := placementsByID[component.ID]
+		group := groupsByID[placement.Group]
+		if group.ID == "" {
+			for _, candidate := range document.Layout.Groups {
+				if stringSliceContains(candidate.Members, component.ID) {
+					group = candidate
+					break
+				}
+			}
+		}
+		request.Components = append(request.Components, schematiclayout.Component{
+			Ref:       component.ID,
+			Value:     component.Value,
+			LibraryID: component.Symbol,
+			Role:      string(component.Role),
+			GroupID:   group.ID,
+			Stage:     schematicStageForGroup(group.Role),
+			FlowRank:  group.Rank,
+			RankFixed: group.ID != "" && !group.Inferred,
+			Near:      append([]string(nil), placement.Near...),
+			Rotation:  kicadfiles.Angle(rotationByID[component.ID]),
+			Pins:      schematicLayoutPins(component),
+		})
+	}
+	for index, net := range document.Circuit.Nets {
+		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: index}
+		if net.UseLabel != nil {
+			layoutNet.PreferredLabels = *net.UseLabel
+		}
+		for _, endpoint := range net.Connect {
+			componentID, pin, ok := endpoint.Split()
+			if ok {
+				layoutNet.Endpoints = append(layoutNet.Endpoints, schematiclayout.Endpoint{Ref: componentID, Pin: pin})
+			}
+		}
+		request.Nets = append(request.Nets, layoutNet)
+	}
+	for index, group := range document.Layout.Groups {
+		request.Groups = append(request.Groups, schematiclayout.Group{
+			ID:              group.ID,
+			Role:            string(group.Role),
+			Stage:           schematicStageForGroup(group.Role),
+			OriginalOrdinal: index,
+		})
+	}
+	return schematiclayout.Place(request)
+}
+
+func schematicLayoutPins(component Component) []schematiclayout.Pin {
+	roles := map[string]string{}
+	for _, pin := range component.Pins {
+		roles[pin.Number] = string(pin.Role)
+	}
+	templatePins, _ := schematic.EmbeddedSymbolPinOffsets(component.Symbol)
+	offsets := map[string]kicadfiles.Point{}
+	for _, pin := range templatePins {
+		offset := pin.Offset
+		if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(component.Symbol, pin.Number); ok {
+			offset = connectionOffset
+		}
+		offsets[pin.Number] = offset
+	}
+	if len(component.Pins) == 0 {
+		pins := make([]schematiclayout.Pin, 0, len(templatePins))
+		for _, pin := range templatePins {
+			pins = append(pins, schematiclayout.Pin{Number: pin.Number, At: offsets[pin.Number]})
+		}
+		return pins
+	}
+	pins := make([]schematiclayout.Pin, 0, len(component.Pins))
+	for _, pin := range component.Pins {
+		pins = append(pins, schematiclayout.Pin{Number: pin.Number, Role: roles[pin.Number], At: offsets[pin.Number]})
+	}
+	return pins
+}
+
+func schematicStageForGroup(role GroupRole) schematiclayout.Stage {
+	switch role {
+	case GroupRoleInputStage, GroupRoleConnectorStage:
+		return schematiclayout.StageBoundaryInput
+	case GroupRoleProtectionStage:
+		return schematiclayout.StageConditioning
+	case GroupRoleOutputStage:
+		return schematiclayout.StageBoundaryOutput
+	case GroupRoleRegulatorStage, GroupRolePowerStage, GroupRoleProcessingStage, GroupRoleDecouplingStage:
+		return schematiclayout.StageProcessing
+	default:
+		return schematiclayout.StageUnknown
+	}
+}
+
+func paperDimensionsMM(paper string) (float64, float64) {
+	switch strings.ToUpper(strings.TrimSpace(paper)) {
+	case "A0":
+		return 1189, 841
+	case "A1":
+		return 841, 594
+	case "A2":
+		return 594, 420
+	case "A3":
+		return 420, 297
+	case "A5":
+		return 210, 148
+	default:
+		return 297, 210
+	}
+}
+
+func stringSliceContains(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func layoutRotations(document Document) map[string]float64 {
@@ -414,6 +533,12 @@ func layoutRotations(document Document) map[string]float64 {
 		switch placement.Orientation {
 		case OrientationRotated:
 			rotations[placement.Target] = 90
+		case OrientationRotated90:
+			rotations[placement.Target] = 90
+		case OrientationRotated180:
+			rotations[placement.Target] = 180
+		case OrientationRotated270:
+			rotations[placement.Target] = 270
 		default:
 			rotations[placement.Target] = 0
 		}
@@ -496,13 +621,24 @@ func inferredRank(role ComponentRole) int {
 	}
 }
 
-func transactionPins(pins []Pin) []transactions.PinSpec {
-	if len(pins) == 0 {
+func transactionPins(component Component) []transactions.PinSpec {
+	if len(component.Pins) == 0 {
 		return nil
 	}
-	out := make([]transactions.PinSpec, 0, len(pins))
-	for _, pin := range pins {
-		out = append(out, transactions.PinSpec{Number: pin.Number})
+	offsets := map[string]kicadfiles.Point{}
+	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(component.Symbol); ok {
+		for _, pin := range templatePins {
+			offset := pin.Offset
+			if connectionOffset, exists := schematic.EmbeddedSymbolConnectionPinOffset(component.Symbol, pin.Number); exists {
+				offset = connectionOffset
+			}
+			offsets[pin.Number] = offset
+		}
+	}
+	out := make([]transactions.PinSpec, 0, len(component.Pins))
+	for _, pin := range component.Pins {
+		offset := offsets[pin.Number]
+		out = append(out, transactions.PinSpec{Number: pin.Number, XMM: float64(offset.X) / 1_000_000, YMM: float64(offset.Y) / 1_000_000})
 	}
 	return out
 }

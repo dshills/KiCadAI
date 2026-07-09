@@ -27,3 +27,4 @@ examples/roundtrip_artifacts/
 examples/promotion_artifacts/
 examples/.generated/
 examples/generated/
+.kicadai/

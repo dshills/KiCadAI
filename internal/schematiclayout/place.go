@@ -50,7 +50,7 @@ func placementRankX(components []Component, cells map[string]placementCell, rule
 	seen := map[int]struct{}{}
 	for _, component := range components {
 		cell := cells[component.Ref]
-		body := DefaultBodyFor(PlacedComponent{Component: component})
+		body := RotateRect(DefaultBodyFor(PlacedComponent{Component: component}), component.Rotation)
 		halfWidth := body.Width() / 2
 		if halfWidth > maxHalfWidth[cell.rank] {
 			maxHalfWidth[cell.rank] = halfWidth
@@ -111,7 +111,7 @@ func placementPositions(components []Component, cells map[string]placementCell, 
 			rank := cells[component.Ref].rank
 			row := rowByRank[rank]
 			rowByRank[rank]++
-			body := DefaultBodyFor(PlacedComponent{Component: component})
+			body := RotateRect(DefaultBodyFor(PlacedComponent{Component: component}), component.Rotation)
 			height := body.Height() + rules.MinTextSpacing*2
 			if height > rowHeight[row] {
 				rowHeight[row] = height

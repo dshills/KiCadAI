@@ -88,6 +88,12 @@ type Endpoint struct {
 	Pin       string
 }
 
+type ConnectOptions struct {
+	// UseLabels forces label stubs when true and direct orthogonal wiring when
+	// false. Nil preserves the legacy distance- and net-name-based behavior.
+	UseLabels *bool
+}
+
 type PlaceFootprintOptions struct {
 	Position                      kicadfiles.Point
 	Rotation                      kicadfiles.Angle
@@ -149,6 +155,7 @@ type symbolState struct {
 	symbolIndex int
 	libraryID   string
 	position    kicadfiles.Point
+	rotation    kicadfiles.Angle
 	pins        map[string]kicadfiles.Point
 	pinOrder    []string
 	pinNets     map[string]string
@@ -157,6 +164,7 @@ type symbolState struct {
 
 const schematicConnectionGrid = kicadfiles.IU(1270000)
 const usbCPowerOnlyConnectorLibraryID = "kicadai:USB_C_Receptacle_PowerOnly_6P"
+const usbCPowerOnlyFullConnectorLibraryID = "kicadai:usb_c_receptacle_poweronly_full"
 
 func New(options Options) (*Builder, error) {
 	name := strings.TrimSpace(options.Name)
@@ -252,7 +260,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		value = reference
 	}
 	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
-	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs)
+	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, options.Rotation)
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", key), libraryID, reference, value, position)
 	symbol.Rotation = options.Rotation
 	symbol.Path = "root.component." + key
@@ -281,6 +289,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
 			anchorOffset = offset
 		}
+		anchorOffset = rotatePadOffset(anchorOffset, options.Rotation)
 		anchor := schematicSymbolPinAnchor(position, anchorOffset)
 		pins[number] = anchor
 		builder.schematicPinAnchors[anchor] = struct{}{}
@@ -303,6 +312,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		symbolIndex: len(builder.design.Schematic.Symbols) - 1,
 		libraryID:   libraryID,
 		position:    position,
+		rotation:    options.Rotation,
 		pins:        pins,
 		pinOrder:    pinOrder,
 		pinNets:     pinNets,
@@ -329,6 +339,10 @@ func symbolPinSpecs(libraryID string, explicit []PinSpec) []PinSpec {
 }
 
 func (builder *Builder) Connect(from, to Endpoint, netName string) error {
+	return builder.ConnectWithOptions(from, to, netName, ConnectOptions{})
+}
+
+func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, options ConnectOptions) error {
 	if builder == nil {
 		return fmt.Errorf("builder required")
 	}
@@ -368,7 +382,12 @@ func (builder *Builder) Connect(from, to Endpoint, netName string) error {
 	builder.assignPinNet(from, netName)
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
-	if builder.schematicConnectionShouldUseDirectLabels(from, to) {
+	if options.UseLabels != nil && *options.UseLabels {
+		builder.addSchematicLabelStub(netName, from, start, builder.labelStubOffset(from, start, end))
+		builder.addSchematicLabelStub(netName, to, end, builder.labelStubOffset(to, end, start))
+	} else if options.UseLabels != nil {
+		builder.addSchematicWire(netName, from, to, start, end)
+	} else if builder.schematicConnectionShouldUseDirectLabels(from, to) {
 		if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
 			return err
 		}
@@ -398,7 +417,8 @@ func (builder *Builder) endpointIsUSBCPowerOnlyCC(endpoint Endpoint) bool {
 	if err != nil {
 		return false
 	}
-	return strings.EqualFold(strings.TrimSpace(state.libraryID), usbCPowerOnlyConnectorLibraryID)
+	libraryID := strings.TrimSpace(state.libraryID)
+	return strings.EqualFold(libraryID, usbCPowerOnlyConnectorLibraryID) || strings.EqualFold(libraryID, usbCPowerOnlyFullConnectorLibraryID)
 }
 
 func schematicConnectionShouldUseLabels(netName string, start, end kicadfiles.Point) bool {
@@ -529,12 +549,23 @@ func (builder *Builder) safeSchematicLabelStubOffset(anchor kicadfiles.Point, pr
 		for _, direction := range directions {
 			candidate := kicadfiles.Point{X: direction.X * scale, Y: direction.Y * scale}
 			labelPoint := kicadfiles.Point{X: anchor.X + candidate.X, Y: anchor.Y + candidate.Y}
-			if !schematicStubTouchesExistingWire(anchor, labelPoint, builder.design.Schematic.Wires) {
+			if !schematicStubTouchesExistingWire(anchor, labelPoint, builder.design.Schematic.Wires) &&
+				!builder.schematicSegmentTouchesOtherPinAnchor(anchor, labelPoint, anchor, anchor) &&
+				!schematicLabelPositionOccupied(labelPoint, builder.design.Schematic.Labels) {
 				return candidate
 			}
 		}
 	}
 	return preferred
+}
+
+func schematicLabelPositionOccupied(position kicadfiles.Point, labels []schematic.Label) bool {
+	for _, label := range labels {
+		if samePoint(position, label.Position) {
+			return true
+		}
+	}
+	return false
 }
 
 func schematicStubTouchesExistingWire(anchor kicadfiles.Point, labelPoint kicadfiles.Point, wires []schematic.Wire) bool {
@@ -1529,7 +1560,7 @@ func (builder *Builder) pinAnchorForState(state *symbolState, reference string, 
 		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", reference, pin)
 	}
 	if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
-		return schematicSymbolPinAnchor(state.position, offset), nil
+		return schematicSymbolPinAnchor(state.position, rotatePadOffset(offset, state.rotation)), nil
 	}
 	return anchor, nil
 }
@@ -1907,19 +1938,19 @@ func snapSchematicPointToConnectionGrid(point kicadfiles.Point) kicadfiles.Point
 	}
 }
 
-func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec) kicadfiles.Point {
+func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle) kicadfiles.Point {
 	position := snapSchematicPointToConnectionGrid(requested)
 	if builder == nil {
 		return position
 	}
 	occupied := builder.schematicPinAnchors
-	if !schematicSymbolPinAnchorsCollide(position, pins, occupied) {
+	if !schematicSymbolPinAnchorsCollide(position, pins, rotation, occupied) {
 		return position
 	}
 	for radius := kicadfiles.IU(1); radius <= 8; radius++ {
 		for _, offset := range schematicGridPerimeterOffsets(radius) {
 			candidate := addPoint(position, offset)
-			if !schematicSymbolPinAnchorsCollide(candidate, pins, occupied) {
+			if !schematicSymbolPinAnchorsCollide(candidate, pins, rotation, occupied) {
 				return candidate
 			}
 		}
@@ -1927,12 +1958,12 @@ func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, 
 	return position
 }
 
-func schematicSymbolPinAnchorsCollide(position kicadfiles.Point, pins []PinSpec, occupied map[kicadfiles.Point]struct{}) bool {
+func schematicSymbolPinAnchorsCollide(position kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, occupied map[kicadfiles.Point]struct{}) bool {
 	if len(pins) == 0 || len(occupied) == 0 {
 		return false
 	}
 	for _, pin := range pins {
-		if _, ok := occupied[schematicSymbolPinAnchor(position, pin.Offset)]; ok {
+		if _, ok := occupied[schematicSymbolPinAnchor(position, rotatePadOffset(pin.Offset, rotation))]; ok {
 			return true
 		}
 	}

@@ -196,10 +196,11 @@ type SymbolProperty struct {
 }
 
 type ConnectOperation struct {
-	Op      OperationKind `json:"op"`
-	From    Endpoint      `json:"from"`
-	To      Endpoint      `json:"to"`
-	NetName string        `json:"net_name"`
+	Op        OperationKind `json:"op"`
+	From      Endpoint      `json:"from"`
+	To        Endpoint      `json:"to"`
+	NetName   string        `json:"net_name"`
+	UseLabels *bool         `json:"use_labels,omitempty"`
 }
 
 type AddLabelOperation struct {

@@ -144,6 +144,30 @@ func TestBuilderConnectUsesOrthogonalSchematicWire(t *testing.T) {
 	}
 }
 
+func TestBuilderRotatesExplicitSymbolPinAnchors(t *testing.T) {
+	builder := newTestBuilder(t)
+	position := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(50.8)}
+	_, err := builder.AddSymbol(SymbolOptions{
+		Reference: "X1",
+		LibraryID: "kicadai:test_rotated_pin",
+		Position:  position,
+		Rotation:  90,
+		Pins:      []PinSpec{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(5.08)}}},
+	})
+	if err != nil {
+		t.Fatalf("add rotated symbol: %v", err)
+	}
+	design := builder.Design()
+	if len(design.Schematic.Symbols) != 1 || len(design.Schematic.Symbols[0].PinAnchors) != 1 {
+		t.Fatalf("unexpected symbols: %#v", design.Schematic.Symbols)
+	}
+	anchor := design.Schematic.Symbols[0].PinAnchors[0]
+	want := kicadfiles.Point{X: kicadfiles.MM(50.8), Y: kicadfiles.MM(55.88)}
+	if anchor != want {
+		t.Fatalf("rotated pin anchor = %#v, want %#v", anchor, want)
+	}
+}
+
 func TestBuilderLongNetLabelStubsAreConnectionGridSafe(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)})

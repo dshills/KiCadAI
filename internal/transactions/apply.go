@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -256,8 +257,13 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			symbol.Properties = schematic.MergeProperties(symbol.Properties, schematicPropertiesFromPayload(payload.Properties, symbol.Position, symbol.Rotation, 2))
 			for _, pin := range payload.Pins {
+				offset := point(pin.XMM, pin.YMM)
+				if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(payload.LibraryID, pin.Number); ok {
+					offset = connectionOffset
+				}
+				offset = rotateSchematicOffset(offset, symbol.Rotation)
 				symbol.Pins = append(symbol.Pins, schematic.SymbolPin{Number: pin.Number, UUID: generator.New("imported.schematic.symbol.pin", payload.Ref, opIndex, pin.Number)})
-				symbol.PinAnchors = append(symbol.PinAnchors, addPoints(symbol.Position, point(pin.XMM, pin.YMM)))
+				symbol.PinAnchors = append(symbol.PinAnchors, addPoints(symbol.Position, offset))
 			}
 			design.Schematic.Symbols = append(design.Schematic.Symbols, symbol)
 			schematicDirty = true
@@ -601,7 +607,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := decodeRaw(op, &payload); err != nil {
 			return nil, err
 		}
-		return nil, builder.Connect(endpoint(payload.From), endpoint(payload.To), payload.NetName)
+		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{UseLabels: payload.UseLabels})
 	case OpAddLabel:
 		var payload AddLabelOperation
 		if err := decodeRaw(op, &payload); err != nil {
@@ -1400,6 +1406,18 @@ func point(xMM, yMM float64) kicadfiles.Point {
 
 func addPoints(a kicadfiles.Point, b kicadfiles.Point) kicadfiles.Point {
 	return kicadfiles.Point{X: a.X + b.X, Y: a.Y + b.Y}
+}
+
+func rotateSchematicOffset(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Point {
+	if angle == 0 {
+		return point
+	}
+	theta := float64(angle) * math.Pi / 180
+	sin, cos := math.Sincos(theta)
+	return kicadfiles.Point{
+		X: kicadfiles.IU(math.Round(float64(point.X)*cos - float64(point.Y)*sin)),
+		Y: kicadfiles.IU(math.Round(float64(point.X)*sin + float64(point.Y)*cos)),
+	}
 }
 
 func symbolPinAnchor(schematicFile *schematic.SchematicFile, ref string, pin string) (kicadfiles.Point, error) {

@@ -98,11 +98,12 @@ func generatedGroupForTemplate(template groupTemplate, generatedGroups map[strin
 		return group
 	}
 	group := &Group{
-		ID:    template.ID,
-		Label: template.Label,
-		Role:  template.Role,
-		Rank:  template.Rank,
-		Side:  template.Side,
+		ID:       template.ID,
+		Label:    template.Label,
+		Role:     template.Role,
+		Rank:     template.Rank,
+		Side:     template.Side,
+		Inferred: true,
 	}
 	generatedGroups[template.ID] = group
 	return group

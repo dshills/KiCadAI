@@ -360,9 +360,18 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 				add(path+".group", "placement references unknown group "+placement.Group)
 			}
 		}
-		if placement.Orientation != "" && placement.Orientation != OrientationNormal && placement.Orientation != OrientationRotated {
+		if !supportedOrientation(placement.Orientation) {
 			add(path+".orientation", "placement orientation is not supported")
 		}
+	}
+}
+
+func supportedOrientation(orientation Orientation) bool {
+	switch orientation {
+	case "", OrientationNormal, OrientationRotated, OrientationRotated90, OrientationRotated180, OrientationRotated270:
+		return true
+	default:
+		return false
 	}
 }
 
