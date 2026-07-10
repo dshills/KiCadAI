@@ -103,6 +103,10 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if !ok || len(connectorPins) != 2 || connectorPins[0].Offset.Y != 0 || connectorPins[1].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected connector offsets: %#v ok=%v", connectorPins, ok)
 	}
+	connector2Pin2Connection, ok := EmbeddedSymbolConnectionPinOffset("Connector_Generic:Conn_01x02", "2")
+	if !ok || connector2Pin2Connection.X != kicadfiles.MM(-5.08) || connector2Pin2Connection.Y != kicadfiles.MM(2.54) {
+		t.Fatalf("unexpected 2-pin connector connection override: %#v ok=%v", connector2Pin2Connection, ok)
+	}
 	connector4Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x04")
 	if !ok || len(connector4Pins) != 4 || connector4Pins[0].Offset.Y != kicadfiles.MM(2.54) || connector4Pins[3].Number != "4" || connector4Pins[3].Offset.Y != kicadfiles.MM(-5.08) {
 		t.Fatalf("unexpected 4-pin connector offsets: %#v ok=%v", connector4Pins, ok)

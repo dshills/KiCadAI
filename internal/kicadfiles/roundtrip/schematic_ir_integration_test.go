@@ -53,6 +53,45 @@ func TestKiCadRoundTripSchematicIRVectorBus(t *testing.T) {
 	}
 }
 
+func TestKiCadRoundTripSchematicIRLEDIndicator(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	fixturePath := repoPath(t, "examples", "schematic-ir", "led_indicator.json")
+	fixture, err := os.Open(fixturePath)
+	if err != nil {
+		t.Fatalf("open LED IR: %v", err)
+	}
+	document, issues := schematicir.DecodeStrict(fixture)
+	_ = fixture.Close()
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode LED IR: %#v", issues)
+	}
+	tx, issues := schematicir.ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("adapt LED IR: %#v", issues)
+	}
+	output := filepath.Join(t.TempDir(), "led_indicator")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write LED schematic: %#v", apply.Issues)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, filepath.Join(output, "led_indicator.kicad_sch"), checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+	if err != nil {
+		t.Fatalf("RunERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass {
+		t.Fatalf("LED ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+	roundTrip, err := RoundTripSchematic(ctx, cli, filepath.Join(output, "led_indicator.kicad_sch"), Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "roundtrip")})
+	if err != nil {
+		t.Fatalf("RoundTripSchematic returned error: %v\nresult=%#v", err, roundTrip)
+	}
+	if !roundTrip.Equal {
+		t.Fatalf("LED round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}
+
 func TestKiCadRoundTripSchematicIRUSBCLocalSymbol(t *testing.T) {
 	cli := requireKiCadCLI(t)
 	fixturePath := repoPath(t, "examples", "schematic-ir", "usb_c_led_indicator.json")

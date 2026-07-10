@@ -34,9 +34,9 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}},
 		{Number: "5", Offset: kicadfiles.Point{Y: kicadfiles.MM(-2.54)}},
 	}},
-	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, rawBody: rawConnectorGenericConn01x02Symbol},
-	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", pins: connectorTemplatePins(3)},
-	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
+	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", localLibrary: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, connectionPinOverride: map[string]kicadfiles.Point{"2": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(2.54)}}, rawBody: rawConnectorGenericConn01x02Symbol},
+	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", localLibrary: true, pins: connectorTemplatePins(3)},
+	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", localLibrary: true, pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
 	"kicadai:usb_c_receptacle_poweronly_6p": {
 		bodyName:     "USB_C_Receptacle_PowerOnly_6P",
 		pinType:      "passive",
