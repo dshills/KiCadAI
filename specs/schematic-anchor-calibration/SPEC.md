@@ -114,6 +114,11 @@ rotation, and emitted wire endpoint when KiCad rejects a connection.
 - `Sensor:Generic_I2C`: pins 1-4 use verified local-library physical anchors;
   generated I2C block metadata uses those anchors for wires, labels, and
   no-connect evidence. Pin 5 retains its direct right-side anchor.
+- Uncalibrated transformed symbols: automatic routes use local-label
+  connectivity rather than direct wires. The KiCad-backed LED matrix proves
+  clean ERC and normalized zero-diff round trips for every non-default
+  rotation/mirror combination of `Device:R` in this mode. This is safety
+  evidence for arbitrary transformed symbols, not direct-wire calibration.
 
 ## Validation
 

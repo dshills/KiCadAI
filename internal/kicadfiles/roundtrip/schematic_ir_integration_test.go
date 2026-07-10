@@ -102,6 +102,67 @@ func TestKiCadRoundTripSchematicIRLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestKiCadAutomaticLabelTransformMatrix(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	cases := []struct {
+		name        string
+		orientation schematicir.Orientation
+		mirror      schematicir.Mirror
+	}{
+		{name: "rotated_90", orientation: schematicir.OrientationRotated90},
+		{name: "rotated_180", orientation: schematicir.OrientationRotated180},
+		{name: "rotated_270", orientation: schematicir.OrientationRotated270},
+		{name: "mirror_x", orientation: schematicir.OrientationNormal, mirror: schematicir.MirrorX},
+		{name: "mirror_y", orientation: schematicir.OrientationNormal, mirror: schematicir.MirrorY},
+		{name: "mirror_x_rotated_90", orientation: schematicir.OrientationRotated90, mirror: schematicir.MirrorX},
+		{name: "mirror_y_rotated_90", orientation: schematicir.OrientationRotated90, mirror: schematicir.MirrorY},
+		{name: "mirror_x_rotated_180", orientation: schematicir.OrientationRotated180, mirror: schematicir.MirrorX},
+		{name: "mirror_y_rotated_180", orientation: schematicir.OrientationRotated180, mirror: schematicir.MirrorY},
+		{name: "mirror_x_rotated_270", orientation: schematicir.OrientationRotated270, mirror: schematicir.MirrorX},
+		{name: "mirror_y_rotated_270", orientation: schematicir.OrientationRotated270, mirror: schematicir.MirrorY},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			fixture, err := os.Open(repoPath(t, "examples", "schematic-ir", "led_indicator.json"))
+			if err != nil {
+				t.Fatalf("open LED IR: %v", err)
+			}
+			document, issues := schematicir.DecodeStrict(fixture)
+			_ = fixture.Close()
+			if reports.HasBlockingIssue(issues) {
+				t.Fatalf("decode LED IR: %#v", issues)
+			}
+			document.Layout.Placements = []schematicir.Placement{{Target: "r_limit", Orientation: tc.orientation, Mirror: tc.mirror}}
+			tx, issues := schematicir.ToProjectTransaction(document)
+			if reports.HasBlockingIssue(issues) {
+				t.Fatalf("adapt transformed LED IR: %#v", issues)
+			}
+			output := filepath.Join(t.TempDir(), "led_indicator_"+tc.name)
+			apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true})
+			if reports.HasBlockingIssue(apply.Issues) {
+				t.Fatalf("write transformed LED schematic: %#v", apply.Issues)
+			}
+			schematicPath := filepath.Join(output, "led_indicator.kicad_sch")
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, schematicPath, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+			if err != nil {
+				t.Fatalf("RunERC returned error: %v\nresult=%#v", err, erc)
+			}
+			if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+				t.Fatalf("transformed LED ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+			}
+			roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "roundtrip")})
+			if err != nil {
+				t.Fatalf("RoundTripSchematic returned error: %v\nresult=%#v", err, roundTrip)
+			}
+			if !roundTrip.Equal {
+				t.Fatalf("transformed LED round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+			}
+		})
+	}
+}
+
 func TestKiCadDirectResistorTransformMatrix(t *testing.T) {
 	runKiCadDirectPassiveTransformMatrix(t, "Device:R", "R1")
 }

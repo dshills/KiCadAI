@@ -91,6 +91,10 @@ Acceptance: full serial Go suite and all optional KiCad calibration tests pass.
 Risk: callers with unsupported explicit direct routes receive a new actionable
 failure instead of a potentially invalid schematic.
 
+Status: automatic label fallback is covered by a KiCad-backed LED
+rotation/mirror matrix. It proves transform-safe label connectivity separately
+from the remaining direct-wire calibration families.
+
 ## Review Protocol
 
 Each completed phase is staged, reviewed with `prism review staged`, tested

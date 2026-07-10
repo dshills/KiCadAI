@@ -194,20 +194,47 @@ func TestToTransactionLabelsPassiveOnlyNetByDefault(t *testing.T) {
 	}
 }
 
-func TestToTransactionLabelsAutomaticNetAtRotatedSymbol(t *testing.T) {
-	doc := validLEDDocument()
-	doc.Layout.Placements = []Placement{{Target: "r_limit", Orientation: OrientationRotated90}}
-	if !schematicNetLabelPreferences(doc)["VIN"] {
-		t.Fatalf("rotated automatic net did not prefer labels: %#v", doc.Circuit.Nets[0])
+func TestToTransactionLabelsAutomaticNetAtTransformedSymbol(t *testing.T) {
+	cases := []struct {
+		name        string
+		orientation Orientation
+		mirror      Mirror
+	}{
+		{name: "rotated_90", orientation: OrientationRotated90},
+		{name: "rotated_180", orientation: OrientationRotated180},
+		{name: "rotated_270", orientation: OrientationRotated270},
+		{name: "mirror_x", orientation: OrientationNormal, mirror: MirrorX},
+		{name: "mirror_y", orientation: OrientationNormal, mirror: MirrorY},
+		{name: "mirror_x_rotated_90", orientation: OrientationRotated90, mirror: MirrorX},
+		{name: "mirror_y_rotated_90", orientation: OrientationRotated90, mirror: MirrorY},
+		{name: "mirror_x_rotated_180", orientation: OrientationRotated180, mirror: MirrorX},
+		{name: "mirror_y_rotated_180", orientation: OrientationRotated180, mirror: MirrorY},
+		{name: "mirror_x_rotated_270", orientation: OrientationRotated270, mirror: MirrorX},
+		{name: "mirror_y_rotated_270", orientation: OrientationRotated270, mirror: MirrorY},
 	}
-	tx, issues := ToTransaction(doc)
-	if len(issues) != 0 {
-		t.Fatalf("ToTransaction issues: %#v", issues)
-	}
-	for _, connect := range decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect) {
-		if connect.NetName == "VIN" && (connect.UseLabels == nil || !*connect.UseLabels) {
-			t.Fatalf("rotated VIN did not emit labels: %#v", connect)
-		}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			doc := validLEDDocument()
+			doc.Layout.Placements = []Placement{{Target: "r_limit", Orientation: tc.orientation, Mirror: tc.mirror}}
+			preferences := schematicNetLabelPreferences(doc)
+			for _, netName := range []string{"VIN", "LED_A"} {
+				if !preferences[netName] {
+					t.Fatalf("%s automatic net did not prefer labels: %#v", netName, doc.Circuit.Nets)
+				}
+			}
+			tx, issues := ToTransaction(doc)
+			if len(issues) != 0 {
+				t.Fatalf("ToTransaction issues: %#v", issues)
+			}
+			for _, connect := range decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect) {
+				if connect.NetName != "VIN" && connect.NetName != "LED_A" {
+					continue
+				}
+				if connect.UseLabels == nil || !*connect.UseLabels || len(connect.Waypoints) != 0 {
+					t.Fatalf("%s transformed automatic net should use labels without direct waypoints: %#v", connect.NetName, connect)
+				}
+			}
+		})
 	}
 }
 
