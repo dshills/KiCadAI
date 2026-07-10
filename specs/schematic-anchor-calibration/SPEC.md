@@ -97,6 +97,16 @@ For each symbol family, the four rotations are separate deterministic cases.
 The test output must retain enough artifact data to report the symbol, pin,
 rotation, and emitted wire endpoint when KiCad rejects a connection.
 
+## Calibrated Inventory
+
+- `Device:R`: calibrated for all four rotations and both supported mirror
+  axes. The KiCad-backed direct-wire matrix requires zero ERC findings and a
+  normalized zero-diff round trip for all twelve transform combinations.
+- `Device:C`: not calibrated. Its second pin currently fails the isolated
+  KiCad direct-wire probe despite matching the visible library geometry. It
+  must remain on raw-template/label-safe behavior until a separate empirical
+  endpoint contract is proven.
+
 ## Validation
 
 Every calibration case must run:
@@ -128,4 +138,6 @@ after each family change so an intentional migration is visible in review.
 This calibration project is complete when the four representative families
 pass the complete rotation corpus with direct wires, existing generated
 schematic fixtures remain clean, and the arbitrary-layout documentation states
-the calibrated versus resolver-required boundary precisely.
+the calibrated versus resolver-required boundary precisely. The current
+resistor result is a completed family milestone, not completion of the full
+calibration project.

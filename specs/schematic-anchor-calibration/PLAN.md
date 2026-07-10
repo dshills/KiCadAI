@@ -17,19 +17,34 @@ Acceptance: the harness can express all planned orientation/mirror cases and
 compare emitted endpoints to KiCad-parsed physical pins. Risk: shared
 orientation semantics and serialized symbol representation.
 
-## Phase 2: Passive Vertical Symbol Calibration
+## Phase 2a: Resistor Calibration
 
 Files: `internal/kicadfiles/schematic/templates.go`, calibration fixtures and
 tests.
 
-- Calibrate `Device:R` and `Device:C` against KiCad's parsed physical pins.
+- Calibrate `Device:R` against KiCad's parsed physical pins.
 - Exercise each pin and all supported rotations/mirrors using direct-only
   nets.
 - Preserve current label-based fixtures and run their KiCad ERC/round-trip
 tests after each template change.
 
-Acceptance: all resistor and capacitor cases pass KiCad ERC and round-trip.
+Acceptance: all resistor transform cases pass KiCad ERC and round-trip.
+Status: completed by the `TestKiCadDirectResistorTransformMatrix` corpus.
 Risk: existing direct passive routes can move.
+
+## Phase 2b: Capacitor Calibration
+
+Files: `internal/kicadfiles/schematic/templates.go`, calibration fixtures and
+tests.
+
+- Build a capacitor-specific direct-wire probe from KiCad-saved evidence.
+- Do not reuse resistor offsets without a passing KiCad ERC matrix.
+- Exercise each pin and all supported rotations/mirrors using direct-only
+  nets.
+
+Acceptance: all capacitor transform cases pass KiCad ERC and round-trip.
+Status: pending; the initial isolated probe reports an unconnected pin 2.
+Risk: capacitor pin endpoints may require a distinct instance/library rule.
 
 ## Phase 3: Connector Calibration
 
