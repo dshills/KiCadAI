@@ -173,6 +173,15 @@ type adapterState struct {
 	issues       []reports.Issue
 }
 
+// connectionOverrideCacheEntry caches the symbol-level KiCad connection
+// anchor for one pin number. The cache is intentionally keyed by symbol ID;
+// embedded connection overrides are shared by every instance of that symbol.
+type connectionOverrideCacheEntry struct {
+	offset kicadfiles.Point
+	known  bool
+	found  bool
+}
+
 const (
 	defaultLayoutStartXMM       = 25.0
 	defaultLayoutSignalYMM      = 55.0
@@ -233,15 +242,36 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 	}
 	state.issues = append(state.issues, schematicLayoutAcceptanceIssues(document, layoutResult)...)
 	connectedPins := connectedPinSet(document)
+	connectionOverrides := map[string]map[string]connectionOverrideCacheEntry{}
 	for componentIndex, component := range document.Circuit.Components {
+		componentID := strings.TrimSpace(component.ID)
+		componentSymbol := strings.TrimSpace(component.Symbol)
+		if _, exists := connectionOverrides[componentSymbol]; !exists {
+			connectionOverrides[componentSymbol] = map[string]connectionOverrideCacheEntry{}
+		}
+		overrides := connectionOverrides[componentSymbol]
 		knownPins := knownSchematicPinNumbers(component, index)
 		for pinIndex, pin := range component.Pins {
 			number := strings.TrimSpace(pin.Number)
-			key := strings.TrimSpace(component.ID) + "." + strings.TrimSpace(pin.Number)
+			key := componentID + "." + number
 			if _, required := connectedPins[key]; !required {
 				continue
 			}
-			if _, ok := explicitPinOffset(pin, kicadfiles.Point{}); ok {
+			cached := overrides[number]
+			if !cached.known {
+				if connectionOffset, hasConnectionOverride := schematic.EmbeddedSymbolConnectionPinOffset(componentSymbol, number); hasConnectionOverride {
+					cached.offset = connectionOffset
+					cached.found = true
+				}
+				cached.known = true
+				overrides[number] = cached
+			}
+			connectionOffset := cached.offset
+			explicit, hasExplicitOffset := explicitPinOffset(pin, connectionOffset)
+			if cached.found && hasExplicitOffset && !schematicAnchorsMatch(explicit, connectionOffset) {
+				state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), fmt.Sprintf("explicit pin offset (%.4f,%.4f) conflicts with the KiCad-validated connection anchor (%.4f,%.4f)", float64(explicit.X)/float64(kicadfiles.MM(1)), float64(explicit.Y)/float64(kicadfiles.MM(1)), float64(connectionOffset.X)/float64(kicadfiles.MM(1)), float64(connectionOffset.Y)/float64(kicadfiles.MM(1))))
+			}
+			if hasExplicitOffset {
 				continue
 			}
 			if _, known := knownPins[number]; known {
@@ -1604,6 +1634,22 @@ func explicitPinOffset(pin Pin, defaultOffset kicadfiles.Point) (kicadfiles.Poin
 		offset.Y = kicadfiles.MM(*pin.OffsetYMM)
 	}
 	return offset, true
+}
+
+func schematicAnchorsMatch(left, right kicadfiles.Point) bool {
+	return iuWithinOne(left.X, right.X) && iuWithinOne(left.Y, right.Y)
+}
+
+func iuWithinOne(left, right kicadfiles.IU) bool {
+	// Avoid subtraction here: IU is signed and hostile IR coordinates must not
+	// turn an extreme-value difference into an apparent near match.
+	if left == right {
+		return true
+	}
+	if left > right {
+		return left <= right+1
+	}
+	return right <= left+1
 }
 
 func transactionSymbolProperties(component Component) []transactions.SymbolProperty {

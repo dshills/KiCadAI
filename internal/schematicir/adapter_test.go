@@ -79,6 +79,24 @@ func TestToTransactionWithLibraryIndexFailsClosedOnMissingRecords(t *testing.T) 
 	}
 }
 
+func TestToTransactionRejectsConflictingKiCadConnectionAnchor(t *testing.T) {
+	document := validLEDDocument()
+	document.Circuit.Components[0].ID = "vin"
+	document.Circuit.Components[0].Symbol = "Connector_Generic:Conn_01x04"
+	document.Circuit.Components[0].Pins = []Pin{
+		{Number: "1", OffsetXMM: floatPtr(-5.08), OffsetYMM: floatPtr(2.54)},
+		{Number: "2", OffsetXMM: floatPtr(-5.08), OffsetYMM: floatPtr(0)},
+		{Number: "3", OffsetXMM: floatPtr(-5.08), OffsetYMM: floatPtr(-2.54)},
+		{Number: "4", OffsetXMM: floatPtr(-5.08), OffsetYMM: floatPtr(-5.08)},
+	}
+	document.Circuit.Nets[0].Connect[0] = "vin.4"
+
+	_, issues := ToTransaction(document)
+	if !schematicIRIssueCode(issues, reports.CodeInvalidArgument) {
+		t.Fatalf("conflicting KiCad connection anchor did not fail closed: %#v", issues)
+	}
+}
+
 func schematicIRIssueCode(issues []reports.Issue, code reports.Code) bool {
 	for _, issue := range issues {
 		if issue.Code == code && issue.Blocking() {

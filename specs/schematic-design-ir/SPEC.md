@@ -715,12 +715,16 @@ The current codebase already has:
 
 Remaining gaps for high-quality AI-generated schematics:
 
-- true KiCad vector-bus graphics, bus entries, and bus-member expansion are not
-  represented by the v1 IR; `bus` currently means a label-friendly bus-signal
-  role such as SDA or SCL, not a KiCad vector bus;
+- KiCad vector-bus graphics, bus entries, member-label expansion, grid
+  normalization, KiCad ERC, and schematic round-trip coverage are implemented
+  for root-sheet IR generation; cross-sheet vector-bus propagation remains
+  unsupported and fails closed;
 - resolver-aware output still depends on configured KiCad library roots or
   explicit symbol geometry; missing geometry fails closed for strict readable
   acceptance;
+- explicit pin offsets must agree with KiCadAI’s validated connection-anchor
+  overrides for embedded symbols; conflicting offsets fail closed before any
+  file is written;
 - inherited symbols in split `.kicad_symdir` libraries require the
   resolver-backed adapter to materialize their base symbol body before
   embedding;
