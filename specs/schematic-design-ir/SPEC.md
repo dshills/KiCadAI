@@ -741,6 +741,10 @@ Remaining gaps for high-quality AI-generated schematics:
   label stubs must leave the symbol on that side rather than guessing from the
   anchor's nearest body edge. This keeps transformed row-pin symbols readable
   without changing the KiCad-proven electrical connection point;
+- resolver-backed symbols derive the same outward direction from KiCad's
+  cardinal library-pin orientation (`0`, `90`, `180`, or `270` degrees), after
+  the resolver normalizes the pin anchor into schematic coordinates. Missing
+  or non-cardinal orientation retains the conservative body-based fallback;
 - inherited symbols in split `.kicad_symdir` libraries require the
   resolver-backed adapter to materialize their base symbol body before
   embedding;

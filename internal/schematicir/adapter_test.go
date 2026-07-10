@@ -3,6 +3,7 @@ package schematicir
 import (
 	"encoding/json"
 	"math"
+	"reflect"
 	"testing"
 
 	"kicadai/internal/kicadfiles"
@@ -70,6 +71,24 @@ func TestSchematicLayoutPinsRetainTemplatePinDirection(t *testing.T) {
 	}
 	if pins[1].Direction != (kicadfiles.Point{X: 1}) {
 		t.Fatalf("pin 8 direction = %#v, want right", pins[1].Direction)
+	}
+}
+
+func TestSchematicLayoutPinDirectionsUseResolverOrientation(t *testing.T) {
+	index := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:Row": {Pins: []libraryresolver.SymbolPin{
+			{Number: "1", Unit: 1, Orientation: "0"},
+			{Number: "2", Unit: 1, Orientation: "180"},
+			{Number: "3", Unit: 1, Orientation: "270"},
+			{Number: "4", Unit: 1, Orientation: "90"},
+		}},
+	}}
+	directions := schematicLayoutPinDirections(Component{Symbol: "Custom:Row", Unit: "1"}, index)
+	want := map[string]kicadfiles.Point{
+		"1": {X: -1}, "2": {X: 1}, "3": {Y: -1}, "4": {Y: 1},
+	}
+	if !reflect.DeepEqual(directions, want) {
+		t.Fatalf("directions = %#v, want %#v", directions, want)
 	}
 }
 

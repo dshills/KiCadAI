@@ -548,6 +548,10 @@ case demonstrates the need.
   when available and retains the body-based fallback otherwise. A twelve-seed
   dense `Sensor:Generic_I2C_8P` corpus now verifies deterministic write, parse,
   electrical, and zero-warning readability evidence for that path.
+- Resolver-backed symbols now derive pin-facing directions from KiCad's
+  cardinal pin orientation before label routing. This closes the row-pin
+  direction ambiguity for indexed libraries while preserving the conservative
+  fallback for absent or non-cardinal library orientation data.
 
 ### Work
 
