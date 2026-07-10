@@ -303,9 +303,10 @@ type BusLayout struct {
 }
 
 type BusEntryLayout struct {
-	Member string      `json:"member"`
-	At     LayoutPoint `json:"at"`
-	Size   LayoutPoint `json:"size"`
+	Member   string      `json:"member"`
+	Endpoint EndpointRef `json:"endpoint"`
+	At       LayoutPoint `json:"at"`
+	Size     LayoutPoint `json:"size"`
 }
 
 type LayoutPoint struct {

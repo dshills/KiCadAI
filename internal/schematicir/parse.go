@@ -194,6 +194,9 @@ func normalizeBuses(document Document) Document {
 				if left.Member != right.Member {
 					return strings.Compare(left.Member, right.Member)
 				}
+				if left.Endpoint != right.Endpoint {
+					return strings.Compare(string(left.Endpoint), string(right.Endpoint))
+				}
 				if left.At.XMM != right.At.XMM {
 					if left.At.XMM < right.At.XMM {
 						return -1

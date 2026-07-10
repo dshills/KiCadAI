@@ -1,0 +1,102 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "vector_bus",
+    "title": "Four-bit Vector Bus",
+    "description": "Native KiCad vector bus with explicit scalar member endpoints.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "input",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_01x04",
+        "value": "BUS IN",
+        "pins": [
+          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
+          {"number": "2", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 0},
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
+          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": -2.54}
+        ]
+      },
+      {
+        "id": "output",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_01x04",
+        "value": "BUS OUT",
+        "pins": [
+          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
+          {"number": "2", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 0},
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
+          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": -2.54}
+        ]
+      }
+    ],
+    "nets": [
+      {"name": "DATA0", "role": "bus", "connect": ["input.1", "output.1"]},
+      {"name": "DATA1", "role": "bus", "connect": ["input.2", "output.2"]},
+      {"name": "DATA2", "role": "bus", "connect": ["input.3", "output.3"]},
+      {"name": "DATA3", "role": "bus", "connect": ["input.4", "output.4"]}
+    ],
+    "buses": [
+      {
+        "id": "data_bus",
+        "name": "DATA[0..3]",
+        "members": [
+          {"net": "DATA0", "label": "DATA[0]"},
+          {"net": "DATA1", "label": "DATA[1]"},
+          {"net": "DATA2", "label": "DATA[2]"},
+          {"net": "DATA3", "label": "DATA[3]"}
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "input_group", "label": "Bus input", "role": "input_stage", "members": ["input"], "rank": 0, "side": "left"},
+      {"id": "output_group", "label": "Bus output", "role": "output_stage", "members": ["output"], "rank": 4, "side": "right"}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 40,
+      "min_component_spacing_mm": 12
+    },
+    "buses": [
+      {
+        "bus": "data_bus",
+        "points": [{"x_mm": 75, "y_mm": 80}, {"x_mm": 200, "y_mm": 80}],
+        "entries": [
+          {"member": "DATA0", "endpoint": "input.1", "at": {"x_mm": 95, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": 2.54}},
+          {"member": "DATA0", "endpoint": "output.1", "at": {"x_mm": 135, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": -2.54}},
+          {"member": "DATA1", "endpoint": "input.2", "at": {"x_mm": 145, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": 2.54}},
+          {"member": "DATA1", "endpoint": "output.2", "at": {"x_mm": 185, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": -2.54}},
+          {"member": "DATA2", "endpoint": "input.3", "at": {"x_mm": 105, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": 2.54}},
+          {"member": "DATA2", "endpoint": "output.3", "at": {"x_mm": 145, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": -2.54}},
+          {"member": "DATA3", "endpoint": "input.4", "at": {"x_mm": 155, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": 2.54}},
+          {"member": "DATA3", "endpoint": "output.4", "at": {"x_mm": 195, "y_mm": 80}, "size": {"x_mm": 2.54, "y_mm": -2.54}}
+        ]
+      }
+    ]
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

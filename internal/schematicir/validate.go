@@ -101,12 +101,39 @@ func (ctx *validationContext) validateBuses(netNames map[string]Net) {
 		}
 		validateBusPoints(path+".points", layout.Points, ctx.add)
 		entryMembers := map[string]struct{}{}
+		entryEndpoints := map[string]map[EndpointRef]struct{}{}
 		for entryIndex, entry := range layout.Entries {
 			entryPath := fmt.Sprintf("%s.entries[%d]", path, entryIndex)
+			memberNet := ""
 			if _, exists := members[entry.Member]; !exists {
 				ctx.add(entryPath+".member", "bus entry references unknown bus member "+entry.Member)
+			} else {
+				for _, bus := range ctx.document.Circuit.Buses {
+					if bus.ID != layout.Bus {
+						continue
+					}
+					for _, member := range bus.Members {
+						if member.Net == entry.Member {
+							memberNet = member.Net
+						}
+					}
+				}
 			}
 			entryMembers[entry.Member] = struct{}{}
+			if strings.TrimSpace(string(entry.Endpoint)) == "" {
+				ctx.add(entryPath+".endpoint", "bus entry endpoint is required")
+			} else if memberNet != "" {
+				if _, exists := entryEndpoints[memberNet]; !exists {
+					entryEndpoints[memberNet] = map[EndpointRef]struct{}{}
+				}
+				if _, duplicate := entryEndpoints[memberNet][entry.Endpoint]; duplicate {
+					ctx.add(entryPath+".endpoint", "bus entry endpoint is duplicated for this member")
+				}
+				entryEndpoints[memberNet][entry.Endpoint] = struct{}{}
+				if !busNetContainsEndpoint(ctx.document.Circuit.Nets, memberNet, entry.Endpoint) {
+					ctx.add(entryPath+".endpoint", "bus entry endpoint is not connected to member net "+memberNet)
+				}
+			}
 			if !finiteFloats(entry.At.XMM, entry.At.YMM, entry.Size.XMM, entry.Size.YMM) {
 				ctx.add(entryPath, "bus entry geometry must be finite")
 			}
@@ -122,6 +149,19 @@ func (ctx *validationContext) validateBuses(netNames map[string]Net) {
 				if _, exists := entryMembers[member]; !exists {
 					ctx.add(path+".entries", "bus member "+member+" has no declared entry")
 				}
+				for _, bus := range ctx.document.Circuit.Buses {
+					if bus.ID != layout.Bus {
+						continue
+					}
+					for _, busMember := range bus.Members {
+						if busMember.Net != member {
+							continue
+						}
+						if len(entryEndpoints[member]) < countNetEndpoints(ctx.document.Circuit.Nets, member) {
+							ctx.add(path+".entries", "bus member "+member+" does not have an entry for every scalar endpoint")
+						}
+					}
+				}
 			}
 		}
 	}
@@ -130,6 +170,33 @@ func (ctx *validationContext) validateBuses(netNames map[string]Net) {
 			ctx.add("layout.buses", "bus "+busID+" requires explicit layout geometry")
 		}
 	}
+}
+
+func busNetContainsEndpoint(nets []Net, name string, endpoint EndpointRef) bool {
+	for _, net := range nets {
+		if net.Name != name {
+			continue
+		}
+		for _, candidate := range net.Connect {
+			if candidate == endpoint {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func countNetEndpoints(nets []Net, name string) int {
+	seen := map[EndpointRef]struct{}{}
+	for _, net := range nets {
+		if net.Name != name {
+			continue
+		}
+		for _, endpoint := range net.Connect {
+			seen[endpoint] = struct{}{}
+		}
+	}
+	return len(seen)
 }
 
 func validateBusPoints(path string, points []LayoutPoint, add func(string, string)) {

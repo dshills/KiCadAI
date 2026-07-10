@@ -15,21 +15,24 @@ func TestSchematicIRExamples(t *testing.T) {
 		minSymbols    int
 		minConnects   int
 		minFootprints int
+		minBuses      int
+		minBusEntries int
 	}{
 		{name: "LED indicator", file: "led_indicator.json", minSymbols: 3, minConnects: 3, minFootprints: 3},
 		{name: "USB-C LED indicator", file: "usb_c_led_indicator.json", minSymbols: 5, minConnects: 7, minFootprints: 5},
 		{name: "I2C sensor 3.3V regulator", file: "i2c_sensor_3v3_regulator.json", minSymbols: 11, minConnects: 20, minFootprints: 11},
 		{name: "Resolver-backed external connector", file: "external_connector_indicator.json", minSymbols: 2, minConnects: 1, minFootprints: 0},
+		{name: "Vector bus", file: "vector_bus.json", minSymbols: 2, minConnects: 0, minFootprints: 0, minBuses: 1, minBusEntries: 8},
 	}
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			testSchematicIRExample(t, tc.file, tc.minSymbols, tc.minConnects, tc.minFootprints)
+			testSchematicIRExample(t, tc.file, tc.minSymbols, tc.minConnects, tc.minFootprints, tc.minBuses, tc.minBusEntries)
 		})
 	}
 }
 
-func testSchematicIRExample(t *testing.T, fileName string, minSymbols int, minConnects int, minFootprints int) {
+func testSchematicIRExample(t *testing.T, fileName string, minSymbols int, minConnects int, minFootprints int, minBuses int, minBusEntries int) {
 	t.Helper()
 	path := filepath.Join("..", "..", "examples", "schematic-ir", fileName)
 	file, err := os.Open(path)
@@ -69,6 +72,12 @@ func testSchematicIRExample(t *testing.T, fileName string, minSymbols int, minCo
 	}
 	if got := exampleOperationCount(tx, transactions.OpAssignFootprint); got < minFootprints {
 		t.Fatalf("assign_footprint count = %d, want >= %d", got, minFootprints)
+	}
+	if got := exampleOperationCount(tx, transactions.OpAddBus); got < minBuses {
+		t.Fatalf("add_bus count = %d, want >= %d", got, minBuses)
+	}
+	if got := exampleOperationCount(tx, transactions.OpAddBusEntry); got < minBusEntries {
+		t.Fatalf("add_bus_entry count = %d, want >= %d", got, minBusEntries)
 	}
 }
 

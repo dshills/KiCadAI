@@ -3,7 +3,8 @@
 ## Phase 1: IR Model And Validation
 
 Add `Circuit.Buses`, `Bus`, `BusMember`, `Layout.Buses`, `BusLayout`, and
-`BusEntryLayout`. Implement strict validation and deterministic normalization.
+`BusEntryLayout` with explicit scalar `endpoint` ownership. Implement strict
+validation and deterministic normalization.
 
 Files: `internal/schematicir/model.go`, `validate.go`, `normalize.go`, tests,
 `SPEC.md`.
@@ -26,14 +27,15 @@ its geometry is malformed.
 
 ## Phase 3: IR Adapter And Readable Geometry
 
-Map validated bus layout intent to transaction operations. Attach member wires
-and labels at KiCad entry connection points. Keep hierarchy conversion fail
-closed when buses are present.
+Map validated bus layout intent to transaction operations. Emit native bus and
+entry graphics plus paired short scalar label stubs at each component endpoint
+and KiCad entry connection point. Keep hierarchy conversion fail closed when
+buses are present.
 
 Files: `internal/schematicir/adapter.go`, tests, targeted hierarchy checks.
 
 Acceptance: bus IR produces a readable transaction with all scalar members still
-electrically represented.
+electrically represented and without crossing member wires.
 
 ## Phase 4: Golden Fixture And Readback
 
@@ -45,7 +47,8 @@ Files: `examples/schematic-ir/vector_bus.json`, `internal/schematicir`
 goldens/tests, CLI tests, docs.
 
 Acceptance: checked-in fixture passes all available gates and reports missing
-KiCad evidence explicitly rather than passing silently.
+KiCad evidence explicitly rather than passing silently. Readback preserves the
+native bus, every entry, both scalar stubs per entry, and member label counts.
 
 ## Phase 5: Documentation And Verification
 

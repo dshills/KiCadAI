@@ -16,7 +16,8 @@ V1 supports:
 - named buses with explicit ordered members;
 - member nets that remain ordinary electrical scalar nets;
 - explicit bus spine points and bus-entry geometry in layout intent;
-- scalar member wires and labels attached to KiCad bus entries;
+- scalar member wires and labels attached to KiCad bus entries; long member
+  connections use paired short label stubs instead of crossing the bus field;
 - strict parse/validation, transaction emission, writer output, readback, and
   readability evidence;
 - root-sheet generation.
@@ -46,10 +47,10 @@ the bus or converting it to scalar labels.
         "id": "data_bus",
         "name": "DATA[0..3]",
         "members": [
-          {"net": "DATA0", "label": "DATA0"},
-          {"net": "DATA1", "label": "DATA1"},
-          {"net": "DATA2", "label": "DATA2"},
-          {"net": "DATA3", "label": "DATA3"}
+          {"net": "DATA0", "label": "DATA[0]"},
+          {"net": "DATA1", "label": "DATA[1]"},
+          {"net": "DATA2", "label": "DATA[2]"},
+          {"net": "DATA3", "label": "DATA[3]"}
         ]
       }
     ]
@@ -63,8 +64,8 @@ the bus or converting it to scalar labels.
           {"x_mm": 150.0, "y_mm": 80.0}
         ],
         "entries": [
-          {"member": "DATA0", "at": {"x_mm": 82.5, "y_mm": 80.0}, "size": {"x_mm": 2.54, "y_mm": 2.54}},
-          {"member": "DATA1", "at": {"x_mm": 100.0, "y_mm": 80.0}, "size": {"x_mm": 2.54, "y_mm": 2.54}}
+          {"member": "DATA0", "endpoint": "u1.1", "at": {"x_mm": 82.5, "y_mm": 80.0}, "size": {"x_mm": 2.54, "y_mm": 2.54}},
+          {"member": "DATA1", "endpoint": "u1.2", "at": {"x_mm": 100.0, "y_mm": 80.0}, "size": {"x_mm": 2.54, "y_mm": 2.54}}
         ]
       }
     ]
@@ -72,11 +73,13 @@ the bus or converting it to scalar labels.
 }
 ```
 
-The `member` value identifies the member net, not a component pin. Every bus
-member must reference exactly one existing non-`no_connect` net. A member
-label is explicit because KiCad bus-member naming has syntax beyond ordinary
-net-name equality. Multiple entries may use the same member label when the
-member is intentionally connected at multiple locations.
+The `member` value identifies the member net, not a component pin. `endpoint`
+identifies the exact component pin served by this entry. Every bus member must
+reference exactly one existing non-`no_connect` net, and every scalar endpoint
+of that net must have a corresponding entry. A member label is explicit because
+KiCad bus-member naming has syntax beyond ordinary net-name equality. Multiple
+entries may use the same member label when the member is intentionally
+connected at multiple locations.
 
 Coordinates are millimetres in the IR and are converted to KiCad internal
 units by the adapter. Points must be orthogonalized only when the requested
@@ -109,22 +112,29 @@ The adapter emits:
 
 1. `add_bus` operations for each spine segment;
 2. `add_bus_entry` operations for each declared entry;
-3. member wire operations from each entry connection point to the referenced
-   component pin endpoint;
-4. local member labels using the declared `label`.
+3. two short scalar wire operations per entry: one leaving the referenced
+   component pin and one leaving the bus-entry connection point;
+4. matching local member labels using the declared `label` on both stubs. KiCad
+   joins those separated scalar stubs by label, so member wires do not cross
+   unrelated members or symbol bodies.
 
 The entry connection point is `entry.at + entry.size`, matching KiCad’s
 `bus_entry (at ...) (size ...)` convention. Member wires are ordinary KiCad
 schematic wires and therefore remain visible to existing scalar connectivity
-checks. The bus graphics do not replace scalar net identity.
+checks. The bus graphics do not replace scalar net identity. The IR bus `name`
+is currently retained as validated semantic metadata; a native bus-label
+operation is reserved for a later phase because the existing scalar label
+rules do not yet understand labels attached directly to vector buses.
 
 ## Readability Policy
 
 - Bus spine segments must be on the requested page and on the configured grid.
 - Entries must be on the spine and use a consistent size within one bus.
 - Member wires must be orthogonal and must not terminate inside a symbol body.
-- Member labels are placed at the entry-connected wire endpoint, rotated only
-  when required by the entry direction.
+- Member labels are placed at short, orthogonal stubs on both the component and
+  entry sides. The adapter chooses the pin-side stub direction from the
+  resolved pin anchor relative to its component, keeping labels outside symbol
+  bodies.
 - Bus diagnostics are blocking under `acceptance = readable`; no warning is
   suppressed merely because KiCad can open the file.
 

@@ -47,6 +47,7 @@ func toTransaction(document Document, index *libraryresolver.LibraryIndex) (tran
 	}
 	state.appendCreateProject(&tx)
 	state.appendComponents(&tx)
+	state.appendBuses(&tx)
 	state.appendNets(&tx)
 	state.appendPorts(&tx)
 
@@ -168,6 +169,7 @@ type adapterState struct {
 	routesByKey  map[string]schematiclayout.RoutedConnection
 	labelsByKey  map[string]kicadfiles.Point
 	textByID     map[string]layoutTextPlacement
+	layoutResult schematiclayout.Result
 	issues       []reports.Issue
 }
 
@@ -222,6 +224,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		refsByID:     map[string]string{},
 		unitsByID:    map[string]int{},
 		pointsByID:   layoutResultPoints(layoutResult),
+		layoutResult: layoutResult,
 		rotationByID: layoutRotations(document),
 		routesByKey:  layoutRouteHints(layoutResult),
 		labelsByKey:  layoutEndpointLabelHints(layoutResult),
@@ -416,6 +419,93 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 	}
 }
 
+func (state *adapterState) appendBuses(tx *transactions.Transaction) {
+	if len(state.document.Circuit.Buses) == 0 {
+		return
+	}
+	if state.layoutResult.Partition != nil && len(state.layoutResult.Partition.Sheets) > 1 {
+		state.addIssue("circuit.buses", "vector bus generation is not supported across generated hierarchy sheets")
+		return
+	}
+	busesByID := make(map[string]Bus, len(state.document.Circuit.Buses))
+	for _, bus := range state.document.Circuit.Buses {
+		busesByID[bus.ID] = bus
+	}
+	for layoutIndex, layout := range state.document.Layout.Buses {
+		bus, ok := busesByID[layout.Bus]
+		if !ok {
+			continue
+		}
+		points := make([]transactions.Point, 0, len(layout.Points))
+		for _, item := range layout.Points {
+			points = append(points, transactions.Point{XMM: item.XMM, YMM: item.YMM})
+		}
+		state.appendOperation(tx, transactions.OpAddBus, transactions.AddBusOperation{
+			Op:     transactions.OpAddBus,
+			Points: points,
+		}, "", "")
+		members := make(map[string]BusMember, len(bus.Members))
+		for _, member := range bus.Members {
+			members[member.Net] = member
+		}
+		for entryIndex, entry := range layout.Entries {
+			member, exists := members[entry.Member]
+			if !exists {
+				continue
+			}
+			state.appendOperation(tx, transactions.OpAddBusEntry, transactions.AddBusEntryOperation{
+				Op:   transactions.OpAddBusEntry,
+				At:   transactions.Point{XMM: entry.At.XMM, YMM: entry.At.YMM},
+				Size: transactions.Point{XMM: entry.Size.XMM, YMM: entry.Size.YMM},
+			}, "", "")
+			anchor, anchorOK := state.portEndpointAnchor(entry.Endpoint)
+			if !anchorOK {
+				state.addIssue(fmt.Sprintf("layout.buses[%d].entries[%d].endpoint", layoutIndex, entryIndex), "bus entry endpoint has no resolved schematic anchor")
+				continue
+			}
+			entryPoint := transactions.Point{XMM: entry.At.XMM + entry.Size.XMM, YMM: entry.At.YMM + entry.Size.YMM}
+			pinStub := state.busPinStub(anchor, entry.Endpoint)
+			entryStub := transactions.Point{XMM: entryPoint.XMM + 5.08, YMM: entryPoint.YMM}
+			state.appendOperation(tx, transactions.OpAddSchematicWire, transactions.AddSchematicWireOperation{
+				Op:          transactions.OpAddSchematicWire,
+				NetName:     member.Net,
+				Points:      []transactions.Point{anchor, pinStub},
+				Label:       member.Label,
+				LabelAt:     &pinStub,
+				LabelRotate: 0,
+			}, "", member.Net)
+			state.appendOperation(tx, transactions.OpAddSchematicWire, transactions.AddSchematicWireOperation{
+				Op:          transactions.OpAddSchematicWire,
+				NetName:     member.Net,
+				Points:      []transactions.Point{entryPoint, entryStub},
+				Label:       member.Label,
+				LabelAt:     &entryStub,
+				LabelRotate: 0,
+			}, "", member.Net)
+		}
+	}
+}
+
+func (state *adapterState) busPinStub(anchor transactions.Point, endpoint EndpointRef) transactions.Point {
+	componentID, _, _ := endpoint.Split()
+	origin, ok := state.pointsByID[componentID]
+	if ok {
+		dx := anchor.XMM - origin.XMM
+		dy := anchor.YMM - origin.YMM
+		if math.Abs(dx) >= math.Abs(dy) && dx != 0 {
+			stubDistance := 2.54
+			if dx < 0 {
+				stubDistance = 5.08
+			}
+			return transactions.Point{XMM: anchor.XMM + math.Copysign(stubDistance, dx), YMM: anchor.YMM}
+		}
+		if dy != 0 {
+			return transactions.Point{XMM: anchor.XMM, YMM: anchor.YMM + math.Copysign(2.54, dy)}
+		}
+	}
+	return transactions.Point{XMM: anchor.XMM + 2.54, YMM: anchor.YMM}
+}
+
 type layoutTextPlacement struct {
 	reference *transactions.Point
 	value     *transactions.Point
@@ -446,6 +536,9 @@ func layoutTextPlacements(result schematiclayout.Result) map[string]layoutTextPl
 
 func (state *adapterState) appendNets(tx *transactions.Transaction) {
 	for netIndex, net := range state.orderedNetsForEmission() {
+		if state.isBusMember(net.Name) {
+			continue
+		}
 		if net.Role == NetRoleNoConnect {
 			for endpointIndex, endpoint := range net.Connect {
 				mapped, ok := state.transactionEndpoint(endpoint, fmt.Sprintf("circuit.nets[%d].connect[%d]", netIndex, endpointIndex))
@@ -535,6 +628,17 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func (state *adapterState) isBusMember(netName string) bool {
+	for _, bus := range state.document.Circuit.Buses {
+		for _, member := range bus.Members {
+			if member.Net == netName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (state *adapterState) appendPorts(tx *transactions.Transaction) {
@@ -1053,6 +1157,9 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 		})
 	}
 	for index, net := range document.Circuit.Nets {
+		if documentNetIsBusMember(document, net.Name) {
+			continue
+		}
 		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: index, PreferDirect: stateDocumentHasPortNet(document, net.Name)}
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
@@ -1075,6 +1182,17 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 		})
 	}
 	return schematiclayout.Layout(request)
+}
+
+func documentNetIsBusMember(document Document, netName string) bool {
+	for _, bus := range document.Circuit.Buses {
+		for _, member := range bus.Members {
+			if member.Net == netName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func stateDocumentHasPortNet(document Document, netName string) bool {
