@@ -274,6 +274,96 @@ func TestSchematicIRWritesResolverBackedExternalSymbolProject(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesResolverBackedOversizedHierarchy(t *testing.T) {
+	document := resolverBackedOversizedHierarchyDocument()
+	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{
+		SymbolsRoot: filepath.Join("testdata", "symbols"),
+	}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(loadIssues) {
+		t.Fatalf("fixture library issues: %+v", loadIssues)
+	}
+	tx, issues := ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("project transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), document.Metadata.Name)
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true, LibraryIndex: &index})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(outputDir)
+	if err != nil {
+		t.Fatalf("read generated hierarchy: %v", err)
+	}
+	if len(read.SheetFiles) < 2 {
+		t.Fatalf("resolver-backed hierarchy did not partition: sheets=%d", len(read.SheetFiles))
+	}
+	foundTransformed := false
+	for _, child := range read.SheetFiles {
+		for _, symbol := range child.Symbols {
+			if symbol.Reference != "J80" {
+				continue
+			}
+			foundTransformed = true
+			if symbol.Rotation != 90 || symbol.Mirror != schematic.SymbolMirror(MirrorX) || symbol.BodyBounds == nil || len(symbol.PinAnchors) != 4 {
+				t.Fatalf("transformed resolver symbol = %#v", symbol)
+			}
+		}
+		report, err := evaluate.Schematic(filepath.Join(outputDir, child.Filename))
+		if err != nil {
+			t.Fatalf("evaluate child %s: %v", child.Filename, err)
+		}
+		for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+			if check := schematicIRCheckByName(report.Checks, name); check.Status != evaluate.CheckPassed {
+				t.Fatalf("child %s %s check = %#v", child.Filename, name, check)
+			}
+		}
+		request, layoutResult := schematiclayout.AdaptSchematic(child)
+		layoutResult = schematiclayout.Validate(layoutResult, request)
+		readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+		if !readability.Passed || readability.ErrorCount != 0 || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+			t.Fatalf("child %s readability = %#v diagnostics=%#v", child.Filename, readability, layoutResult.Diagnostics)
+		}
+	}
+	if !foundTransformed {
+		t.Fatal("generated hierarchy did not contain transformed resolver-backed symbol J80")
+	}
+}
+
+func resolverBackedOversizedHierarchyDocument() Document {
+	document := *NewDocument()
+	document.Metadata.Name = "resolver_backed_oversized_hierarchy"
+	document.Metadata.Title = "Resolver-backed oversized hierarchy"
+	document.Metadata.Description = "Resolver geometry, transformed symbols, and child-sheet readability fixture."
+	document.Policy.Acceptance = AcceptanceReadable
+	const connectorCount = 160
+	group := Group{ID: "connector_fabric", Label: "Connector fabric", Role: GroupRoleConnectorStage, Rank: 1}
+	for index := 1; index <= connectorCount; index++ {
+		id := fmt.Sprintf("connector_%d", index)
+		component := Component{
+			ID: id, Ref: fmt.Sprintf("J%d", index), Role: ComponentRoleConnector,
+			Symbol: "Connector_Generic:Conn_02x02_Odd_Even", Value: "FABRIC",
+			Pins: []Pin{
+				{Number: "1", Role: PinRolePassive, NoConnect: index == 1},
+				{Number: "2", Role: PinRolePassive, NoConnect: index == connectorCount},
+				{Number: "3", Role: PinRolePassive, NoConnect: true},
+				{Number: "4", Role: PinRolePassive, NoConnect: true},
+			},
+		}
+		document.Circuit.Components = append(document.Circuit.Components, component)
+		group.Members = append(group.Members, id)
+		if index > 1 {
+			document.Circuit.Nets = append(document.Circuit.Nets, Net{
+				Name: fmt.Sprintf("FABRIC_%03d", index-1), Role: NetRoleSignal,
+				Connect: []EndpointRef{EndpointRef(fmt.Sprintf("connector_%d.2", index-1)), EndpointRef(fmt.Sprintf("%s.1", id))},
+			})
+		}
+	}
+	document.Layout.Groups = []Group{group}
+	document.Layout.Placements = []Placement{{Target: "connector_80", Orientation: OrientationRotated90, Mirror: MirrorX}}
+	return document
+}
+
 func TestSchematicIRWritesResolverBackedMultiUnitProject(t *testing.T) {
 	document := multiUnitFixtureDocument()
 	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{

@@ -47,7 +47,9 @@ generated and checked-in schematic examples.
 - Oversized IR documents emit deterministic hierarchy child sheets. Explicit
   groups remain together when possible; a group that cannot fit a child page
   is split deliberately, with `partition_split_group_count` reported as layout
-  evidence. Cross-sheet endpoints use collision-aware global-label stubs.
+  evidence. Cross-sheet endpoints use collision-aware global-label stubs, and
+  hierarchy tests cover transformed resolver-backed symbols and pin-owned
+  no-connect markers.
 - Direct local wires are emitted only for calibrated or explicitly requested
   endpoint contracts. Automatic nets that touch transformed symbols use the
   label path by default; all supported symbol rotation/mirror combinations for

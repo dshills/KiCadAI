@@ -877,21 +877,43 @@ func junctionsForSheet(junctions []schematic.Junction, symbols []schematic.Schem
 }
 
 func noConnectsForSheet(noConnects []schematic.NoConnect, symbols []schematic.SchematicSymbol, used map[kicadfiles.UUID]struct{}) []schematic.NoConnect {
-	minPoint, maxPoint, ok := sheetSymbolBounds(symbols)
-	if !ok {
+	anchors := make([]kicadfiles.Point, 0)
+	for _, symbol := range symbols {
+		anchors = append(anchors, symbol.PinAnchors...)
+	}
+	if len(anchors) == 0 {
 		return nil
 	}
 	selected := make([]schematic.NoConnect, 0, len(noConnects))
 	for _, noConnect := range noConnects {
-		if pointInSheetBounds(noConnect.Position, minPoint, maxPoint) {
-			if _, exists := used[noConnect.UUID]; exists {
-				continue
-			}
-			used[noConnect.UUID] = struct{}{}
-			selected = append(selected, noConnect)
+		if !matchesHierarchyPinAnchor(noConnect.Position, anchors) {
+			continue
 		}
+		if _, exists := used[noConnect.UUID]; exists {
+			continue
+		}
+		used[noConnect.UUID] = struct{}{}
+		selected = append(selected, noConnect)
 	}
 	return selected
+}
+
+func matchesHierarchyPinAnchor(position kicadfiles.Point, anchors []kicadfiles.Point) bool {
+	const tolerance = kicadfiles.IU(200000)
+	for _, anchor := range anchors {
+		dx := position.X - anchor.X
+		dy := position.Y - anchor.Y
+		if dx < 0 {
+			dx = -dx
+		}
+		if dy < 0 {
+			dy = -dy
+		}
+		if dx+dy <= tolerance {
+			return true
+		}
+	}
+	return false
 }
 
 func absIU(value kicadfiles.IU) kicadfiles.IU {

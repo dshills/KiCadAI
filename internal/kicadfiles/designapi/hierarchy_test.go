@@ -188,3 +188,16 @@ func TestBuilderWritesUnitAwareGeneratedHierarchy(t *testing.T) {
 		t.Fatalf("child units = %#v, want 1 and 2", seenUnits)
 	}
 }
+
+func TestNoConnectsForSheetUsesActualPinAnchors(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(50)}
+	symbols := []schematic.SchematicSymbol{{Reference: "J1", PinAnchors: []kicadfiles.Point{anchor}}}
+	noConnects := []schematic.NoConnect{
+		{UUID: "connected", Position: anchor},
+		{UUID: "nearby_but_not_pin", Position: kicadfiles.Point{X: kicadfiles.MM(42), Y: kicadfiles.MM(50)}},
+	}
+	selected := noConnectsForSheet(noConnects, symbols, map[kicadfiles.UUID]struct{}{})
+	if len(selected) != 1 || selected[0].UUID != "connected" {
+		t.Fatalf("selected no-connects = %#v, want only the pin-anchor marker", selected)
+	}
+}
