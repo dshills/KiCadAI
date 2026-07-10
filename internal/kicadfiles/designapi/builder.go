@@ -129,11 +129,20 @@ type ConnectOptions struct {
 	// SuppressBendLabels prevents automatic labels at orthogonal route bends
 	// when the caller explicitly chose local wiring.
 	SuppressBendLabels bool
+	// SkipFromLabel and SkipToLabel let a caller replace one endpoint's local
+	// label with a global or hierarchical label at the same anchor.
+	SkipFromLabel bool
+	SkipToLabel   bool
 	// Waypoints contains the complete absolute orthogonal path, including the
 	// source and destination anchors. It is ignored when labels are forced.
 	Waypoints   []kicadfiles.Point
 	FromLabelAt *kicadfiles.Point
 	ToLabelAt   *kicadfiles.Point
+}
+
+type LabelOptions struct {
+	Rotation kicadfiles.Angle
+	Shape    schematic.LabelShape
 }
 
 type PlaceFootprintOptions struct {
@@ -561,8 +570,12 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	builder.assignPinNet(to, netName)
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
 	if options.UseLabels != nil && *options.UseLabels {
-		builder.addSchematicLabelConnection(netName, from, start, end, options.FromLabelAt)
-		builder.addSchematicLabelConnection(netName, to, end, start, options.ToLabelAt)
+		if !options.SkipFromLabel {
+			builder.addSchematicLabelConnection(netName, from, start, end, options.FromLabelAt)
+		}
+		if !options.SkipToLabel {
+			builder.addSchematicLabelConnection(netName, to, end, start, options.ToLabelAt)
+		}
 	} else if len(options.Waypoints) != 0 {
 		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels)
 	} else if options.UseLabels != nil {
@@ -676,6 +689,10 @@ func (builder *Builder) AddNoConnect(endpoint Endpoint) error {
 }
 
 func (builder *Builder) AddLabel(text string, position kicadfiles.Point, kind schematic.LabelKind) error {
+	return builder.AddLabelWithOptions(text, position, kind, LabelOptions{})
+}
+
+func (builder *Builder) AddLabelWithOptions(text string, position kicadfiles.Point, kind schematic.LabelKind, options LabelOptions) error {
 	if builder == nil {
 		return fmt.Errorf("builder required")
 	}
@@ -689,12 +706,15 @@ func (builder *Builder) AddLabel(text string, position kicadfiles.Point, kind sc
 	if hasSchematicLabel(builder.design.Schematic.Labels, text, position) {
 		return nil
 	}
-	builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, schematic.NewLabel(
+	label := schematic.NewLabel(
 		builder.generator.New("root.schematic.label", text, formatPoint(position)),
 		text,
 		kind,
 		position,
-	))
+	)
+	label.Rotation = options.Rotation
+	label.Shape = options.Shape
+	builder.design.Schematic.Labels = append(builder.design.Schematic.Labels, label)
 	return nil
 }
 

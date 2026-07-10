@@ -48,7 +48,7 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 		}
 	}
 	for _, label := range file.Labels {
-		result.Labels = append(result.Labels, Label{NetName: label.Text, Text: label.Text, Position: label.Position})
+		result.Labels = append(result.Labels, Label{NetName: label.Text, Text: label.Text, Position: label.Position, Rotation: label.Rotation})
 	}
 	for _, junction := range file.Junctions {
 		result.Junctions = append(result.Junctions, Junction{Position: junction.Position})

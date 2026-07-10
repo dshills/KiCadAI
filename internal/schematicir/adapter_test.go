@@ -73,8 +73,8 @@ func TestToTransactionEmitsGlobalLabelsForPorts(t *testing.T) {
 	}
 	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
 	for _, connect := range connects {
-		if connect.NetName == "VIN" && (connect.UseLabels == nil || *connect.UseLabels) {
-			t.Fatalf("port net should use direct wiring by default: %#v", connect)
+		if connect.NetName == "VIN" && (connect.UseLabels == nil || !*connect.UseLabels || !connect.SkipFromLabel || connect.SkipToLabel || len(connect.Waypoints) != 0) {
+			t.Fatalf("port net should use global-plus-local labels by default: %#v", connect)
 		}
 	}
 	if result := transactions.Validate(tx); len(result.Issues) != 0 {
@@ -97,8 +97,8 @@ func TestToTransactionPortAlwaysUsesGlobalLabel(t *testing.T) {
 	}
 	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
 	for _, connect := range connects {
-		if connect.NetName == doc.Circuit.Nets[0].Name && (connect.UseLabels == nil || *connect.UseLabels) {
-			t.Fatalf("port net should use direct wiring even when use_label is explicit: %#v", connect)
+		if connect.NetName == doc.Circuit.Nets[0].Name && (connect.UseLabels == nil || !*connect.UseLabels || !connect.SkipFromLabel) {
+			t.Fatalf("port net should preserve global label semantics even when use_label is explicit: %#v", connect)
 		}
 	}
 }

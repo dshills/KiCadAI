@@ -267,6 +267,19 @@ func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectCanReplaceOneLocalLabel(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	useLabels := true
+	if err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "PORT_SIG", ConnectOptions{UseLabels: &useLabels, SkipFromLabel: true}); err != nil {
+		t.Fatalf("connect with one skipped label: %v", err)
+	}
+	if len(builder.design.Schematic.Labels) != 1 || builder.design.Schematic.Labels[0].Text != "PORT_SIG" {
+		t.Fatalf("labels = %#v, want only the non-port local label", builder.design.Schematic.Labels)
+	}
+}
+
 func TestBuilderLongNetLabelStubsAreConnectionGridSafe(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)})

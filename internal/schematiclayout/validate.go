@@ -178,7 +178,7 @@ func validationObjects(result Result) []ValidationObject {
 		}
 	}
 	for _, label := range result.Labels {
-		objects = append(objects, ValidationObject{Ref: label.Text, Kind: "label", Box: TextEstimate(label.Text, label.Position, 0, 0)})
+		objects = append(objects, ValidationObject{Ref: label.Text, Kind: "label", Box: TextEstimateRotated(label.Text, label.Position, label.Rotation)})
 	}
 	return objects
 }

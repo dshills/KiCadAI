@@ -15,3 +15,15 @@ func TestTransformPointMatchesKiCadMirrorAxes(t *testing.T) {
 		t.Fatalf("mirror y = %#v, want reflection across Y axis", got)
 	}
 }
+
+func TestTextEstimateRotatedKeepsAnchorAndTextSide(t *testing.T) {
+	anchor := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	horizontal := TextEstimateRotated("AB", anchor, 0)
+	left := TextEstimateRotated("AB", anchor, 180)
+	if horizontal.MinX != anchor.X || horizontal.MaxX <= anchor.X || horizontal.MaxY != anchor.Y {
+		t.Fatalf("horizontal label bounds = %#v", horizontal)
+	}
+	if left.MaxX != anchor.X || left.MinX >= anchor.X || left.MaxY != anchor.Y {
+		t.Fatalf("left-facing label bounds = %#v", left)
+	}
+}

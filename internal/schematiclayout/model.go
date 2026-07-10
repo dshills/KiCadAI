@@ -99,6 +99,7 @@ type Net struct {
 	Role            string
 	Endpoints       []Endpoint
 	PreferredLabels bool
+	PreferDirect    bool
 	OriginalOrdinal int
 }
 
@@ -175,6 +176,7 @@ type Label struct {
 	NetName  string
 	Text     string
 	Position kicadfiles.Point
+	Rotation kicadfiles.Angle
 }
 
 type Junction struct {

@@ -76,7 +76,12 @@ func toProjectTransaction(document Document, index *libraryresolver.LibraryIndex
 	if reports.HasBlockingIssue(hierarchyIssues) {
 		return tx, issues
 	}
-	payload := transactions.WriteProjectOperation{Op: transactions.OpWriteProject, SchematicOnly: true, Hierarchy: hierarchy}
+	payload := transactions.WriteProjectOperation{
+		Op:                          transactions.OpWriteProject,
+		SchematicOnly:               true,
+		RequireSchematicReadability: document.Policy.Acceptance == AcceptanceReadable,
+		Hierarchy:                   hierarchy,
+	}
 	raw, err := json.Marshal(payload)
 	if err != nil {
 		issues = append(issues, reports.Issue{
@@ -444,11 +449,26 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					waypoints = transactionPoints(points)
 				}
 			}
-			if state.hasPortNet(net.Name) {
-				value := false
+			portNet := state.hasPortNet(net.Name)
+			skipFromLabel := false
+			skipToLabel := false
+			if portNet {
+				value := true
 				useLabels = &value
-				fromLabelAt = nil
-				toLabelAt = nil
+				waypoints = nil
+				portEndpoint := state.portEndpointForNet(net.Name)
+				skipFromLabel = portEndpoint == fromIR
+				skipToLabel = portEndpoint == toIR
+				if !skipFromLabel {
+					if point, pointOK := state.labelPointForEndpoint(net.Name, fromIR); pointOK {
+						fromLabelAt = &point
+					}
+				}
+				if !skipToLabel {
+					if point, pointOK := state.labelPointForEndpoint(net.Name, toIR); pointOK {
+						toLabelAt = &point
+					}
+				}
 			}
 			if useLabels != nil && *useLabels {
 				if fromLabelAt == nil {
@@ -467,6 +487,8 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				NetName:            net.Name,
 				UseLabels:          useLabels,
 				SuppressBendLabels: net.UseLabel != nil && !*net.UseLabel,
+				SkipFromLabel:      skipFromLabel,
+				SkipToLabel:        skipToLabel,
 				Waypoints:          waypoints,
 				FromLabelAt:        fromLabelAt,
 				ToLabelAt:          toLabelAt,
@@ -486,25 +508,30 @@ func (state *adapterState) appendPorts(tx *transactions.Transaction) {
 		if !ok || len(net.Connect) == 0 {
 			continue
 		}
-		endpoint := state.portEndpointForSide(net.Name, net.Connect, port.Side)
-		at, ok := state.portEndpointPoint(net.Name, endpoint)
+		_, at, ok := state.portEndpointInfoForSide(net.Name, net.Connect, port.Side)
 		if !ok {
 			state.addIssue("circuit.ports", "could not resolve schematic anchor for port "+port.Name)
 			continue
 		}
 		payload := transactions.AddLabelOperation{
-			Op:   transactions.OpAddLabel,
-			Text: port.Name,
-			At:   at,
-			Kind: "global",
+			Op:          transactions.OpAddLabel,
+			Text:        port.Name,
+			At:          at,
+			Kind:        "global",
+			RotationDeg: portLabelRotation(port.Side),
 		}
 		state.appendOperation(tx, transactions.OpAddLabel, payload, "", port.Net)
 	}
 }
 
 func (state *adapterState) portEndpointForSide(netName string, endpoints []EndpointRef, side Side) EndpointRef {
+	endpoint, _, _ := state.portEndpointInfoForSide(netName, endpoints, side)
+	return endpoint
+}
+
+func (state *adapterState) portEndpointInfoForSide(netName string, endpoints []EndpointRef, side Side) (EndpointRef, transactions.Point, bool) {
 	if len(endpoints) == 0 {
-		return ""
+		return "", transactions.Point{}, false
 	}
 	type candidate struct {
 		endpoint EndpointRef
@@ -517,7 +544,8 @@ func (state *adapterState) portEndpointForSide(netName string, endpoints []Endpo
 		}
 	}
 	if len(candidates) == 0 {
-		return endpoints[0]
+		point, ok := state.portEndpointPoint(netName, endpoints[0])
+		return endpoints[0], point, ok
 	}
 	best := candidates[0]
 	for _, current := range candidates[1:] {
@@ -536,7 +564,7 @@ func (state *adapterState) portEndpointForSide(netName string, endpoints []Endpo
 			best = current
 		}
 	}
-	return best.endpoint
+	return best.endpoint, best.point, true
 }
 
 func (state *adapterState) hasPortNet(netName string) bool {
@@ -549,9 +577,18 @@ func (state *adapterState) hasPortNet(netName string) bool {
 }
 
 func (state *adapterState) portEndpointPoint(netName string, endpoint EndpointRef) (transactions.Point, bool) {
-	if point, ok := state.labelsByKey[schematicEndpointLabelKey(netName, endpoint)]; ok {
-		return transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}, true
+	_, _, ok := endpoint.Split()
+	if !ok {
+		return transactions.Point{}, false
 	}
+	anchor, ok := state.portEndpointAnchor(endpoint)
+	if !ok {
+		return transactions.Point{}, false
+	}
+	return anchor, true
+}
+
+func (state *adapterState) portEndpointAnchor(endpoint EndpointRef) (transactions.Point, bool) {
 	componentID, pinNumber, ok := endpoint.Split()
 	if !ok {
 		return transactions.Point{}, false
@@ -578,6 +615,66 @@ func (state *adapterState) portEndpointPoint(netName string, endpoint EndpointRe
 		return transactions.Point{XMM: origin.XMM + x, YMM: origin.YMM + y}, true
 	}
 	return transactions.Point{}, false
+}
+
+func (state *adapterState) labelPointForEndpoint(netName string, endpoint EndpointRef) (transactions.Point, bool) {
+	if point, ok := state.labelsByKey[schematicEndpointLabelKey(netName, endpoint)]; ok {
+		return transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}, true
+	}
+	anchor, ok := state.portEndpointAnchor(endpoint)
+	if !ok {
+		return transactions.Point{}, false
+	}
+	componentID, _, _ := endpoint.Split()
+	origin, ok := state.pointsByID[componentID]
+	if !ok {
+		return transactions.Point{}, false
+	}
+	dx, dy := anchor.XMM-origin.XMM, anchor.YMM-origin.YMM
+	if math.Abs(dx) >= math.Abs(dy) {
+		anchor.XMM += math.Copysign(2.54, dx)
+	} else if dy != 0 {
+		anchor.YMM += math.Copysign(2.54, dy)
+	} else {
+		anchor.YMM -= 2.54
+	}
+	return anchor, true
+}
+
+func (state *adapterState) portEndpointInfo(netName string, endpoints []EndpointRef) (EndpointRef, transactions.Point, bool) {
+	for _, port := range state.document.Circuit.Ports {
+		if port.Net == netName {
+			return state.portEndpointInfoForSide(netName, endpoints, port.Side)
+		}
+	}
+	return state.portEndpointInfoForSide(netName, endpoints, SideLeft)
+}
+
+func (state *adapterState) portEndpointForNet(netName string) EndpointRef {
+	endpoint, _, _ := state.portEndpointInfo(netName, state.netEndpoints(netName))
+	return endpoint
+}
+
+func (state *adapterState) netEndpoints(netName string) []EndpointRef {
+	for _, net := range state.document.Circuit.Nets {
+		if net.Name == netName {
+			return net.Connect
+		}
+	}
+	return nil
+}
+
+func portLabelRotation(side Side) float64 {
+	switch side {
+	case SideRight:
+		return 0
+	case SideTop:
+		return 270
+	case SideBottom:
+		return 90
+	default:
+		return 180
+	}
 }
 
 func rotateSchematicPoint(x, y, angle float64) (float64, float64) {
@@ -917,7 +1014,7 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 		})
 	}
 	for index, net := range document.Circuit.Nets {
-		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: index}
+		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: index, PreferDirect: stateDocumentHasPortNet(document, net.Name)}
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
 		}
@@ -939,6 +1036,15 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 		})
 	}
 	return schematiclayout.Layout(request)
+}
+
+func stateDocumentHasPortNet(document Document, netName string) bool {
+	for _, port := range document.Circuit.Ports {
+		if port.Net == netName {
+			return true
+		}
+	}
+	return false
 }
 
 func schematicLayoutBody(component Component, index *libraryresolver.LibraryIndex) schematiclayout.Rect {

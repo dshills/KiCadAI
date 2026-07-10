@@ -127,6 +127,25 @@ func TextEstimate(text string, position kicadfiles.Point, charWidth, height kica
 	}
 }
 
+func TextEstimateRotated(text string, position kicadfiles.Point, rotation kicadfiles.Angle) Rect {
+	base := TextEstimate(text, kicadfiles.Point{}, 0, 0)
+	width, height := base.Width(), base.Height()
+	angle := int(rotation) % 360
+	if angle < 0 {
+		angle += 360
+	}
+	switch angle {
+	case 180:
+		return Rect{MinX: position.X - width, MinY: position.Y - height, MaxX: position.X, MaxY: position.Y}
+	case 90:
+		return Rect{MinX: position.X, MinY: position.Y, MaxX: position.X + height, MaxY: position.Y + width}
+	case 270:
+		return Rect{MinX: position.X - height, MinY: position.Y - width, MaxX: position.X, MaxY: position.Y}
+	default:
+		return Rect{MinX: position.X, MinY: position.Y - height, MaxX: position.X + width, MaxY: position.Y}
+	}
+}
+
 func UsableSheet(sheet Sheet) Rect {
 	width := sheet.Width
 	height := sheet.Height

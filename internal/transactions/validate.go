@@ -187,6 +187,9 @@ func validateOperation(op Operation) []reports.Issue {
 			var issues []reports.Issue
 			issues = append(issues, requireNonEmpty(path+".text", "label text", payload.Text)...)
 			issues = append(issues, validatePoint(path+".at", payload.At)...)
+			if !finite(payload.RotationDeg) {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".rotation_deg", "rotation must be finite"))
+			}
 			return issues
 		})
 	case OpAddNoConnect:

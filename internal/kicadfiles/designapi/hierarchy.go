@@ -724,14 +724,38 @@ func appendCrossSheetLabels(builder *Builder, child *schematic.SchematicFile, sh
 				continue
 			}
 			existing[key] = struct{}{}
-			child.Labels = append(child.Labels, schematic.NewLabel(
+			label := schematic.NewLabel(
 				builder.generator.New("hierarchy.global_label", sheetID, net.Name, endpoint.Reference, strconv.Itoa(endpoint.Unit), endpoint.Pin, strconv.Itoa(sheetIndex)),
 				net.Name,
 				schematic.LabelGlobal,
 				position,
-			))
+			)
+			label.Rotation = hierarchyLabelRotation(symbol.Position, position)
+			child.Labels = append(child.Labels, label)
 		}
 	}
+}
+
+func hierarchyLabelRotation(origin, anchor kicadfiles.Point) kicadfiles.Angle {
+	dx := anchor.X - origin.X
+	dy := anchor.Y - origin.Y
+	if absIU(dx) >= absIU(dy) {
+		if dx < 0 {
+			return 180
+		}
+		return 0
+	}
+	if dy < 0 {
+		return 270
+	}
+	return 90
+}
+
+func absIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 func hierarchySymbolPinAnchor(symbol *schematic.SchematicSymbol, pin string) (kicadfiles.Point, bool) {

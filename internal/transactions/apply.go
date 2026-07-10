@@ -616,6 +616,8 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{
 			UseLabels:          payload.UseLabels,
 			SuppressBendLabels: payload.SuppressBendLabels,
+			SkipFromLabel:      payload.SkipFromLabel,
+			SkipToLabel:        payload.SkipToLabel,
 			Waypoints:          waypoints,
 			FromLabelAt:        optionalPoint(payload.FromLabelAt),
 			ToLabelAt:          optionalPoint(payload.ToLabelAt),
@@ -625,7 +627,10 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := decodeRaw(op, &payload); err != nil {
 			return nil, err
 		}
-		return nil, builder.AddLabel(payload.Text, point(payload.At.XMM, payload.At.YMM), labelKind(payload.Kind))
+		return nil, builder.AddLabelWithOptions(payload.Text, point(payload.At.XMM, payload.At.YMM), labelKind(payload.Kind), designapi.LabelOptions{
+			Rotation: kicadfiles.Angle(payload.RotationDeg),
+			Shape:    schematic.LabelShape(payload.Shape),
+		})
 	case OpAddNoConnect:
 		var payload AddNoConnectOperation
 		if err := decodeRaw(op, &payload); err != nil {
@@ -754,6 +759,11 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		}
 		if err != nil {
 			return nil, err
+		}
+		if payload.RequireSchematicReadability {
+			if err := validateWrittenSchematicReadability(writeResult.WrittenFiles); err != nil {
+				return nil, err
+			}
 		}
 		return artifactsFromWrittenFiles(writeResult.WrittenFiles), nil
 	default:

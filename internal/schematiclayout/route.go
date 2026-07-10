@@ -445,6 +445,9 @@ func shouldUseLabels(net Net, anchors map[Endpoint]kicadfiles.Point, components 
 	if !rules.LabelFallbackEnabled || len(net.Endpoints) < 2 {
 		return false
 	}
+	if net.PreferDirect {
+		return false
+	}
 	role := normalizeRole(net.Role)
 	if net.PreferredLabels || len(net.Endpoints) > 2 || containsNormalizedRole(role, "power", "ground", "bus", "negative_rail") {
 		return true

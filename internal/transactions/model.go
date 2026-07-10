@@ -204,16 +204,20 @@ type ConnectOperation struct {
 	NetName            string        `json:"net_name"`
 	UseLabels          *bool         `json:"use_labels,omitempty"`
 	SuppressBendLabels bool          `json:"suppress_bend_labels,omitempty"`
+	SkipFromLabel      bool          `json:"skip_from_label,omitempty"`
+	SkipToLabel        bool          `json:"skip_to_label,omitempty"`
 	Waypoints          []Point       `json:"waypoints,omitempty"`
 	FromLabelAt        *Point        `json:"from_label_at,omitempty"`
 	ToLabelAt          *Point        `json:"to_label_at,omitempty"`
 }
 
 type AddLabelOperation struct {
-	Op   OperationKind `json:"op"`
-	Text string        `json:"text"`
-	At   Point         `json:"at"`
-	Kind string        `json:"kind,omitempty"`
+	Op          OperationKind `json:"op"`
+	Text        string        `json:"text"`
+	At          Point         `json:"at"`
+	Kind        string        `json:"kind,omitempty"`
+	RotationDeg float64       `json:"rotation_deg,omitempty"`
+	Shape       string        `json:"shape,omitempty"`
 }
 
 type AddNoConnectOperation struct {
@@ -268,11 +272,12 @@ type AddZoneOperation struct {
 }
 
 type WriteProjectOperation struct {
-	Op            OperationKind       `json:"op"`
-	OutputDir     string              `json:"output_dir,omitempty"`
-	Overwrite     bool                `json:"overwrite,omitempty"`
-	SchematicOnly bool                `json:"schematic_only,omitempty"`
-	Hierarchy     *SchematicHierarchy `json:"hierarchy,omitempty"`
+	Op                          OperationKind       `json:"op"`
+	OutputDir                   string              `json:"output_dir,omitempty"`
+	Overwrite                   bool                `json:"overwrite,omitempty"`
+	SchematicOnly               bool                `json:"schematic_only,omitempty"`
+	RequireSchematicReadability bool                `json:"require_schematic_readability,omitempty"`
+	Hierarchy                   *SchematicHierarchy `json:"hierarchy,omitempty"`
 }
 
 type SchematicHierarchy struct {
