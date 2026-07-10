@@ -465,6 +465,35 @@ func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
 	}
 }
 
+func TestSchematicIRLayoutStableUnderInputPermutation(t *testing.T) {
+	document := loadExampleDocument(t, "arbitrary_topology.json")
+	first := schematicLayout(document)
+	permuted := loadExampleDocument(t, "arbitrary_topology.json")
+	random := rand.New(rand.NewSource(42))
+	random.Shuffle(len(permuted.Circuit.Components), func(left, right int) {
+		permuted.Circuit.Components[left], permuted.Circuit.Components[right] = permuted.Circuit.Components[right], permuted.Circuit.Components[left]
+	})
+	for index := range permuted.Circuit.Nets {
+		random.Shuffle(len(permuted.Circuit.Nets[index].Connect), func(left, right int) {
+			permuted.Circuit.Nets[index].Connect[left], permuted.Circuit.Nets[index].Connect[right] = permuted.Circuit.Nets[index].Connect[right], permuted.Circuit.Nets[index].Connect[left]
+		})
+	}
+	random.Shuffle(len(permuted.Circuit.Nets), func(left, right int) {
+		permuted.Circuit.Nets[left], permuted.Circuit.Nets[right] = permuted.Circuit.Nets[right], permuted.Circuit.Nets[left]
+	})
+	random.Shuffle(len(permuted.Layout.Groups), func(left, right int) {
+		permuted.Layout.Groups[left], permuted.Layout.Groups[right] = permuted.Layout.Groups[right], permuted.Layout.Groups[left]
+	})
+	random.Shuffle(len(permuted.Layout.Placements), func(left, right int) {
+		permuted.Layout.Placements[left], permuted.Layout.Placements[right] = permuted.Layout.Placements[right], permuted.Layout.Placements[left]
+	})
+
+	second := schematicLayout(permuted)
+	if !reflect.DeepEqual(first, second) {
+		t.Fatal("schematic layout changed under IR input permutation")
+	}
+}
+
 func generatedArbitraryTopologyDocument(seed int64) Document {
 	random := rand.New(rand.NewSource(seed))
 	document := *NewDocument()
