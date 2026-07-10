@@ -283,6 +283,68 @@ func TestSchematicIRWritesAdversarialTopologyProjects(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesLongLabelStressProject(t *testing.T) {
+	document := longLabelStressDocument()
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), "long_label_stress")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	path := filepath.Join(outputDir, "long_label_stress.kicad_sch")
+	generated, err := schematic.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	report, err := evaluate.Schematic(path)
+	if err != nil {
+		t.Fatalf("evaluate generated schematic: %v", err)
+	}
+	for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+		if check := schematicIRCheckByName(report.Checks, name); check.Status != evaluate.CheckPassed {
+			t.Fatalf("%s check = %#v", name, check)
+		}
+	}
+	request, layoutResult := schematiclayout.AdaptSchematic(&generated)
+	layoutResult = schematiclayout.Validate(layoutResult, request)
+	readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+	if !readability.Passed || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+		t.Fatalf("long-label readability failed: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
+	}
+}
+
+func longLabelStressDocument() Document {
+	document := *NewDocument()
+	document.Metadata.Name = "long_label_stress"
+	document.Metadata.Title = "Long label stress fixture"
+	document.Metadata.Description = "Long-label cyclic schematic IR fixture."
+	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(true)
+	document.Layout.Rules.MinGroupSpacingMM = floatPtr(16)
+	document.Layout.Rules.MinComponentSpacingMM = floatPtr(9)
+	document.Policy.Acceptance = AcceptanceReadable
+	document.Layout.Groups = make([]Group, 0, 6)
+	for index := 1; index <= 6; index++ {
+		id := fmt.Sprintf("r%d", index)
+		document.Layout.Groups = append(document.Layout.Groups, Group{ID: "stage_" + id, Role: GroupRoleProcessingStage, Members: []string{id}, Rank: index - 1})
+		document.Circuit.Components = append(document.Circuit.Components, Component{
+			ID: id, Ref: fmt.Sprintf("R%d", index), Role: ComponentRoleResistor, Symbol: "Device:R",
+			Value: "100k", Pins: []Pin{{Number: "1"}, {Number: "2"}},
+		})
+	}
+	for index := 1; index <= 6; index++ {
+		next := index%6 + 1
+		document.Circuit.Nets = append(document.Circuit.Nets, Net{
+			Name: fmt.Sprintf("LONG_ANALOG_SIGNAL_STAGE_%02d_TO_STAGE_%02d", index, next), Role: NetRoleSignal,
+			Connect:  []EndpointRef{EndpointRef(fmt.Sprintf("r%d.%d", index, 1)), EndpointRef(fmt.Sprintf("r%d.%d", next, 2))},
+			UseLabel: boolPtr(true),
+		})
+	}
+	return document
+}
+
 func testSchematicIRTopologyProject(t *testing.T, document Document) {
 	t.Helper()
 	tx, issues := ToProjectTransaction(document)
