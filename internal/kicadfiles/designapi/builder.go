@@ -718,6 +718,93 @@ func (builder *Builder) AddLabelWithOptions(text string, position kicadfiles.Poi
 	return nil
 }
 
+// AddBus appends one KiCad vector-bus spine. Bus membership remains expressed
+// by scalar member wires and labels emitted separately by the transaction layer.
+func (builder *Builder) AddBus(points []kicadfiles.Point) error {
+	if builder == nil || builder.design.Schematic == nil {
+		return fmt.Errorf("schematic required")
+	}
+	if len(points) < 2 {
+		return fmt.Errorf("bus requires at least two points")
+	}
+	for index := 1; index < len(points); index++ {
+		if samePoint(points[index-1], points[index]) {
+			return fmt.Errorf("bus contains a zero-length segment")
+		}
+		if points[index-1].X != points[index].X && points[index-1].Y != points[index].Y {
+			return fmt.Errorf("bus segments must be orthogonal")
+		}
+	}
+	for _, bus := range builder.design.Schematic.Buses {
+		if samePointList(bus.Points, points) {
+			return nil
+		}
+	}
+	builder.design.Schematic.Buses = append(builder.design.Schematic.Buses, schematic.Bus{
+		UUID:   builder.generator.New("root.schematic.bus", formatPoint(points[0]), formatPoint(points[len(points)-1])),
+		Points: append([]kicadfiles.Point(nil), points...),
+	})
+	return nil
+}
+
+// AddBusEntry appends a native KiCad bus entry. The member wire endpoint is
+// conventionally position plus size, matching KiCad's S-expression format.
+func (builder *Builder) AddBusEntry(position, size kicadfiles.Point) error {
+	if builder == nil || builder.design.Schematic == nil {
+		return fmt.Errorf("schematic required")
+	}
+	if size.X == 0 || size.Y == 0 {
+		return fmt.Errorf("bus entry size must be non-zero on both axes")
+	}
+	for _, entry := range builder.design.Schematic.BusEntries {
+		if entry.Position == position && entry.Size == size {
+			return nil
+		}
+	}
+	builder.design.Schematic.BusEntries = append(builder.design.Schematic.BusEntries, schematic.BusEntry{
+		UUID:     builder.generator.New("root.schematic.bus_entry", formatPoint(position), formatPoint(size)),
+		Position: position,
+		Size:     size,
+	})
+	return nil
+}
+
+// AddSchematicWireWithLabel emits a raw orthogonal scalar member wire and an
+// optional local label. It is intentionally separate from Connect because one
+// endpoint may be a bus entry rather than a symbol pin.
+func (builder *Builder) AddSchematicWireWithLabel(netName string, points []kicadfiles.Point, label string, labelAt *kicadfiles.Point, rotation kicadfiles.Angle) error {
+	if builder == nil || builder.design.Schematic == nil {
+		return fmt.Errorf("schematic required")
+	}
+	if strings.TrimSpace(netName) == "" {
+		return fmt.Errorf("schematic wire net name required")
+	}
+	if len(points) < 2 {
+		return fmt.Errorf("schematic wire requires at least two points")
+	}
+	for index := 1; index < len(points); index++ {
+		if samePoint(points[index-1], points[index]) {
+			return fmt.Errorf("schematic wire contains a zero-length segment")
+		}
+		if points[index-1].X != points[index].X && points[index-1].Y != points[index].Y {
+			return fmt.Errorf("schematic wire segments must be orthogonal")
+		}
+	}
+	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
+	builder.nets.EnsureNet(netName)
+	builder.addSchematicWirePointsWithOptions(netName, Endpoint{}, Endpoint{}, points, true)
+	if strings.TrimSpace(label) != "" {
+		position := points[len(points)-1]
+		if labelAt != nil {
+			position = *labelAt
+		}
+		if err := builder.AddLabelWithOptions(label, position, schematic.LabelLocal, LabelOptions{Rotation: rotation}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (builder *Builder) addSchematicLabelStub(netName string, endpoint Endpoint, anchor kicadfiles.Point, offset kicadfiles.Point) {
 	if builder == nil {
 		return
@@ -1066,6 +1153,18 @@ func samePoint(first, second kicadfiles.Point) bool {
 	// KiCad file coordinates are normalized to integer internal units before
 	// they reach the design builder, so exact comparison is intentional here.
 	return first.X == second.X && first.Y == second.Y
+}
+
+func samePointList(left, right []kicadfiles.Point) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for index := range left {
+		if !samePoint(left[index], right[index]) {
+			return false
+		}
+	}
+	return true
 }
 
 func orthogonalSchematicWirePoints(start, end kicadfiles.Point) []kicadfiles.Point {

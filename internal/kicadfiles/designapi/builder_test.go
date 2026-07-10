@@ -89,6 +89,47 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	assertPadNet(t, design.PCB.Footprints, "D1", "1", "LED_OUT")
 }
 
+func TestBuilderEmitsNativeVectorBusGeometry(t *testing.T) {
+	builder := newTestBuilder(t)
+	busPoints := []kicadfiles.Point{{X: kicadfiles.MM(20), Y: kicadfiles.MM(50)}, {X: kicadfiles.MM(80), Y: kicadfiles.MM(50)}}
+	if err := builder.AddBus(busPoints); err != nil {
+		t.Fatalf("AddBus returned error: %v", err)
+	}
+	entryAt := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(50)}
+	entrySize := kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)}
+	if err := builder.AddBusEntry(entryAt, entrySize); err != nil {
+		t.Fatalf("AddBusEntry returned error: %v", err)
+	}
+	labelAt := kicadfiles.Point{X: entryAt.X + entrySize.X, Y: entryAt.Y + entrySize.Y}
+	if err := builder.AddSchematicWireWithLabel("DATA0", []kicadfiles.Point{
+		{X: kicadfiles.MM(10), Y: labelAt.Y},
+		labelAt,
+	}, "DATA0", &labelAt, 0); err != nil {
+		t.Fatalf("AddSchematicWireWithLabel returned error: %v", err)
+	}
+	design := builder.Design()
+	if err := kicaddesign.Validate(design); err != nil {
+		t.Fatalf("design validation failed: %v", err)
+	}
+	if len(design.Schematic.Buses) != 1 || len(design.Schematic.BusEntries) != 1 || len(design.Schematic.Wires) != 1 {
+		t.Fatalf("native vector bus geometry = buses:%d entries:%d wires:%d", len(design.Schematic.Buses), len(design.Schematic.BusEntries), len(design.Schematic.Wires))
+	}
+	if len(design.Schematic.Labels) != 1 || design.Schematic.Labels[0].Text != "DATA0" {
+		t.Fatalf("member labels = %#v", design.Schematic.Labels)
+	}
+	root := filepath.Join(t.TempDir(), "vector_bus")
+	if _, err := builder.WriteSchematicProject(root, kicaddesign.WriteOptions{}); err != nil {
+		t.Fatalf("WriteSchematicProject returned error: %v", err)
+	}
+	read, err := schematic.ReadFile(filepath.Join(root, "intent_demo.kicad_sch"))
+	if err != nil {
+		t.Fatalf("read written vector bus schematic: %v", err)
+	}
+	if len(read.Buses) != 1 || len(read.BusEntries) != 1 {
+		t.Fatalf("written vector bus geometry = buses:%d entries:%d", len(read.Buses), len(read.BusEntries))
+	}
+}
+
 func TestBuilderSupportsUnitAwareSharedReferences(t *testing.T) {
 	builder := newTestBuilder(t)
 	for unit, x := range map[int]float64{1: 20, 2: 40} {

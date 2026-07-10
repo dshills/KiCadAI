@@ -2,6 +2,7 @@ package transactions
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -218,7 +219,7 @@ func supportedExistingPlanOperation(kind OperationKind) bool {
 
 func supportedPlanOperation(kind OperationKind) bool {
 	switch kind {
-	case OpCreateProject, OpSetBoardOutline, OpAddSymbol, OpAddLabel, OpConnect, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
+	case OpCreateProject, OpSetBoardOutline, OpAddSymbol, OpAddLabel, OpAddBus, OpAddBusEntry, OpAddSchematicWire, OpConnect, OpAssignFootprint, OpPlaceFootprint, OpRoute, OpAddZone, OpAddNoConnect, OpWriteProject:
 		return true
 	default:
 		return false
@@ -259,6 +260,25 @@ func populatePlanFields(planned *PlannedOperation, op Operation, target string, 
 		} else {
 			addNet(planned, payload.Text)
 		}
+	case OpAddBus:
+		var payload AddBusOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return decodeIssue(err)
+		}
+		planned.Capability = fmt.Sprintf("add schematic bus with %d points", len(payload.Points))
+	case OpAddBusEntry:
+		var payload AddBusEntryOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return decodeIssue(err)
+		}
+		planned.Capability = "add schematic bus entry"
+	case OpAddSchematicWire:
+		var payload AddSchematicWireOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return decodeIssue(err)
+		}
+		addNet(planned, payload.NetName)
+		planned.Capability = "add schematic member wire"
 	case OpConnect:
 		var payload ConnectOperation
 		if err := decodeRaw(op, &payload); err != nil {

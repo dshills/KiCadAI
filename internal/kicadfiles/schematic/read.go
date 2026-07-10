@@ -57,6 +57,10 @@ func Read(data []byte) (SchematicFile, error) {
 			file.Symbols = append(file.Symbols, readSymbol(child))
 		case "wire":
 			file.Wires = append(file.Wires, Wire{UUID: readUUID(child), Points: readPoints(child)})
+		case "bus":
+			file.Buses = append(file.Buses, Bus{UUID: readUUID(child), Points: readPoints(child)})
+		case "bus_entry":
+			file.BusEntries = append(file.BusEntries, readBusEntry(child))
 		case "label":
 			file.Labels = append(file.Labels, readLabel(child, LabelLocal))
 		case "global_label":
@@ -196,6 +200,18 @@ func readSheet(node sexpr.ParsedNode) Sheet {
 		sheet.Instances = readNestedSheetInstances(instances)
 	}
 	return sheet
+}
+
+func readBusEntry(node sexpr.ParsedNode) BusEntry {
+	entry := BusEntry{UUID: readUUID(node), Position: readAtPoint(node)}
+	if size, ok := node.Child("size"); ok {
+		x, xOK := size.FloatValue(1)
+		y, yOK := size.FloatValue(2)
+		if xOK && yOK {
+			entry.Size = kicadfiles.Point{X: kicadfiles.MM(x), Y: kicadfiles.MM(y)}
+		}
+	}
+	return entry
 }
 
 func readSheetPin(node sexpr.ParsedNode) (SheetPin, bool) {

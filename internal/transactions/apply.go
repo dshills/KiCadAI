@@ -638,6 +638,32 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			Rotation: kicadfiles.Angle(payload.RotationDeg),
 			Shape:    schematic.LabelShape(payload.Shape),
 		})
+	case OpAddBus:
+		var payload AddBusOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return nil, err
+		}
+		points := make([]kicadfiles.Point, 0, len(payload.Points))
+		for _, item := range payload.Points {
+			points = append(points, point(item.XMM, item.YMM))
+		}
+		return nil, builder.AddBus(points)
+	case OpAddBusEntry:
+		var payload AddBusEntryOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return nil, err
+		}
+		return nil, builder.AddBusEntry(point(payload.At.XMM, payload.At.YMM), point(payload.Size.XMM, payload.Size.YMM))
+	case OpAddSchematicWire:
+		var payload AddSchematicWireOperation
+		if err := decodeRaw(op, &payload); err != nil {
+			return nil, err
+		}
+		points := make([]kicadfiles.Point, 0, len(payload.Points))
+		for _, item := range payload.Points {
+			points = append(points, point(item.XMM, item.YMM))
+		}
+		return nil, builder.AddSchematicWireWithLabel(payload.NetName, points, payload.Label, optionalPoint(payload.LabelAt), kicadfiles.Angle(payload.LabelRotate))
 	case OpAddNoConnect:
 		var payload AddNoConnectOperation
 		if err := decodeRaw(op, &payload); err != nil {

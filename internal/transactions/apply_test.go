@@ -72,6 +72,32 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	}
 }
 
+func TestApplyWritesNativeVectorBusOperations(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "bus_demo")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"bus_demo"},
+	  {"op":"add_bus","points":[{"x_mm":20,"y_mm":50},{"x_mm":80,"y_mm":50}]},
+	  {"op":"add_bus_entry","at":{"x_mm":40,"y_mm":50},"size":{"x_mm":2.54,"y_mm":2.54}},
+	  {"op":"add_schematic_wire","net_name":"DATA0","points":[{"x_mm":10,"y_mm":52.54},{"x_mm":42.54,"y_mm":52.54}],"label":"DATA0","label_at":{"x_mm":42.54,"y_mm":52.54}},
+	  {"op":"write_project","schematic_only":true}
+	]}`)
+	validation := Validate(tx)
+	if reports.HasBlockingIssue(validation.Issues) {
+		t.Fatalf("transaction validation issues: %#v", validation.Issues)
+	}
+	result := Apply(tx, ApplyOptions{OutputDir: output, Overwrite: true})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("apply issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "bus_demo.kicad_sch"))
+	if err != nil {
+		t.Fatalf("read schematic: %v", err)
+	}
+	if len(file.Buses) != 1 || len(file.BusEntries) != 1 || len(file.Wires) != 1 || len(file.Labels) != 1 {
+		t.Fatalf("readback vector bus geometry = buses:%d entries:%d wires:%d labels:%d", len(file.Buses), len(file.BusEntries), len(file.Wires), len(file.Labels))
+	}
+}
+
 func TestApplyPreservesMultiUnitSymbolsAndConnections(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "dual")
 	tx := mustParse(t, `{"operations":[

@@ -5,18 +5,21 @@ import "encoding/json"
 type OperationKind string
 
 const (
-	OpCreateProject   OperationKind = "create_project"
-	OpSetBoardOutline OperationKind = "set_board_outline"
-	OpAddSymbol       OperationKind = "add_symbol"
-	OpAddLabel        OperationKind = "add_label"
-	OpConnect         OperationKind = "connect"
-	OpAssignFootprint OperationKind = "assign_footprint"
-	OpPlaceFootprint  OperationKind = "place_footprint"
-	OpRoute           OperationKind = "route"
-	OpAddZone         OperationKind = "add_zone"
-	OpAddNoConnect    OperationKind = "add_no_connect"
-	OpWriteProject    OperationKind = "write_project"
-	OpRemoveSymbol    OperationKind = "remove_symbol"
+	OpCreateProject    OperationKind = "create_project"
+	OpSetBoardOutline  OperationKind = "set_board_outline"
+	OpAddSymbol        OperationKind = "add_symbol"
+	OpAddLabel         OperationKind = "add_label"
+	OpAddBus           OperationKind = "add_bus"
+	OpAddBusEntry      OperationKind = "add_bus_entry"
+	OpAddSchematicWire OperationKind = "add_schematic_wire"
+	OpConnect          OperationKind = "connect"
+	OpAssignFootprint  OperationKind = "assign_footprint"
+	OpPlaceFootprint   OperationKind = "place_footprint"
+	OpRoute            OperationKind = "route"
+	OpAddZone          OperationKind = "add_zone"
+	OpAddNoConnect     OperationKind = "add_no_connect"
+	OpWriteProject     OperationKind = "write_project"
+	OpRemoveSymbol     OperationKind = "remove_symbol"
 )
 
 type Transaction struct {
@@ -218,6 +221,26 @@ type AddLabelOperation struct {
 	Kind        string        `json:"kind,omitempty"`
 	RotationDeg float64       `json:"rotation_deg,omitempty"`
 	Shape       string        `json:"shape,omitempty"`
+}
+
+type AddBusOperation struct {
+	Op     OperationKind `json:"op"`
+	Points []Point       `json:"points"`
+}
+
+type AddBusEntryOperation struct {
+	Op   OperationKind `json:"op"`
+	At   Point         `json:"at"`
+	Size Point         `json:"size"`
+}
+
+type AddSchematicWireOperation struct {
+	Op          OperationKind `json:"op"`
+	NetName     string        `json:"net_name"`
+	Points      []Point       `json:"points"`
+	Label       string        `json:"label,omitempty"`
+	LabelAt     *Point        `json:"label_at,omitempty"`
+	LabelRotate float64       `json:"label_rotation_deg,omitempty"`
 }
 
 type AddNoConnectOperation struct {

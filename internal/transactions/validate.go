@@ -87,6 +87,11 @@ func plannedOperationIdentity(op Operation) PlannedOperation {
 			addRef(&planned, payload.To.Ref)
 			addNet(&planned, payload.NetName)
 		}
+	case OpAddSchematicWire:
+		var payload AddSchematicWireOperation
+		if decodeRaw(op, &payload) == nil {
+			addNet(&planned, payload.NetName)
+		}
 	case OpAddNoConnect:
 		var payload AddNoConnectOperation
 		if decodeRaw(op, &payload) == nil {
@@ -189,6 +194,36 @@ func validateOperation(op Operation) []reports.Issue {
 			issues = append(issues, validatePoint(path+".at", payload.At)...)
 			if !finite(payload.RotationDeg) {
 				issues = append(issues, issue(reports.CodeInvalidArgument, path+".rotation_deg", "rotation must be finite"))
+			}
+			return issues
+		})
+	case OpAddBus:
+		var payload AddBusOperation
+		return validateDecoded(op, &payload, func() []reports.Issue {
+			return validateOrthogonalPoints(path+".points", payload.Points, 2)
+		})
+	case OpAddBusEntry:
+		var payload AddBusEntryOperation
+		return validateDecoded(op, &payload, func() []reports.Issue {
+			var issues []reports.Issue
+			issues = append(issues, validatePoint(path+".at", payload.At)...)
+			issues = append(issues, validatePoint(path+".size", payload.Size)...)
+			if payload.Size.XMM == 0 || payload.Size.YMM == 0 {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".size", "bus entry size must be non-zero on both axes"))
+			}
+			return issues
+		})
+	case OpAddSchematicWire:
+		var payload AddSchematicWireOperation
+		return validateDecoded(op, &payload, func() []reports.Issue {
+			var issues []reports.Issue
+			issues = append(issues, requireNonEmpty(path+".net_name", "net name", payload.NetName)...)
+			issues = append(issues, validateOrthogonalPoints(path+".points", payload.Points, 2)...)
+			if payload.LabelAt != nil {
+				issues = append(issues, validatePoint(path+".label_at", *payload.LabelAt)...)
+			}
+			if !finite(payload.LabelRotate) {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".label_rotation_deg", "label rotation must be finite"))
 			}
 			return issues
 		})
@@ -296,6 +331,26 @@ func validatePolygon(path string, points []Point) []reports.Issue {
 		issues = append(issues, validatePoint(fmt.Sprintf("%s[%d]", path, i), point)...)
 		if i > 0 && samePoint(points[i-1], point) {
 			issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s[%d]", path, i), "polygon contains a zero-length segment"))
+		}
+	}
+	return issues
+}
+
+func validateOrthogonalPoints(path string, points []Point, minimum int) []reports.Issue {
+	var issues []reports.Issue
+	if len(points) < minimum {
+		issues = append(issues, issue(reports.CodeInvalidArgument, path, fmt.Sprintf("requires at least %d points", minimum)))
+	}
+	for index, point := range points {
+		issues = append(issues, validatePoint(fmt.Sprintf("%s[%d]", path, index), point)...)
+		if index == 0 {
+			continue
+		}
+		previous := points[index-1]
+		if samePoint(previous, point) {
+			issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s[%d]", path, index), "contains a zero-length segment"))
+		} else if previous.XMM != point.XMM && previous.YMM != point.YMM {
+			issues = append(issues, issue(reports.CodeInvalidArgument, fmt.Sprintf("%s[%d]", path, index), "segments must be orthogonal"))
 		}
 	}
 	return issues
