@@ -1369,22 +1369,23 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 				}
 			}
 		}
-		body := schematicLayoutBody(component, index)
+		geometry := schematicLayoutGeometry(component, index)
 		request.Components = append(request.Components, schematiclayout.Component{
-			Ref:       component.ID,
-			Value:     component.Value,
-			LibraryID: component.Symbol,
-			Role:      schematicLayoutComponentRole(component),
-			GroupID:   group.ID,
-			Stage:     schematicStageForGroup(group.Role),
-			FlowRank:  group.Rank,
-			RankFixed: group.ID != "" && !group.Inferred,
-			Near:      append([]string(nil), placement.Near...),
-			Rotation:  kicadfiles.Angle(rotationByID[component.ID]),
-			Mirror:    schematiclayout.Mirror(mirrorByID[component.ID]),
-			Body:      body,
-			BodyKnown: schematicLayoutBodyKnown(component, index),
-			Pins:      schematicLayoutPins(component, index),
+			Ref:            component.ID,
+			Value:          component.Value,
+			LibraryID:      component.Symbol,
+			Role:           schematicLayoutComponentRole(component),
+			GroupID:        group.ID,
+			Stage:          schematicStageForGroup(group.Role),
+			FlowRank:       group.Rank,
+			RankFixed:      group.ID != "" && !group.Inferred,
+			Near:           append([]string(nil), placement.Near...),
+			Rotation:       kicadfiles.Angle(rotationByID[component.ID]),
+			Mirror:         schematiclayout.Mirror(mirrorByID[component.ID]),
+			Body:           geometry.Body,
+			BodyKnown:      geometry.known(),
+			GeometrySource: geometry.Source,
+			Pins:           schematicLayoutPins(component, index),
 		})
 	}
 	for index, net := range document.Circuit.Nets {
@@ -1500,34 +1501,55 @@ func stateDocumentHasPortNet(document Document, netName string) bool {
 	return false
 }
 
+type layoutGeometry struct {
+	Body   schematiclayout.Rect
+	Source schematiclayout.GeometrySource
+}
+
+func (geometry layoutGeometry) known() bool {
+	return geometry.Source != schematiclayout.GeometrySourceUnknown && geometry.Source != schematiclayout.GeometrySourceConservative
+}
+
 func schematicLayoutBody(component Component, index *libraryresolver.LibraryIndex) schematiclayout.Rect {
+	return schematicLayoutGeometry(component, index).Body
+}
+
+func schematicLayoutBodyKnown(component Component, index *libraryresolver.LibraryIndex) bool {
+	return schematicLayoutGeometry(component, index).known()
+}
+
+func schematicLayoutGeometry(component Component, index *libraryresolver.LibraryIndex) layoutGeometry {
 	if component.Body != nil {
-		return schematiclayout.Rect{
+		return layoutGeometry{Body: schematiclayout.Rect{
 			MinX: kicadfiles.MM(component.Body.MinXMM),
 			MinY: kicadfiles.MM(component.Body.MinYMM),
 			MaxX: kicadfiles.MM(component.Body.MaxXMM),
 			MaxY: kicadfiles.MM(component.Body.MaxYMM),
-		}
+		}, Source: schematiclayout.GeometrySourceExplicitBody}
 	}
 	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(component.Symbol)), "kicadai:") {
 		if bounds, ok := schematic.EmbeddedSymbolBodyBounds(component.Symbol); ok {
-			return schematiclayout.Rect{
+			return layoutGeometry{Body: schematiclayout.Rect{
 				MinX: bounds.Min.X,
 				MinY: bounds.Min.Y,
 				MaxX: bounds.Max.X,
 				MaxY: bounds.Max.Y,
-			}
+			}, Source: schematiclayout.GeometrySourceEmbeddedTemplate}
 		}
 	}
 	if index == nil {
+		// Built-in templates without verified body graphics deliberately retain
+		// an empty body here. schematiclayout then applies its established
+		// role-based obstacle envelope rather than shrinking them to the
+		// generic explicit-pin fallback.
 		if _, known := schematic.EmbeddedSymbolTemplate(component.Symbol); known {
-			return schematiclayout.Rect{}
+			return layoutGeometry{Source: schematiclayout.GeometrySourceConservative}
 		}
-		return fallbackComponentBody(component)
+		return fallbackComponentGeometry(component)
 	}
 	record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
 	if !ok {
-		return fallbackComponentBody(component)
+		return fallbackComponentGeometry(component)
 	}
 	unit := componentUnitOrZero(component)
 	var bounds schematiclayout.Rect
@@ -1550,7 +1572,7 @@ func schematicLayoutBody(component Component, index *libraryresolver.LibraryInde
 		hasGraphics = true
 	}
 	if hasGraphics {
-		return bounds
+		return layoutGeometry{Body: bounds, Source: schematiclayout.GeometrySourceResolverGraphics}
 	}
 	// Some KiCad symbols contain only pins or inherit graphics from a library
 	// base. Keep a conservative pin envelope as a placement obstacle.
@@ -1569,30 +1591,14 @@ func schematicLayoutBody(component Component, index *libraryresolver.LibraryInde
 		hasPins = true
 	}
 	if !hasPins {
-		return fallbackComponentBody(component)
+		return fallbackComponentGeometry(component)
 	}
 	padding := defaultComponentPadding
 	pinBounds.MinX -= padding
 	pinBounds.MinY -= padding
 	pinBounds.MaxX += padding
 	pinBounds.MaxY += padding
-	return pinBounds
-}
-
-func schematicLayoutBodyKnown(component Component, index *libraryresolver.LibraryIndex) bool {
-	if component.Body != nil {
-		return true
-	}
-	normalized := strings.ToLower(strings.TrimSpace(component.Symbol))
-	if strings.HasPrefix(normalized, "kicadai:") {
-		_, ok := schematic.EmbeddedSymbolBodyBounds(component.Symbol)
-		return ok
-	}
-	if index == nil {
-		return false
-	}
-	_, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
-	return ok
+	return layoutGeometry{Body: pinBounds, Source: schematiclayout.GeometrySourceResolverPinEnvelope}
 }
 
 func resolverPinOffset(index libraryresolver.LibraryIndex, component Component, number string) (kicadfiles.Point, bool) {
@@ -1629,7 +1635,7 @@ func resolverPinOffsets(record libraryresolver.SymbolRecord, component Component
 	return offsets
 }
 
-func fallbackComponentBody(component Component) schematiclayout.Rect {
+func fallbackComponentGeometry(component Component) layoutGeometry {
 	var bounds schematiclayout.Rect
 	hasPins := false
 	for _, pin := range component.Pins {
@@ -1646,14 +1652,14 @@ func fallbackComponentBody(component Component) schematiclayout.Rect {
 		hasPins = true
 	}
 	if !hasPins {
-		return schematiclayout.Rect{MinX: -defaultComponentPadding, MinY: -defaultComponentPadding, MaxX: defaultComponentPadding, MaxY: defaultComponentPadding}
+		return layoutGeometry{Body: schematiclayout.Rect{MinX: -defaultComponentPadding, MinY: -defaultComponentPadding, MaxX: defaultComponentPadding, MaxY: defaultComponentPadding}, Source: schematiclayout.GeometrySourceConservative}
 	}
 	padding := defaultComponentPadding
 	bounds.MinX -= padding
 	bounds.MinY -= padding
 	bounds.MaxX += padding
 	bounds.MaxY += padding
-	return bounds
+	return layoutGeometry{Body: bounds, Source: schematiclayout.GeometrySourceExplicitPinEnvelope}
 }
 
 func knownSchematicPinNumbers(component Component, index *libraryresolver.LibraryIndex) map[string]struct{} {

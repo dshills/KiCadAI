@@ -72,6 +72,11 @@ spacing adjustments.
 
 ## Phase 5: Shared Direct-Route Enforcement And Documentation
 
+Current outcome: block-generated `Device:R` and `Sensor:Generic_I2C` pin
+metadata now uses calibrated physical anchors, and the schematic-electrical
+preflight avoids unrelated pin/no-connect anchors while constructing its
+deterministic wire evidence.
+
 Files: adapter/transaction validation, docs, roadmap, tests.
 
 - Ensure uncalibrated or conflicting anchors fail closed for explicit direct

@@ -764,7 +764,10 @@ Remaining gaps for high-quality AI-generated schematics:
 - built-in template symbols without a resolver index remain conservative during
   initial layout because route attachment semantics still need to distinguish
   pin-to-body stubs from body crossings; explicit IR body geometry, resolver
-  graphics, and generated-file body bounds are supported. Generated hierarchy
+  graphics, and generated-file body bounds are supported. Every emitted layout
+  records whether its obstacle geometry came from explicit IR bounds, a
+  verified embedded template, resolver graphics, a resolver pin envelope, an
+  explicit pin envelope, or the conservative fallback. Generated hierarchy
   relayout now writes computed field anchors back into child-local
   symbol properties before sheet fitting; resolver-source drift diagnostics and
   broader connector geometry coverage remain open before arbitrary dense

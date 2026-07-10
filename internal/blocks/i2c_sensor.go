@@ -148,11 +148,15 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 }
 
 func i2cSensorPins(roles i2cSensorPinRoleMap) []transactions.PinSpec {
+	// These are physical schematic connection anchors, not the raw local-library
+	// pin coordinates. Sensor:Generic_I2C serializes pins 1-4 with an inverted
+	// Y axis; the embedded-template calibration maps them back to KiCad's
+	// physical wire endpoints.
 	return []transactions.PinSpec{
-		{Number: roles.VCC, XMM: -2.54, YMM: -3.81},
-		{Number: roles.GND, XMM: -2.54, YMM: 3.81},
-		{Number: roles.SDA, XMM: -2.54, YMM: -1.27},
-		{Number: roles.SCL, XMM: -2.54, YMM: 1.27},
+		{Number: roles.VCC, XMM: -2.54, YMM: 3.81},
+		{Number: roles.GND, XMM: -2.54, YMM: -3.81},
+		{Number: roles.SDA, XMM: -2.54, YMM: 1.27},
+		{Number: roles.SCL, XMM: -2.54, YMM: -1.27},
 		{Number: roles.INT, XMM: 2.54, YMM: 0},
 	}
 }

@@ -121,10 +121,10 @@ func instantiateLEDIndicator(definition BlockDefinition, request BlockRequest, p
 func resistorPins() []transactions.PinSpec {
 	// These are schematic symbol anchors only. Footprint pad geometry is
 	// resolved separately by the PCB/library writer. Keep these aligned with
-	// the embedded KiCad Device:R template used by the schematic writer.
+	// the calibrated physical Device:R pins used by the schematic writer.
 	return []transactions.PinSpec{
-		{Number: "1", XMM: 0, YMM: 3.81},
-		{Number: "2", XMM: 0, YMM: -3.81},
+		{Number: "1", XMM: 0, YMM: -3.81},
+		{Number: "2", XMM: 0, YMM: 3.81},
 	}
 }
 

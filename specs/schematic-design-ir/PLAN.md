@@ -523,6 +523,11 @@ case demonstrates the need.
 
 ### Current Outcome
 
+- Every emitted layout component and readability report now records a stable
+  geometry-source classification: explicit body, embedded-template bounds,
+  resolver graphics, resolver pin envelope, explicit pin envelope, or
+  conservative fallback. Existing template-only symbols retain their
+  established role-based conservative obstacle envelope.
 - Fixed hierarchy child relayout to copy computed reference/value text anchors
   into the child symbol properties in the child-local coordinate frame before
   sheet fitting and translation.

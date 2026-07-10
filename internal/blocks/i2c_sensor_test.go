@@ -42,6 +42,25 @@ func TestI2CSensorInstantiatesDefaultOperations(t *testing.T) {
 	}
 }
 
+func TestI2CSensorUsesCalibratedPhysicalAnchors(t *testing.T) {
+	pins := i2cSensorPins(genericI2CSensorPins)
+	want := []transactions.PinSpec{
+		{Number: "1", XMM: -2.54, YMM: 3.81},
+		{Number: "2", XMM: -2.54, YMM: -3.81},
+		{Number: "3", XMM: -2.54, YMM: 1.27},
+		{Number: "4", XMM: -2.54, YMM: -1.27},
+		{Number: "5", XMM: 2.54, YMM: 0},
+	}
+	if len(pins) != len(want) {
+		t.Fatalf("sensor pin count = %d, want %d", len(pins), len(want))
+	}
+	for index := range want {
+		if pins[index] != want[index] {
+			t.Fatalf("sensor pin %d = %#v, want %#v", index+1, pins[index], want[index])
+		}
+	}
+}
+
 func TestI2CSensorDecouplingUsesKiCadCapacitorPinAnchors(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{

@@ -284,6 +284,9 @@ func TestSchematicLayoutPropagatesExplicitBodyGeometry(t *testing.T) {
 		if component.Body != want {
 			t.Fatalf("body = %#v, want %#v", component.Body, want)
 		}
+		if component.GeometrySource != schematiclayout.GeometrySourceExplicitBody {
+			t.Fatalf("geometry source = %q, want %q", component.GeometrySource, schematiclayout.GeometrySourceExplicitBody)
+		}
 		return
 	}
 	t.Fatal("missing r_limit layout component")
@@ -312,6 +315,51 @@ func TestSchematicLayoutUsesResolverPinEnvelopeWithoutGraphics(t *testing.T) {
 	body := result.Components[0].Body
 	if body.MinX != kicadfiles.MM(-3.81) || body.MaxX != kicadfiles.MM(3.81) {
 		t.Fatalf("resolver pin-only bounds = %#v, want both pin positions plus padding", body)
+	}
+	if result.Components[0].GeometrySource != schematiclayout.GeometrySourceResolverPinEnvelope {
+		t.Fatalf("geometry source = %q, want %q", result.Components[0].GeometrySource, schematiclayout.GeometrySourceResolverPinEnvelope)
+	}
+	if got := result.Report.GeometrySourceCounts[schematiclayout.GeometrySourceResolverPinEnvelope]; got != 1 {
+		t.Fatalf("resolver pin-envelope report count = %d, want 1", got)
+	}
+}
+
+func TestSchematicLayoutGeometryClassifiesAllSupportedSources(t *testing.T) {
+	graphicsIndex := &libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:Graphic": {
+			LibraryID: "Custom:Graphic",
+			Graphics: []libraryresolver.SymbolGraphic{{
+				Kind: "rectangle",
+				Bounds: libraryresolver.BoundingBox{
+					Min: kicadfiles.Point{X: kicadfiles.MM(-2)},
+					Max: kicadfiles.Point{X: kicadfiles.MM(3)},
+				},
+			}},
+		},
+	}}
+	cases := []struct {
+		name  string
+		part  Component
+		index *libraryresolver.LibraryIndex
+		want  schematiclayout.GeometrySource
+		known bool
+	}{
+		{name: "explicit body", part: Component{Body: &BodyGeometry{MinXMM: -1, MinYMM: -1, MaxXMM: 1, MaxYMM: 1}}, want: schematiclayout.GeometrySourceExplicitBody, known: true},
+		{name: "embedded template", part: Component{Symbol: "kicadai:ams1117_schematic"}, want: schematiclayout.GeometrySourceEmbeddedTemplate, known: true},
+		{name: "resolver graphics", part: Component{Symbol: "Custom:Graphic"}, index: graphicsIndex, want: schematiclayout.GeometrySourceResolverGraphics, known: true},
+		{name: "explicit pin envelope", part: Component{Pins: []Pin{{Number: "1", OffsetXMM: floatPtr(-2)}, {Number: "2", OffsetXMM: floatPtr(2)}}}, want: schematiclayout.GeometrySourceExplicitPinEnvelope, known: true},
+		{name: "conservative fallback", part: Component{}, want: schematiclayout.GeometrySourceConservative, known: false},
+	}
+	for _, test := range cases {
+		t.Run(test.name, func(t *testing.T) {
+			geometry := schematicLayoutGeometry(test.part, test.index)
+			if geometry.Source != test.want {
+				t.Fatalf("geometry source = %q, want %q", geometry.Source, test.want)
+			}
+			if got := geometry.known(); got != test.known {
+				t.Fatalf("geometry known = %v, want %v", got, test.known)
+			}
+		})
 	}
 }
 

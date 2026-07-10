@@ -68,6 +68,11 @@ stubs, and post-write validation.
 8. All anchors and wire endpoints must lie on KiCad's 1.27 mm connection grid.
 9. The generated schematic must round-trip through KiCad with no normalized
    diff.
+10. Block-generated `PinSpec` metadata, label anchors, no-connect markers, and
+    electrical-preflight wires must use the same calibrated physical anchors as
+    the writer. Preflight doglegs must avoid unrelated pin and no-connect
+    anchors rather than treating a geometrically clean crossing as electrical
+    evidence.
 
 ## Anchor Representation
 
@@ -106,6 +111,9 @@ rotation, and emitted wire endpoint when KiCad rejects a connection.
   KiCad direct-wire probe despite matching the visible library geometry. It
   must remain on raw-template/label-safe behavior until a separate empirical
   endpoint contract is proven.
+- `Sensor:Generic_I2C`: pins 1-4 use verified local-library physical anchors;
+  generated I2C block metadata uses those anchors for wires, labels, and
+  no-connect evidence. Pin 5 retains its direct right-side anchor.
 
 ## Validation
 

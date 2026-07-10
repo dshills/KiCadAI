@@ -137,7 +137,7 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 	if len(issues) != 0 {
 		return file, opts, issues
 	}
-	file.Wires = append(file.Wires, schematicElectricalSafeWires(wireCandidates, file.Labels)...)
+	file.Wires = append(file.Wires, schematicElectricalSafeWires(wireCandidates, file.Labels, schematicElectricalObstacles(file))...)
 	return file, opts, nil
 }
 
@@ -156,17 +156,17 @@ func schematicElectricalAppendLabel(existing []schematic.Label, labels map[strin
 	return append(existing, schematic.Label{Text: netName, Kind: schematic.LabelLocal, Position: point})
 }
 
-func schematicElectricalSafeWires(candidates []schematicElectricalWireCandidate, labels []schematic.Label) []schematic.Wire {
+func schematicElectricalSafeWires(candidates []schematicElectricalWireCandidate, labels []schematic.Label, obstacles []kicadfiles.Point) []schematic.Wire {
 	wires := make([]schematic.Wire, 0, len(candidates))
 	for _, candidate := range candidates {
-		wires = append(wires, schematicElectricalWireForCandidate(candidate, labels))
+		wires = append(wires, schematicElectricalWireForCandidate(candidate, labels, obstacles))
 	}
 	return wires
 }
 
-func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandidate, labels []schematic.Label) schematic.Wire {
+func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandidate, labels []schematic.Label, obstacles []kicadfiles.Point) schematic.Wire {
 	direct := []kicadfiles.Point{candidate.From, candidate.To}
-	if !schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, direct, labels) {
+	if !schematicElectricalPolylineBlocked(candidate, direct, labels, obstacles) {
 		return schematic.Wire{Points: direct}
 	}
 	for _, offset := range []kicadfiles.IU{kicadfiles.MM(2.54), -kicadfiles.MM(2.54), kicadfiles.MM(5.08), -kicadfiles.MM(5.08), kicadfiles.MM(7.62), -kicadfiles.MM(7.62)} {
@@ -176,7 +176,7 @@ func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandid
 			{X: candidate.To.X, Y: candidate.From.Y + offset},
 			candidate.To,
 		}
-		if !schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, yDogleg, labels) {
+		if !schematicElectricalPolylineBlocked(candidate, yDogleg, labels, obstacles) {
 			return schematic.Wire{Points: yDogleg}
 		}
 		xDogleg := []kicadfiles.Point{
@@ -185,11 +185,45 @@ func schematicElectricalWireForCandidate(candidate schematicElectricalWireCandid
 			{X: candidate.From.X + offset, Y: candidate.To.Y},
 			candidate.To,
 		}
-		if !schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, xDogleg, labels) {
+		if !schematicElectricalPolylineBlocked(candidate, xDogleg, labels, obstacles) {
 			return schematic.Wire{Points: xDogleg}
 		}
 	}
 	return schematic.Wire{Points: direct}
+}
+
+func schematicElectricalObstacles(file schematic.SchematicFile) []kicadfiles.Point {
+	seen := map[kicadfiles.Point]struct{}{}
+	for _, symbol := range file.Symbols {
+		for _, anchor := range symbol.PinAnchors {
+			seen[anchor] = struct{}{}
+		}
+	}
+	for _, noConnect := range file.NoConnects {
+		seen[noConnect.Position] = struct{}{}
+	}
+	obstacles := make([]kicadfiles.Point, 0, len(seen))
+	for obstacle := range seen {
+		obstacles = append(obstacles, obstacle)
+	}
+	return obstacles
+}
+
+func schematicElectricalPolylineBlocked(candidate schematicElectricalWireCandidate, points []kicadfiles.Point, labels []schematic.Label, obstacles []kicadfiles.Point) bool {
+	if schematicElectricalPolylineCrossesOtherNetLabel(candidate.NetName, points, labels) {
+		return true
+	}
+	for index := 1; index < len(points); index++ {
+		for _, obstacle := range obstacles {
+			if obstacle == candidate.From || obstacle == candidate.To {
+				continue
+			}
+			if schematicElectricalPointOnSegment(obstacle, points[index-1], points[index]) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func schematicElectricalPolylineCrossesOtherNetLabel(netName string, points []kicadfiles.Point, labels []schematic.Label) bool {
@@ -225,6 +259,17 @@ func schematicElectricalPointStrictlyInsideSegment(point, start, end kicadfiles.
 		return false
 	}
 	return schematicElectricalBetween(point.X, start.X, end.X) && schematicElectricalBetween(point.Y, start.Y, end.Y)
+}
+
+func schematicElectricalPointOnSegment(point, start, end kicadfiles.Point) bool {
+	if !schematicElectricalBetween(point.X, start.X, end.X) || !schematicElectricalBetween(point.Y, start.Y, end.Y) {
+		return false
+	}
+	dx1 := int64(end.X) - int64(start.X)
+	dy1 := int64(end.Y) - int64(start.Y)
+	dx2 := int64(point.X) - int64(start.X)
+	dy2 := int64(point.Y) - int64(start.Y)
+	return dx1*dy2 == dy1*dx2
 }
 
 func schematicElectricalBetween(value, first, second kicadfiles.IU) bool {

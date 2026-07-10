@@ -78,11 +78,27 @@ type Component struct {
 	// BodyKnown distinguishes an intentional pin-only symbol from a missing
 	// body geometry value that should use the role-based fallback.
 	BodyKnown       bool
+	GeometrySource  GeometrySource
 	ReferenceText   TextBox
 	ValueText       TextBox
 	Pins            []Pin
 	OriginalOrdinal int
 }
+
+// GeometrySource records the evidence used to reserve schematic space for a
+// symbol. It lets diagnostics distinguish KiCad-backed geometry from a
+// conservative fallback without changing the placed symbol's coordinates.
+type GeometrySource string
+
+const (
+	GeometrySourceUnknown             GeometrySource = "unknown"
+	GeometrySourceExplicitBody        GeometrySource = "explicit_body"
+	GeometrySourceEmbeddedTemplate    GeometrySource = "embedded_template"
+	GeometrySourceResolverGraphics    GeometrySource = "resolver_graphics"
+	GeometrySourceResolverPinEnvelope GeometrySource = "resolver_pin_envelope"
+	GeometrySourceExplicitPinEnvelope GeometrySource = "explicit_pin_envelope"
+	GeometrySourceConservative        GeometrySource = "conservative"
+)
 
 type Mirror string
 
@@ -206,27 +222,28 @@ const (
 )
 
 type Report struct {
-	Profile                  Profile          `json:"profile"`
-	Passed                   bool             `json:"passed"`
-	SelectedPaper            string           `json:"selected_paper,omitempty"`
-	PageEscalationCount      int              `json:"page_escalation_count,omitempty"`
-	PartitionCount           int              `json:"partition_count,omitempty"`
-	CrossSheetNetCount       int              `json:"cross_sheet_net_count,omitempty"`
-	ComponentCount           int              `json:"component_count"`
-	GroupCount               int              `json:"group_count"`
-	RoutedNetCount           int              `json:"routed_net_count"`
-	LabelFallbackCount       int              `json:"label_fallback_count"`
-	OverlapCounts            map[string]int   `json:"overlap_counts,omitempty"`
-	DiagonalWireCount        int              `json:"diagonal_wire_count"`
-	StageOrderViolationCount int              `json:"stage_order_violation_count"`
-	PowerPlacementViolations int              `json:"power_placement_violation_count"`
-	IslandCount              int              `json:"island_count"`
-	RankCount                int              `json:"rank_count"`
-	OccupiedBounds           Rect             `json:"occupied_bounds"`
-	CenterOffset             kicadfiles.Point `json:"center_offset"`
-	DiagnosticCount          int              `json:"diagnostic_count"`
-	ErrorCount               int              `json:"error_count"`
-	WarningCount             int              `json:"warning_count"`
+	Profile                  Profile                `json:"profile"`
+	Passed                   bool                   `json:"passed"`
+	SelectedPaper            string                 `json:"selected_paper,omitempty"`
+	PageEscalationCount      int                    `json:"page_escalation_count,omitempty"`
+	PartitionCount           int                    `json:"partition_count,omitempty"`
+	CrossSheetNetCount       int                    `json:"cross_sheet_net_count,omitempty"`
+	ComponentCount           int                    `json:"component_count"`
+	GroupCount               int                    `json:"group_count"`
+	RoutedNetCount           int                    `json:"routed_net_count"`
+	LabelFallbackCount       int                    `json:"label_fallback_count"`
+	GeometrySourceCounts     map[GeometrySource]int `json:"geometry_source_counts,omitempty"`
+	OverlapCounts            map[string]int         `json:"overlap_counts,omitempty"`
+	DiagonalWireCount        int                    `json:"diagonal_wire_count"`
+	StageOrderViolationCount int                    `json:"stage_order_violation_count"`
+	PowerPlacementViolations int                    `json:"power_placement_violation_count"`
+	IslandCount              int                    `json:"island_count"`
+	RankCount                int                    `json:"rank_count"`
+	OccupiedBounds           Rect                   `json:"occupied_bounds"`
+	CenterOffset             kicadfiles.Point       `json:"center_offset"`
+	DiagnosticCount          int                    `json:"diagnostic_count"`
+	ErrorCount               int                    `json:"error_count"`
+	WarningCount             int                    `json:"warning_count"`
 }
 
 type TextBox struct {
@@ -419,27 +436,38 @@ func enrichDiagnosticRepairs(diagnostics []Diagnostic) []Diagnostic {
 
 func BuildReport(result Result, profile Profile) Report {
 	report := Report{
-		Profile:             profile,
-		Passed:              true,
-		SelectedPaper:       result.Report.SelectedPaper,
-		PageEscalationCount: result.Report.PageEscalationCount,
-		PartitionCount:      result.Report.PartitionCount,
-		CrossSheetNetCount:  result.Report.CrossSheetNetCount,
-		ComponentCount:      len(result.Components),
-		GroupCount:          countGroups(result.Components),
-		RoutedNetCount:      countRoutedNets(result.Wires),
-		LabelFallbackCount:  len(result.Labels),
-		OverlapCounts:       map[string]int{},
-		DiagnosticCount:     len(result.Diagnostics),
-		IslandCount:         result.Report.IslandCount,
-		RankCount:           result.Report.RankCount,
-		OccupiedBounds:      result.Report.OccupiedBounds,
-		CenterOffset:        result.Report.CenterOffset,
+		Profile:              profile,
+		Passed:               true,
+		SelectedPaper:        result.Report.SelectedPaper,
+		PageEscalationCount:  result.Report.PageEscalationCount,
+		PartitionCount:       result.Report.PartitionCount,
+		CrossSheetNetCount:   result.Report.CrossSheetNetCount,
+		ComponentCount:       len(result.Components),
+		GroupCount:           countGroups(result.Components),
+		RoutedNetCount:       countRoutedNets(result.Wires),
+		LabelFallbackCount:   len(result.Labels),
+		GeometrySourceCounts: map[GeometrySource]int{},
+		OverlapCounts:        map[string]int{},
+		DiagnosticCount:      len(result.Diagnostics),
+		IslandCount:          result.Report.IslandCount,
+		RankCount:            result.Report.RankCount,
+		OccupiedBounds:       result.Report.OccupiedBounds,
+		CenterOffset:         result.Report.CenterOffset,
 	}
 	for _, wire := range result.Wires {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {
 			report.DiagonalWireCount++
 		}
+	}
+	for _, component := range result.Components {
+		source := component.GeometrySource
+		if source == "" {
+			source = GeometrySourceUnknown
+		}
+		report.GeometrySourceCounts[source]++
+	}
+	if len(report.GeometrySourceCounts) == 0 {
+		report.GeometrySourceCounts = nil
 	}
 	for _, diagnostic := range result.Diagnostics {
 		switch diagnostic.Severity {

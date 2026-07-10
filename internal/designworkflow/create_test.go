@@ -152,6 +152,21 @@ func TestSchematicElectricalStageAllowsProtectedUSBCPower(t *testing.T) {
 	}
 }
 
+func TestSchematicElectricalWireAvoidsUnrelatedNoConnectAnchor(t *testing.T) {
+	candidate := schematicElectricalWireCandidate{
+		NetName: "VCC",
+		From:    kicadfiles.Point{X: kicadfiles.MM(0), Y: kicadfiles.MM(10)},
+		To:      kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(-10)},
+	}
+	noConnect := kicadfiles.Point{X: kicadfiles.MM(10), Y: 0}
+	wire := schematicElectricalWireForCandidate(candidate, nil, []kicadfiles.Point{candidate.From, candidate.To, noConnect})
+	for index := 1; index < len(wire.Points); index++ {
+		if schematicElectricalPointOnSegment(noConnect, wire.Points[index-1], wire.Points[index]) {
+			t.Fatalf("wire %#v crosses unrelated no-connect anchor %#v", wire.Points, noConnect)
+		}
+	}
+}
+
 func TestCreateStructuralRequestSkipsFabricationReadiness(t *testing.T) {
 	request := Request{
 		Version:    RequestVersion,

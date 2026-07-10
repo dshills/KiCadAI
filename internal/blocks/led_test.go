@@ -62,6 +62,19 @@ func TestLEDIndicatorActiveLowNetOrder(t *testing.T) {
 	}
 }
 
+func TestLEDIndicatorUsesCalibratedResistorAnchors(t *testing.T) {
+	pins := resistorPins()
+	if len(pins) != 2 {
+		t.Fatalf("resistor pin count = %d, want 2", len(pins))
+	}
+	if pins[0].Number != "1" || pins[0].XMM != 0 || pins[0].YMM != -3.81 {
+		t.Fatalf("resistor pin 1 = %#v, want physical Device:R anchor at (0,-3.81)", pins[0])
+	}
+	if pins[1].Number != "2" || pins[1].XMM != 0 || pins[1].YMM != 3.81 {
+		t.Fatalf("resistor pin 2 = %#v, want physical Device:R anchor at (0,3.81)", pins[1])
+	}
+}
+
 func TestLEDIndicatorResistorOverride(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	for _, value := range []string{"100", "1kΩ", "1k", "10k", "4k7", "4R7"} {
