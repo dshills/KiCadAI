@@ -403,7 +403,7 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					waypoints = transactionPoints(points)
 				}
 			}
-			if state.hasPortNet(net.Name) && net.UseLabel == nil {
+			if state.hasPortNet(net.Name) {
 				value := false
 				useLabels = &value
 				fromLabelAt = nil
@@ -443,11 +443,6 @@ func (state *adapterState) appendPorts(tx *transactions.Transaction) {
 	for _, port := range state.document.Circuit.Ports {
 		net, ok := netsByName[port.Net]
 		if !ok || len(net.Connect) == 0 {
-			continue
-		}
-		if net.UseLabel != nil && *net.UseLabel {
-			// An explicit local-label request already exposes the port net without
-			// adding a duplicate global label at the same anchor.
 			continue
 		}
 		endpoint := state.portEndpointForSide(net.Name, net.Connect, port.Side)

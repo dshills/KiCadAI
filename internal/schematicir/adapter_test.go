@@ -81,7 +81,7 @@ func TestToTransactionEmitsGlobalLabelsForPorts(t *testing.T) {
 	}
 }
 
-func TestToTransactionPreservesExplicitPortLabelPreference(t *testing.T) {
+func TestToTransactionPortAlwaysUsesGlobalLabel(t *testing.T) {
 	doc := validLEDDocument()
 	useLabel := true
 	doc.Circuit.Nets[0].UseLabel = &useLabel
@@ -90,8 +90,15 @@ func TestToTransactionPreservesExplicitPortLabelPreference(t *testing.T) {
 	if len(issues) != 0 {
 		t.Fatalf("expected no issues, got %+v", issues)
 	}
-	if labels := decodeOperations[transactions.AddLabelOperation](t, tx, transactions.OpAddLabel); len(labels) != 0 {
-		t.Fatalf("explicit local label preference should avoid duplicate global label: %#v", labels)
+	labels := decodeOperations[transactions.AddLabelOperation](t, tx, transactions.OpAddLabel)
+	if len(labels) != 1 || labels[0].Kind != "global" || labels[0].Text != "VIN_EXT" {
+		t.Fatalf("port label = %#v, want one global label", labels)
+	}
+	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
+	for _, connect := range connects {
+		if connect.NetName == doc.Circuit.Nets[0].Name && (connect.UseLabels == nil || *connect.UseLabels) {
+			t.Fatalf("port net should use direct wiring even when use_label is explicit: %#v", connect)
+		}
 	}
 }
 

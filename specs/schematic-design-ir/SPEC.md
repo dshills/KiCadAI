@@ -587,6 +587,12 @@ When no block mapping exists, the adapter may emit a schematic-only transaction:
 - optional `assign_footprint`;
 - `write_project`.
 
+IR ports are emitted as KiCad global labels on the physically edge-most
+resolved endpoint for the requested `side` (left/right uses X position; top/
+bottom uses Y position). Port-bearing nets always use direct wiring plus the
+global port label. This keeps the port's external/cross-sheet semantics intact
+and prevents generic local-label preferences from creating duplicate labels.
+
 The v1 adapter may generate schematic-only projects. PCB output can remain a
 future phase unless the IR maps cleanly to existing `design create` requests.
 
@@ -696,13 +702,15 @@ The current codebase already has:
 
 Remaining gaps for high-quality AI-generated schematics:
 
-- no dedicated AI-facing schematic IR schema;
-- no schema-level layout group model;
 - true KiCad vector-bus graphics, bus entries, and bus-member expansion are not
-  represented by the v1 IR;
+  represented by the v1 IR; `bus` currently means a label-friendly bus-signal
+  role such as SDA or SCL, not a KiCad vector bus;
 - resolver-aware output still depends on configured KiCad library roots or
   explicit symbol geometry; missing geometry fails closed for strict readable
   acceptance;
+- inherited symbols in split `.kicad_symdir` libraries require the
+  resolver-backed adapter to materialize their base symbol body before
+  embedding;
 - readability repair remains report-driven rather than a general automatic
   optimization loop;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
