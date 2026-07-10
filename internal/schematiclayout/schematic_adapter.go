@@ -22,6 +22,7 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 	for index, symbol := range file.Symbols {
 		component := Component{
 			Ref:             symbol.Reference,
+			DisplayRef:      symbol.Reference,
 			Value:           symbol.Value,
 			LibraryID:       symbol.LibraryID,
 			Position:        symbol.Position,

@@ -1372,6 +1372,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		geometry := schematicLayoutGeometry(component, index)
 		request.Components = append(request.Components, schematiclayout.Component{
 			Ref:            component.ID,
+			DisplayRef:     component.Ref,
 			Value:          component.Value,
 			LibraryID:      component.Symbol,
 			Role:           schematicLayoutComponentRole(component),

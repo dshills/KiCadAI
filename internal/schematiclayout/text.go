@@ -15,8 +15,12 @@ func placeComponentText(components []PlacedComponent, rules Rules) ([]PlacedComp
 	var diagnostics []Diagnostic
 	for index := range placed {
 		component := &placed[index]
+		referenceText := component.DisplayRef
+		if referenceText == "" {
+			referenceText = component.Ref
+		}
 		if component.ReferenceText.Box.Empty() {
-			field, clean := chooseTextPosition(component.Ref, component.PlacedAt, bodyByRef[component.Ref], occupied, rules, true)
+			field, clean := chooseTextPosition(referenceText, component.PlacedAt, bodyByRef[component.Ref], occupied, rules, true)
 			component.ReferenceText = field
 			occupied = append(occupied, field.Box.Translate(component.PlacedAt))
 			if !clean {
@@ -63,8 +67,12 @@ func reflowTextForWires(components []PlacedComponent, wires []WireSegment, label
 	for index := range placed {
 		component := &placed[index]
 		body := bodyByRef[component.Ref]
+		referenceText := component.DisplayRef
+		if referenceText == "" {
+			referenceText = component.Ref
+		}
 		var clean bool
-		component.ReferenceText, clean = chooseTextPosition(component.Ref, component.PlacedAt, body, occupied, rules, true)
+		component.ReferenceText, clean = chooseTextPosition(referenceText, component.PlacedAt, body, occupied, rules, true)
 		if !clean {
 			diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "text_placement_fallback", Ref: component.Ref, Message: "reference field required crowded fallback placement"})
 		}

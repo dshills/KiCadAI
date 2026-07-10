@@ -41,6 +41,16 @@ func TestRouteUsesLabelsForLongNet(t *testing.T) {
 	}
 }
 
+func TestLabelDirectionUsesPlacedBodyEdge(t *testing.T) {
+	body := Rect{MinX: kicadfiles.MM(40), MinY: kicadfiles.MM(40), MaxX: kicadfiles.MM(60), MaxY: kicadfiles.MM(60)}
+	if direction := labelDirectionFromBody(kicadfiles.Point{X: kicadfiles.MM(41), Y: kicadfiles.MM(50)}, body, kicadfiles.MM(1)); direction != (kicadfiles.Point{X: -kicadfiles.MM(1)}) {
+		t.Fatalf("left-edge direction = %#v", direction)
+	}
+	if direction := labelDirectionFromBody(kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(59)}, body, kicadfiles.MM(1)); direction != (kicadfiles.Point{Y: kicadfiles.MM(1)}) {
+		t.Fatalf("bottom-edge direction = %#v", direction)
+	}
+}
+
 func TestRouteEmitsLabelForSingleEndpointNet(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),

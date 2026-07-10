@@ -320,8 +320,12 @@ func defaultReferenceText(component PlacedComponent) TextBox {
 		return component.ReferenceText
 	}
 	body := componentBody(component)
+	text := component.DisplayRef
+	if text == "" {
+		text = component.Ref
+	}
 	return TextBox{
-		Text: component.Ref,
+		Text: text,
 		Box:  Rect{MinX: body.MinX - component.PlacedAt.X, MinY: body.MinY - component.PlacedAt.Y - kicadfiles.MM(2.54), MaxX: body.MaxX - component.PlacedAt.X, MaxY: body.MinY - component.PlacedAt.Y},
 	}
 }

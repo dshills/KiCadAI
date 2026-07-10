@@ -178,6 +178,13 @@ func TestPlaceKeepsGeneratedFieldsClear(t *testing.T) {
 	}
 }
 
+func TestPlaceUsesDisplayReferenceForFieldText(t *testing.T) {
+	result := Place(Request{Sheet: testSheet(), Components: []Component{{Ref: "internal_sensor_node", DisplayRef: "U1", Value: "SENSOR", Role: "sensor"}}})
+	if len(result.Components) != 1 || result.Components[0].ReferenceText.Text != "U1" {
+		t.Fatalf("reference text = %#v, want display reference U1", result.Components)
+	}
+}
+
 func TestPlaceSeparatesSemanticGroupsWithinLane(t *testing.T) {
 	rules := DefaultRules(ProfileStandard)
 	rules.MinComponentSpacing = kicadfiles.MM(5)

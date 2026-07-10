@@ -315,12 +315,13 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		}
 		key := symbolStateKey(symbol.Reference, symbol.Unit)
 		component := schematiclayout.Component{
-			Ref:       key,
-			Value:     symbol.Value,
-			LibraryID: symbol.LibraryID,
-			Position:  symbol.Position,
-			Rotation:  symbol.Rotation,
-			Mirror:    schematiclayout.Mirror(symbol.Mirror),
+			Ref:        key,
+			DisplayRef: symbol.Reference,
+			Value:      symbol.Value,
+			LibraryID:  symbol.LibraryID,
+			Position:   symbol.Position,
+			Rotation:   symbol.Rotation,
+			Mirror:     schematiclayout.Mirror(symbol.Mirror),
 		}
 		if symbol.BodyBounds != nil {
 			component.Body = schematiclayout.Rect{

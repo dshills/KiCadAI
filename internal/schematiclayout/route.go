@@ -91,6 +91,11 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		if component.Ref != endpoint.Ref {
 			continue
 		}
+		body := componentBody(component)
+		if !body.Empty() {
+			preferred = labelDirectionFromBody(anchor, body, grid)
+			break
+		}
 		offset := InverseTransformPoint(kicadfiles.Point{X: anchor.X - component.PlacedAt.X, Y: anchor.Y - component.PlacedAt.Y}, component.Rotation, component.Mirror)
 		switch {
 		case absIU(offset.X) >= absIU(offset.Y) && offset.X < 0:
@@ -129,6 +134,26 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 	return kicadfiles.Point{X: anchor.X + preferred.X*2, Y: anchor.Y + preferred.Y*2}, false
 }
 
+func labelDirectionFromBody(anchor kicadfiles.Point, body Rect, grid kicadfiles.IU) kicadfiles.Point {
+	type edge struct {
+		distance  kicadfiles.IU
+		direction kicadfiles.Point
+	}
+	edges := []edge{
+		{distance: absIU(anchor.X - body.MinX), direction: kicadfiles.Point{X: -grid}},
+		{distance: absIU(anchor.X - body.MaxX), direction: kicadfiles.Point{X: grid}},
+		{distance: absIU(anchor.Y - body.MinY), direction: kicadfiles.Point{Y: -grid}},
+		{distance: absIU(anchor.Y - body.MaxY), direction: kicadfiles.Point{Y: grid}},
+	}
+	best := edges[0]
+	for _, candidate := range edges[1:] {
+		if candidate.distance < best.distance {
+			best = candidate
+		}
+	}
+	return best.direction
+}
+
 func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, result Result, request Request) bool {
 	if _, intersectsPin := unrelatedPinForWire(stub, stub.NetName, result, request); intersectsPin {
 		return true
@@ -138,8 +163,10 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 		if labelBox.Intersects(body) {
 			return true
 		}
-		if component.Ref != endpoint.Ref && SegmentIntersectsRect(stub, body) {
-			return true
+		if SegmentIntersectsRect(stub, body) {
+			if component.Ref != endpoint.Ref || !wireLeavesAttachedSymbol(stub, ValidationObject{Ref: component.Ref, Box: body}, result.Components) {
+				return true
+			}
 		}
 		for _, text := range []TextBox{component.ReferenceText, component.ValueText} {
 			if !text.Box.Empty() && labelBox.Intersects(text.Box.Translate(component.PlacedAt)) {
