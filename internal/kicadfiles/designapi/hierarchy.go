@@ -266,6 +266,8 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			anchorMoves[anchor] = move
 		}
 		moveSymbol(symbol, move)
+		setHierarchyTextPosition(symbol, "Reference", placed.ReferenceText, placed.PlacedAt)
+		setHierarchyTextPosition(symbol, "Value", placed.ValueText, placed.PlacedAt)
 	}
 	originalNoConnects := append([]schematic.NoConnect(nil), child.NoConnects...)
 	anchors := make([]kicadfiles.Point, 0, len(anchorMoves))
@@ -323,6 +325,19 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		child.Labels = append(child.Labels, schematic.NewLabel(builder.generator.New("hierarchy.local_label", sheetID, label.NetName, strconv.Itoa(index)), label.Text, schematic.LabelLocal, label.Position))
 	}
 	return nil
+}
+
+func setHierarchyTextPosition(symbol *schematic.SchematicSymbol, name string, text schematiclayout.TextBox, origin kicadfiles.Point) {
+	if symbol == nil || text.Box.Empty() {
+		return
+	}
+	for index := range symbol.Properties {
+		if !strings.EqualFold(strings.TrimSpace(symbol.Properties[index].Name), name) {
+			continue
+		}
+		symbol.Properties[index].Position = kicadfiles.Point{X: origin.X + text.At.X, Y: origin.Y + text.At.Y}
+		return
+	}
 }
 
 func nearestAnchorMove(position kicadfiles.Point, anchors []kicadfiles.Point, moves map[kicadfiles.Point]kicadfiles.Point) (kicadfiles.Point, bool) {

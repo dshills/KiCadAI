@@ -327,6 +327,17 @@ func TestToTransactionEmitsTemplatePinOffsetsAndLabelPolicy(t *testing.T) {
 	}
 }
 
+func TestSchematicLayoutBodyUsesSafeTemplateGeometry(t *testing.T) {
+	resistor := schematicLayoutBody(Component{Symbol: "Device:R"}, nil)
+	if resistor.Empty() {
+		t.Fatal("built-in resistor should contribute a body obstacle")
+	}
+	connector := schematicLayoutBody(Component{Symbol: "Connector_Generic:Conn_01x02"}, nil)
+	if !connector.Empty() {
+		t.Fatalf("generic connector should retain conservative pin-only geometry: %#v", connector)
+	}
+}
+
 func TestToTransactionPreservesExplicitDirectRouteIntent(t *testing.T) {
 	doc := validLEDDocument()
 	useLabel := false

@@ -521,6 +521,19 @@ case demonstrates the need.
 
 ## Phase 12: Native Geometry And Hierarchical Text Completion
 
+### Current Outcome
+
+- Enabled embedded body bounds for built-in non-connector, non-power templates
+  while retaining conservative pin-only geometry for generic connectors and
+  power symbols whose current route anchors are not body-safe.
+- Fixed hierarchy child relayout to copy computed reference/value text anchors
+  into the child symbol properties in the child-local coordinate frame before
+  sheet fitting and translation.
+- Readable LED, USB-C, regulator, vector-bus, oversized hierarchy, resolver,
+  multi-unit, adversarial-topology, and generated-arbitrary-topology tests are
+  green. Resolver source/installed-library drift diagnostics remain the next
+  unfinished slice of this phase.
+
 ### Work
 
 - Define a stable geometry source precedence for every symbol: explicit IR body,

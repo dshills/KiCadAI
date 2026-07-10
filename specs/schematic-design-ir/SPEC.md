@@ -753,10 +753,13 @@ Remaining gaps for high-quality AI-generated schematics:
   and library version match the KiCad CLI installation; a resolver source that
   differs from the installed library must fail closed or be materialized as a
   project-local symbol rather than silently mixing pin geometry;
-- built-in template symbols without a resolver index still use conservative
-  pin/envelope layout geometry for compatibility; complete body-graphic
-  hydration and hierarchical-sheet text/label reflow remain open before
-  arbitrary dense circuits can claim warning-free readability;
+- built-in non-connector, non-power template symbols now hydrate their verified
+  embedded body bounds for layout; generic connector and power templates remain
+  conservative until their pin/body routing interactions are covered. Generated
+  hierarchy relayout now writes computed field anchors back into child-local
+  symbol properties before sheet fitting; resolver-source drift diagnostics and
+  broader connector geometry coverage remain open before arbitrary dense
+  circuits can claim warning-free readability;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 
