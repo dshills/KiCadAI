@@ -50,7 +50,20 @@ Acceptance: checked-in fixture passes all available gates and reports missing
 KiCad evidence explicitly rather than passing silently. Readback preserves the
 native bus, every entry, both scalar stubs per entry, and member label counts.
 
-## Phase 5: Documentation And Verification
+## Phase 5: Deterministic Geometry Normalization
+
+Snap bus spine points, entry positions, and entry dimensions to the default
+2.54 mm KiCad connection grid during `NormalizeLayoutIntent`; the transaction
+adapter revalidates spine ownership immediately after normalization. Preserve
+direction and fail closed when normalization makes an entry ambiguous.
+
+Files: `internal/schematicir/layout.go`, layout tests, `SPEC.md`.
+
+Acceptance: off-grid but otherwise valid bus intent produces deterministic
+grid-aligned transaction geometry without changing the source document; invalid
+post-normalization geometry is rejected by the adapter.
+
+## Phase 6: Documentation And Verification
 
 Update the schematic IR spec, roadmap, CLI reference, run Prism on staged code,
 run focused and full tests, and commit each phase separately.

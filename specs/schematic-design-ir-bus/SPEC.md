@@ -82,9 +82,12 @@ Multiple entries may use the same member label when the member is intentionally
 connected at multiple locations.
 
 Coordinates are millimetres in the IR and are converted to KiCad internal
-units by the adapter. Points must be orthogonalized only when the requested
-segments are already horizontal or vertical; the adapter must not silently
-reshape arbitrary user geometry.
+units by the adapter. `NormalizeLayoutIntent` snaps bus points, entry positions,
+and non-zero entry dimensions to KiCad’s 2.54 mm connection grid while
+preserving entry direction. The transaction adapter validates the normalized
+document immediately afterward and fails closed if a snapped entry no longer
+lies on the snapped spine. The adapter must not silently reroute arbitrary user
+geometry.
 
 ## Validation
 
@@ -128,7 +131,9 @@ rules do not yet understand labels attached directly to vector buses.
 
 ## Readability Policy
 
-- Bus spine segments must be on the requested page and on the configured grid.
+- Bus spine segments must be on the requested page and on the configured grid;
+  the default schematic grid is 2.54 mm and is applied during layout-intent
+  normalization.
 - Entries must be on the spine and use a consistent size within one bus.
 - Member wires must be orthogonal and must not terminate inside a symbol body.
 - Member labels are placed at short, orthogonal stubs on both the component and

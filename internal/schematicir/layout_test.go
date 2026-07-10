@@ -1,6 +1,9 @@
 package schematicir
 
-import "testing"
+import (
+	"math"
+	"testing"
+)
 
 func TestNormalizeLayoutIntentAddsGroupsAndPlacements(t *testing.T) {
 	doc := validLEDDocument()
@@ -76,6 +79,43 @@ func TestNormalizeLayoutIntentDoesNotDuplicateExistingGroupMembers(t *testing.T)
 	if seen["led"] != 1 {
 		t.Fatalf("missing generated signal member: %+v", signal.Members)
 	}
+}
+
+func TestNormalizeLayoutIntentSnapsBusGeometryToKiCadGrid(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Buses = []Bus{{
+		ID:      "data_bus",
+		Name:    "DATA[0..1]",
+		Members: []BusMember{{Net: "VIN", Label: "DATA0"}},
+	}}
+	doc.Layout.Buses = []BusLayout{{
+		Bus:    "data_bus",
+		Points: []LayoutPoint{{XMM: 75, YMM: 80}, {XMM: 150, YMM: 80}},
+		Entries: []BusEntryLayout{{
+			Member:   "VIN",
+			Endpoint: "vin.1",
+			At:       LayoutPoint{XMM: 82.5, YMM: 80},
+			Size:     LayoutPoint{XMM: 1, YMM: -1},
+		}},
+	}}
+
+	normalized := NormalizeLayoutIntent(doc)
+	bus := normalized.Layout.Buses[0]
+	if !closeLayoutPoint(bus.Points[0], LayoutPoint{XMM: 76.2, YMM: 78.74}) || !closeLayoutPoint(bus.Points[1], LayoutPoint{XMM: 149.86, YMM: 78.74}) {
+		t.Fatalf("snapped bus points = %#v", bus.Points)
+	}
+	entry := bus.Entries[0]
+	if !closeLayoutPoint(entry.At, LayoutPoint{XMM: 81.28, YMM: 78.74}) || !closeLayoutPoint(entry.Size, LayoutPoint{XMM: 2.54, YMM: -2.54}) {
+		t.Fatalf("snapped bus entry = %#v", entry)
+	}
+	if doc.Layout.Buses[0].Points[0] != (LayoutPoint{XMM: 75, YMM: 80}) {
+		t.Fatalf("NormalizeLayoutIntent mutated the source document: %#v", doc.Layout.Buses[0].Points)
+	}
+}
+
+func closeLayoutPoint(left, right LayoutPoint) bool {
+	const epsilon = 1e-9
+	return math.Abs(left.XMM-right.XMM) <= epsilon && math.Abs(left.YMM-right.YMM) <= epsilon
 }
 
 func placementsByTarget(placements []Placement) map[string]Placement {

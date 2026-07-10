@@ -1,6 +1,9 @@
 package schematicir
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 // NormalizeLayoutIntent fills in deterministic schematic layout hints that are
 // useful for AI-generated schematics but tedious for an AI to specify exactly.
@@ -65,7 +68,58 @@ func NormalizeLayoutIntent(document Document) Document {
 	}
 	document.Layout.Groups = groups
 	document.Layout.Placements = normalizePlacements(document.Layout.Placements, document.Circuit.Components, componentGroup)
+	document.Layout.Buses = normalizeBusGeometry(document.Layout.Buses)
 	return document
+}
+
+const schematicIRGridMM = 2.54
+
+func normalizeBusGeometry(layouts []BusLayout) []BusLayout {
+	if len(layouts) == 0 {
+		return layouts
+	}
+	normalized := make([]BusLayout, len(layouts))
+	for layoutIndex, source := range layouts {
+		normalized[layoutIndex] = source
+		layout := &normalized[layoutIndex]
+		if source.Points != nil {
+			layout.Points = make([]LayoutPoint, len(source.Points))
+			copy(layout.Points, source.Points)
+		}
+		if source.Entries != nil {
+			layout.Entries = make([]BusEntryLayout, len(source.Entries))
+			copy(layout.Entries, source.Entries)
+		}
+		for pointIndex := range layout.Points {
+			layout.Points[pointIndex] = snapBusPoint(layout.Points[pointIndex])
+		}
+		for entryIndex := range layout.Entries {
+			entry := &layout.Entries[entryIndex]
+			entry.At = snapBusPoint(entry.At)
+			entry.Size.XMM = snapBusSize(entry.Size.XMM)
+			entry.Size.YMM = snapBusSize(entry.Size.YMM)
+		}
+	}
+	return normalized
+}
+
+func snapBusPoint(point LayoutPoint) LayoutPoint {
+	return LayoutPoint{XMM: snapBusCoordinate(point.XMM), YMM: snapBusCoordinate(point.YMM)}
+}
+
+func snapBusCoordinate(value float64) float64 {
+	return math.Round(value/schematicIRGridMM) * schematicIRGridMM
+}
+
+func snapBusSize(value float64) float64 {
+	if value == 0 {
+		return 0
+	}
+	snapped := snapBusCoordinate(value)
+	if snapped == 0 {
+		return math.Copysign(schematicIRGridMM, value)
+	}
+	return snapped
 }
 
 type groupTemplate struct {
