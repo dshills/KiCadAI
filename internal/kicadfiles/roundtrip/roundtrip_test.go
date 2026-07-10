@@ -203,6 +203,51 @@ func TestCompareSchematicFilesIgnoresLibSymbolOrdering(t *testing.T) {
 	}
 }
 
+func TestCompareSchematicFilesIgnoresMultiUnitPinOrdering(t *testing.T) {
+	dir := t.TempDir()
+	original := filepath.Join(dir, "original.kicad_sch")
+	roundTripped := filepath.Join(dir, "roundtripped.kicad_sch")
+	writeTestFile(t, original, `(kicad_sch
+  (version 20260206)
+  (symbol (lib_id "MultiUnit:DUAL_DISTINCT")
+    (pin "1" (uuid "11111111-1111-5111-8111-111111111111"))
+    (pin "2" (uuid "22222222-2222-5222-8222-222222222222"))
+    (pin "3" (uuid "33333333-3333-5333-8333-333333333333"))
+    (pin "4" (uuid "44444444-4444-5444-8444-444444444444"))
+    (instances (project "fixture" (path "/" (reference "U1") (unit 1))))
+  )
+)`)
+	writeTestFile(t, roundTripped, `(kicad_sch
+  (version 20260206)
+  (symbol (lib_id "MultiUnit:DUAL_DISTINCT")
+    (pin "3" (uuid "aaaaaaaa-aaaa-5aaa-8aaa-aaaaaaaaaaaa"))
+    (pin "4" (uuid "bbbbbbbb-bbbb-5bbb-8bbb-bbbbbbbbbbbb"))
+    (pin "2" (uuid "cccccccc-cccc-5ccc-8ccc-cccccccccccc"))
+    (pin "1" (uuid "dddddddd-dddd-5ddd-8ddd-dddddddddddd"))
+    (instances (project "fixture" (path "/" (reference "U1") (unit 1))))
+  )
+)`)
+
+	result, err := CompareSchematicFiles(original, roundTripped, Options{})
+	if err != nil {
+		t.Fatalf("CompareSchematicFiles returned error: %v", err)
+	}
+	if !result.Equal {
+		t.Fatalf("Equal = false, differences = %#v", result.Differences)
+	}
+}
+
+func TestSchematicPinNumberLessUsesNaturalAlphaNumericOrder(t *testing.T) {
+	ordered := []string{"A1", "A2", "A10", "B1", "B10"}
+	for i := 0; i < len(ordered); i++ {
+		for j := i + 1; j < len(ordered); j++ {
+			if !schematicPinNumberLess(ordered[i], ordered[j]) {
+				t.Fatalf("expected %q before %q", ordered[i], ordered[j])
+			}
+		}
+	}
+}
+
 func TestCompareFilesWritesArtifacts(t *testing.T) {
 	dir := t.TempDir()
 	original := filepath.Join(dir, "original.kicad_pcb")

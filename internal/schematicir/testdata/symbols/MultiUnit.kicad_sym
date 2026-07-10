@@ -1,0 +1,24 @@
+(kicad_symbol_lib
+	(version 20251024)
+	(generator "kicad_symbol_editor")
+	(generator_version "10.0")
+	(symbol "DUAL_DISTINCT"
+		(pin_names (offset 1.016))
+		(property "Reference" "U" (at 0 5.08 0) (show_name no) (effects (font (size 1.27 1.27))))
+		(property "Value" "DUAL_DISTINCT" (at 0 -5.08 0) (show_name no) (effects (font (size 1.27 1.27))))
+		(property "Footprint" "" (at 0 0 0) (show_name no) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Datasheet" "" (at 0 0 0) (show_name no) (hide yes) (effects (font (size 1.27 1.27))))
+		(property "Description" "Checked-in distinct-pin multi-unit schematic fixture" (at 0 0 0) (show_name no) (hide yes) (effects (font (size 1.27 1.27))))
+		(symbol "DUAL_DISTINCT_1_1"
+			(rectangle (start -2.54 2.54) (end 2.54 -2.54) (stroke (width 0.254) (type default)) (fill (type background)))
+			(pin input line (at -5.08 1.27 0) (length 2.54) (name "IN_A" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+			(pin output line (at 5.08 1.27 180) (length 2.54) (name "OUT_A" (effects (font (size 1.27 1.27)))) (number "2" (effects (font (size 1.27 1.27)))))
+		)
+		(symbol "DUAL_DISTINCT_2_1"
+			(rectangle (start -2.54 2.54) (end 2.54 -2.54) (stroke (width 0.254) (type default)) (fill (type background)))
+			(pin input line (at -5.08 -1.27 0) (length 2.54) (name "IN_B" (effects (font (size 1.27 1.27)))) (number "3" (effects (font (size 1.27 1.27)))))
+			(pin output line (at 5.08 -1.27 180) (length 2.54) (name "OUT_B" (effects (font (size 1.27 1.27)))) (number "4" (effects (font (size 1.27 1.27)))))
+		)
+		(embedded_fonts no)
+	)
+)

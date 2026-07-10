@@ -1,0 +1,74 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "multi_unit",
+    "title": "Multi-Unit Resolver Fixture",
+    "description": "Two units of one resolver-backed symbol with shared reference and connector boundaries.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "u1a",
+        "ref": "U1",
+        "unit": "1",
+        "role": "ic",
+        "symbol": "MultiUnit:DUAL_DISTINCT",
+        "value": "DUAL",
+        "pins": [{"number": "1", "role": "input"}, {"number": "2", "role": "output"}]
+      },
+      {
+        "id": "u1b",
+        "ref": "U1",
+        "unit": "2",
+        "role": "ic",
+        "symbol": "MultiUnit:DUAL_DISTINCT",
+        "value": "DUAL",
+        "pins": [{"number": "3", "role": "input"}, {"number": "4", "role": "output"}]
+      },
+      {
+        "id": "j1",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_02x02_Odd_Even",
+        "value": "IO",
+        "pins": [{"number": "1"}, {"number": "2"}, {"number": "3", "no_connect": true}, {"number": "4", "no_connect": true}]
+      }
+    ],
+    "nets": [
+      {"name": "IN", "role": "signal", "connect": ["j1.1", "u1a.1"], "use_label": true},
+      {"name": "LINK", "role": "signal", "connect": ["u1a.2", "u1b.3"], "use_label": true},
+      {"name": "OUT", "role": "signal", "connect": ["u1b.4", "j1.2"], "use_label": true}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "connector", "label": "I/O", "role": "connector_stage", "members": ["j1"], "rank": 0, "side": "left"},
+      {"id": "unit_a", "label": "Unit A", "role": "processing_stage", "members": ["u1a"], "rank": 1},
+      {"id": "unit_b", "label": "Unit B", "role": "processing_stage", "members": ["u1b"], "rank": 2}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 20,
+      "min_component_spacing_mm": 10
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

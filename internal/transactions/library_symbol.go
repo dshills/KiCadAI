@@ -18,10 +18,14 @@ func symbolRecordPinsForUnit(record libraryresolver.SymbolRecord, unit int) ([]P
 	if targetUnit <= 0 {
 		targetUnit = 1
 	}
+	// KiCad serializes every distinct physical pin on each unit instance. A
+	// repeated pin number across units denotes a shared/common pin instead, so
+	// those symbols retain unit-local pin expansion.
+	includeAllUnits := symbolHasDistinctUnitPins(record)
 	seen := map[string]struct{}{}
 	pins := make([]PinSpec, 0, len(record.Pins))
 	for _, pin := range record.Pins {
-		if pin.Unit != 0 && pin.Unit != targetUnit {
+		if pin.Unit != 0 && !includeAllUnits && pin.Unit != targetUnit {
 			continue
 		}
 		number := strings.TrimSpace(pin.Number)
@@ -42,6 +46,34 @@ func symbolRecordPinsForUnit(record libraryresolver.SymbolRecord, unit int) ([]P
 		return nil, fmt.Errorf("symbol %s has no usable electrical pins", record.LibraryID)
 	}
 	return pins, nil
+}
+
+func symbolHasDistinctUnitPins(record libraryresolver.SymbolRecord) bool {
+	unitsByNumber := map[string]map[int]struct{}{}
+	unitCount := map[int]struct{}{}
+	for _, pin := range record.Pins {
+		if pin.Unit == 0 {
+			continue
+		}
+		number := strings.TrimSpace(pin.Number)
+		if number == "" {
+			continue
+		}
+		if unitsByNumber[number] == nil {
+			unitsByNumber[number] = map[int]struct{}{}
+		}
+		unitsByNumber[number][pin.Unit] = struct{}{}
+		unitCount[pin.Unit] = struct{}{}
+	}
+	if len(unitCount) < 2 {
+		return false
+	}
+	for _, units := range unitsByNumber {
+		if len(units) > 1 {
+			return false
+		}
+	}
+	return true
 }
 
 func resolveSymbolPins(pins []PinSpec, index *libraryresolver.LibraryIndex, libraryID string) ([]PinSpec, error) {
@@ -100,18 +132,30 @@ func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryInde
 		resolvedByNumber[strings.TrimSpace(pin.Number)] = pin
 	}
 	if len(pins) > 0 {
+		provided := make(map[string]struct{}, len(pins))
 		for i := range pins {
+			number := strings.TrimSpace(pins[i].Number)
 			if pins[i].ExplicitOffset {
+				provided[number] = struct{}{}
 				continue
 			}
-			if pin, ok := resolvedByNumber[strings.TrimSpace(pins[i].Number)]; ok {
+			if pin, ok := resolvedByNumber[number]; ok {
 				pins[i].XMM = pin.XMM
 				pins[i].YMM = pin.YMM
+				provided[number] = struct{}{}
 			} else {
-				return nil, fmt.Errorf("symbol %s has no resolver pin %s for unit %d", libraryID, strings.TrimSpace(pins[i].Number), unit)
+				return nil, fmt.Errorf("symbol %s has no resolver pin %s for unit %d", libraryID, number, unit)
 			}
 		}
-		return pins, nil
+		merged := make([]PinSpec, 0, len(pins)+len(resolved))
+		merged = append(merged, pins...)
+		for _, pin := range resolved {
+			number := strings.TrimSpace(pin.Number)
+			if _, exists := provided[number]; !exists {
+				merged = append(merged, pin)
+			}
+		}
+		return merged, nil
 	}
 	if len(resolved) == 0 {
 		return nil, fmt.Errorf("symbol library record found but has no usable pins: %s", libraryID)

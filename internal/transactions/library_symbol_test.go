@@ -60,3 +60,29 @@ func TestResolveSymbolPinsPreservesExplicitOriginOffset(t *testing.T) {
 		t.Fatalf("pin = %#v, want explicit origin offset preserved", pins)
 	}
 }
+
+func TestResolveSymbolPinsExpandsDistinctMultiUnitPins(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"MultiUnit:Distinct": {
+			LibraryID: "MultiUnit:Distinct",
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Unit: 1},
+				{Number: "2", Unit: 1},
+				{Number: "3", Unit: 2},
+				{Number: "4", Unit: 2},
+			},
+		},
+	}}
+	pins, err := resolveSymbolPinsForUnit([]PinSpec{{Number: "1"}}, &index, "MultiUnit:Distinct", 1)
+	if err != nil {
+		t.Fatalf("resolveSymbolPinsForUnit returned error: %v", err)
+	}
+	if len(pins) != 4 {
+		t.Fatalf("pins = %#v, want all distinct physical pins", pins)
+	}
+	for index, want := range []string{"1", "2", "3", "4"} {
+		if pins[index].Number != want {
+			t.Fatalf("pin[%d] = %#v, want number %s", index, pins[index], want)
+		}
+	}
+}

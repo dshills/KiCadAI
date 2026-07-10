@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -244,6 +246,99 @@ func TestKiCadRoundTripSchematicIRResolverExternal(t *testing.T) {
 	}
 	if !roundTrip.Equal {
 		t.Fatalf("resolver external round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}
+
+func TestKiCadRoundTripSchematicIRMultiUnit(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	symbolsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvSymbolsRoot))
+	if symbolsRoot == "" {
+		t.Skip("set KICADAI_SYMBOLS_ROOT to a symbol library matching the KiCad CLI for multi-unit promotion")
+	}
+	connectorPath := resolverFixtureSymbolPath(symbolsRoot, "Connector_Generic", "Conn_02x02_Odd_Even")
+	if connectorPath == "" {
+		t.Skipf("matching Connector_Generic:Conn_02x02_Odd_Even symbol is unavailable under %s", symbolsRoot)
+	}
+	connectorData, err := os.ReadFile(connectorPath)
+	if err != nil {
+		t.Fatalf("read resolver connector library: %v", err)
+	}
+	multiUnitData, err := os.ReadFile(repoPath(t, "internal", "schematicir", "testdata", "symbols", "MultiUnit.kicad_sym"))
+	if err != nil {
+		t.Fatalf("read multi-unit resolver library: %v", err)
+	}
+	resolverRoot := t.TempDir()
+	for name, data := range map[string][]byte{
+		"MultiUnit.kicad_sym":         multiUnitData,
+		"Connector_Generic.kicad_sym": connectorData,
+	} {
+		if err := os.WriteFile(filepath.Join(resolverRoot, name), data, 0o600); err != nil {
+			t.Fatalf("stage resolver library %s: %v", name, err)
+		}
+	}
+	index, issues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{SymbolsRoot: resolverRoot}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("load multi-unit resolver root: %#v", issues)
+	}
+
+	fixture, err := os.Open(repoPath(t, "examples", "schematic-ir", "multi_unit.json"))
+	if err != nil {
+		t.Fatalf("open multi-unit IR: %v", err)
+	}
+	defer fixture.Close()
+	document, decodeIssues := schematicir.DecodeStrict(fixture)
+	if len(decodeIssues) != 0 {
+		t.Fatalf("decode multi-unit IR: %#v", decodeIssues)
+	}
+	tx, adapterIssues := schematicir.ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(adapterIssues) {
+		t.Fatalf("adapt multi-unit IR: %#v", adapterIssues)
+	}
+	output := filepath.Join(t.TempDir(), "multi_unit")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write multi-unit project: %#v", apply.Issues)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(output)
+	if err != nil {
+		t.Fatalf("read multi-unit project: %v", err)
+	}
+	if read.Schematic == nil {
+		t.Fatal("multi-unit project has no root schematic")
+	}
+	units := make([]int, 0, 2)
+	for _, symbol := range read.Schematic.Symbols {
+		if symbol.Reference == "U1" {
+			units = append(units, symbol.Unit)
+		}
+	}
+	sort.Ints(units)
+	if !reflect.DeepEqual(units, []int{1, 2}) {
+		t.Fatalf("multi-unit U1 units = %#v, want [1 2]", units)
+	}
+	request, result := schematiclayout.AdaptSchematic(read.Schematic)
+	result = schematiclayout.Validate(result, request)
+	readability := schematiclayout.BuildReport(result, schematiclayout.ProfileStrict)
+	if !readability.Passed {
+		t.Fatalf("multi-unit readability failed: %#v diagnostics=%#v", readability, result.Diagnostics)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, output, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+	if err != nil {
+		t.Fatalf("multi-unit ERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+		t.Fatalf("multi-unit ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+	schematicPath := filepath.Join(output, read.Schematic.Filename)
+	roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "roundtrip")})
+	if err != nil {
+		t.Fatalf("multi-unit round trip returned error: %v\nresult=%#v", err, roundTrip)
+	}
+	if !roundTrip.Equal {
+		t.Fatalf("multi-unit round trip changed generated schematic: %s", firstResultDifference(roundTrip))
 	}
 }
 

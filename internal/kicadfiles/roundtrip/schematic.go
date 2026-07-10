@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/kicadfiles/sexpr"
@@ -100,7 +101,7 @@ func normalizedSchematicSymbolOrderText(input []byte) (string, bool) {
 	if err != nil || !root.IsList || root.Head() != "kicad_sch" {
 		return "", false
 	}
-	normalized := normalizeSchematicNode(root)
+	normalized := normalizeSchematicNode(root, false)
 	text, err := sexpr.Format(normalized)
 	if err != nil {
 		return "", false
@@ -108,20 +109,23 @@ func normalizedSchematicSymbolOrderText(input []byte) (string, bool) {
 	return NormalizeText(text), true
 }
 
-func normalizeSchematicNode(node sexpr.ParsedNode) sexpr.Node {
+func normalizeSchematicNode(node sexpr.ParsedNode, inLibrarySymbols bool) sexpr.Node {
 	if !node.IsList {
 		return node.Node()
 	}
 	parentHead := node.Head()
+	childInLibrarySymbols := inLibrarySymbols || parentHead == "lib_symbols"
 	children := make([]sexpr.Node, 0, len(node.Children))
 	for _, child := range node.Children {
 		if skipSchematicKiCadInstanceMetadata(parentHead, child) {
 			continue
 		}
-		children = append(children, normalizeSchematicNode(child))
+		children = append(children, normalizeSchematicNode(child, childInLibrarySymbols))
 	}
 	if node.Head() == "lib_symbols" {
 		children = normalizeSchematicLibSymbolsOrder(children)
+	} else if node.Head() == "symbol" && !inLibrarySymbols {
+		children = normalizeSchematicInstanceSymbolPins(node, children)
 	} else if schematicPinInstanceNode(node) {
 		children = normalizeSchematicPinInstance(children)
 	}
@@ -158,6 +162,102 @@ func normalizeSchematicPinInstance(children []sexpr.Node) []sexpr.Node {
 		result = append(result, child)
 	}
 	return result
+}
+
+func normalizeSchematicInstanceSymbolPins(original sexpr.ParsedNode, children []sexpr.Node) []sexpr.Node {
+	// Symbol instances currently have no direct child filtered by the
+	// normalizer. Refuse to use positional replacement if that invariant ever
+	// changes, rather than pairing a pin with an unrelated child.
+	if len(original.Children) != len(children) {
+		return children
+	}
+	var pins []sortableSchematicNode
+	pinIndexes := map[int]struct{}{}
+	for index, child := range original.Children {
+		number, ok := schematicParsedInstancePinNumber(child)
+		if !ok || !schematicParsedPinHasUUID(child) {
+			continue
+		}
+		pinIndexes[index] = struct{}{}
+		pins = append(pins, sortableSchematicNode{node: children[index], key: number})
+	}
+	if len(pins) < 2 {
+		return children
+	}
+	sort.SliceStable(pins, func(i, j int) bool { return schematicPinNumberLess(pins[i].key, pins[j].key) })
+	result := make([]sexpr.Node, 0, len(children))
+	for index, child := range children {
+		if _, ok := pinIndexes[index]; ok {
+			result = append(result, pins[0].node)
+			pins = pins[1:]
+			continue
+		}
+		result = append(result, child)
+	}
+	return result
+}
+
+func schematicPinNumberLess(left, right string) bool {
+	left = strings.TrimSpace(left)
+	right = strings.TrimSpace(right)
+	leftNumber, leftErr := strconv.Atoi(left)
+	rightNumber, rightErr := strconv.Atoi(right)
+	if leftErr == nil && rightErr == nil && leftNumber != rightNumber {
+		return leftNumber < rightNumber
+	}
+	for leftIndex, rightIndex := 0, 0; leftIndex < len(left) && rightIndex < len(right); {
+		leftDigit := left[leftIndex] >= '0' && left[leftIndex] <= '9'
+		rightDigit := right[rightIndex] >= '0' && right[rightIndex] <= '9'
+		if leftDigit && rightDigit {
+			leftEnd := leftIndex
+			for leftEnd < len(left) && left[leftEnd] >= '0' && left[leftEnd] <= '9' {
+				leftEnd++
+			}
+			rightEnd := rightIndex
+			for rightEnd < len(right) && right[rightEnd] >= '0' && right[rightEnd] <= '9' {
+				rightEnd++
+			}
+			leftChunk := strings.TrimLeft(left[leftIndex:leftEnd], "0")
+			rightChunk := strings.TrimLeft(right[rightIndex:rightEnd], "0")
+			if len(leftChunk) != len(rightChunk) {
+				return len(leftChunk) < len(rightChunk)
+			}
+			if leftChunk != rightChunk {
+				return leftChunk < rightChunk
+			}
+			leftIndex, rightIndex = leftEnd, rightEnd
+			continue
+		}
+		if left[leftIndex] != right[rightIndex] {
+			return left[leftIndex] < right[rightIndex]
+		}
+		leftIndex++
+		rightIndex++
+	}
+	return len(left) < len(right)
+}
+
+func schematicParsedInstancePinNumber(node sexpr.ParsedNode) (string, bool) {
+	if !node.IsList || node.Head() != "pin" || len(node.Children) < 2 {
+		return "", false
+	}
+	number := node.ListValue(1)
+	if number == "" {
+		return "", false
+	}
+	return number, true
+}
+
+func schematicParsedPinHasUUID(node sexpr.ParsedNode) bool {
+	if len(node.Children) < 3 {
+		return false
+	}
+	for _, metadata := range node.Children[2:] {
+		if metadata.IsList && metadata.Head() == "uuid" {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeSchematicLibSymbolsOrder(children []sexpr.Node) []sexpr.Node {
