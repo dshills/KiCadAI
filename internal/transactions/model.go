@@ -306,6 +306,7 @@ type WriteProjectOperation struct {
 type SchematicHierarchy struct {
 	Sheets         []SchematicHierarchySheet `json:"sheets"`
 	CrossSheetNets []SchematicCrossSheetNet  `json:"cross_sheet_nets,omitempty"`
+	Buses          []SchematicHierarchyBus   `json:"buses,omitempty"`
 }
 
 type SchematicHierarchySheet struct {
@@ -324,4 +325,19 @@ type SchematicSymbolRef struct {
 type SchematicCrossSheetNet struct {
 	Name      string     `json:"name"`
 	Endpoints []Endpoint `json:"endpoints"`
+}
+
+type SchematicHierarchyBus struct {
+	ID      string                    `json:"id"`
+	Name    string                    `json:"name"`
+	Points  []Point                   `json:"points"`
+	Entries []SchematicHierarchyEntry `json:"entries"`
+}
+
+type SchematicHierarchyEntry struct {
+	Member   string   `json:"member"`
+	Label    string   `json:"label,omitempty"`
+	Endpoint Endpoint `json:"endpoint"`
+	At       Point    `json:"at"`
+	Size     Point    `json:"size"`
 }

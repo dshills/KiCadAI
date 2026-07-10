@@ -103,6 +103,7 @@ type Endpoint struct {
 type SchematicHierarchy struct {
 	Sheets         []SchematicSheet         `json:"sheets"`
 	CrossSheetNets []SchematicCrossSheetNet `json:"cross_sheet_nets,omitempty"`
+	Buses          []SchematicBus           `json:"buses,omitempty"`
 }
 
 type SchematicSheet struct {
@@ -121,6 +122,21 @@ type SchematicSymbolRef struct {
 type SchematicCrossSheetNet struct {
 	Name      string
 	Endpoints []Endpoint
+}
+
+type SchematicBus struct {
+	ID      string
+	Name    string
+	Points  []kicadfiles.Point
+	Entries []SchematicBusEntry
+}
+
+type SchematicBusEntry struct {
+	Member   string
+	Label    string
+	Endpoint Endpoint
+	At       kicadfiles.Point
+	Size     kicadfiles.Point
 }
 
 type ConnectOptions struct {

@@ -31,6 +31,9 @@ const hierarchySheetHeight = 70.0
 const hierarchySheetOrigin = 25.0
 const hierarchySheetStepX = 120.0
 const hierarchySheetStepY = 90.0
+const hierarchyBusMarginMM = 5.0
+const hierarchyBusFallbackWidthMM = 25.4
+const hierarchyBusGridMM = 1.27
 
 func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) error {
 	if builder == nil || builder.hierarchy == nil {
@@ -46,7 +49,7 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	if len(root.RawItems) != 0 {
 		return fmt.Errorf("generated hierarchy cannot preserve unsupported root schematic items")
 	}
-	if len(root.Buses) != 0 || len(root.BusEntries) != 0 || len(root.Polylines) != 0 || len(root.Texts) != 0 {
+	if len(root.Polylines) != 0 || len(root.Texts) != 0 {
 		return fmt.Errorf("generated hierarchy cannot preserve free schematic graphics")
 	}
 
@@ -124,6 +127,9 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		if err := relayoutHierarchyChild(builder, child, spec.ID); err != nil {
 			return err
 		}
+		if err := applyHierarchyBuses(builder, child, spec.ID, hierarchyCrossSheetNetSet(builder)); err != nil {
+			return err
+		}
 		appendCrossSheetLabels(builder, child, spec.ID, refToSheet, index)
 		if err := fitHierarchyChild(child); err != nil {
 			return err
@@ -144,6 +150,131 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 	}
 	design.SheetFiles = children
 	return nil
+}
+
+func hierarchyCrossSheetNetSet(builder *Builder) map[string]struct{} {
+	result := map[string]struct{}{}
+	if builder == nil || builder.hierarchy == nil {
+		return result
+	}
+	for _, net := range builder.hierarchy.CrossSheetNets {
+		result[builder.canonicalNet(net.Name)] = struct{}{}
+	}
+	return result
+}
+
+func applyHierarchyBuses(builder *Builder, child *schematic.SchematicFile, sheetID string, crossSheetNets map[string]struct{}) error {
+	if builder == nil || child == nil || builder.hierarchy == nil || len(builder.hierarchy.Buses) == 0 {
+		return nil
+	}
+	symbolsByKey := make(map[string]*schematic.SchematicSymbol, len(child.Symbols))
+	for index := range child.Symbols {
+		symbolsByKey[symbolStateKey(child.Symbols[index].Reference, child.Symbols[index].Unit)] = &child.Symbols[index]
+	}
+	for _, bus := range builder.hierarchy.Buses {
+		entries := make([]SchematicBusEntry, 0, len(bus.Entries))
+		for _, entry := range bus.Entries {
+			if symbolsByKey[symbolStateKey(entry.Endpoint.Reference, entry.Endpoint.Unit)] == nil {
+				continue
+			}
+			entries = append(entries, entry)
+		}
+		if len(entries) == 0 {
+			continue
+		}
+		sort.SliceStable(entries, func(left, right int) bool {
+			if entries[left].Member != entries[right].Member {
+				return entries[left].Member < entries[right].Member
+			}
+			if entries[left].Endpoint.Reference != entries[right].Endpoint.Reference {
+				return entries[left].Endpoint.Reference < entries[right].Endpoint.Reference
+			}
+			return entries[left].Endpoint.Pin < entries[right].Endpoint.Pin
+		})
+		minPoint, maxPoint, ok := sheetSymbolBounds(child.Symbols)
+		if !ok {
+			return fmt.Errorf("hierarchy child %s bus %s has no symbol bounds", sheetID, bus.ID)
+		}
+		xStart := minPoint.X + kicadfiles.MM(hierarchyBusMarginMM)
+		xEnd := maxPoint.X - kicadfiles.MM(hierarchyBusMarginMM)
+		if xEnd <= xStart {
+			xEnd = xStart + kicadfiles.MM(hierarchyBusFallbackWidthMM)
+		}
+		grid := kicadfiles.MM(hierarchyBusGridMM)
+		xStart = schematiclayout.SnapIU(xStart, grid)
+		xEnd = schematiclayout.SnapIU(xEnd, grid)
+		busY := schematiclayout.SnapIU(maxPoint.Y-kicadfiles.MM(hierarchyBusMarginMM), grid)
+		child.Buses = append(child.Buses, schematic.Bus{
+			UUID:   builder.generator.New("hierarchy.bus", sheetID, bus.ID),
+			Points: []kicadfiles.Point{{X: xStart, Y: busY}, {X: xEnd, Y: busY}},
+		})
+		if strings.TrimSpace(bus.Name) != "" {
+			child.Labels = append(child.Labels, schematic.NewLabel(
+				builder.generator.New("hierarchy.bus.label", sheetID, bus.ID),
+				bus.Name,
+				schematic.LabelLocal,
+				kicadfiles.Point{X: xStart, Y: busY},
+			))
+		}
+		for entryIndex, entry := range entries {
+			x := schematiclayout.SnapIU(xStart+(xEnd-xStart)/kicadfiles.IU(len(entries)+1)*kicadfiles.IU(entryIndex+1), grid)
+			at := kicadfiles.Point{X: x, Y: busY}
+			size := entry.Size
+			if size.X == 0 || size.Y == 0 {
+				size = kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-2.54)}
+			}
+			child.BusEntries = append(child.BusEntries, schematic.BusEntry{
+				UUID:     builder.generator.New("hierarchy.bus.entry", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin),
+				Position: at,
+				Size:     size,
+			})
+			entryPoint := kicadfiles.Point{X: at.X + size.X, Y: at.Y + size.Y}
+			symbol := symbolsByKey[symbolStateKey(entry.Endpoint.Reference, entry.Endpoint.Unit)]
+			anchor, ok := hierarchySymbolPinAnchor(symbol, entry.Endpoint.Pin)
+			if !ok {
+				return fmt.Errorf("hierarchy child %s bus entry %s.%s has no symbol anchor", sheetID, entry.Endpoint.Reference, entry.Endpoint.Pin)
+			}
+			pinStub := hierarchyBusPinStub(symbol, anchor)
+			entryStub := kicadfiles.Point{X: entryPoint.X + kicadfiles.MM(5.08), Y: entryPoint.Y}
+			child.Wires = append(child.Wires,
+				schematic.NewWire(builder.generator.New("hierarchy.bus.pin_wire", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), anchor, pinStub),
+				schematic.NewWire(builder.generator.New("hierarchy.bus.entry_wire", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), entryPoint, entryStub),
+			)
+			kind := schematic.LabelLocal
+			if _, cross := crossSheetNets[builder.canonicalNet(entry.Member)]; cross {
+				kind = schematic.LabelGlobal
+			}
+			label := strings.TrimSpace(entry.Label)
+			if label == "" {
+				label = entry.Member
+			}
+			child.Labels = append(child.Labels,
+				schematic.NewLabel(builder.generator.New("hierarchy.bus.pin_label", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), label, kind, pinStub),
+				schematic.NewLabel(builder.generator.New("hierarchy.bus.entry_label", sheetID, bus.ID, entry.Member, entry.Endpoint.Reference, strconv.Itoa(entry.Endpoint.Unit), entry.Endpoint.Pin), label, kind, entryStub),
+			)
+		}
+	}
+	return nil
+}
+
+func hierarchyBusPinStub(symbol *schematic.SchematicSymbol, anchor kicadfiles.Point) kicadfiles.Point {
+	if symbol == nil {
+		return kicadfiles.Point{X: anchor.X + kicadfiles.MM(2.54), Y: anchor.Y}
+	}
+	dx := anchor.X - symbol.Position.X
+	dy := anchor.Y - symbol.Position.Y
+	if absIU(dx) >= absIU(dy) && dx != 0 {
+		distance := kicadfiles.MM(2.54)
+		if dx < 0 {
+			distance = kicadfiles.MM(5.08)
+			return kicadfiles.Point{X: anchor.X - distance, Y: anchor.Y}
+		}
+		return kicadfiles.Point{X: anchor.X + distance, Y: anchor.Y}
+	}
+	if dy < 0 {
+		return kicadfiles.Point{X: anchor.X, Y: anchor.Y - kicadfiles.MM(2.54)}
+	}
+	return kicadfiles.Point{X: anchor.X, Y: anchor.Y + kicadfiles.MM(2.54)}
 }
 
 func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sheetID string) error {
@@ -448,6 +579,39 @@ func fitHierarchyChild(child *schematic.SchematicFile) error {
 			maxPoint.Y = noConnect.Position.Y
 		}
 	}
+	for _, bus := range child.Buses {
+		for _, point := range bus.Points {
+			if point.X < minPoint.X {
+				minPoint.X = point.X
+			}
+			if point.Y < minPoint.Y {
+				minPoint.Y = point.Y
+			}
+			if point.X > maxPoint.X {
+				maxPoint.X = point.X
+			}
+			if point.Y > maxPoint.Y {
+				maxPoint.Y = point.Y
+			}
+		}
+	}
+	for _, entry := range child.BusEntries {
+		points := []kicadfiles.Point{entry.Position, {X: entry.Position.X + entry.Size.X, Y: entry.Position.Y + entry.Size.Y}}
+		for _, point := range points {
+			if point.X < minPoint.X {
+				minPoint.X = point.X
+			}
+			if point.Y < minPoint.Y {
+				minPoint.Y = point.Y
+			}
+			if point.X > maxPoint.X {
+				maxPoint.X = point.X
+			}
+			if point.Y > maxPoint.Y {
+				maxPoint.Y = point.Y
+			}
+		}
+	}
 	textMargin := kicadfiles.MM(10.16)
 	minPoint.X -= textMargin
 	minPoint.Y -= textMargin
@@ -476,7 +640,10 @@ func fitHierarchyChild(child *schematic.SchematicFile) error {
 		X: (usable.MinX + usable.MaxX) / 2,
 		Y: (usable.MinY + usable.MaxY) / 2,
 	}
-	translateSchematic(child, kicadfiles.Point{X: targetCenter.X - currentCenter.X, Y: targetCenter.Y - currentCenter.Y})
+	delta := kicadfiles.Point{X: targetCenter.X - currentCenter.X, Y: targetCenter.Y - currentCenter.Y}
+	delta.X = schematiclayout.SnapIU(delta.X, kicadfiles.MM(1.27))
+	delta.Y = schematiclayout.SnapIU(delta.Y, kicadfiles.MM(1.27))
+	translateSchematic(child, delta)
 	return nil
 }
 

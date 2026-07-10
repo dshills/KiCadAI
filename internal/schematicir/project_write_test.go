@@ -157,6 +157,45 @@ func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesOversizedVectorBusHierarchy(t *testing.T) {
+	document := loadExampleDocument(t, "vector_bus.json")
+	document.Policy.Acceptance = AcceptanceReadable
+	for index := 0; index < 80; index++ {
+		document.Circuit.Components = append(document.Circuit.Components, Component{
+			ID:     fmt.Sprintf("extra_%d", index),
+			Ref:    fmt.Sprintf("R%d", index+10),
+			Role:   ComponentRoleResistor,
+			Symbol: "Device:R",
+			Value:  "10k",
+			Pins:   []Pin{{Number: "1", Role: PinRoleOutput, NoConnect: true}, {Number: "2", Role: PinRoleInput, NoConnect: true}},
+		})
+	}
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("oversized vector-bus transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), "oversized_vector_bus")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("oversized vector-bus apply issues: %+v", apply.Issues)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(outputDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.SheetFiles) < 2 {
+		t.Fatalf("oversized vector-bus project did not partition: sheets=%d", len(read.SheetFiles))
+	}
+	busCount, entryCount := 0, 0
+	for _, child := range read.SheetFiles {
+		busCount += len(child.Buses)
+		entryCount += len(child.BusEntries)
+	}
+	if busCount == 0 || entryCount == 0 {
+		t.Fatalf("oversized vector-bus hierarchy dropped native bus geometry: buses=%d entries=%d", busCount, entryCount)
+	}
+}
+
 func TestSchematicIRWritesResolverBackedExternalSymbolProject(t *testing.T) {
 	document := loadExampleDocument(t, "external_connector_indicator.json")
 	for index := range document.Circuit.Components {

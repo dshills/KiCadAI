@@ -152,10 +152,52 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 			}
 		}
 	}
+	busesByID := make(map[string]Bus, len(document.Circuit.Buses))
+	for _, candidate := range document.Circuit.Buses {
+		busesByID[candidate.ID] = candidate
+	}
+	for _, busLayout := range document.Layout.Buses {
+		bus := busesByID[busLayout.Bus]
+		if bus.ID == "" || len(busLayout.Points) < 2 {
+			continue
+		}
+		entry := transactions.SchematicHierarchyBus{ID: bus.ID, Name: bus.Name}
+		for _, point := range busLayout.Points {
+			entry.Points = append(entry.Points, transactions.Point{XMM: point.XMM, YMM: point.YMM})
+		}
+		members := make(map[string]BusMember, len(bus.Members))
+		for _, member := range bus.Members {
+			members[member.Net] = member
+		}
+		for _, busEntry := range busLayout.Entries {
+			member, ok := members[busEntry.Member]
+			if !ok {
+				continue
+			}
+			componentID, pin, ok := busEntry.Endpoint.Split()
+			if !ok || componentSheets[componentID] == "" || state.refsByID[componentID] == "" {
+				continue
+			}
+			entry.Entries = append(entry.Entries, transactions.SchematicHierarchyEntry{
+				Member:   busEntry.Member,
+				Label:    member.Label,
+				Endpoint: transactions.Endpoint{Ref: state.refsByID[componentID], Pin: pin, Unit: state.unitsByID[componentID]},
+				At:       busEntryPoint(busEntry.At),
+				Size:     busEntryPoint(busEntry.Size),
+			})
+		}
+		if len(entry.Entries) > 0 {
+			hierarchy.Buses = append(hierarchy.Buses, entry)
+		}
+	}
 	if len(hierarchy.Sheets) < 2 {
 		return nil, nil
 	}
 	return hierarchy, nil
+}
+
+func busEntryPoint(point LayoutPoint) transactions.Point {
+	return transactions.Point{XMM: point.XMM, YMM: point.YMM}
 }
 
 type adapterState struct {
@@ -485,7 +527,6 @@ func (state *adapterState) appendBuses(tx *transactions.Transaction) {
 		return
 	}
 	if state.layoutResult.Partition != nil && len(state.layoutResult.Partition.Sheets) > 1 {
-		state.addIssue("circuit.buses", "vector bus generation is not supported across generated hierarchy sheets")
 		return
 	}
 	busesByID := make(map[string]Bus, len(state.document.Circuit.Buses))

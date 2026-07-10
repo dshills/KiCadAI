@@ -2,6 +2,7 @@ package roundtrip
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -294,5 +295,44 @@ func TestKiCadRoundTripSchematicIRResolverInheritedGeometry(t *testing.T) {
 	}
 	if !roundTrip.Equal {
 		t.Fatalf("resolver geometry round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}
+
+func TestKiCadRoundTripSchematicIROversizedVectorBusHierarchy(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	fixture, err := os.Open(repoPath(t, "examples", "schematic-ir", "vector_bus.json"))
+	if err != nil {
+		t.Fatalf("open vector bus IR: %v", err)
+	}
+	document, issues := schematicir.DecodeStrict(fixture)
+	_ = fixture.Close()
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode vector bus IR: %#v", issues)
+	}
+	document.Policy.Acceptance = schematicir.AcceptanceReadable
+	for index := 0; index < 80; index++ {
+		document.Circuit.Components = append(document.Circuit.Components, schematicir.Component{
+			ID: fmt.Sprintf("extra_%d", index), Ref: fmt.Sprintf("R%d", index+10),
+			Role: schematicir.ComponentRoleResistor, Symbol: "Device:R", Value: "10k",
+			Pins: []schematicir.Pin{{Number: "1", Role: schematicir.PinRoleOutput, NoConnect: true}, {Number: "2", Role: schematicir.PinRoleInput, NoConnect: true}},
+		})
+	}
+	tx, adapterIssues := schematicir.ToProjectTransaction(document)
+	if reports.HasBlockingIssue(adapterIssues) {
+		t.Fatalf("adapt oversized vector bus IR: %#v", adapterIssues)
+	}
+	output := filepath.Join(t.TempDir(), "oversized_vector_bus")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write oversized vector bus project: %#v", apply.Issues)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, output, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+	if err != nil {
+		t.Fatalf("oversized vector bus ERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+		t.Fatalf("oversized vector bus ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
 	}
 }

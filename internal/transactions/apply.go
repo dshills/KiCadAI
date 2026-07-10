@@ -779,6 +779,22 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 				}
 				hierarchy.CrossSheetNets = append(hierarchy.CrossSheetNets, designapi.SchematicCrossSheetNet{Name: net.Name, Endpoints: endpoints})
 			}
+			for _, bus := range payload.Hierarchy.Buses {
+				converted := designapi.SchematicBus{ID: bus.ID, Name: bus.Name}
+				for _, point := range bus.Points {
+					converted.Points = append(converted.Points, kicadfiles.Point{X: kicadfiles.MM(point.XMM), Y: kicadfiles.MM(point.YMM)})
+				}
+				for _, entry := range bus.Entries {
+					converted.Entries = append(converted.Entries, designapi.SchematicBusEntry{
+						Member:   entry.Member,
+						Label:    entry.Label,
+						Endpoint: designapi.Endpoint{Reference: entry.Endpoint.Ref, Pin: entry.Endpoint.Pin, Unit: entry.Endpoint.Unit},
+						At:       kicadfiles.Point{X: kicadfiles.MM(entry.At.XMM), Y: kicadfiles.MM(entry.At.YMM)},
+						Size:     kicadfiles.Point{X: kicadfiles.MM(entry.Size.XMM), Y: kicadfiles.MM(entry.Size.YMM)},
+					})
+				}
+				hierarchy.Buses = append(hierarchy.Buses, converted)
+			}
 			if err := builder.SetSchematicHierarchy(hierarchy); err != nil {
 				return nil, err
 			}
