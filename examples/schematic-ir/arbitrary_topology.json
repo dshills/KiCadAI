@@ -1,0 +1,61 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "arbitrary_topology",
+    "title": "Arbitrary Topology Readability",
+    "description": "A deterministic feedback-cycle and disconnected high-fanout island fixture.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {"id": "r1", "ref": "R1", "role": "resistor", "symbol": "Device:R", "value": "10k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r2", "ref": "R2", "role": "resistor", "symbol": "Device:R", "value": "10k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r3", "ref": "R3", "role": "resistor", "symbol": "Device:R", "value": "10k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r4", "ref": "R4", "role": "resistor", "symbol": "Device:R", "value": "10k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r5", "ref": "R5", "role": "resistor", "symbol": "Device:R", "value": "10k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r6", "ref": "R6", "role": "resistor", "symbol": "Device:R", "value": "10k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r7", "ref": "R7", "role": "resistor", "symbol": "Device:R", "value": "1k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r8", "ref": "R8", "role": "resistor", "symbol": "Device:R", "value": "1k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r9", "ref": "R9", "role": "resistor", "symbol": "Device:R", "value": "1k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]},
+      {"id": "r10", "ref": "R10", "role": "resistor", "symbol": "Device:R", "value": "1k", "pins": [{"number": "1", "role": "passive"}, {"number": "2", "role": "passive"}]}
+    ],
+    "nets": [
+      {"name": "FEEDBACK_A", "role": "feedback", "connect": ["r1.1", "r2.2", "r6.2"], "label": "FEEDBACK_A"},
+      {"name": "FEEDBACK_B", "role": "feedback", "connect": ["r1.2", "r2.1", "r3.2"], "label": "FEEDBACK_B"},
+      {"name": "FEEDBACK_C", "role": "feedback", "connect": ["r3.1", "r4.2", "r5.1"], "label": "FEEDBACK_C"},
+      {"name": "FEEDBACK_D", "role": "feedback", "connect": ["r4.1", "r5.2", "r6.1"], "label": "FEEDBACK_D"},
+      {"name": "ISLAND_FANOUT", "role": "signal", "connect": ["r7.1", "r8.1", "r9.1", "r10.1"], "label": "ISLAND_FANOUT"},
+      {"name": "ISLAND_LEFT", "role": "signal", "connect": ["r7.2", "r8.2"], "label": "ISLAND_LEFT"},
+      {"name": "ISLAND_RIGHT", "role": "signal", "connect": ["r9.2", "r10.2"], "label": "ISLAND_RIGHT"}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "feedback", "label": "Feedback cycle", "role": "processing_stage", "members": ["r1", "r2", "r3", "r4", "r5", "r6"], "rank": 0},
+      {"id": "fanout_island", "label": "Disconnected fanout island", "role": "processing_stage", "members": ["r7", "r8", "r9", "r10"], "rank": 1}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 20,
+      "min_component_spacing_mm": 10
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

@@ -975,7 +975,6 @@ func (state *adapterState) netEmissionPriority(net Net) int {
 
 func schematicNetLabelPreferences(document Document) map[string]bool {
 	pinsByComponent := make(map[string]map[string]*Pin, len(document.Circuit.Components))
-	resolverBacked := make(map[string]bool, len(document.Circuit.Components))
 	for index := range document.Circuit.Components {
 		component := &document.Circuit.Components[index]
 		pins := make(map[string]*Pin, len(component.Pins))
@@ -983,8 +982,6 @@ func schematicNetLabelPreferences(document Document) map[string]bool {
 			pins[component.Pins[pinIndex].Number] = &component.Pins[pinIndex]
 		}
 		pinsByComponent[component.ID] = pins
-		_, knownTemplate := schematic.EmbeddedSymbolPinOffsets(component.Symbol)
-		resolverBacked[component.ID] = !knownTemplate
 	}
 	drivenPorts := make(map[string]bool, len(document.Circuit.Ports))
 	for _, port := range document.Circuit.Ports {
@@ -995,26 +992,26 @@ func schematicNetLabelPreferences(document Document) map[string]bool {
 	}
 	preferences := make(map[string]bool, len(document.Circuit.Nets))
 	for _, net := range document.Circuit.Nets {
-		if value, ok := schematicNetLabelPreferenceFor(document, net, pinsByComponent, resolverBacked, drivenPorts); ok {
+		if value, ok := schematicNetLabelPreferenceFor(document, net, pinsByComponent, drivenPorts); ok {
 			preferences[net.Name] = value
 		}
 	}
 	return preferences
 }
 
-func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent map[string]map[string]*Pin, resolverBacked map[string]bool, drivenPorts map[string]bool) (bool, bool) {
+func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent map[string]map[string]*Pin, drivenPorts map[string]bool) (bool, bool) {
 	if net.UseLabel != nil {
 		return *net.UseLabel, true
 	}
 	if !document.Policy.Repair.AllowLabelInsertion {
 		return false, false
 	}
-	// Verified built-in symbols retain their established direct-route and bend
-	// label policy. This extra default is intentionally limited to resolver
-	// symbols, where the installed-library connection behavior is not yet
-	// proven by a built-in template contract.
+	// Undriven passive-only nets use local labels instead of relying on a
+	// direct wire to establish a KiCad net. This applies to built-in and
+	// resolver-backed symbols alike. Explicit use_label:false remains
+	// authoritative for callers that intentionally accept that tradeoff.
 	needsLabel, complete := schematicNetNeedsLabelForFloatingNet(net, pinsByComponent)
-	if complete && needsLabel && schematicNetHasResolverBackedComponent(net, resolverBacked) && !drivenPorts[net.Name] {
+	if complete && needsLabel && !drivenPorts[net.Name] {
 		return true, true
 	}
 	preferLong := document.Layout.Rules.PreferLabelsForLongNets == nil || *document.Layout.Rules.PreferLabelsForLongNets
@@ -1033,11 +1030,10 @@ func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent 
 
 // KiCad reports a wire-only subgraph with no declared driver as a floating
 // wire. An undriven net is electrically meaningful, but local labels give
-// it a named connection context without inventing an active pin. Resolver-only
-// symbols use this conservative default because their installed-library ERC
-// behavior cannot be inferred from a built-in template. Explicit
-// use_label:false remains authoritative for callers that intentionally accept
-// that KiCad ERC tradeoff.
+// it a named connection context without inventing an active pin. This applies
+// to built-in and resolver-backed symbols alike. Explicit use_label:false
+// remains authoritative for callers that intentionally accept that KiCad ERC
+// tradeoff.
 func schematicNetNeedsLabelForFloatingNet(net Net, pinsByComponent map[string]map[string]*Pin) (bool, bool) {
 	if len(net.Connect) < 2 {
 		return false, false
@@ -1074,16 +1070,6 @@ func schematicNetNeedsLabelForFloatingNet(net Net, pinsByComponent map[string]ma
 	}
 	// Ports are checked by the caller's document-level preference function.
 	return seenPin, true
-}
-
-func schematicNetHasResolverBackedComponent(net Net, resolverBacked map[string]bool) bool {
-	for _, endpoint := range net.Connect {
-		componentID, _, ok := endpoint.Split()
-		if ok && resolverBacked[componentID] {
-			return true
-		}
-	}
-	return false
 }
 
 func (state *adapterState) transactionEndpoint(endpoint EndpointRef, path string) (transactions.Endpoint, bool) {

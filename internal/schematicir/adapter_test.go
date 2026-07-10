@@ -347,11 +347,11 @@ func TestToTransactionEmitsTemplatePinOffsetsAndLabelPolicy(t *testing.T) {
 			t.Fatalf("%s label preference = %#v, want forced labels", netName, preferences[netName])
 		}
 	}
-	if preferences["LED_A"] == nil || *preferences["LED_A"] {
-		t.Fatalf("LED_A label preference = %#v, want explicit local routing", preferences["LED_A"])
+	if preferences["LED_A"] == nil || !*preferences["LED_A"] {
+		t.Fatalf("LED_A label preference = %#v, want passive-only label routing", preferences["LED_A"])
 	}
-	if waypointCounts["LED_A"] < 2 {
-		t.Fatalf("LED_A waypoint count = %d, want explicit orthogonal path", waypointCounts["LED_A"])
+	if waypointCounts["LED_A"] != 0 {
+		t.Fatalf("LED_A waypoint count = %d, want label routing", waypointCounts["LED_A"])
 	}
 }
 

@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"kicadai/internal/kicadfiles/checks"
+	kicaddesign "kicadai/internal/kicadfiles/design"
+	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
+	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
 )
 
@@ -334,5 +337,80 @@ func TestKiCadRoundTripSchematicIROversizedVectorBusHierarchy(t *testing.T) {
 	}
 	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
 		t.Fatalf("oversized vector bus ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+}
+
+func TestKiCadRoundTripSchematicIRArbitraryTopology(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	fixture, err := os.Open(repoPath(t, "examples", "schematic-ir", "arbitrary_topology.json"))
+	if err != nil {
+		t.Fatalf("open arbitrary topology IR: %v", err)
+	}
+	defer fixture.Close()
+	document, issues := schematicir.DecodeStrict(fixture)
+	if len(issues) != 0 {
+		t.Fatalf("decode arbitrary topology IR: %#v", issues)
+	}
+	tx, adapterIssues := schematicir.ToProjectTransaction(document)
+	if reports.HasBlockingIssue(adapterIssues) {
+		t.Fatalf("adapt arbitrary topology IR: %#v", adapterIssues)
+	}
+	baseDir := t.TempDir()
+	output := filepath.Join(baseDir, "arbitrary_topology")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write arbitrary topology project: %#v", apply.Issues)
+	}
+
+	read, err := kicaddesign.ReadProjectDirectory(output)
+	if err != nil {
+		t.Fatalf("read arbitrary topology project: %v", err)
+	}
+	if read.Schematic == nil {
+		t.Fatalf("arbitrary topology project has no root schematic")
+	}
+	schematicPath := filepath.Join(output, read.Schematic.Filename)
+	paths := make([]string, 0, len(read.SheetFiles)+1)
+	seenPaths := map[string]struct{}{}
+	appendPath := func(path string) {
+		path = filepath.Clean(path)
+		if _, seen := seenPaths[path]; seen {
+			return
+		}
+		seenPaths[path] = struct{}{}
+		paths = append(paths, path)
+	}
+	appendPath(schematicPath)
+	for _, child := range read.SheetFiles {
+		appendPath(filepath.Join(output, child.Filename))
+	}
+	for _, path := range paths {
+		file, readErr := schematic.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read generated schematic %s: %v", path, readErr)
+		}
+		request, result := schematiclayout.AdaptSchematic(&file)
+		result = schematiclayout.Validate(result, request)
+		readability := schematiclayout.BuildReport(result, schematiclayout.ProfileStrict)
+		if !readability.Passed {
+			t.Fatalf("arbitrary topology readability for %s: %#v diagnostics=%#v", path, readability, result.Diagnostics)
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, output, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(baseDir, "erc")})
+	if err != nil {
+		t.Fatalf("arbitrary topology ERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+		t.Fatalf("arbitrary topology ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+	roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(baseDir, "roundtrip")})
+	if err != nil {
+		t.Fatalf("arbitrary topology round trip returned error: %v\nresult=%#v", err, roundTrip)
+	}
+	if !roundTrip.Equal {
+		t.Fatalf("arbitrary topology round trip changed generated schematic: %s", firstResultDifference(roundTrip))
 	}
 }
