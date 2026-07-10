@@ -96,7 +96,13 @@ func parseSymbolFiles(ctx context.Context, files []LibraryFile) []symbolParseRes
 }
 
 func ResolveSymbol(index LibraryIndex, libraryID string) (SymbolRecord, bool) {
-	if index.Symbols == nil {
+	return ResolveSymbolPtr(&index, libraryID)
+}
+
+// ResolveSymbolPtr is the pointer form used by write paths that may resolve
+// many symbols from one index without copying the complete inventory.
+func ResolveSymbolPtr(index *LibraryIndex, libraryID string) (SymbolRecord, bool) {
+	if index == nil || index.Symbols == nil {
 		return SymbolRecord{}, false
 	}
 	record, ok := index.Symbols[libraryID]

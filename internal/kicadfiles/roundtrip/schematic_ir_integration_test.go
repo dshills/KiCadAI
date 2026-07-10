@@ -215,6 +215,12 @@ func TestKiCadRoundTripSchematicIRResolverExternal(t *testing.T) {
 	if reports.HasBlockingIssue(apply.Issues) {
 		t.Fatalf("write resolver external schematic: %#v", apply.Issues)
 	}
+	if _, err := os.Stat(filepath.Join(output, "sym-lib-table")); err != nil {
+		t.Fatalf("resolver external project missing project-local symbol table: %v artifacts=%#v", err, apply.Artifacts)
+	}
+	if _, err := os.Stat(filepath.Join(output, "lib", "kicadai_resolved_Connector_Generic.kicad_sym")); err != nil {
+		t.Fatalf("resolver external project missing materialized symbol library: %v artifacts=%#v", err, apply.Artifacts)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 	schematicPath := filepath.Join(output, "external_connector_indicator.kicad_sch")

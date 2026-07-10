@@ -9,6 +9,8 @@ import (
 	"kicadai/internal/kicadfiles/sexpr"
 )
 
+const schematicGeneratorVersion = "10.0"
+
 type TemplatePin struct {
 	Number string
 	Offset kicadfiles.Point
@@ -314,7 +316,7 @@ func LocalSymbolLibraryForIDs(libraryIDs []string) ([]byte, bool) {
 		sexpr.A("kicad_symbol_lib"),
 		sexpr.L(sexpr.A("version"), sexpr.I(kicadfiles.KiCadSchematicFormatWithGeneratorVersion)),
 		sexpr.L(sexpr.A("generator"), sexpr.S("kicadai")),
-		sexpr.L(sexpr.A("generator_version"), sexpr.S("10.0")),
+		sexpr.L(sexpr.A("generator_version"), sexpr.S(schematicGeneratorVersion)),
 	}
 	nodes = append(nodes, bodies...)
 	root := sexpr.L(
@@ -322,6 +324,59 @@ func LocalSymbolLibraryForIDs(libraryIDs []string) ([]byte, bool) {
 	)
 	var buf bytes.Buffer
 	if err := sexpr.Render(&buf, root); err != nil {
+		return nil, false
+	}
+	return buf.Bytes(), true
+}
+
+// LocalSymbolLibraryForRaw renders resolver-provided symbol bodies into a
+// project-local library. The raw bodies are parsed and rendered as KiCad
+// symbols without changing their semantic content, so the embedded schematic
+// body and the project-local table resolve to the same source.
+func LocalSymbolLibraryForRaw(rawSymbols []string) ([]byte, bool) {
+	bodies := make([]sexpr.Node, 0, len(rawSymbols))
+	seen := map[string]struct{}{}
+	for _, raw := range rawSymbols {
+		if strings.TrimSpace(raw) == "" {
+			continue
+		}
+		body := sexpr.List(rawEmbeddedSymbolBody(raw))
+		if len(body) < 2 {
+			return nil, false
+		}
+		head, ok := body[0].(sexpr.Atom)
+		if !ok || string(head) != "symbol" {
+			return nil, false
+		}
+		name, ok := body[1].(sexpr.Atom)
+		if !ok {
+			if stringValue, stringOK := body[1].(sexpr.String); stringOK {
+				name = sexpr.Atom(stringValue)
+				ok = true
+			}
+		}
+		if !ok || strings.TrimSpace(string(name)) == "" {
+			return nil, false
+		}
+		nameKey := strings.ToLower(strings.TrimSpace(string(name)))
+		if _, ok := seen[nameKey]; ok {
+			continue
+		}
+		seen[nameKey] = struct{}{}
+		bodies = append(bodies, body)
+	}
+	if len(bodies) == 0 {
+		return nil, false
+	}
+	nodes := []sexpr.Node{
+		sexpr.A("kicad_symbol_lib"),
+		sexpr.L(sexpr.A("version"), sexpr.I(kicadfiles.KiCadSchematicFormatWithGeneratorVersion)),
+		sexpr.L(sexpr.A("generator"), sexpr.S("kicadai")),
+		sexpr.L(sexpr.A("generator_version"), sexpr.S(schematicGeneratorVersion)),
+	}
+	nodes = append(nodes, bodies...)
+	var buf bytes.Buffer
+	if err := sexpr.Render(&buf, sexpr.L(nodes...)); err != nil {
 		return nil, false
 	}
 	return buf.Bytes(), true

@@ -258,6 +258,24 @@ func TestLocalSymbolLibraryRendersUnqualifiedSyntheticSymbol(t *testing.T) {
 	}
 }
 
+func TestLocalSymbolLibraryForRawPreservesResolverSymbolBodies(t *testing.T) {
+	raw := `(symbol "External" (property "Reference" "J") (symbol "External_1_1" (pin passive line (at -5.08 0 0) (length 2.54) (name "IN") (number "1"))))`
+	contents, ok := LocalSymbolLibraryForRaw([]string{raw, raw})
+	if !ok {
+		t.Fatal("expected resolver raw symbol library")
+	}
+	output := string(contents)
+	if !strings.Contains(output, `(kicad_symbol_lib`) || !strings.Contains(output, `"External"`) {
+		t.Fatalf("raw resolver library missing symbol body:\n%s", output)
+	}
+	if strings.Count(output, "\n  (symbol\n") != 1 {
+		t.Fatalf("raw resolver library should deduplicate symbol bodies:\n%s", output)
+	}
+	if _, ok := LocalSymbolLibraryForRaw([]string{`(not_a_symbol "Broken")`}); ok {
+		t.Fatal("malformed raw symbol should not produce a local library")
+	}
+}
+
 func findTemplatePin(pins []TemplatePin, number string) (TemplatePin, bool) {
 	for _, pin := range pins {
 		if pin.Number == number {

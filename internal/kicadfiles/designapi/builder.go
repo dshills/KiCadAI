@@ -25,15 +25,16 @@ import (
 // Builder accumulates a KiCad design through ordered mutations. It is not
 // safe for concurrent use by multiple goroutines.
 type Builder struct {
-	name         string
-	generator    kicadfiles.DeterministicIDGenerator
-	design       kicaddesign.Design
-	libraryIndex *libraryresolver.LibraryIndex
-	nets         *pcb.NetRegistry
-	netParents   map[string]string
-	symbols      map[string]*symbolState
-	symbolUnits  map[string][]*symbolState
-	symbolKeys   map[string]string
+	name              string
+	generator         kicadfiles.DeterministicIDGenerator
+	design            kicaddesign.Design
+	libraryIndex      *libraryresolver.LibraryIndex
+	resolverSymbolIDs map[string]struct{}
+	nets              *pcb.NetRegistry
+	netParents        map[string]string
+	symbols           map[string]*symbolState
+	symbolUnits       map[string][]*symbolState
+	symbolKeys        map[string]string
 	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
 	// grid snapping can avoid creating exact anchor collisions between symbols.
 	schematicPinAnchors map[kicadfiles.Point]struct{}
@@ -240,6 +241,7 @@ func New(options Options) (*Builder, error) {
 		name:                name,
 		generator:           generator,
 		libraryIndex:        options.LibraryIndex,
+		resolverSymbolIDs:   map[string]struct{}{},
 		nets:                pcb.NewNetRegistry(),
 		netParents:          map[string]string{},
 		symbols:             map[string]*symbolState{},
@@ -408,7 +410,7 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string) error {
 	if schematic.EmbeddedSymbolPresent(builder.design.Schematic, libraryID) {
 		return nil
 	}
-	record, ok := libraryresolver.ResolveSymbol(*builder.libraryIndex, libraryID)
+	record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID)
 	if !ok {
 		return fmt.Errorf("symbol library record not found: %s", libraryID)
 	}
@@ -421,6 +423,7 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string) error {
 		}
 		return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)
 	}
+	builder.resolverSymbolIDs[libraryID] = struct{}{}
 	return nil
 }
 
@@ -1728,7 +1731,9 @@ func (builder *Builder) WriteProject(root string, options kicaddesign.WriteOptio
 	if err := builder.applySchematicHierarchy(&design); err != nil {
 		return kicaddesign.WriteResult{}, err
 	}
-	ensureGeneratedLocalSymbolLibraries(&design)
+	if err := ensureGeneratedLocalSymbolLibraries(&design, builder.libraryIndex, builder.resolverSymbolIDs); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
 	if err := ensureGeneratedLocalFootprintLibraries(&design); err != nil {
 		return kicaddesign.WriteResult{}, err
 	}
@@ -1747,21 +1752,23 @@ func (builder *Builder) WriteSchematicProject(root string, options kicaddesign.W
 	}
 	design.PCB = nil
 	design.ExpectedNets = nil
-	ensureGeneratedLocalSymbolLibraries(&design)
+	if err := ensureGeneratedLocalSymbolLibraries(&design, builder.libraryIndex, builder.resolverSymbolIDs); err != nil {
+		return kicaddesign.WriteResult{}, err
+	}
 	return kicaddesign.WriteProjectDirectory(root, design, options)
 }
 
-func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design) {
+func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design, index *libraryresolver.LibraryIndex, resolverSymbolIDs map[string]struct{}) error {
 	if design == nil || design.Schematic == nil {
-		return
+		return nil
 	}
-	seenLibraries := map[string]struct{}{}
+	seenLibraries := map[string]library.TableEntry{}
 	for _, entry := range design.SymbolTables {
-		seenLibraries[strings.ToLower(strings.TrimSpace(entry.Name))] = struct{}{}
+		seenLibraries[strings.ToLower(strings.TrimSpace(entry.Name))] = entry
 	}
-	seenArtifacts := map[string]struct{}{}
+	existingAssets := map[string][]byte{}
 	for _, artifact := range design.AssetFiles {
-		seenArtifacts[strings.ToLower(strings.TrimSpace(artifact.Path))] = struct{}{}
+		existingAssets[strings.ToLower(strings.TrimSpace(artifact.Path))] = artifact.Contents
 	}
 	libraryIDsByNickname := map[string][]string{}
 	var nicknameOrder []string
@@ -1790,16 +1797,88 @@ func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design) {
 				URI:         "${KIPRJMOD}/" + assetPath,
 				Description: "Generated symbols for " + nickname,
 			})
-			seenLibraries[strings.ToLower(nickname)] = struct{}{}
+			seenLibraries[strings.ToLower(nickname)] = design.SymbolTables[len(design.SymbolTables)-1]
 		}
-		if _, ok := seenArtifacts[strings.ToLower(assetPath)]; !ok {
+		assetKey := strings.ToLower(strings.TrimSpace(assetPath))
+		if _, ok := existingAssets[assetKey]; !ok {
 			design.AssetFiles = append(design.AssetFiles, kicaddesign.TextArtifact{
 				Path:     assetPath,
 				Contents: contents,
 			})
-			seenArtifacts[strings.ToLower(assetPath)] = struct{}{}
+			existingAssets[assetKey] = contents
 		}
 	}
+	return ensureResolverLocalSymbolLibraries(design, index, resolverSymbolIDs, seenLibraries, existingAssets)
+}
+
+func ensureResolverLocalSymbolLibraries(design *kicaddesign.Design, index *libraryresolver.LibraryIndex, resolverSymbolIDs map[string]struct{}, seenLibraries map[string]library.TableEntry, existingAssets map[string][]byte) error {
+	if design == nil || index == nil || len(resolverSymbolIDs) == 0 {
+		return nil
+	}
+	rawByNickname := map[string][]string{}
+	var nicknameOrder []string
+	libraryIDs := make([]string, 0, len(resolverSymbolIDs))
+	for libraryID := range resolverSymbolIDs {
+		libraryIDs = append(libraryIDs, libraryID)
+	}
+	sort.Strings(libraryIDs)
+	for _, libraryID := range libraryIDs {
+		record, ok := libraryresolver.ResolveSymbolPtr(index, libraryID)
+		if !ok {
+			return fmt.Errorf("resolver symbol record not found during materialization: %s", libraryID)
+		}
+		if strings.TrimSpace(record.Raw) == "" {
+			return fmt.Errorf("resolver symbol %s has no materializable KiCad body", libraryID)
+		}
+		nickname := strings.TrimSpace(record.LibraryNickname)
+		if nickname == "" {
+			nickname = libraryNickname(libraryID)
+		}
+		if nickname == "" {
+			return fmt.Errorf("resolver symbol %s has no library nickname", libraryID)
+		}
+		nicknameKey := strings.ToLower(nickname)
+		if _, ok := rawByNickname[nicknameKey]; !ok {
+			nicknameOrder = append(nicknameOrder, nickname)
+		}
+		rawByNickname[nicknameKey] = append(rawByNickname[nicknameKey], record.Raw)
+	}
+	for _, nickname := range nicknameOrder {
+		nicknameKey := strings.ToLower(nickname)
+		contents, ok := schematic.LocalSymbolLibraryForRaw(rawByNickname[nicknameKey])
+		if !ok {
+			return fmt.Errorf("resolver symbol library %s has no materializable symbol bodies", nickname)
+		}
+		safeNickname, ok := validateGeneratedPathComponent(nickname)
+		if !ok {
+			return fmt.Errorf("invalid resolver symbol library nickname %q", nickname)
+		}
+		assetPath := "lib/kicadai_resolved_" + safeNickname + ".kicad_sym"
+		if existing, exists := seenLibraries[nicknameKey]; exists {
+			wantURI := "${KIPRJMOD}/" + assetPath
+			if strings.TrimSpace(existing.URI) != wantURI {
+				return fmt.Errorf("resolver symbol library %s conflicts with existing project table URI %q", nickname, existing.URI)
+			}
+		} else {
+			design.SymbolTables = append(design.SymbolTables, library.TableEntry{
+				Name:        nickname,
+				Type:        "KiCad",
+				URI:         "${KIPRJMOD}/" + assetPath,
+				Description: "Resolver-backed symbols for " + nickname,
+			})
+			seenLibraries[nicknameKey] = design.SymbolTables[len(design.SymbolTables)-1]
+		}
+		assetKey := strings.ToLower(assetPath)
+		if existing, found := existingAssets[assetKey]; found {
+			if !bytes.Equal(existing, contents) {
+				return fmt.Errorf("resolver symbol library asset %s already exists with different contents", assetPath)
+			}
+		} else {
+			design.AssetFiles = append(design.AssetFiles, kicaddesign.TextArtifact{Path: assetPath, Contents: contents})
+			existingAssets[assetKey] = contents
+		}
+	}
+	return nil
 }
 
 func generatedLocalSymbolLibraryIDs(file *schematic.SchematicFile) []string {
@@ -2330,6 +2409,10 @@ func footprintLibraryName(libraryID string) string {
 }
 
 func cleanGeneratedFootprintPathComponent(value string) (string, bool) {
+	return validateGeneratedPathComponent(value)
+}
+
+func validateGeneratedPathComponent(value string) (string, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" || value == "." || value == ".." || strings.ContainsAny(value, `/\:<>|*?"`) {
 		return "", false
