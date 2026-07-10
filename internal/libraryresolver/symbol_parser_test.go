@@ -109,6 +109,9 @@ func TestIndexSymbolsParsesConnectorSymbol(t *testing.T) {
 	if record.Pins[0].Name != "Pin_1" || record.Pins[1].Name != "Pin_2" {
 		t.Fatalf("pin names = %#v", record.Pins)
 	}
+	if record.Pins[0].Position.Y != kicadfiles.MM(-2.54) || record.Pins[1].Position.Y != kicadfiles.MM(2.54) {
+		t.Fatalf("pin positions = %#v, want schematic-coordinate Y inversion", record.Pins)
+	}
 }
 
 func TestResolveSymbol(t *testing.T) {

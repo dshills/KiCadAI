@@ -569,6 +569,9 @@ case demonstrates the need.
 - Body geometry and rotation golden tests for embedded and resolver symbols.
 - Hierarchical stress fixture with strict zero-warning readability evidence.
 - Resolver source/CLI mismatch fails-closed test.
+- Resolver pin and graphic coordinates are normalized to KiCad schematic
+  coordinates at the parser boundary; the optional external-symbol promotion
+  test requires `KICADAI_SYMBOLS_ROOT` to match the KiCad CLI library.
 - Optional KiCad parse/ERC/round-trip checks for a matching resolver root.
 - Full Go suite.
 

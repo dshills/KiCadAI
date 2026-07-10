@@ -39,6 +39,19 @@ type Point struct {
 	Y IU
 }
 
+// SchematicLibraryPoint converts a KiCad symbol-library coordinate into the
+// schematic coordinate frame used by wires and symbol instances.
+func SchematicLibraryPoint(point Point) Point {
+	point.Y = -point.Y
+	return point
+}
+
+// SchematicLibraryBounds converts an axis-aligned library bounds pair into
+// schematic coordinates while preserving min/max ordering.
+func SchematicLibraryBounds(minPoint, maxPoint Point) (Point, Point) {
+	return Point{X: minPoint.X, Y: -maxPoint.Y}, Point{X: maxPoint.X, Y: -minPoint.Y}
+}
+
 type Paper struct {
 	Name   string
 	Width  IU

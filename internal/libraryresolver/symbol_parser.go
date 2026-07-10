@@ -559,7 +559,7 @@ func readLibrarySymbolGraphic(path string, node sexpr.ParsedNode, unit int, body
 	if !bounds.initialized {
 		return SymbolGraphic{}, false
 	}
-	return SymbolGraphic{Kind: node.Head(), Unit: unit, BodyStyle: bodyStyle, Bounds: bounds.box()}, true
+	return SymbolGraphic{Kind: node.Head(), Unit: unit, BodyStyle: bodyStyle, Bounds: normalizeLibraryBounds(bounds.box())}, true
 }
 
 func firstNumericMMFromChild(node sexpr.ParsedNode, name string) (kicadfiles.IU, bool) {
@@ -592,6 +592,10 @@ func readLibraryPin(node sexpr.ParsedNode, unit int, bodyStyle int) SymbolPin {
 			pin.Orientation = at.ListValue(3)
 		}
 	}
+	// KiCad's schematic parser calls parseXY(true) for library symbols. Keep
+	// the raw library S-expression unchanged, but expose the resulting
+	// schematic-coordinate anchor to layout and transaction consumers.
+	pin.Position = normalizeLibraryPoint(pin.Position)
 	if length, ok := node.Child("length"); ok {
 		if value, ok := length.FloatValue(1); ok {
 			pin.Length = kicadfiles.MM(value)
@@ -604,6 +608,21 @@ func readLibraryPin(node sexpr.ParsedNode, unit int, bodyStyle int) SymbolPin {
 		pin.Number = number.ListValue(1)
 	}
 	return pin
+}
+
+// normalizeLibraryPoint converts a KiCad symbol-library coordinate into the
+// schematic coordinate system used by generated symbol instances. Library
+// files use the opposite Y sign from schematic objects when parsed by KiCad.
+func normalizeLibraryPoint(point kicadfiles.Point) kicadfiles.Point {
+	return kicadfiles.SchematicLibraryPoint(point)
+}
+
+func normalizeLibraryBounds(bounds BoundingBox) BoundingBox {
+	minPoint, maxPoint := kicadfiles.SchematicLibraryBounds(bounds.Min, bounds.Max)
+	return BoundingBox{
+		Min: minPoint,
+		Max: maxPoint,
+	}
 }
 
 func parseSymbolUnitBodyStyle(parentName string, childName string) (int, int, bool) {

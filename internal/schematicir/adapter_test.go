@@ -179,6 +179,21 @@ func TestToTransactionPortAlwaysUsesGlobalLabel(t *testing.T) {
 	}
 }
 
+func TestToTransactionLabelsPassiveOnlyNetByDefault(t *testing.T) {
+	doc := loadExampleDocument(t, "external_connector_indicator.json")
+	if !schematicNetLabelPreferences(doc)["INPUT"] {
+		t.Fatalf("fixture net was not classified as passive-only: %#v", doc.Circuit.Nets[0])
+	}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
+	if len(connects) != 1 || connects[0].UseLabels == nil || !*connects[0].UseLabels {
+		t.Fatalf("passive-only net should use labels by default: %#v", connects)
+	}
+}
+
 func TestPortEndpointSelectionFollowsDeclaredSide(t *testing.T) {
 	doc := validLEDDocument()
 	state, issues := newAdapterState(doc, nil)

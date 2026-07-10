@@ -18,8 +18,8 @@
         "pins": [
           {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
           {"number": "2", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 0, "no_connect": true},
-          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54, "no_connect": true},
-          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": -2.54, "no_connect": true}
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 2.54, "no_connect": true},
+          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 2.54, "no_connect": true}
         ]
       },
       {
@@ -31,13 +31,13 @@
         "pins": [
           {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
           {"number": "2", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 0, "no_connect": true},
-          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54, "no_connect": true},
-          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": -2.54, "no_connect": true}
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 2.54, "no_connect": true},
+          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 2.54, "no_connect": true}
         ]
       }
     ],
     "nets": [
-      {"name": "INPUT", "role": "signal", "connect": ["input.1", "output.1"], "label": "INPUT", "use_label": false}
+      {"name": "INPUT", "role": "signal", "connect": ["input.1", "output.1"], "label": "INPUT"}
     ]
   },
   "layout": {
@@ -52,7 +52,7 @@
       "positive_power_top": true,
       "ground_bottom": true,
       "center_on_page": true,
-      "prefer_labels_for_long_nets": false,
+      "prefer_labels_for_long_nets": true,
       "avoid_wire_crossings": true,
       "min_group_spacing_mm": 22,
       "min_component_spacing_mm": 12

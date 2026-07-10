@@ -128,6 +128,36 @@ func embeddedSymbolGeometry(root sexpr.ParsedNode, targetUnit, targetBodyStyle i
 	return pins, bodyBounds, bodyOK
 }
 
+// schematicEmbeddedSymbolGeometry applies the same Y conversion KiCad uses
+// while parsing symbol-library coordinates. The raw helper remains available
+// for verified built-in templates whose writer contract is intentionally kept
+// in their existing coordinate frame.
+func schematicEmbeddedSymbolGeometry(root sexpr.ParsedNode, targetUnit, targetBodyStyle int) ([]embeddedPinGeometry, SymbolBodyBounds, bool) {
+	pins, bounds, ok := embeddedSymbolGeometry(root, targetUnit, targetBodyStyle)
+	for index := range pins {
+		pins[index].Offset = schematicLibraryPoint(pins[index].Offset)
+	}
+	if ok {
+		bounds = schematicLibraryBounds(bounds)
+	}
+	return pins, bounds, ok
+}
+
+func schematicLibraryBounds(bounds SymbolBodyBounds) SymbolBodyBounds {
+	minPoint, maxPoint := kicadfiles.SchematicLibraryBounds(bounds.Min, bounds.Max)
+	return SymbolBodyBounds{
+		Min: minPoint,
+		Max: maxPoint,
+	}
+}
+
+// schematicLibraryPoint mirrors KiCad's parseXY(true) behavior for embedded
+// library geometry. Schematic coordinates stay in the same frame as wires,
+// no-connect markers, and symbol instance positions.
+func schematicLibraryPoint(point kicadfiles.Point) kicadfiles.Point {
+	return kicadfiles.SchematicLibraryPoint(point)
+}
+
 func includeArcBounds(bounds *symbolBoundsAccumulator, start, mid, end kicadfiles.Point) {
 	bounds.include(start)
 	bounds.include(mid)

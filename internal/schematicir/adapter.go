@@ -159,18 +159,19 @@ func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) 
 }
 
 type adapterState struct {
-	document     Document
-	libraryIndex *libraryresolver.LibraryIndex
-	paper        string
-	refsByID     map[string]string
-	unitsByID    map[string]int
-	pointsByID   map[string]transactions.Point
-	rotationByID map[string]float64
-	routesByKey  map[string]schematiclayout.RoutedConnection
-	labelsByKey  map[string]kicadfiles.Point
-	textByID     map[string]layoutTextPlacement
-	layoutResult schematiclayout.Result
-	issues       []reports.Issue
+	document            Document
+	libraryIndex        *libraryresolver.LibraryIndex
+	paper               string
+	refsByID            map[string]string
+	unitsByID           map[string]int
+	pointsByID          map[string]transactions.Point
+	rotationByID        map[string]float64
+	routesByKey         map[string]schematiclayout.RoutedConnection
+	labelsByKey         map[string]kicadfiles.Point
+	netLabelPreferences map[string]bool
+	textByID            map[string]layoutTextPlacement
+	layoutResult        schematiclayout.Result
+	issues              []reports.Issue
 }
 
 // connectionOverrideCacheEntry caches the symbol-level KiCad connection
@@ -221,24 +222,26 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		}
 	}
 	preflightIssues = append(preflightIssues, resolverRecordIssues(document, index)...)
-	layoutResult := schematicLayoutWithLibraryIndex(document, index)
+	netLabelPreferences := schematicNetLabelPreferences(document)
+	layoutResult := schematicLayoutWithLibraryIndexAndPreferences(document, index, netLabelPreferences)
 	paper := layoutResult.Sheet.Name
 	if paper == "" {
 		paper = document.Metadata.Paper
 	}
 	state := &adapterState{
-		document:     document,
-		libraryIndex: index,
-		paper:        paper,
-		refsByID:     map[string]string{},
-		unitsByID:    map[string]int{},
-		pointsByID:   layoutResultPoints(layoutResult),
-		layoutResult: layoutResult,
-		rotationByID: layoutRotations(document),
-		routesByKey:  layoutRouteHints(layoutResult),
-		labelsByKey:  layoutEndpointLabelHints(layoutResult),
-		textByID:     layoutTextPlacements(layoutResult),
-		issues:       preflightIssues,
+		document:            document,
+		libraryIndex:        index,
+		paper:               paper,
+		refsByID:            map[string]string{},
+		unitsByID:           map[string]int{},
+		pointsByID:          layoutResultPoints(layoutResult),
+		layoutResult:        layoutResult,
+		rotationByID:        layoutRotations(document),
+		routesByKey:         layoutRouteHints(layoutResult),
+		labelsByKey:         layoutEndpointLabelHints(layoutResult),
+		netLabelPreferences: netLabelPreferences,
+		textByID:            layoutTextPlacements(layoutResult),
+		issues:              preflightIssues,
 	}
 	state.issues = append(state.issues, schematicLayoutAcceptanceIssues(document, layoutResult)...)
 	connectedPins := connectedPinSet(document)
@@ -619,18 +622,11 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 		if !ok || len(mappedEndpoints) < 2 {
 			continue
 		}
+		useLabelsValue := state.netLabelPreferences[net.Name]
+		useLabels := &useLabelsValue
 		for endpointIndex := 1; endpointIndex < len(mappedEndpoints); endpointIndex++ {
 			from := mappedEndpoints[endpointIndex-1]
 			to := mappedEndpoints[endpointIndex]
-			useLabels := schematicNetLabelPreference(state.document, net)
-			if useLabels == nil {
-				value := false
-				useLabels = &value
-			}
-			if net.UseLabel != nil {
-				value := *net.UseLabel
-				useLabels = &value
-			}
 			var waypoints []transactions.Point
 			var fromLabelAt, toLabelAt *transactions.Point
 			fromIR := net.Connect[endpointIndex-1]
@@ -930,34 +926,123 @@ func (state *adapterState) netEmissionPriority(net Net) int {
 			return 0
 		}
 	}
-	if preference := schematicNetLabelPreference(state.document, net); preference != nil && *preference {
+	if preference, ok := state.netLabelPreferences[net.Name]; ok && preference {
 		return 2
 	}
 	return 1
 }
 
-func schematicNetLabelPreference(document Document, net Net) *bool {
+func schematicNetLabelPreferences(document Document) map[string]bool {
+	pinsByComponent := make(map[string]map[string]*Pin, len(document.Circuit.Components))
+	resolverBacked := make(map[string]bool, len(document.Circuit.Components))
+	for index := range document.Circuit.Components {
+		component := &document.Circuit.Components[index]
+		pins := make(map[string]*Pin, len(component.Pins))
+		for pinIndex := range component.Pins {
+			pins[component.Pins[pinIndex].Number] = &component.Pins[pinIndex]
+		}
+		pinsByComponent[component.ID] = pins
+		_, knownTemplate := schematic.EmbeddedSymbolPinOffsets(component.Symbol)
+		resolverBacked[component.ID] = !knownTemplate
+	}
+	drivenPorts := make(map[string]bool, len(document.Circuit.Ports))
+	for _, port := range document.Circuit.Ports {
+		switch port.Direction {
+		case PortDirectionOutput, PortDirectionBidirectional:
+			drivenPorts[port.Net] = true
+		}
+	}
+	preferences := make(map[string]bool, len(document.Circuit.Nets))
+	for _, net := range document.Circuit.Nets {
+		if value, ok := schematicNetLabelPreferenceFor(document, net, pinsByComponent, resolverBacked, drivenPorts); ok {
+			preferences[net.Name] = value
+		}
+	}
+	return preferences
+}
+
+func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent map[string]map[string]*Pin, resolverBacked map[string]bool, drivenPorts map[string]bool) (bool, bool) {
 	if net.UseLabel != nil {
-		value := *net.UseLabel
-		return &value
+		return *net.UseLabel, true
 	}
 	if !document.Policy.Repair.AllowLabelInsertion {
-		return nil
+		return false, false
+	}
+	// Verified built-in symbols retain their established direct-route and bend
+	// label policy. This extra default is intentionally limited to resolver
+	// symbols, where the installed-library connection behavior is not yet
+	// proven by a built-in template contract.
+	needsLabel, complete := schematicNetNeedsLabelForFloatingNet(net, pinsByComponent)
+	if complete && needsLabel && schematicNetHasResolverBackedComponent(net, resolverBacked) && !drivenPorts[net.Name] {
+		return true, true
 	}
 	preferLong := document.Layout.Rules.PreferLabelsForLongNets == nil || *document.Layout.Rules.PreferLabelsForLongNets
 	if !preferLong {
-		return nil
+		return false, false
 	}
 	switch net.Role {
 	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleShield, NetRoleBus:
-		value := true
-		return &value
+		return true, true
 	}
 	if len(net.Connect) > 2 {
-		value := true
-		return &value
+		return true, true
 	}
-	return nil
+	return false, false
+}
+
+// KiCad reports a wire-only subgraph with no declared driver as a floating
+// wire. An undriven net is electrically meaningful, but local labels give
+// it a named connection context without inventing an active pin. Resolver-only
+// symbols use this conservative default because their installed-library ERC
+// behavior cannot be inferred from a built-in template. Explicit
+// use_label:false remains authoritative for callers that intentionally accept
+// that KiCad ERC tradeoff.
+func schematicNetNeedsLabelForFloatingNet(net Net, pinsByComponent map[string]map[string]*Pin) (bool, bool) {
+	if len(net.Connect) < 2 {
+		return false, false
+	}
+	seenPin := false
+	cachedComponentID := ""
+	var cachedPins map[string]*Pin
+	for _, endpoint := range net.Connect {
+		componentID, pinNumber, ok := endpoint.Split()
+		if !ok {
+			return false, false
+		}
+		if componentID != cachedComponentID {
+			cachedComponentID = componentID
+			cachedPins = pinsByComponent[componentID]
+		}
+		pins := cachedPins
+		if pins == nil {
+			return false, false
+		}
+		found := pins[pinNumber]
+		if found == nil {
+			return false, false
+		}
+		seenPin = true
+		switch found.Role {
+		case PinRolePower, PinRoleGround:
+			// Power and ground pins follow the net-role policy below; they are
+			// never classified as passive floating endpoints.
+			return false, true
+		case PinRoleOutput, PinRoleBidirectional:
+			return false, true
+		}
+	}
+	// Ports are checked by the caller's document-level preference function.
+	return seenPin, true
+}
+
+func schematicNetHasResolverBackedComponent(net Net, resolverBacked map[string]bool) bool {
+	for _, endpoint := range net.Connect {
+		componentID, _, ok := endpoint.Split()
+		if ok && resolverBacked[componentID] {
+			return true
+		}
+	}
+	return false
 }
 
 func (state *adapterState) transactionEndpoint(endpoint EndpointRef, path string) (transactions.Endpoint, bool) {
@@ -1191,6 +1276,10 @@ func schematicLayout(document Document) schematiclayout.Result {
 }
 
 func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) schematiclayout.Result {
+	return schematicLayoutWithLibraryIndexAndPreferences(document, index, schematicNetLabelPreferences(document))
+}
+
+func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *libraryresolver.LibraryIndex, netLabelPreferences map[string]bool) schematiclayout.Result {
 	rotationByID := layoutRotations(document)
 	groupsByID := map[string]Group{}
 	for _, group := range document.Layout.Groups {
@@ -1252,6 +1341,9 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
 			layoutNet.PreferDirect = !*net.UseLabel
+		} else if preference, ok := netLabelPreferences[net.Name]; ok {
+			layoutNet.PreferredLabels = preference
+			layoutNet.PreferDirect = !preference
 		}
 		for _, endpoint := range net.Connect {
 			componentID, pin, ok := endpoint.Split()

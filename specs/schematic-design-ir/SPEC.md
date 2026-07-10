@@ -755,6 +755,12 @@ Remaining gaps for high-quality AI-generated schematics:
   and library version match the KiCad CLI installation; a resolver source that
   differs from the installed library must fail closed or be materialized as a
   project-local symbol rather than silently mixing pin geometry;
+- resolver `SymbolPin.Position` and `SymbolGraphic.Bounds` are exposed in
+  schematic coordinates, including KiCad's library-parser Y inversion, while
+  `Raw` remains in library-file coordinates for embedding. Resolver-backed
+  passive-only nets default to labeled connections when repair is allowed so
+  KiCad does not classify the net as a floating wire; explicit `use_label:false`
+  remains authoritative;
 - built-in template symbols without a resolver index remain conservative during
   initial layout because route attachment semantics still need to distinguish
   pin-to-body stubs from body crossings; explicit IR body geometry, resolver

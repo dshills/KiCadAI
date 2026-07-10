@@ -115,6 +115,14 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 		if !ok {
 			continue
 		}
+		if knownTemplate {
+			if templateBounds, templateOK := EmbeddedSymbolBodyBounds(symbol.LibraryID); templateOK {
+				symbol.BodyBounds = &templateBounds
+			}
+			// Known-template pin anchors are recovered from the verified template
+			// in readSymbol; resolver geometry recovery is only for unknown bodies.
+			continue
+		}
 		key := geometryKey{libraryID: symbol.LibraryID, unit: symbol.Unit, bodyStyle: symbol.BodyStyle}
 		geometry, cached := cache[key]
 		if !cached {
@@ -123,7 +131,7 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 				root = parsedGeometryNode(embedded.Body)
 				parsedBodies[symbol.LibraryID] = root
 			}
-			pins, bounds, boundsOK := embeddedSymbolGeometry(root, symbol.Unit, symbol.BodyStyle)
+			pins, bounds, boundsOK := schematicEmbeddedSymbolGeometry(root, symbol.Unit, symbol.BodyStyle)
 			geometry = geometryValue{pins: pins, bounds: bounds, ok: boundsOK}
 			cache[key] = geometry
 		}

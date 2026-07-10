@@ -4,10 +4,12 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
 	"kicadai/internal/transactions"
@@ -172,5 +174,62 @@ func TestKiCadRoundTripSchematicIRUSBCLocalSymbol(t *testing.T) {
 	}
 	if !roundTrip.Equal {
 		t.Fatalf("USB-C LED round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}
+
+func TestKiCadRoundTripSchematicIRResolverExternal(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	symbolsRoot := strings.TrimSpace(os.Getenv(libraryresolver.EnvSymbolsRoot))
+	if symbolsRoot == "" {
+		t.Skip("set KICADAI_SYMBOLS_ROOT to a symbol library matching the KiCad CLI for resolver promotion")
+	}
+	symbolPath := filepath.Join(symbolsRoot, "Connector_Generic.kicad_sym")
+	symbolData, err := os.ReadFile(symbolPath)
+	if err != nil {
+		t.Skipf("matching Connector_Generic library is unavailable at %s: %v", symbolPath, err)
+	}
+	resolverRoot := t.TempDir()
+	if err := os.WriteFile(filepath.Join(resolverRoot, "Connector_Generic.kicad_sym"), symbolData, 0o600); err != nil {
+		t.Fatalf("stage resolver symbol library: %v", err)
+	}
+	index, issues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{SymbolsRoot: resolverRoot}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("load resolver symbol root: %#v", issues)
+	}
+	fixturePath := repoPath(t, "examples", "schematic-ir", "external_connector_indicator.json")
+	fixture, err := os.Open(fixturePath)
+	if err != nil {
+		t.Fatalf("open resolver external IR: %v", err)
+	}
+	defer fixture.Close()
+	document, decodeIssues := schematicir.DecodeStrict(fixture)
+	if reports.HasBlockingIssue(decodeIssues) {
+		t.Fatalf("decode resolver external IR: %#v", decodeIssues)
+	}
+	tx, adapterIssues := schematicir.ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(adapterIssues) {
+		t.Fatalf("adapt resolver external IR: %#v", adapterIssues)
+	}
+	output := filepath.Join(t.TempDir(), "external_connector_indicator")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write resolver external schematic: %#v", apply.Issues)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	schematicPath := filepath.Join(output, "external_connector_indicator.kicad_sch")
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, schematicPath, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+	if err != nil {
+		t.Fatalf("resolver external RunERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+		t.Fatalf("resolver external ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+	roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "roundtrip")})
+	if err != nil {
+		t.Fatalf("resolver external round trip returned error: %v\nresult=%#v", err, roundTrip)
+	}
+	if !roundTrip.Equal {
+		t.Fatalf("resolver external round trip changed generated schematic: %s", firstResultDifference(roundTrip))
 	}
 }

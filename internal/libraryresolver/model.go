@@ -130,25 +130,30 @@ type SymbolUnit struct {
 }
 
 type SymbolPin struct {
-	Number         string           `json:"number"`
-	Name           string           `json:"name,omitempty"`
-	Electrical     string           `json:"electrical,omitempty"`
-	ElectricalType string           `json:"electrical_type,omitempty"`
-	Unit           int              `json:"unit"`
-	BodyStyle      int              `json:"body_style"`
-	Common         bool             `json:"common,omitempty"`
-	Position       kicadfiles.Point `json:"position"`
-	Orientation    string           `json:"orientation,omitempty"`
-	Length         kicadfiles.IU    `json:"length,omitempty"`
-	Hidden         bool             `json:"hidden"`
-	FunctionHint   string           `json:"function_hint,omitempty"`
+	Number         string `json:"number"`
+	Name           string `json:"name,omitempty"`
+	Electrical     string `json:"electrical,omitempty"`
+	ElectricalType string `json:"electrical_type,omitempty"`
+	Unit           int    `json:"unit"`
+	BodyStyle      int    `json:"body_style"`
+	Common         bool   `json:"common,omitempty"`
+	// Position is expressed in schematic coordinates, matching the connection
+	// anchor KiCad derives after parsing a library pin. SymbolRecord.Raw
+	// preserves the original library S-expression coordinate frame for
+	// materialization.
+	Position     kicadfiles.Point `json:"position"`
+	Orientation  string           `json:"orientation,omitempty"`
+	Length       kicadfiles.IU    `json:"length,omitempty"`
+	Hidden       bool             `json:"hidden"`
+	FunctionHint string           `json:"function_hint,omitempty"`
 }
 
 type SymbolGraphic struct {
-	Kind      string      `json:"kind"`
-	Unit      int         `json:"unit"`
-	BodyStyle int         `json:"body_style"`
-	Bounds    BoundingBox `json:"bounds"`
+	Kind      string `json:"kind"`
+	Unit      int    `json:"unit"`
+	BodyStyle int    `json:"body_style"`
+	// Bounds use the same schematic-coordinate frame as SymbolPin.Position.
+	Bounds BoundingBox `json:"bounds"`
 }
 
 type FootprintRecord struct {
