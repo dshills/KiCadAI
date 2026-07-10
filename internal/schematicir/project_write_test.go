@@ -8,11 +8,13 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 
 	"kicadai/internal/evaluate"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/kicadfiles/sexpr"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematiclayout"
@@ -238,6 +240,63 @@ func TestSchematicIRWritesResolverBackedMultiUnitProject(t *testing.T) {
 	if !readability.Passed || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
 		t.Fatalf("multi-unit readability failed: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
 	}
+}
+
+func TestSchematicIRWritesResolverBackedInheritedSymbolProject(t *testing.T) {
+	document := inheritedSymbolFixtureDocument()
+	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{
+		SymbolsRoot: filepath.Join("testdata", "symbols"),
+	}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(loadIssues) {
+		t.Fatalf("fixture library issues: %+v", loadIssues)
+	}
+	derived, ok := index.Symbols["Amplifier:Derived"]
+	if !ok || !derived.Inherited || strings.Contains(derived.Raw, `(extends "Base")`) {
+		t.Fatalf("inherited resolver record = %#v", derived)
+	}
+	tx, issues := ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("project transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), "inherited_symbol_fixture")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{
+		OutputDir:    outputDir,
+		Overwrite:    true,
+		LibraryIndex: &index,
+	})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	path := filepath.Join(outputDir, "inherited_symbol_fixture.kicad_sch")
+	generated, err := schematic.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	for _, embedded := range generated.LibSymbols {
+		if embedded.LibraryID != "Amplifier:Derived" {
+			continue
+		}
+		rendered, renderErr := sexpr.Format(embedded.Body)
+		if renderErr != nil {
+			t.Fatalf("render inherited embedded body: %v", renderErr)
+		}
+		if strings.Contains(rendered, `(extends "Base")`) || !strings.Contains(rendered, "(rectangle") || !strings.Contains(rendered, "(pin") {
+			t.Fatalf("embedded inherited body was not materialized: %s", rendered)
+		}
+		return
+	}
+	t.Fatal("generated schematic did not contain Amplifier:Derived embedded symbol")
+}
+
+func inheritedSymbolFixtureDocument() Document {
+	document := *NewDocument()
+	document.Metadata.Name = "inherited_symbol_fixture"
+	document.Metadata.Title = "Inherited symbol fixture"
+	document.Circuit.Components = []Component{
+		{ID: "u1", Ref: "U1", Role: ComponentRoleIC, Symbol: "Amplifier:Derived", Value: "Derived", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+	}
+	document.Circuit.Nets = []Net{{Name: "LINK", Role: NetRoleSignal, Connect: []EndpointRef{"u1.1", "u1.2"}}}
+	return document
 }
 
 func multiUnitFixtureDocument() Document {

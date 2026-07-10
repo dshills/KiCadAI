@@ -51,6 +51,41 @@ func TestIndexSymbolsParsesSimpleSymbol(t *testing.T) {
 	}
 }
 
+func TestIndexSymbolsResolvesInheritanceAcrossSymdirFiles(t *testing.T) {
+	root := t.TempDir()
+	symdir := filepath.Join(root, "Test.kicad_symdir")
+	mustWrite(t, filepath.Join(symdir, "Base.kicad_sym"), `(kicad_symbol_lib
+	(version 20251024)
+	(generator "test")
+	(symbol "Base"
+		(symbol "Base_1_1"
+			(rectangle (start -2.54 -2.54) (end 2.54 2.54) (stroke (width 0.254) (type default)) (fill (type background)))
+			(pin passive line (at -5.08 0 0) (length 2.54) (name "IN") (number "1"))
+		)
+	)
+)`)
+	mustWrite(t, filepath.Join(symdir, "Child.kicad_sym"), `(kicad_symbol_lib
+	(version 20251024)
+	(generator "test")
+	(symbol "Child"
+		(extends "Base")
+		(property "Value" "Child")
+	)
+)`)
+
+	records, issues := IndexSymbols(Discover(LibraryRoots{SymbolsRoot: root}))
+	if len(issues) != 0 {
+		t.Fatalf("cross-file inheritance issues = %#v", issues)
+	}
+	child, ok := records["Test:Child"]
+	if !ok || !child.Inherited || len(child.Pins) != 1 || len(child.Graphics) != 1 || len(child.Diagnostics) != 0 {
+		t.Fatalf("cross-file child = %#v", child)
+	}
+	if strings.Contains(child.Raw, `(extends "Base")`) || !strings.Contains(child.Raw, `"Child"`) || !strings.Contains(child.Raw, "(rectangle") || !strings.Contains(child.Raw, "(pin") {
+		t.Fatalf("cross-file child raw body was not materialized: %s", child.Raw)
+	}
+}
+
 func TestIndexSymbolsParsesConnectorSymbol(t *testing.T) {
 	root := t.TempDir()
 	symbols := filepath.Join(root, "symbols")
@@ -299,6 +334,30 @@ func TestIndexSymbolsMissingInheritedBaseBlocks(t *testing.T) {
 		t.Fatalf("records = %#v", records)
 	}
 	if !hasSymbolIssue(issues, "unresolved base symbol") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestIndexSymbolsMissingInheritedAncestorBlocks(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	mustWrite(t, filepath.Join(symbols, "Device.kicad_sym"), `(kicad_symbol_lib
+	(version 20251024)
+	(generator "test")
+	(symbol "Base"
+		(extends "Missing")
+	)
+	(symbol "Derived"
+		(extends "Base")
+	)
+)`)
+
+	records, issues := IndexSymbols(Discover(LibraryRoots{SymbolsRoot: symbols}))
+	derived, ok := records["Device:Derived"]
+	if !ok || derived.Inherited {
+		t.Fatalf("derived record = %#v", derived)
+	}
+	if !hasSymbolIssue(issues, "unresolved inherited base symbol") {
 		t.Fatalf("issues = %#v", issues)
 	}
 }

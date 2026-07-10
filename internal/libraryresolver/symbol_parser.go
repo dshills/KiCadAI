@@ -73,6 +73,10 @@ func IndexSymbolsContext(ctx context.Context, inventory LibraryInventory) (map[s
 			records[record.LibraryID] = record
 		}
 	}
+	records = resolveCrossFileInheritedSymbols(records)
+	for _, record := range records {
+		issues = append(issues, record.Diagnostics...)
+	}
 	if issue, ok := contextIssue(ctx); ok {
 		issues = append(issues, issue)
 	}
@@ -138,10 +142,55 @@ func parseSymbolFile(file LibraryFile) ([]SymbolRecord, []reports.Issue) {
 		records = append(records, readLibrarySymbol(file, child, name))
 	}
 	records = resolveInheritedSymbols(records)
-	for _, record := range records {
-		issues = append(issues, record.Diagnostics...)
-	}
 	return records, issues
+}
+
+func resolveCrossFileInheritedSymbols(records map[string]SymbolRecord) map[string]SymbolRecord {
+	byLibraryAndName := make(map[string]string, len(records))
+	for id, record := range records {
+		byLibraryAndName[record.LibraryNickname+"\x00"+record.Name] = id
+	}
+	resolving := make(map[string]bool, len(records))
+	resolved := make(map[string]bool, len(records))
+	var resolve func(string) SymbolRecord
+	resolve = func(id string) SymbolRecord {
+		record := records[id]
+		if resolved[id] || strings.TrimSpace(record.Extends) == "" || record.Inherited {
+			resolved[id] = true
+			return record
+		}
+		if resolving[id] {
+			return record
+		}
+		baseID, ok := byLibraryAndName[record.LibraryNickname+"\x00"+record.Extends]
+		if !ok {
+			resolved[id] = true
+			return record
+		}
+		resolving[id] = true
+		base := resolve(baseID)
+		resolving[id] = false
+		if hasCyclicInheritanceDiagnostic(base.Diagnostics) {
+			resolved[id] = true
+			return record
+		}
+		if hasUnresolvedBaseDiagnostic(base.Diagnostics) {
+			record.Diagnostics = appendSymbolIssueOnce(record.Diagnostics, unresolvedInheritedBaseIssue(record))
+			records[id] = record
+			resolved[id] = true
+			return record
+		}
+		inherited := inheritSymbolRecord(base, record)
+		inherited.Diagnostics = mergeInheritedSymbolDiagnostics(record.Diagnostics, validateParsedSymbol(inherited))
+		inherited.SearchText = buildSymbolSearchText(inherited)
+		records[id] = inherited
+		resolved[id] = true
+		return inherited
+	}
+	for id := range records {
+		resolve(id)
+	}
+	return records
 }
 
 func readLibrarySymbol(file LibraryFile, node sexpr.ParsedNode, name string) SymbolRecord {
@@ -220,6 +269,12 @@ func resolveInheritedSymbols(records []SymbolRecord) []SymbolRecord {
 			resolved[index] = true
 			return record
 		}
+		if hasUnresolvedBaseDiagnostic(base.Diagnostics) {
+			record.Diagnostics = appendSymbolIssueOnce(record.Diagnostics, unresolvedInheritedBaseIssue(record))
+			records[index] = record
+			resolved[index] = true
+			return record
+		}
 		record = inheritSymbolRecord(base, record)
 		record.Diagnostics = mergeInheritedSymbolDiagnostics(record.Diagnostics, validateParsedSymbol(record))
 		record.SearchText = buildSymbolSearchText(record)
@@ -257,6 +312,19 @@ func hasCyclicInheritanceDiagnostic(issues []reports.Issue) bool {
 	return false
 }
 
+func hasUnresolvedBaseDiagnostic(issues []reports.Issue) bool {
+	for _, issue := range issues {
+		if strings.HasPrefix(issue.Message, "unresolved base symbol ") || strings.HasPrefix(issue.Message, "unresolved inherited base symbol ") {
+			return true
+		}
+	}
+	return false
+}
+
+func unresolvedInheritedBaseIssue(record SymbolRecord) reports.Issue {
+	return symbolIssue(record, reports.SeverityBlocked, "unresolved inherited base symbol "+strconv.Quote(record.Extends))
+}
+
 func cyclicSymbolInheritanceIssue(record SymbolRecord) reports.Issue {
 	issue := symbolIssue(record, reports.SeverityBlocked, "cyclic symbol inheritance involving "+record.LibraryID)
 	issue.Code = codeSymbolInheritanceCycle
@@ -264,12 +332,6 @@ func cyclicSymbolInheritanceIssue(record SymbolRecord) reports.Issue {
 }
 
 func mergeInheritedSymbolDiagnostics(existing []reports.Issue, validation []reports.Issue) []reports.Issue {
-	if len(existing) == 0 {
-		return validation
-	}
-	if len(validation) == 0 {
-		return existing
-	}
 	merged := make([]reports.Issue, 0, len(existing)+len(validation))
 	for _, issue := range existing {
 		if issue.Code == reports.CodeValidationFailed {
@@ -296,6 +358,9 @@ func appendSymbolIssueOnce(issues []reports.Issue, issue reports.Issue) []report
 func inheritSymbolRecord(base SymbolRecord, child SymbolRecord) SymbolRecord {
 	inherited := child
 	inherited.Inherited = true
+	if raw, ok := mergeInheritedSymbolRaw(base.Raw, child.Raw, child.Name); ok {
+		inherited.Raw = raw
+	}
 	inherited.Properties = mergeSymbolProperties(base.Properties, child.Properties)
 	if inherited.Description == "" {
 		inherited.Description = base.Description
@@ -314,6 +379,93 @@ func inheritSymbolRecord(base SymbolRecord, child SymbolRecord) SymbolRecord {
 	inherited.Units = collectSymbolUnits(inherited.Pins)
 	inherited.PowerSymbol = isPowerSymbol(inherited)
 	return inherited
+}
+
+func mergeInheritedSymbolRaw(baseRaw, childRaw, childName string) (string, bool) {
+	baseNode, err := sexpr.Parse([]byte(baseRaw))
+	if err != nil || !baseNode.IsList {
+		return "", false
+	}
+	childNode, err := sexpr.Parse([]byte(childRaw))
+	if err != nil || !childNode.IsList {
+		return "", false
+	}
+	merged := mergeInheritedSymbolList(baseNode.Node().(sexpr.List), childNode.Node().(sexpr.List), true)
+	if len(merged) < 2 {
+		return "", false
+	}
+	merged[1] = sexpr.S(childName)
+	rendered, err := sexpr.Format(merged)
+	if err != nil {
+		return "", false
+	}
+	return strings.TrimSpace(rendered), true
+}
+
+func mergeInheritedSymbolList(base, child sexpr.List, root bool) sexpr.List {
+	merged := append(sexpr.List(nil), base...)
+	if root && len(merged) > 1 {
+		merged[1] = child[1]
+	}
+	for _, childNode := range child {
+		if head := sexprNodeHead(childNode); head == "" || (root && head == "symbol") || head == "extends" {
+			continue
+		}
+		if index := inheritedNodeIndex(merged, childNode); index >= 0 {
+			if baseList, ok := merged[index].(sexpr.List); ok {
+				if childList, ok := childNode.(sexpr.List); ok && sexprNodeHead(childNode) == "symbol" {
+					merged[index] = mergeInheritedSymbolList(baseList, childList, false)
+					continue
+				}
+			}
+			merged[index] = childNode
+			continue
+		}
+		merged = append(merged, childNode)
+	}
+	return merged
+}
+
+func inheritedNodeIndex(nodes sexpr.List, candidate sexpr.Node) int {
+	head := sexprNodeHead(candidate)
+	if head == "" || head == "pin" || head == "rectangle" || head == "circle" || head == "arc" || head == "polyline" || head == "text" {
+		return -1
+	}
+	key := sexprNodeKey(candidate)
+	for index, node := range nodes {
+		if sexprNodeHead(node) != head || sexprNodeKey(node) != key {
+			continue
+		}
+		return index
+	}
+	return -1
+}
+
+func sexprNodeHead(node sexpr.Node) string {
+	list, ok := node.(sexpr.List)
+	if !ok || len(list) == 0 {
+		return ""
+	}
+	atom, ok := list[0].(sexpr.Atom)
+	if !ok {
+		return ""
+	}
+	return string(atom)
+}
+
+func sexprNodeKey(node sexpr.Node) string {
+	list, ok := node.(sexpr.List)
+	if !ok || len(list) < 2 {
+		return ""
+	}
+	switch value := list[1].(type) {
+	case sexpr.Atom:
+		return string(value)
+	case sexpr.String:
+		return string(value)
+	default:
+		return ""
+	}
 }
 
 func mergeSymbolProperties(base map[string]string, child map[string]string) map[string]string {
