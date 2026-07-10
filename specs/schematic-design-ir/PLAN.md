@@ -518,6 +518,12 @@ case demonstrates the need.
 - Built-in body-graphic hydration was tested and reverted from this slice after
   it exposed unresolved hierarchical text/label placement warnings. The next
   phase must solve that with dedicated evidence before enabling it globally.
+- The audit coverage now includes calibrated multi-pin templates and indexed
+  resolver symbols with cardinal KiCad pin orientations. Both retain a visual
+  pin-facing direction independently from the electrical anchor, so label
+  stubs do not cross dense row-pin symbol bodies. The documented fallback for
+  absent/non-cardinal orientation remains conservative body-edge routing;
+  library-version drift still fails closed in KiCad-backed promotion.
 
 ## Phase 12: Native Geometry And Hierarchical Text Completion
 

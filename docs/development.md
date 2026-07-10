@@ -44,6 +44,11 @@ generated and checked-in schematic examples.
   fanout/branch graph families. Every fixture must pass strict post-write
   readability validation, with dense fabric selecting A3 and the more compact
   graph families selecting A4.
+- The dense multi-pin corpus adds twelve deterministic `Sensor:Generic_I2C_8P`
+  meshes with two to four endpoints per labeled net. It verifies that
+  calibrated connection anchors and visual pin-facing directions remain
+  distinct through layout, write, parse, electrical validation, and zero-warning
+  readability checks.
 - Oversized IR documents emit deterministic hierarchy child sheets. Explicit
   groups remain together when possible; a group that cannot fit a child page
   is split deliberately, with `partition_split_group_count` reported as layout
@@ -70,6 +75,7 @@ Useful focused commands:
 go test ./internal/schematiclayout
 go test ./internal/designworkflow -run Readability
 go test ./internal/schematicir -run GeneratedArbitraryTopologyCorpus
+go test ./internal/schematicir -run DenseMultiPinTopologyCorpus
 ```
 
 When a readability test fails, inspect the diagnostic code first. `diagonal_wire`
