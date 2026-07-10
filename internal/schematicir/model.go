@@ -36,6 +36,7 @@ type Circuit struct {
 	Components []Component                `json:"components"`
 	Nets       []Net                      `json:"nets"`
 	Ports      []Port                     `json:"ports,omitempty"`
+	Buses      []Bus                      `json:"buses,omitempty"`
 	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
 }
 
@@ -128,6 +129,20 @@ type Net struct {
 	UseLabel *bool         `json:"use_label,omitempty"`
 }
 
+// Bus declares a KiCad vector bus whose members remain ordinary scalar nets.
+// Geometry is intentionally kept in Layout so circuit intent is independent
+// from drawing coordinates.
+type Bus struct {
+	ID      string      `json:"id"`
+	Name    string      `json:"name"`
+	Members []BusMember `json:"members"`
+}
+
+type BusMember struct {
+	Net   string `json:"net"`
+	Label string `json:"label"`
+}
+
 type EndpointRef string
 
 func (ref EndpointRef) Split() (componentID string, pinSelector string, ok bool) {
@@ -195,6 +210,7 @@ type Layout struct {
 	Lanes      Lanes       `json:"lanes"`
 	Rules      LayoutRules `json:"rules"`
 	Placements []Placement `json:"placements,omitempty"`
+	Buses      []BusLayout `json:"buses,omitempty"`
 }
 
 type Flow string
@@ -280,6 +296,23 @@ type Placement struct {
 	Orientation Orientation `json:"orientation,omitempty"`
 }
 
+type BusLayout struct {
+	Bus     string           `json:"bus"`
+	Points  []LayoutPoint    `json:"points"`
+	Entries []BusEntryLayout `json:"entries"`
+}
+
+type BusEntryLayout struct {
+	Member string      `json:"member"`
+	At     LayoutPoint `json:"at"`
+	Size   LayoutPoint `json:"size"`
+}
+
+type LayoutPoint struct {
+	XMM float64 `json:"x_mm"`
+	YMM float64 `json:"y_mm"`
+}
+
 type Orientation string
 
 const (
@@ -331,6 +364,7 @@ func NewDocument() *Document {
 		Circuit: Circuit{
 			Components: []Component{},
 			Nets:       []Net{},
+			Buses:      []Bus{},
 		},
 		Layout: Layout{
 			Flow:   FlowLeftToRight,

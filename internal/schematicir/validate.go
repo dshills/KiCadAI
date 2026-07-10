@@ -30,6 +30,7 @@ func validateDefaulted(document Document) []reports.Issue {
 	componentPins, componentRefs := ctx.validateComponents()
 	ctx.validateSharedRefs(componentRefs)
 	netNames, netEndpoints, unnamedNetEndpointCounts, noConnectEndpoints, usedEndpoints := ctx.validateNets(componentPins)
+	ctx.validateBuses(netNames)
 	ctx.validateNoConnectPins(noConnectEndpoints, usedEndpoints)
 	portsByNet := ctx.validatePorts(netNames)
 	ctx.validateNetCardinality(netEndpoints, unnamedNetEndpointCounts, portsByNet)
@@ -38,6 +39,139 @@ func validateDefaulted(document Document) []reports.Issue {
 	validatePolicy(ctx.document, ctx.add)
 	validateValues(ctx.document, ctx.add)
 	return ctx.issues
+}
+
+func (ctx *validationContext) validateBuses(netNames map[string]Net) {
+	busNames := map[string]int{}
+	memberOwners := map[string]string{}
+	busMembers := map[string]map[string]struct{}{}
+	for index, bus := range ctx.document.Circuit.Buses {
+		path := fmt.Sprintf("circuit.buses[%d]", index)
+		if !ValidComponentID(bus.ID) {
+			ctx.add(path+".id", "bus id must be a safe identifier")
+		}
+		if previous, exists := busNames[bus.ID]; exists {
+			ctx.add(path+".id", fmt.Sprintf("duplicate bus id already defined at circuit.buses[%d]", previous))
+		}
+		busNames[bus.ID] = index
+		if strings.TrimSpace(bus.Name) == "" {
+			ctx.add(path+".name", "bus name is required")
+		}
+		if len(bus.Members) == 0 {
+			ctx.add(path+".members", "bus must declare at least one member")
+		}
+		members := map[string]struct{}{}
+		for memberIndex, member := range bus.Members {
+			memberPath := fmt.Sprintf("%s.members[%d]", path, memberIndex)
+			netName := strings.TrimSpace(member.Net)
+			if netName == "" {
+				ctx.add(memberPath+".net", "bus member net is required")
+			} else if _, exists := members[netName]; exists {
+				ctx.add(memberPath+".net", "bus member net is duplicated")
+			} else {
+				members[netName] = struct{}{}
+			}
+			if _, exists := netNames[netName]; !exists {
+				ctx.add(memberPath+".net", "bus member references unknown net "+netName)
+			} else if netNames[netName].Role == NetRoleNoConnect {
+				ctx.add(memberPath+".net", "no_connect net cannot be a bus member")
+			}
+			if strings.TrimSpace(member.Label) == "" {
+				ctx.add(memberPath+".label", "bus member label is required")
+			}
+			if previous, exists := memberOwners[netName]; exists && netName != "" {
+				ctx.add(memberPath+".net", "net is already assigned to bus "+previous)
+			}
+			if netName != "" {
+				memberOwners[netName] = bus.ID
+			}
+		}
+		busMembers[bus.ID] = members
+	}
+	layoutNames := map[string]int{}
+	for index, layout := range ctx.document.Layout.Buses {
+		path := fmt.Sprintf("layout.buses[%d]", index)
+		if previous, exists := layoutNames[layout.Bus]; exists {
+			ctx.add(path+".bus", fmt.Sprintf("duplicate bus layout already defined at layout.buses[%d]", previous))
+		}
+		layoutNames[layout.Bus] = index
+		members, known := busMembers[layout.Bus]
+		if !known {
+			ctx.add(path+".bus", "bus layout references unknown bus "+layout.Bus)
+		}
+		validateBusPoints(path+".points", layout.Points, ctx.add)
+		entryMembers := map[string]struct{}{}
+		for entryIndex, entry := range layout.Entries {
+			entryPath := fmt.Sprintf("%s.entries[%d]", path, entryIndex)
+			if _, exists := members[entry.Member]; !exists {
+				ctx.add(entryPath+".member", "bus entry references unknown bus member "+entry.Member)
+			}
+			entryMembers[entry.Member] = struct{}{}
+			if !finiteFloats(entry.At.XMM, entry.At.YMM, entry.Size.XMM, entry.Size.YMM) {
+				ctx.add(entryPath, "bus entry geometry must be finite")
+			}
+			if entry.Size.XMM == 0 || entry.Size.YMM == 0 {
+				ctx.add(entryPath+".size", "bus entry size must be non-zero on both axes")
+			}
+			if !layoutPointOnSegments(entry.At, layout.Points) {
+				ctx.add(entryPath+".at", "bus entry must lie on a bus spine segment")
+			}
+		}
+		if known {
+			for member := range members {
+				if _, exists := entryMembers[member]; !exists {
+					ctx.add(path+".entries", "bus member "+member+" has no declared entry")
+				}
+			}
+		}
+	}
+	for busID := range busNames {
+		if _, exists := layoutNames[busID]; !exists {
+			ctx.add("layout.buses", "bus "+busID+" requires explicit layout geometry")
+		}
+	}
+}
+
+func validateBusPoints(path string, points []LayoutPoint, add func(string, string)) {
+	if len(points) < 2 {
+		add(path, "bus requires at least two spine points")
+		return
+	}
+	for index, point := range points {
+		if !finiteFloats(point.XMM, point.YMM) {
+			add(fmt.Sprintf("%s[%d]", path, index), "bus point must be finite")
+		}
+		if index == 0 {
+			continue
+		}
+		previous := points[index-1]
+		if point.XMM == previous.XMM && point.YMM == previous.YMM {
+			add(fmt.Sprintf("%s[%d]", path, index), "bus spine segment must have non-zero length")
+		} else if point.XMM != previous.XMM && point.YMM != previous.YMM {
+			add(fmt.Sprintf("%s[%d]", path, index), "bus spine segments must be orthogonal")
+		}
+	}
+}
+
+func layoutPointOnSegments(point LayoutPoint, segments []LayoutPoint) bool {
+	const epsilon = 0.000001
+	for index := 1; index < len(segments); index++ {
+		a, b := segments[index-1], segments[index]
+		if a.XMM == b.XMM && math.Abs(point.XMM-a.XMM) <= epsilon && betweenFloat(point.YMM, a.YMM, b.YMM, epsilon) {
+			return true
+		}
+		if a.YMM == b.YMM && math.Abs(point.YMM-a.YMM) <= epsilon && betweenFloat(point.XMM, a.XMM, b.XMM, epsilon) {
+			return true
+		}
+	}
+	return false
+}
+
+func betweenFloat(value, a, b, epsilon float64) bool {
+	if a > b {
+		a, b = b, a
+	}
+	return value >= a-epsilon && value <= b+epsilon
 }
 
 type validationContext struct {

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"slices"
+	"strings"
 
 	"kicadai/internal/reports"
 )
@@ -32,11 +34,11 @@ func DecodeStrict(reader io.Reader) (Document, []reports.Issue) {
 	if len(issues) != 0 {
 		return document, issues
 	}
-	return normalizeNets(document), nil
+	return normalizeBuses(normalizeNets(document)), nil
 }
 
 func Normalize(document Document) Document {
-	return normalizeNets(applyDefaults(document, true))
+	return normalizeBuses(normalizeNets(applyDefaults(document, true)))
 }
 
 func applyDefaults(document Document, cloneNets bool) Document {
@@ -91,6 +93,10 @@ func applyDefaults(document Document, cloneNets bool) Document {
 			document.Circuit.Nets[index].Connect = append([]EndpointRef(nil), document.Circuit.Nets[index].Connect...)
 		}
 	}
+	if cloneNets {
+		document.Circuit.Buses = cloneBuses(document.Circuit.Buses)
+		document.Layout.Buses = cloneBusLayouts(document.Layout.Buses)
+	}
 	for index, net := range document.Circuit.Nets {
 		if net.Role == NetRoleNoConnect && net.Name == "" {
 			name := fmt.Sprintf("NC_invalid_%d", index)
@@ -101,6 +107,31 @@ func applyDefaults(document Document, cloneNets bool) Document {
 		}
 	}
 	return document
+}
+
+func cloneBuses(buses []Bus) []Bus {
+	if buses == nil {
+		return nil
+	}
+	cloned := make([]Bus, len(buses))
+	for index, bus := range buses {
+		cloned[index] = bus
+		cloned[index].Members = append([]BusMember(nil), bus.Members...)
+	}
+	return cloned
+}
+
+func cloneBusLayouts(layouts []BusLayout) []BusLayout {
+	if layouts == nil {
+		return nil
+	}
+	cloned := make([]BusLayout, len(layouts))
+	for index, layout := range layouts {
+		cloned[index] = layout
+		cloned[index].Points = append([]LayoutPoint(nil), layout.Points...)
+		cloned[index].Entries = append([]BusEntryLayout(nil), layout.Entries...)
+	}
+	return cloned
 }
 
 func boolPtr(value bool) *bool {
@@ -135,6 +166,50 @@ func normalizeNets(document Document) Document {
 		seen[net.Name] = state
 	}
 	document.Circuit.Nets = merged
+	return document
+}
+
+func normalizeBuses(document Document) Document {
+	if len(document.Circuit.Buses) != 0 {
+		document.Circuit.Buses = cloneBuses(document.Circuit.Buses)
+		slices.SortStableFunc(document.Circuit.Buses, func(left, right Bus) int {
+			return strings.Compare(left.ID, right.ID)
+		})
+		for index := range document.Circuit.Buses {
+			slices.SortStableFunc(document.Circuit.Buses[index].Members, func(left, right BusMember) int {
+				if left.Net != right.Net {
+					return strings.Compare(left.Net, right.Net)
+				}
+				return strings.Compare(left.Label, right.Label)
+			})
+		}
+	}
+	if len(document.Layout.Buses) != 0 {
+		document.Layout.Buses = cloneBusLayouts(document.Layout.Buses)
+		slices.SortStableFunc(document.Layout.Buses, func(left, right BusLayout) int {
+			return strings.Compare(left.Bus, right.Bus)
+		})
+		for index := range document.Layout.Buses {
+			slices.SortStableFunc(document.Layout.Buses[index].Entries, func(left, right BusEntryLayout) int {
+				if left.Member != right.Member {
+					return strings.Compare(left.Member, right.Member)
+				}
+				if left.At.XMM != right.At.XMM {
+					if left.At.XMM < right.At.XMM {
+						return -1
+					}
+					return 1
+				}
+				if left.At.YMM < right.At.YMM {
+					return -1
+				}
+				if left.At.YMM > right.At.YMM {
+					return 1
+				}
+				return 0
+			})
+		}
+	}
 	return document
 }
 
