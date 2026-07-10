@@ -4315,7 +4315,7 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 			case "transaction", "write":
 				normalized := schematicir.NormalizeLayoutIntent(document)
 				data.Summary = schematicIRDocumentSummary(normalized)
-				libraryIndex, libraryIssues := schematicIRLibraryIndex(context.Background(), opts)
+				libraryIndex, libraryIssues := schematicIRLibraryIndex(context.Background(), opts, normalized)
 				issues = append(issues, libraryIssues...)
 				var tx transactions.Transaction
 				var adapterIssues []reports.Issue
@@ -4364,7 +4364,7 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 	return writeSchematicIRResult(stdout, "schematic-ir."+subcommand, data, issues)
 }
 
-func schematicIRLibraryIndex(ctx context.Context, opts cliOptions) (*libraryresolver.LibraryIndex, []reports.Issue) {
+func schematicIRLibraryIndex(ctx context.Context, opts cliOptions, document schematicir.Document) (*libraryresolver.LibraryIndex, []reports.Issue) {
 	if !pinmapShouldUseLibraryResolver(opts) {
 		return nil, nil
 	}
@@ -4372,10 +4372,42 @@ func schematicIRLibraryIndex(ctx context.Context, opts cliOptions) (*libraryreso
 		CachePath: opts.libraryCache,
 		Refresh:   opts.refreshLibraryCache,
 	})
+	issues = schematicIRRelevantLibraryIssues(document, index, issues)
+	index.Diagnostics = issues
 	if reports.HasBlockingIssue(issues) {
 		return nil, issues
 	}
 	return &index, issues
+}
+
+func schematicIRRelevantLibraryIssues(document schematicir.Document, index libraryresolver.LibraryIndex, issues []reports.Issue) []reports.Issue {
+	requiredSymbols := make(map[string]struct{}, len(document.Circuit.Components))
+	requiredFootprints := make(map[string]struct{}, len(document.Circuit.Components))
+	for _, component := range document.Circuit.Components {
+		if symbol := strings.TrimSpace(component.Symbol); symbol != "" {
+			requiredSymbols[symbol] = struct{}{}
+		}
+		if footprint := strings.TrimSpace(component.Footprint); footprint != "" {
+			requiredFootprints[footprint] = struct{}{}
+		}
+	}
+	filtered := make([]reports.Issue, 0, len(issues))
+	for _, issue := range issues {
+		if strings.HasPrefix(issue.Path, "library.symbol.") {
+			id := strings.TrimPrefix(issue.Path, "library.symbol.")
+			if _, ok := requiredSymbols[id]; !ok {
+				continue
+			}
+		}
+		if strings.HasPrefix(issue.Path, "library.footprint.") {
+			id := strings.TrimPrefix(issue.Path, "library.footprint.")
+			if _, ok := requiredFootprints[id]; !ok {
+				continue
+			}
+		}
+		filtered = append(filtered, issue)
+	}
+	return filtered
 }
 
 func loadSchematicIRDocument(path string) (schematicir.Document, []reports.Issue) {

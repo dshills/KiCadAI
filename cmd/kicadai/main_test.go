@@ -23,10 +23,12 @@ import (
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
 	pcbfiles "kicadai/internal/kicadfiles/pcb"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/manifest"
 	"kicadai/internal/provenance"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicir"
 	"kicadai/internal/transactions"
 	"kicadai/internal/workflows"
 )
@@ -4962,6 +4964,20 @@ func TestSchematicIRWriteCLIUsesConfiguredSymbolResolver(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(output, "external_connector_indicator.kicad_sch")); err != nil {
 		t.Fatalf("expected resolver-backed schematic: %v", err)
+	}
+}
+
+func TestSchematicIRRelevantLibraryIssuesIgnoreUnreferencedRecords(t *testing.T) {
+	document := schematicir.Document{Circuit: schematicir.Circuit{Components: []schematicir.Component{{Symbol: "Connector_Generic:Conn_02x02_Odd_Even"}}}}
+	issues := []reports.Issue{
+		{Path: "roots.symbols_root", Severity: reports.SeverityWarning},
+		{Path: "library.symbol.Connector_Generic:Conn_02x02_Odd_Even", Severity: reports.SeverityError},
+		{Path: "library.symbol.4xxx:Broken", Severity: reports.SeverityError},
+		{Path: "library.footprint.Other:Broken", Severity: reports.SeverityError},
+	}
+	filtered := schematicIRRelevantLibraryIssues(document, libraryresolver.LibraryIndex{}, issues)
+	if len(filtered) != 2 || filtered[1].Path != "library.symbol.Connector_Generic:Conn_02x02_Odd_Even" {
+		t.Fatalf("filtered library issues = %#v", filtered)
 	}
 }
 
