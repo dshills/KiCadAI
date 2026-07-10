@@ -130,7 +130,6 @@ func (builder *Builder) applySchematicHierarchy(design *kicaddesign.Design) erro
 		if err := applyHierarchyBuses(builder, child, spec.ID, hierarchyCrossSheetNetSet(builder)); err != nil {
 			return err
 		}
-		appendCrossSheetLabels(builder, child, spec.ID, refToSheet, index)
 		if err := fitHierarchyChild(child); err != nil {
 			return err
 		}
@@ -363,9 +362,6 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			if netName == "" {
 				continue
 			}
-			if _, crossSheet := crossSheetNets[netName]; crossSheet {
-				continue
-			}
 			allNetEndpoints[netName] = append(allNetEndpoints[netName], schematiclayout.Endpoint{Ref: key, Pin: pin})
 		}
 	}
@@ -462,7 +458,13 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		return labels[i].Position.Y < labels[j].Position.Y
 	})
 	for index, label := range labels {
-		child.Labels = append(child.Labels, schematic.NewLabel(builder.generator.New("hierarchy.local_label", sheetID, label.NetName, strconv.Itoa(index)), label.Text, schematic.LabelLocal, label.Position))
+		kind := schematic.LabelLocal
+		if _, crossSheet := crossSheetNets[builder.canonicalNet(label.NetName)]; crossSheet {
+			kind = schematic.LabelGlobal
+		}
+		generated := schematic.NewLabel(builder.generator.New("hierarchy.local_label", sheetID, label.NetName, strconv.Itoa(index)), label.Text, kind, label.Position)
+		generated.Rotation = label.Rotation
+		child.Labels = append(child.Labels, generated)
 	}
 	return nil
 }
@@ -886,62 +888,6 @@ func noConnectsForSheet(noConnects []schematic.NoConnect, symbols []schematic.Sc
 	return selected
 }
 
-func appendCrossSheetLabels(builder *Builder, child *schematic.SchematicFile, sheetID string, refToSheet map[string]string, sheetIndex int) {
-	existing := map[string]struct{}{}
-	symbolsByKey := make(map[string]*schematic.SchematicSymbol, len(child.Symbols))
-	for index := range child.Symbols {
-		symbolsByKey[symbolStateKey(child.Symbols[index].Reference, child.Symbols[index].Unit)] = &child.Symbols[index]
-	}
-	for _, label := range child.Labels {
-		if label.Kind == schematic.LabelGlobal {
-			existing[globalLabelKey(label.Text, label.Position)] = struct{}{}
-		}
-	}
-	for _, net := range builder.hierarchy.CrossSheetNets {
-		for _, endpoint := range net.Endpoints {
-			if refToSheet[symbolStateKey(endpoint.Reference, endpoint.Unit)] != sheetID {
-				continue
-			}
-			symbol := symbolsByKey[symbolStateKey(endpoint.Reference, endpoint.Unit)]
-			if symbol == nil {
-				continue
-			}
-			position, ok := hierarchySymbolPinAnchor(symbol, endpoint.Pin)
-			if !ok {
-				continue
-			}
-			key := globalLabelKey(net.Name, position)
-			if _, exists := existing[key]; exists {
-				continue
-			}
-			existing[key] = struct{}{}
-			label := schematic.NewLabel(
-				builder.generator.New("hierarchy.global_label", sheetID, net.Name, endpoint.Reference, strconv.Itoa(endpoint.Unit), endpoint.Pin, strconv.Itoa(sheetIndex)),
-				net.Name,
-				schematic.LabelGlobal,
-				position,
-			)
-			label.Rotation = hierarchyLabelRotation(symbol.Position, position)
-			child.Labels = append(child.Labels, label)
-		}
-	}
-}
-
-func hierarchyLabelRotation(origin, anchor kicadfiles.Point) kicadfiles.Angle {
-	dx := anchor.X - origin.X
-	dy := anchor.Y - origin.Y
-	if absIU(dx) >= absIU(dy) {
-		if dx < 0 {
-			return 180
-		}
-		return 0
-	}
-	if dy < 0 {
-		return 270
-	}
-	return 90
-}
-
 func absIU(value kicadfiles.IU) kicadfiles.IU {
 	if value < 0 {
 		return -value
@@ -959,8 +905,4 @@ func hierarchySymbolPinAnchor(symbol *schematic.SchematicSymbol, pin string) (ki
 		}
 	}
 	return kicadfiles.Point{}, false
-}
-
-func globalLabelKey(text string, position kicadfiles.Point) string {
-	return text + "\x00" + strconv.FormatInt(int64(position.X), 10) + ":" + strconv.FormatInt(int64(position.Y), 10)
 }

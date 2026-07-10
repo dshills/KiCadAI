@@ -74,13 +74,23 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 			t.Fatalf("child %s symbols = %#v", child.Filename, child.Symbols)
 		}
 		globalLabels := 0
+		connectedGlobalLabel := false
 		for _, label := range child.Labels {
 			if label.Text == "LONG_NET" && label.Kind == schematic.LabelGlobal {
 				globalLabels++
+				for _, wire := range child.Wires {
+					if len(wire.Points) >= 2 && (wire.Points[0] == label.Position || wire.Points[len(wire.Points)-1] == label.Position) {
+						connectedGlobalLabel = true
+						break
+					}
+				}
 			}
 		}
 		if globalLabels != 1 {
 			t.Fatalf("child %s labels = %#v", child.Filename, child.Labels)
+		}
+		if !connectedGlobalLabel {
+			t.Fatalf("child %s global label was not moved onto a connecting wire: labels=%#v wires=%#v", child.Filename, child.Labels, child.Wires)
 		}
 	}
 }

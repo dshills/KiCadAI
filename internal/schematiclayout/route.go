@@ -18,7 +18,7 @@ func Route(request Request, result Result) Result {
 	anchorIndex := newPinAnchorIndex(anchors)
 	labeled := map[string]kicadfiles.Point{}
 	for _, net := range request.Nets {
-		if len(net.Endpoints) < 2 {
+		if len(net.Endpoints) == 0 {
 			continue
 		}
 		startIndex, start, ok := firstRoutableEndpoint(net, anchors)
@@ -27,6 +27,12 @@ func Route(request Request, result Result) Result {
 			continue
 		}
 		fromEndpoint := net.Endpoints[startIndex]
+		if len(net.Endpoints) == 1 {
+			if net.PreferredLabels {
+				appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
+			}
+			continue
+		}
 		forceLabels := shouldUseLabels(net, anchors, request.Components, rules)
 		for _, toEndpoint := range net.Endpoints[startIndex+1:] {
 			end, exists := anchors[toEndpoint]
@@ -519,6 +525,7 @@ func Layout(request Request) Result {
 	partition := PartitionPlaced(request, last.Components)
 	last.Partition = &partition
 	last.Report.PartitionCount = len(partition.Sheets)
+	last.Report.PartitionSplitGroupCount = len(partition.SplitGroups)
 	last.Report.CrossSheetNetCount = len(partition.CrossSheetNets)
 	if len(partition.Sheets) > 1 {
 		last.Diagnostics = append(last.Diagnostics, Diagnostic{
@@ -526,6 +533,15 @@ func Layout(request Request) Result {
 			Code:     "hierarchy_partition_required",
 			Message:  "the graph was partitioned into deterministic sheet regions",
 			Repair:   "emit KiCad hierarchical sheets and cross-sheet labels",
+		})
+	}
+	for _, group := range partition.SplitGroups {
+		last.Diagnostics = append(last.Diagnostics, Diagnostic{
+			Severity: SeverityInfo,
+			Code:     "hierarchy_group_split",
+			Ref:      group,
+			Message:  "an oversized layout group was split across hierarchy sheets to preserve readable child pages",
+			Repair:   "add smaller layout groups if this functional region should remain on one sheet",
 		})
 	}
 	return NormalizeResult(last, request.Rules)

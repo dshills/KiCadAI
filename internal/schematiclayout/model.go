@@ -227,6 +227,7 @@ type Report struct {
 	SelectedPaper            string                 `json:"selected_paper,omitempty"`
 	PageEscalationCount      int                    `json:"page_escalation_count,omitempty"`
 	PartitionCount           int                    `json:"partition_count,omitempty"`
+	PartitionSplitGroupCount int                    `json:"partition_split_group_count,omitempty"`
 	CrossSheetNetCount       int                    `json:"cross_sheet_net_count,omitempty"`
 	ComponentCount           int                    `json:"component_count"`
 	GroupCount               int                    `json:"group_count"`
@@ -265,6 +266,7 @@ type Rect struct {
 type PartitionResult struct {
 	Sheets         []PartitionSheet `json:"sheets"`
 	CrossSheetNets []CrossSheetNet  `json:"cross_sheet_nets,omitempty"`
+	SplitGroups    []string         `json:"split_groups,omitempty"`
 	Complete       bool             `json:"complete"`
 }
 
@@ -436,23 +438,24 @@ func enrichDiagnosticRepairs(diagnostics []Diagnostic) []Diagnostic {
 
 func BuildReport(result Result, profile Profile) Report {
 	report := Report{
-		Profile:              profile,
-		Passed:               true,
-		SelectedPaper:        result.Report.SelectedPaper,
-		PageEscalationCount:  result.Report.PageEscalationCount,
-		PartitionCount:       result.Report.PartitionCount,
-		CrossSheetNetCount:   result.Report.CrossSheetNetCount,
-		ComponentCount:       len(result.Components),
-		GroupCount:           countGroups(result.Components),
-		RoutedNetCount:       countRoutedNets(result.Wires),
-		LabelFallbackCount:   len(result.Labels),
-		GeometrySourceCounts: map[GeometrySource]int{},
-		OverlapCounts:        map[string]int{},
-		DiagnosticCount:      len(result.Diagnostics),
-		IslandCount:          result.Report.IslandCount,
-		RankCount:            result.Report.RankCount,
-		OccupiedBounds:       result.Report.OccupiedBounds,
-		CenterOffset:         result.Report.CenterOffset,
+		Profile:                  profile,
+		Passed:                   true,
+		SelectedPaper:            result.Report.SelectedPaper,
+		PageEscalationCount:      result.Report.PageEscalationCount,
+		PartitionCount:           result.Report.PartitionCount,
+		PartitionSplitGroupCount: result.Report.PartitionSplitGroupCount,
+		CrossSheetNetCount:       result.Report.CrossSheetNetCount,
+		ComponentCount:           len(result.Components),
+		GroupCount:               countGroups(result.Components),
+		RoutedNetCount:           countRoutedNets(result.Wires),
+		LabelFallbackCount:       len(result.Labels),
+		GeometrySourceCounts:     map[GeometrySource]int{},
+		OverlapCounts:            map[string]int{},
+		DiagnosticCount:          len(result.Diagnostics),
+		IslandCount:              result.Report.IslandCount,
+		RankCount:                result.Report.RankCount,
+		OccupiedBounds:           result.Report.OccupiedBounds,
+		CenterOffset:             result.Report.CenterOffset,
 	}
 	for _, wire := range result.Wires {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {

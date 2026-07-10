@@ -409,6 +409,10 @@ Required v1 semantics:
   4. conflicting or circular `near` hints are non-binding heuristics; the
      deterministic fallback is first valid target by document order;
   5. spacing rules may expand distances but must not reorder groups.
+- When a complete drawing cannot fit on one supported page, KiCadAI partitions
+  it into hierarchy child sheets. Explicit groups remain intact when they fit a
+  child page; an oversized group is split deterministically and reported as
+  layout evidence instead of producing an unreadable or incomplete child.
 - `side` refers to global schematic boundary affinity. `side` and `rank`
   conflict only for edge hints: `side = left` is valid only on the minimum rank
   in the document, and `side = right` only on the maximum rank. `side = top`
@@ -774,10 +778,13 @@ Remaining gaps for high-quality AI-generated schematics:
   records whether its obstacle geometry came from explicit IR bounds, a
   verified embedded template, resolver graphics, a resolver pin envelope, an
   explicit pin envelope, or the conservative fallback. Generated hierarchy
-  relayout now writes computed field anchors back into child-local
-  symbol properties before sheet fitting; resolver-source drift diagnostics and
-  broader connector geometry coverage remain open before arbitrary dense
-  circuits can claim warning-free readability;
+  relayout writes computed field anchors back into child-local symbol
+  properties before sheet fitting and routes cross-sheet single endpoints as
+  collision-aware global-label stubs. Oversized explicit groups split only when
+  required for a complete readable hierarchy and are reported by the partition
+  evidence; resolver-source drift diagnostics and broader connector geometry
+  coverage remain open before arbitrary dense circuits can claim warning-free
+  readability;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 

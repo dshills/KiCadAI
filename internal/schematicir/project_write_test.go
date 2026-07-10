@@ -80,9 +80,12 @@ func TestSchematicIRWritesGlobalPortLabel(t *testing.T) {
 func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 	document := loadExampleDocument(t, "led_indicator.json")
 	document.Policy.Acceptance = AcceptanceReadable
-	for index := 0; index < 80; index++ {
+	const oversizedComponentCount = 240
+	largeStage := Group{ID: "large_stage", Label: "Large processing stage", Role: GroupRoleProcessingStage, Rank: 1}
+	for index := 0; index < oversizedComponentCount; index++ {
+		componentID := fmt.Sprintf("extra_%d", index)
 		document.Circuit.Components = append(document.Circuit.Components, Component{
-			ID:        fmt.Sprintf("extra_%d", index),
+			ID:        componentID,
 			Ref:       fmt.Sprintf("R%d", index+10),
 			Role:      ComponentRoleResistor,
 			Symbol:    "Device:R",
@@ -90,13 +93,19 @@ func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 			Footprint: "Resistor_SMD:R_0603_1608Metric",
 			Pins:      []Pin{{Number: "1", Role: PinRoleOutput}, {Number: "2", Role: PinRoleInput}},
 		})
+		largeStage.Members = append(largeStage.Members, componentID)
 	}
-	for index := 1; index < 80; index++ {
+	document.Layout.Groups = append(document.Layout.Groups, largeStage)
+	for index := 1; index < oversizedComponentCount; index++ {
 		document.Circuit.Nets = append(document.Circuit.Nets, Net{
 			Name:    fmt.Sprintf("EXTRA_%d", index),
 			Role:    NetRoleSignal,
 			Connect: []EndpointRef{EndpointRef(fmt.Sprintf("extra_%d.1", index-1)), EndpointRef(fmt.Sprintf("extra_%d.2", index))},
 		})
+	}
+	layout := schematicLayout(document)
+	if layout.Partition == nil || !layout.Partition.Complete || len(layout.Partition.SplitGroups) != 1 || layout.Partition.SplitGroups[0] != largeStage.ID {
+		t.Fatalf("oversized explicit group layout partition = %#v", layout.Partition)
 	}
 	tx, issues := ToProjectTransaction(document)
 	if reports.HasBlockingIssue(issues) {

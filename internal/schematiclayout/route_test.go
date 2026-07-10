@@ -41,6 +41,28 @@ func TestRouteUsesLabelsForLongNet(t *testing.T) {
 	}
 }
 
+func TestRouteEmitsLabelForSingleEndpointNet(t *testing.T) {
+	result := Route(Request{
+		Sheet: testSheet(),
+		Nets: []Net{{
+			Name: "OFF_SHEET", PreferredLabels: true,
+			Endpoints: []Endpoint{{Ref: "U1", Pin: "1"}},
+		}},
+	}, Result{Components: []PlacedComponent{{
+		Component: Component{Ref: "U1", Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: kicadfiles.MM(2.54)}}}},
+		PlacedAt:  kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+	}}})
+	if len(result.Labels) != 1 || result.Labels[0].Text != "OFF_SHEET" {
+		t.Fatalf("labels = %#v, want one off-sheet label", result.Labels)
+	}
+	if len(result.Wires) != 1 {
+		t.Fatalf("wires = %#v, want one label stub", result.Wires)
+	}
+	if result.Wires[0].From == result.Wires[0].To {
+		t.Fatalf("label stub was not extended: %#v", result.Wires[0])
+	}
+}
+
 func TestRouteRespectsDisabledLabelFallback(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),

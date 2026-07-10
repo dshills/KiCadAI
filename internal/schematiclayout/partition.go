@@ -71,7 +71,8 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 	for _, component := range placed.Components {
 		bodyByRef[component.Ref] = componentBody(component)
 	}
-	assignments := partitionAssignments(placed.Components, groupByRef, usable, bodyByRef)
+	oversizedGroups := oversizedPartitionGroups(groupByRef, usable, bodyByRef)
+	assignments := partitionAssignments(placed.Components, groupByRef, oversizedGroups, usable, bodyByRef)
 	partitions := map[string]*PartitionSheet{}
 	for _, component := range placed.Components {
 		id := assignments[component.Ref]
@@ -115,7 +116,7 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 		ids = append(ids, id)
 	}
 	sort.Strings(ids)
-	result := PartitionResult{Complete: len(ids) > 0, CrossSheetNets: crossSheetNets}
+	result := PartitionResult{Complete: len(ids) > 0, CrossSheetNets: crossSheetNets, SplitGroups: sortedKeys(oversizedGroups)}
 	for _, id := range ids {
 		sheet := *partitions[id]
 		sort.Strings(sheet.Components)
@@ -128,7 +129,25 @@ func partition(request Request, placedComponents []PlacedComponent) PartitionRes
 	return result
 }
 
-func partitionAssignments(components []PlacedComponent, groupByRef map[string]string, usable Rect, bodyByRef map[string]Rect) map[string]string {
+func oversizedPartitionGroups(groupByRef map[string]string, usable Rect, bodyByRef map[string]Rect) map[string]struct{} {
+	boundsByGroup := map[string]Rect{}
+	for ref, group := range groupByRef {
+		body, ok := bodyByRef[ref]
+		if group == "" || !ok {
+			continue
+		}
+		boundsByGroup[group] = unionRect(boundsByGroup[group], body)
+	}
+	oversized := map[string]struct{}{}
+	for group, bounds := range boundsByGroup {
+		if bounds.Width() > usable.Width() || bounds.Height() > usable.Height() {
+			oversized[group] = struct{}{}
+		}
+	}
+	return oversized
+}
+
+func partitionAssignments(components []PlacedComponent, groupByRef map[string]string, oversizedGroups map[string]struct{}, usable Rect, bodyByRef map[string]Rect) map[string]string {
 	assignments := map[string]string{}
 	groupCells := map[string]string{}
 	originX, originY := kicadfiles.IU(0), kicadfiles.IU(0)
@@ -167,6 +186,10 @@ func partitionAssignments(components []PlacedComponent, groupByRef map[string]st
 		center := kicadfiles.Point{X: body.MinX + (body.MaxX-body.MinX)/2, Y: body.MinY + (body.MaxY-body.MinY)/2}
 		cell := fmt.Sprintf("%d-%d", cellIndex(center.X, originX, cellWidth), cellIndex(center.Y, originY, cellHeight))
 		if group := groupByRef[component.Ref]; group != "" {
+			if _, oversized := oversizedGroups[group]; oversized {
+				assignments[component.Ref] = cell
+				continue
+			}
 			if prior := groupCells[group]; prior != "" {
 				cell = prior
 			} else {
