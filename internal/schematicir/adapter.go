@@ -209,6 +209,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 			})
 		}
 	}
+	preflightIssues = append(preflightIssues, resolverRecordIssues(document, index)...)
 	layoutResult := schematicLayoutWithLibraryIndex(document, index)
 	paper := layoutResult.Sheet.Name
 	if paper == "" {
@@ -292,6 +293,44 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		state.refsByID[component.ID] = ref
 	}
 	return state, state.issues
+}
+
+// resolverRecordIssues keeps the AI-facing adapter fail-closed when a caller
+// supplied a library index but one of the requested records was not indexed.
+// The template-only path remains available when no index is supplied.
+func resolverRecordIssues(document Document, index *libraryresolver.LibraryIndex) []reports.Issue {
+	if index == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	for componentIndex, component := range document.Circuit.Components {
+		symbolID := strings.TrimSpace(component.Symbol)
+		if _, embedded := schematic.EmbeddedSymbolTemplate(symbolID); !embedded {
+			if _, found := libraryresolver.ResolveSymbol(*index, symbolID); !found {
+				issues = append(issues, reports.Issue{
+					Code:       reports.CodeUnknownSymbolLibrary,
+					Severity:   reports.SeverityError,
+					Path:       fmt.Sprintf("circuit.components[%d].symbol", componentIndex),
+					Message:    "symbol library record not found: " + symbolID,
+					Suggestion: "configure the correct KiCad symbol root or provide a supported embedded symbol",
+				})
+			}
+		}
+		footprintID := strings.TrimSpace(component.Footprint)
+		if footprintID == "" {
+			continue
+		}
+		if _, found := libraryresolver.ResolveFootprint(*index, footprintID); !found {
+			issues = append(issues, reports.Issue{
+				Code:       reports.CodeUnknownFootprintLibrary,
+				Severity:   reports.SeverityError,
+				Path:       fmt.Sprintf("circuit.components[%d].footprint", componentIndex),
+				Message:    "footprint library record not found: " + footprintID,
+				Suggestion: "configure the correct KiCad footprint root or remove the unresolved footprint assignment",
+			})
+		}
+	}
+	return issues
 }
 
 func schematicLayoutAcceptanceIssues(document Document, result schematiclayout.Result) []reports.Issue {

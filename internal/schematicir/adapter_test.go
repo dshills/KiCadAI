@@ -60,6 +60,34 @@ func TestToTransactionLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestToTransactionWithLibraryIndexFailsClosedOnMissingRecords(t *testing.T) {
+	document := validLEDDocument()
+	document.Circuit.Components[0].Symbol = "Custom:MissingSymbol"
+	document.Circuit.Components[0].Footprint = "Custom:MissingFootprint"
+	document.Circuit.Components[0].Pins[0].OffsetXMM = floatPtr(-2.54)
+	document.Circuit.Components[0].Pins[0].OffsetYMM = floatPtr(0)
+	document.Circuit.Components[0].Pins[1].OffsetXMM = floatPtr(2.54)
+	document.Circuit.Components[0].Pins[1].OffsetYMM = floatPtr(0)
+	index := &libraryresolver.LibraryIndex{}
+
+	_, issues := ToTransactionWithLibraryIndex(document, index)
+	if !schematicIRIssueCode(issues, reports.CodeUnknownSymbolLibrary) {
+		t.Fatalf("missing symbol record did not fail closed: %#v", issues)
+	}
+	if !schematicIRIssueCode(issues, reports.CodeUnknownFootprintLibrary) {
+		t.Fatalf("missing footprint record did not fail closed: %#v", issues)
+	}
+}
+
+func schematicIRIssueCode(issues []reports.Issue, code reports.Code) bool {
+	for _, issue := range issues {
+		if issue.Code == code && issue.Blocking() {
+			return true
+		}
+	}
+	return false
+}
+
 func TestToTransactionEmitsGlobalLabelsForPorts(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Circuit.Ports = []Port{{Name: "VIN_EXT", Direction: PortDirectionInput, Net: "VIN", Side: SideLeft}}
