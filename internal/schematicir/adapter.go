@@ -1006,6 +1006,14 @@ func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent 
 	if !document.Policy.Repair.AllowLabelInsertion {
 		return false, false
 	}
+	// KiCad's generated embedded-symbol endpoint convention is not uniformly
+	// derivable from a template offset after right-angle instance rotation.
+	// Prefer explicit local labels for automatic routes touching those symbols
+	// until a family has KiCad-backed direct-wire calibration. Callers that
+	// explicitly request use_label:false retain that direct-only intent.
+	if schematicNetHasRotatedEndpoint(document, net) {
+		return true, true
+	}
 	// Undriven passive-only nets use local labels instead of relying on a
 	// direct wire to establish a KiCad net. This applies to built-in and
 	// resolver-backed symbols alike. Explicit use_label:false remains
@@ -1026,6 +1034,17 @@ func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent 
 		return true, true
 	}
 	return false, false
+}
+
+func schematicNetHasRotatedEndpoint(document Document, net Net) bool {
+	rotations := layoutRotations(document)
+	for _, endpoint := range net.Connect {
+		componentID, _, ok := endpoint.Split()
+		if ok && rotations[componentID] != 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // KiCad reports a wire-only subgraph with no declared driver as a floating

@@ -194,6 +194,23 @@ func TestToTransactionLabelsPassiveOnlyNetByDefault(t *testing.T) {
 	}
 }
 
+func TestToTransactionLabelsAutomaticNetAtRotatedSymbol(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{{Target: "r_limit", Orientation: OrientationRotated90}}
+	if !schematicNetLabelPreferences(doc)["VIN"] {
+		t.Fatalf("rotated automatic net did not prefer labels: %#v", doc.Circuit.Nets[0])
+	}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("ToTransaction issues: %#v", issues)
+	}
+	for _, connect := range decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect) {
+		if connect.NetName == "VIN" && (connect.UseLabels == nil || !*connect.UseLabels) {
+			t.Fatalf("rotated VIN did not emit labels: %#v", connect)
+		}
+	}
+}
+
 func TestPortEndpointSelectionFollowsDeclaredSide(t *testing.T) {
 	doc := validLEDDocument()
 	state, issues := newAdapterState(doc, nil)
