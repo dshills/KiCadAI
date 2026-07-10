@@ -422,7 +422,7 @@ func TestSchematicIRWritesAdversarialTopologyProjects(t *testing.T) {
 }
 
 func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
-	for seed := int64(1); seed <= 25; seed++ {
+	for seed := int64(1); seed <= 75; seed++ {
 		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
 			document := generatedArbitraryTopologyDocument(seed)
 			firstLayout := schematicLayout(document)
@@ -452,8 +452,12 @@ func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
 				if readErr != nil {
 					t.Fatalf("read %s: %v", path, readErr)
 				}
-				if file.Paper.Name != "A3" {
-					t.Fatalf("%s paper = %q, want the layout-selected A3 page", path, file.Paper.Name)
+				expectedPaper := "A4"
+				if seed%3 == 0 {
+					expectedPaper = "A3"
+				}
+				if file.Paper.Name != expectedPaper {
+					t.Fatalf("%s paper = %q, want topology-selected %s page", path, file.Paper.Name, expectedPaper)
 				}
 				request, result := schematiclayout.AdaptSchematic(&file)
 				result = schematiclayout.Validate(result, request)
@@ -500,7 +504,7 @@ func generatedArbitraryTopologyDocument(seed int64) Document {
 	document := *NewDocument()
 	document.Metadata.Name = fmt.Sprintf("generated_topology_%d", seed)
 	document.Metadata.Title = "Generated arbitrary topology fixture"
-	document.Metadata.Description = "Deterministic high-fanout cyclic schematic corpus fixture."
+	document.Metadata.Description = "Deterministic fabric, feedback-ring, and fanout schematic corpus fixture."
 	document.Policy.Acceptance = AcceptanceReadable
 	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(true)
 	for index := 0; index < 12; index++ {
@@ -511,6 +515,18 @@ func generatedArbitraryTopologyDocument(seed int64) Document {
 			Pins: []Pin{{Number: "1"}, {Number: "2"}},
 		})
 	}
+	switch seed % 3 {
+	case 0:
+		generatedFabricNets(&document, random)
+	case 1:
+		generatedFeedbackRingNets(&document, random)
+	default:
+		generatedFanoutBranchNets(&document, random)
+	}
+	return document
+}
+
+func generatedFabricNets(document *Document, random *rand.Rand) {
 	for netIndex := 0; netIndex < 3; netIndex++ {
 		net := Net{Name: fmt.Sprintf("FABRIC_%d", netIndex+1), Role: NetRoleSignal, UseLabel: boolPtr(true)}
 		for componentIndex := 0; componentIndex < len(document.Circuit.Components); componentIndex++ {
@@ -524,7 +540,43 @@ func generatedArbitraryTopologyDocument(seed int64) Document {
 		random.Shuffle(len(net.Connect), func(i, j int) { net.Connect[i], net.Connect[j] = net.Connect[j], net.Connect[i] })
 		document.Circuit.Nets = append(document.Circuit.Nets, net)
 	}
-	return document
+}
+
+func generatedFeedbackRingNets(document *Document, random *rand.Rand) {
+	for index := 1; index <= len(document.Circuit.Components); index++ {
+		next := index%len(document.Circuit.Components) + 1
+		role := NetRoleSignal
+		if index == len(document.Circuit.Components) {
+			role = NetRoleFeedback
+		}
+		net := Net{Name: fmt.Sprintf("RING_%02d", index), Role: role, Connect: []EndpointRef{EndpointRef(fmt.Sprintf("r%d.2", index)), EndpointRef(fmt.Sprintf("r%d.1", next))}}
+		if index%4 == 0 {
+			net.UseLabel = boolPtr(true)
+		}
+		random.Shuffle(len(net.Connect), func(i, j int) { net.Connect[i], net.Connect[j] = net.Connect[j], net.Connect[i] })
+		document.Circuit.Nets = append(document.Circuit.Nets, net)
+	}
+}
+
+func generatedFanoutBranchNets(document *Document, random *rand.Rand) {
+	document.Circuit.Nets = append(document.Circuit.Nets,
+		Net{Name: "FANOUT", Role: NetRoleSignal, UseLabel: boolPtr(true), Connect: []EndpointRef{"r1.1", "r2.1", "r3.1", "r4.1"}},
+		Net{Name: "BRANCH_A", Role: NetRoleSignal, Connect: []EndpointRef{"r2.2", "r5.1"}},
+		Net{Name: "BRANCH_B", Role: NetRoleSignal, Connect: []EndpointRef{"r3.2", "r6.1"}},
+		Net{Name: "BRANCH_C", Role: NetRoleSignal, Connect: []EndpointRef{"r4.2", "r7.1"}},
+		Net{Name: "MERGE", Role: NetRoleFeedback, UseLabel: boolPtr(true), Connect: []EndpointRef{"r5.2", "r6.2", "r7.2", "r8.1"}},
+		Net{Name: "OUTPUT", Role: NetRoleSignal, Connect: []EndpointRef{"r8.2", "r9.1"}},
+		Net{Name: "RETURN", Role: NetRoleReturn, UseLabel: boolPtr(true), Connect: []EndpointRef{"r9.2", "r1.2"}},
+	)
+	for index := 10; index <= 12; index++ {
+		document.Circuit.Nets = append(document.Circuit.Nets, Net{Name: fmt.Sprintf("NC_R%d_1", index), Role: NetRoleNoConnect, Connect: []EndpointRef{EndpointRef(fmt.Sprintf("r%d.1", index))}})
+		document.Circuit.Nets = append(document.Circuit.Nets, Net{Name: fmt.Sprintf("NC_R%d_2", index), Role: NetRoleNoConnect, Connect: []EndpointRef{EndpointRef(fmt.Sprintf("r%d.2", index))}})
+	}
+	for index := range document.Circuit.Nets {
+		random.Shuffle(len(document.Circuit.Nets[index].Connect), func(i, j int) {
+			document.Circuit.Nets[index].Connect[i], document.Circuit.Nets[index].Connect[j] = document.Circuit.Nets[index].Connect[j], document.Circuit.Nets[index].Connect[i]
+		})
+	}
 }
 
 func TestSchematicIRWritesLongLabelStressProject(t *testing.T) {

@@ -745,10 +745,12 @@ Remaining gaps for high-quality AI-generated schematics:
 - routing and validation treat unrelated symbol pin anchors, including
   intentional no-connect pins, as hard electrical obstacles; endpoints on the
   same net remain legal;
-- the structural arbitrary-topology corpus currently covers 25 deterministic
-  seeds plus feedback, fanout, long-label, disconnected-island, and no-connect
-  stress cases; this proves repeatability for the tested envelope, not every
-  possible graph or symbol geometry;
+- the structural arbitrary-topology corpus currently covers 75 deterministic
+  seeds across dense labeled fabric, feedback-ring, and fanout/branch graph
+  families, plus dedicated feedback, fanout, long-label, disconnected-island,
+  and no-connect stress cases. It proves repeatability, adaptive A4/A3 page
+  selection, and strict post-write readability for that tested envelope, not
+  every possible graph or symbol geometry;
 - the USB-C LED fixture now has KiCad-backed project-context ERC and round-trip
   evidence, including canonical local-library IDs and KiCad-derived pin
   anchors; the vector bus, built-in LED, and USB-C/I2C/3.3 V regulator fixtures
