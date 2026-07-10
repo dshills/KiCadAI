@@ -369,6 +369,10 @@ Required v1 semantics:
 - `rank` orders groups left to right and is authoritative for global group
   order.
 - groups with identical `rank` are sorted by `id` for deterministic output.
+- groups that share a rank are rendered as contiguous vertical sections with a
+  deterministic group gutter. Groups at different ranks remain separated by
+  the horizontal stage spacing rather than being pushed into separate vertical
+  bands.
 - `side` is a port/edge affinity hint. It must not reorder groups. If `side`
   conflicts with `rank`, validation fails so strict IR documents do not carry
   contradictory layout intent.

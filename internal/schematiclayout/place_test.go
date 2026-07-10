@@ -178,6 +178,34 @@ func TestPlaceKeepsGeneratedFieldsClear(t *testing.T) {
 	}
 }
 
+func TestPlaceSeparatesSemanticGroupsWithinLane(t *testing.T) {
+	rules := DefaultRules(ProfileStandard)
+	rules.MinComponentSpacing = kicadfiles.MM(5)
+	rules.MinGroupGutter = kicadfiles.MM(15)
+	request := Request{
+		Sheet: testSheet(),
+		Rules: rules,
+		Components: []Component{
+			{Ref: "R1", Role: "resistor", GroupID: "input_conditioning", FlowRank: 0, RankFixed: true},
+			{Ref: "R2", Role: "resistor", GroupID: "input_conditioning", FlowRank: 0, RankFixed: true},
+			{Ref: "R3", Role: "resistor", GroupID: "output_conditioning", FlowRank: 0, RankFixed: true},
+			{Ref: "R4", Role: "resistor", GroupID: "output_conditioning", FlowRank: 0, RankFixed: true},
+		},
+	}
+	positions := placedPositions(Place(request).Components)
+	withinGroup := absIU(positions["R2"].Y - positions["R1"].Y)
+	betweenGroups := absIU(positions["R3"].Y - positions["R2"].Y)
+	if betweenGroups < withinGroup+rules.MinGroupGutter {
+		t.Fatalf("group boundary gap = %v, within-group gap = %v, want at least %v extra gutter", betweenGroups, withinGroup, rules.MinGroupGutter)
+	}
+
+	permuted := request
+	permuted.Components = []Component{request.Components[3], request.Components[1], request.Components[2], request.Components[0]}
+	if first, second := placedPositions(Place(request).Components), placedPositions(Place(permuted).Components); !reflect.DeepEqual(first, second) {
+		t.Fatalf("grouped placement changed under permutation: first=%#v second=%#v", first, second)
+	}
+}
+
 func TestPlacePowerAndGroundVerticalLanes(t *testing.T) {
 	result := Place(Request{
 		Sheet: testSheet(),
