@@ -200,6 +200,17 @@ func EmbeddedSymbolPinOffsets(libraryID string) ([]TemplatePin, bool) {
 	return cloneTemplatePins(template.pins), true
 }
 
+// EmbeddedSymbolBodyBounds returns the visible geometry bounds for a known
+// seed symbol relative to its symbol origin.
+func EmbeddedSymbolBodyBounds(libraryID string) (SymbolBodyBounds, bool) {
+	template, ok := EmbeddedSymbolTemplate(libraryID)
+	if !ok {
+		return SymbolBodyBounds{}, false
+	}
+	_, bounds, ok := embeddedSymbolGeometry(parsedGeometryNode(template.Body), 1, 1)
+	return bounds, ok
+}
+
 // pinOffsetTemplate provides connection geometry for known external symbols
 // without making the writer emit a synthetic local library body for them.
 func pinOffsetTemplate(libraryID string) (embeddedTemplate, bool) {

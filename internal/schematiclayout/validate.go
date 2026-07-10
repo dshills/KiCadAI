@@ -130,6 +130,9 @@ func wireLeavesAttachedSymbol(wire WireSegment, object ValidationObject, compone
 		if endpoint == wire.To {
 			other = wire.From
 		}
+		if object.Box.ContainsPoint(endpoint) && !object.Box.ContainsPoint(other) {
+			return true
+		}
 		if wire.From.X == wire.To.X && (endpoint.Y <= object.Box.MinY && other.Y <= object.Box.MinY || endpoint.Y >= object.Box.MaxY && other.Y >= object.Box.MaxY) {
 			return true
 		}

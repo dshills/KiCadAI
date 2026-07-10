@@ -106,9 +106,7 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 	parsedBodies := map[string]sexpr.ParsedNode{}
 	for index := range file.Symbols {
 		symbol := &file.Symbols[index]
-		if _, known := EmbeddedSymbolPinOffsets(symbol.LibraryID); known {
-			continue
-		}
+		_, knownTemplate := EmbeddedSymbolPinOffsets(symbol.LibraryID)
 		embedded, ok := byID[symbol.LibraryID]
 		if !ok {
 			continue
@@ -126,7 +124,7 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 			cache[key] = geometry
 		}
 		pins, bounds, boundsOK := geometry.pins, geometry.bounds, geometry.ok
-		if len(pins) != 0 {
+		if len(pins) != 0 && !knownTemplate {
 			anchors := embeddedPinAnchors(pins, symbol.Pins)
 			if len(anchors) == len(symbol.Pins) {
 				for pinIndex, anchor := range anchors {

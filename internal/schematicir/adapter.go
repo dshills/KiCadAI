@@ -791,6 +791,16 @@ func schematicLayoutBody(component Component, index *libraryresolver.LibraryInde
 			MaxY: kicadfiles.MM(component.Body.MaxYMM),
 		}
 	}
+	if strings.HasPrefix(strings.ToLower(strings.TrimSpace(component.Symbol)), "kicadai:") {
+		if bounds, ok := schematic.EmbeddedSymbolBodyBounds(component.Symbol); ok {
+			return schematiclayout.Rect{
+				MinX: bounds.Min.X,
+				MinY: bounds.Min.Y,
+				MaxX: bounds.Max.X,
+				MaxY: bounds.Max.Y,
+			}
+		}
+	}
 	if index == nil {
 		if _, known := schematic.EmbeddedSymbolTemplate(component.Symbol); known {
 			return schematiclayout.Rect{}

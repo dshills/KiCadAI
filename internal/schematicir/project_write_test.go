@@ -164,6 +164,123 @@ func TestSchematicIRWritesResolverBackedExternalSymbolProject(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesAdversarialTopologyProjects(t *testing.T) {
+	tests := []struct {
+		name string
+		doc  Document
+	}{
+		{name: "feedback cycle", doc: adversarialCycleDocument()},
+		{name: "high fanout", doc: adversarialFanoutDocument()},
+		{name: "disconnected islands", doc: adversarialIslandsDocument()},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			testSchematicIRTopologyProject(t, tc.doc)
+		})
+	}
+}
+
+func testSchematicIRTopologyProject(t *testing.T, document Document) {
+	t.Helper()
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), document.Metadata.Name)
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	path := filepath.Join(outputDir, document.Metadata.Name+".kicad_sch")
+	generated, err := schematic.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	report, err := evaluate.Schematic(path)
+	if err != nil {
+		t.Fatalf("evaluate generated schematic: %v", err)
+	}
+	for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+		if check := schematicIRCheckByName(report.Checks, name); check.Status != evaluate.CheckPassed {
+			t.Fatalf("%s check = %#v", name, check)
+		}
+	}
+	request, layoutResult := schematiclayout.AdaptSchematic(&generated)
+	layoutResult = schematiclayout.Validate(layoutResult, request)
+	readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+	if !readability.Passed || readability.ErrorCount != 0 || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+		t.Fatalf("topology readability failed: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
+	}
+}
+
+func adversarialCycleDocument() Document {
+	document := adversarialDocument("ir_feedback_cycle")
+	for index := 1; index <= 3; index++ {
+		document.Circuit.Components = append(document.Circuit.Components, resistorComponent(index))
+	}
+	document.Circuit.Nets = []Net{
+		{Name: "N12", Role: NetRoleSignal, Connect: []EndpointRef{"r1.2", "r2.1"}},
+		{Name: "N23", Role: NetRoleSignal, Connect: []EndpointRef{"r2.2", "r3.1"}},
+		{Name: "N31", Role: NetRoleFeedback, Connect: []EndpointRef{"r3.2", "r1.1"}},
+	}
+	return document
+}
+
+func adversarialFanoutDocument() Document {
+	document := adversarialDocument("ir_high_fanout")
+	document.Layout.Placements = []Placement{{Target: "source", Orientation: OrientationRotated180}}
+	document.Circuit.Components = append(document.Circuit.Components, Component{
+		ID: "source", Ref: "J1", Role: ComponentRoleInputConnector, Symbol: "Connector_Generic:Conn_01x04", Value: "BUS",
+		Body: &BodyGeometry{MinXMM: -3.81, MinYMM: -7.62, MaxXMM: 3.81, MaxYMM: 7.62},
+		Pins: []Pin{{Number: "1"}, {Number: "2"}, {Number: "3"}, {Number: "4"}},
+	})
+	for index := 1; index <= 4; index++ {
+		document.Circuit.Components = append(document.Circuit.Components, resistorComponent(index))
+	}
+	document.Circuit.Nets = []Net{
+		{Name: "BUS", Role: NetRoleSignal, Connect: []EndpointRef{"source.1", "r1.1", "r2.1", "r3.1", "r4.1"}, Label: "BUS", UseLabel: boolPtr(false)},
+		{Name: "NC_SOURCE_2", Role: NetRoleNoConnect, Connect: []EndpointRef{"source.2"}},
+		{Name: "NC_SOURCE_3", Role: NetRoleNoConnect, Connect: []EndpointRef{"source.3"}},
+		{Name: "NC_SOURCE_4", Role: NetRoleNoConnect, Connect: []EndpointRef{"source.4"}},
+		{Name: "NC_R1_2", Role: NetRoleNoConnect, Connect: []EndpointRef{"r1.2"}},
+		{Name: "NC_R2_2", Role: NetRoleNoConnect, Connect: []EndpointRef{"r2.2"}},
+		{Name: "NC_R3_2", Role: NetRoleNoConnect, Connect: []EndpointRef{"r3.2"}},
+		{Name: "NC_R4_2", Role: NetRoleNoConnect, Connect: []EndpointRef{"r4.2"}},
+	}
+	return document
+}
+
+func adversarialIslandsDocument() Document {
+	document := adversarialDocument("ir_disconnected_islands")
+	for index := 1; index <= 4; index++ {
+		document.Circuit.Components = append(document.Circuit.Components, resistorComponent(index))
+	}
+	document.Circuit.Nets = []Net{
+		{Name: "ISLAND_A", Role: NetRoleSignal, Connect: []EndpointRef{"r1.1", "r2.1"}, UseLabel: boolPtr(false)},
+		{Name: "ISLAND_A_RETURN", Role: NetRoleSignal, Connect: []EndpointRef{"r1.2", "r2.2"}, UseLabel: boolPtr(false)},
+		{Name: "ISLAND_B", Role: NetRoleSignal, Connect: []EndpointRef{"r3.1", "r4.1"}, UseLabel: boolPtr(false)},
+		{Name: "ISLAND_B_RETURN", Role: NetRoleSignal, Connect: []EndpointRef{"r3.2", "r4.2"}, UseLabel: boolPtr(false)},
+	}
+	return document
+}
+
+func adversarialDocument(name string) Document {
+	document := *NewDocument()
+	document.Metadata.Name = name
+	document.Metadata.Title = name
+	document.Metadata.Description = "Adversarial schematic IR topology fixture."
+	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(false)
+	document.Layout.Rules.MinGroupSpacingMM = floatPtr(18)
+	document.Layout.Rules.MinComponentSpacingMM = floatPtr(10)
+	document.Policy.Acceptance = AcceptanceReadable
+	return document
+}
+
+func resistorComponent(index int) Component {
+	id := fmt.Sprintf("r%d", index)
+	return Component{ID: id, Ref: fmt.Sprintf("R%d", index), Role: ComponentRoleResistor, Symbol: "Device:R", Value: "10k", Body: &BodyGeometry{MinXMM: -1.016, MinYMM: -2.54, MaxXMM: 1.016, MaxYMM: 2.54}, Pins: []Pin{{Number: "1"}, {Number: "2"}}}
+}
+
 func testSchematicIRWritesReadableProject(t *testing.T, fileName string, projectName string) {
 	t.Helper()
 	document := loadExampleDocument(t, fileName)

@@ -83,7 +83,7 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		if component.Ref != endpoint.Ref {
 			continue
 		}
-		offset := kicadfiles.Point{X: anchor.X - component.PlacedAt.X, Y: anchor.Y - component.PlacedAt.Y}
+		offset := InverseTransformPoint(kicadfiles.Point{X: anchor.X - component.PlacedAt.X, Y: anchor.Y - component.PlacedAt.Y}, component.Rotation, component.Mirror)
 		switch {
 		case absIU(offset.X) >= absIU(offset.Y) && offset.X < 0:
 			preferred = kicadfiles.Point{X: -grid}
@@ -94,9 +94,18 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		default:
 			preferred = kicadfiles.Point{Y: grid}
 		}
+		preferred = TransformPoint(preferred, component.Rotation, component.Mirror)
 		break
 	}
 	directions := []kicadfiles.Point{preferred, {X: grid}, {X: -grid}, {Y: -grid}, {Y: grid}}
+	for index := 1; index < len(directions); index++ {
+		for _, component := range result.Components {
+			if component.Ref == endpoint.Ref {
+				directions[index] = TransformPoint(directions[index], component.Rotation, component.Mirror)
+				break
+			}
+		}
+	}
 	usable := UsableSheet(request.Sheet)
 	for _, scale := range []kicadfiles.IU{2, 4, 6, 8, 12} {
 		for _, direction := range directions {
@@ -217,10 +226,11 @@ func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, re
 			clean = false
 		}
 		for _, component := range result.Components {
-			if component.Ref == from.Ref || component.Ref == to.Ref {
+			if (component.Ref == from.Ref || component.Ref == to.Ref) && component.Body.Empty() {
 				continue
 			}
-			if SegmentIntersectsRect(segment, componentBody(component).Inflate(kicadfiles.MM(0.5))) {
+			body := componentBody(component)
+			if SegmentIntersectsRect(segment, body) && !wireLeavesAttachedSymbol(segment, ValidationObject{Ref: component.Ref, Box: body}, result.Components) {
 				score += routeHardPenalty
 				clean = false
 			}

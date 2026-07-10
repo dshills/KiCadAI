@@ -196,6 +196,16 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	}
 }
 
+func TestEmbeddedSymbolBodyBounds(t *testing.T) {
+	bounds, ok := EmbeddedSymbolBodyBounds("Device:R")
+	if !ok {
+		t.Fatal("expected Device:R body bounds")
+	}
+	if bounds.Min != (kicadfiles.Point{X: kicadfiles.MM(-1.016), Y: kicadfiles.MM(-2.54)}) || bounds.Max != (kicadfiles.Point{X: kicadfiles.MM(1.016), Y: kicadfiles.MM(2.54)}) {
+		t.Fatalf("body bounds = %#v", bounds)
+	}
+}
+
 func TestLocalSymbolLibraryRendersUnqualifiedSyntheticSymbol(t *testing.T) {
 	contents, ok := LocalSymbolLibrary("Sensor:Generic_I2C")
 	if !ok {

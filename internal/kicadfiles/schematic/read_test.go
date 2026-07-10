@@ -34,6 +34,16 @@ func TestReadSchematicWrittenByWriter(t *testing.T) {
 	if read.Symbols[0].Raw == "" {
 		t.Fatal("symbol raw node not preserved")
 	}
+	var resistor *SchematicSymbol
+	for index := range read.Symbols {
+		if read.Symbols[index].LibraryID == "Device:R" {
+			resistor = &read.Symbols[index]
+			break
+		}
+	}
+	if resistor == nil || resistor.BodyBounds == nil {
+		t.Fatalf("known template body geometry not recovered: %#v", resistor)
+	}
 }
 
 func TestReadSchematicPreservesUnsupportedRawNode(t *testing.T) {
