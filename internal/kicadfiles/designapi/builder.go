@@ -318,6 +318,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	if libraryID == "" {
 		return SymbolHandle{}, fmt.Errorf("library id required")
 	}
+	libraryID = schematic.CanonicalEmbeddedSymbolLibraryID(libraryID)
 	if err := builder.ensureSchematicLibrarySymbol(libraryID); err != nil {
 		return SymbolHandle{}, err
 	}

@@ -1249,6 +1249,45 @@ func TestBuilderWriteProjectAddsGeneratedLocalSensorSymbolLibrary(t *testing.T) 
 	}
 }
 
+func TestBuilderWriteSchematicProjectCanonicalizesLocalUSBCAlias(t *testing.T) {
+	builder := newTestBuilder(t)
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "J1",
+		LibraryID: "kicadai:usb_c_receptacle_poweronly_full",
+		Value:     "USB-C",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(100), Y: kicadfiles.MM(80)},
+	}); err != nil {
+		t.Fatalf("AddSymbol returned error: %v", err)
+	}
+
+	root := filepath.Join(t.TempDir(), "usb_c_alias")
+	result, err := builder.WriteSchematicProject(root, kicaddesign.WriteOptions{})
+	if err != nil {
+		t.Fatalf("WriteSchematicProject returned error: %v", err)
+	}
+	schematicFiles, err := filepath.Glob(filepath.Join(result.ProjectDir, "*.kicad_sch"))
+	if err != nil {
+		t.Fatalf("find generated schematic: %v", err)
+	}
+	if len(schematicFiles) != 1 {
+		t.Fatalf("generated schematic files = %v, want one", schematicFiles)
+	}
+	contents, err := os.ReadFile(schematicFiles[0])
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	if !strings.Contains(string(contents), `"kicadai:USB_C_Receptacle_PowerOnly_Full"`) || strings.Contains(string(contents), `"kicadai:usb_c_receptacle_poweronly_full"`) {
+		t.Fatalf("schematic should use the canonical local symbol ID:\n%s", contents)
+	}
+	library, err := os.ReadFile(filepath.Join(result.ProjectDir, "lib", "kicadai_kicadai.kicad_sym"))
+	if err != nil {
+		t.Fatalf("read generated local symbol library: %v", err)
+	}
+	if !strings.Contains(string(library), `"USB_C_Receptacle_PowerOnly_Full"`) || !strings.Contains(string(library), `"USB_C_Receptacle_PowerOnly_Full_1_1"`) {
+		t.Fatalf("local library should use matching canonical symbol names:\n%s", library)
+	}
+}
+
 func TestBuilderWriteProjectAddsGeneratedLocalFootprintLibrary(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})

@@ -123,6 +123,13 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	if ok || usbA4Connection != (kicadfiles.Point{}) {
 		t.Fatalf("unexpected USB-C 6P A4 connection override: %#v ok=%v", usbA4Connection, ok)
 	}
+	if externalConnection, ok := EmbeddedSymbolConnectionPinOffset("Connector:USB_C_Receptacle_USB2.0", "A4"); ok || externalConnection != (kicadfiles.Point{}) {
+		t.Fatalf("installed USB-C symbol should not inherit local-library anchor overrides: %#v ok=%v", externalConnection, ok)
+	}
+	fullUSBConnection, ok := EmbeddedSymbolConnectionPinOffset("kicadai:usb_c_receptacle_poweronly_full", "A4")
+	if !ok || fullUSBConnection.X != kicadfiles.MM(15.24) || fullUSBConnection.Y != kicadfiles.MM(-10.16) {
+		t.Fatalf("unexpected full USB-C A4 connection override: %#v ok=%v", fullUSBConnection, ok)
+	}
 	connector3Pins, ok := EmbeddedSymbolPinOffsets("Connector_Generic:Conn_01x03")
 	if !ok || len(connector3Pins) != 3 || connector3Pins[0].Offset.Y != kicadfiles.MM(2.54) || connector3Pins[2].Number != "3" || connector3Pins[2].Offset.Y != kicadfiles.MM(-2.54) {
 		t.Fatalf("unexpected 3-pin connector offsets: %#v ok=%v", connector3Pins, ok)
@@ -163,7 +170,7 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 		t.Fatalf("unexpected eight-pin generic I2C offsets: %#v ok=%v", i2c8Pins, ok)
 	}
 	externalUSBPins, ok := EmbeddedSymbolPinOffsets("Connector:USB_C_Receptacle_USB2.0")
-	if !ok || len(externalUSBPins) != 11 || externalUSBPins[0].Number != "A5" {
+	if !ok || len(externalUSBPins) != 11 || externalUSBPins[0].Number != "A1" {
 		t.Fatalf("unexpected external USB-C offsets: %#v ok=%v", externalUSBPins, ok)
 	}
 	pins[0].Number = "BROKEN"
@@ -230,6 +237,13 @@ func TestLocalSymbolLibraryRendersUnqualifiedSyntheticSymbol(t *testing.T) {
 	}
 	if _, ok := LocalSymbolLibrary("Custom:Missing"); ok {
 		t.Fatal("unsupported symbols should not produce local libraries")
+	}
+	aliasContents, ok := LocalSymbolLibrary("kicadai:usb_c_receptacle_poweronly_full")
+	if !ok {
+		t.Fatal("expected project-local USB-C alias library")
+	}
+	if !strings.Contains(string(aliasContents), `"USB_C_Receptacle_PowerOnly_Full"`) || !strings.Contains(string(aliasContents), `"USB_C_Receptacle_PowerOnly_Full_1_1"`) || strings.Contains(string(aliasContents), `"kicadai:usb_c_receptacle_poweronly_full"`) {
+		t.Fatalf("USB-C local library should match the requested unqualified alias:\n%s", aliasContents)
 	}
 	grouped, ok := LocalSymbolLibraryForIDs([]string{"Sensor:Generic_I2C", "Sensor:Generic_I2C", "Device:C"})
 	if !ok {

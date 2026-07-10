@@ -742,10 +742,10 @@ Remaining gaps for high-quality AI-generated schematics:
   seeds plus feedback, fanout, long-label, disconnected-island, and no-connect
   stress cases; this proves repeatability for the tested envelope, not every
   possible graph or symbol geometry;
-- the core IR examples that depend on project-local `kicadai:` symbols still
-  need KiCad-backed load/ERC promotion after their embedded-symbol/project
-  context is made fully KiCad-resolvable; structural writer and readability
-  tests remain the authoritative v1 evidence for those examples;
+- the USB-C LED fixture now has KiCad-backed project-context ERC and round-trip
+  evidence, including canonical local-library IDs and KiCad-derived pin
+  anchors; other project-local or resolver-backed symbol families still need
+  the same promotion before they can be treated as KiCad-backed pass fixtures;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 

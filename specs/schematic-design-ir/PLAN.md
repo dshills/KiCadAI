@@ -416,6 +416,94 @@ acceptance.
 
 Low to medium. Mostly additive tests and documentation, with no new PCB scope.
 
+## Phase 10: KiCad-Loadable Project-Local Symbols
+
+### Work
+
+- Canonicalize AI-facing aliases for generated local symbol libraries so the
+  schematic instance ID and on-disk library body agree with KiCad resolution.
+- Keep KiCad-derived connection-anchor overrides scoped to generated local
+  symbols; installed-library symbols must continue to use resolver or explicit
+  pin metadata.
+- Match the KiCad-stable pin ordering for the full USB-C local symbol body.
+- Add project-write and optional KiCad-backed ERC/round-trip regression tests
+  for the USB-C LED IR fixture.
+
+### Likely Files
+
+- `internal/kicadfiles/schematic/templates.go`
+- `internal/kicadfiles/schematic/templates_test.go`
+- `internal/kicadfiles/designapi/builder.go`
+- `internal/kicadfiles/designapi/builder_test.go`
+- `internal/kicadfiles/roundtrip/schematic_ir_integration_test.go`
+- `specs/schematic-design-ir/SPEC.md`
+
+### Tests
+
+- Focused schematic, design API, and schematic IR suites.
+- Optional `TestKiCadRoundTripSchematicIRUSBCLocalSymbol` with KiCad CLI.
+- Full Go suite.
+
+### Acceptance Criteria
+
+- The checked-in USB-C LED IR fixture writes a project with a resolvable
+  project-local symbol library.
+- Project-scoped KiCad ERC reports zero violations when enabled.
+- KiCad schematic upgrade produces zero normalized round-trip differences.
+- Installed external symbols do not inherit local-symbol anchor overrides.
+
+### Rollback Risk
+
+Medium. Symbol identity and pin-anchor behavior affect custom-symbol output;
+preserve the fail-closed conflict checks and the external-library path.
+
+## Phase 11: Arbitrary-Circuit Layout Coverage Audit
+
+### Work
+
+- Build a symbol-family capability matrix covering embedded templates,
+  resolver-backed symbols, multi-unit symbols, inherited symbols, custom local
+  libraries, and symbols with omitted or explicit pin metadata.
+- Add deterministic generated stress fixtures that exercise mixed orientations,
+  dense pin fields, high fanout, feedback, multiple power rails, and isolated
+  subcircuits through the full layout acceptance path.
+- Define measurable layout acceptance thresholds and explicit fail-closed
+  diagnostics for symbol geometry that cannot be resolved safely.
+- Promote representative non-USB custom/resolver fixtures through KiCad parse,
+  ERC, and round-trip checks where their library context is available.
+- Document the boundary between arbitrary electrical topology support and
+  guaranteed human-readable layout support.
+
+### Likely Files
+
+- `internal/schematiclayout/`
+- `internal/schematicir/`
+- `internal/kicadfiles/roundtrip/schematic_ir_integration_test.go`
+- `internal/kicadfiles/schematic/templates_test.go`
+- `specs/schematic-design-ir/SPEC.md`
+- `specs/schematic-design-ir/PLAN.md`
+
+### Tests
+
+- Capability-matrix tests for every supported symbol source.
+- Determinism and readability stress corpus tests.
+- Optional KiCad parse/ERC/round-trip tests for promoted fixtures.
+- Full Go suite.
+
+### Acceptance Criteria
+
+- Every supported symbol source has a documented geometry and validation path.
+- Arbitrary connected topologies either produce readable evidence or a precise
+  fail-closed diagnostic; no topology silently produces unverified layout.
+- At least one resolver-backed and one custom local-symbol fixture joins the
+  KiCad-backed promotion lane in addition to the USB-C LED fixture.
+
+### Rollback Risk
+
+Medium to high. Broader layout changes can affect existing fixtures; add new
+coverage first and change shared placement/routing only when a failing matrix
+case demonstrates the need.
+
 ## Prism And Commit Protocol
 
 For each phase:

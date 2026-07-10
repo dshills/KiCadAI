@@ -15,14 +15,15 @@ type TemplatePin struct {
 }
 
 type embeddedTemplate struct {
-	bodyName              string
-	pinType               string
-	pinX                  float64
-	power                 bool
-	localLibrary          bool
-	pins                  []TemplatePin
-	connectionPinOverride map[string]kicadfiles.Point
-	rawBody               string
+	bodyName                       string
+	pinType                        string
+	pinX                           float64
+	power                          bool
+	localLibrary                   bool
+	connectionPinOverrideLocalOnly bool
+	pins                           []TemplatePin
+	connectionPinOverride          map[string]kicadfiles.Point
+	rawBody                        string
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
@@ -60,19 +61,33 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		},
 	},
 	"kicadai:usb_c_receptacle_poweronly_full": {
-		bodyName:     "USB_C_Receptacle_PowerOnly_Full",
-		pinType:      "passive",
-		localLibrary: true,
+		bodyName:                       "USB_C_Receptacle_PowerOnly_Full",
+		pinType:                        "passive",
+		localLibrary:                   true,
+		connectionPinOverrideLocalOnly: true,
+		// KiCad's saved symbol connection anchors differ from the raw template
+		// primitives only for these seven pins. A5, A9, B4, and B5 retain their
+		// raw offsets; the KiCad-backed ERC fixture proves those anchors are
+		// already correct and must not be inverted as a blanket rule.
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"A4":  {X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-10.16)},
+			"B9":  {X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-2.54)},
+			"A1":  {Y: kicadfiles.MM(10.16)},
+			"A12": {Y: kicadfiles.MM(12.7)},
+			"B1":  {Y: kicadfiles.MM(15.24)},
+			"B12": {Y: kicadfiles.MM(17.78)},
+			"SH":  {X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(20.32)},
+		},
 		pins: []TemplatePin{
-			{Number: "A5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-5.08)}},
-			{Number: "A4", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(10.16)}},
-			{Number: "A9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}},
 			{Number: "A1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-10.16)}},
+			{Number: "A4", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(10.16)}},
+			{Number: "A5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-5.08)}},
+			{Number: "A9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(7.62)}},
 			{Number: "A12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-12.7)}},
-			{Number: "B5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-7.62)}},
-			{Number: "B4", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(5.08)}},
-			{Number: "B9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(2.54)}},
 			{Number: "B1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-15.24)}},
+			{Number: "B4", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(5.08)}},
+			{Number: "B5", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(-7.62)}},
+			{Number: "B9", Offset: kicadfiles.Point{X: kicadfiles.MM(15.24), Y: kicadfiles.MM(2.54)}},
 			{Number: "B12", Offset: kicadfiles.Point{Y: kicadfiles.MM(-17.78)}},
 			{Number: "SH", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-20.32)}},
 		},
@@ -241,16 +256,23 @@ func LocalSymbolLibraryForIDs(libraryIDs []string) ([]byte, bool) {
 	bodies := make([]sexpr.Node, 0, len(libraryIDs))
 	seen := map[string]struct{}{}
 	for _, libraryID := range libraryIDs {
-		libraryID = strings.TrimSpace(libraryID)
+		libraryID = CanonicalEmbeddedSymbolLibraryID(libraryID)
 		template, ok := embeddedSymbolTemplates[strings.ToLower(libraryID)]
 		if !ok || !template.localLibrary || len(template.pins) == 0 {
 			continue
 		}
-		if _, ok := seen[strings.ToLower(template.bodyName)]; ok {
+		symbolName := libraryID
+		if separator := strings.LastIndex(symbolName, ":"); separator >= 0 {
+			symbolName = strings.TrimSpace(symbolName[separator+1:])
+		}
+		if symbolName == "" {
+			symbolName = template.bodyName
+		}
+		if _, ok := seen[strings.ToLower(symbolName)]; ok {
 			continue
 		}
-		seen[strings.ToLower(template.bodyName)] = struct{}{}
-		bodies = append(bodies, symbolBodyFromTemplatePins(template.bodyName, template.bodyName, template.pinType, template.pins))
+		seen[strings.ToLower(symbolName)] = struct{}{}
+		bodies = append(bodies, symbolBodyFromTemplatePinsWithNestedName(symbolName, template.bodyName, symbolName, template.pinType, template.pins))
 	}
 	if len(bodies) == 0 {
 		return nil, false
@@ -272,13 +294,41 @@ func LocalSymbolLibraryForIDs(libraryIDs []string) ([]byte, bool) {
 	return buf.Bytes(), true
 }
 
+// CanonicalEmbeddedSymbolLibraryID returns the project-local library ID that
+// KiCad resolves for a known generated symbol. Local aliases may use a
+// convenient AI-facing spelling, but the on-disk library and schematic must
+// share the template's canonical symbol name.
+func CanonicalEmbeddedSymbolLibraryID(libraryID string) string {
+	libraryID = strings.TrimSpace(libraryID)
+	template, ok := embeddedSymbolTemplates[strings.ToLower(libraryID)]
+	if !ok || !template.localLibrary {
+		return libraryID
+	}
+	separator := strings.LastIndex(libraryID, ":")
+	if separator < 0 {
+		return template.bodyName
+	}
+	nickname := strings.TrimSpace(libraryID[:separator])
+	if nickname == "" {
+		return template.bodyName
+	}
+	return nickname + ":" + template.bodyName
+}
+
 // EmbeddedSymbolConnectionPinOffset returns a KiCad-validated connection
 // anchor override for symbols whose ERC-resolved connection point differs from
 // the canonical raw symbol primitive used for library-body compatibility.
 func EmbeddedSymbolConnectionPinOffset(libraryID string, pinNumber string) (kicadfiles.Point, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(libraryID))
 	template, ok := pinOffsetTemplate(libraryID)
 	if !ok || len(template.connectionPinOverride) == 0 {
 		return kicadfiles.Point{}, false
+	}
+	if template.connectionPinOverrideLocalOnly {
+		resolved, resolvedOK := embeddedSymbolTemplates[normalized]
+		if !resolvedOK || !resolved.localLibrary {
+			return kicadfiles.Point{}, false
+		}
 	}
 	offset, ok := template.connectionPinOverride[strings.TrimSpace(pinNumber)]
 	return offset, ok
@@ -379,7 +429,7 @@ func EnsureEmbeddedSymbol(file *SchematicFile, libraryID string) bool {
 	if file == nil {
 		return false
 	}
-	libraryID = strings.TrimSpace(libraryID)
+	libraryID = CanonicalEmbeddedSymbolLibraryID(libraryID)
 	normalizedID := strings.ToLower(libraryID)
 	templateDefinition, ok := embeddedSymbolTemplates[normalizedID]
 	if !ok {
@@ -479,6 +529,10 @@ func twoPinSymbolBody(libraryID, bodyName, pinType string) sexpr.List {
 }
 
 func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []TemplatePin) sexpr.List {
+	return symbolBodyFromTemplatePinsWithNestedName(libraryID, bodyName, bodyName, pinType, pins)
+}
+
+func symbolBodyFromTemplatePinsWithNestedName(libraryID, bodyName, nestedName, pinType string, pins []TemplatePin) sexpr.List {
 	nodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(libraryID)}
 	if isConnectorTemplateBodyName(bodyName) {
 		nodes = append(nodes, sexpr.L(
@@ -487,7 +541,7 @@ func symbolBodyFromTemplatePins(libraryID, bodyName, pinType string, pins []Temp
 			sexpr.L(sexpr.A("hide"), sexpr.A("yes")),
 		))
 	}
-	pinNodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(bodyName + "_1_1")}
+	pinNodes := []sexpr.Node{sexpr.A("symbol"), sexpr.S(nestedName + "_1_1")}
 	if body := embeddedTemplateBody(bodyName, pins); len(body) > 0 {
 		pinNodes = append(pinNodes, body)
 	}
