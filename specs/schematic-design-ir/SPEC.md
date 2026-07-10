@@ -736,6 +736,11 @@ Remaining gaps for high-quality AI-generated schematics:
 - explicit pin offsets must agree with KiCadAI’s validated connection-anchor
   overrides for embedded symbols and resolver-indexed pin geometry; conflicting
   offsets fail closed before any file is written;
+- calibrated physical pin anchors and a pin's visual outward-facing direction
+  are separate layout facts. When a verified template supplies that direction,
+  label stubs must leave the symbol on that side rather than guessing from the
+  anchor's nearest body edge. This keeps transformed row-pin symbols readable
+  without changing the KiCad-proven electrical connection point;
 - inherited symbols in split `.kicad_symdir` libraries require the
   resolver-backed adapter to materialize their base symbol body before
   embedding;

@@ -569,6 +569,20 @@ func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesDenseMultiPinTopologyCorpus(t *testing.T) {
+	for seed := int64(1); seed <= 12; seed++ {
+		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
+			document := denseMultiPinTopologyDocument(seed)
+			firstLayout := schematicLayout(document)
+			secondLayout := schematicLayout(document)
+			if !reflect.DeepEqual(firstLayout, secondLayout) {
+				t.Fatal("repeated dense multi-pin layout generation was not deterministic")
+			}
+			testSchematicIRTopologyProject(t, document)
+		})
+	}
+}
+
 func TestSchematicIRLayoutStableUnderInputPermutation(t *testing.T) {
 	document := loadExampleDocument(t, "arbitrary_topology.json")
 	first := schematicLayout(document)
@@ -621,6 +635,47 @@ func generatedArbitraryTopologyDocument(seed int64) Document {
 		generatedFeedbackRingNets(&document, random)
 	default:
 		generatedFanoutBranchNets(&document, random)
+	}
+	return document
+}
+
+func denseMultiPinTopologyDocument(seed int64) Document {
+	random := rand.New(rand.NewSource(seed))
+	document := *NewDocument()
+	document.Metadata.Name = fmt.Sprintf("dense_multi_pin_%d", seed)
+	document.Metadata.Title = "Dense multi-pin schematic fixture"
+	document.Metadata.Description = "Deterministic multi-pin label-routing corpus fixture."
+	document.Policy.Acceptance = AcceptanceReadable
+	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(true)
+	document.Layout.Rules.MinComponentSpacingMM = floatPtr(16)
+	const componentCount = 12
+	endpoints := make([]EndpointRef, 0, componentCount*8)
+	for index := 1; index <= componentCount; index++ {
+		id := fmt.Sprintf("node_%d", index)
+		pins := make([]Pin, 0, 8)
+		for pin := 1; pin <= 8; pin++ {
+			pins = append(pins, Pin{Number: fmt.Sprintf("%d", pin), Role: PinRoleBidirectional})
+			endpoints = append(endpoints, EndpointRef(fmt.Sprintf("%s.%d", id, pin)))
+		}
+		document.Circuit.Components = append(document.Circuit.Components, Component{
+			ID: id, Ref: fmt.Sprintf("U%d", index), Role: ComponentRoleSensor,
+			Symbol: "Sensor:Generic_I2C_8P", Value: "MESH", Pins: pins,
+		})
+	}
+	random.Shuffle(len(endpoints), func(left, right int) { endpoints[left], endpoints[right] = endpoints[right], endpoints[left] })
+	for netIndex := 0; len(endpoints) >= 2; netIndex++ {
+		width := 2 + random.Intn(3)
+		if width > len(endpoints) {
+			width = len(endpoints)
+		}
+		if len(endpoints)-width == 1 {
+			width++
+		}
+		document.Circuit.Nets = append(document.Circuit.Nets, Net{
+			Name: fmt.Sprintf("MESH_%02d", netIndex+1), Role: NetRoleSignal,
+			UseLabel: boolPtr(true), Connect: append([]EndpointRef(nil), endpoints[:width]...),
+		})
+		endpoints = endpoints[width:]
 	}
 	return document
 }

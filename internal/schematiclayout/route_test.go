@@ -51,6 +51,40 @@ func TestLabelDirectionUsesPlacedBodyEdge(t *testing.T) {
 	}
 }
 
+func TestRoutePrefersCalibratedPinDirectionForLabelStub(t *testing.T) {
+	result := Route(Request{
+		Sheet: testSheet(),
+		Nets: []Net{{
+			Name:            "I2C_SDA",
+			PreferredLabels: true,
+			Endpoints:       []Endpoint{{Ref: "U1", Pin: "1"}},
+		}},
+	}, Result{Components: []PlacedComponent{{
+		Component: Component{
+			Ref:       "U1",
+			BodyKnown: true,
+			Body:      Rect{MinX: -kicadfiles.MM(5), MinY: -kicadfiles.MM(5), MaxX: kicadfiles.MM(5), MaxY: kicadfiles.MM(5)},
+			Pins: []Pin{{
+				Number:    "1",
+				At:        kicadfiles.Point{X: -kicadfiles.MM(2.54), Y: kicadfiles.MM(3.81)},
+				Direction: kicadfiles.Point{X: -1},
+			}},
+		},
+		PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)},
+	}}})
+	if len(result.Wires) != 1 {
+		t.Fatalf("wires = %#v, want one label stub", result.Wires)
+	}
+	anchor := kicadfiles.Point{X: kicadfiles.MM(50 - 2.54), Y: kicadfiles.MM(50 + 3.81)}
+	other := result.Wires[0].From
+	if other == anchor {
+		other = result.Wires[0].To
+	}
+	if result.Wires[0].From.Y != result.Wires[0].To.Y || other.X >= anchor.X {
+		t.Fatalf("label stub = %#v, want a leftward horizontal stub", result.Wires[0])
+	}
+}
+
 func TestRouteEmitsLabelForSingleEndpointNet(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),

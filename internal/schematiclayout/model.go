@@ -115,6 +115,10 @@ type Pin struct {
 	Number string
 	Role   string
 	At     kicadfiles.Point
+	// Direction points away from the symbol body in its untransformed local
+	// coordinate system. It is optional because generic parsed symbols do not
+	// always retain the original library-pin orientation.
+	Direction kicadfiles.Point
 }
 
 type Net struct {
@@ -652,7 +656,10 @@ func comparePins(first, second Pin) int {
 	if cmp := strings.Compare(first.Role, second.Role); cmp != 0 {
 		return cmp
 	}
-	return comparePoints(first.At, second.At)
+	if cmp := comparePoints(first.At, second.At); cmp != 0 {
+		return cmp
+	}
+	return comparePoints(first.Direction, second.Direction)
 }
 
 func compareEndpoints(first, second Endpoint) int {

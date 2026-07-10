@@ -87,9 +87,17 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		grid = kicadfiles.MM(1.27)
 	}
 	preferred := kicadfiles.Point{X: grid}
+	pinDirected := false
+	if direction, ok := endpointLabelDirection(endpoint, result.Components, grid); ok {
+		preferred = direction
+		pinDirected = true
+	}
 	for _, component := range result.Components {
 		if component.Ref != endpoint.Ref {
 			continue
+		}
+		if pinDirected {
+			break
 		}
 		body := componentBody(component)
 		if !body.Empty() {
@@ -110,7 +118,10 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		preferred = TransformPoint(preferred, component.Rotation, component.Mirror)
 		break
 	}
-	directions := []kicadfiles.Point{preferred, {X: grid}, {X: -grid}, {Y: -grid}, {Y: grid}}
+	directions := []kicadfiles.Point{preferred}
+	if !pinDirected {
+		directions = append(directions, kicadfiles.Point{X: grid}, kicadfiles.Point{X: -grid}, kicadfiles.Point{Y: -grid}, kicadfiles.Point{Y: grid})
+	}
 	for index := 1; index < len(directions); index++ {
 		for _, component := range result.Components {
 			if component.Ref == endpoint.Ref {
@@ -132,6 +143,35 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 		}
 	}
 	return kicadfiles.Point{X: anchor.X + preferred.X*2, Y: anchor.Y + preferred.Y*2}, false
+}
+
+// endpointLabelDirection obtains the intended outward pin direction before
+// falling back to the component body. This matters for calibrated templates
+// whose KiCad connection anchor is mirrored from the raw pin coordinate: the
+// anchor alone can be closer to the wrong body edge.
+func endpointLabelDirection(endpoint Endpoint, components []PlacedComponent, grid kicadfiles.IU) (kicadfiles.Point, bool) {
+	for _, component := range components {
+		if component.Ref != endpoint.Ref {
+			continue
+		}
+		for _, pin := range component.Pins {
+			if pin.Number != endpoint.Pin || (pin.Direction.X == 0 && pin.Direction.Y == 0) {
+				continue
+			}
+			direction := TransformPoint(pin.Direction, component.Rotation, component.Mirror)
+			if absIU(direction.X) >= absIU(direction.Y) {
+				if direction.X < 0 {
+					return kicadfiles.Point{X: -grid}, true
+				}
+				return kicadfiles.Point{X: grid}, true
+			}
+			if direction.Y < 0 {
+				return kicadfiles.Point{Y: -grid}, true
+			}
+			return kicadfiles.Point{Y: grid}, true
+		}
+	}
+	return kicadfiles.Point{}, false
 }
 
 func labelDirectionFromBody(anchor kicadfiles.Point, body Rect, grid kicadfiles.IU) kicadfiles.Point {

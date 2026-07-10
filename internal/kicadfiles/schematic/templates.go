@@ -12,8 +12,9 @@ import (
 const schematicGeneratorVersion = "10.0"
 
 type TemplatePin struct {
-	Number string
-	Offset kicadfiles.Point
+	Number    string
+	Offset    kicadfiles.Point
+	Direction kicadfiles.Point
 }
 
 type embeddedTemplate struct {
@@ -192,11 +193,11 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 			"4": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)},
 		},
 		pins: []TemplatePin{
-			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
-			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},
-			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}},
-			{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}},
-			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: 0}},
+			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: 0}, Direction: kicadfiles.Point{X: 1}},
 		},
 	},
 	"kicadai:ams1117_schematic": {
@@ -229,14 +230,14 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 			"8": {X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-7.62)},
 		},
 		pins: []TemplatePin{
-			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
-			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},
-			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}},
-			{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}},
-			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
-			{Number: "6", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)}},
-			{Number: "7", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(5.08)}},
-			{Number: "8", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(7.62)}},
+			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}, Direction: kicadfiles.Point{X: -1}},
+			{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54)}, Direction: kicadfiles.Point{X: 1}},
+			{Number: "6", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(2.54)}, Direction: kicadfiles.Point{X: 1}},
+			{Number: "7", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(5.08)}, Direction: kicadfiles.Point{X: 1}},
+			{Number: "8", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: kicadfiles.MM(7.62)}, Direction: kicadfiles.Point{X: 1}},
 		},
 	},
 }

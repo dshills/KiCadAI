@@ -543,6 +543,11 @@ case demonstrates the need.
   The fixture suite records the verified local USB-C, regulator, sensor, and
   generic 1x02 connector anchor conventions without promoting the mismatched
   external connector source.
+- Verified embedded templates may carry visual pin-facing directions separately
+  from KiCad-calibrated connection anchors. Label routing uses that direction
+  when available and retains the body-based fallback otherwise. A twelve-seed
+  dense `Sensor:Generic_I2C_8P` corpus now verifies deterministic write, parse,
+  electrical, and zero-warning readability evidence for that path.
 
 ### Work
 

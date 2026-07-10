@@ -60,6 +60,19 @@ func TestToTransactionLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestSchematicLayoutPinsRetainTemplatePinDirection(t *testing.T) {
+	pins := schematicLayoutPins(Component{Symbol: "Sensor:Generic_I2C_8P", Pins: []Pin{{Number: "1"}, {Number: "8"}}}, nil)
+	if len(pins) != 2 {
+		t.Fatalf("pins = %#v", pins)
+	}
+	if pins[0].Direction != (kicadfiles.Point{X: -1}) {
+		t.Fatalf("pin 1 direction = %#v, want left", pins[0].Direction)
+	}
+	if pins[1].Direction != (kicadfiles.Point{X: 1}) {
+		t.Fatalf("pin 8 direction = %#v, want right", pins[1].Direction)
+	}
+}
+
 func TestToTransactionWithLibraryIndexFailsClosedOnMissingRecords(t *testing.T) {
 	document := validLEDDocument()
 	document.Circuit.Components[0].Symbol = "Custom:MissingSymbol"

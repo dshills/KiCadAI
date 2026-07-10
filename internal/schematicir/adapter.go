@@ -1734,6 +1734,7 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	for _, pin := range templatePins {
 		offsets[strings.TrimSpace(pin.Number)] = pin.Offset
 	}
+	directions := schematicLayoutPinDirections(component.Symbol, index)
 	if index != nil {
 		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok {
 			unit := componentUnitOrZero(component)
@@ -1751,7 +1752,7 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	if len(component.Pins) == 0 {
 		pins := make([]schematiclayout.Pin, 0, len(templatePins))
 		for _, pin := range templatePins {
-			pins = append(pins, schematiclayout.Pin{Number: pin.Number, At: offsets[pin.Number]})
+			pins = append(pins, schematiclayout.Pin{Number: pin.Number, At: offsets[pin.Number], Direction: directions[pin.Number]})
 		}
 		return pins
 	}
@@ -1762,9 +1763,28 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 		if explicit, ok := explicitPinOffset(pin, offset); ok {
 			offset = explicit
 		}
-		pins = append(pins, schematiclayout.Pin{Number: number, Role: roles[number], At: offset})
+		pins = append(pins, schematiclayout.Pin{Number: number, Role: roles[number], At: offset, Direction: directions[number]})
 	}
 	return pins
+}
+
+// schematicLayoutPinDirections retains the raw library pin's outward-facing
+// side while connections use KiCad-calibrated physical anchors. KiCad parses
+// raw library Y coordinates into schematic space inverted, hence the Y flip.
+func schematicLayoutPinDirections(symbol string, index *libraryresolver.LibraryIndex) map[string]kicadfiles.Point {
+	directions := map[string]kicadfiles.Point{}
+	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(symbol); ok {
+		for _, pin := range templatePins {
+			if pin.Direction.X != 0 || pin.Direction.Y != 0 {
+				directions[strings.TrimSpace(pin.Number)] = pin.Direction
+			}
+		}
+	}
+	// Resolver records do not yet preserve a reliable pin-facing direction for
+	// every library source. Leave those pins unset so layout retains its proven
+	// body-based fallback rather than guessing from row-pin coordinates.
+	_ = index
+	return directions
 }
 
 func schematicStageForGroup(role GroupRole) schematiclayout.Stage {
