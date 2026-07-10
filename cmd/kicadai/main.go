@@ -4315,6 +4315,8 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 			case "transaction", "write":
 				normalized := schematicir.NormalizeLayoutIntent(document)
 				data.Summary = schematicIRDocumentSummary(normalized)
+				libraryIndex, libraryIssues := schematicIRLibraryIndex(context.Background(), opts)
+				issues = append(issues, libraryIssues...)
 				var tx transactions.Transaction
 				var adapterIssues []reports.Issue
 				transactionGenerated := false
@@ -4327,11 +4329,19 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 							Message:  "schematic-ir write requires --output",
 						})
 					} else {
-						tx, adapterIssues = schematicir.ToProjectTransaction(normalized)
+						if libraryIndex != nil {
+							tx, adapterIssues = schematicir.ToProjectTransactionWithLibraryIndex(normalized, libraryIndex)
+						} else {
+							tx, adapterIssues = schematicir.ToProjectTransaction(normalized)
+						}
 						transactionGenerated = true
 					}
 				} else {
-					tx, adapterIssues = schematicir.ToTransaction(normalized)
+					if libraryIndex != nil {
+						tx, adapterIssues = schematicir.ToTransactionWithLibraryIndex(normalized, libraryIndex)
+					} else {
+						tx, adapterIssues = schematicir.ToTransaction(normalized)
+					}
 					transactionGenerated = true
 				}
 				issues = append(issues, adapterIssues...)
@@ -4344,7 +4354,7 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 					data.Summary.OperationCount = len(tx.Operations)
 					issues = append(issues, validation.Issues...)
 					if subcommand == "write" && !reports.HasBlockingIssue(validation.Issues) {
-						apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite})
+						apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: opts.output, Overwrite: opts.overwrite, LibraryIndex: libraryIndex})
 						issues = append(issues, apply.Issues...)
 					}
 				}
@@ -4352,6 +4362,20 @@ func runSchematicIR(opts cliOptions, stdout io.Writer) error {
 		}
 	}
 	return writeSchematicIRResult(stdout, "schematic-ir."+subcommand, data, issues)
+}
+
+func schematicIRLibraryIndex(ctx context.Context, opts cliOptions) (*libraryresolver.LibraryIndex, []reports.Issue) {
+	if !pinmapShouldUseLibraryResolver(opts) {
+		return nil, nil
+	}
+	index, issues := libraryresolver.Load(ctx, libraryRootsFromOptions(opts), libraryresolver.LoadOptions{
+		CachePath: opts.libraryCache,
+		Refresh:   opts.refreshLibraryCache,
+	})
+	if reports.HasBlockingIssue(issues) {
+		return nil, issues
+	}
+	return &index, issues
 }
 
 func loadSchematicIRDocument(path string) (schematicir.Document, []reports.Issue) {

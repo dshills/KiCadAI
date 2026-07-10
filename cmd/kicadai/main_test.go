@@ -4935,6 +4935,36 @@ func TestSchematicIRWriteCLI(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWriteCLIUsesConfiguredSymbolResolver(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	requestPath := filepath.Join("..", "..", "examples", "schematic-ir", "external_connector_indicator.json")
+	symbolsRoot := filepath.Join("..", "..", "internal", "schematicir", "testdata", "symbols")
+	output := filepath.Join(t.TempDir(), "external_connector_indicator")
+
+	if err := run([]string{"--request", requestPath, "--symbols-root", symbolsRoot, "--output", output, "schematic-ir", "write"}, &stdout, &stderr); err != nil {
+		t.Fatalf("resolver-backed schematic-ir write failed: %v\nstdout=%s\nstderr=%s", err, stdout.String(), stderr.String())
+	}
+	var result struct {
+		OK     bool            `json:"ok"`
+		Issues []reports.Issue `json:"issues"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &result); err != nil {
+		t.Fatalf("decode resolver-backed write response: %v\n%s", err, stdout.String())
+	}
+	if !result.OK {
+		t.Fatalf("expected resolver-backed write response to be OK: %s", stdout.String())
+	}
+	for _, issue := range result.Issues {
+		if issue.Blocking() {
+			t.Fatalf("unexpected blocking resolver issue: %+v", issue)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(output, "external_connector_indicator.kicad_sch")); err != nil {
+		t.Fatalf("expected resolver-backed schematic: %v", err)
+	}
+}
+
 func TestSchematicIRRequiresRequest(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
