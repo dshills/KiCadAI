@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -376,6 +377,78 @@ func TestSchematicIRWritesAdversarialTopologyProjects(t *testing.T) {
 			testSchematicIRTopologyProject(t, tc.doc)
 		})
 	}
+}
+
+func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
+	for _, seed := range []int64{7, 19, 43} {
+		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
+			document := generatedArbitraryTopologyDocument(seed)
+			tx, issues := ToProjectTransaction(document)
+			if reports.HasBlockingIssue(issues) {
+				t.Fatalf("transaction issues: %+v", issues)
+			}
+			outputDir := filepath.Join(t.TempDir(), document.Metadata.Name)
+			apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+			if reports.HasBlockingIssue(apply.Issues) {
+				t.Fatalf("apply issues: %+v", apply.Issues)
+			}
+			read, err := kicaddesign.ReadProjectDirectory(outputDir)
+			if err != nil {
+				t.Fatalf("read generated project: %v", err)
+			}
+			paths := []string{filepath.Join(outputDir, document.Metadata.Name+".kicad_sch")}
+			for _, child := range read.SheetFiles {
+				paths = append(paths, filepath.Join(outputDir, child.Filename))
+			}
+			for _, path := range paths {
+				file, readErr := schematic.ReadFile(path)
+				if readErr != nil {
+					t.Fatalf("read %s: %v", path, readErr)
+				}
+				if file.Paper.Name != "A3" {
+					t.Fatalf("%s paper = %q, want the layout-selected A3 page", path, file.Paper.Name)
+				}
+				request, result := schematiclayout.AdaptSchematic(&file)
+				result = schematiclayout.Validate(result, request)
+				readability := schematiclayout.BuildReport(result, schematiclayout.ProfileStrict)
+				if !readability.Passed {
+					t.Fatalf("%s readability: %#v diagnostics=%#v", path, readability, result.Diagnostics)
+				}
+			}
+		})
+	}
+}
+
+func generatedArbitraryTopologyDocument(seed int64) Document {
+	random := rand.New(rand.NewSource(seed))
+	document := *NewDocument()
+	document.Metadata.Name = fmt.Sprintf("generated_topology_%d", seed)
+	document.Metadata.Title = "Generated arbitrary topology fixture"
+	document.Metadata.Description = "Deterministic high-fanout cyclic schematic corpus fixture."
+	document.Policy.Acceptance = AcceptanceReadable
+	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(true)
+	for index := 0; index < 12; index++ {
+		id := fmt.Sprintf("r%d", index+1)
+		document.Circuit.Components = append(document.Circuit.Components, Component{
+			ID: id, Ref: fmt.Sprintf("R%d", index+1), Role: ComponentRoleResistor, Symbol: "Device:R", Value: "10k",
+			Body: &BodyGeometry{MinXMM: -1.016, MinYMM: -2.54, MaxXMM: 1.016, MaxYMM: 2.54},
+			Pins: []Pin{{Number: "1"}, {Number: "2"}},
+		})
+	}
+	for netIndex := 0; netIndex < 3; netIndex++ {
+		net := Net{Name: fmt.Sprintf("FABRIC_%d", netIndex+1), Role: NetRoleSignal, UseLabel: boolPtr(true)}
+		for componentIndex := 0; componentIndex < len(document.Circuit.Components); componentIndex++ {
+			if componentIndex%3 == netIndex {
+				net.Connect = append(net.Connect, EndpointRef(fmt.Sprintf("r%d.1", componentIndex+1)))
+			}
+			if (componentIndex+1)%3 == netIndex {
+				net.Connect = append(net.Connect, EndpointRef(fmt.Sprintf("r%d.2", componentIndex+1)))
+			}
+		}
+		random.Shuffle(len(net.Connect), func(i, j int) { net.Connect[i], net.Connect[j] = net.Connect[j], net.Connect[i] })
+		document.Circuit.Nets = append(document.Circuit.Nets, net)
+	}
+	return document
 }
 
 func TestSchematicIRWritesLongLabelStressProject(t *testing.T) {

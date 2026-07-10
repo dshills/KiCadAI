@@ -19,6 +19,7 @@ import (
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/manifest"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematiclayout"
 )
 
 const ApplyLockFileName = ".kicadai.apply.lock"
@@ -539,10 +540,16 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 		if err := json.Unmarshal(op.Raw, &payload); err != nil {
 			return nil, err
 		}
+		paper := kicadfiles.Paper{Name: payload.Paper}
+		if strings.TrimSpace(payload.Paper) != "" {
+			sheet := schematiclayout.SheetForPaper(payload.Paper)
+			paper = kicadfiles.Paper{Name: sheet.Name, Width: sheet.Width, Height: sheet.Height}
+		}
 		return designapi.New(designapi.Options{
 			Name:         payload.Name,
 			Seed:         firstNonEmpty(opts.Seed, payload.Name),
 			DesignID:     deterministicDesignUUID(payload.Name, opts.Seed),
+			Paper:        paper,
 			LibraryIndex: opts.LibraryIndex,
 		})
 	}
