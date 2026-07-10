@@ -1,6 +1,7 @@
 package schematiclayout
 
 import (
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ func Route(request Request, result Result) Result {
 	request = Classify(request)
 	rules := normalizeRules(request.Rules)
 	anchors := pinAnchors(result.Components)
+	anchorIndex := newPinAnchorIndex(anchors)
 	labeled := map[string]kicadfiles.Point{}
 	for _, net := range request.Nets {
 		if len(net.Endpoints) < 2 {
@@ -37,7 +39,7 @@ func Route(request Request, result Result) Result {
 				toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
 				result.Connections = append(result.Connections, RoutedConnection{NetName: net.Name, From: fromEndpoint, To: toEndpoint, UseLabels: true, FromLabelAt: &fromLabel, ToLabelAt: &toLabel})
 			} else {
-				points, clean := routeConnectionPoints(net.Name, fromEndpoint, toEndpoint, start, end, result, request, rules)
+				points, clean := routeConnectionPoints(net.Name, fromEndpoint, toEndpoint, start, end, result, request, rules, anchorIndex)
 				if !clean && rules.LabelFallbackEnabled {
 					fromLabel := appendEndpointLabel(&result, labeled, net.Name, fromEndpoint, start, request, rules)
 					toLabel := appendEndpointLabel(&result, labeled, net.Name, toEndpoint, end, request, rules)
@@ -149,8 +151,8 @@ func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, 
 	return false
 }
 
-func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules) ([]kicadfiles.Point, bool) {
-	candidates := routeCandidates(start, end, result.Components, rules)
+func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfiles.Point, result Result, request Request, rules Rules, anchorIndex pinAnchorIndex) ([]kicadfiles.Point, bool) {
+	candidates := routeCandidates(start, end, result.Components, rules, anchorIndex)
 	type scoredRoute struct {
 		points []kicadfiles.Point
 		score  int64
@@ -173,7 +175,7 @@ func routeConnectionPoints(netName string, from, to Endpoint, start, end kicadfi
 	return scored[0].points, scored[0].clean
 }
 
-func routeCandidates(start, end kicadfiles.Point, components []PlacedComponent, rules Rules) [][]kicadfiles.Point {
+func routeCandidates(start, end kicadfiles.Point, components []PlacedComponent, rules Rules, anchorIndex pinAnchorIndex) [][]kicadfiles.Point {
 	if start == end {
 		return [][]kicadfiles.Point{{start}}
 	}
@@ -208,7 +210,94 @@ func routeCandidates(start, end kicadfiles.Point, components []PlacedComponent, 
 			add(start, kicadfiles.Point{X: start.X, Y: y}, kicadfiles.Point{X: end.X, Y: y}, end)
 		}
 	}
+	// Pin-only templates, especially generic connectors, do not always have a
+	// trustworthy body rectangle. Add deterministic offset lanes around every
+	// known pin so direct routes can step around those electrical anchors.
+	pinLane := rules.Grid
+	if pinLane <= 0 {
+		pinLane = kicadfiles.MM(1.27)
+	}
+	minX, maxX := orderedIU(start.X, end.X)
+	minY, maxY := orderedIU(start.Y, end.Y)
+	margin := clearance + pinLane
+	for _, indexed := range anchorIndex.query(minX-margin, maxX+margin, minY-margin, maxY+margin) {
+		anchor := indexed.point
+		for _, x := range []kicadfiles.IU{anchor.X - pinLane, anchor.X + pinLane} {
+			add(start, kicadfiles.Point{X: x, Y: start.Y}, kicadfiles.Point{X: x, Y: end.Y}, end)
+		}
+		for _, y := range []kicadfiles.IU{anchor.Y - pinLane, anchor.Y + pinLane} {
+			add(start, kicadfiles.Point{X: start.X, Y: y}, kicadfiles.Point{X: end.X, Y: y}, end)
+		}
+	}
 	return uniquePointPaths(candidates)
+}
+
+type pinAnchorCell struct {
+	x int
+	y int
+}
+
+type pinAnchorIndex struct {
+	cellSize kicadfiles.IU
+	cells    map[pinAnchorCell][]indexedPinAnchor
+}
+
+type indexedPinAnchor struct {
+	endpoint Endpoint
+	point    kicadfiles.Point
+}
+
+func newPinAnchorIndex(anchors map[Endpoint]kicadfiles.Point) pinAnchorIndex {
+	index := pinAnchorIndex{cellSize: kicadfiles.MM(25.4), cells: map[pinAnchorCell][]indexedPinAnchor{}}
+	seen := map[kicadfiles.Point]struct{}{}
+	for endpoint, anchor := range anchors {
+		if _, exists := seen[anchor]; exists {
+			continue
+		}
+		seen[anchor] = struct{}{}
+		cell := pinAnchorCell{x: pinAnchorCellCoordinate(anchor.X, index.cellSize), y: pinAnchorCellCoordinate(anchor.Y, index.cellSize)}
+		index.cells[cell] = append(index.cells[cell], indexedPinAnchor{endpoint: endpoint, point: anchor})
+	}
+	for cell := range index.cells {
+		sort.Slice(index.cells[cell], func(i, j int) bool {
+			left, right := index.cells[cell][i].point, index.cells[cell][j].point
+			if left.X != right.X {
+				return left.X < right.X
+			}
+			if left.Y != right.Y {
+				return left.Y < right.Y
+			}
+			leftEndpoint, rightEndpoint := index.cells[cell][i].endpoint, index.cells[cell][j].endpoint
+			if leftEndpoint.Ref != rightEndpoint.Ref {
+				return leftEndpoint.Ref < rightEndpoint.Ref
+			}
+			return leftEndpoint.Pin < rightEndpoint.Pin
+		})
+	}
+	return index
+}
+
+func (index pinAnchorIndex) query(minX, maxX, minY, maxY kicadfiles.IU) []indexedPinAnchor {
+	if index.cellSize <= 0 || len(index.cells) == 0 {
+		return nil
+	}
+	minCell := pinAnchorCell{x: pinAnchorCellCoordinate(minX, index.cellSize), y: pinAnchorCellCoordinate(minY, index.cellSize)}
+	maxCell := pinAnchorCell{x: pinAnchorCellCoordinate(maxX, index.cellSize), y: pinAnchorCellCoordinate(maxY, index.cellSize)}
+	var points []indexedPinAnchor
+	for x := minCell.x; x <= maxCell.x; x++ {
+		for y := minCell.y; y <= maxCell.y; y++ {
+			for _, indexed := range index.cells[pinAnchorCell{x: x, y: y}] {
+				if indexed.point.X >= minX && indexed.point.X <= maxX && indexed.point.Y >= minY && indexed.point.Y <= maxY {
+					points = append(points, indexed)
+				}
+			}
+		}
+	}
+	return points
+}
+
+func pinAnchorCellCoordinate(value, cellSize kicadfiles.IU) int {
+	return int(math.Floor(float64(value) / float64(cellSize)))
 }
 
 func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, result Result, request Request) (int64, bool) {

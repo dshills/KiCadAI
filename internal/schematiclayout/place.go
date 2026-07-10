@@ -240,7 +240,11 @@ func placementDiagnostics(components []PlacedComponent, sheet Sheet) []Diagnosti
 	usable := UsableSheet(sheet)
 	var diagnostics []Diagnostic
 	for _, component := range components {
-		if !usable.ContainsRect(componentBody(component)) {
+		body := componentBody(component)
+		if component.BodyKnown && body.Empty() {
+			continue
+		}
+		if !usable.ContainsRect(body) {
 			diagnostics = append(diagnostics, Diagnostic{Severity: SeverityWarning, Code: "page_overflow", Ref: component.Ref, Message: "placed component is outside the preferred readable area"})
 		}
 	}

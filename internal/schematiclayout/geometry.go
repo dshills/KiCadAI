@@ -170,7 +170,7 @@ func UsableSheet(sheet Sheet) Rect {
 
 func componentBody(component PlacedComponent) Rect {
 	body := component.Body
-	if body.Empty() {
+	if body.Empty() && !component.BodyKnown {
 		body = DefaultBodyFor(component)
 	}
 	body = TransformRect(body, component.Rotation, component.Mirror)

@@ -523,16 +523,15 @@ case demonstrates the need.
 
 ### Current Outcome
 
-- Enabled embedded body bounds for built-in non-connector, non-power templates
-  while retaining conservative pin-only geometry for generic connectors and
-  power symbols whose current route anchors are not body-safe.
 - Fixed hierarchy child relayout to copy computed reference/value text anchors
   into the child symbol properties in the child-local coordinate frame before
   sheet fitting and translation.
-- Readable LED, USB-C, regulator, vector-bus, oversized hierarchy, resolver,
-  multi-unit, adversarial-topology, and generated-arbitrary-topology tests are
-  green. Resolver source/installed-library drift diagnostics remain the next
-  unfinished slice of this phase.
+- Explicit and resolver-backed body geometry remains available; template-only
+  layout stays conservative until route attachment semantics can distinguish
+  pin-to-body stubs from body crossings. Readable LED, USB-C, regulator,
+  vector-bus, oversized hierarchy, resolver, multi-unit, adversarial-topology,
+  and generated-arbitrary-topology tests remain green. Resolver
+  source/installed-library drift diagnostics remain the next unfinished slice.
 
 ### Work
 

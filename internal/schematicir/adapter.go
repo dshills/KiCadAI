@@ -1212,6 +1212,7 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 				}
 			}
 		}
+		body := schematicLayoutBody(component, index)
 		request.Components = append(request.Components, schematiclayout.Component{
 			Ref:       component.ID,
 			Value:     component.Value,
@@ -1223,7 +1224,8 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 			RankFixed: group.ID != "" && !group.Inferred,
 			Near:      append([]string(nil), placement.Near...),
 			Rotation:  kicadfiles.Angle(rotationByID[component.ID]),
-			Body:      schematicLayoutBody(component, index),
+			Body:      body,
+			BodyKnown: schematicLayoutBodyKnown(component, index),
 			Pins:      schematicLayoutPins(component, index),
 		})
 	}
@@ -1343,21 +1345,6 @@ func schematicLayoutBody(component Component, index *libraryresolver.LibraryInde
 	}
 	if index == nil {
 		if _, known := schematic.EmbeddedSymbolTemplate(component.Symbol); known {
-			// Generic connectors have pin-only routing semantics in the current
-			// template set. Their body graphics are not yet sufficient to guide
-			// obstacle routing without creating false pin crossings.
-			normalized := strings.ToLower(strings.TrimSpace(component.Symbol))
-			if strings.HasPrefix(normalized, "connector_generic:") || strings.HasPrefix(normalized, "power:") {
-				return schematiclayout.Rect{}
-			}
-			if bounds, ok := schematic.EmbeddedSymbolBodyBounds(component.Symbol); ok {
-				return schematiclayout.Rect{
-					MinX: bounds.Min.X,
-					MinY: bounds.Min.Y,
-					MaxX: bounds.Max.X,
-					MaxY: bounds.Max.Y,
-				}
-			}
 			return schematiclayout.Rect{}
 		}
 		return fallbackComponentBody(component)
@@ -1414,6 +1401,22 @@ func schematicLayoutBody(component Component, index *libraryresolver.LibraryInde
 	pinBounds.MaxX += padding
 	pinBounds.MaxY += padding
 	return pinBounds
+}
+
+func schematicLayoutBodyKnown(component Component, index *libraryresolver.LibraryIndex) bool {
+	if component.Body != nil {
+		return true
+	}
+	normalized := strings.ToLower(strings.TrimSpace(component.Symbol))
+	if strings.HasPrefix(normalized, "kicadai:") {
+		_, ok := schematic.EmbeddedSymbolBodyBounds(component.Symbol)
+		return ok
+	}
+	if index == nil {
+		return false
+	}
+	_, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
+	return ok
 }
 
 func fallbackComponentBody(component Component) schematiclayout.Rect {

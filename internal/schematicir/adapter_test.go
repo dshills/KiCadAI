@@ -327,10 +327,10 @@ func TestToTransactionEmitsTemplatePinOffsetsAndLabelPolicy(t *testing.T) {
 	}
 }
 
-func TestSchematicLayoutBodyUsesSafeTemplateGeometry(t *testing.T) {
+func TestSchematicLayoutBodyRemainsConservativeWithoutResolver(t *testing.T) {
 	resistor := schematicLayoutBody(Component{Symbol: "Device:R"}, nil)
-	if resistor.Empty() {
-		t.Fatal("built-in resistor should contribute a body obstacle")
+	if !resistor.Empty() {
+		t.Fatalf("template-only resistor should retain conservative geometry: %#v", resistor)
 	}
 	connector := schematicLayoutBody(Component{Symbol: "Connector_Generic:Conn_01x02"}, nil)
 	if !connector.Empty() {

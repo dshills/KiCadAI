@@ -190,6 +190,15 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			LibraryID: symbol.LibraryID,
 			Position:  symbol.Position,
 		}
+		if symbol.BodyBounds != nil {
+			component.Body = schematiclayout.Rect{
+				MinX: symbol.BodyBounds.Min.X,
+				MinY: symbol.BodyBounds.Min.Y,
+				MaxX: symbol.BodyBounds.Max.X,
+				MaxY: symbol.BodyBounds.Max.Y,
+			}
+			component.BodyKnown = true
+		}
 		component.Role = schematiclayout.InferComponentRole(component)
 		for index, pin := range symbol.Pins {
 			relative := kicadfiles.Point{X: symbol.PinAnchors[index].X - symbol.Position.X, Y: symbol.PinAnchors[index].Y - symbol.Position.Y}

@@ -67,14 +67,17 @@ type Component struct {
 	Lane      Lane
 	// FlowRank is an optional left-to-right graph rank. RankFixed distinguishes
 	// an explicit rank of zero from an inferred rank.
-	FlowRank        int
-	RankFixed       bool
-	Near            []string
-	Position        kicadfiles.Point
-	Fixed           bool
-	Rotation        kicadfiles.Angle
-	Mirror          Mirror
-	Body            Rect
+	FlowRank  int
+	RankFixed bool
+	Near      []string
+	Position  kicadfiles.Point
+	Fixed     bool
+	Rotation  kicadfiles.Angle
+	Mirror    Mirror
+	Body      Rect
+	// BodyKnown distinguishes an intentional pin-only symbol from a missing
+	// body geometry value that should use the role-based fallback.
+	BodyKnown       bool
 	ReferenceText   TextBox
 	ValueText       TextBox
 	Pins            []Pin

@@ -127,7 +127,7 @@ func TestRouteRejectsUnrelatedPinAnchor(t *testing.T) {
 	components := []PlacedComponent{
 		{Component: Component{Ref: "A", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
 		{Component: Component{Ref: "B", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(80), Y: kicadfiles.MM(20)}},
-		{Component: Component{Ref: "BLOCK", Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: kicadfiles.MM(10)}}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}},
+		{Component: Component{Ref: "BLOCK", BodyKnown: true, Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: kicadfiles.MM(10)}}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}},
 	}
 	request := Request{
 		Sheet: testSheet(),

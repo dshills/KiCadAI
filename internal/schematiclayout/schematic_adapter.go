@@ -31,6 +31,7 @@ func AdaptSchematic(file *schematic.SchematicFile) (Request, Result) {
 		}
 		if symbol.BodyBounds != nil {
 			component.Body = Rect{MinX: symbol.BodyBounds.Min.X, MinY: symbol.BodyBounds.Min.Y, MaxX: symbol.BodyBounds.Max.X, MaxY: symbol.BodyBounds.Max.Y}
+			component.BodyKnown = true
 		}
 		component.Role = InferComponentRole(component)
 		component.Stage = StageForRole(component.Role)
