@@ -2,6 +2,7 @@ package roundtrip
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/checks"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
@@ -97,6 +99,164 @@ func TestKiCadRoundTripSchematicIRLEDIndicator(t *testing.T) {
 	}
 	if !roundTrip.Equal {
 		t.Fatalf("LED round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}
+
+func TestKiCadDirectResistorTransformMatrix(t *testing.T) {
+	runKiCadDirectPassiveTransformMatrix(t, "Device:R", "R1")
+}
+
+func runKiCadDirectPassiveTransformMatrix(t *testing.T, libraryID, reference string) {
+	cli := requireKiCadCLI(t)
+	cases := []struct {
+		name        string
+		orientation schematicir.Orientation
+		mirror      schematicir.Mirror
+	}{
+		{name: "normal", orientation: schematicir.OrientationNormal},
+		{name: "rotated_90", orientation: schematicir.OrientationRotated90},
+		{name: "rotated_180", orientation: schematicir.OrientationRotated180},
+		{name: "rotated_270", orientation: schematicir.OrientationRotated270},
+		{name: "mirror_x", orientation: schematicir.OrientationNormal, mirror: schematicir.MirrorX},
+		{name: "mirror_y", orientation: schematicir.OrientationNormal, mirror: schematicir.MirrorY},
+		{name: "mirror_x_rotated_90", orientation: schematicir.OrientationRotated90, mirror: schematicir.MirrorX},
+		{name: "mirror_y_rotated_90", orientation: schematicir.OrientationRotated90, mirror: schematicir.MirrorY},
+		{name: "mirror_x_rotated_180", orientation: schematicir.OrientationRotated180, mirror: schematicir.MirrorX},
+		{name: "mirror_y_rotated_180", orientation: schematicir.OrientationRotated180, mirror: schematicir.MirrorY},
+		{name: "mirror_x_rotated_270", orientation: schematicir.OrientationRotated270, mirror: schematicir.MirrorX},
+		{name: "mirror_y_rotated_270", orientation: schematicir.OrientationRotated270, mirror: schematicir.MirrorY},
+	}
+	for _, tt := range cases {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			tx := directPassiveCalibrationTransaction(t, libraryID, reference, tt.orientation, tt.mirror)
+			output := filepath.Join(t.TempDir(), "direct_resistor_"+tt.name)
+			apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true})
+			if reports.HasBlockingIssue(apply.Issues) {
+				t.Fatalf("write direct resistor schematic: %#v", apply.Issues)
+			}
+			schematicPath := filepath.Join(output, "direct_resistor_calibration.kicad_sch")
+			generated, err := schematic.ReadFile(schematicPath)
+			if err != nil {
+				t.Fatalf("read generated schematic: %v", err)
+			}
+			if err := schematic.ValidateGeneratedConnectivity(generated); err != nil {
+				t.Fatalf("internal generated connectivity: %v", err)
+			}
+			ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+			defer cancel()
+			erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, schematicPath, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+			if err != nil {
+				t.Fatalf("RunERC returned error: %v\nresult=%#v", err, erc)
+			}
+			if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+				t.Fatalf("ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+			}
+			roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "roundtrip")})
+			if err != nil {
+				t.Fatalf("RoundTripSchematic returned error: %v\nresult=%#v", err, roundTrip)
+			}
+			if !roundTrip.Equal {
+				t.Fatalf("round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+			}
+		})
+	}
+}
+
+func directPassiveCalibrationTransaction(t *testing.T, libraryID, reference string, orientation schematicir.Orientation, mirror schematicir.Mirror) transactions.Transaction {
+	t.Helper()
+	rotation := calibrationRotation(orientation)
+	resistorPins, ok := schematic.EmbeddedSymbolConnectionPinOffsets(libraryID)
+	if !ok || len(resistorPins) != 2 {
+		t.Fatalf("%s connection anchors = %#v", libraryID, resistorPins)
+	}
+	powerFlagPins, ok := schematic.EmbeddedSymbolConnectionPinOffsets("power:PWR_FLAG")
+	if !ok || len(powerFlagPins) != 1 {
+		t.Fatalf("PWR_FLAG connection anchors = %#v", powerFlagPins)
+	}
+	resistorPosition := kicadfiles.Point{X: kicadfiles.MM(60), Y: kicadfiles.MM(50)}
+	canonicalRotation, resistorMirror := schematic.CanonicalSymbolTransform(kicadfiles.Angle(rotation), schematic.SymbolMirror(mirror))
+	anchors := map[string]kicadfiles.Point{}
+	for _, pin := range resistorPins {
+		offset := schematic.TransformConnectionAnchor(pin.Offset, canonicalRotation, resistorMirror)
+		anchors[pin.Number] = kicadfiles.Point{X: resistorPosition.X + offset.X, Y: resistorPosition.Y + offset.Y}
+	}
+	firstTarget := calibrationOutwardPoint(resistorPosition, anchors["1"])
+	secondTarget := calibrationOutwardPoint(resistorPosition, anchors["2"])
+	firstPosition := kicadfiles.Point{X: firstTarget.X - powerFlagPins[0].Offset.X, Y: firstTarget.Y - powerFlagPins[0].Offset.Y}
+	secondPosition := kicadfiles.Point{X: secondTarget.X - powerFlagPins[0].Offset.X, Y: secondTarget.Y - powerFlagPins[0].Offset.Y}
+	direct := false
+	operations := []transactions.Operation{
+		calibrationOperation(t, transactions.OpCreateProject, transactions.CreateProjectOperation{Op: transactions.OpCreateProject, Name: "direct_resistor_calibration", Paper: "A4"}),
+		calibrationOperation(t, transactions.OpAddSymbol, transactions.AddSymbolOperation{Op: transactions.OpAddSymbol, Ref: "#FLG01", LibraryID: "power:PWR_FLAG", At: calibrationTransactionPoint(firstPosition), Pins: calibrationPinSpecs(powerFlagPins)}),
+		calibrationOperation(t, transactions.OpAddSymbol, transactions.AddSymbolOperation{Op: transactions.OpAddSymbol, Ref: reference, LibraryID: libraryID, At: calibrationTransactionPoint(resistorPosition), Rotation: rotation, Mirror: string(mirror), Pins: calibrationPinSpecs(resistorPins)}),
+		calibrationOperation(t, transactions.OpAddSymbol, transactions.AddSymbolOperation{Op: transactions.OpAddSymbol, Ref: "#FLG02", LibraryID: "power:PWR_FLAG", At: calibrationTransactionPoint(secondPosition), Pins: calibrationPinSpecs(powerFlagPins)}),
+		calibrationOperation(t, transactions.OpConnect, transactions.ConnectOperation{Op: transactions.OpConnect, From: transactions.Endpoint{Ref: "#FLG01", Pin: "1"}, To: transactions.Endpoint{Ref: reference, Pin: "1"}, NetName: "IN", UseLabels: &direct}),
+		calibrationOperation(t, transactions.OpConnect, transactions.ConnectOperation{Op: transactions.OpConnect, From: transactions.Endpoint{Ref: reference, Pin: "2"}, To: transactions.Endpoint{Ref: "#FLG02", Pin: "1"}, NetName: "OUT", UseLabels: &direct}),
+		// This harness isolates electrical endpoint calibration. Production IR
+		// fixtures retain strict readability validation separately.
+		calibrationOperation(t, transactions.OpWriteProject, transactions.WriteProjectOperation{Op: transactions.OpWriteProject, SchematicOnly: true}),
+	}
+	return transactions.Transaction{Name: "direct_resistor_calibration", Operations: operations}
+}
+
+func calibrationOperation(t *testing.T, kind transactions.OperationKind, payload any) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions.NewOperation(kind, raw)
+}
+
+func calibrationPinSpecs(pins []schematic.TemplatePin) []transactions.PinSpec {
+	specs := make([]transactions.PinSpec, 0, len(pins))
+	for _, pin := range pins {
+		specs = append(specs, transactions.PinSpec{Number: pin.Number, XMM: float64(pin.Offset.X) / float64(kicadfiles.MM(1)), YMM: float64(pin.Offset.Y) / float64(kicadfiles.MM(1))})
+	}
+	return specs
+}
+
+func calibrationTransactionPoint(point kicadfiles.Point) transactions.Point {
+	return transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}
+}
+
+func calibrationOutwardPoint(origin, anchor kicadfiles.Point) kicadfiles.Point {
+	dx := anchor.X - origin.X
+	dy := anchor.Y - origin.Y
+	if absCalibrationIU(dx) >= absCalibrationIU(dy) {
+		if dx < 0 {
+			anchor.X -= kicadfiles.MM(20)
+		} else {
+			anchor.X += kicadfiles.MM(20)
+		}
+		return anchor
+	}
+	if dy < 0 {
+		anchor.Y -= kicadfiles.MM(20)
+	} else {
+		anchor.Y += kicadfiles.MM(20)
+	}
+	return anchor
+}
+
+func absCalibrationIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
+func calibrationRotation(orientation schematicir.Orientation) float64 {
+	switch orientation {
+	case schematicir.OrientationRotated, schematicir.OrientationRotated90:
+		return 90
+	case schematicir.OrientationRotated180:
+		return 180
+	case schematicir.OrientationRotated270:
+		return 270
+	default:
+		return 0
 	}
 }
 

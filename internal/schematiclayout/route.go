@@ -114,7 +114,7 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 			position := kicadfiles.Point{X: anchor.X + direction.X*scale, Y: anchor.Y + direction.Y*scale}
 			segment := WireSegment{NetName: netName, From: anchor, To: position}
 			labelBox := TextEstimate(netName, position, 0, 0)
-			if !usable.ContainsRect(labelBox) || labelPlacementCollides(labelBox, segment, endpoint, result) {
+			if !usable.ContainsRect(labelBox) || labelPlacementCollides(labelBox, segment, endpoint, result, request) {
 				continue
 			}
 			return position, true
@@ -123,7 +123,10 @@ func labelStubPoint(netName string, endpoint Endpoint, anchor kicadfiles.Point, 
 	return kicadfiles.Point{X: anchor.X + preferred.X*2, Y: anchor.Y + preferred.Y*2}, false
 }
 
-func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, result Result) bool {
+func labelPlacementCollides(labelBox Rect, stub WireSegment, endpoint Endpoint, result Result, request Request) bool {
+	if _, intersectsPin := unrelatedPinForWire(stub, stub.NetName, result, request); intersectsPin {
+		return true
+	}
 	for _, component := range result.Components {
 		body := componentBody(component)
 		if labelBox.Intersects(body) {

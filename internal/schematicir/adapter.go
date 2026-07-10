@@ -483,6 +483,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 		if ref == "" {
 			continue
 		}
+		rotation, mirror := schematic.CanonicalSymbolTransform(kicadfiles.Angle(state.rotationByID[component.ID]), schematic.SymbolMirror(state.mirrorByID[component.ID]))
 		payload := transactions.AddSymbolOperation{
 			Op:         transactions.OpAddSymbol,
 			Ref:        ref,
@@ -491,8 +492,8 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			Value:      component.Value,
 			LibraryID:  component.Symbol,
 			At:         state.pointsByID[component.ID],
-			Rotation:   state.rotationByID[component.ID],
-			Mirror:     string(state.mirrorByID[component.ID]),
+			Rotation:   float64(rotation),
+			Mirror:     string(mirror),
 			Pins:       transactionPinsWithLibraryIndex(component, state.libraryIndex),
 			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID]),
 		}

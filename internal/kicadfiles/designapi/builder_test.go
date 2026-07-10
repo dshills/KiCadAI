@@ -854,14 +854,14 @@ func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	if len(design.Schematic.Symbols[0].Pins) != 2 || len(design.Schematic.Symbols[1].Pins) != 2 {
 		t.Fatalf("template pins not rendered: %#v", design.Schematic.Symbols)
 	}
-	if len(design.Schematic.Wires) < 2 {
-		t.Fatalf("wires = %d, want at least 2", len(design.Schematic.Wires))
+	if len(design.Schematic.Wires) != 1 {
+		t.Fatalf("wires = %d, want one direct physical-pin wire", len(design.Schematic.Wires))
 	}
-	if len(design.Schematic.Labels) < 1 {
-		t.Fatalf("labels = %d, want at least 1 dogleg label", len(design.Schematic.Labels))
+	if len(design.Schematic.Labels) != 0 {
+		t.Fatalf("labels = %d, want no label for aligned direct pins", len(design.Schematic.Labels))
 	}
-	if len(design.Schematic.Junctions) < 1 {
-		t.Fatalf("junctions = %d, want at least 1 dogleg junction", len(design.Schematic.Junctions))
+	if len(design.Schematic.Junctions) != 0 {
+		t.Fatalf("junctions = %d, want no junction for a direct wire", len(design.Schematic.Junctions))
 	}
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "R1", Pin: "2"}, "FILTER")
 	assertSchematicPinNet(t, builder, Endpoint{Reference: "C1", Pin: "1"}, "FILTER")

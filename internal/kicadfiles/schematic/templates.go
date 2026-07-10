@@ -134,7 +134,15 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		localLibrary: true,
 		pins:         deviceRTemplatePins(),
 	},
-	"device:r":            {bodyName: "R", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}}}, rawBody: rawDeviceRSymbol},
+	"device:r": {
+		bodyName: "R", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(3.81)}}, {Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(-3.81)}}}, rawBody: rawDeviceRSymbol,
+		// KiCad parses library-pin coordinates into schematic space with an
+		// inverted Y axis. Direct connections must use those physical anchors.
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"1": {Y: kicadfiles.MM(-3.81)},
+			"2": {Y: kicadfiles.MM(3.81)},
+		},
+	},
 	"connector:testpoint": {bodyName: "TestPoint", pinType: "passive", pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}},
 	"power:+3.3v":         powerTemplate("+3.3V", 5.08),
 	"power:+3v3":          powerTemplate("+3V3", 5.08),

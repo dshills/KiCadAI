@@ -75,16 +75,19 @@ type BoardOutlineHandle struct {
 }
 
 type SymbolOptions struct {
-	Reference  string
-	Unit       int
-	Role       string
-	Value      string
-	LibraryID  string
-	Position   kicadfiles.Point
-	Rotation   kicadfiles.Angle
-	Mirror     schematic.SymbolMirror
-	Pins       []PinSpec
-	Properties []schematic.Property
+	Reference string
+	Unit      int
+	Role      string
+	Value     string
+	LibraryID string
+	Position  kicadfiles.Point
+	Rotation  kicadfiles.Angle
+	Mirror    schematic.SymbolMirror
+	Pins      []PinSpec
+	// UsePhysicalConnectionAnchors applies KiCad-calibrated template anchors
+	// to a transaction-derived pin list. Direct callers keep supplied offsets.
+	UsePhysicalConnectionAnchors bool
+	Properties                   []schematic.Property
 }
 
 type PinSpec struct {
@@ -221,17 +224,18 @@ type ZoneOptions struct {
 }
 
 type symbolState struct {
-	symbolIndex int
-	reference   string
-	unit        int
-	libraryID   string
-	position    kicadfiles.Point
-	rotation    kicadfiles.Angle
-	mirror      schematic.SymbolMirror
-	pins        map[string]kicadfiles.Point
-	pinOrder    []string
-	pinNets     map[string]string
-	footprintID string
+	symbolIndex                  int
+	reference                    string
+	unit                         int
+	libraryID                    string
+	position                     kicadfiles.Point
+	rotation                     kicadfiles.Angle
+	mirror                       schematic.SymbolMirror
+	usePhysicalConnectionAnchors bool
+	pins                         map[string]kicadfiles.Point
+	pinOrder                     []string
+	pinNets                      map[string]string
+	footprintID                  string
 }
 
 const schematicConnectionGrid = kicadfiles.IU(1270000)
@@ -342,16 +346,18 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	if err := builder.ensureSchematicLibrarySymbol(libraryID); err != nil {
 		return SymbolHandle{}, err
 	}
+	rotation, mirror := schematic.CanonicalSymbolTransform(options.Rotation, options.Mirror)
 	value := strings.TrimSpace(options.Value)
 	if value == "" {
 		value = reference
 	}
+	usePhysicalConnectionAnchors := options.UsePhysicalConnectionAnchors || len(options.Pins) == 0
 	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
-	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, options.Rotation, options.Mirror)
+	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, rotation, mirror)
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", generationKey), libraryID, reference, value, position)
 	symbol.Unit = unit
-	symbol.Rotation = options.Rotation
-	symbol.Mirror = options.Mirror
+	symbol.Rotation = rotation
+	symbol.Mirror = mirror
 	symbol.Path = "root.component." + generationKey
 	if strings.EqualFold(strings.TrimSpace(options.Role), "generated_terminal") {
 		inBOM := false
@@ -375,10 +381,12 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 			return SymbolHandle{}, fmt.Errorf("duplicate pin %s on %s", number, reference)
 		}
 		anchorOffset := pin.Offset
-		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
-			anchorOffset = offset
+		if usePhysicalConnectionAnchors {
+			if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
+				anchorOffset = offset
+			}
 		}
-		anchorOffset = schematic.TransformConnectionAnchor(anchorOffset, options.Rotation, options.Mirror)
+		anchorOffset = schematic.TransformConnectionAnchor(anchorOffset, rotation, mirror)
 		anchor := schematicSymbolPinAnchor(position, anchorOffset)
 		pins[number] = anchor
 		builder.schematicPinAnchors[anchor] = struct{}{}
@@ -398,16 +406,17 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	}}
 	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, symbol)
 	builder.symbols[stateKey] = &symbolState{
-		symbolIndex: len(builder.design.Schematic.Symbols) - 1,
-		reference:   reference,
-		unit:        unit,
-		libraryID:   libraryID,
-		position:    position,
-		rotation:    options.Rotation,
-		mirror:      options.Mirror,
-		pins:        pins,
-		pinOrder:    pinOrder,
-		pinNets:     pinNets,
+		symbolIndex:                  len(builder.design.Schematic.Symbols) - 1,
+		reference:                    reference,
+		unit:                         unit,
+		libraryID:                    libraryID,
+		position:                     position,
+		rotation:                     rotation,
+		mirror:                       mirror,
+		usePhysicalConnectionAnchors: usePhysicalConnectionAnchors,
+		pins:                         pins,
+		pinOrder:                     pinOrder,
+		pinNets:                      pinNets,
 	}
 	refKey := referenceKey(reference)
 	states := builder.symbolUnits[refKey]
@@ -2024,8 +2033,10 @@ func (builder *Builder) pinAnchorForState(state *symbolState, reference string, 
 	if !ok {
 		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", reference, pin)
 	}
-	if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
-		return schematicSymbolPinAnchor(state.position, schematic.TransformConnectionAnchor(offset, state.rotation, state.mirror)), nil
+	if state.usePhysicalConnectionAnchors {
+		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
+			return schematicSymbolPinAnchor(state.position, schematic.TransformConnectionAnchor(offset, state.rotation, state.mirror)), nil
+		}
 	}
 	return anchor, nil
 }

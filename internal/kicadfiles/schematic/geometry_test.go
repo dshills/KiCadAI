@@ -34,3 +34,27 @@ func TestTransformConnectionAnchorUsesKiCadMirrorThenRotateOrder(t *testing.T) {
 		t.Fatalf("mirror x then rotate = %#v", got)
 	}
 }
+
+func TestCanonicalSymbolTransformMatchesKiCadSaveForms(t *testing.T) {
+	tests := []struct {
+		rotation     kicadfiles.Angle
+		mirror       SymbolMirror
+		wantRotation kicadfiles.Angle
+		wantMirror   SymbolMirror
+	}{
+		{rotation: 180, mirror: SymbolMirrorX, wantMirror: SymbolMirrorY},
+		{rotation: 90, mirror: SymbolMirrorY, wantRotation: 270, wantMirror: SymbolMirrorX},
+		{rotation: 180, mirror: SymbolMirrorY, wantMirror: SymbolMirrorX},
+		{rotation: 270, mirror: SymbolMirrorY, wantRotation: 90, wantMirror: SymbolMirrorX},
+	}
+	for _, tt := range tests {
+		rotation, mirror := CanonicalSymbolTransform(tt.rotation, tt.mirror)
+		if rotation != tt.wantRotation || mirror != tt.wantMirror {
+			t.Fatalf("CanonicalSymbolTransform(%v, %q) = (%v, %q), want (%v, %q)", tt.rotation, tt.mirror, rotation, mirror, tt.wantRotation, tt.wantMirror)
+		}
+		probe := kicadfiles.Point{X: kicadfiles.MM(3), Y: kicadfiles.MM(4)}
+		if got, want := TransformConnectionAnchor(probe, tt.rotation, tt.mirror), TransformConnectionAnchor(probe, rotation, mirror); got != want {
+			t.Fatalf("canonical transform changed anchor: got %#v want %#v", got, want)
+		}
+	}
+}

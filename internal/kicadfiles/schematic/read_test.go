@@ -127,11 +127,11 @@ func TestReadSchematicRecoversRotatedPinAnchors(t *testing.T) {
 	if len(anchors) != 2 {
 		t.Fatalf("pin anchors = %#v, want two recovered anchors", anchors)
 	}
-	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(6.19), Y: kicadfiles.MM(20)}) {
-		t.Fatalf("pin 1 anchor = %#v, want rotated left anchor", anchors[0])
+	if anchors[0] != (kicadfiles.Point{X: kicadfiles.MM(13.81), Y: kicadfiles.MM(20)}) {
+		t.Fatalf("pin 1 anchor = %#v, want rotated right anchor", anchors[0])
 	}
-	if anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(13.81), Y: kicadfiles.MM(20)}) {
-		t.Fatalf("pin 2 anchor = %#v, want rotated right anchor", anchors[1])
+	if anchors[1] != (kicadfiles.Point{X: kicadfiles.MM(6.19), Y: kicadfiles.MM(20)}) {
+		t.Fatalf("pin 2 anchor = %#v, want rotated left anchor", anchors[1])
 	}
 }
 

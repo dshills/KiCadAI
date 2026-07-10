@@ -82,7 +82,7 @@ func resolveSymbolPins(pins []PinSpec, index *libraryresolver.LibraryIndex, libr
 
 func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryIndex, libraryID string, unit int) ([]PinSpec, error) {
 	pins = append([]PinSpec(nil), pins...)
-	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(libraryID); ok {
+	if templatePins, ok := schematic.EmbeddedSymbolConnectionPinOffsets(libraryID); ok {
 		templateByNumber := make(map[string]PinSpec, len(templatePins))
 		for _, pin := range templatePins {
 			templateByNumber[strings.TrimSpace(pin.Number)] = PinSpec{
@@ -100,6 +100,10 @@ func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryInde
 		}
 		resolved := make([]PinSpec, 0, len(pins))
 		for _, pin := range pins {
+			if pin.ExplicitOffset {
+				resolved = append(resolved, pin)
+				continue
+			}
 			if templatePin, ok := templateByNumber[strings.TrimSpace(pin.Number)]; ok {
 				pin.XMM = templatePin.XMM
 				pin.YMM = templatePin.YMM

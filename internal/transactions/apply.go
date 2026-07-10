@@ -246,8 +246,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			}
 			payload.Pins = pins
 			symbol := schematic.NewSymbol(generator.New("imported.schematic.symbol", payload.Ref, opIndex), payload.LibraryID, payload.Ref, firstNonEmpty(payload.Value, payload.Ref), point(payload.At.XMM, payload.At.YMM))
-			symbol.Rotation = kicadfiles.Angle(payload.Rotation)
-			symbol.Mirror = schematic.SymbolMirror(payload.Mirror)
+			symbol.Rotation, symbol.Mirror = schematic.CanonicalSymbolTransform(kicadfiles.Angle(payload.Rotation), schematic.SymbolMirror(payload.Mirror))
 			if strings.EqualFold(strings.TrimSpace(payload.Role), "generated_terminal") {
 				inBOM := false
 				onBoard := false
@@ -600,16 +599,17 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			pins = append(pins, designapi.PinSpec{Number: pin.Number, Offset: point(pin.XMM, pin.YMM)})
 		}
 		_, err = builder.AddSymbol(designapi.SymbolOptions{
-			Reference:  payload.Ref,
-			Unit:       payload.Unit,
-			Role:       payload.Role,
-			Value:      payload.Value,
-			LibraryID:  payload.LibraryID,
-			Position:   point(payload.At.XMM, payload.At.YMM),
-			Rotation:   kicadfiles.Angle(payload.Rotation),
-			Mirror:     schematic.SymbolMirror(payload.Mirror),
-			Pins:       pins,
-			Properties: schematicPropertiesFromPayload(payload.Properties, point(payload.At.XMM, payload.At.YMM), kicadfiles.Angle(payload.Rotation), 2),
+			Reference:                    payload.Ref,
+			Unit:                         payload.Unit,
+			Role:                         payload.Role,
+			Value:                        payload.Value,
+			LibraryID:                    payload.LibraryID,
+			Position:                     point(payload.At.XMM, payload.At.YMM),
+			Rotation:                     kicadfiles.Angle(payload.Rotation),
+			Mirror:                       schematic.SymbolMirror(payload.Mirror),
+			Pins:                         pins,
+			UsePhysicalConnectionAnchors: transactionPinsNeedPhysicalConnectionAnchors(payload.Pins),
+			Properties:                   schematicPropertiesFromPayload(payload.Properties, point(payload.At.XMM, payload.At.YMM), kicadfiles.Angle(payload.Rotation), 2),
 		})
 		return nil, err
 	case OpConnect:
@@ -1497,6 +1497,18 @@ func validateSymbolPropertyPayload(properties []SymbolProperty) error {
 
 func point(xMM, yMM float64) kicadfiles.Point {
 	return kicadfiles.Point{X: kicadfiles.MM(xMM), Y: kicadfiles.MM(yMM)}
+}
+
+func transactionPinsNeedPhysicalConnectionAnchors(pins []PinSpec) bool {
+	if len(pins) == 0 {
+		return true
+	}
+	for _, pin := range pins {
+		if !pin.ExplicitOffset {
+			return true
+		}
+	}
+	return false
 }
 
 func optionalPoint(value *Point) *kicadfiles.Point {

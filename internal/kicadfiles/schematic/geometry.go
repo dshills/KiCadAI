@@ -34,6 +34,28 @@ func TransformConnectionAnchor(offset kicadfiles.Point, rotation kicadfiles.Angl
 	}
 }
 
+// CanonicalSymbolTransform selects the representation KiCad itself emits for
+// equivalent quarter-turn mirrored transforms. Keeping generated instances in
+// this form avoids save-time churn while preserving the physical transform.
+func CanonicalSymbolTransform(rotation kicadfiles.Angle, mirror SymbolMirror) (kicadfiles.Angle, SymbolMirror) {
+	switch mirror {
+	case SymbolMirrorX:
+		if rotation == 180 {
+			return 0, SymbolMirrorY
+		}
+	case SymbolMirrorY:
+		switch rotation {
+		case 90:
+			return 270, SymbolMirrorX
+		case 180:
+			return 0, SymbolMirrorX
+		case 270:
+			return 90, SymbolMirrorX
+		}
+	}
+	return rotation, mirror
+}
+
 type embeddedPinGeometry struct {
 	Number    string
 	Offset    kicadfiles.Point
