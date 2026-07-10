@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"sort"
 	"testing"
 
 	"kicadai/internal/evaluate"
@@ -162,6 +164,89 @@ func TestSchematicIRWritesResolverBackedExternalSymbolProject(t *testing.T) {
 	if !readability.Passed || readability.ErrorCount != 0 || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
 		t.Fatalf("external symbol readability failed: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
 	}
+}
+
+func TestSchematicIRWritesResolverBackedMultiUnitProject(t *testing.T) {
+	document := multiUnitFixtureDocument()
+	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{
+		SymbolsRoot: filepath.Join("testdata", "symbols"),
+	}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(loadIssues) {
+		t.Fatalf("fixture library issues: %+v", loadIssues)
+	}
+	tx, issues := ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("project transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), "multi_unit_fixture")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{
+		OutputDir:    outputDir,
+		Overwrite:    true,
+		LibraryIndex: &index,
+	})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	path := filepath.Join(outputDir, "multi_unit_fixture.kicad_sch")
+	generated, err := schematic.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	var units []int
+	for _, symbol := range generated.Symbols {
+		if symbol.Reference == "U1" {
+			units = append(units, symbol.Unit)
+			if symbol.BodyBounds == nil || len(symbol.PinAnchors) != 2 {
+				t.Fatalf("multi-unit symbol geometry = %#v", symbol)
+			}
+		}
+	}
+	sort.Ints(units)
+	if !reflect.DeepEqual(units, []int{1, 2}) {
+		t.Fatalf("U1 units = %#v, want [1 2]", units)
+	}
+	report, err := evaluate.Schematic(path)
+	if err != nil {
+		t.Fatalf("evaluate generated schematic: %v", err)
+	}
+	for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+		if check := schematicIRCheckByName(report.Checks, name); check.Status != evaluate.CheckPassed {
+			t.Fatalf("%s check = %#v", name, check)
+		}
+	}
+	request, layoutResult := schematiclayout.AdaptSchematic(&generated)
+	layoutResult = schematiclayout.Validate(layoutResult, request)
+	readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+	if !readability.Passed || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+		t.Fatalf("multi-unit readability failed: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
+	}
+}
+
+func multiUnitFixtureDocument() Document {
+	document := *NewDocument()
+	document.Metadata.Name = "multi_unit_fixture"
+	document.Metadata.Title = "Multi-unit schematic fixture"
+	document.Metadata.Description = "Resolver-backed multi-unit IR fixture."
+	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(false)
+	document.Policy.Acceptance = AcceptanceReadable
+	document.Layout.Groups = []Group{
+		{ID: "connector", Role: GroupRoleConnectorStage, Members: []string{"j1"}, Rank: 0},
+		{ID: "unit_a", Role: GroupRoleProcessingStage, Members: []string{"u1a"}, Rank: 1},
+		{ID: "unit_b", Role: GroupRoleProcessingStage, Members: []string{"u1b"}, Rank: 2},
+	}
+	document.Circuit.Components = []Component{
+		{ID: "u1a", Ref: "U1", Unit: "1", Role: ComponentRoleIC, Symbol: "Amplifier:DUAL", Value: "DUAL", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+		{ID: "u1b", Ref: "U1", Unit: "2", Role: ComponentRoleIC, Symbol: "Amplifier:DUAL", Value: "DUAL", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+		{ID: "j1", Ref: "J1", Role: ComponentRoleInputConnector, Symbol: "Connector_Generic:Conn_02x02_Odd_Even", Value: "IO", Pins: []Pin{{Number: "1"}, {Number: "2"}, {Number: "3"}, {Number: "4"}}},
+	}
+	document.Circuit.Nets = []Net{
+		{Name: "IN", Role: NetRoleSignal, Connect: []EndpointRef{"j1.1", "u1a.1"}, UseLabel: boolPtr(true)},
+		{Name: "LINK", Role: NetRoleSignal, Connect: []EndpointRef{"u1a.2", "u1b.1"}, UseLabel: boolPtr(true)},
+		{Name: "OUT", Role: NetRoleSignal, Connect: []EndpointRef{"u1b.2", "j1.2"}, UseLabel: boolPtr(true)},
+		{Name: "NC3", Role: NetRoleNoConnect, Connect: []EndpointRef{"j1.3"}},
+		{Name: "NC4", Role: NetRoleNoConnect, Connect: []EndpointRef{"j1.4"}},
+	}
+	return document
 }
 
 func TestSchematicIRWritesAdversarialTopologyProjects(t *testing.T) {

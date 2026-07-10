@@ -324,15 +324,25 @@ func externalKiCadCheck(name string, path string) CheckResult {
 	}
 }
 
+type schematicReferenceKey struct {
+	reference string
+	unit      int
+}
+
 func schematicSemanticIssues(file schematicfiles.SchematicFile) []reports.Issue {
-	seen := map[string]struct{}{}
+	seen := map[schematicReferenceKey]struct{}{}
 	var issues []reports.Issue
 	for _, symbol := range file.Symbols {
 		ref := strings.TrimSpace(symbol.Reference)
 		if ref == "" {
 			continue
 		}
-		if _, ok := seen[ref]; ok {
+		unit := symbol.Unit
+		if unit <= 0 {
+			unit = 1
+		}
+		key := schematicReferenceKey{reference: strings.ToLower(ref), unit: unit}
+		if _, ok := seen[key]; ok {
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodeDuplicateReference,
 				Severity: reports.SeverityError,
@@ -341,7 +351,7 @@ func schematicSemanticIssues(file schematicfiles.SchematicFile) []reports.Issue 
 				Refs:     []string{ref},
 			})
 		}
-		seen[ref] = struct{}{}
+		seen[key] = struct{}{}
 	}
 	return issues
 }

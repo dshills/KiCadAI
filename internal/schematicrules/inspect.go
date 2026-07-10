@@ -79,8 +79,13 @@ type indexedLabel struct {
 	path  string
 }
 
+type schematicReferenceKey struct {
+	reference string
+	unit      int
+}
+
 func (inspector *fileInspector) inspectReferences() {
-	seen := map[string][]string{}
+	seen := map[schematicReferenceKey][]string{}
 	for index, symbol := range inspector.file.Symbols {
 		reference := strings.TrimSpace(symbol.Reference)
 		path := "symbols[" + strconv.Itoa(index) + "].reference"
@@ -98,12 +103,18 @@ func (inspector *fileInspector) inspectReferences() {
 		if isPowerReference(reference) || isUnannotatedReference(reference) {
 			continue
 		}
-		seen[strings.ToLower(reference)] = append(seen[strings.ToLower(reference)], path)
+		unit := symbol.Unit
+		if unit <= 0 {
+			unit = 1
+		}
+		key := schematicReferenceKey{reference: strings.ToLower(reference), unit: unit}
+		seen[key] = append(seen[key], path)
 	}
-	for reference, paths := range seen {
+	for key, paths := range seen {
 		if len(paths) < 2 {
 			continue
 		}
+		reference := key.reference
 		for _, path := range paths {
 			inspector.add(Finding{
 				RuleID:    RuleReferenceDuplicate,

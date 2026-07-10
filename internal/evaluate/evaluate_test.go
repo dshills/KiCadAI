@@ -158,6 +158,24 @@ func TestSchematicEvaluationReportsDuplicateReference(t *testing.T) {
 	}
 }
 
+func TestSchematicEvaluationAllowsDistinctMultiUnitReferences(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "multi_unit.kicad_sch")
+	writeFile(t, path, `(kicad_sch
+  (version 20260306)
+  (generator "kicadai")
+  (symbol (lib_id "Amplifier:DUAL") (at 10 10) (unit 1) (property "Reference" "U1") (uuid "11111111-1111-5111-8111-111111111111"))
+  (symbol (lib_id "Amplifier:DUAL") (at 20 10) (unit 2) (property "Reference" "U1") (uuid "22222222-2222-5222-8222-222222222222"))
+)`)
+	report, err := Schematic(path)
+	if err != nil {
+		t.Fatalf("Schematic returned error: %v", err)
+	}
+	check := findCheck(report.Checks, "schematic_validation")
+	if check.Status != CheckPassed {
+		t.Fatalf("distinct multi-unit references should pass validation: %#v", check)
+	}
+}
+
 func TestSchematicEvaluationIncludesPreservationCheck(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "preserved.kicad_sch")
 	writeFile(t, path, `(kicad_sch
