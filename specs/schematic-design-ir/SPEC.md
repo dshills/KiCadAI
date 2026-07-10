@@ -738,6 +738,14 @@ Remaining gaps for high-quality AI-generated schematics:
 - routing and validation treat unrelated symbol pin anchors, including
   intentional no-connect pins, as hard electrical obstacles; endpoints on the
   same net remain legal;
+- the structural arbitrary-topology corpus currently covers 25 deterministic
+  seeds plus feedback, fanout, long-label, disconnected-island, and no-connect
+  stress cases; this proves repeatability for the tested envelope, not every
+  possible graph or symbol geometry;
+- the core IR examples that depend on project-local `kicadai:` symbols still
+  need KiCad-backed load/ERC promotion after their embedded-symbol/project
+  context is made fully KiCad-resolvable; structural writer and readability
+  tests remain the authoritative v1 evidence for those examples;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 

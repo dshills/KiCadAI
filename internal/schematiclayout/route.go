@@ -253,6 +253,11 @@ func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, re
 }
 
 func wirePassesUnrelatedPin(segment WireSegment, netName string, result Result, request Request) bool {
+	_, ok := unrelatedPinForWire(segment, netName, result, request)
+	return ok
+}
+
+func unrelatedPinForWire(segment WireSegment, netName string, result Result, request Request) (Endpoint, bool) {
 	endpoints := netEndpointSet(request, netName)
 	anchors := pinAnchors(result.Components)
 	for endpoint, anchor := range anchors {
@@ -260,10 +265,10 @@ func wirePassesUnrelatedPin(segment WireSegment, netName string, result Result, 
 			continue
 		}
 		if pointOnSegment(segment.From, anchor, segment.To) {
-			return true
+			return endpoint, true
 		}
 	}
-	return false
+	return Endpoint{}, false
 }
 
 func netEndpointSet(request Request, netName string) map[Endpoint]struct{} {

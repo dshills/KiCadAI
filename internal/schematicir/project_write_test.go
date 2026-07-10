@@ -382,9 +382,14 @@ func TestSchematicIRWritesAdversarialTopologyProjects(t *testing.T) {
 }
 
 func TestSchematicIRWritesGeneratedArbitraryTopologyCorpus(t *testing.T) {
-	for _, seed := range []int64{7, 19, 43} {
+	for seed := int64(1); seed <= 25; seed++ {
 		t.Run(fmt.Sprintf("seed_%d", seed), func(t *testing.T) {
 			document := generatedArbitraryTopologyDocument(seed)
+			firstLayout := schematicLayout(document)
+			secondLayout := schematicLayout(document)
+			if !reflect.DeepEqual(firstLayout, secondLayout) {
+				t.Fatal("repeated layout generation was not deterministic")
+			}
 			tx, issues := ToProjectTransaction(document)
 			if reports.HasBlockingIssue(issues) {
 				t.Fatalf("transaction issues: %+v", issues)
