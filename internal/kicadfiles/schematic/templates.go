@@ -358,6 +358,7 @@ func LocalSymbolLibraryForRaw(rawSymbols []string) ([]byte, bool) {
 		if !ok || strings.TrimSpace(string(name)) == "" {
 			return nil, false
 		}
+		body = normalizeRawEmbeddedSymbolBody(body)
 		nameKey := strings.ToLower(strings.TrimSpace(string(name)))
 		if _, ok := seen[nameKey]; ok {
 			continue
@@ -558,7 +559,193 @@ func EnsureEmbeddedSymbolFromRaw(file *SchematicFile, libraryID, raw string) boo
 		return false
 	}
 	body[1] = sexpr.S(strings.TrimSpace(libraryID))
+	body = normalizeRawEmbeddedSymbolBody(body)
 	return ensureEmbeddedSymbolBody(file, libraryID, body)
+}
+
+func normalizeRawEmbeddedSymbolBody(body sexpr.List) sexpr.List {
+	if len(body) < 2 {
+		return body
+	}
+	result := make(sexpr.List, 0, len(body)+len(embeddedSymbolDefaults())+1)
+	result = append(result, body[:2]...)
+	insertedDefaults := false
+	for _, item := range body[2:] {
+		if embeddedSymbolNodeHead(item) == "property" {
+			if property, ok := item.(sexpr.List); ok {
+				item = normalizeRawEmbeddedSymbolProperty(property)
+			}
+		}
+		if !insertedDefaults && (embeddedSymbolNodeHead(item) == "property" || embeddedSymbolNodeHead(item) == "symbol") {
+			result = appendMissingEmbeddedSymbolDefaults(result, body)
+			insertedDefaults = true
+		}
+		result = append(result, item)
+	}
+	if !insertedDefaults {
+		result = appendMissingEmbeddedSymbolDefaults(result, body)
+	}
+	result = canonicalizeEmbeddedSymbolProperties(result)
+	if !hasEmbeddedSymbolChild(body, "embedded_fonts", "") {
+		result = append(result, sexpr.L(sexpr.A("embedded_fonts"), sexpr.A("no")))
+	}
+	return result
+}
+
+func canonicalizeEmbeddedSymbolProperties(body sexpr.List) sexpr.List {
+	properties := map[string]sexpr.List{}
+	var extra []sexpr.Node
+	for _, item := range body[2:] {
+		if embeddedSymbolNodeHead(item) != "property" {
+			continue
+		}
+		property, ok := item.(sexpr.List)
+		if !ok {
+			continue
+		}
+		name := embeddedSymbolNodeKey(property)
+		if name == "Reference" || name == "Value" || name == "Footprint" || name == "Datasheet" || name == "Description" {
+			properties[name] = property
+		} else {
+			extra = append(extra, property)
+		}
+	}
+	result := append(sexpr.List(nil), body[:2]...)
+	inserted := false
+	for _, item := range body[2:] {
+		if embeddedSymbolNodeHead(item) == "property" {
+			continue
+		}
+		if !inserted && embeddedSymbolNodeHead(item) == "symbol" {
+			result = appendCanonicalEmbeddedSymbolProperties(result, properties, extra)
+			inserted = true
+		}
+		result = append(result, item)
+	}
+	if !inserted {
+		result = appendCanonicalEmbeddedSymbolProperties(result, properties, extra)
+	}
+	return result
+}
+
+func appendCanonicalEmbeddedSymbolProperties(result sexpr.List, properties map[string]sexpr.List, extra []sexpr.Node) sexpr.List {
+	for _, name := range []string{"Reference", "Value", "Footprint", "Datasheet", "Description"} {
+		if property, ok := properties[name]; ok {
+			result = append(result, property)
+		}
+	}
+	return append(result, extra...)
+}
+
+func normalizeRawEmbeddedSymbolProperty(property sexpr.List) sexpr.List {
+	if len(property) < 3 || embeddedSymbolNodeHead(property) != "property" {
+		return property
+	}
+	name := embeddedSymbolNodeKey(property)
+	standard := map[string]bool{
+		"Reference":   true,
+		"Value":       true,
+		"Footprint":   true,
+		"Datasheet":   true,
+		"Description": true,
+	}
+	if !standard[name] {
+		return property
+	}
+	existing := map[string]sexpr.Node{}
+	var remainder []sexpr.Node
+	for _, item := range property[3:] {
+		head := embeddedSymbolNodeHead(item)
+		switch head {
+		case "at", "show_name", "do_not_autoplace", "hide", "effects":
+			existing[head] = item
+		default:
+			remainder = append(remainder, item)
+		}
+	}
+	result := append(sexpr.List(nil), property[:3]...)
+	if item, ok := existing["at"]; ok {
+		result = append(result, item)
+	} else {
+		result = append(result, sexpr.L(sexpr.A("at"), sexpr.F(0), sexpr.F(0), sexpr.F(0)))
+	}
+	if item, ok := existing["show_name"]; ok {
+		result = append(result, item)
+	} else {
+		result = append(result, sexpr.L(sexpr.A("show_name"), sexpr.A("no")))
+	}
+	if item, ok := existing["do_not_autoplace"]; ok {
+		result = append(result, item)
+	} else {
+		result = append(result, sexpr.L(sexpr.A("do_not_autoplace"), sexpr.A("no")))
+	}
+	if name == "Footprint" || name == "Datasheet" || name == "Description" {
+		if item, ok := existing["hide"]; ok {
+			result = append(result, item)
+		} else {
+			result = append(result, sexpr.L(sexpr.A("hide"), sexpr.A("yes")))
+		}
+	}
+	if item, ok := existing["effects"]; ok {
+		result = append(result, item)
+	} else {
+		result = append(result, sexpr.L(
+			sexpr.A("effects"),
+			sexpr.L(sexpr.A("font"), sexpr.L(sexpr.A("size"), sexpr.F(1.27), sexpr.F(1.27))),
+		))
+	}
+	return append(result, remainder...)
+}
+
+func appendMissingEmbeddedSymbolDefaults(result, body sexpr.List) sexpr.List {
+	for _, item := range embeddedSymbolDefaults() {
+		head := embeddedSymbolNodeHead(item)
+		key := embeddedSymbolNodeKey(item)
+		if hasEmbeddedSymbolChild(body, head, key) {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result
+}
+
+func hasEmbeddedSymbolChild(body sexpr.List, head, key string) bool {
+	for _, item := range body[2:] {
+		if embeddedSymbolNodeHead(item) != head {
+			continue
+		}
+		if key == "" || embeddedSymbolNodeKey(item) == key {
+			return true
+		}
+	}
+	return false
+}
+
+func embeddedSymbolNodeHead(node sexpr.Node) string {
+	list, ok := node.(sexpr.List)
+	if !ok || len(list) == 0 {
+		return ""
+	}
+	head, ok := list[0].(sexpr.Atom)
+	if !ok {
+		return ""
+	}
+	return string(head)
+}
+
+func embeddedSymbolNodeKey(node sexpr.Node) string {
+	list, ok := node.(sexpr.List)
+	if !ok || len(list) < 2 {
+		return ""
+	}
+	switch value := list[1].(type) {
+	case sexpr.Atom:
+		return string(value)
+	case sexpr.String:
+		return string(value)
+	default:
+		return ""
+	}
 }
 
 // EmbeddedSymbolPresent reports whether the schematic already contains a

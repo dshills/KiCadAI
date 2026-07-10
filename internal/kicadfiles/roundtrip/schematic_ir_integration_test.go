@@ -239,3 +239,60 @@ func TestKiCadRoundTripSchematicIRResolverExternal(t *testing.T) {
 		t.Fatalf("resolver external round trip changed generated schematic: %s", firstResultDifference(roundTrip))
 	}
 }
+
+func TestKiCadRoundTripSchematicIRResolverInheritedGeometry(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	root := repoPath(t, "internal", "schematicir", "testdata", "symbols")
+	index, issues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{SymbolsRoot: root}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("load resolver geometry fixture: %#v", issues)
+	}
+	fixturePath := repoPath(t, "examples", "schematic-ir", "resolver_geometry_stress.json")
+	fixture, err := os.Open(fixturePath)
+	if err != nil {
+		t.Fatalf("open resolver geometry IR: %v", err)
+	}
+	document, decodeIssues := schematicir.DecodeStrict(fixture)
+	_ = fixture.Close()
+	if reports.HasBlockingIssue(decodeIssues) {
+		t.Fatalf("decode resolver geometry IR: %#v", decodeIssues)
+	}
+	tx, adapterIssues := schematicir.ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(adapterIssues) {
+		t.Fatalf("adapt resolver geometry IR: %#v", adapterIssues)
+	}
+	output := filepath.Join(t.TempDir(), "resolver_geometry_stress")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true, LibraryIndex: &index})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write resolver geometry project: %#v", apply.Issues)
+	}
+	for _, asset := range []string{
+		filepath.Join(output, "lib", "kicadai_resolved_Amplifier.kicad_sym"),
+		filepath.Join(output, "lib", "kicadai_resolved_Connector_Generic.kicad_sym"),
+	} {
+		if _, err := os.Stat(asset); err != nil {
+			t.Fatalf("missing resolver materialization %s: %v", asset, err)
+		}
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	schematicPath := filepath.Join(output, "resolver_geometry_stress.kicad_sch")
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, output, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+	if err != nil {
+		t.Fatalf("resolver geometry ERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+		t.Fatalf("resolver geometry ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+	artifactDir := filepath.Join(t.TempDir(), "roundtrip")
+	if configured := strings.TrimSpace(os.Getenv(envArtifactDir)); configured != "" {
+		artifactDir = configured
+	}
+	roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: artifactDir})
+	if err != nil {
+		t.Fatalf("resolver geometry round trip returned error: %v\nresult=%#v", err, roundTrip)
+	}
+	if !roundTrip.Equal {
+		t.Fatalf("resolver geometry round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}

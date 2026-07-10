@@ -81,7 +81,7 @@ func TestIndexSymbolsResolvesInheritanceAcrossSymdirFiles(t *testing.T) {
 	if !ok || !child.Inherited || len(child.Pins) != 1 || len(child.Graphics) != 1 || len(child.Diagnostics) != 0 {
 		t.Fatalf("cross-file child = %#v", child)
 	}
-	if strings.Contains(child.Raw, `(extends "Base")`) || !strings.Contains(child.Raw, `"Child"`) || !strings.Contains(child.Raw, "(rectangle") || !strings.Contains(child.Raw, "(pin") {
+	if strings.Contains(child.Raw, `(extends "Base")`) || !strings.Contains(child.Raw, `"Child"`) || !strings.Contains(child.Raw, `"Child_1_1"`) || strings.Contains(child.Raw, `"Base_1_1"`) || !strings.Contains(child.Raw, "(rectangle") || !strings.Contains(child.Raw, "(pin") {
 		t.Fatalf("cross-file child raw body was not materialized: %s", child.Raw)
 	}
 }

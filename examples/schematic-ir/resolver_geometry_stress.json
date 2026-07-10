@@ -1,0 +1,84 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "resolver_geometry_stress",
+    "title": "Resolver Geometry Stress",
+    "description": "Signal chain using inherited and externally resolved symbol geometry.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "input",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_02x02_Odd_Even",
+        "value": "INPUT",
+        "pins": [
+          {"number": "1", "role": "passive"},
+          {"number": "2", "role": "passive", "no_connect": true},
+          {"number": "3", "role": "passive", "no_connect": true},
+          {"number": "4", "role": "passive", "no_connect": true}
+        ]
+      },
+      {
+        "id": "stage",
+        "ref": "U1",
+        "role": "ic",
+        "symbol": "Amplifier:Derived",
+        "value": "DERIVED",
+        "pins": [
+          {"number": "1", "role": "input"},
+          {"number": "2", "role": "output"}
+        ]
+      },
+      {
+        "id": "output",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_02x02_Odd_Even",
+        "value": "OUTPUT",
+        "pins": [
+          {"number": "1", "role": "passive"},
+          {"number": "2", "role": "passive", "no_connect": true},
+          {"number": "3", "role": "passive", "no_connect": true},
+          {"number": "4", "role": "passive", "no_connect": true}
+        ]
+      }
+    ],
+    "nets": [
+      {"name": "INPUT", "role": "signal", "connect": ["input.1", "stage.1"]},
+      {"name": "OUTPUT", "role": "signal", "connect": ["stage.2", "output.1"]}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "input_group", "role": "input_stage", "members": ["input"], "rank": 0, "side": "left"},
+      {"id": "processing_group", "role": "processing_stage", "members": ["stage"], "rank": 1},
+      {"id": "output_group", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 25,
+      "min_component_spacing_mm": 12
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

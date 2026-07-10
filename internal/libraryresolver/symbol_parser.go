@@ -396,16 +396,37 @@ func mergeInheritedSymbolRaw(baseRaw, childRaw, childName string) (string, bool)
 	if err != nil || !childNode.IsList {
 		return "", false
 	}
-	merged := mergeInheritedSymbolList(baseNode.Node().(sexpr.List), childNode.Node().(sexpr.List), true)
+	baseList := baseNode.Node().(sexpr.List)
+	childList := childNode.Node().(sexpr.List)
+	baseName := sexprNodeKey(baseList)
+	merged := mergeInheritedSymbolList(baseList, childList, true)
 	if len(merged) < 2 {
 		return "", false
 	}
 	merged[1] = sexpr.S(childName)
+	if baseName != "" && childName != "" {
+		renameInheritedSymbolBodies(merged, baseName, childName)
+	}
 	rendered, err := sexpr.Format(merged)
 	if err != nil {
 		return "", false
 	}
 	return strings.TrimSpace(rendered), true
+}
+
+func renameInheritedSymbolBodies(root sexpr.List, baseName, childName string) {
+	for index := 2; index < len(root); index++ {
+		body, ok := root[index].(sexpr.List)
+		if !ok || sexprNodeHead(body) != "symbol" || len(body) < 2 {
+			continue
+		}
+		name := sexprNodeKey(body)
+		if strings.HasPrefix(name, baseName+"_") {
+			body[1] = sexpr.S(childName + strings.TrimPrefix(name, baseName))
+		}
+		renameInheritedSymbolBodies(body, baseName, childName)
+		root[index] = body
+	}
 }
 
 func mergeInheritedSymbolList(base, child sexpr.List, root bool) sexpr.List {
