@@ -59,6 +59,42 @@ func TestToTransactionLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestToTransactionEmitsGlobalLabelsForPorts(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Ports = []Port{{Name: "VIN_EXT", Direction: PortDirectionInput, Net: "VIN", Side: SideLeft}}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	labels := decodeOperations[transactions.AddLabelOperation](t, tx, transactions.OpAddLabel)
+	if len(labels) != 1 || labels[0].Text != "VIN_EXT" || labels[0].Kind != "global" {
+		t.Fatalf("port labels = %#v, want one global VIN_EXT label", labels)
+	}
+	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
+	for _, connect := range connects {
+		if connect.NetName == "VIN" && (connect.UseLabels == nil || *connect.UseLabels) {
+			t.Fatalf("port net should use direct wiring by default: %#v", connect)
+		}
+	}
+	if result := transactions.Validate(tx); len(result.Issues) != 0 {
+		t.Fatalf("transaction validation issues: %+v", result.Issues)
+	}
+}
+
+func TestToTransactionPreservesExplicitPortLabelPreference(t *testing.T) {
+	doc := validLEDDocument()
+	useLabel := true
+	doc.Circuit.Nets[0].UseLabel = &useLabel
+	doc.Circuit.Ports = []Port{{Name: "VIN_EXT", Direction: PortDirectionInput, Net: doc.Circuit.Nets[0].Name, Side: SideLeft}}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	if labels := decodeOperations[transactions.AddLabelOperation](t, tx, transactions.OpAddLabel); len(labels) != 0 {
+		t.Fatalf("explicit local label preference should avoid duplicate global label: %#v", labels)
+	}
+}
+
 func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	doc := *NewDocument()
 	doc.Metadata.Name = "dual_unit"

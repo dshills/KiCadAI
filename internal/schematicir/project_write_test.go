@@ -38,6 +38,42 @@ func TestSchematicIRWritesReadableProject(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesGlobalPortLabel(t *testing.T) {
+	document := loadExampleDocument(t, "led_indicator.json")
+	document.Circuit.Ports = []Port{{Name: "VIN_EXT", Direction: PortDirectionInput, Net: "VIN", Side: SideLeft}}
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), "port_fixture")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	path := filepath.Join(outputDir, "led_indicator.kicad_sch")
+	generated, err := schematic.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	found := false
+	for _, label := range generated.Labels {
+		if label.Text == "VIN_EXT" && label.Kind == schematic.LabelGlobal {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("generated schematic missing VIN_EXT global label: %#v", generated.Labels)
+	}
+	report, err := evaluate.Schematic(path)
+	if err != nil {
+		t.Fatalf("evaluate generated schematic: %v", err)
+	}
+	if check := schematicIRCheckByName(report.Checks, "schematic_validation"); check.Status != evaluate.CheckPassed {
+		t.Fatalf("schematic_validation check = %#v", check)
+	}
+}
+
 func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 	document := loadExampleDocument(t, "led_indicator.json")
 	for index := 0; index < 80; index++ {

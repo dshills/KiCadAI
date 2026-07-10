@@ -3,6 +3,7 @@ package schematicir
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,6 +48,7 @@ func toTransaction(document Document, index *libraryresolver.LibraryIndex) (tran
 	state.appendCreateProject(&tx)
 	state.appendComponents(&tx)
 	state.appendNets(&tx)
+	state.appendPorts(&tx)
 
 	return tx, state.issues
 }
@@ -401,6 +403,12 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					waypoints = transactionPoints(points)
 				}
 			}
+			if state.hasPortNet(net.Name) && net.UseLabel == nil {
+				value := false
+				useLabels = &value
+				fromLabelAt = nil
+				toLabelAt = nil
+			}
 			if useLabels != nil && *useLabels {
 				if fromLabelAt == nil {
 					fromLabel, fromOK := state.labelsByKey[schematicEndpointLabelKey(net.Name, fromIR)]
@@ -425,6 +433,83 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
 	}
+}
+
+func (state *adapterState) appendPorts(tx *transactions.Transaction) {
+	netsByName := make(map[string]Net, len(state.document.Circuit.Nets))
+	for _, net := range state.document.Circuit.Nets {
+		netsByName[net.Name] = net
+	}
+	for _, port := range state.document.Circuit.Ports {
+		net, ok := netsByName[port.Net]
+		if !ok || len(net.Connect) == 0 {
+			continue
+		}
+		if net.UseLabel != nil && *net.UseLabel {
+			// An explicit local-label request already exposes the port net without
+			// adding a duplicate global label at the same anchor.
+			continue
+		}
+		at, ok := state.portEndpointPoint(net.Name, net.Connect[0])
+		if !ok {
+			state.addIssue("circuit.ports", "could not resolve schematic anchor for port "+port.Name)
+			continue
+		}
+		payload := transactions.AddLabelOperation{
+			Op:   transactions.OpAddLabel,
+			Text: port.Name,
+			At:   at,
+			Kind: "global",
+		}
+		state.appendOperation(tx, transactions.OpAddLabel, payload, "", port.Net)
+	}
+}
+
+func (state *adapterState) hasPortNet(netName string) bool {
+	for _, port := range state.document.Circuit.Ports {
+		if port.Net == netName {
+			return true
+		}
+	}
+	return false
+}
+
+func (state *adapterState) portEndpointPoint(netName string, endpoint EndpointRef) (transactions.Point, bool) {
+	if point, ok := state.labelsByKey[schematicEndpointLabelKey(netName, endpoint)]; ok {
+		return transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}, true
+	}
+	componentID, pinNumber, ok := endpoint.Split()
+	if !ok {
+		return transactions.Point{}, false
+	}
+	origin, ok := state.pointsByID[componentID]
+	if !ok {
+		return transactions.Point{}, false
+	}
+	var component Component
+	for _, candidate := range state.document.Circuit.Components {
+		if candidate.ID == componentID {
+			component = candidate
+			break
+		}
+	}
+	if component.ID == "" {
+		return transactions.Point{}, false
+	}
+	for _, pin := range transactionPinsWithLibraryIndex(component, state.libraryIndex) {
+		if pin.Number != pinNumber {
+			continue
+		}
+		x, y := rotateSchematicPoint(pin.XMM, pin.YMM, state.rotationByID[componentID])
+		return transactions.Point{XMM: origin.XMM + x, YMM: origin.YMM + y}, true
+	}
+	return transactions.Point{}, false
+}
+
+func rotateSchematicPoint(x, y, angle float64) (float64, float64) {
+	theta := angle * math.Pi / 180
+	sin, cos := math.Sincos(theta)
+	return x*cos - y*sin, x*sin + y*cos
 }
 
 func (state *adapterState) orderedNetsForEmission() []Net {
