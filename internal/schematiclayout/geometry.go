@@ -1,11 +1,11 @@
 package schematiclayout
 
 import (
-	"math"
 	"strings"
 	"unicode/utf8"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 func (rect Rect) Empty() bool {
@@ -184,23 +184,7 @@ func RotatePoint(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Poin
 }
 
 func TransformPoint(point kicadfiles.Point, angle kicadfiles.Angle, mirror Mirror) kicadfiles.Point {
-	switch mirror {
-	case MirrorX:
-		point.Y = -point.Y
-	case MirrorY:
-		point.X = -point.X
-	}
-	if angle == 0 {
-		return point
-	}
-	theta := float64(angle) * math.Pi / 180
-	sin, cos := math.Sincos(theta)
-	x := float64(point.X)
-	y := float64(point.Y)
-	return kicadfiles.Point{
-		X: kicadfiles.IU(math.Round(x*cos - y*sin)),
-		Y: kicadfiles.IU(math.Round(x*sin + y*cos)),
-	}
+	return schematic.TransformConnectionAnchor(point, angle, schematic.SymbolMirror(mirror))
 }
 
 func InverseTransformPoint(point kicadfiles.Point, angle kicadfiles.Angle, mirror Mirror) kicadfiles.Point {

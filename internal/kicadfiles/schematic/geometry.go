@@ -11,6 +11,29 @@ import (
 
 var embeddedUnitBodyStylePattern = regexp.MustCompile(`_(\d+)_(\d+)$`)
 
+// TransformConnectionAnchor maps a symbol-local physical pin offset to its
+// schematic-space position. It follows KiCad's mirror-then-rotate ordering
+// used while parsing and writing a symbol instance.
+func TransformConnectionAnchor(offset kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror) kicadfiles.Point {
+	switch mirror {
+	case SymbolMirrorX:
+		offset.Y = -offset.Y
+	case SymbolMirrorY:
+		offset.X = -offset.X
+	}
+	if rotation == 0 {
+		return offset
+	}
+	theta := float64(rotation) * math.Pi / 180
+	sin, cos := math.Sincos(theta)
+	x := float64(offset.X)
+	y := float64(offset.Y)
+	return kicadfiles.Point{
+		X: kicadfiles.IU(math.Round(x*cos - y*sin)),
+		Y: kicadfiles.IU(math.Round(x*sin + y*cos)),
+	}
+}
+
 type embeddedPinGeometry struct {
 	Number    string
 	Offset    kicadfiles.Point

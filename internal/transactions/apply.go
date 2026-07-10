@@ -4,7 +4,6 @@ import (
 	"crypto/sha1"
 	"encoding/json"
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -248,6 +247,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			payload.Pins = pins
 			symbol := schematic.NewSymbol(generator.New("imported.schematic.symbol", payload.Ref, opIndex), payload.LibraryID, payload.Ref, firstNonEmpty(payload.Value, payload.Ref), point(payload.At.XMM, payload.At.YMM))
 			symbol.Rotation = kicadfiles.Angle(payload.Rotation)
+			symbol.Mirror = schematic.SymbolMirror(payload.Mirror)
 			if strings.EqualFold(strings.TrimSpace(payload.Role), "generated_terminal") {
 				inBOM := false
 				onBoard := false
@@ -262,7 +262,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(payload.LibraryID, pin.Number); ok {
 					offset = connectionOffset
 				}
-				offset = rotateSchematicOffset(offset, symbol.Rotation)
+				offset = schematic.TransformConnectionAnchor(offset, symbol.Rotation, symbol.Mirror)
 				symbol.Pins = append(symbol.Pins, schematic.SymbolPin{Number: pin.Number, UUID: generator.New("imported.schematic.symbol.pin", payload.Ref, opIndex, pin.Number)})
 				symbol.PinAnchors = append(symbol.PinAnchors, addPoints(symbol.Position, offset))
 			}
@@ -607,6 +607,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			LibraryID:  payload.LibraryID,
 			Position:   point(payload.At.XMM, payload.At.YMM),
 			Rotation:   kicadfiles.Angle(payload.Rotation),
+			Mirror:     schematic.SymbolMirror(payload.Mirror),
 			Pins:       pins,
 			Properties: schematicPropertiesFromPayload(payload.Properties, point(payload.At.XMM, payload.At.YMM), kicadfiles.Angle(payload.Rotation), 2),
 		})
@@ -1508,18 +1509,6 @@ func optionalPoint(value *Point) *kicadfiles.Point {
 
 func addPoints(a kicadfiles.Point, b kicadfiles.Point) kicadfiles.Point {
 	return kicadfiles.Point{X: a.X + b.X, Y: a.Y + b.Y}
-}
-
-func rotateSchematicOffset(point kicadfiles.Point, angle kicadfiles.Angle) kicadfiles.Point {
-	if angle == 0 {
-		return point
-	}
-	theta := float64(angle) * math.Pi / 180
-	sin, cos := math.Sincos(theta)
-	return kicadfiles.Point{
-		X: kicadfiles.IU(math.Round(float64(point.X)*cos - float64(point.Y)*sin)),
-		Y: kicadfiles.IU(math.Round(float64(point.X)*sin + float64(point.Y)*cos)),
-	}
 }
 
 func symbolPinAnchor(schematicFile *schematic.SchematicFile, ref string, pin string) (kicadfiles.Point, error) {

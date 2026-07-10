@@ -72,6 +72,42 @@ func TestApplyBuildsSimpleProject(t *testing.T) {
 	}
 }
 
+func TestApplyPreservesMirroredSymbolConnectionAnchors(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "mirrored")
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"mirrored"},
+	  {"op":"add_symbol","ref":"R1","library_id":"Device:R","at":{"x_mm":20,"y_mm":30},"rotation_deg":90,"mirror":"x","pins":[{"number":"1","x_mm":0,"y_mm":3.81},{"number":"2","x_mm":0,"y_mm":-3.81}]},
+	  {"op":"write_project","schematic_only":true}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output})
+	if len(result.Issues) != 0 {
+		t.Fatalf("apply issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "mirrored.kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(file.Symbols) != 1 {
+		t.Fatalf("symbols = %#v", file.Symbols)
+	}
+	symbol := file.Symbols[0]
+	if symbol.Mirror != schematic.SymbolMirrorX || symbol.Rotation != 90 {
+		t.Fatalf("symbol transform = mirror:%q rotation:%v", symbol.Mirror, symbol.Rotation)
+	}
+	pins, ok := schematic.EmbeddedSymbolConnectionPinOffsets("Device:R")
+	if !ok || len(pins) == 0 {
+		t.Fatal("Device:R connection anchors missing")
+	}
+	offset := pins[0].Offset
+	want := kicadfiles.Point{X: symbol.Position.X, Y: symbol.Position.Y}
+	transformed := schematic.TransformConnectionAnchor(offset, symbol.Rotation, symbol.Mirror)
+	want.X += transformed.X
+	want.Y += transformed.Y
+	if len(symbol.PinAnchors) == 0 || symbol.PinAnchors[0] != want {
+		t.Fatalf("pin 1 anchor = %#v, want %#v", symbol.PinAnchors, want)
+	}
+}
+
 func TestApplyWritesNativeVectorBusOperations(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "bus_demo")
 	tx := mustParse(t, `{"operations":[

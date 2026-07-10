@@ -2,7 +2,6 @@ package schematic
 
 import (
 	"fmt"
-	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -388,21 +387,7 @@ func readSymbolInstances(node sexpr.ParsedNode) []SymbolInstance {
 }
 
 func transformedReadPinOffset(offset kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror) kicadfiles.Point {
-	x := float64(offset.X)
-	y := float64(offset.Y)
-	switch mirror {
-	case SymbolMirrorX:
-		y = -y
-	case SymbolMirrorY:
-		x = -x
-	}
-	if rotation != 0 {
-		radians := float64(rotation) * math.Pi / 180
-		cosine := math.Cos(radians)
-		sine := math.Sin(radians)
-		x, y = x*cosine-y*sine, x*sine+y*cosine
-	}
-	return kicadfiles.Point{X: kicadfiles.IU(math.Round(x)), Y: kicadfiles.IU(math.Round(y))}
+	return TransformConnectionAnchor(offset, rotation, mirror)
 }
 
 func templatePinsForReadSymbol(symbol SchematicSymbol) []TemplatePin {

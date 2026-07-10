@@ -294,6 +294,7 @@ type Placement struct {
 	Group       string      `json:"group,omitempty"`
 	Near        []string    `json:"near,omitempty"`
 	Orientation Orientation `json:"orientation,omitempty"`
+	Mirror      Mirror      `json:"mirror,omitempty"`
 }
 
 type BusLayout struct {
@@ -322,6 +323,16 @@ const (
 	OrientationRotated90  Orientation = "rotated_90"
 	OrientationRotated180 Orientation = "rotated_180"
 	OrientationRotated270 Orientation = "rotated_270"
+)
+
+// Mirror uses KiCad's symbol-instance axes. "x" reflects across the X axis
+// and "y" reflects across the Y axis before the instance rotation.
+type Mirror string
+
+const (
+	MirrorNone Mirror = ""
+	MirrorX    Mirror = "x"
+	MirrorY    Mirror = "y"
 )
 
 type Policy struct {

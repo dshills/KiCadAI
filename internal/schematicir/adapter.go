@@ -208,6 +208,7 @@ type adapterState struct {
 	unitsByID           map[string]int
 	pointsByID          map[string]transactions.Point
 	rotationByID        map[string]float64
+	mirrorByID          map[string]Mirror
 	routesByKey         map[string]schematiclayout.RoutedConnection
 	labelsByKey         map[string]kicadfiles.Point
 	netLabelPreferences map[string]bool
@@ -279,6 +280,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		pointsByID:          layoutResultPoints(layoutResult),
 		layoutResult:        layoutResult,
 		rotationByID:        layoutRotations(document),
+		mirrorByID:          layoutMirrors(document),
 		routesByKey:         layoutRouteHints(layoutResult),
 		labelsByKey:         layoutEndpointLabelHints(layoutResult),
 		netLabelPreferences: netLabelPreferences,
@@ -490,6 +492,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			LibraryID:  component.Symbol,
 			At:         state.pointsByID[component.ID],
 			Rotation:   state.rotationByID[component.ID],
+			Mirror:     string(state.mirrorByID[component.ID]),
 			Pins:       transactionPinsWithLibraryIndex(component, state.libraryIndex),
 			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID]),
 		}
@@ -876,8 +879,15 @@ func (state *adapterState) portEndpointAnchor(endpoint EndpointRef) (transaction
 		if pin.Number != pinNumber {
 			continue
 		}
-		x, y := rotateSchematicPoint(pin.XMM, pin.YMM, state.rotationByID[componentID])
-		return transactions.Point{XMM: origin.XMM + x, YMM: origin.YMM + y}, true
+		offset := schematic.TransformConnectionAnchor(
+			kicadfiles.Point{X: kicadfiles.MM(pin.XMM), Y: kicadfiles.MM(pin.YMM)},
+			kicadfiles.Angle(state.rotationByID[componentID]),
+			schematic.SymbolMirror(state.mirrorByID[componentID]),
+		)
+		return transactions.Point{
+			XMM: origin.XMM + float64(offset.X)/float64(kicadfiles.MM(1)),
+			YMM: origin.YMM + float64(offset.Y)/float64(kicadfiles.MM(1)),
+		}, true
 	}
 	return transactions.Point{}, false
 }
@@ -942,12 +952,6 @@ func portLabelRotation(side Side) float64 {
 	}
 }
 
-func rotateSchematicPoint(x, y, angle float64) (float64, float64) {
-	theta := angle * math.Pi / 180
-	sin, cos := math.Sincos(theta)
-	return x*cos - y*sin, x*sin + y*cos
-}
-
 func (state *adapterState) orderedNetsForEmission() []Net {
 	nets := append([]Net(nil), state.document.Circuit.Nets...)
 	sort.SliceStable(nets, func(i, j int) bool {
@@ -1007,11 +1011,11 @@ func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent 
 		return false, false
 	}
 	// KiCad's generated embedded-symbol endpoint convention is not uniformly
-	// derivable from a template offset after right-angle instance rotation.
+	// derivable from a template offset after an uncalibrated instance transform.
 	// Prefer explicit local labels for automatic routes touching those symbols
 	// until a family has KiCad-backed direct-wire calibration. Callers that
 	// explicitly request use_label:false retain that direct-only intent.
-	if schematicNetHasRotatedEndpoint(document, net) {
+	if schematicNetHasUncalibratedTransform(document, net) {
 		return true, true
 	}
 	// Undriven passive-only nets use local labels instead of relying on a
@@ -1036,11 +1040,12 @@ func schematicNetLabelPreferenceFor(document Document, net Net, pinsByComponent 
 	return false, false
 }
 
-func schematicNetHasRotatedEndpoint(document Document, net Net) bool {
+func schematicNetHasUncalibratedTransform(document Document, net Net) bool {
 	rotations := layoutRotations(document)
+	mirrors := layoutMirrors(document)
 	for _, endpoint := range net.Connect {
 		componentID, _, ok := endpoint.Split()
-		if ok && rotations[componentID] != 0 {
+		if ok && (rotations[componentID] != 0 || mirrors[componentID] != MirrorNone) {
 			return true
 		}
 	}
@@ -1327,6 +1332,7 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 
 func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *libraryresolver.LibraryIndex, netLabelPreferences map[string]bool) schematiclayout.Result {
 	rotationByID := layoutRotations(document)
+	mirrorByID := layoutMirrors(document)
 	groupsByID := map[string]Group{}
 	for _, group := range document.Layout.Groups {
 		groupsByID[group.ID] = group
@@ -1374,6 +1380,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			RankFixed: group.ID != "" && !group.Inferred,
 			Near:      append([]string(nil), placement.Near...),
 			Rotation:  kicadfiles.Angle(rotationByID[component.ID]),
+			Mirror:    schematiclayout.Mirror(mirrorByID[component.ID]),
 			Body:      body,
 			BodyKnown: schematicLayoutBodyKnown(component, index),
 			Pins:      schematicLayoutPins(component, index),
@@ -1796,6 +1803,16 @@ func layoutRotations(document Document) map[string]float64 {
 		}
 	}
 	return rotations
+}
+
+func layoutMirrors(document Document) map[string]Mirror {
+	mirrors := map[string]Mirror{}
+	for _, placement := range document.Layout.Placements {
+		if placement.Target != "" {
+			mirrors[placement.Target] = placement.Mirror
+		}
+	}
+	return mirrors
 }
 
 func pointForRankLane(document Document, rank int, role ComponentRole, counts map[int]map[layoutLane]int, totals map[int]map[layoutLane]int) transactions.Point {

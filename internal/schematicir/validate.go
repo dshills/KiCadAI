@@ -581,12 +581,24 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 		if !supportedOrientation(placement.Orientation) {
 			add(path+".orientation", "placement orientation is not supported")
 		}
+		if !supportedMirror(placement.Mirror) {
+			add(path+".mirror", "placement mirror is not supported")
+		}
 	}
 }
 
 func supportedOrientation(orientation Orientation) bool {
 	switch orientation {
 	case "", OrientationNormal, OrientationRotated, OrientationRotated90, OrientationRotated180, OrientationRotated270:
+		return true
+	default:
+		return false
+	}
+}
+
+func supportedMirror(mirror Mirror) bool {
+	switch mirror {
+	case MirrorNone, MirrorX, MirrorY:
 		return true
 	default:
 		return false

@@ -82,6 +82,7 @@ type SymbolOptions struct {
 	LibraryID  string
 	Position   kicadfiles.Point
 	Rotation   kicadfiles.Angle
+	Mirror     schematic.SymbolMirror
 	Pins       []PinSpec
 	Properties []schematic.Property
 }
@@ -226,6 +227,7 @@ type symbolState struct {
 	libraryID   string
 	position    kicadfiles.Point
 	rotation    kicadfiles.Angle
+	mirror      schematic.SymbolMirror
 	pins        map[string]kicadfiles.Point
 	pinOrder    []string
 	pinNets     map[string]string
@@ -345,10 +347,11 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		value = reference
 	}
 	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
-	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, options.Rotation)
+	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, options.Rotation, options.Mirror)
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", generationKey), libraryID, reference, value, position)
 	symbol.Unit = unit
 	symbol.Rotation = options.Rotation
+	symbol.Mirror = options.Mirror
 	symbol.Path = "root.component." + generationKey
 	if strings.EqualFold(strings.TrimSpace(options.Role), "generated_terminal") {
 		inBOM := false
@@ -375,7 +378,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
 			anchorOffset = offset
 		}
-		anchorOffset = rotatePadOffset(anchorOffset, options.Rotation)
+		anchorOffset = schematic.TransformConnectionAnchor(anchorOffset, options.Rotation, options.Mirror)
 		anchor := schematicSymbolPinAnchor(position, anchorOffset)
 		pins[number] = anchor
 		builder.schematicPinAnchors[anchor] = struct{}{}
@@ -401,6 +404,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		libraryID:   libraryID,
 		position:    position,
 		rotation:    options.Rotation,
+		mirror:      options.Mirror,
 		pins:        pins,
 		pinOrder:    pinOrder,
 		pinNets:     pinNets,
@@ -2021,7 +2025,7 @@ func (builder *Builder) pinAnchorForState(state *symbolState, reference string, 
 		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", reference, pin)
 	}
 	if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
-		return schematicSymbolPinAnchor(state.position, rotatePadOffset(offset, state.rotation)), nil
+		return schematicSymbolPinAnchor(state.position, schematic.TransformConnectionAnchor(offset, state.rotation, state.mirror)), nil
 	}
 	return anchor, nil
 }
@@ -2458,19 +2462,19 @@ func snapSchematicPointToConnectionGrid(point kicadfiles.Point) kicadfiles.Point
 	}
 }
 
-func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle) kicadfiles.Point {
+func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, mirror schematic.SymbolMirror) kicadfiles.Point {
 	position := snapSchematicPointToConnectionGrid(requested)
 	if builder == nil {
 		return position
 	}
 	occupied := builder.schematicPinAnchors
-	if !schematicSymbolPinAnchorsCollide(position, pins, rotation, occupied) {
+	if !schematicSymbolPinAnchorsCollide(position, pins, rotation, mirror, occupied) {
 		return position
 	}
 	for radius := kicadfiles.IU(1); radius <= 8; radius++ {
 		for _, offset := range schematicGridPerimeterOffsets(radius) {
 			candidate := addPoint(position, offset)
-			if !schematicSymbolPinAnchorsCollide(candidate, pins, rotation, occupied) {
+			if !schematicSymbolPinAnchorsCollide(candidate, pins, rotation, mirror, occupied) {
 				return candidate
 			}
 		}
@@ -2478,12 +2482,12 @@ func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, 
 	return position
 }
 
-func schematicSymbolPinAnchorsCollide(position kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, occupied map[kicadfiles.Point]struct{}) bool {
+func schematicSymbolPinAnchorsCollide(position kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, mirror schematic.SymbolMirror, occupied map[kicadfiles.Point]struct{}) bool {
 	if len(pins) == 0 || len(occupied) == 0 {
 		return false
 	}
 	for _, pin := range pins {
-		if _, ok := occupied[schematicSymbolPinAnchor(position, rotatePadOffset(pin.Offset, rotation))]; ok {
+		if _, ok := occupied[schematicSymbolPinAnchor(position, schematic.TransformConnectionAnchor(pin.Offset, rotation, mirror))]; ok {
 			return true
 		}
 	}

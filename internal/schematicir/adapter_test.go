@@ -428,6 +428,24 @@ func TestToTransactionSupportsAllQuarterTurnOrientations(t *testing.T) {
 	}
 }
 
+func TestToTransactionPropagatesSymbolMirror(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Layout.Placements = []Placement{{Target: "r_limit", Mirror: MirrorX}}
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	for _, symbol := range decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol) {
+		if symbol.Ref == "R1" {
+			if symbol.Mirror != string(MirrorX) {
+				t.Fatalf("R1 mirror = %q, want %q", symbol.Mirror, MirrorX)
+			}
+			return
+		}
+	}
+	t.Fatal("R1 symbol not emitted")
+}
+
 func TestToTransactionEmitsExplicitReadableFieldPositions(t *testing.T) {
 	tx, issues := ToTransaction(validLEDDocument())
 	if len(issues) != 0 {

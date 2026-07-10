@@ -185,6 +185,7 @@ type AddSymbolOperation struct {
 	LibraryID  string           `json:"library_id"`
 	At         Point            `json:"at"`
 	Rotation   float64          `json:"rotation_deg,omitempty"`
+	Mirror     string           `json:"mirror,omitempty"`
 	Pins       []PinSpec        `json:"pins,omitempty"`
 	Properties []SymbolProperty `json:"properties,omitempty"`
 }
