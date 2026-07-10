@@ -187,7 +187,10 @@ func TestKiCadRoundTripSchematicIRResolverExternal(t *testing.T) {
 	if symbolsRoot == "" {
 		t.Skip("set KICADAI_SYMBOLS_ROOT to a symbol library matching the KiCad CLI for resolver promotion")
 	}
-	symbolPath := filepath.Join(symbolsRoot, "Connector_Generic.kicad_sym")
+	symbolPath := resolverFixtureSymbolPath(symbolsRoot, "Connector_Generic", "Conn_02x02_Odd_Even")
+	if symbolPath == "" {
+		t.Skipf("matching Connector_Generic:Conn_02x02_Odd_Even symbol is unavailable under %s", symbolsRoot)
+	}
 	symbolData, err := os.ReadFile(symbolPath)
 	if err != nil {
 		t.Skipf("matching Connector_Generic library is unavailable at %s: %v", symbolPath, err)
@@ -242,6 +245,38 @@ func TestKiCadRoundTripSchematicIRResolverExternal(t *testing.T) {
 	if !roundTrip.Equal {
 		t.Fatalf("resolver external round trip changed generated schematic: %s", firstResultDifference(roundTrip))
 	}
+}
+
+func resolverFixtureSymbolPath(symbolsRoot, libraryName, symbolName string) string {
+	candidates := []string{
+		filepath.Join(symbolsRoot, libraryName+".kicad_sym"),
+		filepath.Join(symbolsRoot, libraryName+".kicad_symdir", symbolName+".kicad_sym"),
+	}
+	for _, candidate := range candidates {
+		if resolverFixtureContainsSymbol(candidate, libraryName, symbolName) {
+			return candidate
+		}
+	}
+	return ""
+}
+
+func resolverFixtureContainsSymbol(path, libraryName, symbolName string) bool {
+	if info, err := os.Stat(path); err != nil || info.IsDir() {
+		return false
+	}
+	inventory := libraryresolver.LibraryInventory{SymbolFiles: []libraryresolver.LibraryFile{{
+		Kind:            libraryresolver.LibraryFileSymbol,
+		Path:            filepath.ToSlash(path),
+		LibraryNickname: libraryName,
+		Name:            filepath.Base(path),
+		IDPrefix:        libraryName + ":",
+	}}}
+	records, issues := libraryresolver.IndexSymbols(inventory)
+	if reports.HasBlockingIssue(issues) {
+		return false
+	}
+	_, ok := records[libraryName+":"+symbolName]
+	return ok
 }
 
 func TestKiCadRoundTripSchematicIRResolverInheritedGeometry(t *testing.T) {
