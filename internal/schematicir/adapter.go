@@ -1796,39 +1796,11 @@ func schematicLayoutPinDirections(component Component, index *libraryresolver.Li
 		if _, known := directions[pinNumber]; known {
 			continue
 		}
-		if direction, known := schematicLayoutDirectionFromOrientation(pin.Orientation); known {
+		if direction, known := schematic.PinDirectionFromOrientation(pin.Orientation); known {
 			directions[pinNumber] = direction
 		}
 	}
 	return directions
-}
-
-// schematicLayoutDirectionFromOrientation converts the cardinal angle stored
-// in a KiCad library pin's (at x y angle) clause to the direction that leaves
-// the pin away from its symbol body in schematic coordinates. The resolver
-// already normalizes the pin point's Y coordinate, while this angle remains in
-// the library's orientation convention.
-func schematicLayoutDirectionFromOrientation(orientation string) (kicadfiles.Point, bool) {
-	value, err := strconv.ParseFloat(strings.TrimSpace(orientation), 64)
-	if err != nil {
-		return kicadfiles.Point{}, false
-	}
-	angle := math.Mod(value, 360)
-	if angle < 0 {
-		angle += 360
-	}
-	switch {
-	case math.Abs(angle) < 0.001:
-		return kicadfiles.Point{X: -1}, true
-	case math.Abs(angle-90) < 0.001:
-		return kicadfiles.Point{Y: 1}, true
-	case math.Abs(angle-180) < 0.001:
-		return kicadfiles.Point{X: 1}, true
-	case math.Abs(angle-270) < 0.001:
-		return kicadfiles.Point{Y: -1}, true
-	default:
-		return kicadfiles.Point{}, false
-	}
 }
 
 func schematicStageForGroup(role GroupRole) schematiclayout.Stage {

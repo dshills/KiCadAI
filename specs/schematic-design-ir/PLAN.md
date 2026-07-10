@@ -558,6 +558,11 @@ case demonstrates the need.
   cardinal pin orientation before label routing. This closes the row-pin
   direction ambiguity for indexed libraries while preserving the conservative
   fallback for absent or non-cardinal library orientation data.
+- Child-sheet relayout now preserves the same pin-facing direction from either
+  embedded template metadata or the resolver index. The 96-symbol dense I2C
+  hierarchy fixture proves that partitioning does not reintroduce label stubs
+  through row-pin symbol bodies; root and every child sheet pass electrical and
+  zero-warning readability validation after write and parse.
 
 ### Work
 

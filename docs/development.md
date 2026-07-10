@@ -48,7 +48,8 @@ generated and checked-in schematic examples.
   meshes with two to four endpoints per labeled net. It verifies that
   calibrated connection anchors and visual pin-facing directions remain
   distinct through layout, write, parse, electrical validation, and zero-warning
-  readability checks.
+  readability checks. Its 96-symbol hierarchy companion forces the same mesh
+  through child-sheet relayout and validates every emitted sheet independently.
 - Oversized IR documents emit deterministic hierarchy child sheets. Explicit
   groups remain together when possible; a group that cannot fit a child page
   is split deliberately, with `partition_split_group_count` reported as layout
@@ -76,6 +77,7 @@ go test ./internal/schematiclayout
 go test ./internal/designworkflow -run Readability
 go test ./internal/schematicir -run GeneratedArbitraryTopologyCorpus
 go test ./internal/schematicir -run DenseMultiPinTopologyCorpus
+go test ./internal/schematicir -run DenseMultiPinHierarchy
 ```
 
 When a readability test fails, inspect the diagnostic code first. `diagonal_wire`

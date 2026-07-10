@@ -583,6 +583,66 @@ func TestSchematicIRWritesDenseMultiPinTopologyCorpus(t *testing.T) {
 	}
 }
 
+func TestSchematicIRWritesDenseMultiPinHierarchy(t *testing.T) {
+	document := denseMultiPinTopologyDocumentWithComponentCount(31, 96)
+	document.Metadata.Name = "dense_multi_pin_hierarchy"
+	document.Metadata.Title = "Dense multi-pin hierarchy fixture"
+	document.Metadata.Description = "Oversized multi-pin label-routing hierarchy corpus fixture."
+	members := make([]string, 0, len(document.Circuit.Components))
+	for _, component := range document.Circuit.Components {
+		members = append(members, component.ID)
+	}
+	document.Layout.Groups = []Group{{
+		ID: "sensor_mesh", Label: "Sensor mesh", Role: GroupRoleProcessingStage,
+		Members: members, Rank: 1,
+	}}
+	layout := schematicLayout(document)
+	if layout.Partition == nil || !layout.Partition.Complete || len(layout.Partition.Sheets) < 2 {
+		t.Fatalf("dense multi-pin partition = %#v, want complete multi-sheet hierarchy", layout.Partition)
+	}
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), document.Metadata.Name)
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	read, err := kicaddesign.ReadProjectDirectory(outputDir)
+	if err != nil {
+		t.Fatalf("read generated hierarchy: %v", err)
+	}
+	if len(read.SheetFiles) < 2 {
+		t.Fatalf("generated hierarchy child sheets = %d, want at least two", len(read.SheetFiles))
+	}
+	paths := []string{filepath.Join(outputDir, document.Metadata.Name+".kicad_sch")}
+	for _, child := range read.SheetFiles {
+		paths = append(paths, filepath.Join(outputDir, child.Filename))
+	}
+	for _, path := range paths {
+		report, evaluateErr := evaluate.Schematic(path)
+		if evaluateErr != nil {
+			t.Fatalf("evaluate %s: %v", path, evaluateErr)
+		}
+		for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+			if check := schematicIRCheckByName(report.Checks, name); check.Status != evaluate.CheckPassed {
+				t.Fatalf("%s %s check = %#v", path, name, check)
+			}
+		}
+		file, readErr := schematic.ReadFile(path)
+		if readErr != nil {
+			t.Fatalf("read %s: %v", path, readErr)
+		}
+		request, layoutResult := schematiclayout.AdaptSchematic(&file)
+		layoutResult = schematiclayout.Validate(layoutResult, request)
+		readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+		if !readability.Passed || readability.ErrorCount != 0 || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+			t.Fatalf("%s readability = %#v diagnostics=%#v", path, readability, layoutResult.Diagnostics)
+		}
+	}
+}
+
 func TestSchematicIRLayoutStableUnderInputPermutation(t *testing.T) {
 	document := loadExampleDocument(t, "arbitrary_topology.json")
 	first := schematicLayout(document)
@@ -640,6 +700,10 @@ func generatedArbitraryTopologyDocument(seed int64) Document {
 }
 
 func denseMultiPinTopologyDocument(seed int64) Document {
+	return denseMultiPinTopologyDocumentWithComponentCount(seed, 12)
+}
+
+func denseMultiPinTopologyDocumentWithComponentCount(seed int64, componentCount int) Document {
 	random := rand.New(rand.NewSource(seed))
 	document := *NewDocument()
 	document.Metadata.Name = fmt.Sprintf("dense_multi_pin_%d", seed)
@@ -648,7 +712,6 @@ func denseMultiPinTopologyDocument(seed int64) Document {
 	document.Policy.Acceptance = AcceptanceReadable
 	document.Layout.Rules.PreferLabelsForLongNets = boolPtr(true)
 	document.Layout.Rules.MinComponentSpacingMM = floatPtr(16)
-	const componentCount = 12
 	endpoints := make([]EndpointRef, 0, componentCount*8)
 	for index := 1; index <= componentCount; index++ {
 		id := fmt.Sprintf("node_%d", index)

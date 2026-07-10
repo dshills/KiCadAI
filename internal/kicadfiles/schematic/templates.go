@@ -2,6 +2,7 @@ package schematic
 
 import (
 	"bytes"
+	"math"
 	"strconv"
 	"strings"
 
@@ -15,6 +16,32 @@ type TemplatePin struct {
 	Number    string
 	Offset    kicadfiles.Point
 	Direction kicadfiles.Point
+}
+
+// PinDirectionFromOrientation converts KiCad's cardinal library-pin angle to
+// the direction that leaves the pin away from the symbol body in schematic
+// coordinates. Library pin points are normalized separately by the resolver.
+func PinDirectionFromOrientation(orientation string) (kicadfiles.Point, bool) {
+	value, err := strconv.ParseFloat(strings.TrimSpace(orientation), 64)
+	if err != nil {
+		return kicadfiles.Point{}, false
+	}
+	angle := math.Mod(value, 360)
+	if angle < 0 {
+		angle += 360
+	}
+	switch {
+	case math.Abs(angle) < 0.001:
+		return kicadfiles.Point{X: -1}, true
+	case math.Abs(angle-90) < 0.001:
+		return kicadfiles.Point{Y: 1}, true
+	case math.Abs(angle-180) < 0.001:
+		return kicadfiles.Point{X: 1}, true
+	case math.Abs(angle-270) < 0.001:
+		return kicadfiles.Point{Y: -1}, true
+	default:
+		return kicadfiles.Point{}, false
+	}
 }
 
 type embeddedTemplate struct {

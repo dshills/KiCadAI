@@ -11,6 +11,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/schematiclayout"
 )
 
@@ -339,7 +340,7 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 				symbol.Rotation,
 				schematiclayout.Mirror(symbol.Mirror),
 			)
-			component.Pins = append(component.Pins, schematiclayout.Pin{Number: pin.Number, At: relative})
+			component.Pins = append(component.Pins, schematiclayout.Pin{Number: pin.Number, At: relative, Direction: hierarchyPinDirection(builder, symbol, pin.Number)})
 		}
 		request.Components = append(request.Components, component)
 	}
@@ -474,6 +475,36 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		child.Labels = append(child.Labels, generated)
 	}
 	return nil
+}
+
+// hierarchyPinDirection preserves the pin-facing routing contract when a root
+// layout is repartitioned onto child sheets. Physical pin anchors alone are not
+// sufficient for dense row-pin symbols because their nearest body edge can be
+// unrelated to the side a label stub must leave.
+func hierarchyPinDirection(builder *Builder, symbol schematic.SchematicSymbol, pinNumber string) kicadfiles.Point {
+	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(symbol.LibraryID); ok {
+		for _, pin := range templatePins {
+			if pin.Number == pinNumber && (pin.Direction.X != 0 || pin.Direction.Y != 0) {
+				return pin.Direction
+			}
+		}
+	}
+	if builder == nil || builder.libraryIndex == nil {
+		return kicadfiles.Point{}
+	}
+	record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, symbol.LibraryID)
+	if !ok {
+		return kicadfiles.Point{}
+	}
+	for _, pin := range record.Pins {
+		if pin.Number != pinNumber || (pin.Unit != 0 && pin.Unit != symbol.Unit) {
+			continue
+		}
+		if direction, known := schematic.PinDirectionFromOrientation(pin.Orientation); known {
+			return direction
+		}
+	}
+	return kicadfiles.Point{}
 }
 
 func setHierarchyTextPosition(symbol *schematic.SchematicSymbol, name string, text schematiclayout.TextBox, origin kicadfiles.Point) {
