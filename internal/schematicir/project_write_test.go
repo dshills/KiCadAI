@@ -79,9 +79,27 @@ func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 	if read.Schematic == nil || len(read.Schematic.Sheets) < 2 || len(read.SheetFiles) < 2 {
 		t.Fatalf("hierarchy was not written: root=%#v children=%d", read.Schematic, len(read.SheetFiles))
 	}
+	rootReport, err := evaluate.Schematic(filepath.Join(outputDir, "led_indicator.kicad_sch"))
+	if err != nil {
+		t.Fatalf("root schematic evaluation: %v", err)
+	}
+	for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+		if check := schematicIRCheckByName(rootReport.Checks, name); check.Status != evaluate.CheckPassed {
+			t.Fatalf("root %s check = %#v", name, check)
+		}
+	}
 	for _, child := range read.SheetFiles {
 		if err := schematic.Validate(*child); err != nil {
 			t.Fatalf("child %s validation: %v", child.Filename, err)
+		}
+		childReport, err := evaluate.Schematic(filepath.Join(outputDir, child.Filename))
+		if err != nil {
+			t.Fatalf("child %s evaluation: %v", child.Filename, err)
+		}
+		for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+			if check := schematicIRCheckByName(childReport.Checks, name); check.Status != evaluate.CheckPassed {
+				t.Fatalf("child %s %s check = %#v", child.Filename, name, check)
+			}
 		}
 		request, layoutResult := schematiclayout.AdaptSchematic(child)
 		layoutResult = schematiclayout.Validate(layoutResult, request)

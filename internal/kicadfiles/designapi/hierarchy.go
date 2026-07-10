@@ -294,7 +294,14 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 	// Child-local connectivity is emitted as same-net labels at every endpoint.
 	// This avoids carrying parent-sheet wire geometry across a partition while
 	// preserving KiCad connectivity; cross-sheet nets receive global labels.
-	child.Wires = nil
+	child.Wires = make([]schematic.Wire, 0, len(result.Wires))
+	for index, wire := range result.Wires {
+		child.Wires = append(child.Wires, schematic.NewWire(
+			builder.generator.New("hierarchy.local_wire", sheetID, wire.NetName, strconv.Itoa(index)),
+			wire.From,
+			wire.To,
+		))
+	}
 	child.Labels = preservedLabels
 	child.Junctions = nil
 	child.Buses = nil
