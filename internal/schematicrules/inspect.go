@@ -798,6 +798,11 @@ func labelAnchorCounts(file schematic.SchematicFile, wireIndex wireSegmentIndex)
 			anchors[pin.Position]++
 		}
 	}
+	for _, bus := range file.Buses {
+		for _, point := range bus.Points {
+			anchors[point]++
+		}
+	}
 	for _, label := range allSchematicLabels(file) {
 		if wireIndex.contains(label.Position) {
 			anchors[label.Position]++

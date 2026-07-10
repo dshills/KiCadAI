@@ -47,10 +47,10 @@ the bus or converting it to scalar labels.
         "id": "data_bus",
         "name": "DATA[0..3]",
         "members": [
-          {"net": "DATA0", "label": "DATA[0]"},
-          {"net": "DATA1", "label": "DATA[1]"},
-          {"net": "DATA2", "label": "DATA[2]"},
-          {"net": "DATA3", "label": "DATA[3]"}
+          {"net": "DATA0", "label": "DATA0"},
+          {"net": "DATA1", "label": "DATA1"},
+          {"net": "DATA2", "label": "DATA2"},
+          {"net": "DATA3", "label": "DATA3"}
         ]
       }
     ]
@@ -77,8 +77,8 @@ The `member` value identifies the member net, not a component pin. `endpoint`
 identifies the exact component pin served by this entry. Every bus member must
 reference exactly one existing non-`no_connect` net, and every scalar endpoint
 of that net must have a corresponding entry. A member label is explicit because
-KiCad bus-member naming has syntax beyond ordinary net-name equality. Multiple
-entries may use the same member label when the member is intentionally
+KiCad uses scalar names such as `DATA0` inside a ranged bus named `DATA[0..3]`.
+Multiple entries may use the same member label when the member is intentionally
 connected at multiple locations.
 
 Coordinates are millimetres in the IR and are converted to KiCad internal

@@ -444,6 +444,14 @@ func (state *adapterState) appendBuses(tx *transactions.Transaction) {
 			Op:     transactions.OpAddBus,
 			Points: points,
 		}, "", "")
+		if strings.TrimSpace(bus.Name) != "" && len(points) > 0 {
+			state.appendOperation(tx, transactions.OpAddLabel, transactions.AddLabelOperation{
+				Op:   transactions.OpAddLabel,
+				Text: bus.Name,
+				At:   points[0],
+				Kind: "local",
+			}, "", "")
+		}
 		members := make(map[string]BusMember, len(bus.Members))
 		for _, member := range bus.Members {
 			members[member.Net] = member

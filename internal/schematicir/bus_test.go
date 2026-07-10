@@ -152,7 +152,7 @@ func TestSchematicIRWritesAndReadsVectorBus(t *testing.T) {
 	for _, label := range file.Labels {
 		labels[label.Text]++
 	}
-	if labels["DATA[0]"] != 4 || labels["DATA[1]"] != 4 || labels["DATA[2]"] != 4 || labels["DATA[3]"] != 4 {
+	if labels["DATA0"] != 4 || labels["DATA1"] != 4 || labels["DATA2"] != 4 || labels["DATA3"] != 4 || labels["DATA[0..3]"] != 1 {
 		t.Fatalf("vector bus member labels = %#v", labels)
 	}
 	request, layoutResult := schematiclayout.AdaptSchematic(&file)
