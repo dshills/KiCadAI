@@ -95,6 +95,21 @@ func TestToTransactionPreservesExplicitPortLabelPreference(t *testing.T) {
 	}
 }
 
+func TestPortEndpointSelectionFollowsDeclaredSide(t *testing.T) {
+	doc := validLEDDocument()
+	state, issues := newAdapterState(doc, nil)
+	if len(issues) != 0 {
+		t.Fatalf("adapter state issues: %+v", issues)
+	}
+	net := doc.Circuit.Nets[0]
+	if got := state.portEndpointForSide(net.Name, net.Connect, SideLeft); got != "vin.1" {
+		t.Fatalf("left port endpoint = %q, want vin.1", got)
+	}
+	if got := state.portEndpointForSide(net.Name, net.Connect, SideRight); got != "r_limit.1" {
+		t.Fatalf("right port endpoint = %q, want r_limit.1", got)
+	}
+}
+
 func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	doc := *NewDocument()
 	doc.Metadata.Name = "dual_unit"

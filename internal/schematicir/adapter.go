@@ -450,7 +450,8 @@ func (state *adapterState) appendPorts(tx *transactions.Transaction) {
 			// adding a duplicate global label at the same anchor.
 			continue
 		}
-		at, ok := state.portEndpointPoint(net.Name, net.Connect[0])
+		endpoint := state.portEndpointForSide(net.Name, net.Connect, port.Side)
+		at, ok := state.portEndpointPoint(net.Name, endpoint)
 		if !ok {
 			state.addIssue("circuit.ports", "could not resolve schematic anchor for port "+port.Name)
 			continue
@@ -463,6 +464,43 @@ func (state *adapterState) appendPorts(tx *transactions.Transaction) {
 		}
 		state.appendOperation(tx, transactions.OpAddLabel, payload, "", port.Net)
 	}
+}
+
+func (state *adapterState) portEndpointForSide(netName string, endpoints []EndpointRef, side Side) EndpointRef {
+	if len(endpoints) == 0 {
+		return ""
+	}
+	type candidate struct {
+		endpoint EndpointRef
+		point    transactions.Point
+	}
+	var candidates []candidate
+	for _, endpoint := range endpoints {
+		if point, ok := state.portEndpointPoint(netName, endpoint); ok {
+			candidates = append(candidates, candidate{endpoint: endpoint, point: point})
+		}
+	}
+	if len(candidates) == 0 {
+		return endpoints[0]
+	}
+	best := candidates[0]
+	for _, current := range candidates[1:] {
+		better := false
+		switch side {
+		case SideRight:
+			better = current.point.XMM > best.point.XMM
+		case SideTop:
+			better = current.point.YMM < best.point.YMM
+		case SideBottom:
+			better = current.point.YMM > best.point.YMM
+		default:
+			better = current.point.XMM < best.point.XMM
+		}
+		if better || (current.point == best.point && current.endpoint < best.endpoint) {
+			best = current
+		}
+	}
+	return best.endpoint
 }
 
 func (state *adapterState) hasPortNet(netName string) bool {
