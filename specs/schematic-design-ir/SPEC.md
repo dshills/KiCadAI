@@ -448,6 +448,11 @@ Policy fields:
     KiCad CLI is available; otherwise structural acceptance plus readability
     checks with an explicit missing-ERC evidence note.
 
+For `readable` project writes, KiCadAI also re-reads every generated schematic
+after serialization and applies the strict readability profile to the final
+KiCad-native geometry. Layout-selected paper size is propagated through the
+transaction apply path, including hierarchy child sheets.
+
 V1 must default to conservative behavior:
 
 - ref assignment allowed;

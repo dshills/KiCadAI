@@ -99,7 +99,9 @@ from validation feedback to safe automatic repair.
   validation, deterministic layout-intent normalization, readable-acceptance
   gating, IR-to-transaction conversion, resolver-backed arbitrary symbol
   geometry, cross-file inherited-symbol body hydration, side-aware global port
-  labels, checked-in LED/USB-C LED/USB-C I2C 3.3 V examples, golden tests, and a
+  labels, final KiCad-native readback validation, layout-selected paper
+  propagation, generated high-fanout topology corpus coverage, checked-in
+  LED/USB-C LED/USB-C I2C 3.3 V examples, golden tests, and a
   `schematic-ir validate|normalize|transaction|write` CLI lane. This is the
   AI-facing contract for structured schematic generation before future
   natural-language planners emit KiCadAI operations. Remaining v1 boundaries
