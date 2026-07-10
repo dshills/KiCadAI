@@ -7,6 +7,7 @@ import (
 	"kicadai/internal/kicadfiles"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/schematiclayout"
 )
 
 func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
@@ -25,7 +26,7 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		{ref: "R1", x: 30},
 		{ref: "R2", x: 300},
 	} {
-		if _, err := builder.AddSymbol(SymbolOptions{
+		options := SymbolOptions{
 			Reference: symbol.ref,
 			Role:      "resistor",
 			Value:     "10k",
@@ -35,7 +36,11 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 				{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
 				{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
 			},
-		}); err != nil {
+		}
+		if symbol.ref == "R1" {
+			options.Rotation = 90
+		}
+		if _, err := builder.AddSymbol(options); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -91,6 +96,24 @@ func TestBuilderWritesGeneratedSchematicHierarchy(t *testing.T) {
 		}
 		if !connectedGlobalLabel {
 			t.Fatalf("child %s global label was not moved onto a connecting wire: labels=%#v wires=%#v", child.Filename, child.Labels, child.Wires)
+		}
+		request, result := schematiclayout.AdaptSchematic(child)
+		result = schematiclayout.Validate(result, request)
+		readability := schematiclayout.BuildReport(result, schematiclayout.ProfileStandard)
+		if !readability.Passed || readability.ErrorCount != 0 {
+			t.Fatalf("child %s transformed-symbol readability = %#v diagnostics=%#v", child.Filename, readability, result.Diagnostics)
+		}
+		for _, code := range []string{"wire_symbol_overlap", "wire_pin_overlap", "label_overlap"} {
+			if readability.OverlapCounts[code] != 0 {
+				t.Fatalf("child %s %s count = %d, report=%#v", child.Filename, code, readability.OverlapCounts[code], readability)
+			}
+		}
+	}
+	for _, child := range read.SheetFiles {
+		for _, symbol := range child.Symbols {
+			if symbol.Reference == "R1" && symbol.Rotation != 90 {
+				t.Fatalf("transformed hierarchy symbol rotation = %v, want 90", symbol.Rotation)
+			}
 		}
 	}
 }

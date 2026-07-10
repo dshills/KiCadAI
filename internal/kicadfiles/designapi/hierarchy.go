@@ -319,6 +319,8 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 			Value:     symbol.Value,
 			LibraryID: symbol.LibraryID,
 			Position:  symbol.Position,
+			Rotation:  symbol.Rotation,
+			Mirror:    schematiclayout.Mirror(symbol.Mirror),
 		}
 		if symbol.BodyBounds != nil {
 			component.Body = schematiclayout.Rect{
@@ -331,7 +333,11 @@ func relayoutHierarchyChild(builder *Builder, child *schematic.SchematicFile, sh
 		}
 		component.Role = schematiclayout.InferComponentRole(component)
 		for index, pin := range symbol.Pins {
-			relative := kicadfiles.Point{X: symbol.PinAnchors[index].X - symbol.Position.X, Y: symbol.PinAnchors[index].Y - symbol.Position.Y}
+			relative := schematiclayout.InverseTransformPoint(
+				kicadfiles.Point{X: symbol.PinAnchors[index].X - symbol.Position.X, Y: symbol.PinAnchors[index].Y - symbol.Position.Y},
+				symbol.Rotation,
+				schematiclayout.Mirror(symbol.Mirror),
+			)
 			component.Pins = append(component.Pins, schematiclayout.Pin{Number: pin.Number, At: relative})
 		}
 		request.Components = append(request.Components, component)
