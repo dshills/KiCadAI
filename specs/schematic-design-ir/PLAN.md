@@ -531,7 +531,8 @@ case demonstrates the need.
   pin-to-body stubs from body crossings. Readable LED, USB-C, regulator,
   vector-bus, oversized hierarchy, resolver, multi-unit, adversarial-topology,
   and generated-arbitrary-topology tests remain green. Resolver
-  source/installed-library drift diagnostics remain the next unfinished slice.
+  explicit-pin anchor conflicts now fail closed with unit-aware matching;
+  installed-library/CLI drift evidence remains the next unfinished slice.
 
 ### Work
 

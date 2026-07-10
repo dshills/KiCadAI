@@ -726,8 +726,8 @@ Remaining gaps for high-quality AI-generated schematics:
   explicit symbol geometry; missing geometry fails closed for strict readable
   acceptance;
 - explicit pin offsets must agree with KiCadAI’s validated connection-anchor
-  overrides for embedded symbols; conflicting offsets fail closed before any
-  file is written;
+  overrides for embedded symbols and resolver-indexed pin geometry; conflicting
+  offsets fail closed before any file is written;
 - inherited symbols in split `.kicad_symdir` libraries require the
   resolver-backed adapter to materialize their base symbol body before
   embedding;

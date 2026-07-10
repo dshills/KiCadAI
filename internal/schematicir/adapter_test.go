@@ -79,6 +79,19 @@ func TestToTransactionWithLibraryIndexFailsClosedOnMissingRecords(t *testing.T) 
 	}
 }
 
+func TestResolverPinOffsetPrefersUnitSpecificGeometry(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Test:IC": {LibraryID: "Test:IC", Pins: []libraryresolver.SymbolPin{
+			{Number: "1", Unit: 0, Position: kicadfiles.Point{X: kicadfiles.MM(1)}},
+			{Number: "1", Unit: 2, Position: kicadfiles.Point{X: kicadfiles.MM(2)}},
+		}},
+	}}
+	offset, ok := resolverPinOffset(index, Component{Symbol: "Test:IC", Unit: "2"}, "1")
+	if !ok || offset.X != kicadfiles.MM(2) {
+		t.Fatalf("resolver pin offset = %#v/%v, want unit-specific 2 mm", offset, ok)
+	}
+}
+
 func TestToTransactionRejectsConflictingKiCadConnectionAnchor(t *testing.T) {
 	document := validLEDDocument()
 	document.Circuit.Components[0].ID = "vin"

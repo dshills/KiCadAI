@@ -251,6 +251,16 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		}
 		overrides := connectionOverrides[componentSymbol]
 		knownPins := knownSchematicPinNumbers(component, index)
+		var resolverRecord *libraryresolver.SymbolRecord
+		if index != nil {
+			if record, found := libraryresolver.ResolveSymbol(*index, component.Symbol); found {
+				resolverRecord = &record
+			}
+		}
+		resolverPins := map[string]kicadfiles.Point{}
+		if resolverRecord != nil {
+			resolverPins = resolverPinOffsets(*resolverRecord, component)
+		}
 		for pinIndex, pin := range component.Pins {
 			number := strings.TrimSpace(pin.Number)
 			key := componentID + "." + number
@@ -272,6 +282,11 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 				state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), fmt.Sprintf("explicit pin offset (%.4f,%.4f) conflicts with the KiCad-validated connection anchor (%.4f,%.4f)", float64(explicit.X)/float64(kicadfiles.MM(1)), float64(explicit.Y)/float64(kicadfiles.MM(1)), float64(connectionOffset.X)/float64(kicadfiles.MM(1)), float64(connectionOffset.Y)/float64(kicadfiles.MM(1))))
 			}
 			if hasExplicitOffset {
+				if resolverRecord != nil {
+					if resolverOffset, resolverOK := resolverPins[number]; resolverOK && !schematicAnchorsMatch(explicit, resolverOffset) {
+						state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), fmt.Sprintf("explicit pin offset (%.4f,%.4f) conflicts with resolver pin anchor (%.4f,%.4f)", float64(explicit.X)/float64(kicadfiles.MM(1)), float64(explicit.Y)/float64(kicadfiles.MM(1)), float64(resolverOffset.X)/float64(kicadfiles.MM(1)), float64(resolverOffset.Y)/float64(kicadfiles.MM(1))))
+					}
+				}
 				continue
 			}
 			if _, known := knownPins[number]; known {
@@ -1417,6 +1432,40 @@ func schematicLayoutBodyKnown(component Component, index *libraryresolver.Librar
 	}
 	_, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
 	return ok
+}
+
+func resolverPinOffset(index libraryresolver.LibraryIndex, component Component, number string) (kicadfiles.Point, bool) {
+	record, ok := libraryresolver.ResolveSymbol(index, component.Symbol)
+	if !ok {
+		return kicadfiles.Point{}, false
+	}
+	offset, ok := resolverPinOffsets(record, component)[strings.TrimSpace(number)]
+	return offset, ok
+}
+
+func resolverPinOffsets(record libraryresolver.SymbolRecord, component Component) map[string]kicadfiles.Point {
+	unit := maxUnit(componentUnitOrZero(component))
+	offsets := map[string]kicadfiles.Point{}
+	common := map[string]kicadfiles.Point{}
+	for _, pin := range record.Pins {
+		number := strings.TrimSpace(pin.Number)
+		if number == "" {
+			continue
+		}
+		if pin.Unit == unit {
+			offsets[number] = pin.Position
+			continue
+		}
+		if pin.Unit == 0 {
+			common[number] = pin.Position
+		}
+	}
+	for number, offset := range common {
+		if _, exists := offsets[number]; !exists {
+			offsets[number] = offset
+		}
+	}
+	return offsets
 }
 
 func fallbackComponentBody(component Component) schematiclayout.Rect {
