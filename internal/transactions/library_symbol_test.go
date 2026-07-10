@@ -1,6 +1,11 @@
 package transactions
 
-import "testing"
+import (
+	"testing"
+
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/libraryresolver"
+)
 
 func TestResolveSymbolPinsPrefersEmbeddedTemplateGeometry(t *testing.T) {
 	pins, err := resolveSymbolPins([]PinSpec{
@@ -37,5 +42,21 @@ func TestResolveSymbolPinsPreservesCallerOnlyPins(t *testing.T) {
 	}
 	if pins[1].Number != "99" || pins[1].XMM != 12.7 || pins[1].YMM != 1.27 {
 		t.Fatalf("pin 99 = %#v, want caller-only pin preserved", pins[1])
+	}
+}
+
+func TestResolveSymbolPinsPreservesExplicitOriginOffset(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:Origin": {
+			LibraryID: "Custom:Origin",
+			Pins:      []libraryresolver.SymbolPin{{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(2.54)}}},
+		},
+	}}
+	pins, err := resolveSymbolPins([]PinSpec{{Number: "1", ExplicitOffset: true}}, &index, "Custom:Origin")
+	if err != nil {
+		t.Fatalf("resolveSymbolPins returned error: %v", err)
+	}
+	if len(pins) != 1 || pins[0].XMM != 0 || pins[0].YMM != 0 || !pins[0].ExplicitOffset {
+		t.Fatalf("pin = %#v, want explicit origin offset preserved", pins)
 	}
 }

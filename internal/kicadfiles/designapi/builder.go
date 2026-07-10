@@ -18,20 +18,22 @@ import (
 	"kicadai/internal/kicadfiles/project"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/kicadfiles/sexpr"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/routing"
 )
 
 // Builder accumulates a KiCad design through ordered mutations. It is not
 // safe for concurrent use by multiple goroutines.
 type Builder struct {
-	name        string
-	generator   kicadfiles.DeterministicIDGenerator
-	design      kicaddesign.Design
-	nets        *pcb.NetRegistry
-	netParents  map[string]string
-	symbols     map[string]*symbolState
-	symbolUnits map[string][]*symbolState
-	symbolKeys  map[string]string
+	name         string
+	generator    kicadfiles.DeterministicIDGenerator
+	design       kicaddesign.Design
+	libraryIndex *libraryresolver.LibraryIndex
+	nets         *pcb.NetRegistry
+	netParents   map[string]string
+	symbols      map[string]*symbolState
+	symbolUnits  map[string][]*symbolState
+	symbolKeys   map[string]string
 	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
 	// grid snapping can avoid creating exact anchor collisions between symbols.
 	schematicPinAnchors map[kicadfiles.Point]struct{}
@@ -43,10 +45,11 @@ type Builder struct {
 }
 
 type Options struct {
-	Name     string
-	DesignID kicadfiles.UUID
-	Seed     string
-	Paper    kicadfiles.Paper
+	Name         string
+	DesignID     kicadfiles.UUID
+	Seed         string
+	Paper        kicadfiles.Paper
+	LibraryIndex *libraryresolver.LibraryIndex
 }
 
 type SymbolHandle struct {
@@ -123,6 +126,9 @@ type ConnectOptions struct {
 	// UseLabels forces label stubs when true and direct orthogonal wiring when
 	// false. Nil preserves the legacy distance- and net-name-based behavior.
 	UseLabels *bool
+	// SuppressBendLabels prevents automatic labels at orthogonal route bends
+	// when the caller explicitly chose local wiring.
+	SuppressBendLabels bool
 	// Waypoints contains the complete absolute orthogonal path, including the
 	// source and destination anchors. It is ignored when labels are forced.
 	Waypoints   []kicadfiles.Point
@@ -224,6 +230,7 @@ func New(options Options) (*Builder, error) {
 	builder := &Builder{
 		name:                name,
 		generator:           generator,
+		libraryIndex:        options.LibraryIndex,
 		nets:                pcb.NewNetRegistry(),
 		netParents:          map[string]string{},
 		symbols:             map[string]*symbolState{},
@@ -302,6 +309,9 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	if libraryID == "" {
 		return SymbolHandle{}, fmt.Errorf("library id required")
 	}
+	if err := builder.ensureSchematicLibrarySymbol(libraryID); err != nil {
+		return SymbolHandle{}, err
+	}
 	value := strings.TrimSpace(options.Value)
 	if value == "" {
 		value = reference
@@ -378,8 +388,30 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	builder.symbolUnits[refKey] = states
 	builder.symbolKeys[stateKey] = reference
 	builder.addKnownSymbolLibrary(libraryID)
-	schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID)
 	return SymbolHandle{Reference: reference}, nil
+}
+
+func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string) error {
+	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) || builder.libraryIndex == nil {
+		return nil
+	}
+	if schematic.EmbeddedSymbolPresent(builder.design.Schematic, libraryID) {
+		return nil
+	}
+	record, ok := libraryresolver.ResolveSymbol(*builder.libraryIndex, libraryID)
+	if !ok {
+		return fmt.Errorf("symbol library record not found: %s", libraryID)
+	}
+	if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, record.Raw) {
+		// A resolver record may be pin-only in tests or derived from a project
+		// table whose body is intentionally external. Keep the qualified
+		// reference and let KiCad resolve it through the project library table.
+		if strings.TrimSpace(record.Raw) == "" {
+			return nil
+		}
+		return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)
+	}
+	return nil
 }
 
 // SetSchematicHierarchy schedules deterministic child-sheet emission during
@@ -532,9 +564,9 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 		builder.addSchematicLabelConnection(netName, from, start, end, options.FromLabelAt)
 		builder.addSchematicLabelConnection(netName, to, end, start, options.ToLabelAt)
 	} else if len(options.Waypoints) != 0 {
-		builder.addSchematicWirePoints(netName, from, to, options.Waypoints)
+		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels)
 	} else if options.UseLabels != nil {
-		builder.addSchematicWire(netName, from, to, start, end)
+		builder.addSchematicWireWithOptions(netName, from, to, start, end, options.SuppressBendLabels)
 	} else if builder.schematicConnectionShouldUseDirectLabels(from, to) {
 		if err := builder.AddLabel(netName, start, schematic.LabelLocal); err != nil {
 			return err
@@ -775,14 +807,22 @@ func betweenSchematicInclusive(value kicadfiles.IU, a kicadfiles.IU, b kicadfile
 }
 
 func (builder *Builder) addSchematicWire(netName string, from, to Endpoint, start, end kicadfiles.Point) {
+	builder.addSchematicWireWithOptions(netName, from, to, start, end, false)
+}
+
+func (builder *Builder) addSchematicWireWithOptions(netName string, from, to Endpoint, start, end kicadfiles.Point, suppressBendLabels bool) {
 	if builder == nil {
 		return
 	}
 	points := builder.orthogonalSchematicWirePoints(start, end)
-	builder.addSchematicWirePoints(netName, from, to, points)
+	builder.addSchematicWirePointsWithOptions(netName, from, to, points, suppressBendLabels)
 }
 
 func (builder *Builder) addSchematicWirePoints(netName string, from, to Endpoint, points []kicadfiles.Point) {
+	builder.addSchematicWirePointsWithOptions(netName, from, to, points, false)
+}
+
+func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, to Endpoint, points []kicadfiles.Point, suppressBendLabels bool) {
 	if builder == nil || len(points) < 2 {
 		return
 	}
@@ -801,7 +841,7 @@ func (builder *Builder) addSchematicWirePoints(netName string, from, to Endpoint
 		builder.indexSchematicWireEndpoint(points[index])
 		builder.indexSchematicWireEndpoint(points[index+1])
 	}
-	suppressBendLabels := schematicConnectionSuppressesBendLabels(netName)
+	suppressBendLabelsForNet := schematicConnectionSuppressesBendLabels(netName)
 	for index := 1; index < len(points)-1; index++ {
 		if !hasSchematicJunction(builder.design.Schematic.Junctions, points[index]) {
 			builder.design.Schematic.Junctions = append(builder.design.Schematic.Junctions, schematic.Junction{
@@ -809,7 +849,7 @@ func (builder *Builder) addSchematicWirePoints(netName string, from, to Endpoint
 				Position: points[index],
 			})
 		}
-		if suppressBendLabels {
+		if suppressBendLabels || suppressBendLabelsForNet {
 			continue
 		}
 		if hasSchematicLabel(builder.design.Schematic.Labels, netName, points[index]) {

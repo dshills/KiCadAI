@@ -1,6 +1,7 @@
 package schematicir
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"kicadai/internal/evaluate"
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
@@ -91,6 +93,74 @@ func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 		if !readability.Passed || readability.ErrorCount != 0 || unexpectedOverlap {
 			t.Fatalf("child %s readability: %#v diagnostics=%#v", child.Filename, readability, layoutResult.Diagnostics)
 		}
+	}
+}
+
+func TestSchematicIRWritesResolverBackedExternalSymbolProject(t *testing.T) {
+	document := loadExampleDocument(t, "external_connector_indicator.json")
+	for index := range document.Circuit.Components {
+		for pin := range document.Circuit.Components[index].Pins {
+			document.Circuit.Components[index].Pins[pin].OffsetXMM = nil
+			document.Circuit.Components[index].Pins[pin].OffsetYMM = nil
+		}
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{
+		SymbolsRoot: filepath.Join("testdata", "symbols"),
+	}, libraryresolver.LoadOptions{})
+	if reports.HasBlockingIssue(loadIssues) {
+		t.Fatalf("fixture library issues: %+v", loadIssues)
+	}
+	tx, issues := ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("project transaction issues: %+v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), "external_connector_indicator")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{
+		OutputDir:    outputDir,
+		Overwrite:    true,
+		LibraryIndex: &index,
+	})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("apply issues: %+v", apply.Issues)
+	}
+	schematicPath := filepath.Join(outputDir, "external_connector_indicator.kicad_sch")
+	generated, err := schematic.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatalf("read generated schematic: %v", err)
+	}
+	var connector *schematic.SchematicSymbol
+	for index := range generated.Symbols {
+		if generated.Symbols[index].Reference == "J1" {
+			connector = &generated.Symbols[index]
+			break
+		}
+	}
+	if connector == nil || connector.BodyBounds == nil {
+		t.Fatalf("resolver-backed connector geometry missing: %#v", connector)
+	}
+	if len(connector.PinAnchors) != 4 || connector.PinAnchors[0] == connector.PinAnchors[1] {
+		t.Fatalf("resolver-backed connector pin anchors = %#v", connector.PinAnchors)
+	}
+	if _, ok := schematic.EmbeddedSymbolTemplate("Connector_Generic:Conn_02x02_Odd_Even"); ok {
+		t.Fatal("fixture symbol unexpectedly became a built-in template")
+	}
+	if len(generated.LibSymbols) == 0 || len(generated.LibSymbols[0].Body) == 0 {
+		t.Fatalf("resolver-backed embedded body missing: %#v", generated.LibSymbols)
+	}
+	report, err := evaluate.Schematic(schematicPath)
+	if err != nil {
+		t.Fatalf("evaluate generated schematic: %v", err)
+	}
+	for _, name := range []string{"schematic_validation", "schematic_electrical"} {
+		if check := schematicIRCheckByName(report.Checks, name); check.Status != evaluate.CheckPassed {
+			t.Fatalf("%s check = %#v", name, check)
+		}
+	}
+	request, layoutResult := schematiclayout.AdaptSchematic(&generated)
+	layoutResult = schematiclayout.Validate(layoutResult, request)
+	readability := schematiclayout.BuildReport(layoutResult, schematiclayout.ProfileStandard)
+	if !readability.Passed || readability.ErrorCount != 0 || readability.WarningCount != 0 || len(readability.OverlapCounts) != 0 {
+		t.Fatalf("external symbol readability failed: %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
 	}
 }
 

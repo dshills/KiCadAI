@@ -388,6 +388,48 @@ func EnsureEmbeddedSymbol(file *SchematicFile, libraryID string) bool {
 	return true
 }
 
+// EnsureEmbeddedSymbolFromRaw adds a library-resolved KiCad symbol body to the
+// schematic. Library files store the top-level symbol under its unqualified
+// name; embedded schematic symbols use the fully qualified library ID.
+func EnsureEmbeddedSymbolFromRaw(file *SchematicFile, libraryID, raw string) bool {
+	if file == nil || strings.TrimSpace(libraryID) == "" || strings.TrimSpace(raw) == "" {
+		return false
+	}
+	body := rawEmbeddedSymbolBody(raw)
+	if len(body) < 2 {
+		return false
+	}
+	head, ok := body[0].(sexpr.Atom)
+	if !ok || string(head) != "symbol" {
+		return false
+	}
+	switch body[1].(type) {
+	case sexpr.Atom, sexpr.String:
+	default:
+		return false
+	}
+	body[1] = sexpr.S(strings.TrimSpace(libraryID))
+	return ensureEmbeddedSymbolBody(file, libraryID, body)
+}
+
+// EmbeddedSymbolPresent reports whether the schematic already contains a
+// usable embedded body for libraryID.
+func EmbeddedSymbolPresent(file *SchematicFile, libraryID string) bool {
+	if file == nil {
+		return false
+	}
+	normalized := strings.ToLower(strings.TrimSpace(libraryID))
+	if normalized == "" {
+		return false
+	}
+	for _, symbol := range file.LibSymbols {
+		if strings.ToLower(strings.TrimSpace(symbol.LibraryID)) == normalized && len(symbol.Body) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // EnsureEmbeddedTwoPinSymbol force-adds a two-pin embedded body for callers
 // that already know the custom library ID should use a seed symbol shape.
 func EnsureEmbeddedTwoPinSymbol(file *SchematicFile, libraryID, bodyName, pinType string) bool {

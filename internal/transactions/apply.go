@@ -239,7 +239,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				return result
 			}
 			opIndex := strconv.Itoa(i)
-			pins, err := resolveSymbolPins(payload.Pins, opts.LibraryIndex, payload.LibraryID)
+			pins, err := resolveSymbolPinsForUnit(payload.Pins, opts.LibraryIndex, payload.LibraryID, payload.Unit)
 			if err != nil {
 				result.Issues = append(result.Issues, applyIssue(i, err))
 				return result
@@ -540,9 +540,10 @@ func builderFromTransaction(tx Transaction, opts ApplyOptions) (*designapi.Build
 			return nil, err
 		}
 		return designapi.New(designapi.Options{
-			Name:     payload.Name,
-			Seed:     firstNonEmpty(opts.Seed, payload.Name),
-			DesignID: deterministicDesignUUID(payload.Name, opts.Seed),
+			Name:         payload.Name,
+			Seed:         firstNonEmpty(opts.Seed, payload.Name),
+			DesignID:     deterministicDesignUUID(payload.Name, opts.Seed),
+			LibraryIndex: opts.LibraryIndex,
 		})
 	}
 	return nil, fmt.Errorf("create_project operation is required")
@@ -582,7 +583,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := validateSymbolPropertyPayload(payload.Properties); err != nil {
 			return nil, err
 		}
-		resolverPins, err := resolveSymbolPins(payload.Pins, opts.LibraryIndex, payload.LibraryID)
+		resolverPins, err := resolveSymbolPinsForUnit(payload.Pins, opts.LibraryIndex, payload.LibraryID, payload.Unit)
 		if err != nil {
 			return nil, err
 		}
@@ -613,10 +614,11 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			waypoints = append(waypoints, point(waypoint.XMM, waypoint.YMM))
 		}
 		return nil, builder.ConnectWithOptions(endpoint(payload.From), endpoint(payload.To), payload.NetName, designapi.ConnectOptions{
-			UseLabels:   payload.UseLabels,
-			Waypoints:   waypoints,
-			FromLabelAt: optionalPoint(payload.FromLabelAt),
-			ToLabelAt:   optionalPoint(payload.ToLabelAt),
+			UseLabels:          payload.UseLabels,
+			SuppressBendLabels: payload.SuppressBendLabels,
+			Waypoints:          waypoints,
+			FromLabelAt:        optionalPoint(payload.FromLabelAt),
+			ToLabelAt:          optionalPoint(payload.ToLabelAt),
 		})
 	case OpAddLabel:
 		var payload AddLabelOperation

@@ -19,6 +19,7 @@ func TestSchematicIRExamples(t *testing.T) {
 		{name: "LED indicator", file: "led_indicator.json", minSymbols: 3, minConnects: 3, minFootprints: 3},
 		{name: "USB-C LED indicator", file: "usb_c_led_indicator.json", minSymbols: 5, minConnects: 7, minFootprints: 5},
 		{name: "I2C sensor 3.3V regulator", file: "i2c_sensor_3v3_regulator.json", minSymbols: 11, minConnects: 20, minFootprints: 11},
+		{name: "Resolver-backed external connector", file: "external_connector_indicator.json", minSymbols: 2, minConnects: 1, minFootprints: 0},
 	}
 
 	for _, tc := range cases {

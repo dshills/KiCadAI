@@ -9,6 +9,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
@@ -19,12 +20,22 @@ const footprintPropertyName = "Footprint"
 // ToTransaction converts a validated schematic IR document into the existing
 // schematic transaction operation stream.
 func ToTransaction(document Document) (transactions.Transaction, []reports.Issue) {
+	return toTransaction(document, nil)
+}
+
+// ToTransactionWithLibraryIndex uses resolver geometry for symbols that are
+// not covered by KiCadAI's verified template set.
+func ToTransactionWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
+	return toTransaction(document, index)
+}
+
+func toTransaction(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
 	document = NormalizeLayoutIntent(document)
 	if issues := validateDefaulted(document); len(issues) != 0 {
 		return transactions.Transaction{}, issues
 	}
 
-	state, issues := newAdapterState(document)
+	state, issues := newAdapterState(document, index)
 	if len(issues) != 0 {
 		return transactions.Transaction{}, issues
 	}
@@ -43,12 +54,22 @@ func ToTransaction(document Document) (transactions.Transaction, []reports.Issue
 // ToProjectTransaction converts schematic IR into a transaction that can be
 // applied to write a KiCad project directory.
 func ToProjectTransaction(document Document) (transactions.Transaction, []reports.Issue) {
+	return toProjectTransaction(document, nil)
+}
+
+// ToProjectTransactionWithLibraryIndex carries resolver geometry through the
+// complete IR-to-project path while preserving the template-only API above.
+func ToProjectTransactionWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
+	return toProjectTransaction(document, index)
+}
+
+func toProjectTransaction(document Document, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
 	document = NormalizeLayoutIntent(document)
-	tx, issues := ToTransaction(document)
+	tx, issues := toTransaction(document, index)
 	if reports.HasBlockingIssue(issues) {
 		return tx, issues
 	}
-	hierarchy, hierarchyIssues := schematicHierarchy(document)
+	hierarchy, hierarchyIssues := schematicHierarchy(document, index)
 	issues = append(issues, hierarchyIssues...)
 	if reports.HasBlockingIssue(hierarchyIssues) {
 		return tx, issues
@@ -68,12 +89,12 @@ func ToProjectTransaction(document Document) (transactions.Transaction, []report
 	return tx, issues
 }
 
-func schematicHierarchy(document Document) (*transactions.SchematicHierarchy, []reports.Issue) {
-	layout := schematicLayout(document)
+func schematicHierarchy(document Document, index *libraryresolver.LibraryIndex) (*transactions.SchematicHierarchy, []reports.Issue) {
+	layout := schematicLayoutWithLibraryIndex(document, index)
 	if layout.Partition == nil || len(layout.Partition.Sheets) < 2 {
 		return nil, nil
 	}
-	state, stateIssues := newAdapterState(document)
+	state, stateIssues := newAdapterState(document, index)
 	if len(stateIssues) != 0 {
 		return nil, stateIssues
 	}
@@ -131,6 +152,7 @@ func schematicHierarchy(document Document) (*transactions.SchematicHierarchy, []
 
 type adapterState struct {
 	document     Document
+	libraryIndex *libraryresolver.LibraryIndex
 	paper        string
 	refsByID     map[string]string
 	unitsByID    map[string]int
@@ -147,6 +169,7 @@ const (
 	defaultLayoutSignalYMM      = 55.0
 	defaultLayoutPowerYMM       = 25.0
 	defaultLayoutGroundYMM      = 95.0
+	defaultComponentPadding     = kicadfiles.IU(1270000)
 	defaultAdapterGroupSpacing  = DefaultMinGroupSpacingMM
 	defaultAdapterSymbolSpacing = DefaultMinComponentSpacingMM
 	defaultLayoutFallbackRank   = 2
@@ -164,14 +187,29 @@ const (
 	layoutLaneGround layoutLane = "ground"
 )
 
-func newAdapterState(document Document) (*adapterState, []reports.Issue) {
-	layoutResult := schematicLayout(document)
+func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*adapterState, []reports.Issue) {
+	var preflightIssues []reports.Issue
+	validatedUnits := make(map[string]int, len(document.Circuit.Components))
+	for componentIndex, component := range document.Circuit.Components {
+		if unit, ok := transactionUnit(component.Unit); ok {
+			validatedUnits[component.ID] = unit
+		} else {
+			preflightIssues = append(preflightIssues, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     fmt.Sprintf("circuit.components[%d].unit", componentIndex),
+				Message:  "component unit must be a non-negative integer",
+			})
+		}
+	}
+	layoutResult := schematicLayoutWithLibraryIndex(document, index)
 	paper := layoutResult.Sheet.Name
 	if paper == "" {
 		paper = document.Metadata.Paper
 	}
 	state := &adapterState{
 		document:     document,
+		libraryIndex: index,
 		paper:        paper,
 		refsByID:     map[string]string{},
 		unitsByID:    map[string]int{},
@@ -180,6 +218,25 @@ func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 		routesByKey:  layoutRouteHints(layoutResult),
 		labelsByKey:  layoutEndpointLabelHints(layoutResult),
 		textByID:     layoutTextPlacements(layoutResult),
+		issues:       preflightIssues,
+	}
+	connectedPins := connectedPinSet(document)
+	for componentIndex, component := range document.Circuit.Components {
+		knownPins := knownSchematicPinNumbers(component, index)
+		for pinIndex, pin := range component.Pins {
+			number := strings.TrimSpace(pin.Number)
+			key := strings.TrimSpace(component.ID) + "." + strings.TrimSpace(pin.Number)
+			if _, required := connectedPins[key]; !required {
+				continue
+			}
+			if _, ok := explicitPinOffset(pin, kicadfiles.Point{}); ok {
+				continue
+			}
+			if _, known := knownPins[number]; known {
+				continue
+			}
+			state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), "pin geometry is unresolved; provide explicit offsets or a resolver index")
+		}
 	}
 	refCounters := map[string]int{}
 	usedRefs := map[string]struct{}{}
@@ -187,9 +244,8 @@ func newAdapterState(document Document) (*adapterState, []reports.Issue) {
 	invalidComponentIDs := map[string]struct{}{}
 	trimmedRefs := map[string]string{}
 	for index, component := range document.Circuit.Components {
-		unit, ok := transactionUnit(component.Unit)
+		unit, ok := validatedUnits[component.ID]
 		if !ok {
-			state.addIssue(fmt.Sprintf("circuit.components[%d].unit", index), "component unit must be a non-negative integer")
 			invalidComponentIDs[component.ID] = struct{}{}
 			continue
 		}
@@ -254,7 +310,7 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			LibraryID:  component.Symbol,
 			At:         state.pointsByID[component.ID],
 			Rotation:   state.rotationByID[component.ID],
-			Pins:       transactionPins(component),
+			Pins:       transactionPinsWithLibraryIndex(component, state.libraryIndex),
 			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID]),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
@@ -326,7 +382,7 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			fromIR := net.Connect[endpointIndex-1]
 			toIR := net.Connect[endpointIndex]
 			if hint, exists := state.routesByKey[schematicRouteKey(net.Name, fromIR, toIR)]; exists {
-				if hint.UseLabels {
+				if hint.UseLabels && net.UseLabel == nil {
 					value := true
 					useLabels = &value
 					fromLayout, toLayout := hint.FromLabelAt, hint.ToLabelAt
@@ -356,14 +412,15 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				}
 			}
 			payload := transactions.ConnectOperation{
-				Op:          transactions.OpConnect,
-				From:        from,
-				To:          to,
-				NetName:     net.Name,
-				UseLabels:   useLabels,
-				Waypoints:   waypoints,
-				FromLabelAt: fromLabelAt,
-				ToLabelAt:   toLabelAt,
+				Op:                 transactions.OpConnect,
+				From:               from,
+				To:                 to,
+				NetName:            net.Name,
+				UseLabels:          useLabels,
+				SuppressBendLabels: net.UseLabel != nil && !*net.UseLabel,
+				Waypoints:          waypoints,
+				FromLabelAt:        fromLabelAt,
+				ToLabelAt:          toLabelAt,
 			}
 			state.appendOperation(tx, transactions.OpConnect, payload, "", net.Name)
 		}
@@ -543,6 +600,8 @@ func transactionUnit(unit string) (int, bool) {
 }
 
 func maxUnit(unit int) int {
+	// KiCad symbol units are one-based; IR's empty/zero unit means the first
+	// unit, while unit zero in resolver records denotes common geometry.
 	if unit <= 0 {
 		return 1
 	}
@@ -644,6 +703,10 @@ func transactionPointValue(point kicadfiles.Point, exists bool) *transactions.Po
 }
 
 func schematicLayout(document Document) schematiclayout.Result {
+	return schematicLayoutWithLibraryIndex(document, nil)
+}
+
+func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) schematiclayout.Result {
 	rotationByID := layoutRotations(document)
 	groupsByID := map[string]Group{}
 	for _, group := range document.Layout.Groups {
@@ -690,8 +753,8 @@ func schematicLayout(document Document) schematiclayout.Result {
 			RankFixed: group.ID != "" && !group.Inferred,
 			Near:      append([]string(nil), placement.Near...),
 			Rotation:  kicadfiles.Angle(rotationByID[component.ID]),
-			Body:      schematicLayoutBody(component),
-			Pins:      schematicLayoutPins(component),
+			Body:      schematicLayoutBody(component, index),
+			Pins:      schematicLayoutPins(component, index),
 		})
 	}
 	for index, net := range document.Circuit.Nets {
@@ -719,22 +782,167 @@ func schematicLayout(document Document) schematiclayout.Result {
 	return schematiclayout.Layout(request)
 }
 
-func schematicLayoutBody(component Component) schematiclayout.Rect {
-	if component.Body == nil {
-		return schematiclayout.Rect{}
+func schematicLayoutBody(component Component, index *libraryresolver.LibraryIndex) schematiclayout.Rect {
+	if component.Body != nil {
+		return schematiclayout.Rect{
+			MinX: kicadfiles.MM(component.Body.MinXMM),
+			MinY: kicadfiles.MM(component.Body.MinYMM),
+			MaxX: kicadfiles.MM(component.Body.MaxXMM),
+			MaxY: kicadfiles.MM(component.Body.MaxYMM),
+		}
 	}
-	return schematiclayout.Rect{
-		MinX: kicadfiles.MM(component.Body.MinXMM),
-		MinY: kicadfiles.MM(component.Body.MinYMM),
-		MaxX: kicadfiles.MM(component.Body.MaxXMM),
-		MaxY: kicadfiles.MM(component.Body.MaxYMM),
+	if index == nil {
+		if _, known := schematic.EmbeddedSymbolTemplate(component.Symbol); known {
+			return schematiclayout.Rect{}
+		}
+		return fallbackComponentBody(component)
 	}
+	record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
+	if !ok {
+		return fallbackComponentBody(component)
+	}
+	unit := componentUnitOrZero(component)
+	var bounds schematiclayout.Rect
+	hasGraphics := false
+	for _, graphic := range record.Graphics {
+		if graphic.Unit != 0 && graphic.Unit != maxUnit(unit) {
+			continue
+		}
+		graphicBounds := schematiclayout.Rect{
+			MinX: graphic.Bounds.Min.X,
+			MinY: graphic.Bounds.Min.Y,
+			MaxX: graphic.Bounds.Max.X,
+			MaxY: graphic.Bounds.Max.Y,
+		}
+		if !hasGraphics {
+			bounds = graphicBounds
+		} else {
+			bounds = unionLayoutRect(bounds, graphicBounds)
+		}
+		hasGraphics = true
+	}
+	if hasGraphics {
+		return bounds
+	}
+	// Some KiCad symbols contain only pins or inherit graphics from a library
+	// base. Keep a conservative pin envelope as a placement obstacle.
+	var pinBounds schematiclayout.Rect
+	hasPins := false
+	for _, pin := range record.Pins {
+		if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
+			continue
+		}
+		point := schematiclayout.Rect{MinX: pin.Position.X, MinY: pin.Position.Y, MaxX: pin.Position.X, MaxY: pin.Position.Y}
+		if !hasPins {
+			pinBounds = point
+		} else {
+			pinBounds = unionLayoutRect(pinBounds, point)
+		}
+		hasPins = true
+	}
+	if !hasPins {
+		return fallbackComponentBody(component)
+	}
+	padding := defaultComponentPadding
+	pinBounds.MinX -= padding
+	pinBounds.MinY -= padding
+	pinBounds.MaxX += padding
+	pinBounds.MaxY += padding
+	return pinBounds
 }
 
-func schematicLayoutPins(component Component) []schematiclayout.Pin {
+func fallbackComponentBody(component Component) schematiclayout.Rect {
+	var bounds schematiclayout.Rect
+	hasPins := false
+	for _, pin := range component.Pins {
+		offset, ok := explicitPinOffset(pin, kicadfiles.Point{})
+		if !ok {
+			continue
+		}
+		point := schematiclayout.Rect{MinX: offset.X, MinY: offset.Y, MaxX: offset.X, MaxY: offset.Y}
+		if !hasPins {
+			bounds = point
+		} else {
+			bounds = unionLayoutRect(bounds, point)
+		}
+		hasPins = true
+	}
+	if !hasPins {
+		return schematiclayout.Rect{MinX: -defaultComponentPadding, MinY: -defaultComponentPadding, MaxX: defaultComponentPadding, MaxY: defaultComponentPadding}
+	}
+	padding := defaultComponentPadding
+	bounds.MinX -= padding
+	bounds.MinY -= padding
+	bounds.MaxX += padding
+	bounds.MaxY += padding
+	return bounds
+}
+
+func knownSchematicPinNumbers(component Component, index *libraryresolver.LibraryIndex) map[string]struct{} {
+	known := map[string]struct{}{}
+	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(component.Symbol); ok {
+		for _, pin := range templatePins {
+			known[strings.TrimSpace(pin.Number)] = struct{}{}
+		}
+	}
+	if index == nil {
+		return known
+	}
+	record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
+	if !ok {
+		return known
+	}
+	unit := componentUnitOrZero(component)
+	for _, pin := range record.Pins {
+		if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
+			continue
+		}
+		known[strings.TrimSpace(pin.Number)] = struct{}{}
+	}
+	return known
+}
+
+func connectedPinSet(document Document) map[string]struct{} {
+	connected := map[string]struct{}{}
+	for _, net := range document.Circuit.Nets {
+		if net.Role == NetRoleNoConnect {
+			continue
+		}
+		for _, endpoint := range net.Connect {
+			connected[strings.TrimSpace(string(endpoint))] = struct{}{}
+		}
+	}
+	return connected
+}
+
+func componentUnitOrZero(component Component) int {
+	unit, ok := transactionUnit(component.Unit)
+	if !ok {
+		return 0
+	}
+	return unit
+}
+
+func unionLayoutRect(left, right schematiclayout.Rect) schematiclayout.Rect {
+	if right.MinX < left.MinX {
+		left.MinX = right.MinX
+	}
+	if right.MinY < left.MinY {
+		left.MinY = right.MinY
+	}
+	if right.MaxX > left.MaxX {
+		left.MaxX = right.MaxX
+	}
+	if right.MaxY > left.MaxY {
+		left.MaxY = right.MaxY
+	}
+	return left
+}
+
+func schematicLayoutPins(component Component, index *libraryresolver.LibraryIndex) []schematiclayout.Pin {
 	roles := map[string]string{}
 	for _, pin := range component.Pins {
-		roles[pin.Number] = string(pin.Role)
+		roles[strings.TrimSpace(pin.Number)] = string(pin.Role)
 	}
 	templatePins, _ := schematic.EmbeddedSymbolPinOffsets(component.Symbol)
 	offsets := map[string]kicadfiles.Point{}
@@ -743,7 +951,21 @@ func schematicLayoutPins(component Component) []schematiclayout.Pin {
 		if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(component.Symbol, pin.Number); ok {
 			offset = connectionOffset
 		}
-		offsets[pin.Number] = offset
+		offsets[strings.TrimSpace(pin.Number)] = offset
+	}
+	if index != nil {
+		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok {
+			unit := componentUnitOrZero(component)
+			for _, pin := range record.Pins {
+				if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
+					continue
+				}
+				pinNumber := strings.TrimSpace(pin.Number)
+				if _, known := offsets[pinNumber]; !known {
+					offsets[pinNumber] = pin.Position
+				}
+			}
+		}
 	}
 	if len(component.Pins) == 0 {
 		pins := make([]schematiclayout.Pin, 0, len(templatePins))
@@ -754,11 +976,12 @@ func schematicLayoutPins(component Component) []schematiclayout.Pin {
 	}
 	pins := make([]schematiclayout.Pin, 0, len(component.Pins))
 	for _, pin := range component.Pins {
-		offset := offsets[pin.Number]
+		number := strings.TrimSpace(pin.Number)
+		offset := offsets[number]
 		if explicit, ok := explicitPinOffset(pin, offset); ok {
 			offset = explicit
 		}
-		pins = append(pins, schematiclayout.Pin{Number: pin.Number, Role: roles[pin.Number], At: offset})
+		pins = append(pins, schematiclayout.Pin{Number: number, Role: roles[number], At: offset})
 	}
 	return pins
 }
@@ -885,6 +1108,10 @@ func inferredRank(role ComponentRole) int {
 }
 
 func transactionPins(component Component) []transactions.PinSpec {
+	return transactionPinsWithLibraryIndex(component, nil)
+}
+
+func transactionPinsWithLibraryIndex(component Component, index *libraryresolver.LibraryIndex) []transactions.PinSpec {
 	if len(component.Pins) == 0 {
 		return nil
 	}
@@ -895,16 +1122,32 @@ func transactionPins(component Component) []transactions.PinSpec {
 			if connectionOffset, exists := schematic.EmbeddedSymbolConnectionPinOffset(component.Symbol, pin.Number); exists {
 				offset = connectionOffset
 			}
-			offsets[pin.Number] = offset
+			offsets[strings.TrimSpace(pin.Number)] = offset
+		}
+	}
+	if index != nil {
+		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok {
+			unit := componentUnitOrZero(component)
+			for _, pin := range record.Pins {
+				if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
+					continue
+				}
+				pinNumber := strings.TrimSpace(pin.Number)
+				if _, known := offsets[pinNumber]; !known {
+					offsets[pinNumber] = pin.Position
+				}
+			}
 		}
 	}
 	out := make([]transactions.PinSpec, 0, len(component.Pins))
 	for _, pin := range component.Pins {
-		offset := offsets[pin.Number]
-		if explicit, ok := explicitPinOffset(pin, offset); ok {
+		number := strings.TrimSpace(pin.Number)
+		offset := offsets[number]
+		explicit, ok := explicitPinOffset(pin, offset)
+		if ok {
 			offset = explicit
 		}
-		out = append(out, transactions.PinSpec{Number: pin.Number, XMM: float64(offset.X) / 1_000_000, YMM: float64(offset.Y) / 1_000_000})
+		out = append(out, transactions.PinSpec{Number: number, XMM: float64(offset.X) / float64(kicadfiles.MM(1)), YMM: float64(offset.Y) / float64(kicadfiles.MM(1)), ExplicitOffset: ok})
 	}
 	return out
 }

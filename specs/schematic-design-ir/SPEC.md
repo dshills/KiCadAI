@@ -555,6 +555,14 @@ V1 should map IR to existing systems in this order:
 5. Use existing `designapi.Builder` and schematic writer for KiCad output.
 6. Run existing schematic readability checks and expose diagnostics.
 
+For arbitrary library symbols, callers should use the resolver-aware adapter and
+pass a `libraryresolver.LibraryIndex`. That path supplies resolved pin anchors
+and graphic bounds to layout before transactions are emitted, embeds the raw
+KiCad symbol body with its qualified library ID during apply, and preserves the
+embedded body for readback geometry recovery. Template geometry remains the
+authoritative source for verified symbols with known KiCadAI connection-anchor
+corrections.
+
 ### 7.1 Design Workflow Mapping
 
 When the IR describes a supported block composition, the adapter should create a
@@ -686,12 +694,18 @@ Remaining gaps for high-quality AI-generated schematics:
 
 - no dedicated AI-facing schematic IR schema;
 - no schema-level layout group model;
-- no stable IR-to-transaction adapter;
-- no global schematic layout engine that consumes declarative groups;
-- limited automatic centering and page-fit behavior;
+- resolver-aware IR-to-transaction support now exists for arbitrary single-unit
+  symbols, but multi-unit inheritance and common-pin composition still need
+  end-to-end coverage;
+- the global layout engine consumes declarative groups, but resolver geometry is
+  optional and must be supplied by callers for strict arbitrary-symbol output;
+- automatic centering and page-fit behavior still need adversarial coverage for
+  dense, cyclic, and multi-sheet designs;
 - limited block-to-block schematic readability after composition;
 - limited guarantee that labels, wires, and properties avoid overlap;
-- no formal repair loop for schematic readability issues.
+- no formal repair loop for schematic readability issues;
+- no full KiCad-backed corpus covering arbitrary symbols, multi-unit symbols,
+  hierarchical sheets, and dense feedback networks together.
 
 ## 13. Open Questions
 

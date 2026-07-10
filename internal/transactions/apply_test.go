@@ -304,12 +304,27 @@ func TestApplyBlocksResolverMultiUnitSymbol(t *testing.T) {
 	index := applyResolverFixture()
 	tx := mustParse(t, `{"operations":[
 	  {"op":"create_project","name":"demo"},
-	  {"op":"add_symbol","ref":"U1","library_id":"Amplifier:DUAL","at":{"x_mm":10,"y_mm":10}},
-	  {"op":"write_project"}
+	  {"op":"add_symbol","ref":"U1","unit":1,"library_id":"Amplifier:DUAL","at":{"x_mm":10,"y_mm":10}},
+	  {"op":"add_symbol","ref":"U1","unit":2,"library_id":"Amplifier:DUAL","at":{"x_mm":30,"y_mm":10}},
+	  {"op":"write_project","schematic_only":true}
 	]}`)
 	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index})
-	if len(result.Issues) == 0 || result.Issues[0].Path != "operations[1]" {
-		t.Fatalf("expected multi-unit issue: %#v", result.Issues)
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected multi-unit issues: %#v", result.Issues)
+	}
+	file, err := schematic.ReadFile(filepath.Join(output, "demo.kicad_sch"))
+	if err != nil {
+		t.Fatalf("read multi-unit schematic: %v", err)
+	}
+	units := map[int]bool{}
+	for _, symbol := range file.Symbols {
+		if len(symbol.Pins) != 2 {
+			t.Fatalf("multi-unit symbol pins = %#v, want two pins", symbol)
+		}
+		units[symbol.Unit] = true
+	}
+	if len(file.Symbols) != 2 || !units[1] || !units[2] {
+		t.Fatalf("multi-unit symbols = %#v, want units 1 and 2 with two pins each", file.Symbols)
 	}
 }
 

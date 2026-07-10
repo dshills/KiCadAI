@@ -143,9 +143,10 @@ type Endpoint struct {
 }
 
 type PinSpec struct {
-	Number string  `json:"number"`
-	XMM    float64 `json:"x_mm,omitempty"`
-	YMM    float64 `json:"y_mm,omitempty"`
+	Number         string  `json:"number"`
+	XMM            float64 `json:"x_mm,omitempty"`
+	YMM            float64 `json:"y_mm,omitempty"`
+	ExplicitOffset bool    `json:"explicit_offset,omitempty"`
 }
 
 type PadSpec struct {
@@ -197,14 +198,15 @@ type SymbolProperty struct {
 }
 
 type ConnectOperation struct {
-	Op          OperationKind `json:"op"`
-	From        Endpoint      `json:"from"`
-	To          Endpoint      `json:"to"`
-	NetName     string        `json:"net_name"`
-	UseLabels   *bool         `json:"use_labels,omitempty"`
-	Waypoints   []Point       `json:"waypoints,omitempty"`
-	FromLabelAt *Point        `json:"from_label_at,omitempty"`
-	ToLabelAt   *Point        `json:"to_label_at,omitempty"`
+	Op                 OperationKind `json:"op"`
+	From               Endpoint      `json:"from"`
+	To                 Endpoint      `json:"to"`
+	NetName            string        `json:"net_name"`
+	UseLabels          *bool         `json:"use_labels,omitempty"`
+	SuppressBendLabels bool          `json:"suppress_bend_labels,omitempty"`
+	Waypoints          []Point       `json:"waypoints,omitempty"`
+	FromLabelAt        *Point        `json:"from_label_at,omitempty"`
+	ToLabelAt          *Point        `json:"to_label_at,omitempty"`
 }
 
 type AddLabelOperation struct {

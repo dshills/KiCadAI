@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
 )
@@ -95,6 +96,32 @@ func TestSchematicLayoutPropagatesExplicitBodyGeometry(t *testing.T) {
 		return
 	}
 	t.Fatal("missing r_limit layout component")
+}
+
+func TestSchematicLayoutUsesResolverPinEnvelopeWithoutGraphics(t *testing.T) {
+	doc := *NewDocument()
+	doc.Circuit.Components = []Component{{
+		ID: "custom", Ref: "X1", Role: ComponentRoleGeneric, Symbol: "Custom:PinOnly",
+		Pins: []Pin{{Number: "1"}, {Number: "2"}},
+	}}
+	doc.Circuit.Nets = []Net{{Name: "N", Connect: []EndpointRef{"custom.1", "custom.1"}}}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Custom:PinOnly": {
+			LibraryID: "Custom:PinOnly",
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+				{Number: "2", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}},
+			},
+		},
+	}}
+	result := schematicLayoutWithLibraryIndex(NormalizeLayoutIntent(doc), &index)
+	if len(result.Components) != 1 || result.Components[0].Body.Empty() {
+		t.Fatalf("resolver pin-only body = %#v, want conservative non-empty bounds", result.Components)
+	}
+	body := result.Components[0].Body
+	if body.MinX != kicadfiles.MM(-3.81) || body.MaxX != kicadfiles.MM(3.81) {
+		t.Fatalf("resolver pin-only bounds = %#v, want both pin positions plus padding", body)
+	}
 }
 
 func TestToTransactionUsesSharedGraphLayoutAndCentersResult(t *testing.T) {

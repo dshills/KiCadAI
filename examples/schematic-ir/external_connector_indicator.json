@@ -1,0 +1,71 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "external_connector_indicator",
+    "title": "External Connector Indicator",
+    "description": "Readability fixture using a resolver-backed symbol outside the built-in template set.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "input",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_02x02_Odd_Even",
+        "value": "AUX IN",
+        "pins": [
+          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
+          {"number": "2", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 0},
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
+          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": -2.54}
+        ]
+      },
+      {
+        "id": "output",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_02x02_Odd_Even",
+        "value": "AUX OUT",
+        "pins": [
+          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
+          {"number": "2", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": 0},
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
+          {"number": "4", "role": "passive", "offset_x_mm": 7.62, "offset_y_mm": -2.54}
+        ]
+      }
+    ],
+    "nets": [
+      {"name": "INPUT", "role": "signal", "connect": ["input.1", "output.1"], "label": "INPUT", "use_label": false}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "connector_group", "label": "Connector", "role": "connector_stage", "members": ["input"], "rank": 0, "side": "left"},
+      {"id": "output_group", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 1, "side": "right"}
+    ],
+    "lanes": {"power": "top", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": false,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 22,
+      "min_component_spacing_mm": 12
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}

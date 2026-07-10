@@ -9,15 +9,21 @@ import (
 	"kicadai/internal/libraryresolver"
 )
 
-const internalUnitsPerMM = 1_000_000
-
 func symbolRecordPins(record libraryresolver.SymbolRecord) ([]PinSpec, error) {
-	if len(record.Units) > 1 {
-		return nil, fmt.Errorf("symbol %s has multiple units; resolver-backed multi-unit placement is not implemented", record.LibraryID)
+	return symbolRecordPinsForUnit(record, 0)
+}
+
+func symbolRecordPinsForUnit(record libraryresolver.SymbolRecord, unit int) ([]PinSpec, error) {
+	targetUnit := unit
+	if targetUnit <= 0 {
+		targetUnit = 1
 	}
 	seen := map[string]struct{}{}
 	pins := make([]PinSpec, 0, len(record.Pins))
 	for _, pin := range record.Pins {
+		if pin.Unit != 0 && pin.Unit != targetUnit {
+			continue
+		}
 		number := strings.TrimSpace(pin.Number)
 		if number == "" {
 			continue
@@ -39,6 +45,11 @@ func symbolRecordPins(record libraryresolver.SymbolRecord) ([]PinSpec, error) {
 }
 
 func resolveSymbolPins(pins []PinSpec, index *libraryresolver.LibraryIndex, libraryID string) ([]PinSpec, error) {
+	return resolveSymbolPinsForUnit(pins, index, libraryID, 0)
+}
+
+func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryIndex, libraryID string, unit int) ([]PinSpec, error) {
+	pins = append([]PinSpec(nil), pins...)
 	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(libraryID); ok {
 		templateByNumber := make(map[string]PinSpec, len(templatePins))
 		for _, pin := range templatePins {
@@ -65,16 +76,49 @@ func resolveSymbolPins(pins []PinSpec, index *libraryresolver.LibraryIndex, libr
 		}
 		return resolved, nil
 	}
-	if len(pins) > 0 || index == nil {
+	if index == nil {
 		return pins, nil
 	}
 	record, ok := libraryresolver.ResolveSymbol(*index, libraryID)
 	if !ok {
-		return nil, fmt.Errorf("symbol library record not found: %s", libraryID)
+		return pins, nil
 	}
-	return symbolRecordPins(record)
+	resolved, err := symbolRecordPinsForUnit(record, unit)
+	if err != nil {
+		if len(pins) > 0 {
+			for _, pin := range pins {
+				if !pin.ExplicitOffset {
+					return nil, err
+				}
+			}
+			return pins, nil
+		}
+		return nil, err
+	}
+	resolvedByNumber := make(map[string]PinSpec, len(resolved))
+	for _, pin := range resolved {
+		resolvedByNumber[strings.TrimSpace(pin.Number)] = pin
+	}
+	if len(pins) > 0 {
+		for i := range pins {
+			if pins[i].ExplicitOffset {
+				continue
+			}
+			if pin, ok := resolvedByNumber[strings.TrimSpace(pins[i].Number)]; ok {
+				pins[i].XMM = pin.XMM
+				pins[i].YMM = pin.YMM
+			} else {
+				return nil, fmt.Errorf("symbol %s has no resolver pin %s for unit %d", libraryID, strings.TrimSpace(pins[i].Number), unit)
+			}
+		}
+		return pins, nil
+	}
+	if len(resolved) == 0 {
+		return nil, fmt.Errorf("symbol library record found but has no usable pins: %s", libraryID)
+	}
+	return resolved, nil
 }
 
 func iuToMM(value kicadfiles.IU) float64 {
-	return float64(value) / internalUnitsPerMM
+	return float64(value) / float64(kicadfiles.MM(1))
 }

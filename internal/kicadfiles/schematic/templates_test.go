@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/sexpr"
 )
 
 func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
@@ -69,6 +70,20 @@ func TestEnsureEmbeddedSymbolIsIdempotentAndPreservesUnsupportedLibraries(t *tes
 	}
 	if schematic.LibSymbols[0].LibraryID != "Device:R" || len(schematic.LibSymbols[0].Body) == 0 {
 		t.Fatalf("unexpected template: %#v", schematic.LibSymbols[0])
+	}
+}
+
+func TestEnsureEmbeddedSymbolFromRawQualifiesLibraryID(t *testing.T) {
+	var file SchematicFile
+	raw := `(symbol "Block" (property "Reference" "J") (symbol "Block_1_1" (pin passive line (at -5.08 0 0) (length 2.54) (name "IN") (number "1"))))`
+	if !EnsureEmbeddedSymbolFromRaw(&file, "Custom:Block", raw) {
+		t.Fatal("expected raw symbol to be embedded")
+	}
+	if len(file.LibSymbols) != 1 || len(file.LibSymbols[0].Body) < 2 {
+		t.Fatalf("embedded symbols = %#v", file.LibSymbols)
+	}
+	if got := file.LibSymbols[0].Body[1]; got != sexpr.S("Custom:Block") {
+		t.Fatalf("qualified library ID = %#v, want Custom:Block", got)
 	}
 }
 
