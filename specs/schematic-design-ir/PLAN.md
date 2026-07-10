@@ -504,6 +504,71 @@ Medium to high. Broader layout changes can affect existing fixtures; add new
 coverage first and change shared placement/routing only when a failing matrix
 case demonstrates the need.
 
+### Phase 11 Current Outcome
+
+- Completed the safe portion of the audit by emitting native no-connect
+  operations for `pins[].no_connect` and preserving explicit label preferences
+  while reusing validated layout label coordinates.
+- Existing template, resolver-backed, multi-unit, inherited-symbol, stress, and
+  USB-C local-symbol tests remain green.
+- A KiCad-backed resolver promotion was intentionally not claimed for the
+  external connector fixture because its resolver source and installed KiCad
+  library expose different pin orientation; that is a library-context gap,
+  not evidence to suppress.
+- Built-in body-graphic hydration was tested and reverted from this slice after
+  it exposed unresolved hierarchical text/label placement warnings. The next
+  phase must solve that with dedicated evidence before enabling it globally.
+
+## Phase 12: Native Geometry And Hierarchical Text Completion
+
+### Work
+
+- Define a stable geometry source precedence for every symbol: explicit IR body,
+  resolver graphics, verified embedded-template geometry, or conservative
+  pin envelope.
+- Add geometry-contract tests that compare layout body bounds and emitted
+  schematic body bounds for representative symbols and rotations.
+- Make hierarchical child-sheet text and label placement use the same local
+  coordinate frame as the child layout rather than inheriting root-sheet hints.
+- Re-run readable acceptance after child-sheet materialization and repair text,
+  label, and wire overlaps without weakening electrical connectivity checks.
+- Add a resolver-library compatibility diagnostic that identifies source/CLI
+  pin-geometry drift and fails closed before KiCad execution.
+
+### Likely Files
+
+- `internal/schematicir/adapter.go`
+- `internal/schematiclayout/geometry.go`
+- `internal/schematiclayout/text.go`
+- `internal/schematiclayout/route.go`
+- `internal/schematiclayout/validate.go`
+- `internal/kicadfiles/roundtrip/schematic_ir_integration_test.go`
+- `internal/schematicir/project_write_test.go`
+- `specs/schematic-design-ir/SPEC.md`
+
+### Tests
+
+- Body geometry and rotation golden tests for embedded and resolver symbols.
+- Hierarchical stress fixture with strict zero-warning readability evidence.
+- Resolver source/CLI mismatch fails-closed test.
+- Optional KiCad parse/ERC/round-trip checks for a matching resolver root.
+- Full Go suite.
+
+### Acceptance Criteria
+
+- Every emitted symbol layout has an explicit geometry-source classification.
+- Dense hierarchical fixtures pass strict readability with no text-symbol,
+  text-wire, label, or wire-crossing diagnostics.
+- Resolver/library pin-orientation drift produces an actionable diagnostic and
+  never emits unverified KiCad connectivity.
+- Existing USB-C local-symbol and all current structural fixtures remain green.
+
+### Rollback Risk
+
+High. Geometry and child-sheet coordinates affect placement, routing, and
+readability across the project; land diagnostic and golden-test coverage before
+changing shared layout behavior.
+
 ## Prism And Commit Protocol
 
 For each phase:

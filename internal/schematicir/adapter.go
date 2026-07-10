@@ -434,6 +434,19 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			Properties: transactionSymbolPropertiesWithLayout(component, ref, state.textByID[component.ID]),
 		}
 		state.appendOperation(tx, transactions.OpAddSymbol, payload, ref, "")
+		for _, pin := range component.Pins {
+			if !pin.NoConnect {
+				continue
+			}
+			state.appendOperation(tx, transactions.OpAddNoConnect, transactions.AddNoConnectOperation{
+				Op: transactions.OpAddNoConnect,
+				Endpoint: transactions.Endpoint{
+					Ref:  ref,
+					Unit: state.unitsByID[component.ID],
+					Pin:  strings.TrimSpace(pin.Number),
+				},
+			}, ref, "")
+		}
 		if component.Footprint != "" {
 			// Retain explicit assignment evidence for transaction consumers even
 			// though AddSymbol also carries the hidden KiCad Footprint property
@@ -595,12 +608,20 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			from := mappedEndpoints[endpointIndex-1]
 			to := mappedEndpoints[endpointIndex]
 			useLabels := schematicNetLabelPreference(state.document, net)
+			if useLabels == nil {
+				value := false
+				useLabels = &value
+			}
+			if net.UseLabel != nil {
+				value := *net.UseLabel
+				useLabels = &value
+			}
 			var waypoints []transactions.Point
 			var fromLabelAt, toLabelAt *transactions.Point
 			fromIR := net.Connect[endpointIndex-1]
 			toIR := net.Connect[endpointIndex]
 			if hint, exists := state.routesByKey[schematicRouteKey(net.Name, fromIR, toIR)]; exists {
-				if hint.UseLabels && net.UseLabel == nil {
+				if hint.UseLabels {
 					value := true
 					useLabels = &value
 					fromLayout, toLayout := hint.FromLabelAt, hint.ToLabelAt
@@ -609,7 +630,8 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					}
 					fromLabelAt = transactionPoint(fromLayout)
 					toLabelAt = transactionPoint(toLayout)
-				} else if len(hint.Points) != 0 {
+				}
+				if !hint.UseLabels && len(hint.Points) != 0 {
 					value := false
 					useLabels = &value
 					points := hint.Points
@@ -648,6 +670,16 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 				if toLabelAt == nil {
 					toLabel, toOK := state.labelsByKey[schematicEndpointLabelKey(net.Name, toIR)]
 					toLabelAt = transactionPointValue(toLabel, toOK)
+				}
+				if (fromLabelAt == nil && !skipFromLabel) || (toLabelAt == nil && !skipToLabel) {
+					// A label route without both anchors cannot be applied by the
+					// transaction builder. Retain the electrical connection with
+					// the builder's deterministic direct-wire fallback instead of
+					// emitting an invalid label operation.
+					value := false
+					useLabels = &value
+					fromLabelAt = nil
+					toLabelAt = nil
 				}
 			}
 			payload := transactions.ConnectOperation{
@@ -1202,6 +1234,7 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 		layoutNet := schematiclayout.Net{Name: net.Name, Role: string(net.Role), OriginalOrdinal: index, PreferDirect: stateDocumentHasPortNet(document, net.Name)}
 		if net.UseLabel != nil {
 			layoutNet.PreferredLabels = *net.UseLabel
+			layoutNet.PreferDirect = !*net.UseLabel
 		}
 		for _, endpoint := range net.Connect {
 			componentID, pin, ok := endpoint.Split()

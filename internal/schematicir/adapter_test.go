@@ -327,6 +327,30 @@ func TestToTransactionEmitsTemplatePinOffsetsAndLabelPolicy(t *testing.T) {
 	}
 }
 
+func TestToTransactionPreservesExplicitDirectRouteIntent(t *testing.T) {
+	doc := validLEDDocument()
+	useLabel := false
+	doc.Circuit.Nets[1].UseLabel = &useLabel
+
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	for _, connect := range decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect) {
+		if connect.NetName != "LED_A" {
+			continue
+		}
+		if connect.UseLabels == nil || *connect.UseLabels {
+			t.Fatalf("LED_A label preference = %#v, want explicit direct routing", connect.UseLabels)
+		}
+		if len(connect.Waypoints) < 2 {
+			t.Fatalf("LED_A waypoint count = %d, want explicit route geometry", len(connect.Waypoints))
+		}
+		return
+	}
+	t.Fatal("LED_A connection not emitted")
+}
+
 func TestToTransactionSupportsAllQuarterTurnOrientations(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Layout.Placements = []Placement{
@@ -377,6 +401,9 @@ func TestToTransactionEmitsLabelPointsForEveryHighFanoutEndpoint(t *testing.T) {
 		}
 		if connect.UseLabels == nil || !*connect.UseLabels || connect.FromLabelAt == nil || connect.ToLabelAt == nil {
 			t.Fatalf("VBUS connection missing explicit label geometry: %#v", connect)
+		}
+		if len(connect.Waypoints) != 0 {
+			t.Fatalf("VBUS explicit label connection should not retain direct-route waypoints: %#v", connect)
 		}
 	}
 }
@@ -532,6 +559,20 @@ func TestToTransactionNoConnectNet(t *testing.T) {
 	}
 	if noConnects[0].Endpoint.Ref != "J1" || noConnects[0].Endpoint.Pin != "3" {
 		t.Fatalf("unexpected no-connect endpoint: %+v", noConnects[0].Endpoint)
+	}
+}
+
+func TestToTransactionEmitsPinNoConnect(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Components[0].Pins = append(doc.Circuit.Components[0].Pins, Pin{Number: "3", NoConnect: true})
+
+	tx, issues := ToTransaction(doc)
+	if len(issues) != 0 {
+		t.Fatalf("expected no issues, got %+v", issues)
+	}
+	noConnects := decodeOperations[transactions.AddNoConnectOperation](t, tx, transactions.OpAddNoConnect)
+	if len(noConnects) != 1 || noConnects[0].Endpoint.Ref != "J1" || noConnects[0].Endpoint.Pin != "3" {
+		t.Fatalf("pin no-connect operations = %#v, want J1.3", noConnects)
 	}
 }
 

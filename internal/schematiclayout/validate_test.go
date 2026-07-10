@@ -73,7 +73,7 @@ func TestValidateAcceptsSpacedObjects(t *testing.T) {
 func TestReflowTextForWiresAvoidsWireOverlap(t *testing.T) {
 	component := PlacedComponent{Component: Component{Ref: "F1", Value: "500mA", Role: "fuse"}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(50)}}
 	wires := []WireSegment{{From: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(55)}, To: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(70)}}}
-	placed, diagnostics := reflowTextForWires([]PlacedComponent{component}, wires, DefaultRules(ProfileStandard))
+	placed, diagnostics := reflowTextForWires([]PlacedComponent{component}, wires, nil, DefaultRules(ProfileStandard))
 	if len(placed) != 1 {
 		t.Fatalf("placed = %#v", placed)
 	}

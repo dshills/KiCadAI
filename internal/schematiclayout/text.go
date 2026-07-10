@@ -38,7 +38,7 @@ func placeComponentText(components []PlacedComponent, rules Rules) ([]PlacedComp
 // reflowTextForWires recomputes generated symbol fields after routing. Text
 // placement happens before routes exist, so a field that was clear of symbols
 // can otherwise end up on a power or ground wire.
-func reflowTextForWires(components []PlacedComponent, wires []WireSegment, rules Rules) ([]PlacedComponent, []Diagnostic) {
+func reflowTextForWires(components []PlacedComponent, wires []WireSegment, labels []Label, rules Rules) ([]PlacedComponent, []Diagnostic) {
 	placed := append([]PlacedComponent(nil), components...)
 	var diagnostics []Diagnostic
 	bodyByRef := map[string]Rect{}
@@ -56,6 +56,9 @@ func reflowTextForWires(components []PlacedComponent, wires []WireSegment, rules
 		minX, maxX := orderedIU(wire.From.X, wire.To.X)
 		minY, maxY := orderedIU(wire.From.Y, wire.To.Y)
 		occupied = append(occupied, (Rect{MinX: minX, MinY: minY, MaxX: maxX, MaxY: maxY}).Inflate(wireGap))
+	}
+	for _, label := range labels {
+		occupied = append(occupied, TextEstimateRotated(label.Text, label.Position, label.Rotation))
 	}
 	for index := range placed {
 		component := &placed[index]

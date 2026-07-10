@@ -735,6 +735,9 @@ Remaining gaps for high-quality AI-generated schematics:
   when direct routing reports crossings, body conflicts, or unrelated
   pin-anchor crossings and label insertion is allowed; this is not a general
   automatic optimization loop;
+- pin-level `no_connect` intent is emitted as native KiCad no-connect markers,
+  and explicit label preferences retain the layout engine's validated label
+  coordinates instead of being replaced by a second ad hoc placement pass;
 - routing and validation treat unrelated symbol pin anchors, including
   intentional no-connect pins, as hard electrical obstacles; endpoints on the
   same net remain legal;
@@ -746,6 +749,14 @@ Remaining gaps for high-quality AI-generated schematics:
   evidence, including canonical local-library IDs and KiCad-derived pin
   anchors; other project-local or resolver-backed symbol families still need
   the same promotion before they can be treated as KiCad-backed pass fixtures;
+- resolver-backed KiCad promotion requires a symbol root whose pin orientation
+  and library version match the KiCad CLI installation; a resolver source that
+  differs from the installed library must fail closed or be materialized as a
+  project-local symbol rather than silently mixing pin geometry;
+- built-in template symbols without a resolver index still use conservative
+  pin/envelope layout geometry for compatibility; complete body-graphic
+  hydration and hierarchical-sheet text/label reflow remain open before
+  arbitrary dense circuits can claim warning-free readability;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 
