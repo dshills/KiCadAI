@@ -254,6 +254,23 @@ func EmbeddedSymbolPinOffsets(libraryID string) ([]TemplatePin, bool) {
 	return cloneTemplatePins(template.pins), true
 }
 
+// EmbeddedSymbolConnectionPinOffsets returns the KiCad-backed physical
+// schematic connection anchors for a supported embedded symbol. Callers that
+// place, route, or serialize a symbol must use this instead of raw template
+// pin offsets so every layer agrees on the electrical endpoint.
+func EmbeddedSymbolConnectionPinOffsets(libraryID string) ([]TemplatePin, bool) {
+	pins, ok := EmbeddedSymbolPinOffsets(libraryID)
+	if !ok {
+		return nil, false
+	}
+	for index := range pins {
+		if offset, overridden := EmbeddedSymbolConnectionPinOffset(libraryID, pins[index].Number); overridden {
+			pins[index].Offset = offset
+		}
+	}
+	return pins, true
+}
+
 // EmbeddedSymbolBodyBounds returns the visible geometry bounds for a known
 // seed symbol relative to its symbol origin.
 func EmbeddedSymbolBodyBounds(libraryID string) (SymbolBodyBounds, bool) {

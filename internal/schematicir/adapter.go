@@ -1695,14 +1695,10 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	for _, pin := range component.Pins {
 		roles[strings.TrimSpace(pin.Number)] = string(pin.Role)
 	}
-	templatePins, _ := schematic.EmbeddedSymbolPinOffsets(component.Symbol)
+	templatePins, _ := schematic.EmbeddedSymbolConnectionPinOffsets(component.Symbol)
 	offsets := map[string]kicadfiles.Point{}
 	for _, pin := range templatePins {
-		offset := pin.Offset
-		if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(component.Symbol, pin.Number); ok {
-			offset = connectionOffset
-		}
-		offsets[strings.TrimSpace(pin.Number)] = offset
+		offsets[strings.TrimSpace(pin.Number)] = pin.Offset
 	}
 	if index != nil {
 		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok {
@@ -1867,13 +1863,9 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 		return nil
 	}
 	offsets := map[string]kicadfiles.Point{}
-	if templatePins, ok := schematic.EmbeddedSymbolPinOffsets(component.Symbol); ok {
+	if templatePins, ok := schematic.EmbeddedSymbolConnectionPinOffsets(component.Symbol); ok {
 		for _, pin := range templatePins {
-			offset := pin.Offset
-			if connectionOffset, exists := schematic.EmbeddedSymbolConnectionPinOffset(component.Symbol, pin.Number); exists {
-				offset = connectionOffset
-			}
-			offsets[strings.TrimSpace(pin.Number)] = offset
+			offsets[strings.TrimSpace(pin.Number)] = pin.Offset
 		}
 	}
 	if index != nil {

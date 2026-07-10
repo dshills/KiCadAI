@@ -248,6 +248,16 @@ func TestBuilderRotatesExplicitSymbolPinAnchors(t *testing.T) {
 	}
 }
 
+func TestSymbolPinSpecsUsePhysicalConnectionAnchors(t *testing.T) {
+	pins := symbolPinSpecs("Connector_Generic:Conn_01x02", nil)
+	if len(pins) != 2 {
+		t.Fatalf("connector pins = %#v", pins)
+	}
+	if pins[1].Number != "2" || pins[1].Offset != (kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(2.54)}) {
+		t.Fatalf("connector pin 2 physical anchor = %#v", pins[1])
+	}
+}
+
 func TestBuilderConnectUsesExplicitOrthogonalWaypoints(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})

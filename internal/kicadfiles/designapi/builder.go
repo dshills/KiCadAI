@@ -522,7 +522,7 @@ func symbolPinSpecs(libraryID string, explicit []PinSpec) []PinSpec {
 	if len(explicit) > 0 {
 		return explicit
 	}
-	templatePins, ok := schematic.EmbeddedSymbolPinOffsets(libraryID)
+	templatePins, ok := schematic.EmbeddedSymbolConnectionPinOffsets(libraryID)
 	if !ok {
 		return nil
 	}

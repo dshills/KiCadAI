@@ -207,6 +207,24 @@ func TestEmbeddedSymbolPinOffsets(t *testing.T) {
 	}
 }
 
+func TestEmbeddedSymbolConnectionPinOffsetsApplyKiCadBackedOverrides(t *testing.T) {
+	pins, ok := EmbeddedSymbolConnectionPinOffsets("Connector_Generic:Conn_01x02")
+	if !ok || len(pins) != 2 {
+		t.Fatalf("connector connection pins = %#v ok=%v", pins, ok)
+	}
+	if pins[0].Number != "1" || pins[0].Offset != (kicadfiles.Point{X: kicadfiles.MM(-5.08)}) {
+		t.Fatalf("connector pin 1 physical anchor = %#v", pins[0])
+	}
+	if pins[1].Number != "2" || pins[1].Offset != (kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(2.54)}) {
+		t.Fatalf("connector pin 2 physical anchor = %#v", pins[1])
+	}
+	pins[1].Number = "BROKEN"
+	fresh, ok := EmbeddedSymbolConnectionPinOffsets("Connector_Generic:Conn_01x02")
+	if !ok || fresh[1].Number != "2" {
+		t.Fatalf("connection pins share mutable backing data: %#v ok=%v", fresh, ok)
+	}
+}
+
 func TestEmbeddedSymbolBodyBounds(t *testing.T) {
 	bounds, ok := EmbeddedSymbolBodyBounds("Device:R")
 	if !ok {
