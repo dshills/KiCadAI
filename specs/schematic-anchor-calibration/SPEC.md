@@ -33,11 +33,15 @@ The first calibration corpus covers these representative built-in families:
 
 ## Problem
 
-KiCad symbol-library coordinates invert Y when parsed into schematic-space
-pin positions. Generated embedded symbol bodies may be source-faithful while
-the separate anchor metadata used by layout and transaction generation is not.
-This can produce wires that are orthogonal and internally consistent but do
-not touch KiCad's actual pins after symbol rotation.
+KiCad symbol-library coordinates invert Y when parsed into `SCH_PIN` local
+positions. Its dangling-endpoint pass, however, obtains an embedded symbol's
+wire attachment point through `SCH_SYMBOL::GetPinPhysicalPosition` on the
+library pin. Generated embedded bodies must therefore retain the serialized
+library-pin endpoint convention used by that pass; the separate anchor
+metadata used by layout and transaction generation must use the same
+convention. Mixing parser-local and library-pin coordinates can produce wires
+that are orthogonal and internally consistent but do not touch KiCad's actual
+connection endpoint after symbol rotation.
 
 KiCad's `SCH_IO_KICAD_SEXPR_PARSER::parseXY(true)` and
 `SCH_SYMBOL::GetPinPhysicalPosition` are the source-of-truth implementation
