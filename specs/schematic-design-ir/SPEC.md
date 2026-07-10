@@ -747,8 +747,10 @@ Remaining gaps for high-quality AI-generated schematics:
   possible graph or symbol geometry;
 - the USB-C LED fixture now has KiCad-backed project-context ERC and round-trip
   evidence, including canonical local-library IDs and KiCad-derived pin
-  anchors; other project-local or resolver-backed symbol families still need
-  the same promotion before they can be treated as KiCad-backed pass fixtures;
+  anchors; the vector bus, built-in LED, and USB-C/I2C/3.3 V regulator fixtures
+  now have the same optional KiCad-backed ERC and round-trip promotion. Other
+  project-local or resolver-backed symbol families still need the same
+  promotion before they can be treated as KiCad-backed pass fixtures;
 - resolver-backed KiCad promotion requires a symbol root whose pin orientation
   and library version match the KiCad CLI installation; a resolver source that
   differs from the installed library must fail closed or be materialized as a

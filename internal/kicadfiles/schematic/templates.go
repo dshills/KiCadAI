@@ -22,8 +22,12 @@ type embeddedTemplate struct {
 	localLibrary                   bool
 	connectionPinOverrideLocalOnly bool
 	pins                           []TemplatePin
-	connectionPinOverride          map[string]kicadfiles.Point
-	rawBody                        string
+	// connectionPinOverride stores KiCad's serialized connection anchor when
+	// it differs from the raw library pin coordinate used to render the body.
+	// These values are empirical KiCad-backed data and must not be normalized
+	// to raw pin offsets without rerunning the ERC promotion fixtures.
+	connectionPinOverride map[string]kicadfiles.Point
+	rawBody               string
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
@@ -36,7 +40,9 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	}},
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", localLibrary: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, connectionPinOverride: map[string]kicadfiles.Point{"2": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(2.54)}}, rawBody: rawConnectorGenericConn01x02Symbol},
 	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", localLibrary: true, pins: connectorTemplatePins(3)},
-	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", localLibrary: true, pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
+	// Conn_01x04 remains global-library-backed because its generated local
+	// library body produces a KiCad lib_symbol_mismatch in the I2C fixture.
+	"connector_generic:conn_01x04": {bodyName: "Conn_01x04", pinType: "passive", pins: connectorTemplatePins(4), connectionPinOverride: map[string]kicadfiles.Point{"4": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(5.08)}}, rawBody: rawConnectorGenericConn01x04Symbol},
 	"kicadai:usb_c_receptacle_poweronly_6p": {
 		bodyName:     "USB_C_Receptacle_PowerOnly_6P",
 		pinType:      "passive",
@@ -163,6 +169,14 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		bodyName:     "Generic_I2C",
 		pinType:      "bidirectional",
 		localLibrary: true,
+		// Local-library connection anchors are Y-inverted relative to the raw
+		// body pin coordinates under KiCad's schematic coordinate convention.
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"1": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)},
+			"2": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)},
+			"3": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)},
+			"4": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)},
+		},
 		pins: []TemplatePin{
 			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
 			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},
@@ -173,6 +187,13 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	},
 	"kicadai:ams1117_schematic": {
 		bodyName: "AMS1117_Schematic", pinType: "passive", localLibrary: true,
+		// KiCad-backed ERC uses a positive Y connection anchor for pin 1 even
+		// though the raw body pin is stored at negative Y.
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"1": {Y: kicadfiles.MM(7.62)},
+			"2": {X: kicadfiles.MM(7.62)},
+			"3": {X: kicadfiles.MM(-7.62)},
+		},
 		pins: []TemplatePin{
 			{Number: "1", Offset: kicadfiles.Point{Y: kicadfiles.MM(-7.62)}},
 			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(7.62)}},
@@ -181,6 +202,18 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	},
 	"sensor:generic_i2c_8p": {
 		bodyName: "Generic_I2C_8P", pinType: "passive", localLibrary: true,
+		// Preserve raw body coordinates in pins and KiCad-resolved connection
+		// anchors separately; the I2C promotion fixture proves these values.
+		connectionPinOverride: map[string]kicadfiles.Point{
+			"1": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)},
+			"2": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)},
+			"3": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)},
+			"4": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)},
+			"5": {X: kicadfiles.MM(2.54)},
+			"6": {X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-2.54)},
+			"7": {X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-5.08)},
+			"8": {X: kicadfiles.MM(2.54), Y: kicadfiles.MM(-7.62)},
+		},
 		pins: []TemplatePin{
 			{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-3.81)}},
 			{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(3.81)}},

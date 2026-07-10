@@ -533,6 +533,11 @@ case demonstrates the need.
   and generated-arbitrary-topology tests remain green. Resolver
   explicit-pin anchor conflicts now fail closed with unit-aware matching;
   installed-library/CLI drift evidence remains the next unfinished slice.
+- Optional KiCad-backed ERC and normalized round-trip promotion now pass for
+  LED indicator, vector bus, USB-C LED, and USB-C/I2C/3.3 V regulator fixtures.
+  The fixture suite records the verified local USB-C, regulator, sensor, and
+  generic 1x02 connector anchor conventions without promoting the mismatched
+  external connector source.
 
 ### Work
 

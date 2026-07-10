@@ -13,20 +13,20 @@
         "id": "usb_c",
         "ref": "J1",
         "role": "input_connector",
-        "symbol": "Connector:USB_C_Receptacle_USB2.0",
+        "symbol": "kicadai:usb_c_receptacle_poweronly_full",
         "footprint": "Connector_USB:USB_C_Receptacle_HRO_TYPE-C-31-M-12",
         "pins": [
-          {"number": "A4", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 10.16},
-          {"number": "A9", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 7.62},
-          {"number": "B4", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 5.08},
-          {"number": "B9", "name": "VBUS", "offset_x_mm": 15.24, "offset_y_mm": 2.54},
-          {"number": "A1", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -10.16},
-          {"number": "A12", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -12.70},
-          {"number": "B1", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -15.24},
-          {"number": "B12", "name": "GND", "offset_x_mm": 0, "offset_y_mm": -17.78},
-          {"number": "A5", "name": "CC1", "offset_x_mm": 15.24, "offset_y_mm": -5.08},
-          {"number": "B5", "name": "CC2", "offset_x_mm": 15.24, "offset_y_mm": -7.62},
-          {"number": "SH", "name": "SHIELD", "offset_x_mm": -7.62, "offset_y_mm": -20.32}
+          {"number": "A4", "name": "VBUS"},
+          {"number": "A9", "name": "VBUS"},
+          {"number": "B4", "name": "VBUS"},
+          {"number": "B9", "name": "VBUS"},
+          {"number": "A1", "name": "GND"},
+          {"number": "A12", "name": "GND"},
+          {"number": "B1", "name": "GND"},
+          {"number": "B12", "name": "GND"},
+          {"number": "A5", "name": "CC1"},
+          {"number": "B5", "name": "CC2"},
+          {"number": "SH", "name": "SHIELD"}
         ]
       },
       {
@@ -91,14 +91,14 @@
         "value": "I2C_SENSOR",
         "footprint": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
         "pins": [
-          {"number": "1", "name": "VCC", "offset_x_mm": -2.54, "offset_y_mm": -3.81},
-          {"number": "2", "name": "GND", "offset_x_mm": -2.54, "offset_y_mm": 3.81},
-          {"number": "3", "name": "SDA", "offset_x_mm": -2.54, "offset_y_mm": -1.27},
-          {"number": "4", "name": "SCL", "offset_x_mm": -2.54, "offset_y_mm": 1.27},
+          {"number": "1", "name": "VCC", "offset_x_mm": -2.54, "offset_y_mm": 3.81},
+          {"number": "2", "name": "GND", "offset_x_mm": -2.54, "offset_y_mm": -3.81},
+          {"number": "3", "name": "SDA", "offset_x_mm": -2.54, "offset_y_mm": 1.27},
+          {"number": "4", "name": "SCL", "offset_x_mm": -2.54, "offset_y_mm": -1.27},
           {"number": "5", "name": "INT", "offset_x_mm": 2.54, "offset_y_mm": 0},
-          {"number": "6", "name": "NC1", "offset_x_mm": 2.54, "offset_y_mm": 2.54},
-          {"number": "7", "name": "NC2", "offset_x_mm": 2.54, "offset_y_mm": 5.08},
-          {"number": "8", "name": "NC3", "offset_x_mm": 2.54, "offset_y_mm": 7.62}
+          {"number": "6", "name": "NC1", "offset_x_mm": 2.54, "offset_y_mm": -2.54},
+          {"number": "7", "name": "NC2", "offset_x_mm": 2.54, "offset_y_mm": -5.08},
+          {"number": "8", "name": "NC3", "offset_x_mm": 2.54, "offset_y_mm": -7.62}
         ]
       },
       {
@@ -138,8 +138,8 @@
       {"name": "VCC_5V", "role": "power", "connect": ["fuse.2", "regulator.3", "cin.1"], "label": "VCC_5V"},
       {"name": "VCC_3V3", "role": "power", "connect": ["regulator.2", "cout.1", "sensor.1", "sda_pullup.1", "scl_pullup.1", "header.1"], "label": "VCC_3V3"},
       {"name": "GND", "role": "ground", "connect": ["usb_c.A1", "usb_c.A12", "usb_c.B1", "usb_c.B12", "usb_c.SH", "cc1_rd.2", "cc2_rd.2", "regulator.1", "cin.2", "cout.2", "sensor.2", "header.2"], "label": "GND"},
-      {"name": "CC1", "role": "signal", "connect": ["usb_c.A5", "cc1_rd.1"], "label": "CC1"},
-      {"name": "CC2", "role": "signal", "connect": ["usb_c.B5", "cc2_rd.1"], "label": "CC2"},
+      {"name": "CC1", "role": "signal", "connect": ["usb_c.A5", "cc1_rd.1"], "label": "CC1", "use_label": true},
+      {"name": "CC2", "role": "signal", "connect": ["usb_c.B5", "cc2_rd.1"], "label": "CC2", "use_label": true},
       {"name": "SDA", "role": "signal", "connect": ["sensor.3", "sda_pullup.2", "header.3"], "label": "SDA"},
       {"name": "SCL", "role": "signal", "connect": ["sensor.4", "scl_pullup.2", "header.4"], "label": "SCL"},
       {"name": "NC_INT", "role": "no_connect", "connect": ["sensor.5"]},
