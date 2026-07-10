@@ -572,6 +572,14 @@ embedded body for readback geometry recovery. Template geometry remains the
 authoritative source for verified symbols with known KiCadAI connection-anchor
 corrections.
 
+When a resolver index is supplied, a missing requested symbol or assigned
+footprint is a blocking adapter issue before transaction emission. This keeps
+resolver-backed AI generation fail-closed instead of silently falling back to
+incomplete geometry. Without an index, the template-only path remains available,
+but external-symbol geometry and library compatibility are explicitly unchecked
+evidence and strict readable acceptance requires explicit geometry or resolver
+evidence.
+
 ### 7.1 Design Workflow Mapping
 
 When the IR describes a supported block composition, the adapter should create a
