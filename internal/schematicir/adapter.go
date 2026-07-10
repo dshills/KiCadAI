@@ -222,6 +222,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		textByID:     layoutTextPlacements(layoutResult),
 		issues:       preflightIssues,
 	}
+	state.issues = append(state.issues, schematicLayoutAcceptanceIssues(document, layoutResult)...)
 	connectedPins := connectedPinSet(document)
 	for componentIndex, component := range document.Circuit.Components {
 		knownPins := knownSchematicPinNumbers(component, index)
@@ -286,6 +287,46 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		state.refsByID[component.ID] = ref
 	}
 	return state, state.issues
+}
+
+func schematicLayoutAcceptanceIssues(document Document, result schematiclayout.Result) []reports.Issue {
+	if document.Policy.Acceptance != AcceptanceReadable {
+		return nil
+	}
+	issues := make([]reports.Issue, 0)
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Severity == schematiclayout.SeverityInfo || readableLayoutDiagnosticAllowed(result, diagnostic.Code) {
+			continue
+		}
+		severity := reports.SeverityError
+		if diagnostic.Severity == schematiclayout.SeverityWarning {
+			severity = reports.SeverityBlocked
+		}
+		issues = append(issues, reports.Issue{
+			Code:       reports.CodeValidationFailed,
+			Severity:   severity,
+			Path:       "layout." + diagnostic.Code,
+			Message:    diagnostic.Message,
+			Suggestion: diagnostic.Repair,
+		})
+	}
+	return issues
+}
+
+func readableLayoutDiagnosticAllowed(result schematiclayout.Result, code string) bool {
+	switch code {
+	case "page_escalated", "page_fit_exhausted", "hierarchy_partition_required":
+		return true
+	case "wire_symbol_overlap":
+		// The planner may use a conservative/fallback body envelope before the
+		// writer hydrates the exact embedded symbol geometry. Readback tests
+		// validate the final KiCad-native body for this transitional diagnostic.
+		return true
+	case "outside_sheet":
+		return result.Partition != nil
+	default:
+		return false
+	}
 }
 
 func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {

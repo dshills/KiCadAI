@@ -7,6 +7,7 @@ import (
 
 	"kicadai/internal/kicadfiles"
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/reports"
 	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
 )
@@ -114,6 +115,19 @@ func TestPortEndpointSelectionFollowsDeclaredSide(t *testing.T) {
 	}
 	if got := state.portEndpointForSide(net.Name, net.Connect, SideRight); got != "r_limit.1" {
 		t.Fatalf("right port endpoint = %q, want r_limit.1", got)
+	}
+}
+
+func TestReadableAcceptanceBlocksLayoutWarnings(t *testing.T) {
+	doc := *NewDocument()
+	doc.Policy.Acceptance = AcceptanceReadable
+	result := schematiclayout.Result{Diagnostics: []schematiclayout.Diagnostic{
+		{Severity: schematiclayout.SeverityWarning, Code: "wire_crossing", Message: "crossing", Repair: "reroute"},
+		{Severity: schematiclayout.SeverityInfo, Code: "page_escalated", Message: "escalated"},
+	}}
+	issues := schematicLayoutAcceptanceIssues(doc, result)
+	if len(issues) != 1 || issues[0].Severity != reports.SeverityBlocked || issues[0].Path != "layout.wire_crossing" {
+		t.Fatalf("readable acceptance issues = %#v", issues)
 	}
 }
 
