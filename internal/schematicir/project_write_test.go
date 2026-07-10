@@ -77,6 +77,7 @@ func TestSchematicIRWritesGlobalPortLabel(t *testing.T) {
 
 func TestSchematicIRWritesOversizedProjectAsHierarchy(t *testing.T) {
 	document := loadExampleDocument(t, "led_indicator.json")
+	document.Policy.Acceptance = AcceptanceReadable
 	for index := 0; index < 80; index++ {
 		document.Circuit.Components = append(document.Circuit.Components, Component{
 			ID:        fmt.Sprintf("extra_%d", index),
