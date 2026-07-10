@@ -39,6 +39,15 @@ generated and checked-in schematic examples.
   left-to-right signal flow, feedback above the active stage, positive rails
   above the signal lane, return/load symbols lower on the page, and no diagonal
   schematic wires.
+- The schematic IR arbitrary-topology corpus writes and re-parses a
+  deterministic suite across dense labeled fabric, feedback-ring, and
+  fanout/branch graph families. Every fixture must pass strict post-write
+  readability validation, with dense fabric selecting A3 and the more compact
+  graph families selecting A4.
+- Direct local wires are emitted only for calibrated or explicitly requested
+  endpoint contracts. Automatic nets that touch transformed symbols use the
+  label path by default; all supported symbol rotation/mirror combinations for
+  that path have KiCad ERC and zero-diff round-trip evidence.
 - Workflow readability summaries are emitted by `design create` planning paths
   and include profile, pass/fail, component/routed-net counts, diagonal-wire
   count, stage-order violations, power-placement violations, diagnostic counts,
@@ -54,6 +63,7 @@ Useful focused commands:
 ```sh
 go test ./internal/schematiclayout
 go test ./internal/designworkflow -run Readability
+go test ./internal/schematicir -run GeneratedArbitraryTopologyCorpus
 ```
 
 When a readability test fails, inspect the diagnostic code first. `diagonal_wire`
