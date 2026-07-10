@@ -525,6 +525,18 @@ case demonstrates the need.
   absent/non-cardinal orientation remains conservative body-edge routing;
   library-version drift still fails closed in KiCad-backed promotion.
 
+### Phase 11 Completion
+
+- The capability matrix is covered by embedded templates, custom local symbols,
+  resolver-backed symbols, inherited symbols, multi-unit symbols, explicit pin
+  metadata, and no-connect markers.
+- Structural arbitrary-topology, dense multi-pin, and oversized hierarchy
+  corpora are deterministic and pass post-write electrical plus zero-warning
+  readability checks across every emitted sheet.
+- Unsupported geometry, missing library records, and resolver/library drift are
+  reported as actionable fail-closed conditions rather than silently emitting
+  an unverified schematic.
+
 ## Phase 12: Native Geometry And Hierarchical Text Completion
 
 ### Current Outcome

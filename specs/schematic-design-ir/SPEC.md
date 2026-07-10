@@ -791,10 +791,11 @@ Remaining gaps for high-quality AI-generated schematics:
   properties before sheet fitting and routes cross-sheet single endpoints as
   collision-aware global-label stubs. Oversized explicit groups split only when
   required for a complete readable hierarchy and are reported by the partition
-  evidence. The hierarchy corpus includes transformed resolver-backed symbols
-  and pin-anchor-owned no-connect markers; resolver-source drift diagnostics
-  and broader connector geometry coverage remain open before arbitrary dense
-  circuits can claim warning-free readability;
+  evidence. The hierarchy corpus includes transformed resolver-backed connector
+  symbols, pin-anchor-owned no-connect markers, and a 96-symbol dense I2C mesh
+  with calibrated pin-facing label routing. This proves warning-free readability
+  for the supported source and topology matrix; unresolved geometry and
+  resolver-source/installed-library drift remain fail-closed conditions;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 
