@@ -1163,6 +1163,7 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 	}
 	if document.Layout.Rules.PreferLabelsForLongNets != nil {
 		rules.LabelFallbackEnabled = *document.Layout.Rules.PreferLabelsForLongNets && document.Policy.Repair.AllowLabelInsertion
+		rules.LabelFallbackConfigured = true
 	}
 	request := schematiclayout.Request{
 		Sheet: schematiclayout.SheetForPaper(document.Metadata.Paper),
@@ -1219,7 +1220,53 @@ func schematicLayoutWithLibraryIndex(document Document, index *libraryresolver.L
 			OriginalOrdinal: index,
 		})
 	}
-	return schematiclayout.Layout(request)
+	result := schematiclayout.Layout(request)
+	if document.Policy.Acceptance == AcceptanceReadable && document.Policy.Repair.AllowLabelInsertion && !request.Rules.LabelFallbackEnabled && layoutNeedsLabelRepair(result) {
+		// schematiclayout.Layout begins with NormalizeRequest, which deep-copies
+		// mutable request slices before sorting or mutating them.
+		repairRequest := request
+		repairRules := request.Rules
+		repairRules.LabelFallbackEnabled = true
+		repairRules.LabelFallbackConfigured = true
+		repairRequest.Rules = repairRules
+		repaired := schematiclayout.Layout(repairRequest)
+		if layoutDiagnosticScore(repaired) < layoutDiagnosticScore(result) {
+			repaired.Diagnostics = append(repaired.Diagnostics, schematiclayout.Diagnostic{
+				Severity: schematiclayout.SeverityInfo,
+				Code:     "readability_repair_label_fallback",
+				Message:  "readable layout retry enabled deterministic label fallback after direct routing conflicts",
+				Repair:   "retain label fallback or provide explicit route hints",
+			})
+			result = repaired
+		}
+	}
+	return result
+}
+
+func layoutNeedsLabelRepair(result schematiclayout.Result) bool {
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Severity != schematiclayout.SeverityError && diagnostic.Severity != schematiclayout.SeverityWarning {
+			continue
+		}
+		switch diagnostic.Code {
+		case schematiclayout.DiagnosticWireCrossing, schematiclayout.DiagnosticWireSymbolOverlap, schematiclayout.DiagnosticWirePinOverlap, schematiclayout.DiagnosticTextWireOverlap:
+			return true
+		}
+	}
+	return false
+}
+
+func layoutDiagnosticScore(result schematiclayout.Result) int {
+	score := 0
+	for _, diagnostic := range result.Diagnostics {
+		switch diagnostic.Severity {
+		case schematiclayout.SeverityError:
+			score += 100
+		case schematiclayout.SeverityWarning:
+			score++
+		}
+	}
+	return score
 }
 
 func documentNetIsBusMember(document Document, netName string) bool {

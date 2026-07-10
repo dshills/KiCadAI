@@ -51,6 +51,15 @@ func Validate(result Result, request Request) Result {
 				Message:  fmt.Sprintf("wire crosses unrelated net %s", other.NetName),
 			})
 		}
+		if wirePassesUnrelatedPin(wire, wire.NetName, result, request) {
+			result.Diagnostics = append(result.Diagnostics, Diagnostic{
+				Severity: SeverityError,
+				Code:     DiagnosticWirePinOverlap,
+				NetName:  wire.NetName,
+				Message:  "wire passes through an unrelated symbol pin anchor",
+				Repair:   "reroute the net around the pin or use a label connection",
+			})
+		}
 	}
 	for index, object := range objects {
 		if !usable.ContainsRect(object.Box) {

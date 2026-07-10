@@ -334,6 +334,88 @@ Medium. CLI dispatch is shared; keep new command family isolated.
 
 Low.
 
+## Phase 8: Bounded Readability Repair And Pin-Safe Routing
+
+### Work
+
+- Preserve the distinction between default label policy and an explicit direct
+  routing request.
+- Retry one readable layout with deterministic label insertion only when the
+  direct attempt reports a crossing, body conflict, or unrelated pin-anchor
+  conflict and repair policy allows labels.
+- Treat unrelated pin anchors, including no-connect pins, as hard route
+  obstacles and expose `wire_pin_overlap` in validation and rule metadata.
+- Keep repair score-based and fail closed; do not introduce a general search
+  optimizer.
+
+### Likely Files
+
+- `internal/schematiclayout/model.go`
+- `internal/schematiclayout/route.go`
+- `internal/schematiclayout/validate.go`
+- `internal/schematiclayout/rules_metadata.go`
+- `internal/schematicir/adapter.go`
+- focused layout and adapter tests
+
+### Tests
+
+- Explicitly disabled label fallback remains disabled for direct routing.
+- A route cannot pass through an unrelated pin anchor.
+- Resolver-backed multi-unit/no-connect fixture remains electrically clean.
+- Full Go suite remains green.
+
+### Acceptance Criteria
+
+- Direct routing is not silently converted to label fallback.
+- No generated wire crosses an unrelated or no-connect pin anchor.
+- Readable acceptance can perform at most one deterministic label-fallback
+  retry and retains it only when diagnostics improve.
+
+### Rollback Risk
+
+Medium. Routing and validation changes affect all schematic layout consumers;
+retain the existing default behavior and keep the retry scoped to IR readable
+acceptance.
+
+## Phase 9: Repair Stress Fixtures And Completion Evidence
+
+### Work
+
+- Add deterministic stress fixtures for high fanout, feedback, long labels,
+  mixed orientations, disconnected islands, and no-connect pin corridors.
+- Exercise the complete IR -> normalize -> layout -> transaction -> KiCad
+  schematic path for representative fixtures.
+- Run optional KiCad parsing/ERC and round-trip checks when the KiCad CLI is
+  available.
+- Record supported cases, fail-closed cases, and remaining limitations in the
+  specification and roadmap.
+
+### Likely Files
+
+- `internal/schematicir/project_write_test.go`
+- `internal/schematicir/adapter_test.go`
+- `internal/kicadfiles/roundtrip/schematic_ir_integration_test.go`
+- `specs/schematic-design-ir/SPEC.md`
+- `specs/ROADMAP.md`
+
+### Tests
+
+- Deterministic repeated generation produces identical layout evidence.
+- Stress fixtures pass internal readability/electrical checks.
+- KiCad-backed tests remain optional and pass when enabled.
+
+### Acceptance Criteria
+
+- The repair behavior is proven on more than one hand-authored topology.
+- Unsupported cases produce explicit diagnostics rather than silently ugly
+  output.
+- Documentation states that arbitrary circuits are accepted structurally but
+  readability is guaranteed only within the tested layout envelope.
+
+### Rollback Risk
+
+Low to medium. Mostly additive tests and documentation, with no new PCB scope.
+
 ## Prism And Commit Protocol
 
 For each phase:

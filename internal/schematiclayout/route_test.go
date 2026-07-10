@@ -41,6 +41,23 @@ func TestRouteUsesLabelsForLongNet(t *testing.T) {
 	}
 }
 
+func TestRouteRespectsDisabledLabelFallback(t *testing.T) {
+	result := Route(Request{
+		Sheet: testSheet(),
+		Rules: Rules{Profile: ProfileStandard, LongWireThreshold: kicadfiles.MM(10), LabelFallbackEnabled: false, LabelFallbackConfigured: true},
+		Nets:  []Net{{Name: "LONG_SIG", Endpoints: []Endpoint{{Ref: "J1", Pin: "1"}, {Ref: "J2", Pin: "1"}}}},
+	}, Result{Components: []PlacedComponent{
+		{Component: Component{Ref: "J1", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		{Component: Component{Ref: "J2", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(80), Y: kicadfiles.MM(20)}},
+	}})
+	if len(result.Labels) != 0 {
+		t.Fatalf("labels = %#v, want direct routing when fallback is disabled", result.Labels)
+	}
+	if len(result.Wires) == 0 {
+		t.Fatal("disabled fallback dropped the routed connection")
+	}
+}
+
 func TestRouteUsesLabelsForMultiEndpointPowerNet(t *testing.T) {
 	result := Route(Request{
 		Sheet: testSheet(),
@@ -102,6 +119,25 @@ func TestRouteAvoidsExistingUnrelatedWire(t *testing.T) {
 		}
 		if wireSegmentsCross(wire, result.Wires[0]) {
 			t.Fatalf("new wire %#v crosses existing wire %#v", wire, result.Wires[0])
+		}
+	}
+}
+
+func TestRouteRejectsUnrelatedPinAnchor(t *testing.T) {
+	components := []PlacedComponent{
+		{Component: Component{Ref: "A", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		{Component: Component{Ref: "B", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(80), Y: kicadfiles.MM(20)}},
+		{Component: Component{Ref: "BLOCK", Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: kicadfiles.MM(10)}}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}},
+	}
+	request := Request{
+		Sheet: testSheet(),
+		Rules: Rules{Profile: ProfileStandard, LabelFallbackEnabled: false, LabelFallbackConfigured: true},
+		Nets:  []Net{{Name: "SIG", Endpoints: []Endpoint{{Ref: "A", Pin: "1"}, {Ref: "B", Pin: "1"}}}},
+	}
+	result := Route(request, Result{Components: components})
+	for _, diagnostic := range result.Diagnostics {
+		if diagnostic.Code == DiagnosticWirePinOverlap {
+			t.Fatalf("route retained unrelated pin overlap: %#v", result.Diagnostics)
 		}
 	}
 }

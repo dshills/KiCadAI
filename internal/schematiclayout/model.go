@@ -52,6 +52,9 @@ type Rules struct {
 	LongWireThreshold    kicadfiles.IU
 	MaxDiagnostics       int
 	LabelFallbackEnabled bool
+	// LabelFallbackConfigured distinguishes an explicit false from the zero
+	// value, which inherits the profile default during normalization.
+	LabelFallbackConfigured bool
 }
 
 type Component struct {
@@ -192,6 +195,13 @@ type Diagnostic struct {
 	Repair   string   `json:"repair,omitempty"`
 }
 
+const (
+	DiagnosticWireCrossing      = "wire_crossing"
+	DiagnosticWireSymbolOverlap = "wire_symbol_overlap"
+	DiagnosticWirePinOverlap    = "wire_pin_overlap"
+	DiagnosticTextWireOverlap   = "text_wire_overlap"
+)
+
 type Report struct {
 	Profile                  Profile          `json:"profile"`
 	Passed                   bool             `json:"passed"`
@@ -267,16 +277,17 @@ func DefaultRules(profile Profile) Rules {
 		profile = ProfileStandard
 	}
 	return Rules{
-		Profile:              profile,
-		Grid:                 kicadfiles.MM(2.54),
-		MinorGrid:            kicadfiles.MM(1.27),
-		MinComponentSpacing:  kicadfiles.MM(10.16),
-		MinTextSpacing:       kicadfiles.MM(2.54),
-		MinStageSpacing:      kicadfiles.MM(25.4),
-		MinGroupGutter:       kicadfiles.MM(12.7),
-		LongWireThreshold:    kicadfiles.MM(80),
-		MaxDiagnostics:       100,
-		LabelFallbackEnabled: profile != ProfileOff,
+		Profile:                 profile,
+		Grid:                    kicadfiles.MM(2.54),
+		MinorGrid:               kicadfiles.MM(1.27),
+		MinComponentSpacing:     kicadfiles.MM(10.16),
+		MinTextSpacing:          kicadfiles.MM(2.54),
+		MinStageSpacing:         kicadfiles.MM(25.4),
+		MinGroupGutter:          kicadfiles.MM(12.7),
+		LongWireThreshold:       kicadfiles.MM(80),
+		MaxDiagnostics:          100,
+		LabelFallbackEnabled:    profile != ProfileOff,
+		LabelFallbackConfigured: true,
 	}
 }
 
@@ -439,7 +450,7 @@ func BuildReport(result Result, profile Profile) Report {
 			report.StageOrderViolationCount++
 		case "power_placement":
 			report.PowerPlacementViolations++
-		case "symbol_overlap", "text_symbol_overlap", "text_wire_overlap", "label_overlap", "wire_symbol_overlap", "wire_crossing":
+		case "symbol_overlap", "text_symbol_overlap", "text_wire_overlap", "label_overlap", "wire_symbol_overlap", "wire_crossing", DiagnosticWirePinOverlap:
 			report.OverlapCounts[diagnostic.Code]++
 		}
 	}
@@ -500,8 +511,8 @@ func normalizeRules(rules Rules) Rules {
 	if rules.MaxDiagnostics < 0 {
 		rules.MaxDiagnostics = defaults.MaxDiagnostics
 	}
-	if rules.Profile != ProfileOff {
-		rules.LabelFallbackEnabled = true
+	if !rules.LabelFallbackConfigured {
+		rules.LabelFallbackEnabled = defaults.LabelFallbackEnabled
 	}
 	return rules
 }

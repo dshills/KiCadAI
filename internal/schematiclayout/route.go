@@ -244,8 +244,40 @@ func scoreRoute(points []kicadfiles.Point, netName string, from, to Endpoint, re
 				clean = false
 			}
 		}
+		if wirePassesUnrelatedPin(segment, netName, result, request) {
+			score += routeHardPenalty
+			clean = false
+		}
 	}
 	return score, clean
+}
+
+func wirePassesUnrelatedPin(segment WireSegment, netName string, result Result, request Request) bool {
+	endpoints := netEndpointSet(request, netName)
+	anchors := pinAnchors(result.Components)
+	for endpoint, anchor := range anchors {
+		if _, allowed := endpoints[endpoint]; allowed {
+			continue
+		}
+		if pointOnSegment(segment.From, anchor, segment.To) {
+			return true
+		}
+	}
+	return false
+}
+
+func netEndpointSet(request Request, netName string) map[Endpoint]struct{} {
+	endpoints := map[Endpoint]struct{}{}
+	for _, net := range request.Nets {
+		if net.Name != netName {
+			continue
+		}
+		for _, endpoint := range net.Endpoints {
+			endpoints[endpoint] = struct{}{}
+		}
+		break
+	}
+	return endpoints
 }
 
 func segmentsForPoints(netName string, points []kicadfiles.Point) []WireSegment {

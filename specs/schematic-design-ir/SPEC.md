@@ -634,6 +634,9 @@ Allowed v1 repairs:
 - insert labels when `allow_label_insertion` is true;
 - increase group/component spacing when `allow_group_spacing_adjustment` is true;
 - normalize enum aliases, such as `ltr` to `left_to_right`, if documented.
+- retry one direct-routing result with deterministic label fallback when the
+  direct result contains wire crossings, symbol-body conflicts, or unrelated
+  pin-anchor crossings and label insertion is allowed.
 
 Forbidden v1 repairs:
 
@@ -728,8 +731,13 @@ Remaining gaps for high-quality AI-generated schematics:
 - inherited symbols in split `.kicad_symdir` libraries require the
   resolver-backed adapter to materialize their base symbol body before
   embedding;
-- readability repair remains report-driven rather than a general automatic
-  optimization loop;
+- readable acceptance now has one bounded deterministic label-fallback retry
+  when direct routing reports crossings, body conflicts, or unrelated
+  pin-anchor crossings and label insertion is allowed; this is not a general
+  automatic optimization loop;
+- routing and validation treat unrelated symbol pin anchors, including
+  intentional no-connect pins, as hard electrical obstacles; endpoints on the
+  same net remain legal;
 - KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
   structural IR validation.
 

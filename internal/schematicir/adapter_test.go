@@ -97,6 +97,23 @@ func TestToTransactionRejectsConflictingKiCadConnectionAnchor(t *testing.T) {
 	}
 }
 
+func TestReadableLayoutRepairRecognizesDirectRouteConflicts(t *testing.T) {
+	result := schematiclayout.Result{Diagnostics: []schematiclayout.Diagnostic{{Code: "wire_symbol_overlap", Severity: schematiclayout.SeverityError}}}
+	if !layoutNeedsLabelRepair(result) {
+		t.Fatal("wire-symbol conflict did not request label fallback repair")
+	}
+	if got := layoutDiagnosticScore(result); got != 100 {
+		t.Fatalf("diagnostic score = %d, want 100", got)
+	}
+	clean := schematiclayout.Result{Diagnostics: []schematiclayout.Diagnostic{{Severity: schematiclayout.SeverityInfo, Code: "route_label_fallback"}}}
+	if layoutNeedsLabelRepair(clean) {
+		t.Fatal("informational label fallback did not remain repair-triggering")
+	}
+	if layoutDiagnosticScore(clean) != 0 {
+		t.Fatalf("informational diagnostic score = %d, want 0", layoutDiagnosticScore(clean))
+	}
+}
+
 func schematicIRIssueCode(issues []reports.Issue, code reports.Code) bool {
 	for _, issue := range issues {
 		if issue.Code == code && issue.Blocking() {

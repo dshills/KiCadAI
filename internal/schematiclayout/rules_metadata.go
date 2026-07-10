@@ -51,6 +51,7 @@ func buildReadabilityRules() []RuleMetadata {
 		ruleMetadata("standard.diagonal_wire", "diagonal_wire", SeverityError, "Schematic wires must be orthogonal.", "reroute the net with horizontal and vertical wire segments", RuleProfileStandard, RuleProfileAmplifier),
 		ruleMetadata("standard.symbol_overlap", "symbol_overlap", SeverityError, "Symbols must not overlap each other.", "spread overlapping components apart on the sheet", RuleProfileStandard),
 		ruleMetadata("standard.wire_symbol_overlap", "wire_symbol_overlap", SeverityError, "Wires must not cross through unrelated symbol bodies.", "reroute the wire around the symbol body or move the component", RuleProfileStandard),
+		ruleMetadata("standard.wire_pin_overlap", "wire_pin_overlap", SeverityError, "Wires must not pass through unrelated symbol pin anchors.", "reroute the wire around the pin or use a label connection", RuleProfileStandard),
 		ruleMetadata("standard.text_symbol_overlap", "text_symbol_overlap", SeverityWarning, "Text should not overlap symbol bodies.", "move the text or spread nearby components", RuleProfileStandard),
 		ruleMetadata("standard.text_wire_overlap", "text_wire_overlap", SeverityWarning, "Text should not overlap wires.", "move the text away from routed nets", RuleProfileStandard),
 		ruleMetadata("standard.label_overlap", "label_overlap", SeverityWarning, "Labels should not overlap each other.", "move one label or use a less crowded net-label location", RuleProfileStandard),
