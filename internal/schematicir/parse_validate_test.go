@@ -25,6 +25,14 @@ func TestValidateLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestValidateAllowsLogicalBusNetRole(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Nets[1].Role = NetRoleBus
+	if issues := Validate(doc); len(issues) != 0 {
+		t.Fatalf("logical bus net should validate, got %#v", issues)
+	}
+}
+
 func TestValidateRejectsUnknownEndpointPin(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Circuit.Nets[0].Connect = []EndpointRef{"r_limit.3", "led.1"}

@@ -465,7 +465,7 @@ func schematicNetLabelPreference(document Document, net Net) *bool {
 		return nil
 	}
 	switch net.Role {
-	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleShield:
+	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleShield, NetRoleBus:
 		value := true
 		return &value
 	}

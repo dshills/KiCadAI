@@ -81,6 +81,17 @@ func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	}
 }
 
+func TestSchematicLayoutPrefersLabelsForLogicalBusNets(t *testing.T) {
+	doc := validLEDDocument()
+	doc.Circuit.Nets[1].Role = NetRoleBus
+	result := schematicLayout(doc)
+	for _, connection := range result.Connections {
+		if connection.NetName == doc.Circuit.Nets[1].Name && !connection.UseLabels {
+			t.Fatalf("bus connection should use labels: %#v", connection)
+		}
+	}
+}
+
 func TestSchematicLayoutPropagatesExplicitBodyGeometry(t *testing.T) {
 	doc := validLEDDocument()
 	doc.Circuit.Components[1].Body = &BodyGeometry{MinXMM: -9, MinYMM: -2, MaxXMM: 4, MaxYMM: 11}

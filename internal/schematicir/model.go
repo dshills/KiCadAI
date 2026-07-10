@@ -147,6 +147,7 @@ const (
 	NetRoleFeedback  NetRole = "feedback"
 	NetRoleBias      NetRole = "bias"
 	NetRoleShield    NetRole = "shield"
+	NetRoleBus       NetRole = "bus"
 	NetRoleNoConnect NetRole = "no_connect"
 )
 

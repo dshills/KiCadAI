@@ -45,7 +45,9 @@ natural language prompt
 - No free-form natural-language parser in this milestone.
 - No new LLM provider integration.
 - No KiCad S-expression authoring by AI callers.
-- No arbitrary circuit synthesis guarantee.
+- No arbitrary circuit synthesis guarantee from natural language; arbitrary
+  validated IR is supported only when symbol geometry and pin metadata are
+  available from explicit IR fields or a resolver index.
 - No PCB routing, board placement, DRC, fabrication, or block-family expansion.
 - No full graph-layout optimizer in v1.
 - No mutation of imported user schematics by default.
@@ -258,10 +260,12 @@ Net fields:
 - `name`: required except for `no_connect` records. If a `no_connect` net
   omits `name`, normalization must assign a deterministic internal NC name
   from its single endpoint.
-- `role`: one of `signal`, `power`, `power_pos`, `power_neg`, `ground`,
+- `role`: one of `signal`, `bus`, `power`, `power_pos`, `power_neg`, `ground`,
   `return`, `feedback`, `bias`, `shield`, or `no_connect`. `power` is a
-  generic power rail when polarity is unknown. The `bus` role is deferred until
-  a later IR version defines KiCad bus naming and bus-entry semantics.
+  generic power rail when polarity is unknown. In v1, `bus` means one logical
+  bus member such as SDA or SCL and is emitted as a label-friendly electrical
+  net. True KiCad vector-bus graphics, bus entries, and bus-member expansion
+  remain unsupported and must fail closed rather than be guessed.
 - `connect`: required list of endpoints. Endpoints use the mandatory component `id` plus pin selector: `component_id.pin`. The endpoint grammar is `<component_id>.<pin_selector>`, both parts must be non-empty, and a missing dot is invalid. The first dot separates the component ID from the pin selector; because component IDs cannot contain dots, pin selectors may still contain dots when a symbol library requires them. The pin selector must match the component `pins[].number` value or a pin number from resolved symbol metadata. Explicit KiCad `ref` values are output names only and must not be used for IR-local references. Future named-pin aliases may be accepted only after validation resolves them to pin numbers.
 - Multiple net records may share the same `name` as an AI-authoring
   convenience. Normalization must merge them into one net before adapter
@@ -694,18 +698,15 @@ Remaining gaps for high-quality AI-generated schematics:
 
 - no dedicated AI-facing schematic IR schema;
 - no schema-level layout group model;
-- resolver-aware IR-to-transaction support now exists for arbitrary single-unit
-  symbols, but multi-unit inheritance and common-pin composition still need
-  end-to-end coverage;
-- the global layout engine consumes declarative groups, but resolver geometry is
-  optional and must be supplied by callers for strict arbitrary-symbol output;
-- automatic centering and page-fit behavior still need adversarial coverage for
-  dense, cyclic, and multi-sheet designs;
-- limited block-to-block schematic readability after composition;
-- limited guarantee that labels, wires, and properties avoid overlap;
-- no formal repair loop for schematic readability issues;
-- no full KiCad-backed corpus covering arbitrary symbols, multi-unit symbols,
-  hierarchical sheets, and dense feedback networks together.
+- true KiCad vector-bus graphics, bus entries, and bus-member expansion are not
+  represented by the v1 IR;
+- resolver-aware output still depends on configured KiCad library roots or
+  explicit symbol geometry; missing geometry fails closed for strict readable
+  acceptance;
+- readability repair remains report-driven rather than a general automatic
+  optimization loop;
+- KiCad-backed ERC/DRC evidence remains environment-gated and is not implied by
+  structural IR validation.
 
 ## 13. Open Questions
 
