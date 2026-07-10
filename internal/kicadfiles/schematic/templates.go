@@ -33,12 +33,12 @@ type embeddedTemplate struct {
 }
 
 var embeddedSymbolTemplates = map[string]embeddedTemplate{
-	"amplifier_operational:lmv321": {bodyName: "LMV321", pinType: "passive", pins: []TemplatePin{
-		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(2.54), Y: 0}},
-		{Number: "2", Offset: kicadfiles.Point{Y: kicadfiles.MM(2.54)}},
-		{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(1.27)}},
-		{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-1.27)}},
-		{Number: "5", Offset: kicadfiles.Point{Y: kicadfiles.MM(-2.54)}},
+	"amplifier_operational:lmv321": {bodyName: "LMV321", pinType: "passive", rawBody: rawAmplifierOperationalLMV321Symbol, pins: []TemplatePin{
+		{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(2.54)}},
+		{Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-7.62)}},
+		{Number: "3", Offset: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-2.54)}},
+		{Number: "4", Offset: kicadfiles.Point{X: kicadfiles.MM(7.62)}},
+		{Number: "5", Offset: kicadfiles.Point{X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(7.62)}},
 	}},
 	"connector_generic:conn_01x02": {bodyName: "Conn_01x02", pinType: "passive", localLibrary: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08)}}, {Number: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}}}, connectionPinOverride: map[string]kicadfiles.Point{"2": {X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(2.54)}}, rawBody: rawConnectorGenericConn01x02Symbol},
 	"connector_generic:conn_01x03": {bodyName: "Conn_01x03", pinType: "passive", localLibrary: true, pins: connectorTemplatePins(3)},
@@ -139,15 +139,19 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 	"power:+3.3v":         powerTemplate("+3.3V", 5.08),
 	"power:+3v3":          powerTemplate("+3V3", 5.08),
 	"power:+5v":           powerTemplate("+5V", 5.08),
-	"power:+12v":          powerTemplate("+12V", 5.08),
-	"power:-12v":          powerTemplate("-12V", -5.08),
-	"power:gnd":           powerTemplate("GND", -5.08),
+	// These dual-rail symbols are embedded from the KiCad 10 library. Their
+	// source pin is at the symbol origin; using the legacy synthetic geometry
+	// creates library-mismatch ERC findings and puts power-net labels off-pin.
+	"power:+12v": {bodyName: "+12V", pinType: "power_in", power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: rawPowerPlus12VSymbol},
+	"power:-12v": {bodyName: "-12V", pinType: "power_in", power: true, pins: []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}}, rawBody: rawPowerMinus12VSymbol},
+	"power:gnd":  powerTemplate("GND", -5.08),
 	"power:pwr_flag": {
 		bodyName: "PWR_FLAG",
 		pinType:  "power_out",
 		pinX:     0,
 		power:    true,
 		pins:     []TemplatePin{{Number: "1", Offset: kicadfiles.Point{}}},
+		rawBody:  rawPowerPWRFlagSymbol,
 	},
 	// Template keys are normalized to lowercase before lookup.
 	"regulator_linear:ams1117-3.3": {
@@ -1005,6 +1009,396 @@ func templatePinRotation(offset kicadfiles.Point) int64 {
 func templatePinMM(value kicadfiles.IU) float64 {
 	return float64(value) / 1_000_000
 }
+
+const rawPowerPlus12VSymbol = `(symbol "power:+12V"
+	(power global)
+	(pin_numbers
+		(hide yes)
+	)
+	(pin_names
+		(offset 0)
+		(hide yes)
+	)
+	(exclude_from_sim no)
+	(in_bom yes)
+	(on_board yes)
+	(in_pos_files yes)
+	(duplicate_pin_numbers_are_jumpers no)
+	(property "Reference" "#PWR"
+		(at 0 -3.81 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Value" "+12V"
+		(at 0 3.556 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Footprint" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Description" "Power symbol creates a global label with name \"+12V\""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "ki_keywords" "global power"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(symbol "+12V_0_1"
+		(polyline (pts (xy -0.762 1.27) (xy 0 2.54)) (stroke (width 0) (type default)) (fill (type none)))
+		(polyline (pts (xy 0 2.54) (xy 0.762 1.27)) (stroke (width 0) (type default)) (fill (type none)))
+		(polyline (pts (xy 0 0) (xy 0 2.54)) (stroke (width 0) (type default)) (fill (type none)))
+	)
+	(symbol "+12V_1_1"
+		(pin power_in line (at 0 0 90) (length 0) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+	)
+	(embedded_fonts no)
+)`
+
+const rawPowerMinus12VSymbol = `(symbol "power:-12V"
+	(power global)
+	(pin_numbers
+		(hide yes)
+	)
+	(pin_names
+		(offset 0)
+		(hide yes)
+	)
+	(exclude_from_sim no)
+	(in_bom yes)
+	(on_board yes)
+	(in_pos_files yes)
+	(duplicate_pin_numbers_are_jumpers no)
+	(property "Reference" "#PWR"
+		(at 0 -3.81 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Value" "-12V"
+		(at 0 3.556 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Footprint" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Description" "Power symbol creates a global label with name \"-12V\""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "ki_keywords" "global power"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(symbol "-12V_0_0"
+		(pin power_in line (at 0 0 90) (length 0) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+	)
+	(symbol "-12V_0_1"
+		(polyline (pts (xy 0 0) (xy 0 1.27) (xy 0.762 1.27) (xy 0 2.54) (xy -0.762 1.27) (xy 0 1.27)) (stroke (width 0) (type default)) (fill (type outline)))
+	)
+	(embedded_fonts no)
+)`
+
+const rawPowerPWRFlagSymbol = `(symbol "power:PWR_FLAG"
+	(power global)
+	(pin_numbers
+		(hide yes)
+	)
+	(pin_names
+		(offset 0)
+		(hide yes)
+	)
+	(exclude_from_sim no)
+	(in_bom yes)
+	(on_board yes)
+	(in_pos_files yes)
+	(duplicate_pin_numbers_are_jumpers no)
+	(property "Reference" "#FLG"
+		(at 0 1.905 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Value" "PWR_FLAG"
+		(at 0 3.81 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Footprint" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "Description" "Special symbol for telling ERC where power comes from"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(property "ki_keywords" "flag power"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects (font (size 1.27 1.27)))
+	)
+	(symbol "PWR_FLAG_0_0"
+		(pin power_out line (at 0 0 90) (length 0) (name "" (effects (font (size 1.27 1.27)))) (number "1" (effects (font (size 1.27 1.27)))))
+	)
+	(symbol "PWR_FLAG_0_1"
+		(polyline (pts (xy 0 0) (xy 0 1.27) (xy -1.016 1.905) (xy 0 2.54) (xy 1.016 1.905) (xy 0 1.27)) (stroke (width 0) (type default)) (fill (type none)))
+	)
+	(embedded_fonts no)
+)`
+
+const rawAmplifierOperationalLMV321Symbol = `(symbol "Amplifier_Operational:LMV321"
+	(pin_names
+		(offset 0.127)
+	)
+	(exclude_from_sim no)
+	(in_bom yes)
+	(on_board yes)
+	(in_pos_files yes)
+	(duplicate_pin_numbers_are_jumpers no)
+	(property "Reference" "U"
+		(at 0 5.08 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+	)
+	(property "Value" "LMV321"
+		(at 0 -5.08 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+	)
+	(property "Footprint" ""
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+			(justify left)
+		)
+	)
+	(property "Datasheet" "http://www.ti.com/lit/ds/symlink/lmv324.pdf"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" "Low-Voltage Rail-to-Rail Output Operational Amplifiers, SOT-23-5/SC-70-5"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "ki_keywords" "single opamp"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "ki_fp_filters" "SOT?23* *SC*70*"
+		(at 0 0 0)
+		(show_name no)
+		(do_not_autoplace no)
+		(hide yes)
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(symbol "LMV321_0_1"
+		(polyline
+			(pts
+				(xy -5.08 5.08) (xy 5.08 0) (xy -5.08 -5.08) (xy -5.08 5.08)
+			)
+			(stroke
+				(width 0.254)
+				(type default)
+			)
+			(fill
+				(type background)
+			)
+		)
+		(pin power_in line
+			(at -2.54 -7.62 90)
+			(length 3.81)
+			(name "V-"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(number "2"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+		(pin power_in line
+			(at -2.54 7.62 270)
+			(length 3.81)
+			(name "V+"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(number "5"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+	)
+	(symbol "LMV321_1_1"
+		(pin input line
+			(at -7.62 2.54 0)
+			(length 2.54)
+			(name "+"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(number "1"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+		(pin input line
+			(at -7.62 -2.54 0)
+			(length 2.54)
+			(name "-"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(number "3"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+		(pin output line
+			(at 7.62 0 180)
+			(length 2.54)
+			(name ""
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+			(number "4"
+				(effects
+					(font
+						(size 1.27 1.27)
+					)
+				)
+			)
+		)
+	)
+	(embedded_fonts no)
+)`
 
 const rawDeviceRSymbol = `(symbol "Device:R"
   (pin_numbers (hide yes))

@@ -32,6 +32,7 @@ func TestSchematicIRWritesReadableProject(t *testing.T) {
 		{name: "USB-C LED indicator", fileName: "usb_c_led_indicator.json", projectName: "usb_c_led_indicator"},
 		{name: "I2C sensor regulator", fileName: "i2c_sensor_3v3_regulator.json", projectName: "i2c_sensor_3v3_regulator"},
 		{name: "Vector bus", fileName: "vector_bus.json", projectName: "vector_bus"},
+		{name: "Mixed-supply op-amp", fileName: "mixed_supply_opamp.json", projectName: "mixed_supply_opamp"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

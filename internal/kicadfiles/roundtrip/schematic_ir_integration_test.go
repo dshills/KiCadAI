@@ -100,6 +100,55 @@ func TestKiCadRoundTripSchematicIRLEDIndicator(t *testing.T) {
 	}
 }
 
+func TestKiCadRoundTripSchematicIRMixedSupplyOpAmp(t *testing.T) {
+	cli := requireKiCadCLI(t)
+	fixture, err := os.Open(repoPath(t, "examples", "schematic-ir", "mixed_supply_opamp.json"))
+	if err != nil {
+		t.Fatalf("open mixed-supply op-amp IR: %v", err)
+	}
+	defer fixture.Close()
+	document, issues := schematicir.DecodeStrict(fixture)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode mixed-supply op-amp IR: %#v", issues)
+	}
+	tx, issues := schematicir.ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("adapt mixed-supply op-amp IR: %#v", issues)
+	}
+	output := filepath.Join(t.TempDir(), "mixed_supply_opamp")
+	apply := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: output, Overwrite: true})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("write mixed-supply op-amp schematic: %#v", apply.Issues)
+	}
+	schematicPath := filepath.Join(output, "mixed_supply_opamp.kicad_sch")
+	generated, err := schematic.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatalf("read mixed-supply op-amp schematic: %v", err)
+	}
+	request, layout := schematiclayout.AdaptSchematic(&generated)
+	layout = schematiclayout.Validate(layout, request)
+	readability := schematiclayout.BuildReport(layout, schematiclayout.ProfileStrict)
+	if !readability.Passed {
+		t.Fatalf("mixed-supply op-amp readability failed: %#v diagnostics=%#v", readability, layout.Diagnostics)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+	defer cancel()
+	erc, err := checks.RunERC(ctx, checks.KiCadCLI{Path: cli.Path}, schematicPath, checks.Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "erc")})
+	if err != nil {
+		t.Fatalf("mixed-supply op-amp ERC returned error: %v\nresult=%#v", err, erc)
+	}
+	if erc.Status != checks.CheckStatusPass || len(erc.Findings) != 0 {
+		t.Fatalf("mixed-supply op-amp ERC status = %s, findings=%#v parser=%#v", erc.Status, erc.Findings, erc.ParserIssues)
+	}
+	roundTrip, err := RoundTripSchematic(ctx, cli, schematicPath, Options{KeepArtifacts: true, ArtifactDir: filepath.Join(t.TempDir(), "roundtrip")})
+	if err != nil {
+		t.Fatalf("mixed-supply op-amp round trip returned error: %v\nresult=%#v", err, roundTrip)
+	}
+	if !roundTrip.Equal {
+		t.Fatalf("mixed-supply op-amp round trip changed generated schematic: %s", firstResultDifference(roundTrip))
+	}
+}
+
 func TestKiCadRoundTripSchematicIRI2CSensorRegulator(t *testing.T) {
 	cli := requireKiCadCLI(t)
 	fixturePath := repoPath(t, "examples", "schematic-ir", "i2c_sensor_3v3_regulator.json")

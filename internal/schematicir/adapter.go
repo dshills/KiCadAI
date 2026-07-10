@@ -1348,7 +1348,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 			Ref:       component.ID,
 			Value:     component.Value,
 			LibraryID: component.Symbol,
-			Role:      string(component.Role),
+			Role:      schematicLayoutComponentRole(component),
 			GroupID:   group.ID,
 			Stage:     schematicStageForGroup(group.Role),
 			FlowRank:  group.Rank,
@@ -1410,6 +1410,21 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		}
 	}
 	return result
+}
+
+func schematicLayoutComponentRole(component Component) string {
+	if component.Role != ComponentRolePowerSymbol {
+		return string(component.Role)
+	}
+	value := strings.ToLower(strings.TrimSpace(component.Value + " " + component.Symbol))
+	switch {
+	case strings.Contains(value, "gnd"), strings.Contains(value, "ground"):
+		return "ground"
+	case strings.Contains(value, "vee"), strings.Contains(value, "vss"), strings.HasPrefix(strings.TrimSpace(component.Value), "-"):
+		return "negative_rail"
+	default:
+		return "positive_rail"
+	}
 }
 
 func layoutNeedsLabelRepair(result schematiclayout.Result) bool {

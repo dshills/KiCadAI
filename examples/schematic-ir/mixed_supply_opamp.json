@@ -1,0 +1,142 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "mixed_supply_opamp",
+    "title": "Mixed-Supply Op-Amp Feedback Stage",
+    "description": "A human-readable analog stage with positive and negative supplies, feedback, and a grounded input reference.",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "input",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_01x02",
+        "value": "AUDIO_IN",
+        "pins": [{"number": "1", "name": "IN"}, {"number": "2", "name": "GND"}]
+      },
+      {
+        "id": "input_coupling",
+        "ref": "C1",
+        "role": "capacitor",
+        "symbol": "Device:C",
+        "value": "1u",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "opamp",
+        "ref": "U1",
+        "role": "ic",
+        "symbol": "Amplifier_Operational:LMV321",
+        "value": "LMV321",
+        "pins": [
+          {"number": "1", "name": "+"},
+          {"number": "2", "name": "V-"},
+          {"number": "3", "name": "-"},
+          {"number": "4", "name": "OUT"},
+          {"number": "5", "name": "V+"}
+        ]
+      },
+      {
+        "id": "feedback",
+        "ref": "R1",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "10k",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "input_reference",
+        "ref": "R2",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "100k",
+        "pins": [{"number": "1"}, {"number": "2"}]
+      },
+      {
+        "id": "positive_supply",
+        "ref": "#PWR01",
+        "role": "power_symbol",
+        "symbol": "power:+12V",
+        "value": "+12V",
+        "pins": [{"number": "1", "name": "+12V"}]
+      },
+      {
+        "id": "negative_supply",
+        "ref": "#PWR02",
+        "role": "power_symbol",
+        "symbol": "power:-12V",
+        "value": "-12V",
+        "pins": [{"number": "1", "name": "-12V"}]
+      },
+      {
+        "id": "positive_supply_flag",
+        "ref": "#FLG01",
+        "role": "power_symbol",
+        "symbol": "power:PWR_FLAG",
+        "value": "PWR_FLAG",
+        "pins": [{"number": "1", "name": "PWR"}]
+      },
+      {
+        "id": "negative_supply_flag",
+        "ref": "#FLG02",
+        "role": "power_symbol",
+        "symbol": "power:PWR_FLAG",
+        "value": "PWR_FLAG",
+        "pins": [{"number": "1", "name": "PWR"}]
+      },
+      {
+        "id": "output",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_01x02",
+        "value": "AUDIO_OUT",
+        "pins": [{"number": "1", "name": "OUT"}, {"number": "2", "name": "GND"}]
+      }
+    ],
+    "nets": [
+      {"name": "AUDIO_IN", "role": "signal", "connect": ["input.1", "input_coupling.1"], "label": "AUDIO_IN"},
+      {"name": "NONINV_IN", "role": "signal", "connect": ["input_coupling.2", "opamp.1", "input_reference.1"], "label": "NONINV_IN"},
+      {"name": "+12V", "role": "power_pos", "connect": ["opamp.5", "positive_supply.1", "positive_supply_flag.1"], "label": "+12V"},
+      {"name": "-12V", "role": "power_neg", "connect": ["opamp.2", "negative_supply.1", "negative_supply_flag.1"], "label": "-12V"},
+      {"name": "GND", "role": "ground", "connect": ["input.2", "input_reference.2", "output.2"], "label": "GND"},
+      {"name": "FB", "role": "feedback", "connect": ["opamp.4", "feedback.1", "output.1"], "label": "FB", "use_label": true},
+      {"name": "INV_IN", "role": "signal", "connect": ["feedback.2", "opamp.3"], "label": "INV_IN"}
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "input_stage", "label": "Input", "role": "input_stage", "members": ["input", "input_coupling"], "rank": 0, "side": "left"},
+      {"id": "gain_stage", "label": "Op-Amp Gain", "role": "processing_stage", "members": ["opamp", "feedback", "input_reference"], "rank": 1},
+      {"id": "supply_stage", "label": "Dual Supply", "role": "power_stage", "members": ["positive_supply", "negative_supply", "positive_supply_flag", "negative_supply_flag"], "rank": 1},
+      {"id": "output_stage", "label": "Output", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
+    ],
+    "placements": [
+      {"target": "opamp", "group": "gain_stage", "orientation": "rotated_180"}
+    ],
+    "lanes": {"power": "top", "power_negative": "lower", "ground": "bottom", "signals": "middle"},
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 20,
+      "min_component_spacing_mm": 10
+    }
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "readable"
+  }
+}
