@@ -316,6 +316,15 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	if route := routes["gnd_entry"]; route.Layer != "F.Cu" || len(route.Points) != 2 {
 		t.Fatalf("AP2112 GND entry = %#v", route)
 	}
+	if route := routes["vout_bypass"]; route.Layer != "B.Cu" || route.To.Pin != "5" || len(route.Points) != 2 {
+		t.Fatalf("AP2112 VOUT bypass = %#v", route)
+	}
+	if route := routes["ap2112_gnd_core"]; route.Layer != "B.Cu" || route.To.Pin != "2" {
+		t.Fatalf("AP2112 GND core = %#v", route)
+	}
+	if route := routes["ap2112_vin_core"]; route.Layer != "F.Cu" || route.To.Pin != "1" {
+		t.Fatalf("AP2112 VIN core = %#v", route)
+	}
 }
 
 func TestRealizeBlockPCBI2COmitsPullupRoutesWhenDisabled(t *testing.T) {
