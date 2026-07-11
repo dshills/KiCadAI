@@ -1,15 +1,15 @@
 {
-  "record_count": 48,
+  "record_count": 50,
   "family_count": 13,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 4,
-    "verified": 39
+    "verified": 41
   },
   "alternative_coverage": {
-    "concrete_records": 27,
+    "concrete_records": 29,
     "generic_fallback_records": 21,
     "equivalence_groups": 19
   },
@@ -294,22 +294,26 @@
     {
       "family": "sensor",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 1,
+      "record_count": 4,
+      "concrete_records": 3,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 3,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
       "blocked_records": 0,
       "missing_resolver_evidence": [
         "sensor.bosch.bme280.lga8",
-        "sensor.i2c.interface_header.5pin"
+        "sensor.bosch.bmp280.lga8",
+        "sensor.i2c.interface_header.5pin",
+        "sensor.sensirion.sht31_dis.dfn8"
       ],
       "record_ids": [
         "sensor.bosch.bme280.lga8",
-        "sensor.i2c.interface_header.5pin"
+        "sensor.bosch.bmp280.lga8",
+        "sensor.i2c.interface_header.5pin",
+        "sensor.sensirion.sht31_dis.dfn8"
       ]
     },
     {

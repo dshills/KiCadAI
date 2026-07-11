@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -146,6 +147,81 @@ func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	requireAmplifierOutputEvidence(t, placeholder, "npn", true)
 	if placeholder.Verification.Confidence != ConfidenceBlocked {
 		t.Fatalf("power output placeholder confidence = %q, want blocked", placeholder.Verification.Confidence)
+	}
+}
+
+func TestCheckedInCatalogSensorFamilyEvidence(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	tests := []struct {
+		id        string
+		symbol    string
+		pkg       string
+		addresses []string
+	}{
+		{id: "sensor.bosch.bme280.lga8", symbol: "Sensor:BME280", pkg: "lga8", addresses: []string{"0x76", "0x77"}},
+		{id: "sensor.bosch.bmp280.lga8", symbol: "Sensor_Pressure:BMP280", pkg: "lga8", addresses: []string{"0x76", "0x77"}},
+		{id: "sensor.sensirion.sht31_dis.dfn8", symbol: "Sensor_Humidity:SHT31-DIS", pkg: "dfn8_ep", addresses: []string{"0x44", "0x45"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.id, func(t *testing.T) {
+			record := requireCatalogRecord(t, catalog, tt.id)
+			if record.Verification.Confidence != ConfidenceVerified || record.Sensor == nil {
+				t.Fatalf("sensor evidence = %#v", record.Sensor)
+			}
+			requireSymbolFunctions(t, record, tt.symbol, []string{"SDA", "SCL"})
+			if len(record.Packages) != 1 || record.Packages[0].ID != tt.pkg || !record.Packages[0].Verification.PinMapChecked {
+				t.Fatalf("package evidence = %#v", record.Packages)
+			}
+			got := make([]string, len(record.Sensor.I2CAddresses))
+			for i, option := range record.Sensor.I2CAddresses {
+				got[i] = option.Address
+			}
+			if !slices.Equal(got, tt.addresses) {
+				t.Fatalf("addresses = %#v, want %#v", got, tt.addresses)
+			}
+		})
+	}
+}
+
+func TestValidateCatalogSensorEvidenceRejectsMalformedMetadata(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*SensorEvidence)
+		path   string
+	}{
+		{name: "reserved address", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].Address = "0x02" }, path: "records[0].sensor_evidence.i2c_addresses[0].address"},
+		{name: "missing default", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].Default = false }, path: "records[0].sensor_evidence.i2c_addresses"},
+		{name: "unknown select function", mutate: func(e *SensorEvidence) { e.I2CAddresses[0].SelectFunction = "MAGIC" }, path: "records[0].sensor_evidence.i2c_addresses[0].function"},
+		{name: "invalid pin level", mutate: func(e *SensorEvidence) { e.I2CModeConnections[0].Level = "floating" }, path: "records[0].sensor_evidence.i2c_mode_connections[0].level"},
+		{name: "unknown interrupt", mutate: func(e *SensorEvidence) { e.OptionalInterruptFunction = "IRQ" }, path: "records[0].sensor_evidence.optional_interrupt_function"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			catalog.Families[0] = FamilyDefinition{ID: "sensor", Name: "Sensor"}
+			record := &catalog.Records[0]
+			record.ID = "sensor.example.i2c"
+			record.Family = "sensor"
+			record.Symbols[0].FunctionPins = []FunctionPin{
+				{Function: "SDA", SymbolPin: "1"},
+				{Function: "SCL", SymbolPin: "2"},
+				{Function: "ADDR", SymbolPin: "3"},
+			}
+			record.Sensor = &SensorEvidence{
+				Interfaces:         []string{"i2c"},
+				I2CAddresses:       []SensorI2CAddress{{Address: "0x44", SelectFunction: "ADDR", Level: "low", Default: true}},
+				I2CModeConnections: []SensorPinConnection{{Function: "ADDR", Level: "low"}},
+			}
+			tt.mutate(record.Sensor)
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected invalid sensor evidence to fail")
+			}
+			assertIssuePath(t, result.Issues, tt.path)
+		})
 	}
 }
 

@@ -152,6 +152,27 @@ func TestBuiltinsIncludesHumanVerifiedEntries(t *testing.T) {
 	}
 }
 
+func TestBuiltinsIncludeExpandedI2CSensorPinmaps(t *testing.T) {
+	want := map[string]int{
+		mappingKey("Sensor_Pressure:BMP280", "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering"):       8,
+		mappingKey("Sensor_Humidity:SHT31-DIS", "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm"): 9,
+	}
+	for _, entry := range Builtins() {
+		key := mappingKey(entry.Symbol, entry.Footprint)
+		count, ok := want[key]
+		if !ok {
+			continue
+		}
+		if len(entry.Pins) != count {
+			t.Fatalf("%s pin count = %d, want %d", key, len(entry.Pins), count)
+		}
+		delete(want, key)
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing expanded sensor pinmaps: %#v", want)
+	}
+}
+
 func TestBuiltinsReturnsDeepCopy(t *testing.T) {
 	entries := Builtins()
 	entries[0].Pins[0].SymbolPin = "mutated"

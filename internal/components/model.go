@@ -101,6 +101,7 @@ type ComponentRecord struct {
 	Regulator       *RegulatorEvidence       `json:"regulator_evidence,omitempty"`
 	Capacitor       *CapacitorEvidence       `json:"capacitor_evidence,omitempty"`
 	OpAmp           *OpAmpEvidence           `json:"opamp_evidence,omitempty"`
+	Sensor          *SensorEvidence          `json:"sensor_evidence,omitempty"`
 	AmplifierOutput *AmplifierOutputEvidence `json:"amplifier_output_evidence,omitempty"`
 	PlacementHints  []PlacementHint          `json:"placement_hints,omitempty"`
 	RoutingHints    []RoutingHint            `json:"routing_hints,omitempty"`
@@ -263,6 +264,32 @@ type OpAmpEvidence struct {
 	InputCommonModeStatus      string   `json:"input_common_mode_status,omitempty"`
 	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string   `json:"review_note,omitempty"`
+}
+
+type SensorEvidence struct {
+	Interfaces                []string                `json:"interfaces"`
+	I2CAddresses              []SensorI2CAddress      `json:"i2c_addresses,omitempty"`
+	I2CModeConnections        []SensorPinConnection   `json:"i2c_mode_connections,omitempty"`
+	OptionalInterruptFunction string                  `json:"optional_interrupt_function,omitempty"`
+	UnusedPinPolicies         []SensorUnusedPinPolicy `json:"unused_pin_policies,omitempty"`
+	ReviewNote                string                  `json:"review_note,omitempty"`
+}
+
+type SensorI2CAddress struct {
+	Address        string `json:"address"`
+	SelectFunction string `json:"select_function,omitempty"`
+	Level          string `json:"level,omitempty"`
+	Default        bool   `json:"default,omitempty"`
+}
+
+type SensorPinConnection struct {
+	Function string `json:"function"`
+	Level    string `json:"level"`
+}
+
+type SensorUnusedPinPolicy struct {
+	Function string `json:"function"`
+	Policy   string `json:"policy"`
 }
 
 type AmplifierOutputEvidence struct {

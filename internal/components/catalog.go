@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -154,6 +155,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateRegulatorEvidence(path+".regulator_evidence", record.Regulator)...)
 		issues = append(issues, validateCapacitorEvidence(path+".capacitor_evidence", record.Generic, record.Capacitor)...)
 		issues = append(issues, validateOpAmpEvidence(path+".opamp_evidence", record.OpAmp)...)
+		issues = append(issues, validateSensorEvidence(path+".sensor_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
 		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
 		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
@@ -534,6 +536,99 @@ func validateOpAmpEvidence(path string, evidence *OpAmpEvidence) []reports.Issue
 		issues = append(issues, validateReviewStatus(fieldPath, value, status.label)...)
 	}
 	return issues
+}
+
+func validateSensorEvidence(path string, record *ComponentRecord) []reports.Issue {
+	evidence := record.Sensor
+	if evidence == nil {
+		return nil
+	}
+	var issues []reports.Issue
+	if record.Family != "sensor" {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path, "sensor evidence is only valid for sensor-family records"))
+	}
+	interfaces := make(map[string]bool, len(evidence.Interfaces))
+	for i, raw := range evidence.Interfaces {
+		interfacePath := fmt.Sprintf("%s.interfaces[%d]", path, i)
+		value := strings.ToLower(strings.TrimSpace(raw))
+		switch value {
+		case "i2c", "spi":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath, "unsupported sensor interface: "+raw))
+			continue
+		}
+		if interfaces[value] {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, interfacePath, "duplicate sensor interface: "+value))
+		}
+		interfaces[value] = true
+	}
+	if len(interfaces) == 0 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".interfaces", "sensor evidence requires at least one interface"))
+	}
+	if interfaces["i2c"] && len(evidence.I2CAddresses) == 0 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".i2c_addresses", "I2C sensor evidence requires at least one address"))
+	}
+	seenAddresses := make(map[string]bool, len(evidence.I2CAddresses))
+	defaultCount := 0
+	for i, option := range evidence.I2CAddresses {
+		optionPath := fmt.Sprintf("%s.i2c_addresses[%d]", path, i)
+		address := strings.ToLower(strings.TrimSpace(option.Address))
+		if !validSensorI2CAddress(address) {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, optionPath+".address", "sensor I2C address must be an unreserved 7-bit hexadecimal address"))
+		} else if seenAddresses[address] {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, optionPath+".address", "duplicate sensor I2C address: "+address))
+		}
+		seenAddresses[address] = true
+		if option.Default {
+			defaultCount++
+		}
+		if len(evidence.I2CAddresses) > 1 || option.SelectFunction != "" || option.Level != "" {
+			issues = append(issues, validateSensorFunctionLevel(record, optionPath, option.SelectFunction, option.Level)...)
+		}
+	}
+	if len(evidence.I2CAddresses) > 0 && defaultCount != 1 {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".i2c_addresses", "sensor I2C evidence requires exactly one default address"))
+	}
+	for i, connection := range evidence.I2CModeConnections {
+		connectionPath := fmt.Sprintf("%s.i2c_mode_connections[%d]", path, i)
+		issues = append(issues, validateSensorFunctionLevel(record, connectionPath, connection.Function, connection.Level)...)
+	}
+	if evidence.OptionalInterruptFunction != "" && !recordHasFunction(*record, evidence.OptionalInterruptFunction) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".optional_interrupt_function", "sensor interrupt function is not present in the symbol bindings"))
+	}
+	for i, policy := range evidence.UnusedPinPolicies {
+		policyPath := fmt.Sprintf("%s.unused_pin_policies[%d]", path, i)
+		if !recordHasFunction(*record, policy.Function) {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, policyPath+".function", "sensor unused-pin function is not present in the symbol bindings"))
+		}
+		switch policy.Policy {
+		case "no_connect", "high", "low":
+		default:
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, policyPath+".policy", "invalid sensor unused-pin policy: "+policy.Policy))
+		}
+	}
+	return issues
+}
+
+func validateSensorFunctionLevel(record *ComponentRecord, path string, function string, level string) []reports.Issue {
+	var issues []reports.Issue
+	if !recordHasFunction(*record, function) {
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".function", "sensor function is not present in the symbol bindings"))
+	}
+	switch level {
+	case "high", "low":
+	default:
+		issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+".level", "sensor pin level must be high or low"))
+	}
+	return issues
+}
+
+func validSensorI2CAddress(value string) bool {
+	if len(value) != 4 || !strings.HasPrefix(value, "0x") {
+		return false
+	}
+	address, err := strconv.ParseUint(value[2:], 16, 8)
+	return err == nil && address >= 0x08 && address <= 0x77
 }
 
 func validateAmplifierOutputEvidence(path string, record *ComponentRecord) []reports.Issue {

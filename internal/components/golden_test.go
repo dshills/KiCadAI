@@ -125,7 +125,7 @@ func TestGoldenVerifiedActiveSelections(t *testing.T) {
 		{
 			name: "select_i2c_sensor.json",
 			request: SelectionRequest{
-				Query:             Query{Family: "sensor", Package: "lga8"},
+				Query:             Query{Text: "sensor.bosch.bme280.lga8", Family: "sensor", Package: "lga8"},
 				Acceptance:        AcceptanceConnectivity,
 				RequiredFunctions: []string{"VDD", "GND", "SDA", "SCL"},
 				RequireConcrete:   true,

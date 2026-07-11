@@ -251,6 +251,15 @@
         {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place a local decoupling capacitor close to VDD/VDDIO and GND."},
         {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires pull-ups on SDA and SCL."}
       ],
+      "sensor_evidence": {
+        "interfaces": ["i2c", "spi"],
+        "i2c_addresses": [
+          {"address": "0x76", "select_function": "SDO", "level": "low", "default": true},
+          {"address": "0x77", "select_function": "SDO", "level": "high"}
+        ],
+        "i2c_mode_connections": [{"function": "CSB", "level": "high"}],
+        "review_note": "I2C mode requires CSB high and SDO at a defined address-select level."
+      },
       "symbols": [{
         "symbol_id": "Sensor:BME280",
         "function_pins": [
@@ -286,6 +295,131 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Sensor:BME280"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Sensor:BME280"], "pinmap_checked": true, "notes": ["Record supports I2C mode through SDA/SDI and SCL/SCK aliases."]}
+    },
+    {
+      "id": "sensor.bosch.bmp280.lga8",
+      "family": "sensor",
+      "name": "Bosch BMP280 I2C/SPI pressure and temperature sensor",
+      "generic": false,
+      "manufacturer": "Bosch Sensortec",
+      "mpn": "BMP280",
+      "lifecycle": "active",
+      "tags": ["sensor", "i2c", "spi", "temperature", "pressure", "lga8"],
+      "ratings": [{"kind": "supply_voltage", "min": "1.71", "max": "3.6", "unit": "V"}],
+      "companions": [
+        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place local decoupling close to VDD/VDDIO and GND."},
+        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires an SDA pull-up and a compatible SCL pull-up policy."}
+      ],
+      "sensor_evidence": {
+        "interfaces": ["i2c", "spi"],
+        "i2c_addresses": [
+          {"address": "0x76", "select_function": "SDO", "level": "low", "default": true},
+          {"address": "0x77", "select_function": "SDO", "level": "high"}
+        ],
+        "i2c_mode_connections": [{"function": "CSB", "level": "high"}],
+        "review_note": "Bosch BST-BMP280-DS001-26 requires CSB tied to VDDIO for I2C and SDO at a defined address-select level."
+      },
+      "symbols": [{
+        "symbol_id": "Sensor_Pressure:BMP280",
+        "function_pins": [
+          {"function": "GND", "symbol_pin": "1", "electrical": "power_in", "required": true},
+          {"function": "CSB", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "SDA", "symbol_pin": "3", "electrical": "bidirectional", "required": true, "aliases": ["SDI"]},
+          {"function": "SCL", "symbol_pin": "4", "electrical": "input", "required": true, "aliases": ["SCK"]},
+          {"function": "SDO", "symbol_pin": "5", "electrical": "bidirectional", "required": true},
+          {"function": "VDDIO", "symbol_pin": "6", "electrical": "power_in", "required": true},
+          {"function": "GND", "symbol_pin": "7", "electrical": "power_in", "required": true},
+          {"function": "VDD", "symbol_pin": "8", "electrical": "power_in", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Sensor_Pressure:BMP280", "datasheet:Bosch:BST-BMP280-DS001-26", "builtin_pinmap:Sensor_Pressure:BMP280"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "lga8",
+        "name": "Bosch LGA-8 2.0x2.5 mm P0.65",
+        "footprint_id": "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering",
+        "package_type": "lga8",
+        "mpn": "BMP280",
+        "lifecycle": "active",
+        "pinmap_id": "Sensor_Pressure:BMP280|Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering",
+        "pad_functions": [
+          {"function": "GND", "pad": "1"},
+          {"function": "CSB", "pad": "2"},
+          {"function": "SDA", "pad": "3", "aliases": ["SDI"]},
+          {"function": "SCL", "pad": "4", "aliases": ["SCK"]},
+          {"function": "SDO", "pad": "5"},
+          {"function": "VDDIO", "pad": "6"},
+          {"function": "GND", "pad": "7"},
+          {"function": "VDD", "pad": "8"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["datasheet:Bosch:BST-BMP280-DS001-26", "builtin_pinmap:Sensor_Pressure:BMP280"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_part:Bosch:BST-BMP280-DS001-26", "builtin_pinmap:Sensor_Pressure:BMP280"], "pinmap_checked": true, "notes": ["Connectivity profile is limited to I2C mode at address 0x76 or 0x77."]}
+    },
+    {
+      "id": "sensor.sensirion.sht31_dis.dfn8",
+      "family": "sensor",
+      "name": "Sensirion SHT31-DIS I2C humidity and temperature sensor",
+      "generic": false,
+      "manufacturer": "Sensirion",
+      "mpn": "SHT31-DIS",
+      "lifecycle": "active",
+      "tags": ["sensor", "i2c", "temperature", "humidity", "dfn8", "alert"],
+      "ratings": [{"kind": "supply_voltage", "min": "2.15", "max": "5.5", "unit": "V"}],
+      "companions": [
+        {"id": "sensor.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place a 100 nF local decoupling capacitor close to VDD and VSS."},
+        {"id": "sensor.i2c_pullups", "family": "resistor", "role": "i2c_pullup", "required": true, "description": "I2C mode requires pull-ups on SDA and SCL."}
+      ],
+      "sensor_evidence": {
+        "interfaces": ["i2c"],
+        "i2c_addresses": [
+          {"address": "0x44", "select_function": "ADDR", "level": "low", "default": true},
+          {"address": "0x45", "select_function": "ADDR", "level": "high"}
+        ],
+        "i2c_mode_connections": [{"function": "R", "level": "low"}],
+        "optional_interrupt_function": "ALERT",
+        "unused_pin_policies": [
+          {"function": "ALERT", "policy": "no_connect"},
+          {"function": "RESET", "policy": "no_connect"}
+        ],
+        "review_note": "Sensirion SHT3x-DIS v7 requires ADDR at a defined level, R tied to VSS, and ALERT left floating when unused."
+      },
+      "symbols": [{
+        "symbol_id": "Sensor_Humidity:SHT31-DIS",
+        "function_pins": [
+          {"function": "SDA", "symbol_pin": "1", "electrical": "bidirectional", "required": true},
+          {"function": "ADDR", "symbol_pin": "2", "electrical": "input", "required": true},
+          {"function": "ALERT", "symbol_pin": "3", "electrical": "output"},
+          {"function": "SCL", "symbol_pin": "4", "electrical": "input", "required": true},
+          {"function": "VDD", "symbol_pin": "5", "electrical": "power_in", "required": true},
+          {"function": "RESET", "symbol_pin": "6", "electrical": "input", "aliases": ["nRESET"]},
+          {"function": "R", "symbol_pin": "7", "electrical": "passive", "required": true},
+          {"function": "VSS", "symbol_pin": "8", "electrical": "power_in", "required": true},
+          {"function": "VSS", "symbol_pin": "9", "electrical": "passive", "required": true, "aliases": ["EP"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbols:Sensor_Humidity:SHT31-DIS", "datasheet:Sensirion:SHT3x-DIS-v7", "builtin_pinmap:Sensor_Humidity:SHT31-DIS"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "dfn8_ep",
+        "name": "Sensirion DFN-8-1EP 2.5x2.5 mm P0.5",
+        "footprint_id": "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm",
+        "package_type": "dfn8_ep",
+        "mpn": "SHT31-DIS",
+        "lifecycle": "active",
+        "pinmap_id": "Sensor_Humidity:SHT31-DIS|Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm",
+        "pad_functions": [
+          {"function": "SDA", "pad": "1"},
+          {"function": "ADDR", "pad": "2"},
+          {"function": "ALERT", "pad": "3"},
+          {"function": "SCL", "pad": "4"},
+          {"function": "VDD", "pad": "5"},
+          {"function": "RESET", "pad": "6", "aliases": ["nRESET"]},
+          {"function": "R", "pad": "7"},
+          {"function": "VSS", "pad": "8"},
+          {"function": "VSS", "pad": "9", "aliases": ["EP"]}
+        ],
+        "verification": {"confidence": "verified", "sources": ["datasheet:Sensirion:SHT3x-DIS-v7", "builtin_pinmap:Sensor_Humidity:SHT31-DIS"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_part:Sensirion:SHT3x-DIS-v7", "builtin_pinmap:Sensor_Humidity:SHT31-DIS"], "pinmap_checked": true, "notes": ["Connectivity profile is limited to I2C mode at address 0x44 or 0x45."]}
     },
     {
       "id": "mcu.microchip.atmega328p_a.tqfp32",

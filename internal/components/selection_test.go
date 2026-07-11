@@ -720,6 +720,14 @@ func cloneSelectionTestRecord(record ComponentRecord) ComponentRecord {
 		opamp.IntendedRoles = append([]string(nil), record.OpAmp.IntendedRoles...)
 		clone.OpAmp = &opamp
 	}
+	if record.Sensor != nil {
+		sensor := *record.Sensor
+		sensor.Interfaces = append([]string(nil), record.Sensor.Interfaces...)
+		sensor.I2CAddresses = append([]SensorI2CAddress(nil), record.Sensor.I2CAddresses...)
+		sensor.I2CModeConnections = append([]SensorPinConnection(nil), record.Sensor.I2CModeConnections...)
+		sensor.UnusedPinPolicies = append([]SensorUnusedPinPolicy(nil), record.Sensor.UnusedPinPolicies...)
+		clone.Sensor = &sensor
+	}
 	if record.AmplifierOutput != nil {
 		output := *record.AmplifierOutput
 		clone.AmplifierOutput = &output
@@ -742,6 +750,55 @@ func TestSelectRejectsOpAmpOutsideSupplyRange(t *testing.T) {
 		t.Fatal("expected opamp over-voltage request to fail")
 	}
 	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+}
+
+func TestSelectVerifiedI2CSensorVariants(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	for _, id := range []string{
+		"sensor.bosch.bme280.lga8",
+		"sensor.bosch.bmp280.lga8",
+		"sensor.sensirion.sht31_dis.dfn8",
+	} {
+		t.Run(id, func(t *testing.T) {
+			selection, result := Select(context.Background(), catalog, SelectionRequest{
+				Query:             Query{Text: id, Family: "sensor", MinimumConfidence: ConfidenceVerified},
+				Acceptance:        AcceptanceConnectivity,
+				RequiredRatings:   []RequiredRating{{Kind: "supply_voltage", Value: "3.3", Unit: "V"}},
+				RequiredFunctions: []string{"SDA", "SCL"},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			})
+			if !result.OK {
+				t.Fatalf("select %s: %+v", id, result.Issues)
+			}
+			if selection.Component.ID != id || selection.Component.Sensor == nil {
+				t.Fatalf("selection = %#v", selection)
+			}
+		})
+	}
+}
+
+func TestSelectI2CSensorRejectsUnsupportedSupplyAndFunction(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:           Query{Text: "sensor.sensirion.sht31_dis.dfn8", Family: "sensor"},
+		Acceptance:      AcceptanceConnectivity,
+		RequiredRatings: []RequiredRating{{Kind: "supply_voltage", Value: "1.8", Unit: "V"}},
+	})
+	if result.OK {
+		t.Fatal("expected 1.8 V SHT31 request to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentRatingTooLow)
+
+	_, result = Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Text: "sensor.bosch.bmp280.lga8", Family: "sensor"},
+		Acceptance:        AcceptanceConnectivity,
+		RequiredFunctions: []string{"ALERT"},
+	})
+	if result.OK {
+		t.Fatal("expected unsupported BMP280 ALERT function to fail")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentFunctionMissing)
 }
 
 func TestSelectRejectsOpAmpBelowMinimumSupplyRange(t *testing.T) {
@@ -957,7 +1014,7 @@ func TestSelectVerifiedMCUAndRequiredFunctions(t *testing.T) {
 func TestSelectVerifiedI2CSensor(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{
-		Query:      Query{Family: "sensor", Package: "lga8"},
+		Query:      Query{Text: "sensor.bosch.bme280.lga8", Family: "sensor", Package: "lga8"},
 		Acceptance: AcceptanceConnectivity,
 	})
 	if !result.OK {

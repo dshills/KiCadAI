@@ -43,6 +43,7 @@ var plannedVerifiedExpansionTargetMatrix = []struct {
 	{Family: "crystal", Current: true, BaselinePackages: []string{"5032_2pin"}, BaselineValues: []string{"16"}, PlannedPackages: []string{"5032_2pin"}, PlannedValues: []string{"16"}, PlannedUses: []string{"clock_source"}},
 	{Family: "bjt", Current: true, BaselinePackages: []string{"sot23"}, PlannedPackages: []string{"sot23", "to92", "to220"}, PlannedUses: []string{"class_ab_driver", "small_signal_switch", "power_output_blocked"}},
 	{Family: "usb_c", Current: true, BaselinePackages: []string{"gct_usb4125_6p"}, PlannedPackages: []string{"power_only"}, PlannedUses: []string{"power_entry"}},
+	{Family: "sensor", Current: true, BaselinePackages: []string{"lga8"}, PlannedPackages: []string{"lga8", "dfn8_ep"}, PlannedValues: []string{"BME280", "BMP280", "SHT31-DIS"}, PlannedUses: []string{"environmental_i2c", "pressure", "humidity", "temperature"}},
 }
 
 func TestComponentCoverageCountsCatalog(t *testing.T) {
@@ -215,6 +216,7 @@ func TestCheckedInCatalogMeetsExpandedCoverageThresholds(t *testing.T) {
 		"led":        {concrete: 3, generic: 2},
 		"protection": {concrete: 1, generic: 1},
 		"resistor":   {concrete: 4, generic: 2},
+		"sensor":     {concrete: 3, generic: 1},
 	}
 	for family, threshold := range thresholds {
 		coverage, ok := familyCoverageByID(report, family)
@@ -245,6 +247,7 @@ func TestVerifiedExpansionTargetMatrixCoversPlannedFamilies(t *testing.T) {
 		"opamp":      true,
 		"protection": true,
 		"resistor":   true,
+		"sensor":     true,
 		"usb_c":      true,
 	}
 	for _, target := range plannedVerifiedExpansionTargetMatrix {
