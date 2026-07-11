@@ -244,7 +244,7 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 	if route := routes["bmp280_vddio_tie"]; route.From.Pin != "6" || route.To.Pin != "8" {
 		t.Fatalf("BMP280 VDDIO tie = %#v -> %#v", route.From, route.To)
 	}
-	if route := routes["bmp280_csb_tie"]; route.From.Pin != "2" || route.To.Pin != "6" {
+	if route := routes["bmp280_csb_tie"]; route.From.Pin != "2" || route.To.Pin != "8" || len(route.Points) != 5 {
 		t.Fatalf("BMP280 CSB tie = %#v -> %#v", route.From, route.To)
 	}
 	for _, routeID := range []string{"vcc_decoupling", "sda_pullup_vcc", "scl_pullup_vcc"} {
