@@ -3,11 +3,17 @@ package designworkflow
 import (
 	"context"
 	"encoding/json"
+	"path/filepath"
+	"slices"
+	"strings"
 	"testing"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/componentprops"
 	"kicadai/internal/components"
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
@@ -92,7 +98,7 @@ func TestApplyComponentSelectionsToPlanWarnsOnIdentityReplacement(t *testing.T) 
 	assertProperty(t, properties, componentprops.PropertyComponentID, "new.component")
 }
 
-func TestConcreteI2CSensorSelectionReachesGeneratedOperations(t *testing.T) {
+func TestConcreteI2CSensorSelectionReachesWrittenSchematic(t *testing.T) {
 	registry := blocks.NewBuiltinRegistry()
 	request := Request{
 		Version: RequestVersion,
@@ -154,6 +160,152 @@ func TestConcreteI2CSensorSelectionReachesGeneratedOperations(t *testing.T) {
 			t.Fatalf("%s = %d, want 0; summary=%#v", key, got, readability)
 		}
 	}
+	tx, err := blocks.ProjectTransactionForCompositionOutput(request.Name, plan.Output, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := componentSelectionResolverIndex(t, plan.Output.Operations)
+	outputDir := filepath.Join(t.TempDir(), request.Name)
+	applied := transactions.Apply(tx, transactions.ApplyOptions{OutputDir: outputDir, LibraryIndex: &index})
+	if reports.HasBlockingIssue(applied.Issues) {
+		t.Fatalf("apply issues = %#v", applied.Issues)
+	}
+	written, err := schematic.ReadFile(filepath.Join(outputDir, request.Name+".kicad_sch"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	writtenSensorCount := 0
+	for _, symbol := range written.Symbols {
+		if symbol.LibraryID != "Sensor_Humidity:SHT31-DIS" {
+			continue
+		}
+		writtenSensorCount++
+		properties := map[string]string{}
+		for _, property := range symbol.Properties {
+			properties[property.Name] = property.Value
+		}
+		assertProperty(t, properties, componentprops.PropertyComponentID, "sensor.sensirion.sht31_dis.dfn8")
+		assertProperty(t, properties, componentprops.PropertyMPN, "SHT31-DIS")
+	}
+	if writtenSensorCount != 1 {
+		t.Fatalf("written concrete sensor count = %d, want 1", writtenSensorCount)
+	}
+}
+
+func componentSelectionResolverIndex(t *testing.T, operations []transactions.Operation) libraryresolver.LibraryIndex {
+	t.Helper()
+	// This minimal passive geometry exists only to prove that workflow identity
+	// properties survive KiCad serialization. Concrete pin semantics and
+	// footprint mappings are covered by block and pinmap tests.
+	index := libraryresolver.LibraryIndex{
+		Symbols:    map[string]libraryresolver.SymbolRecord{},
+		Footprints: map[string]libraryresolver.FootprintRecord{},
+	}
+	pinsByRef := map[string][]transactions.PinSpec{}
+	for _, operation := range operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		add := decodeAddSymbolOperation(t, operation)
+		parts := strings.SplitN(add.LibraryID, ":", 2)
+		name := parts[len(parts)-1]
+		nickname := ""
+		if len(parts) == 2 {
+			nickname = parts[0]
+		}
+		unit := add.Unit
+		if unit == 0 {
+			unit = 1
+		}
+		pins := make([]libraryresolver.SymbolPin, 0, len(add.Pins))
+		for _, pin := range add.Pins {
+			pins = append(pins, libraryresolver.SymbolPin{
+				Number:     pin.Number,
+				Electrical: "passive",
+				Unit:       unit,
+				BodyStyle:  1,
+				Position:   kicadfiles.Point{X: kicadfiles.MM(pin.XMM), Y: kicadfiles.MM(pin.YMM)},
+			})
+		}
+		record, exists := index.Symbols[add.LibraryID]
+		if !exists {
+			record = libraryresolver.SymbolRecord{
+				LibraryID:       add.LibraryID,
+				LibraryNickname: nickname,
+				Name:            name,
+			}
+		}
+		unitExists := false
+		for _, existing := range record.Units {
+			if existing.Unit == unit && existing.BodyStyle == 1 {
+				unitExists = true
+				break
+			}
+		}
+		if !unitExists {
+			record.Units = append(record.Units, libraryresolver.SymbolUnit{Unit: unit, BodyStyle: 1})
+		}
+		for _, pin := range pins {
+			pinExists := false
+			for _, existing := range record.Pins {
+				if existing.Unit == pin.Unit && existing.BodyStyle == pin.BodyStyle && existing.Number == pin.Number {
+					pinExists = true
+					break
+				}
+			}
+			if !pinExists {
+				record.Pins = append(record.Pins, pin)
+			}
+		}
+		index.Symbols[add.LibraryID] = record
+		pinsByRef[add.Ref] = append(pinsByRef[add.Ref], add.Pins...)
+	}
+	for _, operation := range operations {
+		if operation.Op != transactions.OpAssignFootprint {
+			continue
+		}
+		assign := decodeAssignFootprintOperation(t, operation)
+		refPins, ok := pinsByRef[assign.Ref]
+		if !ok || len(refPins) == 0 {
+			t.Fatalf("footprint assignment %s has no matching generated symbol pins for %s", assign.FootprintID, assign.Ref)
+		}
+		parts := strings.SplitN(assign.FootprintID, ":", 2)
+		name := parts[len(parts)-1]
+		nickname := ""
+		if len(parts) == 2 {
+			nickname = parts[0]
+		}
+		record, exists := index.Footprints[assign.FootprintID]
+		if !exists {
+			record = libraryresolver.FootprintRecord{
+				FootprintID:     assign.FootprintID,
+				LibraryNickname: nickname,
+				Name:            name,
+				Attributes:      []string{"smd"},
+			}
+		}
+		pads := slices.Clone(record.Pads)
+		seenPads := map[string]bool{}
+		for _, pad := range pads {
+			seenPads[pad.Name] = true
+		}
+		for _, pin := range refPins {
+			if seenPads[pin.Number] {
+				continue
+			}
+			seenPads[pin.Number] = true
+			pads = append(pads, libraryresolver.FootprintPad{
+				Name:   pin.Number,
+				Type:   "smd",
+				Shape:  "rect",
+				Size:   kicadfiles.Point{X: kicadfiles.MM(0.8), Y: kicadfiles.MM(0.8)},
+				Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFPaste, kicadfiles.LayerFMask},
+			})
+		}
+		record.Pads = pads
+		index.Footprints[assign.FootprintID] = record
+	}
+	return index
 }
 
 func componentSelectionTestDefinition() blocks.BlockDefinition {
