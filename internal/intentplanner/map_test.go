@@ -2,6 +2,7 @@ package intentplanner
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -218,6 +219,43 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 			}
 		}
 		t.Fatalf("transaction validation = %#v; suspect operations = %#v", validation.Issues, bad)
+	}
+}
+
+func TestBMP280IntentMatchesKiCadBackedPassFixture(t *testing.T) {
+	intentFile, err := os.Open("../../examples/intent/sensor_bmp280_breakout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer intentFile.Close()
+	request, issues := DecodeRequestStrict(intentFile)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode intent issues = %#v", issues)
+	}
+	plan := Plan(request)
+	if plan.Status != PlanStatusReady || plan.GeneratedRequest == nil {
+		t.Fatalf("intent plan = %#v", plan)
+	}
+
+	fixtureFile, err := os.Open("../../examples/design/kicad-backed/sensor_bmp280_breakout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer fixtureFile.Close()
+	fixture, fixtureIssues := designworkflow.DecodeRequestStrict(fixtureFile)
+	if reports.HasBlockingIssue(fixtureIssues) {
+		t.Fatalf("decode fixture issues = %#v", fixtureIssues)
+	}
+	generatedJSON, err := json.Marshal(plan.GeneratedRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fixtureJSON, err := json.Marshal(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(generatedJSON) != string(fixtureJSON) {
+		t.Fatalf("BMP280 KiCad-backed request drifted from structured intent\ngenerated: %s\nfixture: %s", generatedJSON, fixtureJSON)
 	}
 }
 
