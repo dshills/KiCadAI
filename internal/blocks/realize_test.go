@@ -249,6 +249,42 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 	}
 }
 
+func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("voltage_regulator")
+	if !ok {
+		t.Fatal("missing voltage_regulator")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "voltage_regulator",
+		InstanceID: "rail",
+		Params: map[string]any{
+			"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+			"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+			"input_voltage":       "5V",
+			"output_voltage":      "3.3V",
+			"output_current":      "0.05A",
+			"enable_mode":         "tied_input",
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	for _, route := range result.LocalRoutes {
+		if route.ID == "ap2112_vin_enable_tie" {
+			if route.From.Pin != "1" || route.To.Pin != "3" || route.WidthMM != 0.3 {
+				t.Fatalf("AP2112 tie = %#v", route)
+			}
+			return
+		}
+	}
+	t.Fatalf("AP2112 VIN/EN tie missing: routes=%#v", result.LocalRoutes)
+}
+
 func TestRealizeBlockPCBI2COmitsPullupRoutesWhenDisabled(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	definition, ok := registry.GetBlock("i2c_sensor")

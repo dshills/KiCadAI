@@ -123,6 +123,7 @@ func voltageRegulatorComponents(defaults voltageRegulatorComponentDefaults) []Bl
 }
 
 func voltageRegulatorPCBRealization() *PCBRealization {
+	ap2112 := RealizationWhen{Params: map[string]any{"regulator_symbol": "Regulator_Linear:AP2112K-3.3"}}
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
@@ -146,6 +147,7 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ID: "vin_bypass", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: -11.1, YMM: 11.5}, {XMM: -2.45, YMM: 11.5}, {XMM: -2.45, YMM: 18.9}}, Layer: "F.Cu", WidthMM: 0.5, Required: true, Description: "Input bypass doglegs outside the AMS1117 VOUT tab clearance before returning to VIN pad 3."},
 			{ID: "vout_bypass", NetTemplate: "vout", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
 			{ID: "gnd_bypass", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, Layer: "B.Cu", WidthMM: 0.5, Required: true, Description: "Bottom-layer ground bypass keeps regulator return connected while avoiding top-layer VOUT/VIN crossings; local-route emission adds endpoint vias for SMD pad access."},
+			{ID: "ap2112_vin_enable_tie", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "regulator", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: -2.4, YMM: -0.95}, {XMM: -2.4, YMM: 0.95}}, Layer: "F.Cu", WidthMM: 0.3, Required: true, When: ap2112, Description: "Tie AP2112 VIN to EN around the ground pad for always-on operation."},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "regulator_power_width", Kind: "min_width", NetTemplate: "vin", MinWidthMM: 0.5, Description: "Regulator input path should use a wider local route."},
