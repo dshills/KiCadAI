@@ -3551,7 +3551,7 @@ func runIntentCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if err != nil {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "check_options", Message: err.Error()})
 	}
-	createOpts, err := designCreateOptions(opts, checkOpts)
+	createOpts, err := designCreateOptions(ctx, opts, checkOpts)
 	if err != nil {
 		return writeReportFailure(stdout, "intent", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
@@ -3803,7 +3803,7 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "check_options", Message: err.Error()})
 	}
-	createOpts, err := designCreateOptions(opts, checkOpts)
+	createOpts, err := designCreateOptions(ctx, opts, checkOpts)
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
@@ -3889,7 +3889,7 @@ func promotionSummaryPointer(summary designworkflow.PromotionSummary) *designwor
 	return &summary
 }
 
-func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkflow.CreateOptions, error) {
+func designCreateOptions(ctx context.Context, opts cliOptions, checkOpts checks.Options) (designworkflow.CreateOptions, error) {
 	routeMode, err := designworkflow.ParseRoutingMode(opts.routeMode)
 	if err != nil {
 		return designworkflow.CreateOptions{}, err
@@ -3944,10 +3944,33 @@ func designCreateOptions(opts cliOptions, checkOpts checks.Options) (designworkf
 		Repair:     repairOptionsForDesignCreate(opts),
 		PostRepair: repairPostValidationOptions(opts),
 	}
+	if pinmapShouldUseLibraryResolver(opts) {
+		roots := libraryRootsFromOptions(opts)
+		index, libraryIssues := libraryresolver.Load(ctx, roots, libraryresolver.LoadOptions{
+			CachePath: opts.libraryCache,
+			Refresh:   opts.refreshLibraryCache,
+		})
+		if strings.TrimSpace(roots.SymbolsRoot) != "" && len(index.Symbols) == 0 {
+			return designworkflow.CreateOptions{}, emptyConfiguredLibraryIndexError("symbol", libraryIssues)
+		}
+		if strings.TrimSpace(roots.FootprintsRoot) != "" && len(index.Footprints) == 0 {
+			return designworkflow.CreateOptions{}, emptyConfiguredLibraryIndexError("footprint", libraryIssues)
+		}
+		createOpts.LibraryIndex = &index
+		createOpts.Writer.LibraryIndex = index
+		createOpts.Writer.HasLibraryIndex = true
+	}
 	if opts.routeAllowPartialSet {
 		createOpts.Routing.AllowPartial = &opts.routeAllowPartial
 	}
 	return createOpts, nil
+}
+
+func emptyConfiguredLibraryIndexError(kind string, issues []reports.Issue) error {
+	if issue, ok := firstBlockingIssue(issues); ok {
+		return fmt.Errorf("configured %s library root produced no records: %s", kind, issue.Message)
+	}
+	return fmt.Errorf("configured %s library root produced no records", kind)
 }
 
 func repairOptionsForDesignCreate(opts cliOptions) repair.Options {

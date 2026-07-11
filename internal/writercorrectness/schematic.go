@@ -80,6 +80,12 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 		}
 		fileSnapshot := SchematicFileSnapshot{Path: slashPath(path)}
 		anchors := schematicAnchors(file)
+		embeddedLibraryIDs := make(map[string]struct{}, len(file.LibSymbols))
+		for _, embedded := range file.LibSymbols {
+			if libraryID := strings.TrimSpace(embedded.LibraryID); libraryID != "" && len(embedded.Body) > 0 {
+				embeddedLibraryIDs[libraryID] = struct{}{}
+			}
+		}
 		for _, symbol := range file.Symbols {
 			ref := strings.TrimSpace(symbol.Reference)
 			footprint := symbolFootprint(symbol)
@@ -105,7 +111,7 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 					Refs:     []string{ref},
 				})
 			} else if opts.HasLibraryIndex {
-				connectivityIssues = append(connectivityIssues, resolverSymbolIssues(path, ref, libraryID, opts)...)
+				connectivityIssues = append(connectivityIssues, resolverSymbolIssues(embeddedLibraryIDs, path, ref, libraryID, opts)...)
 			}
 			if previous, ok := seenRefs[strings.ToUpper(ref)]; ok && !strings.HasPrefix(ref, "#") {
 				connectivityIssues = append(connectivityIssues, reports.Issue{
@@ -212,7 +218,10 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 	}}
 }
 
-func resolverSymbolIssues(path string, ref string, libraryID string, opts Options) []reports.Issue {
+func resolverSymbolIssues(embeddedLibraryIDs map[string]struct{}, path string, ref string, libraryID string, opts Options) []reports.Issue {
+	if _, ok := embeddedLibraryIDs[libraryID]; ok {
+		return nil
+	}
 	if _, ok := libraryresolver.ResolveSymbol(opts.LibraryIndex, libraryID); !ok {
 		return []reports.Issue{{
 			Code:     reports.CodeMissingFile,

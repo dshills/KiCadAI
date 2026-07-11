@@ -1,6 +1,7 @@
 package designapi
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	kicaddesign "kicadai/internal/kicadfiles/design"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/routing"
 )
 
@@ -825,6 +827,35 @@ func TestBuilderAddSymbolEmbedsSupportedSymbolTemplates(t *testing.T) {
 	}
 	if seen["custom:block"] {
 		t.Fatalf("unsupported custom symbol should not be embedded: %#v", seen)
+	}
+}
+
+func TestBuilderAddSymbolKeepsCanonicalTemplateOverResolverBody(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Device:R": {
+			LibraryID: "Device:R",
+			Raw:       `(symbol "R" (property "Description" "resolver marker"))`,
+		},
+	}}
+	builder, err := New(Options{
+		Name:         "canonical_symbol",
+		DesignID:     kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"),
+		LibraryIndex: &index,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "R1",
+		LibraryID: "Device:R",
+		Value:     "1k",
+		Position:  kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	design := builder.Design()
+	if len(design.Schematic.LibSymbols) != 1 || strings.Contains(fmt.Sprint(design.Schematic.LibSymbols[0].Body), "resolver marker") {
+		t.Fatalf("canonical body was replaced: %#v", design.Schematic.LibSymbols)
 	}
 }
 

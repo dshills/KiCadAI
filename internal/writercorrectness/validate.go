@@ -29,7 +29,7 @@ func Validate(ctx context.Context, input string, opts Options) Result {
 			result.Finish()
 			return result
 		}
-		_, transferCheck := CheckSchematicToPCBTransfer(target)
+		_, transferCheck := CheckSchematicToPCBTransferWithOptions(target, opts)
 		result.AddCheck(transferCheck)
 		if appendCanceled(ctx, &result) {
 			result.Finish()

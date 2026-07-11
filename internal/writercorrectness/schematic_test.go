@@ -93,6 +93,31 @@ func TestCheckSchematicsAllowsResolvedSymbolWithLibraryIndex(t *testing.T) {
 	}
 }
 
+func TestCheckSchematicsAllowsEmbeddedProjectLocalSymbolWithLibraryIndex(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "demo.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (lib_symbols
+    (symbol "kicadai:Local" (property "Reference" "U" (at 0 0 0)))
+  )
+  (symbol (lib_id "kicadai:Local") (at 10 10 0)
+    (property "Reference" "U1" (at 10 10 0))
+    (property "Value" "Local" (at 10 12 0))
+    (property "Footprint" "Package_Test:Local" (at 10 14 0) hide)
+  )
+`))
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{}}
+
+	_, checks := CheckSchematicsWithOptions(Target{SchematicFiles: []string{path}}, Options{LibraryIndex: index, HasLibraryIndex: true})
+	for _, check := range checks {
+		for _, issue := range check.Issues {
+			if strings.Contains(issue.Message, "symbol library record not found") {
+				t.Fatalf("unexpected resolver issue for embedded symbol: %#v", checks)
+			}
+		}
+	}
+}
+
 func TestCheckSchematicsReportsUnresolvedPowerSymbolWithLibraryIndex(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "demo.kicad_sch")

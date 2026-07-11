@@ -253,6 +253,37 @@ func TestApplyUsesResolverFootprintPadsForGeneratedPlacement(t *testing.T) {
 	}
 }
 
+func TestApplyCanPreserveTransactionFootprintGeometryWithResolver(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "demo")
+	index := applyResolverFixture()
+	tx := mustParse(t, `{"operations":[
+	  {"op":"create_project","name":"demo"},
+	  {"op":"add_symbol","ref":"J1","library_id":"Connector:Conn_01x02","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"},{"number":"2"}]},
+	  {"op":"assign_footprint","ref":"J1","footprint_id":"Connector_Test:TH_1x02"},
+	  {"op":"place_footprint","ref":"J1","footprint_id":"Connector_Test:TH_1x02","at":{"x_mm":20,"y_mm":20},"pads":[
+	    {"name":"1","type":"smd","shape":"rect","x_mm":-1,"y_mm":0,"size_x_mm":1,"size_y_mm":1},
+	    {"name":"2","type":"smd","shape":"rect","x_mm":1,"y_mm":0,"size_x_mm":1,"size_y_mm":1}
+	  ]},
+	  {"op":"write_project"}
+	]}`)
+	result := Apply(tx, ApplyOptions{OutputDir: output, LibraryIndex: &index, PreserveFootprintGeometry: true})
+	if len(result.Issues) != 0 {
+		t.Fatalf("unexpected issues: %#v", result.Issues)
+	}
+	board, err := pcb.ReadFile(filepath.Join(output, "demo.kicad_pcb"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(board.Footprints) != 1 || len(board.Footprints[0].Pads) != 2 {
+		t.Fatalf("unexpected footprints: %#v", board.Footprints)
+	}
+	for _, pad := range board.Footprints[0].Pads {
+		if pad.Type != "smd" || pad.Shape != "rect" || pad.Drill != 0 {
+			t.Fatalf("transaction footprint geometry was not preserved: %#v", board.Footprints[0].Pads)
+		}
+	}
+}
+
 func TestApplyUsesResolverSymbolPinsForGeneratedSchematic(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "demo")
 	index := applyResolverFixture()

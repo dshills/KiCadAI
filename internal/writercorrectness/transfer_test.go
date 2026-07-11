@@ -3,6 +3,8 @@ package writercorrectness
 import (
 	"path/filepath"
 	"testing"
+
+	"kicadai/internal/libraryresolver"
 )
 
 func TestCheckSchematicPCBTransferSkipsWithoutSchematic(t *testing.T) {
@@ -12,6 +14,31 @@ func TestCheckSchematicPCBTransferSkipsWithoutSchematic(t *testing.T) {
 	}
 	if check.Status != CheckSkipped {
 		t.Fatalf("status = %q, want skipped", check.Status)
+	}
+}
+
+func TestCheckSchematicPCBTransferUsesLibraryIndex(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, filepath.Join(dir, "demo.kicad_pro"), "{}")
+	writeFile(t, filepath.Join(dir, "demo.kicad_sch"), schematicWithBody(`
+  (symbol (lib_id "Connector:Conn_01x02") (at 10 10 0)
+    (property "Reference" "J1" (at 10 10 0))
+    (property "Value" "IN" (at 10 12 0))
+    (property "Footprint" "Connector_Test:Exact" (at 10 14 0) hide)
+  )
+`))
+	index := libraryresolver.LibraryIndex{Footprints: map[string]libraryresolver.FootprintRecord{
+		"Connector_Test:Exact": {FootprintID: "Connector_Test:Exact"},
+	}}
+	_, check := CheckSchematicToPCBTransferWithOptions(Target{
+		ProjectDir:    dir,
+		ProjectPath:   filepath.Join(dir, "demo.kicad_pro"),
+		SchematicPath: filepath.Join(dir, "demo.kicad_sch"),
+	}, Options{LibraryIndex: index, HasLibraryIndex: true})
+	for _, issue := range check.Issues {
+		if issue.Code == "UNKNOWN_FOOTPRINT_LIBRARY" {
+			t.Fatalf("library index was not used: %#v", check.Issues)
+		}
 	}
 }
 

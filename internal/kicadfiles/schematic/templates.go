@@ -209,7 +209,7 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		},
 	},
 	"regulator_linear:ap2112k-3.3": {
-		bodyName: "AP2112K-3.3", pinType: "passive",
+		bodyName: "AP2112K-3.3", pinType: "passive", localLibrary: true,
 		connectionPinOverride: map[string]kicadfiles.Point{
 			"1": {X: kicadfiles.MM(-2.54), Y: kicadfiles.MM(-2.54)},
 			"2": {Y: kicadfiles.MM(2.54)},
@@ -290,7 +290,7 @@ var embeddedSymbolTemplates = map[string]embeddedTemplate{
 		},
 	},
 	"sensor_pressure:bmp280": {
-		bodyName: "BMP280", pinType: "passive",
+		bodyName: "BMP280", pinType: "passive", localLibrary: true,
 		connectionPinOverride: map[string]kicadfiles.Point{
 			"1": {Y: kicadfiles.MM(-7.62)},
 			"2": {X: kicadfiles.MM(-10.16), Y: kicadfiles.MM(-2.54)},

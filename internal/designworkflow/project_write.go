@@ -8,14 +8,17 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/inspect"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
 
 type ProjectWriteOptions struct {
-	OutputDir string
-	Overwrite bool
-	Seed      string
+	OutputDir                 string
+	Overwrite                 bool
+	Seed                      string
+	LibraryIndex              *libraryresolver.LibraryIndex
+	PreserveFootprintGeometry bool
 }
 
 type ProjectWriteResult struct {
@@ -95,9 +98,15 @@ func WriteProject(ctx context.Context, request *Request, plan *BlockPlanResult, 
 	}
 	outputDir = absolute
 	applyResult := transactions.Apply(tx, transactions.ApplyOptions{
-		OutputDir: outputDir,
-		Overwrite: opts.Overwrite,
-		Seed:      opts.Seed,
+		OutputDir:                       outputDir,
+		Overwrite:                       opts.Overwrite,
+		Seed:                            opts.Seed,
+		LibraryIndex:                    opts.LibraryIndex,
+		SuppressPinmapWarnings:          opts.LibraryIndex != nil,
+		SuppressExplicitPinSymbolErrors: opts.LibraryIndex != nil,
+		// Routing was computed against transaction pads; resolver hydration here
+		// would move anchors after routes have already been generated.
+		PreserveFootprintGeometry: opts.PreserveFootprintGeometry,
 	})
 	issues = append(issues, applyResult.Issues...)
 	var inspection inspect.ProjectSummary

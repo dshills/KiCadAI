@@ -40,6 +40,10 @@ const (
 )
 
 func CheckSchematicToPCBTransfer(target Target) (TransferSnapshot, CheckResult) {
+	return CheckSchematicToPCBTransferWithOptions(target, Options{})
+}
+
+func CheckSchematicToPCBTransferWithOptions(target Target, opts Options) (TransferSnapshot, CheckResult) {
 	if target.SchematicPath == "" {
 		return TransferSnapshot{Confidence: TransferConfidenceUnknown}, CheckResult{
 			Name:     CheckSchematicPCBTransfer,
@@ -57,7 +61,11 @@ func CheckSchematicToPCBTransfer(target Target) (TransferSnapshot, CheckResult) 
 			Summary:  "failed to load schematic design for transfer",
 		}
 	}
-	result := schematicpcb.FromDesign(design, schematicpcb.Options{})
+	transferOpts := schematicpcb.Options{}
+	if opts.HasLibraryIndex {
+		transferOpts.LibraryIndex = &opts.LibraryIndex
+	}
+	result := schematicpcb.FromDesign(design, transferOpts)
 	snapshot := TransferSnapshot{
 		SymbolCount:       result.SymbolCount,
 		AssignedCount:     result.AssignedCount,

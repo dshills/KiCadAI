@@ -33,6 +33,7 @@ type ApplyOptions struct {
 	AllowImportedMutation           bool
 	SuppressPinmapWarnings          bool
 	SuppressExplicitPinSymbolErrors bool
+	PreserveFootprintGeometry       bool
 	LibraryIndex                    *libraryresolver.LibraryIndex
 	LibraryIssues                   []reports.Issue
 }
@@ -698,7 +699,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			AllowUnmatchedUnconnectedPads: payload.AllowUnmatchedUnconnectedPads,
 			HideDefaultFootprintText:      payload.HideDefaultFootprintText,
 		}
-		if opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
+		if !opts.PreserveFootprintGeometry && opts.LibraryIndex != nil && strings.TrimSpace(payload.FootprintID) != "" {
 			if record, ok := libraryresolver.ResolveFootprint(*opts.LibraryIndex, payload.FootprintID); ok {
 				enrichPlaceFootprintOptionsWithRecord(&placeOptions, record, boardLayer(payload.Layer))
 			}

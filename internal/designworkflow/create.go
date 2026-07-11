@@ -10,6 +10,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/fabrication"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/repair"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
@@ -31,6 +32,7 @@ type CreateOptions struct {
 	Repair        repair.Options
 	PostRepair    repair.PostValidationOptions
 	BlockRegistry blocks.Registry
+	LibraryIndex  *libraryresolver.LibraryIndex
 }
 
 func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowResult {
@@ -96,9 +98,11 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
 	}
 	written := WriteProject(ctx, &normalized, &plan, &placed, &routed, ProjectWriteOptions{
-		OutputDir: opts.OutputDir,
-		Overwrite: opts.Overwrite,
-		Seed:      opts.Seed,
+		OutputDir:                 opts.OutputDir,
+		Overwrite:                 opts.Overwrite,
+		Seed:                      opts.Seed,
+		LibraryIndex:              opts.LibraryIndex,
+		PreserveFootprintGeometry: true,
 	})
 	stages = append(stages, written.Stage)
 	if workflowStageBlocked(written.Stage) {

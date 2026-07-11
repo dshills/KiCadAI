@@ -1999,14 +1999,14 @@ func TestParseDesignRepairApplyImpliesRepair(t *testing.T) {
 }
 
 func TestDesignCreateOptionsRejectsUnknownRouteMode(t *testing.T) {
-	_, err := designCreateOptions(cliOptions{routeMode: "sideways"}, checks.Options{})
+	_, err := designCreateOptions(context.Background(), cliOptions{routeMode: "sideways"}, checks.Options{})
 	if err == nil {
 		t.Fatal("expected invalid route mode error")
 	}
 }
 
 func TestDesignCreateOptionsMapsPlacementFlags(t *testing.T) {
-	opts, err := designCreateOptions(cliOptions{
+	opts, err := designCreateOptions(context.Background(), cliOptions{
 		placementEstWidth:    3.5,
 		placementEstHeight:   2.5,
 		placementBoardMargin: 4,
@@ -2023,7 +2023,7 @@ func TestDesignCreateOptionsMapsPlacementFlags(t *testing.T) {
 }
 
 func TestDesignCreateOptionsMapsComponentSourceDir(t *testing.T) {
-	opts, err := designCreateOptions(cliOptions{
+	opts, err := designCreateOptions(context.Background(), cliOptions{
 		sourceDir: "component-sources",
 	}, checks.Options{})
 	if err != nil {
@@ -2035,9 +2035,16 @@ func TestDesignCreateOptionsMapsComponentSourceDir(t *testing.T) {
 }
 
 func TestDesignCreateOptionsRejectsUnsafeComponentSourceDir(t *testing.T) {
-	_, err := designCreateOptions(cliOptions{sourceDir: "../component-sources"}, checks.Options{})
+	_, err := designCreateOptions(context.Background(), cliOptions{sourceDir: "../component-sources"}, checks.Options{})
 	if err == nil {
 		t.Fatal("expected unsafe component source dir error")
+	}
+}
+
+func TestDesignCreateOptionsRejectsConfiguredEmptySymbolRoot(t *testing.T) {
+	_, err := designCreateOptions(context.Background(), cliOptions{symbolsRoot: t.TempDir()}, checks.Options{})
+	if err == nil || !strings.Contains(err.Error(), "configured symbol library root produced no records") {
+		t.Fatalf("error = %v", err)
 	}
 }
 
