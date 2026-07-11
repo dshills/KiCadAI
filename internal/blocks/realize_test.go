@@ -293,15 +293,29 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	if reports.HasBlockingIssue(result.Issues) {
 		t.Fatalf("realize issues = %#v", result.Issues)
 	}
-	for _, route := range result.LocalRoutes {
-		if route.ID == "ap2112_vin_enable_tie" {
-			if route.From.Pin != "1" || route.To.Pin != "3" || route.WidthMM != 0.3 {
-				t.Fatalf("AP2112 tie = %#v", route)
-			}
-			return
-		}
+	anchors := map[string]RealizedPCBEntryAnchor{}
+	for _, anchor := range result.EntryAnchors {
+		anchors[anchor.ID] = anchor
 	}
-	t.Fatalf("AP2112 VIN/EN tie missing: routes=%#v", result.LocalRoutes)
+	if anchors["vin"].Placement.XMM != -7 {
+		t.Fatalf("AP2112 VIN anchor = %#v", anchors["vin"])
+	}
+	routes := map[string]RealizedPCBLocalRoute{}
+	for _, route := range result.LocalRoutes {
+		routes[route.ID] = route
+	}
+	if route := routes["ap2112_vin_enable_tie"]; route.From.Pin != "1" || route.To.Pin != "3" || route.WidthMM != 0.3 {
+		t.Fatalf("AP2112 tie = %#v", route)
+	}
+	if route := routes["vin_entry"]; route.EntryAnchorDogbone != nil || !route.DisableEntryAnchorVia || len(route.Points) != 3 {
+		t.Fatalf("AP2112 VIN entry = %#v", route)
+	}
+	if route := routes["vout_entry"]; route.EntryAnchorDogbone != nil || !route.DisableEntryAnchorVia || len(route.Points) != 2 {
+		t.Fatalf("AP2112 VOUT entry = %#v", route)
+	}
+	if route := routes["gnd_entry"]; route.Layer != "F.Cu" || len(route.Points) != 2 {
+		t.Fatalf("AP2112 GND entry = %#v", route)
+	}
 }
 
 func TestRealizeBlockPCBI2COmitsPullupRoutesWhenDisabled(t *testing.T) {

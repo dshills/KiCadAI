@@ -69,13 +69,19 @@ type PCBPlacementGroup struct {
 }
 
 type PCBEntryAnchor struct {
-	ID          string            `json:"id"`
-	Port        string            `json:"port"`
-	NetTemplate string            `json:"net_template,omitempty"`
-	Placement   RelativePlacement `json:"placement"`
-	Side        string            `json:"side,omitempty"`
-	Description string            `json:"description,omitempty"`
-	When        RealizationWhen   `json:"when,omitempty"`
+	ID          string                      `json:"id"`
+	Port        string                      `json:"port"`
+	NetTemplate string                      `json:"net_template,omitempty"`
+	Placement   RelativePlacement           `json:"placement"`
+	Variants    []PCBAnchorPlacementVariant `json:"placement_variants,omitempty"`
+	Side        string                      `json:"side,omitempty"`
+	Description string                      `json:"description,omitempty"`
+	When        RealizationWhen             `json:"when,omitempty"`
+}
+
+type PCBAnchorPlacementVariant struct {
+	Placement RelativePlacement `json:"placement"`
+	When      RealizationWhen   `json:"when"`
 }
 
 type RelativeBounds struct {
@@ -86,20 +92,22 @@ type RelativeBounds struct {
 }
 
 type PCBLocalRoute struct {
-	ID                 string                 `json:"id"`
-	NetTemplate        string                 `json:"net_template"`
-	From               RouteEndpoint          `json:"from"`
-	To                 RouteEndpoint          `json:"to"`
-	Waypoints          []RelativePoint        `json:"waypoints,omitempty"`
-	WaypointVariants   []PCBWaypointVariant   `json:"waypoint_variants,omitempty"`
-	EndpointVariants   []PCBEndpointVariant   `json:"endpoint_variants,omitempty"`
-	ToEndpointDogbone  bool                   `json:"to_endpoint_dogbone,omitempty"`
-	Layer              string                 `json:"layer,omitempty"`
-	WidthMM            float64                `json:"width_mm,omitempty"`
-	Required           bool                   `json:"required,omitempty"`
-	EntryAnchorDogbone *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
-	Description        string                 `json:"description,omitempty"`
-	When               RealizationWhen        `json:"when,omitempty"`
+	ID                    string                    `json:"id"`
+	NetTemplate           string                    `json:"net_template"`
+	From                  RouteEndpoint             `json:"from"`
+	To                    RouteEndpoint             `json:"to"`
+	Waypoints             []RelativePoint           `json:"waypoints,omitempty"`
+	WaypointVariants      []PCBWaypointVariant      `json:"waypoint_variants,omitempty"`
+	EndpointVariants      []PCBEndpointVariant      `json:"endpoint_variants,omitempty"`
+	GeometryVariants      []PCBRouteGeometryVariant `json:"geometry_variants,omitempty"`
+	ToEndpointDogbone     bool                      `json:"to_endpoint_dogbone,omitempty"`
+	Layer                 string                    `json:"layer,omitempty"`
+	WidthMM               float64                   `json:"width_mm,omitempty"`
+	Required              bool                      `json:"required,omitempty"`
+	EntryAnchorDogbone    *PCBEntryAnchorDogbone    `json:"entry_anchor_dogbone,omitempty"`
+	DisableEntryAnchorVia bool                      `json:"disable_entry_anchor_via,omitempty"`
+	Description           string                    `json:"description,omitempty"`
+	When                  RealizationWhen           `json:"when,omitempty"`
 }
 
 type PCBWaypointVariant struct {
@@ -110,6 +118,15 @@ type PCBWaypointVariant struct {
 type PCBEndpointVariant struct {
 	ToEndpointDogbone bool            `json:"to_endpoint_dogbone,omitempty"`
 	When              RealizationWhen `json:"when"`
+}
+
+type PCBRouteGeometryVariant struct {
+	Waypoints                 []RelativePoint `json:"waypoints,omitempty"`
+	ClearWaypoints            bool            `json:"clear_waypoints,omitempty"`
+	Layer                     string          `json:"layer,omitempty"`
+	DisableEntryAnchorDogbone bool            `json:"disable_entry_anchor_dogbone,omitempty"`
+	DisableEntryAnchorVia     bool            `json:"disable_entry_anchor_via,omitempty"`
+	When                      RealizationWhen `json:"when"`
 }
 
 type PCBEntryAnchorDogbone struct {
@@ -297,6 +314,14 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, validatePCBRealizationSide(anchorPath+".side", anchor.Side)...)
 		issues = append(issues, validateRealizationWhen(anchorPath+".when", anchor.When, parameters)...)
 		issues = append(issues, validateRelativePlacement(anchorPath+".placement", anchor.Placement)...)
+		for variantIndex, variant := range anchor.Variants {
+			variantPath := fmt.Sprintf("%s.placement_variants.%d", anchorPath, variantIndex)
+			issues = append(issues, validateRelativePlacement(variantPath+".placement", variant.Placement)...)
+			if len(variant.When.Params) == 0 {
+				issues = append(issues, blockIssue(variantPath+".when", "anchor placement variant requires a non-empty condition"))
+			}
+			issues = append(issues, validateRealizationWhen(variantPath+".when", variant.When, parameters)...)
+		}
 	}
 	routeIDs := map[string]struct{}{}
 	for index, route := range realization.LocalRoutes {
@@ -353,6 +378,23 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			}
 			if len(variant.When.Params) == 0 {
 				issues = append(issues, blockIssue(variantPath+".when", "endpoint variant requires a non-empty condition"))
+			}
+			issues = append(issues, validateRealizationWhen(variantPath+".when", variant.When, parameters)...)
+		}
+		for variantIndex, variant := range route.GeometryVariants {
+			variantPath := fmt.Sprintf("%s.geometry_variants.%d", routePath, variantIndex)
+			if len(variant.Waypoints) > 0 && variant.ClearWaypoints {
+				issues = append(issues, blockIssue(variantPath+".clear_waypoints", "route geometry variant cannot replace and clear waypoints"))
+			}
+			if len(variant.Waypoints) == 0 && !variant.ClearWaypoints && strings.TrimSpace(variant.Layer) == "" && !variant.DisableEntryAnchorDogbone && !variant.DisableEntryAnchorVia {
+				issues = append(issues, blockIssue(variantPath, "route geometry variant requires at least one geometry change"))
+			}
+			issues = append(issues, validateLayer(variantPath+".layer", variant.Layer, true)...)
+			for waypointIndex, point := range variant.Waypoints {
+				issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", variantPath, waypointIndex), point)...)
+			}
+			if len(variant.When.Params) == 0 {
+				issues = append(issues, blockIssue(variantPath+".when", "route geometry variant requires a non-empty condition"))
 			}
 			issues = append(issues, validateRealizationWhen(variantPath+".when", variant.When, parameters)...)
 		}
@@ -813,6 +855,10 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.EntryAnchors = append([]PCBEntryAnchor(nil), realization.EntryAnchors...)
 	for i := range clone.EntryAnchors {
 		clone.EntryAnchors[i].When = cloneRealizationWhen(realization.EntryAnchors[i].When)
+		clone.EntryAnchors[i].Variants = append([]PCBAnchorPlacementVariant(nil), realization.EntryAnchors[i].Variants...)
+		for variantIndex := range clone.EntryAnchors[i].Variants {
+			clone.EntryAnchors[i].Variants[variantIndex].When = cloneRealizationWhen(clone.EntryAnchors[i].Variants[variantIndex].When)
+		}
 	}
 	clone.LocalRoutes = append([]PCBLocalRoute(nil), realization.LocalRoutes...)
 	for i := range clone.LocalRoutes {
@@ -821,6 +867,12 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 		clone.LocalRoutes[i].EndpointVariants = append([]PCBEndpointVariant(nil), realization.LocalRoutes[i].EndpointVariants...)
 		for variantIndex := range clone.LocalRoutes[i].EndpointVariants {
 			clone.LocalRoutes[i].EndpointVariants[variantIndex].When = cloneRealizationWhen(clone.LocalRoutes[i].EndpointVariants[variantIndex].When)
+		}
+		clone.LocalRoutes[i].GeometryVariants = append([]PCBRouteGeometryVariant(nil), realization.LocalRoutes[i].GeometryVariants...)
+		for variantIndex := range clone.LocalRoutes[i].GeometryVariants {
+			variant := &clone.LocalRoutes[i].GeometryVariants[variantIndex]
+			variant.Waypoints = append([]RelativePoint(nil), variant.Waypoints...)
+			variant.When = cloneRealizationWhen(variant.When)
 		}
 		for variantIndex := range clone.LocalRoutes[i].WaypointVariants {
 			variant := &clone.LocalRoutes[i].WaypointVariants[variantIndex]

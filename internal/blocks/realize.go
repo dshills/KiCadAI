@@ -57,16 +57,17 @@ type RealizedPCBEntryAnchor struct {
 }
 
 type RealizedPCBLocalRoute struct {
-	ID                 string                 `json:"id"`
-	NetName            string                 `json:"net_name"`
-	From               transactions.Endpoint  `json:"from"`
-	To                 transactions.Endpoint  `json:"to"`
-	Points             []transactions.Point   `json:"points,omitempty"`
-	Layer              string                 `json:"layer,omitempty"`
-	WidthMM            float64                `json:"width_mm,omitempty"`
-	LengthMM           float64                `json:"length_mm,omitempty"`
-	EntryAnchorDogbone *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
-	ToEndpointDogbone  bool                   `json:"to_endpoint_dogbone,omitempty"`
+	ID                    string                 `json:"id"`
+	NetName               string                 `json:"net_name"`
+	From                  transactions.Endpoint  `json:"from"`
+	To                    transactions.Endpoint  `json:"to"`
+	Points                []transactions.Point   `json:"points,omitempty"`
+	Layer                 string                 `json:"layer,omitempty"`
+	WidthMM               float64                `json:"width_mm,omitempty"`
+	LengthMM              float64                `json:"length_mm,omitempty"`
+	EntryAnchorDogbone    *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
+	DisableEntryAnchorVia bool                   `json:"disable_entry_anchor_via,omitempty"`
+	ToEndpointDogbone     bool                   `json:"to_endpoint_dogbone,omitempty"`
 }
 
 type TimingFixtureEvidence struct {
@@ -224,7 +225,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		if !realizationWhenMatches(anchor.When, output.Instance.Params) {
 			continue
 		}
-		placement := anchor.Placement
+		placement := realizedEntryAnchorPlacement(anchor, output.Instance.Params)
 		placement.XMM += opts.OriginXMM
 		placement.YMM += opts.OriginYMM
 		placement.Layer = firstNonEmptyString(anchor.Placement.Layer, opts.Layer, "F.Cu")
@@ -262,14 +263,15 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		}
 		netName := aliasedRealizationNetName(opts.NetAliases, InstanceNetName(output.Instance.InstanceID, route.NetTemplate))
 		realizedRoute := RealizedPCBLocalRoute{
-			ID:                 route.ID,
-			NetName:            netName,
-			From:               from.Endpoint,
-			To:                 to.Endpoint,
-			Layer:              firstNonEmptyString(route.Layer, opts.Layer, "F.Cu"),
-			WidthMM:            route.WidthMM,
-			EntryAnchorDogbone: route.EntryAnchorDogbone,
-			ToEndpointDogbone:  route.ToEndpointDogbone,
+			ID:                    route.ID,
+			NetName:               netName,
+			From:                  from.Endpoint,
+			To:                    to.Endpoint,
+			Layer:                 firstNonEmptyString(route.Layer, opts.Layer, "F.Cu"),
+			WidthMM:               route.WidthMM,
+			EntryAnchorDogbone:    route.EntryAnchorDogbone,
+			DisableEntryAnchorVia: route.DisableEntryAnchorVia,
+			ToEndpointDogbone:     route.ToEndpointDogbone,
 		}
 		points := routePoints(route, from.Point, to.Point, opts)
 		realizedRoute.Points = points
@@ -313,7 +315,35 @@ func realizedLocalRouteGeometry(route PCBLocalRoute, params map[string]any) PCBL
 			break
 		}
 	}
+	for _, variant := range route.GeometryVariants {
+		if realizationWhenMatches(variant.When, params) {
+			if variant.ClearWaypoints {
+				route.Waypoints = nil
+			} else if len(variant.Waypoints) > 0 {
+				route.Waypoints = append([]RelativePoint(nil), variant.Waypoints...)
+			}
+			if strings.TrimSpace(variant.Layer) != "" {
+				route.Layer = variant.Layer
+			}
+			if variant.DisableEntryAnchorDogbone {
+				route.EntryAnchorDogbone = nil
+			}
+			if variant.DisableEntryAnchorVia {
+				route.DisableEntryAnchorVia = true
+			}
+			break
+		}
+	}
 	return route
+}
+
+func realizedEntryAnchorPlacement(anchor PCBEntryAnchor, params map[string]any) RelativePlacement {
+	for _, variant := range anchor.Variants {
+		if realizationWhenMatches(variant.When, params) {
+			return variant.Placement
+		}
+	}
+	return anchor.Placement
 }
 
 func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, output BlockOutput, roleRefs map[string]string) RouteEndpoint {

@@ -943,7 +943,9 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	if len(dogbonePoints) > 0 {
 		vias = append(vias, localRouteEndpointVia(dogbonePoints[0], to.Layer, layer))
 	}
-	vias = append(vias, localRouteEntryAnchorVias(layer, from, to, vias)...)
+	if !route.DisableEntryAnchorVia {
+		vias = append(vias, localRouteEntryAnchorVias(layer, from, to, vias)...)
+	}
 	trackSegments := routeTrackSegmentCount(mainRoutePoints) + routeTrackSegmentCount(dogbonePoints)
 	if trackSegments == 0 {
 		mainRoutePoints = nil

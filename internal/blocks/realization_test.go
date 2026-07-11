@@ -70,6 +70,24 @@ func TestValidatePCBRealizationRejectsInvalidEndpointVariant(t *testing.T) {
 	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.0.endpoint_variants.0.when")
 }
 
+func TestValidatePCBRealizationRejectsInvalidGeometryVariants(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
+		ID: "input_entry", Port: "IN", Placement: RelativePlacement{Layer: "F.Cu"},
+		Variants: []PCBAnchorPlacementVariant{{Placement: RelativePlacement{Layer: "Nope.Cu"}}},
+	}}
+	definition.PCBRealization.LocalRoutes[0].GeometryVariants = []PCBRouteGeometryVariant{{
+		Waypoints:      []RelativePoint{{XMM: 1}},
+		ClearWaypoints: true,
+	}}
+
+	issues := ValidatePCBRealization(definition)
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.0.placement_variants.0.placement.layer")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.entry_anchors.0.placement_variants.0.when")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.0.geometry_variants.0.clear_waypoints")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.0.geometry_variants.0.when")
+}
+
 func TestValidatePCBRealizationAcceptsEntryAnchorRoute(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{
@@ -190,14 +208,25 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 		Port:      "IN",
 		Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
 		When:      RealizationWhen{Params: map[string]any{"enabled": true}},
+		Variants: []PCBAnchorPlacementVariant{{
+			Placement: RelativePlacement{XMM: 1, YMM: 2, Layer: "F.Cu"},
+			When:      RealizationWhen{Params: map[string]any{"variant": true}},
+		}},
 	}}
 	definition.PCBRealization.LocalRoutes[0].When = RealizationWhen{Params: map[string]any{"enabled": true}}
+	definition.PCBRealization.LocalRoutes[0].GeometryVariants = []PCBRouteGeometryVariant{{
+		Waypoints: []RelativePoint{{XMM: 1, YMM: 2}},
+		When:      RealizationWhen{Params: map[string]any{"variant": true}},
+	}}
 	definition.PCBRealization.Zones[0].When = RealizationWhen{Params: map[string]any{"enabled": true}}
 	clone := cloneBlockDefinition(definition)
 	clone.PCBRealization.Components[0].Properties["k"] = "changed"
 	clone.PCBRealization.EntryAnchors[0].When.Params["enabled"] = false
+	clone.PCBRealization.EntryAnchors[0].Variants[0].When.Params["variant"] = false
 	clone.PCBRealization.LocalRoutes[0].Waypoints[0].XMM = 99
 	clone.PCBRealization.LocalRoutes[0].When.Params["enabled"] = false
+	clone.PCBRealization.LocalRoutes[0].GeometryVariants[0].Waypoints[0].XMM = 99
+	clone.PCBRealization.LocalRoutes[0].GeometryVariants[0].When.Params["variant"] = false
 	clone.PCBRealization.Zones[0].When.Params["enabled"] = false
 	fixture := &clone.PCBRealization.TimingFixtures[0]
 	if len(fixture.LoadCapacitorRoles) == 0 || len(fixture.DecouplingRoles) == 0 || len(fixture.EnableControlRoles) == 0 {
@@ -219,11 +248,17 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 	if definition.PCBRealization.EntryAnchors[0].When.Params["enabled"] != true {
 		t.Fatalf("entry anchor condition params were not cloned")
 	}
+	if definition.PCBRealization.EntryAnchors[0].Variants[0].When.Params["variant"] != true {
+		t.Fatalf("entry anchor variant condition params were not cloned")
+	}
 	if definition.PCBRealization.LocalRoutes[0].Waypoints[0].XMM == 99 {
 		t.Fatalf("route waypoints were not cloned")
 	}
 	if definition.PCBRealization.LocalRoutes[0].When.Params["enabled"] != true {
 		t.Fatalf("route condition params were not cloned")
+	}
+	if definition.PCBRealization.LocalRoutes[0].GeometryVariants[0].Waypoints[0].XMM == 99 || definition.PCBRealization.LocalRoutes[0].GeometryVariants[0].When.Params["variant"] != true {
+		t.Fatalf("route geometry variant was not cloned")
 	}
 	if definition.PCBRealization.Zones[0].When.Params["enabled"] != true {
 		t.Fatalf("zone condition params were not cloned")
