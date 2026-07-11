@@ -109,7 +109,7 @@ func validateSchematicLayoutTarget(target string, blockInstances map[string]stru
 		return "layout target is required"
 	}
 	for instanceID := range blockInstances {
-		prefix := instanceID + "__"
+		prefix := instanceID + schematicLayoutTargetDelimiter
 		if strings.HasPrefix(target, prefix) && strings.TrimPrefix(target, prefix) != "" {
 			return ""
 		}

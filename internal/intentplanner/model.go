@@ -42,19 +42,20 @@ const (
 )
 
 type Request struct {
-	Version         string                         `json:"version"`
-	Name            string                         `json:"name"`
-	Summary         string                         `json:"summary,omitempty"`
-	Kind            IntentKind                     `json:"kind,omitempty"`
-	Acceptance      designworkflow.AcceptanceLevel `json:"acceptance,omitempty"`
-	SchematicLayout *schematicir.Layout            `json:"schematic_layout,omitempty"`
-	Board           BoardIntent                    `json:"board,omitempty"`
-	Power           PowerIntent                    `json:"power,omitempty"`
-	Interfaces      []InterfaceIntent              `json:"interfaces,omitempty"`
-	Functions       []FunctionIntent               `json:"functions,omitempty"`
-	Protection      ProtectionIntent               `json:"protection,omitempty"`
-	Manufacturing   ManufacturingIntent            `json:"manufacturing,omitempty"`
-	Constraints     ConstraintIntent               `json:"constraints,omitempty"`
+	Version             string                         `json:"version"`
+	Name                string                         `json:"name"`
+	Summary             string                         `json:"summary,omitempty"`
+	Kind                IntentKind                     `json:"kind,omitempty"`
+	Acceptance          designworkflow.AcceptanceLevel `json:"acceptance,omitempty"`
+	SchematicLayout     *schematicir.Layout            `json:"schematic_layout,omitempty"`
+	AutoSchematicLayout bool                           `json:"auto_schematic_layout,omitempty"`
+	Board               BoardIntent                    `json:"board,omitempty"`
+	Power               PowerIntent                    `json:"power,omitempty"`
+	Interfaces          []InterfaceIntent              `json:"interfaces,omitempty"`
+	Functions           []FunctionIntent               `json:"functions,omitempty"`
+	Protection          ProtectionIntent               `json:"protection,omitempty"`
+	Manufacturing       ManufacturingIntent            `json:"manufacturing,omitempty"`
+	Constraints         ConstraintIntent               `json:"constraints,omitempty"`
 }
 
 type BoardIntent struct {
@@ -273,6 +274,9 @@ func ValidateRequest(request Request) []reports.Issue {
 	}
 	if !validAcceptance(request.Acceptance) {
 		issues = append(issues, issue("acceptance", "unsupported acceptance level "+string(request.Acceptance)))
+	}
+	if request.AutoSchematicLayout && request.SchematicLayout != nil {
+		issues = append(issues, issue("auto_schematic_layout", "automatic schematic layout cannot be combined with explicit schematic_layout intent"))
 	}
 	if !validStrength(request.Board.MountingHoles) {
 		issues = append(issues, issue("board.mounting_holes", "unsupported requirement strength "+string(request.Board.MountingHoles)))

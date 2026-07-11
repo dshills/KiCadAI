@@ -15,6 +15,8 @@ import (
 	"kicadai/internal/transactions"
 )
 
+const schematicLayoutTargetDelimiter = "__"
+
 func layoutSchematicOperations(output blocks.CompositionOutput, layout schematicir.Layout) ([]transactions.Operation, string, error) {
 	document, targetByRef, err := schematicLayoutDocument(output, layout)
 	if err != nil {
@@ -145,10 +147,10 @@ func schematicLayoutDocument(output blocks.CompositionOutput, layout schematicir
 func schematicLayoutTarget(instanceID, role string) (string, error) {
 	instanceID = strings.TrimSpace(instanceID)
 	role = strings.TrimSpace(role)
-	if strings.Contains(instanceID, "__") || strings.Contains(role, "__") {
+	if strings.Contains(instanceID, schematicLayoutTargetDelimiter) || strings.Contains(role, schematicLayoutTargetDelimiter) {
 		return "", fmt.Errorf("schematic layout instance and role IDs cannot contain reserved delimiter __: %s, %s", instanceID, role)
 	}
-	return instanceID + "__" + role, nil
+	return instanceID + schematicLayoutTargetDelimiter + role, nil
 }
 
 func schematicLayoutComponentRole(role string) schematicir.ComponentRole {

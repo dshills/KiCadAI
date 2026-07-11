@@ -33,19 +33,20 @@ const (
 )
 
 type Request struct {
-	Version           string                 `json:"version"`
-	Name              string                 `json:"name"`
-	Intent            Intent                 `json:"intent,omitempty"`
-	SchematicLayout   *schematicir.Layout    `json:"schematic_layout,omitempty"`
-	Board             BoardSpec              `json:"board"`
-	Libraries         LibrarySpec            `json:"libraries,omitempty"`
-	Components        ComponentPolicySpec    `json:"component_policy,omitempty"`
-	Blocks            []BlockInstanceSpec    `json:"blocks"`
-	Connections       []ConnectionSpec       `json:"connections,omitempty"`
-	ExternalEndpoints []ExternalEndpointSpec `json:"external_endpoints,omitempty"`
-	Constraints       ConstraintSpec         `json:"constraints,omitempty"`
-	Validation        ValidationSpec         `json:"validation,omitempty"`
-	RoutingRetry      RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
+	Version             string                 `json:"version"`
+	Name                string                 `json:"name"`
+	Intent              Intent                 `json:"intent,omitempty"`
+	SchematicLayout     *schematicir.Layout    `json:"schematic_layout,omitempty"`
+	AutoSchematicLayout bool                   `json:"auto_schematic_layout,omitempty"`
+	Board               BoardSpec              `json:"board"`
+	Libraries           LibrarySpec            `json:"libraries,omitempty"`
+	Components          ComponentPolicySpec    `json:"component_policy,omitempty"`
+	Blocks              []BlockInstanceSpec    `json:"blocks"`
+	Connections         []ConnectionSpec       `json:"connections,omitempty"`
+	ExternalEndpoints   []ExternalEndpointSpec `json:"external_endpoints,omitempty"`
+	Constraints         ConstraintSpec         `json:"constraints,omitempty"`
+	Validation          ValidationSpec         `json:"validation,omitempty"`
+	RoutingRetry        RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
 }
 
 type Intent struct {
@@ -414,9 +415,12 @@ func ValidateRequest(request Request) []reports.Issue {
 		if strings.TrimSpace(block.BlockID) == "" {
 			issues = append(issues, issue(path+".block_id", "block ID is required"))
 		}
-		if request.SchematicLayout != nil && strings.Contains(block.ID, "__") {
+		if (request.SchematicLayout != nil || request.AutoSchematicLayout) && strings.Contains(block.ID, schematicLayoutTargetDelimiter) {
 			issues = append(issues, issue(path+".id", "block instance ID cannot contain reserved schematic layout delimiter __"))
 		}
+	}
+	if request.AutoSchematicLayout && request.SchematicLayout != nil {
+		issues = append(issues, issue("auto_schematic_layout", "automatic schematic layout cannot be combined with explicit schematic_layout intent"))
 	}
 	issues = append(issues, validateSchematicLayoutRequest(request.SchematicLayout, seenBlocks)...)
 	for index, connection := range request.Connections {

@@ -25,20 +25,34 @@ func TestBMP280LayoutIntentIsNameIndependentAndDeterministic(t *testing.T) {
 	if reports.HasBlockingIssue(issues) {
 		t.Fatalf("decode BMP280 fixture: %#v", issues)
 	}
-	if request.SchematicLayout == nil {
-		t.Fatal("BMP280 fixture is missing schematic_layout intent")
+	if request.SchematicLayout != nil {
+		t.Fatal("BMP280 fixture must not carry hand-authored schematic_layout intent")
+	}
+	if !request.AutoSchematicLayout {
+		t.Fatal("BMP280 fixture must opt into automatic schematic layout")
 	}
 	request.Name = "renamed_layout_acceptance"
 	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
 	if reports.HasBlockingIssue(plan.Stage.Issues) {
 		t.Fatalf("plan BMP280 fixture: %#v", plan.Stage.Issues)
 	}
-	first, firstPaper, err := layoutSchematicOperations(plan.Output, *request.SchematicLayout)
+	if plan.Request.SchematicLayout == nil {
+		t.Fatal("block planning did not synthesize schematic layout intent")
+	}
+	first, firstPaper, err := layoutSchematicOperations(plan.Output, *plan.Request.SchematicLayout)
 	if err != nil {
 		t.Fatal(err)
 	}
-	plan.Output.ProjectName = "another_name"
-	second, secondPaper, err := layoutSchematicOperations(plan.Output, *request.SchematicLayout)
+	secondRequest := request
+	secondRequest.Name = "another_name"
+	secondPlan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), secondRequest)
+	if reports.HasBlockingIssue(secondPlan.Stage.Issues) {
+		t.Fatalf("repeat plan BMP280 fixture: %#v", secondPlan.Stage.Issues)
+	}
+	if !reflect.DeepEqual(*plan.Request.SchematicLayout, *secondPlan.Request.SchematicLayout) {
+		t.Fatal("inferred schematic layout changed with project name or repeated planning")
+	}
+	second, secondPaper, err := layoutSchematicOperations(secondPlan.Output, *secondPlan.Request.SchematicLayout)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,6 +118,46 @@ func TestBMP280LayoutIntentIsNameIndependentAndDeterministic(t *testing.T) {
 	if center := (minY + maxY) / 2; center < 95 || center > 115 {
 		t.Fatalf("vertical layout center = %.2f mm, want near A4 center", center)
 	}
+}
+
+func TestAutomaticSchematicLayoutFailsClosedOnDisconnectedStageTopology(t *testing.T) {
+	file, err := os.Open("../../examples/design/kicad-backed/sensor_bmp280_breakout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	request, issues := DecodeRequestStrict(file)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode BMP280 fixture: %#v", issues)
+	}
+	filtered := request.Connections[:0]
+	for _, connection := range request.Connections {
+		if connection.From == "usb_power.VBUS_OUT" && connection.To == "regulator.VIN" {
+			continue
+		}
+		filtered = append(filtered, connection)
+	}
+	request.Connections = filtered
+	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	for _, issue := range plan.Stage.Issues {
+		if issue.Path == "schematic_layout.inference.topology" && issue.Severity == reports.SeverityBlocked {
+			return
+		}
+	}
+	t.Fatalf("planning issues = %#v, want blocked topology inference diagnostic", plan.Stage.Issues)
+}
+
+func TestAutomaticSchematicLayoutFailsClosedOnAmbiguousParallelStages(t *testing.T) {
+	_, issues := inferredSchematicInstances([]schematicir.Component{
+		{ID: "sensor_a__sensor", Role: schematicir.ComponentRoleSensor},
+		{ID: "sensor_b__sensor", Role: schematicir.ComponentRoleSensor},
+	})
+	for _, issue := range issues {
+		if issue.Path == "schematic_layout.inference.instances.sensor_b" && issue.Severity == reports.SeverityBlocked {
+			return
+		}
+	}
+	t.Fatalf("inference issues = %#v, want ambiguous parallel-stage diagnostic", issues)
 }
 
 func TestValidateRequestRejectsUnknownSchematicLayoutRelationTarget(t *testing.T) {

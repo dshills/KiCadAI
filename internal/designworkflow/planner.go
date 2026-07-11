@@ -47,6 +47,13 @@ func PlanBlocks(ctx context.Context, registry blocks.Registry, request Request) 
 	}
 	output := blocks.ComposeBlocks(ctx, registry, composition)
 	issues = append(issues, output.Issues...)
+	if normalized.AutoSchematicLayout && normalized.SchematicLayout == nil && !reports.HasBlockingIssue(issues) {
+		layout, layoutIssues := inferSchematicLayout(output)
+		issues = append(issues, layoutIssues...)
+		if !reports.HasBlockingIssue(layoutIssues) {
+			normalized.SchematicLayout = &layout
+		}
+	}
 	evidence, evidenceIssues := blockEvidenceForRequest(ctx, registry, normalized)
 	issues = append(issues, evidenceIssues...)
 	stage := NewStageResult(StageBlockPlanning, issues)
