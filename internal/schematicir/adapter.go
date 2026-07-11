@@ -18,6 +18,18 @@ import (
 
 const footprintPropertyName = "Footprint"
 
+// LayoutDocument normalizes a schematic IR document and returns the same
+// deterministic layout result used by transaction generation.
+func LayoutDocument(document Document) schematiclayout.Result {
+	return LayoutDocumentWithLibraryIndex(document, nil)
+}
+
+// LayoutDocumentWithLibraryIndex includes resolver-backed symbol geometry.
+func LayoutDocumentWithLibraryIndex(document Document, index *libraryresolver.LibraryIndex) schematiclayout.Result {
+	document = NormalizeLayoutIntent(document)
+	return schematicLayoutWithLibraryIndex(document, index)
+}
+
 // ToTransaction converts a validated schematic IR document into the existing
 // schematic transaction operation stream.
 func ToTransaction(document Document) (transactions.Transaction, []reports.Issue) {
@@ -1342,6 +1354,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 	for _, placement := range document.Layout.Placements {
 		placementsByID[placement.Target] = placement
 	}
+	ordinalByID := schematicLayoutOrdinals(document)
 	rules := schematiclayout.DefaultRules(schematiclayout.ProfileStandard)
 	if document.Layout.Rules.MinComponentSpacingMM != nil {
 		rules.MinComponentSpacing = kicadfiles.MM(*document.Layout.Rules.MinComponentSpacingMM)
@@ -1371,22 +1384,25 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		}
 		geometry := schematicLayoutGeometry(component, index)
 		request.Components = append(request.Components, schematiclayout.Component{
-			Ref:            component.ID,
-			DisplayRef:     component.Ref,
-			Value:          component.Value,
-			LibraryID:      component.Symbol,
-			Role:           schematicLayoutComponentRole(component),
-			GroupID:        group.ID,
-			Stage:          schematicStageForGroup(group.Role),
-			FlowRank:       group.Rank,
-			RankFixed:      group.ID != "" && !group.Inferred,
-			Near:           append([]string(nil), placement.Near...),
-			Rotation:       kicadfiles.Angle(rotationByID[component.ID]),
-			Mirror:         schematiclayout.Mirror(mirrorByID[component.ID]),
-			Body:           geometry.Body,
-			BodyKnown:      geometry.known(),
-			GeometrySource: geometry.Source,
-			Pins:           schematicLayoutPins(component, index),
+			Ref:             component.ID,
+			DisplayRef:      component.Ref,
+			Value:           component.Value,
+			LibraryID:       component.Symbol,
+			Role:            schematicLayoutComponentRole(component),
+			GroupID:         group.ID,
+			Stage:           schematicStageForGroup(group.Role),
+			FlowRank:        group.Rank,
+			RankFixed:       group.ID != "" && !group.Inferred,
+			Near:            append([]string(nil), placement.Near...),
+			Above:           append([]string(nil), placement.Above...),
+			RightOf:         append([]string(nil), placement.RightOf...),
+			Rotation:        kicadfiles.Angle(rotationByID[component.ID]),
+			Mirror:          schematiclayout.Mirror(mirrorByID[component.ID]),
+			Body:            geometry.Body,
+			BodyKnown:       geometry.known(),
+			GeometrySource:  geometry.Source,
+			Pins:            schematicLayoutPins(component, index),
+			OriginalOrdinal: ordinalByID[component.ID],
 		})
 	}
 	for index, net := range document.Circuit.Nets {
@@ -1439,6 +1455,42 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		}
 	}
 	return result
+}
+
+func schematicLayoutOrdinals(document Document) map[string]int {
+	groups := append([]Group(nil), document.Layout.Groups...)
+	for index := range groups {
+		groups[index].Members = append([]string(nil), groups[index].Members...)
+	}
+	sort.SliceStable(groups, func(i, j int) bool {
+		if groups[i].Rank != groups[j].Rank {
+			return groups[i].Rank < groups[j].Rank
+		}
+		return groups[i].ID < groups[j].ID
+	})
+	ordinals := map[string]int{}
+	next := 0
+	for _, group := range groups {
+		for _, member := range group.Members {
+			if _, exists := ordinals[member]; exists {
+				continue
+			}
+			ordinals[member] = next
+			next++
+		}
+	}
+	var remaining []string
+	for _, component := range document.Circuit.Components {
+		if _, exists := ordinals[component.ID]; !exists {
+			remaining = append(remaining, component.ID)
+		}
+	}
+	sort.Strings(remaining)
+	for _, componentID := range remaining {
+		ordinals[componentID] = next
+		next++
+	}
+	return ordinals
 }
 
 func schematicLayoutComponentRole(component Component) string {

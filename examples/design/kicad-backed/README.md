@@ -111,6 +111,13 @@ the deterministic synthesized request at
 `examples/design/kicad-backed/sensor_bmp280_breakout.json` with readiness
 declared by `sensor_bmp280_breakout.metadata.json`.
 
+Both checked inputs carry the same `schematic_layout` object. It defines
+functional groups and ranks, power/signal/ground lanes, page-centering and
+spacing rules, and `near`/`above`/`right_of` relations using stable
+`instance__role` targets. The generated schematic therefore does not depend
+on the project name, generated reference hashes, or hardcoded coordinates in
+the workflow.
+
 Run the full intent workflow from the repository root with the compiled binary
 on `PATH`:
 

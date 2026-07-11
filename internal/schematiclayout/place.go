@@ -12,6 +12,7 @@ func Place(request Request) Result {
 	cells, islandCount, rankCount := planPlacement(request)
 	rankX := placementRankX(request.Components, cells, rules)
 	positions := placementPositions(request.Components, cells, rankX, rules)
+	relationsConverged := enforceRelativePlacement(request.Components, positions, rules)
 	result := Result{Sheet: request.Sheet, Components: make([]PlacedComponent, 0, len(request.Components))}
 	for _, component := range request.Components {
 		placed := PlacedComponent{Component: component}
@@ -22,6 +23,9 @@ func Place(request Request) Result {
 			placed.PlacedAt = positions[component.Ref]
 		}
 		result.Components = append(result.Components, placed)
+	}
+	if !relationsConverged {
+		result.Diagnostics = append(result.Diagnostics, Diagnostic{Severity: SeverityError, Code: "relative_placement_not_converged", Message: "relative placement constraints did not converge", Repair: "remove relation cycles or increase compatible group/lane spacing"})
 	}
 	var textDiagnostics []Diagnostic
 	result.Components, textDiagnostics = placeComponentText(result.Components, rules)
@@ -41,6 +45,131 @@ func Place(request Request) Result {
 	result = Validate(result, request)
 	result.Diagnostics = append(result.Diagnostics, placementDiagnostics(result.Components, request.Sheet)...)
 	return NormalizeResult(result, rules)
+}
+
+func enforceRelativePlacement(components []Component, positions map[string]kicadfiles.Point, rules Rules) bool {
+	byRef := make(map[string]Component, len(components))
+	aboveByTarget := map[string][]Component{}
+	for _, component := range components {
+		byRef[component.Ref] = component
+		if component.Fixed {
+			continue
+		}
+		for _, targetRef := range component.Above {
+			aboveByTarget[targetRef] = append(aboveByTarget[targetRef], component)
+		}
+	}
+	targetRefs := make([]string, 0, len(aboveByTarget))
+	for targetRef := range aboveByTarget {
+		targetRefs = append(targetRefs, targetRef)
+	}
+	sort.Strings(targetRefs)
+	maxIterations := len(components) * 2
+	for iteration := 0; iteration < maxIterations; iteration++ {
+		changed := false
+		for _, component := range components {
+			position, ok := positions[component.Ref]
+			if !ok || component.Fixed {
+				continue
+			}
+			componentBounds := componentBoundsAt(component, position)
+			for _, targetRef := range component.RightOf {
+				target, targetOK := byRef[targetRef]
+				targetPosition, positionOK := positions[targetRef]
+				if !targetOK || !positionOK {
+					continue
+				}
+				targetBounds := componentBoundsAt(target, targetPosition)
+				minimumX := targetBounds.MaxX + rules.MinComponentSpacing
+				if componentBounds.MinX < minimumX {
+					delta := minimumX - componentBounds.MinX
+					position.X = snapAtLeast(position.X+delta, rules.Grid)
+					positions[component.Ref] = position
+					componentBounds = componentBoundsAt(component, position)
+					changed = true
+				}
+			}
+		}
+		for _, targetRef := range targetRefs {
+			target, targetOK := byRef[targetRef]
+			targetPosition, positionOK := positions[targetRef]
+			if !targetOK || !positionOK {
+				continue
+			}
+			maximumY := componentBoundsAt(target, targetPosition).MinY - rules.MinComponentSpacing
+			groupBottom := kicadfiles.IU(-1 << 62)
+			for _, component := range aboveByTarget[targetRef] {
+				if bounds := componentBoundsAt(component, positions[component.Ref]); bounds.MaxY > groupBottom {
+					groupBottom = bounds.MaxY
+				}
+			}
+			if groupBottom <= maximumY {
+				continue
+			}
+			delta := groupBottom - maximumY
+			for _, component := range aboveByTarget[targetRef] {
+				position := positions[component.Ref]
+				position.Y = snapAtMost(position.Y-delta, rules.Grid)
+				positions[component.Ref] = position
+			}
+			changed = true
+		}
+		if !changed {
+			return true
+		}
+	}
+	return relativePositionsSatisfied(components, positions, rules)
+}
+
+func relativePositionsSatisfied(components []Component, positions map[string]kicadfiles.Point, rules Rules) bool {
+	byRef := make(map[string]Component, len(components))
+	for _, component := range components {
+		byRef[component.Ref] = component
+	}
+	for _, component := range components {
+		bounds := componentBoundsAt(component, positions[component.Ref])
+		for _, targetRef := range component.RightOf {
+			target, ok := byRef[targetRef]
+			if ok && bounds.MinX < componentBoundsAt(target, positions[targetRef]).MaxX+rules.MinComponentSpacing {
+				return false
+			}
+		}
+		for _, targetRef := range component.Above {
+			target, ok := byRef[targetRef]
+			if ok && bounds.MaxY > componentBoundsAt(target, positions[targetRef]).MinY-rules.MinComponentSpacing {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func snapAtLeast(value, grid kicadfiles.IU) kicadfiles.IU {
+	if grid <= 0 {
+		return value
+	}
+	quotient := value / grid
+	remainder := value % grid
+	if remainder > 0 {
+		quotient++
+	}
+	return quotient * grid
+}
+
+func snapAtMost(value, grid kicadfiles.IU) kicadfiles.IU {
+	if grid <= 0 {
+		return value
+	}
+	quotient := value / grid
+	remainder := value % grid
+	if remainder < 0 {
+		quotient--
+	}
+	return quotient * grid
+}
+
+func componentBoundsAt(component Component, position kicadfiles.Point) Rect {
+	return componentBody(PlacedComponent{Component: component, PlacedAt: position})
 }
 
 func placementRankX(components []Component, cells map[string]placementCell, rules Rules) map[int]kicadfiles.IU {

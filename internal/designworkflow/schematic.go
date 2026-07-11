@@ -66,8 +66,8 @@ func ApplySchematic(ctx context.Context, plan BlockPlanResult, opts SchematicApp
 	}
 	output := plan.Output
 	paper := ""
-	if requiresGeneratedSchematicLayout(projectName) {
-		operations, selectedPaper, err := layoutSchematicOperations(output.Operations)
+	if plan.Request.SchematicLayout != nil {
+		operations, selectedPaper, err := layoutSchematicOperations(output, *plan.Request.SchematicLayout)
 		if err != nil {
 			issues = append(issues, reports.Issue{
 				Code:     reports.CodeInvalidArgument,

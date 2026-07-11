@@ -293,6 +293,8 @@ type Placement struct {
 	Target      string      `json:"target"`
 	Group       string      `json:"group,omitempty"`
 	Near        []string    `json:"near,omitempty"`
+	Above       []string    `json:"above,omitempty"`
+	RightOf     []string    `json:"right_of,omitempty"`
 	Orientation Orientation `json:"orientation,omitempty"`
 	Mirror      Mirror      `json:"mirror,omitempty"`
 }

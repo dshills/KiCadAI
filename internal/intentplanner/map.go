@@ -39,8 +39,9 @@ func Plan(request Request) PlanResult {
 		registry: builtinIntentRegistry,
 		plan:     plan,
 		workflow: designworkflow.Request{
-			Version: designworkflow.RequestVersion,
-			Name:    normalized.Name,
+			Version:         designworkflow.RequestVersion,
+			Name:            normalized.Name,
+			SchematicLayout: normalized.SchematicLayout,
 			Intent: designworkflow.Intent{
 				Summary:  normalized.Summary,
 				Category: string(normalized.Kind),

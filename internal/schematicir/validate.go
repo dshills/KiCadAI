@@ -584,6 +584,29 @@ func validateLayout(document Document, componentPins map[string]map[string]struc
 		if !supportedMirror(placement.Mirror) {
 			add(path+".mirror", "placement mirror is not supported")
 		}
+		relations := []struct {
+			field   string
+			targets []string
+		}{{"near", placement.Near}, {"above", placement.Above}, {"right_of", placement.RightOf}}
+		for _, relation := range relations {
+			seenTargets := map[string]struct{}{}
+			for targetIndex, target := range relation.targets {
+				targetPath := fmt.Sprintf("%s.%s[%d]", path, relation.field, targetIndex)
+				if target == placement.Target {
+					add(targetPath, "placement relation cannot reference its own target")
+				} else if _, exists := componentPins[target]; !exists {
+					add(targetPath, "placement relation references unknown component "+target)
+				} else if _, duplicate := seenTargets[target]; duplicate {
+					add(targetPath, "placement relation contains duplicate target "+target)
+				}
+				seenTargets[target] = struct{}{}
+			}
+		}
+	}
+	for _, relation := range []string{"above", "right_of"} {
+		if cycle := PlacementRelationCycle(document.Layout.Placements, relation); len(cycle) != 0 {
+			add("layout.placements", relation+" relation contains a cycle: "+FormatPlacementRelationCycle(cycle))
+		}
 	}
 }
 

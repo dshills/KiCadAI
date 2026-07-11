@@ -79,6 +79,7 @@ func Validate(result Result, request Request) Result {
 			result.Diagnostics = append(result.Diagnostics, overlapDiagnostic(object, other))
 		}
 	}
+	result.Diagnostics = append(result.Diagnostics, relativePlacementDiagnostics(result.Components, rules)...)
 	symbolBodies := symbolValidationBodies(objects)
 	textObjects := nonSymbolValidationObjects(objects)
 	for _, wire := range result.Wires {
@@ -107,6 +108,36 @@ func Validate(result Result, request Request) Result {
 		}
 	}
 	return NormalizeResult(result, rules)
+}
+
+func relativePlacementDiagnostics(components []PlacedComponent, rules Rules) []Diagnostic {
+	byRef := make(map[string]PlacedComponent, len(components))
+	for _, component := range components {
+		byRef[component.Ref] = component
+	}
+	var diagnostics []Diagnostic
+	for _, component := range components {
+		bounds := componentBody(component)
+		for _, targetRef := range component.RightOf {
+			target, ok := byRef[targetRef]
+			if !ok {
+				continue
+			}
+			if bounds.MinX < componentBody(target).MaxX+rules.MinComponentSpacing {
+				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "right_of_violation", Ref: component.Ref, Message: fmt.Sprintf("component must be right of %s", targetRef), Repair: "increase horizontal stage spacing or correct the right_of relation"})
+			}
+		}
+		for _, targetRef := range component.Above {
+			target, ok := byRef[targetRef]
+			if !ok {
+				continue
+			}
+			if bounds.MaxY > componentBody(target).MinY-rules.MinComponentSpacing {
+				diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "above_violation", Ref: component.Ref, Message: fmt.Sprintf("component must be above %s", targetRef), Repair: "increase vertical lane spacing or correct the above relation"})
+			}
+		}
+	}
+	return diagnostics
 }
 
 // wireLeavesAttachedSymbol permits the short wire stub that exits a symbol

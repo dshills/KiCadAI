@@ -31,6 +31,13 @@ func buildPlacementGraph(request Request) placementGraph {
 		for _, near := range component.Near {
 			graph.addUndirected(component.Ref, near)
 		}
+		for _, above := range component.Above {
+			graph.addUndirected(component.Ref, above)
+		}
+		for _, left := range component.RightOf {
+			graph.addUndirected(component.Ref, left)
+			graph.addDirected(left, component.Ref)
+		}
 	}
 	for _, net := range request.Nets {
 		if containsRole(net.Role, "no_connect") {
@@ -58,6 +65,19 @@ func buildPlacementGraph(request Request) placementGraph {
 		}
 	}
 	return graph
+}
+
+func (graph placementGraph) addDirected(first, second string) {
+	if first == "" || second == "" || first == second {
+		return
+	}
+	if _, ok := graph.components[first]; !ok {
+		return
+	}
+	if _, ok := graph.components[second]; !ok {
+		return
+	}
+	graph.directed[first][second] = struct{}{}
 }
 
 func (graph placementGraph) addUndirected(first, second string) {
@@ -400,7 +420,7 @@ func (graph placementGraph) orders(refs []string, ranks map[string]int) map[stri
 	rankValues := make([]int, 0, len(byRank))
 	for rank := range byRank {
 		rankValues = append(rankValues, rank)
-		sort.Strings(byRank[rank])
+		sort.SliceStable(byRank[rank], func(i, j int) bool { return graph.refLess(byRank[rank][i], byRank[rank][j]) })
 	}
 	sort.Ints(rankValues)
 	positions := map[string]int{}
@@ -421,7 +441,7 @@ func (graph placementGraph) orders(refs []string, ranks map[string]int) map[stri
 				if left != right {
 					return left < right
 				}
-				return byRank[rank][i] < byRank[rank][j]
+				return graph.refLess(byRank[rank][i], byRank[rank][j])
 			})
 			for index, ref := range byRank[rank] {
 				positions[ref] = index
@@ -429,6 +449,15 @@ func (graph placementGraph) orders(refs []string, ranks map[string]int) map[stri
 		}
 	}
 	return positions
+}
+
+func (graph placementGraph) refLess(first, second string) bool {
+	firstComponent := graph.components[first]
+	secondComponent := graph.components[second]
+	if firstComponent.OriginalOrdinal != secondComponent.OriginalOrdinal {
+		return firstComponent.OriginalOrdinal < secondComponent.OriginalOrdinal
+	}
+	return first < second
 }
 
 func (graph placementGraph) barycenter(ref string, positions, ranks map[string]int, rank int, fromLeft bool) float64 {

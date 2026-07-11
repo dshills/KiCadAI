@@ -14,6 +14,7 @@ import (
 	"kicadai/internal/blocks"
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicir"
 	"kicadai/internal/transactions"
 )
 
@@ -35,6 +36,7 @@ type Request struct {
 	Version           string                 `json:"version"`
 	Name              string                 `json:"name"`
 	Intent            Intent                 `json:"intent,omitempty"`
+	SchematicLayout   *schematicir.Layout    `json:"schematic_layout,omitempty"`
 	Board             BoardSpec              `json:"board"`
 	Libraries         LibrarySpec            `json:"libraries,omitempty"`
 	Components        ComponentPolicySpec    `json:"component_policy,omitempty"`
@@ -170,6 +172,10 @@ func DecodeRequestStrict(reader io.Reader) (Request, []reports.Issue) {
 
 func NormalizeRequest(request Request) Request {
 	request.Name = NormalizeProjectName(request.Name)
+	if request.SchematicLayout != nil {
+		layout := schematicir.CloneLayout(*request.SchematicLayout)
+		request.SchematicLayout = &layout
+	}
 	if request.Board.Layers == 0 {
 		request.Board.Layers = 2
 	}
@@ -408,7 +414,11 @@ func ValidateRequest(request Request) []reports.Issue {
 		if strings.TrimSpace(block.BlockID) == "" {
 			issues = append(issues, issue(path+".block_id", "block ID is required"))
 		}
+		if request.SchematicLayout != nil && strings.Contains(block.ID, "__") {
+			issues = append(issues, issue(path+".id", "block instance ID cannot contain reserved schematic layout delimiter __"))
+		}
 	}
+	issues = append(issues, validateSchematicLayoutRequest(request.SchematicLayout, seenBlocks)...)
 	for index, connection := range request.Connections {
 		path := fmt.Sprintf("connections[%d]", index)
 		from, ok := ParseEndpoint(connection.From)

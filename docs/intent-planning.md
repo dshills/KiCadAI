@@ -95,6 +95,16 @@ metadata declares `pass` and requires real KiCad ERC and DRC evidence. See
 `examples/design/kicad-backed/README.md` for the exact generation command and
 artifact paths.
 
+The BMP280 input also demonstrates data-driven `schematic_layout` intent. It
+uses the same groups, lanes, rules, and placements as the schematic design IR.
+Layout targets use stable `instance__role` IDs such as
+`sensor__decoupling_capacitor`; generated KiCad references are deliberately
+not part of the contract. Placements can declare `near`, `above`, and
+`right_of` relations. KiCadAI validates those relations, runs the shared
+schematic layout engine, centers the result on the selected page, and writes
+explicit symbol and reference/value positions into the transaction. The
+layout section contains no absolute component coordinates.
+
 The top-level JSON result uses requested acceptance as the success contract. A
 request for `structural` acceptance can return `ok: true` while still including
 connectivity or KiCad-check issues for higher levels. Those issues are retained

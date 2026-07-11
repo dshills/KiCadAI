@@ -113,6 +113,20 @@ func TestNormalizeLayoutIntentSnapsBusGeometryToKiCadGrid(t *testing.T) {
 	}
 }
 
+func TestPlacementRelationCycleIsDeterministic(t *testing.T) {
+	placements := []Placement{
+		{Target: "b", Above: []string{"a"}},
+		{Target: "a", Above: []string{"b"}},
+	}
+	cycle := PlacementRelationCycle(placements, "above")
+	if got := FormatPlacementRelationCycle(cycle); got != "a -> b -> a" {
+		t.Fatalf("cycle = %q", got)
+	}
+	if cycle := PlacementRelationCycle(placements, "near"); cycle != nil {
+		t.Fatalf("unsupported relation cycle = %#v", cycle)
+	}
+}
+
 func closeLayoutPoint(left, right LayoutPoint) bool {
 	const epsilon = 1e-9
 	return math.Abs(left.XMM-right.XMM) <= epsilon && math.Abs(left.YMM-right.YMM) <= epsilon

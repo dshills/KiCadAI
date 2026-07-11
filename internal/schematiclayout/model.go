@@ -71,6 +71,8 @@ type Component struct {
 	FlowRank  int
 	RankFixed bool
 	Near      []string
+	Above     []string
+	RightOf   []string
 	Position  kicadfiles.Point
 	Fixed     bool
 	Rotation  kicadfiles.Angle
@@ -326,7 +328,11 @@ func NormalizeRequest(request Request) Request {
 	for index := range request.Components {
 		request.Components[index].Pins = append([]Pin(nil), request.Components[index].Pins...)
 		request.Components[index].Near = append([]string(nil), request.Components[index].Near...)
+		request.Components[index].Above = append([]string(nil), request.Components[index].Above...)
+		request.Components[index].RightOf = append([]string(nil), request.Components[index].RightOf...)
 		sort.Strings(request.Components[index].Near)
+		sort.Strings(request.Components[index].Above)
+		sort.Strings(request.Components[index].RightOf)
 		sort.SliceStable(request.Components[index].Pins, func(i, j int) bool {
 			return comparePins(request.Components[index].Pins[i], request.Components[index].Pins[j]) < 0
 		})

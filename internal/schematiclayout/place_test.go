@@ -240,6 +240,46 @@ func TestPlacePreservesFixedCoordinates(t *testing.T) {
 	}
 }
 
+func TestPlaceHonorsAboveAndRightOfRelations(t *testing.T) {
+	rules := DefaultRules(ProfileStandard)
+	rules.MinComponentSpacing = kicadfiles.MM(1)
+	result := Place(Request{
+		Sheet: testSheet(),
+		Rules: rules,
+		Components: []Component{
+			{Ref: "J1", Role: "input_connector"},
+			{Ref: "U1", Role: "sensor", RightOf: []string{"J1"}},
+			{Ref: "C1", Role: "decoupling", Above: []string{"U1"}, Near: []string{"U1"}},
+		},
+	})
+	byRef := map[string]PlacedComponent{}
+	for _, component := range result.Components {
+		byRef[component.Ref] = component
+	}
+	if componentBody(byRef["U1"]).MinX < componentBody(byRef["J1"]).MaxX+rules.MinComponentSpacing {
+		t.Fatalf("U1=%#v is not right of J1=%#v", byRef["U1"], byRef["J1"])
+	}
+	if componentBody(byRef["C1"]).MaxY > componentBody(byRef["U1"]).MinY-rules.MinComponentSpacing {
+		t.Fatalf("C1=%#v is not above U1=%#v", byRef["C1"], byRef["U1"])
+	}
+	if hasDiagnostic(result.Diagnostics, "above_violation", SeverityError) || hasDiagnostic(result.Diagnostics, "right_of_violation", SeverityError) {
+		t.Fatalf("relative placement diagnostics = %#v", result.Diagnostics)
+	}
+}
+
+func TestPlaceReportsNonConvergingRelativeRelations(t *testing.T) {
+	result := Place(Request{
+		Sheet: testSheet(),
+		Components: []Component{
+			{Ref: "A", Role: "resistor", RightOf: []string{"B"}},
+			{Ref: "B", Role: "resistor", RightOf: []string{"A"}},
+		},
+	})
+	if !hasDiagnostic(result.Diagnostics, "relative_placement_not_converged", SeverityError) {
+		t.Fatalf("diagnostics = %#v, want convergence error", result.Diagnostics)
+	}
+}
+
 func placedPositions(components []PlacedComponent) map[string]kicadfiles.Point {
 	positions := map[string]kicadfiles.Point{}
 	for _, component := range components {

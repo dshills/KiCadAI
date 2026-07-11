@@ -13,6 +13,7 @@ import (
 
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
+	"kicadai/internal/schematicir"
 )
 
 const (
@@ -41,18 +42,19 @@ const (
 )
 
 type Request struct {
-	Version       string                         `json:"version"`
-	Name          string                         `json:"name"`
-	Summary       string                         `json:"summary,omitempty"`
-	Kind          IntentKind                     `json:"kind,omitempty"`
-	Acceptance    designworkflow.AcceptanceLevel `json:"acceptance,omitempty"`
-	Board         BoardIntent                    `json:"board,omitempty"`
-	Power         PowerIntent                    `json:"power,omitempty"`
-	Interfaces    []InterfaceIntent              `json:"interfaces,omitempty"`
-	Functions     []FunctionIntent               `json:"functions,omitempty"`
-	Protection    ProtectionIntent               `json:"protection,omitempty"`
-	Manufacturing ManufacturingIntent            `json:"manufacturing,omitempty"`
-	Constraints   ConstraintIntent               `json:"constraints,omitempty"`
+	Version         string                         `json:"version"`
+	Name            string                         `json:"name"`
+	Summary         string                         `json:"summary,omitempty"`
+	Kind            IntentKind                     `json:"kind,omitempty"`
+	Acceptance      designworkflow.AcceptanceLevel `json:"acceptance,omitempty"`
+	SchematicLayout *schematicir.Layout            `json:"schematic_layout,omitempty"`
+	Board           BoardIntent                    `json:"board,omitempty"`
+	Power           PowerIntent                    `json:"power,omitempty"`
+	Interfaces      []InterfaceIntent              `json:"interfaces,omitempty"`
+	Functions       []FunctionIntent               `json:"functions,omitempty"`
+	Protection      ProtectionIntent               `json:"protection,omitempty"`
+	Manufacturing   ManufacturingIntent            `json:"manufacturing,omitempty"`
+	Constraints     ConstraintIntent               `json:"constraints,omitempty"`
 }
 
 type BoardIntent struct {
@@ -167,6 +169,10 @@ func NormalizeRequest(request Request) Request {
 	}
 	if request.Acceptance == "" {
 		request.Acceptance = designworkflow.AcceptanceStructural
+	}
+	if request.SchematicLayout != nil {
+		layout := schematicir.CloneLayout(*request.SchematicLayout)
+		request.SchematicLayout = &layout
 	}
 	if request.Board.Layers == 0 {
 		request.Board.Layers = 2

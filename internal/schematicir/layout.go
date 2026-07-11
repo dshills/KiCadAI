@@ -3,7 +3,117 @@ package schematicir
 import (
 	"math"
 	"sort"
+	"strings"
 )
+
+// CloneLayout returns an independent copy suitable for carrying layout intent
+// across parser, planner, and workflow boundaries.
+func CloneLayout(layout Layout) Layout {
+	clone := layout
+	clone.Groups = make([]Group, len(layout.Groups))
+	for index, group := range layout.Groups {
+		clone.Groups[index] = group
+		clone.Groups[index].Members = append([]string(nil), group.Members...)
+	}
+	clone.Placements = make([]Placement, len(layout.Placements))
+	for index, placement := range layout.Placements {
+		clone.Placements[index] = placement
+		clone.Placements[index].Near = append([]string(nil), placement.Near...)
+		clone.Placements[index].Above = append([]string(nil), placement.Above...)
+		clone.Placements[index].RightOf = append([]string(nil), placement.RightOf...)
+	}
+	clone.Buses = make([]BusLayout, len(layout.Buses))
+	for index, bus := range layout.Buses {
+		clone.Buses[index] = bus
+		clone.Buses[index].Points = append([]LayoutPoint(nil), bus.Points...)
+		clone.Buses[index].Entries = append([]BusEntryLayout(nil), bus.Entries...)
+	}
+	clone.Rules.PositivePowerTop = cloneBool(layout.Rules.PositivePowerTop)
+	clone.Rules.GroundBottom = cloneBool(layout.Rules.GroundBottom)
+	clone.Rules.CenterOnPage = cloneBool(layout.Rules.CenterOnPage)
+	clone.Rules.PreferLabelsForLongNets = cloneBool(layout.Rules.PreferLabelsForLongNets)
+	clone.Rules.AvoidWireCrossings = cloneBool(layout.Rules.AvoidWireCrossings)
+	clone.Rules.MinGroupSpacingMM = cloneFloat(layout.Rules.MinGroupSpacingMM)
+	clone.Rules.MinComponentSpacingMM = cloneFloat(layout.Rules.MinComponentSpacingMM)
+	return clone
+}
+
+func cloneBool(value *bool) *bool {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+func cloneFloat(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	clone := *value
+	return &clone
+}
+
+// PlacementRelationCycle returns one deterministic cycle for a directed
+// placement relation, or nil when the relation graph is acyclic.
+func PlacementRelationCycle(placements []Placement, relation string) []string {
+	graph := map[string][]string{}
+	for _, placement := range placements {
+		var targets []string
+		switch relation {
+		case "above":
+			targets = placement.Above
+		case "right_of":
+			targets = placement.RightOf
+		default:
+			return nil
+		}
+		graph[placement.Target] = append(graph[placement.Target], targets...)
+	}
+	nodes := make([]string, 0, len(graph))
+	for node := range graph {
+		nodes = append(nodes, node)
+		sort.Strings(graph[node])
+	}
+	sort.Strings(nodes)
+	state := map[string]uint8{}
+	stack := []string{}
+	stackIndex := map[string]int{}
+	var visit func(string) []string
+	visit = func(node string) []string {
+		state[node] = 1
+		stackIndex[node] = len(stack)
+		stack = append(stack, node)
+		for _, next := range graph[node] {
+			switch state[next] {
+			case 0:
+				if cycle := visit(next); len(cycle) != 0 {
+					return cycle
+				}
+			case 1:
+				start := stackIndex[next]
+				cycle := append([]string(nil), stack[start:]...)
+				return append(cycle, next)
+			}
+		}
+		stack = stack[:len(stack)-1]
+		delete(stackIndex, node)
+		state[node] = 2
+		return nil
+	}
+	for _, node := range nodes {
+		if state[node] == 0 {
+			if cycle := visit(node); len(cycle) != 0 {
+				return cycle
+			}
+		}
+	}
+	return nil
+}
+
+func FormatPlacementRelationCycle(cycle []string) string {
+	return strings.Join(cycle, " -> ")
+}
 
 // NormalizeLayoutIntent fills in deterministic schematic layout hints that are
 // useful for AI-generated schematics but tedious for an AI to specify exactly.
@@ -168,6 +278,12 @@ func normalizePlacements(existing []Placement, components []Component, component
 	seen := map[string]struct{}{}
 	for index := range placements {
 		placement := &placements[index]
+		placement.Near = append([]string(nil), placement.Near...)
+		placement.Above = append([]string(nil), placement.Above...)
+		placement.RightOf = append([]string(nil), placement.RightOf...)
+		sort.Strings(placement.Near)
+		sort.Strings(placement.Above)
+		sort.Strings(placement.RightOf)
 		if placement.Target == "" {
 			continue
 		}

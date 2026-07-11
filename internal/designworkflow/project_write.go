@@ -192,8 +192,8 @@ func schematicTransaction(request *Request, plan *BlockPlanResult, overwrite boo
 	}
 	output := plan.Output
 	paper := ""
-	if requiresGeneratedSchematicLayout(projectName) {
-		operations, selectedPaper, err := layoutSchematicOperations(output.Operations)
+	if request.SchematicLayout != nil {
+		operations, selectedPaper, err := layoutSchematicOperations(output, *request.SchematicLayout)
 		if err != nil {
 			return transactions.Transaction{}, []reports.Issue{{
 				Code:     reports.CodeInvalidArgument,

@@ -427,13 +427,13 @@ func assertDesignExampleBMP280Readability(t *testing.T, result WorkflowResult, o
 	if errors := summaryInt(t, readability, "error_count"); errors != 0 {
 		t.Fatalf("BMP280 readability errors = %d: %#v", errors, readability)
 	}
-	file, err := schematic.ReadFile(filepath.Join(outputDir, bmp280BreakoutProjectName+".kicad_sch"))
+	file, err := schematic.ReadFile(filepath.Join(outputDir, filepath.Base(outputDir)+".kicad_sch"))
 	if err != nil {
 		t.Fatalf("read BMP280 schematic for readability evidence: %v", err)
 	}
 	positions := map[string]kicadfiles.Point{}
 	for _, symbol := range file.Symbols {
-		if symbol.Position.X < kicadfiles.MM(20) || symbol.Position.X > kicadfiles.MM(277) || symbol.Position.Y < kicadfiles.MM(30) || symbol.Position.Y > kicadfiles.MM(150) {
+		if symbol.Position.X < kicadfiles.MM(10.16) || symbol.Position.X > kicadfiles.MM(286.84) || symbol.Position.Y < kicadfiles.MM(10.16) || symbol.Position.Y > kicadfiles.MM(199.84) {
 			t.Fatalf("BMP280 symbol %s is outside the readable A4 drawing region at %v", symbol.Reference, symbol.Position)
 		}
 		positions[symbol.Value] = symbol.Position
