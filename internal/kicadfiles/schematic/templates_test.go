@@ -366,6 +366,17 @@ func TestEmbeddedSymbolTemplateRendersTemplatePinOffsets(t *testing.T) {
 	if !strings.Contains(output, "(rectangle") || !strings.Contains(output, "(at -5.08 -5.08 0)") {
 		t.Fatalf("4-pin connector template did not render body and pins:\n%s", output)
 	}
+	for pin, wantY := range map[string]kicadfiles.IU{
+		"1": kicadfiles.MM(-2.54),
+		"2": 0,
+		"3": kicadfiles.MM(2.54),
+		"4": kicadfiles.MM(5.08),
+	} {
+		offset, ok := EmbeddedSymbolConnectionPinOffset("Connector_Generic:Conn_01x04", pin)
+		if !ok || offset.X != kicadfiles.MM(-5.08) || offset.Y != wantY {
+			t.Fatalf("connector pin %s connection offset = %#v, want (-5.08, %v)", pin, offset, wantY)
+		}
+	}
 }
 
 func TestLEDIndicatorSchematicEmbedsCustomLibraryIDs(t *testing.T) {
