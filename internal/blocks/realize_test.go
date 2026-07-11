@@ -247,6 +247,19 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 	if route := routes["bmp280_csb_tie"]; route.From.Pin != "2" || route.To.Pin != "8" || len(route.Points) != 5 {
 		t.Fatalf("BMP280 CSB tie = %#v -> %#v", route.From, route.To)
 	}
+	for routeID, wantTransition := range map[string]transactions.Point{
+		"sda_pullup": {XMM: 30, YMM: 10},
+		"scl_pullup": {XMM: 31, YMM: 11},
+	} {
+		route := routes[routeID]
+		if !route.ToEndpointDogbone || len(route.Points) < 3 {
+			t.Fatalf("BMP280 route %s endpoint dogbone = %#v", routeID, route)
+		}
+		transition := route.Points[len(route.Points)-2]
+		if transition != wantTransition {
+			t.Fatalf("BMP280 route %s transition = %#v, want %#v", routeID, transition, wantTransition)
+		}
+	}
 	for _, routeID := range []string{"vcc_decoupling", "sda_pullup_vcc", "scl_pullup_vcc"} {
 		points := routes[routeID].Points
 		if len(points) != 3 || points[1].XMM != bmp280VCCTrunkXMM || points[1].YMM != bmp280VCCTrunkYMM {

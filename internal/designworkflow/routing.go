@@ -910,13 +910,6 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		return nil, issues, summary, false
 	}
 	layer := firstNonEmpty(route.Layer, from.Layer, to.Layer, "F.Cu")
-	vias, viaOK := localRouteEndpointVias(layer, from, to)
-	if !viaOK {
-		issues = append(issues, localRouteBindingIssue(routePath+".layer", "local route layer "+layer+" does not match endpoint layers "+from.Layer+" and "+to.Layer, []string{from.Ref, to.Ref}))
-		summary.IssueCount = len(issues)
-		return nil, issues, summary, false
-	}
-	vias = append(vias, localRouteEntryAnchorVias(layer, from, to, vias)...)
 	points := []transactions.Point{
 		from.Point,
 		to.Point,
@@ -924,8 +917,34 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	if routedPoints, ok := placedLocalRoutePoints(route.Points, from.Point, to.Point); ok {
 		points = routedPoints
 	}
-	trackSegments := routeTrackSegmentCount(points)
 	mainRoutePoints := points
+	dogbonePoints := []transactions.Point(nil)
+	if route.ToEndpointDogbone {
+		if len(points) < 3 || sameRoutePoint(points[len(points)-2], to.Point) {
+			issues = append(issues, localRouteBindingIssue(routePath+".to_endpoint_dogbone", "destination endpoint dogbone requires a distinct final waypoint", []string{to.Ref}))
+			summary.IssueCount = len(issues)
+			return nil, issues, summary, false
+		}
+		if strings.EqualFold(canonicalCopperLayer(layer), canonicalCopperLayer(to.Layer)) {
+			issues = append(issues, localRouteBindingIssue(routePath+".to_endpoint_dogbone", "destination endpoint dogbone requires a route layer different from the destination pad layer", []string{to.Ref}))
+			summary.IssueCount = len(issues)
+			return nil, issues, summary, false
+		}
+		transition := points[len(points)-2]
+		mainRoutePoints = append([]transactions.Point(nil), points[:len(points)-1]...)
+		dogbonePoints = []transactions.Point{transition, to.Point}
+	}
+	vias, viaOK := localRouteEndpointVias(layer, from, to, route.ToEndpointDogbone)
+	if !viaOK {
+		issues = append(issues, localRouteBindingIssue(routePath+".layer", "local route layer "+layer+" does not match endpoint layers "+from.Layer+" and "+to.Layer, []string{from.Ref, to.Ref}))
+		summary.IssueCount = len(issues)
+		return nil, issues, summary, false
+	}
+	if len(dogbonePoints) > 0 {
+		vias = append(vias, localRouteEndpointVia(dogbonePoints[0], to.Layer, layer))
+	}
+	vias = append(vias, localRouteEntryAnchorVias(layer, from, to, vias)...)
+	trackSegments := routeTrackSegmentCount(mainRoutePoints) + routeTrackSegmentCount(dogbonePoints)
 	if trackSegments == 0 {
 		mainRoutePoints = nil
 	}
@@ -941,6 +960,21 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		})
 		if err != nil {
 			issues = append(issues, localRouteBindingIssue(routePath, err.Error(), []string{from.Ref, to.Ref}))
+			summary.IssueCount = len(issues)
+			return nil, issues, summary, false
+		}
+		operations = append(operations, operation)
+	}
+	if len(dogbonePoints) > 0 {
+		operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+			Op:      transactions.OpRoute,
+			NetName: netName,
+			Layer:   canonicalCopperLayer(to.Layer),
+			WidthMM: route.WidthMM,
+			Points:  dogbonePoints,
+		})
+		if err != nil {
+			issues = append(issues, localRouteBindingIssue(routePath+".to_endpoint_dogbone", err.Error(), []string{to.Ref}))
 			summary.IssueCount = len(issues)
 			return nil, issues, summary, false
 		}
@@ -966,7 +1000,7 @@ func routeTrackSegmentCount(points []transactions.Point) int {
 	return count
 }
 
-func localRouteEndpointVias(layer string, from PlacedPadEndpoint, to PlacedPadEndpoint) ([]transactions.RouteViaSpec, bool) {
+func localRouteEndpointVias(layer string, from PlacedPadEndpoint, to PlacedPadEndpoint, skipTo bool) ([]transactions.RouteViaSpec, bool) {
 	routeLayer := canonicalCopperLayer(layer)
 	fromLayer := canonicalCopperLayer(from.Layer)
 	toLayer := canonicalCopperLayer(to.Layer)
@@ -977,7 +1011,7 @@ func localRouteEndpointVias(layer string, from PlacedPadEndpoint, to PlacedPadEn
 	if !strings.EqualFold(routeLayer, fromLayer) {
 		vias = append(vias, localRouteEndpointVia(from.Point, fromLayer, routeLayer))
 	}
-	if !strings.EqualFold(routeLayer, toLayer) && !sameRoutePoint(from.Point, to.Point) {
+	if !skipTo && !strings.EqualFold(routeLayer, toLayer) && !sameRoutePoint(from.Point, to.Point) {
 		vias = append(vias, localRouteEndpointVia(to.Point, toLayer, routeLayer))
 	}
 	return vias, true

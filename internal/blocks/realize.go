@@ -66,6 +66,7 @@ type RealizedPCBLocalRoute struct {
 	WidthMM            float64                `json:"width_mm,omitempty"`
 	LengthMM           float64                `json:"length_mm,omitempty"`
 	EntryAnchorDogbone *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
+	ToEndpointDogbone  bool                   `json:"to_endpoint_dogbone,omitempty"`
 }
 
 type TimingFixtureEvidence struct {
@@ -268,6 +269,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			Layer:              firstNonEmptyString(route.Layer, opts.Layer, "F.Cu"),
 			WidthMM:            route.WidthMM,
 			EntryAnchorDogbone: route.EntryAnchorDogbone,
+			ToEndpointDogbone:  route.ToEndpointDogbone,
 		}
 		points := routePoints(route, from.Point, to.Point, opts)
 		realizedRoute.Points = points
@@ -302,6 +304,12 @@ func realizedLocalRouteGeometry(route PCBLocalRoute, params map[string]any) PCBL
 	for _, variant := range route.WaypointVariants {
 		if realizationWhenMatches(variant.When, params) {
 			route.Waypoints = append([]RelativePoint(nil), variant.Waypoints...)
+			break
+		}
+	}
+	for _, variant := range route.EndpointVariants {
+		if realizationWhenMatches(variant.When, params) {
+			route.ToEndpointDogbone = variant.ToEndpointDogbone
 			break
 		}
 	}

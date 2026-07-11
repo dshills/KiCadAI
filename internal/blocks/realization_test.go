@@ -60,6 +60,16 @@ func TestValidatePCBRealizationRejectsUnconditionalWaypointVariant(t *testing.T)
 	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.0.waypoint_variants.0.when")
 }
 
+func TestValidatePCBRealizationRejectsInvalidEndpointVariant(t *testing.T) {
+	definition := minimalRealizationDefinition()
+	definition.PCBRealization.LocalRoutes[0].Waypoints = nil
+	definition.PCBRealization.LocalRoutes[0].EndpointVariants = []PCBEndpointVariant{{}}
+
+	issues := ValidatePCBRealization(definition)
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.0.endpoint_variants.0.to_endpoint_dogbone")
+	assertIssuePath(t, issues, "block.demo.pcb_realization.local_routes.0.endpoint_variants.0.when")
+}
+
 func TestValidatePCBRealizationAcceptsEntryAnchorRoute(t *testing.T) {
 	definition := minimalRealizationDefinition()
 	definition.PCBRealization.EntryAnchors = []PCBEntryAnchor{{

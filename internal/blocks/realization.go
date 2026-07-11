@@ -92,6 +92,8 @@ type PCBLocalRoute struct {
 	To                 RouteEndpoint          `json:"to"`
 	Waypoints          []RelativePoint        `json:"waypoints,omitempty"`
 	WaypointVariants   []PCBWaypointVariant   `json:"waypoint_variants,omitempty"`
+	EndpointVariants   []PCBEndpointVariant   `json:"endpoint_variants,omitempty"`
+	ToEndpointDogbone  bool                   `json:"to_endpoint_dogbone,omitempty"`
 	Layer              string                 `json:"layer,omitempty"`
 	WidthMM            float64                `json:"width_mm,omitempty"`
 	Required           bool                   `json:"required,omitempty"`
@@ -103,6 +105,11 @@ type PCBLocalRoute struct {
 type PCBWaypointVariant struct {
 	Waypoints []RelativePoint `json:"waypoints"`
 	When      RealizationWhen `json:"when"`
+}
+
+type PCBEndpointVariant struct {
+	ToEndpointDogbone bool            `json:"to_endpoint_dogbone,omitempty"`
+	When              RealizationWhen `json:"when"`
 }
 
 type PCBEntryAnchorDogbone struct {
@@ -316,6 +323,9 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 				issues = append(issues, blockIssue(routePath+".entry_anchor_dogbone.tie_offset", "entry anchor dogbone tie offset must be non-zero"))
 			}
 		}
+		if route.ToEndpointDogbone && len(route.Waypoints) == 0 {
+			issues = append(issues, blockIssue(routePath+".to_endpoint_dogbone", "destination endpoint dogbone requires at least one route waypoint"))
+		}
 		issues = append(issues, validateRealizationWhen(routePath+".when", route.When, parameters)...)
 		for waypointIndex, point := range route.Waypoints {
 			issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", routePath, waypointIndex), point)...)
@@ -330,6 +340,19 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			}
 			for waypointIndex, point := range variant.Waypoints {
 				issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", variantPath, waypointIndex), point)...)
+			}
+			issues = append(issues, validateRealizationWhen(variantPath+".when", variant.When, parameters)...)
+		}
+		for variantIndex, variant := range route.EndpointVariants {
+			variantPath := fmt.Sprintf("%s.endpoint_variants.%d", routePath, variantIndex)
+			if !variant.ToEndpointDogbone {
+				issues = append(issues, blockIssue(variantPath+".to_endpoint_dogbone", "endpoint variant must enable a supported behavior"))
+			}
+			if len(route.Waypoints) == 0 {
+				issues = append(issues, blockIssue(variantPath+".to_endpoint_dogbone", "destination endpoint dogbone requires at least one route waypoint"))
+			}
+			if len(variant.When.Params) == 0 {
+				issues = append(issues, blockIssue(variantPath+".when", "endpoint variant requires a non-empty condition"))
 			}
 			issues = append(issues, validateRealizationWhen(variantPath+".when", variant.When, parameters)...)
 		}
@@ -795,6 +818,10 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	for i := range clone.LocalRoutes {
 		clone.LocalRoutes[i].Waypoints = append([]RelativePoint(nil), realization.LocalRoutes[i].Waypoints...)
 		clone.LocalRoutes[i].WaypointVariants = append([]PCBWaypointVariant(nil), realization.LocalRoutes[i].WaypointVariants...)
+		clone.LocalRoutes[i].EndpointVariants = append([]PCBEndpointVariant(nil), realization.LocalRoutes[i].EndpointVariants...)
+		for variantIndex := range clone.LocalRoutes[i].EndpointVariants {
+			clone.LocalRoutes[i].EndpointVariants[variantIndex].When = cloneRealizationWhen(clone.LocalRoutes[i].EndpointVariants[variantIndex].When)
+		}
 		for variantIndex := range clone.LocalRoutes[i].WaypointVariants {
 			variant := &clone.LocalRoutes[i].WaypointVariants[variantIndex]
 			variant.Waypoints = append([]RelativePoint(nil), variant.Waypoints...)

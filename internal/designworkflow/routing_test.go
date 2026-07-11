@@ -464,6 +464,58 @@ func TestLocalRouteOperationsAddsEndpointViasForCrossLayerRoutes(t *testing.T) {
 	}
 }
 
+func TestLocalRouteOperationsMovesDestinationViaToDogboneWaypoint(t *testing.T) {
+	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "sensor",
+		BlockID:    "i2c_sensor",
+		Realization: blocks.BlockPCBRealizationResult{LocalRoutes: []blocks.RealizedPCBLocalRoute{
+			{
+				ID:                "sda_pullup",
+				NetName:           "SDA",
+				From:              transactions.Endpoint{Ref: "R1", Pin: "2"},
+				To:                transactions.Endpoint{Ref: "U1", Pin: "3"},
+				Points:            []transactions.Point{{XMM: 11, YMM: 5}, {XMM: 16, YMM: 3}, {XMM: 19, YMM: 5}},
+				Layer:             "B.Cu",
+				WidthMM:           0.25,
+				ToEndpointDogbone: true,
+			},
+		}},
+	}}}
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Components: []placement.Component{
+				{Ref: "R1", FootprintID: "Test:R", Pads: []placement.PadSummary{{Name: "2", Net: "SDA", XMM: 1}}},
+				{Ref: "U1", FootprintID: "Test:U", Pads: []placement.PadSummary{{Name: "3", Net: "SDA", XMM: -1}}},
+			},
+			Nets: []placement.Net{{Name: "SDA", Endpoints: []placement.Endpoint{{Ref: "R1", Pin: "2"}, {Ref: "U1", Pin: "3"}}}},
+		},
+		Result: placement.Result{Status: placement.StatusPlaced, Placements: []placement.PlacementResult{
+			{Ref: "R1", FootprintID: "Test:R", Position: placement.Placement{XMM: 10, YMM: 5, Layer: "F.Cu"}},
+			{Ref: "U1", FootprintID: "Test:U", Position: placement.Placement{XMM: 20, YMM: 5, Layer: "F.Cu"}},
+		}},
+		Stage: NewStageResult(StagePlacement, nil),
+	}
+
+	operations, issues, summary := localRouteOperations(fragments, &placed)
+	if len(issues) != 0 || summary.RoutesBound != 1 || len(operations) != 2 {
+		t.Fatalf("issues=%#v summary=%#v operations=%#v", issues, summary, operations)
+	}
+	var mainRoute, dogbone transactions.RouteOperation
+	if err := json.Unmarshal(operations[0].Raw, &mainRoute); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(operations[1].Raw, &dogbone); err != nil {
+		t.Fatal(err)
+	}
+	transition := transactions.Point{XMM: 16, YMM: 3}
+	if mainRoute.Layer != "B.Cu" || len(mainRoute.Points) != 2 || mainRoute.Points[1] != transition || len(mainRoute.Vias) != 2 || mainRoute.Vias[1].At != transition {
+		t.Fatalf("main route = %#v", mainRoute)
+	}
+	if dogbone.Layer != "F.Cu" || len(dogbone.Points) != 2 || dogbone.Points[0] != transition || dogbone.Points[1] != (transactions.Point{XMM: 19, YMM: 5}) {
+		t.Fatalf("dogbone = %#v", dogbone)
+	}
+}
+
 func TestLocalRouteConnectivitySummaryJSONStable(t *testing.T) {
 	summary := LocalRouteConnectivitySummary{
 		RoutesAttempted:        1,
