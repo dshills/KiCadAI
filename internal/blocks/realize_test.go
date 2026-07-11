@@ -241,6 +241,12 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 			t.Fatalf("route %s to = %#v, want sensor pin %s", routeID, route.To, wantPin)
 		}
 	}
+	if route := routes["bmp280_vddio_tie"]; route.From.Pin != "6" || route.To.Pin != "8" {
+		t.Fatalf("BMP280 VDDIO tie = %#v -> %#v", route.From, route.To)
+	}
+	if route := routes["bmp280_csb_tie"]; route.From.Pin != "2" || route.To.Pin != "6" {
+		t.Fatalf("BMP280 CSB tie = %#v -> %#v", route.From, route.To)
+	}
 }
 
 func TestRealizeBlockPCBI2COmitsPullupRoutesWhenDisabled(t *testing.T) {

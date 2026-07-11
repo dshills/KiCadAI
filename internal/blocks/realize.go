@@ -303,6 +303,7 @@ func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, ou
 	if ref == "" || port == "" {
 		return endpoint
 	}
+	physicalPins := []string{}
 	for _, operation := range output.Operations {
 		if operation.Op != transactions.OpConnect {
 			continue
@@ -312,13 +313,19 @@ func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, ou
 			continue
 		}
 		if pin, ok := emittedPortPhysicalPin(connect.From, connect.To, output.Instance.InstanceID, port, ref); ok {
-			endpoint.Pin = pin
-			return endpoint
+			physicalPins = append(physicalPins, pin)
 		}
 		if pin, ok := emittedPortPhysicalPin(connect.To, connect.From, output.Instance.InstanceID, port, ref); ok {
-			endpoint.Pin = pin
+			physicalPins = append(physicalPins, pin)
+		}
+	}
+	for _, pin := range physicalPins {
+		if strings.EqualFold(strings.TrimSpace(endpoint.Pin), pin) {
 			return endpoint
 		}
+	}
+	if len(physicalPins) > 0 {
+		endpoint.Pin = physicalPins[0]
 	}
 	return endpoint
 }

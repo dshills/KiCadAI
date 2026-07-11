@@ -169,6 +169,7 @@ func i2cSensorComponents() []BlockComponent {
 
 func i2cSensorPCBRealization() *PCBRealization {
 	pullupsEnabled := RealizationWhen{Params: map[string]any{"include_pullups": true}}
+	bmp280 := RealizationWhen{Params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8"}}
 	fixedLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": true}}
 	movableLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": false}}
 	return &PCBRealization{
@@ -192,6 +193,8 @@ func i2cSensorPCBRealization() *PCBRealization {
 			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 15, YMM: 20}, {XMM: 15, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 9.5}, {XMM: 14, YMM: 9.5}, {XMM: 14, YMM: 15.635}, {XMM: 25.05, YMM: 15.635}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 16.905}, {XMM: 25.05, YMM: 16.905}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "bmp280_vddio_tie", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sensor", Pin: "6"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: "8"}, Waypoints: []RelativePoint{{XMM: 28.325, YMM: 16.5}, {XMM: 27.025, YMM: 16.5}}, Layer: "F.Cu", WidthMM: 0.2, Required: true, When: bmp280},
+			{ID: "bmp280_csb_tie", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sensor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: "6"}, Waypoints: []RelativePoint{{XMM: 27.675, YMM: 15}, {XMM: 28.325, YMM: 15}}, Layer: "F.Cu", WidthMM: 0.2, Required: true, When: bmp280},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "i2c_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"sensor", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Sensor decoupling capacitor should remain close to the sensor supply pins."},
