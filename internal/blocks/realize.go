@@ -173,9 +173,9 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			})
 			continue
 		}
-		footprintID := resolveRealizationFootprint(component, output.Instance.Params)
+		footprintID := componentFacts[ref].FootprintID
 		if footprintID == "" {
-			footprintID = componentFacts[ref].FootprintID
+			footprintID = resolveRealizationFootprint(component, output.Instance.Params)
 		}
 		if footprintID == "" {
 			result.Issues = append(result.Issues, reports.Issue{
@@ -684,6 +684,11 @@ func matchingRefForComponent(component BlockComponent, refs []string, facts map[
 func componentFactMatches(component BlockComponent, fact emittedComponentFact, role string) bool {
 	if role == "connector" {
 		return connectorComponentFactCompatible(component, fact)
+	}
+	// An exact emitted role remains authoritative when component selection
+	// replaces a block's generic symbol or footprint with a concrete part.
+	if role != "" && fact.Role == role {
+		return true
 	}
 	if component.SymbolID != "" && fact.SymbolID != component.SymbolID {
 		return false

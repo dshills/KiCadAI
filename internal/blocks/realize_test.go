@@ -70,6 +70,98 @@ func TestRealizeBlockPCBMatchesComponentsByEmittedRole(t *testing.T) {
 	}
 }
 
+func TestRealizeBlockPCBPreservesRoleAfterConcreteComponentSelection(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("i2c_sensor")
+	if !ok {
+		t.Fatal("missing i2c_sensor")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "i2c_sensor",
+		InstanceID: "sensor1",
+		Params: map[string]any{
+			"i2c_address":     "0x76",
+			"include_pullups": true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+
+	sensorRef := ""
+	for _, operation := range output.Operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Role == "sensor" {
+			sensorRef = payload.Ref
+			break
+		}
+	}
+	if sensorRef == "" {
+		t.Fatal("sensor ref not emitted")
+	}
+	for index, operation := range output.Operations {
+		switch operation.Op {
+		case transactions.OpAddSymbol:
+			var payload transactions.AddSymbolOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Role != "sensor" {
+				continue
+			}
+			payload.LibraryID = "Sensor_Pressure:BMP280"
+			output.Operations[index] = mustWrapRealizeTestOperation(t, operation.Op, operation.Ref, payload)
+		case transactions.OpAssignFootprint:
+			var payload transactions.AssignFootprintOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Ref != sensorRef {
+				continue
+			}
+			payload.FootprintID = "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering"
+			output.Operations[index] = mustWrapRealizeTestOperation(t, operation.Op, operation.Ref, payload)
+		case transactions.OpPlaceFootprint:
+			var payload transactions.PlaceFootprintOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Ref != sensorRef {
+				continue
+			}
+			payload.FootprintID = "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering"
+			output.Operations[index] = mustWrapRealizeTestOperation(t, operation.Op, operation.Ref, payload)
+		}
+	}
+	facts, factIssues := componentFactsFromOperations(output.Operations)
+	if len(factIssues) != 0 {
+		t.Fatalf("component fact issues = %#v", factIssues)
+	}
+	if got := facts[sensorRef].FootprintID; got != "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering" {
+		t.Fatalf("selected sensor fact footprint = %q; operations = %#v", got, output.Operations)
+	}
+
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	if result.RoleRefs["sensor"] != sensorRef {
+		t.Fatalf("sensor role ref = %q, want %q", result.RoleRefs["sensor"], sensorRef)
+	}
+	if got := realizedFootprintForRole(result.Components, "sensor"); got != "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering" {
+		t.Fatalf("sensor footprint = %q", got)
+	}
+	if len(result.LocalRoutes) != 6 {
+		t.Fatalf("local routes = %d, want 6; issues = %#v", len(result.LocalRoutes), result.Issues)
+	}
+}
+
 func TestRealizeBlockPCBI2CPullupVCCRoutesResolvePullupRefs(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	definition, ok := registry.GetBlock("i2c_sensor")
@@ -422,6 +514,24 @@ func countOperations(operations []transactions.Operation, kind transactions.Oper
 		}
 	}
 	return count
+}
+
+func mustWrapRealizeTestOperation(t *testing.T, kind transactions.OperationKind, ref string, payload any) transactions.Operation {
+	t.Helper()
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return transactions.Operation{Op: kind, Ref: ref, Raw: raw}
+}
+
+func realizedFootprintForRole(components []RealizedPCBComponent, role string) string {
+	for _, component := range components {
+		if component.ComponentRole == role {
+			return component.FootprintID
+		}
+	}
+	return ""
 }
 
 func addSymbolRolesByRef(t *testing.T, operations []transactions.Operation) map[string]string {
