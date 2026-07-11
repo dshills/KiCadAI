@@ -430,6 +430,7 @@ const (
 
 func usbCPowerPCBRealization() *PCBRealization {
 	usbPowerRoles := []string{"usb_c_receptacle", "cc1_rd", "cc2_rd", "vbus_fuse", "vbus_tvs", "bulk_capacitor"}
+	minimalPowerOnly := RealizationWhen{Params: map[string]any{"include_fuse": false, "include_tvs": false, "include_bulk_capacitor": false, "include_power_led": false}}
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
@@ -489,6 +490,8 @@ func usbCPowerPCBRealization() *PCBRealization {
 				When:        RealizationWhen{Params: map[string]any{"include_bulk_capacitor": true}},
 			},
 			{ID: "gnd_receptacle_pair", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 0, "A12")}, To: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 1, "B12")}, Waypoints: []RelativePoint{{XMM: 2.75, YMM: -5.8}, {XMM: -2.75, YMM: -5.8}}, Layer: "F.Cu", WidthMM: 0.5, Required: true},
+			{ID: "minimal_cc_ground_pair", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"}, To: RouteEndpoint{ComponentRole: "cc1_rd", Pin: "2"}, Layer: "F.Cu", WidthMM: 0.4, Required: true, When: minimalPowerOnly, Description: "Join both CC pull-down returns locally before entering the receptacle ground return."},
+			{ID: "minimal_cc_ground_return", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "usb_c_receptacle", Pin: usbCPowerPinAt(usbCPowerPins.GND, 0, "A12")}, To: RouteEndpoint{ComponentRole: "cc2_rd", Pin: "2"}, Waypoints: []RelativePoint{{XMM: 3.5, YMM: -2.5}, {XMM: 7.8, YMM: -2.5}, {XMM: 7.8, YMM: 1}}, Layer: "B.Cu", WidthMM: 0.4, Required: true, When: minimalPowerOnly, Description: "Bottom-layer CC return stays outside the top-layer CC2 and VBUS access corridor."},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "usb_c_vbus_width", Kind: "min_width", NetTemplate: "vbus_connector", MinWidthMM: 0.75, Description: "VBUS entry path should support requested current."},

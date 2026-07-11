@@ -277,6 +277,50 @@ func TestUSBCPowerDefaultRealizationUsesBulkTVSGroundRoute(t *testing.T) {
 	}
 }
 
+func TestUSBCPowerMinimalRealizationOwnsCCGroundReturns(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("usb_c_power")
+	if !ok {
+		t.Fatal("missing usb_c_power")
+	}
+	realize := func(includePowerLED bool) map[string]bool {
+		output, issues := registry.Instantiate(context.Background(), BlockRequest{
+			BlockID: "usb_c_power", InstanceID: "usb",
+			Params: map[string]any{
+				"include_fuse":           false,
+				"include_tvs":            false,
+				"include_bulk_capacitor": false,
+				"include_power_led":      includePowerLED,
+			},
+		})
+		if reports.HasBlockingIssue(issues) {
+			t.Fatalf("instantiate issues = %#v", issues)
+		}
+		result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+		if reports.HasBlockingIssue(result.Issues) {
+			t.Fatalf("realize issues = %#v", result.Issues)
+		}
+		routes := map[string]bool{}
+		for _, route := range result.LocalRoutes {
+			routes[route.ID] = true
+		}
+		return routes
+	}
+
+	minimal := realize(false)
+	for _, routeID := range []string{"minimal_cc_ground_pair", "minimal_cc_ground_return"} {
+		if !minimal[routeID] {
+			t.Fatalf("minimal routes = %#v, missing %s", minimal, routeID)
+		}
+	}
+	withLED := realize(true)
+	for _, routeID := range []string{"minimal_cc_ground_pair", "minimal_cc_ground_return"} {
+		if withLED[routeID] {
+			t.Fatalf("LED routes = %#v, want %s omitted", withLED, routeID)
+		}
+	}
+}
+
 func TestUSBCPowerPowerLEDIsForwardBiased(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	output, issues := registry.Instantiate(context.Background(), BlockRequest{
