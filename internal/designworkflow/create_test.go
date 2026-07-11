@@ -167,6 +167,24 @@ func TestSchematicElectricalWireAvoidsUnrelatedNoConnectAnchor(t *testing.T) {
 	}
 }
 
+func TestSchematicElectricalInputsRespectLabelOnlyConnections(t *testing.T) {
+	addA := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"A1","value":"A","library_id":"Connector:Test","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1"}]}`))
+	addB := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"B1","value":"B","library_id":"Connector:Test","at":{"x_mm":20,"y_mm":20},"pins":[{"number":"1"}]}`))
+	connect := transactions.NewOperation(transactions.OpConnect, []byte(`{"op":"connect","from":{"ref":"A1","pin":"1"},"to":{"ref":"B1","pin":"1"},"net_name":"SIG","use_labels":true,"skip_from_label":true}`))
+
+	file, _, issues := schematicElectricalInputsFromTransaction(transactions.Transaction{Operations: []transactions.Operation{addA, addB, connect}})
+	if len(issues) != 0 {
+		t.Fatalf("input issues = %#v", issues)
+	}
+	if len(file.Wires) != 0 {
+		t.Fatalf("label-only connection emitted synthetic wires: %#v", file.Wires)
+	}
+	expectedPosition := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}
+	if len(file.Labels) != 1 || file.Labels[0].Text != "SIG" || file.Labels[0].Position != expectedPosition {
+		t.Fatalf("label-only connection labels = %#v", file.Labels)
+	}
+}
+
 func TestCreateStructuralRequestSkipsFabricationReadiness(t *testing.T) {
 	request := Request{
 		Version:    RequestVersion,

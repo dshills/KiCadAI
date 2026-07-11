@@ -104,9 +104,16 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 			}
 			netName := strings.TrimSpace(payload.NetName)
 			if netName != "" {
-				file.Labels = schematicElectricalAppendLabel(file.Labels, labels, netName, from)
-				file.Labels = schematicElectricalAppendLabel(file.Labels, labels, netName, to)
-				wireCandidates = append(wireCandidates, schematicElectricalWireCandidate{NetName: netName, From: from, To: to})
+				labelOnly := payload.UseLabels != nil && *payload.UseLabels
+				if !labelOnly || !payload.SkipFromLabel {
+					file.Labels = schematicElectricalAppendLabel(file.Labels, labels, netName, from)
+				}
+				if !labelOnly || !payload.SkipToLabel {
+					file.Labels = schematicElectricalAppendLabel(file.Labels, labels, netName, to)
+				}
+				if !labelOnly {
+					wireCandidates = append(wireCandidates, schematicElectricalWireCandidate{NetName: netName, From: from, To: to})
+				}
 			} else {
 				file.Wires = append(file.Wires, schematic.Wire{Points: []kicadfiles.Point{from, to}})
 			}

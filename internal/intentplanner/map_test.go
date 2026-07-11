@@ -1,11 +1,16 @@
 package intentplanner
 
 import (
+	"context"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
+	"time"
 
+	"kicadai/internal/blocks"
 	"kicadai/internal/designworkflow"
+	"kicadai/internal/reports"
 )
 
 func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
@@ -120,6 +125,40 @@ func TestPlanPreservesConcreteI2CSensorSelection(t *testing.T) {
 		if got := workflowBlockParam(*plan.GeneratedRequest, "i2c_sensor", key); got != want {
 			t.Fatalf("%s = %#v, want %#v", key, got, want)
 		}
+	}
+}
+
+func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
+	file, err := os.Open("../../examples/intent/sensor_bmp280_breakout.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	request, issues := DecodeRequestStrict(file)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode issues = %#v", issues)
+	}
+	intentPlan := Plan(request)
+	if intentPlan.Status != PlanStatusReady || intentPlan.GeneratedRequest == nil {
+		t.Fatalf("intent plan = %#v", intentPlan)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	registry := blocks.NewBuiltinRegistry()
+	blockPlan := designworkflow.PlanBlocks(ctx, registry, *intentPlan.GeneratedRequest)
+	if reports.HasBlockingIssue(blockPlan.Stage.Issues) {
+		t.Fatalf("block plan issues = %#v", blockPlan.Stage.Issues)
+	}
+	selection := designworkflow.SelectWorkflowComponents(ctx, registry, blockPlan, designworkflow.ComponentSelectionOptions{})
+	if reports.HasBlockingIssue(selection.Stage.Issues) {
+		t.Fatalf("selection issues = %#v", selection.Stage.Issues)
+	}
+	if applyIssues := designworkflow.ApplyComponentSelectionsToPlan(&blockPlan, registry, selection.Selections); reports.HasBlockingIssue(applyIssues) {
+		t.Fatalf("apply selection issues = %#v", applyIssues)
+	}
+	stage := designworkflow.SchematicElectricalStage(blockPlan)
+	if stage.Status == designworkflow.StageStatusBlocked || reports.HasBlockingIssue(stage.Issues) {
+		t.Fatalf("schematic electrical stage = %#v", stage)
 	}
 }
 
