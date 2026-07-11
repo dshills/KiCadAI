@@ -85,6 +85,44 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 	}
 }
 
+func TestPlanPreservesConcreteI2CSensorSelection(t *testing.T) {
+	request := Request{
+		Version:    RequestVersion,
+		Name:       "concrete_humidity_sensor",
+		Kind:       IntentBreakout,
+		Acceptance: designworkflow.AcceptanceConnectivity,
+		Power: PowerIntent{
+			Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}},
+			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 50}},
+		},
+		Interfaces: []InterfaceIntent{{Kind: "i2c", Voltage: "3.3V"}},
+		Functions: []FunctionIntent{{
+			Kind:   "sensor",
+			Family: "i2c_sensor",
+			Params: map[string]any{
+				"sensor_component_id": "sensor.sensirion.sht31_dis.dfn8",
+				"i2c_address":         "0x44",
+				"supply_voltage":      "3.3V",
+				"include_interrupt":   true,
+			},
+		}},
+	}
+	plan := Plan(request)
+	if plan.Status != PlanStatusReady || plan.GeneratedRequest == nil {
+		t.Fatalf("plan = %#v", plan)
+	}
+	for key, want := range map[string]any{
+		"sensor_component_id": "sensor.sensirion.sht31_dis.dfn8",
+		"i2c_address":         "0x44",
+		"supply_voltage":      "3.3V",
+		"include_interrupt":   "true",
+	} {
+		if got := workflowBlockParam(*plan.GeneratedRequest, "i2c_sensor", key); got != want {
+			t.Fatalf("%s = %#v, want %#v", key, got, want)
+		}
+	}
+}
+
 func TestPlanDoesNotSelectAP2112KAboveModeledCurrent(t *testing.T) {
 	plan := Plan(Request{
 		Version:    "0.1.0",

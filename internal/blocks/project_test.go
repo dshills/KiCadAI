@@ -271,6 +271,76 @@ func TestProjectTransactionLabelsOneOfMultiplePseudoPorts(t *testing.T) {
 	}
 }
 
+func TestProjectTransactionPreservesForcedLabelsAcrossPseudoPortGroup(t *testing.T) {
+	var operations []transactions.Operation
+	for index, ref := range []string{"U1", "C1", "R1"} {
+		componentOps, issues := ComponentOperations(BlockComponent{
+			Role:      "test_node",
+			RefPrefix: string(ref[0]),
+			Value:     "Test",
+			SymbolID:  "Connector:Conn_01x01_Pin",
+			Pins:      []transactions.PinSpec{{Number: "1"}},
+		}, ref, transactions.Point{XMM: float64(index * 10), YMM: 20})
+		if len(issues) != 0 {
+			t.Fatalf("component issues: %#v", issues)
+		}
+		operations = append(operations, componentOps...)
+	}
+	useLabels := true
+	for _, pair := range []struct{ from, to transactions.Endpoint }{
+		{from: transactions.Endpoint{Ref: "sensor", Pin: "VCC"}, to: transactions.Endpoint{Ref: "U1", Pin: "1"}},
+		{from: transactions.Endpoint{Ref: "U1", Pin: "1"}, to: transactions.Endpoint{Ref: "C1", Pin: "1"}},
+		{from: transactions.Endpoint{Ref: "R1", Pin: "1"}, to: transactions.Endpoint{Ref: "sensor", Pin: "VCC"}},
+	} {
+		operation, err := wrapOperation(transactions.OpConnect, transactions.ConnectOperation{
+			Op:        transactions.OpConnect,
+			From:      pair.from,
+			To:        pair.to,
+			NetName:   "VCC",
+			UseLabels: &useLabels,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		operations = append(operations, operation)
+	}
+
+	tx, err := ProjectTransactionForBlockOutput("sensor", BlockOutput{
+		Instance:   BlockInstance{InstanceID: "sensor", Refs: []string{"U1", "C1", "R1"}},
+		Operations: operations,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	connects := 0
+	for _, operation := range tx.Operations {
+		if operation.Op != transactions.OpConnect {
+			continue
+		}
+		var payload transactions.ConnectOperation
+		if err := decodeBlockOperation(operation, &payload); err != nil {
+			t.Fatal(err)
+		}
+		connects++
+		if payload.NetName != "VCC" {
+			t.Fatalf("materialized connect lost pseudo-port net identity: %#v", payload)
+		}
+		if payload.UseLabels == nil || !*payload.UseLabels {
+			t.Fatalf("materialized connect lost forced-label policy: %#v", payload)
+		}
+		if connects == 1 {
+			if payload.From != payload.To || payload.SkipFromLabel || !payload.SkipToLabel {
+				t.Fatalf("first connect must explicitly materialize one block-port label: %#v", payload)
+			}
+		} else if !payload.SkipFromLabel || payload.SkipToLabel {
+			t.Fatalf("later materialized connect must preserve only its new endpoint label: %#v", payload)
+		}
+	}
+	if connects != 3 {
+		t.Fatalf("connects = %d, want one port materialization and two endpoint joins", connects)
+	}
+}
+
 func TestProjectTransactionFallsBackToCapacitorLabelWhenNoOtherAnchorExists(t *testing.T) {
 	componentOps, issues := ComponentOperations(BlockComponent{
 		Role:      "dc_blocking_capacitor",

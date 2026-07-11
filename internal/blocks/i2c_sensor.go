@@ -125,11 +125,6 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	}
 	componentID := strings.TrimSpace(stringParam(params, "sensor_component_id"))
 	profile, concreteProfile := concreteI2CSensorProfiles[componentID]
-	roles := genericI2CSensorPins
-	pins := i2cSensorPins(genericI2CSensorPins)
-	sensorValue := "I2C Sensor"
-	sensorSymbol := stringParam(params, "sensor_symbol")
-	sensorFootprint := stringParam(params, "sensor_footprint")
 	if componentID != "" && !concreteProfile {
 		issues = append(issues, reports.Issue{
 			Code:       reports.CodeUnsupportedOperation,
@@ -138,12 +133,21 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 			Message:    "i2c_sensor does not have a verified topology profile for " + componentID,
 			Suggestion: "use a component ID listed in the i2c_sensor block documentation",
 		})
+		return dryRunBlockOutput(definition, request, nil, issues)
 	}
+	addressLevel := ""
+	roles := genericI2CSensorPins
+	pins := i2cSensorPins(genericI2CSensorPins)
+	sensorValue := "I2C Sensor"
+	sensorSymbol := stringParam(params, "sensor_symbol")
+	sensorFootprint := stringParam(params, "sensor_footprint")
 	if concreteProfile {
 		roles = profile.Roles
 		pins = append([]transactions.PinSpec(nil), profile.Pins...)
 		sensorValue = profile.Value
-		if _, ok := profile.AddressLevels[address]; !ok {
+		var addressSupported bool
+		addressLevel, addressSupported = profile.AddressLevels[address]
+		if !addressSupported {
 			issues = append(issues, blockIssue("params.i2c_address", "i2c_address is not supported by "+componentID))
 		}
 		if sensorSymbol != "" && sensorSymbol != defaultI2CSensorSymbol && sensorSymbol != profile.SymbolID {
@@ -203,30 +207,37 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	gndNet := InstanceNetName(request.InstanceID, "gnd")
 	sdaNet := InstanceNetName(request.InstanceID, "sda")
 	sclNet := InstanceNetName(request.InstanceID, "scl")
-	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "VCC", sensorRef, roles.VCC, vccNet)
-	appendConnectOperation(&operations, &issuesOut, sensorRef, roles.GND, request.InstanceID, "GND", gndNet)
-	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SDA", sensorRef, roles.SDA, sdaNet)
-	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SCL", sensorRef, roles.SCL, sclNet)
+	appendPortConnection := appendConnectOperation
 	if concreteProfile {
+		appendPortConnection = appendLabeledConnectOperation
+	}
+	appendPortConnection(&operations, &issuesOut, sensorRef, roles.VCC, request.InstanceID, "VCC", vccNet)
+	appendPortConnection(&operations, &issuesOut, sensorRef, roles.GND, request.InstanceID, "GND", gndNet)
+	appendPortConnection(&operations, &issuesOut, sensorRef, roles.SDA, request.InstanceID, "SDA", sdaNet)
+	appendPortConnection(&operations, &issuesOut, sensorRef, roles.SCL, request.InstanceID, "SCL", sclNet)
+	if concreteProfile {
+		// Only verified concrete profiles define auxiliary supply, address,
+		// mode, and unused pins. The generic topology intentionally exposes
+		// only its standard VCC/GND/SDA/SCL/INT contract.
 		for _, pin := range profile.AdditionalVCC {
-			appendConnectOperation(&operations, &issuesOut, sensorRef, pin, sensorRef, roles.VCC, vccNet)
+			appendLabeledConnectOperation(&operations, &issuesOut, sensorRef, pin, request.InstanceID, "VCC", vccNet)
 		}
 		for _, pin := range profile.AdditionalGND {
-			appendConnectOperation(&operations, &issuesOut, sensorRef, pin, sensorRef, roles.GND, gndNet)
+			appendLabeledConnectOperation(&operations, &issuesOut, sensorRef, pin, request.InstanceID, "GND", gndNet)
 		}
-		appendSensorPinLevel(&operations, &issuesOut, sensorRef, profile.AddressPin, profile.AddressLevels[address], roles, vccNet, gndNet)
+		appendSensorPinLevel(&operations, &issuesOut, request.InstanceID, sensorRef, profile.AddressPin, addressLevel, vccNet, gndNet)
 		for _, pin := range profile.ModeHigh {
-			appendSensorPinLevel(&operations, &issuesOut, sensorRef, pin, "high", roles, vccNet, gndNet)
+			appendSensorPinLevel(&operations, &issuesOut, request.InstanceID, sensorRef, pin, "high", vccNet, gndNet)
 		}
 		for _, pin := range profile.ModeLow {
-			appendSensorPinLevel(&operations, &issuesOut, sensorRef, pin, "low", roles, vccNet, gndNet)
+			appendSensorPinLevel(&operations, &issuesOut, request.InstanceID, sensorRef, pin, "low", vccNet, gndNet)
 		}
 	}
 
 	refs := []string{sensorRef}
 	nets := []string{vccNet, gndNet, sdaNet, sclNet}
 	if boolParam(params, "include_interrupt", false) {
-		appendConnectOperation(&operations, &issuesOut, sensorRef, roles.INT, request.InstanceID, "INT", InstanceNetName(request.InstanceID, "int"))
+		appendPortConnection(&operations, &issuesOut, sensorRef, roles.INT, request.InstanceID, "INT", InstanceNetName(request.InstanceID, "int"))
 		nets = append(nets, InstanceNetName(request.InstanceID, "int"))
 	} else if roles.INT != "" {
 		appendNoConnectOperation(&operations, &issuesOut, sensorRef, roles.INT)
@@ -275,15 +286,35 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	return output
 }
 
-func appendSensorPinLevel(operations *[]transactions.Operation, issues *[]reports.Issue, ref string, pin string, level string, roles i2cSensorPinRoleMap, vccNet string, gndNet string) {
+func appendSensorPinLevel(operations *[]transactions.Operation, issues *[]reports.Issue, instanceID string, ref string, pin string, level string, vccNet string, gndNet string) {
 	if pin == "" || level == "" {
 		return
 	}
 	if level == "high" {
-		appendConnectOperation(operations, issues, ref, pin, ref, roles.VCC, vccNet)
+		appendLabeledConnectOperation(operations, issues, ref, pin, instanceID, "VCC", vccNet)
 		return
 	}
-	appendConnectOperation(operations, issues, ref, pin, ref, roles.GND, gndNet)
+	appendLabeledConnectOperation(operations, issues, ref, pin, instanceID, "GND", gndNet)
+}
+
+func appendLabeledConnectOperation(operations *[]transactions.Operation, issues *[]reports.Issue, fromRef string, fromPin string, toRef string, toPin string, netName string) {
+	if fromRef == "" || fromPin == "" || toRef == "" || toPin == "" || netName == "" {
+		*issues = append(*issues, blockIssue("connect", "connect operation requires from ref/pin, to ref/pin, and net name"))
+		return
+	}
+	useLabels := true
+	operation, err := wrapOperation(transactions.OpConnect, transactions.ConnectOperation{
+		Op:        transactions.OpConnect,
+		From:      transactions.Endpoint{Ref: fromRef, Pin: fromPin},
+		To:        transactions.Endpoint{Ref: toRef, Pin: toPin},
+		NetName:   netName,
+		UseLabels: &useLabels,
+	})
+	if err != nil {
+		*issues = append(*issues, blockIssue("connect", err.Error()))
+		return
+	}
+	*operations = append(*operations, operation)
 }
 
 func i2cSensorPins(roles i2cSensorPinRoleMap) []transactions.PinSpec {

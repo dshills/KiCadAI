@@ -1,0 +1,23 @@
+{
+  "version": "0.1.0",
+  "name": "sensor_sht31_breakout",
+  "summary": "USB-powered SHT31-DIS humidity and temperature sensor breakout with optional alert output.",
+  "kind": "breakout",
+  "acceptance": "connectivity",
+  "board": {"width_mm": 45, "height_mm": 30, "layers": 2},
+  "power": {
+    "inputs": [{"kind": "usb_c", "voltage": "5V", "current_ma": 500}],
+    "rails": [{"name": "VCC", "voltage": "3.3V", "current_ma": 50}]
+  },
+  "interfaces": [{"kind": "i2c", "voltage": "3.3V"}],
+  "functions": [{
+    "kind": "sensor",
+    "family": "i2c_sensor",
+    "params": {
+      "sensor_component_id": "sensor.sensirion.sht31_dis.dfn8",
+      "i2c_address": "0x44",
+      "supply_voltage": "3.3V",
+      "include_interrupt": true
+    }
+  }]
+}

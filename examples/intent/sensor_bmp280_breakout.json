@@ -1,0 +1,22 @@
+{
+  "version": "0.1.0",
+  "name": "sensor_bmp280_breakout",
+  "summary": "USB-powered BMP280 pressure and temperature sensor breakout with a verified concrete sensor topology.",
+  "kind": "breakout",
+  "acceptance": "connectivity",
+  "board": {"width_mm": 45, "height_mm": 30, "layers": 2},
+  "power": {
+    "inputs": [{"kind": "usb_c", "voltage": "5V", "current_ma": 500}],
+    "rails": [{"name": "VCC", "voltage": "3.3V", "current_ma": 50}]
+  },
+  "interfaces": [{"kind": "i2c", "voltage": "3.3V"}],
+  "functions": [{
+    "kind": "sensor",
+    "family": "i2c_sensor",
+    "params": {
+      "sensor_component_id": "sensor.bosch.bmp280.lga8",
+      "i2c_address": "0x76",
+      "supply_voltage": "3.3V"
+    }
+  }]
+}

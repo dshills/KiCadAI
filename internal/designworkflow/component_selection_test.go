@@ -92,6 +92,70 @@ func TestApplyComponentSelectionsToPlanWarnsOnIdentityReplacement(t *testing.T) 
 	assertProperty(t, properties, componentprops.PropertyComponentID, "new.component")
 }
 
+func TestConcreteI2CSensorSelectionReachesGeneratedOperations(t *testing.T) {
+	registry := blocks.NewBuiltinRegistry()
+	request := Request{
+		Version: RequestVersion,
+		Name:    "humidity_sensor",
+		Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "sensor",
+			BlockID: "i2c_sensor",
+			Params: map[string]any{
+				"sensor_component_id": "sensor.sensirion.sht31_dis.dfn8",
+				"i2c_address":         "0x44",
+				"supply_voltage":      "3.3V",
+			},
+		}},
+		Validation: ValidationSpec{Acceptance: AcceptanceConnectivity},
+	}
+	plan := PlanBlocks(context.Background(), registry, request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+	}
+	selectionResult := SelectWorkflowComponents(context.Background(), registry, plan, ComponentSelectionOptions{})
+	if reports.HasBlockingIssue(selectionResult.Stage.Issues) {
+		t.Fatalf("selection issues = %#v", selectionResult.Stage.Issues)
+	}
+	var sensorSelection *ComponentSelectionEntry
+	for i := range selectionResult.Selections {
+		if selectionResult.Selections[i].InstanceID == "sensor" && selectionResult.Selections[i].Role == "sensor" {
+			sensorSelection = &selectionResult.Selections[i]
+			break
+		}
+	}
+	if sensorSelection == nil || sensorSelection.ComponentID != "sensor.sensirion.sht31_dis.dfn8" || sensorSelection.SymbolID != "Sensor_Humidity:SHT31-DIS" {
+		t.Fatalf("sensor selection = %#v", sensorSelection)
+	}
+	if issues := ApplyComponentSelectionsToPlan(&plan, registry, selectionResult.Selections); reports.HasBlockingIssue(issues) {
+		t.Fatalf("apply selection issues = %#v", issues)
+	}
+	found := false
+	for _, operation := range plan.Output.Operations {
+		if operation.Op != transactions.OpAddSymbol || operation.Ref != plan.Output.Instances[0].Refs[0] {
+			continue
+		}
+		add := decodeAddSymbolOperation(t, operation)
+		properties := symbolPropertyValues(add.Properties)
+		assertProperty(t, properties, componentprops.PropertyComponentID, "sensor.sensirion.sht31_dis.dfn8")
+		assertProperty(t, properties, componentprops.PropertyMPN, "SHT31-DIS")
+		found = true
+	}
+	if !found {
+		t.Fatal("selected sensor add-symbol operation not found")
+	}
+	stage := schematicStageFromPlan(plan)
+	readability, ok := stage.Summary["readability"].(map[string]any)
+	if !ok {
+		t.Fatalf("readability summary missing: %#v", stage.Summary)
+	}
+	for _, key := range []string{"diagonal_wire_count", "decode_error_count", "stage_order_violation_count", "power_placement_violation_count"} {
+		if got := summaryInt(t, readability, key); got != 0 {
+			t.Fatalf("%s = %d, want 0; summary=%#v", key, got, readability)
+		}
+	}
+}
+
 func componentSelectionTestDefinition() blocks.BlockDefinition {
 	return blocks.BlockDefinition{
 		ID:      "test_block",

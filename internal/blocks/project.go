@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 
+	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
 
@@ -187,6 +188,7 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 	set := newProjectEndpointSet()
 	netNames := map[projectEndpointKey]string{}
 	var pseudoEdges []projectPseudoEdge
+	var forceLabelEndpoints []projectEndpointKey
 	anchors, err := projectEndpointAnchors(operations)
 	if err != nil {
 		return nil, err
@@ -202,6 +204,9 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		from := projectEndpoint(payload.From)
 		to := projectEndpoint(payload.To)
 		set.union(from, to)
+		if payload.UseLabels != nil && *payload.UseLabels {
+			forceLabelEndpoints = append(forceLabelEndpoints, from, to)
+		}
 		fromPseudo := isProjectPseudoRef(from.ref, pseudoRefs)
 		toPseudo := isProjectPseudoRef(to.ref, pseudoRefs)
 		switch {
@@ -221,6 +226,7 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 	groupNetNames := map[projectEndpointKey]string{}
 	groupPseudoEndpoints := map[projectEndpointKey][]projectEndpointKey{}
 	groupPseudoLabelEndpoints := map[projectEndpointKey][]projectEndpointKey{}
+	groupForceLabels := map[projectEndpointKey]bool{}
 	for endpoint := range set.parent {
 		if isProjectPseudoRef(endpoint.ref, pseudoRefs) {
 			root := set.find(endpoint)
@@ -240,6 +246,9 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		root := set.find(edge.endpoint)
 		groupPseudoLabelEndpoints[root] = append(groupPseudoLabelEndpoints[root], edge.endpoint)
 	}
+	for _, endpoint := range forceLabelEndpoints {
+		groupForceLabels[set.find(endpoint)] = true
+	}
 	var roots []projectEndpointKey
 	for root := range groups {
 		roots = append(roots, root)
@@ -257,7 +266,8 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		sort.Slice(endpoints, func(i, j int) bool {
 			return projectEndpointLess(endpoints[i], endpoints[j])
 		})
-		if len(endpoints) >= 1 && len(pseudoEndpoints) >= 1 {
+		forceLabels := groupForceLabels[root]
+		if len(endpoints) >= 1 && len(pseudoEndpoints) >= 1 && !forceLabels {
 			sort.Slice(pseudoEndpoints, func(i, j int) bool {
 				return projectEndpointLess(pseudoEndpoints[i], pseudoEndpoints[j])
 			})
@@ -280,12 +290,26 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		if pseudoNetName, ok := projectPseudoEndpointNetName(pseudoEndpoints, netName); ok {
 			netName = pseudoNetName
 		}
+		// Forced labels must be placed after resolver geometry is available.
+		// A one-ended connect explicitly materializes the pseudo-derived block
+		// port label and assigns its concrete anchor to the net without a wire.
+		if forceLabels && len(endpoints) >= 1 && len(pseudoEndpoints) >= 1 {
+			endpoint := endpoints[0]
+			operation, issues := materializedConnectOperation(endpoint, endpoint, netName, true, false, true)
+			if len(issues) != 0 {
+				return nil, fmt.Errorf("failed to materialize labeled port %s.%s on %s: %s", endpoint.ref, endpoint.pin, netName, issues[0].Message)
+			}
+			out = append(out, operation)
+		}
 		if len(endpoints) < 2 {
 			continue
 		}
 		first := endpoints[0]
 		for _, endpoint := range endpoints[1:] {
-			operation, issues := ConnectOperation(first.ref, first.pin, endpoint.ref, endpoint.pin, netName)
+			// The self-connect above owns the shared endpoint label. Forced
+			// joins suppress that duplicate while retaining each new endpoint's
+			// label; ordinary joins keep their existing direct-wire behavior.
+			operation, issues := materializedConnectOperation(first, endpoint, netName, forceLabels, forceLabels, false)
 			if len(issues) != 0 {
 				errs := make([]error, 0, len(issues))
 				for _, issue := range issues {
@@ -297,6 +321,26 @@ func materializedGeneratedConnects(operations []transactions.Operation, generate
 		}
 	}
 	return out, nil
+}
+
+func materializedConnectOperation(from projectEndpointKey, to projectEndpointKey, netName string, useLabels bool, skipFromLabel bool, skipToLabel bool) (transactions.Operation, []reports.Issue) {
+	if !useLabels {
+		return ConnectOperation(from.ref, from.pin, to.ref, to.pin, netName)
+	}
+	forceLabels := true
+	operation, err := wrapOperation(transactions.OpConnect, transactions.ConnectOperation{
+		Op:            transactions.OpConnect,
+		From:          transactions.Endpoint{Ref: from.ref, Pin: from.pin},
+		To:            transactions.Endpoint{Ref: to.ref, Pin: to.pin},
+		NetName:       netName,
+		UseLabels:     &forceLabels,
+		SkipFromLabel: skipFromLabel,
+		SkipToLabel:   skipToLabel,
+	})
+	if err != nil {
+		return transactions.Operation{}, []reports.Issue{blockIssue("connect", err.Error())}
+	}
+	return operation, nil
 }
 
 func projectPseudoEndpointNetName(pseudoEndpoints []projectEndpointKey, fallback string) (string, bool) {
