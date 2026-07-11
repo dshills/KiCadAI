@@ -254,3 +254,11 @@ Commit:
 - Generated design workflows can use the new coverage without hidden guesses.
 - Rationale reports explain the selected parts and remaining gaps.
 - Full tests pass.
+
+## Follow-On Wave: Concrete I2C Sensor Families
+
+The regulator slice above is complete. The next finite coverage wave is defined
+in `specs/i2c-sensor-family-expansion/`: add verified BMP280 and SHT31-DIS
+catalog records and make BME280/BMP280/SHT31-DIS executable concrete variants
+of the existing `i2c_sensor` block. This preserves the broader backlog while
+giving the next implementation a measurable catalog and topology boundary.
