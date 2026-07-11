@@ -195,6 +195,18 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 6.7, 7.0), Pads: pads}, true
 	case "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm":
 		return rowPadTemplate(5.9, 4.9, 1.27, 0.7, 0.9, []string{"1", "2", "3", "4"}, []string{"8", "7", "6", "5"}), true
+	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
+		pads := []placement.PadSummary{
+			{Name: "1", XMM: -0.975, YMM: -0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "2", XMM: -0.325, YMM: -0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "3", XMM: 0.325, YMM: -0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "4", XMM: 0.975, YMM: -0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "5", XMM: 0.975, YMM: 0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "6", XMM: 0.325, YMM: 0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "7", XMM: -0.325, YMM: 0.8, WidthMM: 0.35, HeightMM: 0.5},
+			{Name: "8", XMM: -0.975, YMM: 0.8, WidthMM: 0.35, HeightMM: 0.5},
+		}
+		return verifiedPadTemplateRecord{Bounds: padEnvelopeBounds(pads, 2.0, 2.5), Pads: pads}, true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
 		return pinHeaderTemplate(1), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical":

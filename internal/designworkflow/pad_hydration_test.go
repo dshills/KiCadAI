@@ -166,6 +166,27 @@ func TestVerifiedPadTemplateUsesPackageSpecificRowPinOrder(t *testing.T) {
 	}
 }
 
+func TestVerifiedBMP280PadTemplateMatchesKiCadFootprint(t *testing.T) {
+	template, ok := verifiedPadTemplate("Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering")
+	if !ok {
+		t.Fatal("missing BMP280 LGA-8 template")
+	}
+	if got := padTemplateNames(template.Pads); !reflect.DeepEqual(got, []string{"1", "2", "3", "4", "5", "6", "7", "8"}) {
+		t.Fatalf("BMP280 pad order = %#v", got)
+	}
+	wantCenters := []placement.Point{
+		{XMM: -0.975, YMM: -0.8}, {XMM: -0.325, YMM: -0.8},
+		{XMM: 0.325, YMM: -0.8}, {XMM: 0.975, YMM: -0.8},
+		{XMM: 0.975, YMM: 0.8}, {XMM: 0.325, YMM: 0.8},
+		{XMM: -0.325, YMM: 0.8}, {XMM: -0.975, YMM: 0.8},
+	}
+	for index, pad := range template.Pads {
+		if pad.XMM != wantCenters[index].XMM || pad.YMM != wantCenters[index].YMM || pad.WidthMM != 0.35 || pad.HeightMM != 0.5 {
+			t.Fatalf("BMP280 pad %s = %#v, want center %#v and size 0.35x0.5", pad.Name, pad, wantCenters[index])
+		}
+	}
+}
+
 func TestVerifiedTwoPadTemplatesDoNotOverlap(t *testing.T) {
 	for _, footprintID := range []string{
 		"Resistor_SMD:R_0603_1608Metric",
