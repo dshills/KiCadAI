@@ -2,13 +2,13 @@
 
 ## Phase 1: Conditional Model And Validation
 
-Add destination endpoint-dogbone variants to block realization, cloning, and realized routes. Validate non-empty conditions and at least one route waypoint.
+Add source/destination endpoint-dogbone variants to block realization, cloning, and realized routes. Validate non-empty conditions and enough route waypoints for the selected transitions.
 
 Tests: accepted conditional variant, missing condition, missing waypoint, and realization selection.
 
 ## Phase 2: Mixed-Layer Emission
 
-Split an opted-in route at its final transformed waypoint, emit the default through via there, and add the destination-layer dogbone operation.
+Split an opted-in route at its first/final transformed waypoints, emit default through vias there, and add source/destination-layer dogbone operations.
 
 Tests: unchanged default route; B.Cu main route terminates at via; F.Cu dogbone terminates at destination pad; invalid same-layer/degenerate cases fail closed.
 

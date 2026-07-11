@@ -6,34 +6,35 @@ Support a deterministic layer transition outside a fine-pitch SMD pad so the BMP
 
 ## Scope
 
-- Add optional destination-endpoint dogbone intent to `PCBLocalRoute`.
-- Use the route's final authored waypoint as the layer-transition via location.
+- Add optional source- and destination-endpoint dogbone intent to `PCBLocalRoute`.
+- Use the route's first/final authored waypoints as layer-transition via locations.
 - Emit the main route on its authored layer up to that waypoint.
 - Emit a short same-net dogbone on the destination pad layer from the transition via to the pad.
 - Use existing default via diameter/drill and active board rules.
 - Opt in only the existing BMP280 SDA and SCL pull-up routes through a conditional variant.
 
-Source-endpoint dogbones, arbitrary multi-layer stacks, blind/buried vias, inter-block routing, placement changes, and design-rule changes are out of scope.
+Arbitrary multi-layer stacks, blind/buried vias, inter-block routing, placement changes, and design-rule changes are out of scope.
 
 ## Model
 
 `PCBLocalRoute` gains conditional endpoint-access variants. A v1 variant contains:
 
-- `to_endpoint_dogbone`: boolean;
+- `from_endpoint_dogbone` and/or `to_endpoint_dogbone`: boolean;
 - `when`: existing `RealizationWhen` condition.
 
 When active, the route must have at least one authored waypoint. The final waypoint is the transition point. The realized route records the selected dogbone intent so placement can transform all route points using existing geometry code.
 
 ## Emission Semantics
 
-For a destination dogbone:
+For endpoint dogbones:
 
 1. Resolve and transform the normal route points.
-2. Treat the penultimate transformed point as the transition point.
-3. Emit the main route without its final pad point.
-4. Materialize one normal through via at the transition point.
-5. Emit a destination-layer route from the transition point to the destination pad.
-6. Count both operations and preserve endpoint-connectivity evidence.
+2. Treat the second transformed point as the source transition when enabled.
+3. Treat the penultimate transformed point as the destination transition when enabled.
+4. Emit the main route between the selected transition points.
+5. Materialize normal through vias at enabled transition points.
+6. Emit pad-layer dogbones between each enabled endpoint pad and transition.
+7. Count all operations and preserve endpoint-connectivity evidence.
 
 The destination endpoint must be an SMD pad on a copper layer different from the main route. Unsupported or degenerate geometry fails closed with a route-binding issue.
 

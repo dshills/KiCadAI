@@ -100,6 +100,7 @@ type PCBLocalRoute struct {
 	WaypointVariants      []PCBWaypointVariant      `json:"waypoint_variants,omitempty"`
 	EndpointVariants      []PCBEndpointVariant      `json:"endpoint_variants,omitempty"`
 	GeometryVariants      []PCBRouteGeometryVariant `json:"geometry_variants,omitempty"`
+	FromEndpointDogbone   bool                      `json:"from_endpoint_dogbone,omitempty"`
 	ToEndpointDogbone     bool                      `json:"to_endpoint_dogbone,omitempty"`
 	Layer                 string                    `json:"layer,omitempty"`
 	WidthMM               float64                   `json:"width_mm,omitempty"`
@@ -117,8 +118,9 @@ type PCBWaypointVariant struct {
 }
 
 type PCBEndpointVariant struct {
-	ToEndpointDogbone bool            `json:"to_endpoint_dogbone,omitempty"`
-	When              RealizationWhen `json:"when"`
+	FromEndpointDogbone bool            `json:"from_endpoint_dogbone,omitempty"`
+	ToEndpointDogbone   bool            `json:"to_endpoint_dogbone,omitempty"`
+	When                RealizationWhen `json:"when"`
 }
 
 type PCBRouteGeometryVariant struct {
@@ -350,8 +352,11 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 				issues = append(issues, blockIssue(routePath+".entry_anchor_dogbone.tie_offset", "entry anchor dogbone tie offset must be non-zero"))
 			}
 		}
-		if route.ToEndpointDogbone && len(route.Waypoints) == 0 {
-			issues = append(issues, blockIssue(routePath+".to_endpoint_dogbone", "destination endpoint dogbone requires at least one route waypoint"))
+		if (route.FromEndpointDogbone || route.ToEndpointDogbone) && len(route.Waypoints) == 0 {
+			issues = append(issues, blockIssue(routePath, "endpoint dogbone requires at least one route waypoint"))
+		}
+		if route.FromEndpointDogbone && route.ToEndpointDogbone && len(route.Waypoints) < 2 {
+			issues = append(issues, blockIssue(routePath, "source and destination endpoint dogbones require at least two route waypoints"))
 		}
 		issues = append(issues, validateRealizationWhen(routePath+".when", route.When, parameters)...)
 		for waypointIndex, point := range route.Waypoints {
@@ -372,8 +377,8 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		}
 		for variantIndex, variant := range route.EndpointVariants {
 			variantPath := fmt.Sprintf("%s.endpoint_variants.%d", routePath, variantIndex)
-			if !variant.ToEndpointDogbone {
-				issues = append(issues, blockIssue(variantPath+".to_endpoint_dogbone", "endpoint variant must enable a supported behavior"))
+			if !variant.FromEndpointDogbone && !variant.ToEndpointDogbone {
+				issues = append(issues, blockIssue(variantPath, "endpoint variant must enable a supported behavior"))
 			}
 			if len(route.Waypoints) == 0 {
 				issues = append(issues, blockIssue(variantPath+".to_endpoint_dogbone", "destination endpoint dogbone requires at least one route waypoint"))

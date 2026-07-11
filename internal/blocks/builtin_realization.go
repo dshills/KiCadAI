@@ -196,8 +196,8 @@ func i2cSensorPCBRealization() *PCBRealization {
 	// realization. Replacing the generic detours with this point produces
 	// vertical source-to-trunk segments and a horizontal approach to VDD.
 	bmp280VCCTrunk := []PCBWaypointVariant{{Waypoints: []RelativePoint{{XMM: bmp280VCCTrunkXMM, YMM: bmp280VCCTrunkYMM}}, When: bmp280}}
-	bmp280SDAEscape := []PCBWaypointVariant{{Waypoints: []RelativePoint{{XMM: 20.6, YMM: 9.5}, {XMM: 14, YMM: 9.5}, {XMM: 14, YMM: 15.635}, {XMM: 25.05, YMM: 15.635}, {XMM: 30, YMM: 10}}, When: bmp280}}
-	bmp280SCLEscape := []PCBWaypointVariant{{Waypoints: []RelativePoint{{XMM: 20.6, YMM: 16.905}, {XMM: 25.05, YMM: 16.905}, {XMM: 29.8, YMM: 14.2}}, When: bmp280}}
+	bmp280SDAEscape := []PCBWaypointVariant{{Waypoints: []RelativePoint{{XMM: 20.6, YMM: 9.5}, {XMM: 14, YMM: 9.5}, {XMM: 30, YMM: 10}}, When: bmp280}}
+	bmp280SCLEscape := []PCBWaypointVariant{{Waypoints: []RelativePoint{{XMM: 20.6, YMM: 13}, {XMM: 29.8, YMM: 14.2}}, When: bmp280}}
 	bmp280EndpointDogbone := []PCBEndpointVariant{{ToEndpointDogbone: true, When: bmp280}}
 	fixedLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": true}}
 	movableLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": false}}
@@ -222,7 +222,7 @@ func i2cSensorPCBRealization() *PCBRealization {
 			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 15, YMM: 20}, {XMM: 15, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, WaypointVariants: bmp280VCCTrunk, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 9.5}, {XMM: 14, YMM: 9.5}, {XMM: 14, YMM: 15.635}, {XMM: 25.05, YMM: 15.635}}, WaypointVariants: bmp280SDAEscape, EndpointVariants: bmp280EndpointDogbone, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 16.905}, {XMM: 25.05, YMM: 16.905}}, WaypointVariants: bmp280SCLEscape, EndpointVariants: bmp280EndpointDogbone, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
-			{ID: "bmp280_vddio_tie", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sensor", Pin: "6"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: "8"}, Waypoints: []RelativePoint{{XMM: 28.325, YMM: 16.5}, {XMM: 27.025, YMM: 16.5}}, Layer: "F.Cu", WidthMM: 0.2, Required: true, When: bmp280},
+			{ID: "bmp280_vddio_tie", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sensor", Pin: "6"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: "8"}, Waypoints: []RelativePoint{{XMM: 29, YMM: 18.5}, {XMM: 23.5, YMM: 18.5}, {XMM: 23.5, YMM: 15.2}}, FromEndpointDogbone: true, ToEndpointDogbone: true, Layer: "B.Cu", WidthMM: 0.2, Required: true, When: bmp280, Description: "Escape VDDIO below the bus, carry VCC left on B.Cu, and rise outside the SDA/SCL fanout before the VDD dogbone."},
 			{ID: "bmp280_csb_tie", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sensor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, Waypoints: []RelativePoint{{XMM: 27.675, YMM: 12.5}, {XMM: 19.4, YMM: 12.5}}, Layer: "F.Cu", WidthMM: 0.2, Required: true, When: bmp280},
 		},
 		Constraints: []PCBConstraint{

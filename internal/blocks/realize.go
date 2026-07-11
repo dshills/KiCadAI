@@ -67,6 +67,7 @@ type RealizedPCBLocalRoute struct {
 	LengthMM              float64                `json:"length_mm,omitempty"`
 	EntryAnchorDogbone    *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
 	DisableEntryAnchorVia bool                   `json:"disable_entry_anchor_via,omitempty"`
+	FromEndpointDogbone   bool                   `json:"from_endpoint_dogbone,omitempty"`
 	ToEndpointDogbone     bool                   `json:"to_endpoint_dogbone,omitempty"`
 }
 
@@ -274,6 +275,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			WidthMM:               route.WidthMM,
 			EntryAnchorDogbone:    route.EntryAnchorDogbone,
 			DisableEntryAnchorVia: route.DisableEntryAnchorVia,
+			FromEndpointDogbone:   route.FromEndpointDogbone,
 			ToEndpointDogbone:     route.ToEndpointDogbone,
 		}
 		points := routePoints(route, from.Point, to.Point, opts)
@@ -314,6 +316,7 @@ func realizedLocalRouteGeometry(route PCBLocalRoute, params map[string]any) PCBL
 	}
 	for _, variant := range route.EndpointVariants {
 		if realizationWhenMatches(variant.When, params) {
+			route.FromEndpointDogbone = variant.FromEndpointDogbone
 			route.ToEndpointDogbone = variant.ToEndpointDogbone
 			break
 		}
