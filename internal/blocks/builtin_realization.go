@@ -13,7 +13,7 @@ const (
 	bmp280VCCTrunkYMM            = 15.8
 	ap2112RegulatorSymbol        = "Regulator_Linear:AP2112K-3.3"
 	ap2112OutputGroundCapXMM     = 6.6
-	ap2112GroundPinXMM           = -1.5
+	ap2112OutputGroundEntryXMM   = -3.5
 	ap2112OutputGroundChannelYMM = -6.0
 )
 
@@ -138,7 +138,7 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 	ap2112VINEntry := []PCBRouteGeometryVariant{{Waypoints: []RelativePoint{{XMM: -6.8, YMM: -4}}, DisableEntryAnchorDogbone: true, DisableEntryAnchorVia: true, When: ap2112}}
 	ap2112VOUTEntry := []PCBRouteGeometryVariant{{ClearWaypoints: true, DisableEntryAnchorDogbone: true, DisableEntryAnchorVia: true, When: ap2112}}
 	ap2112GNDEntry := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "F.Cu", When: ap2112}}
-	ap2112VINBypass := []PCBRouteGeometryVariant{{Waypoints: []RelativePoint{{XMM: -6.6, YMM: -2}, {XMM: -3, YMM: -2}, {XMM: -3, YMM: 0.95}}, When: ap2112}}
+	ap2112VINBypass := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VOUTBypass := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "B.Cu", When: ap2112}}
 	ap2112DisableGenericGround := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	return &PCBRealization{
@@ -164,10 +164,10 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ID: "vin_bypass", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: -11.1, YMM: 11.5}, {XMM: -2.45, YMM: 11.5}, {XMM: -2.45, YMM: 18.9}}, GeometryVariants: ap2112VINBypass, Layer: "F.Cu", WidthMM: 0.5, Required: true, Description: "Input bypass doglegs outside the AMS1117 VOUT tab clearance before returning to VIN pad 3."},
 			{ID: "vout_bypass", NetTemplate: "vout", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, GeometryVariants: ap2112VOUTBypass, Layer: "F.Cu", WidthMM: 0.5, Required: true, Description: "Output capacitor bypass to the regulator output pin; component pinmap resolution selects AP2112 pin 5."},
 			{ID: "gnd_bypass", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, GeometryVariants: ap2112DisableGenericGround, Layer: "B.Cu", WidthMM: 0.5, Required: true, Description: "Bottom-layer ground bypass keeps regulator return connected while avoiding top-layer VOUT/VIN crossings; local-route emission adds endpoint vias for SMD pad access."},
-			{ID: "ap2112_gnd_core", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Layer: "B.Cu", WidthMM: 0.5, Required: true, When: ap2112, Description: "Bottom-layer AP2112 ground tie keeps the regulator return out of the compact VIN/EN fanout."},
-			{ID: "ap2112_output_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Waypoints: []RelativePoint{{XMM: ap2112OutputGroundCapXMM, YMM: ap2112OutputGroundChannelYMM}, {XMM: ap2112GroundPinXMM, YMM: ap2112OutputGroundChannelYMM}}, Layer: "B.Cu", WidthMM: 0.5, Required: true, When: ap2112, Description: "Bottom-layer output-capacitor return reaches AP2112 ground above the VOUT corridor."},
+			{ID: "ap2112_gnd_core", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Waypoints: []RelativePoint{{XMM: -5.4, YMM: -3}, {XMM: ap2112OutputGroundEntryXMM, YMM: -3}, {XMM: ap2112OutputGroundEntryXMM, YMM: 0}}, Layer: "B.Cu", WidthMM: 0.5, Required: true, When: ap2112, Description: "Bottom-layer AP2112 ground tie shares the left-side ground channel and approaches pin 2 horizontally."},
+			{ID: "ap2112_output_ground", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "output_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "2"}, Waypoints: []RelativePoint{{XMM: ap2112OutputGroundCapXMM, YMM: ap2112OutputGroundChannelYMM}, {XMM: ap2112OutputGroundEntryXMM, YMM: ap2112OutputGroundChannelYMM}, {XMM: ap2112OutputGroundEntryXMM, YMM: 0}}, Layer: "B.Cu", WidthMM: 0.5, Required: true, When: ap2112, Description: "Bottom-layer output-capacitor return approaches AP2112 ground horizontally without crossing the VIN/EN vias."},
 			{ID: "ap2112_vin_core", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "input_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "1"}, Waypoints: []RelativePoint{{XMM: -6.6, YMM: -2}, {XMM: -3, YMM: -2}}, Layer: "F.Cu", WidthMM: 0.5, Required: true, When: ap2112, Description: "Direct low-impedance input-capacitor path to AP2112 VIN pin 1."},
-			{ID: "ap2112_vin_enable_tie", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "regulator", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: -2.4, YMM: -0.95}, {XMM: -2.4, YMM: 0.95}}, Layer: "F.Cu", WidthMM: 0.3, Required: true, When: ap2112, Description: "Tie AP2112 VIN to EN around the ground pad for always-on operation."},
+			{ID: "ap2112_vin_enable_tie", NetTemplate: "vin", From: RouteEndpoint{ComponentRole: "regulator", Pin: "1"}, To: RouteEndpoint{ComponentRole: "regulator", Pin: "3"}, Waypoints: []RelativePoint{{XMM: 0.2, YMM: -0.95}, {XMM: 0.2, YMM: 0.95}}, Layer: "B.Cu", WidthMM: 0.3, Required: true, When: ap2112, Description: "Tie AP2112 VIN to EN on B.Cu around the ground pad for always-on operation."},
 		},
 		Constraints: []PCBConstraint{
 			{ID: "regulator_power_width", Kind: "min_width", NetTemplate: "vin", MinWidthMM: 0.5, Description: "Regulator input path should use a wider local route."},

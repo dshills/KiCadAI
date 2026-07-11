@@ -158,6 +158,9 @@ func TestVerifiedPadTemplateUsesPackageSpecificRowPinOrder(t *testing.T) {
 	if sot.Bounds.WidthMM < 3.7 {
 		t.Fatalf("SOT bounds too narrow: %#v", sot.Bounds)
 	}
+	if sot.Pads[0].XMM != -1.1375 || sot.Pads[0].WidthMM != 1.325 || sot.Pads[0].HeightMM != 0.6 {
+		t.Fatalf("SOT-23-5 pad geometry does not match KiCad library: %#v", sot.Pads[0])
+	}
 	if sot.Pads[0].YMM == soic.Pads[0].YMM {
 		t.Fatalf("expected package-specific pitch, sot=%#v soic=%#v", sot.Pads[0], soic.Pads[0])
 	}

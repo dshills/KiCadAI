@@ -169,11 +169,11 @@ func verifiedPadTemplate(footprintID string) (verifiedPadTemplateRecord, bool) {
 		return verifiedPadTemplateRecord{
 			Bounds: centeredEstimatedBounds(3.7, 3.0),
 			Pads: []placement.PadSummary{
-				{Name: "1", XMM: -1.5, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
-				{Name: "2", XMM: -1.5, YMM: 0, WidthMM: 0.7, HeightMM: 0.8},
-				{Name: "3", XMM: -1.5, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
-				{Name: "5", XMM: 1.5, YMM: -0.95, WidthMM: 0.7, HeightMM: 0.8},
-				{Name: "4", XMM: 1.5, YMM: 0.95, WidthMM: 0.7, HeightMM: 0.8},
+				{Name: "1", XMM: -1.1375, YMM: -0.95, WidthMM: 1.325, HeightMM: 0.6},
+				{Name: "2", XMM: -1.1375, YMM: 0, WidthMM: 1.325, HeightMM: 0.6},
+				{Name: "3", XMM: -1.1375, YMM: 0.95, WidthMM: 1.325, HeightMM: 0.6},
+				{Name: "5", XMM: 1.1375, YMM: -0.95, WidthMM: 1.325, HeightMM: 0.6},
+				{Name: "4", XMM: 1.1375, YMM: 0.95, WidthMM: 1.325, HeightMM: 0.6},
 			},
 		}, true
 	case "Package_TO_SOT_SMD:SOT-23":

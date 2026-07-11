@@ -304,8 +304,11 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	for _, route := range result.LocalRoutes {
 		routes[route.ID] = route
 	}
-	if route := routes["ap2112_vin_enable_tie"]; route.From.Pin != "1" || route.To.Pin != "3" || route.WidthMM != 0.3 {
+	if route := routes["ap2112_vin_enable_tie"]; route.From.Pin != "1" || route.To.Pin != "3" || route.WidthMM != 0.3 || route.Layer != "B.Cu" {
 		t.Fatalf("AP2112 tie = %#v", route)
+	}
+	if _, exists := routes["vin_bypass"]; exists {
+		t.Fatalf("AP2112 routes include disabled generic VIN bypass: %#v", routes["vin_bypass"])
 	}
 	if route := routes["vin_entry"]; route.EntryAnchorDogbone != nil || !route.DisableEntryAnchorVia || len(route.Points) != 3 {
 		t.Fatalf("AP2112 VIN entry = %#v", route)
@@ -319,10 +322,10 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	if route := routes["vout_bypass"]; route.Layer != "B.Cu" || route.To.Pin != "5" || len(route.Points) != 2 {
 		t.Fatalf("AP2112 VOUT bypass = %#v", route)
 	}
-	if route := routes["ap2112_gnd_core"]; route.Layer != "B.Cu" || route.To.Pin != "2" {
+	if route := routes["ap2112_gnd_core"]; route.Layer != "B.Cu" || route.To.Pin != "2" || len(route.Points) < 5 || route.Points[3] != (transactions.Point{XMM: ap2112OutputGroundEntryXMM, YMM: 0}) {
 		t.Fatalf("AP2112 GND core = %#v", route)
 	}
-	if route := routes["ap2112_output_ground"]; route.Layer != "B.Cu" || route.To.Pin != "2" || len(route.Points) < 4 || route.Points[1] != (transactions.Point{XMM: ap2112OutputGroundCapXMM, YMM: ap2112OutputGroundChannelYMM}) || route.Points[2] != (transactions.Point{XMM: ap2112GroundPinXMM, YMM: ap2112OutputGroundChannelYMM}) {
+	if route := routes["ap2112_output_ground"]; route.Layer != "B.Cu" || route.To.Pin != "2" || len(route.Points) < 5 || route.Points[1] != (transactions.Point{XMM: ap2112OutputGroundCapXMM, YMM: ap2112OutputGroundChannelYMM}) || route.Points[2] != (transactions.Point{XMM: ap2112OutputGroundEntryXMM, YMM: ap2112OutputGroundChannelYMM}) || route.Points[3] != (transactions.Point{XMM: ap2112OutputGroundEntryXMM, YMM: 0}) {
 		t.Fatalf("AP2112 output ground = %#v", route)
 	}
 	if _, exists := routes["gnd_bypass"]; exists {
