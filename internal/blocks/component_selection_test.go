@@ -101,6 +101,36 @@ func TestConnectorBreakoutSelectionRequestPreservesPackageParam(t *testing.T) {
 	}
 }
 
+func TestI2CSensorSelectionRequestUsesConcreteComponentAndSupply(t *testing.T) {
+	definition := i2cSensorDefinition()
+	component := definition.Components[0]
+	request, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{
+		"sensor_component_id": "sensor.sensirion.sht31_dis.dfn8",
+		"supply_voltage":      "3.3V",
+	})
+	if !ok {
+		t.Fatal("expected concrete sensor selection request")
+	}
+	if request.Query.Text != "sensor.sensirion.sht31_dis.dfn8" || !request.RequireConcrete || !request.RequireCompanions {
+		t.Fatalf("request = %#v", request)
+	}
+	if len(request.RequiredRatings) != 1 || request.RequiredRatings[0].Kind != "supply_voltage" || request.RequiredRatings[0].Value != "3.3" {
+		t.Fatalf("ratings = %#v", request.RequiredRatings)
+	}
+	selection, result := components.Select(context.Background(), loadBlockTestCatalog(t), request)
+	if !result.OK || selection.Component.ID != "sensor.sensirion.sht31_dis.dfn8" {
+		t.Fatalf("selection = %#v, issues = %#v", selection, result.Issues)
+	}
+}
+
+func TestI2CSensorSelectionRequestIsOptionalForGenericTemplate(t *testing.T) {
+	definition := i2cSensorDefinition()
+	component := definition.Components[0]
+	if _, ok := SelectionRequestForComponentWithParams(component, components.AcceptanceConnectivity, map[string]any{"supply_voltage": "3.3V"}); ok {
+		t.Fatal("generic template should not claim concrete component evidence")
+	}
+}
+
 func TestSelectDefinitionComponentsForVoltageRegulator(t *testing.T) {
 	catalog := loadBlockTestCatalog(t)
 	definition := voltageRegulatorDefinition()

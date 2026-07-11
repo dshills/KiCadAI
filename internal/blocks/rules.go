@@ -176,11 +176,14 @@ func requireComponentEvidence(ctx RuleContext) []RuleOutcome {
 	}
 	var outcomes []RuleOutcome
 	for _, component := range ctx.Definition.Components {
-		if component.ComponentID == "" && component.ComponentQuery == nil {
+		if component.ComponentID == "" && component.ComponentIDParam == "" && component.ComponentQuery == nil {
 			continue
 		}
 		selection, ok := selectionByRole[component.Role]
 		if !ok {
+			if component.ComponentIDParam != "" && component.ComponentID == "" && component.ComponentQuery == nil {
+				continue
+			}
 			outcomes = append(outcomes, ruleBlocker("component_evidence.missing."+component.Role, RuleKindEvidence, "block."+ctx.Definition.ID+".components."+component.Role, "component role "+component.Role+" has no selected part evidence"))
 			continue
 		}

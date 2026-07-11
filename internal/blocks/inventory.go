@@ -346,7 +346,7 @@ func electricalRuleSummaries(definition BlockDefinition) []string {
 		if component.PinmapRequired && component.Role != "" {
 			rules = append(rules, "pinmap_required:"+component.Role)
 		}
-		if component.Role != "" && (component.ComponentID != "" || component.ComponentQuery != nil) {
+		if component.Role != "" && (component.ComponentID != "" || component.ComponentIDParam != "" || component.ComponentQuery != nil) {
 			rules = append(rules, "component_evidence:"+component.Role)
 		}
 	}

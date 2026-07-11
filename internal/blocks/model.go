@@ -129,6 +129,7 @@ type BlockComponent struct {
 	PlacementGroup           string                     `json:"placement_group,omitempty"`
 	Alternatives             []string                   `json:"alternatives,omitempty"`
 	ComponentID              string                     `json:"component_id,omitempty"`
+	ComponentIDParam         string                     `json:"component_id_param,omitempty"`
 	ComponentQuery           *components.Query          `json:"component_query,omitempty"`
 	ComponentVariant         string                     `json:"component_variant,omitempty"`
 	ComponentValueParam      string                     `json:"component_value_param,omitempty"`

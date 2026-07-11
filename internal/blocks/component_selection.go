@@ -36,6 +36,9 @@ func SelectDefinitionComponents(ctx context.Context, definition BlockDefinition,
 		}
 		request, ok := SelectionRequestForComponentWithParams(component, acceptance, params)
 		if !ok {
+			if component.ComponentIDParam != "" && stringParam(params, component.ComponentIDParam) == "" {
+				continue
+			}
 			report.Issues = append(report.Issues, reports.Issue{
 				Code:     reports.CodeValidationFailed,
 				Severity: reports.SeverityWarning,
@@ -63,6 +66,21 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 	}
 	if acceptance == "" {
 		acceptance = components.AcceptanceDraft
+	}
+	if component.ComponentIDParam != "" {
+		if componentID := stringParam(params, component.ComponentIDParam); componentID != "" {
+			return components.SelectionRequest{
+				Query: components.Query{
+					Text:              componentID,
+					MinimumConfidence: component.MinimumConfidence,
+				},
+				Acceptance:        acceptance,
+				RequiredRatings:   sensorSupplyRating(component, params),
+				RequiredFunctions: []string{"SDA", "SCL"},
+				RequireConcrete:   true,
+				RequireCompanions: true,
+			}, true
+		}
 	}
 	if component.ComponentID != "" {
 		return components.SelectionRequest{
@@ -110,6 +128,17 @@ func SelectionRequestForComponentWithParams(component BlockComponent, acceptance
 		return components.SelectionRequest{Query: queryCopy, Acceptance: acceptance}, true
 	}
 	return components.SelectionRequest{}, false
+}
+
+func sensorSupplyRating(component BlockComponent, params map[string]any) []components.RequiredRating {
+	if component.ComponentIDParam != "sensor_component_id" {
+		return nil
+	}
+	value, ok := parseUnit(params["supply_voltage"], "V", voltageMultipliers())
+	if !ok {
+		return nil
+	}
+	return []components.RequiredRating{{Kind: "supply_voltage", Value: strconv.FormatFloat(value, 'f', -1, 64), Unit: "V"}}
 }
 
 func paramsWithInferredConnectorPinCount(component BlockComponent, params map[string]any) map[string]any {

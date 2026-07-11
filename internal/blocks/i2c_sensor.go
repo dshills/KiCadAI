@@ -24,6 +24,78 @@ type i2cSensorPinRoleMap struct {
 
 var genericI2CSensorPins = i2cSensorPinRoleMap{VCC: "1", GND: "2", SDA: "3", SCL: "4", INT: "5"}
 
+type i2cSensorProfile struct {
+	ComponentID   string
+	Value         string
+	SymbolID      string
+	FootprintID   string
+	Roles         i2cSensorPinRoleMap
+	Pins          []transactions.PinSpec
+	AdditionalVCC []string
+	AdditionalGND []string
+	AddressPin    string
+	AddressLevels map[string]string
+	ModeHigh      []string
+	ModeLow       []string
+	NoConnect     []string
+}
+
+var concreteI2CSensorProfiles = map[string]i2cSensorProfile{
+	"sensor.bosch.bme280.lga8": {
+		ComponentID: "sensor.bosch.bme280.lga8",
+		Value:       "BME280",
+		SymbolID:    "Sensor:BME280",
+		FootprintID: "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering",
+		Roles:       i2cSensorPinRoleMap{VCC: "8", GND: "1", SDA: "3", SCL: "4"},
+		Pins: []transactions.PinSpec{
+			{Number: "1", XMM: -2.54, YMM: -15.24}, {Number: "2", XMM: 15.24, YMM: -7.62},
+			{Number: "3", XMM: 15.24, YMM: -2.54}, {Number: "4", XMM: 15.24, YMM: 2.54},
+			{Number: "5", XMM: 15.24, YMM: 7.62}, {Number: "6", XMM: -2.54, YMM: 15.24},
+			{Number: "7", XMM: 2.54, YMM: -15.24}, {Number: "8", XMM: 2.54, YMM: 15.24},
+		},
+		AdditionalVCC: []string{"6"}, AdditionalGND: []string{"7"},
+		AddressPin:    "5",
+		AddressLevels: map[string]string{"0x76": "low", "0x77": "high"},
+		ModeHigh:      []string{"2"},
+	},
+	"sensor.bosch.bmp280.lga8": {
+		ComponentID: "sensor.bosch.bmp280.lga8",
+		Value:       "BMP280",
+		SymbolID:    "Sensor_Pressure:BMP280",
+		FootprintID: "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering",
+		Roles:       i2cSensorPinRoleMap{VCC: "8", GND: "1", SDA: "3", SCL: "4"},
+		Pins: []transactions.PinSpec{
+			{Number: "1", XMM: 0, YMM: -7.62}, {Number: "2", XMM: -10.16, YMM: -2.54},
+			{Number: "3", XMM: -10.16, YMM: 2.54}, {Number: "4", XMM: -10.16, YMM: 5.08},
+			{Number: "5", XMM: -10.16, YMM: 0}, {Number: "6", XMM: 0, YMM: 10.16},
+			{Number: "7", XMM: 2.54, YMM: -7.62}, {Number: "8", XMM: 2.54, YMM: 10.16},
+		},
+		AdditionalVCC: []string{"6"}, AdditionalGND: []string{"7"},
+		AddressPin:    "5",
+		AddressLevels: map[string]string{"0x76": "low", "0x77": "high"},
+		ModeHigh:      []string{"2"},
+	},
+	"sensor.sensirion.sht31_dis.dfn8": {
+		ComponentID: "sensor.sensirion.sht31_dis.dfn8",
+		Value:       "SHT31-DIS",
+		SymbolID:    "Sensor_Humidity:SHT31-DIS",
+		FootprintID: "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm",
+		Roles:       i2cSensorPinRoleMap{VCC: "5", GND: "8", SDA: "1", SCL: "4", INT: "3"},
+		Pins: []transactions.PinSpec{
+			{Number: "1", XMM: 10.16, YMM: 2.54}, {Number: "2", XMM: -10.16, YMM: 2.54},
+			{Number: "3", XMM: 10.16, YMM: -2.54}, {Number: "4", XMM: 10.16, YMM: 0},
+			{Number: "5", XMM: 0, YMM: 7.62}, {Number: "6", XMM: -10.16, YMM: 0},
+			{Number: "7", XMM: -10.16, YMM: -2.54}, {Number: "8", XMM: 0, YMM: -7.62},
+			{Number: "9", XMM: 0, YMM: -7.62},
+		},
+		AdditionalGND: []string{"9"},
+		AddressPin:    "2",
+		AddressLevels: map[string]string{"0x44": "low", "0x45": "high"},
+		ModeLow:       []string{"7"},
+		NoConnect:     []string{"6"},
+	},
+}
+
 func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, params map[string]any, issues []reports.Issue) BlockOutput {
 	if hasBlockingIssues(issues) {
 		return dryRunBlockOutput(definition, request, nil, issues)
@@ -51,38 +123,74 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 			issues = append(issues, blockIssue("params.decoupling_footprint", "decoupling_footprint is required"))
 		}
 	}
+	componentID := strings.TrimSpace(stringParam(params, "sensor_component_id"))
+	profile, concreteProfile := concreteI2CSensorProfiles[componentID]
+	roles := genericI2CSensorPins
+	pins := i2cSensorPins(genericI2CSensorPins)
+	sensorValue := "I2C Sensor"
 	sensorSymbol := stringParam(params, "sensor_symbol")
-	switch {
-	case sensorSymbol == "":
-		issues = append(issues, blockIssue("params.sensor_symbol", "sensor_symbol is required"))
-	case sensorSymbol != defaultI2CSensorSymbol:
+	sensorFootprint := stringParam(params, "sensor_footprint")
+	if componentID != "" && !concreteProfile {
 		issues = append(issues, reports.Issue{
 			Code:       reports.CodeUnsupportedOperation,
 			Severity:   reports.SeverityBlocked,
-			Path:       "params.sensor_symbol",
-			Message:    "i2c_sensor currently supports only the generic I2C sensor template pinout",
-			Suggestion: "use " + defaultI2CSensorSymbol + " or wait for sensor pin-role map support",
+			Path:       "params.sensor_component_id",
+			Message:    "i2c_sensor does not have a verified topology profile for " + componentID,
+			Suggestion: "use a component ID listed in the i2c_sensor block documentation",
 		})
 	}
-	sensorFootprint := stringParam(params, "sensor_footprint")
-	if sensorFootprint == "" {
-		issues = append(issues, blockIssue("params.sensor_footprint", "sensor_footprint is required"))
+	if concreteProfile {
+		roles = profile.Roles
+		pins = append([]transactions.PinSpec(nil), profile.Pins...)
+		sensorValue = profile.Value
+		if _, ok := profile.AddressLevels[address]; !ok {
+			issues = append(issues, blockIssue("params.i2c_address", "i2c_address is not supported by "+componentID))
+		}
+		if sensorSymbol != "" && sensorSymbol != defaultI2CSensorSymbol && sensorSymbol != profile.SymbolID {
+			issues = append(issues, blockIssue("params.sensor_symbol", "sensor_symbol does not match the selected sensor component"))
+		}
+		if sensorFootprint != "" && sensorFootprint != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" && sensorFootprint != profile.FootprintID {
+			issues = append(issues, blockIssue("params.sensor_footprint", "sensor_footprint does not match the selected sensor component"))
+		}
+		sensorSymbol = profile.SymbolID
+		sensorFootprint = profile.FootprintID
+		if boolParam(params, "include_interrupt", false) && roles.INT == "" {
+			issues = append(issues, blockIssue("params.include_interrupt", "selected sensor does not expose a verified interrupt pin"))
+		}
+	} else {
+		switch {
+		case sensorSymbol == "":
+			issues = append(issues, blockIssue("params.sensor_symbol", "sensor_symbol is required"))
+		case sensorSymbol != defaultI2CSensorSymbol:
+			issues = append(issues, reports.Issue{
+				Code:       reports.CodeUnsupportedOperation,
+				Severity:   reports.SeverityBlocked,
+				Path:       "params.sensor_symbol",
+				Message:    "custom sensor symbols require a verified sensor_component_id topology profile",
+				Suggestion: "use " + defaultI2CSensorSymbol + " or select a verified concrete sensor component",
+			})
+		}
+		if sensorFootprint == "" {
+			issues = append(issues, blockIssue("params.sensor_footprint", "sensor_footprint is required"))
+		}
 	}
 	if hasBlockingIssues(issues) {
 		return dryRunBlockOutput(definition, request, nil, issues)
 	}
 	instanceParams := cloneAnyParams(params)
 	instanceParams["i2c_address"] = address
+	instanceParams["sensor_symbol"] = sensorSymbol
+	instanceParams["sensor_footprint"] = sensorFootprint
 
 	allocator := NewInstanceReferenceAllocator(request.InstanceID)
 	sensorRef := allocator.Next("U")
 	sensor := BlockComponent{
 		Role:        "sensor",
 		RefPrefix:   "U",
-		Value:       "I2C Sensor " + address,
+		Value:       sensorValue + " " + address,
 		SymbolID:    sensorSymbol,
 		FootprintID: sensorFootprint,
-		Pins:        i2cSensorPins(genericI2CSensorPins),
+		Pins:        pins,
 	}
 	var issuesOut []reports.Issue
 	issuesOut = append(issuesOut, issues...)
@@ -95,18 +203,38 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	gndNet := InstanceNetName(request.InstanceID, "gnd")
 	sdaNet := InstanceNetName(request.InstanceID, "sda")
 	sclNet := InstanceNetName(request.InstanceID, "scl")
-	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "VCC", sensorRef, genericI2CSensorPins.VCC, vccNet)
-	appendConnectOperation(&operations, &issuesOut, sensorRef, genericI2CSensorPins.GND, request.InstanceID, "GND", gndNet)
-	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SDA", sensorRef, genericI2CSensorPins.SDA, sdaNet)
-	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SCL", sensorRef, genericI2CSensorPins.SCL, sclNet)
+	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "VCC", sensorRef, roles.VCC, vccNet)
+	appendConnectOperation(&operations, &issuesOut, sensorRef, roles.GND, request.InstanceID, "GND", gndNet)
+	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SDA", sensorRef, roles.SDA, sdaNet)
+	appendConnectOperation(&operations, &issuesOut, request.InstanceID, "SCL", sensorRef, roles.SCL, sclNet)
+	if concreteProfile {
+		for _, pin := range profile.AdditionalVCC {
+			appendConnectOperation(&operations, &issuesOut, sensorRef, pin, sensorRef, roles.VCC, vccNet)
+		}
+		for _, pin := range profile.AdditionalGND {
+			appendConnectOperation(&operations, &issuesOut, sensorRef, pin, sensorRef, roles.GND, gndNet)
+		}
+		appendSensorPinLevel(&operations, &issuesOut, sensorRef, profile.AddressPin, profile.AddressLevels[address], roles, vccNet, gndNet)
+		for _, pin := range profile.ModeHigh {
+			appendSensorPinLevel(&operations, &issuesOut, sensorRef, pin, "high", roles, vccNet, gndNet)
+		}
+		for _, pin := range profile.ModeLow {
+			appendSensorPinLevel(&operations, &issuesOut, sensorRef, pin, "low", roles, vccNet, gndNet)
+		}
+	}
 
 	refs := []string{sensorRef}
 	nets := []string{vccNet, gndNet, sdaNet, sclNet}
 	if boolParam(params, "include_interrupt", false) {
-		appendConnectOperation(&operations, &issuesOut, sensorRef, genericI2CSensorPins.INT, request.InstanceID, "INT", InstanceNetName(request.InstanceID, "int"))
+		appendConnectOperation(&operations, &issuesOut, sensorRef, roles.INT, request.InstanceID, "INT", InstanceNetName(request.InstanceID, "int"))
 		nets = append(nets, InstanceNetName(request.InstanceID, "int"))
-	} else {
-		appendNoConnectOperation(&operations, &issuesOut, sensorRef, genericI2CSensorPins.INT)
+	} else if roles.INT != "" {
+		appendNoConnectOperation(&operations, &issuesOut, sensorRef, roles.INT)
+	}
+	if concreteProfile {
+		for _, pin := range profile.NoConnect {
+			appendNoConnectOperation(&operations, &issuesOut, sensorRef, pin)
+		}
 	}
 	if boolParam(params, "include_decoupling", true) {
 		capRef := allocator.Next("C")
@@ -114,8 +242,8 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 		capOps, capIssues := ComponentOperations(capacitor, capRef, transactions.Point{XMM: 0, YMM: 10})
 		issuesOut = append(issuesOut, capIssues...)
 		operations = append(operations, capOps...)
-		appendConnectOperation(&operations, &issuesOut, capRef, "1", sensorRef, genericI2CSensorPins.VCC, vccNet)
-		appendConnectOperation(&operations, &issuesOut, capRef, "2", sensorRef, genericI2CSensorPins.GND, gndNet)
+		appendConnectOperation(&operations, &issuesOut, capRef, "1", sensorRef, roles.VCC, vccNet)
+		appendConnectOperation(&operations, &issuesOut, capRef, "2", sensorRef, roles.GND, gndNet)
 		refs = append(refs, capRef)
 	}
 	if boolParam(params, "include_pullups", true) {
@@ -125,15 +253,15 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 			pin  string
 			xmm  float64
 		}{
-			{role: "sda_pullup", net: sdaNet, pin: genericI2CSensorPins.SDA, xmm: 25},
-			{role: "scl_pullup", net: sclNet, pin: genericI2CSensorPins.SCL, xmm: 35},
+			{role: "sda_pullup", net: sdaNet, pin: roles.SDA, xmm: 25},
+			{role: "scl_pullup", net: sclNet, pin: roles.SCL, xmm: 35},
 		} {
 			ref := allocator.Next("R")
 			component := BlockComponent{Role: pullup.role, RefPrefix: "R", Value: stringParam(params, "pullup_value"), SymbolID: "Device:R", FootprintID: stringParam(params, "pullup_footprint"), Pins: deviceRTemplatePins()}
 			pullupOps, pullupIssues := ComponentOperations(component, ref, transactions.Point{XMM: pullup.xmm, YMM: -10})
 			issuesOut = append(issuesOut, pullupIssues...)
 			operations = append(operations, pullupOps...)
-			appendConnectOperation(&operations, &issuesOut, ref, "1", sensorRef, genericI2CSensorPins.VCC, vccNet)
+			appendConnectOperation(&operations, &issuesOut, ref, "1", sensorRef, roles.VCC, vccNet)
 			appendConnectOperation(&operations, &issuesOut, ref, "2", sensorRef, pullup.pin, pullup.net)
 			refs = append(refs, ref)
 		}
@@ -145,6 +273,17 @@ func instantiateI2CSensor(definition BlockDefinition, request BlockRequest, para
 	output.Instance.Refs = refs
 	output.Instance.Nets = nets
 	return output
+}
+
+func appendSensorPinLevel(operations *[]transactions.Operation, issues *[]reports.Issue, ref string, pin string, level string, roles i2cSensorPinRoleMap, vccNet string, gndNet string) {
+	if pin == "" || level == "" {
+		return
+	}
+	if level == "high" {
+		appendConnectOperation(operations, issues, ref, pin, ref, roles.VCC, vccNet)
+		return
+	}
+	appendConnectOperation(operations, issues, ref, pin, ref, roles.GND, gndNet)
 }
 
 func i2cSensorPins(roles i2cSensorPinRoleMap) []transactions.PinSpec {

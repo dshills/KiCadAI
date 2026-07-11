@@ -188,6 +188,112 @@ func TestI2CSensorOptionalInterruptExportsPort(t *testing.T) {
 	}
 }
 
+func TestI2CSensorConcreteProfilesEmitVerifiedTopology(t *testing.T) {
+	tests := []struct {
+		name          string
+		componentID   string
+		address       string
+		symbolID      string
+		footprintID   string
+		vccPins       []string
+		gndPins       []string
+		sdaPin        string
+		sclPin        string
+		noConnectPins []string
+	}{
+		{name: "bme280", componentID: "sensor.bosch.bme280.lga8", address: "0x76", symbolID: "Sensor:BME280", footprintID: "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering", vccPins: []string{"8", "6", "2"}, gndPins: []string{"1", "7", "5"}, sdaPin: "3", sclPin: "4"},
+		{name: "bmp280", componentID: "sensor.bosch.bmp280.lga8", address: "0x77", symbolID: "Sensor_Pressure:BMP280", footprintID: "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering", vccPins: []string{"8", "6", "2", "5"}, gndPins: []string{"1", "7"}, sdaPin: "3", sclPin: "4"},
+		{name: "sht31", componentID: "sensor.sensirion.sht31_dis.dfn8", address: "0x44", symbolID: "Sensor_Humidity:SHT31-DIS", footprintID: "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm", vccPins: []string{"5"}, gndPins: []string{"8", "9", "2", "7"}, sdaPin: "1", sclPin: "4", noConnectPins: []string{"3", "6"}},
+	}
+	registry := NewBuiltinRegistry()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, issues := registry.Instantiate(context.Background(), BlockRequest{
+				BlockID:    "i2c_sensor",
+				InstanceID: tt.name,
+				Params: map[string]any{
+					"sensor_component_id": tt.componentID,
+					"i2c_address":         tt.address,
+				},
+			})
+			if reports.HasBlockingIssue(issues) {
+				t.Fatalf("issues = %#v", issues)
+			}
+			ref := output.Instance.Refs[0]
+			symbol := addSymbolOperations(t, output.Operations)[ref]
+			if symbol.LibraryID != tt.symbolID || !strings.HasSuffix(symbol.Value, " "+tt.address) {
+				t.Fatalf("symbol = %#v", symbol)
+			}
+			if got := stringParam(output.Instance.Params, "sensor_footprint"); got != tt.footprintID {
+				t.Fatalf("footprint param = %q, want %q", got, tt.footprintID)
+			}
+			vccNet := InstanceNetName(tt.name, "vcc")
+			gndNet := InstanceNetName(tt.name, "gnd")
+			for _, pin := range tt.vccPins {
+				if !hasPinOnNet(output.Operations, ref, pin, vccNet) {
+					t.Errorf("pin %s missing from %s", pin, vccNet)
+				}
+			}
+			for _, pin := range tt.gndPins {
+				if !hasPinOnNet(output.Operations, ref, pin, gndNet) {
+					t.Errorf("pin %s missing from %s", pin, gndNet)
+				}
+			}
+			if !hasPinOnNet(output.Operations, ref, tt.sdaPin, InstanceNetName(tt.name, "sda")) || !hasPinOnNet(output.Operations, ref, tt.sclPin, InstanceNetName(tt.name, "scl")) {
+				t.Errorf("missing I2C bus pin connectivity")
+			}
+			for _, pin := range tt.noConnectPins {
+				if !hasNoConnect(output.Operations, ref, pin) {
+					t.Errorf("pin %s missing no-connect", pin)
+				}
+			}
+			if validation := transactions.Validate(transactions.Transaction{Operations: output.Operations}); len(validation.Issues) != 0 {
+				t.Fatalf("transaction validation issues = %#v", validation.Issues)
+			}
+		})
+	}
+}
+
+func TestI2CSensorSHT31InterruptReplacesAlertNoConnect(t *testing.T) {
+	output, issues := NewBuiltinRegistry().Instantiate(context.Background(), BlockRequest{
+		BlockID:    "i2c_sensor",
+		InstanceID: "humidity",
+		Params: map[string]any{
+			"sensor_component_id": "sensor.sensirion.sht31_dis.dfn8",
+			"i2c_address":         "0x45",
+			"include_interrupt":   true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	ref := output.Instance.Refs[0]
+	if hasNoConnect(output.Operations, ref, "3") || !hasPinOnNet(output.Operations, ref, "3", InstanceNetName("humidity", "int")) {
+		t.Fatalf("ALERT pin handling is not connected-only: %#v", output.Operations)
+	}
+}
+
+func TestI2CSensorConcreteProfilesFailClosed(t *testing.T) {
+	tests := []struct {
+		name   string
+		params map[string]any
+		path   string
+	}{
+		{name: "unknown component", params: map[string]any{"sensor_component_id": "sensor.unknown", "i2c_address": "0x44"}, path: "params.sensor_component_id"},
+		{name: "unsupported address", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "i2c_address": "0x44"}, path: "params.i2c_address"},
+		{name: "mismatched symbol", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "sensor_symbol": "Sensor:BME280", "i2c_address": "0x76"}, path: "params.sensor_symbol"},
+		{name: "unsupported interrupt", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "i2c_address": "0x76", "include_interrupt": true}, path: "params.include_interrupt"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, issues := NewBuiltinRegistry().Instantiate(context.Background(), BlockRequest{BlockID: "i2c_sensor", InstanceID: "bad", Params: tt.params})
+			if !reports.HasBlockingIssue(issues) || !hasBlockIssuePath(issues, tt.path) {
+				t.Fatalf("issues = %#v, want blocker at %s", issues, tt.path)
+			}
+		})
+	}
+}
+
 func TestI2CSensorDuplicateAddressOnSharedBusBlocks(t *testing.T) {
 	output := ComposeBlocks(context.Background(), NewBuiltinRegistry(), CompositionRequest{
 		Instances: []CompositionInstance{

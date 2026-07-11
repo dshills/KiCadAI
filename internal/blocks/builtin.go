@@ -277,6 +277,7 @@ func i2cSensorDefinition() BlockDefinition {
 		Category:    "sensor",
 		Parameters: []BlockParameter{
 			{Name: "supply_voltage", Type: ParameterVoltage, Default: "3.3V", Description: "Sensor supply rail."},
+			{Name: "sensor_component_id", Type: ParameterString, Default: "", Description: "Optional allowlisted concrete sensor component ID; empty retains the generic structural template."},
 			{Name: "sensor_symbol", Type: ParameterSymbolID, Default: defaultI2CSensorSymbol, Description: "KiCad symbol ID for the supported generic I2C sensor template."},
 			{Name: "sensor_footprint", Type: ParameterFootprintID, Default: "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", Description: "KiCad footprint ID for the sensor package."},
 			{Name: "i2c_address", Type: ParameterString, Required: true, Description: "7-bit I2C address such as 0x48."},
@@ -298,9 +299,15 @@ func i2cSensorDefinition() BlockDefinition {
 		},
 		RequiredLibraries: []LibraryRequirement{
 			{Kind: "symbol", ID: defaultI2CSensorSymbol, Required: true, Description: "Generic I2C sensor template."},
+			{Kind: "symbol", ID: "Sensor:BME280", Required: false, Description: "Concrete BME280 sensor profile."},
+			{Kind: "symbol", ID: "Sensor_Pressure:BMP280", Required: false, Description: "Concrete BMP280 sensor profile."},
+			{Kind: "symbol", ID: "Sensor_Humidity:SHT31-DIS", Required: false, Description: "Concrete SHT31-DIS sensor profile."},
 			{Kind: "symbol", ID: "Device:R", Required: true, Description: "Optional pull-up resistors."},
 			{Kind: "symbol", ID: "Device:C", Required: true, Description: "Optional decoupling capacitor."},
 			{Kind: "footprint", ID: "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", Required: true, Description: "Default sensor footprint."},
+			{Kind: "footprint", ID: "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering", Required: false, Description: "Concrete BME280 footprint."},
+			{Kind: "footprint", ID: "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering", Required: false, Description: "Concrete BMP280 footprint."},
+			{Kind: "footprint", ID: "Sensor_Humidity:Sensirion_DFN-8-1EP_2.5x2.5mm_P0.5mm_EP1.1x1.7mm", Required: false, Description: "Concrete SHT31-DIS footprint."},
 			{Kind: "footprint", ID: "Resistor_SMD:R_0805_2012Metric", Required: false, Description: "Default pull-up resistor footprint."},
 			{Kind: "footprint", ID: "Capacitor_SMD:C_0805_2012Metric", Required: false, Description: "Default decoupling capacitor footprint."},
 		},
