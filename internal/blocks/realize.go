@@ -242,14 +242,17 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 	anchors := realizedAnchorMap(result.EntryAnchors)
 	anchorsByPort := realizedAnchorsByPort(result.EntryAnchors)
 	componentByRole := blockComponentByRole(definition.Components)
+	componentByRole = componentRolesWithEmittedPins(componentByRole, roleRefs, output.Operations)
 	activeRouteIDs := map[string]struct{}{}
 	for _, route := range definition.PCBRealization.LocalRoutes {
 		if !realizationWhenMatches(route.When, output.Instance.Params) {
 			continue
 		}
 		activeRouteIDs[route.ID] = struct{}{}
-		from, fromIssues := resolveRealizedRouteEndpoint(route.ID, "from", route.From, roleRefs, placements, componentByRole, anchors, anchorsByPort)
-		to, toIssues := resolveRealizedRouteEndpoint(route.ID, "to", route.To, roleRefs, placements, componentByRole, anchors, anchorsByPort)
+		fromEndpoint := routeEndpointFromEmittedPort(route.From, route.NetTemplate, output, roleRefs)
+		toEndpoint := routeEndpointFromEmittedPort(route.To, route.NetTemplate, output, roleRefs)
+		from, fromIssues := resolveRealizedRouteEndpoint(route.ID, "from", fromEndpoint, roleRefs, placements, componentByRole, anchors, anchorsByPort)
+		to, toIssues := resolveRealizedRouteEndpoint(route.ID, "to", toEndpoint, roleRefs, placements, componentByRole, anchors, anchorsByPort)
 		if len(fromIssues) != 0 || len(toIssues) != 0 {
 			result.Issues = append(result.Issues, fromIssues...)
 			result.Issues = append(result.Issues, toIssues...)
@@ -292,6 +295,42 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 	result.Metadata["local_routes"] = RealizationMetric{Count: len(result.LocalRoutes)}
 	result.Metadata["timing"] = RealizationMetric{Count: len(result.Timing)}
 	return result
+}
+
+func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, output BlockOutput, roleRefs map[string]string) RouteEndpoint {
+	ref := strings.TrimSpace(roleRefs[strings.TrimSpace(endpoint.ComponentRole)])
+	port := strings.TrimSpace(netTemplate)
+	if ref == "" || port == "" {
+		return endpoint
+	}
+	for _, operation := range output.Operations {
+		if operation.Op != transactions.OpConnect {
+			continue
+		}
+		var connect transactions.ConnectOperation
+		if err := decodeOperation(operation, &connect); err != nil {
+			continue
+		}
+		if pin, ok := emittedPortPhysicalPin(connect.From, connect.To, output.Instance.InstanceID, port, ref); ok {
+			endpoint.Pin = pin
+			return endpoint
+		}
+		if pin, ok := emittedPortPhysicalPin(connect.To, connect.From, output.Instance.InstanceID, port, ref); ok {
+			endpoint.Pin = pin
+			return endpoint
+		}
+	}
+	return endpoint
+}
+
+func emittedPortPhysicalPin(portEndpoint transactions.Endpoint, physicalEndpoint transactions.Endpoint, instanceID string, port string, ref string) (string, bool) {
+	if !strings.EqualFold(strings.TrimSpace(portEndpoint.Ref), strings.TrimSpace(instanceID)) ||
+		!strings.EqualFold(strings.TrimSpace(portEndpoint.Pin), strings.TrimSpace(port)) ||
+		!strings.EqualFold(strings.TrimSpace(physicalEndpoint.Ref), strings.TrimSpace(ref)) {
+		return "", false
+	}
+	pin := strings.TrimSpace(physicalEndpoint.Pin)
+	return pin, pin != ""
 }
 
 func activeTimingFixtures(fixtures []PCBTimingFixture, params map[string]any) []PCBTimingFixture {
@@ -825,6 +864,32 @@ func blockComponentByRole(components []BlockComponent) map[string]BlockComponent
 		}
 	}
 	return byRole
+}
+
+func componentRolesWithEmittedPins(components map[string]BlockComponent, roleRefs map[string]string, operations []transactions.Operation) map[string]BlockComponent {
+	byRef := map[string]string{}
+	for role, ref := range roleRefs {
+		if ref = strings.TrimSpace(ref); ref != "" {
+			byRef[strings.ToUpper(ref)] = role
+		}
+	}
+	for _, operation := range operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := decodeOperation(operation, &payload); err != nil || len(payload.Pins) == 0 {
+			continue
+		}
+		role := byRef[strings.ToUpper(strings.TrimSpace(payload.Ref))]
+		component, ok := components[role]
+		if !ok {
+			continue
+		}
+		component.Pins = append([]transactions.PinSpec(nil), payload.Pins...)
+		components[role] = component
+	}
+	return components
 }
 
 type realizedRouteEndpoint struct {

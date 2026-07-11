@@ -204,6 +204,45 @@ func TestRealizeBlockPCBI2CPullupVCCRoutesResolvePullupRefs(t *testing.T) {
 	}
 }
 
+func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
+	registry := NewBuiltinRegistry()
+	definition, ok := registry.GetBlock("i2c_sensor")
+	if !ok {
+		t.Fatal("missing i2c_sensor")
+	}
+	output, issues := registry.Instantiate(context.Background(), BlockRequest{
+		BlockID:    "i2c_sensor",
+		InstanceID: "sensor1",
+		Params: map[string]any{
+			"sensor_component_id": "sensor.bosch.bmp280.lga8",
+			"i2c_address":         "0x76",
+			"include_pullups":     true,
+		},
+	})
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("instantiate issues = %#v", issues)
+	}
+	result := RealizeBlockPCB(definition, output, PCBRealizationOptions{})
+	if reports.HasBlockingIssue(result.Issues) {
+		t.Fatalf("realize issues = %#v", result.Issues)
+	}
+	routes := map[string]RealizedPCBLocalRoute{}
+	for _, route := range result.LocalRoutes {
+		routes[route.ID] = route
+	}
+	for routeID, wantPin := range map[string]string{
+		"vcc_decoupling": "8",
+		"gnd_decoupling": "1",
+		"sda_pullup":     "3",
+		"scl_pullup":     "4",
+	} {
+		route := routes[routeID]
+		if route.To.Ref != result.RoleRefs["sensor"] || route.To.Pin != wantPin {
+			t.Fatalf("route %s to = %#v, want sensor pin %s", routeID, route.To, wantPin)
+		}
+	}
+}
+
 func TestRealizeBlockPCBI2COmitsPullupRoutesWhenDisabled(t *testing.T) {
 	registry := NewBuiltinRegistry()
 	definition, ok := registry.GetBlock("i2c_sensor")

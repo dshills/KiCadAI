@@ -163,6 +163,40 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 	if stage.Status == designworkflow.StageStatusBlocked || reports.HasBlockingIssue(stage.Issues) {
 		t.Fatalf("schematic electrical stage = %#v", stage)
 	}
+	fragments := designworkflow.RealizePCBFragments(ctx, registry, blockPlan)
+	placed := designworkflow.PlaceFragments(ctx, *intentPlan.GeneratedRequest, fragments, designworkflow.PlacementOptions{ComponentSelections: selection.Selections})
+	if reports.HasBlockingIssue(placed.Stage.Issues) {
+		t.Fatalf("placement stage = %#v", placed.Stage)
+	}
+	sensorRef := ""
+	regulatorRef := ""
+	for _, fragment := range fragments.Fragments {
+		switch fragment.InstanceID {
+		case "sensor":
+			sensorRef = fragment.Realization.RoleRefs["sensor"]
+		case "regulator":
+			regulatorRef = fragment.Realization.RoleRefs["regulator"]
+		}
+	}
+	hasEndpoint := func(netName string, ref string, pin string) bool {
+		for _, net := range placed.Request.Nets {
+			if net.Name != netName {
+				continue
+			}
+			for _, endpoint := range net.Endpoints {
+				if endpoint.Ref == ref && endpoint.Pin == pin {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if !hasEndpoint("VCC_3v3v", sensorRef, "8") || !hasEndpoint("VCC_3v3v", regulatorRef, "5") {
+		t.Fatalf("concrete power pins missing from VCC_3v3v: nets=%#v", placed.Request.Nets)
+	}
+	if hasEndpoint("GND", sensorRef, "8") || hasEndpoint("GND", regulatorRef, "5") {
+		t.Fatalf("concrete power pins merged into GND: nets=%#v", placed.Request.Nets)
+	}
 }
 
 func TestPlanDoesNotSelectAP2112KAboveModeledCurrent(t *testing.T) {
