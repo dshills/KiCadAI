@@ -3,7 +3,7 @@
   "name": "sensor_bmp280_breakout",
   "summary": "USB-powered BMP280 pressure and temperature sensor breakout with a verified concrete sensor topology.",
   "kind": "breakout",
-  "acceptance": "connectivity",
+  "acceptance": "erc-drc",
   "board": {"width_mm": 40, "height_mm": 75, "edge_clearance_mm": 0.25, "layers": 2},
   "power": {
     "inputs": [{"kind": "usb_c", "voltage": "5V", "current_ma": 500}],

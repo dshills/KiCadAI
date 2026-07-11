@@ -365,6 +365,24 @@ func TestVerifiedTransferSOIC8PadsProvideNetHints(t *testing.T) {
 	}
 }
 
+func TestVerifiedTransferBMP280AndAP2112PadsProvideNetHints(t *testing.T) {
+	sot, ok := verifiedTransferPadSpecs("Package_TO_SOT_SMD:SOT-23-5", map[string]string{"1": "VIN", "5": "VOUT"})
+	if !ok || len(sot) != 5 || sot[0].Net == nil || *sot[0].Net != "VIN" || sot[4].Net == nil || *sot[4].Net != "VOUT" {
+		t.Fatalf("SOT-23-5 pads = %#v", sot)
+	}
+	if sot[0].XMM != -1.1375 || sot[0].YMM != -0.95 || sot[4].XMM != 1.1375 || sot[4].YMM != -0.95 {
+		t.Fatalf("SOT-23-5 geometry = %#v", sot)
+	}
+
+	lga, ok := verifiedTransferPadSpecs("Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering", map[string]string{"1": "GND", "3": "SDA", "4": "SCL", "8": "VCC"})
+	if !ok || len(lga) != 8 || lga[0].Net == nil || *lga[0].Net != "GND" || lga[7].Net == nil || *lga[7].Net != "VCC" {
+		t.Fatalf("BMP280 LGA-8 pads = %#v", lga)
+	}
+	if lga[2].XMM != 0.325 || lga[2].YMM != -0.8 || lga[7].XMM != -0.975 || lga[7].YMM != 0.8 {
+		t.Fatalf("BMP280 LGA-8 geometry = %#v", lga)
+	}
+}
+
 func TestFromDesignFallsBackToVerifiedTemplatesWhenIndexMissesFootprint(t *testing.T) {
 	trueValue := true
 	point := func(x, y float64) kicadfiles.Point {

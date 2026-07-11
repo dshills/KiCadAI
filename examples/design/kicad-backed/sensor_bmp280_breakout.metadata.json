@@ -1,0 +1,28 @@
+{
+  "id": "sensor_bmp280_breakout",
+  "request": "sensor_bmp280_breakout.json",
+  "tier": "block-composition",
+  "readiness": "pass",
+  "acceptance": "erc-drc",
+  "require_erc": true,
+  "require_drc": true,
+  "allowlists": [],
+  "expected_artifacts": [
+    ".kicadai/design-promotion.json"
+  ],
+  "expected_stages": [
+    "block_planning",
+    "component_selection",
+    "schematic",
+    "schematic_electrical",
+    "pcb_realization",
+    "placement",
+    "routing",
+    "project_write",
+    "writer_correctness",
+    "validation",
+    "kicad_checks"
+  ],
+  "known_gaps": [],
+  "notes": "Concrete BMP280 breakout promoted from structured intent with verified Bosch BMP280 identity, LGA-8 footprint and pad mapping, AP2112 3.3 V regulation, I2C pull-ups, decoupling, complete required-net routing, and clean required KiCad ERC/DRC evidence."
+}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"os/exec"
 	pathpkg "path"
 	"path/filepath"
 	"reflect"
@@ -23,6 +24,7 @@ import (
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/kicadfiles/pcb"
 	"kicadai/internal/kicadfiles/schematic"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 	"kicadai/internal/writercorrectness"
@@ -1603,16 +1605,84 @@ func designExampleExpectedFailRequiresKiCadCLI(metadata designExampleMetadata) b
 	return false
 }
 
+func TestDesignExampleLibraryRootsFindsMacOSAppBundle(t *testing.T) {
+	t.Setenv(libraryresolver.EnvSymbolsRoot, "")
+	t.Setenv(libraryresolver.EnvFootprintsRoot, "")
+	contentsDir := filepath.Join(t.TempDir(), "KiCad.app", "Contents")
+	cliPath := filepath.Join(contentsDir, "MacOS", "kicad-cli")
+	for _, dir := range []string{
+		filepath.Dir(cliPath),
+		filepath.Join(contentsDir, "SharedSupport", "symbols"),
+		filepath.Join(contentsDir, "SharedSupport", "footprints"),
+	} {
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(cliPath, nil, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	roots := designExampleLibraryRoots(cliPath)
+	if roots.SymbolsRoot != filepath.Join(contentsDir, "SharedSupport", "symbols") {
+		t.Fatalf("symbols root = %q", roots.SymbolsRoot)
+	}
+	if roots.FootprintsRoot != filepath.Join(contentsDir, "SharedSupport", "footprints") {
+		t.Fatalf("footprints root = %q", roots.FootprintsRoot)
+	}
+}
+
 func designExampleWriterOptionsForMetadata(metadata designExampleMetadata, cliPath string, outputDir string) writercorrectness.Options {
 	if metadata.Readiness != "pass" {
 		return writercorrectness.Options{}
 	}
-	return writercorrectness.Options{
+	opts := writercorrectness.Options{
 		RequireKiCadRoundTrip: true,
 		KiCadCLI:              cliPath,
 		KeepArtifacts:         true,
 		ArtifactDir:           filepath.Join(outputDir, ".kicadai", "checks"),
 	}
+	roots := designExampleLibraryRoots(cliPath)
+	if strings.TrimSpace(roots.SymbolsRoot) == "" && strings.TrimSpace(roots.FootprintsRoot) == "" {
+		return opts
+	}
+	opts.LibraryResolutionUsed = true
+	index, _ := libraryresolver.Load(context.Background(), roots, libraryresolver.LoadOptions{})
+	if len(index.Symbols) != 0 || len(index.Footprints) != 0 {
+		opts.LibraryIndex = index
+		opts.HasLibraryIndex = true
+	}
+	return opts
+}
+
+func designExampleLibraryRoots(cliPath string) libraryresolver.LibraryRoots {
+	roots, _ := libraryresolver.ResolveRoots()
+	resolvedCLI := strings.TrimSpace(cliPath)
+	if resolvedCLI == "" {
+		return roots
+	}
+	if !filepath.IsAbs(resolvedCLI) {
+		path, err := exec.LookPath(resolvedCLI)
+		if err != nil {
+			return roots
+		}
+		resolvedCLI = path
+	}
+	contentsDir := filepath.Clean(filepath.Join(filepath.Dir(resolvedCLI), ".."))
+	sharedSupport := filepath.Join(contentsDir, "SharedSupport")
+	if strings.TrimSpace(roots.SymbolsRoot) == "" {
+		candidate := filepath.Join(sharedSupport, "symbols")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			roots.SymbolsRoot = candidate
+		}
+	}
+	if strings.TrimSpace(roots.FootprintsRoot) == "" {
+		candidate := filepath.Join(sharedSupport, "footprints")
+		if info, err := os.Stat(candidate); err == nil && info.IsDir() {
+			roots.FootprintsRoot = candidate
+		}
+	}
+	return roots
 }
 
 func validateDesignExampleArtifactPaths(paths []string) error {

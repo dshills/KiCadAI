@@ -1,0 +1,167 @@
+{
+  "version": "0.1.0",
+  "name": "sensor_bmp280_breakout",
+  "intent": {
+    "summary": "USB-powered BMP280 pressure and temperature sensor breakout with a verified concrete sensor topology.",
+    "category": "breakout"
+  },
+  "board": {
+    "width_mm": 40,
+    "height_mm": 75,
+    "layers": 2,
+    "edge_clearance_mm": 0.25
+  },
+  "libraries": {},
+  "component_policy": {
+    "minimum_confidence": "library_derived",
+    "acceptance": "erc_drc",
+    "procurement_policy": {},
+    "overrides": {
+      "regulator.input_capacitor": {
+        "required_ratings": [
+          {
+            "kind": "voltage",
+            "value": "6.3",
+            "unit": "V"
+          }
+        ]
+      },
+      "regulator.output_capacitor": {
+        "required_ratings": [
+          {
+            "kind": "voltage",
+            "value": "6.3",
+            "unit": "V"
+          }
+        ]
+      },
+      "regulator.regulator": {
+        "required_ratings": [
+          {
+            "kind": "input_voltage",
+            "value": "5",
+            "unit": "V"
+          },
+          {
+            "kind": "output_current",
+            "value": "0.05",
+            "unit": "A"
+          }
+        ]
+      }
+    }
+  },
+  "blocks": [
+    {
+      "id": "usb_power",
+      "block_id": "usb_c_power",
+      "params": {
+        "include_bulk_capacitor": false,
+        "include_fuse": false,
+        "include_power_led": false,
+        "include_tvs": false,
+        "shield_policy": "floating"
+      }
+    },
+    {
+      "id": "regulator",
+      "block_id": "voltage_regulator",
+      "params": {
+        "enable_mode": "tied_input",
+        "input_voltage": "5V",
+        "input_voltage_max": "5V",
+        "input_voltage_min": "5V",
+        "output_current": "0.05A",
+        "output_voltage": "3.3V",
+        "regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+        "regulator_symbol": "Regulator_Linear:AP2112K-3.3"
+      }
+    },
+    {
+      "id": "sensor",
+      "block_id": "i2c_sensor",
+      "params": {
+        "i2c_address": "0x76",
+        "pullup_value": "4.7k",
+        "sensor_component_id": "sensor.bosch.bmp280.lga8",
+        "supply_voltage": "3.3V"
+      }
+    },
+    {
+      "id": "i2c_connector",
+      "block_id": "connector_breakout",
+      "params": {
+        "pin_names": [
+          "VCC",
+          "GND",
+          "SDA",
+          "SCL"
+        ]
+      }
+    }
+  ],
+  "connections": [
+    {
+      "from": "usb_power.VBUS_OUT",
+      "to": "regulator.VIN",
+      "net_alias": "VIN_RAW_usb_power"
+    },
+    {
+      "from": "usb_power.GND",
+      "to": "regulator.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "regulator.VOUT",
+      "to": "sensor.VCC",
+      "net_alias": "VCC_3v3v"
+    },
+    {
+      "from": "usb_power.GND",
+      "to": "i2c_connector.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "usb_power.GND",
+      "to": "sensor.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "usb_power.GND",
+      "to": "regulator.GND",
+      "net_alias": "GND"
+    },
+    {
+      "from": "i2c_connector.SDA",
+      "to": "sensor.SDA",
+      "net_alias": "SDA"
+    },
+    {
+      "from": "i2c_connector.SCL",
+      "to": "sensor.SCL",
+      "net_alias": "SCL"
+    },
+    {
+      "from": "regulator.VOUT",
+      "to": "i2c_connector.VCC",
+      "net_alias": "VCC_3v3v"
+    }
+  ],
+  "constraints": {},
+  "validation": {
+    "acceptance": "erc-drc",
+    "require_erc": true,
+    "require_drc": true,
+    "strict_unrouted": true,
+    "strict_zones": true
+  },
+  "routing_retry": {
+    "max_attempts": 1,
+    "allowed_hint_categories": [
+      "reduce_distance",
+      "increase_spacing",
+      "improve_fanout",
+      "move_from_edge"
+    ]
+  }
+}

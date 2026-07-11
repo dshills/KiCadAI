@@ -89,6 +89,12 @@ Omitting `sensor_component_id` deliberately selects the backward-compatible
 generic topology. Providing an unknown ID does not fall back; it blocks until
 a verified concrete profile exists.
 
+The BMP280 intent is also promoted through the optional KiCad-backed fixture
+lane as `examples/design/kicad-backed/sensor_bmp280_breakout.json`. Its
+metadata declares `pass` and requires real KiCad ERC and DRC evidence. See
+`examples/design/kicad-backed/README.md` for the exact generation command and
+artifact paths.
+
 The top-level JSON result uses requested acceptance as the success contract. A
 request for `structural` acceptance can return `ok: true` while still including
 connectivity or KiCad-check issues for higher levels. Those issues are retained

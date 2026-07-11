@@ -54,6 +54,7 @@ kicadai \
 | `led_indicator_kicad_smoke` | `candidate` | Tracks the smallest design-level KiCad-backed smoke path with schematic electrical checks, block-local route contact proof, writer correctness, board validation, and warning-only KiCad evidence. |
 | `connector_led_kicad_smoke` | `expected_fail` | Tracks connector-to-LED multi-block composition with KiCad-native net assignment and routed inter-block endpoint contact evidence. It currently blocks on required KiCad ERC pin/endpoint evidence. |
 | `i2c_sensor_breakout_candidate` | `candidate` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, project-write, writer-correctness, structural validation, and warning-level optional KiCad evidence. Pass promotion still requires clean required KiCad DRC evidence from a stable `kicad-cli`. |
+| `sensor_bmp280_breakout` | `pass` | Reproduces the concrete BMP280 structured-intent result through the environment-gated design fixture lane with verified Bosch identity, LGA-8 footprint/pad mapping, complete required-net routing, and clean KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
 | `usb_c_i2c_sensor_3v3_protected` | `candidate` | Tracks the medium-complexity AI-generated target fixture: `usb_c_power` input, protected VBUS path, 5 V to 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and header. It now clears blocking KiCad ERC/DRC evidence; remaining work is warning-level ERC cleanup and fabrication-grade AMS1117 regulator proof. |
@@ -101,6 +102,56 @@ Observed promotion status:
 
 The ERC report has no violations. The DRC report has no violations and no
 unconnected items. Both normalized round-trip diffs are zero bytes.
+
+## BMP280 Structured-Intent Pass Evidence
+
+The authoritative input is
+`examples/intent/sensor_bmp280_breakout.json`. The optional fixture lane checks
+the deterministic synthesized request at
+`examples/design/kicad-backed/sensor_bmp280_breakout.json` with readiness
+declared by `sensor_bmp280_breakout.metadata.json`.
+
+Run the full intent workflow from the repository root with the compiled binary
+on `PATH`:
+
+```sh
+export KICADAI_KICAD_CLI=/path/to/kicad-cli
+kicadai \
+  --request examples/intent/sensor_bmp280_breakout.json \
+  --output examples/.generated/sensor_bmp280_breakout \
+  --overwrite \
+  --kicad-cli "$KICADAI_KICAD_CLI" \
+  --require-erc \
+  --require-drc \
+  --require-kicad-roundtrip \
+  --keep-artifacts \
+  --artifact-dir examples/.generated/sensor_bmp280_breakout/.kicadai/checks \
+  intent create
+```
+
+Re-run only the checked-in environment-gated fixture:
+
+```sh
+KICADAI_KICAD_CLI=/path/to/kicad-cli \
+go test -v ./internal/designworkflow \
+  -run 'TestDesignExamplesOptionalKiCadBackedTier/sensor_bmp280_breakout' \
+  -count=1
+```
+
+Evidence is written under
+`examples/.generated/sensor_bmp280_breakout/.kicadai/`:
+
+- promotion: `design-promotion.json`;
+- workflow and route-completion evidence: `workflow-result.json`;
+- generated transaction and identity provenance: `transaction.json`;
+- KiCad ERC: `checks/kicadai-check-erc-*/erc.json`;
+- KiCad DRC: `checks/kicadai-check-drc-*/drc.json`;
+- PCB round-trip diff: `checks/pcb-roundtrip-*/normalized.diff`;
+- schematic round-trip diff: `checks/sensor_bmp280_breakout-*/normalized.diff`.
+
+A passing run reports promotion readiness `pass`, zero KiCad ERC/DRC
+violations, zero DRC unconnected items, all 16 required PCB endpoints proven,
+and zero-byte normalized round-trip diffs.
 
 ## Interpreting Results
 
