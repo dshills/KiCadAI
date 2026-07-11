@@ -111,6 +111,12 @@ unsupported power devices:
   `regulator_evidence`: AMS1117 is modeled as ESR-window-required for output
   capacitor stability, while AP2112K is modeled as ceramic-stable for
   connectivity but still review-gated for MLCC derating and thermal evidence.
+- Bosch BME280 and BMP280 LGA-8 sensors plus Sensirion SHT31-DIS DFN-8.
+  Their verified records include typed sensor evidence for supply range, I2C
+  address options and strap levels, I2C-mode pins, optional interrupt/alert
+  behavior, and unused-pin policy. Their exact component IDs are
+  `sensor.bosch.bme280.lga8`, `sensor.bosch.bmp280.lga8`, and
+  `sensor.sensirion.sht31_dis.dfn8`.
 - onsemi MMBT3904/MMBT3906 SOT-23 small-signal BJT amplifier seeds, plus a
   blocked-by-default NPN TO-220 power-output placeholder that requires pinout,
   package, thermal, Safe Operating Area (SOA), and layout-constraint evidence
@@ -124,6 +130,20 @@ or connectivity scaffolding before choosing an exact part.
 The checked-in source records are local curated snapshots. They prove that the
 workflow can carry lifecycle and availability-status fields, but they do not
 imply live stock, pricing, or current distributor availability.
+
+## Verified I2C Sensor Slice
+
+The `i2c_sensor` block can select the three sensor records above through its
+`sensor_component_id` parameter. BME280 and BMP280 support generated I2C
+addresses `0x76` and `0x77`; SHT31-DIS supports `0x44` and `0x45`. Selection
+uses the catalog symbol and footprint and fails closed when a caller supplies
+an unknown component ID or a mismatched symbol, footprint, address, supply, or
+interrupt requirement.
+
+This slice proves I2C connectivity topology, required supply/ground pins,
+address and mode straps, declared no-connect treatment, pull-ups, decoupling,
+and identity propagation. It does not model SPI mode, arbitrary environmental
+sensors, measurement accuracy, calibration, or production suitability.
 
 Records can include optional `equivalence` metadata:
 

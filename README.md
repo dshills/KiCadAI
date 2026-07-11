@@ -237,6 +237,8 @@ common generated designs:
 - 1x02 through 1x06 2.54 mm pin headers and indicator LEDs;
 - Signal and Schottky diodes plus a SOD-323 ESD/TVS protection diode;
 - AMS1117 SOT-223 and AP2112K SOT-23-5 fixed 3.3 V LDOs;
+- Bosch BME280/BMP280 and Sensirion SHT31-DIS I2C sensors with verified
+  symbol, footprint, pinmap, supply, address-strap, and auxiliary-pin evidence;
 - onsemi MMBT3904/MMBT3906 SOT-23 BJT amplifier seeds;
 - blocked-by-default NPN TO-220 power-output placeholders for unsupported
   power-device scenarios.

@@ -70,6 +70,25 @@ plus the optional KiCad-backed `i2c_sensor_breakout_candidate` design example.
 It is now a reproducible KiCad-backed pass fixture when run with configured
 required ERC/DRC evidence.
 
+Concrete structured-intent examples are checked in at:
+
+- `examples/intent/sensor_bmp280_breakout.json`;
+- `examples/intent/sensor_sht31_breakout.json`.
+
+Each example carries `sensor_component_id` through `intent plan` into the
+generated `i2c_sensor` request. Component selection then writes the selected
+manufacturer/MPN, component ID, symbol, footprint, confidence, and pinmap
+evidence into generated operations. Use `intent plan` to inspect this handoff:
+
+```sh
+kicadai --request ./examples/intent/sensor_bmp280_breakout.json intent plan
+kicadai --request ./examples/intent/sensor_sht31_breakout.json intent plan
+```
+
+Omitting `sensor_component_id` deliberately selects the backward-compatible
+generic topology. Providing an unknown ID does not fall back; it blocks until
+a verified concrete profile exists.
+
 The top-level JSON result uses requested acceptance as the success contract. A
 request for `structural` acceptance can return `ok: true` while still including
 connectivity or KiCad-check issues for higher levels. Those issues are retained

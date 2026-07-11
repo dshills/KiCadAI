@@ -13,6 +13,8 @@ Date: 2026-07-11
 
 ## Phase 1: Scope And Evidence Contract
 
+Status: completed.
+
 Deliverables:
 
 - `SPEC.md` and this phased plan;
@@ -33,6 +35,8 @@ Acceptance:
 Risk: low; documentation-only and independently revertible.
 
 ## Phase 2: Catalog And Pinmap Evidence
+
+Status: completed.
 
 Likely files:
 
@@ -60,6 +64,8 @@ Acceptance:
 Risk: medium; incorrect pin identity would invalidate generated connectivity.
 
 ## Phase 3: Concrete Sensor Block Profiles
+
+Status: completed.
 
 Likely files:
 
@@ -91,6 +97,8 @@ connectivity, so this phase remains a separate commit.
 
 ## Phase 4: Intent And Workflow Integration
 
+Status: completed.
+
 Likely files:
 
 - `internal/intentplanner` mapping/model tests;
@@ -118,6 +126,8 @@ Acceptance:
 Risk: medium; integration must not alter existing seed phrase behavior.
 
 ## Phase 5: Documentation And Compatibility Closeout
+
+Status: completed.
 
 Likely files:
 

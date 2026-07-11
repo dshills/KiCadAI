@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"kicadai/internal/evaluate"
 	"kicadai/internal/kicadfiles"
@@ -13,6 +14,7 @@ import (
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
+	"kicadai/internal/writercorrectness"
 )
 
 func TestConcreteI2CSensorProfilesWriteElectricalSchematics(t *testing.T) {
@@ -21,6 +23,7 @@ func TestConcreteI2CSensorProfilesWriteElectricalSchematics(t *testing.T) {
 		componentID string
 		address     string
 	}{
+		{name: "bme280", componentID: "sensor.bosch.bme280.lga8", address: "0x76"},
 		{name: "bmp280", componentID: "sensor.bosch.bmp280.lga8", address: "0x76"},
 		{name: "sht31", componentID: "sensor.sensirion.sht31_dis.dfn8", address: "0x44"},
 	}
@@ -62,6 +65,33 @@ func TestConcreteI2CSensorProfilesWriteElectricalSchematics(t *testing.T) {
 			for _, check := range report.Checks {
 				if (check.Name == "schematic_validation" || check.Name == "schematic_electrical") && check.Status != evaluate.CheckPassed {
 					t.Fatalf("check %s = %#v", check.Name, check)
+				}
+			}
+			validationContext, cancelValidation := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancelValidation()
+			writerResult := writercorrectness.Validate(validationContext, outputDir, writercorrectness.Options{
+				LibraryIndex:    index,
+				HasLibraryIndex: true,
+			})
+			if !writerResult.OK {
+				var firstIssue any
+				if len(writerResult.Issues) != 0 {
+					firstIssue = writerResult.Issues[0]
+				}
+				t.Fatalf("writer correctness failed: summary=%#v issue_count=%d first_issue=%#v", writerResult.OverallSummary, len(writerResult.Issues), firstIssue)
+			}
+			for _, name := range []string{writercorrectness.CheckProjectStructure, writercorrectness.CheckSchematicParse, writercorrectness.CheckSchematicConnectivity} {
+				found := false
+				for _, check := range writerResult.Checks {
+					if check.Name == name {
+						found = true
+						if check.Status != writercorrectness.CheckPass {
+							t.Errorf("writer check %s status=%s issues=%#v", name, check.Status, check.Issues)
+						}
+					}
+				}
+				if !found {
+					t.Errorf("writer check %s missing", name)
 				}
 			}
 		})

@@ -312,7 +312,8 @@ Make part selection reliable enough for AI-generated designs beyond demos.
 
 ### Status
 
-Foundation plus first verified family-expansion slice implemented.
+Foundation plus the first verified alternatives and concrete I2C sensor
+family-expansion waves implemented.
 
 ### Current Foundation
 
@@ -344,6 +345,10 @@ USB-C power-only, and protection parts. It includes:
   concrete-vs-generic behavior, equivalence metadata validation, alternative
   coverage reporting, workflow procurement evidence, and BOM procurement
   snapshot propagation;
+- verified I2C sensor topology coverage for Bosch BME280/BMP280 and Sensirion
+  SHT31-DIS, including typed supply/address/mode/interrupt/unused-pin evidence,
+  exact built-in pinmaps, deterministic component selection, and fail-closed
+  profile matching;
 - an NPN TO-220 power-output BJT placeholder that is blocked by default
   until pinout, package, thermal, Safe Operating Area (SOA), and layout
   constraints are modeled;
@@ -420,6 +425,11 @@ Implemented foundation with a documented first AI-controlled generation lane.
   reset/programming header, ESD protection, and reverse-polarity protection
   blocks declare electrical rules, PCB constraints, and required local-route
   expectations where supported by the current realization model.
+- The `i2c_sensor` block retains its generic path and supports concrete
+  catalog-backed BME280, BMP280, and SHT31-DIS profiles with exact real-pin
+  topology, address/mode straps, optional interrupt handling, generated
+  identity evidence, readable labeled ports, and hermetic post-write
+  schematic/electrical/writer-correctness coverage.
 - PCB realization metadata includes placement groups, keepouts, proximity
   constraints, route width constraints, edge-facing constraints, and local
   route definitions for supported block-local nets.
@@ -524,6 +534,8 @@ Implemented foundation with a documented first AI-controlled generation lane.
 - Convert more semantic PCB constraints into downstream placement, routing,
   DRC, and repair enforcement.
 - Broaden block variants beyond the initial verified/default topologies.
+- Expand concrete sensor profiles only in finite datasheet-backed waves; SPI,
+  arbitrary sensor pin inference, and unverified IDs remain explicit gaps.
 
 ### Acceptance Gates
 

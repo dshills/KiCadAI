@@ -310,6 +310,21 @@ when they satisfy the request; draft and structural workflows may still use
 generic fallback records. Inspect `alternative_coverage` in `component coverage`
 when judging catalog breadth.
 
+For a supported concrete I2C sensor, set `i2c_sensor.params.sensor_component_id`
+to exactly one of:
+
+- `sensor.bosch.bme280.lga8`;
+- `sensor.bosch.bmp280.lga8`;
+- `sensor.sensirion.sht31_dis.dfn8`.
+
+Use `0x76`/`0x77` for the Bosch profiles and `0x44`/`0x45` for SHT31-DIS.
+Inspect the generated `component_selection` evidence and schematic identity
+properties before claiming a concrete part was used. Do not invent IDs, infer
+pin roles, request SPI mode, or substitute a generic topology after a concrete
+selection fails. The checked-in intent examples
+`sensor_bmp280_breakout.json` and `sensor_sht31_breakout.json` demonstrate the
+supported handoff.
+
 Stop if a fabrication-candidate request lacks verified component evidence.
 When lifecycle or availability matters, provide `--source-dir` and inspect the
 selected `procurement` object. Treat source evidence as a local snapshot only;

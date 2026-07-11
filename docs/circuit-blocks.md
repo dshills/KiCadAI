@@ -17,6 +17,23 @@ readiness gaps. `design create` includes that block readiness in its
 `block_planning` stage so agents can explain selected blocks, missing evidence,
 required local routes, and known limitations before writing a project.
 
+### Concrete I2C Sensor Profiles
+
+`i2c_sensor` retains its generic structural template when
+`sensor_component_id` is omitted. It also has verified concrete profiles for:
+
+- `sensor.bosch.bme280.lga8` at `0x76` or `0x77`;
+- `sensor.bosch.bmp280.lga8` at `0x76` or `0x77`;
+- `sensor.sensirion.sht31_dis.dfn8` at `0x44` or `0x45`.
+
+Concrete profiles emit the catalog-backed symbol and footprint, every required
+supply and ground pin, SDA/SCL, deterministic address and mode straps,
+optional alert/interrupt handling where verified, and explicit no-connects
+where the profile permits them. External ports and strap nets use local labels
+to avoid rail crossings through the sensor body. Unknown component IDs and
+mismatched symbol, footprint, address, or interrupt requests fail closed. SPI
+and inferred pin-role mappings remain unsupported.
+
 Amplifier inventory is intentionally broader than the currently implemented
 amplifier blocks. The roadmap-backed family now names input buffer, gain stage,
 bias network, Class AB output pair, output protection, supply decoupling,
