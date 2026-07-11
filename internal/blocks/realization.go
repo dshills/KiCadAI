@@ -91,12 +91,18 @@ type PCBLocalRoute struct {
 	From               RouteEndpoint          `json:"from"`
 	To                 RouteEndpoint          `json:"to"`
 	Waypoints          []RelativePoint        `json:"waypoints,omitempty"`
+	WaypointVariants   []PCBWaypointVariant   `json:"waypoint_variants,omitempty"`
 	Layer              string                 `json:"layer,omitempty"`
 	WidthMM            float64                `json:"width_mm,omitempty"`
 	Required           bool                   `json:"required,omitempty"`
 	EntryAnchorDogbone *PCBEntryAnchorDogbone `json:"entry_anchor_dogbone,omitempty"`
 	Description        string                 `json:"description,omitempty"`
 	When               RealizationWhen        `json:"when,omitempty"`
+}
+
+type PCBWaypointVariant struct {
+	Waypoints []RelativePoint `json:"waypoints"`
+	When      RealizationWhen `json:"when"`
 }
 
 type PCBEntryAnchorDogbone struct {
@@ -313,6 +319,19 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		issues = append(issues, validateRealizationWhen(routePath+".when", route.When, parameters)...)
 		for waypointIndex, point := range route.Waypoints {
 			issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", routePath, waypointIndex), point)...)
+		}
+		for variantIndex, variant := range route.WaypointVariants {
+			variantPath := fmt.Sprintf("%s.waypoint_variants.%d", routePath, variantIndex)
+			if len(variant.Waypoints) == 0 {
+				issues = append(issues, blockIssue(variantPath+".waypoints", "waypoint variant requires at least one point"))
+			}
+			if len(variant.When.Params) == 0 {
+				issues = append(issues, blockIssue(variantPath+".when", "waypoint variant requires a non-empty condition"))
+			}
+			for waypointIndex, point := range variant.Waypoints {
+				issues = append(issues, validatePoint(fmt.Sprintf("%s.waypoints.%d", variantPath, waypointIndex), point)...)
+			}
+			issues = append(issues, validateRealizationWhen(variantPath+".when", variant.When, parameters)...)
 		}
 	}
 	timingIDs := make(map[string]struct{})
@@ -775,6 +794,12 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.LocalRoutes = append([]PCBLocalRoute(nil), realization.LocalRoutes...)
 	for i := range clone.LocalRoutes {
 		clone.LocalRoutes[i].Waypoints = append([]RelativePoint(nil), realization.LocalRoutes[i].Waypoints...)
+		clone.LocalRoutes[i].WaypointVariants = append([]PCBWaypointVariant(nil), realization.LocalRoutes[i].WaypointVariants...)
+		for variantIndex := range clone.LocalRoutes[i].WaypointVariants {
+			variant := &clone.LocalRoutes[i].WaypointVariants[variantIndex]
+			variant.Waypoints = append([]RelativePoint(nil), variant.Waypoints...)
+			variant.When = cloneRealizationWhen(variant.When)
+		}
 		if realization.LocalRoutes[i].EntryAnchorDogbone != nil {
 			dogbone := *realization.LocalRoutes[i].EntryAnchorDogbone
 			clone.LocalRoutes[i].EntryAnchorDogbone = &dogbone

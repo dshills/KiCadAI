@@ -248,6 +248,7 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		if !realizationWhenMatches(route.When, output.Instance.Params) {
 			continue
 		}
+		route = realizedLocalRouteGeometry(route, output.Instance.Params)
 		activeRouteIDs[route.ID] = struct{}{}
 		fromEndpoint := routeEndpointFromEmittedPort(route.From, route.NetTemplate, output, roleRefs)
 		toEndpoint := routeEndpointFromEmittedPort(route.To, route.NetTemplate, output, roleRefs)
@@ -295,6 +296,16 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 	result.Metadata["local_routes"] = RealizationMetric{Count: len(result.LocalRoutes)}
 	result.Metadata["timing"] = RealizationMetric{Count: len(result.Timing)}
 	return result
+}
+
+func realizedLocalRouteGeometry(route PCBLocalRoute, params map[string]any) PCBLocalRoute {
+	for _, variant := range route.WaypointVariants {
+		if realizationWhenMatches(variant.When, params) {
+			route.Waypoints = append([]RelativePoint(nil), variant.Waypoints...)
+			break
+		}
+	}
+	return route
 }
 
 func routeEndpointFromEmittedPort(endpoint RouteEndpoint, netTemplate string, output BlockOutput, roleRefs map[string]string) RouteEndpoint {

@@ -247,6 +247,12 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 	if route := routes["bmp280_csb_tie"]; route.From.Pin != "2" || route.To.Pin != "6" {
 		t.Fatalf("BMP280 CSB tie = %#v -> %#v", route.From, route.To)
 	}
+	for _, routeID := range []string{"vcc_decoupling", "sda_pullup_vcc", "scl_pullup_vcc"} {
+		points := routes[routeID].Points
+		if len(points) != 3 || points[1].XMM != bmp280VCCTrunkXMM || points[1].YMM != bmp280VCCTrunkYMM {
+			t.Fatalf("BMP280 route %s does not use left-side VCC trunk: %#v", routeID, points)
+		}
+	}
 }
 
 func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {

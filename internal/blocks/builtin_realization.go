@@ -7,6 +7,12 @@ import (
 	"kicadai/internal/transactions"
 )
 
+const (
+	i2cVCCSourceXMM   = 19.4
+	bmp280VCCTrunkXMM = i2cVCCSourceXMM
+	bmp280VCCTrunkYMM = 15.8
+)
+
 func boolPtr(value bool) *bool {
 	return &value
 }
@@ -172,6 +178,10 @@ func i2cSensorComponents() []BlockComponent {
 func i2cSensorPCBRealization() *PCBRealization {
 	pullupsEnabled := RealizationWhen{Params: map[string]any{"include_pullups": true}}
 	bmp280 := RealizationWhen{Params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8"}}
+	// The decoupling and both pull-up VCC pads share X=19.4 in this
+	// realization. Replacing the generic detours with this point produces
+	// vertical source-to-trunk segments and a horizontal approach to VDD.
+	bmp280VCCTrunk := []PCBWaypointVariant{{Waypoints: []RelativePoint{{XMM: bmp280VCCTrunkXMM, YMM: bmp280VCCTrunkYMM}}, When: bmp280}}
 	fixedLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": true}}
 	movableLayout := RealizationWhen{Params: map[string]any{"fixed_pcb_layout": false}}
 	return &PCBRealization{
@@ -189,10 +199,10 @@ func i2cSensorPCBRealization() *PCBRealization {
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "sensor_core", ComponentRoles: []string{"sensor", "decoupling_capacitor", "sda_pullup", "scl_pullup"}, AnchorRole: "sensor", Bounds: &RelativeBounds{MinXMM: -14, MinYMM: -6, MaxXMM: 3, MaxYMM: 7}}},
 		LocalRoutes: []PCBLocalRoute{
-			{ID: "vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 19.4, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
+			{ID: "vcc_decoupling", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: i2cVCCSourceXMM, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, WaypointVariants: bmp280VCCTrunk, Layer: "F.Cu", WidthMM: 0.3, Required: true},
 			{ID: "gnd_decoupling", NetTemplate: "gnd", From: RouteEndpoint{ComponentRole: "decoupling_capacitor", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.GND}, Waypoints: []RelativePoint{{XMM: 25.05, YMM: 14.365}}, Layer: "F.Cu", WidthMM: 0.3, Required: true},
-			{ID: "sda_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 16, YMM: 11}, {XMM: 16, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
-			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 15, YMM: 20}, {XMM: 15, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "sda_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 16, YMM: 11}, {XMM: 16, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, WaypointVariants: bmp280VCCTrunk, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
+			{ID: "scl_pullup_vcc", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "1"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.VCC}, Waypoints: []RelativePoint{{XMM: 15, YMM: 20}, {XMM: 15, YMM: 13.095}, {XMM: 25.05, YMM: 13.095}}, WaypointVariants: bmp280VCCTrunk, Layer: "F.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "sda_pullup", NetTemplate: "sda", From: RouteEndpoint{ComponentRole: "sda_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SDA}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 9.5}, {XMM: 14, YMM: 9.5}, {XMM: 14, YMM: 15.635}, {XMM: 25.05, YMM: 15.635}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "scl_pullup", NetTemplate: "scl", From: RouteEndpoint{ComponentRole: "scl_pullup", Pin: "2"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: genericI2CSensorPins.SCL}, Waypoints: []RelativePoint{{XMM: 20.6, YMM: 16.905}, {XMM: 25.05, YMM: 16.905}}, Layer: "B.Cu", WidthMM: 0.25, Required: true, When: pullupsEnabled},
 			{ID: "bmp280_vddio_tie", NetTemplate: "vcc", From: RouteEndpoint{ComponentRole: "sensor", Pin: "6"}, To: RouteEndpoint{ComponentRole: "sensor", Pin: "8"}, Waypoints: []RelativePoint{{XMM: 28.325, YMM: 16.5}, {XMM: 27.025, YMM: 16.5}}, Layer: "F.Cu", WidthMM: 0.2, Required: true, When: bmp280},
