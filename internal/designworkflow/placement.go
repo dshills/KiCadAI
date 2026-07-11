@@ -51,6 +51,9 @@ func PlaceFragments(ctx context.Context, request Request, fragments PCBFragmentR
 		Rules: mergePlacementRules(opts.Rules),
 		Seed:  normalized.Name,
 	}
+	if normalized.Board.EdgeClearanceMM > 0 {
+		placementRequest.Rules.BoardEdgeClearanceMM = normalized.Board.EdgeClearanceMM
+	}
 	if placementRequest.Board.MarginMM == 0 {
 		placementRequest.Board.MarginMM = 1
 	}

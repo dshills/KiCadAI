@@ -19,7 +19,7 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 		Name:       "sensor_breakout",
 		Kind:       IntentBreakout,
 		Acceptance: designworkflow.AcceptanceConnectivity,
-		Board:      BoardIntent{WidthMM: 50, HeightMM: 30, Layers: 2},
+		Board:      BoardIntent{WidthMM: 50, HeightMM: 30, EdgeClearanceMM: 0.25, Layers: 2},
 		Power: PowerIntent{
 			Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}},
 			Rails:  []PowerRailIntent{{Name: "VCC", Voltage: "3.3V", CurrentMA: 100}},
@@ -32,6 +32,9 @@ func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
 	}
 	if plan.GeneratedRequest == nil {
 		t.Fatalf("GeneratedRequest missing")
+	}
+	if plan.GeneratedRequest.Board.EdgeClearanceMM != 0.25 {
+		t.Fatalf("edge clearance = %v, want 0.25", plan.GeneratedRequest.Board.EdgeClearanceMM)
 	}
 	for _, blockID := range []string{"usb_c_power", "voltage_regulator", "i2c_sensor", "connector_breakout"} {
 		if !hasWorkflowBlock(*plan.GeneratedRequest, blockID) {

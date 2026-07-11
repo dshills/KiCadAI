@@ -531,3 +531,20 @@ func TestPlaceFragmentsMergesRulesWithoutDroppingCustomValues(t *testing.T) {
 		t.Fatalf("request constraints did not override layer preferences: %#v", result.Request.Rules)
 	}
 }
+
+func TestPlaceFragmentsHonorsExplicitBoardEdgeClearance(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "status_board",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 25, EdgeClearanceMM: 0.25, Layers: 2},
+		Blocks:  []BlockInstanceSpec{{ID: "status", BlockID: "led_indicator"}},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if result.Request.Board.MarginMM != 0.25 || result.Request.Rules.BoardEdgeClearanceMM != 0.25 {
+		t.Fatalf("edge clearance not honored: board=%#v rules=%#v", result.Request.Board, result.Request.Rules)
+	}
+}

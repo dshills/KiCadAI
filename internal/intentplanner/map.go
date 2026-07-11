@@ -46,9 +46,10 @@ func Plan(request Request) PlanResult {
 				Category: string(normalized.Kind),
 			},
 			Board: designworkflow.BoardSpec{
-				WidthMM:  normalized.Board.WidthMM,
-				HeightMM: normalized.Board.HeightMM,
-				Layers:   normalized.Board.Layers,
+				WidthMM:         normalized.Board.WidthMM,
+				HeightMM:        normalized.Board.HeightMM,
+				EdgeClearanceMM: normalized.Board.EdgeClearanceMM,
+				Layers:          normalized.Board.Layers,
 			},
 			Validation: designworkflow.ValidationSpec{
 				Acceptance: normalized.Acceptance,

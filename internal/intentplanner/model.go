@@ -56,10 +56,11 @@ type Request struct {
 }
 
 type BoardIntent struct {
-	WidthMM       float64  `json:"width_mm,omitempty"`
-	HeightMM      float64  `json:"height_mm,omitempty"`
-	Layers        int      `json:"layers,omitempty"`
-	MountingHoles Strength `json:"mounting_holes,omitempty"`
+	WidthMM         float64  `json:"width_mm,omitempty"`
+	HeightMM        float64  `json:"height_mm,omitempty"`
+	EdgeClearanceMM float64  `json:"edge_clearance_mm,omitempty"`
+	Layers          int      `json:"layers,omitempty"`
+	MountingHoles   Strength `json:"mounting_holes,omitempty"`
 }
 
 type PowerIntent struct {
@@ -257,6 +258,9 @@ func ValidateRequest(request Request) []reports.Issue {
 	}
 	if request.Board.HeightMM < 0 || math.IsNaN(request.Board.HeightMM) || math.IsInf(request.Board.HeightMM, 0) {
 		issues = append(issues, issue("board.height_mm", "board height must be non-negative and finite"))
+	}
+	if request.Board.EdgeClearanceMM < 0 || math.IsNaN(request.Board.EdgeClearanceMM) || math.IsInf(request.Board.EdgeClearanceMM, 0) {
+		issues = append(issues, issue("board.edge_clearance_mm", "board edge clearance must be non-negative and finite"))
 	}
 	if request.Board.Layers != 1 && request.Board.Layers != 2 {
 		issues = append(issues, issue("board.layers", "board layers must be 1 or 2"))
