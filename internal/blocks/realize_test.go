@@ -261,10 +261,19 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 		}
 	}
 	for _, routeID := range []string{"vcc_decoupling", "sda_pullup_vcc", "scl_pullup_vcc"} {
+		if routeID == "scl_pullup_vcc" {
+			if _, exists := routes[routeID]; exists {
+				t.Fatalf("BMP280 routes include disabled generic SCL supply: %#v", routes[routeID])
+			}
+			continue
+		}
 		points := routes[routeID].Points
 		if len(points) != 3 || points[1].XMM != bmp280VCCTrunkXMM || points[1].YMM != bmp280VCCTrunkYMM {
 			t.Fatalf("BMP280 route %s does not use left-side VCC trunk: %#v", routeID, points)
 		}
+	}
+	if route := routes["bmp280_scl_pullup_supply"]; route.Layer != "B.Cu" || route.To.Ref != result.RoleRefs["decoupling_capacitor"] || route.To.Pin != "1" {
+		t.Fatalf("BMP280 SCL pull-up supply = %#v", route)
 	}
 }
 
