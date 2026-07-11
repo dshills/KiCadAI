@@ -26,6 +26,7 @@ A local-route geometry variant is atomic and contains one or more of:
 - replacement `layer`;
 - `disable_entry_anchor_dogbone`;
 - `disable_entry_anchor_via` when the anchor is already joined to same-layer pad copper;
+- `disable_route` when a generic route is replaced by an active profile-specific route;
 - non-empty `when`.
 
 `waypoints` and `clear_waypoints` are mutually exclusive. A variant with no geometry change is invalid. The first matching variant is applied before route points are realized. Existing `waypoint_variants` remain supported and unchanged.

@@ -322,6 +322,12 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	if route := routes["ap2112_gnd_core"]; route.Layer != "B.Cu" || route.To.Pin != "2" {
 		t.Fatalf("AP2112 GND core = %#v", route)
 	}
+	if route := routes["ap2112_output_ground"]; route.Layer != "B.Cu" || route.To.Pin != "2" || len(route.Points) < 4 || route.Points[1] != (transactions.Point{XMM: ap2112OutputGroundCapXMM, YMM: ap2112OutputGroundChannelYMM}) || route.Points[2] != (transactions.Point{XMM: ap2112GroundPinXMM, YMM: ap2112OutputGroundChannelYMM}) {
+		t.Fatalf("AP2112 output ground = %#v", route)
+	}
+	if _, exists := routes["gnd_bypass"]; exists {
+		t.Fatalf("AP2112 routes include disabled generic GND bypass: %#v", routes["gnd_bypass"])
+	}
 	if route := routes["ap2112_vin_core"]; route.Layer != "F.Cu" || route.To.Pin != "1" {
 		t.Fatalf("AP2112 VIN core = %#v", route)
 	}

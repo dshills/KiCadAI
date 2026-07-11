@@ -106,6 +106,7 @@ type PCBLocalRoute struct {
 	Required              bool                      `json:"required,omitempty"`
 	EntryAnchorDogbone    *PCBEntryAnchorDogbone    `json:"entry_anchor_dogbone,omitempty"`
 	DisableEntryAnchorVia bool                      `json:"disable_entry_anchor_via,omitempty"`
+	Disabled              bool                      `json:"disabled,omitempty"`
 	Description           string                    `json:"description,omitempty"`
 	When                  RealizationWhen           `json:"when,omitempty"`
 }
@@ -126,6 +127,7 @@ type PCBRouteGeometryVariant struct {
 	Layer                     string          `json:"layer,omitempty"`
 	DisableEntryAnchorDogbone bool            `json:"disable_entry_anchor_dogbone,omitempty"`
 	DisableEntryAnchorVia     bool            `json:"disable_entry_anchor_via,omitempty"`
+	DisableRoute              bool            `json:"disable_route,omitempty"`
 	When                      RealizationWhen `json:"when"`
 }
 
@@ -386,7 +388,7 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 			if len(variant.Waypoints) > 0 && variant.ClearWaypoints {
 				issues = append(issues, blockIssue(variantPath+".clear_waypoints", "route geometry variant cannot replace and clear waypoints"))
 			}
-			if len(variant.Waypoints) == 0 && !variant.ClearWaypoints && strings.TrimSpace(variant.Layer) == "" && !variant.DisableEntryAnchorDogbone && !variant.DisableEntryAnchorVia {
+			if len(variant.Waypoints) == 0 && !variant.ClearWaypoints && strings.TrimSpace(variant.Layer) == "" && !variant.DisableEntryAnchorDogbone && !variant.DisableEntryAnchorVia && !variant.DisableRoute {
 				issues = append(issues, blockIssue(variantPath, "route geometry variant requires at least one geometry change"))
 			}
 			issues = append(issues, validateLayer(variantPath+".layer", variant.Layer, true)...)

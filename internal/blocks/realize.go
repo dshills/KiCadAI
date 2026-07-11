@@ -251,6 +251,9 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 			continue
 		}
 		route = realizedLocalRouteGeometry(route, output.Instance.Params)
+		if route.Disabled {
+			continue
+		}
 		activeRouteIDs[route.ID] = struct{}{}
 		fromEndpoint := routeEndpointFromEmittedPort(route.From, route.NetTemplate, output, roleRefs)
 		toEndpoint := routeEndpointFromEmittedPort(route.To, route.NetTemplate, output, roleRefs)
@@ -330,6 +333,9 @@ func realizedLocalRouteGeometry(route PCBLocalRoute, params map[string]any) PCBL
 			}
 			if variant.DisableEntryAnchorVia {
 				route.DisableEntryAnchorVia = true
+			}
+			if variant.DisableRoute {
+				route.Disabled = true
 			}
 			break
 		}
