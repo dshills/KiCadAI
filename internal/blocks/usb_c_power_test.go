@@ -283,7 +283,7 @@ func TestUSBCPowerMinimalRealizationOwnsCCGroundReturns(t *testing.T) {
 	if !ok {
 		t.Fatal("missing usb_c_power")
 	}
-	realize := func(includePowerLED bool) map[string]bool {
+	realize := func(includePowerLED bool) map[string]RealizedPCBLocalRoute {
 		output, issues := registry.Instantiate(context.Background(), BlockRequest{
 			BlockID: "usb_c_power", InstanceID: "usb",
 			Params: map[string]any{
@@ -300,22 +300,26 @@ func TestUSBCPowerMinimalRealizationOwnsCCGroundReturns(t *testing.T) {
 		if reports.HasBlockingIssue(result.Issues) {
 			t.Fatalf("realize issues = %#v", result.Issues)
 		}
-		routes := map[string]bool{}
+		routes := map[string]RealizedPCBLocalRoute{}
 		for _, route := range result.LocalRoutes {
-			routes[route.ID] = true
+			routes[route.ID] = route
 		}
 		return routes
 	}
 
 	minimal := realize(false)
 	for _, routeID := range []string{"minimal_cc_ground_pair", "minimal_cc_ground_return"} {
-		if !minimal[routeID] {
+		if _, exists := minimal[routeID]; !exists {
 			t.Fatalf("minimal routes = %#v, missing %s", minimal, routeID)
 		}
 	}
+	cc2 := minimal["cc2_pull_down"]
+	if cc2.Layer != "B.Cu" || !cc2.FromEndpointDogbone || !cc2.ToEndpointDogbone || len(cc2.Points) != 4 {
+		t.Fatalf("minimal CC2 route = %#v, want B.Cu route with endpoint dogbones", cc2)
+	}
 	withLED := realize(true)
 	for _, routeID := range []string{"minimal_cc_ground_pair", "minimal_cc_ground_return"} {
-		if withLED[routeID] {
+		if _, exists := withLED[routeID]; exists {
 			t.Fatalf("LED routes = %#v, want %s omitted", withLED, routeID)
 		}
 	}
