@@ -11,6 +11,7 @@ import (
 	"kicadai/internal/blocks"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
+	"kicadai/internal/transactions"
 )
 
 func TestPlanMapsSensorBreakoutIntent(t *testing.T) {
@@ -196,6 +197,24 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 	}
 	if hasEndpoint("GND", sensorRef, "8") || hasEndpoint("GND", regulatorRef, "5") {
 		t.Fatalf("concrete power pins merged into GND: nets=%#v", placed.Request.Nets)
+	}
+	routed := designworkflow.RoutePlacement(ctx, *intentPlan.GeneratedRequest, fragments, placed, designworkflow.RoutingOptions{ComponentSelections: selection.Selections})
+	if reports.HasBlockingIssue(routed.Stage.Issues) {
+		t.Fatalf("routing stage = %#v", routed.Stage)
+	}
+	tx, txIssues := designworkflow.ProjectTransaction(intentPlan.GeneratedRequest, &blockPlan, &placed, &routed, true)
+	if reports.HasBlockingIssue(txIssues) {
+		t.Fatalf("transaction issues = %#v", txIssues)
+	}
+	validation := transactions.Validate(tx)
+	if reports.HasBlockingIssue(validation.Issues) {
+		bad := []transactions.Operation{}
+		for _, index := range []int{90, 92} {
+			if index < len(tx.Operations) {
+				bad = append(bad, tx.Operations[index])
+			}
+		}
+		t.Fatalf("transaction validation = %#v; suspect operations = %#v", validation.Issues, bad)
 	}
 }
 

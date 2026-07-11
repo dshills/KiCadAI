@@ -207,6 +207,17 @@ func TestCompactRoutePointsKeepsMinimumTrackEndpoints(t *testing.T) {
 	}
 }
 
+func TestCompactRouteOperationGeometryDropsZeroLengthTracks(t *testing.T) {
+	zero := mustGeneratedNetAssignmentRouteOperation(t, "GND")
+	zero.Raw = json.RawMessage(`{"op":"route","net_name":"GND","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":2.6,"y_mm":22},{"x_mm":2.6,"y_mm":22}]}`)
+	valid := mustGeneratedNetAssignmentRouteOperation(t, "SDA")
+
+	operations := compactRouteOperationGeometry([]transactions.Operation{zero, valid})
+	if len(operations) != 1 || operations[0].Net != "SDA" {
+		t.Fatalf("operations = %#v, want only valid SDA route", operations)
+	}
+}
+
 func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 	extraRoute := mustGeneratedNetAssignmentRouteOperation(t, "EXTRA")
 	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
@@ -257,6 +268,43 @@ func TestLocalRouteOperationsBindToPlacedPadEndpoints(t *testing.T) {
 		route.Points[0].XMM != 11 || route.Points[0].YMM != 5 ||
 		route.Points[1].XMM != 19 || route.Points[1].YMM != 5 {
 		t.Fatalf("route points = %#v, want physical pad centers", route.Points)
+	}
+}
+
+func TestLocalRouteOperationsSkipCoincidentTrack(t *testing.T) {
+	fragments := PCBFragmentResult{Fragments: []BlockFragment{{
+		InstanceID: "coincident",
+		Realization: blocks.BlockPCBRealizationResult{LocalRoutes: []blocks.RealizedPCBLocalRoute{{
+			ID: "same_point", NetName: "GND",
+			From:  transactions.Endpoint{Ref: "C1", Pin: "2"},
+			To:    transactions.Endpoint{Ref: "U1", Pin: "2"},
+			Layer: "F.Cu", WidthMM: 0.25,
+		}}},
+	}}}
+	placed := PlacementStageResult{
+		Request: placement.Request{
+			Components: []placement.Component{
+				{Ref: "C1", Pads: []placement.PadSummary{{Name: "2", Net: "GND"}}},
+				{Ref: "U1", Pads: []placement.PadSummary{{Name: "2", Net: "GND"}}},
+			},
+			Nets: []placement.Net{{Name: "GND", Endpoints: []placement.Endpoint{{Ref: "C1", Pin: "2"}, {Ref: "U1", Pin: "2"}}}},
+		},
+		Result: placement.Result{Status: placement.StatusPlaced, Placements: []placement.PlacementResult{
+			{Ref: "C1", Position: placement.Placement{XMM: 10, YMM: 10, Layer: "F.Cu"}},
+			{Ref: "U1", Position: placement.Placement{XMM: 10, YMM: 10, Layer: "F.Cu"}},
+		}},
+		Stage: NewStageResult(StagePlacement, nil),
+	}
+
+	operations, issues, summary := localRouteOperations(fragments, &placed)
+	if len(issues) != 0 {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if len(operations) != 0 {
+		t.Fatalf("operations = %#v, want no zero-length track", operations)
+	}
+	if summary.RoutesBound != 1 || summary.EndpointContactsProven != 2 || summary.EmittedTrackSegments != 0 {
+		t.Fatalf("summary = %#v", summary)
 	}
 }
 

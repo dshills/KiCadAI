@@ -199,6 +199,7 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	operations := append(localOperations, anchorOperations...)
 	operations = append(operations, routeOperations...)
 	operations = dedupeSameNetRouteVias(operations)
+	operations = compactRouteOperationGeometry(operations)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Issues = cloneIssues(issues)
 	routeDiagnostics := routing.DiagnosticsForResult(result)
@@ -232,6 +233,40 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 		stage.Summary["route_reports"] = len(result.Quality.NetReports)
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func compactRouteOperationGeometry(operations []transactions.Operation) []transactions.Operation {
+	out := make([]transactions.Operation, 0, len(operations))
+	for _, operation := range operations {
+		if operation.Op != transactions.OpRoute {
+			out = append(out, operation)
+			continue
+		}
+		var payload transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			out = append(out, operation)
+			continue
+		}
+		payload.Points = compactRoutePoints(payload.Points)
+		if routeTrackSegmentCount(payload.Points) == 0 {
+			payload.Points = nil
+			if len(payload.Vias) == 0 {
+				continue
+			}
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			out = append(out, operation)
+			continue
+		}
+		compacted := transactions.NewOperation(transactions.OpRoute, raw)
+		compacted.Index = operation.Index
+		compacted.Ref = operation.Ref
+		compacted.Net = operation.Net
+		compacted.SnapExempt = operation.SnapExempt
+		out = append(out, compacted)
+	}
+	return out
 }
 
 func addComponentHintSummaryToStage(stage *StageResult, hints []ComponentHintEvidence) {
@@ -889,28 +924,46 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 	if routedPoints, ok := placedLocalRoutePoints(route.Points, from.Point, to.Point); ok {
 		points = routedPoints
 	}
-	operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
-		Op:      transactions.OpRoute,
-		NetName: netName,
-		Layer:   layer,
-		WidthMM: route.WidthMM,
-		Points:  points,
-		Vias:    vias,
-	})
-	if err != nil {
-		issues = append(issues, localRouteBindingIssue(routePath, err.Error(), []string{from.Ref, to.Ref}))
-		summary.IssueCount = len(issues)
-		return nil, issues, summary, false
+	trackSegments := routeTrackSegmentCount(points)
+	mainRoutePoints := points
+	if trackSegments == 0 {
+		mainRoutePoints = nil
 	}
-	operations := []transactions.Operation{operation}
+	operations := []transactions.Operation{}
+	if len(mainRoutePoints) > 0 || len(vias) > 0 {
+		operation, err := workflowOperation(transactions.OpRoute, transactions.RouteOperation{
+			Op:      transactions.OpRoute,
+			NetName: netName,
+			Layer:   layer,
+			WidthMM: route.WidthMM,
+			Points:  mainRoutePoints,
+			Vias:    vias,
+		})
+		if err != nil {
+			issues = append(issues, localRouteBindingIssue(routePath, err.Error(), []string{from.Ref, to.Ref}))
+			summary.IssueCount = len(issues)
+			return nil, issues, summary, false
+		}
+		operations = append(operations, operation)
+	}
 	dogbones, dogboneIssues := localRouteEntryAnchorDogboneOperations(routePath, netName, layer, route.WidthMM, points, from, to, vias, route.EntryAnchorDogbone)
 	issues = append(issues, dogboneIssues...)
 	operations = append(operations, dogbones...)
 	summary.RoutesBound = 1
 	summary.EndpointContactsProven = 2
-	summary.EmittedTrackSegments = max(1, len(points)-1) + len(dogbones)
+	summary.EmittedTrackSegments = trackSegments + len(dogbones)
 	summary.IssueCount = len(issues)
 	return operations, issues, summary, true
+}
+
+func routeTrackSegmentCount(points []transactions.Point) int {
+	count := 0
+	for index := 1; index < len(points); index++ {
+		if !sameRoutePoint(points[index-1], points[index]) {
+			count++
+		}
+	}
+	return count
 }
 
 func localRouteEndpointVias(layer string, from PlacedPadEndpoint, to PlacedPadEndpoint) ([]transactions.RouteViaSpec, bool) {
@@ -1656,6 +1709,14 @@ func snapInterBlockRouteEndpoints(candidates []InterBlockRouteCandidate, operati
 			issues = append(issues, snapIssues...)
 			continue
 		}
+		payload.Points = compactRoutePoints(payload.Points)
+		if routeTrackSegmentCount(payload.Points) == 0 {
+			payload.Points = nil
+			if len(payload.Vias) == 0 {
+				out[index] = transactions.Operation{}
+				continue
+			}
+		}
 		raw, err := json.Marshal(payload)
 		if err != nil {
 			issues = append(issues, interBlockRouteSnapIssue(index, operation, "route operation could not be encoded after endpoint snapping: "+err.Error()))
@@ -1665,7 +1726,13 @@ func snapInterBlockRouteEndpoints(candidates []InterBlockRouteCandidate, operati
 		snapped.Index = operation.Index
 		out[index] = snapped
 	}
-	return out, issues
+	compacted := out[:0]
+	for _, operation := range out {
+		if operation.Op != "" {
+			compacted = append(compacted, operation)
+		}
+	}
+	return compacted, issues
 }
 
 func suppressProvenRouteDisconnectedIssues(issues []reports.Issue, evidence InterBlockContactEvidence, interBlockOperations []transactions.Operation, localOperations []transactions.Operation, localSummary LocalRouteConnectivitySummary) []reports.Issue {
