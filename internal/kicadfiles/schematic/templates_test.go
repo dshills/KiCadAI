@@ -30,6 +30,8 @@ func TestEmbeddedSymbolTemplateRendersSupportedSeedSymbols(t *testing.T) {
 		"power:-12V",
 		"power:PWR_FLAG",
 		"Regulator_Linear:AMS1117-3.3",
+		"Regulator_Linear:AP2112K-3.3",
+		"Sensor_Pressure:BMP280",
 		"power:VDD",
 		"power:VEE",
 		"power:VSS",
