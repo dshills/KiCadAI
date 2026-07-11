@@ -282,6 +282,7 @@ func TestI2CSensorConcreteProfilesFailClosed(t *testing.T) {
 		{name: "unknown component", params: map[string]any{"sensor_component_id": "sensor.unknown", "i2c_address": "0x44"}, path: "params.sensor_component_id"},
 		{name: "unsupported address", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "i2c_address": "0x44"}, path: "params.i2c_address"},
 		{name: "mismatched symbol", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "sensor_symbol": "Sensor:BME280", "i2c_address": "0x76"}, path: "params.sensor_symbol"},
+		{name: "mismatched footprint", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "sensor_footprint": "Package_LGA:Bosch_LGA-8_2.5x2.5mm_P0.65mm_ClockwisePinNumbering", "i2c_address": "0x76"}, path: "params.sensor_footprint"},
 		{name: "unsupported interrupt", params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8", "i2c_address": "0x76", "include_interrupt": true}, path: "params.include_interrupt"},
 	}
 	for _, tt := range tests {
