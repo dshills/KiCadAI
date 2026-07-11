@@ -1015,24 +1015,54 @@ func (builder *planBuilder) connectI2CBuses() {
 		mcuID, hasMCU := builder.i2cMCUTarget(bus)
 		sdaNet := builder.i2cSignalNetAlias(bus, "SDA", hasMCU)
 		sclNet := builder.i2cSignalNetAlias(bus, "SCL", hasMCU)
-		for _, sensorID := range builder.instancesOnI2CBus(builder.sensorIDs, bus) {
+		sensorIDs := builder.instancesOnI2CBus(builder.sensorIDs, bus)
+		connectorIDs := builder.instancesOnI2CBus(builder.i2cConnectorIDs, bus)
+		for _, sensorID := range sensorIDs {
 			if hasMCU {
 				builder.addConnection(mcuID+".SDA", sensorID+".SDA", sdaNet, "I2C data connects MCU to sensor on "+bus)
 				builder.addConnection(mcuID+".SCL", sensorID+".SCL", sclNet, "I2C clock connects MCU to sensor on "+bus)
 			}
-			for _, connectorID := range builder.instancesOnI2CBus(builder.i2cConnectorIDs, bus) {
+			for _, connectorID := range connectorIDs {
 				builder.addConnection(connectorID+".SDA", sensorID+".SDA", sdaNet, "I2C data connects sensor to breakout connector on "+bus)
 				builder.addConnection(connectorID+".SCL", sensorID+".SCL", sclNet, "I2C clock connects sensor to breakout connector on "+bus)
 			}
 		}
+		builder.connectI2CConnectorPower(bus, sensorIDs, connectorIDs)
 		if hasMCU {
-			for _, connectorID := range builder.instancesOnI2CBus(builder.i2cConnectorIDs, bus) {
-				if len(builder.instancesOnI2CBus(builder.sensorIDs, bus)) == 0 {
+			for _, connectorID := range connectorIDs {
+				if len(sensorIDs) == 0 {
 					builder.addConnection(mcuID+".SDA", connectorID+".SDA", sdaNet, "I2C data connects MCU to breakout connector on "+bus)
 					builder.addConnection(mcuID+".SCL", connectorID+".SCL", sclNet, "I2C clock connects MCU to breakout connector on "+bus)
 				}
 			}
 		}
+	}
+}
+
+func (builder *planBuilder) connectI2CConnectorPower(bus string, sensorIDs []string, connectorIDs []string) {
+	for _, connectorID := range connectorIDs {
+		supplySource := ""
+		supplyPort := ""
+		conflict := false
+		for _, sensorID := range sensorIDs {
+			source, port := builder.supplySourceForTarget(sensorID)
+			if source == "" || source == connectorID {
+				continue
+			}
+			if supplySource == "" {
+				supplySource, supplyPort = source, port
+				continue
+			}
+			if supplySource != source || supplyPort != port {
+				builder.addIssue("blocks."+connectorID+".supply", "I2C bus "+bus+" has sensors on conflicting supply sources", "use one voltage domain per exposed I2C connector")
+				conflict = true
+				break
+			}
+		}
+		if conflict || supplySource == "" {
+			continue
+		}
+		builder.addConnection(supplySource+"."+supplyPort, connectorID+"."+builder.powerPortFor(connectorID), builder.supplyNetAlias(supplySource), "sensor supply rail feeds I2C breakout connector")
 	}
 }
 

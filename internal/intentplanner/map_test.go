@@ -146,6 +146,9 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 	if intentPlan.Status != PlanStatusReady || intentPlan.GeneratedRequest == nil {
 		t.Fatalf("intent plan = %#v", intentPlan)
 	}
+	if !hasConnectionWithNet(*intentPlan.GeneratedRequest, "regulator.VOUT", "i2c_connector.VCC", "VCC_3v3v") {
+		t.Fatalf("BMP280 connector VCC connection missing: %#v", intentPlan.GeneratedRequest.Connections)
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	registry := blocks.NewBuiltinRegistry()
