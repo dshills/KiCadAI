@@ -208,6 +208,22 @@ func TestRouteRejectsUnrelatedPinAnchor(t *testing.T) {
 	}
 }
 
+func TestSameNameNetFragmentsShareAllowedPinAnchors(t *testing.T) {
+	components := []PlacedComponent{
+		{Component: Component{Ref: "A", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}},
+		{Component: Component{Ref: "B", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(50), Y: kicadfiles.MM(20)}},
+		{Component: Component{Ref: "C", Pins: []Pin{{Number: "1"}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(80), Y: kicadfiles.MM(20)}},
+	}
+	request := Request{Nets: []Net{
+		{Name: "SIG", Endpoints: []Endpoint{{Ref: "A", Pin: "1"}, {Ref: "B", Pin: "1"}}},
+		{Name: "SIG", Endpoints: []Endpoint{{Ref: "B", Pin: "1"}, {Ref: "C", Pin: "1"}}},
+	}}
+	segment := WireSegment{NetName: "SIG", From: components[0].PlacedAt, To: components[2].PlacedAt}
+	if endpoint, overlaps := unrelatedPinForWire(segment, "SIG", Result{Components: components}, request); overlaps {
+		t.Fatalf("same-net pin %s.%s classified as unrelated", endpoint.Ref, endpoint.Pin)
+	}
+}
+
 func resultComponentByRef(t *testing.T, components []PlacedComponent, ref string) PlacedComponent {
 	t.Helper()
 	for _, component := range components {

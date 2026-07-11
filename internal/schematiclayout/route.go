@@ -445,7 +445,6 @@ func netEndpointSet(request Request, netName string) map[Endpoint]struct{} {
 		for _, endpoint := range net.Endpoints {
 			endpoints[endpoint] = struct{}{}
 		}
-		break
 	}
 	return endpoints
 }

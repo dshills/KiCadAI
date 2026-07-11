@@ -190,7 +190,22 @@ func schematicTransaction(request *Request, plan *BlockPlanResult, overwrite boo
 	if composition.ProjectName != "" {
 		projectName = composition.ProjectName
 	}
-	tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, plan.Output, overwrite)
+	output := plan.Output
+	paper := ""
+	if requiresGeneratedSchematicLayout(projectName) {
+		operations, selectedPaper, err := layoutSchematicOperations(output.Operations)
+		if err != nil {
+			return transactions.Transaction{}, []reports.Issue{{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityBlocked,
+				Path:     "project.transaction.layout",
+				Message:  err.Error(),
+			}}
+		}
+		output.Operations = operations
+		paper = selectedPaper
+	}
+	tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, output, overwrite)
 	if err != nil {
 		return tx, []reports.Issue{{
 			Code:     reports.CodeInvalidArgument,
@@ -198,6 +213,17 @@ func schematicTransaction(request *Request, plan *BlockPlanResult, overwrite boo
 			Path:     "project.transaction",
 			Message:  err.Error(),
 		}}
+	}
+	if paper != "" {
+		tx, err = applySchematicPaper(tx, paper)
+		if err != nil {
+			return tx, []reports.Issue{{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityBlocked,
+				Path:     "project.transaction.layout",
+				Message:  err.Error(),
+			}}
+		}
 	}
 	return tx, nil
 }

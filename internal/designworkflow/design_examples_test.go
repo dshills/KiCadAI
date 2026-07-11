@@ -248,6 +248,9 @@ func TestDesignExamplesOptionalKiCadBackedTier(t *testing.T) {
 					ArtifactDir:   filepath.Join(outputDir, ".kicadai", "checks"),
 				},
 			})
+			if metadata.ID == "sensor_bmp280_breakout" {
+				assertDesignExampleBMP280Readability(t, result, outputDir)
+			}
 			promotion := BuildInternalPromotionReport(promotionFixtureFromDesignExampleMetadata(metadata), result)
 			promotionArtifact, promotionIssue := WritePromotionReportArtifact(outputDir, promotion, true)
 			if promotionIssue != nil {
@@ -380,6 +383,9 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			} else {
 				result = Create(ctx, request, CreateOptions{OutputDir: outputDir, Overwrite: true})
 			}
+			if metadata.ID == "sensor_bmp280_breakout" {
+				assertDesignExampleBMP280Readability(t, result, outputDir)
+			}
 			if metadata.ID == "class_ab_headphone_protected" {
 				assertDesignExampleProtectedAmplifierEvidence(t, metadata, outputDir, result)
 			}
@@ -402,6 +408,63 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 			}
 			assertDesignExamplePromotionMatchesMetadata(t, metadata, report, outputDir, result)
 		})
+	}
+}
+
+func assertDesignExampleBMP280Readability(t *testing.T, result WorkflowResult, outputDir string) {
+	t.Helper()
+	stage, ok := designExampleStageByName(result, StageSchematic)
+	if !ok {
+		t.Fatal("BMP280 fixture missing schematic stage")
+	}
+	readability, ok := stage.Summary["readability"].(map[string]any)
+	if !ok {
+		t.Fatalf("BMP280 readability summary missing: %#v", stage.Summary)
+	}
+	if passed, ok := readability["passed"].(bool); !ok || !passed {
+		t.Fatalf("BMP280 readability did not pass: %#v", readability)
+	}
+	if errors := summaryInt(t, readability, "error_count"); errors != 0 {
+		t.Fatalf("BMP280 readability errors = %d: %#v", errors, readability)
+	}
+	file, err := schematic.ReadFile(filepath.Join(outputDir, bmp280BreakoutProjectName+".kicad_sch"))
+	if err != nil {
+		t.Fatalf("read BMP280 schematic for readability evidence: %v", err)
+	}
+	positions := map[string]kicadfiles.Point{}
+	for _, symbol := range file.Symbols {
+		if symbol.Position.X < kicadfiles.MM(20) || symbol.Position.X > kicadfiles.MM(277) || symbol.Position.Y < kicadfiles.MM(30) || symbol.Position.Y > kicadfiles.MM(150) {
+			t.Fatalf("BMP280 symbol %s is outside the readable A4 drawing region at %v", symbol.Reference, symbol.Position)
+		}
+		positions[symbol.Value] = symbol.Position
+		var referencePosition, valuePosition kicadfiles.Point
+		propertyCounts := map[string]int{}
+		for _, property := range symbol.Properties {
+			propertyCounts[strings.ToLower(strings.TrimSpace(property.Name))]++
+			switch property.Name {
+			case "Reference":
+				referencePosition = property.Position
+			case "Value":
+				valuePosition = property.Position
+			}
+		}
+		if referencePosition == symbol.Position || valuePosition == symbol.Position || referencePosition == valuePosition {
+			t.Fatalf("BMP280 symbol %s reference/value text is not separated from its body: ref=%v value=%v body=%v", symbol.Reference, referencePosition, valuePosition, symbol.Position)
+		}
+		if propertyCounts["reference"] != 1 || propertyCounts["value"] != 1 {
+			t.Fatalf("BMP280 symbol %s has duplicate standard properties: %#v", symbol.Reference, propertyCounts)
+		}
+	}
+	flow := []string{"USB-C Power", "LDO 3.3V", "BMP280 0x76", "Conn_01x04"}
+	for index := 1; index < len(flow); index++ {
+		left, leftOK := positions[flow[index-1]]
+		right, rightOK := positions[flow[index]]
+		if !leftOK || !rightOK {
+			t.Fatalf("BMP280 schematic is missing flow symbols %q or %q: %#v", flow[index-1], flow[index], positions)
+		}
+		if left.X >= right.X {
+			t.Fatalf("BMP280 schematic flow is not left-to-right: %q at %v, %q at %v", flow[index-1], left, flow[index], right)
+		}
 	}
 }
 

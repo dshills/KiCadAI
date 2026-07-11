@@ -64,7 +64,23 @@ func ApplySchematic(ctx context.Context, plan BlockPlanResult, opts SchematicApp
 	if projectName == "" {
 		projectName = plan.Request.Name
 	}
-	tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, plan.Output, opts.Overwrite)
+	output := plan.Output
+	paper := ""
+	if requiresGeneratedSchematicLayout(projectName) {
+		operations, selectedPaper, err := layoutSchematicOperations(output.Operations)
+		if err != nil {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "schematic.layout",
+				Message:  err.Error(),
+			})
+			return SchematicApplyResult{Stage: NewStageResult(StageSchematic, issues)}
+		}
+		output.Operations = operations
+		paper = selectedPaper
+	}
+	tx, err := blocks.ProjectTransactionForCompositionOutput(projectName, output, opts.Overwrite)
 	if err != nil {
 		issues = append(issues, reports.Issue{
 			Code:     reports.CodeInvalidArgument,
@@ -73,6 +89,18 @@ func ApplySchematic(ctx context.Context, plan BlockPlanResult, opts SchematicApp
 			Message:  err.Error(),
 		})
 		return SchematicApplyResult{Transaction: tx, Stage: NewStageResult(StageSchematic, issues)}
+	}
+	if paper != "" {
+		tx, err = applySchematicPaper(tx, paper)
+		if err != nil {
+			issues = append(issues, reports.Issue{
+				Code:     reports.CodeInvalidArgument,
+				Severity: reports.SeverityError,
+				Path:     "schematic.layout",
+				Message:  err.Error(),
+			})
+			return SchematicApplyResult{Transaction: tx, Stage: NewStageResult(StageSchematic, issues)}
+		}
 	}
 	validation := transactions.Validate(tx)
 	issues = append(issues, validation.Issues...)
