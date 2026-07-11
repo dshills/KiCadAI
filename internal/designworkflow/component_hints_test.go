@@ -234,10 +234,10 @@ func TestComponentRoutingHintsSatisfiedByBlockTieAndNoConnect(t *testing.T) {
 			{Kind: "no_connect", NetRole: "nc"},
 		},
 	}}, PCBFragmentResult{Fragments: []BlockFragment{{
-		InstanceID: "rail",
+		InstanceID:       "rail",
+		SourceOperations: []transactions.Operation{connect, noConnect},
 		Realization: blocks.BlockPCBRealizationResult{
-			RoleRefs:   map[string]string{"regulator": "U1"},
-			Operations: []transactions.Operation{connect, noConnect},
+			RoleRefs: map[string]string{"regulator": "U1"},
 		},
 	}}})
 

@@ -23,15 +23,16 @@ type PCBFragmentResult struct {
 }
 
 type BlockFragment struct {
-	InstanceID      string                             `json:"instance_id"`
-	BlockID         string                             `json:"block_id"`
-	OriginXMM       float64                            `json:"origin_x_mm"`
-	OriginYMM       float64                            `json:"origin_y_mm"`
-	Realization     blocks.BlockPCBRealizationResult   `json:"realization"`
-	PortEndpoints   map[string][]transactions.Endpoint `json:"port_endpoints,omitempty"`
-	PlacementGroups []blocks.PCBPlacementGroup         `json:"placement_groups,omitempty"`
-	Keepouts        []blocks.PCBKeepout                `json:"keepouts,omitempty"`
-	Constraints     []blocks.PCBConstraint             `json:"constraints,omitempty"`
+	InstanceID       string                             `json:"instance_id"`
+	BlockID          string                             `json:"block_id"`
+	OriginXMM        float64                            `json:"origin_x_mm"`
+	OriginYMM        float64                            `json:"origin_y_mm"`
+	Realization      blocks.BlockPCBRealizationResult   `json:"realization"`
+	SourceOperations []transactions.Operation           `json:"-"`
+	PortEndpoints    map[string][]transactions.Endpoint `json:"port_endpoints,omitempty"`
+	PlacementGroups  []blocks.PCBPlacementGroup         `json:"placement_groups,omitempty"`
+	Keepouts         []blocks.PCBKeepout                `json:"keepouts,omitempty"`
+	Constraints      []blocks.PCBConstraint             `json:"constraints,omitempty"`
 }
 
 func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan BlockPlanResult) PCBFragmentResult {
@@ -77,12 +78,13 @@ func RealizePCBFragments(ctx context.Context, registry blocks.Registry, plan Blo
 		realizationIssues = append(realizationIssues, timingEvidenceIssues(realization)...)
 		issues = append(issues, prefixIssues(realizationPath, realizationIssues)...)
 		fragment := BlockFragment{
-			InstanceID:    instance.ID,
-			BlockID:       instance.BlockID,
-			OriginXMM:     originX,
-			OriginYMM:     originY,
-			Realization:   realization,
-			PortEndpoints: fragmentPortEndpoints(instance.ID, output.Operations),
+			InstanceID:       instance.ID,
+			BlockID:          instance.BlockID,
+			OriginXMM:        originX,
+			OriginYMM:        originY,
+			Realization:      realization,
+			SourceOperations: append([]transactions.Operation(nil), output.Operations...),
+			PortEndpoints:    fragmentPortEndpoints(instance.ID, output.Operations),
 		}
 		if definition.PCBRealization != nil {
 			fragment.PlacementGroups = clonePCBPlacementGroups(definition.PCBRealization.PlacementGroups)

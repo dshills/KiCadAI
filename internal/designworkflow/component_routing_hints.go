@@ -32,7 +32,11 @@ func componentRoutingHints(selections []ComponentSelectionEntry, fragments PCBFr
 	}
 	operationsByInstance := map[string]componentRoutingOperationIndex{}
 	for _, fragment := range fragments.Fragments {
-		operationsByInstance[fragment.InstanceID] = componentRoutingOperationIndexFromOperations(fragment.Realization.Operations)
+		operations := fragment.SourceOperations
+		if len(operations) == 0 {
+			operations = fragment.Realization.Operations
+		}
+		operationsByInstance[fragment.InstanceID] = componentRoutingOperationIndexFromOperations(operations)
 	}
 	selectionByHint := map[string]ComponentSelectionEntry{}
 	for _, selection := range selections {
