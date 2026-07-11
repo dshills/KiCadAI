@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/reports"
@@ -139,6 +140,55 @@ func TestSchematicStageOpAmpReadabilitySummaryIsClean(t *testing.T) {
 	roles, ok := readability["roles"].(map[string]string)
 	if !ok || len(roles) == 0 {
 		t.Fatalf("roles missing from readability summary: %#v", readability)
+	}
+}
+
+func TestConcreteI2CSensorReadabilitySummariesAreClean(t *testing.T) {
+	tests := []struct {
+		name        string
+		componentID string
+		address     string
+	}{
+		{name: "bme280", componentID: "sensor.bosch.bme280.lga8", address: "0x76"},
+		{name: "bmp280", componentID: "sensor.bosch.bmp280.lga8", address: "0x76"},
+		{name: "sht31", componentID: "sensor.sensirion.sht31_dis.dfn8", address: "0x44"},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			plan := PlanBlocks(ctx, registry, Request{
+				Version: RequestVersion,
+				Name:    tt.name,
+				Board:   BoardSpec{WidthMM: 45, HeightMM: 30, Layers: 2},
+				Blocks: []BlockInstanceSpec{{
+					ID:      "sensor",
+					BlockID: "i2c_sensor",
+					Params: map[string]any{
+						"sensor_component_id": tt.componentID,
+						"i2c_address":         tt.address,
+						"supply_voltage":      "3.3V",
+					},
+				}},
+			})
+			if err := ctx.Err(); err != nil {
+				t.Fatalf("planning context: %v", err)
+			}
+			if reports.HasBlockingIssue(plan.Stage.Issues) {
+				t.Fatalf("plan issues = %#v", plan.Stage.Issues)
+			}
+			stage := schematicStageFromPlan(plan)
+			readability, ok := stage.Summary["readability"].(map[string]any)
+			if !ok {
+				t.Fatalf("readability summary missing: %#v", stage.Summary)
+			}
+			for _, key := range []string{"diagonal_wire_count", "decode_error_count", "stage_order_violation_count", "power_placement_violation_count"} {
+				if got := summaryInt(t, readability, key); got != 0 {
+					t.Errorf("%s = %d, want 0; summary=%#v", key, got, readability)
+				}
+			}
+		})
 	}
 }
 
