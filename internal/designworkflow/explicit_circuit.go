@@ -2,9 +2,7 @@ package designworkflow
 
 import (
 	"context"
-	"math"
 	"path/filepath"
-	"sort"
 
 	"kicadai/internal/inspect"
 	"kicadai/internal/libraryresolver"
@@ -44,16 +42,16 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
-	tx, txIssues := explicitCircuitTransaction(request, opts.Overwrite, opts.LibraryIndex)
+	schematicTx, txIssues := explicitSchematicTransaction(request, opts.LibraryIndex)
 	schematic := NewStageResult(StageSchematic, txIssues)
-	schematic.Summary = map[string]any{"operation_count": len(tx.Operations), "mode": "schematic_ir"}
+	schematic.Summary = map[string]any{"operation_count": len(schematicTx.Operations), "mode": "schematic_ir"}
 	stages = append(stages, schematic)
 	if workflowStageBlocked(schematic) {
 		stages = append(stages, skippedWorkflowStages("explicit schematic generation did not complete", StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
 		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
 	}
 
-	electrical := schematicElectricalStageFromTransaction(tx)
+	electrical := schematicElectricalStageFromTransaction(schematicTx)
 	stages = append(stages, electrical)
 	if workflowStageBlocked(electrical) {
 		stages = append(stages, skippedWorkflowStages("schematic electrical rules did not pass", StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
@@ -62,10 +60,30 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 
 	pcbRealization := NewStageResult(StagePCBRealization, nil)
 	pcbRealization.Summary = map[string]any{"footprint_count": len(request.ExplicitCircuit.Components), "net_count": len(request.ExplicitCircuit.Nets)}
-	placement := NewStageResult(StagePlacement, nil)
-	placement.Summary = map[string]any{"placement_count": len(request.ExplicitCircuit.Components), "mode": "deterministic_grid"}
-	routing := StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{"reason": "explicit graph routing constraints are applied in the next workflow phase"}}
-	stages = append(stages, pcbRealization, placement, routing)
+	stages = append(stages, pcbRealization)
+	placementOpts := opts.Placement
+	placementOpts.LibraryIndex = opts.LibraryIndex
+	placed := PlaceExplicitCircuit(ctx, request, placementOpts)
+	stages = append(stages, placed.Stage)
+	if workflowStageBlocked(placed.Stage) {
+		stages = append(stages, skippedWorkflowStages("explicit placement did not complete", StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
+	}
+	routingOpts := opts.Routing
+	routingOpts.Skip = routingOpts.Skip || opts.SkipRouting || request.Validation.SkipRouting
+	routed := RouteExplicitCircuit(ctx, request, placed, routingOpts)
+	stages = append(stages, routed.Stage)
+	if workflowStageBlocked(routed.Stage) {
+		stages = append(stages, skippedWorkflowStages("explicit routing did not complete", StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
+	}
+	tx, projectTxIssues := explicitCircuitTransaction(request, schematicTx, placed, routed, opts.Overwrite)
+	if reports.HasBlockingIssue(projectTxIssues) {
+		writeStage := NewStageResult(StageProjectWrite, projectTxIssues)
+		stages = append(stages, writeStage)
+		stages = append(stages, skippedWorkflowStages("explicit project transaction did not complete", StageWriterCorrect, StageValidation, StageKiCadChecks)...)
+		return BuildWorkflowResult(project, request.Validation.Acceptance, stages)
+	}
 
 	written := writeExplicitCircuitProject(ctx, request, tx, opts)
 	stages = append(stages, written.Stage)
@@ -96,7 +114,7 @@ func explicitComponentCount(request Request) int {
 	return len(request.ExplicitCircuit.Components)
 }
 
-func explicitCircuitTransaction(request Request, overwrite bool, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
+func explicitSchematicTransaction(request Request, index *libraryresolver.LibraryIndex) (transactions.Transaction, []reports.Issue) {
 	if request.ExplicitCircuit == nil {
 		return transactions.Transaction{}, []reports.Issue{{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "explicit_circuit", Message: "explicit circuit is required"}}
 	}
@@ -110,18 +128,20 @@ func explicitCircuitTransaction(request Request, overwrite bool, index *libraryr
 	if reports.HasBlockingIssue(issues) {
 		return tx, issues
 	}
+	return tx, issues
+}
+
+func explicitCircuitTransaction(request Request, schematicTx transactions.Transaction, placed PlacementStageResult, routed RoutingStageResult, overwrite bool) (transactions.Transaction, []reports.Issue) {
+	tx := schematicTx
+	var issues []reports.Issue
 	boardOps, boardIssues := boardOperations(&request)
 	issues = append(issues, boardIssues...)
 	tx.Operations = append(tx.Operations, boardOps...)
-	components := sortedExplicitComponents(request.ExplicitCircuit.Components)
-	for i, component := range components {
-		appendExplicitOperation(&tx, transactions.OpPlaceFootprint, transactions.PlaceFootprintOperation{
-			Op: transactions.OpPlaceFootprint, Ref: component.Reference, Role: component.Role,
-			FootprintID: component.FootprintID, Value: component.Value,
-			At: explicitGridPoint(i, len(components), request.Board), Layer: "F.Cu",
-			Pads: explicitPadSpecs(component.Pads), HideDefaultFootprintText: true,
-		}, &issues)
-	}
+	tx.Operations = append(tx.Operations, placed.Result.Operations...)
+	tx.Operations = append(tx.Operations, routed.Operations...)
+	zoneOps, zoneIssues := explicitZoneOperations(request)
+	issues = append(issues, zoneIssues...)
+	tx.Operations = append(tx.Operations, zoneOps...)
 	appendExplicitOperation(&tx, transactions.OpWriteProject, transactions.WriteProjectOperation{
 		Op: transactions.OpWriteProject, Overwrite: overwrite,
 		RequireSchematicReadability: request.ExplicitCircuit.Schematic.Policy.Acceptance == schematicir.AcceptanceReadable,
@@ -164,45 +184,6 @@ func writeExplicitCircuitProject(ctx context.Context, request Request, tx transa
 	stage.Artifacts = append([]reports.Artifact(nil), applyResult.Artifacts...)
 	stage.Summary = map[string]any{"operation_count": len(tx.Operations), "artifact_count": len(applyResult.Artifacts), "mode": "explicit_circuit"}
 	return ProjectWriteResult{Transaction: tx, Validation: validation, ApplyResult: applyResult, Inspection: inspection, Stage: stage}
-}
-
-func explicitGridPoint(index, count int, board BoardSpec) transactions.Point {
-	columns := int(math.Ceil(math.Sqrt(float64(count))))
-	if columns < 1 {
-		columns = 1
-	}
-	rows := (count + columns - 1) / columns
-	margin := math.Max(2, board.EdgeClearanceMM+1)
-	usableWidth := math.Max(0, board.WidthMM-2*margin)
-	usableHeight := math.Max(0, board.HeightMM-2*margin)
-	column, row := index%columns, index/columns
-	x, y := board.WidthMM/2, board.HeightMM/2
-	if columns > 1 {
-		x = margin + usableWidth*float64(column)/float64(columns-1)
-	}
-	if rows > 1 {
-		y = margin + usableHeight*float64(row)/float64(rows-1)
-	}
-	return transactions.Point{XMM: x, YMM: y}
-}
-
-func sortedExplicitComponents(components []ExplicitComponentSpec) []ExplicitComponentSpec {
-	result := append([]ExplicitComponentSpec(nil), components...)
-	sort.SliceStable(result, func(i, j int) bool { return result[i].Reference < result[j].Reference })
-	return result
-}
-
-func explicitPadSpecs(pads []ExplicitPadSpec) []transactions.PadSpec {
-	result := make([]transactions.PadSpec, 0, len(pads))
-	for _, pad := range pads {
-		var net *string
-		if pad.Net != "" {
-			value := pad.Net
-			net = &value
-		}
-		result = append(result, transactions.PadSpec{Name: pad.Name, Net: net})
-	}
-	return result
 }
 
 func appendExplicitOperation(tx *transactions.Transaction, kind transactions.OperationKind, payload any, issues *[]reports.Issue) {

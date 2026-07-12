@@ -297,6 +297,9 @@ func validateOperation(op Operation) []reports.Issue {
 			if payload.NetName != nil && strings.TrimSpace(*payload.NetName) == "" {
 				issues = append(issues, issue(reports.CodeInvalidArgument, path+".net_name", "net name must be null or non-empty"))
 			}
+			if payload.ClearanceMM < 0 || math.IsNaN(payload.ClearanceMM) || math.IsInf(payload.ClearanceMM, 0) {
+				issues = append(issues, issue(reports.CodeInvalidArgument, path+".clearance_mm", "zone clearance must be finite and non-negative"))
+			}
 			issues = append(issues, validatePolygon(path+".polygon", payload.Polygon)...)
 			return issues
 		})

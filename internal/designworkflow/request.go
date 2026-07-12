@@ -57,15 +57,19 @@ type ExplicitCircuitSpec struct {
 	Schematic      schematicir.Document    `json:"schematic"`
 	Components     []ExplicitComponentSpec `json:"components"`
 	Nets           []ExplicitNetSpec       `json:"nets"`
+	Regions        []ExplicitRegionSpec    `json:"regions,omitempty"`
+	Keepouts       []ExplicitKeepoutSpec   `json:"keepouts,omitempty"`
+	Zones          []ExplicitZoneSpec      `json:"zones,omitempty"`
 }
 
 type ExplicitComponentSpec struct {
-	ID          string            `json:"id"`
-	Reference   string            `json:"reference"`
-	Role        string            `json:"role,omitempty"`
-	Value       string            `json:"value,omitempty"`
-	FootprintID string            `json:"footprint_id"`
-	Pads        []ExplicitPadSpec `json:"pads"`
+	ID          string                `json:"id"`
+	Reference   string                `json:"reference"`
+	Role        string                `json:"role,omitempty"`
+	Value       string                `json:"value,omitempty"`
+	FootprintID string                `json:"footprint_id"`
+	Pads        []ExplicitPadSpec     `json:"pads"`
+	Placement   ExplicitPlacementSpec `json:"placement,omitempty"`
 }
 
 type ExplicitPadSpec struct {
@@ -75,13 +79,51 @@ type ExplicitPadSpec struct {
 }
 
 type ExplicitNetSpec struct {
-	Name      string                `json:"name"`
-	Endpoints []ExplicitNetEndpoint `json:"endpoints"`
+	Name        string                `json:"name"`
+	Endpoints   []ExplicitNetEndpoint `json:"endpoints"`
+	Role        string                `json:"role,omitempty"`
+	NetClass    string                `json:"net_class,omitempty"`
+	Required    bool                  `json:"required,omitempty"`
+	CurrentMA   float64               `json:"current_ma,omitempty"`
+	WidthMM     float64               `json:"width_mm,omitempty"`
+	ClearanceMM float64               `json:"clearance_mm,omitempty"`
 }
 
 type ExplicitNetEndpoint struct {
 	Component string `json:"component"`
 	Pad       string `json:"pad"`
+}
+
+type ExplicitPlacementSpec struct {
+	Region        string  `json:"region,omitempty"`
+	Near          string  `json:"near,omitempty"`
+	Edge          string  `json:"edge,omitempty"`
+	Priority      int     `json:"priority,omitempty"`
+	MaxDistanceMM float64 `json:"max_distance_mm,omitempty"`
+}
+
+type ExplicitRegionSpec struct {
+	ID       string  `json:"id"`
+	Role     string  `json:"role,omitempty"`
+	XMM      float64 `json:"x_mm"`
+	YMM      float64 `json:"y_mm"`
+	WidthMM  float64 `json:"width_mm"`
+	HeightMM float64 `json:"height_mm"`
+}
+
+type ExplicitKeepoutSpec struct {
+	ID       string   `json:"id"`
+	XMM      float64  `json:"x_mm"`
+	YMM      float64  `json:"y_mm"`
+	WidthMM  float64  `json:"width_mm"`
+	HeightMM float64  `json:"height_mm"`
+	Layers   []string `json:"layers,omitempty"`
+}
+
+type ExplicitZoneSpec struct {
+	Net         string   `json:"net"`
+	Layers      []string `json:"layers"`
+	ClearanceMM float64  `json:"clearance_mm,omitempty"`
 }
 
 type Intent struct {
@@ -468,6 +510,7 @@ func ValidateRequest(request Request) []reports.Issue {
 			issues = append(issues, issue("explicit_circuit", "explicit circuit mode cannot include block connections, external endpoints, or top-level schematic layout"))
 		}
 		issues = append(issues, validateExplicitCircuit(*request.ExplicitCircuit)...)
+		issues = append(issues, validateExplicitCircuitBoard(*request.ExplicitCircuit, request.Board)...)
 	}
 	for index, connection := range request.Connections {
 		path := fmt.Sprintf("connections[%d]", index)
@@ -507,6 +550,15 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 	clone.Nets = append([]ExplicitNetSpec(nil), source.Nets...)
 	for index := range clone.Nets {
 		clone.Nets[index].Endpoints = append([]ExplicitNetEndpoint(nil), source.Nets[index].Endpoints...)
+	}
+	clone.Regions = append([]ExplicitRegionSpec(nil), source.Regions...)
+	clone.Keepouts = append([]ExplicitKeepoutSpec(nil), source.Keepouts...)
+	for index := range clone.Keepouts {
+		clone.Keepouts[index].Layers = append([]string(nil), source.Keepouts[index].Layers...)
+	}
+	clone.Zones = append([]ExplicitZoneSpec(nil), source.Zones...)
+	for index := range clone.Zones {
+		clone.Zones[index].Layers = append([]string(nil), source.Zones[index].Layers...)
 	}
 	return &clone
 }
@@ -572,6 +624,37 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 			issues = append(issues, issue("explicit_circuit.schematic", "schematic component "+id+" has no resolved explicit component"))
 		}
 	}
+	regions := map[string]ExplicitRegionSpec{}
+	for index, region := range circuit.Regions {
+		path := fmt.Sprintf("explicit_circuit.regions[%d]", index)
+		if region.ID == "" || !positiveFinite(region.WidthMM) || !positiveFinite(region.HeightMM) || !finiteScalar(region.XMM) || !finiteScalar(region.YMM) {
+			issues = append(issues, issue(path, "region id and finite positive bounds are required"))
+		}
+		if _, exists := regions[region.ID]; exists {
+			issues = append(issues, issue(path+".id", "duplicate region id"))
+		}
+		regions[region.ID] = region
+	}
+	for index, component := range circuit.Components {
+		path := fmt.Sprintf("explicit_circuit.components[%d].placement", index)
+		placement := component.Placement
+		if placement.Region != "" {
+			if _, exists := regions[placement.Region]; !exists {
+				issues = append(issues, issue(path+".region", "placement region does not exist"))
+			}
+		}
+		if placement.Near != "" {
+			if _, exists := componentsByID[placement.Near]; !exists || placement.Near == component.ID {
+				issues = append(issues, issue(path+".near", "near must reference another explicit component"))
+			}
+		}
+		if placement.Edge != "" && placement.Edge != "left" && placement.Edge != "right" && placement.Edge != "top" && placement.Edge != "bottom" {
+			issues = append(issues, issue(path+".edge", "edge must be left, right, top, or bottom"))
+		}
+		if placement.Priority < 0 || placement.MaxDistanceMM < 0 || !finiteScalar(placement.MaxDistanceMM) {
+			issues = append(issues, issue(path, "placement priority and maximum distance must be finite and non-negative"))
+		}
+	}
 	if len(circuit.Nets) == 0 {
 		issues = append(issues, issue("explicit_circuit.nets", "at least one explicit net is required"))
 	}
@@ -592,6 +675,9 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		path := fmt.Sprintf("explicit_circuit.nets[%d]", netIndex)
 		if net.Name == "" || len(net.Endpoints) < 2 {
 			issues = append(issues, issue(path, "net name and at least two endpoints are required"))
+		}
+		if net.CurrentMA < 0 || net.WidthMM < 0 || net.ClearanceMM < 0 || !finiteScalar(net.CurrentMA) || !finiteScalar(net.WidthMM) || !finiteScalar(net.ClearanceMM) {
+			issues = append(issues, issue(path, "net current, width, and clearance must be finite and non-negative"))
 		}
 		if _, exists := seenNets[net.Name]; exists {
 			issues = append(issues, issue(path+".name", "duplicate explicit net name"))
@@ -639,7 +725,27 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 			}
 		}
 	}
+	for index, keepout := range circuit.Keepouts {
+		path := fmt.Sprintf("explicit_circuit.keepouts[%d]", index)
+		if keepout.ID == "" || !positiveFinite(keepout.WidthMM) || !positiveFinite(keepout.HeightMM) || !finiteScalar(keepout.XMM) || !finiteScalar(keepout.YMM) || len(keepout.Layers) == 0 {
+			issues = append(issues, issue(path, "keepout id, layers, and finite positive bounds are required"))
+		}
+	}
+	for index, zone := range circuit.Zones {
+		path := fmt.Sprintf("explicit_circuit.zones[%d]", index)
+		if _, exists := seenNets[zone.Net]; !exists || len(zone.Layers) == 0 || zone.ClearanceMM < 0 || !finiteScalar(zone.ClearanceMM) {
+			issues = append(issues, issue(path, "zone must reference a resolved net and have layers and non-negative clearance"))
+		}
+	}
 	return issues
+}
+
+func finiteScalar(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, 0)
+}
+
+func positiveFinite(value float64) bool {
+	return value > 0 && finiteScalar(value)
 }
 
 func sameExplicitEndpointSet(left, right map[string]struct{}) bool {
@@ -652,6 +758,42 @@ func sameExplicitEndpointSet(left, right map[string]struct{}) bool {
 		}
 	}
 	return true
+}
+
+func validateExplicitCircuitBoard(circuit ExplicitCircuitSpec, board BoardSpec) []reports.Issue {
+	var issues []reports.Issue
+	for index, region := range circuit.Regions {
+		path := fmt.Sprintf("explicit_circuit.regions[%d]", index)
+		if region.XMM < 0 || region.YMM < 0 || region.XMM+region.WidthMM > board.WidthMM+anchorBindingGeometryEpsilonMM || region.YMM+region.HeightMM > board.HeightMM+anchorBindingGeometryEpsilonMM {
+			issues = append(issues, issue(path, "region bounds must remain inside the declared board"))
+		}
+	}
+	for index, keepout := range circuit.Keepouts {
+		path := fmt.Sprintf("explicit_circuit.keepouts[%d]", index)
+		if keepout.XMM < 0 || keepout.YMM < 0 || keepout.XMM+keepout.WidthMM > board.WidthMM+anchorBindingGeometryEpsilonMM || keepout.YMM+keepout.HeightMM > board.HeightMM+anchorBindingGeometryEpsilonMM {
+			issues = append(issues, issue(path, "keepout bounds must remain inside the declared board"))
+		}
+		issues = append(issues, validateExplicitCopperLayers(path+".layers", keepout.Layers, board)...)
+	}
+	for index, zone := range circuit.Zones {
+		issues = append(issues, validateExplicitCopperLayers(fmt.Sprintf("explicit_circuit.zones[%d].layers", index), zone.Layers, board)...)
+	}
+	return issues
+}
+
+func validateExplicitCopperLayers(path string, layers []string, board BoardSpec) []reports.Issue {
+	var issues []reports.Issue
+	for index, layer := range layers {
+		layerPath := fmt.Sprintf("%s[%d]", path, index)
+		if !isCopperLayer(layer) {
+			issues = append(issues, issue(layerPath, "layer must be a supported KiCad copper layer"))
+			continue
+		}
+		if inner, ok := innerLayerNumber(layer); ok && board.Layers > 0 && (inner < 1 || inner > board.Layers-2) {
+			issues = append(issues, issue(layerPath, "internal copper layer does not exist in declared board stackup"))
+		}
+	}
+	return issues
 }
 
 func validSHA256(value string) bool {

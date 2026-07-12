@@ -390,7 +390,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("add_zone requires net_name for imported apply")))
 				return result
 			}
-			zone := pcb.Zone{UUID: generator.New("imported.pcb.zone", *payload.NetName, pointsSeed(payload.Polygon)), NetName: *payload.NetName, Name: firstNonEmpty(payload.Name, *payload.NetName), MinThickness: kicadfiles.MM(0.25)}
+			zone := pcb.Zone{UUID: generator.New("imported.pcb.zone", *payload.NetName, pointsSeed(payload.Polygon)), NetName: *payload.NetName, Name: firstNonEmpty(payload.Name, *payload.NetName), Clearance: kicadfiles.MM(payload.ClearanceMM), MinThickness: kicadfiles.MM(0.25)}
 			for _, layer := range payload.Layers {
 				zone.Layers = append(zone.Layers, boardLayer(layer))
 			}
@@ -751,7 +751,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 				layers = append(layers, boardLayer(layer))
 			}
 		}
-		_, err := builder.AddZone(*payload.NetName, polygon, designapi.ZoneOptions{Name: payload.Name, Layers: layers})
+		_, err := builder.AddZone(*payload.NetName, polygon, designapi.ZoneOptions{Name: payload.Name, Layers: layers, Clearance: kicadfiles.MM(payload.ClearanceMM)})
 		return nil, err
 	case OpWriteProject:
 		var payload WriteProjectOperation

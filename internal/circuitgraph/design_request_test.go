@@ -58,3 +58,22 @@ func TestToDesignRequestPreservesBMP280PadNets(t *testing.T) {
 		t.Fatalf("missing sensor pads = %#v", want)
 	}
 }
+
+func TestToDesignRequestPreservesPCBIntent(t *testing.T) {
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), loadGraphExample(t, "usb_c_led_indicator_protected.json"))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("request issues = %#v", issues)
+	}
+	if len(request.ExplicitCircuit.Regions) != 3 || len(request.ExplicitCircuit.Zones) != 1 {
+		t.Fatalf("PCB regions/zones = %#v", request.ExplicitCircuit)
+	}
+	for _, net := range request.ExplicitCircuit.Nets {
+		if net.Name == "VBUS_RAW" && (!net.Required || net.WidthMM != 0.8 || net.CurrentMA != 500) {
+			t.Fatalf("VBUS_RAW policy = %#v", net)
+		}
+	}
+}

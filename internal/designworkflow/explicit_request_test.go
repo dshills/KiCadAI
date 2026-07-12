@@ -2,17 +2,44 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/routing"
 	"kicadai/internal/schematicir"
+	"kicadai/internal/transactions"
 )
 
 func TestValidateRequestAcceptsExplicitCircuitMode(t *testing.T) {
 	request := validExplicitCircuitRequest()
 	if issues := ValidateRequest(request); reports.HasBlockingIssue(issues) {
 		t.Fatalf("validation issues = %#v", issues)
+	}
+}
+
+func TestExplicitRequiredRoutesFailClosed(t *testing.T) {
+	nets := []ExplicitNetSpec{{Name: "REQ", Required: true}, {Name: "OPTIONAL"}}
+	issues := explicitRequiredRouteIssues(nets, routing.Result{Routes: []routing.Route{{Net: "OPTIONAL", Status: routing.RouteStatusFailed}}})
+	if len(issues) != 1 || issues[0].Path != "explicit_circuit.nets.REQ" {
+		t.Fatalf("required route issues = %#v", issues)
+	}
+}
+
+func TestExplicitZoneOperationsPreserveClearance(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	request.ExplicitCircuit.Zones = []ExplicitZoneSpec{{Net: "SIG", Layers: []string{"B.Cu"}, ClearanceMM: 0.35}}
+	operations, issues := explicitZoneOperations(request)
+	if reports.HasBlockingIssue(issues) || len(operations) != 1 {
+		t.Fatalf("zone operations/issues = %#v %#v", operations, issues)
+	}
+	var payload transactions.AddZoneOperation
+	if err := json.Unmarshal(operations[0].Raw, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.ClearanceMM != 0.35 || len(payload.Layers) != 1 || payload.Layers[0] != "B.Cu" {
+		t.Fatalf("zone payload = %#v", payload)
 	}
 }
 
@@ -59,6 +86,15 @@ func TestValidateRequestRejectsExplicitSchematicProjectionDisagreement(t *testin
 	request.ExplicitCircuit.Schematic.Circuit.Nets[0].Connect[0] = "r1.2"
 	if issues := ValidateRequest(request); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.nets") {
 		t.Fatalf("net projection issues = %#v", issues)
+	}
+}
+
+func TestValidateRequestRejectsExplicitPCBIntentOutsideBoard(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	request.ExplicitCircuit.Regions = []ExplicitRegionSpec{{ID: "bad", XMM: 29, YMM: 1, WidthMM: 5, HeightMM: 5}}
+	request.ExplicitCircuit.Components[0].Placement.Region = "bad"
+	if issues := ValidateRequest(request); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.regions") {
+		t.Fatalf("region bounds issues = %#v", issues)
 	}
 }
 

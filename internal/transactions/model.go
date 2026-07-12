@@ -288,11 +288,12 @@ type RouteViaSpec struct {
 }
 
 type AddZoneOperation struct {
-	Op      OperationKind `json:"op"`
-	Name    string        `json:"name,omitempty"`
-	NetName *string       `json:"net_name"`
-	Layers  []string      `json:"layers,omitempty"`
-	Polygon []Point       `json:"polygon"`
+	Op          OperationKind `json:"op"`
+	Name        string        `json:"name,omitempty"`
+	NetName     *string       `json:"net_name"`
+	Layers      []string      `json:"layers,omitempty"`
+	Polygon     []Point       `json:"polygon"`
+	ClearanceMM float64       `json:"clearance_mm,omitempty"`
 }
 
 type WriteProjectOperation struct {

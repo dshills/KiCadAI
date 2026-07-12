@@ -39,6 +39,28 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 		Components: make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
 		Nets:       make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),
 	}
+	for _, region := range resolved.Source.PCB.Regions {
+		explicit.Regions = append(explicit.Regions, designworkflow.ExplicitRegionSpec{
+			ID: region.ID, Role: region.Role, XMM: region.Bounds.XMM, YMM: region.Bounds.YMM,
+			WidthMM: region.Bounds.WidthMM, HeightMM: region.Bounds.HeightMM,
+		})
+	}
+	for _, keepout := range resolved.Source.PCB.Keepouts {
+		explicit.Keepouts = append(explicit.Keepouts, designworkflow.ExplicitKeepoutSpec{
+			ID: keepout.ID, XMM: keepout.Bounds.XMM, YMM: keepout.Bounds.YMM,
+			WidthMM: keepout.Bounds.WidthMM, HeightMM: keepout.Bounds.HeightMM,
+			Layers: append([]string(nil), keepout.Layers...),
+		})
+	}
+	for _, zone := range resolved.Source.PCB.Zones {
+		explicit.Zones = append(explicit.Zones, designworkflow.ExplicitZoneSpec{
+			Net: zone.Net, Layers: append([]string(nil), zone.Layers...), ClearanceMM: zone.ClearanceMM,
+		})
+	}
+	placements := make(map[string]PCBPlacement, len(resolved.Source.PCB.Placements))
+	for _, placement := range resolved.Source.PCB.Placements {
+		placements[placement.Component] = placement
+	}
 	for _, component := range resolved.Components {
 		padsByName := map[string]designworkflow.ExplicitPadSpec{}
 		for _, function := range component.Functions {
@@ -57,13 +79,19 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 			pads = append(pads, pad)
 		}
 		slices.SortStableFunc(pads, func(left, right designworkflow.ExplicitPadSpec) int { return strings.Compare(left.Name, right.Name) })
+		placement := placements[component.Instance.ID]
 		explicit.Components = append(explicit.Components, designworkflow.ExplicitComponentSpec{
 			ID: component.Instance.ID, Reference: references[component.Instance.ID], Role: string(component.Instance.Role),
 			Value: schematicValue(component, resolved.Source.Policy), FootprintID: component.FootprintID, Pads: pads,
+			Placement: designworkflow.ExplicitPlacementSpec{Region: placement.Region, Near: placement.Near, Edge: string(placement.Edge), Priority: placement.Priority, MaxDistanceMM: placement.MaxDistanceMM},
 		})
 	}
 	for _, net := range resolved.Nets {
-		explicitNet := designworkflow.ExplicitNetSpec{Name: net.Intent.Name}
+		explicitNet := designworkflow.ExplicitNetSpec{
+			Name: net.Intent.Name, Role: string(net.Intent.Role), NetClass: net.Intent.NetClass,
+			Required: net.Intent.Required != nil && *net.Intent.Required, CurrentMA: net.Intent.CurrentMA,
+			WidthMM: net.Intent.WidthMM, ClearanceMM: net.Intent.ClearanceMM,
+		}
 		seen := map[physicalBindingID]struct{}{}
 		for _, endpoint := range net.Endpoints {
 			for _, binding := range endpoint.Bindings {
