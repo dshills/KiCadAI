@@ -10,6 +10,7 @@ import (
 	"testing"
 
 	"kicadai/internal/aiprovider"
+	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
 	"kicadai/internal/reports"
 )
@@ -99,7 +100,7 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 		"design", "create",
 	}, &stdout, &bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "blocking issues") {
-		t.Fatalf("expected current placement blocker, err=%v", err)
+		t.Fatalf("expected current downstream workflow blocker, err=%v", err)
 	}
 	var payload struct {
 		Data aiDesignCreateResult `json:"data"`
@@ -110,7 +111,7 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	if payload.Data.Provider.Name != "recorded" || !payload.Data.Provider.Recorded || payload.Data.Intent.Name != "usb_c_bmp280_breakout" {
 		t.Fatalf("provider/intent = %#v / %#v", payload.Data.Provider, payload.Data.Intent)
 	}
-	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Stage != "placement" {
+	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Stage != "validation" || payload.Data.AIStatus.IssueCode != reports.CodeDisconnectedPad {
 		t.Fatalf("AI status = %#v", payload.Data.AIStatus)
 	}
 	for _, name := range []string{
@@ -202,6 +203,21 @@ func TestGenerateValidatedAIIntentDoesNotRetryAuthentication(t *testing.T) {
 	_, _, _, attempts, _, err := generateValidatedAIIntent(context.Background(), provider, "build bmp280", 2)
 	if aiprovider.ErrorCodeOf(err) != aiprovider.ErrorAuthentication || len(provider.requests) != 1 || len(attempts) != 1 {
 		t.Fatalf("err=%v requests=%d attempts=%#v", err, len(provider.requests), attempts)
+	}
+}
+
+func TestPrepareAIWorkflowRequestEnablesBoundedPlacementRepair(t *testing.T) {
+	request := prepareAIWorkflowRequest(designworkflow.Request{})
+	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 2 {
+		t.Fatalf("routing retry = %#v", request.RoutingRetry)
+	}
+	if !request.RoutingRetry.StopOnNewBlockers || !request.RoutingRetry.StopOnRepeatedSignature || !request.RoutingRetry.StopOnNonImprovement {
+		t.Fatalf("routing retry stop policy = %#v", request.RoutingRetry)
+	}
+
+	skipped := prepareAIWorkflowRequest(designworkflow.Request{Validation: designworkflow.ValidationSpec{SkipRouting: true}})
+	if skipped.RoutingRetry.Enabled {
+		t.Fatalf("skip-routing request enabled retry: %#v", skipped.RoutingRetry)
 	}
 }
 

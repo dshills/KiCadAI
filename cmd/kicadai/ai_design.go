@@ -108,7 +108,8 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "mode", Message: err.Error()})
 	}
-	request := *plan.GeneratedRequest
+	request := prepareAIWorkflowRequest(*plan.GeneratedRequest)
+	plan.GeneratedRequest = &request
 	workflow := designworkflow.Create(ctx, request, createOpts)
 	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
@@ -171,6 +172,20 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 		return errors.New("AI design create reported blocking issues")
 	}
 	return nil
+}
+
+func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Request {
+	if request.Validation.SkipRouting {
+		return request
+	}
+	request.RoutingRetry.Enabled = true
+	if request.RoutingRetry.MaxAttempts < 2 {
+		request.RoutingRetry.MaxAttempts = 2
+	}
+	request.RoutingRetry.StopOnNewBlockers = true
+	request.RoutingRetry.StopOnRepeatedSignature = true
+	request.RoutingRetry.StopOnNonImprovement = true
+	return request
 }
 
 func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider, prompt string, maxAttempts int) (aiprovider.GenerateResult, intentplanner.Request, intentplanner.PlanResult, []aiAttemptEvidence, []reports.Issue, error) {
