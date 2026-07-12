@@ -226,6 +226,16 @@ func RealizeBlockPCB(definition BlockDefinition, output BlockOutput, opts PCBRea
 		if !realizationWhenMatches(anchor.When, output.Instance.Params) {
 			continue
 		}
+		omitted := false
+		for _, condition := range anchor.OmitWhen {
+			if realizationWhenMatches(condition, output.Instance.Params) {
+				omitted = true
+				break
+			}
+		}
+		if omitted {
+			continue
+		}
 		placement := realizedEntryAnchorPlacement(anchor, output.Instance.Params)
 		placement.XMM += opts.OriginXMM
 		placement.YMM += opts.OriginYMM

@@ -306,8 +306,8 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	for _, anchor := range result.EntryAnchors {
 		anchors[anchor.ID] = anchor
 	}
-	if anchors["vin"].Placement.XMM != -7 {
-		t.Fatalf("AP2112 VIN anchor = %#v", anchors["vin"])
+	if len(anchors) != 0 {
+		t.Fatalf("AP2112 virtual entry anchors = %#v", anchors)
 	}
 	routes := map[string]RealizedPCBLocalRoute{}
 	for _, route := range result.LocalRoutes {
@@ -319,14 +319,14 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	if _, exists := routes["vin_bypass"]; exists {
 		t.Fatalf("AP2112 routes include disabled generic VIN bypass: %#v", routes["vin_bypass"])
 	}
-	if route := routes["vin_entry"]; route.EntryAnchorDogbone != nil || !route.DisableEntryAnchorVia || len(route.Points) != 3 {
-		t.Fatalf("AP2112 VIN entry = %#v", route)
+	if _, exists := routes["vin_entry"]; exists {
+		t.Fatalf("AP2112 routes include redundant VIN entry: %#v", routes["vin_entry"])
 	}
 	if _, exists := routes["vout_entry"]; exists {
 		t.Fatalf("AP2112 routes include redundant VOUT entry: %#v", routes["vout_entry"])
 	}
-	if route := routes["gnd_entry"]; route.Layer != "F.Cu" || len(route.Points) != 2 {
-		t.Fatalf("AP2112 GND entry = %#v", route)
+	if _, exists := routes["gnd_entry"]; exists {
+		t.Fatalf("AP2112 routes include redundant GND entry: %#v", routes["gnd_entry"])
 	}
 	if route := routes["vout_bypass"]; route.Layer != "B.Cu" || route.To.Pin != "5" || len(route.Points) != 2 {
 		t.Fatalf("AP2112 VOUT bypass = %#v", route)

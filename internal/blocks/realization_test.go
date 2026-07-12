@@ -208,6 +208,7 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 		Port:      "IN",
 		Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"},
 		When:      RealizationWhen{Params: map[string]any{"enabled": true}},
+		OmitWhen:  []RealizationWhen{{Params: map[string]any{"omit": true}}},
 		Variants: []PCBAnchorPlacementVariant{{
 			Placement: RelativePlacement{XMM: 1, YMM: 2, Layer: "F.Cu"},
 			When:      RealizationWhen{Params: map[string]any{"variant": true}},
@@ -222,6 +223,7 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 	clone := cloneBlockDefinition(definition)
 	clone.PCBRealization.Components[0].Properties["k"] = "changed"
 	clone.PCBRealization.EntryAnchors[0].When.Params["enabled"] = false
+	clone.PCBRealization.EntryAnchors[0].OmitWhen[0].Params["omit"] = false
 	clone.PCBRealization.EntryAnchors[0].Variants[0].When.Params["variant"] = false
 	clone.PCBRealization.LocalRoutes[0].Waypoints[0].XMM = 99
 	clone.PCBRealization.LocalRoutes[0].When.Params["enabled"] = false
@@ -247,6 +249,9 @@ func TestCloneBlockDefinitionClonesPCBRealization(t *testing.T) {
 	}
 	if definition.PCBRealization.EntryAnchors[0].When.Params["enabled"] != true {
 		t.Fatalf("entry anchor condition params were not cloned")
+	}
+	if definition.PCBRealization.EntryAnchors[0].OmitWhen[0].Params["omit"] != true {
+		t.Fatalf("entry anchor omit condition params were not cloned")
 	}
 	if definition.PCBRealization.EntryAnchors[0].Variants[0].When.Params["variant"] != true {
 		t.Fatalf("entry anchor variant condition params were not cloned")

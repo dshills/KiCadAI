@@ -77,6 +77,7 @@ type PCBEntryAnchor struct {
 	Side        string                      `json:"side,omitempty"`
 	Description string                      `json:"description,omitempty"`
 	When        RealizationWhen             `json:"when,omitempty"`
+	OmitWhen    []RealizationWhen           `json:"omit_when,omitempty"`
 }
 
 type PCBAnchorPlacementVariant struct {
@@ -317,6 +318,9 @@ func ValidatePCBRealization(definition BlockDefinition) []reports.Issue {
 		}
 		issues = append(issues, validatePCBRealizationSide(anchorPath+".side", anchor.Side)...)
 		issues = append(issues, validateRealizationWhen(anchorPath+".when", anchor.When, parameters)...)
+		for omitIndex, condition := range anchor.OmitWhen {
+			issues = append(issues, validateRealizationWhen(fmt.Sprintf("%s.omit_when.%d", anchorPath, omitIndex), condition, parameters)...)
+		}
 		issues = append(issues, validateRelativePlacement(anchorPath+".placement", anchor.Placement)...)
 		for variantIndex, variant := range anchor.Variants {
 			variantPath := fmt.Sprintf("%s.placement_variants.%d", anchorPath, variantIndex)
@@ -862,6 +866,10 @@ func clonePCBRealization(realization *PCBRealization) *PCBRealization {
 	clone.EntryAnchors = append([]PCBEntryAnchor(nil), realization.EntryAnchors...)
 	for i := range clone.EntryAnchors {
 		clone.EntryAnchors[i].When = cloneRealizationWhen(realization.EntryAnchors[i].When)
+		clone.EntryAnchors[i].OmitWhen = append([]RealizationWhen(nil), realization.EntryAnchors[i].OmitWhen...)
+		for omitIndex := range clone.EntryAnchors[i].OmitWhen {
+			clone.EntryAnchors[i].OmitWhen[omitIndex] = cloneRealizationWhen(clone.EntryAnchors[i].OmitWhen[omitIndex])
+		}
 		clone.EntryAnchors[i].Variants = append([]PCBAnchorPlacementVariant(nil), realization.EntryAnchors[i].Variants...)
 		for variantIndex := range clone.EntryAnchors[i].Variants {
 			clone.EntryAnchors[i].Variants[variantIndex].When = cloneRealizationWhen(clone.EntryAnchors[i].Variants[variantIndex].When)

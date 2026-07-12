@@ -136,9 +136,9 @@ func voltageRegulatorComponents(defaults voltageRegulatorComponentDefaults) []Bl
 func voltageRegulatorPCBRealization() *PCBRealization {
 	ap2112 := RealizationWhen{Params: map[string]any{"regulator_symbol": ap2112RegulatorSymbol}}
 	ap2112VINAnchor := []PCBAnchorPlacementVariant{{Placement: RelativePlacement{XMM: -7, YMM: -4, Layer: "F.Cu"}, When: ap2112}}
-	ap2112VINEntry := []PCBRouteGeometryVariant{{Waypoints: []RelativePoint{{XMM: -6.8, YMM: -4}}, DisableEntryAnchorDogbone: true, DisableEntryAnchorVia: true, When: ap2112}}
+	ap2112VINEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VOUTEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
-	ap2112GNDEntry := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "F.Cu", When: ap2112}}
+	ap2112GNDEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VINBypass := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VOUTBypass := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "B.Cu", When: ap2112}}
 	ap2112DisableGenericGround := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
@@ -153,9 +153,9 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 			{ComponentRole: "power_led", FootprintID: "LED_SMD:LED_0805_2012Metric", Placement: RelativePlacement{XMM: 18, YMM: 0, RotationDeg: 180, Layer: "F.Cu"}},
 		},
 		EntryAnchors: []PCBEntryAnchor{
-			{ID: "vin", Port: "VIN", NetTemplate: "vin", Placement: RelativePlacement{XMM: -8, YMM: -4, Layer: "F.Cu"}, Variants: ap2112VINAnchor, Description: "Regulator input rail entry with clearance from adjacent ground-return access."},
-			{ID: "vout", Port: "VOUT", NetTemplate: "vout", Placement: RelativePlacement{XMM: 5.4, YMM: -4, Layer: "F.Cu"}, Description: "Regulator output rail entry at the output capacitor pad."},
-			{ID: "gnd", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: -5.4, YMM: -4, Layer: "F.Cu"}, Description: "Regulator ground entry at the input capacitor return pad."},
+			{ID: "vin", Port: "VIN", NetTemplate: "vin", Placement: RelativePlacement{XMM: -8, YMM: -4, Layer: "F.Cu"}, Variants: ap2112VINAnchor, OmitWhen: []RealizationWhen{ap2112}, Description: "Regulator input rail entry with clearance from adjacent ground-return access."},
+			{ID: "vout", Port: "VOUT", NetTemplate: "vout", Placement: RelativePlacement{XMM: 5.4, YMM: -4, Layer: "F.Cu"}, OmitWhen: []RealizationWhen{ap2112}, Description: "Regulator output rail entry at the output capacitor pad."},
+			{ID: "gnd", Port: "GND", NetTemplate: "gnd", Placement: RelativePlacement{XMM: -5.4, YMM: -4, Layer: "F.Cu"}, OmitWhen: []RealizationWhen{ap2112}, Description: "Regulator ground entry at the input capacitor return pad."},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "regulator_core", ComponentRoles: []string{"regulator", "input_capacitor", "output_capacitor"}, AnchorRole: "regulator", Bounds: &RelativeBounds{MinXMM: -9, MinYMM: -7, MaxXMM: 9, MaxYMM: 5}}},
 		LocalRoutes: []PCBLocalRoute{
