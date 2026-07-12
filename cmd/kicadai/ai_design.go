@@ -15,6 +15,7 @@ import (
 
 	"kicadai/internal/aiprovider"
 	"kicadai/internal/blocks"
+	"kicadai/internal/circuitgraph"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
 	"kicadai/internal/reports"
@@ -39,6 +40,7 @@ type aiProviderSummary struct {
 
 type aiRequestEvidence struct {
 	Schema       string `json:"schema"`
+	Profile      string `json:"profile,omitempty"`
 	Provider     string `json:"provider"`
 	Model        string `json:"model,omitempty"`
 	PromptSource string `json:"prompt_source"`
@@ -80,7 +82,7 @@ func hasAIPromptSource(opts cliOptions) bool {
 }
 
 func aiDesignOptionsPresent(opts cliOptions) bool {
-	return hasAIPromptSource(opts) || strings.TrimSpace(opts.aiProvider) != "" || strings.TrimSpace(opts.aiModel) != "" || strings.TrimSpace(opts.aiProviderRecord) != "" || opts.aiBackground || opts.maxAIAttempts != 1
+	return hasAIPromptSource(opts) || strings.TrimSpace(opts.aiProvider) != "" || strings.TrimSpace(opts.aiProfile) != "" || strings.TrimSpace(opts.aiModel) != "" || strings.TrimSpace(opts.aiProviderRecord) != "" || opts.aiBackground || opts.maxAIAttempts != 1
 }
 
 func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -90,6 +92,9 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	prompt, promptSource, issue := loadAIPrompt(opts)
 	if issue != nil {
 		return writeDesignFailure(stdout, *issue)
+	}
+	if strings.TrimSpace(opts.aiProfile) == circuitgraph.ProviderProfileID {
+		return runAIGenericCircuitCreate(ctx, opts, prompt, promptSource, stdout)
 	}
 	profile, err := aiprovider.SelectReferenceProfile(prompt)
 	if err != nil {
@@ -378,6 +383,9 @@ func validateAIDesignOptions(opts cliOptions) *reports.Issue {
 	}
 	if opts.maxAIAttempts < 1 || opts.maxAIAttempts > 2 {
 		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "max_ai_attempts", Message: "--max-ai-attempts must be 1 or 2"}
+	}
+	if profile := strings.TrimSpace(opts.aiProfile); profile != "" && profile != circuitgraph.ProviderProfileID {
+		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "ai_profile", Message: "unsupported --ai-profile " + profile}
 	}
 	if strings.EqualFold(strings.TrimSpace(opts.aiProvider), "recorded") && strings.TrimSpace(opts.aiProviderRecord) == "" {
 		return &reports.Issue{Code: reports.CodeAIProviderConfiguration, Severity: reports.SeverityError, Path: "provider_record", Message: "--provider-record is required for the recorded provider"}

@@ -11,8 +11,12 @@ import (
 	"testing"
 
 	"kicadai/internal/aiprovider"
+	"kicadai/internal/circuitgraph"
+	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
+	"kicadai/internal/kicadfiles"
+	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
 )
 
@@ -21,6 +25,7 @@ func TestParseAIDesignFlags(t *testing.T) {
 		"--prompt", "build bmp280",
 		"--provider", "recorded",
 		"--provider-record", "response.json",
+		"--ai-profile", "generic-circuit-v1",
 		"--model", "test-model",
 		"--max-ai-attempts", "2",
 		"--ai-background",
@@ -32,9 +37,139 @@ func TestParseAIDesignFlags(t *testing.T) {
 	if command != "design" || len(opts.commandArgs) != 1 || opts.commandArgs[0] != "create" {
 		t.Fatalf("command=%q args=%#v", command, opts.commandArgs)
 	}
-	if opts.aiPrompt != "build bmp280" || opts.aiProvider != "recorded" || opts.aiProviderRecord != "response.json" || opts.aiModel != "test-model" || opts.maxAIAttempts != 2 || !opts.aiBackground {
+	if opts.aiPrompt != "build bmp280" || opts.aiProvider != "recorded" || opts.aiProviderRecord != "response.json" || opts.aiProfile != "generic-circuit-v1" || opts.aiModel != "test-model" || opts.maxAIAttempts != 2 || !opts.aiBackground {
 		t.Fatalf("options = %#v", opts)
 	}
+}
+
+func TestRecordedGenericCircuitProviderToWorkflow(t *testing.T) {
+	fixture := filepath.Join("..", "..", "examples", "ai", "generic_parallel_resistors", "recorded-response.json")
+	data, err := os.ReadFile(fixture)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := aiprovider.NewRecordedProvider("generic_parallel_resistors", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalogDir, err := filepath.Abs(filepath.Join("..", "..", "data", "components"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{CatalogDir: catalogDir})
+	if err != nil {
+		t.Fatal(err)
+	}
+	index := genericResistorLibraryIndex()
+	symbols, footprints := circuitgraph.LibraryEvidenceFromIndex(index)
+	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "test", LibrarySymbols: symbols, LibraryFootprints: footprints, RequireLibraryEvidence: true})
+	capability, err := circuitgraph.ProviderCapabilityContext(catalog, aiprovider.MaxCapabilityBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, graph, resolved, request, attempts, issues, err := generateValidatedAIGraph(context.Background(), provider, aiprovider.GenericCircuitProfile(capability), resolver, "build two parallel resistors", 1)
+	if err != nil || reports.HasBlockingIssue(issues) {
+		t.Fatalf("generic preflight err=%v issues=%#v", err, issues)
+	}
+	if !result.Recorded || graph.Project.Name != "generic_parallel_resistors" || resolved.ResolutionHash == "" || request.ExplicitCircuit == nil || len(attempts) != 1 {
+		t.Fatalf("generic preflight result=%#v graph=%#v resolved=%#v request=%#v attempts=%#v", result, graph, resolved, request, attempts)
+	}
+	request.Validation.Acceptance = designworkflow.AcceptanceDraft
+	request.Validation.RequireERC = false
+	request.Validation.RequireDRC = false
+	workflow := designworkflow.Create(context.Background(), request, designworkflow.CreateOptions{OutputDir: filepath.Join(t.TempDir(), "project"), Overwrite: true, LibraryIndex: &index})
+	if stage := testAIWorkflowStage(workflow, designworkflow.StageProjectWrite); stage == nil || stage.Status == designworkflow.StageStatusBlocked {
+		t.Fatalf("project write stage=%#v issues=%#v", stage, designworkflow.WorkflowIssues(workflow))
+	}
+	if stage := testAIWorkflowStage(workflow, designworkflow.StageRouting); stage == nil || stage.Status == designworkflow.StageStatusBlocked || stage.Status == designworkflow.StageStatusSkipped {
+		t.Fatalf("routing stage=%#v issues=%#v", stage, designworkflow.WorkflowIssues(workflow))
+	}
+}
+
+func TestRunRecordedGenericCircuitCLIEndToEnd(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "examples", "ai", "generic_parallel_resistors")
+	symbolsRoot, footprintsRoot := writeCLILibraryFixture(t)
+	catalogDir, err := filepath.Abs(filepath.Join("..", "..", "data", "components"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "project")
+	var stdout bytes.Buffer
+	err = run([]string{
+		"--prompt-file", filepath.Join(fixtureDir, "prompt.txt"),
+		"--provider", "recorded", "--provider-record", filepath.Join(fixtureDir, "recorded-response.json"),
+		"--ai-profile", "generic-circuit-v1", "--catalog-dir", catalogDir,
+		"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"--output", output, "--overwrite", "design", "create",
+	}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("generic CLI run: %v\n%s", err, stdout.String())
+	}
+	var payload struct {
+		OK   bool                      `json:"ok"`
+		Data aiGraphDesignCreateResult `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if !payload.OK || payload.Data.Graph.Project.Name != "generic_parallel_resistors" || payload.Data.Request.ExplicitCircuit == nil || payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != aiLaneStatusCandidate {
+		t.Fatalf("generic CLI payload = %#v", payload)
+	}
+	for _, name := range []string{"circuit-graph.json", "circuit-resolution.json", "design-request.json", "ai-request.json", "ai-response.json", "ai-attempts.json", "workflow-result.json"} {
+		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
+			t.Fatalf("missing %s: %v", name, err)
+		}
+	}
+}
+
+func TestAIDesignRejectsUnknownExplicitProfile(t *testing.T) {
+	issue := validateAIDesignOptions(cliOptions{output: "out", aiPrompt: "test", aiProvider: "recorded", aiProviderRecord: "response.json", aiProfile: "unknown", maxAIAttempts: 1})
+	if issue == nil || issue.Path != "ai_profile" {
+		t.Fatalf("unknown profile issue = %#v", issue)
+	}
+}
+
+func TestGenericCircuitProfileRejectsUnknownFieldBeforeWorkflow(t *testing.T) {
+	data := []byte(`{"schema":"kicadai.ai.intent.v1","intent":{"schema":"kicadai.circuit-graph.v1","version":1,"unexpected":true}}`)
+	provider, err := aiprovider.NewRecordedProvider("invalid", data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _, _, request, _, issues, err := generateValidatedAIGraph(context.Background(), provider, aiprovider.GenericCircuitProfile("catalog"), circuitgraph.NewResolver(circuitgraph.ResolveOptions{}), "invalid graph", 1)
+	if err != nil || !reports.HasBlockingIssue(issues) || request.ExplicitCircuit != nil || !strings.HasPrefix(issues[0].Path, "provider.graph") {
+		t.Fatalf("invalid graph err=%v issues=%#v request=%#v", err, issues, request)
+	}
+}
+
+func genericResistorLibraryIndex() libraryresolver.LibraryIndex {
+	return libraryresolver.LibraryIndex{
+		Symbols: map[string]libraryresolver.SymbolRecord{
+			"Device:R": {LibraryID: "Device:R", Name: "R", Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Unit: 1, Position: kicadfiles.Point{X: -2540000}, Electrical: "passive"},
+				{Number: "2", Unit: 1, Position: kicadfiles.Point{X: 2540000}, Electrical: "passive"},
+			}},
+		},
+		Footprints: map[string]libraryresolver.FootprintRecord{
+			"Resistor_SMD:R_0805_2012Metric": {
+				FootprintID: "Resistor_SMD:R_0805_2012Metric", Name: "R_0805_2012Metric",
+				BoundingBox:  libraryresolver.BoundingBox{Min: kicadfiles.Point{X: -1500000, Y: -1000000}, Max: kicadfiles.Point{X: 1500000, Y: 1000000}},
+				CourtyardBox: libraryresolver.BoundingBox{Min: kicadfiles.Point{X: -1600000, Y: -1100000}, Max: kicadfiles.Point{X: 1600000, Y: 1100000}},
+				Pads: []libraryresolver.FootprintPad{
+					{Name: "1", Type: "smd", Shape: "rect", Position: kicadfiles.Point{X: -950000}, Size: kicadfiles.Point{X: 1000000, Y: 1200000}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
+					{Name: "2", Type: "smd", Shape: "rect", Position: kicadfiles.Point{X: 950000}, Size: kicadfiles.Point{X: 1000000, Y: 1200000}, Layers: []kicadfiles.BoardLayer{kicadfiles.LayerFCu, kicadfiles.LayerFMask}},
+				},
+			},
+		},
+	}
+}
+
+func testAIWorkflowStage(result designworkflow.WorkflowResult, name designworkflow.StageName) *designworkflow.StageResult {
+	for index := range result.Stages {
+		if result.Stages[index].Name == name {
+			return &result.Stages[index]
+		}
+	}
+	return nil
 }
 
 func TestRunAIDesignRejectsConflictingInputsBeforeOutput(t *testing.T) {

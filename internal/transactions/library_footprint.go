@@ -30,7 +30,7 @@ func footprintRecordPadSpecs(record libraryresolver.FootprintRecord, placementLa
 	return pads
 }
 
-func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOptions, record libraryresolver.FootprintRecord, placementLayer kicadfiles.BoardLayer) {
+func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOptions, record libraryresolver.FootprintRecord, placementLayer kicadfiles.BoardLayer) error {
 	options.Description = record.Description
 	options.Tags = strings.Join(record.Tags, " ")
 	options.Attributes = append([]string(nil), record.Attributes...)
@@ -40,7 +40,40 @@ func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOpti
 	options.Models = importedModels(record.Models)
 	if len(options.Pads) == 0 {
 		options.Pads = footprintRecordPadSpecs(record, placementLayer)
+		return nil
 	}
+	if !netOnlyDesignAPIPadSpecs(options.Pads) {
+		return nil
+	}
+	nets := make(map[string]string, len(options.Pads))
+	for _, pad := range options.Pads {
+		nets[pad.Name] = pad.Net
+	}
+	hydrated := footprintRecordPadSpecs(record, placementLayer)
+	seen := make(map[string]struct{}, len(hydrated))
+	for index := range hydrated {
+		if net, exists := nets[hydrated[index].Name]; exists {
+			hydrated[index].Net = net
+			seen[hydrated[index].Name] = struct{}{}
+		}
+	}
+	for name := range nets {
+		if _, exists := seen[name]; !exists {
+			return fmt.Errorf("footprint %s has no pad %s", record.FootprintID, name)
+		}
+	}
+	options.Pads = hydrated
+	return nil
+}
+
+func netOnlyDesignAPIPadSpecs(specs []designapi.PadSpec) bool {
+	for _, spec := range specs {
+		if strings.TrimSpace(spec.Name) == "" || strings.TrimSpace(spec.Type) != "" || strings.TrimSpace(spec.Shape) != "" ||
+			spec.Offset != (kicadfiles.Point{}) || spec.Size != (kicadfiles.Point{}) || spec.Drill != 0 || len(spec.Layers) != 0 {
+			return false
+		}
+	}
+	return len(specs) > 0
 }
 
 func upsertImportedFootprintWithLibrary(board *pcb.PCBFile, generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, index *libraryresolver.LibraryIndex) error {

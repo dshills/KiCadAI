@@ -109,6 +109,7 @@ Global flags:
   --prompt string        AI-provider natural-language design request
   --prompt-file string   AI-provider request file (avoids shell history)
   --provider string      AI intent provider: openai or recorded
+  --ai-profile string    Explicit AI schema profile, including generic-circuit-v1
   --model string         AI provider model override
   --provider-record string Recorded AI response fixture path
   --max-ai-attempts int  Maximum AI intent attempts: 1 or 2 (default 1)
@@ -223,6 +224,7 @@ type cliOptions struct {
 	aiPrompt                    string
 	aiPromptFile                string
 	aiProvider                  string
+	aiProfile                   string
 	aiModel                     string
 	aiProviderRecord            string
 	maxAIAttempts               int
@@ -426,6 +428,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.aiPrompt, "prompt", "", "AI-provider natural-language design request")
 	flags.StringVar(&opts.aiPromptFile, "prompt-file", "", "AI-provider request file")
 	flags.StringVar(&opts.aiProvider, "provider", "", "AI intent provider: openai or recorded")
+	flags.StringVar(&opts.aiProfile, "ai-profile", "", "explicit AI schema profile, including generic-circuit-v1")
 	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")
 	flags.StringVar(&opts.aiProviderRecord, "provider-record", "", "recorded AI response fixture path")
 	flags.IntVar(&opts.maxAIAttempts, "max-ai-attempts", 1, "maximum AI intent attempts")

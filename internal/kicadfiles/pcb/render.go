@@ -267,7 +267,7 @@ func renderFootprintLibraryModule(footprint *Footprint, name string) sexpr.List 
 		nodes = append(nodes, renderFootprintText(footprintLibraryText(text)))
 	}
 	for _, graphic := range footprint.Graphics {
-		nodes = append(nodes, renderFootprintGraphic(graphic))
+		nodes = append(nodes, renderFootprintGraphic(footprintLibraryGraphic(graphic)))
 	}
 	for _, pad := range footprint.Pads {
 		nodes = append(nodes, renderPad(footprintLibraryPad(pad), ""))
@@ -291,6 +291,12 @@ func footprintLibraryPad(pad Pad) Pad {
 	pad.NetCode = 0
 	pad.NetName = ""
 	return pad
+}
+
+func footprintLibraryGraphic(graphic FootprintGraphic) FootprintGraphic {
+	drawing := Drawing(graphic)
+	drawing.UUID = ""
+	return FootprintGraphic(drawing)
 }
 
 func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
@@ -631,10 +637,10 @@ func renderGraphic(prefix string, drawing Drawing) sexpr.List {
 			renderAt(drawing.Text.Position, drawing.Text.Rotation),
 		)
 	}
-	nodes = append(nodes,
-		sexpr.L(sexpr.A("layer"), sexpr.S(string(drawing.Layer))),
-		sexpr.L(sexpr.A("uuid"), sexpr.S(string(drawing.UUID))),
-	)
+	nodes = append(nodes, sexpr.L(sexpr.A("layer"), sexpr.S(string(drawing.Layer))))
+	if drawing.UUID.Valid() {
+		nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(drawing.UUID))))
+	}
 	if drawing.Text != nil {
 		nodes = append(nodes, renderEffects(drawing.Text.Effects))
 	}

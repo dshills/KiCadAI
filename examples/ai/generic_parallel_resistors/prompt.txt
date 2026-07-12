@@ -1,0 +1,1 @@
+Create a small board with two 10k 0805 resistors connected in parallel between NET_A and NET_B.

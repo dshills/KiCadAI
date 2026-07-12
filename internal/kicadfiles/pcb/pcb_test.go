@@ -955,6 +955,18 @@ func TestWriteOmitsNetForUnconnectedPad(t *testing.T) {
 	}
 }
 
+func TestFootprintLibraryModuleOmitsInstanceGraphicUUIDs(t *testing.T) {
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")
+	footprint.Graphics = []FootprintGraphic{{UUID: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", Layer: kicadfiles.LayerFSilkS, Line: &LineDrawing{Start: kicadfiles.Point{}, End: kicadfiles.Point{X: kicadfiles.MM(1)}, Width: kicadfiles.MM(0.1)}}}
+	var module bytes.Buffer
+	if err := WriteFootprintLibraryModule(&module, &footprint, "R_0805"); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(module.String(), "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb") || strings.Contains(module.String(), `(uuid "")`) {
+		t.Fatalf("library module retained instance UUID:\n%s", module.String())
+	}
+}
+
 func TestValidateRejectsPadNetNameMismatch(t *testing.T) {
 	board := minimalPCB()
 	board.Nets = []Net{{Code: 1, Name: "A"}}

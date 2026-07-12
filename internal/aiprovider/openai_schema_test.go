@@ -12,6 +12,7 @@ func TestOpenAIIntentSchemaObjectsAreStrictAndFullyRequired(t *testing.T) {
 	for name, schema := range map[string]map[string]any{
 		"bmp280":        BMP280ReferenceIntentEnvelopeSchema(),
 		"protected_led": ProtectedLEDReferenceIntentEnvelopeSchema(),
+		"generic":       GenericCircuitProfile("catalog").IntentEnvelopeSchema(),
 	} {
 		t.Run(name, func(t *testing.T) {
 			assertStrictSchemaNode(t, "schema", schema)
@@ -33,7 +34,7 @@ func assertStrictSchemaNode(t *testing.T, path string, node any) {
 		if !ok {
 			t.Fatalf("%s properties = %#v", path, object["properties"])
 		}
-		var want []string
+		want := make([]string, 0, len(properties))
 		for name := range properties {
 			want = append(want, name)
 		}

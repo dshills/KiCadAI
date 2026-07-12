@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"kicadai/internal/placement"
@@ -233,4 +234,32 @@ func appendExplicitOperationToSlice(operations *[]transactions.Operation, kind t
 		return
 	}
 	*operations = append(*operations, op)
+}
+
+func explicitPlacementWriteOperations(source []transactions.Operation) ([]transactions.Operation, []reports.Issue) {
+	operations := make([]transactions.Operation, 0, len(source))
+	var issues []reports.Issue
+	for index, operation := range source {
+		if operation.Op != transactions.OpPlaceFootprint {
+			operations = append(operations, operation)
+			continue
+		}
+		var payload transactions.PlaceFootprintOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "explicit_circuit.placement_operations", Message: err.Error()})
+			continue
+		}
+		for padIndex, pad := range payload.Pads {
+			payload.Pads[padIndex] = transactions.PadSpec{Name: pad.Name, Net: pad.Net}
+		}
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "explicit_circuit.placement_operations", Message: err.Error()})
+			continue
+		}
+		converted := transactions.NewOperationWithMetadata(transactions.OpPlaceFootprint, raw, payload.Ref, "")
+		converted.Index = index
+		operations = append(operations, converted)
+	}
+	return operations, issues
 }

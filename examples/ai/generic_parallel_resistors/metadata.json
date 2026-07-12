@@ -1,0 +1,8 @@
+{
+  "schema": "kicadai.ai.generic-fixture.v1",
+  "id": "generic_parallel_resistors",
+  "profile": "generic-circuit-v1",
+  "prompt": "prompt.txt",
+  "recorded_response": "recorded-response.json",
+  "expected_status": "candidate"
+}

@@ -1,0 +1,40 @@
+{
+  "schema": "kicadai.ai.intent.v1",
+  "intent": {
+    "schema": "kicadai.circuit-graph.v1",
+    "version": 1,
+    "project": {
+      "name": "generic_parallel_resistors",
+      "title": "Parallel Resistors",
+      "description": "Two catalog-resolved 10k resistors in parallel.",
+      "acceptance": "connectivity",
+      "board": {"width_mm": 30, "height_mm": 20, "layers": 2, "edge_clearance_mm": 0.25}
+    },
+    "components": [
+      {"id": "r1", "reference": "R1", "role": "resistor", "component_id": "resistor.generic.0805", "variant_id": "0805", "value": "10k", "population": "populate"},
+      {"id": "r2", "reference": "R2", "role": "resistor", "component_id": "resistor.generic.0805", "variant_id": "0805", "value": "10k", "population": "populate"}
+    ],
+    "nets": [
+      {"name": "NET_A", "role": "signal", "required": true, "width_mm": 0.3, "endpoints": [{"component": "r1", "selector_kind": "function", "selector": "A"}, {"component": "r2", "selector_kind": "function", "selector": "A"}]},
+      {"name": "NET_B", "role": "signal", "required": true, "width_mm": 0.3, "endpoints": [{"component": "r1", "selector_kind": "function", "selector": "B"}, {"component": "r2", "selector_kind": "function", "selector": "B"}]}
+    ],
+    "no_connects": [],
+    "buses": [],
+    "schematic": {
+      "flow": "left_to_right",
+      "origin": "centered",
+      "groups": [{"id": "resistors", "role": "processing_stage", "members": ["r1", "r2"], "rank": 0}],
+      "lanes": {"power": "top", "signals": "middle", "ground": "bottom"},
+      "placements": [{"component": "r1", "group": "resistors", "orientation": "normal", "mirror": "none"}, {"component": "r2", "group": "resistors", "near": "r1", "orientation": "normal", "mirror": "none"}],
+      "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": true, "avoid_wire_crossings": true, "min_group_spacing_mm": 12.7, "min_component_spacing_mm": 7.62},
+      "hierarchy": {"mode": "flat"}
+    },
+    "pcb": {
+      "regions": [{"id": "main", "role": "signal", "bounds": {"x_mm": 2, "y_mm": 2, "width_mm": 26, "height_mm": 16}}],
+      "placements": [{"component": "r1", "region": "main", "priority": 80}, {"component": "r2", "region": "main", "near": "r1", "priority": 80, "max_distance_mm": 10}],
+      "keepouts": [],
+      "zones": []
+    },
+    "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true}
+  }
+}

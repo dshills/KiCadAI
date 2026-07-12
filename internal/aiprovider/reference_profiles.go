@@ -4,6 +4,8 @@ import (
 	"errors"
 	"strings"
 	"unicode"
+
+	"kicadai/internal/circuitgraph"
 )
 
 const (
@@ -45,6 +47,24 @@ func ProtectedLEDProfile() ReferenceProfile {
 		SchemaName:        ProtectedLEDReferenceSchemaName,
 		CapabilityContext: ProtectedLEDReferenceCapabilityContext,
 		schema:            ProtectedLEDReferenceIntentEnvelopeSchema,
+	}
+}
+
+func GenericCircuitProfile(capabilityContext string) ReferenceProfile {
+	return ReferenceProfile{
+		ID: circuitgraph.ProviderProfileID, SchemaName: circuitgraph.ProviderSchemaName,
+		CapabilityContext: capabilityContext, schema: genericCircuitEnvelopeSchema,
+	}
+}
+
+func genericCircuitEnvelopeSchema() map[string]any {
+	return map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"schema": map[string]any{"type": "string", "const": EnvelopeSchemaV1},
+			"intent": circuitgraph.ProviderGraphSchema(),
+		},
+		"required": []string{"intent", "schema"}, "additionalProperties": false,
 	}
 }
 

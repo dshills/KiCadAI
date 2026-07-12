@@ -33,6 +33,21 @@ func TestSelectReferenceProfile(t *testing.T) {
 	}
 }
 
+func TestGenericCircuitProfileUsesStrictGraphSchema(t *testing.T) {
+	profile := GenericCircuitProfile("catalog")
+	if profile.ID != "generic-circuit-v1" || profile.SchemaName != "kicadai_generic_circuit_graph_v1" || profile.CapabilityContext != "catalog" {
+		t.Fatalf("generic profile = %#v", profile)
+	}
+	if profile.IntentEnvelopeSchema()["additionalProperties"] != false {
+		t.Fatalf("generic schema is not strict: %#v", profile.IntentEnvelopeSchema())
+	}
+	properties := profile.IntentEnvelopeSchema()["properties"].(map[string]any)
+	intent := properties["intent"].(map[string]any)
+	if intent["additionalProperties"] != false || properties["schema"].(map[string]any)["const"] != EnvelopeSchemaV1 {
+		t.Fatalf("generic envelope is not strict: %#v", profile.IntentEnvelopeSchema())
+	}
+}
+
 func TestReferenceProfilesReturnFreshStrictSchemas(t *testing.T) {
 	for _, profile := range []ReferenceProfile{BMP280Profile(), ProtectedLEDProfile()} {
 		first := profile.IntentEnvelopeSchema()
