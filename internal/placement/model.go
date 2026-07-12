@@ -150,13 +150,14 @@ type Endpoint struct {
 }
 
 type Group struct {
-	ID           string
-	Role         string
-	Components   []string
-	Anchor       GroupAnchor
-	KeepTogether bool
-	MaxSpreadMM  float64
-	Priority     int
+	ID              string
+	Role            string
+	Components      []string
+	Anchor          GroupAnchor
+	KeepTogether    bool
+	MaxSpreadMM     float64
+	TranslateAsUnit bool
+	Priority        int
 }
 
 type GroupAnchor struct {
@@ -1114,6 +1115,28 @@ func Validate(request Request) []reports.Issue {
 			trimmedRef := strings.TrimSpace(group.Anchor.Ref)
 			if _, ok := refs[strings.ToUpper(trimmedRef)]; !ok {
 				issues = append(issues, issue(path+".anchor.ref", "group anchor references unknown component "+trimmedRef))
+			}
+		}
+		if group.TranslateAsUnit {
+			anchorRef := normalizeRef(group.Anchor.Ref)
+			if anchorRef == "" {
+				issues = append(issues, issue(path+".anchor.ref", "relative-placement group requires a component anchor"))
+			}
+			anchorIncluded := false
+			for _, ref := range group.Components {
+				if normalizeRef(ref) == anchorRef {
+					anchorIncluded = true
+				}
+				component, ok := refs[normalizeRef(ref)]
+				if ok && component.Position == nil {
+					issues = append(issues, issue(path+".components", "relative-placement component "+strings.TrimSpace(ref)+" requires an authored position"))
+				}
+			}
+			if anchor, ok := refs[anchorRef]; ok && anchor.Position == nil {
+				issues = append(issues, issue(path+".anchor.ref", "relative-placement anchor requires an authored position"))
+			}
+			if anchorRef != "" && !anchorIncluded {
+				issues = append(issues, issue(path+".anchor.ref", "relative-placement anchor must be included in group components"))
 			}
 		}
 	}

@@ -61,11 +61,12 @@ type RelativePlacement struct {
 }
 
 type PCBPlacementGroup struct {
-	ID             string          `json:"id"`
-	ComponentRoles []string        `json:"component_roles"`
-	AnchorRole     string          `json:"anchor_role,omitempty"`
-	Bounds         *RelativeBounds `json:"bounds,omitempty"`
-	Description    string          `json:"description,omitempty"`
+	ID              string          `json:"id"`
+	ComponentRoles  []string        `json:"component_roles"`
+	AnchorRole      string          `json:"anchor_role,omitempty"`
+	Bounds          *RelativeBounds `json:"bounds,omitempty"`
+	TranslateAsUnit bool            `json:"translate_as_unit,omitempty"`
+	Description     string          `json:"description,omitempty"`
 }
 
 type PCBEntryAnchor struct {

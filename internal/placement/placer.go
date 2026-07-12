@@ -95,6 +95,11 @@ func PlaceContext(ctx context.Context, request Request) Result {
 		placedByRef[normalizeRef(placement.Ref)] = placement
 		result.Placements = append(result.Placements, placement)
 	}
+	rigidIssues := preserveRelativeGroupPlacements(request, result.Placements)
+	result.Issues = append(result.Issues, rigidIssues...)
+	if len(rigidIssues) > 0 && result.Status == StatusPlaced {
+		result.Status = StatusPartial
+	}
 	if result.Metrics.UnplacedCount > 0 && result.Metrics.PlacedCount == 0 {
 		result.Status = StatusBlocked
 	}

@@ -139,6 +139,52 @@ func TestPlaceFragmentsHydratesGeneratedMobilityWhenRetryEnabled(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsPreservesRegulatorCoreRelativePlacement(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "regulated_board",
+		Board:   BoardSpec{WidthMM: 100, HeightMM: 75, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "regulator",
+			BlockID: "voltage_regulator",
+			Params: map[string]any{
+				"regulator_symbol":    "Regulator_Linear:AP2112K-3.3",
+				"regulator_footprint": "Package_TO_SOT_SMD:SOT-23-5",
+				"input_voltage":       "5V",
+				"output_voltage":      "3.3V",
+				"output_current":      "0.1A",
+				"enable_mode":         "tied_input",
+			},
+		}},
+		RoutingRetry: RoutingRetryPolicySpec{Enabled: true},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	if len(result.Request.Groups) != 1 || !result.Request.Groups[0].TranslateAsUnit {
+		t.Fatalf("regulator placement groups = %#v", result.Request.Groups)
+	}
+
+	refs := fragments.Fragments[0].Realization.RoleRefs
+	placements := map[string]placement.Placement{}
+	for _, placed := range result.Result.Placements {
+		placements[placed.Ref] = placed.Position
+	}
+	regulator := placements[refs["regulator"]]
+	input := placements[refs["input_capacitor"]]
+	output := placements[refs["output_capacitor"]]
+	if input.XMM-regulator.XMM != -6 || input.YMM-regulator.YMM != -4 {
+		t.Fatalf("input capacitor offset = (%v,%v), want (-6,-4)", input.XMM-regulator.XMM, input.YMM-regulator.YMM)
+	}
+	if output.XMM-regulator.XMM != 6 || output.YMM-regulator.YMM != -4 {
+		t.Fatalf("output capacitor offset = (%v,%v), want (6,-4)", output.XMM-regulator.XMM, output.YMM-regulator.YMM)
+	}
+}
+
 func TestPlaceFragmentsPromotesRequestConnectionsToPlacementNets(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

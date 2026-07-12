@@ -595,18 +595,17 @@ func placementGroupsFromFragment(fragment BlockFragment) []placement.Group {
 	groups := make([]placement.Group, 0, len(fragment.PlacementGroups))
 	for _, group := range fragment.PlacementGroups {
 		converted := placement.Group{
-			ID:           blockPlacementGroupID(fragment, group.ID),
-			Role:         group.ID,
-			KeepTogether: true,
-			Priority:     10,
+			ID:              blockPlacementGroupID(fragment, group.ID),
+			Role:            group.ID,
+			Anchor:          placement.GroupAnchor{Ref: fragment.Realization.RoleRefs[strings.TrimSpace(group.AnchorRole)]},
+			KeepTogether:    true,
+			TranslateAsUnit: group.TranslateAsUnit,
+			Priority:        10,
 		}
 		for _, role := range group.ComponentRoles {
 			if ref := fragment.Realization.RoleRefs[strings.TrimSpace(role)]; ref != "" {
 				converted.Components = append(converted.Components, ref)
 			}
-		}
-		if group.AnchorRole != "" {
-			converted.Anchor.Ref = fragment.Realization.RoleRefs[strings.TrimSpace(group.AnchorRole)]
 		}
 		if group.Bounds != nil {
 			converted.MaxSpreadMM = boundsDiagonal(*group.Bounds)
