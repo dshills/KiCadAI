@@ -57,7 +57,7 @@ kicadai \
 | `sensor_bmp280_breakout` | `pass` | Reproduces the concrete BMP280 structured-intent result through the environment-gated design fixture lane with verified Bosch identity, LGA-8 footprint/pad mapping, complete required-net routing, and clean KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. Its schematic layout is inferred from component roles and non-ground topology, with no hand-authored layout coordinates. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
-| `usb_c_i2c_sensor_3v3_protected` | `candidate` | Tracks the medium-complexity AI-generated target fixture: `usb_c_power` input, protected VBUS path, 5 V to 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and header. It now clears blocking KiCad ERC/DRC evidence; remaining work is warning-level ERC cleanup and fabrication-grade AMS1117 regulator proof. |
+| `usb_c_i2c_sensor_3v3_protected` | `pass` | Tracks the medium-complexity AI-generated target fixture: protected USB-C input, AMS1117 5 V to 3.3 V regulation, I2C sensor, pull-ups, decoupling, and header. It has clean required KiCad ERC/DRC, route-completion, writer-correctness, and zero-diff round-trip evidence for `erc-drc` acceptance. Fabrication readiness remains a separate, stricter gate. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
@@ -106,6 +106,50 @@ checked-in request opts into `auto_schematic_layout`; inference places the
 USB-C connector, fuse, indicator resistor, and LED in left-to-right power-flow
 order while keeping CC pull-downs, TVS protection, and bulk capacitance below
 and near their owning power stages.
+
+## Protected USB-C I2C 3.3 V Pass Evidence
+
+The medium-complexity protected USB-C I2C fixture is a checked-in KiCad-backed
+`pass` fixture for `erc-drc` acceptance. Run from the repository root:
+
+```sh
+make build
+KICADAI_KICAD_CLI=/path/to/kicad-cli
+./bin/kicadai \
+  --request examples/design/kicad-backed/usb_c_i2c_sensor_3v3_protected.json \
+  --output examples/.generated/usb_c_i2c_sensor_3v3_protected \
+  --overwrite \
+  --kicad-cli "$KICADAI_KICAD_CLI" \
+  --require-erc \
+  --require-drc \
+  --require-kicad-roundtrip \
+  --keep-artifacts \
+  --artifact-dir examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/checks \
+  design create
+```
+
+Observed evidence:
+
+- promotion status and achieved readiness: `pass`;
+- KiCad ERC report:
+  `examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/checks/kicadai-check-erc-<run-id>/erc.json`;
+- KiCad DRC report:
+  `examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/checks/kicadai-check-drc-<run-id>/drc.json`;
+- PCB normalized round-trip diff:
+  `examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/checks/pcb-roundtrip-<run-id>/normalized.diff`;
+- schematic normalized round-trip diff:
+  `examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/checks/usb_c_i2c_sensor_3v3_protected-<run-id>/normalized.diff`.
+
+Run IDs are generated for each execution. Read
+`examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/design-promotion.json`
+for the exact ERC, DRC, and round-trip artifact paths produced by a run.
+
+ERC and DRC contain no violations, DRC reports no unconnected items, required
+route groups are complete, writer correctness passes, and both normalized
+round-trip diffs are zero bytes. The selected AMS1117 and 10 uF capacitors have
+verified connectivity-level identity and pin/pad evidence suitable for this
+acceptance level. Manufacturer-specific ESR, effective-capacitance, and thermal
+review are still required before claiming fabrication readiness.
 
 ## BMP280 Structured-Intent Pass Evidence
 

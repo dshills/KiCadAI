@@ -2,7 +2,7 @@
   "id": "usb_c_i2c_sensor_3v3_protected",
   "request": "usb_c_i2c_sensor_3v3_protected.json",
   "tier": "block-composition",
-  "readiness": "candidate",
+  "readiness": "pass",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -23,10 +23,6 @@
     "validation",
     "kicad_checks"
   ],
-  "known_gaps": [
-    "KiCad ERC still reports warning-level pin_to_pin findings for unspecified/passive schematic connections.",
-    "KiCad ERC still reports warning-level unconnected_wire_endpoint findings on regulator-area schematic stubs, but no pin_not_connected errors remain.",
-    "AMS1117 fabrication-candidate use still requires regulator stability, ESR, thermal, and selected-manufacturer review before fabrication-ready promotion."
-  ],
-  "notes": "Medium-complexity AI-generated KiCad-backed fixture combining USB-C power, protected 5 V input, 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. It now reaches candidate with clean blocking DRC evidence and no KiCad ERC errors; remaining promotion work is warning cleanup and fabrication-grade regulator proof."
+  "known_gaps": [],
+  "notes": "Medium-complexity AI-generated KiCad-backed pass fixture combining USB-C power, protected 5 V input, an AMS1117 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. It has clean required KiCad ERC/DRC, route-completion, writer-correctness, and zero-diff round-trip evidence for erc-drc acceptance. This pass does not claim fabrication readiness; AMS1117 manufacturer-specific ESR, effective-capacitance, and thermal review remain required for fabrication-candidate use."
 }
