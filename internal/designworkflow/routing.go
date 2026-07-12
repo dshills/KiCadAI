@@ -856,9 +856,10 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 	var issues []reports.Issue
 	summary := LocalRouteConnectivitySummary{}
 	for _, fragment := range fragments.Fragments {
+		unitContext := newTranslatedUnitRouteContext(fragment)
 		for _, route := range fragment.Realization.LocalRoutes {
 			summary.RoutesAttempted++
-			routeOperations, routeIssues, routeSummary, ok := bindLocalRouteOperation(fragment, route, resolver)
+			routeOperations, routeIssues, routeSummary, ok := bindLocalRouteOperation(fragment, route, resolver, unitContext)
 			issues = append(issues, routeIssues...)
 			summary.RoutesBound += routeSummary.RoutesBound
 			summary.EndpointsResolved += routeSummary.EndpointsResolved
@@ -875,7 +876,7 @@ func bindLocalRouteOperations(fragments PCBFragmentResult, resolver PlacedPadEnd
 	return operations, issues, summary
 }
 
-func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary, bool) {
+func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLocalRoute, resolver PlacedPadEndpointResolver, unitContext translatedUnitRouteContext) ([]transactions.Operation, []reports.Issue, LocalRouteConnectivitySummary, bool) {
 	var issues []reports.Issue
 	summary := LocalRouteConnectivitySummary{RoutesAttempted: 1}
 	netName := strings.TrimSpace(route.NetName)
@@ -914,7 +915,9 @@ func bindLocalRouteOperation(fragment BlockFragment, route blocks.RealizedPCBLoc
 		from.Point,
 		to.Point,
 	}
-	if routedPoints, ok := placedLocalRoutePoints(route.Points, from.Point, to.Point); ok {
+	if routedPoints, ok := translatedUnitLocalRoutePoints(unitContext, route, from, to); ok {
+		points = routedPoints
+	} else if routedPoints, ok := placedLocalRoutePoints(route.Points, from.Point, to.Point); ok {
 		points = routedPoints
 	}
 	mainStart := 0
@@ -1204,6 +1207,68 @@ func localRouteMaterializedAnchorVia(point transactions.Point, routeLayer string
 func sameRoutePoint(a transactions.Point, b transactions.Point) bool {
 	const toleranceMM = 0.001
 	return math.Hypot(a.XMM-b.XMM, a.YMM-b.YMM) <= toleranceMM
+}
+
+type translatedUnitRouteContext struct {
+	authored map[string]transactions.Point
+	groups   []map[string]struct{}
+}
+
+func newTranslatedUnitRouteContext(fragment BlockFragment) translatedUnitRouteContext {
+	context := translatedUnitRouteContext{authored: make(map[string]transactions.Point, len(fragment.Realization.Components))}
+	for _, component := range fragment.Realization.Components {
+		context.authored[strings.ToUpper(strings.TrimSpace(component.Ref))] = transactions.Point{XMM: component.Placement.XMM, YMM: component.Placement.YMM}
+	}
+	for _, group := range fragment.PlacementGroups {
+		if !group.TranslateAsUnit {
+			continue
+		}
+		members := make(map[string]struct{}, len(group.ComponentRoles))
+		for _, role := range group.ComponentRoles {
+			if ref := strings.TrimSpace(fragment.Realization.RoleRefs[strings.TrimSpace(role)]); ref != "" {
+				members[strings.ToUpper(ref)] = struct{}{}
+			}
+		}
+		if len(members) != 0 {
+			context.groups = append(context.groups, members)
+		}
+	}
+	return context
+}
+
+func translatedUnitLocalRoutePoints(context translatedUnitRouteContext, route blocks.RealizedPCBLocalRoute, from PlacedPadEndpoint, to PlacedPadEndpoint) ([]transactions.Point, bool) {
+	if len(route.Points) < 2 {
+		return nil, false
+	}
+	fromRef := strings.ToUpper(strings.TrimSpace(from.Ref))
+	toRef := strings.ToUpper(strings.TrimSpace(to.Ref))
+	for _, members := range context.groups {
+		if _, ok := members[fromRef]; !ok {
+			continue
+		}
+		if _, ok := members[toRef]; !ok {
+			continue
+		}
+		fromAuthored, fromOK := context.authored[fromRef]
+		toAuthored, toOK := context.authored[toRef]
+		if !fromOK || !toOK {
+			continue
+		}
+		fromDelta := transactions.Point{XMM: from.ComponentAt.XMM - fromAuthored.XMM, YMM: from.ComponentAt.YMM - fromAuthored.YMM}
+		toDelta := transactions.Point{XMM: to.ComponentAt.XMM - toAuthored.XMM, YMM: to.ComponentAt.YMM - toAuthored.YMM}
+		const toleranceMM = 0.001
+		if math.Hypot(fromDelta.XMM-toDelta.XMM, fromDelta.YMM-toDelta.YMM) > toleranceMM {
+			return nil, false
+		}
+		points := make([]transactions.Point, 0, len(route.Points))
+		points = append(points, from.Point)
+		for _, point := range route.Points[1 : len(route.Points)-1] {
+			points = append(points, transactions.Point{XMM: point.XMM + fromDelta.XMM, YMM: point.YMM + fromDelta.YMM})
+		}
+		points = append(points, to.Point)
+		return compactRoutePoints(points), true
+	}
+	return nil, false
 }
 
 func placedLocalRoutePoints(points []transactions.Point, from transactions.Point, to transactions.Point) ([]transactions.Point, bool) {

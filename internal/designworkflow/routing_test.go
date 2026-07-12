@@ -197,6 +197,32 @@ func TestPlacedLocalRoutePointsTransformsSingleAuthoredWaypoint(t *testing.T) {
 	}
 }
 
+func TestTranslatedUnitLocalRoutePointsMovesAuthoredWaypointsWithGroup(t *testing.T) {
+	fragment := BlockFragment{
+		PlacementGroups: []blocks.PCBPlacementGroup{{ID: "core", ComponentRoles: []string{"source", "sink"}, TranslateAsUnit: true}},
+		Realization: blocks.BlockPCBRealizationResult{
+			RoleRefs: map[string]string{"source": "C1", "sink": "U1"},
+			Components: []blocks.RealizedPCBComponent{
+				{Ref: "C1", Placement: blocks.RelativePlacement{XMM: 5, YMM: 10}},
+				{Ref: "U1", Placement: blocks.RelativePlacement{XMM: 10, YMM: 10}},
+			},
+		},
+	}
+	route := blocks.RealizedPCBLocalRoute{
+		From:   transactions.Endpoint{Ref: "C1", Pin: "1"},
+		To:     transactions.Endpoint{Ref: "U1", Pin: "1"},
+		Points: []transactions.Point{{XMM: 4, YMM: 10}, {XMM: 5, YMM: 8}, {XMM: 10, YMM: 8}, {XMM: 11, YMM: 10}},
+	}
+	from := PlacedPadEndpoint{Ref: "C1", Point: transactions.Point{XMM: 24, YMM: 40}, ComponentAt: transactions.Point{XMM: 25, YMM: 40}}
+	to := PlacedPadEndpoint{Ref: "U1", Point: transactions.Point{XMM: 31, YMM: 40}, ComponentAt: transactions.Point{XMM: 30, YMM: 40}}
+
+	points, ok := translatedUnitLocalRoutePoints(newTranslatedUnitRouteContext(fragment), route, from, to)
+	want := []transactions.Point{{XMM: 24, YMM: 40}, {XMM: 25, YMM: 38}, {XMM: 30, YMM: 38}, {XMM: 31, YMM: 40}}
+	if !ok || !slices.Equal(points, want) {
+		t.Fatalf("translated points = %#v ok=%v, want %#v", points, ok, want)
+	}
+}
+
 func TestCompactRoutePointsKeepsMinimumTrackEndpoints(t *testing.T) {
 	points := compactRoutePoints([]transactions.Point{
 		{XMM: 10, YMM: 10},
