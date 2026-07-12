@@ -106,28 +106,34 @@ kicadai validate board ./out/project
 kicadai --target ./out/project intent rationale
 ```
 
-Prompt-driven first-lane sequence:
+Provider-backed reference sequence:
 
 ```sh
-kicadai --text "make a simple LED indicator board" --output ./out/ai_led intent create
-# Continue only when data.ai_status.status is ready or candidate.
-kicadai writer check ./out/ai_led
-kicadai validate board ./out/ai_led
-kicadai --target ./out/ai_led intent rationale
+kicadai --prompt-file examples/ai/usb_c_bmp280_breakout/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/usb_c_bmp280_breakout/recorded-response.json \
+  --output ./out/ai_usb_c_bmp280 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-kicad-roundtrip --strict-diffs \
+  design create
+# Continue autonomously only when AI status is ready and promotion is pass.
+kicadai writer check ./out/ai_usb_c_bmp280
+kicadai validate board ./out/ai_usb_c_bmp280
 ```
 
-The simple LED prompt is the promoted first prompt lane. In the default
-structural flow it should produce a generated KiCad project with
-`data.ai_status.status` equal to `candidate`. Do not describe that as
-fabrication-ready. Inspect `.kicadai/workflow-result.json`,
-`.kicadai/validation-summary.json`, and `.kicadai/design-promotion.json`; the
-promotion report should reach `candidate` in the default structural lane while
-clearly labeling missing KiCad evidence. For KiCad-backed evidence, set
-`KICADAI_KICAD_CLI` or pass `--kicad-cli` and include
-`--require-erc --require-drc`; clean KiCad checks promote the LED report to
-`pass`, while KiCad findings remain blockers.
+The protected USB-C BMP280 fixture is the first provider-backed production
+reference. Its strict KiCad-backed lane should return
+`data.ai_status.status: "ready"` and `.kicadai/design-promotion.json` status
+`pass`. Do not describe that as fabrication-ready. For a live provider run,
+set `OPENAI_API_KEY` and replace the two recorded-provider flags with
+`--provider openai`. Keep the recorded provider for deterministic CI and
+reproduction.
 
-After `intent create`, inspect `data.ai_status` from stdout or
+`candidate` remains a valid generated artifact for manual inspection, but it is
+not permission for an agent to claim the requested KiCad-backed gates passed.
+
+After provider-backed `design create` or deterministic `intent create`, inspect
+`data.ai_status` from stdout or
 `.kicadai/validation-summary.json`:
 
 - `ready`: continue to writer/board checks and optional ERC/DRC.
@@ -141,7 +147,8 @@ After `intent create`, inspect `data.ai_status` from stdout or
   show that the same failure state already consumed its retry budget. The file
   `.kicadai/retry-state.json` stores `current_automatic_retry_attempt`, and
   the budget field is `max_automatic_retry_attempts`. KiCadAI writes this file
-  during prompt-driven `intent create`; when the same output directory and
+  during provider-backed `design create` and `intent create`;
+  when the same output directory and
   retry key are reused, KiCadAI detects the existing file and increments the
   current attempt count. An external retry loop may keep additional state, but
   should not hand-edit KiCadAI's generated retry-state file as the source of
@@ -149,6 +156,7 @@ After `intent create`, inspect `data.ai_status` from stdout or
   `max_automatic_retry_attempts` from the status mapper: repairable blockers
   get one automatic retry, while clarification, unsupported, and tool-error
   statuses get zero.
+  Do not run concurrent retry loops against the same output directory.
 - `needs_clarification`: ask the user for the missing design choice.
 - `unsupported`: stop or choose a supported first-lane prompt or structured
   intent.

@@ -301,45 +301,34 @@ separate repair command authorization for KiCadAI-managed generated files.
 
 ### AI-Controlled Generation Lane
 
-The shortest current path for an AI agent is prompt-driven `intent create`.
-First-lane prompts include simple LED indicator, connector breakout with power
-LED, and 3.3 V I2C sensor breakout requests. "First-lane" means deterministic,
-instrumented, and fail-closed; it does not guarantee `ready` status yet. The
-simple LED prompt now emits a KiCad project with `data.ai_status.status` set to
-`candidate` in the default structural lane, and
-`.kicadai/design-promotion.json` now records `achieved_readiness: candidate`
-with explicit missing-KiCad evidence. When rerun with `--kicad-cli`,
-`--require-erc`, and `--require-drc`, clean KiCad evidence promotes that report
-to `pass`; KiCad findings remain precise blockers. Broader prompts can still
-stop at placement, routing, validation, clarification, unsupported, or tool
-blockers. The command drafts the
-intent, plans supported blocks, runs the deterministic design workflow, and
-writes `.kicadai/` evidence artifacts even when blocked:
+The production reference lane accepts a natural-language prompt through an
+OpenAI or recorded provider, validates strict structured intent, and runs the
+deterministic schematic/PCB workflow. The checked-in USB-C-powered BMP280
+breakout reaches user-facing `ready` and KiCad-backed promotion `pass` with
+clean ERC, DRC, route-completion, writer-correctness, and round-trip evidence:
 
 ```sh
-kicadai --text "make a simple LED indicator board" --output ./out/ai_led --overwrite intent create
+kicadai --prompt-file examples/ai/usb_c_bmp280_breakout/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/usb_c_bmp280_breakout/recorded-response.json \
+  --output ./out/ai_usb_c_bmp280 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-kicad-roundtrip --strict-diffs \
+  design create
 ```
 
-Read `data.ai_status.status` in the CLI JSON response. The file
-`.kicadai/validation-summary.json` contains the `ai_status` object itself, so
-the status field is at the root JSON property `status`; this file is intended
-as the compact persisted status, not a full CLI response wrapper. In short:
-stdout uses `data.ai_status.status`; the file uses `status`. Important statuses
-are `ready`, `candidate`, `blocked`, `needs_clarification`, `unsupported`, and
-`tool_error`. Retryable blockers
-include `retry_allowed`, `retry_key`, `max_automatic_retry_attempts`,
-`current_automatic_retry_attempt`, `repair_category`, optional
-`repair_bundle_path`, and artifact paths. Revalidate after any repair.
-Mains/high-voltage and ambiguous battery prompts fail closed instead of
-guessing.
+Strict round-trip comparison uses KiCadAI's normalized semantic diff rather
+than raw timestamps or formatting.
 
-Run KiCad-backed checks when `kicad-cli` is available:
+For a live request, set `OPENAI_API_KEY` and replace the recorded-provider flags
+with `--provider openai`. Provider output is untrusted: KiCadAI strict-decodes
+it, allows at most the configured bounded correction attempts, and never treats
+provider success as electrical evidence. The v1 provider schema is deliberately
+limited to the demonstrated BMP280 reference capability; unrelated arbitrary
+circuits still fail closed or require structured intent.
 
-```sh
-kicadai check erc ./examples/checks/erc_fail/erc_fail.kicad_sch
-kicadai check drc ./examples/checks/drc_pass/drc_pass.kicad_pcb
-kicadai --kicad-cli /path/to/kicad-cli --require-erc --require-drc --text "make a simple LED indicator board" --output ./out/ai_led_kicad --overwrite intent create
-```
+See [AI Generation](docs/ai-generation.md) for provider setup, live and
+recorded commands, evidence artifacts, failure behavior, and current limits.
 
 ## Intent Planning
 
@@ -366,6 +355,7 @@ Detailed reference material lives in [docs/](docs/README.md):
 
 - [KiCadAI Agent Skill](docs/kicadai-agent-skill.md)
 - [CLI Reference](docs/cli-reference.md)
+- [AI Generation](docs/ai-generation.md)
 - [Intent Planning And AI Workflow](docs/intent-planning.md)
 - [Circuit Blocks](docs/circuit-blocks.md)
 - [Libraries And Components](docs/libraries-and-components.md)

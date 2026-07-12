@@ -72,6 +72,10 @@ kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_p
 kicadai --request ./examples/intent/sensor_breakout.json intent explain
 kicadai --text "make a 3.3V I2C temperature sensor breakout" intent rationale
 kicadai --request ./examples/intent/sensor_breakout.json --output ./out/intent_sensor --overwrite intent create
+kicadai --prompt-file ./examples/ai/usb_c_bmp280_breakout/prompt.txt \
+  --provider recorded \
+  --provider-record ./examples/ai/usb_c_bmp280_breakout/recorded-response.json \
+  --output ./out/ai_usb_c_bmp280 --overwrite design create
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
@@ -86,6 +90,14 @@ kicadai --request ./examples/design/led_indicator.json --output ./out/led_indica
 kicadai --execute --overwrite --target ./out/led_indicator --request ./out/led_indicator/.kicadai/repair-bundle.json repair apply
 kicadai --feedback transaction validate ./examples/transactions/invalid_feedback.json
 ```
+
+### Provider-Backed Design Creation
+
+`design create` accepts either a deterministic `--request` or one provider
+input from `--prompt`/`--prompt-file`. Recorded mode is hermetic and suitable
+for CI; OpenAI mode requires `OPENAI_API_KEY` and uses strict Structured
+Outputs. See [AI Generation](ai-generation.md) for the strict KiCad-backed
+reference command and artifact contract.
 
 ### Schematic IR Commands
 

@@ -2,6 +2,15 @@
 
 Date: 2026-07-12
 
+## Implementation Status
+
+- Phases 1-7: complete.
+- Phase 8: recorded-provider and KiCad-backed promotion complete. The opt-in
+  live OpenAI smoke test remains environment-gated and was not counted as
+  passed in the local completion evidence.
+- Phase 9: complete.
+- Phase 10: pending final completion audit.
+
 ## Phase 1: Baseline, Specification, and Acceptance Fixture
 
 ### Objective

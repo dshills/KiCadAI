@@ -6,6 +6,7 @@ This directory holds the detailed reference material that used to live in the pr
 
 - [KiCadAI Agent Skill](kicadai-agent-skill.md): prescriptive command and validation contract for AI agents using KiCadAI.
 - [CLI Reference](cli-reference.md): command overview, KiCad IPC setup, and direct generation commands.
+- [AI Generation](ai-generation.md): prompt-provider setup, the reproducible USB-C BMP280 lane, evidence, and failure behavior.
 - [Intent Planning And AI Workflow](intent-planning.md): structured intent, rationale reports, semantic synthesis, and current AI workflow limits.
 - [Circuit Blocks](circuit-blocks.md): reusable block workflows and block-library commands.
 - [Placement And Routing](layout-routing.md): placement quality, routing policy, route diagnostics, and retry-related evidence.

@@ -866,13 +866,20 @@ decisions.
 
 ### Status
 
-Implemented foundation.
+Production BMP280 reference lane implemented; broader circuit coverage remains.
 
 ### Current Foundation
 
 `design create` accepts structured requests and orchestrates block planning,
 component selection, schematic/PCB generation, placement, routing, validation,
 optional bounded placement-routing retry, and optional repair behavior.
+
+Provider-backed `design create --prompt/--prompt-file` now supports strict
+OpenAI Structured Outputs and hermetic recorded replay. The checked-in
+protected USB-C BMP280 reference runs through the same post-provider path and
+reaches user-facing `ready` plus KiCad-backed promotion `pass`, including clean
+ERC/DRC, route completion, writer correctness, and strict round-trip evidence.
+Provider correction is bounded and all unsupported intent remains fail-closed.
 
 The `intent` command family now adds a structured planning layer above
 `design create`:
@@ -995,11 +1002,12 @@ intent:
 
 ### Remaining Work
 
-- Broaden natural-language coverage beyond deterministic seed phrases and add
-  future LLM adapter auditing against the draft result shape.
-- Promote the first prompt-driven LED lane from AI-lane `candidate` to strict
-  promotion `candidate`/`pass` by closing warning-level catalog/pinmap evidence
-  and collecting required KiCad ERC/DRC evidence in the promotion gate.
+- Generalize the provider capability/schema beyond the single proven BMP280
+  reference by promoting one additional topology at a time through the same
+  optional KiCad-backed fixture lane.
+- Add environment-backed live-provider CI/smoke evidence where outbound Go
+  network access and API credentials are intentionally available; default tests
+  remain credential-free and deterministic.
 - Expand semantic synthesis beyond the seed MCU template, especially
   resolver-backed MCU alternate functions, additional bus peripherals,
   supported GPIO assignment, and safe external-clock topology generation.
@@ -1022,12 +1030,12 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-1. Expand verified component and block coverage alongside each new block
-   family.
-2. Add stackup, courtyard, solder mask/paste, silkscreen, and mounting-hole
-   fabrication checks.
-3. Expand structured intent planning into a semantic design synthesis loop with
-   richer MCU, interface, voltage-domain, and fabrication evidence.
+1. Promote a second provider-backed topology using existing verified blocks to
+   prove the provider contract is not fixture-specific.
+2. Generalize capability metadata and semantic synthesis only where that second
+   fixture demonstrates a concrete gap.
+3. Add stackup, courtyard, solder mask/paste, silkscreen, and mounting-hole
+   fabrication checks before claiming fabrication readiness.
 
 ## Definition Of Autonomous Ready
 
