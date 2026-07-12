@@ -80,6 +80,17 @@ kicadai --prompt-file ./examples/ai/usb_c_led_indicator_protected/prompt.txt \
   --provider recorded \
   --provider-record ./examples/ai/usb_c_led_indicator_protected/recorded-response.json \
   --output ./out/ai_usb_c_led_protected --overwrite design create
+kicadai --prompt-file ./examples/ai/generic_rc_filter/prompt.txt \
+  --provider recorded \
+  --provider-record ./examples/ai/generic_rc_filter/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  --output ./out/ai_generic_rc --overwrite design create
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
@@ -101,9 +112,11 @@ kicadai --feedback transaction validate ./examples/transactions/invalid_feedback
 input from `--prompt`/`--prompt-file`. Recorded mode is hermetic and suitable
 for CI; OpenAI mode requires `OPENAI_API_KEY` and uses strict Structured
 Outputs. Bounded semantic dispatch supports the promoted BMP280 and protected
-LED profiles and rejects unsupported or composite prompts before provider
-execution. See [AI Generation](ai-generation.md) for strict KiCad-backed
-commands and the artifact contract.
+LED profiles. Explicit `--ai-profile generic-circuit-v1` instead requests the
+strict catalog-resolved graph contract; it never falls back to a bounded
+profile or accepts provider-defined libraries and geometry. See
+[AI Generation](ai-generation.md) for strict KiCad-backed commands and the
+artifact contract.
 
 ### Schematic IR Commands
 

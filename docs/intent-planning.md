@@ -2,6 +2,12 @@
 
 Structured-intent generation, rationale reports, and semantic synthesis behavior.
 
+Natural-language generation also has an explicit generic circuit-graph path.
+With `--ai-profile generic-circuit-v1`, provider output is strict-decoded and
+catalog-resolved before it is lowered into this design workflow. See
+[AI Generation](ai-generation.md); the generic path does not bypass intent,
+electrical, placement, routing, or KiCad validation gates.
+
 ### AI Design Workflow
 
 `design create` is the first deterministic AI-facing workflow. It accepts an

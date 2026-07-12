@@ -5,9 +5,16 @@ structured intent, then hands that validated intent to the deterministic
 planner, schematic writer, placement/routing workflow, and KiCad checks. The
 provider never emits KiCad S-expressions or route geometry directly.
 
-## Supported Reference Lanes
+## Provider Modes
 
-The provider has exactly two promoted reference profiles:
+KiCadAI exposes two provider contracts:
+
+1. Bounded automatic profiles selected from prompt semantics.
+2. Explicit `generic-circuit-v1`, where the provider emits a strict circuit
+   graph and KiCadAI resolves every component, function, pin, pad, symbol, and
+   footprint against the trusted catalog.
+
+The two bounded production references remain:
 
 - a protected USB-C-powered BMP280 I2C breakout with an AP2112 3.3 V
   regulator, pull-ups, decoupling, and external I2C connector;
@@ -17,6 +24,10 @@ The provider has exactly two promoted reference profiles:
 Their checked-in provider inputs are under
 `examples/ai/usb_c_bmp280_breakout/` and
 `examples/ai/usb_c_led_indicator_protected/`.
+
+The first promoted generic reference is an RC low-pass filter under
+`examples/ai/generic_rc_filter/`. It proves that a new passive topology can use
+the common graph schema instead of a topology-specific provider schema.
 
 Recorded, strict KiCad-backed run:
 
@@ -51,6 +62,23 @@ kicadai --prompt-file examples/ai/usb_c_led_indicator_protected/prompt.txt \
   design create
 ```
 
+Recorded generic RC run:
+
+```sh
+kicadai --prompt-file examples/ai/generic_rc_filter/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_rc_filter/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/ai_generic_rc --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
 ## OpenAI Provider
 
 Load `OPENAI_API_KEY` into the process environment from the user's shell
@@ -78,6 +106,9 @@ kicadai --prompt-file examples/ai/usb_c_led_indicator_protected/prompt.txt \
   design create
 ```
 
+For a live generic RC run, use the recorded generic command above and replace
+the two recorded-provider options with `--provider openai`.
+
 The selected schema depends only on bounded prompt semantics, never project
 names, output paths, fixture paths, or model output.
 
@@ -91,7 +122,7 @@ The live provider smoke test is opt-in:
 
 ```sh
 KICADAI_OPENAI_LIVE_TEST=1 \
-  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280|ProtectedLED)Intent$' -count=1 -v
+  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph)$' -count=1 -v
 ```
 
 ## Reproducible Promotion Test
@@ -116,7 +147,10 @@ The generated `.kicadai/` directory includes:
 - `ai-request.json`: sanitized provider/model/schema metadata and prompt hash;
 - `ai-response.json`: validated normalized intent and response metadata;
 - `ai-attempts.json`: bounded attempt history;
-- `intent-plan.json` and `generated-request.json`;
+- `intent-plan.json` and `generated-request.json`: bounded-profile planning
+  and lowered request evidence;
+- `circuit-graph.json`, `circuit-resolution.json`, and `design-request.json`:
+  generic graph, trusted resolution, and lowered request evidence;
 - `workflow-result.json` and `design-promotion.json`;
 - `validation-summary.json` and `retry-state.json`;
 - writer, route-completion, ERC/DRC, and round-trip evidence referenced by the
@@ -148,11 +182,18 @@ the reproducibility boundary.
 
 ## Current Limits
 
-This milestone proves two production reference profiles, not arbitrary
-electronics generation. The provider schemas are intentionally constrained to
-the USB-C BMP280 and protected USB-C LED designs. Prompts matching neither
-profile, or requesting both profiles as one composite design, fail before a
-provider call or project write. New circuit categories need reviewed strict
-schemas and promotion fixtures before they can make the same claim. A
-KiCad-backed pass is design-validation evidence, not a claim that the board is
-fabrication-ready without manufacturing review.
+The generic graph removes the architectural requirement for one provider
+schema per topology; it does not make every circuit routable or electrically
+proven. V1 is limited to catalog-resolvable parts and functions, flat graph
+topology, bounded relative layout intent, deterministic placement, and the
+current explicit-circuit router. The generic protected USB-C LED proof fixture
+strict-decodes, resolves, and lowers but remains candidate-level because its
+multi-branch routing is not yet complete. Dense boards, arbitrary hierarchy,
+analog performance, thermal/SAFE operating area, safety isolation, and
+fabrication release still require additional evidence.
+
+Automatic bounded dispatch remains available for the two promoted references.
+Explicit generic mode must be selected with `--ai-profile generic-circuit-v1`.
+Unknown parts, ambiguous catalog matches, invented pins, unsupported geometry,
+and incomplete required routing fail closed. A KiCad-backed pass is
+design-validation evidence, not a fabrication-ready claim.

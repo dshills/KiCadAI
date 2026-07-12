@@ -17,12 +17,13 @@ path.
   tested.
 - Structured intent can generate supported designs through planning, component
   selection, schematic/PCB realization, placement, routing, and validation.
-- The provider-backed natural-language lane has two promoted profiles:
-  protected USB-C BMP280 breakout and protected USB-C LED indicator.
-- Both promoted provider profiles have recorded and live OpenAI evidence that
-  reaches KiCad-backed `pass` with clean ERC/DRC and strict round-trip checks.
-- Arbitrary natural-language electronics generation is not yet supported.
-  Unsupported and composite provider requests fail closed.
+- The provider-backed natural-language lane retains two promoted bounded
+  profiles and now adds an explicit catalog-resolved circuit graph contract.
+- The bounded USB-C BMP280 and protected LED profiles remain KiCad-backed
+  `pass`; a generic RC filter also reaches recorded and live KiCad-backed
+  `pass` without a topology-specific provider schema.
+- Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
+  closed on unknown parts, pins, ratings, placement, or routing capability.
 - Generated `pass` evidence is not automatically a fabrication-release claim.
 
 See [Project Status](docs/project-status.md) for capability boundaries and
@@ -107,9 +108,9 @@ replace the recorded-provider flags with `--provider openai`. Provider output is
 strict-decoded and remains untrusted until deterministic and KiCad-backed gates
 pass.
 
-See [AI Generation](docs/ai-generation.md) for both supported profiles, live
-commands, evidence files, failure behavior, and current limits. AI agents should
-also follow the [KiCadAI Agent Skill](docs/kicadai-agent-skill.md).
+See [AI Generation](docs/ai-generation.md) for bounded and generic modes, live
+commands, evidence files, failure behavior, and current limits. AI agents
+should also follow the [KiCadAI Agent Skill](docs/kicadai-agent-skill.md).
 
 ## Schematic IR
 

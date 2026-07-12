@@ -866,8 +866,10 @@ decisions.
 
 ### Status
 
-Production BMP280 and protected USB-C LED provider lanes implemented; broader
-circuit coverage remains.
+Production BMP280 and protected USB-C LED bounded provider lanes are retained.
+The generic catalog-resolved circuit graph lane is implemented and has one
+live/recorded KiCad-backed pass; broader placement, routing, and catalog
+coverage remain.
 
 ### Current Foundation
 
@@ -885,6 +887,15 @@ Deterministic semantic dispatch now selects between the BMP280 and protected
 LED strict schemas without inspecting project names, paths, or provider output.
 Both recorded fixtures and both opt-in live intents produce equivalent critical
 design projections, and both full provider lanes reach KiCad-backed `pass`.
+
+Explicit `--ai-profile generic-circuit-v1` removes the architectural need for
+one provider schema per topology. Provider graphs are strict-decoded, resolved
+against trusted catalog and pin/function evidence, lowered to schematic IR and
+an explicit PCB request, and passed through deterministic placement, routing,
+writer, ERC/DRC, and round-trip gates. The generic RC filter has recorded and
+live KiCad-backed `pass` evidence. The generic protected USB-C LED graph proves
+the richer resolver/lowering path but remains candidate-level at the current
+multi-branch routing gate.
 
 The `intent` command family now adds a structured planning layer above
 `design create`:
@@ -1007,10 +1018,10 @@ intent:
 
 ### Remaining Work
 
-- Promote any future provider topology one at a time through a reviewed strict
-  schema, recorded response, semantic-equivalence projection, and the same
-  optional KiCad-backed fixture lane; arbitrary/composite provider schemas
-  remain out of scope.
+- Promote new generic topologies through the shared graph schema, catalog
+  resolution, recorded response, semantic-equivalence projection, and optional
+  KiCad-backed fixture lane. Add a specialized bounded schema only when the
+  shared graph cannot safely express a required contract.
 - Add environment-backed live-provider CI/smoke evidence where outbound Go
   network access and API credentials are intentionally available; default tests
   remain credential-free and deterministic.
@@ -1036,12 +1047,13 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-1. Promote a second provider-backed topology using existing verified blocks to
-   prove the provider contract is not fixture-specific.
-2. Generalize capability metadata and semantic synthesis only where that second
-   fixture demonstrates a concrete gap.
-3. Add stackup, courtyard, solder mask/paste, silkscreen, and mounting-hole
-   fabrication checks before claiming fabrication readiness.
+1. Complete generic explicit-circuit routing for the protected USB-C LED graph
+   and promote it from candidate to pass without fixture-identity logic.
+2. Add generic BMP280 graph promotion to prove mixed power, regulator, bus,
+   pull-up, and sensor topology through the shared contract.
+3. Broaden trusted catalog/function and placement-routing capability only from
+   concrete failing graphs, then add fabrication evidence before claiming
+   fabrication readiness.
 
 ## Definition Of Autonomous Ready
 

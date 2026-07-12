@@ -1,7 +1,27 @@
 # Generic Catalog-Resolved Circuit Graph IR Implementation Plan
 
 Date: 2026-07-12
-Status: Phase 1 in progress
+Status: Complete; Phases 1-10 implemented and reviewed
+
+## Completion Evidence
+
+- Phase commits: `d45b7dfd`, `5935a5fe`, `cf6c9fe9`, `7f2b7afd`,
+  `053714e7`, `7dc30cea`, `320f2454`, `cbbee8fe`, `98a24b81`,
+  `9b29f6d3`, and `610a808c`.
+- `go test ./...` passes on the KiCad-equipped development host.
+- `make lint` passes with zero findings.
+- The optional KiCad-backed provider table passes for bounded BMP280, bounded
+  protected LED, generic RC, and the expected candidate generic protected LED.
+- A live OpenAI generic RC CLI run strict-decoded, catalog-resolved, routed,
+  wrote KiCad files, and produced promotion `pass` under strict ERC, DRC,
+  route-completion, writer, and round-trip options.
+- The opt-in live semantic-equivalence test is checked in. Completion-audit
+  retries after the successful CLI run were blocked by TCP dial timeouts to the
+  provider endpoint; default and recorded tests remain deterministic and green.
+- Prism reviews reported no unresolved high findings. Findings based on
+  pointer nilability or missing enums were rejected against the Go signatures
+  and staged enum constraints; `anyOf` remains required by OpenAI Structured
+  Outputs for the disjoint parameter-value union.
 
 ## Delivery Rules
 

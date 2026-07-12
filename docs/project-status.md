@@ -32,7 +32,7 @@ See [KiCad Direct File Writers](kicad-file-writers.md) and
 See [Intent Planning And AI Workflow](intent-planning.md) and
 [AI Generation](ai-generation.md).
 
-### Proven Provider Profiles
+### Proven Provider Lanes
 
 Two natural-language profiles are promoted:
 
@@ -46,9 +46,16 @@ and KiCad-backed promotion fixtures. Their strict lanes reach AI status
 `ready` and promotion `pass` with clean KiCad ERC/DRC, complete required-net
 routing, writer correctness, and zero unexpected normalized round-trip diffs.
 
-The provider lane is deliberately bounded. Prompts outside these profiles or
-requesting their unsupported composition fail before provider execution or
-project writes.
+An explicit generic circuit-graph lane now resolves provider topology against
+the checked-in component catalog and lowers it through the same deterministic
+schematic and PCB workflow. A generic RC filter has recorded and live
+KiCad-backed pass evidence without a topology-specific schema. The generic
+protected USB-C LED graph is candidate-level because current explicit routing
+does not complete all of its multi-branch nets.
+
+The generic contract is deliberately strict. It expands topology expression,
+but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or
+round-trip gates.
 
 ### Schematic Readability
 
@@ -124,10 +131,10 @@ treated as autonomous or fabrication-ready.
 
 ## Remaining Direction
 
-The next work should extend verified provider topologies one at a time, improve
-general topology synthesis without weakening strict schemas, broaden component
-and model evidence, and promote increasingly complex designs through the same
-connectivity, ERC/DRC, writer, and round-trip gates.
+The next work should improve generic explicit-circuit placement and routing,
+promote the generic protected USB-C LED graph to pass, broaden catalog and
+pin/function evidence, and then exercise increasingly complex graphs through
+the same connectivity, ERC/DRC, writer, and round-trip gates.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and
