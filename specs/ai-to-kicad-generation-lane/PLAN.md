@@ -29,6 +29,8 @@ The older `sensor_bmp280_breakout` optional fixture still reproduces its
 pre-existing VCC/GND DRC failure at clean pre-milestone `HEAD`; this milestone
 did not regress or reclassify that separate legacy fixture.
 
+Two-profile extension status: planned; implementation begins with Phase 11.
+
 ## Phase 1: Baseline, Specification, and Acceptance Fixture
 
 ### Objective
@@ -492,3 +494,112 @@ clean repository.
 ### Rollback risk
 
 Low. Verification only, except for blocker fixes discovered by the audit.
+
+## Phase 11: Reference Profile Registry and Fail-Closed Dispatch
+
+### Objective
+
+Replace the single hard-coded BMP280 provider contract with two explicit
+reference profiles selected from prompt semantics before provider execution.
+
+### Work
+
+1. Add profile descriptors and immutable registry entries.
+2. Move BMP280 capability/schema identity behind its profile while retaining
+   the existing exported capability constant and schema function as
+   source-compatible wrappers.
+3. Add the protected USB-C LED capability and strict schema.
+4. Implement deterministic USB-C plus BMP280/LED semantic dispatch.
+5. Reject unsupported and ambiguous prompts before provider calls or writes.
+6. Add classifier, schema strictness, and no-provider-call tests.
+
+### Acceptance criteria
+
+- Existing BMP280 selection is unchanged.
+- LED prompts select only the LED profile.
+- Ambiguous/unsupported prompts fail closed without provider invocation.
+- Default tests remain hermetic.
+
+### Suggested commit
+
+`Add bounded AI reference profile dispatch`
+
+## Phase 12: Recorded LED Fixture and Offline Promotion
+
+### Objective
+
+Prove the second profile through the complete recorded-provider path.
+
+### Work
+
+1. Add prompt, sanitized response, and strict promotion metadata.
+2. Add critical generated-request projection checks against the deterministic
+   protected USB-C LED fixture.
+3. Add CLI evidence/security tests and repeated-run determinism.
+4. Add the optional examples-based KiCad promotion harness.
+5. Resolve only LED fixture blockers found in gate order.
+
+### Acceptance criteria
+
+- Offline recorded generation reaches the existing deterministic design.
+- Optional KiCad execution reaches AI `ready` and promotion `pass`.
+- BMP280 recorded promotion remains pass.
+
+### Suggested commits
+
+- blocker-specific commits as required;
+- `Promote recorded AI USB-C LED fixture`.
+
+## Phase 13: Live LED Equivalence and KiCad Promotion
+
+### Objective
+
+Prove the real provider produces the same critical LED design and passes the
+strict KiCad lane.
+
+### Work
+
+1. Add an opt-in live LED provider test.
+2. Compare typed critical projections exactly for board geometry, blocks,
+   parameters, connections, layout mode, and acceptance policy while excluding
+   project name, summary, provider prose, and diagnostics; canonicalize
+   explicit connections by schema-pinned well-known net name and sorted block
+   instance/port endpoints, and anonymous nets by sorted endpoint sets alone.
+3. Run the full live CLI command with strict round-trip.
+4. Pin only profile requirements proven necessary by live variance.
+5. Re-run BMP280 live/recorded and deterministic LED regressions.
+
+### Acceptance criteria
+
+- Live intent validates and plans ready.
+- Live/recorded critical projections are equivalent.
+- Live CLI reaches AI `ready` and promotion `pass`.
+
+### Suggested commit
+
+`Harden live USB-C LED provider contract`
+
+## Phase 14: Two-Profile Documentation and Completion Audit
+
+### Objective
+
+Document both proven profiles and close the extension with direct evidence.
+
+### Work
+
+1. Update AI generation docs, CLI reference, agent skill, and roadmap.
+2. Run default full tests and lint.
+3. Run both provider-backed promotion fixtures and deterministic LED fixture.
+4. Run both opt-in live provider tests when credentials/network are available.
+5. Review staged changes with Prism and confirm a clean worktree.
+
+### Acceptance criteria
+
+- Documentation gives exact commands and evidence paths for both profiles.
+- All extension completion criteria in Specification section 21.5 have direct
+  evidence.
+- Worktree is clean after final commit.
+
+### Suggested commit
+
+`Complete two-profile AI generation audit`

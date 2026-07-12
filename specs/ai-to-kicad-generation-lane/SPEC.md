@@ -596,3 +596,120 @@ must not make the default repository test suite nondeterministic.
   it does not guarantee identical output from a changing live model.
 - Fabrication release still requires the project's fabrication-specific gates
   and any documented human review not covered by `erc-drc` acceptance.
+
+## 21. Two-Profile Provider Extension
+
+The next bounded extension adds one second proven profile: a protected
+USB-C-powered LED indicator. It reuses block instances `usb_power` and
+`indicator`, whose existing variants are `usb_c_power` and `led_indicator`,
+respectively. It does not introduce a general electronics schema.
+
+### 21.1 Reference profiles
+
+The provider boundary exposes an immutable profile descriptor containing:
+
+- stable profile ID and Structured Output schema name;
+- bounded capability context;
+- a fresh strict JSON Schema for the profile;
+- fixture/evidence identity used only after semantic selection.
+
+The initial profile registry contains exactly:
+
+- protected USB-C BMP280 I2C breakout;
+- protected USB-C LED indicator.
+
+### 21.2 Deterministic selection
+
+Selection occurs before any provider request and examines normalized prompt
+semantics only. It must not inspect output paths, project names, fixture paths,
+recorded-response filenames, or model output. The bounded classifier recognizes
+the required USB-C context plus one functional anchor (`BMP280` or `LED
+indicator`). Prompts matching neither profile are rejected as unsupported.
+Prompts matching both are rejected as an unsupported composition. No provider
+call or output directory creation occurs after selection failure.
+
+Normalization applies Unicode lowercase mapping, treats characters outside the
+Unicode letter and number categories as token separators, and collapses
+whitespace. USB-C context matches the adjacent token sequence `usb`, `c` or the
+single token `usbc`. The BMP280 anchor is the
+token `bmp280`. The LED anchor is the token `led` or plural `leds`. A profile
+requires USB-C context and exactly its own
+anchor; synonyms and implicit topology inference are intentionally unsupported
+in this bounded phase.
+
+The checked-in BMP280 reference prompt already contains explicit `USB-C`
+context, so this requirement preserves the existing promoted provider command
+and tests. Compatibility does not extend to previously unpromoted BMP280-only
+phrasing that omitted the required power topology.
+
+Rejecting a prompt that combines both anchors is an explicit limitation of this
+two-profile milestone. Multi-profile circuit composition requires a separate
+reviewed contract and is not inferred here.
+
+This software rejection behavior is unrelated to physical protection behavior:
+the generated board's fuse must open the overcurrent path rather than conduct
+through a fault.
+
+This classifier is a safety dispatch layer, not a natural-language circuit
+parser. Adding another topology requires another reviewed profile and promotion
+fixture.
+
+### 21.3 LED profile contract
+
+The strict LED profile fixes the proven deterministic design requirements:
+
+- 50 mm by 30 mm, two-layer board;
+- 5 V USB-C power-only input, including the `usb_c_power` variant's mandatory
+  5.1 kohm CC1 and CC2 pull-downs;
+- required fuse, TVS, and bulk capacitance enabled as subcomponents of the
+  `usb_power` block instance;
+- reverse-polarity protection remains disabled to match the promoted fixture;
+- one active-high indicator function;
+- 5 mA LED current and 2.0 V forward-voltage assumption for the promoted
+  indicator LED; color-specific LED selection is outside this profile;
+- a pinned 600 ohm current-limiting resistor result, derived from
+  `(5.0 V - 2.0 V) / 0.005 A`; standard-series part selection is outside this
+  fixture-equivalence milestone and must map the value to an orderable part
+  before fabrication release;
+- automatic readable schematic layout;
+- ERC/DRC acceptance.
+
+The generated critical projection must contain only the `usb_power` and
+`indicator` block instances. Fuse, TVS, bulk capacitor, CC pull-downs, and LED
+resistor are verified through their containing block's strict parameters and
+generated component evidence. GND and `VCC_5v` connections must match the
+checked-in deterministic fixture. Equivalence is a typed exact comparison of board width,
+height, and layer count; block kind, variant, parameters, and enabled optional
+components; connection net names and endpoints; layout mode; and acceptance
+policy. Project name, summary, provider prose, and diagnostic metadata are
+excluded. `VCC_5v` and GND are explicit schema outputs and the existing promoted
+fixture's deterministic canonical net names; anonymous generated net names are
+not compared as strings. Their endpoint grouping is still validated inside the
+verified block projection and generated electrical evidence. Explicit
+inter-block connections are canonicalized by their schema-pinned well-known net
+name (`GND` or `VCC_5v`) and sorted `(block instance name, port name)` endpoint
+sets. Internal anonymous nets are canonicalized only by their sorted endpoint
+sets. Their source ordering is not electrically meaningful. Pinned numeric inputs are schema-constrained and normalized before
+comparison, then compared exactly rather than accepting arbitrary model drift.
+
+### 21.4 Validation and promotion
+
+Recorded and live responses use the same selected profile and post-provider
+pipeline. Default tests validate both profile fixtures without credentials or
+network access. Optional tests require explicit OpenAI and KiCad environments.
+`pass` still requires real ERC, DRC, connectivity, route completion, writer
+correctness, and strict round-trip evidence. The existing BMP280 provider lane
+and deterministic protected USB-C LED fixture remain regression gates.
+
+### 21.5 Extension completion criteria
+
+1. Semantic profile selection is deterministic and fail-closed.
+2. Unsupported and ambiguous prompts make no provider request and write no
+   project.
+3. Recorded LED generation reaches AI `ready` and promotion `pass`.
+4. Live and recorded LED critical projections are semantically equivalent.
+5. Live LED generation reaches AI `ready` and promotion `pass`.
+6. Existing BMP280 live/recorded and protected LED deterministic gates remain
+   clean.
+7. Default tests, lint, Prism review, documentation, and worktree cleanliness
+   meet the original milestone requirements.
