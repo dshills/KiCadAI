@@ -210,6 +210,8 @@ func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Req
 			if _, exists := request.Blocks[index].Params["edge_side"]; !exists {
 				request.Blocks[index].Params["edge_side"] = aiDefaultConnectorEdgeSide
 			}
+		case "led_indicator":
+			delete(request.Blocks[index].Params, "led_current_ma")
 		}
 	}
 	if request.Validation.SkipRouting {

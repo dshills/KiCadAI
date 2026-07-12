@@ -1,0 +1,11 @@
+{
+  "schema": "kicadai.ai.promotion-fixture.v1",
+  "id": "usb_c_led_indicator_protected",
+  "prompt": "prompt.txt",
+  "recorded_response": "recorded-response.json",
+  "readiness": "pass",
+  "require_erc": true,
+  "require_drc": true,
+  "require_round_trip": true,
+  "strict_diffs": true
+}

@@ -181,6 +181,66 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	}
 }
 
+func TestRunAIDesignRecordedProtectedLEDEndToEnd(t *testing.T) {
+	fixtureDir := filepath.Join("..", "..", "examples", "ai", "usb_c_led_indicator_protected")
+	var generated [][]byte
+	for runIndex := 0; runIndex < 2; runIndex++ {
+		output := filepath.Join(t.TempDir(), "project")
+		var stdout bytes.Buffer
+		err := run([]string{
+			"--prompt-file", filepath.Join(fixtureDir, "prompt.txt"),
+			"--provider", "recorded",
+			"--provider-record", filepath.Join(fixtureDir, "recorded-response.json"),
+			"--output", output,
+			"--overwrite",
+			"design", "create",
+		}, &stdout, &bytes.Buffer{})
+		if err != nil {
+			t.Fatalf("recorded protected LED run %d: %v\n%s", runIndex+1, err, stdout.String())
+		}
+		var payload struct {
+			Data aiDesignCreateResult `json:"data"`
+		}
+		if err := json.Unmarshal(stdout.Bytes(), &payload); err != nil {
+			t.Fatal(err)
+		}
+		if payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != aiLaneStatusCandidate || payload.Data.Plan.Status != intentplanner.PlanStatusReady || payload.Data.Plan.GeneratedRequest == nil {
+			t.Fatalf("AI result = %#v", payload.Data)
+		}
+		request := payload.Data.Plan.GeneratedRequest
+		usb := designRequestBlock(*request, "usb_power")
+		indicator := designRequestBlock(*request, "indicator")
+		if usb.BlockID != "usb_c_power" || usb.Params["include_fuse"] != true || usb.Params["include_tvs"] != true || usb.Params["include_bulk_capacitor"] != true {
+			t.Fatalf("USB block = %#v", usb)
+		}
+		resistor, resistorOK := indicator.Params["resistor_value"].(string)
+		current, currentOK := indicator.Params["led_current"].(string)
+		if indicator.BlockID != "led_indicator" || !resistorOK || resistor != "600" || !currentOK || current != "5mA" {
+			t.Fatalf("indicator block = %#v", indicator)
+		}
+		if _, exists := indicator.Params["led_current_ma"]; exists {
+			t.Fatalf("calculation-only LED current leaked into workflow block: %#v", indicator.Params)
+		}
+		data, err := os.ReadFile(filepath.Join(output, ".kicadai", "generated-request.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		generated = append(generated, data)
+	}
+	if !bytes.Equal(generated[0], generated[1]) {
+		t.Fatal("recorded protected LED generated request is not deterministic")
+	}
+}
+
+func designRequestBlock(request designworkflow.Request, id string) designworkflow.BlockInstanceSpec {
+	for _, block := range request.Blocks {
+		if block.ID == id {
+			return block
+		}
+	}
+	return designworkflow.BlockInstanceSpec{}
+}
+
 func TestAIProviderIssueMapping(t *testing.T) {
 	tests := []struct {
 		providerCode aiprovider.ErrorCode

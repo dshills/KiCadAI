@@ -1,0 +1,1 @@
+Create a protected USB-C powered active-high LED indicator with a fuse, TVS, bulk capacitance, and a 5 mA LED on 5 V.
