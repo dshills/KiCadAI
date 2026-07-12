@@ -29,7 +29,9 @@ The older `sensor_bmp280_breakout` optional fixture still reproduces its
 pre-existing VCC/GND DRC failure at clean pre-milestone `HEAD`; this milestone
 did not regress or reclassify that separate legacy fixture.
 
-Two-profile extension status: planned; implementation begins with Phase 11.
+Two-profile extension status: Phases 11-14 complete. The protected USB-C LED
+profile passes recorded and live semantic-equivalence checks and reaches strict
+KiCad-backed promotion `pass`; BMP280 remains clean.
 
 ## Phase 1: Baseline, Specification, and Acceptance Fixture
 

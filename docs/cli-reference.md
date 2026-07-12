@@ -76,6 +76,10 @@ kicadai --prompt-file ./examples/ai/usb_c_bmp280_breakout/prompt.txt \
   --provider recorded \
   --provider-record ./examples/ai/usb_c_bmp280_breakout/recorded-response.json \
   --output ./out/ai_usb_c_bmp280 --overwrite design create
+kicadai --prompt-file ./examples/ai/usb_c_led_indicator_protected/prompt.txt \
+  --provider recorded \
+  --provider-record ./examples/ai/usb_c_led_indicator_protected/recorded-response.json \
+  --output ./out/ai_usb_c_led_protected --overwrite design create
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir validate
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir normalize
 kicadai --request ./examples/schematic-ir/led_indicator.json schematic-ir transaction
@@ -96,8 +100,10 @@ kicadai --feedback transaction validate ./examples/transactions/invalid_feedback
 `design create` accepts either a deterministic `--request` or one provider
 input from `--prompt`/`--prompt-file`. Recorded mode is hermetic and suitable
 for CI; OpenAI mode requires `OPENAI_API_KEY` and uses strict Structured
-Outputs. See [AI Generation](ai-generation.md) for the strict KiCad-backed
-reference command and artifact contract.
+Outputs. Bounded semantic dispatch supports the promoted BMP280 and protected
+LED profiles and rejects unsupported or composite prompts before provider
+execution. See [AI Generation](ai-generation.md) for strict KiCad-backed
+commands and the artifact contract.
 
 ### Schematic IR Commands
 

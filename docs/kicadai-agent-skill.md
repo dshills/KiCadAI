@@ -121,13 +121,18 @@ kicadai writer check ./out/ai_usb_c_bmp280
 kicadai validate board ./out/ai_usb_c_bmp280
 ```
 
-The protected USB-C BMP280 fixture is the first provider-backed production
-reference. Its strict KiCad-backed lane should return
+The protected USB-C BMP280 and protected USB-C LED fixtures are the two
+provider-backed production references. Their strict KiCad-backed lanes should return
 `data.ai_status.status: "ready"` and `.kicadai/design-promotion.json` status
 `pass`. Do not describe that as fabrication-ready. For a live provider run,
 set `OPENAI_API_KEY` and replace the two recorded-provider flags with
 `--provider openai`. Keep the recorded provider for deterministic CI and
 reproduction.
+
+For the LED reference, replace both BMP280 fixture paths with
+`examples/ai/usb_c_led_indicator_protected/` and use a separate output path.
+Do not rewrite an unsupported or composite request to force either profile;
+preserve the structured fail-closed diagnostic.
 
 `candidate` remains a valid generated artifact for manual inspection, but it is
 not permission for an agent to claim the requested KiCad-backed gates passed.

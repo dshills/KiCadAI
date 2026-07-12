@@ -303,9 +303,10 @@ separate repair command authorization for KiCadAI-managed generated files.
 
 The production reference lane accepts a natural-language prompt through an
 OpenAI or recorded provider, validates strict structured intent, and runs the
-deterministic schematic/PCB workflow. The checked-in USB-C-powered BMP280
-breakout reaches user-facing `ready` and KiCad-backed promotion `pass` with
-clean ERC, DRC, route-completion, writer-correctness, and round-trip evidence:
+deterministic schematic/PCB workflow. Two checked-in profiles reach
+user-facing `ready` and KiCad-backed promotion `pass`: the USB-C-powered BMP280
+breakout and protected USB-C LED indicator. Both have clean ERC, DRC,
+route-completion, writer-correctness, and round-trip evidence:
 
 ```sh
 kicadai --prompt-file examples/ai/usb_c_bmp280_breakout/prompt.txt \
@@ -320,12 +321,17 @@ kicadai --prompt-file examples/ai/usb_c_bmp280_breakout/prompt.txt \
 Strict round-trip comparison uses KiCadAI's normalized semantic diff rather
 than raw timestamps or formatting.
 
+The protected LED profile uses the same command with `--prompt-file
+examples/ai/usb_c_led_indicator_protected/prompt.txt`, `--provider-record
+examples/ai/usb_c_led_indicator_protected/recorded-response.json`, and a
+different output directory such as `--output ./out/ai_usb_c_led_protected`.
+
 For a live request, set `OPENAI_API_KEY` and replace the recorded-provider flags
 with `--provider openai`. Provider output is untrusted: KiCadAI strict-decodes
 it, allows at most the configured bounded correction attempts, and never treats
-provider success as electrical evidence. The v1 provider schema is deliberately
-limited to the demonstrated BMP280 reference capability; unrelated arbitrary
-circuits still fail closed or require structured intent.
+provider success as electrical evidence. Provider dispatch is deliberately
+limited to the demonstrated BMP280 and protected LED capabilities; unrelated
+or composite circuits fail closed or require structured intent.
 
 See [AI Generation](docs/ai-generation.md) for provider setup, live and
 recorded commands, evidence artifacts, failure behavior, and current limits.

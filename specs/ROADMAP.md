@@ -866,7 +866,8 @@ decisions.
 
 ### Status
 
-Production BMP280 reference lane implemented; broader circuit coverage remains.
+Production BMP280 and protected USB-C LED provider lanes implemented; broader
+circuit coverage remains.
 
 ### Current Foundation
 
@@ -880,6 +881,10 @@ protected USB-C BMP280 reference runs through the same post-provider path and
 reaches user-facing `ready` plus KiCad-backed promotion `pass`, including clean
 ERC/DRC, route completion, writer correctness, and strict round-trip evidence.
 Provider correction is bounded and all unsupported intent remains fail-closed.
+Deterministic semantic dispatch now selects between the BMP280 and protected
+LED strict schemas without inspecting project names, paths, or provider output.
+Both recorded fixtures and both opt-in live intents produce equivalent critical
+design projections, and both full provider lanes reach KiCad-backed `pass`.
 
 The `intent` command family now adds a structured planning layer above
 `design create`:
@@ -1002,9 +1007,10 @@ intent:
 
 ### Remaining Work
 
-- Generalize the provider capability/schema beyond the single proven BMP280
-  reference by promoting one additional topology at a time through the same
-  optional KiCad-backed fixture lane.
+- Promote any future provider topology one at a time through a reviewed strict
+  schema, recorded response, semantic-equivalence projection, and the same
+  optional KiCad-backed fixture lane; arbitrary/composite provider schemas
+  remain out of scope.
 - Add environment-backed live-provider CI/smoke evidence where outbound Go
   network access and API credentials are intentionally available; default tests
   remain credential-free and deterministic.

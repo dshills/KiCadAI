@@ -5,12 +5,18 @@ structured intent, then hands that validated intent to the deterministic
 planner, schematic writer, placement/routing workflow, and KiCad checks. The
 provider never emits KiCad S-expressions or route geometry directly.
 
-## Supported Reference Lane
+## Supported Reference Lanes
 
-The demonstrated v1 reference is a protected USB-C-powered BMP280 I2C
-breakout with an AP2112 3.3 V regulator, pull-ups, decoupling, and an external
-I2C connector. Its checked-in provider inputs are under
-`examples/ai/usb_c_bmp280_breakout/`.
+The provider has exactly two promoted reference profiles:
+
+- a protected USB-C-powered BMP280 I2C breakout with an AP2112 3.3 V
+  regulator, pull-ups, decoupling, and external I2C connector;
+- a protected USB-C-powered active-high LED indicator with fuse, TVS, bulk
+  capacitance, and a 5 mA indicator path.
+
+Their checked-in provider inputs are under
+`examples/ai/usb_c_bmp280_breakout/` and
+`examples/ai/usb_c_led_indicator_protected/`.
 
 Recorded, strict KiCad-backed run:
 
@@ -32,6 +38,19 @@ The CLI response wraps status at `data.ai_status.status`. The persisted compact
 summary `.kicadai/validation-summary.json` stores the same value at its root
 `status` property.
 
+Recorded protected LED run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/usb_c_led_indicator_protected/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/usb_c_led_indicator_protected/recorded-response.json \
+  --output ./out/ai_usb_c_led_protected --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-kicad-roundtrip --strict-diffs \
+  design create
+```
+
 ## OpenAI Provider
 
 Load `OPENAI_API_KEY` into the process environment from the user's shell
@@ -47,6 +66,21 @@ kicadai --prompt-file examples/ai/usb_c_bmp280_breakout/prompt.txt \
   design create
 ```
 
+Live protected LED run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/usb_c_led_indicator_protected/prompt.txt \
+  --provider openai \
+  --output ./out/live_ai_usb_c_led_protected --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-kicad-roundtrip --strict-diffs \
+  design create
+```
+
+The selected schema depends only on bounded prompt semantics, never project
+names, output paths, fixture paths, or model output.
+
 Optional provider settings include `--model`, `--max-ai-attempts`, and
 `--ai-background`. Correction attempts are bounded and restricted to explicit
 schema/intent diagnostics. Authentication, refusal, unsupported topology, and
@@ -56,7 +90,8 @@ unbounded retries.
 The live provider smoke test is opt-in:
 
 ```sh
-KICADAI_OPENAI_LIVE_TEST=1 go test ./internal/aiprovider -run TestOpenAILiveBMP280Intent -count=1 -v
+KICADAI_OPENAI_LIVE_TEST=1 \
+  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280|ProtectedLED)Intent$' -count=1 -v
 ```
 
 ## Reproducible Promotion Test
@@ -66,7 +101,7 @@ or KiCad. To run the real KiCad-backed promotion lane:
 
 ```sh
 KICADAI_KICAD_CLI=/path/to/kicad-cli \
-  go test ./cmd/kicadai -run TestAIBMP280OptionalKiCadPromotion -count=1 -v
+  go test ./cmd/kicadai -run '^TestAIProviderOptionalKiCadPromotion$' -count=1 -v
 ```
 
 The test uses a unique ignored workspace under `examples/.generated` because
@@ -87,6 +122,13 @@ The generated `.kicadai/` directory includes:
 - writer, route-completion, ERC/DRC, and round-trip evidence referenced by the
   workflow and promotion reports.
 
+For an output such as `./out/live_ai_usb_c_led_protected`, inspect
+`./out/live_ai_usb_c_led_protected/.kicadai/validation-summary.json`,
+`./out/live_ai_usb_c_led_protected/.kicadai/workflow-result.json`, and
+`./out/live_ai_usb_c_led_protected/.kicadai/design-promotion.json`. The
+workflow result embeds the exact KiCad ERC/DRC commands, versions, finding
+counts, and strict writer summary; promotion `pass` is the checked gate result.
+
 Plaintext prompts, API keys, authorization headers, and hidden provider
 reasoning are not persisted. The normalized intent plus the KiCadAI version is
 the reproducibility boundary.
@@ -106,9 +148,11 @@ the reproducibility boundary.
 
 ## Current Limits
 
-This milestone proves one production reference lane, not arbitrary electronics
-generation. The provider capability/schema is intentionally constrained to the
-USB-C BMP280 design and existing verified blocks. New circuit categories need
-verified component/block semantics and promotion fixtures before they can make
-the same claim. A KiCad-backed pass is design-validation evidence, not a claim
-that the board is fabrication-ready without manufacturing review.
+This milestone proves two production reference profiles, not arbitrary
+electronics generation. The provider schemas are intentionally constrained to
+the USB-C BMP280 and protected USB-C LED designs. Prompts matching neither
+profile, or requesting both profiles as one composite design, fail before a
+provider call or project write. New circuit categories need reviewed strict
+schemas and promotion fixtures before they can make the same claim. A
+KiCad-backed pass is design-validation evidence, not a claim that the board is
+fabrication-ready without manufacturing review.
