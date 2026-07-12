@@ -61,6 +61,7 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 		}
 		layer := firstNonEmpty(position.Layer, "F.Cu")
 		padNameCounts := componentPadNameCounts(component.Pads)
+		padNameOccurrences := map[string]int{}
 		reportedDuplicatePadWarning := map[string]struct{}{}
 		if edgeFacingComponent(component.Edge) && (frame.WidthMM <= 0 || frame.HeightMM <= 0) {
 			issues = append(issues, reports.Issue{
@@ -85,8 +86,9 @@ func DiscoverPhysicalEndpointsWithOptions(placed PlacementStageResult, opts Phys
 			}
 			absolute := absolutePadPoint(position, pad)
 			netName := strings.TrimSpace(pad.Net)
+			padNameOccurrences[padName]++
 			endpoint := PhysicalEndpoint{
-				ID:         physicalEndpointID(PhysicalEndpointFootprintPad, ref, padName),
+				ID:         physicalEndpointOccurrenceID(PhysicalEndpointFootprintPad, ref, padName, padNameOccurrences[padName]),
 				Kind:       PhysicalEndpointFootprintPad,
 				Ref:        ref,
 				Pad:        padName,

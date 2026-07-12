@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"sort"
+	"strconv"
 	"strings"
 
 	"kicadai/internal/reports"
@@ -322,10 +323,17 @@ func sortAnchorBindingIssues(issues []AnchorBindingIssue) {
 }
 
 func physicalEndpointID(kind PhysicalEndpointKind, ref string, pad string) string {
+	return physicalEndpointOccurrenceID(kind, ref, pad, 1)
+}
+
+func physicalEndpointOccurrenceID(kind PhysicalEndpointKind, ref string, pad string, occurrence int) string {
 	kind = PhysicalEndpointKind(strings.TrimSpace(string(kind)))
 	ref = strings.TrimSpace(ref)
 	pad = strings.TrimSpace(pad)
 	input := "kind=" + string(kind) + "\nref=" + ref + "\npad=" + pad + "\n"
+	if occurrence > 1 {
+		input += "occurrence=" + strconv.Itoa(occurrence) + "\n"
+	}
 	sum := sha256.Sum256([]byte(input))
 	hash := hex.EncodeToString(sum[:])[:8]
 	return string(kind) + ":" + ref + ":" + pad + ":" + hash

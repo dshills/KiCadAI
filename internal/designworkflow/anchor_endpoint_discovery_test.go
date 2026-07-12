@@ -363,13 +363,45 @@ func TestDiscoverPhysicalEndpointsSkipsDuplicatePadNamesForDerivedEdges(t *testi
 
 	endpoints, issues := DiscoverPhysicalEndpointsWithOptions(placed, PhysicalEndpointDiscoveryOptions{})
 
+	padEndpointIDs := map[string]struct{}{}
 	for _, endpoint := range endpoints {
 		if endpoint.Kind == PhysicalEndpointBoardEdgePoint {
 			t.Fatalf("unexpected derived endpoint for duplicate pad name = %#v", endpoint)
 		}
+		if endpoint.Kind == PhysicalEndpointFootprintPad {
+			padEndpointIDs[endpoint.ID] = struct{}{}
+		}
 	}
-	if len(issues) != 2 {
+	if len(padEndpointIDs) != 2 {
+		t.Fatalf("duplicate same-net physical pad endpoints = %#v, want two durable IDs", endpoints)
+	}
+	if len(issues) != 1 {
 		t.Fatalf("duplicate pad issues = %#v", issues)
+	}
+}
+
+func TestDiscoverPhysicalEndpointsKeepsDuplicateSameNetPads(t *testing.T) {
+	placed := PlacementStageResult{
+		Request: placement.Request{Components: []placement.Component{{
+			Ref: "U1",
+			Pads: []placement.PadSummary{
+				{Name: "2", Net: "VOUT", XMM: 0, YMM: 2.4},
+				{Name: "2", Net: "VOUT", XMM: 0, YMM: -2.1},
+			},
+		}}},
+		Result: placement.Result{Placements: []placement.PlacementResult{{
+			Ref:      "U1",
+			Position: placement.Placement{XMM: 10, YMM: 10, Layer: "F.Cu"},
+		}}},
+		Stage: StageResult{Name: StagePlacement, Status: StageStatusOK},
+	}
+
+	endpoints, issues := DiscoverPhysicalEndpoints(placed)
+	if len(issues) != 0 {
+		t.Fatalf("duplicate same-net pad issues = %#v", issues)
+	}
+	if len(endpoints) != 2 || endpoints[0].ID == endpoints[1].ID || endpoints[0].Pad != "2" || endpoints[1].Pad != "2" {
+		t.Fatalf("duplicate same-net endpoints = %#v, want two physical pad IDs for logical pad 2", endpoints)
 	}
 }
 
