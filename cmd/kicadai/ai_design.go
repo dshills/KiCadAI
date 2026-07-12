@@ -143,6 +143,7 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	allIssues = append(allIssues, artifactIssues...)
 	allIssues = append(allIssues, designworkflow.WorkflowIssues(workflow)...)
 	status := buildAILaneStatus(plan, &workflow, allIssues, artifacts)
+	status = aiLaneStatusWithPromotionEvidence(status, promotion)
 	aiArtifacts, aiArtifactIssues := writeAILaneArtifacts(opts.output, plan, nil, prompt, status, artifacts)
 	artifacts = append(artifacts, aiArtifacts...)
 	allIssues = append(allIssues, aiArtifactIssues...)
@@ -175,6 +176,17 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 		return errors.New("AI design create reported blocking issues")
 	}
 	return nil
+}
+
+func aiLaneStatusWithPromotionEvidence(status aiLaneStatus, promotion designworkflow.PromotionReport) aiLaneStatus {
+	if status.Status != aiLaneStatusCandidate || promotion.Status != designworkflow.PromotionStatusPass {
+		return status
+	}
+	status.Status = aiLaneStatusReady
+	status.Stage = string(designworkflow.StageValidation)
+	status.Message = "generated project satisfies the requested KiCad-backed promotion gates"
+	status.SuggestedNextAction = "review generated KiCad project and evidence artifacts"
+	return status
 }
 
 func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Request {

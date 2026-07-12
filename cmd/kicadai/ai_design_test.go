@@ -247,6 +247,18 @@ func TestPrepareAIWorkflowRequestEnablesBoundedPlacementRepair(t *testing.T) {
 	}
 }
 
+func TestAILaneStatusUsesAuthoritativePromotionPass(t *testing.T) {
+	status := aiLaneStatus{Status: aiLaneStatusCandidate, Message: "warning-level evidence"}
+	got := aiLaneStatusWithPromotionEvidence(status, designworkflow.PromotionReport{Status: designworkflow.PromotionStatusPass})
+	if got.Status != aiLaneStatusReady || got.Stage != "validation" {
+		t.Fatalf("promoted AI status = %#v", got)
+	}
+	blocked := aiLaneStatus{Status: aiLaneStatusBlocked}
+	if got := aiLaneStatusWithPromotionEvidence(blocked, designworkflow.PromotionReport{Status: designworkflow.PromotionStatusPass}); got.Status != aiLaneStatusBlocked {
+		t.Fatalf("promotion overrode blocked status: %#v", got)
+	}
+}
+
 type sequenceAIProvider struct {
 	results  []aiprovider.GenerateResult
 	errors   []error
