@@ -118,6 +118,9 @@ type TargetRef struct {
 type ProtectionIntent struct {
 	ESD             Strength `json:"esd,omitempty"`
 	ReversePolarity Strength `json:"reverse_polarity,omitempty"`
+	Overcurrent     Strength `json:"overcurrent,omitempty"`
+	Transient       Strength `json:"transient,omitempty"`
+	BulkCapacitance Strength `json:"bulk_capacitance,omitempty"`
 }
 
 type ManufacturingIntent struct {
@@ -186,6 +189,9 @@ func NormalizeRequest(request Request) Request {
 	request.Functions = normalizeFunctions(request.Functions)
 	request.Protection.ESD = normalizeStrength(request.Protection.ESD, StrengthOptional)
 	request.Protection.ReversePolarity = normalizeStrength(request.Protection.ReversePolarity, StrengthOptional)
+	request.Protection.Overcurrent = normalizeStrength(request.Protection.Overcurrent, StrengthOptional)
+	request.Protection.Transient = normalizeStrength(request.Protection.Transient, StrengthOptional)
+	request.Protection.BulkCapacitance = normalizeStrength(request.Protection.BulkCapacitance, StrengthOptional)
 	request.Constraints.PackagePreferences = normalizeStringMap(request.Constraints.PackagePreferences)
 	return request
 }
@@ -397,6 +403,15 @@ func validateProtection(protection ProtectionIntent) []reports.Issue {
 	}
 	if !validStrength(protection.ReversePolarity) {
 		issues = append(issues, issue("protection.reverse_polarity", "unsupported requirement strength "+string(protection.ReversePolarity)))
+	}
+	if !validStrength(protection.Overcurrent) {
+		issues = append(issues, issue("protection.overcurrent", "unsupported requirement strength "+string(protection.Overcurrent)))
+	}
+	if !validStrength(protection.Transient) {
+		issues = append(issues, issue("protection.transient", "unsupported requirement strength "+string(protection.Transient)))
+	}
+	if !validStrength(protection.BulkCapacitance) {
+		issues = append(issues, issue("protection.bulk_capacitance", "unsupported requirement strength "+string(protection.BulkCapacitance)))
 	}
 	return issues
 }

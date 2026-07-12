@@ -62,7 +62,7 @@ func TestValidateRequestReportsInvalidFields(t *testing.T) {
 		},
 		Interfaces: []InterfaceIntent{{Kind: "canbus", Quantity: -1}},
 		Functions:  []FunctionIntent{{Kind: "radio", Quantity: -1}},
-		Protection: ProtectionIntent{ESD: Strength("yes")},
+		Protection: ProtectionIntent{ESD: Strength("yes"), Overcurrent: Strength("always"), Transient: Strength("clamp"), BulkCapacitance: Strength("large")},
 	})
 	for _, path := range []string{
 		"acceptance",
@@ -80,10 +80,20 @@ func TestValidateRequestReportsInvalidFields(t *testing.T) {
 		"power.rails[0].name",
 		"power.rails[0].voltage",
 		"protection.esd",
+		"protection.overcurrent",
+		"protection.transient",
+		"protection.bulk_capacitance",
 	} {
 		if !hasIssuePath(issues, path) {
 			t.Fatalf("missing issue path %s in %#v", path, issues)
 		}
+	}
+}
+
+func TestNormalizeRequestDefaultsUSBProtectionToOptional(t *testing.T) {
+	normalized := NormalizeRequest(Request{Version: RequestVersion, Name: "protection_defaults"})
+	if normalized.Protection.Overcurrent != StrengthOptional || normalized.Protection.Transient != StrengthOptional || normalized.Protection.BulkCapacitance != StrengthOptional {
+		t.Fatalf("protection defaults = %#v, want optional", normalized.Protection)
 	}
 }
 

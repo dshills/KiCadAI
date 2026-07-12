@@ -624,6 +624,73 @@ func TestPlanConnectsUSBCPoweredActiveHighLEDInput(t *testing.T) {
 	}
 }
 
+func TestPlanMapsProtectedUSBPowerRequirementsToExistingBlock(t *testing.T) {
+	plan := Plan(Request{
+		Version: RequestVersion,
+		Name:    "protected_usb_power",
+		Kind:    IntentBreakout,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}}},
+		Protection: ProtectionIntent{
+			Overcurrent:     StrengthRequired,
+			Transient:       StrengthPreferred,
+			BulkCapacitance: StrengthRequired,
+		},
+	})
+	if plan.Status == PlanStatusBlocked || plan.GeneratedRequest == nil {
+		t.Fatalf("plan blocked: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	params := workflowBlockParams(*plan.GeneratedRequest, "usb_power")
+	for _, key := range []string{"include_fuse", "include_tvs", "include_bulk_capacitor"} {
+		if params[key] != true {
+			t.Fatalf("%s = %#v, want true; params=%#v", key, params[key], params)
+		}
+	}
+	for _, id := range []string{"protection.overcurrent", "protection.transient", "protection.bulk_capacitance"} {
+		if _, ok := requirementByID(plan, id); !ok {
+			t.Fatalf("missing requirement %q in %#v", id, plan.Requirements)
+		}
+	}
+}
+
+func TestPlanMapsOptionalAndForbiddenUSBPowerProtectionToDisabled(t *testing.T) {
+	plan := Plan(Request{
+		Version: RequestVersion,
+		Name:    "minimal_usb_power",
+		Kind:    IntentBreakout,
+		Power:   PowerIntent{Inputs: []PowerInputIntent{{Kind: "usb_c", Voltage: "5V"}}},
+		Protection: ProtectionIntent{
+			Overcurrent:     StrengthForbidden,
+			Transient:       StrengthOptional,
+			BulkCapacitance: StrengthForbidden,
+		},
+	})
+	if plan.Status == PlanStatusBlocked || plan.GeneratedRequest == nil {
+		t.Fatalf("plan blocked: status=%s issues=%#v", plan.Status, plan.Issues)
+	}
+	params := workflowBlockParams(*plan.GeneratedRequest, "usb_power")
+	for _, key := range []string{"include_fuse", "include_tvs", "include_bulk_capacitor"} {
+		if params[key] != false {
+			t.Fatalf("%s = %#v, want false; params=%#v", key, params[key], params)
+		}
+	}
+}
+
+func TestPlanBlocksRequiredUSBPowerProtectionForUnsupportedNonUSBInput(t *testing.T) {
+	plan := Plan(Request{
+		Version:    RequestVersion,
+		Name:       "unsupported_protection",
+		Kind:       IntentBreakout,
+		Power:      PowerIntent{Inputs: []PowerInputIntent{{Kind: "external", Voltage: "5V"}}},
+		Protection: ProtectionIntent{Overcurrent: StrengthRequired},
+	})
+	if plan.Status != PlanStatusBlocked {
+		t.Fatalf("status = %s, want blocked; issues=%#v", plan.Status, plan.Issues)
+	}
+	if !hasIssuePath(plan.Issues, "protection.overcurrent") {
+		t.Fatalf("missing protection blocker: %#v", plan.Issues)
+	}
+}
+
 func TestPlanConnectsUSBCPoweredActiveLowLEDInput(t *testing.T) {
 	plan := Plan(Request{
 		Version: "0.1.0",

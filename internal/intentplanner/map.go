@@ -518,6 +518,9 @@ func (builder *planBuilder) mapInterfaces() {
 }
 
 func (builder *planBuilder) mapProtection() {
+	builder.mapUSBPowerProtection("overcurrent", builder.request.Protection.Overcurrent, "include_fuse", "input overcurrent protection")
+	builder.mapUSBPowerProtection("transient", builder.request.Protection.Transient, "include_tvs", "input transient protection")
+	builder.mapUSBPowerProtection("bulk_capacitance", builder.request.Protection.BulkCapacitance, "include_bulk_capacitor", "input bulk capacitance")
 	if builder.request.Protection.ESD == StrengthPreferred || builder.request.Protection.ESD == StrengthRequired {
 		reqID := "protection.esd"
 		builder.addRequirement(RequirementRecord{ID: reqID, Path: "protection.esd", Type: "protection", Strength: builder.request.Protection.ESD, Value: "esd"})
@@ -544,6 +547,53 @@ func (builder *planBuilder) mapProtection() {
 			}
 		}
 	}
+}
+
+func (builder *planBuilder) mapUSBPowerProtection(name string, strength Strength, param string, description string) {
+	if strength == StrengthOptional {
+		return
+	}
+	reqID := "protection." + name
+	path := reqID
+	enabled := strength == StrengthRequired || strength == StrengthPreferred
+	record := RequirementRecord{
+		ID:       reqID,
+		Path:     path,
+		Type:     "protection",
+		Strength: strength,
+		Value:    name,
+		Evidence: []string{fmt.Sprintf("%s=%t", param, enabled)},
+	}
+	if len(builder.usbPowerIDs) == 0 {
+		record.Implementation = "none"
+		record.Evidence = []string{"no usb_c_power block selected"}
+		builder.addRequirement(record)
+		if enabled {
+			builder.unsupportedRequirement(reqID, path, description+" requires a USB-C power input", strength, "add a usb_c power input or mark the protection requirement optional")
+		}
+		return
+	}
+	implementations := make([]string, 0, len(builder.usbPowerIDs))
+	for _, instanceID := range builder.usbPowerIDs {
+		implementations = append(implementations, instanceID+"."+param)
+	}
+	record.Implementation = strings.Join(implementations, ",")
+	builder.addRequirement(record)
+	for _, instanceID := range builder.usbPowerIDs {
+		builder.updateWorkflowBlockParam(instanceID, param, enabled)
+		if index, ok := builder.selectedBlockIndex[instanceID]; ok && index >= 0 && index < len(builder.plan.SelectedBlocks) {
+			builder.plan.SelectedBlocks[index].RequirementIDs = appendUniqueString(builder.plan.SelectedBlocks[index].RequirementIDs, reqID)
+		}
+	}
+	blockDescription := "usb_c_power block"
+	if len(builder.usbPowerIDs) > 1 {
+		blockDescription = "all usb_c_power blocks"
+	}
+	builder.plan.Assumptions = append(builder.plan.Assumptions, PlanNote{
+		ID:      reqID + ".usb_c_power",
+		Path:    path,
+		Message: fmt.Sprintf("%s maps to %s %s=%t", description, blockDescription, param, enabled),
+	})
 }
 
 func (builder *planBuilder) connectPowerAndSignals() {
