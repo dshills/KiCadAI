@@ -1,15 +1,113 @@
 package schematicir
 
 import (
+	"fmt"
+	"math"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
+	"kicadai/internal/kicadfiles"
 	"kicadai/internal/kicadfiles/schematic"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematiclayout"
 	"kicadai/internal/transactions"
 )
+
+func TestVectorBusUsesCalibratedConnectionAnchors(t *testing.T) {
+	document := loadExampleDocument(t, "vector_bus.json")
+	tx, issues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("vector bus transaction issues: %#v", issues)
+	}
+
+	wantY := map[string]float64{"1": -2.54, "2": 0, "3": 2.54, "4": 5.08}
+	seen := map[string]bool{}
+	for _, symbol := range decodeOperations[transactions.AddSymbolOperation](t, tx, transactions.OpAddSymbol) {
+		if symbol.Ref != "J1" && symbol.Ref != "J2" {
+			continue
+		}
+		seen[symbol.Ref] = true
+		if len(symbol.Pins) != len(wantY) {
+			t.Fatalf("%s pins = %#v", symbol.Ref, symbol.Pins)
+		}
+		for _, pin := range symbol.Pins {
+			expectedY, ok := wantY[pin.Number]
+			if !ok {
+				t.Fatalf("%s has unexpected pin %s: %#v", symbol.Ref, pin.Number, symbol.Pins)
+			}
+			if !vectorBusMMEqual(pin.XMM, -5.08) || !vectorBusMMEqual(pin.YMM, expectedY) || !pin.ExplicitOffset {
+				t.Fatalf("%s pin %s = %#v, want calibrated explicit anchor (-5.08, %.2f)", symbol.Ref, pin.Number, pin, expectedY)
+			}
+		}
+	}
+	if !seen["J1"] || !seen["J2"] {
+		t.Fatalf("vector bus connector operations = %#v, want J1 and J2", seen)
+	}
+
+	repeated, repeatedIssues := ToProjectTransaction(document)
+	if reports.HasBlockingIssue(repeatedIssues) {
+		t.Fatalf("repeated vector bus transaction issues: %#v", repeatedIssues)
+	}
+	if !reflect.DeepEqual(tx, repeated) {
+		t.Fatal("vector bus transaction changed across repeated generation")
+	}
+}
+
+func TestVectorBusRejectsRawLibraryPinOffsetAsConnectionAnchor(t *testing.T) {
+	document := loadExampleDocument(t, "vector_bus.json")
+	staleRawY := 2.54
+	issuePath := ""
+	for componentIndex := range document.Circuit.Components {
+		component := &document.Circuit.Components[componentIndex]
+		if component.Ref != "J1" {
+			continue
+		}
+		for pinIndex := range component.Pins {
+			if component.Pins[pinIndex].Number == "1" {
+				component.Pins[pinIndex].OffsetYMM = &staleRawY
+				issuePath = fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex)
+				break
+			}
+		}
+	}
+	if issuePath == "" {
+		t.Fatal("vector bus fixture does not contain J1 pin 1")
+	}
+
+	_, issues := ToProjectTransaction(document)
+	for _, issue := range issues {
+		if issue.Path == issuePath && issue.Code == reports.CodeInvalidArgument && strings.Contains(issue.Message, "conflicts with the KiCad-validated connection anchor") {
+			return
+		}
+	}
+	t.Fatalf("stale raw pin offset did not fail closed: %#v", issues)
+}
+
+func TestVectorBusConnectionAnchorFollowsSymbolTransform(t *testing.T) {
+	document := loadExampleDocument(t, "vector_bus.json")
+	document.Layout.Placements = []Placement{{Target: "input", Group: "input_group", Orientation: OrientationRotated180}}
+	state, issues := newAdapterState(document, nil)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transformed vector bus adapter state issues: %#v", issues)
+	}
+	origin := state.pointsByID["input"]
+	anchor, ok := state.portEndpointAnchor("input.1")
+	if !ok {
+		t.Fatal("transformed input.1 anchor was not resolved")
+	}
+	if !vectorBusMMEqual(anchor.XMM, origin.XMM+5.08) || !vectorBusMMEqual(anchor.YMM, origin.YMM+2.54) {
+		t.Fatalf("transformed input.1 anchor = %#v from origin %#v, want (+5.08,+2.54)", anchor, origin)
+	}
+	if got := schematic.TransformConnectionAnchor(kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(-2.54)}, 180, ""); got != (kicadfiles.Point{X: kicadfiles.MM(5.08), Y: kicadfiles.MM(2.54)}) {
+		t.Fatalf("KiCad connection-anchor transform = %#v", got)
+	}
+}
+
+func vectorBusMMEqual(left, right float64) bool {
+	return math.Abs(left-right) <= 1e-9
+}
 
 func TestValidateVectorBusLayout(t *testing.T) {
 	document := validLEDDocument()

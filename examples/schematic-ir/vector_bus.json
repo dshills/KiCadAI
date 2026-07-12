@@ -16,9 +16,9 @@
         "symbol": "Connector_Generic:Conn_01x04",
         "value": "BUS IN",
         "pins": [
-          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 2.54},
+          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
           {"number": "2", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
-          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 2.54},
           {"number": "4", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 5.08}
         ]
       },
@@ -29,9 +29,9 @@
         "symbol": "Connector_Generic:Conn_01x04",
         "value": "BUS OUT",
         "pins": [
-          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 2.54},
+          {"number": "1", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
           {"number": "2", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 0},
-          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": -2.54},
+          {"number": "3", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 2.54},
           {"number": "4", "role": "passive", "offset_x_mm": -5.08, "offset_y_mm": 5.08}
         ]
       }
