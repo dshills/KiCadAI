@@ -53,6 +53,27 @@ func TestExistingCopperFromRouteOperationsSkipsSignalLocalRoutesWithoutVias(t *t
 	}
 }
 
+func TestExistingCopperFromRouteOperationsIncludesUSBCCRoutesWithoutVias(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"usb_power_cc2","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}]}`))
+
+	existing := existingCopperFromRouteOperations([]transactions.Operation{operation}, "F.Cu", routing.DefaultRules())
+	if len(existing) != 1 || existing[0].Net != "usb_power_cc2" || existing[0].Kind != routing.CopperSegment {
+		t.Fatalf("existing copper = %#v, want fixed USB CC segment obstacle", existing)
+	}
+}
+
+func TestExistingUSBConfigurationCopperExcludesOtherLocalRoutes(t *testing.T) {
+	operations := []transactions.Operation{
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"usb_power_cc1","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}]}`)),
+		transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"GND","layer":"F.Cu","width_mm":0.5,"points":[{"x_mm":1,"y_mm":4},{"x_mm":6,"y_mm":4}]}`)),
+	}
+
+	existing := existingUSBConfigurationCopperFromRouteOperations(operations, "F.Cu", routing.DefaultRules())
+	if len(existing) != 1 || existing[0].Net != "usb_power_cc1" {
+		t.Fatalf("existing copper = %#v, want only USB CC copper", existing)
+	}
+}
+
 func TestExistingCopperFromRouteOperationsIncludesSignalLocalRouteVias(t *testing.T) {
 	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SDA","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}],"vias":[{"at":{"x_mm":6,"y_mm":2},"diameter_mm":0.6,"drill_mm":0.3,"layers":["F.Cu","B.Cu"]}]}`))
 

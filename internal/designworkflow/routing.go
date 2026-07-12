@@ -170,8 +170,12 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 	if localRouteConnectivity.IssueCount == 0 {
 		routingRequest.Nets = excludeNetsWithRouteOperations(routingRequest.Nets, localOperations, interBlockCandidates)
 	}
-	if localRouteConnectivity.IssueCount == 0 && normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
-		routingRequest.Existing = append(routingRequest.Existing, existingCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
+	if localRouteConnectivity.IssueCount == 0 {
+		if normalized.Constraints.TreatLocalPowerRoutesAsObstacles {
+			routingRequest.Existing = append(routingRequest.Existing, existingCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
+		} else {
+			routingRequest.Existing = append(routingRequest.Existing, existingUSBConfigurationCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
+		}
 	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
 	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, localOperations)
@@ -742,7 +746,7 @@ func preservedLocalRouteOperations(fragments PCBFragmentResult) []transactions.O
 }
 
 func existingCopperFromRouteOperations(operations []transactions.Operation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {
-	existing := []routing.ExistingCopper{}
+	routes := make([]transactions.RouteOperation, 0, len(operations))
 	for _, operation := range operations {
 		if operation.Op != transactions.OpRoute {
 			continue
@@ -754,6 +758,14 @@ func existingCopperFromRouteOperations(operations []transactions.Operation, defa
 		if !routeOperationBlocksInterBlockRouting(&route) {
 			continue
 		}
+		routes = append(routes, route)
+	}
+	return existingCopperFromDecodedRoutes(routes, defaultLayer, rules)
+}
+
+func existingCopperFromDecodedRoutes(routes []transactions.RouteOperation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {
+	existing := []routing.ExistingCopper{}
+	for _, route := range routes {
 		layer := routeBranchCanonicalLayer(route.Layer, defaultLayer)
 		for index := 1; index < len(route.Points); index++ {
 			segment := routing.Segment{
@@ -795,6 +807,21 @@ func existingCopperFromRouteOperations(operations []transactions.Operation, defa
 	return existing
 }
 
+func existingUSBConfigurationCopperFromRouteOperations(operations []transactions.Operation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {
+	routes := make([]transactions.RouteOperation, 0, len(operations))
+	for _, operation := range operations {
+		if operation.Op != transactions.OpRoute {
+			continue
+		}
+		var route transactions.RouteOperation
+		if err := json.Unmarshal(operation.Raw, &route); err != nil || !usbConfigurationChannelNet(route.NetName) {
+			continue
+		}
+		routes = append(routes, route)
+	}
+	return existingCopperFromDecodedRoutes(routes, defaultLayer, rules)
+}
+
 func routeOperationBlocksInterBlockRouting(route *transactions.RouteOperation) bool {
 	if route == nil {
 		return false
@@ -805,11 +832,17 @@ func routeOperationBlocksInterBlockRouting(route *transactions.RouteOperation) b
 	case placement.NetSignal:
 		// Via-bearing local signal routes are fixed cross-layer copper. Keeping
 		// via-free signal traces out preserves existing routability while still
-		// preventing route-tree branches from shorting through signal vias.
-		return len(route.Vias) != 0
+		// preventing route-tree branches from shorting through signal vias. USB-C
+		// configuration-channel routes are also fixed electrical entry geometry.
+		return len(route.Vias) != 0 || usbConfigurationChannelNet(route.NetName)
 	default:
 		return false
 	}
+}
+
+func usbConfigurationChannelNet(netName string) bool {
+	normalized := strings.ToUpper(strings.TrimSpace(netName))
+	return strings.HasSuffix(normalized, "_CC1") || strings.HasSuffix(normalized, "_CC2") || normalized == "CC1" || normalized == "CC2"
 }
 
 func preservedUnmodeledFragmentOperations(fragments PCBFragmentResult) []transactions.Operation {
