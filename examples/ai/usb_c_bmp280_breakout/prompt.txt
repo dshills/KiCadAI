@@ -1,0 +1,1 @@
+Create a protected USB-C powered BMP280 I2C breakout with a 3.3 V regulator, pull-ups, decoupling, and an external I2C connector.

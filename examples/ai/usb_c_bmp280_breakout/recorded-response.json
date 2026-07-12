@@ -1,0 +1,79 @@
+{
+  "schema": "kicadai.ai.intent.v1",
+  "intent": {
+    "version": "0.1.0",
+    "name": "usb_c_bmp280_breakout",
+    "summary": "Protected USB-C powered BMP280 I2C breakout with regulated 3.3 V, pull-ups, decoupling, and an external connector.",
+    "kind": "breakout",
+    "acceptance": "erc-drc",
+    "auto_schematic_layout": true,
+    "board": {
+      "width_mm": 100,
+      "height_mm": 60,
+      "edge_clearance_mm": 0.25,
+      "layers": 2,
+      "mounting_holes": "optional"
+    },
+    "power": {
+      "inputs": [
+        {
+          "kind": "usb_c",
+          "voltage": "5V",
+          "current_ma": 500,
+          "strength": "required"
+        }
+      ],
+      "rails": [
+        {
+          "name": "VCC",
+          "voltage": "3.3V",
+          "current_ma": 100,
+          "strength": "required",
+          "alias": "3v3"
+        }
+      ]
+    },
+    "interfaces": [
+      {
+        "kind": "i2c",
+        "voltage": "3.3V",
+        "connector": "external",
+        "quantity": 1,
+        "strength": "required",
+        "bus": "i2c1"
+      }
+    ],
+    "functions": [
+      {
+        "kind": "sensor",
+        "family": "i2c_sensor",
+        "quantity": 1,
+        "params": {
+          "sensor_component_id": "sensor.bosch.bmp280.lga8",
+          "i2c_address": "0x76",
+          "supply_voltage": "3.3V",
+          "include_pullups": true,
+          "include_decoupling": true
+        },
+        "strength": "required",
+        "interface": "i2c",
+        "bus": "i2c1",
+        "supply": "3v3"
+      }
+    ],
+    "protection": {
+      "esd": "optional",
+      "reverse_polarity": "optional",
+      "overcurrent": "required",
+      "transient": "required",
+      "bulk_capacitance": "required"
+    },
+    "manufacturing": {
+      "fabrication_candidate": false
+    },
+    "constraints": {
+      "prefer_smd": true,
+      "allow_placeholders": false
+    }
+  }
+}
