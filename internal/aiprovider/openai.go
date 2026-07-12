@@ -20,7 +20,7 @@ const (
 	openAIResponsesEndpoint = "https://api.openai.com/v1/responses"
 	defaultOpenAIModel      = "gpt-5.6"
 	openAIHTTPTimeout       = 2 * time.Minute
-	openAIMaxOutputTokens   = 2048
+	openAIMaxOutputTokens   = 8192
 )
 
 const openAIInstructions = `You convert one user request into the supplied KiCadAI intent JSON schema.

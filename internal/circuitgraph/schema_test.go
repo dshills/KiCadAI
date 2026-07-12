@@ -60,6 +60,27 @@ func TestProviderGraphSchemaTopLevelMatchesDocument(t *testing.T) {
 	}
 }
 
+func TestProviderGraphSchemaConstrainsSchematicTransforms(t *testing.T) {
+	schema := ProviderGraphSchema()
+	placements := schema["properties"].(map[string]any)["schematic"].(map[string]any)["properties"].(map[string]any)["placements"].(map[string]any)
+	properties := placements["items"].(map[string]any)["properties"].(map[string]any)
+	if got := properties["orientation"].(map[string]any)["enum"]; !reflect.DeepEqual(got, []string{"normal", "rotated_90", "rotated_180", "rotated_270"}) {
+		t.Fatalf("orientation enum = %#v", got)
+	}
+	if got := properties["mirror"].(map[string]any)["enum"]; !reflect.DeepEqual(got, []string{"", "none", "x", "y"}) {
+		t.Fatalf("mirror enum = %#v", got)
+	}
+}
+
+func TestProviderGraphSchemaConstrainsRoutingNetClasses(t *testing.T) {
+	schema := ProviderGraphSchema()
+	nets := schema["properties"].(map[string]any)["nets"].(map[string]any)
+	properties := nets["items"].(map[string]any)["properties"].(map[string]any)
+	if got := properties["net_class"].(map[string]any)["enum"]; !reflect.DeepEqual(got, []string{"", "signal", "clock", "power", "ground"}) {
+		t.Fatalf("net class enum = %#v", got)
+	}
+}
+
 func jsonFieldNames(typ reflect.Type) map[string]bool {
 	fields := map[string]bool{}
 	for index := 0; index < typ.NumField(); index++ {

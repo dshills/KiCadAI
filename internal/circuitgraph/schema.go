@@ -26,7 +26,7 @@ func ProviderGraphSchema() map[string]any {
 	})
 	libraryConstraint := strictObject(map[string]any{"library_id": stringValue})
 	rating := strictObject(map[string]any{"kind": stringValue, "value": stringValue, "unit": stringValue})
-	parameterValue := map[string]any{"oneOf": []any{
+	parameterValue := map[string]any{"anyOf": []any{
 		stringValue,
 		numberValue,
 		boolValue,
@@ -63,7 +63,7 @@ func ProviderGraphSchema() map[string]any {
 		"role":              map[string]any{"type": "string", "enum": netRoleValues()},
 		"required":          boolValue,
 		"voltage_domain":    stringValue,
-		"net_class":         stringValue,
+		"net_class":         map[string]any{"type": "string", "enum": []string{"", "signal", "clock", "power", "ground"}},
 		"current_ma":        numberValue,
 		"width_mm":          numberValue,
 		"clearance_mm":      numberValue,
@@ -82,7 +82,9 @@ func ProviderGraphSchema() map[string]any {
 	})
 	schematicPlacement := strictObject(map[string]any{
 		"component": identifier, "group": stringValue, "near": stringValue,
-		"above": stringValue, "right_of": stringValue, "orientation": stringValue, "mirror": stringValue,
+		"above": stringValue, "right_of": stringValue,
+		"orientation": map[string]any{"type": "string", "enum": []string{"normal", "rotated_90", "rotated_180", "rotated_270"}},
+		"mirror":      map[string]any{"type": "string", "enum": []string{"", "none", "x", "y"}},
 	})
 	bounds := strictObject(map[string]any{"x_mm": numberValue, "y_mm": numberValue, "width_mm": numberValue, "height_mm": numberValue})
 	region := strictObject(map[string]any{"id": identifier, "role": stringValue, "bounds": bounds})

@@ -1,18 +1,24 @@
 package aiprovider
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"runtime"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
+	"kicadai/internal/circuitgraph"
+	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
+	"kicadai/internal/reports"
 )
 
 func TestOpenAILiveBMP280Intent(t *testing.T) {
@@ -126,6 +132,103 @@ func TestOpenAILiveProtectedLEDIntent(t *testing.T) {
 	recordedProjection := protectedLEDProjectionFor(t, *recordedPlan.GeneratedRequest)
 	if !reflect.DeepEqual(liveProjection, recordedProjection) {
 		t.Fatalf("live protected LED request differs from recorded reference\nlive=%#v\nrecorded=%#v", liveProjection, recordedProjection)
+	}
+}
+
+func TestOpenAILiveGenericRCGraph(t *testing.T) {
+	if os.Getenv("KICADAI_OPENAI_LIVE_TEST") != "1" {
+		t.Skip("set KICADAI_OPENAI_LIVE_TEST=1 to run the live provider test")
+	}
+	fixtureDir := filepath.Dir(providerFixturePath(t, "generic_rc_filter", "prompt.txt"))
+	prompt, err := os.ReadFile(filepath.Join(fixtureDir, "prompt.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := components.LoadCatalog(context.Background(), components.LoadOptions{
+		CatalogDir: filepath.Clean(filepath.Join(fixtureDir, "..", "..", "..", "data", "components")),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	capability, err := circuitgraph.ProviderCapabilityContext(catalog, MaxCapabilityBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := NewOpenAIProvider(OpenAIOptionsFromEnvironment())
+	if err != nil {
+		t.Fatalf("configure provider: %v", err)
+	}
+	profile := GenericCircuitProfile(capability)
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	result, err := provider.GenerateIntent(ctx, GenerateRequest{
+		Prompt: string(prompt), CapabilityContext: profile.CapabilityContext,
+		OutputSchemaName: profile.SchemaName, OutputSchema: profile.IntentEnvelopeSchema(),
+		SchemaVersion: EnvelopeSchemaV1, Attempt: 1,
+	})
+	if err != nil {
+		t.Fatalf("generate generic RC graph: %v (cause %T: %v)", err, errors.Unwrap(err), errors.Unwrap(err))
+	}
+	live := decodeAndResolveGraph(t, result.IntentJSON, catalog)
+	recordedEnvelope, err := os.ReadFile(filepath.Join(fixtureDir, "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordedJSON, err := DecodeEnvelope(recordedEnvelope)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorded := decodeAndResolveGraph(t, recordedJSON, catalog)
+	if got, want := genericRCProjectionFor(live), genericRCProjectionFor(recorded); !reflect.DeepEqual(got, want) {
+		t.Fatalf("live generic RC graph differs from recorded semantics\nlive=%#v\nrecorded=%#v", got, want)
+	}
+}
+
+type genericRCProjection struct {
+	Board      string
+	Components []string
+	Nets       []string
+	Flow       circuitgraph.Flow
+}
+
+func decodeAndResolveGraph(t *testing.T, data []byte, catalog *components.Catalog) circuitgraph.ResolvedDocument {
+	t.Helper()
+	document, issues := circuitgraph.DecodeStrict(bytes.NewReader(data))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode graph issues = %#v", issues)
+	}
+	resolved, issues := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"}).Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve graph issues = %#v", issues)
+	}
+	if _, issues := circuitgraph.ToDesignRequest(resolved); reports.HasBlockingIssue(issues) {
+		t.Fatalf("lower graph issues = %#v", issues)
+	}
+	return resolved
+}
+
+func genericRCProjectionFor(resolved circuitgraph.ResolvedDocument) genericRCProjection {
+	references := make(map[string]string, len(resolved.Components))
+	componentsProjection := make([]string, 0, len(resolved.Components))
+	for _, component := range resolved.Components {
+		references[component.Instance.ID] = component.Instance.Reference
+		componentsProjection = append(componentsProjection, component.Instance.Reference+":"+component.Family+":"+component.VariantID+":"+component.Instance.Value)
+	}
+	slices.Sort(componentsProjection)
+	nets := make([]string, 0, len(resolved.Nets))
+	for _, net := range resolved.Nets {
+		endpoints := make([]string, 0, len(net.Endpoints))
+		for _, endpoint := range net.Endpoints {
+			endpoints = append(endpoints, references[endpoint.Intent.Component]+"."+endpoint.Function)
+		}
+		slices.Sort(endpoints)
+		nets = append(nets, string(net.Intent.Role)+":"+strings.Join(endpoints, ","))
+	}
+	slices.Sort(nets)
+	board := resolved.Source.Project.Board
+	return genericRCProjection{
+		Board:      fmt.Sprintf("%.3fx%.3f:%d:%s", board.WidthMM, board.HeightMM, board.Layers, resolved.Source.Project.Acceptance),
+		Components: componentsProjection, Nets: nets, Flow: resolved.Source.Schematic.Flow,
 	}
 }
 

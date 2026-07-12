@@ -39,8 +39,12 @@ func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (strin
 		Rules: []string{
 			"Use only listed component IDs and variant IDs, or constrained catalog queries.",
 			"Use listed logical functions or verified symbol pins for net endpoints.",
+			"Put nominal resistance, capacitance, frequency, and similar design values in component value or query; do not repeat them as required ratings.",
+			"Use required ratings only for limits such as voltage, current, power, thermal, or frequency stability that the selected catalog record explicitly proves.",
 			"Do not invent symbols, footprints, pins, pads, paths, commands, URLs, or coordinates.",
 			"Describe electrical and relative layout intent only; KiCadAI resolves physical evidence and geometry.",
+			"Leave net_class empty for role-based defaults, or use only signal, clock, power, or ground.",
+			"Prefer bounded PCB regions for left-to-right placement; do not use hard PCB edge constraints unless the prompt explicitly requires an edge-mounted part.",
 		},
 	}
 	records := append([]components.ComponentRecord(nil), catalog.Records...)
