@@ -46,6 +46,7 @@ type GenerateResult struct {
 	Usage        Usage           `json:"usage,omitempty"`
 	FinishReason string          `json:"finish_reason,omitempty"`
 	Recorded     bool            `json:"recorded,omitempty"`
+	Background   bool            `json:"background,omitempty"`
 }
 
 type Usage struct {

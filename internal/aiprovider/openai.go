@@ -178,7 +178,12 @@ func (provider *OpenAIProvider) GenerateIntent(ctx context.Context, request Gene
 			return GenerateResult{}, err
 		}
 	}
-	return decodeOpenAIResponse(responseBody, provider.model)
+	result, err := decodeOpenAIResponse(responseBody, provider.model)
+	if err != nil {
+		return GenerateResult{}, err
+	}
+	result.Background = provider.background
+	return result, nil
 }
 
 func validOpenAISchemaName(value string) bool {
@@ -401,6 +406,7 @@ func decodeOpenAIResponse(data []byte, fallbackModel string) (GenerateResult, er
 		IntentJSON:   intentJSON,
 		Usage:        Usage(response.Usage),
 		FinishReason: response.Status,
+		Background:   false,
 	}, nil
 }
 

@@ -46,6 +46,14 @@ const (
 	CodeRouteCompletionPartial    Code = "ROUTE_COMPLETION_PARTIAL"
 	CodeFixedNetSkipped           Code = "FIXED_NET_SKIPPED"
 	CodeMissingNetClass           Code = "MISSING_NET_CLASS"
+	CodeAIProviderConfiguration   Code = "AI_PROVIDER_CONFIGURATION"
+	CodeAIProviderTransport       Code = "AI_PROVIDER_TRANSPORT"
+	CodeAIProviderAuthentication  Code = "AI_PROVIDER_AUTHENTICATION"
+	CodeAIProviderRateLimit       Code = "AI_PROVIDER_RATE_LIMIT"
+	CodeAIProviderTimeout         Code = "AI_PROVIDER_TIMEOUT"
+	CodeAIProviderRefusal         Code = "AI_PROVIDER_REFUSAL"
+	CodeAIProviderIncomplete      Code = "AI_PROVIDER_INCOMPLETE"
+	CodeAIOutputInvalid           Code = "AI_OUTPUT_INVALID"
 )
 
 type Issue struct {

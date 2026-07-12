@@ -106,6 +106,13 @@ Global flags:
   --request string       Structured request JSON path for generator commands
   --text string          Natural-language intent text
   --file string          Natural-language intent text file
+  --prompt string        AI-provider natural-language design request
+  --prompt-file string   AI-provider request file (avoids shell history)
+  --provider string      AI intent provider: openai or recorded
+  --model string         AI provider model override
+  --provider-record string Recorded AI response fixture path
+  --max-ai-attempts int  Maximum AI intent attempts: 1 or 2 (default 1)
+  --ai-background        Use OpenAI background polling (requires temporary provider storage)
   --format string        Output format for supported commands: json or text (default json)
   --strict              Treat blocking draft clarifications as command errors
   --name string          Project/design name for generation commands
@@ -213,6 +220,13 @@ type cliOptions struct {
 	requestPath                 string
 	intentText                  string
 	intentFile                  string
+	aiPrompt                    string
+	aiPromptFile                string
+	aiProvider                  string
+	aiModel                     string
+	aiProviderRecord            string
+	maxAIAttempts               int
+	aiBackground                bool
 	outputFormat                string
 	strictDraft                 bool
 	name                        string
@@ -409,6 +423,13 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.requestPath, "request", "", "structured request JSON path")
 	flags.StringVar(&opts.intentText, "text", "", "natural-language intent text")
 	flags.StringVar(&opts.intentFile, "file", "", "natural-language intent text file")
+	flags.StringVar(&opts.aiPrompt, "prompt", "", "AI-provider natural-language design request")
+	flags.StringVar(&opts.aiPromptFile, "prompt-file", "", "AI-provider request file")
+	flags.StringVar(&opts.aiProvider, "provider", "", "AI intent provider: openai or recorded")
+	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")
+	flags.StringVar(&opts.aiProviderRecord, "provider-record", "", "recorded AI response fixture path")
+	flags.IntVar(&opts.maxAIAttempts, "max-ai-attempts", 1, "maximum AI intent attempts")
+	flags.BoolVar(&opts.aiBackground, "ai-background", false, "use OpenAI background polling")
 	flags.StringVar(&opts.outputFormat, "format", "json", "output format: json or text")
 	flags.BoolVar(&opts.strictDraft, "strict", false, "treat blocking draft clarifications as command errors")
 	flags.StringVar(&opts.name, "name", "", "project/design name")
@@ -3780,6 +3801,9 @@ func runDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	if !opts.jsonOutput {
 		return fmt.Errorf("design create requires --format json")
 	}
+	if aiDesignOptionsPresent(opts) {
+		return runAIDesignCreate(ctx, opts, stdout)
+	}
 	if strings.TrimSpace(opts.requestPath) == "" {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "--request is required"})
 	}
@@ -3859,6 +3883,9 @@ func designWorkflowReport(workflow designworkflow.WorkflowResult, extraIssues []
 // designPromotionFixture converts a completed CLI workflow into promotion gates.
 func designPromotionFixture(opts cliOptions, request designworkflow.Request, workflow designworkflow.WorkflowResult) designworkflow.PromotionFixture {
 	requestName := filepath.Base(opts.requestPath)
+	if strings.TrimSpace(opts.requestPath) == "" && hasAIPromptSource(opts) {
+		requestName = "ai-prompt"
+	}
 	readiness := designworkflow.PromotionReadinessCandidate
 	if designworkflow.AcceptanceSatisfied(request.Validation.Acceptance, workflow.Acceptance.Achieved) && designworkflow.AcceptanceSatisfied(designworkflow.AcceptanceFabricationCandidate, workflow.Acceptance.Achieved) {
 		readiness = designworkflow.PromotionReadinessPass
