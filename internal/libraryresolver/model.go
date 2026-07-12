@@ -157,23 +157,32 @@ type SymbolGraphic struct {
 }
 
 type FootprintRecord struct {
-	FootprintID     string             `json:"footprint_id"`
-	LibraryNickname string             `json:"library_nickname"`
-	Name            string             `json:"name"`
-	Path            string             `json:"path"`
-	Description     string             `json:"description,omitempty"`
-	Tags            []string           `json:"tags,omitempty"`
-	Attributes      []string           `json:"attributes,omitempty"`
-	Properties      map[string]string  `json:"properties,omitempty"`
-	Pads            []FootprintPad     `json:"pads,omitempty"`
-	Texts           []FootprintText    `json:"texts,omitempty"`
-	Graphics        []FootprintGraphic `json:"graphics,omitempty"`
-	GraphicsSummary GraphicsSummary    `json:"graphics_summary"`
-	Models          []string           `json:"models,omitempty"`
-	BoundingBox     BoundingBox        `json:"bounding_box"`
-	CourtyardBox    BoundingBox        `json:"courtyard_box,omitempty"`
-	Raw             string             `json:"raw,omitempty"`
-	SearchText      string             `json:"-"`
+	FootprintID      string              `json:"footprint_id"`
+	LibraryNickname  string              `json:"library_nickname"`
+	Name             string              `json:"name"`
+	Path             string              `json:"path"`
+	Description      string              `json:"description,omitempty"`
+	Tags             []string            `json:"tags,omitempty"`
+	Attributes       []string            `json:"attributes,omitempty"`
+	Properties       map[string]string   `json:"properties,omitempty"`
+	CustomProperties []FootprintProperty `json:"custom_properties,omitempty"`
+	Pads             []FootprintPad      `json:"pads,omitempty"`
+	Texts            []FootprintText     `json:"texts,omitempty"`
+	Graphics         []FootprintGraphic  `json:"graphics,omitempty"`
+	GraphicsSummary  GraphicsSummary     `json:"graphics_summary"`
+	Models           []string            `json:"models,omitempty"`
+	BoundingBox      BoundingBox         `json:"bounding_box"`
+	CourtyardBox     BoundingBox         `json:"courtyard_box,omitempty"`
+	Raw              string              `json:"raw,omitempty"`
+	SearchText       string              `json:"-"`
+}
+
+type FootprintProperty struct {
+	Name     string           `json:"name"`
+	Value    string           `json:"value"`
+	Position kicadfiles.Point `json:"position"`
+	Layer    string           `json:"layer,omitempty"`
+	Hide     bool             `json:"hide,omitempty"`
 }
 
 type FootprintPad struct {

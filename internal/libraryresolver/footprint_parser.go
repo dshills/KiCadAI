@@ -118,7 +118,17 @@ func readLibraryFootprint(file LibraryFile, node sexpr.ParsedNode, name string) 
 	}
 	for _, property := range node.ChildrenByHead("property") {
 		if len(property.Children) >= 3 {
-			record.Properties[property.ListValue(1)] = property.ListValue(2)
+			if _, hasAt := property.Child("at"); hasAt {
+				position, _ := readNamedPointOK(property, "at")
+				layer := ""
+				if layerNode, ok := property.Child("layer"); ok {
+					layer = layerNode.ListValue(1)
+				}
+				_, hidden := property.Child("hide")
+				record.CustomProperties = append(record.CustomProperties, FootprintProperty{Name: property.ListValue(1), Value: property.ListValue(2), Position: position, Layer: layer, Hide: hidden})
+			} else {
+				record.Properties[property.ListValue(1)] = property.ListValue(2)
+			}
 		}
 	}
 	bounds := newBounds()

@@ -35,6 +35,7 @@ func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOpti
 	options.Tags = strings.Join(record.Tags, " ")
 	options.Attributes = append([]string(nil), record.Attributes...)
 	options.MetadataProperties = importedMetadataProperties(record.Properties)
+	options.Properties = footprintPropertiesFromRecord(record.CustomProperties, placementLayer)
 	options.Texts = footprintTextsFromRecord(record.Texts, placementLayer)
 	options.Graphics = footprintGraphicsFromRecord(record.Graphics, placementLayer)
 	options.Models = importedModels(record.Models)
@@ -162,7 +163,30 @@ func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload Place
 		Pads:               importedPadsFromRecord(generator, payload.Ref, record, layer),
 		Models:             importedModels(record.Models),
 	}
+	footprint.Properties = append(footprint.Properties, importedFootprintProperties(generator, payload.Ref, record.CustomProperties, layer)...)
 	return footprint
+}
+
+func footprintPropertiesFromRecord(properties []libraryresolver.FootprintProperty, placementLayer kicadfiles.BoardLayer) []pcb.FootprintProperty {
+	result := make([]pcb.FootprintProperty, 0, len(properties))
+	for _, property := range properties {
+		if strings.EqualFold(strings.TrimSpace(property.Name), "Reference") || strings.EqualFold(strings.TrimSpace(property.Name), "Value") {
+			continue
+		}
+		result = append(result, pcb.FootprintProperty{
+			Name: property.Name, Value: property.Value, Position: property.Position,
+			Layer: kicadfiles.BoardLayerForPlacement(kicadfiles.BoardLayer(property.Layer), placementLayer), Hide: property.Hide,
+		})
+	}
+	return result
+}
+
+func importedFootprintProperties(generator kicadfiles.IDGenerator, ref string, properties []libraryresolver.FootprintProperty, placementLayer kicadfiles.BoardLayer) []pcb.FootprintProperty {
+	result := footprintPropertiesFromRecord(properties, placementLayer)
+	for index := range result {
+		result[index].UUID = generator.New("imported.pcb.footprint.property", ref, result[index].Name, strconv.Itoa(index))
+	}
+	return result
 }
 
 func importedDefaultFootprintProperties(generator kicadfiles.IDGenerator, ref string, value string, layer kicadfiles.BoardLayer, hideDefaultFootprintText bool) []pcb.FootprintProperty {
@@ -199,6 +223,9 @@ func importedMetadataProperties(properties map[string]string) []pcb.FootprintMet
 	keys := sortedMapKeys(properties)
 	metadata := make([]pcb.FootprintMetadataProperty, 0, len(keys))
 	for _, key := range keys {
+		if strings.EqualFold(strings.TrimSpace(key), "Reference") || strings.EqualFold(strings.TrimSpace(key), "Value") {
+			continue
+		}
 		metadata = append(metadata, pcb.FootprintMetadataProperty{Name: key, Value: properties[key]})
 	}
 	return metadata

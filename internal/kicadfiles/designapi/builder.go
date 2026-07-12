@@ -174,6 +174,7 @@ type PlaceFootprintOptions struct {
 	Tags                          string
 	Attributes                    []string
 	MetadataProperties            []pcb.FootprintMetadataProperty
+	Properties                    []pcb.FootprintProperty
 	Texts                         []pcb.FootprintText
 	Graphics                      []pcb.FootprintGraphic
 	Models                        []pcb.Model3D
@@ -1293,6 +1294,11 @@ func (builder *Builder) PlaceFootprint(reference string, options PlaceFootprintO
 		Texts:              builder.footprintTextsFromOptions(reference, options.Texts),
 		Graphics:           builder.footprintGraphicsFromOptions(reference, options.Graphics),
 		Models:             cloneModels(options.Models),
+	}
+	for index, property := range options.Properties {
+		property.UUID = builder.generator.New("root.pcb.footprint.property", reference, property.Name, fmt.Sprintf("%d", index))
+		property.Layer = kicadfiles.BoardLayerForPlacement(property.Layer, options.Layer)
+		footprint.Properties = append(footprint.Properties, property)
 	}
 	padOccurrences := map[string]int{}
 	for _, padSpec := range padSpecs {
@@ -2904,6 +2910,7 @@ func cloneFootprintTexts(source []pcb.FootprintText) []pcb.FootprintText {
 	clone := make([]pcb.FootprintText, len(source))
 	for i := range source {
 		clone[i] = source[i]
+		clone[i].Effects.Justify = append([]string(nil), source[i].Effects.Justify...)
 	}
 	return clone
 }

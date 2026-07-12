@@ -151,6 +151,7 @@ type FootprintText struct {
 	Position kicadfiles.Point
 	Rotation kicadfiles.Angle
 	Layer    kicadfiles.BoardLayer
+	Effects  TextEffects
 }
 
 type FootprintProperty struct {

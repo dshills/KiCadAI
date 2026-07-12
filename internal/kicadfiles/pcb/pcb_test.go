@@ -2037,6 +2037,25 @@ func minimalFootprint(uuid, reference string) Footprint {
 	}
 }
 
+func TestWriteRendersCanonicalFootprintTextDefaults(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "TEST"}}
+	board.Footprints = []Footprint{minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "R1")}
+
+	var output bytes.Buffer
+	if err := Write(&output, board); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	rendered := output.String()
+	if !strings.Contains(rendered, "(at 0 0 0)") {
+		t.Fatalf("footprint text omitted canonical zero rotation:\n%s", rendered)
+	}
+	if !strings.Contains(rendered, "(size 1.27 1.27)") {
+		t.Fatalf("footprint text omitted canonical default effects:\n%s", rendered)
+	}
+}
+
 func repoPathForPCBTest(t *testing.T, parts ...string) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

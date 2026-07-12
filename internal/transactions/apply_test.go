@@ -513,6 +513,13 @@ func TestUpsertImportedFootprintRejectsUnknownNetOnlyPad(t *testing.T) {
 	}
 }
 
+func TestImportedMetadataPropertiesExcludeReservedFootprintProperties(t *testing.T) {
+	properties := importedMetadataProperties(map[string]string{"Reference": "REF**", "Value": "R", "KiLib_Generator": "test"})
+	if len(properties) != 1 || properties[0].Name != "KiLib_Generator" || properties[0].Value != "test" {
+		t.Fatalf("metadata properties = %#v", properties)
+	}
+}
+
 func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
 	index := applyResolverFixture()
 	record := index.Footprints["Resistor_Test:R_0603"]

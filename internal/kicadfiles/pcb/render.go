@@ -507,16 +507,22 @@ func defaultScale(value XYZ) XYZ {
 }
 
 func renderFootprintText(text FootprintText) sexpr.List {
+	effects := text.Effects
+	if effects.FontSize == (kicadfiles.Point{}) && effects.FontThickness == 0 {
+		effects.FontSize = kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)}
+		effects.OmitFontThickness = true
+	}
 	nodes := []sexpr.Node{
 		sexpr.A("fp_text"),
 		sexpr.A(text.Kind),
 		sexpr.S(text.Text),
-		renderAt(text.Position, text.Rotation),
+		renderAtWithRotation(text.Position, text.Rotation),
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(text.Layer))),
 	}
 	if text.UUID.Valid() {
 		nodes = append(nodes, sexpr.L(sexpr.A("uuid"), sexpr.S(string(text.UUID))))
 	}
+	nodes = append(nodes, renderEffects(effects))
 	return sexpr.L(nodes...)
 }
 
