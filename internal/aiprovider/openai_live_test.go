@@ -72,6 +72,63 @@ func TestOpenAILiveBMP280Intent(t *testing.T) {
 	}
 }
 
+func TestOpenAILiveProtectedLEDIntent(t *testing.T) {
+	if os.Getenv("KICADAI_OPENAI_LIVE_TEST") != "1" {
+		t.Skip("set KICADAI_OPENAI_LIVE_TEST=1 to run the live provider test")
+	}
+	prompt, err := os.ReadFile(providerFixturePath(t, "usb_c_led_indicator_protected", "prompt.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider, err := NewOpenAIProvider(OpenAIOptionsFromEnvironment())
+	if err != nil {
+		t.Fatalf("configure provider: %v", err)
+	}
+	profile := ProtectedLEDProfile()
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	result, err := provider.GenerateIntent(ctx, GenerateRequest{
+		Prompt:            string(prompt),
+		CapabilityContext: profile.CapabilityContext,
+		OutputSchemaName:  profile.SchemaName,
+		OutputSchema:      profile.IntentEnvelopeSchema(),
+		SchemaVersion:     EnvelopeSchemaV1,
+		Attempt:           1,
+	})
+	if err != nil {
+		t.Fatalf("generate protected LED intent: %v", err)
+	}
+	liveRequest, issues := DecodeIntent(result.IntentJSON)
+	if len(issues) != 0 {
+		t.Fatalf("live intent issues = %#v", issues)
+	}
+	livePlan := intentplanner.Plan(liveRequest)
+	if livePlan.Status != intentplanner.PlanStatusReady || livePlan.GeneratedRequest == nil {
+		t.Fatalf("live plan status=%s issues=%#v gaps=%#v", livePlan.Status, livePlan.Issues, livePlan.KnownGaps)
+	}
+	recordedData, err := os.ReadFile(providerFixturePath(t, "usb_c_led_indicator_protected", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordedJSON, err := DecodeEnvelope(recordedData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recordedRequest, recordedIssues := DecodeIntent(recordedJSON)
+	if len(recordedIssues) != 0 {
+		t.Fatalf("recorded intent issues = %#v", recordedIssues)
+	}
+	recordedPlan := intentplanner.Plan(recordedRequest)
+	if recordedPlan.Status != intentplanner.PlanStatusReady || recordedPlan.GeneratedRequest == nil {
+		t.Fatalf("recorded plan status=%s issues=%#v", recordedPlan.Status, recordedPlan.Issues)
+	}
+	liveProjection := protectedLEDProjectionFor(t, *livePlan.GeneratedRequest)
+	recordedProjection := protectedLEDProjectionFor(t, *recordedPlan.GeneratedRequest)
+	if !reflect.DeepEqual(liveProjection, recordedProjection) {
+		t.Fatalf("live protected LED request differs from recorded reference\nlive=%#v\nrecorded=%#v", liveProjection, recordedProjection)
+	}
+}
+
 type referenceGeneratedRequestProjection struct {
 	Board             designworkflow.BoardSpec
 	USBProtection     referenceUSBProtectionProjection
@@ -100,7 +157,6 @@ type referenceSensorProjection struct {
 	ComponentID string
 	Pullups     bool
 	Decoupling  bool
-	FixedLayout bool
 }
 
 func referenceGeneratedRequestProjectionFor(t *testing.T, request *designworkflow.Request) referenceGeneratedRequestProjection {
@@ -137,7 +193,6 @@ func referenceGeneratedRequestProjectionFor(t *testing.T, request *designworkflo
 			ComponentID: parameterString(t, sensor.Params, "sensor_component_id"),
 			Pullups:     parameterBool(t, sensor.Params, "include_pullups"),
 			Decoupling:  parameterBool(t, sensor.Params, "include_decoupling"),
-			FixedLayout: parameterBool(t, sensor.Params, "fixed_pcb_layout"),
 		},
 		ConnectorPins:     connector.Params["pin_names"],
 		ConnectionAliases: aliases,
@@ -191,10 +246,14 @@ func requireReferenceBlock(t *testing.T, blocksByID map[string]designworkflow.Bl
 }
 
 func referenceFixturePath(t *testing.T, name string) string {
+	return providerFixturePath(t, "usb_c_bmp280_breakout", name)
+}
+
+func providerFixturePath(t *testing.T, fixtureID, name string) string {
 	t.Helper()
 	_, sourcePath, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("locate live provider test source")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(sourcePath), "..", "..", "examples", "ai", "usb_c_bmp280_breakout", name))
+	return filepath.Clean(filepath.Join(filepath.Dir(sourcePath), "..", "..", "examples", "ai", fixtureID, name))
 }
