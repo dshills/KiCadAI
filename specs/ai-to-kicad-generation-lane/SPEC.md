@@ -192,6 +192,12 @@ The OpenAI provider must:
   supported intent contract;
 - request strict `json_schema` output through `text.format`;
 - set a finite HTTP timeout and output token limit;
+- use stateless streaming by default so long generation does not depend on a
+  response-header timeout;
+- support explicit background polling for constrained network paths through
+  `KICADAI_AI_BACKGROUND=true`; this sets `background:true` and `store:true`,
+  and documentation must disclose that OpenAI temporarily stores the response
+  to make retrieval possible;
 - reject incomplete, refused, empty, multi-payload, or non-message output;
 - inspect response content items for an OpenAI `refusal` item/string before
   attempting to decode structured output and classify it as a provider refusal;
@@ -532,6 +538,9 @@ reported as a real pass.
 ## 17. Security, Privacy, and Reliability
 
 - Never persist or print `OPENAI_API_KEY`.
+- Default OpenAI requests use `store:false`; opt-in background mode requires
+  temporary provider-side storage and is unsuitable for Zero Data Retention
+  requirements.
 - Do not include local file contents beyond the bounded capability context.
 - Do not send generated KiCad files to the provider.
 - Use context cancellation, finite HTTP timeouts, response-size limits, and

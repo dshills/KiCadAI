@@ -3,16 +3,18 @@ package aiprovider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 )
 
 const (
-	EnvelopeSchemaV1 = "kicadai.ai.intent.v1"
-	MaxPromptBytes   = 1 << 20
-	MaxResponseBytes = 2 << 20
-	MaxDiagnostics   = 8
-	MaxDiagnosticLen = 512
+	EnvelopeSchemaV1   = "kicadai.ai.intent.v1"
+	MaxPromptBytes     = 1 << 20
+	MaxResponseBytes   = 2 << 20
+	MaxDiagnostics     = 8
+	MaxDiagnosticLen   = 512
+	MaxCapabilityBytes = 64 << 10
 )
 
 type Provider interface {
@@ -21,10 +23,13 @@ type Provider interface {
 }
 
 type GenerateRequest struct {
-	Prompt        string       `json:"-"`
-	SchemaVersion string       `json:"schema_version"`
-	Attempt       int          `json:"attempt"`
-	Diagnostics   []Diagnostic `json:"diagnostics,omitempty"`
+	Prompt            string         `json:"-"`
+	CapabilityContext string         `json:"-"`
+	OutputSchemaName  string         `json:"-"`
+	OutputSchema      map[string]any `json:"-"`
+	SchemaVersion     string         `json:"schema_version"`
+	Attempt           int            `json:"attempt"`
+	Diagnostics       []Diagnostic   `json:"diagnostics,omitempty"`
 }
 
 type Diagnostic struct {
@@ -87,6 +92,14 @@ func newProviderError(code ErrorCode, message string, cause error) error {
 	return &ProviderError{Code: code, Message: message, cause: cause}
 }
 
+func ErrorCodeOf(err error) ErrorCode {
+	var providerErr *ProviderError
+	if errors.As(err, &providerErr) {
+		return providerErr.Code
+	}
+	return ""
+}
+
 func ValidateGenerateRequest(request GenerateRequest) error {
 	prompt := strings.TrimSpace(request.Prompt)
 	if prompt == "" {
@@ -94,6 +107,9 @@ func ValidateGenerateRequest(request GenerateRequest) error {
 	}
 	if len(request.Prompt) > MaxPromptBytes {
 		return newProviderError(ErrorConfiguration, fmt.Sprintf("AI prompt exceeds %d-byte limit", MaxPromptBytes), nil)
+	}
+	if len(request.CapabilityContext) > MaxCapabilityBytes {
+		return newProviderError(ErrorConfiguration, fmt.Sprintf("AI capability context exceeds %d-byte limit", MaxCapabilityBytes), nil)
 	}
 	if request.SchemaVersion != EnvelopeSchemaV1 {
 		return newProviderError(ErrorConfiguration, "unsupported AI intent schema "+request.SchemaVersion, nil)

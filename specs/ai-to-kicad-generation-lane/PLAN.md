@@ -163,6 +163,9 @@ Outputs, behind the provider interface.
 2. Build a bounded developer instruction and capability context.
 3. Implement HTTP request, authorization, timeout, and context cancellation.
 4. Parse completed response output and usage.
+   - use stateless streaming by default;
+   - support explicitly configured background polling for environments with
+     short response-header limits and document its provider-storage tradeoff.
 5. Classify provider failures and redact sensitive data.
    - evidence types must not contain HTTP request/response objects, headers,
      organization/project identifiers, or provider client configuration;
