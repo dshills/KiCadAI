@@ -1,6 +1,7 @@
 package pcb
 
 import (
+	"math"
 	"strings"
 	"testing"
 )
@@ -65,7 +66,7 @@ func TestReadPCBPreservesFootprintRotationForConnectivity(t *testing.T) {
 		`    (path "/11111111-1111-5111-8111-111111111111")`,
 		`    (property "Reference" "D1" (at 0 0 0) (layer "F.SilkS") (uuid "11111111-1111-5111-8111-111111111112"))`,
 		`    (property "Value" "LED" (at 0 1 0) (layer "F.Fab") (uuid "11111111-1111-5111-8111-111111111113"))`,
-		`    (pad "1" smd rect (at -0.6 0) (size 0.7 0.8) (layers "F.Cu" "F.Mask") (net "SIG") (uuid "11111111-1111-5111-8111-111111111114"))`,
+		`    (pad "1" smd rect (at -0.6 0 180) (size 0.7 0.8) (layers "F.Cu" "F.Mask") (net "SIG") (uuid "11111111-1111-5111-8111-111111111114"))`,
 		`  )`,
 		`  (segment (start 5.6 5) (end 10.6 5) (width 0.25) (layer "F.Cu") (net "SIG") (uuid "22222222-2222-5222-8222-222222222222"))`,
 		`)`,
@@ -77,6 +78,9 @@ func TestReadPCBPreservesFootprintRotationForConnectivity(t *testing.T) {
 	}
 	if read.Footprints[1].Rotation != 180 {
 		t.Fatalf("footprint rotation = %g, want 180", read.Footprints[1].Rotation)
+	}
+	if math.Abs(float64(read.Footprints[1].Pads[0].Rotation)) > 1e-9 {
+		t.Fatalf("relative pad rotation = %g, want 0", read.Footprints[1].Pads[0].Rotation)
 	}
 	if err := ValidateGeneratedConnectivity(read); err != nil {
 		t.Fatalf("ValidateGeneratedConnectivity returned error: %v", err)

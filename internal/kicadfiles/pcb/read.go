@@ -117,7 +117,9 @@ func readFootprint(node sexpr.ParsedNode) Footprint {
 		}
 	}
 	for _, pad := range node.ChildrenByHead("pad") {
-		fp.Pads = append(fp.Pads, readPad(pad))
+		parsed := readPad(pad)
+		parsed.Rotation = normalizedFootprintAngle(parsed.Rotation - fp.Rotation)
+		fp.Pads = append(fp.Pads, parsed)
 	}
 	return fp
 }

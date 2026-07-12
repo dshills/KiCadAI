@@ -56,7 +56,7 @@ kicadai \
 | `i2c_sensor_breakout_candidate` | `candidate` | Tracks the richer sensor breakout candidate after placement, local route contact proof, VCC/GND/SDA/SCL alias propagation, route-tree execution, contact graph evidence, project-write, writer-correctness, structural validation, and warning-level optional KiCad evidence. Pass promotion still requires clean required KiCad DRC evidence from a stable `kicad-cli`. |
 | `sensor_bmp280_breakout` | `pass` | Reproduces the concrete BMP280 structured-intent result through the environment-gated design fixture lane with verified Bosch identity, LGA-8 footprint/pad mapping, complete required-net routing, and clean KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
-| `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
+| `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. Its schematic layout is inferred from component roles and non-ground topology, with no hand-authored layout coordinates. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
 | `usb_c_i2c_sensor_3v3_protected` | `candidate` | Tracks the medium-complexity AI-generated target fixture: `usb_c_power` input, protected VBUS path, 5 V to 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and header. It now clears blocking KiCad ERC/DRC evidence; remaining work is warning-level ERC cleanup and fabrication-grade AMS1117 regulator proof. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
@@ -92,16 +92,20 @@ Observed promotion status:
 - `promotion.achieved_readiness`: `pass`
 - `acceptance.achieved`: `erc-drc`
 - KiCad ERC report:
-  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/kicadai-check-erc-4129510764/erc.json`
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/kicadai-check-erc-2411734681/erc.json`
 - KiCad DRC report:
-  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/kicadai-check-drc-2807111534/drc.json`
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/kicadai-check-drc-1509461091/drc.json`
 - PCB round-trip normalized diff:
-  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/pcb-roundtrip-840250900/normalized.diff`
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/pcb-roundtrip-3229415959/normalized.diff`
 - Schematic round-trip normalized diff:
-  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/usb_c_led_indicator_protected-3948003877/normalized.diff`
+  `examples/.generated/usb_c_led_indicator_protected/.kicadai/checks/usb_c_led_indicator_protected-259474249/normalized.diff`
 
 The ERC report has no violations. The DRC report has no violations and no
-unconnected items. Both normalized round-trip diffs are zero bytes.
+unconnected items. Both normalized round-trip diffs are zero bytes. The
+checked-in request opts into `auto_schematic_layout`; inference places the
+USB-C connector, fuse, indicator resistor, and LED in left-to-right power-flow
+order while keeping CC pull-downs, TVS protection, and bulk capacitance below
+and near their owning power stages.
 
 ## BMP280 Structured-Intent Pass Evidence
 

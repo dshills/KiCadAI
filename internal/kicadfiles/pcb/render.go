@@ -3,6 +3,7 @@ package pcb
 import (
 	"cmp"
 	"io"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -353,7 +354,7 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 		nodes = append(nodes, renderFootprintGraphic(graphic))
 	}
 	for _, pad := range footprint.Pads {
-		nodes = append(nodes, renderPad(pad, netNames[pad.NetCode]))
+		nodes = append(nodes, renderPad(placedFootprintPad(pad, footprint.Rotation), netNames[pad.NetCode]))
 	}
 	if footprint.EmbeddedFonts != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("embedded_fonts"), yesNo(*footprint.EmbeddedFonts)))
@@ -362,6 +363,19 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 		nodes = append(nodes, renderModel3D(model))
 	}
 	return sexpr.L(nodes...)
+}
+
+func placedFootprintPad(pad Pad, footprintRotation kicadfiles.Angle) Pad {
+	pad.Rotation = normalizedFootprintAngle(pad.Rotation + footprintRotation)
+	return pad
+}
+
+func normalizedFootprintAngle(angle kicadfiles.Angle) kicadfiles.Angle {
+	normalized := math.Mod(float64(angle), 360)
+	if normalized < 0 {
+		normalized += 360
+	}
+	return kicadfiles.Angle(normalized)
 }
 
 func renderFootprintLibraryProperty(property FootprintProperty, footprintName string) sexpr.List {

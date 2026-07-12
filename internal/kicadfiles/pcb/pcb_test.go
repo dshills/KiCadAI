@@ -902,6 +902,32 @@ func TestWriteRendersPadMetadata(t *testing.T) {
 	}
 }
 
+func TestWriteRendersBoardPadOrientationRelativeToRotatedFootprint(t *testing.T) {
+	board := minimalPCB()
+	footprint := minimalFootprint("11111111-1111-5111-8111-111111111111", "D1")
+	footprint.Rotation = 350
+	footprint.Pads[0].NetCode = 0
+	footprint.Pads[0].Rotation = 15
+	board.Footprints = []Footprint{footprint}
+
+	var output strings.Builder
+	if err := Write(&output, board); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(output.String(), `(at 0 0 5)`) {
+		t.Fatalf("rotated board pad did not contain absolute KiCad orientation:\n%s", output.String())
+	}
+
+	var module strings.Builder
+	if err := WriteFootprintLibraryModule(&module, &footprint, "LED_0805_2012Metric"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(module.String(), `(at 0 0 15)`) {
+		t.Fatalf("library pad did not retain footprint-relative orientation:\n%s", module.String())
+	}
+}
+
 func TestWriteOmitsNetForUnconnectedPad(t *testing.T) {
 	board := minimalPCB()
 	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
