@@ -12,3 +12,14 @@ const BMP280ReferenceCapabilityContext = `Supported design scope:
 - one external I2C connector
 - 100 mm by 75 mm two-layer reference board with 0.25 mm edge clearance
 Do not select identifiers or features outside this list.`
+
+const ProtectedLEDReferenceCapabilityContext = `Supported design scope:
+- one protected USB-C powered LED indicator
+- USB-C power-only sink at 5V
+- existing USB-C CC pull-down, fuse, TVS, and bulk-capacitance capabilities
+- require fuse, TVS, and bulk capacitance; keep reverse-polarity protection optional
+- one active-high indicator LED characterized at 2.0V and 5 mA
+- one 600 ohm current-limiting resistor
+- 50 mm by 30 mm two-layer reference board
+- automatic readable schematic layout and ERC/DRC acceptance
+Do not select identifiers, components, or features outside this list.`

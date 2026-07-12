@@ -9,7 +9,14 @@ import (
 )
 
 func TestOpenAIIntentSchemaObjectsAreStrictAndFullyRequired(t *testing.T) {
-	assertStrictSchemaNode(t, "schema", BMP280ReferenceIntentEnvelopeSchema())
+	for name, schema := range map[string]map[string]any{
+		"bmp280":        BMP280ReferenceIntentEnvelopeSchema(),
+		"protected_led": ProtectedLEDReferenceIntentEnvelopeSchema(),
+	} {
+		t.Run(name, func(t *testing.T) {
+			assertStrictSchemaNode(t, "schema", schema)
+		})
+	}
 }
 
 func assertStrictSchemaNode(t *testing.T, path string, node any) {
@@ -44,16 +51,48 @@ func assertStrictSchemaNode(t *testing.T, path string, node any) {
 	}
 }
 
-func TestOpenAIIntentTopLevelSchemaIsSubsetOfGoIntentModel(t *testing.T) {
-	schema := BMP280ReferenceIntentEnvelopeSchema()
-	properties := schema["properties"].(map[string]any)
-	intent := properties["intent"].(map[string]any)
-	intentProperties := intent["properties"].(map[string]any)
-	goFields := jsonFieldNames(reflect.TypeOf(intentplanner.Request{}))
-	for name := range intentProperties {
-		if !goFields[name] {
-			t.Fatalf("provider intent property %q has no intentplanner.Request field", name)
+func TestProtectedLEDReferenceSchemaPinsProvenDesign(t *testing.T) {
+	schema := ProtectedLEDReferenceIntentEnvelopeSchema()
+	board := schemaProperties(t, schemaNodeAt(t, schema, "intent", "board"))
+	if got := schemaConst(t, schemaProperty(t, board, "width_mm")); got != 50.0 {
+		t.Fatalf("board width = %#v, want 50", got)
+	}
+	if got := schemaConst(t, schemaProperty(t, board, "height_mm")); got != 30.0 {
+		t.Fatalf("board height = %#v, want 30", got)
+	}
+	function := schemaProperties(t, schemaItems(t, schemaProperty(t, schemaProperties(t, schemaNodeAt(t, schema, "intent")), "functions")))
+	params := schemaProperties(t, schemaProperty(t, function, "params"))
+	for name, want := range map[string]any{
+		"active_high": true, "supply_voltage": "5V", "led_forward_voltage": "2.0V", "led_current_ma": 5,
+	} {
+		if got := schemaConst(t, schemaProperty(t, params, name)); got != want {
+			t.Fatalf("function params.%s = %#v, want %#v", name, got, want)
 		}
+	}
+	protection := schemaProperties(t, schemaNodeAt(t, schema, "intent", "protection"))
+	for _, name := range []string{"overcurrent", "transient", "bulk_capacitance"} {
+		if got := schemaConst(t, schemaProperty(t, protection, name)); got != "required" {
+			t.Fatalf("protection.%s = %#v, want required", name, got)
+		}
+	}
+}
+
+func TestOpenAIIntentTopLevelSchemaIsSubsetOfGoIntentModel(t *testing.T) {
+	for profile, schema := range map[string]map[string]any{
+		"bmp280": BMP280ReferenceIntentEnvelopeSchema(),
+		"led":    ProtectedLEDReferenceIntentEnvelopeSchema(),
+	} {
+		t.Run(profile, func(t *testing.T) {
+			properties := schema["properties"].(map[string]any)
+			intent := properties["intent"].(map[string]any)
+			intentProperties := intent["properties"].(map[string]any)
+			goFields := jsonFieldNames(reflect.TypeOf(intentplanner.Request{}))
+			for name := range intentProperties {
+				if !goFields[name] {
+					t.Fatalf("provider intent property %q has no intentplanner.Request field", name)
+				}
+			}
+		})
 	}
 }
 

@@ -20,7 +20,6 @@ import (
 	"kicadai/internal/reports"
 )
 
-const aiReferenceSchemaName = "kicadai_bmp280_intent_v1"
 const aiDefaultConnectorEdgeSide = "bottom"
 
 type aiDesignCreateResult struct {
@@ -92,11 +91,15 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	if issue != nil {
 		return writeDesignFailure(stdout, *issue)
 	}
+	profile, err := aiprovider.SelectReferenceProfile(prompt)
+	if err != nil {
+		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "prompt", Message: err.Error()})
+	}
 	provider, err := aiProviderFromOptions(opts)
 	if err != nil {
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
-	providerResult, intent, plan, attempts, issues, err := generateValidatedAIIntent(ctx, provider, prompt, opts.maxAIAttempts)
+	providerResult, intent, plan, attempts, issues, err := generateValidatedAIIntent(ctx, provider, profile, prompt, opts.maxAIAttempts)
 	if err != nil {
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
@@ -260,15 +263,15 @@ func aiEndpointNeedsLocalRouteProtection(endpoint blocks.PortRef, blocksByID map
 	return slices.Contains(definition.PCBRealization.InterBlockObstaclePorts, port)
 }
 
-func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider, prompt string, maxAttempts int) (aiprovider.GenerateResult, intentplanner.Request, intentplanner.PlanResult, []aiAttemptEvidence, []reports.Issue, error) {
+func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider, profile aiprovider.ReferenceProfile, prompt string, maxAttempts int) (aiprovider.GenerateResult, intentplanner.Request, intentplanner.PlanResult, []aiAttemptEvidence, []reports.Issue, error) {
 	var diagnostics []aiprovider.Diagnostic
 	var attempts []aiAttemptEvidence
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		result, err := provider.GenerateIntent(ctx, aiprovider.GenerateRequest{
 			Prompt:            prompt,
-			CapabilityContext: aiprovider.BMP280ReferenceCapabilityContext,
-			OutputSchemaName:  aiReferenceSchemaName,
-			OutputSchema:      aiprovider.BMP280ReferenceIntentEnvelopeSchema(),
+			CapabilityContext: profile.CapabilityContext,
+			OutputSchemaName:  profile.SchemaName,
+			OutputSchema:      profile.IntentEnvelopeSchema(),
 			SchemaVersion:     aiprovider.EnvelopeSchemaV1,
 			Attempt:           attempt,
 			Diagnostics:       diagnostics,

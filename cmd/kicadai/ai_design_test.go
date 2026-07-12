@@ -41,7 +41,7 @@ func TestRunAIDesignRejectsConflictingInputsBeforeOutput(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "must-not-exist")
 	var stdout bytes.Buffer
 	err := run([]string{
-		"--prompt", "build bmp280",
+		"--prompt", "build a USB-C BMP280 breakout",
 		"--request", "request.json",
 		"--provider", "recorded",
 		"--provider-record", filepath.Join("..", "..", "examples", "ai", "usb_c_bmp280_breakout", "recorded-response.json"),
@@ -69,7 +69,7 @@ func TestRunAIDesignMalformedRecordCreatesNoOutput(t *testing.T) {
 	output := filepath.Join(root, "must-not-exist")
 	var stdout bytes.Buffer
 	err := run([]string{
-		"--prompt", "build bmp280",
+		"--prompt", "build a USB-C BMP280 breakout",
 		"--provider", "recorded",
 		"--provider-record", record,
 		"--output", output,
@@ -84,6 +84,38 @@ func TestRunAIDesignMalformedRecordCreatesNoOutput(t *testing.T) {
 	var result reports.Result
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil || result.OK || len(result.Issues) != 1 || result.Issues[0].Code != reports.CodeAIOutputInvalid {
 		t.Fatalf("result=%#v decode=%v stdout=%s", result, decodeErr, stdout.String())
+	}
+}
+
+func TestRunAIDesignRejectsUnsupportedProfilesBeforeProviderOrOutput(t *testing.T) {
+	for _, prompt := range []string{
+		"Create a USB-C motor controller",
+		"Create a USB-C BMP280 breakout with an LED indicator",
+	} {
+		t.Run(prompt, func(t *testing.T) {
+			output := filepath.Join(t.TempDir(), "must-not-exist")
+			var stdout bytes.Buffer
+			err := run([]string{
+				"--prompt", prompt,
+				"--provider", "recorded",
+				"--provider-record", filepath.Join(t.TempDir(), "missing-provider-response.json"),
+				"--output", output,
+				"design", "create",
+			}, &stdout, &bytes.Buffer{})
+			if err == nil {
+				t.Fatal("expected profile selection failure")
+			}
+			if _, statErr := os.Stat(output); !os.IsNotExist(statErr) {
+				t.Fatalf("output should not exist, stat error=%v", statErr)
+			}
+			var result reports.Result
+			if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+				t.Fatalf("decode result: %v; stdout=%s", decodeErr, stdout.String())
+			}
+			if result.OK || len(result.Issues) != 1 || result.Issues[0].Path != "prompt" || result.Issues[0].Code != reports.CodeInvalidArgument {
+				t.Fatalf("result = %#v", result)
+			}
+		})
 	}
 }
 
@@ -182,7 +214,7 @@ func TestGenerateValidatedAIIntentRetriesSchemaFailureOnce(t *testing.T) {
 		{Provider: "sequence", Model: "test", ResponseID: "first", IntentJSON: json.RawMessage(`{"version":"0.1.0","name":"bad","unknown":true}`)},
 		{Provider: "sequence", Model: "test", ResponseID: "second", IntentJSON: validIntent},
 	}}
-	result, _, plan, attempts, issues, err := generateValidatedAIIntent(context.Background(), provider, "build bmp280", 2)
+	result, _, plan, attempts, issues, err := generateValidatedAIIntent(context.Background(), provider, aiprovider.BMP280Profile(), "build bmp280", 2)
 	if err != nil {
 		t.Fatalf("generate: %v", err)
 	}
@@ -201,7 +233,7 @@ func TestGenerateValidatedAIIntentDoesNotRetryAuthentication(t *testing.T) {
 	provider := &sequenceAIProvider{errors: []error{
 		&aiprovider.ProviderError{Code: aiprovider.ErrorAuthentication, Message: "authentication failed"},
 	}}
-	_, _, _, attempts, _, err := generateValidatedAIIntent(context.Background(), provider, "build bmp280", 2)
+	_, _, _, attempts, _, err := generateValidatedAIIntent(context.Background(), provider, aiprovider.BMP280Profile(), "build bmp280", 2)
 	if aiprovider.ErrorCodeOf(err) != aiprovider.ErrorAuthentication || len(provider.requests) != 1 || len(attempts) != 1 {
 		t.Fatalf("err=%v requests=%d attempts=%#v", err, len(provider.requests), attempts)
 	}

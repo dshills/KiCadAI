@@ -73,6 +73,57 @@ func BMP280ReferenceIntentEnvelopeSchema() map[string]any {
 	})
 }
 
+func ProtectedLEDReferenceIntentEnvelopeSchema() map[string]any {
+	powerInput := strictObject(map[string]any{
+		"kind":       map[string]any{"type": "string", "const": "usb_c"},
+		"voltage":    map[string]any{"type": "string", "const": "5V"},
+		"current_ma": map[string]any{"type": "integer", "const": 100},
+		"strength":   map[string]any{"type": "string", "const": "required"},
+	})
+	functionParams := strictObject(map[string]any{
+		"active_high":         map[string]any{"type": "boolean", "const": true},
+		"supply_voltage":      map[string]any{"type": "string", "const": "5V"},
+		"led_forward_voltage": map[string]any{"type": "string", "const": "2.0V"},
+		"led_current_ma":      map[string]any{"type": "integer", "const": 5},
+	})
+	functionIntent := strictObject(map[string]any{
+		"kind":     map[string]any{"type": "string", "const": "indicator"},
+		"family":   map[string]any{"type": "string", "const": "led_indicator"},
+		"quantity": map[string]any{"type": "integer", "const": 1},
+		"params":   functionParams,
+		"strength": map[string]any{"type": "string", "const": "required"},
+		"supply":   map[string]any{"type": "string", "const": "5V"},
+	})
+	intent := strictObject(map[string]any{
+		"version":               map[string]any{"type": "string", "const": "0.1.0"},
+		"name":                  map[string]any{"type": "string"},
+		"kind":                  map[string]any{"type": "string", "const": "breakout"},
+		"acceptance":            map[string]any{"type": "string", "const": "erc-drc"},
+		"auto_schematic_layout": map[string]any{"type": "boolean", "const": true},
+		"board": strictObject(map[string]any{
+			"width_mm":       map[string]any{"type": "number", "const": 50.0},
+			"height_mm":      map[string]any{"type": "number", "const": 30.0},
+			"layers":         map[string]any{"type": "integer", "const": 2},
+			"mounting_holes": map[string]any{"type": "string", "const": "optional"},
+		}),
+		"power": strictObject(map[string]any{
+			"inputs": map[string]any{"type": "array", "minItems": 1, "maxItems": 1, "items": powerInput},
+		}),
+		"functions": map[string]any{"type": "array", "minItems": 1, "maxItems": 1, "items": functionIntent},
+		"protection": strictObject(map[string]any{
+			"esd":              map[string]any{"type": "string", "const": "optional"},
+			"reverse_polarity": map[string]any{"type": "string", "const": "optional"},
+			"overcurrent":      map[string]any{"type": "string", "const": "required"},
+			"transient":        map[string]any{"type": "string", "const": "required"},
+			"bulk_capacitance": map[string]any{"type": "string", "const": "required"},
+		}),
+	})
+	return strictObject(map[string]any{
+		"schema": map[string]any{"type": "string", "const": EnvelopeSchemaV1},
+		"intent": intent,
+	})
+}
+
 func strictObject(properties map[string]any) map[string]any {
 	required := make([]string, 0, len(properties))
 	for name := range properties {
