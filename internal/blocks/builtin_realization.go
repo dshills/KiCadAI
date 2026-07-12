@@ -86,16 +86,29 @@ func connectorBreakoutComponents() []BlockComponent {
 func connectorBreakoutPCBRealization() *PCBRealization {
 	edgeFacing := RealizationWhen{Params: map[string]any{"edge_facing": true}}
 	notEdgeFacing := RealizationWhen{Params: map[string]any{"edge_facing": false}}
+	rightEdge := combinedRealizationWhen(edgeFacing, RealizationWhen{Params: map[string]any{"edge_side": "right"}})
+	bottomEdge := combinedRealizationWhen(edgeFacing, RealizationWhen{Params: map[string]any{"edge_side": "bottom"}})
+	leftEdge := combinedRealizationWhen(edgeFacing, RealizationWhen{Params: map[string]any{"edge_side": "left"}})
+	topEdge := combinedRealizationWhen(edgeFacing, RealizationWhen{Params: map[string]any{"edge_side": "top"}})
 	return &PCBRealization{
 		Version:           "0.1.0",
 		VerificationLevel: PCBVerificationPlacementVerified,
 		Components: []PCBComponentRealization{
 			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 0, YMM: 0, Layer: "F.Cu"}, When: notEdgeFacing},
-			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 12, YMM: 14.5, Layer: "F.Cu"}, When: edgeFacing},
+			// Preserve the historical right-edge fixture placement; new edge choices are movable and enforced by the placer.
+			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 12, YMM: 14.5, Layer: "F.Cu", Fixed: true}, When: rightEdge},
+			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 12, YMM: 14.5, Layer: "F.Cu"}, When: bottomEdge},
+			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 12, YMM: 14.5, Layer: "F.Cu"}, When: leftEdge},
+			{ComponentRole: "connector", FootprintParam: "connector_footprint", Placement: RelativePlacement{XMM: 12, YMM: 14.5, Layer: "F.Cu"}, When: topEdge},
 		},
 		PlacementGroups: []PCBPlacementGroup{{ID: "connector_edge", ComponentRoles: []string{"connector"}, AnchorRole: "connector", Bounds: &RelativeBounds{MinXMM: -3, MinYMM: -10, MaxXMM: 3, MaxYMM: 10}}},
-		Constraints:     []PCBConstraint{{ID: "connector_right_edge_facing", Kind: "edge_facing", AppliesTo: []string{"connector"}, Description: "Place generated connector breakouts on the right board edge when requested.", When: edgeFacing}},
-		Validation:      PCBValidationExpectations{AllowedUnroutedNets: []string{"*"}},
+		Constraints: []PCBConstraint{
+			{ID: "connector_right_edge_facing", Kind: "edge_facing", AppliesTo: []string{"connector"}, Description: "Place generated connector breakouts on the right board edge when requested.", When: rightEdge},
+			{ID: "connector_bottom_edge_facing", Kind: "edge_facing", AppliesTo: []string{"connector"}, Description: "Place generated connector breakouts on the bottom board edge when requested.", When: bottomEdge},
+			{ID: "connector_left_edge_facing", Kind: "edge_facing", AppliesTo: []string{"connector"}, Description: "Place generated connector breakouts on the left board edge when requested.", When: leftEdge},
+			{ID: "connector_top_edge_facing", Kind: "edge_facing", AppliesTo: []string{"connector"}, Description: "Place generated connector breakouts on the top board edge when requested.", When: topEdge},
+		},
+		Validation: PCBValidationExpectations{AllowedUnroutedNets: []string{"*"}},
 	}
 }
 
@@ -232,7 +245,8 @@ func i2cSensorPCBRealization() *PCBRealization {
 			{ID: "i2c_decoupling_proximity", Kind: "proximity", NetTemplate: "vcc", AppliesTo: []string{"sensor", "decoupling_capacitor"}, MaxLengthMM: 5, Description: "Sensor decoupling capacitor should remain close to the sensor supply pins."},
 			{ID: "i2c_bus_pullup_group", Kind: "shared_bus_pullup", AppliesTo: []string{"sda_pullup", "scl_pullup"}, Description: "SDA and SCL pull-ups must be owned once per bus."},
 		},
-		Validation: PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "sda", "scl"}, RequiredRoutes: []string{"vcc_decoupling", "gnd_decoupling", "sda_pullup_vcc", "scl_pullup_vcc", "sda_pullup", "scl_pullup"}},
+		InterBlockObstaclePorts: []string{"GND", "SCL", "SDA", "VCC"},
+		Validation:              PCBValidationExpectations{RequiredNets: []string{"vcc", "gnd", "sda", "scl"}, RequiredRoutes: []string{"vcc_decoupling", "gnd_decoupling", "sda_pullup_vcc", "scl_pullup_vcc", "sda_pullup", "scl_pullup"}},
 	}
 }
 

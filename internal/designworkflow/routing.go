@@ -177,10 +177,18 @@ func RoutePlacement(ctx context.Context, request Request, fragments PCBFragmentR
 			routingRequest.Existing = append(routingRequest.Existing, existingUSBConfigurationCopperFromRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)...)
 		}
 	}
+	selectiveLocalRouteObstacles := []routing.ExistingCopper(nil)
+	selectiveLocalRouteObstacleNets := map[string]struct{}{}
+	if localRouteConnectivity.IssueCount == 0 && !normalized.Constraints.TreatLocalPowerRoutesAsObstacles && len(normalized.Constraints.LocalRouteObstacleNets) != 0 {
+		selectiveLocalRouteObstacles = existingCopperFromAllRouteOperations(localOperations, routeBranchDefaultLayer(routingRequest.Board), routingRequest.Rules)
+		for _, netName := range normalized.Constraints.LocalRouteObstacleNets {
+			selectiveLocalRouteObstacleNets[strings.TrimSpace(netName)] = struct{}{}
+		}
+	}
 	targetEvidence := BuildInterBlockContactTargets(interBlockCandidates, &placed)
 	routeTreeAccess, routeTreeAccessIssues := BuildRouteTreeEndpointAccessWithIssues(targetEvidence, localOperations)
 	issues = append(issues, routeTreeAccessIssues...)
-	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence, routeTreeAccess)
+	routeTreeExecution := executeInterBlockRouteTrees(ctx, routingRequest, interBlockCandidates, targetEvidence, routeTreeAccess, selectiveLocalRouteObstacles, selectiveLocalRouteObstacleNets)
 	routingRequest.Nets = excludeManagedInterBlockNets(routingRequest.Nets, routeTreeExecution.Summary.ManagedNets)
 	issues = append(issues, targetEvidence.Issues...)
 	issues = append(issues, routeTreeExecution.Issues...)
@@ -490,7 +498,7 @@ func interBlockRouteTreeByNet(trees []InterBlockRouteTree) map[string]InterBlock
 	return byNet
 }
 
-func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, candidates []InterBlockRouteCandidate, targetEvidence InterBlockContactEvidence, routeTreeAccess []RouteTreeEndpointAccess) interBlockRouteTreeExecutionResult {
+func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, candidates []InterBlockRouteCandidate, targetEvidence InterBlockContactEvidence, routeTreeAccess []RouteTreeEndpointAccess, selectiveExisting []routing.ExistingCopper, selectiveNets map[string]struct{}) interBlockRouteTreeExecutionResult {
 	groups, groupIssues := BuildInterBlockRouteGroups(candidates)
 	trees := BuildInterBlockRouteTrees(groups, targetEvidence)
 	groupByNet := interBlockRouteGroupByNet(groups)
@@ -498,6 +506,10 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 	execution.Issues = append(execution.Issues, groupIssues...)
 	workingBase := base
 	workingBase.Existing = append([]routing.ExistingCopper(nil), base.Existing...)
+	selectiveBase := base
+	selectiveBase.Existing = make([]routing.ExistingCopper, 0, len(base.Existing)+len(selectiveExisting))
+	selectiveBase.Existing = append(selectiveBase.Existing, base.Existing...)
+	selectiveBase.Existing = append(selectiveBase.Existing, selectiveExisting...)
 	for _, tree := range trees {
 		if ctx != nil && ctx.Err() != nil {
 			break
@@ -514,7 +526,11 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 		execution.Summary.GroupsAttempted++
 		execution.Summary.BranchesPlanned += len(tree.Branches)
 		execution.Summary.ManagedNets = append(execution.Summary.ManagedNets, netName)
-		branchResult := RouteInterBlockTreeBranchesWithAccess(ctx, workingBase, group, tree, routeTreeAccess)
+		treeBase := workingBase
+		if _, selected := selectiveNets[strings.TrimSpace(netName)]; selected {
+			treeBase = selectiveBase
+		}
+		branchResult := RouteInterBlockTreeBranchesWithAccess(ctx, treeBase, group, tree, routeTreeAccess)
 		execution.Operations = append(execution.Operations, branchResult.Operations...)
 		execution.Issues = append(execution.Issues, branchResult.Issues...)
 		execution.Branches = append(execution.Branches, RouteTreeBranchEvidenceSummary{
@@ -522,6 +538,7 @@ func executeInterBlockRouteTrees(ctx context.Context, base routing.Request, cand
 			Branches: append([]InterBlockBranchRoutingEvidence(nil), branchResult.Branches...),
 		})
 		workingBase.Existing = append(workingBase.Existing, branchResult.ExistingCopper...)
+		selectiveBase.Existing = append(selectiveBase.Existing, branchResult.ExistingCopper...)
 		routedBranches := 0
 		blockedBranches := 0
 		for _, branch := range branchResult.Branches {
@@ -746,6 +763,15 @@ func preservedLocalRouteOperations(fragments PCBFragmentResult) []transactions.O
 }
 
 func existingCopperFromRouteOperations(operations []transactions.Operation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {
+	routes := decodedRouteOperations(operations, routeOperationBlocksInterBlockRouting)
+	return existingCopperFromDecodedRoutes(routes, defaultLayer, rules)
+}
+
+func existingCopperFromAllRouteOperations(operations []transactions.Operation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {
+	return existingCopperFromDecodedRoutes(decodedRouteOperations(operations, nil), defaultLayer, rules)
+}
+
+func decodedRouteOperations(operations []transactions.Operation, include func(*transactions.RouteOperation) bool) []transactions.RouteOperation {
 	routes := make([]transactions.RouteOperation, 0, len(operations))
 	for _, operation := range operations {
 		if operation.Op != transactions.OpRoute {
@@ -755,12 +781,12 @@ func existingCopperFromRouteOperations(operations []transactions.Operation, defa
 		if err := json.Unmarshal(operation.Raw, &route); err != nil {
 			continue
 		}
-		if !routeOperationBlocksInterBlockRouting(&route) {
+		if include != nil && !include(&route) {
 			continue
 		}
 		routes = append(routes, route)
 	}
-	return existingCopperFromDecodedRoutes(routes, defaultLayer, rules)
+	return routes
 }
 
 func existingCopperFromDecodedRoutes(routes []transactions.RouteOperation, defaultLayer string, rules routing.Rules) []routing.ExistingCopper {

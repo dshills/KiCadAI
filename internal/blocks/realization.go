@@ -23,19 +23,20 @@ const (
 )
 
 type PCBRealization struct {
-	Version              string                    `json:"version"`
-	VerificationLevel    PCBVerificationLevel      `json:"verification_level"`
-	Components           []PCBComponentRealization `json:"components,omitempty"`
-	EntryAnchors         []PCBEntryAnchor          `json:"entry_anchors,omitempty"`
-	PlacementGroups      []PCBPlacementGroup       `json:"placement_groups,omitempty"`
-	LocalRoutes          []PCBLocalRoute           `json:"local_routes,omitempty"`
-	TimingFixtures       []PCBTimingFixture        `json:"timing,omitempty"`
-	Zones                []PCBZoneRealization      `json:"zones,omitempty"`
-	Keepouts             []PCBKeepout              `json:"keepouts,omitempty"`
-	Constraints          []PCBConstraint           `json:"constraints,omitempty"`
-	Validation           PCBValidationExpectations `json:"validation,omitempty"`
-	FabricationReadiness bool                      `json:"fabrication_readiness,omitempty"`
-	UnsupportedBehaviors []string                  `json:"unsupported_behaviors,omitempty"`
+	Version                 string                    `json:"version"`
+	VerificationLevel       PCBVerificationLevel      `json:"verification_level"`
+	Components              []PCBComponentRealization `json:"components,omitempty"`
+	EntryAnchors            []PCBEntryAnchor          `json:"entry_anchors,omitempty"`
+	PlacementGroups         []PCBPlacementGroup       `json:"placement_groups,omitempty"`
+	LocalRoutes             []PCBLocalRoute           `json:"local_routes,omitempty"`
+	TimingFixtures          []PCBTimingFixture        `json:"timing,omitempty"`
+	Zones                   []PCBZoneRealization      `json:"zones,omitempty"`
+	Keepouts                []PCBKeepout              `json:"keepouts,omitempty"`
+	Constraints             []PCBConstraint           `json:"constraints,omitempty"`
+	InterBlockObstaclePorts []string                  `json:"inter_block_obstacle_ports,omitempty"`
+	Validation              PCBValidationExpectations `json:"validation,omitempty"`
+	FabricationReadiness    bool                      `json:"fabrication_readiness,omitempty"`
+	UnsupportedBehaviors    []string                  `json:"unsupported_behaviors,omitempty"`
 }
 
 type PCBComponentRealization struct {

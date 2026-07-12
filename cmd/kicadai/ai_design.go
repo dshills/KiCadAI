@@ -10,15 +10,18 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"kicadai/internal/aiprovider"
+	"kicadai/internal/blocks"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
 	"kicadai/internal/reports"
 )
 
 const aiReferenceSchemaName = "kicadai_bmp280_intent_v1"
+const aiDefaultConnectorEdgeSide = "bottom"
 
 type aiDesignCreateResult struct {
 	Provider aiProviderSummary             `json:"provider"`
@@ -175,10 +178,13 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 }
 
 func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Request {
+	request.Blocks = append([]designworkflow.BlockInstanceSpec(nil), request.Blocks...)
 	for index := range request.Blocks {
-		if request.Blocks[index].Params == nil {
-			request.Blocks[index].Params = map[string]any{}
+		params := make(map[string]any, len(request.Blocks[index].Params))
+		for key, value := range request.Blocks[index].Params {
+			params[key] = value
 		}
+		request.Blocks[index].Params = params
 		switch request.Blocks[index].BlockID {
 		case "i2c_sensor":
 			if componentID, ok := request.Blocks[index].Params["sensor_component_id"].(string); ok && strings.TrimSpace(componentID) != "" {
@@ -186,6 +192,9 @@ func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Req
 			}
 		case "connector_breakout":
 			request.Blocks[index].Params["edge_facing"] = true
+			if _, exists := request.Blocks[index].Params["edge_side"]; !exists {
+				request.Blocks[index].Params["edge_side"] = aiDefaultConnectorEdgeSide
+			}
 		}
 	}
 	if request.Validation.SkipRouting {
@@ -197,7 +206,46 @@ func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Req
 	}
 	request.RoutingRetry.StopOnRepeatedSignature = true
 	request.RoutingRetry.StopOnNonImprovement = true
+	if len(request.Constraints.LocalRouteObstacleNets) == 0 {
+		request.Constraints.LocalRouteObstacleNets = aiLocalRouteObstacleNets(request)
+	}
 	return request
+}
+
+func aiLocalRouteObstacleNets(request designworkflow.Request) []string {
+	registry := blocks.NewBuiltinRegistry()
+	blocksByID := make(map[string]string, len(request.Blocks))
+	for _, block := range request.Blocks {
+		blocksByID[strings.TrimSpace(block.ID)] = strings.TrimSpace(block.BlockID)
+	}
+	nets := map[string]struct{}{}
+	for _, connection := range request.Connections {
+		alias := strings.TrimSpace(connection.NetAlias)
+		from, fromOK := designworkflow.ParseEndpoint(connection.From)
+		to, toOK := designworkflow.ParseEndpoint(connection.To)
+		if alias == "" || !fromOK || !toOK {
+			continue
+		}
+		if aiEndpointNeedsLocalRouteProtection(from, blocksByID, registry) || aiEndpointNeedsLocalRouteProtection(to, blocksByID, registry) {
+			nets[alias] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(nets))
+	for netName := range nets {
+		result = append(result, netName)
+	}
+	slices.Sort(result)
+	return result
+}
+
+func aiEndpointNeedsLocalRouteProtection(endpoint blocks.PortRef, blocksByID map[string]string, registry blocks.Registry) bool {
+	blockID := blocksByID[strings.TrimSpace(endpoint.InstanceID)]
+	definition, ok := registry.GetBlock(blockID)
+	if !ok || definition.PCBRealization == nil {
+		return false
+	}
+	port := strings.TrimSpace(endpoint.Port)
+	return slices.Contains(definition.PCBRealization.InterBlockObstaclePorts, port)
 }
 
 func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider, prompt string, maxAttempts int) (aiprovider.GenerateResult, intentplanner.Request, intentplanner.PlanResult, []aiAttemptEvidence, []reports.Issue, error) {

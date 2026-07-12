@@ -516,7 +516,8 @@ func placementLocalRouteRefs(fragment BlockFragment) map[string]bool {
 func generatedPlacementMobility(request Request, fragment BlockFragment, component blocks.RealizedPCBComponent, groupID string, edge placement.EdgeConstraint, hasLocalRoute bool) (placement.MobilityPolicy, bool) {
 	ownerScope := "block:" + fragment.BlockID + "/" + fragment.InstanceID
 	constraints := []string{"generated", "block:" + fragment.BlockID}
-	hardFixed := component.Placement.Fixed || edge != placement.EdgeNone || request.RoutingRetry.PreserveFixed
+	hardEdge := edge != placement.EdgeNone && hasLocalRoute
+	hardFixed := component.Placement.Fixed || request.RoutingRetry.PreserveFixed || hardEdge
 	if !request.RoutingRetry.Enabled {
 		hardFixed = true
 		constraints = append(constraints, "retry_disabled")
@@ -524,7 +525,7 @@ func generatedPlacementMobility(request Request, fragment BlockFragment, compone
 	if request.RoutingRetry.PreserveFixed {
 		constraints = append(constraints, "preserve_fixed")
 	}
-	if edge != placement.EdgeNone {
+	if hardEdge {
 		constraints = append(constraints, "edge")
 	}
 	if component.Placement.Fixed {
@@ -533,7 +534,7 @@ func generatedPlacementMobility(request Request, fragment BlockFragment, compone
 	if hardFixed {
 		return placement.MobilityPolicy{
 			Class:         placement.MobilityFixed,
-			Reason:        generatedMobilityFixedReason(request, component, edge),
+			Reason:        generatedMobilityFixedReason(request, component, hardEdge),
 			OwnerScope:    ownerScope,
 			GroupID:       groupID,
 			RouteHandling: placement.RouteHandlingPreserveFixed,
@@ -561,7 +562,7 @@ func generatedPlacementMobility(request Request, fragment BlockFragment, compone
 	return policy, false
 }
 
-func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBComponent, edge placement.EdgeConstraint) string {
+func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBComponent, hardEdge bool) string {
 	switch {
 	case !request.RoutingRetry.Enabled:
 		return "routing retry is disabled"
@@ -569,7 +570,7 @@ func generatedMobilityFixedReason(request Request, component blocks.RealizedPCBC
 		return "routing retry preserve_fixed is enabled"
 	case component.Placement.Fixed:
 		return "generated component has fixed placement attribute"
-	case edge != placement.EdgeNone:
+	case hardEdge:
 		return "generated component has hard edge constraint"
 	}
 	return "generated component is treated as fixed by safety policy"

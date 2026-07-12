@@ -185,6 +185,71 @@ func TestPlaceFragmentsPreservesRegulatorCoreRelativePlacement(t *testing.T) {
 	}
 }
 
+func TestPlaceFragmentsMovesRouteFreeConnectorToRequestedEdge(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "bottom_connector",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "io",
+			BlockID: "connector_breakout",
+			Params: map[string]any{
+				"pin_names":   []any{"VCC", "GND", "SDA", "SCL"},
+				"edge_facing": true,
+				"edge_side":   "bottom",
+			},
+		}},
+		RoutingRetry: RoutingRetryPolicySpec{Enabled: true},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	component := result.Request.Components[0]
+	if component.Fixed || component.Edge != placement.EdgeBottom {
+		t.Fatalf("connector placement intent = %#v", component)
+	}
+	placed := result.Result.Placements[0]
+	if placed.Position.YMM < request.Board.HeightMM/2 {
+		t.Fatalf("connector position = %#v, want bottom half of board", placed.Position)
+	}
+}
+
+func TestPlaceFragmentsPreservesLegacyRightEdgeConnectorPosition(t *testing.T) {
+	request := Request{
+		Version: RequestVersion,
+		Name:    "right_connector",
+		Board:   BoardSpec{WidthMM: 40, HeightMM: 30, Layers: 2},
+		Blocks: []BlockInstanceSpec{{
+			ID:      "io",
+			BlockID: "connector_breakout",
+			Params: map[string]any{
+				"pin_names":   []any{"VCC", "GND"},
+				"edge_facing": true,
+			},
+		}},
+		RoutingRetry: RoutingRetryPolicySpec{Enabled: true},
+	}
+	registry := blocks.NewBuiltinRegistry()
+	plan := PlanBlocks(context.Background(), registry, request)
+	fragments := RealizePCBFragments(context.Background(), registry, plan)
+	result := PlaceFragments(context.Background(), request, fragments, PlacementOptions{})
+	if reports.HasBlockingIssue(result.Stage.Issues) {
+		t.Fatalf("placement issues = %#v", result.Stage.Issues)
+	}
+	component := result.Request.Components[0]
+	if !component.Fixed || component.Edge != placement.EdgeRight {
+		t.Fatalf("legacy connector placement intent = %#v", component)
+	}
+	placed := result.Result.Placements[0]
+	if component.Position == nil || placed.Position.XMM != component.Position.XMM || placed.Position.YMM != component.Position.YMM {
+		t.Fatalf("legacy connector position = %#v, want authored %#v", placed.Position, component.Position)
+	}
+}
+
 func TestPlaceFragmentsPromotesRequestConnectionsToPlacementNets(t *testing.T) {
 	request := Request{
 		Version: RequestVersion,

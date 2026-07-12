@@ -432,6 +432,7 @@ func connectorBreakoutDefinition() BlockDefinition {
 			{Name: "include_labels", Type: ParameterBool, Default: true, Description: "Add schematic labels for exported pins."},
 			{Name: "include_mounting_holes", Type: ParameterBool, Default: false, Description: "Reserve mounting-hole support for later PCB generation."},
 			{Name: "edge_facing", Type: ParameterBool, Default: false, Description: "Place the connector at the board edge for checked-in validation fixtures."},
+			{Name: "edge_side", Type: ParameterEnum, Default: "right", Allowed: []any{"right", "bottom", "left", "top"}, Description: "Preferred board edge when edge_facing is enabled."},
 		},
 		Ports: []BlockPort{
 			{Name: "PINS", Direction: PortPassive, Description: "Dynamic exported pin group; concrete ports are generated from pin_names in later phases."},

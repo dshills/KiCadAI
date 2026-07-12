@@ -53,6 +53,18 @@ func TestExistingCopperFromRouteOperationsSkipsSignalLocalRoutesWithoutVias(t *t
 	}
 }
 
+func TestExistingCopperFromAllRouteOperationsIncludesViaFreeSignalRoutes(t *testing.T) {
+	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"SDA","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":5}]}`))
+
+	existing := existingCopperFromAllRouteOperations([]transactions.Operation{operation}, "F.Cu", routing.DefaultRules())
+	if len(existing) != 1 || existing[0].Net != "SDA" || existing[0].Kind != routing.CopperSegment {
+		t.Fatalf("existing copper = %#v, want via-free SDA segment for selective obstacles", existing)
+	}
+	if len(existing[0].Centerline) != 2 || len(existing[0].Geometry.Polygon) == 0 {
+		t.Fatalf("existing copper = %#v, want diagonal width-aware geometry", existing[0])
+	}
+}
+
 func TestExistingCopperFromRouteOperationsIncludesUSBCCRoutesWithoutVias(t *testing.T) {
 	operation := transactions.NewOperation(transactions.OpRoute, []byte(`{"op":"route","net_name":"usb_power_cc2","layer":"F.Cu","width_mm":0.25,"points":[{"x_mm":1,"y_mm":2},{"x_mm":6,"y_mm":2}]}`))
 

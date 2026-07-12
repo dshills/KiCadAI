@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -207,18 +208,37 @@ func TestGenerateValidatedAIIntentDoesNotRetryAuthentication(t *testing.T) {
 }
 
 func TestPrepareAIWorkflowRequestEnablesBoundedPlacementRepair(t *testing.T) {
-	request := prepareAIWorkflowRequest(designworkflow.Request{Blocks: []designworkflow.BlockInstanceSpec{
-		{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8"}},
-		{ID: "io", BlockID: "connector_breakout"},
-	}})
+	original := designworkflow.Request{
+		Blocks: []designworkflow.BlockInstanceSpec{
+			{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8"}},
+			{ID: "io", BlockID: "connector_breakout"},
+		},
+		Connections: []designworkflow.ConnectionSpec{
+			{From: "io.GND", To: "sensor.GND", NetAlias: "GND"},
+			{From: "io.SDA", To: "sensor.SDA", NetAlias: "SDA"},
+			{From: "io.SCL", To: "sensor.SCL", NetAlias: "SCL"},
+			{From: "io.VCC", To: "sensor.VCC", NetAlias: "VCC_3v3"},
+		},
+	}
+	request := prepareAIWorkflowRequest(original)
 	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 2 {
 		t.Fatalf("routing retry = %#v", request.RoutingRetry)
 	}
 	if request.RoutingRetry.StopOnNewBlockers || !request.RoutingRetry.StopOnRepeatedSignature || !request.RoutingRetry.StopOnNonImprovement {
 		t.Fatalf("routing retry stop policy = %#v", request.RoutingRetry)
 	}
-	if request.Blocks[0].Params["fixed_pcb_layout"] != true || request.Blocks[1].Params["edge_facing"] != true {
+	if !slices.Equal(request.Constraints.LocalRouteObstacleNets, []string{"GND", "SCL", "SDA", "VCC_3v3"}) {
+		t.Fatalf("selective local-route obstacles = %#v", request.Constraints.LocalRouteObstacleNets)
+	}
+	if request.Blocks[0].Params["fixed_pcb_layout"] != true || request.Blocks[1].Params["edge_facing"] != true || request.Blocks[1].Params["edge_side"] != "bottom" {
 		t.Fatalf("AI block placement params = %#v", request.Blocks)
+	}
+	if _, exists := original.Blocks[0].Params["fixed_pcb_layout"]; exists || original.Blocks[1].Params != nil {
+		t.Fatalf("prepareAIWorkflowRequest mutated caller blocks: %#v", original.Blocks)
+	}
+	preserved := prepareAIWorkflowRequest(designworkflow.Request{Blocks: []designworkflow.BlockInstanceSpec{{ID: "io", BlockID: "connector_breakout", Params: map[string]any{"edge_side": "left"}}}})
+	if preserved.Blocks[0].Params["edge_side"] != "left" {
+		t.Fatalf("AI connector edge override = %#v, want left preserved", preserved.Blocks[0].Params["edge_side"])
 	}
 
 	skipped := prepareAIWorkflowRequest(designworkflow.Request{Validation: designworkflow.ValidationSpec{SkipRouting: true}})

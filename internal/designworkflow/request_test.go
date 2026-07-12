@@ -1,6 +1,7 @@
 package designworkflow
 
 import (
+	"slices"
 	"strings"
 	"testing"
 
@@ -127,6 +128,20 @@ func TestNormalizeRequestEnabledRoutingRetryIsBounded(t *testing.T) {
 	normalized := NormalizeRequest(request)
 	if normalized.RoutingRetry.MaxAttempts != 2 {
 		t.Fatalf("max attempts = %d, want total attempts bumped to 2", normalized.RoutingRetry.MaxAttempts)
+	}
+}
+
+func TestNormalizeRequestLocalRouteObstacleNets(t *testing.T) {
+	request := validRequest()
+	request.Constraints.LocalRouteObstacleNets = []string{" GND ", "", "Sda"}
+
+	normalized := NormalizeRequest(request)
+	if !slices.Equal(normalized.Constraints.LocalRouteObstacleNets, []string{"GND", "Sda"}) {
+		t.Fatalf("local-route obstacle nets = %#v", normalized.Constraints.LocalRouteObstacleNets)
+	}
+	normalized.Constraints.LocalRouteObstacleNets[0] = "changed"
+	if request.Constraints.LocalRouteObstacleNets[0] != " GND " {
+		t.Fatalf("NormalizeRequest did not clone local-route obstacle nets")
 	}
 }
 

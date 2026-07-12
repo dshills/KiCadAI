@@ -43,6 +43,7 @@ func TestPlaceContextHonorsCanceledContext(t *testing.T) {
 func TestPlacePreservesFixedComponent(t *testing.T) {
 	req := minimalRequest()
 	req.Components[0].Fixed = true
+	req.Components[0].Edge = EdgeRight
 	req.Components[0].Position = &Placement{XMM: 10, YMM: 10, RotationDeg: 90, Layer: "F.Cu"}
 
 	result := Place(req)

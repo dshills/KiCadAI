@@ -266,6 +266,10 @@ func candidatePlacements(component Component, componentRef string, request Reque
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectOutsideBoard, "candidate is outside usable board area")
 						continue
 					}
+					if !component.Fixed && component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, candidateResult.Position, component.Edge) {
+						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectEdge, "candidate does not satisfy edge constraint")
+						continue
+					}
 					if reason, message, refs, rejected := advancedPlacementHardRejection(component, candidateResult, advancedContext); rejected {
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, reason, message, refs...)
 						continue

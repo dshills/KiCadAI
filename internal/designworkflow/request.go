@@ -114,11 +114,12 @@ type ExternalEndpointSpec struct {
 }
 
 type ConstraintSpec struct {
-	RouteWidthMM                     float64 `json:"route_width_mm,omitempty"`
-	ClearanceMM                      float64 `json:"clearance_mm,omitempty"`
-	PreferTopLayer                   bool    `json:"prefer_top_layer,omitempty"`
-	AllowBackLayer                   bool    `json:"allow_back_layer,omitempty"`
-	TreatLocalPowerRoutesAsObstacles bool    `json:"treat_local_power_routes_as_obstacles,omitempty"`
+	RouteWidthMM                     float64  `json:"route_width_mm,omitempty"`
+	ClearanceMM                      float64  `json:"clearance_mm,omitempty"`
+	PreferTopLayer                   bool     `json:"prefer_top_layer,omitempty"`
+	AllowBackLayer                   bool     `json:"allow_back_layer,omitempty"`
+	TreatLocalPowerRoutesAsObstacles bool     `json:"treat_local_power_routes_as_obstacles,omitempty"`
+	LocalRouteObstacleNets           []string `json:"local_route_obstacle_nets,omitempty"`
 }
 
 type ValidationSpec struct {
@@ -184,6 +185,7 @@ func NormalizeRequest(request Request) Request {
 		request.Validation.Acceptance = AcceptanceStructural
 	}
 	request.RoutingRetry = normalizeRoutingRetryPolicy(request.RoutingRetry)
+	request.Constraints.LocalRouteObstacleNets = normalizeStringList(request.Constraints.LocalRouteObstacleNets, strings.TrimSpace)
 	request.Components = normalizeComponentPolicy(request.Components)
 	request.Blocks = append([]BlockInstanceSpec(nil), request.Blocks...)
 	for i := range request.Blocks {

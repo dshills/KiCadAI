@@ -3,6 +3,7 @@ package blocks
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -205,6 +206,9 @@ func TestRealizeBlockPCBI2CPullupVCCRoutesResolvePullupRefs(t *testing.T) {
 }
 
 func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
+	if got := i2cSensorPCBRealization().InterBlockObstaclePorts; !slices.Equal(got, []string{"GND", "SCL", "SDA", "VCC"}) {
+		t.Fatalf("I2C inter-block obstacle ports = %#v", got)
+	}
 	registry := NewBuiltinRegistry()
 	definition, ok := registry.GetBlock("i2c_sensor")
 	if !ok {
