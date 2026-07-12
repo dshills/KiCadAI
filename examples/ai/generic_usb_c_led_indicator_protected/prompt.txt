@@ -1,0 +1,1 @@
+Create a protected USB-C powered LED indicator with CC pull-downs, a fuse, TVS protection, and bulk capacitance.

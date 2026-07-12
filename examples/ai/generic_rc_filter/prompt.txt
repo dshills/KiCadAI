@@ -1,0 +1,1 @@
+Create an RC low-pass filter with input and output connectors, a 10k series resistor, and a 100nF capacitor to ground.

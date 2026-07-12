@@ -40,12 +40,16 @@
     "hierarchy": {"mode": "flat"}
   },
   "pcb": {
-    "regions": [{"id": "main", "role": "signal", "bounds": {"x_mm": 2, "y_mm": 2, "width_mm": 36, "height_mm": 21}}],
+    "regions": [
+      {"id": "input", "role": "input", "bounds": {"x_mm": 0, "y_mm": 0, "width_mm": 8, "height_mm": 25}},
+      {"id": "filter", "role": "signal", "bounds": {"x_mm": 8, "y_mm": 0, "width_mm": 24, "height_mm": 25}},
+      {"id": "output", "role": "output", "bounds": {"x_mm": 32, "y_mm": 0, "width_mm": 8, "height_mm": 25}}
+    ],
     "placements": [
-      {"component": "input", "region": "main", "edge": "left", "priority": 100},
-      {"component": "r1", "region": "main", "near": "input", "priority": 80, "max_distance_mm": 15},
-      {"component": "c1", "region": "main", "near": "r1", "priority": 80, "max_distance_mm": 8},
-      {"component": "output", "region": "main", "edge": "right", "priority": 100}
+      {"component": "input", "region": "input", "priority": 100},
+      {"component": "r1", "region": "filter", "near": "input", "priority": 80, "max_distance_mm": 15},
+      {"component": "c1", "region": "filter", "near": "r1", "priority": 80, "max_distance_mm": 8},
+      {"component": "output", "region": "output", "priority": 100}
     ],
     "keepouts": [],
     "zones": []

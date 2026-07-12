@@ -49,16 +49,18 @@
   },
   "pcb": {
     "regions": [
-      {"id": "input", "role": "power_input", "bounds": {"x_mm": 1, "y_mm": 3, "width_mm": 16, "height_mm": 24}},
+      {"id": "input", "role": "power_input", "bounds": {"x_mm": 0, "y_mm": 0, "width_mm": 17, "height_mm": 30}},
       {"id": "power", "role": "protection", "bounds": {"x_mm": 17, "y_mm": 3, "width_mm": 18, "height_mm": 24}},
-      {"id": "indicator", "role": "output", "bounds": {"x_mm": 35, "y_mm": 3, "width_mm": 14, "height_mm": 24}}
+      {"id": "indicator", "role": "output", "bounds": {"x_mm": 35, "y_mm": 0, "width_mm": 15, "height_mm": 30}}
     ],
     "placements": [
-      {"component": "usb", "region": "input", "edge": "left", "priority": 100},
+      {"component": "usb", "region": "input", "priority": 100},
+      {"component": "cc1_rd", "region": "input", "near": "usb", "priority": 95, "max_distance_mm": 10},
+      {"component": "cc2_rd", "region": "input", "near": "usb", "priority": 95, "max_distance_mm": 10},
       {"component": "fuse", "region": "power", "near": "usb", "priority": 100, "max_distance_mm": 12},
       {"component": "tvs", "region": "power", "near": "usb", "priority": 90, "max_distance_mm": 12},
       {"component": "bulk", "region": "power", "near": "tvs", "priority": 90, "max_distance_mm": 8},
-      {"component": "indicator", "region": "indicator", "edge": "right", "priority": 80}
+      {"component": "indicator", "region": "indicator", "priority": 80}
     ],
     "keepouts": [],
     "zones": [{"net": "GND", "layers": ["B.Cu"], "clearance_mm": 0.25}]
