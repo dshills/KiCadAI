@@ -1,16 +1,16 @@
 {
-  "record_count": 50,
-  "family_count": 13,
+  "record_count": 51,
+  "family_count": 14,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
-    "rule_inferred": 4,
+    "rule_inferred": 5,
     "verified": 41
   },
   "alternative_coverage": {
     "concrete_records": 29,
-    "generic_fallback_records": 21,
+    "generic_fallback_records": 22,
     "equivalence_groups": 19
   },
   "families": [
@@ -149,6 +149,25 @@
         "diode.schottky.generic",
         "diode.signal.generic",
         "diode.tvs_unidirectional.generic"
+      ]
+    },
+    {
+      "family": "fuse",
+      "defined": true,
+      "record_count": 1,
+      "concrete_records": 0,
+      "generic_fallback_records": 1,
+      "equivalence_groups": 0,
+      "verified_records": 0,
+      "library_derived_records": 0,
+      "rule_inferred_records": 1,
+      "placeholder_records": 0,
+      "blocked_records": 0,
+      "missing_resolver_evidence": [
+        "fuse.generic.1206"
+      ],
+      "record_ids": [
+        "fuse.generic.1206"
       ]
     },
     {

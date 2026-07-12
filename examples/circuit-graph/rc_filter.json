@@ -10,8 +10,8 @@
   },
   "components": [
     {"id": "input", "reference": "J1", "role": "input_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "population": "populate"},
-    {"id": "r1", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "10k", "minimum_confidence": "library_derived"}, "value": "10k", "population": "populate"},
-    {"id": "c1", "reference": "C1", "role": "capacitor", "query": {"family": "capacitor", "package": "0805", "value_kind": "capacitance", "value": "100nF", "minimum_confidence": "library_derived"}, "value": "100nF", "population": "populate"},
+    {"id": "r1", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "10k", "minimum_confidence": "rule_inferred"}, "value": "10k", "population": "populate"},
+    {"id": "c1", "reference": "C1", "role": "capacitor", "query": {"family": "capacitor", "package": "0805", "value_kind": "capacitance", "value": "100nF", "minimum_confidence": "rule_inferred"}, "value": "100nF", "population": "populate"},
     {"id": "output", "reference": "J2", "role": "output_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "population": "populate"}
   ],
   "nets": [

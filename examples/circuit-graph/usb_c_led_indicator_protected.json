@@ -10,12 +10,12 @@
   },
   "components": [
     {"id": "usb", "reference": "J1", "role": "input_connector", "component_id": "usb_c.gct.usb4125_power_only_6p", "variant_id": "gct_usb4125_6p", "required_functions": ["vbus", "gnd", "cc1", "cc2"], "population": "populate"},
-    {"id": "cc1_rd", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "library_derived"}, "value": "5.1k", "population": "populate"},
-    {"id": "cc2_rd", "reference": "R2", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "library_derived"}, "value": "5.1k", "population": "populate"},
+    {"id": "cc1_rd", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "rule_inferred"}, "value": "5.1k", "population": "populate"},
+    {"id": "cc2_rd", "reference": "R2", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "rule_inferred"}, "value": "5.1k", "population": "populate"},
     {"id": "fuse", "reference": "F1", "role": "fuse", "component_id": "fuse.generic.1206", "variant_id": "1206", "value": "500mA", "population": "populate"},
     {"id": "tvs", "reference": "D1", "role": "tvs", "component_id": "protection.tvs.usb_5v_unidirectional", "variant_id": "sod_323", "population": "populate"},
-    {"id": "bulk", "reference": "C1", "role": "bulk_capacitor", "query": {"family": "capacitor", "package": "0805", "value_kind": "capacitance", "value": "10uF", "min_voltage_v": 10, "minimum_confidence": "library_derived"}, "value": "10uF", "population": "populate"},
-    {"id": "led_resistor", "reference": "R3", "role": "current_limiter", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "600", "minimum_confidence": "library_derived"}, "value": "600", "population": "populate"},
+    {"id": "bulk", "reference": "C1", "role": "bulk_capacitor", "query": {"family": "capacitor", "package": "0805", "value_kind": "capacitance", "value": "10uF", "min_voltage_v": 10, "minimum_confidence": "rule_inferred"}, "value": "10uF", "population": "populate"},
+    {"id": "led_resistor", "reference": "R3", "role": "current_limiter", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "600", "minimum_confidence": "rule_inferred"}, "value": "600", "population": "populate"},
     {"id": "indicator", "reference": "D2", "role": "indicator_led", "component_id": "led.generic.0805", "variant_id": "0805", "required_ratings": [{"kind": "forward_current", "value": "5", "unit": "mA"}], "population": "populate"}
   ],
   "nets": [

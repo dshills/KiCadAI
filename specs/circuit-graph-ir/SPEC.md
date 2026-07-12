@@ -251,10 +251,13 @@ physical-package identity.
 Namespaces never fall through: `function` matches only canonical logical
 functions, `alias` matches only aliases, and `symbol_pin` matches only a
 canonical symbol pin. A selector matching more than one entry in its declared
-namespace is ambiguous and blocks resolution. Resolution must map it to one
-symbol pin and one footprint pad using catalog symbol function metadata,
-package pad functions, pinmap evidence, and resolver data. Provider pin numbers
-are selectors to verify, not trusted mappings.
+namespace is ambiguous and blocks resolution. Resolution maps it to one
+canonical logical function and one or more verified physical bindings. Most
+functions produce one symbol-pin/footprint-pad binding; intentionally duplicated
+power or ground functions may produce several. An exact `symbol_pin` selector
+produces one binding. Catalog symbol function metadata, package pad functions,
+pinmap evidence, and resolver data must prove every binding. Provider pin
+numbers are selectors to verify, not trusted mappings.
 
 An endpoint may appear on exactly one ordinary net. A no-connect endpoint may
 not appear on an ordinary net and must be listed once in the top-level
@@ -377,8 +380,16 @@ Resolution produces a separate immutable result. For every component it records:
 - provider constraints and whether each matched.
 
 For every endpoint it records the original selector, canonical logical
-function, symbol pin, footprint pad, and evidence source. Writers consume only
-this resolved representation, never the unresolved provider document.
+function, verified symbol-pin/footprint-pad bindings, and evidence sources.
+Physical pin ownership is checked after resolution so alternate selectors
+cannot assign one pin to multiple nets or both a net and a no-connect. Writers
+consume only this resolved representation, never the unresolved provider
+document.
+
+V1 permits a physical pad to appear in multiple symbol units only when every
+unit uses the same physical symbol-pin identifier. It fails closed when
+distinct symbol pins collapse onto one footprint pad. N-to-1 pin/pad mappings
+require explicit catalog semantics and are unsupported in v1.
 
 Resolution is deterministic for a fixed graph, catalog, source snapshot,
 library index, and KiCadAI version. These identities and hashes are persisted.

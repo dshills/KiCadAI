@@ -10,7 +10,7 @@
   },
   "components": [
     {"id": "control", "reference": "J1", "role": "input_connector", "component_id": "connector.pinheader.1x03.2_54mm", "variant_id": "vertical", "population": "populate"},
-    {"id": "base_resistor", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "library_derived"}, "value": "4.7k", "population": "populate"},
+    {"id": "base_resistor", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "rule_inferred"}, "value": "4.7k", "population": "populate"},
     {"id": "switch", "reference": "Q1", "role": "bjt", "component_id": "bjt.onsemi.mmbt3904.sot23", "variant_id": "sot23", "required_functions": ["base", "collector", "emitter"], "population": "populate"},
     {"id": "load", "reference": "J2", "role": "output_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "population": "populate"}
   ],

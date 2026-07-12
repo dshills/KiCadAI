@@ -145,6 +145,23 @@ type ResolvedComponent struct {
 	Symbol    SymbolBinding   `json:"symbol"`
 }
 
+// ValidateResolvedComponent applies the same requirement and acceptance gates
+// used during catalog selection to an explicitly resolved component binding.
+func ValidateResolvedComponent(resolved ResolvedComponent, request SelectionRequest) reports.Result {
+	confidence := weakerConfidence(resolved.Component.Verification.Confidence, resolved.Variant.Verification.Confidence)
+	candidate := Candidate{
+		ComponentID: resolved.Component.ID,
+		VariantID:   resolved.Variant.ID,
+		Family:      resolved.Component.Family,
+		Name:        resolved.Component.Name,
+		FootprintID: resolved.Variant.FootprintID,
+		Confidence:  confidence,
+		Generic:     resolved.Component.Generic,
+	}
+	issues := selectionCandidateIssues(resolved.Component, candidate, request)
+	return reports.ResultWithIssues("component resolve validate", resolved, issues, nil)
+}
+
 func Find(ctx context.Context, catalog *Catalog, query Query) ([]Candidate, reports.Result) {
 	if err := ctx.Err(); err != nil {
 		issue := reports.Issue{Code: reports.CodeOperationCanceled, Severity: reports.SeverityBlocked, Message: err.Error()}
@@ -913,7 +930,7 @@ func passiveRuleInferred(record ComponentRecord) bool {
 		return false
 	}
 	switch record.Family {
-	case "resistor":
+	case "resistor", "fuse":
 		return true
 	case "capacitor":
 		for _, tag := range record.Tags {
@@ -930,11 +947,11 @@ func passiveRuleInferred(record ComponentRecord) bool {
 func recordHasFunction(record ComponentRecord, function string) bool {
 	for _, symbol := range record.Symbols {
 		for _, pin := range symbol.FunctionPins {
-			if pin.Function == function {
+			if strings.EqualFold(pin.Function, function) {
 				return true
 			}
 			for _, alias := range pin.Aliases {
-				if alias == function {
+				if strings.EqualFold(alias, function) {
 					return true
 				}
 			}

@@ -136,6 +136,36 @@
       "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Nonpolar passive; voltage derating remains design-specific."]}
     },
     {
+      "id": "fuse.generic.1206",
+      "family": "fuse",
+      "name": "Generic 1206 fuse",
+      "description": "Generic two-terminal 1206 fuse for connectivity-level overcurrent protection design.",
+      "generic": true,
+      "tags": ["protection", "fuse", "smd", "1206"],
+      "ratings": [{"kind": "current", "typ": "500", "unit": "mA"}],
+      "symbols": [{
+        "symbol_id": "Device:Fuse",
+        "function_pins": [
+          {"function": "A", "symbol_pin": "1", "required": true},
+          {"function": "B", "symbol_pin": "2", "required": true}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["builtin_pinmap:Device:Fuse"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "1206",
+        "name": "1206 SMD",
+        "footprint_id": "Fuse:Fuse_1206_3216Metric",
+        "package_type": "1206",
+        "pinmap_id": "Device:Fuse|Fuse:Fuse_1206_3216Metric",
+        "pad_functions": [
+          {"function": "A", "pad": "1"},
+          {"function": "B", "pad": "2"}
+        ],
+        "verification": {"confidence": "rule_inferred", "sources": ["symmetric_two_terminal_rule", "builtin_pinmap:Device:Fuse"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "rule_inferred", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Fuse"], "pinmap_checked": true, "notes": ["Symmetric two-terminal pin mapping is deterministic. Exact fuse technology, trip curve, voltage rating, and part number remain design-specific."]}
+    },
+    {
       "id": "capacitor.electrolytic.radial",
       "family": "capacitor",
       "name": "Generic radial electrolytic capacitor",
