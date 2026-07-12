@@ -543,6 +543,8 @@ func verifiedTransferPadSpecs(footprintID string, hints map[string]string) ([]tr
 		return soic8NarrowTransferTemplate.pads(hints), true
 	case "Package_TO_SOT_SMD:SOT-23-5":
 		return sot23_5TransferPads(hints), true
+	case "Package_TO_SOT_SMD:SOT-223-3_TabPin2":
+		return sot223_3TransferPads(hints), true
 	case "Package_LGA:Bosch_LGA-8_2x2.5mm_P0.65mm_ClockwisePinNumbering":
 		return boschLGA8TransferPads(hints), true
 	case "Connector_PinHeader_2.54mm:PinHeader_1x01_P2.54mm_Vertical":
@@ -567,6 +569,15 @@ func sot23_5TransferPads(hints map[string]string) []transactions.PadSpec {
 		transferPadSpec("3", -1.1375, 0.95, 1.325, 0.6, hints),
 		transferPadSpec("4", 1.1375, 0.95, 1.325, 0.6, hints),
 		transferPadSpec("5", 1.1375, -0.95, 1.325, 0.6, hints),
+	}
+}
+
+func sot223_3TransferPads(hints map[string]string) []transactions.PadSpec {
+	return []transactions.PadSpec{
+		transferPadSpec("1", -2.3, 2.4, 1.2, 1.5, hints),
+		transferPadSpec("2", 0, 2.4, 1.2, 1.5, hints),
+		transferPadSpec("3", 2.3, 2.4, 1.2, 1.5, hints),
+		transferPadSpec("2", 0, -2.1, 3.8, 2.4, hints),
 	}
 }
 
