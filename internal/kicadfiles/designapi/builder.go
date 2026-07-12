@@ -88,6 +88,7 @@ type SymbolOptions struct {
 	// to a transaction-derived pin list. Direct callers keep supplied offsets.
 	UsePhysicalConnectionAnchors bool
 	Properties                   []schematic.Property
+	PreferResolverSymbol         bool
 }
 
 type PinSpec struct {
@@ -344,7 +345,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		return SymbolHandle{}, fmt.Errorf("library id required")
 	}
 	libraryID = schematic.CanonicalEmbeddedSymbolLibraryID(libraryID)
-	if err := builder.ensureSchematicLibrarySymbol(libraryID); err != nil {
+	if err := builder.ensureSchematicLibrarySymbol(libraryID, options.PreferResolverSymbol); err != nil {
 		return SymbolHandle{}, err
 	}
 	rotation, mirror := schematic.CanonicalSymbolTransform(options.Rotation, options.Mirror)
@@ -433,11 +434,20 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	return SymbolHandle{Reference: reference}, nil
 }
 
-func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string) error {
-	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) || builder.libraryIndex == nil {
+func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string, preferResolver bool) error {
+	if schematic.EmbeddedSymbolPresent(builder.design.Schematic, libraryID) {
 		return nil
 	}
-	if schematic.EmbeddedSymbolPresent(builder.design.Schematic, libraryID) {
+	if preferResolver && builder.libraryIndex != nil {
+		if record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID); ok && strings.TrimSpace(record.Raw) != "" {
+			if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, record.Raw) {
+				return fmt.Errorf("symbol library record has malformed KiCad body: %s", libraryID)
+			}
+			builder.resolverSymbolIDs[libraryID] = struct{}{}
+			return nil
+		}
+	}
+	if schematic.EnsureEmbeddedSymbol(builder.design.Schematic, libraryID) || builder.libraryIndex == nil {
 		return nil
 	}
 	record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID)
@@ -445,9 +455,8 @@ func (builder *Builder) ensureSchematicLibrarySymbol(libraryID string) error {
 		return fmt.Errorf("symbol library record not found: %s", libraryID)
 	}
 	if !schematic.EnsureEmbeddedSymbolFromRaw(builder.design.Schematic, libraryID, record.Raw) {
-		// A resolver record may be pin-only in tests or derived from a project
-		// table whose body is intentionally external. Keep the qualified
-		// reference and let KiCad resolve it through the project library table.
+		// Pin-only resolver records intentionally rely on the qualified library
+		// reference when no bundled template exists.
 		if strings.TrimSpace(record.Raw) == "" {
 			return nil
 		}
@@ -1808,6 +1817,9 @@ func ensureGeneratedLocalSymbolLibraries(design *kicaddesign.Design, index *libr
 	libraryIDsByNickname := map[string][]string{}
 	var nicknameOrder []string
 	for _, libraryID := range generatedLocalSymbolLibraryIDs(design.Schematic) {
+		if _, resolverOwned := resolverSymbolIDs[libraryID]; resolverOwned {
+			continue
+		}
 		nickname := libraryNickname(libraryID)
 		if nickname == "" {
 			continue

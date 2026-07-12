@@ -2,6 +2,7 @@ package designworkflow
 
 import (
 	"context"
+	"encoding/json"
 	"path/filepath"
 
 	"kicadai/internal/inspect"
@@ -127,6 +128,23 @@ func explicitSchematicTransaction(request Request, index *libraryresolver.Librar
 	}
 	if reports.HasBlockingIssue(issues) {
 		return tx, issues
+	}
+	for index, operation := range tx.Operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "explicit_circuit.schematic", Message: err.Error()})
+			continue
+		}
+		payload.PreferResolverSymbol = true
+		raw, err := json.Marshal(payload)
+		if err != nil {
+			issues = append(issues, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "explicit_circuit.schematic", Message: err.Error()})
+			continue
+		}
+		tx.Operations[index].Raw = raw
 	}
 	return tx, issues
 }

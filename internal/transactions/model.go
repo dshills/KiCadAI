@@ -177,17 +177,18 @@ type SetBoardOutlineOperation struct {
 }
 
 type AddSymbolOperation struct {
-	Op         OperationKind    `json:"op"`
-	Ref        string           `json:"ref"`
-	Unit       int              `json:"unit,omitempty"`
-	Role       string           `json:"role,omitempty"`
-	Value      string           `json:"value,omitempty"`
-	LibraryID  string           `json:"library_id"`
-	At         Point            `json:"at"`
-	Rotation   float64          `json:"rotation_deg,omitempty"`
-	Mirror     string           `json:"mirror,omitempty"`
-	Pins       []PinSpec        `json:"pins,omitempty"`
-	Properties []SymbolProperty `json:"properties,omitempty"`
+	Op                   OperationKind    `json:"op"`
+	Ref                  string           `json:"ref"`
+	Unit                 int              `json:"unit,omitempty"`
+	Role                 string           `json:"role,omitempty"`
+	Value                string           `json:"value,omitempty"`
+	LibraryID            string           `json:"library_id"`
+	At                   Point            `json:"at"`
+	Rotation             float64          `json:"rotation_deg,omitempty"`
+	Mirror               string           `json:"mirror,omitempty"`
+	Pins                 []PinSpec        `json:"pins,omitempty"`
+	Properties           []SymbolProperty `json:"properties,omitempty"`
+	PreferResolverSymbol bool             `json:"prefer_resolver_symbol,omitempty"`
 }
 
 type SymbolProperty struct {

@@ -363,8 +363,9 @@
       circle
       (at 0 -1.27)
       (size 1.7 1.7)
-      (layers "*.Cu" "*.Mask")
       (drill 1)
+      (layers "*.Cu" "*.Mask")
+      (remove_unused_layers no)
       (pinfunction "VCC")
       (pintype "power_in")
       (net 2 "VCC")
@@ -376,8 +377,9 @@
       circle
       (at 0 1.27)
       (size 1.7 1.7)
-      (layers "*.Cu" "*.Mask")
       (drill 1)
+      (layers "*.Cu" "*.Mask")
+      (remove_unused_layers no)
       (pinfunction "GND")
       (pintype "power_in")
       (net 1 "GND")

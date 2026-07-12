@@ -19,6 +19,27 @@ func TestValidateRequestAcceptsExplicitCircuitMode(t *testing.T) {
 	}
 }
 
+func TestExplicitSchematicTransactionPrefersResolverSymbols(t *testing.T) {
+	tx, issues := explicitSchematicTransaction(validExplicitCircuitRequest(), nil)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("issues = %#v", issues)
+	}
+	for _, operation := range tx.Operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatal(err)
+		}
+		if !payload.PreferResolverSymbol {
+			t.Fatalf("add-symbol operation does not prefer resolver: %#v", payload)
+		}
+		return
+	}
+	t.Fatal("missing add-symbol operation")
+}
+
 func TestExplicitRequiredRoutesFailClosed(t *testing.T) {
 	nets := []ExplicitNetSpec{{Name: "REQ", Required: true}, {Name: "OPTIONAL"}}
 	issues := explicitRequiredRouteIssues(nets, routing.Result{Routes: []routing.Route{{Net: "OPTIONAL", Status: routing.RouteStatusFailed}}})

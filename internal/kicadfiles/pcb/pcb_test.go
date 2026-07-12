@@ -2056,6 +2056,33 @@ func TestWriteRendersCanonicalFootprintTextDefaults(t *testing.T) {
 	}
 }
 
+func TestWriteCanonicalizesPlacedFootprintAngleAndDrilledPadDefaults(t *testing.T) {
+	board := minimalPCB()
+	board.Nets = []Net{{Code: 1, Name: "TEST"}}
+	footprint := minimalFootprint("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", "J1")
+	footprint.Rotation = 270
+	footprint.Pads[0].Type = "thru_hole"
+	footprint.Pads[0].Drill = kicadfiles.MM(0.8)
+	footprint.Pads[0].Layers = []kicadfiles.BoardLayer{kicadfiles.LayerAllCu, kicadfiles.LayerAllMask}
+	board.Footprints = []Footprint{footprint}
+
+	var output bytes.Buffer
+	if err := Write(&output, board); err != nil {
+		t.Fatalf("Write() error = %v", err)
+	}
+
+	rendered := output.String()
+	if !strings.Contains(rendered, "(at 1 1 -90)") {
+		t.Fatalf("placed footprint angle was not canonicalized:\n%s", rendered)
+	}
+	drill := strings.Index(rendered, "(drill 0.8)")
+	layers := strings.Index(rendered, "(layers \"*.Cu\" \"*.Mask\")")
+	removeUnused := strings.Index(rendered, "(remove_unused_layers no)")
+	if drill < 0 || layers < 0 || removeUnused < 0 || !(drill < layers && layers < removeUnused) {
+		t.Fatalf("drilled pad nodes are not canonical:\n%s", rendered)
+	}
+}
+
 func repoPathForPCBTest(t *testing.T, parts ...string) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

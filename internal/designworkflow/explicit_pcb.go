@@ -42,7 +42,8 @@ func PlaceExplicitCircuit(ctx context.Context, request Request, opts PlacementOp
 		placementRequest.Components = append(placementRequest.Components, placement.Component{
 			Ref: component.Reference, Value: component.Value, FootprintID: component.FootprintID,
 			Role: component.Role, Edge: explicitPlacementEdge(component.Placement.Edge), Priority: component.Placement.Priority,
-			Side: placement.SideTop, Mobility: placement.MobilityPolicy{
+			Rotation: placement.RotationConstraint{AllowedDeg: []float64{0}},
+			Side:     placement.SideTop, Mobility: placement.MobilityPolicy{
 				Class: placement.MobilitySoftPreferred, Reason: "catalog-resolved graph placement",
 				OwnerScope: "explicit-circuit", RouteHandling: placement.RouteHandlingInvalidateRebuild,
 				Transforms: []string{"translate"}, Constraints: []string{"catalog_resolved"},

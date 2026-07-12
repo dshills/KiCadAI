@@ -859,6 +859,26 @@ func TestBuilderAddSymbolKeepsCanonicalTemplateOverResolverBody(t *testing.T) {
 	}
 }
 
+func TestBuilderAddSymbolCanPreferResolverBody(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Device:R": {LibraryID: "Device:R", Raw: `(symbol "R" (property "Description" "resolver marker"))`},
+	}}
+	builder, err := New(Options{Name: "resolver_symbol", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"), LibraryIndex: &index})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "R1", LibraryID: "Device:R", Value: "1k", PreferResolverSymbol: true,
+		Position: kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	design := builder.Design()
+	if len(design.Schematic.LibSymbols) != 1 || !strings.Contains(fmt.Sprint(design.Schematic.LibSymbols[0].Body), "resolver marker") {
+		t.Fatalf("resolver body was not selected: %#v", design.Schematic.LibSymbols)
+	}
+}
+
 func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{

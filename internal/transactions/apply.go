@@ -613,6 +613,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			Mirror:                       schematic.SymbolMirror(payload.Mirror),
 			Pins:                         pins,
 			UsePhysicalConnectionAnchors: transactionPinsNeedPhysicalConnectionAnchors(payload.Pins),
+			PreferResolverSymbol:         payload.PreferResolverSymbol,
 			Properties:                   schematicPropertiesFromPayload(payload.Properties, point(payload.At.XMM, payload.At.YMM), kicadfiles.Angle(payload.Rotation), 2),
 		})
 		return nil, err

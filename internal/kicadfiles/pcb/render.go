@@ -310,7 +310,7 @@ func renderFootprint(footprint Footprint, netNames map[int]string) sexpr.List {
 	nodes = append(nodes,
 		sexpr.L(sexpr.A("layer"), sexpr.S(string(footprint.Layer))),
 		sexpr.L(sexpr.A("uuid"), sexpr.S(string(footprint.UUID))),
-		renderAt(footprint.Position, footprint.Rotation),
+		renderAt(footprint.Position, canonicalPlacedFootprintAngle(footprint.Rotation)),
 	)
 	if strings.TrimSpace(footprint.Description) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("descr"), sexpr.S(footprint.Description)))
@@ -382,6 +382,14 @@ func normalizedFootprintAngle(angle kicadfiles.Angle) kicadfiles.Angle {
 		normalized += 360
 	}
 	return kicadfiles.Angle(normalized)
+}
+
+func canonicalPlacedFootprintAngle(angle kicadfiles.Angle) kicadfiles.Angle {
+	normalized := normalizedFootprintAngle(angle)
+	if normalized > 180 {
+		normalized -= 360
+	}
+	return normalized
 }
 
 func renderFootprintLibraryProperty(property FootprintProperty, footprintName string) sexpr.List {
@@ -537,13 +545,15 @@ func renderPad(pad Pad, netName string) sexpr.List {
 		sexpr.A(pad.Shape),
 		renderAt(pad.Position, pad.Rotation),
 		sexpr.L(sexpr.A("size"), fixed(pad.Size.X), fixed(pad.Size.Y)),
-		renderLayerList("layers", pad.Layers),
 	}
 	if pad.Drill > 0 {
 		nodes = append(nodes, renderPadDrill(pad))
 	}
+	nodes = append(nodes, renderLayerList("layers", pad.Layers))
 	if pad.RemoveUnusedLayers != nil {
 		nodes = append(nodes, sexpr.L(sexpr.A("remove_unused_layers"), yesNo(*pad.RemoveUnusedLayers)))
+	} else if pad.Drill > 0 {
+		nodes = append(nodes, sexpr.L(sexpr.A("remove_unused_layers"), sexpr.A("no")))
 	}
 	if strings.TrimSpace(pad.PinFunction) != "" {
 		nodes = append(nodes, sexpr.L(sexpr.A("pinfunction"), sexpr.S(pad.PinFunction)))
