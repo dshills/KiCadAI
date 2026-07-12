@@ -40,6 +40,9 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 		opts.BlockRegistry = blocks.NewBuiltinRegistry()
 	}
 	normalized := NormalizeRequest(request)
+	if normalized.ExplicitCircuit != nil {
+		return createExplicitCircuit(ctx, normalized, opts)
+	}
 	plan := PlanBlocks(ctx, opts.BlockRegistry, normalized)
 	stages := []StageResult{plan.Stage}
 	if workflowStageBlocked(plan.Stage) {

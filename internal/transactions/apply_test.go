@@ -456,11 +456,13 @@ func TestUpsertImportedFootprintUsesResolverRecord(t *testing.T) {
 		t.Fatal(err)
 	}
 	board := &pcb.PCBFile{}
-	upsertImportedFootprintWithLibrary(board, generator, PlaceFootprintOperation{
+	if err := upsertImportedFootprintWithLibrary(board, generator, PlaceFootprintOperation{
 		Ref:         "J1",
 		FootprintID: "Connector_Test:TH_1x02",
 		At:          Point{XMM: 5, YMM: 5},
-	}, &index)
+	}, &index); err != nil {
+		t.Fatal(err)
+	}
 	if len(board.Footprints) != 1 || len(board.Footprints[0].Pads) != 2 {
 		t.Fatalf("unexpected footprint: %#v", board.Footprints)
 	}
@@ -475,6 +477,39 @@ func TestUpsertImportedFootprintUsesResolverRecord(t *testing.T) {
 	}
 	if graphic := pcb.Drawing(board.Footprints[0].Graphics[1]); graphic.Curve == nil || graphic.Layer != kicadfiles.LayerFFab {
 		t.Fatalf("resolver curve not mapped: %#v", graphic)
+	}
+}
+
+func TestUpsertImportedFootprintAppliesNetOnlyPadsToResolverGeometry(t *testing.T) {
+	index := applyResolverFixture()
+	board := &pcb.PCBFile{}
+	netA, netB := "VCC", "GND"
+	if err := upsertImportedFootprintWithLibrary(board, mustGenerator(t), PlaceFootprintOperation{
+		Ref: "J1", FootprintID: "Connector_Test:TH_1x02", At: Point{XMM: 5, YMM: 5},
+		Pads: []PadSpec{{Name: "1", Net: &netA}, {Name: "2", Net: &netB}},
+	}, &index); err != nil {
+		t.Fatal(err)
+	}
+	if len(board.Footprints) != 1 || len(board.Footprints[0].Pads) != 2 {
+		t.Fatalf("unexpected footprint: %#v", board.Footprints)
+	}
+	if board.Footprints[0].Pads[0].Drill == 0 || board.Footprints[0].Pads[1].Position == (kicadfiles.Point{}) {
+		t.Fatalf("resolver geometry was not preserved: %#v", board.Footprints[0].Pads)
+	}
+	if board.Footprints[0].Pads[0].NetName != netA || board.Footprints[0].Pads[1].NetName != netB {
+		t.Fatalf("explicit nets were not applied: %#v", board.Footprints[0].Pads)
+	}
+}
+
+func TestUpsertImportedFootprintRejectsUnknownNetOnlyPad(t *testing.T) {
+	index := applyResolverFixture()
+	board := &pcb.PCBFile{}
+	net := "VCC"
+	err := upsertImportedFootprintWithLibrary(board, mustGenerator(t), PlaceFootprintOperation{
+		Ref: "J1", FootprintID: "Connector_Test:TH_1x02", Pads: []PadSpec{{Name: "99", Net: &net}},
+	}, &index)
+	if err == nil || !strings.Contains(err.Error(), "no pad 99") {
+		t.Fatalf("expected missing-pad error, got %v", err)
 	}
 }
 

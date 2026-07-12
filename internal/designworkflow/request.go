@@ -42,11 +42,46 @@ type Request struct {
 	Libraries           LibrarySpec            `json:"libraries,omitempty"`
 	Components          ComponentPolicySpec    `json:"component_policy,omitempty"`
 	Blocks              []BlockInstanceSpec    `json:"blocks"`
+	ExplicitCircuit     *ExplicitCircuitSpec   `json:"explicit_circuit,omitempty"`
 	Connections         []ConnectionSpec       `json:"connections,omitempty"`
 	ExternalEndpoints   []ExternalEndpointSpec `json:"external_endpoints,omitempty"`
 	Constraints         ConstraintSpec         `json:"constraints,omitempty"`
 	Validation          ValidationSpec         `json:"validation,omitempty"`
 	RoutingRetry        RoutingRetryPolicySpec `json:"routing_retry,omitempty"`
+}
+
+type ExplicitCircuitSpec struct {
+	ResolutionHash string                  `json:"resolution_hash"`
+	CatalogID      string                  `json:"catalog_id"`
+	CatalogHash    string                  `json:"catalog_hash"`
+	Schematic      schematicir.Document    `json:"schematic"`
+	Components     []ExplicitComponentSpec `json:"components"`
+	Nets           []ExplicitNetSpec       `json:"nets"`
+}
+
+type ExplicitComponentSpec struct {
+	ID          string            `json:"id"`
+	Reference   string            `json:"reference"`
+	Role        string            `json:"role,omitempty"`
+	Value       string            `json:"value,omitempty"`
+	FootprintID string            `json:"footprint_id"`
+	Pads        []ExplicitPadSpec `json:"pads"`
+}
+
+type ExplicitPadSpec struct {
+	Name      string `json:"name"`
+	SymbolPin string `json:"symbol_pin"`
+	Net       string `json:"net,omitempty"`
+}
+
+type ExplicitNetSpec struct {
+	Name      string                `json:"name"`
+	Endpoints []ExplicitNetEndpoint `json:"endpoints"`
+}
+
+type ExplicitNetEndpoint struct {
+	Component string `json:"component"`
+	Pad       string `json:"pad"`
 }
 
 type Intent struct {
@@ -193,6 +228,7 @@ func NormalizeRequest(request Request) Request {
 		request.Blocks[i].BlockID = strings.TrimSpace(request.Blocks[i].BlockID)
 		request.Blocks[i].Params = cloneParams(request.Blocks[i].Params)
 	}
+	request.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
 	request.Connections = append([]ConnectionSpec(nil), request.Connections...)
 	for i := range request.Connections {
 		request.Connections[i].From = strings.TrimSpace(request.Connections[i].From)
@@ -401,8 +437,10 @@ func ValidateRequest(request Request) []reports.Issue {
 			issues = append(issues, componentIssue)
 		}
 	}
-	if len(request.Blocks) == 0 {
-		issues = append(issues, issue("blocks", "at least one block is required"))
+	blockMode := len(request.Blocks) != 0
+	explicitMode := request.ExplicitCircuit != nil
+	if blockMode == explicitMode {
+		issues = append(issues, issue("design_mode", "exactly one of blocks or explicit_circuit is required"))
 	}
 	seenBlocks := map[string]struct{}{}
 	for index, block := range request.Blocks {
@@ -425,6 +463,12 @@ func ValidateRequest(request Request) []reports.Issue {
 		issues = append(issues, issue("auto_schematic_layout", "automatic schematic layout cannot be combined with explicit schematic_layout intent"))
 	}
 	issues = append(issues, validateSchematicLayoutRequest(request.SchematicLayout, seenBlocks)...)
+	if explicitMode {
+		if len(request.Connections) != 0 || len(request.ExternalEndpoints) != 0 || request.SchematicLayout != nil || request.AutoSchematicLayout {
+			issues = append(issues, issue("explicit_circuit", "explicit circuit mode cannot include block connections, external endpoints, or top-level schematic layout"))
+		}
+		issues = append(issues, validateExplicitCircuit(*request.ExplicitCircuit)...)
+	}
 	for index, connection := range request.Connections {
 		path := fmt.Sprintf("connections[%d]", index)
 		from, ok := ParseEndpoint(connection.From)
@@ -448,6 +492,178 @@ func ValidateRequest(request Request) []reports.Issue {
 		issues = append(issues, issue("constraints.clearance_mm", "clearance must be non-negative"))
 	}
 	return issues
+}
+
+func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
+	if source == nil {
+		return nil
+	}
+	clone := *source
+	clone.Schematic = schematicir.Normalize(source.Schematic)
+	clone.Components = append([]ExplicitComponentSpec(nil), source.Components...)
+	for index := range clone.Components {
+		clone.Components[index].Pads = append([]ExplicitPadSpec(nil), source.Components[index].Pads...)
+	}
+	clone.Nets = append([]ExplicitNetSpec(nil), source.Nets...)
+	for index := range clone.Nets {
+		clone.Nets[index].Endpoints = append([]ExplicitNetEndpoint(nil), source.Nets[index].Endpoints...)
+	}
+	return &clone
+}
+
+func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
+	var issues []reports.Issue
+	if !validSHA256(circuit.ResolutionHash) {
+		issues = append(issues, issue("explicit_circuit.resolution_hash", "resolution hash must be a lowercase SHA-256 digest"))
+	}
+	if strings.TrimSpace(circuit.CatalogID) == "" || !validSHA256(circuit.CatalogHash) {
+		issues = append(issues, issue("explicit_circuit.catalog", "catalog id and lowercase SHA-256 hash are required"))
+	}
+	issues = append(issues, schematicir.Validate(circuit.Schematic)...)
+	if len(circuit.Components) == 0 {
+		issues = append(issues, issue("explicit_circuit.components", "at least one explicit component is required"))
+	}
+	componentsByID := map[string]ExplicitComponentSpec{}
+	references := map[string]string{}
+	padsByComponent := map[string]map[string]ExplicitPadSpec{}
+	for index, component := range circuit.Components {
+		path := fmt.Sprintf("explicit_circuit.components[%d]", index)
+		if component.ID == "" || component.Reference == "" || component.FootprintID == "" {
+			issues = append(issues, issue(path, "component id, reference, and footprint_id are required"))
+		}
+		if _, exists := componentsByID[component.ID]; exists {
+			issues = append(issues, issue(path+".id", "duplicate explicit component id"))
+		}
+		componentsByID[component.ID] = component
+		refKey := strings.ToUpper(component.Reference)
+		if owner, exists := references[refKey]; exists && owner != component.ID {
+			issues = append(issues, issue(path+".reference", "reference is already owned by "+owner))
+		}
+		references[refKey] = component.ID
+		pads := map[string]ExplicitPadSpec{}
+		for padIndex, pad := range component.Pads {
+			padPath := fmt.Sprintf("%s.pads[%d]", path, padIndex)
+			if pad.Name == "" || pad.SymbolPin == "" {
+				issues = append(issues, issue(padPath, "pad name and verified symbol_pin are required"))
+			}
+			if _, exists := pads[pad.Name]; exists {
+				issues = append(issues, issue(padPath+".name", "duplicate explicit pad name"))
+			}
+			pads[pad.Name] = pad
+		}
+		padsByComponent[component.ID] = pads
+	}
+	schematicComponents := make(map[string]schematicir.Component, len(circuit.Schematic.Circuit.Components))
+	for _, component := range circuit.Schematic.Circuit.Components {
+		schematicComponents[component.ID] = component
+	}
+	for id, component := range componentsByID {
+		schematicComponent, exists := schematicComponents[id]
+		if !exists {
+			issues = append(issues, issue("explicit_circuit.components", "component "+id+" is missing from schematic IR"))
+			continue
+		}
+		if schematicComponent.Ref != component.Reference || schematicComponent.Footprint != component.FootprintID {
+			issues = append(issues, issue("explicit_circuit.components", "component "+id+" disagrees with schematic reference or footprint"))
+		}
+	}
+	for id := range schematicComponents {
+		if _, exists := componentsByID[id]; !exists {
+			issues = append(issues, issue("explicit_circuit.schematic", "schematic component "+id+" has no resolved explicit component"))
+		}
+	}
+	if len(circuit.Nets) == 0 {
+		issues = append(issues, issue("explicit_circuit.nets", "at least one explicit net is required"))
+	}
+	ownedPads := map[string]string{}
+	seenNets := map[string]struct{}{}
+	schematicNets := make(map[string]map[string]struct{}, len(circuit.Schematic.Circuit.Nets))
+	for _, net := range circuit.Schematic.Circuit.Nets {
+		endpoints := make(map[string]struct{}, len(net.Connect))
+		for _, endpoint := range net.Connect {
+			component, pin, ok := endpoint.Split()
+			if ok {
+				endpoints[component+"\x00"+pin] = struct{}{}
+			}
+		}
+		schematicNets[net.Name] = endpoints
+	}
+	for netIndex, net := range circuit.Nets {
+		path := fmt.Sprintf("explicit_circuit.nets[%d]", netIndex)
+		if net.Name == "" || len(net.Endpoints) < 2 {
+			issues = append(issues, issue(path, "net name and at least two endpoints are required"))
+		}
+		if _, exists := seenNets[net.Name]; exists {
+			issues = append(issues, issue(path+".name", "duplicate explicit net name"))
+		}
+		seenNets[net.Name] = struct{}{}
+		schematicEndpoints, schematicNetExists := schematicNets[net.Name]
+		if !schematicNetExists {
+			issues = append(issues, issue(path, "net is missing from schematic IR"))
+		}
+		explicitEndpoints := map[string]struct{}{}
+		for endpointIndex, endpoint := range net.Endpoints {
+			endpointPath := fmt.Sprintf("%s.endpoints[%d]", path, endpointIndex)
+			pad, exists := padsByComponent[endpoint.Component][endpoint.Pad]
+			if !exists {
+				issues = append(issues, issue(endpointPath, "endpoint does not resolve to an explicit component pad"))
+				continue
+			}
+			key := endpoint.Component + "\x00" + endpoint.Pad
+			if owner, exists := ownedPads[key]; exists && owner != net.Name {
+				issues = append(issues, issue(endpointPath, "pad is already assigned to net "+owner))
+			}
+			ownedPads[key] = net.Name
+			if pad.Net != net.Name {
+				issues = append(issues, issue(endpointPath, "endpoint net disagrees with component pad net"))
+			}
+			explicitEndpoints[endpoint.Component+"\x00"+pad.SymbolPin] = struct{}{}
+		}
+		if schematicNetExists && !sameExplicitEndpointSet(explicitEndpoints, schematicEndpoints) {
+			issues = append(issues, issue(path, "resolved pad endpoints disagree with schematic symbol-pin endpoints"))
+		}
+	}
+	for name := range schematicNets {
+		if _, exists := seenNets[name]; !exists {
+			issues = append(issues, issue("explicit_circuit.schematic", "schematic net "+name+" has no resolved explicit net"))
+		}
+	}
+	for componentID, pads := range padsByComponent {
+		for padName, pad := range pads {
+			if pad.Net == "" {
+				continue
+			}
+			key := componentID + "\x00" + padName
+			if ownedPads[key] != pad.Net {
+				issues = append(issues, issue("explicit_circuit.components", "pad "+componentID+"."+padName+" names net "+pad.Net+" without a matching resolved endpoint"))
+			}
+		}
+	}
+	return issues
+}
+
+func sameExplicitEndpointSet(left, right map[string]struct{}) bool {
+	if len(left) != len(right) {
+		return false
+	}
+	for endpoint := range left {
+		if _, exists := right[endpoint]; !exists {
+			return false
+		}
+	}
+	return true
+}
+
+func validSHA256(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, character := range value {
+		if !((character >= '0' && character <= '9') || (character >= 'a' && character <= 'f')) {
+			return false
+		}
+	}
+	return true
 }
 
 func validateRoutingRetryPolicy(policy RoutingRetryPolicySpec) []reports.Issue {

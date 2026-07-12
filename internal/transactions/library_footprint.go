@@ -3,6 +3,7 @@ package transactions
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"fmt"
 	"sort"
 	"strconv"
 	"strings"
@@ -42,26 +43,66 @@ func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOpti
 	}
 }
 
-func upsertImportedFootprintWithLibrary(board *pcb.PCBFile, generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, index *libraryresolver.LibraryIndex) {
-	if index == nil || len(payload.Pads) > 0 {
+func upsertImportedFootprintWithLibrary(board *pcb.PCBFile, generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, index *libraryresolver.LibraryIndex) error {
+	if index == nil || (len(payload.Pads) > 0 && !netOnlyPadSpecs(payload.Pads)) {
 		upsertImportedFootprint(board, generator, payload)
-		return
+		return nil
 	}
 	record, ok := libraryresolver.ResolveFootprint(*index, payload.FootprintID)
 	if !ok || len(record.Pads) == 0 {
+		if netOnlyPadSpecs(payload.Pads) {
+			return fmt.Errorf("footprint library record %s with pad geometry is required for net-only pad assignments", payload.FootprintID)
+		}
 		upsertImportedFootprint(board, generator, payload)
-		return
+		return nil
 	}
 	for i := range board.Footprints {
 		if board.Footprints[i].Reference == payload.Ref {
-			updateImportedFootprint(&board.Footprints[i], generator, payload)
+			placement := payload
+			placement.Pads = nil
+			updateImportedFootprint(&board.Footprints[i], generator, placement)
 			if len(board.Footprints[i].Pads) == 0 {
 				board.Footprints[i].Pads = importedPadsFromRecord(generator, payload.Ref, record, board.Footprints[i].Layer)
 			}
-			return
+			return applyImportedPadNets(&board.Footprints[i], payload.Pads)
 		}
 	}
-	board.Footprints = append(board.Footprints, importedFootprintFromRecord(generator, payload, record))
+	placement := payload
+	placement.Pads = nil
+	board.Footprints = append(board.Footprints, importedFootprintFromRecord(generator, placement, record))
+	return applyImportedPadNets(&board.Footprints[len(board.Footprints)-1], payload.Pads)
+}
+
+func netOnlyPadSpecs(specs []PadSpec) bool {
+	for _, spec := range specs {
+		if strings.TrimSpace(spec.Name) == "" || strings.TrimSpace(spec.Type) != "" || strings.TrimSpace(spec.Shape) != "" ||
+			spec.XMM != 0 || spec.YMM != 0 || spec.WidthMM != 0 || spec.HeightMM != 0 || spec.DrillMM != 0 {
+			return false
+		}
+	}
+	return len(specs) > 0
+}
+
+func applyImportedPadNets(footprint *pcb.Footprint, specs []PadSpec) error {
+	if len(specs) == 0 {
+		return nil
+	}
+	pads := make(map[string][]*pcb.Pad, len(footprint.Pads))
+	for i := range footprint.Pads {
+		pads[footprint.Pads[i].Name] = append(pads[footprint.Pads[i].Name], &footprint.Pads[i])
+	}
+	for _, spec := range specs {
+		matches := pads[spec.Name]
+		if len(matches) == 0 {
+			return fmt.Errorf("footprint %s has no pad %s", footprint.LibraryID, spec.Name)
+		}
+		if spec.Net != nil {
+			for _, pad := range matches {
+				pad.NetName = *spec.Net
+			}
+		}
+	}
+	return nil
 }
 
 func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload PlaceFootprintOperation, record libraryresolver.FootprintRecord) pcb.Footprint {

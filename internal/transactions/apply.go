@@ -329,7 +329,10 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				result.Issues = append(result.Issues, applyIssue(i, fmt.Errorf("place_footprint requires footprint_id for imported apply")))
 				return result
 			}
-			upsertImportedFootprintWithLibrary(design.PCB, generator, payload, opts.LibraryIndex)
+			if err := upsertImportedFootprintWithLibrary(design.PCB, generator, payload, opts.LibraryIndex); err != nil {
+				result.Issues = append(result.Issues, applyIssue(i, err))
+				return result
+			}
 			pcbDirty = true
 			lastDirtyIndex = i
 		case OpRoute:

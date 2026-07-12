@@ -33,6 +33,10 @@ func SchematicElectricalStage(plan BlockPlanResult) StageResult {
 		stage.Summary = map[string]any{"status": string(schematicrules.StatusBlocked)}
 		return stage
 	}
+	return schematicElectricalStageFromTransaction(tx)
+}
+
+func schematicElectricalStageFromTransaction(tx transactions.Transaction) StageResult {
 	file, opts, issues := schematicElectricalInputsFromTransaction(tx)
 	if len(issues) != 0 {
 		stage := NewStageResult(StageSchematicElectrical, issues)
