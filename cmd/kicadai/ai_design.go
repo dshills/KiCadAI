@@ -175,6 +175,19 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 }
 
 func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Request {
+	for index := range request.Blocks {
+		if request.Blocks[index].Params == nil {
+			request.Blocks[index].Params = map[string]any{}
+		}
+		switch request.Blocks[index].BlockID {
+		case "i2c_sensor":
+			if componentID, ok := request.Blocks[index].Params["sensor_component_id"].(string); ok && strings.TrimSpace(componentID) != "" {
+				request.Blocks[index].Params["fixed_pcb_layout"] = true
+			}
+		case "connector_breakout":
+			request.Blocks[index].Params["edge_facing"] = true
+		}
+	}
 	if request.Validation.SkipRouting {
 		return request
 	}
@@ -182,7 +195,6 @@ func prepareAIWorkflowRequest(request designworkflow.Request) designworkflow.Req
 	if request.RoutingRetry.MaxAttempts < 2 {
 		request.RoutingRetry.MaxAttempts = 2
 	}
-	request.RoutingRetry.StopOnNewBlockers = true
 	request.RoutingRetry.StopOnRepeatedSignature = true
 	request.RoutingRetry.StopOnNonImprovement = true
 	return request

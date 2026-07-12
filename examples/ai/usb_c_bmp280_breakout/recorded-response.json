@@ -9,7 +9,7 @@
     "auto_schematic_layout": true,
     "board": {
       "width_mm": 100,
-      "height_mm": 60,
+      "height_mm": 75,
       "edge_clearance_mm": 0.25,
       "layers": 2,
       "mounting_holes": "optional"

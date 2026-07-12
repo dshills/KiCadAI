@@ -137,7 +137,7 @@ func voltageRegulatorPCBRealization() *PCBRealization {
 	ap2112 := RealizationWhen{Params: map[string]any{"regulator_symbol": ap2112RegulatorSymbol}}
 	ap2112VINAnchor := []PCBAnchorPlacementVariant{{Placement: RelativePlacement{XMM: -7, YMM: -4, Layer: "F.Cu"}, When: ap2112}}
 	ap2112VINEntry := []PCBRouteGeometryVariant{{Waypoints: []RelativePoint{{XMM: -6.8, YMM: -4}}, DisableEntryAnchorDogbone: true, DisableEntryAnchorVia: true, When: ap2112}}
-	ap2112VOUTEntry := []PCBRouteGeometryVariant{{ClearWaypoints: true, DisableEntryAnchorDogbone: true, DisableEntryAnchorVia: true, When: ap2112}}
+	ap2112VOUTEntry := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112GNDEntry := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "F.Cu", When: ap2112}}
 	ap2112VINBypass := []PCBRouteGeometryVariant{{DisableRoute: true, When: ap2112}}
 	ap2112VOUTBypass := []PCBRouteGeometryVariant{{ClearWaypoints: true, Layer: "B.Cu", When: ap2112}}

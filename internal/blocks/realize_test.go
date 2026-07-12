@@ -322,8 +322,8 @@ func TestRealizeBlockPCBAddsAP2112VINEnableTie(t *testing.T) {
 	if route := routes["vin_entry"]; route.EntryAnchorDogbone != nil || !route.DisableEntryAnchorVia || len(route.Points) != 3 {
 		t.Fatalf("AP2112 VIN entry = %#v", route)
 	}
-	if route := routes["vout_entry"]; route.EntryAnchorDogbone != nil || !route.DisableEntryAnchorVia || len(route.Points) != 2 {
-		t.Fatalf("AP2112 VOUT entry = %#v", route)
+	if _, exists := routes["vout_entry"]; exists {
+		t.Fatalf("AP2112 routes include redundant VOUT entry: %#v", routes["vout_entry"])
 	}
 	if route := routes["gnd_entry"]; route.Layer != "F.Cu" || len(route.Points) != 2 {
 		t.Fatalf("AP2112 GND entry = %#v", route)

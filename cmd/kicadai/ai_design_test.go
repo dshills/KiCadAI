@@ -99,8 +99,8 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 		"--overwrite",
 		"design", "create",
 	}, &stdout, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "blocking issues") {
-		t.Fatalf("expected current downstream workflow blocker, err=%v", err)
+	if err != nil {
+		t.Fatalf("recorded AI design create: %v", err)
 	}
 	var payload struct {
 		Data aiDesignCreateResult `json:"data"`
@@ -111,7 +111,7 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	if payload.Data.Provider.Name != "recorded" || !payload.Data.Provider.Recorded || payload.Data.Intent.Name != "usb_c_bmp280_breakout" {
 		t.Fatalf("provider/intent = %#v / %#v", payload.Data.Provider, payload.Data.Intent)
 	}
-	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Stage != "routing" || payload.Data.AIStatus.IssueCode != reports.CodeValidationFailed {
+	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != "candidate" {
 		t.Fatalf("AI status = %#v", payload.Data.AIStatus)
 	}
 	for _, name := range []string{
@@ -207,12 +207,18 @@ func TestGenerateValidatedAIIntentDoesNotRetryAuthentication(t *testing.T) {
 }
 
 func TestPrepareAIWorkflowRequestEnablesBoundedPlacementRepair(t *testing.T) {
-	request := prepareAIWorkflowRequest(designworkflow.Request{})
+	request := prepareAIWorkflowRequest(designworkflow.Request{Blocks: []designworkflow.BlockInstanceSpec{
+		{ID: "sensor", BlockID: "i2c_sensor", Params: map[string]any{"sensor_component_id": "sensor.bosch.bmp280.lga8"}},
+		{ID: "io", BlockID: "connector_breakout"},
+	}})
 	if !request.RoutingRetry.Enabled || request.RoutingRetry.MaxAttempts != 2 {
 		t.Fatalf("routing retry = %#v", request.RoutingRetry)
 	}
-	if !request.RoutingRetry.StopOnNewBlockers || !request.RoutingRetry.StopOnRepeatedSignature || !request.RoutingRetry.StopOnNonImprovement {
+	if request.RoutingRetry.StopOnNewBlockers || !request.RoutingRetry.StopOnRepeatedSignature || !request.RoutingRetry.StopOnNonImprovement {
 		t.Fatalf("routing retry stop policy = %#v", request.RoutingRetry)
+	}
+	if request.Blocks[0].Params["fixed_pcb_layout"] != true || request.Blocks[1].Params["edge_facing"] != true {
+		t.Fatalf("AI block placement params = %#v", request.Blocks)
 	}
 
 	skipped := prepareAIWorkflowRequest(designworkflow.Request{Validation: designworkflow.ValidationSpec{SkipRouting: true}})
