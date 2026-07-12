@@ -343,6 +343,9 @@ func TestDesignExamplePromotionClassificationMatchesMetadata(t *testing.T) {
 	if strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI)) != "" {
 		t.Skipf("set %s: promotion classification is covered by TestDesignExamplesOptionalKiCadBackedTier", checks.EnvKiCadCLI)
 	}
+	if cli, err := checks.DiscoverCLI(""); err == nil {
+		t.Skipf("KiCad CLI auto-discovered at %s: no-KiCad classification requires a host without KiCad", cli.Path)
+	}
 	repoRoot := designExampleRepoRoot(t)
 	createTimeout := designExampleCreateTimeout(t)
 	for _, metadataPath := range optionalDesignExampleMetadataFiles(t, repoRoot) {
