@@ -4,6 +4,7 @@ This directory holds the detailed reference material that used to live in the pr
 
 ## User Workflows
 
+- [Project Status](project-status.md): current capabilities, proven workflows, evidence levels, and explicit limitations.
 - [KiCadAI Agent Skill](kicadai-agent-skill.md): prescriptive command and validation contract for AI agents using KiCadAI.
 - [CLI Reference](cli-reference.md): command overview, KiCad IPC setup, and direct generation commands.
 - [AI Generation](ai-generation.md): prompt-provider setup, the reproducible USB-C BMP280 and protected LED lanes, evidence, and failure behavior.
