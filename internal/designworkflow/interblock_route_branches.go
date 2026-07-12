@@ -739,6 +739,8 @@ func routeTreeBranchAccessAuditForBranchWithMergeAudit(access []RouteTreeEndpoin
 	targetOpposite := routeTreeFirstAccessForEndpoint(access, branch.StartEndpointID, netName, cache)
 	sourceCandidates := routeTreeCachedAccessCandidates(cache, access, branch.StartEndpointID, netName, sourceOpposite)
 	targetCandidates := routeTreeCachedAccessCandidates(cache, access, branch.EndEndpointID, netName, targetOpposite)
+	sourceCandidates = routeTreeAccessCandidatesWithProvenCopperContact(sourceCandidates)
+	targetCandidates = routeTreeAccessCandidatesWithProvenCopperContact(targetCandidates)
 	sourceCandidates = routeTreeAccessCandidatesWithMergePriority(sourceCandidates, mergeAuditBase)
 	targetCandidates = routeTreeAccessCandidatesWithMergePriority(targetCandidates, mergeAuditBase)
 	sourceCandidates = routeTreeAccessCandidatesWithObstacleRanks(sourceCandidates, mergeAuditBase.OtherNetPadGrid)
@@ -753,6 +755,37 @@ func routeTreeBranchAccessAuditForBranchWithMergeAudit(access []RouteTreeEndpoin
 		Limit:            limit,
 		Truncated:        totalPairCount > limit,
 	}
+}
+
+func routeTreeAccessCandidatesWithProvenCopperContact(candidates []routeTreeBranchAccessCandidate) []routeTreeBranchAccessCandidate {
+	var exact []RouteTreeEndpointAccess
+	for _, candidate := range candidates {
+		if candidate.EndpointRank == routeTreeAccessExactEndpointRank && !routeTreeAccessIsGeneratedSameNetCopper(candidate.Access) {
+			exact = append(exact, candidate.Access)
+		}
+	}
+	if len(exact) == 0 {
+		return candidates
+	}
+	filtered := make([]routeTreeBranchAccessCandidate, 0, len(candidates))
+	for _, candidate := range candidates {
+		if !routeTreeAccessIsGeneratedSameNetCopper(candidate.Access) || routeTreeCopperTouchesAnyExactAccess(candidate.Access, exact) {
+			filtered = append(filtered, candidate)
+		}
+	}
+	return filtered
+}
+
+func routeTreeCopperTouchesAnyExactAccess(copper RouteTreeEndpointAccess, exact []RouteTreeEndpointAccess) bool {
+	for _, access := range exact {
+		if copper.Layer != "" && access.Layer != "" && !strings.EqualFold(copper.Layer, access.Layer) {
+			continue
+		}
+		if routeTreeSamePoint(transactions.Point{XMM: copper.XMM, YMM: copper.YMM}, transactions.Point{XMM: access.XMM, YMM: access.YMM}) {
+			return true
+		}
+	}
+	return false
 }
 
 func routeTreeAccessCandidatesWithMergePriority(candidates []routeTreeBranchAccessCandidate, mergeAuditBase routeTreeMergeAuditBase) []routeTreeBranchAccessCandidate {

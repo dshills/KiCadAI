@@ -111,7 +111,7 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	if payload.Data.Provider.Name != "recorded" || !payload.Data.Provider.Recorded || payload.Data.Intent.Name != "usb_c_bmp280_breakout" {
 		t.Fatalf("provider/intent = %#v / %#v", payload.Data.Provider, payload.Data.Intent)
 	}
-	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Stage != "validation" || payload.Data.AIStatus.IssueCode != reports.CodeDisconnectedPad {
+	if payload.Data.AIStatus == nil || payload.Data.AIStatus.Stage != "routing" || payload.Data.AIStatus.IssueCode != reports.CodeValidationFailed {
 		t.Fatalf("AI status = %#v", payload.Data.AIStatus)
 	}
 	for _, name := range []string{

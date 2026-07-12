@@ -596,6 +596,24 @@ func TestRouteTreePrefersSameNetCopperAccessOnlyForPowerNets(t *testing.T) {
 	}
 }
 
+func TestRouteTreeAccessCandidatesRequireCopperContactWithExactEndpoint(t *testing.T) {
+	candidates := []routeTreeBranchAccessCandidate{
+		{Access: RouteTreeEndpointAccess{EndpointID: "U1.1", Role: RouteTreeAccessTargetPad, Net: "VCC", Layer: "F.Cu", XMM: 10, YMM: 10}, EndpointRank: routeTreeAccessExactEndpointRank},
+		{Access: RouteTreeEndpointAccess{Role: RouteTreeAccessSameNetCopper, Net: "VCC", Layer: "F.Cu", XMM: 2, YMM: 2, Source: routeTreeSameNetExistingCopperSource}, EndpointRank: routeTreeAccessFallbackEndpointRank},
+	}
+	filtered := routeTreeAccessCandidatesWithProvenCopperContact(candidates)
+	if len(filtered) != 1 || filtered[0].Access.Role != RouteTreeAccessTargetPad {
+		t.Fatalf("filtered = %#v, want unconnected copper fallback removed", filtered)
+	}
+
+	candidates[1].Access.XMM = 10
+	candidates[1].Access.YMM = 10
+	filtered = routeTreeAccessCandidatesWithProvenCopperContact(candidates)
+	if len(filtered) != 2 {
+		t.Fatalf("filtered = %#v, want contacting copper retained", filtered)
+	}
+}
+
 func routeTreeAccessContainsPoint(access []RouteTreeEndpointAccess, xMM float64, yMM float64) bool {
 	for _, item := range access {
 		if math.Abs(item.XMM-xMM) <= 1e-9 && math.Abs(item.YMM-yMM) <= 1e-9 {
