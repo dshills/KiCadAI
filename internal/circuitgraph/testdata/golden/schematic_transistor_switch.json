@@ -1,0 +1,267 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "generic_transistor_switch",
+    "title": "NPN Low-Side Switch",
+    "description": "Catalog-only connector, base resistor, and NPN transistor switch graph.",
+    "seed": "8e7692fa5870dbc8c695c9c8373e9d67336ec06ed7c755217c03af8a33461abe",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "base_resistor",
+        "ref": "R1",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "4.7k",
+        "footprint": "Resistor_SMD:R_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "resistor.yageo.rc0805fr_074k7l.0805",
+          "KiCadAI Resolution Hash": "8e7692fa5870dbc8c695c9c8373e9d67336ec06ed7c755217c03af8a33461abe",
+          "KiCadAI Variant ID": "0805",
+          "MPN": "RC0805FR-074K7L",
+          "Manufacturer": "Yageo"
+        }
+      },
+      {
+        "id": "control",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_01x03",
+        "value": "1x03 2.54 mm pin header",
+        "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x03_P2.54mm_Vertical",
+        "pins": [
+          {
+            "number": "1",
+            "name": "PIN_1",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "PIN_2",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "PIN_3",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "connector.pinheader.1x03.2_54mm",
+          "KiCadAI Resolution Hash": "8e7692fa5870dbc8c695c9c8373e9d67336ec06ed7c755217c03af8a33461abe",
+          "KiCadAI Variant ID": "vertical"
+        }
+      },
+      {
+        "id": "load",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_01x02",
+        "value": "1x02 2.54 mm pin header",
+        "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pins": [
+          {
+            "number": "1",
+            "name": "PIN_1",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "PIN_2",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
+          "KiCadAI Resolution Hash": "8e7692fa5870dbc8c695c9c8373e9d67336ec06ed7c755217c03af8a33461abe",
+          "KiCadAI Variant ID": "vertical"
+        }
+      },
+      {
+        "id": "switch",
+        "ref": "Q1",
+        "role": "bjt",
+        "symbol": "Device:Q_NPN_BEC",
+        "value": "MMBT3904LT1G",
+        "footprint": "Package_TO_SOT_SMD:SOT-23",
+        "pins": [
+          {
+            "number": "1",
+            "name": "BASE",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "EMITTER",
+            "role": "passive"
+          },
+          {
+            "number": "3",
+            "name": "COLLECTOR",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "bjt.onsemi.mmbt3904.sot23",
+          "KiCadAI Resolution Hash": "8e7692fa5870dbc8c695c9c8373e9d67336ec06ed7c755217c03af8a33461abe",
+          "KiCadAI Variant ID": "sot23",
+          "MPN": "MMBT3904LT1G",
+          "Manufacturer": "onsemi"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "name": "BASE",
+        "role": "bias",
+        "connect": [
+          "base_resistor.2",
+          "switch.1"
+        ]
+      },
+      {
+        "name": "CONTROL",
+        "role": "signal",
+        "connect": [
+          "base_resistor.1",
+          "control.1"
+        ]
+      },
+      {
+        "name": "GND",
+        "role": "ground",
+        "connect": [
+          "control.3",
+          "switch.2"
+        ]
+      },
+      {
+        "name": "SWITCH_OUT",
+        "role": "signal",
+        "connect": [
+          "load.1",
+          "switch.3"
+        ]
+      },
+      {
+        "name": "VCC",
+        "role": "power_pos",
+        "connect": [
+          "control.2",
+          "load.2"
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {
+        "id": "control_stage",
+        "role": "input_stage",
+        "members": [
+          "base_resistor",
+          "control"
+        ],
+        "rank": 0,
+        "side": "left"
+      },
+      {
+        "id": "switch_stage",
+        "role": "processing_stage",
+        "members": [
+          "switch"
+        ],
+        "rank": 1
+      },
+      {
+        "id": "load_stage",
+        "role": "output_stage",
+        "members": [
+          "load"
+        ],
+        "rank": 2,
+        "side": "right"
+      }
+    ],
+    "lanes": {
+      "power": "top",
+      "ground": "bottom",
+      "signals": "middle"
+    },
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 12.7,
+      "min_component_spacing_mm": 7.62
+    },
+    "placements": [
+      {
+        "target": "base_resistor",
+        "group": "control_stage",
+        "right_of": [
+          "control"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "control",
+        "group": "control_stage",
+        "orientation": "normal"
+      },
+      {
+        "target": "load",
+        "group": "load_stage",
+        "right_of": [
+          "switch"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "switch",
+        "group": "switch_stage",
+        "right_of": [
+          "base_resistor"
+        ],
+        "orientation": "normal"
+      }
+    ]
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "erc_clean"
+  }
+}

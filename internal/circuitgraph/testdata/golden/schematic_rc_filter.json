@@ -1,0 +1,243 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "generic_rc_filter",
+    "title": "RC Low-Pass Filter",
+    "description": "Catalog-resolved passive low-pass filter with input and output connectors.",
+    "seed": "a32760acc85e150f0e3b555e0ba1425d0453c9682b9396fd9c8c75b7a391ed88",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "c1",
+        "ref": "C1",
+        "role": "capacitor",
+        "symbol": "Device:C",
+        "value": "100nF",
+        "footprint": "Capacitor_SMD:C_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "capacitor.murata.grm21br71h104ka01l.0805",
+          "KiCadAI Resolution Hash": "a32760acc85e150f0e3b555e0ba1425d0453c9682b9396fd9c8c75b7a391ed88",
+          "KiCadAI Variant ID": "0805",
+          "MPN": "GRM21BR71H104KA01L",
+          "Manufacturer": "Murata"
+        }
+      },
+      {
+        "id": "input",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector_Generic:Conn_01x02",
+        "value": "1x02 2.54 mm pin header",
+        "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pins": [
+          {
+            "number": "1",
+            "name": "PIN_1",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "PIN_2",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
+          "KiCadAI Resolution Hash": "a32760acc85e150f0e3b555e0ba1425d0453c9682b9396fd9c8c75b7a391ed88",
+          "KiCadAI Variant ID": "vertical"
+        }
+      },
+      {
+        "id": "output",
+        "ref": "J2",
+        "role": "output_connector",
+        "symbol": "Connector_Generic:Conn_01x02",
+        "value": "1x02 2.54 mm pin header",
+        "footprint": "Connector_PinHeader_2.54mm:PinHeader_1x02_P2.54mm_Vertical",
+        "pins": [
+          {
+            "number": "1",
+            "name": "PIN_1",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "PIN_2",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "connector.pinheader.1x02.2_54mm",
+          "KiCadAI Resolution Hash": "a32760acc85e150f0e3b555e0ba1425d0453c9682b9396fd9c8c75b7a391ed88",
+          "KiCadAI Variant ID": "vertical"
+        }
+      },
+      {
+        "id": "r1",
+        "ref": "R1",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "10k",
+        "footprint": "Resistor_SMD:R_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "resistor.yageo.rc0805fr_0710kl.0805",
+          "KiCadAI Resolution Hash": "a32760acc85e150f0e3b555e0ba1425d0453c9682b9396fd9c8c75b7a391ed88",
+          "KiCadAI Variant ID": "0805",
+          "MPN": "RC0805FR-0710KL",
+          "Manufacturer": "Yageo"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "name": "FILTER_IN",
+        "role": "signal",
+        "connect": [
+          "input.1",
+          "r1.1"
+        ]
+      },
+      {
+        "name": "FILTER_OUT",
+        "role": "signal",
+        "connect": [
+          "c1.1",
+          "output.1",
+          "r1.2"
+        ]
+      },
+      {
+        "name": "GND",
+        "role": "ground",
+        "connect": [
+          "c1.2",
+          "input.2",
+          "output.2"
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {
+        "id": "input_stage",
+        "role": "input_stage",
+        "members": [
+          "input"
+        ],
+        "rank": 0,
+        "side": "left"
+      },
+      {
+        "id": "filter_stage",
+        "role": "processing_stage",
+        "members": [
+          "c1",
+          "r1"
+        ],
+        "rank": 1
+      },
+      {
+        "id": "output_stage",
+        "role": "output_stage",
+        "members": [
+          "output"
+        ],
+        "rank": 2,
+        "side": "right"
+      }
+    ],
+    "lanes": {
+      "power": "top",
+      "ground": "bottom",
+      "signals": "middle"
+    },
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 12.7,
+      "min_component_spacing_mm": 7.62
+    },
+    "placements": [
+      {
+        "target": "c1",
+        "group": "filter_stage",
+        "near": [
+          "r1"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "input",
+        "group": "input_stage",
+        "orientation": "normal"
+      },
+      {
+        "target": "output",
+        "group": "output_stage",
+        "right_of": [
+          "r1"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "r1",
+        "group": "filter_stage",
+        "right_of": [
+          "input"
+        ],
+        "orientation": "normal"
+      }
+    ]
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "erc_clean"
+  }
+}

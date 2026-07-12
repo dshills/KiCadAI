@@ -1,0 +1,436 @@
+{
+  "schema": "kicadai.schematic.ir.v1",
+  "version": 1,
+  "metadata": {
+    "name": "generic_usb_c_led_protected",
+    "title": "Protected USB-C LED Indicator",
+    "description": "Explicit component graph equivalent of the promoted protected USB-C LED block design.",
+    "seed": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+    "paper": "A4"
+  },
+  "circuit": {
+    "components": [
+      {
+        "id": "bulk",
+        "ref": "C1",
+        "role": "bulk_capacitor",
+        "symbol": "Device:C",
+        "value": "10uF",
+        "footprint": "Capacitor_SMD:C_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "capacitor.murata.grm21br61a106ke19l.0805",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "0805",
+          "MPN": "GRM21BR61A106KE19L",
+          "Manufacturer": "Murata"
+        }
+      },
+      {
+        "id": "cc1_rd",
+        "ref": "R1",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "5.1k",
+        "footprint": "Resistor_SMD:R_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "resistor.generic.0805",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "0805"
+        }
+      },
+      {
+        "id": "cc2_rd",
+        "ref": "R2",
+        "role": "resistor",
+        "symbol": "Device:R",
+        "value": "5.1k",
+        "footprint": "Resistor_SMD:R_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "resistor.generic.0805",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "0805"
+        }
+      },
+      {
+        "id": "fuse",
+        "ref": "F1",
+        "role": "fuse",
+        "symbol": "Device:Fuse",
+        "value": "500mA",
+        "footprint": "Fuse:Fuse_1206_3216Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "fuse.generic.1206",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "1206"
+        }
+      },
+      {
+        "id": "indicator",
+        "ref": "D2",
+        "role": "indicator_led",
+        "symbol": "Device:LED",
+        "value": "Generic 0805 indicator LED",
+        "footprint": "LED_SMD:LED_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "CATHODE",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "ANODE",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "led.generic.0805",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "0805"
+        }
+      },
+      {
+        "id": "led_resistor",
+        "ref": "R3",
+        "role": "current_limiter",
+        "symbol": "Device:R",
+        "value": "600ohm",
+        "footprint": "Resistor_SMD:R_0805_2012Metric",
+        "pins": [
+          {
+            "number": "1",
+            "name": "A",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "B",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "resistor.generic.0805",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "0805"
+        }
+      },
+      {
+        "id": "tvs",
+        "ref": "D1",
+        "role": "tvs",
+        "symbol": "Device:D_TVS",
+        "value": "Generic 5 V unidirectional TVS protection diode",
+        "footprint": "Diode_SMD:D_SOD-323",
+        "pins": [
+          {
+            "number": "1",
+            "name": "CATHODE",
+            "role": "passive"
+          },
+          {
+            "number": "2",
+            "name": "ANODE",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "protection.tvs.usb_5v_unidirectional",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "sod_323"
+        }
+      },
+      {
+        "id": "usb",
+        "ref": "J1",
+        "role": "input_connector",
+        "symbol": "Connector:USB_C_Receptacle_PowerOnly_6P",
+        "value": "USB4125",
+        "footprint": "Connector_USB:USB_C_Receptacle_GCT_USB4125-xx-x_6P_TopMnt_Horizontal",
+        "pins": [
+          {
+            "number": "A12",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "A5",
+            "name": "CC1",
+            "role": "passive"
+          },
+          {
+            "number": "A9",
+            "name": "VBUS",
+            "role": "passive"
+          },
+          {
+            "number": "B12",
+            "name": "GND",
+            "role": "ground"
+          },
+          {
+            "number": "B5",
+            "name": "CC2",
+            "role": "passive"
+          },
+          {
+            "number": "B9",
+            "name": "VBUS",
+            "role": "passive"
+          },
+          {
+            "number": "SH",
+            "name": "SHIELD",
+            "role": "passive"
+          }
+        ],
+        "properties": {
+          "KiCadAI Catalog": "checked-in",
+          "KiCadAI Catalog Hash": "04af1f9616aeb7789431b1cf23915325ebb35bbb60278a0c9fb59c171d44d04f",
+          "KiCadAI Component ID": "usb_c.gct.usb4125_power_only_6p",
+          "KiCadAI Resolution Hash": "08372676123e4a94c0fc0fd182391927e8f6c7a9c8f412cc13ca677138a19475",
+          "KiCadAI Variant ID": "gct_usb4125_6p",
+          "MPN": "USB4125",
+          "Manufacturer": "GCT"
+        }
+      }
+    ],
+    "nets": [
+      {
+        "name": "CC1",
+        "role": "signal",
+        "connect": [
+          "cc1_rd.1",
+          "usb.A5"
+        ]
+      },
+      {
+        "name": "CC2",
+        "role": "signal",
+        "connect": [
+          "cc2_rd.1",
+          "usb.B5"
+        ]
+      },
+      {
+        "name": "GND",
+        "role": "ground",
+        "connect": [
+          "bulk.2",
+          "cc1_rd.2",
+          "cc2_rd.2",
+          "indicator.2",
+          "tvs.2",
+          "usb.A12",
+          "usb.B12"
+        ]
+      },
+      {
+        "name": "LED_A",
+        "role": "signal",
+        "connect": [
+          "indicator.1",
+          "led_resistor.2"
+        ]
+      },
+      {
+        "name": "VBUS_RAW",
+        "role": "power_pos",
+        "connect": [
+          "fuse.1",
+          "usb.A9",
+          "usb.B9"
+        ]
+      },
+      {
+        "name": "VCC_5v",
+        "role": "power_pos",
+        "connect": [
+          "bulk.1",
+          "fuse.2",
+          "led_resistor.1",
+          "tvs.1"
+        ]
+      }
+    ]
+  },
+  "layout": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {
+        "id": "input_stage",
+        "role": "input_stage",
+        "members": [
+          "cc1_rd",
+          "cc2_rd",
+          "usb"
+        ],
+        "rank": 0,
+        "side": "left"
+      },
+      {
+        "id": "protection_stage",
+        "role": "protection_stage",
+        "members": [
+          "bulk",
+          "fuse",
+          "tvs"
+        ],
+        "rank": 1
+      },
+      {
+        "id": "indicator_stage",
+        "role": "output_stage",
+        "members": [
+          "indicator",
+          "led_resistor"
+        ],
+        "rank": 2,
+        "side": "right"
+      }
+    ],
+    "lanes": {
+      "power": "top",
+      "ground": "bottom",
+      "signals": "middle"
+    },
+    "rules": {
+      "positive_power_top": true,
+      "ground_bottom": true,
+      "center_on_page": true,
+      "prefer_labels_for_long_nets": true,
+      "avoid_wire_crossings": true,
+      "min_group_spacing_mm": 12.7,
+      "min_component_spacing_mm": 7.62
+    },
+    "placements": [
+      {
+        "target": "bulk",
+        "group": "protection_stage",
+        "near": [
+          "tvs"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "fuse",
+        "group": "protection_stage",
+        "right_of": [
+          "usb"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "indicator",
+        "group": "indicator_stage",
+        "right_of": [
+          "led_resistor"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "led_resistor",
+        "group": "indicator_stage",
+        "right_of": [
+          "fuse"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "tvs",
+        "group": "protection_stage",
+        "near": [
+          "fuse"
+        ],
+        "orientation": "normal"
+      },
+      {
+        "target": "usb",
+        "group": "input_stage",
+        "orientation": "normal"
+      },
+      {
+        "target": "cc1_rd",
+        "group": "input_stage",
+        "orientation": "rotated"
+      },
+      {
+        "target": "cc2_rd",
+        "group": "input_stage",
+        "orientation": "rotated"
+      }
+    ]
+  },
+  "policy": {
+    "repair": {
+      "allow_ref_assignment": true,
+      "allow_label_insertion": true,
+      "allow_group_spacing_adjustment": true,
+      "allow_symbol_substitution": false,
+      "allow_pin_guessing": false
+    },
+    "acceptance": "erc_clean"
+  }
+}

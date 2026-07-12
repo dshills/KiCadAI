@@ -14,6 +14,7 @@ const (
 	CodePadUnresolved       reports.Code = "GRAPH_PAD_UNRESOLVED"
 	CodePinmapConflict      reports.Code = "GRAPH_PINMAP_CONFLICT"
 	CodeRequiredPinOpen     reports.Code = "GRAPH_REQUIRED_PIN_UNCONNECTED"
+	CodeSchematicLowering   reports.Code = "GRAPH_SCHEMATIC_LOWERING_INVALID"
 )
 
 type ResolvedDocument struct {
