@@ -1,0 +1,54 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {
+    "name": "generic_transistor_switch",
+    "title": "NPN Low-Side Switch",
+    "description": "Catalog-only connector, base resistor, and NPN transistor switch graph.",
+    "acceptance": "connectivity",
+    "board": {"width_mm": 45, "height_mm": 30, "layers": 2, "edge_clearance_mm": 0.25}
+  },
+  "components": [
+    {"id": "control", "reference": "J1", "role": "input_connector", "component_id": "connector.pinheader.1x03.2_54mm", "variant_id": "vertical", "population": "populate"},
+    {"id": "base_resistor", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "4.7k", "minimum_confidence": "library_derived"}, "value": "4.7k", "population": "populate"},
+    {"id": "switch", "reference": "Q1", "role": "bjt", "component_id": "bjt.onsemi.mmbt3904.sot23", "variant_id": "sot23", "required_functions": ["base", "collector", "emitter"], "population": "populate"},
+    {"id": "load", "reference": "J2", "role": "output_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "population": "populate"}
+  ],
+  "nets": [
+    {"name": "CONTROL", "role": "signal", "required": true, "endpoints": [{"component": "control", "selector_kind": "symbol_pin", "selector": "1"}, {"component": "base_resistor", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "BASE", "role": "bias", "required": true, "endpoints": [{"component": "base_resistor", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "switch", "selector_kind": "function", "selector": "base"}]},
+    {"name": "SWITCH_OUT", "role": "signal", "required": true, "endpoints": [{"component": "switch", "selector_kind": "function", "selector": "collector"}, {"component": "load", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "VCC", "role": "power_pos", "required": true, "voltage_domain": "5V", "current_ma": 100, "width_mm": 0.5, "endpoints": [{"component": "control", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "load", "selector_kind": "symbol_pin", "selector": "2"}]},
+    {"name": "GND", "role": "ground", "required": true, "endpoints": [{"component": "control", "selector_kind": "symbol_pin", "selector": "3"}, {"component": "switch", "selector_kind": "function", "selector": "emitter"}]}
+  ],
+  "no_connects": [],
+  "buses": [],
+  "schematic": {
+    "flow": "left_to_right", "origin": "centered",
+    "groups": [
+      {"id": "control_stage", "role": "input_stage", "members": ["control", "base_resistor"], "rank": 0, "side": "left"},
+      {"id": "switch_stage", "role": "processing_stage", "members": ["switch"], "rank": 1},
+      {"id": "load_stage", "role": "output_stage", "members": ["load"], "rank": 2, "side": "right"}
+    ],
+    "lanes": {"power": "top", "signals": "middle", "ground": "bottom"},
+    "placements": [
+      {"component": "control", "group": "control_stage", "orientation": "normal", "mirror": "none"},
+      {"component": "base_resistor", "group": "control_stage", "right_of": "control", "orientation": "normal", "mirror": "none"},
+      {"component": "switch", "group": "switch_stage", "right_of": "base_resistor", "orientation": "normal", "mirror": "none"},
+      {"component": "load", "group": "load_stage", "right_of": "switch", "orientation": "normal", "mirror": "none"}
+    ],
+    "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": true, "avoid_wire_crossings": true, "min_group_spacing_mm": 12.7, "min_component_spacing_mm": 7.62},
+    "hierarchy": {"mode": "flat"}
+  },
+  "pcb": {
+    "regions": [{"id": "main", "role": "signal", "bounds": {"x_mm": 2, "y_mm": 2, "width_mm": 41, "height_mm": 26}}],
+    "placements": [
+      {"component": "control", "region": "main", "edge": "left", "priority": 100},
+      {"component": "base_resistor", "region": "main", "near": "switch", "priority": 80, "max_distance_mm": 8},
+      {"component": "switch", "region": "main", "near": "load", "priority": 90, "max_distance_mm": 10},
+      {"component": "load", "region": "main", "edge": "right", "priority": 100}
+    ],
+    "keepouts": [], "zones": []
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true}
+}

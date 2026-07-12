@@ -1,0 +1,67 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {
+    "name": "generic_usb_c_led_protected",
+    "title": "Protected USB-C LED Indicator",
+    "description": "Explicit component graph equivalent of the promoted protected USB-C LED block design.",
+    "acceptance": "erc-drc",
+    "board": {"width_mm": 50, "height_mm": 30, "layers": 2, "edge_clearance_mm": 0.25}
+  },
+  "components": [
+    {"id": "usb", "reference": "J1", "role": "input_connector", "component_id": "usb_c.gct.usb4125_power_only_6p", "variant_id": "gct_usb4125_6p", "required_functions": ["vbus", "gnd", "cc1", "cc2"], "population": "populate"},
+    {"id": "cc1_rd", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "library_derived"}, "value": "5.1k", "population": "populate"},
+    {"id": "cc2_rd", "reference": "R2", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "5.1k", "minimum_confidence": "library_derived"}, "value": "5.1k", "population": "populate"},
+    {"id": "fuse", "reference": "F1", "role": "fuse", "component_id": "fuse.generic.1206", "variant_id": "1206", "value": "500mA", "population": "populate"},
+    {"id": "tvs", "reference": "D1", "role": "tvs", "component_id": "protection.tvs.usb_5v_unidirectional", "variant_id": "sod_323", "population": "populate"},
+    {"id": "bulk", "reference": "C1", "role": "bulk_capacitor", "query": {"family": "capacitor", "package": "0805", "value_kind": "capacitance", "value": "10uF", "min_voltage_v": 10, "minimum_confidence": "library_derived"}, "value": "10uF", "population": "populate"},
+    {"id": "led_resistor", "reference": "R3", "role": "current_limiter", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "600", "minimum_confidence": "library_derived"}, "value": "600", "population": "populate"},
+    {"id": "indicator", "reference": "D2", "role": "indicator_led", "component_id": "led.generic.0805", "variant_id": "0805", "required_ratings": [{"kind": "forward_current", "value": "5", "unit": "mA"}], "population": "populate"}
+  ],
+  "nets": [
+    {"name": "VBUS_RAW", "role": "power_pos", "required": true, "voltage_domain": "5V", "current_ma": 500, "width_mm": 0.8, "endpoints": [{"component": "usb", "selector_kind": "function", "selector": "vbus"}, {"component": "fuse", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "VCC_5v", "role": "power_pos", "required": true, "voltage_domain": "5V", "current_ma": 500, "width_mm": 0.8, "endpoints": [{"component": "fuse", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "tvs", "selector_kind": "symbol_pin", "selector": "1"}, {"component": "bulk", "selector_kind": "symbol_pin", "selector": "1"}, {"component": "led_resistor", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "LED_A", "role": "signal", "required": true, "endpoints": [{"component": "led_resistor", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "indicator", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "CC1", "role": "signal", "required": true, "endpoints": [{"component": "usb", "selector_kind": "function", "selector": "cc1"}, {"component": "cc1_rd", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "CC2", "role": "signal", "required": true, "endpoints": [{"component": "usb", "selector_kind": "function", "selector": "cc2"}, {"component": "cc2_rd", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "GND", "role": "ground", "required": true, "width_mm": 0.8, "endpoints": [{"component": "usb", "selector_kind": "function", "selector": "gnd"}, {"component": "cc1_rd", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "cc2_rd", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "tvs", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "bulk", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "indicator", "selector_kind": "symbol_pin", "selector": "2"}]}
+  ],
+  "no_connects": [],
+  "buses": [],
+  "schematic": {
+    "flow": "left_to_right", "origin": "centered",
+    "groups": [
+      {"id": "input_stage", "role": "input_stage", "members": ["usb", "cc1_rd", "cc2_rd"], "rank": 0, "side": "left"},
+      {"id": "protection_stage", "role": "protection_stage", "members": ["fuse", "tvs", "bulk"], "rank": 1},
+      {"id": "indicator_stage", "role": "output_stage", "members": ["led_resistor", "indicator"], "rank": 2, "side": "right"}
+    ],
+    "lanes": {"power": "top", "signals": "middle", "ground": "bottom"},
+    "placements": [
+      {"component": "usb", "group": "input_stage", "orientation": "normal", "mirror": "none"},
+      {"component": "fuse", "group": "protection_stage", "right_of": "usb", "orientation": "normal", "mirror": "none"},
+      {"component": "tvs", "group": "protection_stage", "near": "fuse", "orientation": "normal", "mirror": "none"},
+      {"component": "bulk", "group": "protection_stage", "near": "tvs", "orientation": "normal", "mirror": "none"},
+      {"component": "led_resistor", "group": "indicator_stage", "right_of": "fuse", "orientation": "normal", "mirror": "none"},
+      {"component": "indicator", "group": "indicator_stage", "right_of": "led_resistor", "orientation": "normal", "mirror": "none"}
+    ],
+    "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": true, "avoid_wire_crossings": true, "min_group_spacing_mm": 12.7, "min_component_spacing_mm": 7.62},
+    "hierarchy": {"mode": "flat"}
+  },
+  "pcb": {
+    "regions": [
+      {"id": "input", "role": "power_input", "bounds": {"x_mm": 1, "y_mm": 3, "width_mm": 16, "height_mm": 24}},
+      {"id": "power", "role": "protection", "bounds": {"x_mm": 17, "y_mm": 3, "width_mm": 18, "height_mm": 24}},
+      {"id": "indicator", "role": "output", "bounds": {"x_mm": 35, "y_mm": 3, "width_mm": 14, "height_mm": 24}}
+    ],
+    "placements": [
+      {"component": "usb", "region": "input", "edge": "left", "priority": 100},
+      {"component": "fuse", "region": "power", "near": "usb", "priority": 100, "max_distance_mm": 12},
+      {"component": "tvs", "region": "power", "near": "usb", "priority": 90, "max_distance_mm": 12},
+      {"component": "bulk", "region": "power", "near": "tvs", "priority": 90, "max_distance_mm": 8},
+      {"component": "indicator", "region": "indicator", "edge": "right", "priority": 80}
+    ],
+    "keepouts": [],
+    "zones": [{"net": "GND", "layers": ["B.Cu"], "clearance_mm": 0.25}]
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true}
+}

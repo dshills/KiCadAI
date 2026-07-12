@@ -1,0 +1,54 @@
+{
+  "schema": "kicadai.circuit-graph.v1",
+  "version": 1,
+  "project": {
+    "name": "generic_rc_filter",
+    "title": "RC Low-Pass Filter",
+    "description": "Catalog-resolved passive low-pass filter with input and output connectors.",
+    "acceptance": "erc-drc",
+    "board": {"width_mm": 40, "height_mm": 25, "layers": 2, "edge_clearance_mm": 0.25}
+  },
+  "components": [
+    {"id": "input", "reference": "J1", "role": "input_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "population": "populate"},
+    {"id": "r1", "reference": "R1", "role": "resistor", "query": {"family": "resistor", "package": "0805", "value_kind": "resistance", "value": "10k", "minimum_confidence": "library_derived"}, "value": "10k", "population": "populate"},
+    {"id": "c1", "reference": "C1", "role": "capacitor", "query": {"family": "capacitor", "package": "0805", "value_kind": "capacitance", "value": "100nF", "minimum_confidence": "library_derived"}, "value": "100nF", "population": "populate"},
+    {"id": "output", "reference": "J2", "role": "output_connector", "component_id": "connector.pinheader.1x02.2_54mm", "variant_id": "vertical", "population": "populate"}
+  ],
+  "nets": [
+    {"name": "FILTER_IN", "role": "signal", "required": true, "endpoints": [{"component": "input", "selector_kind": "symbol_pin", "selector": "1"}, {"component": "r1", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "FILTER_OUT", "role": "signal", "required": true, "endpoints": [{"component": "r1", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "c1", "selector_kind": "symbol_pin", "selector": "1"}, {"component": "output", "selector_kind": "symbol_pin", "selector": "1"}]},
+    {"name": "GND", "role": "ground", "required": true, "endpoints": [{"component": "input", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "c1", "selector_kind": "symbol_pin", "selector": "2"}, {"component": "output", "selector_kind": "symbol_pin", "selector": "2"}]}
+  ],
+  "no_connects": [],
+  "buses": [],
+  "schematic": {
+    "flow": "left_to_right",
+    "origin": "centered",
+    "groups": [
+      {"id": "input_stage", "role": "input_stage", "members": ["input"], "rank": 0, "side": "left"},
+      {"id": "filter_stage", "role": "processing_stage", "members": ["r1", "c1"], "rank": 1},
+      {"id": "output_stage", "role": "output_stage", "members": ["output"], "rank": 2, "side": "right"}
+    ],
+    "lanes": {"power": "top", "signals": "middle", "ground": "bottom"},
+    "placements": [
+      {"component": "input", "group": "input_stage", "orientation": "normal", "mirror": "none"},
+      {"component": "r1", "group": "filter_stage", "right_of": "input", "orientation": "normal", "mirror": "none"},
+      {"component": "c1", "group": "filter_stage", "near": "r1", "orientation": "normal", "mirror": "none"},
+      {"component": "output", "group": "output_stage", "right_of": "r1", "orientation": "normal", "mirror": "none"}
+    ],
+    "rules": {"positive_power_top": true, "ground_bottom": true, "center_on_page": true, "prefer_labels_for_long_nets": true, "avoid_wire_crossings": true, "min_group_spacing_mm": 12.7, "min_component_spacing_mm": 7.62},
+    "hierarchy": {"mode": "flat"}
+  },
+  "pcb": {
+    "regions": [{"id": "main", "role": "signal", "bounds": {"x_mm": 2, "y_mm": 2, "width_mm": 36, "height_mm": 21}}],
+    "placements": [
+      {"component": "input", "region": "main", "edge": "left", "priority": 100},
+      {"component": "r1", "region": "main", "near": "input", "priority": 80, "max_distance_mm": 15},
+      {"component": "c1", "region": "main", "near": "r1", "priority": 80, "max_distance_mm": 8},
+      {"component": "output", "region": "main", "edge": "right", "priority": 100}
+    ],
+    "keepouts": [],
+    "zones": []
+  },
+  "policy": {"allow_reference_assignment": true, "allow_value_normalization": true, "allow_layout_inference": true, "allow_spacing_adjustment": true, "allow_label_insertion": true, "allow_placement_adjustment": true, "allow_route_retry": true}
+}
