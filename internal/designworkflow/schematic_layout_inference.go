@@ -31,6 +31,7 @@ type inferredSchematicGroup struct {
 	order    int
 	anchor   string
 	previous string
+	below    []string
 	relation inferredSchematicGroupRelation
 }
 
@@ -41,6 +42,8 @@ const (
 	inferredRelationInputSupport  inferredSchematicGroupRelation = "input_support"
 	inferredRelationLocalSupport  inferredSchematicGroupRelation = "local_support"
 	inferredRelationOutputSupport inferredSchematicGroupRelation = "output_support"
+	inferredRelationSeriesInput   inferredSchematicGroupRelation = "series_input"
+	inferredRelationFlowOutput    inferredSchematicGroupRelation = "flow_output"
 )
 
 func inferSchematicLayout(output blocks.CompositionOutput) (schematicir.Layout, []reports.Issue) {
@@ -179,6 +182,8 @@ func inferredSchematicAnchor(role schematicir.ComponentRole) (int, schematicir.G
 		return inferredProcessingStagePriority, schematicir.GroupRoleProcessingStage, "", true
 	case schematicir.ComponentRoleOutputConnector:
 		return inferredOutputStagePriority, schematicir.GroupRoleOutputStage, schematicir.SideRight, true
+	case schematicir.ComponentRoleIndicatorLED:
+		return inferredOutputStagePriority, schematicir.GroupRoleOutputStage, schematicir.SideRight, true
 	default:
 		return 0, "", "", false
 	}
@@ -254,8 +259,8 @@ func inferredSchematicReachable(adjacent map[string]map[string]struct{}, root st
 }
 
 func inferredSchematicGroups(instances []inferredSchematicInstance) []inferredSchematicGroup {
-	groups := make([]inferredSchematicGroup, 0, len(instances)*2)
-	previousAnchor := ""
+	groups := make([]inferredSchematicGroup, 0, len(instances)*6)
+	previousFlowTarget := ""
 	for _, instance := range instances {
 		main := inferredSchematicGroup{
 			group: schematicir.Group{
@@ -266,20 +271,43 @@ func inferredSchematicGroups(instances []inferredSchematicInstance) []inferredSc
 			},
 			order:    instance.priority * 10,
 			anchor:   instance.anchor.ID,
-			previous: previousAnchor,
+			previous: previousFlowTarget,
 			relation: inferredRelationMain,
 		}
 		inputSupport := inferredSchematicGroup{
 			group: schematicir.Group{ID: instance.id + "_input_support", Label: instance.id + " input support", Role: schematicir.GroupRoleDecouplingStage, Side: schematicir.SideTop},
-			order: instance.priority*10 - 2, anchor: instance.anchor.ID, previous: previousAnchor, relation: inferredRelationInputSupport,
+			order: instance.priority*10 - 2, anchor: instance.anchor.ID, previous: previousFlowTarget, relation: inferredRelationInputSupport,
 		}
 		localSupport := inferredSchematicGroup{
 			group: schematicir.Group{ID: instance.id + "_support", Label: instance.id + " support", Role: schematicir.GroupRoleDecouplingStage, Side: schematicir.SideTop},
-			order: instance.priority*10 - 1, anchor: instance.anchor.ID, previous: previousAnchor, relation: inferredRelationLocalSupport,
+			order: instance.priority*10 - 1, anchor: instance.anchor.ID, previous: previousFlowTarget, relation: inferredRelationLocalSupport,
 		}
 		outputSupport := inferredSchematicGroup{
 			group: schematicir.Group{ID: instance.id + "_output_support", Label: instance.id + " output support", Role: schematicir.GroupRoleDecouplingStage, Side: schematicir.SideTop},
-			order: instance.priority*10 + 1, anchor: instance.anchor.ID, previous: previousAnchor, relation: inferredRelationOutputSupport,
+			order: instance.priority*10 + 1, anchor: instance.anchor.ID, previous: previousFlowTarget, relation: inferredRelationOutputSupport,
+		}
+		seriesInput := inferredSchematicGroup{
+			group: schematicir.Group{ID: instance.id + "_series_input", Label: instance.id + " series input", Role: schematicir.GroupRolePowerStage},
+			order: instance.priority*10 - 1, anchor: instance.anchor.ID, previous: previousFlowTarget, relation: inferredRelationSeriesInput,
+		}
+		inputGroundSupport := inferredSchematicGroup{
+			group: schematicir.Group{ID: instance.id + "_input_ground", Label: instance.id + " input ground", Role: schematicir.GroupRoleProtectionStage, Side: schematicir.SideBottom},
+			order: instance.priority*10 + 2, anchor: instance.anchor.ID,
+		}
+		flowOutput := inferredSchematicGroup{
+			group: schematicir.Group{ID: instance.id + "_flow_output", Label: instance.id + " protected output", Role: schematicir.GroupRoleProtectionStage},
+			order: instance.priority*10 + 1, previous: instance.anchor.ID, relation: inferredRelationFlowOutput,
+		}
+		outputGroundSupport := inferredSchematicGroup{
+			group: schematicir.Group{ID: instance.id + "_output_ground", Label: instance.id + " protected ground", Role: schematicir.GroupRoleProtectionStage, Side: schematicir.SideBottom},
+			order: instance.priority*10 + 3,
+		}
+		hasProtectedFlow := false
+		for _, component := range instance.components {
+			if component.Role == schematicir.ComponentRoleFuse {
+				hasProtectedFlow = true
+				break
+			}
 		}
 		for _, component := range instance.components {
 			_, rawRole, _ := strings.Cut(component.ID, schematicLayoutTargetDelimiter)
@@ -290,16 +318,57 @@ func inferredSchematicGroups(instances []inferredSchematicInstance) []inferredSc
 				outputSupport.group.Members = append(outputSupport.group.Members, component.ID)
 			case component.Role == schematicir.ComponentRoleDecouplingCapacitor || component.Role == schematicir.ComponentRolePullup:
 				localSupport.group.Members = append(localSupport.group.Members, component.ID)
+			case component.Role == schematicir.ComponentRoleFuse:
+				flowOutput.group.Members = append(flowOutput.group.Members, component.ID)
+			case component.Role == schematicir.ComponentRoleTVS || component.Role == schematicir.ComponentRoleBulkCapacitor:
+				outputGroundSupport.group.Members = append(outputGroundSupport.group.Members, component.ID)
+			case instance.anchor.Role == schematicir.ComponentRoleIndicatorLED && component.Role == schematicir.ComponentRoleResistor:
+				seriesInput.group.Members = append(seriesInput.group.Members, component.ID)
+			case hasProtectedFlow && instance.anchor.Role == schematicir.ComponentRoleInputConnector && strings.HasSuffix(rawRole, "_rd"):
+				inputGroundSupport.group.Members = append(inputGroundSupport.group.Members, component.ID)
 			default:
 				main.group.Members = append(main.group.Members, component.ID)
 			}
 		}
-		for _, group := range []inferredSchematicGroup{inputSupport, localSupport, main, outputSupport} {
+
+		flowTarget := instance.anchor.ID
+		if len(seriesInput.group.Members) != 0 {
+			main.previous = seriesInput.group.Members[len(seriesInput.group.Members)-1]
+		}
+		if len(inputGroundSupport.group.Members) != 0 {
+			main.group.Members = append(main.group.Members, inputGroundSupport.group.Members...)
+			main.below = append(main.below, inputGroundSupport.group.Members...)
+			inputGroundSupport.group.Members = nil
+		}
+		if len(flowOutput.group.Members) != 0 {
+			flowTarget = flowOutput.group.Members[len(flowOutput.group.Members)-1]
+			flowOutput.anchor = flowTarget
+			outputGroundSupport.anchor = flowTarget
+			flowOutput.group.Members = append(flowOutput.group.Members, outputGroundSupport.group.Members...)
+			flowOutput.below = append(flowOutput.below, outputGroundSupport.group.Members...)
+			outputGroundSupport.group.Members = nil
+		} else {
+			outputGroundSupport.anchor = instance.anchor.ID
+			main.group.Members = append(main.group.Members, outputGroundSupport.group.Members...)
+			main.below = append(main.below, outputGroundSupport.group.Members...)
+			outputGroundSupport.group.Members = nil
+		}
+
+		for _, group := range []inferredSchematicGroup{
+			inputSupport,
+			localSupport,
+			seriesInput,
+			main,
+			inputGroundSupport,
+			outputSupport,
+			flowOutput,
+			outputGroundSupport,
+		} {
 			if len(group.group.Members) != 0 {
 				groups = append(groups, group)
 			}
 		}
-		previousAnchor = instance.anchor.ID
+		previousFlowTarget = flowTarget
 	}
 	sort.SliceStable(groups, func(i, j int) bool {
 		if groups[i].order != groups[j].order {
@@ -320,6 +389,7 @@ func inferredSchematicPlacements(group inferredSchematicGroup) []schematicir.Pla
 				if group.previous != "" {
 					placement.RightOf = []string{group.previous}
 				}
+				placement.Above = append(placement.Above, group.below...)
 			} else {
 				placement.Near = []string{group.anchor}
 			}
@@ -333,6 +403,18 @@ func inferredSchematicPlacements(group inferredSchematicGroup) []schematicir.Pla
 			placement.Near = []string{group.anchor}
 			placement.Above = []string{group.anchor}
 			placement.RightOf = []string{group.anchor}
+		case inferredRelationSeriesInput:
+			placement.Near = []string{group.anchor}
+			if group.previous != "" {
+				placement.RightOf = []string{group.previous}
+			}
+		case inferredRelationFlowOutput:
+			if target == group.anchor {
+				placement.RightOf = []string{group.previous}
+				placement.Above = append(placement.Above, group.below...)
+			} else {
+				placement.Near = []string{group.anchor}
+			}
 		}
 		placements = append(placements, placement)
 	}

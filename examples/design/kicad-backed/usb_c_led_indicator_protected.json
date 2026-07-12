@@ -5,6 +5,7 @@
     "summary": "USB-C powered LED indicator board with a 5 V power-only sink and active-high indicator LED.",
     "category": "breakout"
   },
+  "auto_schematic_layout": true,
   "board": {
     "width_mm": 50,
     "height_mm": 30,

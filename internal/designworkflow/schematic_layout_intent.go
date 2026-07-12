@@ -114,13 +114,14 @@ func schematicLayoutDocument(output blocks.CompositionOutput, layout schematicir
 		if payload.Unit > 0 {
 			unit = strconv.Itoa(payload.Unit)
 		}
+		componentRole := schematicLayoutComponentRole(role)
 		component := schematicir.Component{
 			ID:     target,
 			Ref:    payload.Ref,
 			Unit:   unit,
-			Role:   schematicLayoutComponentRole(role),
+			Role:   componentRole,
 			Symbol: payload.LibraryID,
-			Value:  payload.Value,
+			Value:  schematicLayoutComponentValue(componentRole, payload.Value),
 		}
 		for _, pin := range payload.Pins {
 			x, y := pin.XMM, pin.YMM
@@ -158,6 +159,14 @@ func schematicLayoutComponentRole(role string) schematicir.ComponentRole {
 	switch {
 	case strings.Contains(normalized, "usb_c_receptacle"):
 		return schematicir.ComponentRoleInputConnector
+	case schematicLayoutRoleHasToken(normalized, "led") && !schematicLayoutRoleHasToken(normalized, "driver"):
+		return schematicir.ComponentRoleIndicatorLED
+	case strings.Contains(normalized, "fuse"):
+		return schematicir.ComponentRoleFuse
+	case strings.Contains(normalized, "tvs"):
+		return schematicir.ComponentRoleTVS
+	case strings.Contains(normalized, "bulk_capacitor"):
+		return schematicir.ComponentRoleBulkCapacitor
 	case normalized == "connector" || strings.Contains(normalized, "output_connector"):
 		return schematicir.ComponentRoleOutputConnector
 	case strings.Contains(normalized, "regulator"):
@@ -175,6 +184,44 @@ func schematicLayoutComponentRole(role string) schematicir.ComponentRole {
 	default:
 		return schematicir.ComponentRoleGeneric
 	}
+}
+
+func schematicLayoutComponentValue(role schematicir.ComponentRole, value string) string {
+	trimmed := strings.TrimSpace(value)
+	if role != schematicir.ComponentRoleResistor && role != schematicir.ComponentRoleCurrentLimiter {
+		return trimmed
+	}
+	if !schematicLayoutPlainDecimal(trimmed) {
+		return trimmed
+	}
+	return trimmed + "R"
+}
+
+func schematicLayoutRoleHasToken(role, token string) bool {
+	for _, part := range strings.FieldsFunc(role, func(r rune) bool {
+		return r == '_' || r == '-' || r == '.'
+	}) {
+		if part == token {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicLayoutPlainDecimal(value string) bool {
+	digits := 0
+	dots := 0
+	for _, r := range value {
+		switch {
+		case r >= '0' && r <= '9':
+			digits++
+		case r == '.':
+			dots++
+		default:
+			return false
+		}
+	}
+	return digits > 0 && dots <= 1
 }
 
 func schematicLayoutNets(operations []transactions.Operation, targetByRef map[string]string) ([]schematicir.Net, error) {

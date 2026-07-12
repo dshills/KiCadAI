@@ -120,6 +120,157 @@ func TestBMP280LayoutIntentIsNameIndependentAndDeterministic(t *testing.T) {
 	}
 }
 
+func TestProtectedUSBCLEDLayoutInferenceIsDeterministicAndReadable(t *testing.T) {
+	file, err := os.Open("../../examples/design/kicad-backed/usb_c_led_indicator_protected.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	request, issues := DecodeRequestStrict(file)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode protected USB-C LED fixture: %#v", issues)
+	}
+	if request.SchematicLayout != nil {
+		t.Fatal("protected USB-C LED fixture must not carry hand-authored schematic_layout intent")
+	}
+	if !request.AutoSchematicLayout {
+		t.Fatal("protected USB-C LED fixture must opt into automatic schematic layout")
+	}
+
+	request.Name = "renamed_protected_indicator"
+	plan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), request)
+	if reports.HasBlockingIssue(plan.Stage.Issues) {
+		t.Fatalf("plan protected USB-C LED fixture: %#v", plan.Stage.Issues)
+	}
+	if plan.Request.SchematicLayout == nil {
+		t.Fatal("block planning did not synthesize protected USB-C LED layout intent")
+	}
+	placements := map[string]schematicir.Placement{}
+	for _, placement := range plan.Request.SchematicLayout.Placements {
+		placements[placement.Target] = placement
+	}
+	for target, relation := range map[string]string{
+		"usb_power__vbus_fuse": "usb_power__usb_c_receptacle",
+		"indicator__resistor":  "usb_power__vbus_fuse",
+		"indicator__led":       "indicator__resistor",
+	} {
+		if !containsLayoutTarget(placements[target].RightOf, relation) {
+			t.Fatalf("%s right_of = %#v, want %s", target, placements[target].RightOf, relation)
+		}
+	}
+	for _, target := range []string{"usb_power__cc1_rd", "usb_power__cc2_rd"} {
+		if !containsLayoutTarget(placements["usb_power__usb_c_receptacle"].Above, target) {
+			t.Fatalf("USB-C receptacle above = %#v, want %s below", placements["usb_power__usb_c_receptacle"].Above, target)
+		}
+	}
+	for _, target := range []string{"usb_power__vbus_tvs", "usb_power__bulk_capacitor"} {
+		if !containsLayoutTarget(placements["usb_power__vbus_fuse"].Above, target) {
+			t.Fatalf("fuse above = %#v, want %s below", placements["usb_power__vbus_fuse"].Above, target)
+		}
+		if !containsLayoutTarget(placements[target].Near, "usb_power__vbus_fuse") {
+			t.Fatalf("%s near = %#v, want fuse", target, placements[target].Near)
+		}
+	}
+
+	secondRequest := request
+	secondRequest.Name = "another_protected_indicator_name"
+	secondPlan := PlanBlocks(context.Background(), blocks.NewBuiltinRegistry(), secondRequest)
+	if reports.HasBlockingIssue(secondPlan.Stage.Issues) {
+		t.Fatalf("repeat plan protected USB-C LED fixture: %#v", secondPlan.Stage.Issues)
+	}
+	if !reflect.DeepEqual(*plan.Request.SchematicLayout, *secondPlan.Request.SchematicLayout) {
+		t.Fatal("protected USB-C LED inferred layout changed with project name or repeated planning")
+	}
+
+	operations, paper, err := layoutSchematicOperations(plan.Output, *plan.Request.SchematicLayout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if paper != "A4" {
+		t.Fatalf("selected paper = %q, want A4", paper)
+	}
+	secondOperations, secondPaper, err := layoutSchematicOperations(secondPlan.Output, *secondPlan.Request.SchematicLayout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if secondPaper != paper || !reflect.DeepEqual(operations, secondOperations) {
+		t.Fatal("protected USB-C LED schematic transactions changed with project name or repeated planning")
+	}
+	positions := map[string]transactions.Point{}
+	for index, operation := range operations {
+		if operation.Op != transactions.OpAddSymbol {
+			continue
+		}
+		var payload transactions.AddSymbolOperation
+		if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+			t.Fatalf("decode add_symbol %d: %v", index, err)
+		}
+		positions[payload.Role] = payload.At
+		for _, property := range payload.Properties {
+			if property.Name != "Reference" && property.Name != "Value" {
+				continue
+			}
+			if property.At == nil || *property.At == payload.At {
+				t.Fatalf("%s %s property is not explicitly separated from its body", payload.Ref, property.Name)
+			}
+		}
+	}
+	for _, pair := range [][2]string{
+		{"usb_c_receptacle", "vbus_fuse"},
+		{"vbus_fuse", "resistor"},
+		{"resistor", "led"},
+	} {
+		if positions[pair[0]].XMM >= positions[pair[1]].XMM {
+			t.Fatalf("flow %s -> %s is not left-to-right: %#v", pair[0], pair[1], positions)
+		}
+	}
+	for _, role := range []string{"cc1_rd", "cc2_rd"} {
+		if positions[role].YMM <= positions["usb_c_receptacle"].YMM {
+			t.Fatalf("%s is not below USB-C receptacle: %#v", role, positions)
+		}
+	}
+	for _, role := range []string{"vbus_tvs", "bulk_capacitor"} {
+		if positions[role].YMM <= positions["vbus_fuse"].YMM {
+			t.Fatalf("%s is not below fuse: %#v", role, positions)
+		}
+	}
+}
+
+func containsLayoutTarget(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
+}
+
+func TestSchematicLayoutComponentRoleRecognizesLEDToken(t *testing.T) {
+	for _, role := range []string{"led", "power_led", "status-led", "led.red", "indicator_led"} {
+		if got := schematicLayoutComponentRole(role); got != schematicir.ComponentRoleIndicatorLED {
+			t.Errorf("schematicLayoutComponentRole(%q) = %q, want %q", role, got, schematicir.ComponentRoleIndicatorLED)
+		}
+	}
+	if got := schematicLayoutComponentRole("led_driver"); got == schematicir.ComponentRoleIndicatorLED {
+		t.Fatalf("schematicLayoutComponentRole(led_driver) = %q, want a non-LED role", got)
+	}
+}
+
+func TestSchematicLayoutComponentValueNormalizesOnlyPlainDecimalResistance(t *testing.T) {
+	for value, want := range map[string]string{
+		"600":      "600R",
+		" 0.5 ":    "0.5R",
+		"1e3":      "1e3",
+		"NaN":      "NaN",
+		"Infinity": "Infinity",
+		"-10":      "-10",
+	} {
+		if got := schematicLayoutComponentValue(schematicir.ComponentRoleResistor, value); got != want {
+			t.Errorf("schematicLayoutComponentValue(resistor, %q) = %q, want %q", value, got, want)
+		}
+	}
+}
+
 func TestAutomaticSchematicLayoutFailsClosedOnDisconnectedStageTopology(t *testing.T) {
 	file, err := os.Open("../../examples/design/kicad-backed/sensor_bmp280_breakout.json")
 	if err != nil {
