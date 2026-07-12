@@ -147,7 +147,7 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 	if intentPlan.Status != PlanStatusReady || intentPlan.GeneratedRequest == nil {
 		t.Fatalf("intent plan = %#v", intentPlan)
 	}
-	if !hasConnectionWithNet(*intentPlan.GeneratedRequest, "regulator.VOUT", "i2c_connector.VCC", "VCC_3v3v") {
+	if !hasConnectionWithNet(*intentPlan.GeneratedRequest, "regulator.VOUT", "i2c_connector.VCC", "VCC_3v3") {
 		t.Fatalf("BMP280 connector VCC connection missing: %#v", intentPlan.GeneratedRequest.Connections)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -196,8 +196,8 @@ func TestBMP280IntentClearsSchematicElectrical(t *testing.T) {
 		}
 		return false
 	}
-	if !hasEndpoint("VCC_3v3v", sensorRef, "8") || !hasEndpoint("VCC_3v3v", regulatorRef, "5") {
-		t.Fatalf("concrete power pins missing from VCC_3v3v: nets=%#v", placed.Request.Nets)
+	if !hasEndpoint("VCC_3v3", sensorRef, "8") || !hasEndpoint("VCC_3v3", regulatorRef, "5") {
+		t.Fatalf("concrete power pins missing from VCC_3v3: nets=%#v", placed.Request.Nets)
 	}
 	if hasEndpoint("GND", sensorRef, "8") || hasEndpoint("GND", regulatorRef, "5") {
 		t.Fatalf("concrete power pins merged into GND: nets=%#v", placed.Request.Nets)
@@ -1101,12 +1101,12 @@ func TestPlanRecordsVoltageDomainEvidence(t *testing.T) {
 	if !ok {
 		t.Fatalf("missing function requirement: %#v", plan.Requirements)
 	}
-	for _, evidence := range []string{"supply:regulator.VOUT", "net:VCC_3v3v"} {
+	for _, evidence := range []string{"supply:regulator.VOUT", "net:VCC_3v3"} {
 		if !containsString(requirement.Evidence, evidence) {
 			t.Fatalf("missing evidence %s in %#v", evidence, requirement.Evidence)
 		}
 	}
-	if !hasConnectionWithNet(*plan.GeneratedRequest, "regulator.VOUT", "sensor.VCC", "VCC_3v3v") {
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "regulator.VOUT", "sensor.VCC", "VCC_3v3") {
 		t.Fatalf("missing sensor supply connection: %#v", plan.GeneratedRequest.Connections)
 	}
 }
@@ -1125,7 +1125,7 @@ func TestPlanResolvesSupplyByRailNameAndBlocksUnknownSupply(t *testing.T) {
 	if plan.Status == PlanStatusBlocked {
 		t.Fatalf("plan blocked: %#v", plan.Issues)
 	}
-	if !hasConnectionWithNet(*plan.GeneratedRequest, "regulator.VOUT", "sensor.VCC", "VCC_3v3v") {
+	if !hasConnectionWithNet(*plan.GeneratedRequest, "regulator.VOUT", "sensor.VCC", "VCC_3v3") {
 		t.Fatalf("missing rail-name supply connection: %#v", plan.GeneratedRequest.Connections)
 	}
 
@@ -1358,6 +1358,19 @@ func TestPlanDerivesDraftComponentPolicy(t *testing.T) {
 	}
 	if !plan.GeneratedRequest.Validation.SkipRouting {
 		t.Fatalf("SkipRouting not derived: %#v", plan.GeneratedRequest.Validation)
+	}
+}
+
+func TestVoltageNetTokenDoesNotDuplicateDecimalVoltageUnit(t *testing.T) {
+	tests := map[string]string{
+		"3.3V": "3v3",
+		"3.3":  "3v3",
+		"5V":   "5v",
+	}
+	for input, want := range tests {
+		if got := voltageNetToken(input); got != want {
+			t.Errorf("voltageNetToken(%q) = %q, want %q", input, got, want)
+		}
 	}
 }
 

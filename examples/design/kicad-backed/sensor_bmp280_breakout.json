@@ -114,7 +114,7 @@
     {
       "from": "regulator.VOUT",
       "to": "sensor.VCC",
-      "net_alias": "VCC_3v3v"
+      "net_alias": "VCC_3v3"
     },
     {
       "from": "usb_power.GND",
@@ -144,7 +144,7 @@
     {
       "from": "regulator.VOUT",
       "to": "i2c_connector.VCC",
-      "net_alias": "VCC_3v3v"
+      "net_alias": "VCC_3v3"
     }
   ],
   "constraints": {},

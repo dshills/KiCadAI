@@ -1331,12 +1331,20 @@ func (builder *planBuilder) supplyNetAlias(sourceID string) string {
 		return builder.powerPortFor(sourceID)
 	}
 	if voltage := firstNonEmpty(builder.paramString(sourceID, "output_voltage"), builder.inputVoltageForInstance(sourceID)); voltage != "" {
-		return "VCC_" + normalizeToken(strings.ReplaceAll(voltage, ".", "V"))
+		return "VCC_" + voltageNetToken(voltage)
 	}
 	if sourceID != "" {
 		return "VCC_" + normalizeToken(sourceID)
 	}
 	return "VCC"
+}
+
+func voltageNetToken(voltage string) string {
+	voltage = strings.TrimSpace(voltage)
+	if strings.Contains(voltage, ".") && strings.HasSuffix(strings.ToUpper(voltage), "V") {
+		voltage = strings.TrimSpace(voltage[:len(voltage)-1])
+	}
+	return normalizeToken(strings.ReplaceAll(voltage, ".", "V"))
 }
 
 func (builder *planBuilder) rawPowerSourceForVoltage(voltage string) (string, string) {
