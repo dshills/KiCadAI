@@ -190,6 +190,20 @@
         "population": "populate"
       },
       {
+        "id": "sdo_strap",
+        "reference": "R5",
+        "role": "resistor",
+        "query": {
+          "family": "resistor",
+          "package": "0805",
+          "value_kind": "resistance",
+          "value": "10k",
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "10k",
+        "population": "populate"
+      },
+      {
         "id": "i2c_header",
         "reference": "J2",
         "role": "output_connector",
@@ -393,6 +407,23 @@
         ]
       },
       {
+        "name": "SDO_ADDR",
+        "role": "signal",
+        "required": true,
+        "endpoints": [
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "SDO"
+          },
+          {
+            "component": "sdo_strap",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          }
+        ]
+      },
+      {
         "name": "GND",
         "role": "ground",
         "required": true,
@@ -444,9 +475,9 @@
             "selector": "gnd"
           },
           {
-            "component": "sensor",
-            "selector_kind": "function",
-            "selector": "SDO"
+            "component": "sdo_strap",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
           },
           {
             "component": "sensor_cap",
@@ -539,7 +570,8 @@
             "sensor",
             "sensor_cap",
             "sda_pullup",
-            "scl_pullup"
+            "scl_pullup",
+            "sdo_strap"
           ],
           "rank": 3
         },
@@ -588,6 +620,13 @@
         },
         {
           "component": "sensor_cap",
+          "group": "sensor_stage",
+          "near": "sensor",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
+          "component": "sdo_strap",
           "group": "sensor_stage",
           "near": "sensor",
           "orientation": "normal",
@@ -672,6 +711,13 @@
           "near": "sensor",
           "priority": 100,
           "max_distance_mm": 5
+        },
+        {
+          "component": "sdo_strap",
+          "region": "sensor",
+          "near": "sensor",
+          "priority": 1,
+          "max_distance_mm": 8
         },
         {
           "component": "i2c_header",
