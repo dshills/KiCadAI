@@ -563,10 +563,10 @@ func (state *adapterState) appendBuses(tx *transactions.Transaction) {
 			Op:     transactions.OpAddBus,
 			Points: points,
 		}, "", "")
-		if strings.TrimSpace(bus.Name) != "" && len(points) > 0 {
+		if label := schematicBusLabel(bus); label != "" && len(points) > 0 {
 			state.appendOperation(tx, transactions.OpAddLabel, transactions.AddLabelOperation{
 				Op:   transactions.OpAddLabel,
-				Text: bus.Name,
+				Text: label,
 				At:   points[0],
 				Kind: "local",
 			}, "", "")
@@ -611,6 +611,49 @@ func (state *adapterState) appendBuses(tx *transactions.Transaction) {
 			}, "", member.Net)
 		}
 	}
+}
+
+func schematicBusLabel(bus Bus) string {
+	name := strings.TrimSpace(bus.Name)
+	if strings.ContainsAny(name, "[{") {
+		// Explicit KiCad vector/group syntax is authoritative for the label;
+		// Bus.Members still controls entry and scalar-wire emission.
+		return name
+	}
+	members := make([]string, 0, len(bus.Members))
+	prefix := name + "."
+	for _, member := range bus.Members {
+		label := strings.TrimSpace(member.Label)
+		if label == "" {
+			continue
+		}
+		members = append(members, label)
+	}
+	if len(members) == 0 {
+		return name
+	}
+	namedMembers := name != ""
+	if namedMembers {
+		for _, member := range members {
+			if !strings.HasPrefix(member, prefix) || len(member) == len(prefix) {
+				namedMembers = false
+				break
+			}
+		}
+	}
+	if namedMembers {
+		for index := range members {
+			members[index] = strings.TrimPrefix(members[index], prefix)
+		}
+	}
+	group := "{" + strings.Join(members, " ") + "}"
+	if namedMembers {
+		return name + group
+	}
+	// KiCad prefixes every member of a named group. Keep ordinary scalar net
+	// labels unprefixed by emitting an unnamed group; prepending name here
+	// would silently change SCL into name.SCL in the electrical netlist.
+	return group
 }
 
 func (state *adapterState) busPinStub(anchor transactions.Point, endpoint EndpointRef) transactions.Point {

@@ -260,3 +260,44 @@ func TestSchematicIRWritesAndReadsVectorBus(t *testing.T) {
 		t.Fatalf("vector bus readability = %#v diagnostics=%#v", readability, layoutResult.Diagnostics)
 	}
 }
+
+func TestSchematicBusLabelUsesKiCadBusSyntax(t *testing.T) {
+	tests := []struct {
+		name string
+		bus  Bus
+		want string
+	}{
+		{
+			name: "explicit vector",
+			bus:  Bus{Name: "DATA[0..3]", Members: []BusMember{{Net: "DATA0", Label: "DATA0"}}},
+			want: "DATA[0..3]",
+		},
+		{
+			name: "ordinary scalar members",
+			bus:  Bus{Name: "I2C", Members: []BusMember{{Net: "SCL", Label: "SCL"}, {Net: "SDA", Label: "SDA"}}},
+			want: "{SCL SDA}",
+		},
+		{
+			name: "named group members",
+			bus:  Bus{Name: "USB", Members: []BusMember{{Net: "USB.DP", Label: "USB.DP"}, {Net: "USB.DM", Label: "USB.DM"}}},
+			want: "USB{DP DM}",
+		},
+		{
+			name: "explicit group",
+			bus:  Bus{Name: "{SCL SDA}", Members: []BusMember{{Net: "SCL", Label: "SCL"}, {Net: "SDA", Label: "SDA"}}},
+			want: "{SCL SDA}",
+		},
+		{
+			name: "legacy name without members",
+			bus:  Bus{Name: "LEGACY"},
+			want: "LEGACY",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			if got := schematicBusLabel(test.bus); got != test.want {
+				t.Fatalf("schematicBusLabel(%#v) = %q, want %q", test.bus, got, test.want)
+			}
+		})
+	}
+}
