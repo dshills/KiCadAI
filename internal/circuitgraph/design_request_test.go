@@ -29,6 +29,9 @@ func TestToDesignRequestCheckedInExamples(t *testing.T) {
 			if validation := designworkflow.ValidateRequest(request); reports.HasBlockingIssue(validation) {
 				t.Fatalf("workflow validation = %#v", validation)
 			}
+			if got, want := request.Constraints.AllowBackLayer, resolved.Source.Project.Board.Layers > 1; got != want {
+				t.Fatalf("allow back layer = %v, want %v for %d layers", got, want, resolved.Source.Project.Board.Layers)
+			}
 		})
 	}
 }

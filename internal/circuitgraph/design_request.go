@@ -119,6 +119,7 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 			WidthMM: resolved.Source.Project.Board.WidthMM, HeightMM: resolved.Source.Project.Board.HeightMM,
 			Layers: resolved.Source.Project.Board.Layers, EdgeClearanceMM: resolved.Source.Project.Board.EdgeClearanceMM,
 		},
+		Constraints:     designworkflow.ConstraintSpec{AllowBackLayer: resolved.Source.Project.Board.Layers > 1},
 		ExplicitCircuit: &explicit,
 		Validation: designworkflow.ValidationSpec{
 			Acceptance: designWorkflowAcceptance(resolved.Source.Project.Acceptance),
