@@ -137,7 +137,53 @@ func (builder *promotionReportBuilder) addWriterGate() {
 }
 
 func (builder *promotionReportBuilder) addConnectivityGate() {
-	builder.addStageStatusGate("connectivity", StageValidation, []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass})
+	required := []PromotionReadiness{PromotionReadinessCandidate, PromotionReadinessPass}
+	if !builder.stageRelevant(StageValidation) {
+		required = nil
+	}
+	stage, ok := builder.stages[StageValidation]
+	if !ok {
+		builder.gates = append(builder.gates, PromotionGate{ID: "connectivity", Status: PromotionGateStatusNotRun, RequiredFor: required})
+		return
+	}
+	issueCodes := builder.issueCodesForStage(StageValidation)
+	remaining := make([]string, 0, len(issueCodes))
+	for _, code := range issueCodes {
+		if builder.connectivityIssueSatisfiedByKiCad(builder.issues[code]) {
+			continue
+		}
+		remaining = append(remaining, code)
+	}
+	status := promotionGateStatusForStage(stage)
+	if len(remaining) == 0 && len(issueCodes) != 0 {
+		status = PromotionGateStatusPass
+	}
+	builder.gates = append(builder.gates, PromotionGate{
+		ID: "connectivity", Status: status, RequiredFor: required, IssueCodes: remaining,
+	})
+}
+
+func (builder *promotionReportBuilder) connectivityIssueSatisfiedByKiCad(issue PromotionIssue) bool {
+	message := strings.TrimSpace(issue.Message)
+	switch {
+	case strings.HasPrefix(message, "erc_validation is available through the `check` command"):
+		return builder.kiCadCheckPassed(promotionKiCadERCSummaryKey)
+	case strings.HasPrefix(message, "drc_validation is available through the `check` command"):
+		return builder.kiCadCheckPassed(promotionKiCadDRCSummaryKey)
+	case message == "zone has no fill evidence; run KiCad refill/DRC for authoritative zone connectivity":
+		return builder.kiCadCheckPassed(promotionKiCadDRCSummaryKey)
+	default:
+		return false
+	}
+}
+
+func (builder *promotionReportBuilder) kiCadCheckPassed(key string) bool {
+	stage, ok := builder.stages[StageKiCadChecks]
+	if !ok || stage.Summary == nil {
+		return false
+	}
+	status, valid := promotionCheckResultStatus(stage.Summary[key])
+	return valid && status == PromotionGateStatusPass
 }
 
 func (builder *promotionReportBuilder) addSchematicElectricalGate() {

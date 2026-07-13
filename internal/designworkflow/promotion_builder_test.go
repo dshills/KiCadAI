@@ -495,6 +495,55 @@ func TestBuildPromotionReportKiCadChecksCleanEvidencePasses(t *testing.T) {
 	}
 }
 
+func TestBuildPromotionReportCleanKiCadEvidenceSatisfiesDeferredConnectivityWarnings(t *testing.T) {
+	fixture := PromotionFixture{
+		ID: "deferred_connectivity", Request: "deferred_connectivity.json", Tier: "pass",
+		DeclaredReadiness: PromotionReadinessPass, Acceptance: AcceptanceERCDRC,
+		RequireERC: true, RequireDRC: true, ExpectedStages: []StageName{StageValidation, StageKiCadChecks},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "deferred_connectivity"}, AcceptanceERCDRC, []StageResult{
+		{Name: StageValidation, Status: StageStatusWarning, Issues: []reports.Issue{
+			{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityInfo, Message: "erc_validation is available through the `check` command and is not run by default during structural evaluation"},
+			{Code: reports.CodeSkippedExternalTool, Severity: reports.SeverityInfo, Message: "drc_validation is available through the `check` command and is not run by default during structural evaluation"},
+			{Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning, Message: "zone has no fill evidence; run KiCad refill/DRC for authoritative zone connectivity"},
+		}},
+		{Name: StageKiCadChecks, Status: StageStatusOK, Summary: map[string]any{
+			"erc": checks.CheckResult{Kind: checks.CheckKindERC, Status: checks.CheckStatusPass},
+			"drc": checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusPass},
+		}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "connectivity")
+	if gate.Status != PromotionGateStatusPass || len(gate.IssueCodes) != 0 {
+		t.Fatalf("connectivity gate = %#v, want evidence-backed pass", gate)
+	}
+	if report.AchievedReadiness != PromotionReadinessPass || report.Status != PromotionStatusPass {
+		t.Fatalf("promotion = %q/%q, want pass/pass", report.AchievedReadiness, report.Status)
+	}
+}
+
+func TestBuildPromotionReportDoesNotSatisfyZoneWarningWithoutCleanDRC(t *testing.T) {
+	fixture := PromotionFixture{
+		ID: "deferred_zone", Request: "deferred_zone.json", Tier: "pass",
+		DeclaredReadiness: PromotionReadinessPass, Acceptance: AcceptanceERCDRC,
+		RequireDRC: true, ExpectedStages: []StageName{StageValidation, StageKiCadChecks},
+	}
+	result := BuildWorkflowResult(ProjectSummary{Name: "deferred_zone"}, AcceptanceERCDRC, []StageResult{
+		{Name: StageValidation, Status: StageStatusWarning, Issues: []reports.Issue{{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityWarning,
+			Message: "zone has no fill evidence; run KiCad refill/DRC for authoritative zone connectivity",
+		}}},
+		{Name: StageKiCadChecks, Status: StageStatusWarning, Summary: map[string]any{
+			"drc": checks.CheckResult{Kind: checks.CheckKindDRC, Status: checks.CheckStatusFail, Findings: []checks.CheckFinding{{Severity: "warning"}}},
+		}},
+	})
+	report := BuildInternalPromotionReport(fixture, result)
+	gate := promotionGateByID(t, report, "connectivity")
+	if gate.Status != PromotionGateStatusWarn || len(gate.IssueCodes) != 1 {
+		t.Fatalf("connectivity gate = %#v, want unresolved warning", gate)
+	}
+}
+
 func TestBuildPromotionReportKiCadChecksUnexpectedFindingFails(t *testing.T) {
 	fixture := PromotionFixture{
 		ID:                "failing_kicad",
