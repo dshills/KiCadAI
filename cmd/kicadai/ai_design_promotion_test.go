@@ -142,10 +142,11 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 
 func aiPromotionFixtureIDs() []string {
 	return []string{
+		"generic_rc_filter",
+		"generic_usb_c_bmp280_breakout",
+		"generic_usb_c_led_indicator_protected",
 		"usb_c_bmp280_breakout",
 		"usb_c_led_indicator_protected",
-		"generic_rc_filter",
-		"generic_usb_c_led_indicator_protected",
 	}
 }
 
