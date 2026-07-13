@@ -4,11 +4,9 @@
   "profile": "generic-circuit-v1",
   "prompt": "prompt.txt",
   "recorded_response": "recorded-response.json",
-  "readiness": "candidate",
+  "readiness": "pass",
   "require_erc": true,
   "require_drc": true,
   "require_round_trip": true,
-  "strict_diffs": true,
-  "expected_stage": "routing",
-  "expected_issue_code": "VALIDATION_FAILED"
+  "strict_diffs": true
 }
