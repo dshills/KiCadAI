@@ -68,6 +68,9 @@ func Normalize(document Document) Document {
 		slices.SortStableFunc(normalized.Nets[index].Endpoints, compareEndpoints)
 	}
 	slices.SortStableFunc(normalized.NoConnects, compareEndpoints)
+	slices.SortStableFunc(normalized.PowerFlags, func(left, right PowerFlag) int {
+		return strings.Compare(left.Net, right.Net)
+	})
 	slices.SortStableFunc(normalized.Buses, func(left, right Bus) int {
 		return strings.Compare(left.ID, right.ID)
 	})
@@ -158,6 +161,7 @@ func cloneDocument(document Document) Document {
 		cloned.Nets[index].Endpoints = append([]Endpoint(nil), document.Nets[index].Endpoints...)
 	}
 	cloned.NoConnects = append([]Endpoint(nil), document.NoConnects...)
+	cloned.PowerFlags = append([]PowerFlag(nil), document.PowerFlags...)
 	cloned.Buses = append([]Bus(nil), document.Buses...)
 	for index := range cloned.Buses {
 		cloned.Buses[index].Members = append([]BusMember(nil), document.Buses[index].Members...)

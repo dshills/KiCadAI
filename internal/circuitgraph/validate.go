@@ -17,6 +17,7 @@ const (
 	CodeComponentDuplicate        reports.Code = "GRAPH_COMPONENT_DUPLICATE"
 	CodeComponentSelectionInvalid reports.Code = "GRAPH_COMPONENT_SELECTION_INVALID"
 	CodeNetInvalid                reports.Code = "GRAPH_NET_INVALID"
+	CodePowerFlagInvalid          reports.Code = "GRAPH_POWER_FLAG_INVALID"
 	CodeEndpointDuplicate         reports.Code = "GRAPH_ENDPOINT_DUPLICATE"
 	CodeLayoutUnsupported         reports.Code = "GRAPH_LAYOUT_UNSUPPORTED"
 	CodePCBConstraintInvalid      reports.Code = "GRAPH_PCB_CONSTRAINT_INVALID"
@@ -34,6 +35,7 @@ func Validate(document Document) []reports.Issue {
 	validator.header()
 	componentsByID := validator.components()
 	netsByName, connected := validator.nets(componentsByID)
+	validator.powerFlags(netsByName)
 	validator.noConnects(componentsByID, connected)
 	validator.buses(netsByName)
 	validator.schematic(componentsByID)
@@ -105,6 +107,9 @@ func (validator *graphValidator) components() map[string]Component {
 				validator.add(CodeComponentDuplicate, path+".reference", fmt.Sprintf("reference duplicates components[%d]", previous))
 			}
 			references[component.Reference] = index
+			if strings.HasPrefix(strings.ToUpper(component.Reference), "#FLG") {
+				validator.add(CodePowerFlagInvalid, path+".reference", "#FLG reference prefix is reserved for generated power flags")
+			}
 		}
 		if !validComponentRole(component.Role) {
 			validator.add(CodeSchemaInvalid, path+".role", "unsupported component role")
@@ -163,6 +168,33 @@ func (validator *graphValidator) components() map[string]Component {
 		}
 	}
 	return byID
+}
+
+func (validator *graphValidator) powerFlags(netsByName map[string]Net) {
+	if len(validator.document.PowerFlags) > MaxPowerFlags {
+		validator.add(CodeLimitExceeded, "power_flags", "power flag count exceeds limit")
+	}
+	seen := map[string]struct{}{}
+	for index, flag := range validator.document.PowerFlags {
+		path := fmt.Sprintf("power_flags[%d].net", index)
+		if strings.TrimSpace(flag.Net) == "" {
+			validator.add(CodePowerFlagInvalid, path, "power flag net is required")
+			continue
+		}
+		validator.boundedString(path, flag.Net, MaxStringBytes)
+		net, exists := netsByName[flag.Net]
+		if !exists {
+			validator.add(CodePowerFlagInvalid, path, "power flag references unknown net "+flag.Net)
+			continue
+		}
+		if _, duplicate := seen[flag.Net]; duplicate {
+			validator.add(CodePowerFlagInvalid, path, "duplicate power flag for net "+flag.Net)
+		}
+		seen[flag.Net] = struct{}{}
+		if !validPowerFlagNetRole(net.Role) {
+			validator.add(CodePowerFlagInvalid, path, "power flag requires a power, ground, or return net")
+		}
+	}
 }
 
 func (validator *graphValidator) query(path string, query ComponentQuery) {
@@ -557,6 +589,15 @@ func validComponentRole(value ComponentRole) bool {
 func validNetRole(value NetRole) bool {
 	switch value {
 	case NetRoleSignal, NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn, NetRoleFeedback, NetRoleBias, NetRoleShield:
+		return true
+	default:
+		return false
+	}
+}
+
+func validPowerFlagNetRole(value NetRole) bool {
+	switch value {
+	case NetRolePower, NetRolePowerPos, NetRolePowerNeg, NetRoleGround, NetRoleReturn:
 		return true
 	default:
 		return false

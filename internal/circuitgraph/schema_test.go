@@ -81,6 +81,18 @@ func TestProviderGraphSchemaConstrainsRoutingNetClasses(t *testing.T) {
 	}
 }
 
+func TestProviderGraphSchemaConstrainsPowerFlags(t *testing.T) {
+	schema := ProviderGraphSchema()
+	flags := schema["properties"].(map[string]any)["power_flags"].(map[string]any)
+	if got := flags["maxItems"]; got != MaxPowerFlags {
+		t.Fatalf("power flag maxItems = %#v, want %d", got, MaxPowerFlags)
+	}
+	properties := flags["items"].(map[string]any)["properties"].(map[string]any)
+	if _, exists := properties["net"]; !exists || len(properties) != 1 {
+		t.Fatalf("power flag properties = %#v", properties)
+	}
+}
+
 func jsonFieldNames(typ reflect.Type) map[string]bool {
 	fields := map[string]bool{}
 	for index := 0; index < typ.NumField(); index++ {

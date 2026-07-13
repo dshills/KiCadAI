@@ -75,6 +75,7 @@ func ProviderGraphSchema() map[string]any {
 		"id": identifier, "name": stringValue,
 		"members": map[string]any{"type": "array", "minItems": 1, "items": busMember},
 	})
+	powerFlag := strictObject(map[string]any{"net": stringValue})
 	group := strictObject(map[string]any{
 		"id": identifier, "label": stringValue, "role": stringValue,
 		"members": stringArray(MaxComponents), "rank": map[string]any{"type": "integer"},
@@ -113,6 +114,7 @@ func ProviderGraphSchema() map[string]any {
 		"components":  map[string]any{"type": "array", "minItems": 1, "maxItems": MaxComponents, "items": component},
 		"nets":        map[string]any{"type": "array", "minItems": 1, "maxItems": MaxNets, "items": net},
 		"no_connects": map[string]any{"type": "array", "maxItems": MaxNoConnects, "items": endpoint},
+		"power_flags": map[string]any{"type": "array", "maxItems": MaxPowerFlags, "items": powerFlag},
 		"buses":       map[string]any{"type": "array", "maxItems": MaxBuses, "items": bus},
 		"schematic": strictObject(map[string]any{
 			"flow":   map[string]any{"type": "string", "const": string(FlowLeftToRight)},

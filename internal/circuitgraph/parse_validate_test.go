@@ -51,6 +51,10 @@ func TestNormalizeIsDeterministicAndDoesNotMutateCaller(t *testing.T) {
 	document := validTestDocument()
 	document.Components[0], document.Components[1] = document.Components[1], document.Components[0]
 	document.Nets[0].Endpoints[0], document.Nets[0].Endpoints[1] = document.Nets[0].Endpoints[1], document.Nets[0].Endpoints[0]
+	document.PowerFlags = []PowerFlag{{Net: "PWR"}, {Net: "GND"}}
+	document.Nets = append(document.Nets, Net{Name: "PWR", Role: NetRolePowerPos, Required: document.Nets[0].Required, Endpoints: append([]Endpoint(nil), document.Nets[0].Endpoints...)})
+	document.Nets[2].Endpoints[0].Selector = "3"
+	document.Nets[2].Endpoints[1].Selector = "3"
 	original, _ := json.Marshal(document)
 	first := Normalize(document)
 	second := Normalize(first)
@@ -59,6 +63,9 @@ func TestNormalizeIsDeterministicAndDoesNotMutateCaller(t *testing.T) {
 	}
 	if first.Components[0].ID != "j1" || first.Components[1].ID != "r1" {
 		t.Fatalf("component order = %#v", first.Components)
+	}
+	if got := []string{first.PowerFlags[0].Net, first.PowerFlags[1].Net}; !reflect.DeepEqual(got, []string{"GND", "PWR"}) {
+		t.Fatalf("power flag order = %#v", got)
 	}
 	after, _ := json.Marshal(document)
 	if !bytes.Equal(original, after) {
@@ -80,6 +87,12 @@ func TestValidateRejectsUnsafeGraphCases(t *testing.T) {
 		{name: "unknown endpoint", edit: func(document *Document) { document.Nets[0].Endpoints[0].Component = "missing" }, code: string(CodeNetInvalid), path: "nets[0].endpoints[0].component"},
 		{name: "duplicate endpoint", edit: func(document *Document) { document.Nets[1].Endpoints[0] = document.Nets[0].Endpoints[0] }, code: string(CodeEndpointDuplicate), path: "nets[1].endpoints[0]"},
 		{name: "connected no-connect", edit: func(document *Document) { document.NoConnects = []Endpoint{document.Nets[0].Endpoints[0]} }, code: string(CodeEndpointDuplicate), path: "no_connects[0]"},
+		{name: "unknown power flag net", edit: func(document *Document) { document.PowerFlags = []PowerFlag{{Net: "MISSING"}} }, code: string(CodePowerFlagInvalid), path: "power_flags[0].net"},
+		{name: "empty power flag net", edit: func(document *Document) { document.PowerFlags = []PowerFlag{{}} }, code: string(CodePowerFlagInvalid), path: "power_flags[0].net"},
+		{name: "duplicate power flag", edit: func(document *Document) { document.PowerFlags = []PowerFlag{{Net: "GND"}, {Net: "GND"}} }, code: string(CodePowerFlagInvalid), path: "power_flags[1].net"},
+		{name: "signal power flag", edit: func(document *Document) { document.PowerFlags = []PowerFlag{{Net: "IN"}} }, code: string(CodePowerFlagInvalid), path: "power_flags[0].net"},
+		{name: "too many power flags", edit: func(document *Document) { document.PowerFlags = make([]PowerFlag, MaxPowerFlags+1) }, code: string(CodeLimitExceeded), path: "power_flags"},
+		{name: "reserved power flag reference", edit: func(document *Document) { document.Components[0].Reference = "#FLG01" }, code: string(CodePowerFlagInvalid), path: "components[0].reference"},
 		{name: "unknown group member", edit: func(document *Document) {
 			document.Schematic.Groups[0].Members = append(document.Schematic.Groups[0].Members, "missing")
 		}, code: string(CodeLayoutUnsupported), path: "schematic.groups[0].members[2]"},
@@ -152,7 +165,7 @@ func validTestDocument() Document {
 			{Name: "IN", Role: NetRoleSignal, Required: &trueValue, Endpoints: []Endpoint{{Component: "j1", SelectorKind: SelectorSymbolPin, Selector: "1"}, {Component: "r1", SelectorKind: SelectorSymbolPin, Selector: "1"}}},
 			{Name: "GND", Role: NetRoleGround, Required: &trueValue, Endpoints: []Endpoint{{Component: "j1", SelectorKind: SelectorSymbolPin, Selector: "2"}, {Component: "r1", SelectorKind: SelectorSymbolPin, Selector: "2"}}},
 		},
-		NoConnects: []Endpoint{}, Buses: []Bus{},
+		NoConnects: []Endpoint{}, PowerFlags: []PowerFlag{}, Buses: []Bus{},
 		Schematic: SchematicIntent{
 			Flow: FlowLeftToRight, Origin: OriginCentered,
 			Groups:     []SchematicGroup{{ID: "signal", Role: "processing_stage", Members: []string{"j1", "r1"}, Rank: 0}},

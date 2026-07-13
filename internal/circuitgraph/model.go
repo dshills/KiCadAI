@@ -21,6 +21,7 @@ const (
 	MaxTotalEndpoints   = 32768
 	MaxNoConnects       = 16384
 	MaxBuses            = 128
+	MaxPowerFlags       = 64
 	MaxStringBytes      = 256
 	MaxDescriptionBytes = 2048
 	MaxBoardDimensionMM = 1000
@@ -33,11 +34,18 @@ type Document struct {
 	Components []Component                `json:"components"`
 	Nets       []Net                      `json:"nets"`
 	NoConnects []Endpoint                 `json:"no_connects"`
+	PowerFlags []PowerFlag                `json:"power_flags,omitempty"`
 	Buses      []Bus                      `json:"buses"`
 	Schematic  SchematicIntent            `json:"schematic"`
 	PCB        PCBIntent                  `json:"pcb"`
 	Policy     Policy                     `json:"policy"`
 	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
+}
+
+// PowerFlag declares that an existing power or return net is driven by a
+// source outside the modeled circuit. It lowers to a schematic-only PWR_FLAG.
+type PowerFlag struct {
+	Net string `json:"net"`
 }
 
 type Project struct {
