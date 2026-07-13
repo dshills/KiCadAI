@@ -145,7 +145,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		issues = append(issues, result.Issues...)
 	}
 	issues = append(issues, explicitRequiredRouteIssues(request.ExplicitCircuit.Nets, result)...)
-	operations := compactRouteOperationGeometry(transactionRouteOperations(result.Operations))
+	operations := finalizeExplicitRouteOperations(result.Operations)
 	stage := NewStageResult(StageRouting, issues)
 	stage.Summary = map[string]any{
 		"status": result.Status, "net_count": result.Metrics.NetCount, "routed_nets": result.Metrics.RoutedNetCount,
@@ -155,6 +155,12 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		stage.Status = StageStatusWarning
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func finalizeExplicitRouteOperations(operations []routing.Operation) []transactions.Operation {
+	transactionOperations := transactionRouteOperations(operations)
+	transactionOperations = dedupeSameNetRouteVias(transactionOperations)
+	return compactRouteOperationGeometry(transactionOperations)
 }
 
 func expandExplicitPhysicalPadEndpoints(request routing.Request) routing.Request {
