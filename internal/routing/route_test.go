@@ -3,6 +3,7 @@ package routing
 import (
 	"context"
 	"math"
+	"reflect"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -20,6 +21,19 @@ func TestRouteRequestRoutesSimpleBoard(t *testing.T) {
 	}
 	if len(result.Routes) != 1 || len(result.Routes[0].Segments) == 0 {
 		t.Fatalf("routes = %#v", result.Routes)
+	}
+}
+
+func TestEndpointNeckdownTrunkIssueIdentifiesPair(t *testing.T) {
+	issue := endpointNeckdownTrunkIssue("GND", 3, EndpointPair{
+		From: Endpoint{Ref: "U2", Pin: "7"},
+		To:   Endpoint{Ref: "R5", Pin: "2"},
+	})
+	if issue.Path != `nets["GND"].pairs[3]` || issue.Message != "endpoint neckdown path between U2.7 and R5.2 does not leave a clearance-safe full-width trunk" {
+		t.Fatalf("issue = %#v", issue)
+	}
+	if !reflect.DeepEqual(issue.Refs, []string{"U2", "R5"}) || !reflect.DeepEqual(issue.Nets, []string{"GND"}) {
+		t.Fatalf("issue identity = %#v", issue)
 	}
 }
 

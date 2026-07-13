@@ -2,6 +2,7 @@ package routing
 
 import (
 	"context"
+	"fmt"
 	"math"
 
 	"kicadai/internal/pcbrules"
@@ -164,13 +165,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if len(routeIssues) == 0 {
 				segments, metrics = BuildSegmentsFromPathWithNeckdown(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM)
 				if segmentsUseNeckdown(segments, netRequest.Rules.TraceWidthMM) && !nominalSegmentsClearOccupancy(segments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
-					routeIssues = []reports.Issue{{
-						Code:       reports.CodeValidationFailed,
-						Severity:   reports.SeverityBlocked,
-						Message:    "endpoint neckdown path does not leave a clearance-safe full-width trunk",
-						Nets:       []string{plan.Net.Name},
-						Suggestion: "increase endpoint access space or move the connected components farther apart",
-					}}
+					routeIssues = []reports.Issue{endpointNeckdownTrunkIssue(plan.Net.Name, pairIndex, pair)}
 				}
 			}
 			if len(routeIssues) != 0 {
@@ -251,6 +246,21 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	quality := BuildQualityReportWithEvidence(request, result, qualityEvidence)
 	result.Quality = &quality
 	return result
+}
+
+func endpointNeckdownTrunkIssue(netName string, pairIndex int, pair EndpointPair) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityBlocked,
+		Path:     fmt.Sprintf("nets[%q].pairs[%d]", netName, pairIndex),
+		Message: fmt.Sprintf(
+			"endpoint neckdown path between %s.%s and %s.%s does not leave a clearance-safe full-width trunk",
+			pair.From.Ref, pair.From.Pin, pair.To.Ref, pair.To.Pin,
+		),
+		Refs:       []string{pair.From.Ref, pair.To.Ref},
+		Nets:       []string{netName},
+		Suggestion: "increase endpoint access space or move the connected components farther apart",
+	}
 }
 
 func routeCanceledResult(ctx context.Context) (Result, bool) {
