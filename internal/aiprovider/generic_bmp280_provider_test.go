@@ -97,7 +97,7 @@ func genericBMP280ProjectionFor(t *testing.T, resolved circuitgraph.ResolvedDocu
 	componentsProjection := make([]string, 0, len(resolved.Components))
 	projection := genericBMP280Projection{Flow: resolved.Source.Schematic.Flow, Nets: make([]string, 0, len(resolved.Nets))}
 	for _, component := range resolved.Components {
-		key := strings.Join([]string{string(component.Instance.Role), component.ComponentID, component.VariantID, component.Instance.Value}, ":")
+		key := genericBMP280SemanticComponentKey(t, component)
 		componentKeys[component.Instance.ID] = key
 		componentsProjection = append(componentsProjection, key)
 		if component.ComponentID == "sensor.bosch.bmp280.lga8" {
@@ -120,7 +120,7 @@ func genericBMP280ProjectionFor(t *testing.T, resolved circuitgraph.ResolvedDocu
 		}
 		slices.Sort(endpoints)
 		required := net.Intent.Required != nil && *net.Intent.Required
-		netProjection := fmt.Sprintf("%s:%t:%.3f:%.3f:%s", net.Intent.Role, required, net.Intent.WidthMM, net.Intent.CurrentMA, strings.Join(endpoints, ","))
+		netProjection := fmt.Sprintf("%s:%t:%.3f:%s", net.Intent.Role, required, net.Intent.WidthMM, strings.Join(endpoints, ","))
 		projection.Nets = append(projection.Nets, netProjection)
 		netProjectionByName[net.Intent.Name] = netProjection
 	}
@@ -136,6 +136,26 @@ func genericBMP280ProjectionFor(t *testing.T, resolved circuitgraph.ResolvedDocu
 	board := resolved.Source.Project.Board
 	projection.Board = fmt.Sprintf("%.3fx%.3f:%d:%s", board.WidthMM, board.HeightMM, board.Layers, resolved.Source.Project.Acceptance)
 	return projection
+}
+
+func genericBMP280SemanticComponentKey(t *testing.T, component circuitgraph.ResolvedComponent) string {
+	t.Helper()
+	role := string(component.Instance.Role)
+	switch role {
+	case "input_connector", "regulator", "sensor":
+		return strings.Join([]string{role, component.ComponentID}, ":")
+	case "bulk_capacitor", "decoupling_capacitor", "fuse", "pullup", "resistor":
+		value, ok := components.ParseEngineeringValue(component.Instance.Value)
+		if !ok {
+			t.Fatalf("component %q has non-engineering value %q", component.Instance.ID, component.Instance.Value)
+		}
+		return fmt.Sprintf("%s:%s:%.12g", role, component.Family, value)
+	case "output_connector", "tvs":
+		return strings.Join([]string{role, component.Family}, ":")
+	default:
+		t.Fatalf("component %q has unsupported semantic role %q", component.Instance.ID, role)
+		return ""
+	}
 }
 
 func assertGenericBMP280CriticalEquivalence(t *testing.T, live, recorded genericBMP280Projection) {

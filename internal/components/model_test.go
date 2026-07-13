@@ -182,3 +182,11 @@ func TestParseLeadingEngineeringNumber(t *testing.T) {
 		}
 	}
 }
+
+func TestParseEngineeringValueUsesBaseUnits(t *testing.T) {
+	left, leftOK := ParseEngineeringValue("4.7k")
+	right, rightOK := ParseEngineeringValue("4.7 kOhm")
+	if !leftOK || !rightOK || left != right || left != 4700 {
+		t.Fatalf("parsed values = %g/%t and %g/%t, want equivalent 4700", left, leftOK, right, rightOK)
+	}
+}

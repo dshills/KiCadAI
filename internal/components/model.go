@@ -819,6 +819,12 @@ func parseLeadingEngineeringNumber(value string) (float64, bool) {
 	return number, true
 }
 
+// ParseEngineeringValue converts an engineering-formatted electrical value to
+// its base-unit numeric value.
+func ParseEngineeringValue(value string) (float64, bool) {
+	return parseLeadingEngineeringNumber(value)
+}
+
 func parseEmbeddedEngineeringNumber(value string) (float64, bool) {
 	runes := []rune(value)
 	for i := 1; i < len(runes)-1; i++ {
