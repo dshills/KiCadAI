@@ -1103,6 +1103,11 @@ func TestBuilderAvoidsRouteAndZoneUUIDCollisions(t *testing.T) {
 	if _, err := builder.AddZone("GND", polygon, ZoneOptions{Layers: []kicadfiles.BoardLayer{kicadfiles.LayerBCu}}); err != nil {
 		t.Fatalf("back AddZone returned error: %v", err)
 	}
+	for _, zone := range builder.Design().PCB.Zones {
+		if got := zone.Polygons[0]; len(got) != len(polygon)+1 || got[0] != got[len(got)-1] {
+			t.Fatalf("zone polygon is not explicitly closed: %#v", got)
+		}
+	}
 
 	design := builder.Design()
 	if len(design.PCB.Tracks) != 4 {

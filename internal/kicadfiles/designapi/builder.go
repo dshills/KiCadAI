@@ -1526,6 +1526,10 @@ func (builder *Builder) AddZone(netName string, polygon []kicadfiles.Point, opti
 	if countDistinctPoints(polygon) < 3 {
 		return ZoneHandle{}, fmt.Errorf("zone polygon requires at least three distinct points")
 	}
+	closedPolygon := append([]kicadfiles.Point(nil), polygon...)
+	if closedPolygon[0] != closedPolygon[len(closedPolygon)-1] {
+		closedPolygon = append(closedPolygon, closedPolygon[0])
+	}
 	layers := options.Layers
 	if len(layers) == 0 {
 		layers = []kicadfiles.BoardLayer{kicadfiles.LayerFCu}
@@ -1537,12 +1541,12 @@ func (builder *Builder) AddZone(netName string, polygon []kicadfiles.Point, opti
 	}
 	zoneOffset := len(builder.design.PCB.Zones)
 	builder.design.PCB.Zones = append(builder.design.PCB.Zones, pcb.Zone{
-		UUID:                 builder.generator.New("root.pcb.zone", name, net.Name, fmt.Sprintf("%d", zoneOffset), formatLayers(layers), formatPoints(polygon)),
+		UUID:                 builder.generator.New("root.pcb.zone", name, net.Name, fmt.Sprintf("%d", zoneOffset), formatLayers(layers), formatPoints(closedPolygon)),
 		NetCode:              net.Code,
 		NetName:              net.Name,
 		Name:                 name,
 		Layers:               append([]kicadfiles.BoardLayer(nil), layers...),
-		Polygons:             [][]kicadfiles.Point{append([]kicadfiles.Point(nil), polygon...)},
+		Polygons:             [][]kicadfiles.Point{closedPolygon},
 		ConnectPads:          options.ConnectPads,
 		Clearance:            options.Clearance,
 		MinThickness:         defaultIU(options.MinThickness, kicadfiles.MM(0.25)),

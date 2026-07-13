@@ -160,6 +160,8 @@ func normalizePCBNetNode(node sexpr.ParsedNode, netNames map[int]string, root bo
 		return node.Node()
 	}
 	parentHead := node.Head()
+	_, zoneHasNet := node.Child("net")
+	fillUsesAreaRemoval := pcbFillUsesAreaRemoval(node)
 	children := make([]sexpr.Node, 0, len(node.Children))
 	for _, child := range node.Children {
 		if root {
@@ -168,6 +170,20 @@ func normalizePCBNetNode(node sexpr.ParsedNode, netNames map[int]string, root bo
 			}
 		}
 		if skipPCBKiCad10Default(parentHead, child) {
+			continue
+		}
+		if parentHead == "zone" && zoneHasNet && child.IsList && child.Head() == "net_name" {
+			continue
+		}
+		if parentHead == "fill" && !fillUsesAreaRemoval && child.IsList && child.Head() == "island_area_min" {
+			continue
+		}
+		if parentHead == "zone" && child.IsList && child.Head() == "layer" {
+			children = append(children, normalizePCBZoneLayer(child, netNames))
+			continue
+		}
+		if parentHead == "polygon" && child.IsList && child.Head() == "pts" {
+			children = append(children, normalizePCBPolygonPoints(child, netNames))
 			continue
 		}
 		if child.IsList && child.Head() == "net" {
@@ -182,6 +198,46 @@ func normalizePCBNetNode(node sexpr.ParsedNode, netNames map[int]string, root bo
 	return sexpr.L(children...)
 }
 
+func pcbFillUsesAreaRemoval(node sexpr.ParsedNode) bool {
+	if node.Head() != "fill" {
+		return false
+	}
+	mode, ok := node.Child("island_removal_mode")
+	return ok && mode.ListValue(1) == "2"
+}
+
+func normalizePCBPolygonPoints(node sexpr.ParsedNode, netNames map[int]string) sexpr.Node {
+	children := node.Children
+	if len(children) > 2 && samePCBXY(children[1], children[len(children)-1]) {
+		children = children[:len(children)-1]
+	}
+	result := make([]sexpr.Node, 0, len(children))
+	for _, child := range children {
+		result = append(result, normalizePCBNetNode(child, netNames, false))
+	}
+	return sexpr.L(result...)
+}
+
+func normalizePCBZoneLayer(node sexpr.ParsedNode, netNames map[int]string) sexpr.Node {
+	children := make([]sexpr.Node, 0, len(node.Children))
+	children = append(children, sexpr.A("layers"))
+	for _, child := range node.Children[1:] {
+		children = append(children, normalizePCBNetNode(child, netNames, false))
+	}
+	return sexpr.L(children...)
+}
+
+func samePCBXY(left, right sexpr.ParsedNode) bool {
+	if !left.IsList || !right.IsList || left.Head() != "xy" || right.Head() != "xy" {
+		return false
+	}
+	leftX, leftXOK := left.FloatValue(1)
+	leftY, leftYOK := left.FloatValue(2)
+	rightX, rightXOK := right.FloatValue(1)
+	rightY, rightYOK := right.FloatValue(2)
+	return leftXOK && leftYOK && rightXOK && rightYOK && leftX == rightX && leftY == rightY
+}
+
 func skipPCBKiCad10Default(parentHead string, child sexpr.ParsedNode) bool {
 	if !child.IsList {
 		return false
@@ -189,6 +245,8 @@ func skipPCBKiCad10Default(parentHead string, child sexpr.ParsedNode) bool {
 	switch child.Head() {
 	case "path":
 		return parentHead == "footprint"
+	case "filled_areas_thickness":
+		return parentHead == "zone"
 	case "duplicate_pad_numbers_are_jumpers", "embedded_fonts":
 		if len(child.Children) < 2 {
 			return false

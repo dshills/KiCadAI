@@ -113,6 +113,38 @@ func TestComparePCBFilesTreatsKiCad10NameOnlyNetsAsEquivalent(t *testing.T) {
 	}
 }
 
+func TestComparePCBFilesTreatsKiCad10ZoneEncodingAsEquivalent(t *testing.T) {
+	dir := t.TempDir()
+	original := filepath.Join(dir, "original.kicad_pcb")
+	roundTripped := filepath.Join(dir, "roundtripped.kicad_pcb")
+	writeTestFile(t, original, `(kicad_pcb
+  (version 20260206)
+  (net 0 "")
+  (net 1 "GND")
+  (zone (net 1) (net_name "GND") (layers "F.Cu")
+    (filled_areas_thickness no)
+    (fill (island_removal_mode 1) (island_area_min 0))
+    (polygon (pts (xy 0 0) (xy 10 0) (xy 10 10) (xy 0 0)))
+  )
+)`)
+	writeTestFile(t, roundTripped, `(kicad_pcb
+  (version 20260206)
+  (zone (net "GND") (layer "F.Cu")
+    (fill (island_removal_mode 1))
+    (polygon (pts (xy 0 0) (xy 10 0) (xy 10 10)))
+  )
+  (embedded_fonts no)
+)`)
+
+	result, err := ComparePCBFiles(original, roundTripped, Options{})
+	if err != nil {
+		t.Fatalf("ComparePCBFiles returned error: %v", err)
+	}
+	if !result.Equal {
+		t.Fatalf("Equal = false, differences = %#v", result.Differences)
+	}
+}
+
 func TestEquivalentPCBSummariesIgnoresOnlyNetTableCount(t *testing.T) {
 	original := Summary{Sections: map[string]int{"net": 2, "footprint": 1, "segment": 1}}
 	roundTripped := Summary{Sections: map[string]int{"embedded_fonts": 1, "footprint": 1, "segment": 1}}
