@@ -1,6 +1,7 @@
 package writercorrectness
 
 import (
+	"fmt"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -199,6 +200,35 @@ func TestCheckSchematicsAllowsLabelOnWireSegment(t *testing.T) {
 				t.Fatalf("label on segment reported as unattached: %#v", checks)
 			}
 		}
+	}
+}
+
+func TestCheckSchematicsAllowsLabelOnBus(t *testing.T) {
+	tests := []struct {
+		name string
+		x    int
+	}{
+		{name: "endpoint", x: 0},
+		{name: "segment", x: 5},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, "demo.kicad_sch")
+			writeFile(t, path, schematicWithBody(fmt.Sprintf(`
+  (bus (pts (xy 0 0) (xy 10 0)))
+  (label "{SCL SDA}" (at %d 0 0))
+`, test.x)))
+
+			_, checks := CheckSchematics(Target{SchematicFiles: []string{path}})
+			for _, check := range checks {
+				for _, issue := range check.Issues {
+					if strings.Contains(issue.Message, "not attached") {
+						t.Fatalf("label on bus reported as unattached: %#v", checks)
+					}
+				}
+			}
+		})
 	}
 }
 

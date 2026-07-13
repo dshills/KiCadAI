@@ -157,7 +157,7 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 					Code:     reports.CodeValidationFailed,
 					Severity: reports.SeverityWarning,
 					Path:     slashPath(path),
-					Message:  "schematic label is not attached to a parsed wire endpoint, junction, or no-connect marker",
+					Message:  "schematic label is not attached to a parsed wire or bus, junction, or no-connect marker",
 					Nets:     []string{text},
 				})
 			}
@@ -273,6 +273,11 @@ func schematicAnchors(file kschematic.SchematicFile) map[kicadfiles.Point]bool {
 			anchors[point] = true
 		}
 	}
+	for _, bus := range file.Buses {
+		for _, point := range bus.Points {
+			anchors[point] = true
+		}
+	}
 	for _, junction := range file.Junctions {
 		anchors[junction.Position] = true
 	}
@@ -294,6 +299,13 @@ func labelAttached(file kschematic.SchematicFile, anchors map[kicadfiles.Point]b
 	for _, wire := range file.Wires {
 		for i := 1; i < len(wire.Points); i++ {
 			if pointOnSegment(point, wire.Points[i-1], wire.Points[i]) {
+				return true
+			}
+		}
+	}
+	for _, bus := range file.Buses {
+		for i := 1; i < len(bus.Points); i++ {
+			if pointOnSegment(point, bus.Points[i-1], bus.Points[i]) {
 				return true
 			}
 		}
