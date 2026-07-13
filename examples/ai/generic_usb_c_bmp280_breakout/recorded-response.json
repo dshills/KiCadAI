@@ -685,14 +685,14 @@
           "group": "sensor_stage",
           "above": "bmp280_sensor",
           "right_of": "sda_pullup",
-          "orientation": "normal",
+          "orientation": "rotated_90",
           "mirror": "none"
         },
         {
           "component": "sda_pullup",
           "group": "sensor_stage",
           "above": "bmp280_sensor",
-          "orientation": "normal",
+          "orientation": "rotated_90",
           "mirror": "none"
         }
       ],
