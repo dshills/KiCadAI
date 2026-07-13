@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"math"
 	"sort"
 	"strconv"
 	"strings"
@@ -38,7 +39,7 @@ func enrichPlaceFootprintOptionsWithRecord(options *designapi.PlaceFootprintOpti
 	options.MetadataProperties = importedMetadataProperties(record.Properties)
 	options.Properties = footprintPropertiesFromRecord(record.CustomProperties, placementLayer)
 	options.Texts = footprintTextsFromRecord(record.Texts, placementLayer)
-	options.Graphics = footprintGraphicsFromRecord(record.Graphics, placementLayer)
+	options.Graphics = footprintGraphicsFromRecord(record.Graphics, record.Pads, placementLayer)
 	options.Models = importedModels(record.Models)
 	if len(options.Pads) == 0 {
 		options.Pads = footprintRecordPadSpecs(record, placementLayer)
@@ -160,7 +161,7 @@ func importedFootprintFromRecord(generator kicadfiles.IDGenerator, payload Place
 		MetadataProperties: importedMetadataProperties(record.Properties),
 		Properties:         importedDefaultFootprintProperties(generator, payload.Ref, value, layer, payload.HideDefaultFootprintText),
 		Texts:              importedFootprintTexts(generator, payload.Ref, record.Texts, layer),
-		Graphics:           importedFootprintGraphics(generator, payload.Ref, record.Graphics, layer),
+		Graphics:           importedFootprintGraphics(generator, payload.Ref, record.Graphics, record.Pads, layer),
 		Pads:               importedPadsFromRecord(generator, payload.Ref, record, layer),
 		Models:             importedModels(record.Models),
 	}
@@ -264,11 +265,15 @@ func footprintTextsFromRecord(texts []libraryresolver.FootprintText, placementLa
 	return result
 }
 
-func importedFootprintGraphics(generator kicadfiles.IDGenerator, ref string, graphics []libraryresolver.FootprintGraphic, placementLayer kicadfiles.BoardLayer) []pcb.FootprintGraphic {
+func importedFootprintGraphics(generator kicadfiles.IDGenerator, ref string, graphics []libraryresolver.FootprintGraphic, pads []libraryresolver.FootprintPad, placementLayer kicadfiles.BoardLayer) []pcb.FootprintGraphic {
 	result := make([]pcb.FootprintGraphic, 0, len(graphics))
 	seen := map[string]int{}
 	seedScratch := make([]byte, 0, 256)
+	maskObstacles := footprintMaskObstacles(pads, placementLayer)
 	for _, graphic := range graphics {
+		if silkscreenLineOverlapsPadMask(graphic, maskObstacles, placementLayer) {
+			continue
+		}
 		converted, ok := footprintGraphicFromRecord(graphic, placementLayer)
 		if !ok {
 			continue
@@ -286,14 +291,121 @@ func importedFootprintGraphics(generator kicadfiles.IDGenerator, ref string, gra
 	return result
 }
 
-func footprintGraphicsFromRecord(graphics []libraryresolver.FootprintGraphic, placementLayer kicadfiles.BoardLayer) []pcb.FootprintGraphic {
+func footprintGraphicsFromRecord(graphics []libraryresolver.FootprintGraphic, pads []libraryresolver.FootprintPad, placementLayer kicadfiles.BoardLayer) []pcb.FootprintGraphic {
 	result := make([]pcb.FootprintGraphic, 0, len(graphics))
+	maskObstacles := footprintMaskObstacles(pads, placementLayer)
 	for _, graphic := range graphics {
+		if silkscreenLineOverlapsPadMask(graphic, maskObstacles, placementLayer) {
+			continue
+		}
 		if converted, ok := footprintGraphicFromRecord(graphic, placementLayer); ok {
 			result = append(result, converted)
 		}
 	}
 	return result
+}
+
+type footprintMaskObstacle struct {
+	layer                 kicadfiles.BoardLayer
+	center                kicadfiles.Point
+	cosine, sine          float64
+	halfWidth, halfHeight float64
+}
+
+func footprintMaskObstacles(pads []libraryresolver.FootprintPad, placementLayer kicadfiles.BoardLayer) []footprintMaskObstacle {
+	obstacles := make([]footprintMaskObstacle, 0, len(pads))
+	for _, pad := range pads {
+		if !supportedMaskPadShape(pad.Shape) {
+			continue
+		}
+		radians := -float64(pad.Rotation) * math.Pi / 180
+		cosine, sine := math.Cos(radians), math.Sin(radians)
+		for _, layer := range pad.Layers {
+			maskLayer := kicadfiles.BoardLayerForPlacement(layer, placementLayer)
+			if maskLayer != kicadfiles.LayerFMask && maskLayer != kicadfiles.LayerBMask {
+				continue
+			}
+			obstacles = append(obstacles, footprintMaskObstacle{
+				layer: maskLayer, center: pad.Position, cosine: cosine, sine: sine,
+				halfWidth: float64(pad.Size.X) / 2, halfHeight: float64(pad.Size.Y) / 2,
+			})
+		}
+	}
+	return obstacles
+}
+
+func silkscreenLineOverlapsPadMask(graphic libraryresolver.FootprintGraphic, obstacles []footprintMaskObstacle, placementLayer kicadfiles.BoardLayer) bool {
+	if graphic.Kind != "line" || graphic.Start == nil || graphic.End == nil {
+		return false
+	}
+	graphicLayer := kicadfiles.BoardLayerForPlacement(kicadfiles.BoardLayer(graphic.Layer), placementLayer)
+	if graphicLayer != kicadfiles.LayerFSilkS && graphicLayer != kicadfiles.LayerBSilkS {
+		return false
+	}
+	maskLayer := kicadfiles.LayerFMask
+	if graphicLayer == kicadfiles.LayerBSilkS {
+		maskLayer = kicadfiles.LayerBMask
+	}
+	strokeRadius := float64(footprintGraphicStrokeWidth(graphic.Width)) / 2
+	for _, obstacle := range obstacles {
+		if obstacle.layer != maskLayer {
+			continue
+		}
+		startX, startY := pointInMaskObstacleCoordinates(*graphic.Start, obstacle)
+		endX, endY := pointInMaskObstacleCoordinates(*graphic.End, obstacle)
+		halfWidth := obstacle.halfWidth + strokeRadius
+		halfHeight := obstacle.halfHeight + strokeRadius
+		if segmentIntersectsCenteredRect(startX, startY, endX, endY, halfWidth, halfHeight) {
+			return true
+		}
+	}
+	return false
+}
+
+func supportedMaskPadShape(shape string) bool {
+	switch strings.ToLower(strings.TrimSpace(shape)) {
+	case "rect", "roundrect", "oval", "circle":
+		return true
+	default:
+		return false
+	}
+}
+
+func pointInMaskObstacleCoordinates(point kicadfiles.Point, obstacle footprintMaskObstacle) (float64, float64) {
+	dx := float64(point.X - obstacle.center.X)
+	dy := float64(point.Y - obstacle.center.Y)
+	return dx*obstacle.cosine - dy*obstacle.sine, dx*obstacle.sine + dy*obstacle.cosine
+}
+
+func segmentIntersectsCenteredRect(startX, startY, endX, endY, halfWidth, halfHeight float64) bool {
+	deltaX, deltaY := endX-startX, endY-startY
+	minimum, maximum := 0.0, 1.0
+	for _, boundary := range [4][2]float64{
+		{-deltaX, startX + halfWidth},
+		{deltaX, halfWidth - startX},
+		{-deltaY, startY + halfHeight},
+		{deltaY, halfHeight - startY},
+	} {
+		if boundary[0] == 0 {
+			if boundary[1] < 0 {
+				return false
+			}
+			continue
+		}
+		ratio := boundary[1] / boundary[0]
+		if boundary[0] < 0 {
+			if ratio > maximum {
+				return false
+			}
+			minimum = max(minimum, ratio)
+		} else {
+			if ratio < minimum {
+				return false
+			}
+			maximum = min(maximum, ratio)
+		}
+	}
+	return true
 }
 
 func footprintGraphicFromRecord(graphic libraryresolver.FootprintGraphic, placementLayer kicadfiles.BoardLayer) (pcb.FootprintGraphic, bool) {

@@ -557,7 +557,7 @@ func TestResolverFootprintBottomPlacementMapsFrontLayers(t *testing.T) {
 	if len(footprint.Graphics) == 0 {
 		t.Fatalf("graphics not populated: %#v", footprint.Graphics)
 	}
-	if graphic := pcb.Drawing(footprint.Graphics[0]); graphic.Layer != kicadfiles.LayerBSilkS {
+	if graphic := pcb.Drawing(footprint.Graphics[0]); graphic.Layer != kicadfiles.LayerBFab {
 		t.Fatalf("graphic layers not remapped: %#v", graphic)
 	}
 }
