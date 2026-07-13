@@ -119,6 +119,22 @@ func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryInde
 	if !ok {
 		return pins, nil
 	}
+	return mergeSymbolRecordPinsForUnit(pins, record, unit)
+}
+
+func resolvePreferredSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryIndex, libraryID string, unit int, preferResolver bool) ([]PinSpec, error) {
+	if !preferResolver || index == nil {
+		return resolveSymbolPinsForUnit(pins, index, libraryID, unit)
+	}
+	record, ok := libraryresolver.ResolveSymbol(*index, libraryID)
+	if !ok || strings.TrimSpace(record.Raw) == "" {
+		return resolveSymbolPinsForUnit(pins, index, libraryID, unit)
+	}
+	return mergeSymbolRecordPinsForUnit(append([]PinSpec(nil), pins...), record, unit)
+}
+
+func mergeSymbolRecordPinsForUnit(pins []PinSpec, record libraryresolver.SymbolRecord, unit int) ([]PinSpec, error) {
+	pins = append([]PinSpec(nil), pins...)
 	resolved, err := symbolRecordPinsForUnit(record, unit)
 	if err != nil {
 		if len(pins) > 0 {
@@ -148,7 +164,7 @@ func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryInde
 				pins[i].YMM = pin.YMM
 				provided[number] = struct{}{}
 			} else {
-				return nil, fmt.Errorf("symbol %s has no resolver pin %s for unit %d", libraryID, number, unit)
+				return nil, fmt.Errorf("symbol %s has no resolver pin %s for unit %d", record.LibraryID, number, unit)
 			}
 		}
 		merged := make([]PinSpec, 0, len(pins)+len(resolved))
@@ -162,7 +178,7 @@ func resolveSymbolPinsForUnit(pins []PinSpec, index *libraryresolver.LibraryInde
 		return merged, nil
 	}
 	if len(resolved) == 0 {
-		return nil, fmt.Errorf("symbol library record found but has no usable pins: %s", libraryID)
+		return nil, fmt.Errorf("symbol library record found but has no usable pins: %s", record.LibraryID)
 	}
 	return resolved, nil
 }

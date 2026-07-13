@@ -61,6 +61,51 @@ func TestResolveSymbolPinsPreservesExplicitOriginOffset(t *testing.T) {
 	}
 }
 
+func TestResolvePreferredSymbolPinsUsesResolverBeforeEmbeddedTemplate(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Device:R": {
+			LibraryID: "Device:R",
+			Raw:       `(symbol "R")`,
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-5.08), Y: kicadfiles.MM(2.54)}},
+				{Number: "2", Position: kicadfiles.Point{X: kicadfiles.MM(5.08), Y: kicadfiles.MM(-2.54)}},
+			},
+		},
+	}}
+	pins, err := resolvePreferredSymbolPinsForUnit([]PinSpec{{Number: "1"}, {Number: "2"}}, &index, "Device:R", 1, true)
+	if err != nil {
+		t.Fatalf("resolvePreferredSymbolPinsForUnit returned error: %v", err)
+	}
+	if len(pins) != 2 {
+		t.Fatalf("pins = %#v, want two resolver pins", pins)
+	}
+	if pins[0].XMM != -5.08 || pins[0].YMM != 2.54 {
+		t.Fatalf("pin 1 = %#v, want resolver geometry", pins[0])
+	}
+	if pins[1].XMM != 5.08 || pins[1].YMM != -2.54 {
+		t.Fatalf("pin 2 = %#v, want resolver geometry", pins[1])
+	}
+}
+
+func TestResolvePreferredSymbolPinsKeepsTemplateDefault(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Device:R": {
+			LibraryID: "Device:R",
+			Pins: []libraryresolver.SymbolPin{
+				{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-5.08)}},
+				{Number: "2", Position: kicadfiles.Point{X: kicadfiles.MM(5.08)}},
+			},
+		},
+	}}
+	pins, err := resolvePreferredSymbolPinsForUnit([]PinSpec{{Number: "1"}, {Number: "2"}}, &index, "Device:R", 1, false)
+	if err != nil {
+		t.Fatalf("resolvePreferredSymbolPinsForUnit returned error: %v", err)
+	}
+	if pins[0].XMM != 0 || pins[0].YMM != -3.81 || pins[1].XMM != 0 || pins[1].YMM != 3.81 {
+		t.Fatalf("pins = %#v, want embedded template geometry", pins)
+	}
+}
+
 func TestResolveSymbolPinsExpandsDistinctMultiUnitPins(t *testing.T) {
 	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
 		"MultiUnit:Distinct": {

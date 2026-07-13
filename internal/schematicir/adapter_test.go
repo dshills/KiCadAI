@@ -124,6 +124,38 @@ func TestResolverPinOffsetPrefersUnitSpecificGeometry(t *testing.T) {
 	}
 }
 
+func TestResolverPinGeometryOverridesEmbeddedFallback(t *testing.T) {
+	component := Component{
+		Symbol: "Sensor_Pressure:BMP280",
+		Pins:   []Pin{{Number: "1", Role: PinRoleGround}},
+	}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Sensor_Pressure:BMP280": {
+			LibraryID: "Sensor_Pressure:BMP280",
+			Raw:       `(symbol "BMP280")`,
+			Pins: []libraryresolver.SymbolPin{{
+				Number:      "1",
+				Position:    kicadfiles.Point{Y: kicadfiles.MM(7.62)},
+				Orientation: "90",
+			}},
+		},
+	}}
+
+	transactionPins := transactionPinsWithLibraryIndex(component, &index)
+	if len(transactionPins) != 1 || !vectorBusMMEqual(transactionPins[0].YMM, 7.62) {
+		t.Fatalf("resolver-backed transaction pins = %#v, want pin 1 at +7.62 mm", transactionPins)
+	}
+	layoutPins := schematicLayoutPins(component, &index)
+	if len(layoutPins) != 1 || layoutPins[0].At.Y != kicadfiles.MM(7.62) {
+		t.Fatalf("resolver-backed layout pins = %#v, want pin 1 at +7.62 mm", layoutPins)
+	}
+
+	fallbackPins := transactionPinsWithLibraryIndex(component, nil)
+	if len(fallbackPins) != 1 || !vectorBusMMEqual(fallbackPins[0].YMM, -7.62) {
+		t.Fatalf("offline template fallback pins = %#v, want calibrated fallback at -7.62 mm", fallbackPins)
+	}
+}
+
 func TestToTransactionRejectsConflictingKiCadConnectionAnchor(t *testing.T) {
 	document := validLEDDocument()
 	document.Circuit.Components[0].ID = "vin"
@@ -836,6 +868,42 @@ func TestLayoutRouteHintsRejectCrossNetCoordinateConflicts(t *testing.T) {
 	groundHint := hints[schematicRouteKey("GND", "U1.1", "U1.3")]
 	if groundHint.ToLabelAt == nil || *groundHint.ToLabelAt != sharedNet {
 		t.Fatalf("same-net route label hint = %#v, want %v", groundHint.ToLabelAt, sharedNet)
+	}
+}
+
+func TestLabelPointForEndpointRepairsDiagonalLayoutHint(t *testing.T) {
+	component := Component{ID: "sensor", Symbol: "Test:Sensor", Pins: []Pin{{Number: "1"}}}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Test:Sensor": {
+			LibraryID: "Test:Sensor",
+			Pins:      []libraryresolver.SymbolPin{{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}}},
+		},
+	}}
+	state := adapterState{
+		document:       Document{Circuit: Circuit{Components: []Component{component}}},
+		componentsByID: map[string]Component{"sensor": component},
+		libraryIndex:   &index,
+		pointsByID:     map[string]transactions.Point{"sensor": {XMM: 20, YMM: 30}},
+		rotationByID:   map[string]float64{},
+		mirrorByID:     map[string]Mirror{},
+		labelsByKey: map[string]kicadfiles.Point{
+			schematicEndpointLabelKey("GND", "sensor.1"): {X: kicadfiles.MM(16), Y: kicadfiles.MM(28)},
+		},
+	}
+
+	point, ok := state.labelPointForEndpoint("GND", "sensor.1")
+	if !ok {
+		t.Fatal("label fallback was not resolved")
+	}
+	anchor, ok := state.portEndpointAnchor("sensor.1")
+	if !ok {
+		t.Fatal("pin anchor was not resolved")
+	}
+	if point.XMM != anchor.XMM && point.YMM != anchor.YMM {
+		t.Fatalf("label fallback %#v is diagonal to pin anchor %#v", point, anchor)
+	}
+	if point == (transactions.Point{XMM: 16, YMM: 28}) {
+		t.Fatalf("diagonal layout hint was retained: %#v", point)
 	}
 }
 

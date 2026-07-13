@@ -217,6 +217,7 @@ type adapterState struct {
 	libraryIndex        *libraryresolver.LibraryIndex
 	paper               string
 	refsByID            map[string]string
+	componentsByID      map[string]Component
 	unitsByID           map[string]int
 	pointsByID          map[string]transactions.Point
 	rotationByID        map[string]float64
@@ -289,6 +290,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		libraryIndex:        index,
 		paper:               paper,
 		refsByID:            map[string]string{},
+		componentsByID:      indexComponentsByID(document.Circuit.Components),
 		unitsByID:           map[string]int{},
 		pointsByID:          layoutResultPoints(layoutResult),
 		layoutResult:        layoutResult,
@@ -313,7 +315,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		knownPins := knownSchematicPinNumbers(component, index)
 		var resolverRecord *libraryresolver.SymbolRecord
 		if index != nil {
-			if record, found := libraryresolver.ResolveSymbol(*index, component.Symbol); found {
+			if record, found := libraryresolver.ResolveSymbol(*index, component.Symbol); found && resolverGeometryAuthoritative(record, component.Symbol) {
 				resolverRecord = &record
 			}
 		}
@@ -337,16 +339,18 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 				overrides[number] = cached
 			}
 			connectionOffset := cached.offset
+			connectionOffsetFound := cached.found
+			connectionOffsetSource := "KiCad-validated connection anchor"
+			if resolverOffset, resolverOK := resolverPins[number]; resolverOK {
+				connectionOffset = resolverOffset
+				connectionOffsetFound = true
+				connectionOffsetSource = "resolver pin anchor"
+			}
 			explicit, hasExplicitOffset := explicitPinOffset(pin, connectionOffset)
-			if cached.found && hasExplicitOffset && !schematicAnchorsMatch(explicit, connectionOffset) {
-				state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), fmt.Sprintf("explicit pin offset (%.4f,%.4f) conflicts with the KiCad-validated connection anchor (%.4f,%.4f)", float64(explicit.X)/float64(kicadfiles.MM(1)), float64(explicit.Y)/float64(kicadfiles.MM(1)), float64(connectionOffset.X)/float64(kicadfiles.MM(1)), float64(connectionOffset.Y)/float64(kicadfiles.MM(1))))
+			if connectionOffsetFound && hasExplicitOffset && !schematicAnchorsMatch(explicit, connectionOffset) {
+				state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), fmt.Sprintf("explicit pin offset (%.4f,%.4f) conflicts with the %s (%.4f,%.4f)", float64(explicit.X)/float64(kicadfiles.MM(1)), float64(explicit.Y)/float64(kicadfiles.MM(1)), connectionOffsetSource, float64(connectionOffset.X)/float64(kicadfiles.MM(1)), float64(connectionOffset.Y)/float64(kicadfiles.MM(1))))
 			}
 			if hasExplicitOffset {
-				if resolverRecord != nil {
-					if resolverOffset, resolverOK := resolverPins[number]; resolverOK && !schematicAnchorsMatch(explicit, resolverOffset) {
-						state.addIssue(fmt.Sprintf("circuit.components[%d].pins[%d]", componentIndex, pinIndex), fmt.Sprintf("explicit pin offset (%.4f,%.4f) conflicts with resolver pin anchor (%.4f,%.4f)", float64(explicit.X)/float64(kicadfiles.MM(1)), float64(explicit.Y)/float64(kicadfiles.MM(1)), float64(resolverOffset.X)/float64(kicadfiles.MM(1)), float64(resolverOffset.Y)/float64(kicadfiles.MM(1))))
-					}
-				}
 				continue
 			}
 			if _, known := knownPins[number]; known {
@@ -753,6 +757,8 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					waypoints = transactionPoints(points)
 				}
 			}
+			fromLabelAt = state.validLabelPointForEndpoint(fromIR, fromLabelAt)
+			toLabelAt = state.validLabelPointForEndpoint(toIR, toLabelAt)
 			portNet := state.hasPortNet(net.Name)
 			skipFromLabel := false
 			skipToLabel := false
@@ -924,14 +930,8 @@ func (state *adapterState) portEndpointAnchor(endpoint EndpointRef) (transaction
 	if !ok {
 		return transactions.Point{}, false
 	}
-	var component Component
-	for _, candidate := range state.document.Circuit.Components {
-		if candidate.ID == componentID {
-			component = candidate
-			break
-		}
-	}
-	if component.ID == "" {
+	component, ok := state.componentsByID[componentID]
+	if !ok {
 		return transactions.Point{}, false
 	}
 	for _, pin := range transactionPinsWithLibraryIndex(component, state.libraryIndex) {
@@ -953,9 +953,54 @@ func (state *adapterState) portEndpointAnchor(endpoint EndpointRef) (transaction
 
 func (state *adapterState) labelPointForEndpoint(netName string, endpoint EndpointRef) (transactions.Point, bool) {
 	if point, ok := state.labelsByKey[schematicEndpointLabelKey(netName, endpoint)]; ok {
-		return transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}, true
+		candidate := transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}
+		if state.validLabelPointForEndpoint(endpoint, &candidate) != nil {
+			return candidate, true
+		}
 	}
 	// A rejected or missing layout hint falls back to calibrated pin geometry.
+	return state.fallbackLabelPointForEndpoint(endpoint)
+}
+
+func (state *adapterState) validLabelPointForEndpoint(endpoint EndpointRef, point *transactions.Point) *transactions.Point {
+	if point == nil {
+		return nil
+	}
+	anchor, ok := state.portEndpointAnchor(endpoint)
+	if !ok {
+		return nil
+	}
+	if point.XMM != anchor.XMM && point.YMM != anchor.YMM && state.endpointUsesResolverGeometry(endpoint) {
+		return nil
+	}
+	return point
+}
+
+func (state *adapterState) endpointUsesResolverGeometry(endpoint EndpointRef) bool {
+	if state.libraryIndex == nil {
+		return false
+	}
+	componentID, _, ok := endpoint.Split()
+	if !ok {
+		return false
+	}
+	component, ok := state.componentsByID[componentID]
+	if !ok {
+		return false
+	}
+	record, resolved := libraryresolver.ResolveSymbol(*state.libraryIndex, component.Symbol)
+	return resolved && resolverGeometryAuthoritative(record, component.Symbol)
+}
+
+func indexComponentsByID(components []Component) map[string]Component {
+	indexed := make(map[string]Component, len(components))
+	for _, component := range components {
+		indexed[component.ID] = component
+	}
+	return indexed
+}
+
+func (state *adapterState) fallbackLabelPointForEndpoint(endpoint EndpointRef) (transactions.Point, bool) {
 	anchor, ok := state.portEndpointAnchor(endpoint)
 	if !ok {
 		return transactions.Point{}, false
@@ -1754,11 +1799,19 @@ func schematicLayoutGeometry(component Component, index *libraryresolver.Library
 
 func resolverPinOffset(index libraryresolver.LibraryIndex, component Component, number string) (kicadfiles.Point, bool) {
 	record, ok := libraryresolver.ResolveSymbol(index, component.Symbol)
-	if !ok {
+	if !ok || !resolverGeometryAuthoritative(record, component.Symbol) {
 		return kicadfiles.Point{}, false
 	}
 	offset, ok := resolverPinOffsets(record, component)[strings.TrimSpace(number)]
 	return offset, ok
+}
+
+func resolverGeometryAuthoritative(record libraryresolver.SymbolRecord, symbolID string) bool {
+	if strings.TrimSpace(record.Raw) != "" {
+		return true
+	}
+	_, hasEmbeddedGeometry := schematic.EmbeddedSymbolConnectionPinOffsets(symbolID)
+	return !hasEmbeddedGeometry
 }
 
 func resolverPinOffsets(record libraryresolver.SymbolRecord, component Component) map[string]kicadfiles.Point {
@@ -1886,16 +1939,14 @@ func schematicLayoutPins(component Component, index *libraryresolver.LibraryInde
 	}
 	directions := schematicLayoutPinDirections(component, index)
 	if index != nil {
-		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok {
+		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok && resolverGeometryAuthoritative(record, component.Symbol) {
 			unit := componentUnitOrZero(component)
 			for _, pin := range record.Pins {
 				if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
 					continue
 				}
 				pinNumber := strings.TrimSpace(pin.Number)
-				if _, known := offsets[pinNumber]; !known {
-					offsets[pinNumber] = pin.Position
-				}
+				offsets[pinNumber] = pin.Position
 			}
 		}
 	}
@@ -1934,7 +1985,7 @@ func schematicLayoutPinDirections(component Component, index *libraryresolver.Li
 		return directions
 	}
 	record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol)
-	if !ok {
+	if !ok || !resolverGeometryAuthoritative(record, component.Symbol) {
 		return directions
 	}
 	unit := componentUnitOrZero(component)
@@ -1943,9 +1994,6 @@ func schematicLayoutPinDirections(component Component, index *libraryresolver.Li
 			continue
 		}
 		pinNumber := strings.TrimSpace(pin.Number)
-		if _, known := directions[pinNumber]; known {
-			continue
-		}
 		if direction, known := schematic.PinDirectionFromOrientation(pin.Orientation); known {
 			directions[pinNumber] = direction
 		}
@@ -2099,16 +2147,14 @@ func transactionPinsWithLibraryIndex(component Component, index *libraryresolver
 		}
 	}
 	if index != nil {
-		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok {
+		if record, ok := libraryresolver.ResolveSymbol(*index, component.Symbol); ok && resolverGeometryAuthoritative(record, component.Symbol) {
 			unit := componentUnitOrZero(component)
 			for _, pin := range record.Pins {
 				if pin.Unit != 0 && pin.Unit != maxUnit(unit) {
 					continue
 				}
 				pinNumber := strings.TrimSpace(pin.Number)
-				if _, known := offsets[pinNumber]; !known {
-					offsets[pinNumber] = pin.Position
-				}
+				offsets[pinNumber] = pin.Position
 			}
 		}
 	}

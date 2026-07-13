@@ -348,6 +348,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	if err := builder.ensureSchematicLibrarySymbol(libraryID, options.PreferResolverSymbol); err != nil {
 		return SymbolHandle{}, err
 	}
+	_, resolverOwned := builder.resolverSymbolIDs[libraryID]
 	rotation, mirror := schematic.CanonicalSymbolTransform(options.Rotation, options.Mirror)
 	value := strings.TrimSpace(options.Value)
 	if value == "" {
@@ -355,6 +356,11 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	}
 	usePhysicalConnectionAnchors := options.UsePhysicalConnectionAnchors || len(options.Pins) == 0
 	pinSpecs := symbolPinSpecs(libraryID, options.Pins)
+	if resolverOwned && len(options.Pins) == 0 {
+		if resolved := builder.resolverPinSpecs(libraryID, unit); len(resolved) > 0 {
+			pinSpecs = resolved
+		}
+	}
 	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, rotation, mirror)
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", generationKey), libraryID, reference, value, position)
 	symbol.Unit = unit
@@ -383,7 +389,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 			return SymbolHandle{}, fmt.Errorf("duplicate pin %s on %s", number, reference)
 		}
 		anchorOffset := pin.Offset
-		if usePhysicalConnectionAnchors {
+		if usePhysicalConnectionAnchors && !resolverOwned {
 			if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
 				anchorOffset = offset
 			}
@@ -552,6 +558,47 @@ func symbolPinSpecs(libraryID string, explicit []PinSpec) []PinSpec {
 	pins := make([]PinSpec, 0, len(templatePins))
 	for _, pin := range templatePins {
 		pins = append(pins, PinSpec{Number: pin.Number, Offset: pin.Offset})
+	}
+	return pins
+}
+
+func (builder *Builder) resolverPinSpecs(libraryID string, unit int) []PinSpec {
+	if builder == nil || builder.libraryIndex == nil {
+		return nil
+	}
+	record, ok := libraryresolver.ResolveSymbolPtr(builder.libraryIndex, libraryID)
+	if !ok {
+		return nil
+	}
+	selected := make(map[string]PinSpec, len(record.Pins))
+	for _, pin := range record.Pins {
+		if pin.Unit != 0 {
+			continue
+		}
+		number := strings.TrimSpace(pin.Number)
+		if number == "" {
+			continue
+		}
+		selected[number] = PinSpec{Number: number, Offset: pin.Position}
+	}
+	for _, pin := range record.Pins {
+		if pin.Unit != unit {
+			continue
+		}
+		number := strings.TrimSpace(pin.Number)
+		if number == "" {
+			continue
+		}
+		selected[number] = PinSpec{Number: number, Offset: pin.Position}
+	}
+	numbers := make([]string, 0, len(selected))
+	for number := range selected {
+		numbers = append(numbers, number)
+	}
+	sort.Strings(numbers)
+	pins := make([]PinSpec, 0, len(numbers))
+	for _, number := range numbers {
+		pins = append(pins, selected[number])
 	}
 	return pins
 }
@@ -1040,7 +1087,7 @@ func validateSchematicLabelPoint(position *kicadfiles.Point, anchor kicadfiles.P
 		return nil
 	}
 	if position.X != anchor.X && position.Y != anchor.Y {
-		return fmt.Errorf("schematic label stub must be orthogonal")
+		return fmt.Errorf("schematic label stub must be orthogonal: label %s, anchor %s", formatPoint(*position), formatPoint(anchor))
 	}
 	return nil
 }
@@ -2056,6 +2103,9 @@ func (builder *Builder) pinAnchorForState(state *symbolState, reference string, 
 		return kicadfiles.Point{}, fmt.Errorf("symbol %s has no pin %s", reference, pin)
 	}
 	if state.usePhysicalConnectionAnchors {
+		if _, resolverOwned := builder.resolverSymbolIDs[state.libraryID]; resolverOwned {
+			return anchor, nil
+		}
 		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
 			return schematicSymbolPinAnchor(state.position, schematic.TransformConnectionAnchor(offset, state.rotation, state.mirror)), nil
 		}

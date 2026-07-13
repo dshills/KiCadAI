@@ -879,6 +879,43 @@ func TestBuilderAddSymbolCanPreferResolverBody(t *testing.T) {
 	}
 }
 
+func TestBuilderPreferredResolverBodyUsesResolverPinAnchors(t *testing.T) {
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Regulator_Linear:AP2112K-3.3": {
+			LibraryID: "Regulator_Linear:AP2112K-3.3",
+			Raw:       `(symbol "AP2112K-3.3" (property "Description" "resolver marker"))`,
+			Pins: []libraryresolver.SymbolPin{{
+				Number:   "1",
+				Position: kicadfiles.Point{X: kicadfiles.MM(-7.62), Y: kicadfiles.MM(-2.54)},
+			}},
+		},
+	}}
+	builder, err := New(Options{Name: "resolver_pin_anchor", DesignID: kicadfiles.UUID("12345678-1234-5678-9234-123456789abc"), LibraryIndex: &index})
+	if err != nil {
+		t.Fatal(err)
+	}
+	position := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}
+	if _, err := builder.AddSymbol(SymbolOptions{
+		Reference: "U1", LibraryID: "Regulator_Linear:AP2112K-3.3", Value: "3V3", PreferResolverSymbol: true,
+		Position: position,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	anchor, err := builder.pinAnchor(Endpoint{Reference: "U1", Pin: "1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state, err := builder.symbolState("U1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := kicadfiles.Point{X: state.position.X + kicadfiles.MM(-7.62), Y: state.position.Y + kicadfiles.MM(-2.54)}
+	if anchor != want {
+		t.Fatalf("resolver pin anchor = %#v, want %#v", anchor, want)
+	}
+}
+
 func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {
 	builder := newTestBuilder(t)
 	if _, err := builder.AddSymbol(SymbolOptions{

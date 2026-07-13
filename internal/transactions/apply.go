@@ -240,7 +240,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 				return result
 			}
 			opIndex := strconv.Itoa(i)
-			pins, err := resolveSymbolPinsForUnit(payload.Pins, opts.LibraryIndex, payload.LibraryID, payload.Unit)
+			pins, err := resolvePreferredSymbolPinsForUnit(payload.Pins, opts.LibraryIndex, payload.LibraryID, payload.Unit, payload.PreferResolverSymbol)
 			if err != nil {
 				result.Issues = append(result.Issues, applyIssue(i, err))
 				return result
@@ -259,7 +259,7 @@ func applyImported(tx Transaction, opts ApplyOptions, result ApplyResult) ApplyR
 			symbol.Properties = schematic.MergeProperties(symbol.Properties, schematicPropertiesFromPayload(payload.Properties, symbol.Position, symbol.Rotation, 2))
 			for _, pin := range payload.Pins {
 				offset := point(pin.XMM, pin.YMM)
-				if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(payload.LibraryID, pin.Number); ok {
+				if connectionOffset, ok := schematic.EmbeddedSymbolConnectionPinOffset(payload.LibraryID, pin.Number); ok && !payload.PreferResolverSymbol {
 					offset = connectionOffset
 				}
 				offset = schematic.TransformConnectionAnchor(offset, symbol.Rotation, symbol.Mirror)
@@ -593,7 +593,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 		if err := validateSymbolPropertyPayload(payload.Properties); err != nil {
 			return nil, err
 		}
-		resolverPins, err := resolveSymbolPinsForUnit(payload.Pins, opts.LibraryIndex, payload.LibraryID, payload.Unit)
+		resolverPins, err := resolvePreferredSymbolPinsForUnit(payload.Pins, opts.LibraryIndex, payload.LibraryID, payload.Unit, payload.PreferResolverSymbol)
 		if err != nil {
 			return nil, err
 		}
