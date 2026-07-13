@@ -261,7 +261,13 @@
         ]
       }
     ],
-    "no_connects": [],
+    "no_connects": [
+      {
+        "component": "usb",
+        "selector_kind": "symbol_pin",
+        "selector": "SH"
+      }
+    ],
     "buses": [],
     "schematic": {
       "flow": "left_to_right",
