@@ -89,6 +89,85 @@ func TestValidateResultDetectsInvalidVia(t *testing.T) {
 	assertValidationIssue(t, report, "via must span at least two layers")
 }
 
+func TestRouteConnectivityJoinsSameLayerTJunction(t *testing.T) {
+	route := Route{Segments: []Segment{
+		{Layer: "F.Cu", Start: Point{XMM: 0, YMM: 0}, End: Point{XMM: 10, YMM: 0}},
+		{Layer: "F.Cu", Start: Point{XMM: 5, YMM: -5}, End: Point{XMM: 5, YMM: 0}},
+	}}
+	assertRoutePointsConnected(t, route, layerPoint{Point: Point{XMM: 0, YMM: 0}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 5, YMM: -5}, Layer: "F.Cu"})
+}
+
+func TestRouteConnectivityJoinsSameLayerCrossing(t *testing.T) {
+	route := Route{Segments: []Segment{
+		{Layer: "F.Cu", Start: Point{XMM: 0, YMM: 0}, End: Point{XMM: 10, YMM: 0}},
+		{Layer: "F.Cu", Start: Point{XMM: 5, YMM: -5}, End: Point{XMM: 5, YMM: 5}},
+	}}
+	assertRoutePointsConnected(t, route, layerPoint{Point: Point{XMM: 0, YMM: 0}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 5, YMM: 5}, Layer: "F.Cu"})
+}
+
+func TestRouteConnectivityJoinsViaOnSegmentInterior(t *testing.T) {
+	route := Route{
+		Segments: []Segment{
+			{Layer: "F.Cu", Start: Point{XMM: 0, YMM: 0}, End: Point{XMM: 10, YMM: 0}},
+			{Layer: "B.Cu", Start: Point{XMM: 5, YMM: 0}, End: Point{XMM: 5, YMM: 10}},
+		},
+		Vias: []Via{{At: Point{XMM: 5, YMM: 0}, Layers: []string{"F.Cu", "B.Cu"}}},
+	}
+	assertRoutePointsConnected(t, route, layerPoint{Point: Point{XMM: 0, YMM: 0}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 5, YMM: 10}, Layer: "B.Cu"})
+}
+
+func TestRouteConnectivityDoesNotJoinDifferentLayerCrossing(t *testing.T) {
+	route := Route{Segments: []Segment{
+		{Layer: "F.Cu", Start: Point{XMM: 0, YMM: 0}, End: Point{XMM: 10, YMM: 0}},
+		{Layer: "B.Cu", Start: Point{XMM: 5, YMM: -5}, End: Point{XMM: 5, YMM: 5}},
+	}}
+	assertRoutePointsDisconnected(t, route, layerPoint{Point: Point{XMM: 0, YMM: 0}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 5, YMM: 5}, Layer: "B.Cu"})
+}
+
+func TestRouteConnectivityDoesNotJoinNearMiss(t *testing.T) {
+	route := Route{Segments: []Segment{
+		{Layer: "F.Cu", Start: Point{XMM: 0, YMM: 0}, End: Point{XMM: 10, YMM: 0}},
+		{Layer: "F.Cu", Start: Point{XMM: 5, YMM: 0.001}, End: Point{XMM: 5, YMM: 5}},
+	}}
+	assertRoutePointsDisconnected(t, route, layerPoint{Point: Point{XMM: 0, YMM: 0}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 5, YMM: 5}, Layer: "F.Cu"})
+}
+
+func TestRouteConnectivityJunctionsAreSegmentOrderIndependent(t *testing.T) {
+	segments := []Segment{
+		{Layer: "F.Cu", Start: Point{XMM: 0, YMM: 0}, End: Point{XMM: 10, YMM: 0}},
+		{Layer: "F.Cu", Start: Point{XMM: 5, YMM: -5}, End: Point{XMM: 5, YMM: 0}},
+		{Layer: "F.Cu", Start: Point{XMM: 10, YMM: 0}, End: Point{XMM: 15, YMM: 5}},
+	}
+	assertRoutePointsConnected(t, Route{Segments: segments}, layerPoint{Point: Point{XMM: 5, YMM: -5}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 15, YMM: 5}, Layer: "F.Cu"})
+	for left, right := 0, len(segments)-1; left < right; left, right = left+1, right-1 {
+		segments[left], segments[right] = segments[right], segments[left]
+	}
+	assertRoutePointsConnected(t, Route{Segments: segments}, layerPoint{Point: Point{XMM: 5, YMM: -5}, Layer: "F.Cu"}, layerPoint{Point: Point{XMM: 15, YMM: 5}, Layer: "F.Cu"})
+}
+
+func assertRoutePointsConnected(t *testing.T, route Route, left, right layerPoint) {
+	t.Helper()
+	graph := newRouteConnectivity(route)
+	leftKey, leftOK := graph.nearestKey(left.Point, left.Layer)
+	rightKey, rightOK := graph.nearestKey(right.Point, right.Layer)
+	if !leftOK || !rightOK || graph.find(leftKey) != graph.find(rightKey) {
+		t.Fatalf("route points are disconnected: left=%#v/%v right=%#v/%v", left, leftOK, right, rightOK)
+	}
+}
+
+func assertRoutePointsDisconnected(t *testing.T, route Route, left, right layerPoint) {
+	t.Helper()
+	graph := newRouteConnectivity(route)
+	leftKey, leftOK := graph.nearestKey(left.Point, left.Layer)
+	rightKey, rightOK := graph.nearestKey(right.Point, right.Layer)
+	if !leftOK || !rightOK {
+		t.Fatalf("route points are missing: left=%#v/%v right=%#v/%v", left, leftOK, right, rightOK)
+	}
+	if graph.find(leftKey) == graph.find(rightKey) {
+		t.Fatalf("route points are unexpectedly connected: left=%#v right=%#v", left, right)
+	}
+}
+
 func assertValidationIssue(t *testing.T, report ValidationReport, message string) {
 	t.Helper()
 	for _, issue := range report.Issues {

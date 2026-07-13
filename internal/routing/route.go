@@ -115,6 +115,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		var fallbackOccupancy Occupancy
 		var fallbackViaOccupancy Occupancy
 		fallbackReady := false
+		netAccess := clonePadAccessPoints(access)
 		for pairIndex, pair := range plan.Pairs {
 			if pairIndex%routePairContextCheckInterval == 0 {
 				if err := ctx.Err(); err != nil {
@@ -126,7 +127,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if netFailed {
 				break
 			}
-			path, routeIssues := routePairPath(ctx, searchRequest, access, occupancy, viaOccupancy, plan.Net.Name, pair)
+			path, routeIssues := routePairPath(ctx, searchRequest, netAccess, occupancy, viaOccupancy, plan.Net.Name, pair)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
@@ -148,7 +149,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 						}
 					}
 					if fallbackReady {
-						fallbackPath, fallbackIssues := routePairPath(ctx, fallbackRequest, access, fallbackOccupancy, fallbackViaOccupancy, plan.Net.Name, pair)
+						fallbackPath, fallbackIssues := routePairPath(ctx, fallbackRequest, netAccess, fallbackOccupancy, fallbackViaOccupancy, plan.Net.Name, pair)
 						route.SearchNodes += fallbackPath.SearchNodes
 						result.Metrics.SearchNodes += fallbackPath.SearchNodes
 						if len(fallbackIssues) == 0 {
@@ -166,6 +167,9 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				segments, metrics = BuildSegmentsFromPathWithNeckdown(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM)
 				if segmentsUseNeckdown(segments, netRequest.Rules.TraceWidthMM) && !nominalSegmentsClearOccupancy(segments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
 					routeIssues = []reports.Issue{endpointNeckdownTrunkIssue(plan.Net.Name, pairIndex, pair)}
+				}
+				if len(routeIssues) == 0 && (!pinPathEndpointAccess(&netAccess, path, pair.From, 0) || !pinPathEndpointAccess(&netAccess, path, pair.To, len(path.Points)-1)) {
+					routeIssues = []reports.Issue{routeEndpointAccessIssue(plan.Net.Name, pairIndex, pair)}
 				}
 			}
 			if len(routeIssues) != 0 {
@@ -246,6 +250,53 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 	quality := BuildQualityReportWithEvidence(request, result, qualityEvidence)
 	result.Quality = &quality
 	return result
+}
+
+func clonePadAccessPoints(access PadAccess) PadAccess {
+	cloned := access
+	cloned.AccessPoints = make(map[endpointID][]AccessPoint, len(access.AccessPoints))
+	for endpoint, points := range access.AccessPoints {
+		cloned.AccessPoints[endpoint] = append([]AccessPoint(nil), points...)
+	}
+	return cloned
+}
+
+func pinPathEndpointAccess(access *PadAccess, path GridPath, endpoint Endpoint, pointIndex int) bool {
+	if access == nil || pointIndex < 0 || pointIndex >= len(path.Points) || pointIndex >= len(path.Coordinates) {
+		return false
+	}
+	points, ok := AccessPointsForEndpoint(*access, endpoint)
+	if !ok {
+		return false
+	}
+	targetPoint := roundPoint(path.Points[pointIndex])
+	targetLayerName, hasTargetLayer := path.LayerNames[path.Coordinates[pointIndex].Layer]
+	targetLayer := normalizeLayer(targetLayerName)
+	if !hasTargetLayer || targetLayer == "" {
+		targetLayer = normalizeLayer(path.Layer)
+	}
+	for _, point := range points {
+		if roundPoint(point.Point) == targetPoint && normalizeLayer(point.Layer) == targetLayer {
+			access.AccessPoints[endpointKey(endpoint.Ref, endpoint.Pin)] = []AccessPoint{point}
+			return true
+		}
+	}
+	return false
+}
+
+func routeEndpointAccessIssue(netName string, pairIndex int, pair EndpointPair) reports.Issue {
+	return reports.Issue{
+		Code:     reports.CodeValidationFailed,
+		Severity: reports.SeverityBlocked,
+		Path:     fmt.Sprintf("nets[%q].pairs[%d]", netName, pairIndex),
+		Message: fmt.Sprintf(
+			"routed path between %s.%s and %s.%s does not terminate on known physical pad access",
+			pair.From.Ref, pair.From.Pin, pair.To.Ref, pair.To.Pin,
+		),
+		Refs:       []string{pair.From.Ref, pair.To.Ref},
+		Nets:       []string{netName},
+		Suggestion: "verify pad access points and routed path endpoint alignment",
+	}
 }
 
 func endpointNeckdownTrunkIssue(netName string, pairIndex int, pair EndpointPair) reports.Issue {

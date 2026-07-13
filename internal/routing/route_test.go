@@ -24,6 +24,66 @@ func TestRouteRequestRoutesSimpleBoard(t *testing.T) {
 	}
 }
 
+func TestRouteRequestReusesDuplicatePadAccessAcrossNetBranches(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Components = []Component{
+		{
+			Ref:      "J1",
+			Position: Placement{Layer: "F.Cu"},
+			Pads: []Pad{
+				duplicateAccessTestPad("J1", "SH", Point{XMM: 15, YMM: 5}),
+				duplicateAccessTestPad("J1", "SH", Point{XMM: 15, YMM: 15}),
+			},
+		},
+		{
+			Ref:      "J2",
+			Position: Placement{Layer: "F.Cu"},
+			Pads:     []Pad{duplicateAccessTestPad("J2", "1", Point{XMM: 25, YMM: 5})},
+		},
+		{
+			Ref:      "J3",
+			Position: Placement{Layer: "F.Cu"},
+			Pads:     []Pad{duplicateAccessTestPad("J3", "1", Point{XMM: 5, YMM: 15})},
+		},
+	}
+	request.Nets = []Net{{
+		Name: "SIG",
+		Endpoints: []Endpoint{
+			{Ref: "J1", Pin: "SH"},
+			{Ref: "J2", Pin: "1"},
+			{Ref: "J3", Pin: "1"},
+		},
+	}}
+
+	result := RouteRequest(request)
+	if result.Status != StatusRouted {
+		t.Fatalf("status = %s, issues = %#v, routes = %#v", result.Status, result.Issues, result.Routes)
+	}
+	if len(result.Routes) != 1 || len(result.Routes[0].Segments) == 0 {
+		t.Fatalf("routes = %#v, want one routed tree", result.Routes)
+	}
+	graph := newRouteConnectivity(result.Routes[0])
+	root, rootOK := graph.nearestKey(Point{XMM: 15, YMM: 5}, "F.Cu")
+	second, secondOK := graph.nearestKey(Point{XMM: 25, YMM: 5}, "F.Cu")
+	third, thirdOK := graph.nearestKey(Point{XMM: 5, YMM: 15}, "F.Cu")
+	if !rootOK || !secondOK || !thirdOK || graph.find(root) != graph.find(second) || graph.find(root) != graph.find(third) {
+		t.Fatalf("duplicate-pad route tree is disconnected: root=%v second=%v third=%v route=%#v", rootOK, secondOK, thirdOK, result.Routes[0])
+	}
+}
+
+func duplicateAccessTestPad(ref, name string, point Point) Pad {
+	return Pad{
+		Ref:      ref,
+		Name:     name,
+		Net:      "SIG",
+		Position: point,
+		Shape:    PadRect,
+		Type:     PadSMD,
+		Size:     Size{WidthMM: 1, HeightMM: 1},
+		Layers:   []string{"F.Cu"},
+	}
+}
+
 func TestEndpointNeckdownTrunkIssueIdentifiesPair(t *testing.T) {
 	issue := endpointNeckdownTrunkIssue("GND", 3, EndpointPair{
 		From: Endpoint{Ref: "U2", Pin: "7"},

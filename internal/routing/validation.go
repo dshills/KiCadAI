@@ -118,25 +118,64 @@ type layerPoint struct {
 	Layer string
 }
 
+type routeConnectivitySegment struct {
+	segment  Segment
+	layer    string
+	startKey string
+}
+
 func newRouteConnectivity(route Route) routeConnectivity {
 	graph := routeConnectivity{parent: map[string]string{}, points: map[string]layerPoint{}}
+	segments := make([]routeConnectivitySegment, 0, len(route.Segments))
+	indexedSegments := make([]clearanceSegment, 0, len(route.Segments))
 	for _, segment := range route.Segments {
-		start := graph.addPoint(segment.Start, segment.Layer)
-		end := graph.addPoint(segment.End, segment.Layer)
+		segment.Start = roundPoint(segment.Start)
+		segment.End = roundPoint(segment.End)
+		layer := normalizeLayer(segment.Layer)
+		start := graph.addPoint(segment.Start, layer)
+		end := graph.addPoint(segment.End, layer)
 		graph.union(start, end)
+		segments = append(segments, routeConnectivitySegment{segment: segment, layer: layer, startKey: start})
+		indexedSegments = append(indexedSegments, clearanceSegment{Layer: layer, Segment: segment})
+	}
+	spatialIndex := clearanceSpatialIndex(indexedSegments, 2.54)
+	queryScratch := newClearanceQueryScratch(len(segments))
+	for leftIndex, left := range segments {
+		for _, rightIndex := range spatialIndex.query(left.layer, left.segment, distanceEpsilon, queryScratch) {
+			if rightIndex <= leftIndex {
+				continue
+			}
+			right := segments[rightIndex]
+			if segmentsIntersect(left.segment.Start, left.segment.End, right.segment.Start, right.segment.End) {
+				graph.union(left.startKey, right.startKey)
+			}
+		}
 	}
 	for _, via := range route.Vias {
+		via.At = roundPoint(via.At)
 		var first string
 		for _, layer := range via.Layers {
+			layer = normalizeLayer(layer)
 			key := graph.addPoint(via.At, layer)
 			if first == "" {
 				first = key
-				continue
+			} else {
+				graph.union(first, key)
 			}
-			graph.union(first, key)
+			pointSegment := Segment{Start: via.At, End: via.At}
+			for _, candidateIndex := range spatialIndex.query(layer, pointSegment, distanceEpsilon, queryScratch) {
+				segment := segments[candidateIndex]
+				if routePointOnSegment(via.At, segment.segment) {
+					graph.union(key, segment.startKey)
+				}
+			}
 		}
 	}
 	return graph
+}
+
+func routePointOnSegment(point Point, segment Segment) bool {
+	return orientation(segment.Start, segment.End, point) == 0 && pointOnSegment(point, segment.Start, segment.End)
 }
 
 func (graph routeConnectivity) addPoint(point Point, layer string) string {
