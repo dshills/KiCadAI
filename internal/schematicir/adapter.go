@@ -283,6 +283,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 	if paper == "" {
 		paper = document.Metadata.Paper
 	}
+	labelConflicts := layoutCrossNetLabelPoints(layoutResult)
 	state := &adapterState{
 		document:            document,
 		libraryIndex:        index,
@@ -293,8 +294,8 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		layoutResult:        layoutResult,
 		rotationByID:        layoutRotations(document),
 		mirrorByID:          layoutMirrors(document),
-		routesByKey:         layoutRouteHints(layoutResult),
-		labelsByKey:         layoutEndpointLabelHints(layoutResult),
+		routesByKey:         layoutRouteHints(layoutResult, labelConflicts),
+		labelsByKey:         layoutEndpointLabelHints(layoutResult, labelConflicts),
 		netLabelPreferences: netLabelPreferences,
 		textByID:            layoutTextPlacements(layoutResult),
 		issues:              preflightIssues,
@@ -732,12 +733,14 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			}
 			if useLabels != nil && *useLabels {
 				if fromLabelAt == nil {
-					fromLabel, fromOK := state.labelsByKey[schematicEndpointLabelKey(net.Name, fromIR)]
-					fromLabelAt = transactionPointValue(fromLabel, fromOK)
+					if point, pointOK := state.labelPointForEndpoint(net.Name, fromIR); pointOK {
+						fromLabelAt = &point
+					}
 				}
 				if toLabelAt == nil {
-					toLabel, toOK := state.labelsByKey[schematicEndpointLabelKey(net.Name, toIR)]
-					toLabelAt = transactionPointValue(toLabel, toOK)
+					if point, pointOK := state.labelPointForEndpoint(net.Name, toIR); pointOK {
+						toLabelAt = &point
+					}
 				}
 				if (fromLabelAt == nil && !skipFromLabel) || (toLabelAt == nil && !skipToLabel) {
 					// A label route without both anchors cannot be applied by the
@@ -909,6 +912,7 @@ func (state *adapterState) labelPointForEndpoint(netName string, endpoint Endpoi
 	if point, ok := state.labelsByKey[schematicEndpointLabelKey(netName, endpoint)]; ok {
 		return transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}, true
 	}
+	// A rejected or missing layout hint falls back to calibrated pin geometry.
 	anchor, ok := state.portEndpointAnchor(endpoint)
 	if !ok {
 		return transactions.Point{}, false
@@ -1260,32 +1264,83 @@ func layoutResultPoints(result schematiclayout.Result) map[string]transactions.P
 	return points
 }
 
-func layoutRouteHints(result schematiclayout.Result) map[string]schematiclayout.RoutedConnection {
+type schematicLabelPointKey struct {
+	x kicadfiles.IU
+	y kicadfiles.IU
+}
+
+func newSchematicLabelPointKey(point kicadfiles.Point) schematicLabelPointKey {
+	return schematicLabelPointKey{x: point.X, y: point.Y}
+}
+
+func layoutRouteHints(result schematiclayout.Result, conflicts map[schematicLabelPointKey]struct{}) map[string]schematiclayout.RoutedConnection {
 	hints := make(map[string]schematiclayout.RoutedConnection, len(result.Connections))
 	for _, connection := range result.Connections {
-		from := EndpointRef(connection.From.Ref + "." + connection.From.Pin)
-		to := EndpointRef(connection.To.Ref + "." + connection.To.Pin)
-		hints[schematicRouteKey(connection.NetName, from, to)] = connection
+		hint := connection
+		if hint.FromLabelAt != nil {
+			if _, conflict := conflicts[newSchematicLabelPointKey(*hint.FromLabelAt)]; conflict {
+				hint.FromLabelAt = nil
+			}
+		}
+		if hint.ToLabelAt != nil {
+			if _, conflict := conflicts[newSchematicLabelPointKey(*hint.ToLabelAt)]; conflict {
+				hint.ToLabelAt = nil
+			}
+		}
+		from := EndpointRef(hint.From.Ref + "." + hint.From.Pin)
+		to := EndpointRef(hint.To.Ref + "." + hint.To.Pin)
+		hints[schematicRouteKey(hint.NetName, from, to)] = hint
 	}
 	return hints
 }
 
-func layoutEndpointLabelHints(result schematiclayout.Result) map[string]kicadfiles.Point {
+func layoutEndpointLabelHints(result schematiclayout.Result, conflicts map[schematicLabelPointKey]struct{}) map[string]kicadfiles.Point {
 	hints := map[string]kicadfiles.Point{}
 	for _, connection := range result.Connections {
 		if !connection.UseLabels {
 			continue
 		}
 		if connection.FromLabelAt != nil {
-			endpoint := EndpointRef(connection.From.Ref + "." + connection.From.Pin)
-			hints[schematicEndpointLabelKey(connection.NetName, endpoint)] = *connection.FromLabelAt
+			if _, conflict := conflicts[newSchematicLabelPointKey(*connection.FromLabelAt)]; !conflict {
+				endpoint := EndpointRef(connection.From.Ref + "." + connection.From.Pin)
+				hints[schematicEndpointLabelKey(connection.NetName, endpoint)] = *connection.FromLabelAt
+			}
 		}
 		if connection.ToLabelAt != nil {
-			endpoint := EndpointRef(connection.To.Ref + "." + connection.To.Pin)
-			hints[schematicEndpointLabelKey(connection.NetName, endpoint)] = *connection.ToLabelAt
+			if _, conflict := conflicts[newSchematicLabelPointKey(*connection.ToLabelAt)]; !conflict {
+				endpoint := EndpointRef(connection.To.Ref + "." + connection.To.Pin)
+				hints[schematicEndpointLabelKey(connection.NetName, endpoint)] = *connection.ToLabelAt
+			}
 		}
 	}
 	return hints
+}
+
+func layoutCrossNetLabelPoints(result schematiclayout.Result) map[schematicLabelPointKey]struct{} {
+	netsByPoint := make(map[schematicLabelPointKey]string, len(result.Connections)*2)
+	conflicts := make(map[schematicLabelPointKey]struct{}, len(result.Connections))
+	add := func(point *kicadfiles.Point, netName string) {
+		if point == nil {
+			return
+		}
+		key := newSchematicLabelPointKey(*point)
+		firstNet, ok := netsByPoint[key]
+		if !ok {
+			netsByPoint[key] = netName
+			return
+		}
+		if firstNet != netName {
+			conflicts[key] = struct{}{}
+		}
+	}
+	for _, connection := range result.Connections {
+		if !connection.UseLabels {
+			continue
+		}
+		add(connection.FromLabelAt, connection.NetName)
+		add(connection.ToLabelAt, connection.NetName)
+	}
+	return conflicts
 }
 
 func schematicEndpointLabelKey(netName string, endpoint EndpointRef) string {

@@ -793,6 +793,52 @@ func countOperations(tx transactions.Transaction, kind transactions.OperationKin
 	return count
 }
 
+func TestLayoutEndpointLabelHintsRejectCrossNetCoordinateConflicts(t *testing.T) {
+	conflict := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(30)}
+	sharedNet := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(50)}
+	result := schematiclayout.Result{Connections: []schematiclayout.RoutedConnection{
+		{NetName: "GND", From: schematiclayout.Endpoint{Ref: "U1", Pin: "1"}, UseLabels: true, FromLabelAt: &conflict},
+		{NetName: "VCC", From: schematiclayout.Endpoint{Ref: "U1", Pin: "2"}, UseLabels: true, FromLabelAt: &conflict},
+		{NetName: "SDA", From: schematiclayout.Endpoint{Ref: "U2", Pin: "1"}, UseLabels: true, FromLabelAt: &sharedNet},
+		{NetName: "SDA", From: schematiclayout.Endpoint{Ref: "J1", Pin: "1"}, UseLabels: true, FromLabelAt: &sharedNet},
+	}}
+
+	hints := layoutEndpointLabelHints(result, layoutCrossNetLabelPoints(result))
+	if _, ok := hints[schematicEndpointLabelKey("GND", "U1.1")]; ok {
+		t.Fatal("cross-net GND label conflict was retained")
+	}
+	if _, ok := hints[schematicEndpointLabelKey("VCC", "U1.2")]; ok {
+		t.Fatal("cross-net VCC label conflict was retained")
+	}
+	if len(hints) != 2 {
+		t.Fatalf("same-net label hints = %#v, want both SDA endpoints", hints)
+	}
+}
+
+func TestLayoutRouteHintsRejectCrossNetCoordinateConflicts(t *testing.T) {
+	conflict := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(30)}
+	sharedNet := kicadfiles.Point{X: kicadfiles.MM(40), Y: kicadfiles.MM(50)}
+	result := schematiclayout.Result{Connections: []schematiclayout.RoutedConnection{
+		{NetName: "GND", From: schematiclayout.Endpoint{Ref: "U1", Pin: "1"}, To: schematiclayout.Endpoint{Ref: "U1", Pin: "3"}, UseLabels: true, FromLabelAt: &conflict, ToLabelAt: &sharedNet},
+		{NetName: "VCC", From: schematiclayout.Endpoint{Ref: "U1", Pin: "2"}, To: schematiclayout.Endpoint{Ref: "U1", Pin: "4"}, UseLabels: true, FromLabelAt: &conflict},
+		{NetName: "GND", From: schematiclayout.Endpoint{Ref: "U2", Pin: "1"}, To: schematiclayout.Endpoint{Ref: "J1", Pin: "1"}, UseLabels: true, FromLabelAt: &sharedNet},
+	}}
+
+	hints := layoutRouteHints(result, layoutCrossNetLabelPoints(result))
+	for _, hint := range hints {
+		if hint.FromLabelAt != nil && *hint.FromLabelAt == conflict {
+			t.Fatalf("cross-net route label conflict was retained: %#v", hint)
+		}
+		if hint.ToLabelAt != nil && *hint.ToLabelAt == conflict {
+			t.Fatalf("cross-net route label conflict was retained: %#v", hint)
+		}
+	}
+	groundHint := hints[schematicRouteKey("GND", "U1.1", "U1.3")]
+	if groundHint.ToLabelAt == nil || *groundHint.ToLabelAt != sharedNet {
+		t.Fatalf("same-net route label hint = %#v, want %v", groundHint.ToLabelAt, sharedNet)
+	}
+}
+
 func decodeOperations[T any](t *testing.T, tx transactions.Transaction, kind transactions.OperationKind) []T {
 	t.Helper()
 	var out []T
