@@ -514,9 +514,24 @@ func TestUpsertImportedFootprintRejectsUnknownNetOnlyPad(t *testing.T) {
 }
 
 func TestImportedMetadataPropertiesExcludeReservedFootprintProperties(t *testing.T) {
-	properties := importedMetadataProperties(map[string]string{"Reference": "REF**", "Value": "R", "KiLib_Generator": "test"})
+	properties := importedMetadataProperties(map[string]string{
+		"Reference": "REF**", "Value": "R", "Datasheet": "https://example.test", "Description": "resistor", "KiLib_Generator": "test",
+	})
 	if len(properties) != 1 || properties[0].Name != "KiLib_Generator" || properties[0].Value != "test" {
 		t.Fatalf("metadata properties = %#v", properties)
+	}
+}
+
+func TestImportedFootprintPropertiesExcludeDefaultProperties(t *testing.T) {
+	properties := footprintPropertiesFromRecord([]libraryresolver.FootprintProperty{
+		{Name: "Reference", Value: "REF**"},
+		{Name: "value", Value: "R"},
+		{Name: " Datasheet ", Value: "https://example.test"},
+		{Name: "DESCRIPTION", Value: "resistor"},
+		{Name: "KiLib_Generator", Value: "test"},
+	}, kicadfiles.LayerFCu)
+	if len(properties) != 1 || properties[0].Name != "KiLib_Generator" || properties[0].Value != "test" {
+		t.Fatalf("footprint properties = %#v", properties)
 	}
 }
 
