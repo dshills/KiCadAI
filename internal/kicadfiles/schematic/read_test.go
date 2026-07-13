@@ -183,6 +183,47 @@ func TestReadSchematicRecoversUnknownEmbeddedSymbolGeometry(t *testing.T) {
 	}
 }
 
+func TestReadSchematicRecoversMarkedResolverGeometryForKnownTemplate(t *testing.T) {
+	input := strings.Join([]string{
+		`(kicad_sch`,
+		`  (version 20260306)`,
+		`  (generator "eeschema")`,
+		`  (generator_version "10.0.3")`,
+		`  (uuid "11111111-1111-5111-8111-111111111111")`,
+		`  (paper A4)`,
+		`  (lib_symbols`,
+		`    (symbol "Device:R"`,
+		`      (symbol "R_1_1"`,
+		`        (pin passive line (at -5 0 0) (length 1) (name "A") (number "1"))`,
+		`      )`,
+		`    )`,
+		`  )`,
+		`  (symbol`,
+		`    (lib_id "Device:R")`,
+		`    (at 50 50 0)`,
+		`    (unit 1)`,
+		`    (uuid "33333333-3333-5333-8333-333333333333")`,
+		`    (property "Reference" "R1")`,
+		`    (property "Value" "1k")`,
+		`    (property "KiCadAI Symbol Geometry" "template" (hide yes))`,
+		`    (property "KiCadAI Symbol Geometry" "resolver" (hide yes))`,
+		`    (pin "1" (uuid "44444444-4444-5444-8444-444444444444"))`,
+		`  )`,
+		`)`,
+	}, "\n")
+	read, err := Read([]byte(input))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(read.Symbols) != 1 || len(read.Symbols[0].PinAnchors) != 1 {
+		t.Fatalf("resolver symbol geometry = %#v", read.Symbols)
+	}
+	want := kicadfiles.Point{X: kicadfiles.MM(45), Y: kicadfiles.MM(50)}
+	if read.Symbols[0].PinAnchors[0] != want {
+		t.Fatalf("resolver pin anchor = %#v, want %#v", read.Symbols[0].PinAnchors[0], want)
+	}
+}
+
 func TestReadSchematicRecoversConnectionOverridePinAnchors(t *testing.T) {
 	input := strings.Join([]string{
 		`(kicad_sch`,

@@ -914,6 +914,15 @@ func TestBuilderPreferredResolverBodyUsesResolverPinAnchors(t *testing.T) {
 	if anchor != want {
 		t.Fatalf("resolver pin anchor = %#v, want %#v", anchor, want)
 	}
+	foundMarker := false
+	for _, property := range builder.Design().Schematic.Symbols[0].Properties {
+		if property.Name == schematic.ResolverGeometryPropertyName && property.Value == schematic.ResolverGeometryPropertyValue && property.Hidden && property.Private {
+			foundMarker = true
+		}
+	}
+	if !foundMarker {
+		t.Fatal("resolver-backed symbol is missing its persisted geometry marker")
+	}
 }
 
 func TestBuilderAddSymbolDerivesPinsFromEmbeddedTemplate(t *testing.T) {

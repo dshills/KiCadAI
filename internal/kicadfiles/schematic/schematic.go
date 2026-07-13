@@ -107,6 +107,11 @@ type Property struct {
 	Rotation       kicadfiles.Angle
 }
 
+const (
+	ResolverGeometryPropertyName  = "KiCadAI Symbol Geometry"
+	ResolverGeometryPropertyValue = "resolver"
+)
+
 type SymbolPin struct {
 	Number    string
 	UUID      kicadfiles.UUID

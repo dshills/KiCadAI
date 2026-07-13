@@ -10,6 +10,8 @@ import (
 	"kicadai/internal/kicadfiles/sexpr"
 )
 
+var resolverGeometryPropertyNormalizedName = NormalizePropertyName(ResolverGeometryPropertyName)
+
 func ReadFile(path string) (SchematicFile, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -110,11 +112,12 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 	for index := range file.Symbols {
 		symbol := &file.Symbols[index]
 		_, knownTemplate := EmbeddedSymbolPinOffsets(symbol.LibraryID)
+		resolverGeometry := knownTemplate && symbolUsesResolverGeometry(symbol)
 		embedded, ok := byID[symbol.LibraryID]
 		if !ok {
 			continue
 		}
-		if knownTemplate {
+		if knownTemplate && !resolverGeometry {
 			if templateBounds, templateOK := EmbeddedSymbolBodyBounds(symbol.LibraryID); templateOK {
 				symbol.BodyBounds = &templateBounds
 			}
@@ -135,7 +138,7 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 			cache[key] = geometry
 		}
 		pins, bounds, boundsOK := geometry.pins, geometry.bounds, geometry.ok
-		if len(pins) != 0 && !knownTemplate {
+		if len(pins) != 0 && (!knownTemplate || resolverGeometry) {
 			anchors := embeddedPinAnchors(pins, symbol.Pins)
 			if len(anchors) == len(symbol.Pins) {
 				for pinIndex, anchor := range anchors {
@@ -149,6 +152,18 @@ func recoverEmbeddedSymbolGeometry(file *SchematicFile) {
 			symbol.BodyBounds = &bounds
 		}
 	}
+}
+
+func symbolUsesResolverGeometry(symbol *SchematicSymbol) bool {
+	for _, property := range symbol.Properties {
+		if NormalizePropertyName(property.Name) != resolverGeometryPropertyNormalizedName {
+			continue
+		}
+		if strings.EqualFold(strings.TrimSpace(property.Value), ResolverGeometryPropertyValue) {
+			return true
+		}
+	}
+	return false
 }
 
 func embeddedPinAnchors(available []embeddedPinGeometry, symbolPins []SymbolPin) []kicadfiles.Point {

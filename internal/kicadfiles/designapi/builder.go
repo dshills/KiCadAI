@@ -375,7 +375,16 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		symbol.OnBoard = &onBoard
 		symbol.InPositionFile = &inPositionFile
 	}
-	symbol.Properties = schematic.MergeProperties(symbol.Properties, options.Properties)
+	properties := options.Properties
+	if resolverOwned {
+		properties = append(append([]schematic.Property(nil), properties...), schematic.Property{
+			Name:    schematic.ResolverGeometryPropertyName,
+			Value:   schematic.ResolverGeometryPropertyValue,
+			Private: true,
+			Hidden:  true,
+		})
+	}
+	symbol.Properties = schematic.MergeProperties(symbol.Properties, properties)
 	symbol.Pins = make([]schematic.SymbolPin, 0, len(pinSpecs))
 	pins := make(map[string]kicadfiles.Point, len(pinSpecs))
 	pinNets := make(map[string]string, len(pinSpecs))
