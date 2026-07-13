@@ -7,6 +7,19 @@ import (
 	"kicadai/internal/routing"
 )
 
+func TestExplicitNetWeightDoesNotLetSharedGroundCurrentDominatePlacement(t *testing.T) {
+	required := true
+	ground := explicitNetWeight(ExplicitNetSpec{Name: "GND", Role: "ground", Required: required, CurrentMA: 500})
+	returnNet := explicitNetWeight(ExplicitNetSpec{Name: "RETURN", Role: "return", Required: required, CurrentMA: 500})
+	power := explicitNetWeight(ExplicitNetSpec{Name: "VBUS", Role: "power_pos", Required: required, CurrentMA: 500})
+	if ground != 10 || returnNet != 10 {
+		t.Fatalf("ground/return weights = %d/%d, want required-net weight 10", ground, returnNet)
+	}
+	if power != 14 {
+		t.Fatalf("power weight = %d, want current-weighted value 14", power)
+	}
+}
+
 func TestExpandExplicitPhysicalPadEndpointsIncludesDuplicateSameNetPads(t *testing.T) {
 	request := routing.Request{
 		Components: []routing.Component{{

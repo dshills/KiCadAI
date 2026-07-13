@@ -271,6 +271,12 @@ func explicitNetWeight(net ExplicitNetSpec) int {
 	if net.Required {
 		weight += 6
 	}
+	// A shared ground or return net often touches most of the board. Giving
+	// its aggregate current an additional placement bonus overwhelms local
+	// signal and power-rail relationships instead of improving return paths.
+	if explicitPlacementNetRole(net.Role) == placement.NetGround {
+		return weight
+	}
 	if net.CurrentMA >= 500 {
 		weight += 4
 	} else if net.CurrentMA > 0 {
