@@ -137,6 +137,16 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 			}
 			file.NoConnects = append(file.NoConnects, schematic.NoConnect{Position: point})
 			opts.PinIntents = append(opts.PinIntents, schematicrules.PinIntent{Reference: payload.Endpoint.Ref, Pin: payload.Endpoint.Pin, Position: schematicElectricalIntentPointIU(point), Kind: schematicrules.PinIntentNoConnect})
+		case transactions.OpAddBus:
+			var payload transactions.AddBusOperation
+			if err := decodeSchematicElectricalOperation(operation, &payload); err != nil {
+				return file, opts, []reports.Issue{schematicElectricalDecodeIssue(index, err)}
+			}
+			points := make([]kicadfiles.Point, 0, len(payload.Points))
+			for _, point := range payload.Points {
+				points = append(points, schematicElectricalPoint(point))
+			}
+			file.Buses = append(file.Buses, schematic.Bus{Points: points})
 		case transactions.OpAddLabel:
 			var payload transactions.AddLabelOperation
 			if err := decodeSchematicElectricalOperation(operation, &payload); err != nil {

@@ -185,6 +185,25 @@ func TestSchematicElectricalInputsRespectLabelOnlyConnections(t *testing.T) {
 	}
 }
 
+func TestSchematicElectricalInputsPreserveBusLabelAnchor(t *testing.T) {
+	addBus := transactions.NewOperation(transactions.OpAddBus, []byte(`{"op":"add_bus","points":[{"x_mm":10,"y_mm":10},{"x_mm":30,"y_mm":10}]}`))
+	addLabel := transactions.NewOperation(transactions.OpAddLabel, []byte(`{"op":"add_label","text":"I2C","at":{"x_mm":10,"y_mm":10},"kind":"local"}`))
+
+	file, opts, issues := schematicElectricalInputsFromTransaction(transactions.Transaction{Operations: []transactions.Operation{addBus, addLabel}})
+	if len(issues) != 0 {
+		t.Fatalf("input issues = %#v", issues)
+	}
+	if len(file.Buses) != 1 {
+		t.Fatalf("buses = %#v, want one preserved bus", file.Buses)
+	}
+	report := schematicrules.Inspect(file, opts)
+	for _, finding := range report.Findings {
+		if finding.RuleID == schematicrules.RuleLabelFloating {
+			t.Fatalf("bus label should be anchored: %#v", report.Findings)
+		}
+	}
+}
+
 func TestCreateStructuralRequestSkipsFabricationReadiness(t *testing.T) {
 	request := Request{
 		Version:    RequestVersion,
