@@ -2,6 +2,7 @@ package placement
 
 import (
 	"context"
+	"math"
 	"reflect"
 	"testing"
 
@@ -241,7 +242,61 @@ func TestPlaceSamplesFixedOrientationEdgeAnchorFromPhysicalBounds(t *testing.T) 
 			if !edgeConstraintSatisfied(req.Board, req.Components[0], result.Placements[0].Position, tc.edge, edgeConstraintTolerance(req.Board, normalized.Rules)) {
 				t.Fatalf("placement %#v does not satisfy %s edge", result.Placements[0].Position, tc.edge)
 			}
+			bounds, ok := ComponentPhysicalBounds(req.Components[0], result.Placements[0].Position)
+			if !ok {
+				t.Fatal("expected physical bounds")
+			}
+			if tc.edge == EdgeLeft && bounds.Min.XMM < 2 || tc.edge == EdgeRight && bounds.Max.XMM > 98 {
+				t.Fatalf("physical bounds %#v do not preserve board clearance", bounds)
+			}
 		})
+	}
+}
+
+func TestPlaceEdgeCandidateRespectsGeneratedCopperClearance(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 100
+	req.Board.HeightMM = 20
+	req.Board.MarginMM = 0.25
+	req.Components[0].Edge = EdgeRight
+	rotation := 0.0
+	req.Components[0].Rotation.FixedDeg = &rotation
+	req.Rules.BoardEdgeClearanceMM = 0.25
+	req.Rules.MaxCandidatesPerPart = 10
+
+	result := Place(req)
+	if result.Status != StatusPlaced {
+		t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+	}
+	bounds, ok := ComponentPhysicalBounds(req.Components[0], result.Placements[0].Position)
+	if !ok || bounds.Max.XMM > 99.5 {
+		t.Fatalf("physical bounds %#v do not preserve generated-board copper clearance", bounds)
+	}
+}
+
+func TestEdgeAnySamplesEdgesBeyondCorners(t *testing.T) {
+	req := minimalRequest()
+	req.Board.WidthMM = 100
+	req.Board.HeightMM = 20
+	req.Board.MarginMM = 0.25
+	req.Components[0].Edge = EdgeAny
+	req.Rules.BoardEdgeClearanceMM = 0.25
+	normalized := NormalizeRequest(req)
+	usable := BoardUsableRect(normalized.Board, normalized.Rules)
+	grid := normalized.Rules.GridMM
+	count := int(math.Floor((usable.Max.XMM-usable.Min.XMM)/grid)) + 1
+	edgeInset := edgeCandidateInset(normalized.Board, normalized.Rules)
+	edgeSpan := connectorEdgeProximity(normalized.Rules) - edgeInset
+	indices := edgeAwareSampledIndices(normalized.Components[0], []float64{0}, EdgeAny, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, count, 7)
+	middleFound := false
+	for _, index := range indices {
+		if index > count/3 && index < 2*count/3 {
+			middleFound = true
+			break
+		}
+	}
+	if !middleFound {
+		t.Fatalf("EdgeAny indices %#v do not sample the edge away from corners", indices)
 	}
 }
 

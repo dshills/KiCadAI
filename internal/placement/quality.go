@@ -1333,11 +1333,20 @@ func centroid(points []Point) Point {
 
 func edgeConstraintTolerance(board BoardPlacementArea, rules Rules) float64 {
 	clearance := max(board.MarginMM, rules.BoardEdgeClearanceMM)
-	connectorTolerance := rules.ConnectorEdgeClearanceMM
-	if connectorTolerance <= 0 {
-		connectorTolerance = DefaultRules().ConnectorEdgeClearanceMM
+	return clearance + connectorEdgeProximity(rules)
+}
+
+func connectorEdgeProximity(rules Rules) float64 {
+	if rules.ConnectorEdgeClearanceMM > 0 {
+		return rules.ConnectorEdgeClearanceMM
 	}
-	return clearance + connectorTolerance
+	return DefaultRules().ConnectorEdgeClearanceMM
+}
+
+func edgeCandidateInset(board BoardPlacementArea, rules Rules) float64 {
+	const generatedBoardCopperEdgeClearanceMM = 0.5
+	clearance := max(board.MarginMM, rules.BoardEdgeClearanceMM)
+	return min(connectorEdgeProximity(rules), max(0, generatedBoardCopperEdgeClearanceMM-clearance))
 }
 
 func edgeConstraintSatisfied(board BoardPlacementArea, component Component, placement Placement, edge EdgeConstraint, toleranceMM float64) bool {

@@ -228,6 +228,8 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
 	usable := BoardUsableRect(request.Board, request.Rules)
 	edgeTolerance := edgeConstraintTolerance(request.Board, request.Rules)
+	edgeInset := edgeCandidateInset(request.Board, request.Rules)
+	edgeSpan := max(0, connectorEdgeProximity(request.Rules)-edgeInset)
 	grid := request.Rules.GridMM
 	if grid <= 0 {
 		grid = DefaultRules().GridMM
@@ -241,8 +243,8 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	yCount := max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)
 	variantsPerPoint := max(1, len(rotations)*len(layers))
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
-	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, grid, xCount, axisSamples)
-	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, grid, yCount, axisSamples)
+	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, edgeInset, edgeSpan, grid, xCount, axisSamples)
+	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, edgeInset, edgeSpan, grid, yCount, axisSamples)
 	candidateIndex := 0
 	for _, yIndex := range yIndices {
 		y := usable.Min.YMM + float64(yIndex)*grid
@@ -424,40 +426,52 @@ func sampledIndices(count int, target int) []int {
 	return indices
 }
 
-func edgeAwareSampledIndices(component Component, rotations []float64, edge EdgeConstraint, horizontal bool, usableMin, usableMax, grid float64, count, target int) []int {
+func edgeAwareSampledIndices(component Component, rotations []float64, edge EdgeConstraint, horizontal bool, usableMin, usableMax, edgeInset, edgeSpan, grid float64, count, target int) []int {
 	if edge == EdgeNone {
 		return sampledIndices(count, target)
 	}
 	edgeIndices := map[int]struct{}{}
+	inwardSteps := max(0, int(math.Floor(edgeSpan/grid)))
+	addIndices := func(position float64, lowerBound bool) {
+		const gridIndexEpsilon = 1e-9
+		value := (position - usableMin) / grid
+		center := int(math.Floor(value + gridIndexEpsilon))
+		start, end := center-inwardSteps, center
+		if lowerBound {
+			center = int(math.Ceil(value - gridIndexEpsilon))
+			start, end = center, center+inwardSteps
+		}
+		for index := start; index <= end; index++ {
+			if index >= 0 && index < count {
+				edgeIndices[index] = struct{}{}
+			}
+		}
+	}
 	for _, rotation := range rotations {
 		bounds, ok := ComponentPhysicalBounds(component, Placement{RotationDeg: rotation})
 		if !ok {
 			continue
 		}
-		var positions []float64
-		switch {
-		case horizontal && (edge == EdgeLeft || edge == EdgeAny):
-			positions = append(positions, usableMin-bounds.Min.XMM)
-		case !horizontal && (edge == EdgeTop || edge == EdgeAny):
-			positions = append(positions, usableMin-bounds.Min.YMM)
+		if horizontal && (edge == EdgeLeft || edge == EdgeAny) {
+			addIndices(usableMin+edgeInset-bounds.Min.XMM, true)
 		}
-		switch {
-		case horizontal && (edge == EdgeRight || edge == EdgeAny):
-			positions = append(positions, usableMax-bounds.Max.XMM)
-		case !horizontal && (edge == EdgeBottom || edge == EdgeAny):
-			positions = append(positions, usableMax-bounds.Max.YMM)
+		if !horizontal && (edge == EdgeTop || edge == EdgeAny) {
+			addIndices(usableMin+edgeInset-bounds.Min.YMM, true)
 		}
-		for _, position := range positions {
-			center := int(math.Round((position - usableMin) / grid))
-			for index := center - 1; index <= center+1; index++ {
-				if index >= 0 && index < count {
-					edgeIndices[index] = struct{}{}
-				}
-			}
+		if horizontal && (edge == EdgeRight || edge == EdgeAny) {
+			addIndices(usableMax-edgeInset-bounds.Max.XMM, false)
+		}
+		if !horizontal && (edge == EdgeBottom || edge == EdgeAny) {
+			addIndices(usableMax-edgeInset-bounds.Max.YMM, false)
 		}
 	}
 	if len(edgeIndices) == 0 {
 		return sampledIndices(count, target)
+	}
+	if edge == EdgeAny {
+		for _, index := range sampledIndices(count, target) {
+			edgeIndices[index] = struct{}{}
+		}
 	}
 	edgeSamples := make([]int, 0, len(edgeIndices))
 	for index := range edgeIndices {
@@ -471,26 +485,7 @@ func edgeAwareSampledIndices(component Component, rotations []float64, edge Edge
 		}
 		return selected
 	}
-	baseTarget := target - len(edgeSamples)
-	var baseSamples []int
-	if baseTarget == 1 {
-		baseSamples = []int{count / 2}
-	} else {
-		baseSamples = sampledIndices(count, baseTarget)
-	}
-	seen := make(map[int]struct{}, len(edgeSamples)+len(baseSamples))
-	for _, index := range edgeSamples {
-		seen[index] = struct{}{}
-	}
-	for _, index := range baseSamples {
-		seen[index] = struct{}{}
-	}
-	indices := make([]int, 0, len(seen))
-	for index := range seen {
-		indices = append(indices, index)
-	}
-	sort.Ints(indices)
-	return indices
+	return edgeSamples
 }
 
 func placementScore(component Component, placement Placement, request Request, anchor Point, hasAnchor bool, groupTarget Point, hasGroupTarget bool, netTargets []netScoreTarget, rotatedPadsByRotation map[int64]map[string]Point, seedBase uint64) float64 {
