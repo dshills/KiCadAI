@@ -199,7 +199,11 @@ func decodeAndResolveGraph(t *testing.T, data []byte, catalog *components.Catalo
 	}
 	resolved, issues := circuitgraph.NewResolver(circuitgraph.ResolveOptions{Catalog: catalog, CatalogID: "checked-in"}).Resolve(context.Background(), document)
 	if reports.HasBlockingIssue(issues) {
-		t.Fatalf("resolve graph issues = %#v", issues)
+		selections := make([]string, 0, len(document.Components))
+		for index, component := range document.Components {
+			selections = append(selections, fmt.Sprintf("%d:%s:%s/%s", index, component.ID, component.ComponentID, component.VariantID))
+		}
+		t.Fatalf("resolve graph selections=%v issues=%#v", selections, issues)
 	}
 	if _, issues := circuitgraph.ToDesignRequest(resolved); reports.HasBlockingIssue(issues) {
 		t.Fatalf("lower graph issues = %#v", issues)
