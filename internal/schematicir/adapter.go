@@ -224,10 +224,21 @@ type adapterState struct {
 	mirrorByID          map[string]Mirror
 	routesByKey         map[string]schematiclayout.RoutedConnection
 	labelsByKey         map[string]kicadfiles.Point
+	pinAnchorsByX       map[kicadfiles.IU][]indexedSchematicAnchor
+	pinAnchorsByY       map[kicadfiles.IU][]indexedSchematicAnchor
+	labelAnchorsByX     map[kicadfiles.IU][]indexedSchematicAnchor
+	labelAnchorsByY     map[kicadfiles.IU][]indexedSchematicAnchor
 	netLabelPreferences map[string]bool
 	textByID            map[string]layoutTextPlacement
 	layoutResult        schematiclayout.Result
 	issues              []reports.Issue
+}
+
+type indexedSchematicAnchor struct {
+	point       kicadfiles.Point
+	componentID string
+	pinNumber   string
+	netName     string
 }
 
 // connectionOverrideCacheEntry caches the symbol-level KiCad connection
@@ -302,6 +313,7 @@ func newAdapterState(document Document, index *libraryresolver.LibraryIndex) (*a
 		textByID:            layoutTextPlacements(layoutResult),
 		issues:              preflightIssues,
 	}
+	state.indexSchematicCollisionAnchors()
 	state.issues = append(state.issues, schematicLayoutAcceptanceIssues(document, layoutResult)...)
 	connectedPins := connectedPinSet(document)
 	connectionOverrides := map[string]map[string]connectionOverrideCacheEntry{}
@@ -595,7 +607,11 @@ func (state *adapterState) appendBuses(tx *transactions.Transaction) {
 				continue
 			}
 			entryPoint := transactions.Point{XMM: entry.At.XMM + entry.Size.XMM, YMM: entry.At.YMM + entry.Size.YMM}
-			pinStub := state.busPinStub(anchor, entry.Endpoint)
+			pinStub, stubOK := state.busPinStub(anchor, entry.Endpoint, member.Net)
+			if !stubOK {
+				state.addIssue(fmt.Sprintf("layout.buses[%d].entries[%d].endpoint", layoutIndex, entryIndex), "bus member pin has no collision-free label stub")
+				continue
+			}
 			entryStub := transactions.Point{XMM: entryPoint.XMM + 5.08, YMM: entryPoint.YMM}
 			state.appendOperation(tx, transactions.OpAddSchematicWire, transactions.AddSchematicWireOperation{
 				Op:          transactions.OpAddSchematicWire,
@@ -660,24 +676,41 @@ func schematicBusLabel(bus Bus) string {
 	return group
 }
 
-func (state *adapterState) busPinStub(anchor transactions.Point, endpoint EndpointRef) transactions.Point {
+func (state *adapterState) busPinStub(anchor transactions.Point, endpoint EndpointRef, netName string) (transactions.Point, bool) {
 	componentID, _, _ := endpoint.Split()
 	origin, ok := state.pointsByID[componentID]
 	if ok {
 		dx := anchor.XMM - origin.XMM
 		dy := anchor.YMM - origin.YMM
 		if math.Abs(dx) >= math.Abs(dy) && dx != 0 {
-			stubDistance := 2.54
+			distances := []float64{2.54, 1.27}
 			if dx < 0 {
-				stubDistance = 5.08
+				distances = []float64{5.08, 2.54, 1.27}
 			}
-			return transactions.Point{XMM: anchor.XMM + math.Copysign(stubDistance, dx), YMM: anchor.YMM}
+			for _, distance := range distances {
+				candidate := transactions.Point{XMM: anchor.XMM + math.Copysign(distance, dx), YMM: anchor.YMM}
+				if !state.labelSegmentConflicts(netName, endpoint, anchor, candidate) {
+					return candidate, true
+				}
+			}
+			return transactions.Point{}, false
 		}
 		if dy != 0 {
-			return transactions.Point{XMM: anchor.XMM, YMM: anchor.YMM + math.Copysign(2.54, dy)}
+			for _, distance := range []float64{2.54, 1.27} {
+				candidate := transactions.Point{XMM: anchor.XMM, YMM: anchor.YMM + math.Copysign(distance, dy)}
+				if !state.labelSegmentConflicts(netName, endpoint, anchor, candidate) {
+					return candidate, true
+				}
+			}
+		}
+		for _, distance := range []float64{2.54, 1.27} {
+			candidate := transactions.Point{XMM: anchor.XMM, YMM: anchor.YMM - distance}
+			if !state.labelSegmentConflicts(netName, endpoint, anchor, candidate) {
+				return candidate, true
+			}
 		}
 	}
-	return transactions.Point{XMM: anchor.XMM + 2.54, YMM: anchor.YMM}
+	return transactions.Point{}, false
 }
 
 type layoutTextPlacement struct {
@@ -757,8 +790,8 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 					waypoints = transactionPoints(points)
 				}
 			}
-			fromLabelAt = state.validLabelPointForEndpoint(fromIR, fromLabelAt)
-			toLabelAt = state.validLabelPointForEndpoint(toIR, toLabelAt)
+			fromLabelAt = state.validLabelPointForEndpoint(net.Name, fromIR, fromLabelAt)
+			toLabelAt = state.validLabelPointForEndpoint(net.Name, toIR, toLabelAt)
 			portNet := state.hasPortNet(net.Name)
 			skipFromLabel := false
 			skipToLabel := false
@@ -954,15 +987,15 @@ func (state *adapterState) portEndpointAnchor(endpoint EndpointRef) (transaction
 func (state *adapterState) labelPointForEndpoint(netName string, endpoint EndpointRef) (transactions.Point, bool) {
 	if point, ok := state.labelsByKey[schematicEndpointLabelKey(netName, endpoint)]; ok {
 		candidate := transactions.Point{XMM: float64(point.X) / float64(kicadfiles.MM(1)), YMM: float64(point.Y) / float64(kicadfiles.MM(1))}
-		if state.validLabelPointForEndpoint(endpoint, &candidate) != nil {
+		if state.validLabelPointForEndpoint(netName, endpoint, &candidate) != nil {
 			return candidate, true
 		}
 	}
 	// A rejected or missing layout hint falls back to calibrated pin geometry.
-	return state.fallbackLabelPointForEndpoint(endpoint)
+	return state.fallbackLabelPointForEndpoint(netName, endpoint)
 }
 
-func (state *adapterState) validLabelPointForEndpoint(endpoint EndpointRef, point *transactions.Point) *transactions.Point {
+func (state *adapterState) validLabelPointForEndpoint(netName string, endpoint EndpointRef, point *transactions.Point) *transactions.Point {
 	if point == nil {
 		return nil
 	}
@@ -973,7 +1006,127 @@ func (state *adapterState) validLabelPointForEndpoint(endpoint EndpointRef, poin
 	if point.XMM != anchor.XMM && point.YMM != anchor.YMM && state.endpointUsesResolverGeometry(endpoint) {
 		return nil
 	}
+	if state.labelSegmentConflicts(netName, endpoint, anchor, *point) {
+		return nil
+	}
 	return point
+}
+
+func (state *adapterState) labelSegmentConflicts(netName string, endpoint EndpointRef, anchor, label transactions.Point) bool {
+	return state.labelSegmentTouchesForeignPin(netName, endpoint, anchor, label) || state.labelSegmentTouchesOtherNetLabel(netName, anchor, label)
+}
+
+func (state *adapterState) labelSegmentTouchesOtherNetLabel(netName string, anchor, label transactions.Point) bool {
+	start := transactionPointToSchematicPoint(anchor)
+	end := transactionPointToSchematicPoint(label)
+	for _, candidate := range indexedSchematicAnchorsForSegment(state.labelAnchorsByX, state.labelAnchorsByY, start, end) {
+		if candidate.netName != netName && indexedPointWithinSegment(candidate.point, start, end) {
+			return true
+		}
+	}
+	return false
+}
+
+func (state *adapterState) labelSegmentTouchesForeignPin(netName string, endpoint EndpointRef, anchor, label transactions.Point) bool {
+	componentID, pinNumber, ok := endpoint.Split()
+	if !ok {
+		return false
+	}
+	start := transactionPointToSchematicPoint(anchor)
+	end := transactionPointToSchematicPoint(label)
+	for _, candidate := range indexedSchematicAnchorsForSegment(state.pinAnchorsByX, state.pinAnchorsByY, start, end) {
+		if candidate.componentID == componentID && candidate.pinNumber == pinNumber {
+			continue
+		}
+		if candidate.componentID == componentID && candidate.netName != "" && candidate.netName == netName {
+			continue
+		}
+		if indexedPointWithinSegment(candidate.point, start, end) {
+			return true
+		}
+	}
+	return false
+}
+
+func (state *adapterState) indexSchematicCollisionAnchors() {
+	state.pinAnchorsByX = map[kicadfiles.IU][]indexedSchematicAnchor{}
+	state.pinAnchorsByY = map[kicadfiles.IU][]indexedSchematicAnchor{}
+	state.labelAnchorsByX = map[kicadfiles.IU][]indexedSchematicAnchor{}
+	state.labelAnchorsByY = map[kicadfiles.IU][]indexedSchematicAnchor{}
+	pinNets := schematicPinNetsByComponent(state.document.Circuit.Nets)
+	for componentID, component := range state.componentsByID {
+		origin, ok := state.pointsByID[componentID]
+		if !ok {
+			continue
+		}
+		for _, pin := range transactionPinsWithLibraryIndex(component, state.libraryIndex) {
+			offset := schematic.TransformConnectionAnchor(
+				kicadfiles.Point{X: kicadfiles.MM(pin.XMM), Y: kicadfiles.MM(pin.YMM)},
+				kicadfiles.Angle(state.rotationByID[componentID]),
+				schematic.SymbolMirror(state.mirrorByID[componentID]),
+			)
+			point := kicadfiles.Point{X: kicadfiles.MM(origin.XMM) + offset.X, Y: kicadfiles.MM(origin.YMM) + offset.Y}
+			indexed := indexedSchematicAnchor{point: point, componentID: componentID, pinNumber: pin.Number, netName: pinNets[componentID][pin.Number]}
+			state.pinAnchorsByX[point.X] = append(state.pinAnchorsByX[point.X], indexed)
+			state.pinAnchorsByY[point.Y] = append(state.pinAnchorsByY[point.Y], indexed)
+		}
+	}
+	for key, point := range state.labelsByKey {
+		netName, _, _ := strings.Cut(key, "\x00")
+		indexed := indexedSchematicAnchor{point: point, netName: netName}
+		state.labelAnchorsByX[point.X] = append(state.labelAnchorsByX[point.X], indexed)
+		state.labelAnchorsByY[point.Y] = append(state.labelAnchorsByY[point.Y], indexed)
+	}
+}
+
+func schematicPinNetsByComponent(nets []Net) map[string]map[string]string {
+	indexed := map[string]map[string]string{}
+	for _, net := range nets {
+		for _, endpoint := range net.Connect {
+			componentID, pinNumber, ok := endpoint.Split()
+			if !ok {
+				continue
+			}
+			if indexed[componentID] == nil {
+				indexed[componentID] = map[string]string{}
+			}
+			indexed[componentID][pinNumber] = net.Name
+		}
+	}
+	return indexed
+}
+
+func indexedSchematicAnchorsForSegment(byX, byY map[kicadfiles.IU][]indexedSchematicAnchor, start, end kicadfiles.Point) []indexedSchematicAnchor {
+	switch {
+	case start.X == end.X:
+		return byX[start.X]
+	case start.Y == end.Y:
+		return byY[start.Y]
+	default:
+		return nil
+	}
+}
+
+func transactionPointToSchematicPoint(point transactions.Point) kicadfiles.Point {
+	return kicadfiles.Point{X: kicadfiles.MM(point.XMM), Y: kicadfiles.MM(point.YMM)}
+}
+
+func indexedPointWithinSegment(point, start, end kicadfiles.Point) bool {
+	switch {
+	case start.X == end.X:
+		return betweenSchematicCoordinates(point.Y, start.Y, end.Y)
+	case start.Y == end.Y:
+		return betweenSchematicCoordinates(point.X, start.X, end.X)
+	default:
+		return false
+	}
+}
+
+func betweenSchematicCoordinates(value, start, end kicadfiles.IU) bool {
+	if start > end {
+		start, end = end, start
+	}
+	return value >= start && value <= end
 }
 
 func (state *adapterState) endpointUsesResolverGeometry(endpoint EndpointRef) bool {
@@ -1000,7 +1153,7 @@ func indexComponentsByID(components []Component) map[string]Component {
 	return indexed
 }
 
-func (state *adapterState) fallbackLabelPointForEndpoint(endpoint EndpointRef) (transactions.Point, bool) {
+func (state *adapterState) fallbackLabelPointForEndpoint(netName string, endpoint EndpointRef) (transactions.Point, bool) {
 	anchor, ok := state.portEndpointAnchor(endpoint)
 	if !ok {
 		return transactions.Point{}, false
@@ -1011,14 +1164,20 @@ func (state *adapterState) fallbackLabelPointForEndpoint(endpoint EndpointRef) (
 		return transactions.Point{}, false
 	}
 	dx, dy := anchor.XMM-origin.XMM, anchor.YMM-origin.YMM
-	if math.Abs(dx) >= math.Abs(dy) {
-		anchor.XMM += math.Copysign(2.54, dx)
-	} else if dy != 0 {
-		anchor.YMM += math.Copysign(2.54, dy)
-	} else {
-		anchor.YMM -= 2.54
+	for _, distance := range []float64{2.54, 1.27, 0} {
+		candidate := anchor
+		if math.Abs(dx) >= math.Abs(dy) && dx != 0 {
+			candidate.XMM += math.Copysign(distance, dx)
+		} else if dy != 0 {
+			candidate.YMM += math.Copysign(distance, dy)
+		} else {
+			candidate.YMM -= distance
+		}
+		if !state.labelSegmentConflicts(netName, endpoint, anchor, candidate) {
+			return candidate, true
+		}
 	}
-	return anchor, true
+	return transactions.Point{}, false
 }
 
 func (state *adapterState) portEndpointInfo(netName string, endpoints []EndpointRef) (EndpointRef, transactions.Point, bool) {

@@ -890,6 +890,7 @@ func TestLabelPointForEndpointRepairsDiagonalLayoutHint(t *testing.T) {
 			schematicEndpointLabelKey("GND", "sensor.1"): {X: kicadfiles.MM(16), Y: kicadfiles.MM(28)},
 		},
 	}
+	state.indexSchematicCollisionAnchors()
 
 	point, ok := state.labelPointForEndpoint("GND", "sensor.1")
 	if !ok {
@@ -904,6 +905,87 @@ func TestLabelPointForEndpointRepairsDiagonalLayoutHint(t *testing.T) {
 	}
 	if point == (transactions.Point{XMM: 16, YMM: 28}) {
 		t.Fatalf("diagonal layout hint was retained: %#v", point)
+	}
+}
+
+func TestLabelPointForEndpointAvoidsForeignPinAnchor(t *testing.T) {
+	source := Component{ID: "source", Symbol: "Test:Source", Pins: []Pin{{Number: "1"}}}
+	neighbor := Component{ID: "neighbor", Symbol: "Test:Neighbor", Pins: []Pin{{Number: "1"}}}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Test:Source": {
+			LibraryID: "Test:Source",
+			Raw:       `(symbol "Source")`,
+			Pins:      []libraryresolver.SymbolPin{{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(-2.54)}}},
+		},
+		"Test:Neighbor": {
+			LibraryID: "Test:Neighbor",
+			Raw:       `(symbol "Neighbor")`,
+			Pins:      []libraryresolver.SymbolPin{{Number: "1", Position: kicadfiles.Point{X: kicadfiles.MM(2.54)}}},
+		},
+	}}
+	state := adapterState{
+		document:       Document{Circuit: Circuit{Components: []Component{source, neighbor}}},
+		libraryIndex:   &index,
+		componentsByID: map[string]Component{"source": source, "neighbor": neighbor},
+		pointsByID: map[string]transactions.Point{
+			"source":   {XMM: 20, YMM: 30},
+			"neighbor": {XMM: 12.38, YMM: 30},
+		},
+		rotationByID: map[string]float64{},
+		mirrorByID:   map[string]Mirror{},
+		labelsByKey: map[string]kicadfiles.Point{
+			schematicEndpointLabelKey("SDA", "source.1"): {X: kicadfiles.MM(14.92), Y: kicadfiles.MM(30)},
+		},
+	}
+	state.indexSchematicCollisionAnchors()
+
+	point, ok := state.labelPointForEndpoint("SDA", "source.1")
+	if !ok {
+		t.Fatal("label fallback was not resolved")
+	}
+	if point == (transactions.Point{XMM: 14.92, YMM: 30}) {
+		t.Fatalf("foreign pin collision was retained: %#v", point)
+	}
+	if point != (transactions.Point{XMM: 16.19, YMM: 30}) {
+		t.Fatalf("label fallback = %#v, want shortened outward stub", point)
+	}
+	anchor, ok := state.portEndpointAnchor("source.1")
+	if !ok {
+		t.Fatal("source pin anchor was not resolved")
+	}
+	if busStub, ok := state.busPinStub(anchor, "source.1", "SDA"); !ok || busStub != (transactions.Point{XMM: 16.19, YMM: 30}) {
+		t.Fatalf("bus pin stub = %#v/%v, want shortened outward stub", busStub, ok)
+	}
+	state.labelsByKey[schematicEndpointLabelKey("VCC", "neighbor.1")] = kicadfiles.Point{X: kicadfiles.MM(16.19), Y: kicadfiles.MM(30)}
+	state.indexSchematicCollisionAnchors()
+	if busStub, ok := state.busPinStub(anchor, "source.1", "SDA"); ok {
+		t.Fatalf("cross-net bus pin stub = %#v/%v, want fail-closed result", busStub, ok)
+	}
+}
+
+func TestBusPinStubUsesSafeOriginFallback(t *testing.T) {
+	component := Component{ID: "origin", Symbol: "Test:Origin", Pins: []Pin{{Number: "1"}}}
+	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{
+		"Test:Origin": {
+			LibraryID: "Test:Origin",
+			Raw:       `(symbol "Origin")`,
+			Pins:      []libraryresolver.SymbolPin{{Number: "1"}},
+		},
+	}}
+	state := adapterState{
+		document:       Document{Circuit: Circuit{Components: []Component{component}}},
+		libraryIndex:   &index,
+		componentsByID: map[string]Component{"origin": component},
+		pointsByID:     map[string]transactions.Point{"origin": {XMM: 20, YMM: 30}},
+		rotationByID:   map[string]float64{},
+		mirrorByID:     map[string]Mirror{},
+		labelsByKey:    map[string]kicadfiles.Point{},
+	}
+	state.indexSchematicCollisionAnchors()
+
+	stub, ok := state.busPinStub(transactions.Point{XMM: 20, YMM: 30}, "origin.1", "SIG")
+	if !ok || stub != (transactions.Point{XMM: 20, YMM: 27.46}) {
+		t.Fatalf("origin bus pin stub = %#v/%v, want safe upward fallback", stub, ok)
 	}
 }
 
