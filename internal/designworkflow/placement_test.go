@@ -508,6 +508,63 @@ func TestPlaceFragmentsHydratesGeneratedPadsFromResolver(t *testing.T) {
 	}
 }
 
+func TestHydratePlacementRequestPadsExpandsLogicalPadsFromResolverFootprint(t *testing.T) {
+	const footprintID = "Connector_Test:DuplicateShieldPads"
+	request := placement.Request{
+		Components: []placement.Component{{
+			Ref:         "J1",
+			FootprintID: footprintID,
+			Pads: []placement.PadSummary{
+				{Name: "1", Net: "VBUS"},
+				{Name: "SH", Net: "GND"},
+			},
+		}},
+		Nets: []placement.Net{
+			{Name: "VBUS", Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "1"}}},
+			{Name: "GND", Endpoints: []placement.Endpoint{{Ref: "J1", Pin: "SH"}}},
+		},
+	}
+	index := libraryresolver.LibraryIndex{Footprints: map[string]libraryresolver.FootprintRecord{
+		footprintID: {
+			FootprintID: footprintID,
+			BoundingBox: libraryresolver.BoundingBox{
+				Min: kicadfiles.Point{X: -5_000_000, Y: -3_000_000},
+				Max: kicadfiles.Point{X: 5_000_000, Y: 3_000_000},
+			},
+			Pads: []libraryresolver.FootprintPad{
+				{Name: "1", Position: kicadfiles.Point{X: 0, Y: -2_000_000}, Size: kicadfiles.Point{X: 800_000, Y: 1_200_000}},
+				{Name: "SH", Position: kicadfiles.Point{X: -4_000_000, Y: -2_000_000}, Size: kicadfiles.Point{X: 1_100_000, Y: 1_700_000}},
+				{Name: "SH", Position: kicadfiles.Point{X: -4_000_000, Y: 1_000_000}, Size: kicadfiles.Point{X: 1_100_000, Y: 1_700_000}},
+				{Name: "SH", Position: kicadfiles.Point{X: 4_000_000, Y: -2_000_000}, Size: kicadfiles.Point{X: 1_100_000, Y: 1_700_000}},
+				{Name: "SH", Position: kicadfiles.Point{X: 4_000_000, Y: 1_000_000}, Size: kicadfiles.Point{X: 1_100_000, Y: 1_700_000}},
+			},
+		},
+	}}
+
+	got, entries, issues := hydratePlacementRequestPads(request, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("hydration issues = %#v", issues)
+	}
+	if len(entries) != 1 || entries[0].Source != PadHydrationSourceResolver || entries[0].PadCount != 5 {
+		t.Fatalf("hydration entries = %#v, want five resolver pads", entries)
+	}
+	if len(got.Components[0].Pads) != 5 {
+		t.Fatalf("physical pads = %#v, want complete resolver footprint", got.Components[0].Pads)
+	}
+	shieldCount := 0
+	for _, pad := range got.Components[0].Pads {
+		if pad.Name == "SH" {
+			shieldCount++
+			if pad.Net != "GND" {
+				t.Fatalf("shield pad net = %q, want GND", pad.Net)
+			}
+		}
+	}
+	if shieldCount != 4 {
+		t.Fatalf("shield pad count = %d, want 4", shieldCount)
+	}
+}
+
 func TestHydratePlacementRequestPadsBlocksUnknownFootprint(t *testing.T) {
 	request := placement.Request{
 		Components: []placement.Component{{Ref: "X1", FootprintID: "Unknown:Missing", Bounds: defaultWorkflowBounds}},

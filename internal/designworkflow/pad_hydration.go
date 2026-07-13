@@ -3,6 +3,7 @@ package designworkflow
 import (
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -49,6 +50,54 @@ type padHydrationResolver struct {
 	index libraryresolver.LibraryIndex
 	cache map[string]padHydrationResult
 	mu    sync.Mutex
+}
+
+func routingPadNames(pads []placement.PadSummary) []string {
+	names := make([]string, len(pads))
+	for index, pad := range pads {
+		names[index] = pad.Name
+	}
+	return uniqueRoutingPadNames(names)
+}
+
+func uniqueRoutingPadNames(names []string) []string {
+	out := make([]string, len(names))
+	reserved := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		if name := strings.ToUpper(strings.TrimSpace(name)); name != "" {
+			reserved[name] = struct{}{}
+		}
+	}
+	assigned := make(map[string]struct{}, len(names))
+	occurrences := map[string]int{}
+	for index, name := range names {
+		base := strings.TrimSpace(name)
+		key := strings.ToUpper(base)
+		if key == "" {
+			continue
+		}
+		occurrences[key]++
+		if _, exists := assigned[key]; !exists {
+			out[index] = base
+			assigned[key] = struct{}{}
+			continue
+		}
+		for suffix := max(2, occurrences[key]); ; suffix++ {
+			candidate := base + "#" + strconv.Itoa(suffix)
+			candidateKey := strings.ToUpper(candidate)
+			if _, conflicts := reserved[candidateKey]; conflicts {
+				continue
+			}
+			if _, conflicts := assigned[candidateKey]; conflicts {
+				continue
+			}
+			out[index] = candidate
+			assigned[candidateKey] = struct{}{}
+			occurrences[key] = suffix
+			break
+		}
+	}
+	return out
 }
 
 func (resolver *padHydrationResolver) Hydrate(ref string, footprintID string) padHydrationResult {

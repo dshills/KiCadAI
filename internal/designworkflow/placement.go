@@ -270,6 +270,19 @@ func hydratePlacementRequestPads(request placement.Request, index *libraryresolv
 	for componentIndex := range request.Components {
 		component := &request.Components[componentIndex]
 		if len(component.Pads) != 0 {
+			if hydrated, attempted := preferredPhysicalPadHydration(&resolver, index, component.Ref, component.FootprintID); attempted {
+				if len(hydrated.Pads) != 0 {
+					component.Bounds = hydrated.Bounds
+					component.AllowUnmatchedUnconnectedPads = hasPackageOnlyPads(component.Ref, hydrated.Pads, netAssignments)
+				}
+				pads, netIssues := assignPadNetsFromIndex(component.Ref, hydrated.Pads, netAssignments)
+				component.Pads = pads
+				hydrated.Entry.PadCount = len(pads)
+				entries = append(entries, hydrated.Entry)
+				issues = append(issues, hydrated.Issues...)
+				issues = append(issues, netIssues...)
+				continue
+			}
 			pads, netIssues := assignPadNetsFromIndex(component.Ref, component.Pads, netAssignments)
 			component.Pads = pads
 			entries = append(entries, PadHydrationEntry{Ref: component.Ref, FootprintID: component.FootprintID, Source: PadHydrationSourceInput, PadCount: len(component.Pads)})
@@ -297,6 +310,18 @@ func hydratePlacementRequestPads(request placement.Request, index *libraryresolv
 		issues = append(issues, netIssues...)
 	}
 	return request, entries, issues
+}
+
+func preferredPhysicalPadHydration(resolver *padHydrationResolver, index *libraryresolver.LibraryIndex, ref string, footprintID string) (padHydrationResult, bool) {
+	if index != nil {
+		if _, ok := libraryresolver.ResolveFootprint(*index, strings.TrimSpace(footprintID)); ok {
+			return resolver.Hydrate(ref, footprintID), true
+		}
+	}
+	if fallback := hydratePadsFromVerifiedTemplate(ref, footprintID); len(fallback.Pads) != 0 {
+		return fallback, true
+	}
+	return padHydrationResult{}, false
 }
 
 func hasPackageOnlyPads(ref string, pads []placement.PadSummary, assignments padNetAssignmentIndex) bool {

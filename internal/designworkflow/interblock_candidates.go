@@ -36,12 +36,15 @@ type InterBlockRouteEndpoint struct {
 	BlockID    string `json:"block_id,omitempty"`
 }
 
+type physicalPadEndpointsByNet map[string][]InterBlockRouteEndpoint
+
 func BuildInterBlockRouteCandidates(fragments PCBFragmentResult, placed PlacementStageResult) ([]InterBlockRouteCandidate, []reports.Issue) {
 	componentRefIndex := generatedComponentFragmentIndex(fragments)
+	physicalEndpoints := indexPhysicalPadEndpointsByNet(placed.Request.Components, componentRefIndex)
 	var candidates []InterBlockRouteCandidate
 	var issues []reports.Issue
 	for netIndex, net := range placed.Request.Nets {
-		candidate, netIssues, ok := interBlockCandidateFromPlacementNet(netIndex, net, componentRefIndex)
+		candidate, netIssues, ok := interBlockCandidateFromPlacementNet(netIndex, net, physicalEndpoints, componentRefIndex)
 		issues = append(issues, netIssues...)
 		if ok {
 			candidates = append(candidates, candidate)
@@ -50,7 +53,7 @@ func BuildInterBlockRouteCandidates(fragments PCBFragmentResult, placed Placemen
 	return candidates, issues
 }
 
-func interBlockCandidateFromPlacementNet(index int, net placement.Net, componentRefIndex map[string]BlockFragment) (InterBlockRouteCandidate, []reports.Issue, bool) {
+func interBlockCandidateFromPlacementNet(index int, net placement.Net, physicalEndpoints physicalPadEndpointsByNet, componentRefIndex map[string]BlockFragment) (InterBlockRouteCandidate, []reports.Issue, bool) {
 	instanceSet := map[string]struct{}{}
 	blockSet := map[string]struct{}{}
 	var endpoints []InterBlockRouteEndpoint
@@ -87,6 +90,7 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, component
 	if len(instanceSet) < 2 {
 		return InterBlockRouteCandidate{}, issues, false
 	}
+	endpoints = appendParticipatingPhysicalPadEndpoints(endpoints, physicalEndpoints[strings.ToUpper(strings.TrimSpace(net.Name))])
 	endpoints = pruneLocalRouteInternalEndpoints(net.Name, endpoints, componentRefIndex)
 	return InterBlockRouteCandidate{
 		NetName:     net.Name,
@@ -96,6 +100,57 @@ func interBlockCandidateFromPlacementNet(index int, net placement.Net, component
 		BlockIDs:    sortedStringSet(blockSet),
 		Unresolved:  unresolved,
 	}, issues, true
+}
+
+func indexPhysicalPadEndpointsByNet(components []placement.Component, componentRefIndex map[string]BlockFragment) physicalPadEndpointsByNet {
+	byNet := physicalPadEndpointsByNet{}
+	for _, component := range components {
+		ref := strings.ToUpper(strings.TrimSpace(component.Ref))
+		fragment, ok := componentRefIndex[ref]
+		if !ok {
+			continue
+		}
+		routingNames := routingPadNames(component.Pads)
+		for padIndex, pad := range component.Pads {
+			netKey := strings.ToUpper(strings.TrimSpace(pad.Net))
+			pin := routingNames[padIndex]
+			if netKey == "" || pin == "" {
+				continue
+			}
+			byNet[netKey] = append(byNet[netKey], InterBlockRouteEndpoint{
+				Ref:        strings.TrimSpace(component.Ref),
+				Pin:        pin,
+				InstanceID: fragment.InstanceID,
+				BlockID:    fragment.BlockID,
+			})
+		}
+	}
+	return byNet
+}
+
+func appendParticipatingPhysicalPadEndpoints(endpoints []InterBlockRouteEndpoint, physicalEndpoints []InterBlockRouteEndpoint) []InterBlockRouteEndpoint {
+	participatingRefs := map[string]struct{}{}
+	seen := map[string]struct{}{}
+	for _, endpoint := range endpoints {
+		ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+		if ref != "" {
+			participatingRefs[ref] = struct{}{}
+		}
+		seen[normalizedRouteGroupEndpointKey(endpoint.Ref, endpoint.Pin)] = struct{}{}
+	}
+	for _, endpoint := range physicalEndpoints {
+		ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+		if _, participates := participatingRefs[ref]; !participates {
+			continue
+		}
+		key := normalizedRouteGroupEndpointKey(endpoint.Ref, endpoint.Pin)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		endpoints = append(endpoints, endpoint)
+	}
+	return endpoints
 }
 
 func pruneLocalRouteInternalEndpoints(netName string, endpoints []InterBlockRouteEndpoint, componentRefIndex map[string]BlockFragment) []InterBlockRouteEndpoint {

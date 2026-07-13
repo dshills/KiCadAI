@@ -1481,7 +1481,7 @@ func TestBuilderWriteProjectRejectsUnsafeGeneratedFootprintPath(t *testing.T) {
 	}
 }
 
-func TestBuilderDesignAddsSameNetDuplicatePadAliasTie(t *testing.T) {
+func TestBuilderDesignDoesNotAddImplicitDuplicatePadCopper(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "U1", "Device:R", "Alias", kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)})
 	if err := builder.Connect(Endpoint{Reference: "U1", Pin: "1"}, Endpoint{Reference: "U1", Pin: "2"}, "OUT"); err != nil {
@@ -1502,26 +1502,12 @@ func TestBuilderDesignAddsSameNetDuplicatePadAliasTie(t *testing.T) {
 	}
 
 	design := builder.Design()
-	if len(design.PCB.Tracks) != 1 {
-		t.Fatalf("tracks = %#v, want one alias tie", design.PCB.Tracks)
-	}
-	track := design.PCB.Tracks[0]
-	if track.NetName != "OUT" || track.Layer != kicadfiles.LayerFCu {
-		t.Fatalf("alias tie = %#v, want OUT on F.Cu", track)
+	if len(design.PCB.Tracks) != 0 {
+		t.Fatalf("tracks = %#v, want no copper without an explicit route", design.PCB.Tracks)
 	}
 	again := builder.Design()
-	if len(again.PCB.Tracks) != 1 {
-		t.Fatalf("second Design tracks = %#v, want one non-accumulating alias tie", again.PCB.Tracks)
-	}
-}
-
-func TestSharedPadTieLayerHandlesAllCopperAndInternalLayers(t *testing.T) {
-	layer, ok := sharedPadTieLayer(
-		&pcb.Pad{Layers: []kicadfiles.BoardLayer{kicadfiles.LayerAllCu}},
-		&pcb.Pad{Layers: []kicadfiles.BoardLayer{kicadfiles.BoardLayer("In1.Cu")}},
-	)
-	if !ok || layer != kicadfiles.BoardLayer("In1.Cu") {
-		t.Fatalf("layer = %q ok=%v, want In1.Cu", layer, ok)
+	if len(again.PCB.Tracks) != 0 {
+		t.Fatalf("second Design tracks = %#v, want no implicit copper", again.PCB.Tracks)
 	}
 }
 

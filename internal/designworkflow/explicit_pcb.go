@@ -122,6 +122,7 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		return RoutingStageResult{Stage: StageResult{Name: StageRouting, Status: StageStatusSkipped, Summary: map[string]any{"reason": "placement did not complete"}}}
 	}
 	routingRequest, issues := routingadapters.RequestFromPlacement(placed.Request, placed.Result)
+	routingRequest = expandExplicitPhysicalPadEndpoints(routingRequest)
 	applyRoutingOptions(request, opts, &routingRequest)
 	if routingRequest.Rules.NetOverrides == nil {
 		routingRequest.Rules.NetOverrides = map[string]routing.NetRule{}
@@ -154,6 +155,65 @@ func RouteExplicitCircuit(ctx context.Context, request Request, placed Placement
 		stage.Status = StageStatusWarning
 	}
 	return RoutingStageResult{Request: routingRequest, Result: result, Operations: operations, Stage: stage}
+}
+
+func expandExplicitPhysicalPadEndpoints(request routing.Request) routing.Request {
+	request.Components = append([]routing.Component(nil), request.Components...)
+	for componentIndex := range request.Components {
+		request.Components[componentIndex].Pads = append([]routing.Pad(nil), request.Components[componentIndex].Pads...)
+	}
+	request.Nets = append([]routing.Net(nil), request.Nets...)
+	for netIndex := range request.Nets {
+		request.Nets[netIndex].Endpoints = append([]routing.Endpoint(nil), request.Nets[netIndex].Endpoints...)
+	}
+	endpointKeys := make(map[string]map[string]struct{}, len(request.Nets))
+	participatingRefs := make(map[string]map[string]struct{}, len(request.Nets))
+	netIndexes := make(map[string]int, len(request.Nets))
+	for netIndex := range request.Nets {
+		netKey := strings.ToUpper(strings.TrimSpace(request.Nets[netIndex].Name))
+		netIndexes[netKey] = netIndex
+		endpointKeys[netKey] = map[string]struct{}{}
+		participatingRefs[netKey] = map[string]struct{}{}
+		for _, endpoint := range request.Nets[netIndex].Endpoints {
+			ref := strings.ToUpper(strings.TrimSpace(endpoint.Ref))
+			pin := strings.ToUpper(strings.TrimSpace(endpoint.Pin))
+			endpointKeys[netKey][ref+"."+pin] = struct{}{}
+			participatingRefs[netKey][ref] = struct{}{}
+		}
+	}
+	for componentIndex := range request.Components {
+		component := &request.Components[componentIndex]
+		names := make([]string, len(component.Pads))
+		for padIndex, pad := range component.Pads {
+			names[padIndex] = pad.Name
+		}
+		aliases := uniqueRoutingPadNames(names)
+		for padIndex := range component.Pads {
+			component.Pads[padIndex].Name = aliases[padIndex]
+		}
+		ref := strings.ToUpper(strings.TrimSpace(component.Ref))
+		for _, pad := range component.Pads {
+			netKey := strings.ToUpper(strings.TrimSpace(pad.Net))
+			netIndex, exists := netIndexes[netKey]
+			if !exists {
+				continue
+			}
+			if _, participates := participatingRefs[netKey][ref]; !participates {
+				continue
+			}
+			pin := strings.TrimSpace(pad.Name)
+			key := ref + "." + strings.ToUpper(pin)
+			if pin == "" {
+				continue
+			}
+			if _, exists := endpointKeys[netKey][key]; exists {
+				continue
+			}
+			endpointKeys[netKey][key] = struct{}{}
+			request.Nets[netIndex].Endpoints = append(request.Nets[netIndex].Endpoints, routing.Endpoint{Ref: component.Ref, Pin: pin})
+		}
+	}
+	return request
 }
 
 func explicitRequiredRouteIssues(nets []ExplicitNetSpec, result routing.Result) []reports.Issue {

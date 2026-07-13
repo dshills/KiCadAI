@@ -62,7 +62,8 @@ func NewPlacedPadEndpointResolver(placed *PlacementStageResult, table GeneratedN
 			continue
 		}
 		reportedUnnamedPad := false
-		for _, pad := range component.Pads {
+		routingNames := routingPadNames(component.Pads)
+		for padIndex, pad := range component.Pads {
 			endpoint, issue, ok := placedPadEndpoint(component, position, pad, table)
 			if !ok {
 				if !reportedUnnamedPad {
@@ -74,7 +75,7 @@ func NewPlacedPadEndpointResolver(placed *PlacementStageResult, table GeneratedN
 			if issue != nil {
 				resolver.issues = append(resolver.issues, *issue)
 			}
-			key := routeEndpointKeyNormalized(refKey, strings.ToUpper(endpoint.Pad))
+			key := routeEndpointKeyNormalized(refKey, strings.ToUpper(routingNames[padIndex]))
 			if existing, exists := resolver.endpoints[key]; exists {
 				if samePlacedPadEndpointNet(existing, endpoint) {
 					continue

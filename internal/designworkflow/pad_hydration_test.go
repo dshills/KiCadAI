@@ -350,6 +350,32 @@ func TestUSBShieldPadMatcherRequiresNumericSuffix(t *testing.T) {
 	}
 }
 
+func TestRoutingPadNamesAliasesDuplicatePhysicalPads(t *testing.T) {
+	pads := []placement.PadSummary{
+		{Name: "SH", Net: "GND", XMM: -4.32, YMM: -3},
+		{Name: "SH", Net: "GND", XMM: -4.32, YMM: 0.8},
+		{Name: "SH", Net: "GND", XMM: 4.32, YMM: -3},
+		{Name: "SH", Net: "GND", XMM: 4.32, YMM: 0.8},
+	}
+
+	got := routingPadNames(pads)
+	want := []string{"SH", "SH#2", "SH#3", "SH#4"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("routing names = %#v, want %#v", got, want)
+	}
+	if pads[1].Name != "SH" {
+		t.Fatalf("input pads mutated: %#v", pads)
+	}
+}
+
+func TestRoutingPadNamesAvoidsExistingSuffixCollision(t *testing.T) {
+	pads := []placement.PadSummary{{Name: "2"}, {Name: "2"}, {Name: "2#2"}}
+	got := routingPadNames(pads)
+	if got[0] != "2" || got[1] != "2#3" || got[2] != "2#2" {
+		t.Fatalf("pads = %#v, want collision-safe deterministic aliases", got)
+	}
+}
+
 func padTemplateNames(pads []placement.PadSummary) []string {
 	names := make([]string, 0, len(pads))
 	for _, pad := range pads {

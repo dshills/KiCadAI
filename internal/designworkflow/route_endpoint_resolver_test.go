@@ -101,7 +101,7 @@ func TestPlacedPadEndpointResolverEndpointsAreStable(t *testing.T) {
 	}
 }
 
-func TestPlacedPadEndpointResolverAllowsSameNetDuplicatePadAlias(t *testing.T) {
+func TestPlacedPadEndpointResolverResolvesSameNetDuplicatePhysicalPads(t *testing.T) {
 	placed := endpointResolverPlacement(placement.Placement{XMM: 10, YMM: 20, Layer: "F.Cu"},
 		placement.PadSummary{Name: "2", Net: "SIG", XMM: 0, YMM: 1},
 		placement.PadSummary{Name: "2", Net: "SIG", XMM: 0, YMM: -1},
@@ -111,8 +111,16 @@ func TestPlacedPadEndpointResolverAllowsSameNetDuplicatePadAlias(t *testing.T) {
 	if len(resolver.Issues()) != 0 {
 		t.Fatalf("same-net pad alias should not create resolver issues: %#v", resolver.Issues())
 	}
-	if _, ok := resolver.Resolve(transactions.Endpoint{Ref: "R1", Pin: "2"}); !ok {
-		t.Fatalf("same-net pad alias should resolve")
+	first, firstOK := resolver.Resolve(transactions.Endpoint{Ref: "R1", Pin: "2"})
+	second, secondOK := resolver.Resolve(transactions.Endpoint{Ref: "R1", Pin: "2#2"})
+	if !firstOK || !secondOK {
+		t.Fatalf("same-net physical pads should resolve: first=%t second=%t", firstOK, secondOK)
+	}
+	if first.Point == second.Point {
+		t.Fatalf("duplicate physical pads resolved to the same point: %#v", first.Point)
+	}
+	if first.Pad != "2" || second.Pad != "2" {
+		t.Fatalf("resolved physical names = %q, %q; want 2", first.Pad, second.Pad)
 	}
 }
 
