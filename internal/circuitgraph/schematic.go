@@ -1,6 +1,8 @@
 package circuitgraph
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"slices"
 	"strconv"
@@ -9,6 +11,8 @@ import (
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
 )
+
+const powerFlagPinNumber = "1"
 
 // ToSchematicIR lowers only trusted resolved bindings. Unresolved provider
 // selectors never reach schematic transactions through this adapter.
@@ -21,6 +25,8 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 	references, referenceIssues := schematicReferences(resolved)
 	issues = append(issues, referenceIssues...)
 	noConnects := schematicNoConnects(resolved)
+	powerFlags, powerFlagsByNet, powerFlagIssues := schematicPowerFlags(resolved, unitIDs)
+	issues = append(issues, powerFlagIssues...)
 
 	unitCount := 0
 	for _, units := range unitsByComponent {
@@ -33,7 +39,7 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 			Description: resolved.Source.Project.Description, Seed: resolved.ResolutionHash, Paper: schematicir.DefaultPaper,
 		},
 		Circuit: schematicir.Circuit{
-			Components: make([]schematicir.Component, 0, unitCount),
+			Components: make([]schematicir.Component, 0, unitCount+len(powerFlags)),
 			Nets:       make([]schematicir.Net, 0, len(resolved.Nets)),
 			Buses:      make([]schematicir.Bus, 0, len(resolved.Source.Buses)),
 		},
@@ -54,10 +60,14 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 			}
 		}
 	}
+	document.Circuit.Components = append(document.Circuit.Components, powerFlags...)
 	for netIndex, net := range resolved.Nets {
 		irNet, netIssues := schematicNet(net, netIndex, unitIDs)
 		issues = append(issues, netIssues...)
 		if !reports.HasBlockingIssue(netIssues) {
+			if flagID := powerFlagsByNet[net.Intent.Name]; flagID != "" {
+				irNet.Connect = append(irNet.Connect, schematicir.EndpointRef(flagID+"."+powerFlagPinNumber))
+			}
 			document.Circuit.Nets = append(document.Circuit.Nets, irNet)
 		}
 	}
@@ -76,6 +86,51 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 		return schematicir.Document{}, dedupeGraphIssues(issues)
 	}
 	return document, dedupeGraphIssues(issues)
+}
+
+func schematicPowerFlags(resolved ResolvedDocument, unitIDs map[schematicUnitKey]string) ([]schematicir.Component, map[string]string, []reports.Issue) {
+	usedIDs := make(map[string]struct{}, len(unitIDs))
+	for _, id := range unitIDs {
+		usedIDs[id] = struct{}{}
+	}
+	components := make([]schematicir.Component, 0, len(resolved.Source.PowerFlags))
+	byNet := make(map[string]string, len(resolved.Source.PowerFlags))
+	netRoles := make(map[string]NetRole, len(resolved.Nets))
+	for _, net := range resolved.Nets {
+		netRoles[net.Intent.Name] = net.Intent.Role
+	}
+	var issues []reports.Issue
+	referenceIndex := 0
+	for index, flag := range resolved.Source.PowerFlags {
+		if _, duplicate := byNet[flag.Net]; duplicate {
+			issues = append(issues, graphIssue(CodePowerFlagInvalid, fmt.Sprintf("power_flags[%d].net", index), "duplicate power flag declaration reached schematic lowering"))
+			continue
+		}
+		id := powerFlagComponentID(flag.Net)
+		if _, collision := usedIDs[id]; collision {
+			issues = append(issues, graphIssue(CodeSchematicLowering, fmt.Sprintf("power_flags[%d].net", index), "generated power flag id collides with a circuit component"))
+			continue
+		}
+		usedIDs[id] = struct{}{}
+		role := schematicir.ComponentRolePowerSymbol
+		netRole := netRoles[flag.Net]
+		if netRole == NetRoleGround || netRole == NetRoleReturn {
+			role = schematicir.ComponentRoleGroundSymbol
+		}
+		referenceIndex++
+		components = append(components, schematicir.Component{
+			ID: id, Ref: fmt.Sprintf("#FLG%02d", referenceIndex), Role: role,
+			Symbol: "power:PWR_FLAG", Value: "PWR_FLAG",
+			Pins: []schematicir.Pin{{Number: powerFlagPinNumber, Name: "PWR_FLAG", Role: schematicir.PinRolePower}},
+		})
+		byNet[flag.Net] = id
+	}
+	return components, byNet, issues
+}
+
+func powerFlagComponentID(netName string) string {
+	digest := sha256.Sum256([]byte(netName))
+	return "kicadai_pwr_flag_" + hex.EncodeToString(digest[:])[:16]
 }
 
 type schematicUnitKey struct {

@@ -2,6 +2,7 @@ package circuitgraph
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"kicadai/internal/designworkflow"
@@ -59,6 +60,27 @@ func TestToDesignRequestPreservesBMP280PadNets(t *testing.T) {
 	}
 	if len(want) != 0 {
 		t.Fatalf("missing sensor pads = %#v", want)
+	}
+}
+
+func TestToDesignRequestKeepsPowerFlagsOutOfPCBComponents(t *testing.T) {
+	graph := loadGraphExample(t, "usb_c_bmp280_breakout.json")
+	graph.PowerFlags = []PowerFlag{{Net: "VBUS_RAW"}, {Net: "GND"}}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("request issues = %#v", issues)
+	}
+	if got, want := len(request.ExplicitCircuit.Components), len(resolved.Components); got != want {
+		t.Fatalf("PCB component count = %d, want %d", got, want)
+	}
+	for _, component := range request.ExplicitCircuit.Components {
+		if strings.HasPrefix(component.ID, "kicadai_pwr_flag_") || component.FootprintID == "" {
+			t.Fatalf("schematic-only component leaked into PCB request: %#v", component)
+		}
 	}
 }
 

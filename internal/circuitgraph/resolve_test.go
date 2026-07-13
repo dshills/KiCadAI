@@ -323,6 +323,22 @@ func TestResolverUsesTrustedPrecomputedCatalogHash(t *testing.T) {
 	}
 }
 
+func TestResolveRejectsPowerFlagOnInternalPowerOutput(t *testing.T) {
+	document := loadGraphExample(t, "usb_c_bmp280_breakout.json")
+	document.PowerFlags = []PowerFlag{{Net: "VCC_3v3"}}
+	_, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), document)
+	if !hasIssue(issues, string(CodePowerFlagInvalid), "power_flags[0].net") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestValidateResolvedPowerFlagsRejectsMissingResolvedNet(t *testing.T) {
+	issues := validateResolvedPowerFlags([]PowerFlag{{Net: "MISSING"}}, nil)
+	if !hasIssue(issues, string(CodePowerFlagInvalid), "power_flags[0].net") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 const sha256HexLength = 64
 
 func TestNilResolverAndCatalogFailClosed(t *testing.T) {

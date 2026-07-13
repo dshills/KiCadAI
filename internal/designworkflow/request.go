@@ -51,15 +51,24 @@ type Request struct {
 }
 
 type ExplicitCircuitSpec struct {
-	ResolutionHash string                  `json:"resolution_hash"`
-	CatalogID      string                  `json:"catalog_id"`
-	CatalogHash    string                  `json:"catalog_hash"`
-	Schematic      schematicir.Document    `json:"schematic"`
-	Components     []ExplicitComponentSpec `json:"components"`
-	Nets           []ExplicitNetSpec       `json:"nets"`
-	Regions        []ExplicitRegionSpec    `json:"regions,omitempty"`
-	Keepouts       []ExplicitKeepoutSpec   `json:"keepouts,omitempty"`
-	Zones          []ExplicitZoneSpec      `json:"zones,omitempty"`
+	ResolutionHash   string                         `json:"resolution_hash"`
+	CatalogID        string                         `json:"catalog_id"`
+	CatalogHash      string                         `json:"catalog_hash"`
+	Schematic        schematicir.Document           `json:"schematic"`
+	SchematicSupport []ExplicitSchematicSupportSpec `json:"schematic_support,omitempty"`
+	Components       []ExplicitComponentSpec        `json:"components"`
+	Nets             []ExplicitNetSpec              `json:"nets"`
+	Regions          []ExplicitRegionSpec           `json:"regions,omitempty"`
+	Keepouts         []ExplicitKeepoutSpec          `json:"keepouts,omitempty"`
+	Zones            []ExplicitZoneSpec             `json:"zones,omitempty"`
+}
+
+const ExplicitSchematicSupportPowerFlag = "power_flag"
+
+type ExplicitSchematicSupportSpec struct {
+	ID   string `json:"id"`
+	Kind string `json:"kind"`
+	Net  string `json:"net"`
 }
 
 type ExplicitComponentSpec struct {
@@ -543,6 +552,7 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 	}
 	clone := *source
 	clone.Schematic = schematicir.Normalize(source.Schematic)
+	clone.SchematicSupport = append([]ExplicitSchematicSupportSpec(nil), source.SchematicSupport...)
 	clone.Components = append([]ExplicitComponentSpec(nil), source.Components...)
 	for index := range clone.Components {
 		clone.Components[index].Pads = append([]ExplicitPadSpec(nil), source.Components[index].Pads...)
@@ -605,6 +615,21 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		}
 		padsByComponent[component.ID] = pads
 	}
+	supportByID := map[string]ExplicitSchematicSupportSpec{}
+	for index, support := range circuit.SchematicSupport {
+		path := fmt.Sprintf("explicit_circuit.schematic_support[%d]", index)
+		if support.ID == "" || support.Kind != ExplicitSchematicSupportPowerFlag || support.Net == "" {
+			issues = append(issues, issue(path, "power-flag support requires id, kind=power_flag, and net"))
+			continue
+		}
+		if _, exists := componentsByID[support.ID]; exists {
+			issues = append(issues, issue(path+".id", "schematic support id collides with an explicit PCB component"))
+		}
+		if _, exists := supportByID[support.ID]; exists {
+			issues = append(issues, issue(path+".id", "duplicate schematic support id"))
+		}
+		supportByID[support.ID] = support
+	}
 	schematicComponents := make(map[string]schematicir.Component, len(circuit.Schematic.Circuit.Components))
 	for _, component := range circuit.Schematic.Circuit.Components {
 		schematicComponents[component.ID] = component
@@ -620,8 +645,21 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		}
 	}
 	for id := range schematicComponents {
-		if _, exists := componentsByID[id]; !exists {
-			issues = append(issues, issue("explicit_circuit.schematic", "schematic component "+id+" has no resolved explicit component"))
+		if _, exists := componentsByID[id]; exists {
+			continue
+		}
+		support, exists := supportByID[id]
+		if !exists {
+			issues = append(issues, issue("explicit_circuit.schematic", "schematic component "+id+" has no resolved explicit component or support authorization"))
+			continue
+		}
+		if !validExplicitPowerFlagSupport(schematicComponents[id], support) {
+			issues = append(issues, issue("explicit_circuit.schematic_support", "schematic support "+id+" is not a valid generated power flag"))
+		}
+	}
+	for id := range supportByID {
+		if _, exists := schematicComponents[id]; !exists {
+			issues = append(issues, issue("explicit_circuit.schematic_support", "authorized schematic support "+id+" is missing from schematic IR"))
 		}
 	}
 	regions := map[string]ExplicitRegionSpec{}
@@ -661,15 +699,28 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	ownedPads := map[string]string{}
 	seenNets := map[string]struct{}{}
 	schematicNets := make(map[string]map[string]struct{}, len(circuit.Schematic.Circuit.Nets))
+	supportAttachments := map[string]int{}
 	for _, net := range circuit.Schematic.Circuit.Nets {
 		endpoints := make(map[string]struct{}, len(net.Connect))
 		for _, endpoint := range net.Connect {
 			component, pin, ok := endpoint.Split()
 			if ok {
+				if support, exists := supportByID[component]; exists {
+					if support.Net != net.Name || pin != "1" {
+						issues = append(issues, issue("explicit_circuit.schematic_support", "power flag "+component+" is attached outside its declared net or pin"))
+					}
+					supportAttachments[component]++
+					continue
+				}
 				endpoints[component+"\x00"+pin] = struct{}{}
 			}
 		}
 		schematicNets[net.Name] = endpoints
+	}
+	for id := range supportByID {
+		if supportAttachments[id] != 1 {
+			issues = append(issues, issue("explicit_circuit.schematic_support", "power flag "+id+" must attach exactly once to its declared net"))
+		}
 	}
 	for netIndex, net := range circuit.Nets {
 		path := fmt.Sprintf("explicit_circuit.nets[%d]", netIndex)
@@ -738,6 +789,19 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		}
 	}
 	return issues
+}
+
+func validExplicitPowerFlagSupport(component schematicir.Component, support ExplicitSchematicSupportSpec) bool {
+	if support.Kind != ExplicitSchematicSupportPowerFlag || component.ID != support.ID || !strings.HasPrefix(component.ID, "kicadai_pwr_flag_") {
+		return false
+	}
+	if !strings.HasPrefix(strings.ToUpper(component.Ref), "#FLG") || component.Symbol != "power:PWR_FLAG" || component.Value != "PWR_FLAG" || component.Footprint != "" {
+		return false
+	}
+	if component.Role != schematicir.ComponentRolePowerSymbol && component.Role != schematicir.ComponentRoleGroundSymbol {
+		return false
+	}
+	return len(component.Pins) == 1 && component.Pins[0].Number == "1" && !component.Pins[0].NoConnect
 }
 
 func finiteScalar(value float64) bool {

@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"slices"
 	"testing"
 
 	"kicadai/internal/evaluate"
@@ -88,6 +89,81 @@ func TestToSchematicIRPreservesNoConnectAndProvenance(t *testing.T) {
 	if !foundNC {
 		t.Fatalf("regulator pins = %#v", regulator.Pins)
 	}
+}
+
+func TestToSchematicIRLowersPowerFlagsAsSchematicOnlySymbols(t *testing.T) {
+	graph := loadGraphExample(t, "usb_c_bmp280_breakout.json")
+	graph.PowerFlags = []PowerFlag{{Net: "VBUS_RAW"}, {Net: "GND"}}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	document, issues := ToSchematicIR(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("lowering issues = %#v", issues)
+	}
+	if got, want := len(document.Circuit.Components), len(resolved.Components)+2; got != want {
+		t.Fatalf("schematic component count = %d, want %d", got, want)
+	}
+	wantFlags := map[string]struct {
+		ref  string
+		role schematicir.ComponentRole
+	}{
+		powerFlagComponentID("GND"):      {ref: "#FLG01", role: schematicir.ComponentRoleGroundSymbol},
+		powerFlagComponentID("VBUS_RAW"): {ref: "#FLG02", role: schematicir.ComponentRolePowerSymbol},
+	}
+	for _, component := range document.Circuit.Components {
+		want, exists := wantFlags[component.ID]
+		if !exists {
+			continue
+		}
+		if component.Ref != want.ref || component.Role != want.role || component.Symbol != "power:PWR_FLAG" || component.Footprint != "" || len(component.Pins) != 1 || component.Pins[0].Number != "1" {
+			t.Fatalf("power flag %s = %#v", component.ID, component)
+		}
+		delete(wantFlags, component.ID)
+	}
+	if len(wantFlags) != 0 {
+		t.Fatalf("missing power flags = %#v", wantFlags)
+	}
+	for _, net := range document.Circuit.Nets {
+		if net.Name != "GND" && net.Name != "VBUS_RAW" {
+			continue
+		}
+		wantEndpoint := schematicir.EndpointRef(powerFlagComponentID(net.Name) + ".1")
+		if !slices.Contains(net.Connect, wantEndpoint) {
+			t.Fatalf("net %s endpoints = %#v, want %s", net.Name, net.Connect, wantEndpoint)
+		}
+	}
+	index := schematicTestLibraryIndex(resolved)
+	first, issues := schematicir.ToTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transaction issues = %#v", issues)
+	}
+	second, issues := schematicir.ToTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) || !reflect.DeepEqual(first, second) {
+		t.Fatalf("transaction is not deterministic: issues=%#v", issues)
+	}
+}
+
+func TestToSchematicIRRejectsPowerFlagIDCollision(t *testing.T) {
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), loadGraphExample(t, "usb_c_bmp280_breakout.json"))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	resolved.Source.PowerFlags = []PowerFlag{{Net: "GND"}}
+	resolved.Components[0].Instance.ID = powerFlagComponentID("GND")
+	_, issues = ToSchematicIR(resolved)
+	assertGraphIssueCode(t, issues, CodeSchematicLowering)
+}
+
+func TestToSchematicIRRejectsDuplicatePowerFlagAfterResolution(t *testing.T) {
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), loadGraphExample(t, "usb_c_bmp280_breakout.json"))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	resolved.Source.PowerFlags = []PowerFlag{{Net: "GND"}, {Net: "GND"}}
+	_, issues = ToSchematicIR(resolved)
+	assertGraphIssueCode(t, issues, CodePowerFlagInvalid)
 }
 
 func TestToSchematicIRPreservesMultiUnitReference(t *testing.T) {

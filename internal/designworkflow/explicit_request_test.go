@@ -110,6 +110,43 @@ func TestValidateRequestRejectsExplicitSchematicProjectionDisagreement(t *testin
 	}
 }
 
+func TestValidateRequestAcceptsOnlyAuthorizedPowerFlagSupport(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	id := "kicadai_pwr_flag_0123456789abcdef"
+	request.ExplicitCircuit.Schematic.Circuit.Components = append(request.ExplicitCircuit.Schematic.Circuit.Components, schematicir.Component{
+		ID: id, Ref: "#FLG01", Role: schematicir.ComponentRolePowerSymbol,
+		Symbol: "power:PWR_FLAG", Value: "PWR_FLAG",
+		Pins: []schematicir.Pin{{Number: "1", Name: "PWR_FLAG", Role: schematicir.PinRolePower}},
+	})
+	request.ExplicitCircuit.Schematic.Circuit.Nets[0].Connect = append(request.ExplicitCircuit.Schematic.Circuit.Nets[0].Connect, schematicir.EndpointRef(id+".1"))
+	request.ExplicitCircuit.SchematicSupport = []ExplicitSchematicSupportSpec{{ID: id, Kind: ExplicitSchematicSupportPowerFlag, Net: "SIG"}}
+	request.ExplicitCircuit.Schematic = schematicir.NormalizeLayoutIntent(request.ExplicitCircuit.Schematic)
+	if issues := ValidateRequest(request); reports.HasBlockingIssue(issues) {
+		t.Fatalf("authorized power flag issues = %#v", issues)
+	}
+
+	wrongSymbol := request
+	wrongSymbol.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	wrongSymbol.ExplicitCircuit.Schematic.Circuit.Components[2].Symbol = "Device:R"
+	if issues := ValidateRequest(wrongSymbol); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.schematic_support") {
+		t.Fatalf("wrong-symbol issues = %#v", issues)
+	}
+
+	wrongNet := request
+	wrongNet.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	wrongNet.ExplicitCircuit.SchematicSupport[0].Net = "OTHER"
+	if issues := ValidateRequest(wrongNet); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.schematic_support") {
+		t.Fatalf("wrong-net issues = %#v", issues)
+	}
+
+	missingAuthorization := request
+	missingAuthorization.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	missingAuthorization.ExplicitCircuit.SchematicSupport = nil
+	if issues := ValidateRequest(missingAuthorization); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.schematic") {
+		t.Fatalf("missing-authorization issues = %#v", issues)
+	}
+}
+
 func TestValidateRequestRejectsExplicitPCBIntentOutsideBoard(t *testing.T) {
 	request := validExplicitCircuitRequest()
 	request.ExplicitCircuit.Regions = []ExplicitRegionSpec{{ID: "bad", XMM: 29, YMM: 1, WidthMM: 5, HeightMM: 5}}

@@ -98,6 +98,7 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		}
 		result.Nets = append(result.Nets, resolvedNet)
 	}
+	issues = append(issues, validateResolvedPowerFlags(result.Source.PowerFlags, result.Nets)...)
 	for endpointIndex, endpoint := range normalized.NoConnects {
 		path := fmt.Sprintf("no_connects[%d]", endpointIndex)
 		resolvedEndpoint, endpointIssues := resolveEndpoint(path, endpoint, resolvedByID)
@@ -131,6 +132,47 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		result.ResolutionHash = resolvedHash(result)
 	}
 	return result, issues
+}
+
+func validateResolvedPowerFlags(flags []PowerFlag, nets []ResolvedNet) []reports.Issue {
+	byName := make(map[string]ResolvedNet, len(nets))
+	for _, net := range nets {
+		byName[net.Intent.Name] = net
+	}
+	var issues []reports.Issue
+	seen := map[string]int{}
+	for index, flag := range flags {
+		if previous, duplicate := seen[flag.Net]; duplicate {
+			path := fmt.Sprintf("power_flags[%d].net", index)
+			message := fmt.Sprintf("duplicate power flag for net %s already declared at power_flags[%d]", flag.Net, previous)
+			issues = append(issues, graphIssue(CodePowerFlagInvalid, path, message))
+			continue
+		}
+		seen[flag.Net] = index
+		net, exists := byName[flag.Net]
+		if !exists {
+			path := fmt.Sprintf("power_flags[%d].net", index)
+			issues = append(issues, graphIssue(CodePowerFlagInvalid, path, "power flag net is missing from resolved connectivity"))
+			continue
+		}
+		foundDriver := false
+		for _, endpoint := range net.Endpoints {
+			for _, binding := range endpoint.Bindings {
+				if !strings.EqualFold(strings.TrimSpace(binding.Electrical), "power_out") {
+					continue
+				}
+				path := fmt.Sprintf("power_flags[%d].net", index)
+				message := fmt.Sprintf("net %s already has internal power_out driver %s.%s", flag.Net, endpoint.Intent.Component, binding.SymbolPin)
+				issues = append(issues, graphIssue(CodePowerFlagInvalid, path, message))
+				foundDriver = true
+				break
+			}
+			if foundDriver {
+				break
+			}
+		}
+	}
+	return issues
 }
 
 func LibraryEvidenceFromIndex(index libraryresolver.LibraryIndex) (map[string]LibrarySymbolEvidence, map[string]LibraryFootprintEvidence) {

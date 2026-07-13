@@ -39,6 +39,11 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 		Components: make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
 		Nets:       make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),
 	}
+	for _, flag := range resolved.Source.PowerFlags {
+		explicit.SchematicSupport = append(explicit.SchematicSupport, designworkflow.ExplicitSchematicSupportSpec{
+			ID: powerFlagComponentID(flag.Net), Kind: designworkflow.ExplicitSchematicSupportPowerFlag, Net: flag.Net,
+		})
+	}
 	for _, region := range resolved.Source.PCB.Regions {
 		explicit.Regions = append(explicit.Regions, designworkflow.ExplicitRegionSpec{
 			ID: region.ID, Role: region.Role, XMM: region.Bounds.XMM, YMM: region.Bounds.YMM,
