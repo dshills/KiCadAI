@@ -1,0 +1,369 @@
+{
+  "schema": "kicadai.ai.intent.v1",
+  "intent": {
+    "schema": "kicadai.circuit-graph.v1",
+    "version": 1,
+    "project": {
+      "name": "generic_lmv321_ac_gain_stage",
+      "title": "LMV321 AC-Coupled Gain Stage",
+      "description": "Catalog-resolved single-supply LMV321 non-inverting small-signal gain stage with a bypassed virtual reference.",
+      "acceptance": "erc-drc",
+      "board": {
+        "width_mm": 60,
+        "height_mm": 40,
+        "layers": 2,
+        "edge_clearance_mm": 0.5
+      }
+    },
+    "components": [
+      {
+        "id": "power_input",
+        "reference": "J1",
+        "role": "input_connector",
+        "component_id": "connector.pinheader.1x02.2_54mm",
+        "variant_id": "vertical",
+        "value": "5V POWER",
+        "required_functions": ["PIN_1", "PIN_2"],
+        "population": "populate"
+      },
+      {
+        "id": "signal_input",
+        "reference": "J2",
+        "role": "input_connector",
+        "component_id": "connector.pinheader.1x02.2_54mm",
+        "variant_id": "vertical",
+        "value": "SIGNAL IN",
+        "required_functions": ["PIN_1", "PIN_2"],
+        "population": "populate"
+      },
+      {
+        "id": "amplifier",
+        "reference": "U1",
+        "role": "ic",
+        "component_id": "opamp.ti.lmv321.sot23_5",
+        "variant_id": "sot23_5",
+        "value": "LMV321",
+        "manufacturer": "Texas Instruments",
+        "mpn": "LMV321IDBVR",
+        "required_functions": ["IN_PLUS", "V_MINUS", "IN_MINUS", "OUT", "V_PLUS"],
+        "population": "populate",
+        "properties": [
+          {"name": "gain_bandwidth_status", "value": "review_required"},
+          {"name": "stability_status", "value": "review_required"},
+          {"name": "output_drive_status", "value": "review_required"},
+          {"name": "load_compatibility_status", "value": "review_required"},
+          {"name": "noise_distortion_status", "value": "review_required"}
+        ]
+      },
+      {
+        "id": "vref_top",
+        "reference": "R1",
+        "role": "resistor",
+        "component_id": "resistor.generic.0603",
+        "variant_id": "0603",
+        "value": "100k",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "vref_bottom",
+        "reference": "R2",
+        "role": "resistor",
+        "component_id": "resistor.generic.0603",
+        "variant_id": "0603",
+        "value": "100k",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "vref_bypass",
+        "reference": "C1",
+        "role": "capacitor",
+        "component_id": "capacitor.ceramic.0805",
+        "variant_id": "0805",
+        "value": "1uF",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "input_coupling",
+        "reference": "C2",
+        "role": "capacitor",
+        "component_id": "capacitor.ceramic.0805",
+        "variant_id": "0805",
+        "value": "1uF",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "input_bias",
+        "reference": "R3",
+        "role": "resistor",
+        "component_id": "resistor.generic.0603",
+        "variant_id": "0603",
+        "value": "100k",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "feedback",
+        "reference": "R4",
+        "role": "resistor",
+        "component_id": "resistor.generic.0603",
+        "variant_id": "0603",
+        "value": "100k",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "gain_setting",
+        "reference": "R5",
+        "role": "resistor",
+        "component_id": "resistor.generic.0603",
+        "variant_id": "0603",
+        "value": "10k",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "supply_decoupling",
+        "reference": "C3",
+        "role": "decoupling_capacitor",
+        "component_id": "capacitor.ceramic.0603",
+        "variant_id": "0603",
+        "value": "100nF",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "output_coupling",
+        "reference": "C4",
+        "role": "capacitor",
+        "component_id": "capacitor.ceramic.0805",
+        "variant_id": "0805",
+        "value": "1uF",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "output_reference",
+        "reference": "R6",
+        "role": "resistor",
+        "component_id": "resistor.generic.0603",
+        "variant_id": "0603",
+        "value": "100k",
+        "required_functions": ["A", "B"],
+        "population": "populate"
+      },
+      {
+        "id": "signal_output",
+        "reference": "J3",
+        "role": "output_connector",
+        "component_id": "connector.pinheader.1x02.2_54mm",
+        "variant_id": "vertical",
+        "value": "SIGNAL OUT",
+        "required_functions": ["PIN_1", "PIN_2"],
+        "population": "populate"
+      }
+    ],
+    "nets": [
+      {
+        "name": "5V",
+        "role": "power_pos",
+        "required": true,
+        "voltage_domain": "5V",
+        "net_class": "power",
+        "width_mm": 0.5,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "power_input", "selector_kind": "function", "selector": "PIN_1"},
+          {"component": "amplifier", "selector_kind": "function", "selector": "V_PLUS"},
+          {"component": "vref_top", "selector_kind": "function", "selector": "A"},
+          {"component": "supply_decoupling", "selector_kind": "function", "selector": "A"}
+        ]
+      },
+      {
+        "name": "GND",
+        "role": "ground",
+        "required": true,
+        "voltage_domain": "0V",
+        "net_class": "ground",
+        "width_mm": 0.5,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "power_input", "selector_kind": "function", "selector": "PIN_2"},
+          {"component": "signal_input", "selector_kind": "function", "selector": "PIN_2"},
+          {"component": "signal_output", "selector_kind": "function", "selector": "PIN_2"},
+          {"component": "amplifier", "selector_kind": "function", "selector": "V_MINUS"},
+          {"component": "vref_bottom", "selector_kind": "function", "selector": "B"},
+          {"component": "vref_bypass", "selector_kind": "function", "selector": "B"},
+          {"component": "supply_decoupling", "selector_kind": "function", "selector": "B"},
+          {"component": "output_reference", "selector_kind": "function", "selector": "B"}
+        ]
+      },
+      {
+        "name": "VREF",
+        "role": "bias",
+        "required": true,
+        "voltage_domain": "2V5",
+        "net_class": "analog",
+        "width_mm": 0.25,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "vref_top", "selector_kind": "function", "selector": "B"},
+          {"component": "vref_bottom", "selector_kind": "function", "selector": "A"},
+          {"component": "vref_bypass", "selector_kind": "function", "selector": "A"},
+          {"component": "input_bias", "selector_kind": "function", "selector": "B"},
+          {"component": "gain_setting", "selector_kind": "function", "selector": "B"}
+        ]
+      },
+      {
+        "name": "SIGNAL_IN",
+        "role": "signal",
+        "required": true,
+        "net_class": "analog",
+        "width_mm": 0.25,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "signal_input", "selector_kind": "function", "selector": "PIN_1"},
+          {"component": "input_coupling", "selector_kind": "function", "selector": "A"}
+        ]
+      },
+      {
+        "name": "BIASED_IN",
+        "role": "signal",
+        "required": true,
+        "voltage_domain": "2V5",
+        "net_class": "analog",
+        "width_mm": 0.25,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "input_coupling", "selector_kind": "function", "selector": "B"},
+          {"component": "input_bias", "selector_kind": "function", "selector": "A"},
+          {"component": "amplifier", "selector_kind": "function", "selector": "IN_PLUS"}
+        ]
+      },
+      {
+        "name": "FEEDBACK",
+        "role": "feedback",
+        "required": true,
+        "voltage_domain": "2V5",
+        "net_class": "analog",
+        "width_mm": 0.25,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "amplifier", "selector_kind": "function", "selector": "IN_MINUS"},
+          {"component": "feedback", "selector_kind": "function", "selector": "B"},
+          {"component": "gain_setting", "selector_kind": "function", "selector": "A"}
+        ]
+      },
+      {
+        "name": "OPAMP_OUT",
+        "role": "signal",
+        "required": true,
+        "voltage_domain": "2V5",
+        "net_class": "analog",
+        "width_mm": 0.25,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "amplifier", "selector_kind": "function", "selector": "OUT"},
+          {"component": "feedback", "selector_kind": "function", "selector": "A"},
+          {"component": "output_coupling", "selector_kind": "function", "selector": "A"}
+        ]
+      },
+      {
+        "name": "SIGNAL_OUT",
+        "role": "signal",
+        "required": true,
+        "net_class": "analog",
+        "width_mm": 0.25,
+        "clearance_mm": 0.2,
+        "endpoints": [
+          {"component": "output_coupling", "selector_kind": "function", "selector": "B"},
+          {"component": "output_reference", "selector_kind": "function", "selector": "A"},
+          {"component": "signal_output", "selector_kind": "function", "selector": "PIN_1"}
+        ]
+      }
+    ],
+    "no_connects": [],
+    "power_flags": [
+      {"net": "5V"},
+      {"net": "GND"}
+    ],
+    "buses": [],
+    "schematic": {
+      "flow": "left_to_right",
+      "origin": "centered",
+      "groups": [
+        {"id": "power_stage", "label": "5 V Power", "role": "power", "members": ["power_input", "supply_decoupling"], "rank": 0, "side": "left"},
+        {"id": "input_stage", "label": "AC Input", "role": "input", "members": ["signal_input", "input_coupling", "input_bias"], "rank": 0, "side": "left"},
+        {"id": "bias_stage", "label": "Virtual Reference", "role": "bias", "members": ["vref_top", "vref_bottom", "vref_bypass"], "rank": 1},
+        {"id": "gain_stage", "label": "LMV321 Gain", "role": "processing", "members": ["amplifier", "feedback", "gain_setting"], "rank": 2},
+        {"id": "output_stage", "label": "AC Output", "role": "output", "members": ["output_coupling", "output_reference", "signal_output"], "rank": 3, "side": "right"}
+      ],
+      "lanes": {"power": "top", "signals": "middle", "ground": "bottom"},
+      "placements": [
+        {"component": "power_input", "group": "power_stage", "orientation": "normal", "mirror": "none"},
+        {"component": "supply_decoupling", "group": "power_stage", "near": "amplifier", "above": "amplifier", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "signal_input", "group": "input_stage", "orientation": "normal", "mirror": "none"},
+        {"component": "input_coupling", "group": "input_stage", "right_of": "signal_input", "orientation": "normal", "mirror": "none"},
+        {"component": "input_bias", "group": "input_stage", "near": "input_coupling", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "vref_top", "group": "bias_stage", "above": "vref_bottom", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "vref_bottom", "group": "bias_stage", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "vref_bypass", "group": "bias_stage", "near": "vref_bottom", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "amplifier", "group": "gain_stage", "right_of": "input_coupling", "orientation": "normal", "mirror": "none"},
+        {"component": "feedback", "group": "gain_stage", "near": "amplifier", "orientation": "normal", "mirror": "none"},
+        {"component": "gain_setting", "group": "gain_stage", "near": "amplifier", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "output_coupling", "group": "output_stage", "right_of": "amplifier", "orientation": "normal", "mirror": "none"},
+        {"component": "output_reference", "group": "output_stage", "near": "output_coupling", "orientation": "rotated_90", "mirror": "none"},
+        {"component": "signal_output", "group": "output_stage", "right_of": "output_coupling", "orientation": "normal", "mirror": "none"}
+      ],
+      "rules": {
+        "positive_power_top": true,
+        "ground_bottom": true,
+        "center_on_page": true,
+        "prefer_labels_for_long_nets": true,
+        "avoid_wire_crossings": true,
+        "min_group_spacing_mm": 20.32,
+        "min_component_spacing_mm": 5.08
+      },
+      "hierarchy": {"mode": "flat", "max_components_per_sheet": 30}
+    },
+    "pcb": {
+      "regions": [
+        {"id": "power_input", "role": "power input", "bounds": {"x_mm": 0, "y_mm": 0, "width_mm": 15, "height_mm": 15}},
+        {"id": "signal_input", "role": "signal input", "bounds": {"x_mm": 0, "y_mm": 15, "width_mm": 15, "height_mm": 25}},
+        {"id": "analog_core", "role": "analog core", "bounds": {"x_mm": 15, "y_mm": 0, "width_mm": 33, "height_mm": 40}},
+        {"id": "signal_output", "role": "signal output", "bounds": {"x_mm": 48, "y_mm": 0, "width_mm": 12, "height_mm": 40}}
+      ],
+      "placements": [
+        {"component": "power_input", "region": "power_input", "edge": "left", "priority": 100},
+        {"component": "signal_input", "region": "signal_input", "edge": "left", "priority": 100},
+        {"component": "amplifier", "region": "analog_core", "priority": 100},
+        {"component": "supply_decoupling", "region": "analog_core", "near": "amplifier", "priority": 95, "max_distance_mm": 3},
+        {"component": "vref_top", "region": "analog_core", "near": "amplifier", "priority": 80, "max_distance_mm": 10},
+        {"component": "vref_bottom", "region": "analog_core", "near": "vref_top", "priority": 85, "max_distance_mm": 5},
+        {"component": "vref_bypass", "region": "analog_core", "near": "vref_bottom", "priority": 90, "max_distance_mm": 3},
+        {"component": "input_coupling", "region": "signal_input", "near": "signal_input", "priority": 85, "max_distance_mm": 8},
+        {"component": "input_bias", "region": "analog_core", "near": "amplifier", "priority": 90, "max_distance_mm": 5},
+        {"component": "feedback", "region": "analog_core", "near": "amplifier", "priority": 95, "max_distance_mm": 3},
+        {"component": "gain_setting", "region": "analog_core", "near": "amplifier", "priority": 95, "max_distance_mm": 3},
+        {"component": "output_coupling", "region": "signal_output", "near": "amplifier", "priority": 85, "max_distance_mm": 12},
+        {"component": "output_reference", "region": "signal_output", "near": "output_coupling", "priority": 80, "max_distance_mm": 5},
+        {"component": "signal_output", "region": "signal_output", "edge": "right", "priority": 100}
+      ],
+      "keepouts": [],
+      "zones": []
+    },
+    "policy": {
+      "allow_reference_assignment": true,
+      "allow_value_normalization": true,
+      "allow_layout_inference": true,
+      "allow_spacing_adjustment": true,
+      "allow_label_insertion": true,
+      "allow_placement_adjustment": true,
+      "allow_route_retry": true
+    },
+    "extensions": null
+  }
+}
