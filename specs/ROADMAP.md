@@ -867,9 +867,11 @@ decisions.
 ### Status
 
 Production BMP280 and protected USB-C LED bounded provider lanes are retained.
-The generic catalog-resolved circuit graph lane is implemented and has one
-live/recorded KiCad-backed pass; broader placement, routing, and catalog
-coverage remain.
+The generic catalog-resolved circuit graph lane is implemented and has four
+promoted KiCad-backed topology classes: RC filter, protected USB-C LED,
+protected USB-C BMP280, and LMV321 AC-coupled gain-stage. The RC, BMP280, and
+LMV321 references include live provider pass evidence; broader placement,
+routing, catalog, and domain-specific validation coverage remain.
 
 ### Current Foundation
 
@@ -896,7 +898,10 @@ writer, ERC/DRC, and round-trip gates. The generic RC filter has recorded and
 live KiCad-backed `pass` evidence. Generic protected USB-C LED and protected
 USB-C BMP280 graphs now also reach the optional KiCad-backed `pass` lane,
 proving multi-branch protected power plus regulated sensor/I2C topology through
-the shared contract.
+the shared contract. The generic LMV321 AC-coupled gain stage adds a verified
+active analog device, VREF biasing, coupling, feedback, deterministic routing,
+and live/recorded KiCad-backed `pass`; its analog performance properties remain
+explicitly review-required rather than inferred from ERC/DRC.
 
 The `intent` command family now adds a structured planning layer above
 `design create`:

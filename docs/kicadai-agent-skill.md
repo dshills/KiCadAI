@@ -133,10 +133,14 @@ For a catalog-resolved topology that is not one of those bounded profiles, use
 `--ai-profile generic-circuit-v1`. The provider then emits a strict circuit
 graph; KiCadAI, not the provider, resolves components, functions, pins, pads,
 symbols, footprints, placement, and routes. Use
-`examples/ai/generic_rc_filter/` as the passing reference. Treat the generic
-protected USB-C LED fixture as candidate-level until its required routes are
-complete. Never translate a generic failure into invented component IDs,
-library IDs, pin names, or coordinates.
+`examples/ai/generic_rc_filter/`,
+`examples/ai/generic_usb_c_led_indicator_protected/`,
+`examples/ai/generic_usb_c_bmp280_breakout/`, and
+`examples/ai/generic_lmv321_ac_gain_stage/` as passing references. The LMV321
+reference proves structure and KiCad checks, while stability, gain-bandwidth,
+output drive, noise, distortion, and load compatibility remain review-required.
+Never translate a generic failure into invented component IDs, library IDs,
+pin names, or coordinates.
 
 For the LED reference, replace both BMP280 fixture paths with
 `examples/ai/usb_c_led_indicator_protected/` and use a separate output path.
