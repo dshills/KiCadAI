@@ -7,6 +7,9 @@ func ProviderGraphSchema() map[string]any {
 	stringValue := map[string]any{"type": "string", "maxLength": MaxStringBytes}
 	boolValue := map[string]any{"type": "boolean"}
 	numberValue := map[string]any{"type": "number"}
+	// Circuit-graph PCB regions use board-local coordinates in the positive quadrant.
+	positiveMM := map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": MaxBoardDimensionMM}
+	nonnegativeMM := map[string]any{"type": "number", "minimum": 0, "maximum": MaxBoardDimensionMM}
 	stringArray := func(limit int) map[string]any {
 		return map[string]any{"type": "array", "maxItems": limit, "items": stringValue}
 	}
@@ -87,7 +90,7 @@ func ProviderGraphSchema() map[string]any {
 		"orientation": map[string]any{"type": "string", "enum": []string{"normal", "rotated_90", "rotated_180", "rotated_270"}},
 		"mirror":      map[string]any{"type": "string", "enum": []string{"", "none", "x", "y"}},
 	})
-	bounds := strictObject(map[string]any{"x_mm": numberValue, "y_mm": numberValue, "width_mm": numberValue, "height_mm": numberValue})
+	bounds := strictObject(map[string]any{"x_mm": nonnegativeMM, "y_mm": nonnegativeMM, "width_mm": positiveMM, "height_mm": positiveMM})
 	region := strictObject(map[string]any{"id": identifier, "role": stringValue, "bounds": bounds})
 	pcbPlacement := strictObject(map[string]any{
 		"component": identifier, "region": stringValue, "near": stringValue,
@@ -106,9 +109,9 @@ func ProviderGraphSchema() map[string]any {
 			"description": map[string]any{"type": "string", "maxLength": MaxDescriptionBytes},
 			"acceptance":  map[string]any{"type": "string", "enum": []string{string(AcceptanceStructural), string(AcceptanceConnectivity), string(AcceptanceERCDRC), string(AcceptanceFabricationCandidate)}},
 			"board": strictObject(map[string]any{
-				"width_mm": numberValue, "height_mm": numberValue,
+				"width_mm": positiveMM, "height_mm": positiveMM,
 				"layers":            map[string]any{"type": "integer", "enum": []int{2, 4}},
-				"edge_clearance_mm": numberValue,
+				"edge_clearance_mm": nonnegativeMM,
 			}),
 		}),
 		"components":  map[string]any{"type": "array", "minItems": 1, "maxItems": MaxComponents, "items": component},

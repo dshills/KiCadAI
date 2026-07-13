@@ -93,6 +93,26 @@ func TestProviderGraphSchemaConstrainsPowerFlags(t *testing.T) {
 	}
 }
 
+func TestProviderGraphSchemaRequiresUsableBoardAndPCBLayout(t *testing.T) {
+	properties := ProviderGraphSchema()["properties"].(map[string]any)
+	project := properties["project"].(map[string]any)["properties"].(map[string]any)
+	board := project["board"].(map[string]any)["properties"].(map[string]any)
+	for _, field := range []string{"width_mm", "height_mm"} {
+		constraint := board[field].(map[string]any)
+		if constraint["exclusiveMinimum"] != 0 || constraint["maximum"] != MaxBoardDimensionMM {
+			t.Fatalf("board %s constraint = %#v", field, constraint)
+		}
+	}
+	if constraint := board["edge_clearance_mm"].(map[string]any); constraint["minimum"] != 0 || constraint["maximum"] != MaxBoardDimensionMM {
+		t.Fatalf("board edge clearance constraint = %#v", constraint)
+	}
+	pcb := properties["pcb"].(map[string]any)["properties"].(map[string]any)
+	regionBounds := pcb["regions"].(map[string]any)["items"].(map[string]any)["properties"].(map[string]any)["bounds"].(map[string]any)["properties"].(map[string]any)
+	if regionBounds["width_mm"].(map[string]any)["exclusiveMinimum"] != 0 || regionBounds["x_mm"].(map[string]any)["minimum"] != 0 {
+		t.Fatalf("region bounds constraints = %#v", regionBounds)
+	}
+}
+
 func jsonFieldNames(typ reflect.Type) map[string]bool {
 	fields := map[string]bool{}
 	for index := 0; index < typ.NumField(); index++ {

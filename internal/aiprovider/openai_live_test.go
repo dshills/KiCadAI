@@ -354,9 +354,14 @@ func referenceFixturePath(t *testing.T, name string) string {
 
 func providerFixturePath(t *testing.T, fixtureID, name string) string {
 	t.Helper()
+	return filepath.Join(providerRepoRoot(t), "examples", "ai", fixtureID, name)
+}
+
+func providerRepoRoot(t *testing.T) string {
+	t.Helper()
 	_, sourcePath, _, ok := runtime.Caller(0)
 	if !ok {
 		t.Fatal("locate live provider test source")
 	}
-	return filepath.Clean(filepath.Join(filepath.Dir(sourcePath), "..", "..", "examples", "ai", fixtureID, name))
+	return filepath.Clean(filepath.Join(filepath.Dir(sourcePath), "..", ".."))
 }
