@@ -2,12 +2,15 @@ package circuitgraph
 
 import (
 	"context"
+	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/kicadfiles/design"
+	"kicadai/internal/libraryresolver"
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 )
 
@@ -101,6 +104,37 @@ func TestResolvedGraphPlacementIsDeterministicAcrossProjectNames(t *testing.T) {
 	third := designworkflow.PlaceExplicitCircuit(context.Background(), renamed, designworkflow.PlacementOptions{LibraryIndex: &index})
 	if first.Stage.Status == designworkflow.StageStatusBlocked || !reflect.DeepEqual(first.Result.Placements, second.Result.Placements) || !reflect.DeepEqual(first.Result.Placements, third.Result.Placements) {
 		t.Fatalf("placements are not deterministic: first=%#v second=%#v renamed=%#v", first.Result.Placements, second.Result.Placements, third.Result.Placements)
+	}
+}
+
+func TestGenericUSBCBMP280RoutesWithInstalledLibraries(t *testing.T) {
+	symbolsRoot := os.Getenv(libraryresolver.EnvSymbolsRoot)
+	footprintsRoot := os.Getenv(libraryresolver.EnvFootprintsRoot)
+	if symbolsRoot == "" || footprintsRoot == "" {
+		t.Skip("installed KiCad libraries are required")
+	}
+	index, loadIssues := libraryresolver.Load(context.Background(), libraryresolver.LibraryRoots{SymbolsRoot: symbolsRoot, FootprintsRoot: footprintsRoot}, libraryresolver.LoadOptions{})
+	if len(index.Symbols) == 0 || len(index.Footprints) == 0 {
+		t.Fatalf("installed library index is empty; issues = %#v", loadIssues)
+	}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), loadGraphExample(t, "usb_c_bmp280_breakout.json"))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("request issues = %#v", issues)
+	}
+	placed := designworkflow.PlaceExplicitCircuit(context.Background(), request, designworkflow.PlacementOptions{
+		LibraryIndex: &index,
+		Rules:        placement.Rules{BoardEdgeClearanceMM: 2},
+	})
+	if placed.Stage.Status == designworkflow.StageStatusBlocked {
+		t.Fatalf("placement issues = %#v", placed.Stage.Issues)
+	}
+	routed := designworkflow.RouteExplicitCircuit(context.Background(), request, placed, designworkflow.RoutingOptions{})
+	if routed.Stage.Status == designworkflow.StageStatusBlocked {
+		t.Fatalf("routing issues = %#v routes = %#v", routed.Stage.Issues, routed.Result.Routes)
 	}
 }
 

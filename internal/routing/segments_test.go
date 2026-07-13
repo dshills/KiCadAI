@@ -2,6 +2,22 @@ package routing
 
 import "testing"
 
+func TestBuildSegmentsFromPathAppliesBoundedEndpointNeckdown(t *testing.T) {
+	path := GridPath{Net: "VCC", Layer: "F.Cu", Points: []Point{{XMM: 0, YMM: 0}, {XMM: 10, YMM: 0}}}
+
+	segments, metrics := BuildSegmentsFromPathWithNeckdown(path, 0.8, 0.2, 3)
+
+	if metrics.TotalLengthMM != 10 || len(segments) != 3 {
+		t.Fatalf("segments = %#v metrics = %#v", segments, metrics)
+	}
+	if segments[0].WidthMM != 0.2 || segments[1].WidthMM != 0.8 || segments[2].WidthMM != 0.2 {
+		t.Fatalf("neckdown widths = %#v", segments)
+	}
+	if segments[0].End.XMM != 3 || segments[1].End.XMM != 7 {
+		t.Fatalf("neckdown boundaries = %#v", segments)
+	}
+}
+
 func TestBuildSegmentsFromPathMergesStraightPath(t *testing.T) {
 	path := GridPath{
 		Net:   "SIG",

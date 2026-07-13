@@ -316,6 +316,26 @@ func TestExistingCopperForSegmentsIncludesTraceWidth(t *testing.T) {
 	}
 }
 
+func TestNominalSegmentsClearOccupancyRejectsThickenedCollision(t *testing.T) {
+	request := singleLayerSearchRequest()
+	request.Rules.TraceWidthMM = 0.8
+	request.Obstacles = append(request.Obstacles, Obstacle{
+		Layer:    "F.Cu",
+		Geometry: Shape{Rect: &Rect{Min: Point{XMM: 9, YMM: 9}, Max: Point{XMM: 11, YMM: 11}}},
+	})
+	occupancy, err := BuildOccupancy(request, "SIG")
+	if err != nil {
+		t.Fatalf("build occupancy: %v", err)
+	}
+	segments := []Segment{
+		{Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 2, YMM: 10}, End: Point{XMM: 5, YMM: 10}, WidthMM: 0.2},
+		{Net: "SIG", Layer: "F.Cu", Start: Point{XMM: 5, YMM: 10}, End: Point{XMM: 15, YMM: 10}, WidthMM: 0.8},
+	}
+	if nominalSegmentsClearOccupancy(segments, 0.8, occupancy, request.Board.Layers) {
+		t.Fatal("thickened segment crossing an obstacle was accepted")
+	}
+}
+
 func crossingNetsRequest() Request {
 	request := singleLayerSearchRequest()
 	request.Nets[0].Name = "A_HORIZONTAL"

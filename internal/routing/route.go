@@ -59,6 +59,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			route.Status = RouteStatusFailed
 		}
 		netRequest.Rules = applyEffectiveRule(request.Rules, effectiveRule)
+		searchRequest := routingSearchRequest(netRequest)
 		if plan.Net.Class == "" && (plan.Net.Role == NetPower || plan.Net.Role == NetGround || plan.Net.Role == NetHighCurrent) {
 			route.Issues = append(route.Issues, reports.Issue{
 				Code:       reports.CodeMissingNetClass,
@@ -71,12 +72,14 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		}
 		var occupancy Occupancy
 		var viaOccupancy Occupancy
+		var nominalOccupancy Occupancy
 		if !netFailed {
 			var err error
-			if netRequest.Strategy.Mode == ModeSingleLayer {
-				occupancy, err = BuildOccupancy(netRequest, plan.Net.Name)
+			if searchRequest.Rules.TraceWidthMM != netRequest.Rules.TraceWidthMM {
+				nominalOccupancy, _, err = buildRouteOccupancy(netRequest, plan.Net.Name)
 			} else {
-				occupancy, viaOccupancy, err = BuildTraceAndViaOccupancy(netRequest, plan.Net.Name)
+				occupancy, viaOccupancy, err = buildRouteOccupancy(searchRequest, plan.Net.Name)
+				nominalOccupancy = occupancy
 			}
 			if err != nil {
 				if issue, ok := reports.IssueFromError(err); ok {
@@ -92,6 +95,14 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				netFailed = true
 				failed = true
 			}
+			if !netFailed && searchRequest.Rules.TraceWidthMM != netRequest.Rules.TraceWidthMM {
+				occupancy, viaOccupancy, err = buildRouteOccupancy(searchRequest, plan.Net.Name)
+				if err != nil {
+					route.Issues = append(route.Issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Message: err.Error(), Nets: []string{plan.Net.Name}})
+					netFailed = true
+					failed = true
+				}
+			}
 		} else {
 			failed = true
 		}
@@ -99,6 +110,10 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		netSegmentCount := 0
 		netViaCount := 0
 		netLengthMM := 0.0
+		var fallbackRequest Request
+		var fallbackOccupancy Occupancy
+		var fallbackViaOccupancy Occupancy
+		fallbackReady := false
 		for pairIndex, pair := range plan.Pairs {
 			if pairIndex%routePairContextCheckInterval == 0 {
 				if err := ctx.Err(); err != nil {
@@ -110,12 +125,53 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			if netFailed {
 				break
 			}
-			path, routeIssues := routePairPath(ctx, netRequest, access, occupancy, viaOccupancy, plan.Net.Name, pair)
+			path, routeIssues := routePairPath(ctx, searchRequest, access, occupancy, viaOccupancy, plan.Net.Name, pair)
 			route.SearchNodes += path.SearchNodes
 			result.Metrics.SearchNodes += path.SearchNodes
 			if path.SearchLimitHit {
 				route.SearchLimitHit = true
 				result.Metrics.MaxSearchNodesHit = true
+			}
+			neckdownWidthMM := netRequest.Rules.NeckdownWidthMM
+			neckdownLengthMM := netRequest.Rules.NeckdownLengthMM
+			if len(routeIssues) != 0 && neckdownWidthMM == 0 {
+				candidate, ok := endpointNeckdownFallbackRequest(netRequest, netRequest.Rules, plan.Net.Role)
+				if ok && ctx.Err() == nil {
+					if !fallbackReady {
+						fallbackRequest = candidate
+						var err error
+						fallbackOccupancy, err = BuildOccupancy(fallbackRequest, plan.Net.Name)
+						if err == nil {
+							fallbackViaOccupancy = viaOccupancy
+							fallbackReady = true
+						}
+					}
+					if fallbackReady {
+						fallbackPath, fallbackIssues := routePairPath(ctx, fallbackRequest, access, fallbackOccupancy, fallbackViaOccupancy, plan.Net.Name, pair)
+						route.SearchNodes += fallbackPath.SearchNodes
+						result.Metrics.SearchNodes += fallbackPath.SearchNodes
+						if len(fallbackIssues) == 0 {
+							path = fallbackPath
+							routeIssues = nil
+							neckdownWidthMM = fallbackRequest.Rules.TraceWidthMM
+							neckdownLengthMM = pcbrules.DefaultPowerNeckdownLengthMM
+						}
+					}
+				}
+			}
+			var segments []Segment
+			var metrics Metrics
+			if len(routeIssues) == 0 {
+				segments, metrics = BuildSegmentsFromPathWithNeckdown(path, netRequest.Rules.TraceWidthMM, neckdownWidthMM, neckdownLengthMM)
+				if segmentsUseNeckdown(segments, netRequest.Rules.TraceWidthMM) && !nominalSegmentsClearOccupancy(segments, netRequest.Rules.TraceWidthMM, nominalOccupancy, netRequest.Board.Layers) {
+					routeIssues = []reports.Issue{{
+						Code:       reports.CodeValidationFailed,
+						Severity:   reports.SeverityBlocked,
+						Message:    "endpoint neckdown path does not leave a clearance-safe full-width trunk",
+						Nets:       []string{plan.Net.Name},
+						Suggestion: "increase endpoint access space or move the connected components farther apart",
+					}}
+				}
 			}
 			if len(routeIssues) != 0 {
 				route.Issues = append(route.Issues, routeIssues...)
@@ -123,7 +179,6 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 				failed = true
 				break
 			}
-			segments, metrics := BuildSegmentsFromPath(path, netRequest.Rules.TraceWidthMM)
 			vias := BuildViasFromPath(path, netRequest.Rules)
 			route.Segments = append(route.Segments, segments...)
 			route.Vias = append(route.Vias, vias...)
@@ -242,6 +297,12 @@ func applyEffectiveRule(rules Rules, effective pcbrules.EffectiveRule) Rules {
 	if effective.MaxViasPerNet > 0 {
 		rules.MaxViasPerNet = effective.MaxViasPerNet
 	}
+	if effective.NeckdownWidthMM > 0 {
+		rules.NeckdownWidthMM = effective.NeckdownWidthMM
+	}
+	if effective.NeckdownLengthMM > 0 {
+		rules.NeckdownLengthMM = effective.NeckdownLengthMM
+	}
 	if effective.PreferLayer != "" {
 		rules.PreferLayer = effective.PreferLayer
 	}
@@ -249,6 +310,69 @@ func applyEffectiveRule(rules Rules, effective pcbrules.EffectiveRule) Rules {
 		rules.AllowedLayers = append([]string(nil), effective.AllowedLayers...)
 	}
 	return rules
+}
+
+func routingSearchRequest(request Request) Request {
+	if request.Rules.NeckdownWidthMM > 0 && request.Rules.NeckdownLengthMM > 0 && request.Rules.NeckdownWidthMM < request.Rules.TraceWidthMM {
+		request.Rules.TraceWidthMM = request.Rules.NeckdownWidthMM
+	}
+	return request
+}
+
+func endpointNeckdownFallbackRequest(request Request, rules Rules, role NetRole) (Request, bool) {
+	if role != NetPower && role != NetGround {
+		return Request{}, false
+	}
+	widthMM := max(pcbrules.DefaultPowerNeckdownWidthMM, rules.MinNeckdownWidthMM)
+	if widthMM >= rules.TraceWidthMM {
+		return Request{}, false
+	}
+	request.Rules = rules
+	request.Rules.TraceWidthMM = widthMM
+	return request, true
+}
+
+func buildRouteOccupancy(request Request, netName string) (Occupancy, Occupancy, error) {
+	if request.Strategy.Mode == ModeSingleLayer {
+		occupancy, err := BuildOccupancy(request, netName)
+		return occupancy, Occupancy{}, err
+	}
+	return BuildTraceAndViaOccupancy(request, netName)
+}
+
+func nominalSegmentsClearOccupancy(segments []Segment, nominalWidthMM float64, occupancy Occupancy, layers []Layer) bool {
+	gridMM := occupancy.Grid.spacingMM()
+	if gridMM <= 0 {
+		return false
+	}
+	layerIndexes, _ := LayerIndexes(layers)
+	for _, segment := range segments {
+		if segment.WidthMM+distanceEpsilon < nominalWidthMM {
+			continue
+		}
+		layerIndex, ok := layerIndexes[normalizeLayer(segment.Layer)]
+		if !ok {
+			return false
+		}
+		lengthMM := pointDistance(segment.Start, segment.End)
+		steps := max(1, int(math.Ceil(lengthMM/(gridMM/2))))
+		for step := 0; step <= steps; step++ {
+			point := interpolateSegmentPoint(segment, float64(step)/float64(steps))
+			if occupancy.BlockedCell(occupancy.Grid.ToGrid(point, layerIndex)) {
+				return false
+			}
+		}
+	}
+	return true
+}
+
+func segmentsUseNeckdown(segments []Segment, nominalWidthMM float64) bool {
+	for _, segment := range segments {
+		if segment.WidthMM+distanceEpsilon < nominalWidthMM {
+			return true
+		}
+	}
+	return false
 }
 
 func lengthPolicyIssues(netName string, effective pcbrules.EffectiveRule, route Route) []reports.Issue {

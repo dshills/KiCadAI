@@ -132,13 +132,15 @@ type Issue struct {
 type ClearanceMatrix map[string]float64
 
 const (
-	DefaultTraceWidthMM   = 0.25
-	DefaultClearanceMM    = 0.20
-	DefaultViaDiameterMM  = 0.60
-	DefaultViaDrillMM     = 0.30
-	DefaultViaClearanceMM = 0.20
-	DefaultMaxViasPerNet  = 4
-	DifferentialPairMode  = "differential_pair"
+	DefaultTraceWidthMM          = 0.25
+	DefaultClearanceMM           = 0.20
+	DefaultViaDiameterMM         = 0.60
+	DefaultViaDrillMM            = 0.30
+	DefaultViaClearanceMM        = 0.20
+	DefaultMaxViasPerNet         = 4
+	DefaultPowerNeckdownWidthMM  = 0.20
+	DefaultPowerNeckdownLengthMM = 3.00
+	DifferentialPairMode         = "differential_pair"
 )
 
 type Resolver struct {

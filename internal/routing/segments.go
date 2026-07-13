@@ -1,6 +1,9 @@
 package routing
 
-import "math"
+import (
+	"math"
+	"slices"
+)
 
 const distanceEpsilonSquared = distanceEpsilon * distanceEpsilon
 
@@ -13,6 +16,70 @@ func BuildSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Metrics) 
 		return buildLayeredSegmentsFromPath(path, widthMM)
 	}
 	return buildSegmentsForPoints(path.Net, path.Layer, path.Points, widthMM, path.SearchNodes)
+}
+
+func BuildSegmentsFromPathWithNeckdown(path GridPath, widthMM, neckdownWidthMM, neckdownLengthMM float64) ([]Segment, Metrics) {
+	segments, metrics := BuildSegmentsFromPath(path, widthMM)
+	if neckdownWidthMM <= 0 || neckdownLengthMM <= 0 || neckdownWidthMM >= widthMM || len(segments) == 0 {
+		return segments, metrics
+	}
+	segments = applyEndpointNeckdown(segments, neckdownWidthMM, neckdownLengthMM)
+	metrics.SegmentCount = len(segments)
+	return segments, metrics
+}
+
+func applyEndpointNeckdown(segments []Segment, widthMM, lengthMM float64) []Segment {
+	totalLength := 0.0
+	for _, segment := range segments {
+		totalLength += pointDistance(segment.Start, segment.End)
+	}
+	if totalLength <= distanceEpsilon {
+		return segments
+	}
+	startBoundary := min(lengthMM, totalLength)
+	endBoundary := max(0.0, totalLength-lengthMM)
+	result := make([]Segment, 0, len(segments)*3)
+	distance := 0.0
+	for _, segment := range segments {
+		segmentLength := pointDistance(segment.Start, segment.End)
+		if segmentLength <= distanceEpsilon {
+			continue
+		}
+		cuts := []float64{0, segmentLength}
+		for _, boundary := range []float64{startBoundary, endBoundary} {
+			local := boundary - distance
+			if local > distanceEpsilon && local < segmentLength-distanceEpsilon {
+				cuts = append(cuts, local)
+			}
+		}
+		slices.Sort(cuts)
+		for index := 1; index < len(cuts); index++ {
+			fromDistance := cuts[index-1]
+			toDistance := cuts[index]
+			midpoint := distance + (fromDistance+toDistance)/2
+			width := segment.WidthMM
+			if midpoint <= startBoundary || midpoint >= endBoundary {
+				width = widthMM
+			}
+			part := segment
+			part.Start = interpolateSegmentPoint(segment, fromDistance/segmentLength)
+			part.End = interpolateSegmentPoint(segment, toDistance/segmentLength)
+			part.WidthMM = roundMM(width)
+			if pointDistanceSquared(part.Start, part.End) <= distanceEpsilonSquared {
+				continue
+			}
+			result = append(result, part)
+		}
+		distance += segmentLength
+	}
+	return result
+}
+
+func interpolateSegmentPoint(segment Segment, fraction float64) Point {
+	return roundPoint(Point{
+		XMM: segment.Start.XMM + (segment.End.XMM-segment.Start.XMM)*fraction,
+		YMM: segment.Start.YMM + (segment.End.YMM-segment.Start.YMM)*fraction,
+	})
 }
 
 func buildLayeredSegmentsFromPath(path GridPath, widthMM float64) ([]Segment, Metrics) {
