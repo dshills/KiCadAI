@@ -1,0 +1,696 @@
+{
+  "schema": "kicadai.ai.intent.v1",
+  "intent": {
+    "schema": "kicadai.circuit-graph.v1",
+    "version": 1,
+    "project": {
+      "name": "generic_usb_c_bmp280",
+      "title": "Protected USB-C BMP280 Breakout",
+      "description": "Explicit graph equivalent of the promoted USB-C BMP280 reference design.",
+      "acceptance": "erc-drc",
+      "board": {
+        "width_mm": 100,
+        "height_mm": 75,
+        "layers": 2,
+        "edge_clearance_mm": 0.25
+      }
+    },
+    "components": [
+      {
+        "id": "usb",
+        "reference": "J1",
+        "role": "input_connector",
+        "component_id": "usb_c.gct.usb4125_power_only_6p",
+        "variant_id": "gct_usb4125_6p",
+        "population": "populate"
+      },
+      {
+        "id": "cc1_rd",
+        "reference": "R1",
+        "role": "resistor",
+        "query": {
+          "family": "resistor",
+          "package": "0805",
+          "value_kind": "resistance",
+          "value": "5.1k",
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "5.1k",
+        "population": "populate"
+      },
+      {
+        "id": "cc2_rd",
+        "reference": "R2",
+        "role": "resistor",
+        "query": {
+          "family": "resistor",
+          "package": "0805",
+          "value_kind": "resistance",
+          "value": "5.1k",
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "5.1k",
+        "population": "populate"
+      },
+      {
+        "id": "fuse",
+        "reference": "F1",
+        "role": "fuse",
+        "component_id": "fuse.generic.1206",
+        "variant_id": "1206",
+        "value": "500mA",
+        "population": "populate"
+      },
+      {
+        "id": "tvs",
+        "reference": "D1",
+        "role": "tvs",
+        "component_id": "protection.tvs.usb_5v_unidirectional",
+        "variant_id": "sod_323",
+        "population": "populate"
+      },
+      {
+        "id": "bulk",
+        "reference": "C1",
+        "role": "bulk_capacitor",
+        "query": {
+          "family": "capacitor",
+          "package": "0805",
+          "value_kind": "capacitance",
+          "value": "10uF",
+          "min_voltage_v": 10,
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "10uF",
+        "population": "populate"
+      },
+      {
+        "id": "regulator",
+        "reference": "U1",
+        "role": "regulator",
+        "component_id": "regulator.linear.ap2112k_3v3.sot23_5",
+        "variant_id": "sot23_5",
+        "required_functions": [
+          "VIN",
+          "VOUT",
+          "GND",
+          "EN",
+          "NC"
+        ],
+        "population": "populate"
+      },
+      {
+        "id": "reg_in_cap",
+        "reference": "C2",
+        "role": "decoupling_capacitor",
+        "query": {
+          "family": "capacitor",
+          "package": "0805",
+          "value_kind": "capacitance",
+          "value": "1uF",
+          "min_voltage_v": 10,
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "1uF",
+        "population": "populate"
+      },
+      {
+        "id": "reg_out_cap",
+        "reference": "C3",
+        "role": "decoupling_capacitor",
+        "query": {
+          "family": "capacitor",
+          "package": "0805",
+          "value_kind": "capacitance",
+          "value": "2.2uF",
+          "min_voltage_v": 6.3,
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "2.2uF",
+        "population": "populate"
+      },
+      {
+        "id": "sensor",
+        "reference": "U2",
+        "role": "sensor",
+        "component_id": "sensor.bosch.bmp280.lga8",
+        "variant_id": "lga8",
+        "required_functions": [
+          "vdd",
+          "vddio",
+          "gnd",
+          "sda",
+          "scl",
+          "CSB",
+          "SDO"
+        ],
+        "population": "populate"
+      },
+      {
+        "id": "sensor_cap",
+        "reference": "C4",
+        "role": "decoupling_capacitor",
+        "query": {
+          "family": "capacitor",
+          "package": "0805",
+          "value_kind": "capacitance",
+          "value": "100nF",
+          "min_voltage_v": 6.3,
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "100nF",
+        "population": "populate"
+      },
+      {
+        "id": "sda_pullup",
+        "reference": "R3",
+        "role": "pullup",
+        "query": {
+          "family": "resistor",
+          "package": "0805",
+          "value_kind": "resistance",
+          "value": "4.7k",
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "4.7k",
+        "population": "populate"
+      },
+      {
+        "id": "scl_pullup",
+        "reference": "R4",
+        "role": "pullup",
+        "query": {
+          "family": "resistor",
+          "package": "0805",
+          "value_kind": "resistance",
+          "value": "4.7k",
+          "minimum_confidence": "rule_inferred"
+        },
+        "value": "4.7k",
+        "population": "populate"
+      },
+      {
+        "id": "i2c_header",
+        "reference": "J2",
+        "role": "output_connector",
+        "component_id": "connector.pinheader.1x04.2_54mm",
+        "variant_id": "vertical",
+        "population": "populate"
+      }
+    ],
+    "nets": [
+      {
+        "name": "VBUS_RAW",
+        "role": "power_pos",
+        "required": true,
+        "voltage_domain": "5V",
+        "current_ma": 500,
+        "width_mm": 0.8,
+        "endpoints": [
+          {
+            "component": "usb",
+            "selector_kind": "function",
+            "selector": "vbus"
+          },
+          {
+            "component": "fuse",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          }
+        ]
+      },
+      {
+        "name": "VCC_5v",
+        "role": "power_pos",
+        "required": true,
+        "voltage_domain": "5V",
+        "current_ma": 500,
+        "width_mm": 0.8,
+        "endpoints": [
+          {
+            "component": "fuse",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "tvs",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          },
+          {
+            "component": "bulk",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          },
+          {
+            "component": "regulator",
+            "selector_kind": "function",
+            "selector": "VIN"
+          },
+          {
+            "component": "regulator",
+            "selector_kind": "function",
+            "selector": "EN"
+          },
+          {
+            "component": "reg_in_cap",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          }
+        ]
+      },
+      {
+        "name": "VCC_3v3",
+        "role": "power_pos",
+        "required": true,
+        "voltage_domain": "3.3V",
+        "current_ma": 100,
+        "width_mm": 0.5,
+        "endpoints": [
+          {
+            "component": "regulator",
+            "selector_kind": "function",
+            "selector": "VOUT"
+          },
+          {
+            "component": "reg_out_cap",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          },
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "vdd"
+          },
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "vddio"
+          },
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "CSB"
+          },
+          {
+            "component": "sensor_cap",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          },
+          {
+            "component": "sda_pullup",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          },
+          {
+            "component": "scl_pullup",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          },
+          {
+            "component": "i2c_header",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          }
+        ]
+      },
+      {
+        "name": "SDA",
+        "role": "signal",
+        "required": true,
+        "endpoints": [
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "sda"
+          },
+          {
+            "component": "sda_pullup",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "i2c_header",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          }
+        ]
+      },
+      {
+        "name": "SCL",
+        "role": "signal",
+        "required": true,
+        "endpoints": [
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "scl"
+          },
+          {
+            "component": "scl_pullup",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "i2c_header",
+            "selector_kind": "symbol_pin",
+            "selector": "3"
+          }
+        ]
+      },
+      {
+        "name": "CC1",
+        "role": "signal",
+        "required": true,
+        "endpoints": [
+          {
+            "component": "usb",
+            "selector_kind": "function",
+            "selector": "cc1"
+          },
+          {
+            "component": "cc1_rd",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          }
+        ]
+      },
+      {
+        "name": "CC2",
+        "role": "signal",
+        "required": true,
+        "endpoints": [
+          {
+            "component": "usb",
+            "selector_kind": "function",
+            "selector": "cc2"
+          },
+          {
+            "component": "cc2_rd",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
+          }
+        ]
+      },
+      {
+        "name": "GND",
+        "role": "ground",
+        "required": true,
+        "width_mm": 0.8,
+        "endpoints": [
+          {
+            "component": "usb",
+            "selector_kind": "function",
+            "selector": "gnd"
+          },
+          {
+            "component": "cc1_rd",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "cc2_rd",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "tvs",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "bulk",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "regulator",
+            "selector_kind": "function",
+            "selector": "GND"
+          },
+          {
+            "component": "reg_in_cap",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "reg_out_cap",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "gnd"
+          },
+          {
+            "component": "sensor",
+            "selector_kind": "function",
+            "selector": "SDO"
+          },
+          {
+            "component": "sensor_cap",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "i2c_header",
+            "selector_kind": "symbol_pin",
+            "selector": "4"
+          }
+        ]
+      }
+    ],
+    "no_connects": [
+      {
+        "component": "regulator",
+        "selector_kind": "function",
+        "selector": "NC"
+      },
+      {
+        "component": "usb",
+        "selector_kind": "function",
+        "selector": "SHIELD"
+      }
+    ],
+    "buses": [
+      {
+        "id": "i2c",
+        "name": "I2C",
+        "members": [
+          {
+            "net": "SCL",
+            "label": "SCL"
+          },
+          {
+            "net": "SDA",
+            "label": "SDA"
+          }
+        ]
+      }
+    ],
+    "schematic": {
+      "flow": "left_to_right",
+      "origin": "centered",
+      "groups": [
+        {
+          "id": "input_stage",
+          "role": "input_stage",
+          "members": [
+            "usb",
+            "cc1_rd",
+            "cc2_rd"
+          ],
+          "rank": 0,
+          "side": "left"
+        },
+        {
+          "id": "protection_stage",
+          "role": "protection_stage",
+          "members": [
+            "fuse",
+            "tvs",
+            "bulk"
+          ],
+          "rank": 1
+        },
+        {
+          "id": "regulator_stage",
+          "role": "regulator_stage",
+          "members": [
+            "regulator",
+            "reg_in_cap",
+            "reg_out_cap"
+          ],
+          "rank": 2
+        },
+        {
+          "id": "sensor_stage",
+          "role": "processing_stage",
+          "members": [
+            "sensor",
+            "sensor_cap",
+            "sda_pullup",
+            "scl_pullup"
+          ],
+          "rank": 3
+        },
+        {
+          "id": "output_stage",
+          "role": "output_stage",
+          "members": [
+            "i2c_header"
+          ],
+          "rank": 4,
+          "side": "right"
+        }
+      ],
+      "lanes": {
+        "power": "top",
+        "signals": "middle",
+        "ground": "bottom"
+      },
+      "placements": [
+        {
+          "component": "usb",
+          "group": "input_stage",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
+          "component": "fuse",
+          "group": "protection_stage",
+          "right_of": "usb",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
+          "component": "regulator",
+          "group": "regulator_stage",
+          "right_of": "fuse",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
+          "component": "sensor",
+          "group": "sensor_stage",
+          "right_of": "regulator",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
+          "component": "sensor_cap",
+          "group": "sensor_stage",
+          "near": "sensor",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
+          "component": "i2c_header",
+          "group": "output_stage",
+          "right_of": "sensor",
+          "orientation": "normal",
+          "mirror": "none"
+        }
+      ],
+      "rules": {
+        "positive_power_top": true,
+        "ground_bottom": true,
+        "center_on_page": true,
+        "prefer_labels_for_long_nets": true,
+        "avoid_wire_crossings": true,
+        "min_group_spacing_mm": 12.7,
+        "min_component_spacing_mm": 7.62
+      },
+      "hierarchy": {
+        "mode": "flat"
+      }
+    },
+    "pcb": {
+      "regions": [
+        {
+          "id": "power",
+          "role": "power",
+          "bounds": {
+            "x_mm": 2,
+            "y_mm": 5,
+            "width_mm": 42,
+            "height_mm": 65
+          }
+        },
+        {
+          "id": "sensor",
+          "role": "sensor",
+          "bounds": {
+            "x_mm": 44,
+            "y_mm": 5,
+            "width_mm": 35,
+            "height_mm": 65
+          }
+        },
+        {
+          "id": "io",
+          "role": "connector",
+          "bounds": {
+            "x_mm": 79,
+            "y_mm": 5,
+            "width_mm": 19,
+            "height_mm": 65
+          }
+        }
+      ],
+      "placements": [
+        {
+          "component": "usb",
+          "region": "power",
+          "edge": "left",
+          "priority": 100
+        },
+        {
+          "component": "regulator",
+          "region": "power",
+          "near": "fuse",
+          "priority": 100,
+          "max_distance_mm": 15
+        },
+        {
+          "component": "sensor",
+          "region": "sensor",
+          "priority": 100
+        },
+        {
+          "component": "sensor_cap",
+          "region": "sensor",
+          "near": "sensor",
+          "priority": 100,
+          "max_distance_mm": 5
+        },
+        {
+          "component": "i2c_header",
+          "region": "io",
+          "edge": "right",
+          "priority": 100
+        }
+      ],
+      "keepouts": [],
+      "zones": [
+        {
+          "net": "GND",
+          "layers": [
+            "B.Cu"
+          ],
+          "clearance_mm": 0.25
+        }
+      ]
+    },
+    "policy": {
+      "allow_reference_assignment": true,
+      "allow_value_normalization": true,
+      "allow_layout_inference": true,
+      "allow_spacing_adjustment": true,
+      "allow_label_insertion": true,
+      "allow_placement_adjustment": true,
+      "allow_route_retry": true
+    }
+  }
+}

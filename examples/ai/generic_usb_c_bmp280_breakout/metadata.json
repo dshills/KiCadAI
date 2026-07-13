@@ -1,0 +1,14 @@
+{
+  "schema": "kicadai.ai.promotion-fixture.v1",
+  "id": "generic_usb_c_bmp280_breakout",
+  "profile": "generic-circuit-v1",
+  "prompt": "prompt.txt",
+  "recorded_response": "recorded-response.json",
+  "readiness": "candidate",
+  "require_erc": true,
+  "require_drc": true,
+  "require_round_trip": true,
+  "strict_diffs": true,
+  "expected_stage": "validation",
+  "expected_issue_code": "VALIDATION_FAILED"
+}

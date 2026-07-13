@@ -1,0 +1,1 @@
+Create a protected USB-C powered BMP280 I2C breakout with CC pull-downs, a fuse, TVS protection, bulk capacitance, a 3.3 V regulator, I2C pull-ups, local decoupling, and an external I2C and power connector.
