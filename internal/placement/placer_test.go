@@ -214,6 +214,37 @@ func TestPlaceSamplesAcrossBoardWhenCandidateCapIsSmall(t *testing.T) {
 	}
 }
 
+func TestPlaceSamplesFixedOrientationEdgeAnchorFromPhysicalBounds(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		edge EdgeConstraint
+	}{
+		{name: "left", edge: EdgeLeft},
+		{name: "right", edge: EdgeRight},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := minimalRequest()
+			req.Board.WidthMM = 100
+			req.Board.HeightMM = 20
+			req.Board.MarginMM = 2
+			req.Components[0].Edge = tc.edge
+			rotation := 0.0
+			req.Components[0].Rotation.FixedDeg = &rotation
+			req.Rules.BoardEdgeClearanceMM = 2
+			req.Rules.MaxCandidatesPerPart = 10
+
+			result := Place(req)
+			if result.Status != StatusPlaced {
+				t.Fatalf("status = %s, want placed; issues=%#v", result.Status, result.Issues)
+			}
+			normalized := NormalizeRequest(req)
+			if !edgeConstraintSatisfied(req.Board, req.Components[0], result.Placements[0].Position, tc.edge, edgeConstraintTolerance(req.Board, normalized.Rules)) {
+				t.Fatalf("placement %#v does not satisfy %s edge", result.Placements[0].Position, tc.edge)
+			}
+		})
+	}
+}
+
 func TestPlaceScoresBottomEdgeWithoutCancelingY(t *testing.T) {
 	req := minimalRequest()
 	req.Board.WidthMM = 30

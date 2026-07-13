@@ -166,6 +166,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 	componentRefsByGroup := componentRefsByGroupID(request.Components)
 	keepoutReports := keepoutViolationReports(request.Keepouts, successful)
 	requiredKeepoutViolations, optionalKeepoutViolations := keepoutViolationCounts(keepoutReports)
+	edgeTolerance := edgeConstraintTolerance(request.Board, request.Rules)
 	report := QualityReport{
 		Status:                    result.Status,
 		Ready:                     validation.Ready,
@@ -192,7 +193,7 @@ func BuildQualityReport(request Request, result Result) QualityReport {
 		}
 		if component.Edge != EdgeNone {
 			report.EdgeConstraintCount++
-			if edgeConstraintSatisfied(request.Board, component, placement.Position, component.Edge) {
+			if edgeConstraintSatisfied(request.Board, component, placement.Position, component.Edge, edgeTolerance) {
 				report.EdgeConstraintSatisfied++
 			}
 		}
@@ -1330,8 +1331,16 @@ func centroid(points []Point) Point {
 	return center
 }
 
-func edgeConstraintSatisfied(board BoardPlacementArea, component Component, placement Placement, edge EdgeConstraint) bool {
-	toleranceMM := math.Min(2.0, math.Min(board.WidthMM, board.HeightMM)*0.1)
+func edgeConstraintTolerance(board BoardPlacementArea, rules Rules) float64 {
+	clearance := max(board.MarginMM, rules.BoardEdgeClearanceMM)
+	connectorTolerance := rules.ConnectorEdgeClearanceMM
+	if connectorTolerance <= 0 {
+		connectorTolerance = DefaultRules().ConnectorEdgeClearanceMM
+	}
+	return clearance + connectorTolerance
+}
+
+func edgeConstraintSatisfied(board BoardPlacementArea, component Component, placement Placement, edge EdgeConstraint, toleranceMM float64) bool {
 	bounds, ok := ComponentPhysicalBounds(component, placement)
 	if !ok {
 		return false

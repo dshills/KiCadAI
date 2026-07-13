@@ -227,6 +227,7 @@ func placeComponent(component Component, request Request, occupancy *occupancy, 
 
 func candidatePlacements(component Component, componentRef string, request Request, placedByRef map[string]PlacementResult, padsByRef map[string]map[string]Point, rotatedPadsByRef map[string]map[int64]map[string]Point, netsByRef map[string][]*normalizedNet, advancedRequestContext advancedPlacementRequestContext, keepTogetherPeersByRef map[string][]string, congestionContext congestionCandidateScoringContext, scoring *CandidateScoringReport) []placementCandidate {
 	usable := BoardUsableRect(request.Board, request.Rules)
+	edgeTolerance := edgeConstraintTolerance(request.Board, request.Rules)
 	grid := request.Rules.GridMM
 	if grid <= 0 {
 		grid = DefaultRules().GridMM
@@ -240,8 +241,8 @@ func candidatePlacements(component Component, componentRef string, request Reque
 	yCount := max(1, int(math.Floor((usable.Max.YMM-usable.Min.YMM)/grid))+1)
 	variantsPerPoint := max(1, len(rotations)*len(layers))
 	axisSamples := max(7, int(math.Ceil(math.Sqrt(float64(maxCandidates)/float64(variantsPerPoint)))))
-	xIndices := sampledIndices(xCount, axisSamples)
-	yIndices := sampledIndices(yCount, axisSamples)
+	xIndices := edgeAwareSampledIndices(component, rotations, component.Edge, true, usable.Min.XMM, usable.Max.XMM, grid, xCount, axisSamples)
+	yIndices := edgeAwareSampledIndices(component, rotations, component.Edge, false, usable.Min.YMM, usable.Max.YMM, grid, yCount, axisSamples)
 	candidateIndex := 0
 	for _, yIndex := range yIndices {
 		y := usable.Min.YMM + float64(yIndex)*grid
@@ -266,7 +267,7 @@ func candidatePlacements(component Component, componentRef string, request Reque
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectOutsideBoard, "candidate is outside usable board area")
 						continue
 					}
-					if !component.Fixed && component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, candidateResult.Position, component.Edge) {
+					if !component.Fixed && component.Edge != EdgeNone && !edgeConstraintSatisfied(request.Board, component, candidateResult.Position, component.Edge, edgeTolerance) {
 						recordCandidateRejection(scoring, component, componentRef, candidateResult.Position, index, CandidateRejectEdge, "candidate does not satisfy edge constraint")
 						continue
 					}
@@ -420,6 +421,75 @@ func sampledIndices(count int, target int) []int {
 		seen[index] = struct{}{}
 		indices = append(indices, index)
 	}
+	return indices
+}
+
+func edgeAwareSampledIndices(component Component, rotations []float64, edge EdgeConstraint, horizontal bool, usableMin, usableMax, grid float64, count, target int) []int {
+	if edge == EdgeNone {
+		return sampledIndices(count, target)
+	}
+	edgeIndices := map[int]struct{}{}
+	for _, rotation := range rotations {
+		bounds, ok := ComponentPhysicalBounds(component, Placement{RotationDeg: rotation})
+		if !ok {
+			continue
+		}
+		var positions []float64
+		switch {
+		case horizontal && (edge == EdgeLeft || edge == EdgeAny):
+			positions = append(positions, usableMin-bounds.Min.XMM)
+		case !horizontal && (edge == EdgeTop || edge == EdgeAny):
+			positions = append(positions, usableMin-bounds.Min.YMM)
+		}
+		switch {
+		case horizontal && (edge == EdgeRight || edge == EdgeAny):
+			positions = append(positions, usableMax-bounds.Max.XMM)
+		case !horizontal && (edge == EdgeBottom || edge == EdgeAny):
+			positions = append(positions, usableMax-bounds.Max.YMM)
+		}
+		for _, position := range positions {
+			center := int(math.Round((position - usableMin) / grid))
+			for index := center - 1; index <= center+1; index++ {
+				if index >= 0 && index < count {
+					edgeIndices[index] = struct{}{}
+				}
+			}
+		}
+	}
+	if len(edgeIndices) == 0 {
+		return sampledIndices(count, target)
+	}
+	edgeSamples := make([]int, 0, len(edgeIndices))
+	for index := range edgeIndices {
+		edgeSamples = append(edgeSamples, index)
+	}
+	sort.Ints(edgeSamples)
+	if len(edgeSamples) >= target {
+		selected := sampledIndices(len(edgeSamples), target)
+		for index := range selected {
+			selected[index] = edgeSamples[selected[index]]
+		}
+		return selected
+	}
+	baseTarget := target - len(edgeSamples)
+	var baseSamples []int
+	if baseTarget == 1 {
+		baseSamples = []int{count / 2}
+	} else {
+		baseSamples = sampledIndices(count, baseTarget)
+	}
+	seen := make(map[int]struct{}, len(edgeSamples)+len(baseSamples))
+	for _, index := range edgeSamples {
+		seen[index] = struct{}{}
+	}
+	for _, index := range baseSamples {
+		seen[index] = struct{}{}
+	}
+	indices := make([]int, 0, len(seen))
+	for index := range seen {
+		indices = append(indices, index)
+	}
+	sort.Ints(indices)
 	return indices
 }
 
