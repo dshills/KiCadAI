@@ -473,6 +473,14 @@
         "selector": "SHIELD"
       }
     ],
+    "power_flags": [
+      {
+        "net": "VCC_5v"
+      },
+      {
+        "net": "GND"
+      }
+    ],
     "buses": [
       {
         "id": "i2c",
