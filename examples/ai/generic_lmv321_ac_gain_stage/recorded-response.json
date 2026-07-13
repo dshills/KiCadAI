@@ -78,7 +78,7 @@
       {
         "id": "vref_bypass",
         "reference": "C1",
-        "role": "capacitor",
+        "role": "decoupling_capacitor",
         "component_id": "capacitor.ceramic.0805",
         "variant_id": "0805",
         "value": "1uF",
