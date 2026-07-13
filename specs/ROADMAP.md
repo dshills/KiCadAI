@@ -893,9 +893,10 @@ one provider schema per topology. Provider graphs are strict-decoded, resolved
 against trusted catalog and pin/function evidence, lowered to schematic IR and
 an explicit PCB request, and passed through deterministic placement, routing,
 writer, ERC/DRC, and round-trip gates. The generic RC filter has recorded and
-live KiCad-backed `pass` evidence. The generic protected USB-C LED graph proves
-the richer resolver/lowering path but remains candidate-level at the current
-multi-branch routing gate.
+live KiCad-backed `pass` evidence. Generic protected USB-C LED and protected
+USB-C BMP280 graphs now also reach the optional KiCad-backed `pass` lane,
+proving multi-branch protected power plus regulated sensor/I2C topology through
+the shared contract.
 
 The `intent` command family now adds a structured planning layer above
 `design create`:
@@ -1047,13 +1048,16 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-1. Complete generic explicit-circuit routing for the protected USB-C LED graph
-   and promote it from candidate to pass without fixture-identity logic.
-2. Add generic BMP280 graph promotion to prove mixed power, regulator, bus,
-   pull-up, and sensor topology through the shared contract.
-3. Broaden trusted catalog/function and placement-routing capability only from
-   concrete failing graphs, then add fabrication evidence before claiming
-   fabrication readiness.
+The first generic promotions are complete: RC filter, protected USB-C LED, and
+protected USB-C BMP280 all reach the optional KiCad-backed pass lane through
+the shared graph contract.
+
+1. Add a materially different generic graph only when it exposes a concrete
+   catalog, lowering, placement, routing, or validation gap.
+2. Generalize bounded placement-routing correction from those observed
+   failures without introducing fixture-identity logic.
+3. Expand calculated rating and fabrication evidence before claiming broader
+   autonomous or fabrication-ready coverage.
 
 ## Definition Of Autonomous Ready
 

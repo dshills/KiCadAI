@@ -25,9 +25,15 @@ Their checked-in provider inputs are under
 `examples/ai/usb_c_bmp280_breakout/` and
 `examples/ai/usb_c_led_indicator_protected/`.
 
-The first promoted generic reference is an RC low-pass filter under
-`examples/ai/generic_rc_filter/`. It proves that a new passive topology can use
-the common graph schema instead of a topology-specific provider schema.
+The promoted generic references are:
+
+- `examples/ai/generic_rc_filter/`;
+- `examples/ai/generic_usb_c_led_indicator_protected/`;
+- `examples/ai/generic_usb_c_bmp280_breakout/`.
+
+They prove passive, multi-branch protected-power, and regulated I2C sensor
+topologies through the common graph schema instead of topology-specific
+provider schemas.
 
 Recorded, strict KiCad-backed run:
 
@@ -79,6 +85,42 @@ kicadai --prompt-file examples/ai/generic_rc_filter/prompt.txt \
   design create
 ```
 
+Recorded generic USB-C BMP280 run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_usb_c_bmp280_breakout/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_usb_c_bmp280_breakout/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/ai_generic_usb_c_bmp280 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
+Recorded generic protected USB-C LED run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_usb_c_led_indicator_protected/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_usb_c_led_indicator_protected/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/ai_generic_usb_c_led --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
 ## OpenAI Provider
 
 Load `OPENAI_API_KEY` into the process environment from the user's shell
@@ -106,8 +148,24 @@ kicadai --prompt-file examples/ai/usb_c_led_indicator_protected/prompt.txt \
   design create
 ```
 
-For a live generic RC run, use the recorded generic command above and replace
-the two recorded-provider options with `--provider openai`.
+For a live generic run, use its recorded command and replace the two
+recorded-provider options with `--provider openai`. For example, the generic
+BMP280 command becomes:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_usb_c_bmp280_breakout/prompt.txt \
+  --provider openai \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/live_generic_usb_c_bmp280 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
 
 The selected schema depends only on bounded prompt semantics, never project
 names, output paths, fixture paths, or model output.
@@ -122,7 +180,7 @@ The live provider smoke test is opt-in:
 
 ```sh
 KICADAI_OPENAI_LIVE_TEST=1 \
-  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph)$' -count=1 -v
+  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph|GenericUSBCBMP280Graph)$' -count=1 -v
 ```
 
 ## Reproducible Promotion Test
@@ -163,6 +221,14 @@ For an output such as `./out/live_ai_usb_c_led_protected`, inspect
 workflow result embeds the exact KiCad ERC/DRC commands, versions, finding
 counts, and strict writer summary; promotion `pass` is the checked gate result.
 
+For the generic BMP280 commands above, the corresponding stable evidence paths
+are `./out/ai_generic_usb_c_bmp280/.kicadai/` or
+`./out/live_generic_usb_c_bmp280/.kicadai/`. Start with
+`design-promotion.json`, `workflow-result.json`, `validation-summary.json`,
+and `circuit-resolution.json`. The workflow report embeds writer and round-trip
+summaries and records the exact temporary KiCad ERC/DRC report paths used by
+that run.
+
 Plaintext prompts, API keys, authorization headers, and hidden provider
 reasoning are not persisted. The normalized intent plus the KiCadAI version is
 the reproducibility boundary.
@@ -186,11 +252,10 @@ The generic graph removes the architectural requirement for one provider
 schema per topology; it does not make every circuit routable or electrically
 proven. V1 is limited to catalog-resolvable parts and functions, flat graph
 topology, bounded relative layout intent, deterministic placement, and the
-current explicit-circuit router. The generic protected USB-C LED proof fixture
-strict-decodes, resolves, and lowers but remains candidate-level because its
-multi-branch routing is not yet complete. Dense boards, arbitrary hierarchy,
-analog performance, thermal/SAFE operating area, safety isolation, and
-fabrication release still require additional evidence.
+current explicit-circuit router. The promoted generic fixtures prove three
+specific topology classes, not arbitrary electronics. Dense boards, arbitrary
+hierarchy, analog performance, thermal/safe-operating-area analysis, safety
+isolation, and fabrication release still require additional evidence.
 
 Automatic bounded dispatch remains available for the two promoted references.
 Explicit generic mode must be selected with `--ai-profile generic-circuit-v1`.

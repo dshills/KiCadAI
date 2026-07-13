@@ -48,10 +48,11 @@ routing, writer correctness, and zero unexpected normalized round-trip diffs.
 
 An explicit generic circuit-graph lane now resolves provider topology against
 the checked-in component catalog and lowers it through the same deterministic
-schematic and PCB workflow. A generic RC filter has recorded and live
-KiCad-backed pass evidence without a topology-specific schema. The generic
-protected USB-C LED graph is candidate-level because current explicit routing
-does not complete all of its multi-branch nets.
+schematic and PCB workflow. Generic RC filter, protected USB-C LED, and
+protected USB-C BMP280 graphs have recorded KiCad-backed pass evidence without
+topology-specific schemas. The generic BMP280 lane also has live OpenAI pass
+evidence through schematic generation, placement, complete required-net
+routing, writer correctness, strict ERC/DRC, and round-trip checks.
 
 The generic contract is deliberately strict. It expands topology expression,
 but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or

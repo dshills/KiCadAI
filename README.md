@@ -20,8 +20,9 @@ path.
 - The provider-backed natural-language lane retains two promoted bounded
   profiles and now adds an explicit catalog-resolved circuit graph contract.
 - The bounded USB-C BMP280 and protected LED profiles remain KiCad-backed
-  `pass`; a generic RC filter also reaches recorded and live KiCad-backed
-  `pass` without a topology-specific provider schema.
+  `pass`. Generic RC filter, protected USB-C LED, and protected USB-C BMP280
+  fixtures also reach KiCad-backed `pass` through the shared catalog-resolved
+  graph contract without topology-specific provider schemas.
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - Generated `pass` evidence is not automatically a fabrication-release claim.
