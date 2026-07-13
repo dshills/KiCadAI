@@ -85,6 +85,33 @@ func TestRouteRequestPartialWhenAllowed(t *testing.T) {
 	}
 }
 
+func TestRouteRequestFailedNetDoesNotOccupyCopperForLaterNets(t *testing.T) {
+	request := failedBranchOccupancyRequest()
+
+	result := RouteRequest(request)
+	if result.Status != StatusPartial {
+		t.Fatalf("status = %s, want partial; issues = %#v", result.Status, result.Issues)
+	}
+	var failedRoute, laterRoute Route
+	for _, route := range result.Routes {
+		switch route.Net {
+		case "A_FAIL":
+			failedRoute = route
+		case "B_LATER":
+			laterRoute = route
+		}
+	}
+	if failedRoute.Status != RouteStatusFailed || len(failedRoute.Segments) == 0 {
+		t.Fatalf("failed route = %#v, want a discarded successful branch", failedRoute)
+	}
+	if laterRoute.Status != RouteStatusRouted || len(laterRoute.Segments) == 0 {
+		t.Fatalf("later route = %#v, want routed after failed branch rollback", laterRoute)
+	}
+	if result.Metrics.SegmentCount != len(laterRoute.Segments) || result.Metrics.ViaCount != len(laterRoute.Vias) {
+		t.Fatalf("committed metrics = %#v, want only later route geometry", result.Metrics)
+	}
+}
+
 func TestRouteRequestAppliesNetClassTraceAndViaRules(t *testing.T) {
 	request := twoLayerViaRequest()
 	request.Rules.NetClasses = map[string]NetClass{
@@ -338,6 +365,32 @@ func partialRoutingRequest() Request {
 			Max: Point{XMM: 15, YMM: 20},
 		}},
 	}}
+	return request
+}
+
+func failedBranchOccupancyRequest() Request {
+	request := singleLayerSearchRequest()
+	request.Board.WidthMM = 10
+	request.Board.HeightMM = 10
+	request.Board.MarginMM = 1
+	request.Strategy.AllowPartial = true
+	request.Components = []Component{
+		testComponent("A1", "1", "A_FAIL", 1.5, 5),
+		testComponent("A2", "1", "A_FAIL", 8.5, 5),
+		testComponent("A3", "1", "A_FAIL", 8, 8),
+		testComponent("B1", "1", "B_LATER", 5, 2),
+		testComponent("B2", "1", "B_LATER", 5, 8),
+	}
+	request.Nets = []Net{
+		{Name: "A_FAIL", Priority: 10, Endpoints: []Endpoint{{Ref: "A1", Pin: "1"}, {Ref: "A2", Pin: "1"}, {Ref: "A3", Pin: "1"}}},
+		{Name: "B_LATER", Priority: 1, Endpoints: []Endpoint{{Ref: "B1", Pin: "1"}, {Ref: "B2", Pin: "1"}}},
+	}
+	request.Obstacles = []Obstacle{
+		{Kind: ObstacleKeepout, Layer: "F.Cu", Geometry: Shape{Rect: &Rect{Min: Point{XMM: 6.5, YMM: 6.5}, Max: Point{XMM: 9.5, YMM: 7}}}},
+		{Kind: ObstacleKeepout, Layer: "F.Cu", Geometry: Shape{Rect: &Rect{Min: Point{XMM: 6.5, YMM: 9}, Max: Point{XMM: 9.5, YMM: 9.5}}}},
+		{Kind: ObstacleKeepout, Layer: "F.Cu", Geometry: Shape{Rect: &Rect{Min: Point{XMM: 6.5, YMM: 7}, Max: Point{XMM: 7, YMM: 9}}}},
+		{Kind: ObstacleKeepout, Layer: "F.Cu", Geometry: Shape{Rect: &Rect{Min: Point{XMM: 9, YMM: 7}, Max: Point{XMM: 9.5, YMM: 9}}}},
+	}
 	return request
 }
 

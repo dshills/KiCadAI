@@ -95,6 +95,10 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		} else {
 			failed = true
 		}
+		existingStart := len(request.Existing)
+		netSegmentCount := 0
+		netViaCount := 0
+		netLengthMM := 0.0
 		for pairIndex, pair := range plan.Pairs {
 			if pairIndex%routePairContextCheckInterval == 0 {
 				if err := ctx.Err(); err != nil {
@@ -123,13 +127,15 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			vias := BuildViasFromPath(path, netRequest.Rules)
 			route.Segments = append(route.Segments, segments...)
 			route.Vias = append(route.Vias, vias...)
-			result.Metrics.SegmentCount += len(segments)
-			result.Metrics.ViaCount += len(vias)
-			result.Metrics.TotalLengthMM = roundMM(result.Metrics.TotalLengthMM + metrics.TotalLengthMM)
+			netSegmentCount += len(segments)
+			netViaCount += len(vias)
+			netLengthMM += metrics.TotalLengthMM
 			request.Existing = append(request.Existing, existingCopperForSegments(segments)...)
 			request.Existing = append(request.Existing, existingCopperForVias(vias)...)
 		}
 		if netFailed || hasBlockingIssue(route.Issues) {
+			request.Existing = request.Existing[:existingStart]
+			failed = true
 			route.Status = RouteStatusFailed
 			result.Metrics.FailedNetCount++
 			result.Routes = append(result.Routes, route)
@@ -144,6 +150,7 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 		}
 		route.Issues = append(route.Issues, lengthPolicyIssues(plan.Net.Name, effectiveRule, route)...)
 		if hasBlockingIssue(route.Issues) {
+			request.Existing = request.Existing[:existingStart]
 			route.Status = RouteStatusFailed
 			result.Metrics.FailedNetCount++
 			result.Routes = append(result.Routes, route)
@@ -157,6 +164,9 @@ func RouteRequestContext(ctx context.Context, request Request) Result {
 			failed = true
 			continue
 		}
+		result.Metrics.SegmentCount += netSegmentCount
+		result.Metrics.ViaCount += netViaCount
+		result.Metrics.TotalLengthMM = roundMM(result.Metrics.TotalLengthMM + netLengthMM)
 		result.Metrics.RoutedNetCount++
 		result.Routes = append(result.Routes, route)
 	}
