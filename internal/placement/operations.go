@@ -107,12 +107,13 @@ func padSpecs(pads []PadSummary) []transactions.PadSpec {
 			net = &value
 		}
 		specs = append(specs, transactions.PadSpec{
-			Name:     pad.Name,
-			XMM:      pad.XMM,
-			YMM:      pad.YMM,
-			WidthMM:  pad.WidthMM,
-			HeightMM: pad.HeightMM,
-			Net:      net,
+			Name:        pad.Name,
+			XMM:         pad.XMM,
+			YMM:         pad.YMM,
+			RotationDeg: pad.RotationDeg,
+			WidthMM:     pad.WidthMM,
+			HeightMM:    pad.HeightMM,
+			Net:         net,
 		})
 	}
 	return specs

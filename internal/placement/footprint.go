@@ -39,14 +39,15 @@ func BoundsFromFootprint(record libraryresolver.FootprintRecord) (Bounds, []PadS
 	pads := make([]PadSummary, 0, len(record.Pads))
 	for _, pad := range record.Pads {
 		pads = append(pads, PadSummary{
-			Name:     strings.TrimSpace(pad.Name),
-			XMM:      iuToMM(pad.Position.X),
-			YMM:      iuToMM(pad.Position.Y),
-			WidthMM:  iuToMM(pad.Size.X),
-			HeightMM: iuToMM(pad.Size.Y),
-			Type:     strings.TrimSpace(pad.Type),
-			DrillMM:  iuToMM(pad.Drill),
-			Layers:   footprintPadLayers(pad.Layers),
+			Name:        strings.TrimSpace(pad.Name),
+			XMM:         iuToMM(pad.Position.X),
+			YMM:         iuToMM(pad.Position.Y),
+			RotationDeg: float64(pad.Rotation),
+			WidthMM:     iuToMM(pad.Size.X),
+			HeightMM:    iuToMM(pad.Size.Y),
+			Type:        strings.TrimSpace(pad.Type),
+			DrillMM:     iuToMM(pad.Drill),
+			Layers:      footprintPadLayers(pad.Layers),
 		})
 	}
 	return bounds, pads, issues

@@ -32,7 +32,7 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	if _, err := builder.PlaceFootprint("R1", PlaceFootprintOptions{
 		Position: kicadfiles.Point{X: kicadfiles.MM(25), Y: kicadfiles.MM(25)},
 		Pads: []PadSpec{
-			{Name: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-1), Y: 0}},
+			{Name: "1", Offset: kicadfiles.Point{X: kicadfiles.MM(-1), Y: 0}, Rotation: 90},
 			{Name: "2", Offset: kicadfiles.Point{X: kicadfiles.MM(1), Y: 0}, Net: "LED_OUT"},
 		},
 	}); err != nil {
@@ -75,6 +75,9 @@ func TestBuilderCreatesValidDesignFromIntent(t *testing.T) {
 	}
 	if len(design.PCB.Footprints) != 2 {
 		t.Fatalf("footprints = %d, want 2", len(design.PCB.Footprints))
+	}
+	if design.PCB.Footprints[0].Pads[0].Rotation != 90 {
+		t.Fatalf("pad rotation = %v, want 90", design.PCB.Footprints[0].Pads[0].Rotation)
 	}
 	for _, property := range design.PCB.Footprints[0].Properties {
 		if (property.Name == "Reference" || property.Name == "Value") && property.Hide {

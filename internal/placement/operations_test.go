@@ -12,7 +12,7 @@ func TestPlacementOperationPayload(t *testing.T) {
 		Ref:         "R1",
 		Value:       "10k",
 		FootprintID: "Resistor:R_0603",
-		Pads:        []PadSummary{{Name: "1", XMM: -0.5, WidthMM: 0.4, HeightMM: 0.6}},
+		Pads:        []PadSummary{{Name: "1", XMM: -0.5, RotationDeg: 90, WidthMM: 0.4, HeightMM: 0.6}},
 	}
 	placement := PlacementResult{
 		Ref:      "R1",
@@ -33,7 +33,7 @@ func TestPlacementOperationPayload(t *testing.T) {
 	if payload.At.XMM != 12 || payload.At.YMM != 7 || payload.Rotation != 90 || payload.Layer != "F.Cu" {
 		t.Fatalf("payload placement = %#v", payload)
 	}
-	if len(payload.Pads) != 1 || payload.Pads[0].Name != "1" || payload.Pads[0].WidthMM != 0.4 {
+	if len(payload.Pads) != 1 || payload.Pads[0].Name != "1" || payload.Pads[0].RotationDeg != 90 || payload.Pads[0].WidthMM != 0.4 {
 		t.Fatalf("payload pads = %#v", payload.Pads)
 	}
 	if !payload.HideDefaultFootprintText {

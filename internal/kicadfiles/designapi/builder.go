@@ -186,14 +186,15 @@ type PlaceFootprintOptions struct {
 }
 
 type PadSpec struct {
-	Name   string
-	Type   string
-	Offset kicadfiles.Point
-	Size   kicadfiles.Point
-	Drill  kicadfiles.IU
-	Shape  string
-	Layers []kicadfiles.BoardLayer
-	Net    string
+	Name     string
+	Type     string
+	Offset   kicadfiles.Point
+	Rotation kicadfiles.Angle
+	Size     kicadfiles.Point
+	Drill    kicadfiles.IU
+	Shape    string
+	Layers   []kicadfiles.BoardLayer
+	Net      string
 }
 
 type RouteOptions struct {
@@ -2323,6 +2324,7 @@ func (builder *Builder) padFromSpec(reference string, occurrence int, spec PadSp
 		NetName:  net.Name,
 		Shape:    shape,
 		Position: spec.Offset,
+		Rotation: spec.Rotation,
 		Size:     size,
 		Drill:    drill,
 		Layers:   append([]kicadfiles.BoardLayer(nil), layers...),

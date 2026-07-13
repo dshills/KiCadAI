@@ -1039,7 +1039,7 @@ func TestUpsertImportedFootprintRemovesStalePadsAndPreservesUUID(t *testing.T) {
 	upsertImportedFootprint(board, generator, PlaceFootprintOperation{
 		Ref:  "J1",
 		At:   Point{XMM: 5, YMM: 6},
-		Pads: []PadSpec{{Name: "1", XMM: 1, YMM: 2}},
+		Pads: []PadSpec{{Name: "1", XMM: 1, YMM: 2, RotationDeg: 90}},
 	})
 
 	pads := board.Footprints[0].Pads
@@ -1051,6 +1051,9 @@ func TestUpsertImportedFootprintRemovesStalePadsAndPreservesUUID(t *testing.T) {
 	}
 	if pads[0].Position != (kicadfiles.Point{X: kicadfiles.MM(1), Y: kicadfiles.MM(2)}) {
 		t.Fatalf("pad position = %#v, want updated position", pads[0].Position)
+	}
+	if pads[0].Rotation != 90 {
+		t.Fatalf("pad rotation = %v, want 90", pads[0].Rotation)
 	}
 }
 

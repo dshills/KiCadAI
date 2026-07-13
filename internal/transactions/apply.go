@@ -693,7 +693,7 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			if pad.Net != nil {
 				net = *pad.Net
 			}
-			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Shape: pad.Shape, Offset: point(pad.XMM, pad.YMM), Size: padSize(pad), Drill: kicadfiles.MM(pad.DrillMM), Net: net})
+			pads = append(pads, designapi.PadSpec{Name: pad.Name, Type: pad.Type, Shape: pad.Shape, Offset: point(pad.XMM, pad.YMM), Rotation: kicadfiles.Angle(pad.RotationDeg), Size: padSize(pad), Drill: kicadfiles.MM(pad.DrillMM), Net: net})
 		}
 		placeOptions := designapi.PlaceFootprintOptions{
 			Position:                      point(payload.At.XMM, payload.At.YMM),
@@ -929,6 +929,7 @@ func upsertImportedFootprint(board *pcb.PCBFile, generator kicadfiles.IDGenerato
 			Type:     firstNonEmpty(padSpec.Type, "smd"),
 			Shape:    firstNonEmpty(padSpec.Shape, "rect"),
 			Position: point(padSpec.XMM, padSpec.YMM),
+			Rotation: kicadfiles.Angle(padSpec.RotationDeg),
 			Size:     padSizeOrDefault(padSpec),
 			Drill:    kicadfiles.MM(padSpec.DrillMM),
 			Layers:   padLayersFor(firstNonEmpty(padSpec.Type, "smd"), footprint.Layer),
@@ -1000,6 +1001,7 @@ func applyImportedPadSpec(pad *pcb.Pad, footprintLayer kicadfiles.BoardLayer, sp
 		pad.Shape = "rect"
 	}
 	pad.Position = point(spec.XMM, spec.YMM)
+	pad.Rotation = kicadfiles.Angle(spec.RotationDeg)
 	if spec.WidthMM > 0 || spec.HeightMM > 0 {
 		pad.Size = padSizeOrDefault(spec)
 	} else if pad.Size == (kicadfiles.Point{}) {

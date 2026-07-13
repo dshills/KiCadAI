@@ -18,6 +18,7 @@ func TestBoundsFromFootprintUsesBoundingBoxAndPads(t *testing.T) {
 		Pads: []libraryresolver.FootprintPad{{
 			Name:     " 1 ",
 			Position: kicadfiles.Point{X: kicadfiles.MM(-0.6), Y: 0},
+			Rotation: 90,
 			Size:     kicadfiles.Point{X: kicadfiles.MM(0.5), Y: kicadfiles.MM(0.8)},
 		}},
 	}
@@ -35,7 +36,7 @@ func TestBoundsFromFootprintUsesBoundingBoxAndPads(t *testing.T) {
 	if bounds.Source != BoundsLibraryCourtyard {
 		t.Fatalf("source = %q, want library courtyard", bounds.Source)
 	}
-	if len(pads) != 1 || pads[0].Name != "1" || !nearlyEqual(pads[0].XMM, -0.6) {
+	if len(pads) != 1 || pads[0].Name != "1" || !nearlyEqual(pads[0].XMM, -0.6) || pads[0].RotationDeg != 90 {
 		t.Fatalf("pads = %#v, want converted pad summary", pads)
 	}
 }

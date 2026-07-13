@@ -256,12 +256,13 @@ func padSummaries(pads []transactions.PadSpec) []PadSummary {
 			net = *pad.Net
 		}
 		summaries = append(summaries, PadSummary{
-			Name:     strings.TrimSpace(pad.Name),
-			Net:      strings.TrimSpace(net),
-			XMM:      pad.XMM,
-			YMM:      pad.YMM,
-			WidthMM:  pad.WidthMM,
-			HeightMM: pad.HeightMM,
+			Name:        strings.TrimSpace(pad.Name),
+			Net:         strings.TrimSpace(net),
+			XMM:         pad.XMM,
+			YMM:         pad.YMM,
+			RotationDeg: pad.RotationDeg,
+			WidthMM:     pad.WidthMM,
+			HeightMM:    pad.HeightMM,
 		})
 	}
 	return summaries

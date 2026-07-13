@@ -125,15 +125,16 @@ type Bounds struct {
 }
 
 type PadSummary struct {
-	Name     string
-	Net      string
-	XMM      float64
-	YMM      float64
-	WidthMM  float64
-	HeightMM float64
-	Type     string
-	DrillMM  float64
-	Layers   []string
+	Name        string
+	Net         string
+	XMM         float64
+	YMM         float64
+	RotationDeg float64
+	WidthMM     float64
+	HeightMM    float64
+	Type        string
+	DrillMM     float64
+	Layers      []string
 }
 
 type Net struct {
