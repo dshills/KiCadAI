@@ -79,6 +79,11 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	if len(artifactIssues) == 0 {
 		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactValidationReport, Path: ".kicadai/workflow-result.json", Description: "generic AI design workflow result"})
 	}
+	if correctionArtifact, correctionIssue := writeAutonomousCorrectionArtifact(artifactDir, request, workflow); correctionIssue != nil {
+		artifactIssues = append(artifactIssues, *correctionIssue)
+	} else {
+		artifacts = append(artifacts, correctionArtifact)
+	}
 	graphArtifacts, graphIssues := writeAIGraphArtifacts(artifactDir, graph, resolved)
 	artifacts = append(artifacts, graphArtifacts...)
 	artifactIssues = append(artifactIssues, graphIssues...)
@@ -116,6 +121,21 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 		return errors.New("generic AI design create reported blocking issues")
 	}
 	return nil
+}
+
+func writeAutonomousCorrectionArtifact(artifactDir string, request designworkflow.Request, workflow designworkflow.WorkflowResult) (reports.Artifact, *reports.Issue) {
+	report, ok := designworkflow.AutonomousCorrectionEvidence(request, workflow)
+	if !ok {
+		return reports.Artifact{}, &reports.Issue{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityError,
+			Path: ".kicadai/autonomous-correction.json", Message: "generic workflow did not produce autonomous correction evidence",
+		}
+	}
+	return writeJSONArtifact(
+		filepath.Join(artifactDir, "autonomous-correction.json"), report,
+		reports.ArtifactValidationReport, ".kicadai/autonomous-correction.json",
+		"generic autonomous placement and routing correction evidence",
+	)
 }
 
 func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider, profile aiprovider.ReferenceProfile, resolver *circuitgraph.Resolver, prompt string, maxAttempts int) (aiprovider.GenerateResult, circuitgraph.Document, circuitgraph.ResolvedDocument, designworkflow.Request, []aiAttemptEvidence, []reports.Issue, error) {

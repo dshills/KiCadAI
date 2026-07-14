@@ -65,6 +65,7 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	placementOpts := opts.Placement
 	placementOpts.LibraryIndex = opts.LibraryIndex
 	placed := PlaceExplicitCircuit(ctx, request, placementOpts)
+	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
 	if workflowStageBlocked(placed.Stage) {
 		stages = append(stages, skippedWorkflowStages("explicit placement did not complete", StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
@@ -73,6 +74,8 @@ func createExplicitCircuit(ctx context.Context, request Request, opts CreateOpti
 	routingOpts := opts.Routing
 	routingOpts.Skip = routingOpts.Skip || opts.SkipRouting || request.Validation.SkipRouting
 	routed := RouteExplicitCircuit(ctx, request, placed, routingOpts)
+	placed, routed, _ = maybeRetryExplicitPlacementRouting(ctx, request, placed, routed, routingOpts, request.RoutingRetry)
+	stages[placementStageIndex] = placed.Stage
 	stages = append(stages, routed.Stage)
 	if workflowStageBlocked(routed.Stage) {
 		stages = append(stages, skippedWorkflowStages("explicit routing did not complete", StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)

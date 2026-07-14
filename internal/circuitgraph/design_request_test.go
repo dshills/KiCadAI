@@ -33,6 +33,10 @@ func TestToDesignRequestCheckedInExamples(t *testing.T) {
 			if got, want := request.Constraints.AllowBackLayer, resolved.Source.Project.Board.Layers > 1; got != want {
 				t.Fatalf("allow back layer = %v, want %v for %d layers", got, want, resolved.Source.Project.Board.Layers)
 			}
+			policy := request.RoutingRetry
+			if !policy.Enabled || policy.MaxAttempts != 3 || !policy.PreserveFixed || !policy.StopOnNewBlockers || !policy.StopOnRepeatedSignature || !policy.StopOnNonImprovement {
+				t.Fatalf("generic routing retry policy = %#v", policy)
+			}
 		})
 	}
 }

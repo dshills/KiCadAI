@@ -341,7 +341,7 @@ KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints \
 - [x] Phase 2 complete
 - [x] Phase 3 complete
 - [x] Phase 4 complete
-- [ ] Phase 5 complete
+- [x] Phase 5 complete
 - [ ] Phase 6 complete
 - [ ] Phase 7 complete
 - [ ] Phase 8 complete

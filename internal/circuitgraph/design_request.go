@@ -133,6 +133,11 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 			RequireDRC: resolved.Source.Project.Acceptance == AcceptanceERCDRC || resolved.Source.Project.Acceptance == AcceptanceFabricationCandidate,
 		},
 	}
+	designworkflow.EnableGeneratedRoutingRetry(&request, designworkflow.GenericAutonomousCorrectionMaxAttempts)
+	request.RoutingRetry.PreserveFixed = true
+	request.RoutingRetry.StopOnNewBlockers = true
+	request.RoutingRetry.StopOnRepeatedSignature = true
+	request.RoutingRetry.StopOnNonImprovement = true
 	request = designworkflow.NormalizeRequest(request)
 	issues = append(issues, designworkflow.ValidateRequest(request)...)
 	if reports.HasBlockingIssue(issues) {

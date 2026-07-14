@@ -115,10 +115,18 @@ func TestRunRecordedGenericCircuitCLIEndToEnd(t *testing.T) {
 	if !payload.OK || payload.Data.Graph.Project.Name != "generic_parallel_resistors" || payload.Data.Request.ExplicitCircuit == nil || payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != aiLaneStatusCandidate {
 		t.Fatalf("generic CLI payload = %#v", payload)
 	}
-	for _, name := range []string{"circuit-graph.json", "circuit-resolution.json", "design-request.json", "ai-request.json", "ai-response.json", "ai-attempts.json", "workflow-result.json"} {
+	for _, name := range []string{"circuit-graph.json", "circuit-resolution.json", "design-request.json", "ai-request.json", "ai-response.json", "ai-attempts.json", "workflow-result.json", "autonomous-correction.json"} {
 		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}
+	}
+	var correction designworkflow.AutonomousCorrectionReport
+	readJSONFile(t, filepath.Join(output, ".kicadai", "autonomous-correction.json"), &correction)
+	if correction.SchemaVersion != designworkflow.AutonomousCorrectionSchemaV1 || correction.Scope != "generic-circuit-v1" || !correction.Enabled || correction.MaxAttempts != 3 {
+		t.Fatalf("autonomous correction policy evidence = %#v", correction)
+	}
+	if correction.Attempts != 1 || correction.Applied != 0 || correction.StopReason != "routed" || correction.SelectedAttempt != 1 || !correction.ProtectedInvariantsPreserved || !correction.AllAttemptInvariantsPreserved {
+		t.Fatalf("autonomous correction result evidence = %#v", correction)
 	}
 }
 

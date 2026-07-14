@@ -17,6 +17,7 @@ import (
 )
 
 const AutonomousCorrectionSchemaV1 = "kicadai.autonomous-correction.v1"
+const GenericAutonomousCorrectionMaxAttempts = 3
 
 type AutonomousCorrectionCategory string
 
@@ -99,6 +100,38 @@ type AutonomousCorrectionApplication struct {
 	Adjustment                   PlacementRetryAdjustment `json:"adjustment,omitempty"`
 	ValidationIssues             []reports.Issue          `json:"validation_issues,omitempty"`
 	ProtectedInvariantsPreserved bool                     `json:"protected_invariants_preserved"`
+}
+
+type AutonomousCorrectionAttempt struct {
+	Attempt            int                              `json:"attempt"`
+	Outcome            string                           `json:"outcome"`
+	Plan               *AutonomousCorrectionPlan        `json:"plan,omitempty"`
+	Application        *AutonomousCorrectionApplication `json:"application,omitempty"`
+	RoutingStatus      routing.Status                   `json:"routing_status,omitempty"`
+	RoutedNets         int                              `json:"routed_nets"`
+	FailedNets         int                              `json:"failed_nets"`
+	PlacementStateHash string                           `json:"placement_state_hash,omitempty"`
+	Selected           bool                             `json:"selected,omitempty"`
+	SelectedReason     string                           `json:"selected_reason,omitempty"`
+	RegressionFlags    []string                         `json:"regression_flags,omitempty"`
+}
+
+type AutonomousCorrectionReport struct {
+	SchemaVersion                 string                        `json:"schema_version"`
+	Scope                         string                        `json:"scope"`
+	Enabled                       bool                          `json:"enabled"`
+	MaxAttempts                   int                           `json:"max_attempts"`
+	Attempts                      int                           `json:"attempts"`
+	Applied                       int                           `json:"applied"`
+	StopReason                    string                        `json:"stop_reason,omitempty"`
+	SelectedAttempt               int                           `json:"selected_attempt,omitempty"`
+	SelectedReason                string                        `json:"selected_reason,omitempty"`
+	InitialInvariantFingerprint   string                        `json:"initial_invariant_fingerprint,omitempty"`
+	FinalInvariantFingerprint     string                        `json:"final_invariant_fingerprint,omitempty"`
+	ProtectedInvariantsPreserved  bool                          `json:"protected_invariants_preserved"`
+	AllAttemptInvariantsPreserved bool                          `json:"all_attempt_invariants_preserved"`
+	AppliedRetryKeys              []string                      `json:"applied_retry_keys,omitempty"`
+	AttemptHistory                []AutonomousCorrectionAttempt `json:"attempt_history,omitempty"`
 }
 
 const (
@@ -472,6 +505,151 @@ func autonomousCorrectionPlacementInvariantFingerprint(request placement.Request
 	}
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+func newAutonomousCorrectionReport(request Request, policy RoutingRetryPolicySpec, placed PlacementStageResult, routed RoutingStageResult) *AutonomousCorrectionReport {
+	if !IsGenericAutonomousCorrectionRequest(request) {
+		return nil
+	}
+	fingerprint, err := AutonomousCorrectionInvariantFingerprint(request)
+	preserved := err == nil && fingerprint != ""
+	return &AutonomousCorrectionReport{
+		SchemaVersion:                 AutonomousCorrectionSchemaV1,
+		Scope:                         "generic-circuit-v1",
+		Enabled:                       policy.Enabled,
+		MaxAttempts:                   policy.MaxAttempts,
+		Attempts:                      1,
+		InitialInvariantFingerprint:   fingerprint,
+		FinalInvariantFingerprint:     fingerprint,
+		ProtectedInvariantsPreserved:  preserved,
+		AllAttemptInvariantsPreserved: preserved,
+		AttemptHistory:                []AutonomousCorrectionAttempt{autonomousCorrectionAttemptForResult(1, nil, nil, placed, routed)},
+	}
+}
+
+func autonomousCorrectionAttemptForResult(attempt int, plan *AutonomousCorrectionPlan, application *AutonomousCorrectionApplication, placed PlacementStageResult, routed RoutingStageResult) AutonomousCorrectionAttempt {
+	result := AutonomousCorrectionAttempt{
+		Attempt: attempt, Outcome: "materialized", Plan: plan, Application: application,
+		RoutingStatus: routed.Result.Status, RoutedNets: routed.Result.Metrics.RoutedNetCount,
+		FailedNets:         routed.Result.Metrics.FailedNetCount,
+		PlacementStateHash: placementStateHash(placed.Result.Placements),
+	}
+	return result
+}
+
+func autonomousCorrectionUnmaterializedAttempt(attempt int, outcome string, plan *AutonomousCorrectionPlan, application *AutonomousCorrectionApplication, placed PlacementStageResult) AutonomousCorrectionAttempt {
+	return AutonomousCorrectionAttempt{
+		Attempt: attempt, Outcome: outcome, Plan: plan, Application: application,
+		PlacementStateHash: placementStateHash(placed.Result.Placements),
+	}
+}
+
+func finalizeAutonomousCorrectionReport(report *AutonomousCorrectionReport, request Request, summary placementRoutingRetrySummary) {
+	if report == nil {
+		return
+	}
+	finalFingerprint, err := AutonomousCorrectionInvariantFingerprint(request)
+	if err != nil {
+		finalFingerprint = ""
+	}
+	report.FinalInvariantFingerprint = finalFingerprint
+	report.Attempts = summary.Attempts
+	report.Applied = summary.Applied
+	report.StopReason = summary.StopReason
+	report.SelectedAttempt = summary.SelectedAttempt
+	report.SelectedReason = summary.SelectedReason
+	if report.SelectedAttempt == 0 {
+		report.SelectedAttempt = 1
+	}
+	if report.SelectedReason == "" {
+		report.SelectedReason = "initial_attempt"
+	}
+	fingerprintPreserved := report.InitialInvariantFingerprint != "" && report.InitialInvariantFingerprint == report.FinalInvariantFingerprint
+	selectedAttemptPreserved := true
+	allAttemptsPreserved := fingerprintPreserved
+	for index := range report.AttemptHistory {
+		report.AttemptHistory[index].Selected = report.AttemptHistory[index].Attempt == report.SelectedAttempt
+		if report.AttemptHistory[index].Selected {
+			report.AttemptHistory[index].SelectedReason = report.SelectedReason
+		}
+		for _, legacy := range summary.AttemptHistory {
+			if legacy.Attempt == report.AttemptHistory[index].Attempt {
+				report.AttemptHistory[index].RegressionFlags = slices.Clone(legacy.RegressionFlags)
+				break
+			}
+		}
+		if application := report.AttemptHistory[index].Application; application != nil && application.Applied && !application.ProtectedInvariantsPreserved {
+			allAttemptsPreserved = false
+			if report.AttemptHistory[index].Selected {
+				selectedAttemptPreserved = false
+			}
+		}
+	}
+	report.ProtectedInvariantsPreserved = fingerprintPreserved && selectedAttemptPreserved
+	report.AllAttemptInvariantsPreserved = allAttemptsPreserved
+}
+
+func AutonomousCorrectionReportFromWorkflow(workflow WorkflowResult) (AutonomousCorrectionReport, bool) {
+	for _, stage := range workflow.Stages {
+		if stage.Name != StageRouting || stage.Summary == nil {
+			continue
+		}
+		value, exists := stage.Summary["autonomous_correction"]
+		if !exists {
+			continue
+		}
+		switch report := value.(type) {
+		case AutonomousCorrectionReport:
+			return report, true
+		case *AutonomousCorrectionReport:
+			if report != nil {
+				return *report, true
+			}
+		case map[string]any:
+			data, err := json.Marshal(report)
+			if err != nil {
+				continue
+			}
+			var decoded AutonomousCorrectionReport
+			if err := json.Unmarshal(data, &decoded); err == nil && decoded.SchemaVersion == AutonomousCorrectionSchemaV1 {
+				return decoded, true
+			}
+		}
+	}
+	return AutonomousCorrectionReport{}, false
+}
+
+func AutonomousCorrectionEvidence(request Request, workflow WorkflowResult) (AutonomousCorrectionReport, bool) {
+	if report, ok := AutonomousCorrectionReportFromWorkflow(workflow); ok {
+		return report, true
+	}
+	if !IsGenericAutonomousCorrectionRequest(request) {
+		return AutonomousCorrectionReport{}, false
+	}
+	fingerprint, err := AutonomousCorrectionInvariantFingerprint(request)
+	preserved := err == nil && fingerprint != ""
+	stopReason := "workflow_ended_before_routing"
+	for _, stage := range workflow.Stages {
+		if stage.Status == StageStatusBlocked {
+			stopReason = "blocked_before_routing"
+			break
+		}
+		if stage.Name == StageRouting {
+			stopReason = "routing_evidence_missing"
+			break
+		}
+	}
+	return AutonomousCorrectionReport{
+		SchemaVersion:                 AutonomousCorrectionSchemaV1,
+		Scope:                         "generic-circuit-v1",
+		Enabled:                       request.RoutingRetry.Enabled,
+		MaxAttempts:                   request.RoutingRetry.MaxAttempts,
+		StopReason:                    stopReason,
+		InitialInvariantFingerprint:   fingerprint,
+		FinalInvariantFingerprint:     fingerprint,
+		ProtectedInvariantsPreserved:  preserved,
+		AllAttemptInvariantsPreserved: preserved,
+	}, true
 }
 
 // BuildAutonomousCorrectionDiagnostics converts subsystem issues into the
