@@ -320,6 +320,16 @@ identity-neutral stress fixture.
 - Agents can distinguish provider retry, engineering correction, deterministic
   repair, and manual review.
 
+### Completion evidence
+
+- The AI generation guide documents the generic-only three-attempt correction
+  contract, supported and fail-closed actions, stop conditions, compiled CLI
+  example, and dedicated artifact fields.
+- The agent skill distinguishes provider retry, in-memory engineering
+  correction, persisted repair, and final promotion evidence.
+- README and roadmap status reflect the bounded correction capability without
+  claiming arbitrary-board autonomy.
+
 ### Rollback risk
 
 - Low; documentation only.
@@ -355,4 +365,4 @@ KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints \
 - [x] Phase 6 complete
 - [x] Phase 7 complete
 - [x] Phase 8 complete
-- [ ] Phase 9 complete
+- [x] Phase 9 complete

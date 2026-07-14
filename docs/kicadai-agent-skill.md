@@ -63,6 +63,8 @@ Current strong paths:
   any project write;
 - deterministic schematic layout, PCB placement, routing, and promotion
   evidence for the checked-in generic reference fixtures;
+- bounded deterministic placement/routing correction for generated
+  `generic-circuit-v1` requests, with protected-invariant and retry evidence;
 - generic multi-unit schematic lowering with one physical component,
   footprint, and BOM identity, proven by the LM358 reference;
 - verified circuit block generation for supported block families;
@@ -285,6 +287,35 @@ After provider-backed `design create` or deterministic `intent create`, inspect
 - `unsupported`: stop or choose a supported first-lane prompt or structured
   intent.
 - `tool_error`: fix local tooling or file paths before retrying.
+
+### Generic engineering correction
+
+For `generic-circuit-v1` only, inspect
+`.kicadai/autonomous-correction.json` after generation. This evidence describes
+a deterministic placement/routing correction loop, not a second provider call
+and not a persisted `repair apply` operation. The budget is three total routing
+attempts: one initial attempt and at most two corrected attempts.
+
+Read these fields together:
+
+- `attempts`: routing executions that actually occurred;
+- `plan_evaluations`: correction plans, including fail-closed plans that did
+  not authorize another execution;
+- `applied`, `applied_retry_keys`, and `attempt_history`: what changed and why;
+- `selected_attempt` and `selected_reason`: the best retained attempt;
+- `initial_invariant_fingerprint`, `final_invariant_fingerprint`, and
+  `all_attempt_invariants_preserved`: proof that protected circuit and physical
+  intent did not change;
+- `stop_reason`: `routed` or the structured reason automation stopped.
+
+Only authorized relative-spacing, declared-region, endpoint-fanout, and
+endpoint-distance adjustments are applied in v1. Automatic route-tree branch
+reordering and layer-transition insertion remain unsupported and must stop with
+structured evidence. Stop rather than retry externally when
+the report shows repeated state/key, budget exhaustion, non-improvement,
+unsupported/ambiguous diagnostics, fixed constraints, or invariant mismatch.
+Do not claim board success from this report alone; require connectivity, route
+completion, writer correctness, round-trip, ERC/DRC, and promotion evidence.
 
 For automation, construct the repair command yourself from a trusted KiCadAI
 executable path, `repair_bundle_path`, `repair_category`, and the known
@@ -573,8 +604,9 @@ Success requires:
 
 For provider-backed generic circuits, also inspect
 `.kicadai/circuit-graph.json`, `.kicadai/circuit-resolution.json`,
-`.kicadai/design-request.json`, `.kicadai/workflow-result.json`, and
-`.kicadai/design-promotion.json`. For multi-unit parts, verify that logical
+`.kicadai/design-request.json`, `.kicadai/autonomous-correction.json`,
+`.kicadai/workflow-result.json`, and `.kicadai/design-promotion.json`. For
+multi-unit parts, verify that logical
 units remain distinct in the schematic while the PCB and BOM contain exactly
 one physical package. A live graph is equivalent to a recording only when the
 fixture's semantic-projection test passes; textual or ordering similarity is

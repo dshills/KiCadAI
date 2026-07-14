@@ -19,15 +19,17 @@ path.
   selection, schematic/PCB realization, placement, routing, and validation.
 - The provider-backed natural-language lane retains two promoted bounded
   profiles and now adds an explicit catalog-resolved circuit graph contract.
+- Generated `generic-circuit-v1` designs now have a deterministic correction
+  loop with at most three placement/routing attempts, protected-invariant
+  checks, stable retry evidence, and fail-closed unsupported actions.
 - The bounded USB-C BMP280 and protected LED profiles remain KiCad-backed
-  `pass`. Generic RC filter, protected USB-C BMP280, and LMV321 AC-coupled
-  single-stage and two-stage signal-conditioner fixtures reach recorded and
-  live KiCad-backed `pass` through the shared catalog-resolved graph contract.
-  The generic protected USB-C LED reaches recorded KiCad-backed `pass` through
-  the same contract. The LM358 fixture reaches recorded and live-provider
-  KiCad-backed `pass` while proving one-package, multi-unit schematic lowering
-  with one footprint and BOM identity. None requires a topology-specific
-  provider schema.
+  `pass`. Six generic fixtures use the shared catalog-resolved graph contract:
+  RC filter, protected USB-C LED, protected USB-C BMP280, single-stage LMV321,
+  dual LMV321, and multi-unit LM358. Their recorded/live evidence varies by
+  fixture, while each checked-in optional KiCad promotion lane is `pass`. None
+  requires a topology-specific provider schema. The LM358 fixture additionally
+  proves one-package, multi-unit schematic lowering with one footprint and BOM
+  identity.
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - Generated `pass` evidence is not automatically a fabrication-release claim.

@@ -344,6 +344,65 @@ schema/intent diagnostics. Authentication, refusal, unsupported topology, and
 post-generation engineering failures are not sent back to the model for
 unbounded retries.
 
+## Generic Placement And Routing Correction
+
+After a `generic-circuit-v1` graph strict-decodes, resolves through the trusted
+catalog, and lowers to a design request, KiCadAI automatically enters a separate
+deterministic engineering correction loop when the initial route fails with
+supported diagnostics. This is not a provider retry: board diagnostics are
+never returned to the model. It is also not the persisted `repair apply`
+workflow used after project generation.
+
+The loop allows three total placement/routing attempts: the initial attempt and
+at most two corrections. It normalizes placement, routing, route-tree, and
+contact-graph diagnostics; derives stable retry keys; plans without mutation;
+applies only authorized adjustments; reruns placement and the real router; and
+retains the best electrically ranked attempt. It stops on success, exhausted
+budget, repeated retry key or placement state, non-improvement, cancellation,
+ambiguous/unsupported evidence, fixed-constraint conflict, or protected
+invariant change.
+
+V1 can apply validated relative-spacing, declared-region, endpoint-fanout, and
+endpoint-distance adjustments before rebuilding affected routes. Route-tree
+branch reordering and layer-transition insertion are represented in the
+diagnostic taxonomy but remain unsupported automatic actions and fail closed.
+The loop cannot change components, values, pin mappings, footprints, nets,
+board outline, layer count, net classes, width/clearance rules, fixed placement,
+or catalog resolution.
+
+Here, fail closed means correction stops and retains the best ranked attempt;
+if that attempt is still incomplete, connectivity, routing, and promotion gates
+remain blocked. It does not silently treat an unsupported action as success.
+
+Run any checked-in generic fixture through the compiled CLI. Set the two
+library variables to your local KiCad library checkouts first:
+
+```sh
+mkdir -p ./out
+# Replace both values with absolute paths to your local KiCad library checkouts.
+KICAD_SYMBOLS_ROOT="/absolute/path/to/kicad-symbols"
+KICAD_FOOTPRINTS_ROOT="/absolute/path/to/kicad-footprints"
+kicadai --prompt-file examples/ai/generic_rc_filter/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_rc_filter/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root "$KICAD_SYMBOLS_ROOT" \
+  --footprints-root "$KICAD_FOOTPRINTS_ROOT" \
+  --output ./out/generic_rc_filter --overwrite \
+  design create
+jq . ./out/generic_rc_filter/.kicadai/autonomous-correction.json
+```
+
+The report uses schema `kicadai.autonomous-correction.v1`. `attempts` counts
+routing executions, including the initial attempt. `plan_evaluations` counts
+correction plans, including plans that fail closed without another routing
+execution. Inspect `stop_reason`, `selected_attempt`, invariant fingerprints,
+`selected_reason`, `all_attempt_invariants_preserved`, applied retry keys, and
+`attempt_history`; do not infer success from `applied` alone. Final authority
+remains route completion, connectivity, writer, round-trip, ERC/DRC, and
+promotion evidence.
+
 The live provider smoke test is opt-in:
 
 ```sh
@@ -377,6 +436,8 @@ The generated `.kicadai/` directory includes:
   and lowered request evidence;
 - `circuit-graph.json`, `circuit-resolution.json`, and `design-request.json`:
   generic graph, trusted resolution, and lowered request evidence;
+- `autonomous-correction.json`: generic-only bounded placement/routing attempt,
+  retry-key, action, invariant, selection, and stop evidence;
 - `workflow-result.json` and `design-promotion.json`;
 - `validation-summary.json` and `retry-state.json`;
 - writer, route-completion, ERC/DRC, and round-trip evidence referenced by the
@@ -454,10 +515,12 @@ The generic graph removes the architectural requirement for one provider
 schema per topology; it does not make every circuit routable or electrically
 proven. V1 is limited to catalog-resolvable parts and functions, flat graph
 topology, bounded relative layout intent, deterministic placement, and the
-current explicit-circuit router. The promoted generic fixtures prove five
-specific topology classes, not arbitrary electronics. Dense boards, arbitrary
-hierarchy, analog performance, thermal/safe-operating-area analysis, safety
-isolation, and fabrication release still require additional evidence.
+current explicit-circuit router. The promoted generic fixtures prove six
+specific topology classes: RC filter, protected USB-C LED, protected USB-C
+BMP280, single-stage LMV321, dual LMV321, and multi-unit LM358. They do not
+prove arbitrary electronics. Dense boards, arbitrary hierarchy, analog
+performance, thermal/safe-operating-area analysis, safety isolation, and
+fabrication release still require additional evidence.
 
 Automatic bounded dispatch remains available for the two promoted references.
 Explicit generic mode must be selected with `--ai-profile generic-circuit-v1`.

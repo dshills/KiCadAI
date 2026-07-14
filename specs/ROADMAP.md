@@ -1,6 +1,6 @@
 # KiCadAI Roadmap
 
-Date: 2026-07-04
+Date: 2026-07-14
 
 This roadmap replaces the older roadmap and gap analysis now archived as
 `specs/OLD_ROADMAP.md` and `specs/OLD_ROADMAP_GAP.md`.
@@ -75,6 +75,16 @@ from validation feedback to safe automatic repair.
   carry explicit mobility policy, including `fixed`, `group_transform`,
   `local_rebuild`, `soft_preferred`, and `unowned` classes, and retry evidence
   reports eligible refs, blocked refs, and `local_route_mobility` handling.
+- Generic autonomous placement/routing correction for generated
+  `generic-circuit-v1` requests with normalized diagnostic taxonomy, pure plans,
+  guarded apply, protected circuit/physical-rule fingerprints, stable retry
+  keys, a three-attempt ceiling, repeated-state/non-improvement stops,
+  best-attempt preservation, and dedicated
+  `.kicadai/autonomous-correction.json` evidence. An identity-neutral
+  two-resistor stress fixture proves an initial real-router failure recovers on
+  attempt 2 with clean KiCad ERC/DRC, writer correctness, and normalized
+  round-trip evidence; the existing provider-backed promotion suite remains
+  in a passing state.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.
@@ -199,8 +209,10 @@ loop confidence:
 - placement-routing retry now includes focused pad-backed seeds, generated
   workflow coverage, larger generated fixture families, selected attempt
   evidence, optional DRC evidence, and generated mobility policy coverage. It
-  still needs broader real KiCad DRC-clean layout proof before it can be
-  treated as production layout quality;
+  now also has one identity-neutral, correction-required, KiCad DRC-clean
+  stress proof. It still needs broader dense-board and varied-component proof
+  before it can be treated as production layout quality; automatic route-tree
+  branch reordering and layer-transition insertion remain fail-closed;
 - KiCad-backed validation exists in the repair and workflow loops, but needs
   broader golden evidence and richer parser-to-repair category mapping.
   Promotion reports now make missing or failed evidence explicit, but the
