@@ -142,11 +142,14 @@ func genericLM358CriticalProjection(t *testing.T, resolved circuitgraph.Resolved
 	t.Helper()
 	projection := make([]string, 0, len(resolved.Components)+len(resolved.Nets)*4)
 	componentsByID := make(map[string]circuitgraph.ResolvedComponent, len(resolved.Components))
+	componentKeysByID := make(map[string]string, len(resolved.Components))
 	for _, component := range resolved.Components {
 		componentsByID[component.Instance.ID] = component
-		projection = append(projection, "component:"+string(component.Instance.Role)+":"+component.ComponentID+":"+component.FootprintID)
+		componentKey := genericLM358ComponentProjectionKey(&component)
+		componentKeysByID[component.Instance.ID] = componentKey
+		projection = append(projection, "component:"+componentKey)
 		for _, unit := range component.Units {
-			projection = append(projection, "unit:"+component.ComponentID+":"+unit.ID+":"+unit.Role)
+			projection = append(projection, "unit:"+componentKey+":"+unit.ID+":"+genericLM358UnitRole(unit.Role))
 		}
 	}
 	for _, net := range resolved.Nets {
@@ -157,7 +160,7 @@ func genericLM358CriticalProjection(t *testing.T, resolved circuitgraph.Resolved
 				t.Fatalf("resolved net %s references unknown component %s", net.Intent.Name, endpoint.Intent.Component)
 			}
 			for _, binding := range endpoint.Bindings {
-				endpoints = append(endpoints, component.ComponentID+":"+endpoint.Intent.Unit+":"+endpoint.Function+":"+binding.Pad)
+				endpoints = append(endpoints, componentKeysByID[component.Instance.ID]+":"+endpoint.Intent.Unit+":"+endpoint.Function+":"+binding.Pad)
 			}
 		}
 		slices.Sort(endpoints)
@@ -165,4 +168,23 @@ func genericLM358CriticalProjection(t *testing.T, resolved circuitgraph.Resolved
 	}
 	slices.Sort(projection)
 	return projection
+}
+
+func genericLM358ComponentProjectionKey(component *circuitgraph.ResolvedComponent) string {
+	role := string(component.Instance.Role)
+	if strings.HasPrefix(component.SymbolID, "Device:C") {
+		role = "capacitor"
+	}
+	return role + ":" + component.SymbolID + ":" + component.FootprintID
+}
+
+func genericLM358UnitRole(role string) string {
+	switch role {
+	case "gain_stage", "non_inverting_gain_stage":
+		return "gain_stage"
+	case "power", "shared_supply":
+		return "power"
+	default:
+		return role
+	}
 }
