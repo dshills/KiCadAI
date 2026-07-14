@@ -179,12 +179,15 @@ func genericLM358ComponentProjectionKey(component *circuitgraph.ResolvedComponen
 }
 
 func genericLM358UnitRole(role string) string {
-	switch role {
+	normalized := strings.ToLower(strings.TrimSpace(role))
+	switch normalized {
+	case "reference_buffer", "vref_buffer":
+		return "reference_buffer"
 	case "gain_stage", "non_inverting_gain_stage":
 		return "gain_stage"
 	case "power", "shared_supply":
 		return "power"
 	default:
-		return role
+		return normalized
 	}
 }
