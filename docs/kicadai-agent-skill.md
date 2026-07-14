@@ -41,10 +41,11 @@ the workflow evidence explicitly supports that claim.
   configuration should be reported as skipped/not-supported, not guessed. There
   is not yet a stable CLI flag or environment variable for external simulator
   execution; current simulation runners are Go-level/test-harness integrations.
-- Treat `examples/design/kicad-backed/` as an opt-in evidence tier. Do not
-  claim those fixtures pass unless `KICADAI_KICAD_CLI` was configured and
-  KiCad report artifacts were produced; current fixtures intentionally record
-  `expected_fail` blockers.
+- Treat KiCad-backed fixtures as an opt-in evidence tier. Do not claim a
+  fixture passes unless `KICADAI_KICAD_CLI` was configured, required KiCad
+  report artifacts were produced, and `.kicadai/design-promotion.json` records
+  `"status": "pass"`. Several checked-in fixtures now reach that tier;
+  metadata alone is not pass evidence.
 - Preserve request JSON, generated artifacts, `.kicadai/` metadata, and
   validation outputs with any final answer or handoff.
 - Only mutate generated projects unless the command explicitly supports safe
@@ -56,6 +57,14 @@ Current strong paths:
 
 - direct KiCad project, schematic, and PCB file writing;
 - structured intent planning and `intent create`;
+- strict provider-backed generation for bounded references and explicit
+  `generic-circuit-v1` graphs;
+- trusted-catalog resolution of provider component/function/pin intent before
+  any project write;
+- deterministic schematic layout, PCB placement, routing, and promotion
+  evidence for the checked-in generic reference fixtures;
+- generic multi-unit schematic lowering with one physical component,
+  footprint, and BOM identity, proven by the LM358 reference;
 - verified circuit block generation for supported block families;
 - component selection from the local catalog;
 - writer correctness checks;
@@ -68,7 +77,8 @@ Current strong paths:
 
 Current weak or blocked paths:
 
-- arbitrary natural-language-to-board synthesis;
+- arbitrary natural-language-to-board synthesis outside catalog-resolvable,
+  supported graph, placement, and routing capabilities;
 - arbitrary imported project mutation;
 - speaker, bridge, mains, or power-amplifier generation claims without SOA,
   thermal, active fault protection, simulation, KiCad ERC/DRC, and physical-rule
@@ -136,11 +146,107 @@ symbols, footprints, placement, and routes. Use
 `examples/ai/generic_rc_filter/`,
 `examples/ai/generic_usb_c_led_indicator_protected/`,
 `examples/ai/generic_usb_c_bmp280_breakout/`, and
-`examples/ai/generic_lmv321_ac_gain_stage/` as passing references. The LMV321
-reference proves structure and KiCad checks, while stability, gain-bandwidth,
-output drive, noise, distortion, and load compatibility remain review-required.
+`examples/ai/generic_lmv321_ac_gain_stage/`,
+`examples/ai/generic_dual_lmv321_signal_conditioner/`, and
+`examples/ai/generic_lm358_buffered_signal_conditioner/` as passing references.
+The LMV321 and LM358 references prove structure and configured KiCad checks,
+while analog performance remains review-required.
 Never translate a generic failure into invented component IDs, library IDs,
 pin names, or coordinates.
+
+### Generic Multi-Unit Contract
+
+Model a multi-unit package as one physical graph component. Its `units` array
+declares logical schematic units, while endpoints and layout relationships use
+explicit unit qualifiers. For the verified LM358 record:
+
+- `A` and `B` are independent amplifier units;
+- required unit `P` owns the shared supply pins;
+- all units retain one reference, one catalog identity, one SOIC-8 footprint,
+  and one BOM identity.
+
+Do not create one physical component per logical unit. Do not add unit
+qualifiers to ordinary single-unit parts. Use relative qualifiers such as
+`near_unit` only when the target component declares that unit. Stop on unknown
+or duplicate units, missing required power units, conflicting shared-pin nets,
+duplicate package footprints, or ambiguous unit-to-pad mappings. Do not repair
+those failures by duplicating symbols or footprints.
+
+The graph representation uses separate fields rather than a combined `U1.A`
+string. For example:
+
+```json
+{
+  "components": [
+    {
+      "id": "amplifier",
+      "reference": "U1",
+      "units": [
+        {"id": "A", "role": "reference_buffer"},
+        {"id": "B", "role": "gain_stage"},
+        {"id": "P", "role": "power"}
+      ]
+    }
+  ],
+  "nets": [
+    {
+      "name": "GAIN_OUT",
+      "endpoints": [
+        {
+          "component": "amplifier",
+          "unit": "B",
+          "selector_kind": "function",
+          "selector": "OUT"
+        }
+      ]
+    }
+  ],
+  "schematic_layout": {
+    "placements": [
+      {
+        "component": "feedback",
+        "near": "amplifier",
+        "near_unit": "B"
+      }
+    ]
+  }
+}
+```
+
+Recorded LM358 verification:
+
+```sh
+kicadai --prompt-file examples/ai/generic_lm358_buffered_signal_conditioner/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_lm358_buffered_signal_conditioner/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/ai_generic_lm358 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
+For a live run, reuse the same prompt and trusted-library arguments, replace
+the recorded-provider flags with `--provider openai --ai-background`, and add
+`--max-ai-attempts 2`. Change `--output` to `./out/live_generic_lm358` so the
+semantic comparison below reads the generated live graph. Load
+`OPENAI_API_KEY` from the environment; never put it in a command, request,
+fixture, log, or evidence artifact. Live provider timeouts before graph
+generation do not invalidate recorded evidence. Replay a saved graph or rerun
+the optional live lane; never infer a graph from a timeout.
+
+To compare a saved live LM358 graph with the checked-in critical projection
+without another provider request:
+
+```sh
+KICADAI_OPENAI_LIVE_TEST=1 \
+KICADAI_OPENAI_LM358_LIVE_GRAPH=./out/live_generic_lm358/.kicadai/circuit-graph.json \
+  go test ./internal/aiprovider -run '^TestOpenAILiveGenericLM358Graph$' -count=1 -v
+```
 
 For the LED reference, replace both BMP280 fixture paths with
 `examples/ai/usb_c_led_indicator_protected/` and use a separate output path.
@@ -465,6 +571,29 @@ Success requires:
 - `pass` promotion claims include clean required KiCad ERC/DRC evidence when
   those checks are requested.
 
+For provider-backed generic circuits, also inspect
+`.kicadai/circuit-graph.json`, `.kicadai/circuit-resolution.json`,
+`.kicadai/design-request.json`, `.kicadai/workflow-result.json`, and
+`.kicadai/design-promotion.json`. For multi-unit parts, verify that logical
+units remain distinct in the schematic while the PCB and BOM contain exactly
+one physical package. A live graph is equivalent to a recording only when the
+fixture's semantic-projection test passes; textual or ordering similarity is
+not sufficient.
+
+To run all checked-in provider fixtures through the optional KiCad-backed
+promotion lane:
+
+```sh
+KICADAI_KICAD_CLI=/path/to/kicad-cli \
+KICADAI_SYMBOLS_ROOT=/path/to/kicad-symbols \
+KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints \
+  go test ./cmd/kicadai -run '^TestAIProviderOptionalKiCadPromotion$' -count=1 -v
+```
+
+Generation commands accept library and KiCad paths as CLI flags. The optional
+Go promotion harness uses the corresponding environment variables because it
+runs multiple checked-in fixtures in one test process.
+
 ## Stop Conditions
 
 Stop and report blockers when:
@@ -523,7 +652,10 @@ correctness, board validation, and required ERC/DRC evidence all support it.
 For amplifier work, distinguish simulation evidence from fabrication evidence:
 a passing `.kicadai/amplifier-simulation.json` can support a narrow
 headphone-slice promotion gate, but it does not prove speaker or
-power-amplifier safety.
+power-amplifier safety. For LMV321 and LM358 references, clean ERC, DRC,
+routing, writer, and round-trip evidence does not establish stability,
+gain-bandwidth, output swing, input common-mode range, output drive, noise,
+distortion, or load compatibility. Preserve their `review_required` evidence.
 
 ## Common Safe Commands
 
@@ -549,6 +681,8 @@ kicadai --target ./out/project intent rationale
 - [Docs Index](README.md) for subsystem documentation.
 - [Intent Planning And AI Workflow](intent-planning.md) for structured intent
   behavior.
+- [AI Generation](ai-generation.md) for bounded and generic provider commands,
+  multi-unit semantics, fixture evidence, and current limits.
 - [Validation And Analysis](validation-and-analysis.md) for validation command
   details.
 - [Libraries And Components](libraries-and-components.md) for catalog, pinmap,
