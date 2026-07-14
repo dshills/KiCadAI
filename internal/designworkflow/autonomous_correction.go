@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"math"
 	"path"
 	"slices"
 	"strconv"
@@ -87,6 +88,19 @@ type AutonomousCorrectionPlanOptions struct {
 	AppliedRetryKeys []string
 }
 
+type AutonomousCorrectionApplication struct {
+	Applied                      bool                     `json:"applied"`
+	RetryKey                     string                   `json:"retry_key,omitempty"`
+	StopReason                   string                   `json:"stop_reason,omitempty"`
+	InvariantFingerprintBefore   string                   `json:"invariant_fingerprint_before,omitempty"`
+	InvariantFingerprintAfter    string                   `json:"invariant_fingerprint_after,omitempty"`
+	PlacementInvariantBefore     string                   `json:"placement_invariant_before,omitempty"`
+	PlacementInvariantAfter      string                   `json:"placement_invariant_after,omitempty"`
+	Adjustment                   PlacementRetryAdjustment `json:"adjustment,omitempty"`
+	ValidationIssues             []reports.Issue          `json:"validation_issues,omitempty"`
+	ProtectedInvariantsPreserved bool                     `json:"protected_invariants_preserved"`
+}
+
 const (
 	CorrectionStopNotGeneric              = "not_generic_circuit"
 	CorrectionStopNotRequired             = "correction_not_required"
@@ -95,6 +109,10 @@ const (
 	CorrectionStopAmbiguousDiagnostics    = "ambiguous_diagnostics"
 	CorrectionStopFixedConstraintConflict = "fixed_constraint_conflict"
 	CorrectionStopRepeatedRetryKey        = "repeated_retry_key"
+	CorrectionStopPlanNotAuthorized       = "plan_not_authorized"
+	CorrectionStopInvariantMismatch       = "invariant_mismatch"
+	CorrectionStopNoSafeAdjustment        = "no_safe_adjustment"
+	CorrectionStopAdjustedRequestInvalid  = "adjusted_request_invalid"
 )
 
 // PlanAutonomousCorrection is pure: it derives an authorized plan without
@@ -323,6 +341,137 @@ func autonomousCorrectionActionsFixed(components []placement.Component, actions 
 		}
 	}
 	return false
+}
+
+// ApplyAutonomousCorrectionPlan guards and applies only the existing bounded
+// placement adjustments represented by an authorized plan. It never writes
+// files or runs placement/routing itself.
+func ApplyAutonomousCorrectionPlan(request Request, placementRequest placement.Request, placements []placement.PlacementResult, plan AutonomousCorrectionPlan, appliedRetryKeys []string) (placement.Request, AutonomousCorrectionApplication, error) {
+	current := placement.CloneRequest(placementRequest)
+	application := AutonomousCorrectionApplication{RetryKey: plan.RetryKey}
+	if !IsGenericAutonomousCorrectionRequest(request) || !plan.Authorized || plan.StopReason != "" || plan.Attempt < 2 || plan.Attempt > plan.MaxAttempts {
+		application.StopReason = CorrectionStopPlanNotAuthorized
+		return current, application, nil
+	}
+	fingerprint, err := AutonomousCorrectionInvariantFingerprint(request)
+	if err != nil {
+		return current, application, err
+	}
+	application.InvariantFingerprintBefore = fingerprint
+	application.InvariantFingerprintAfter = fingerprint
+	if fingerprint != plan.InvariantFingerprint || placementStateHash(placements) != plan.PlacementStateHash {
+		application.StopReason = CorrectionStopInvariantMismatch
+		return current, application, nil
+	}
+	if plan.RetryKey == "" || slices.Contains(appliedRetryKeys, plan.RetryKey) {
+		application.StopReason = CorrectionStopRepeatedRetryKey
+		return current, application, nil
+	}
+	beforePlacementInvariant, err := autonomousCorrectionPlacementInvariantFingerprint(current)
+	if err != nil {
+		return current, application, err
+	}
+	application.PlacementInvariantBefore = beforePlacementInvariant
+	hints := autonomousCorrectionPlacementHints(plan.Actions)
+	if len(hints) == 0 {
+		application.StopReason = CorrectionStopNoSafeAdjustment
+		return current, application, nil
+	}
+	adjusted, adjustment := BuildPlacementRetryAdjustment(current, hints, 1)
+	adjustment.Attempt = plan.Attempt - 1
+	application.Adjustment = adjustment
+	if !adjustment.Applied || adjustment.SpacingDeltaMM > placementRetryBaseSpacingDeltaMM+retryScoreComparisonEpsilon || len(adjustment.ProximityRules) == 0 && math.Abs(adjustment.SpacingDeltaMM) < retryScoreComparisonEpsilon {
+		application.StopReason = CorrectionStopNoSafeAdjustment
+		return current, application, nil
+	}
+	afterPlacementInvariant, err := autonomousCorrectionPlacementInvariantFingerprint(adjusted)
+	if err != nil {
+		return current, application, err
+	}
+	application.PlacementInvariantAfter = afterPlacementInvariant
+	if beforePlacementInvariant != afterPlacementInvariant {
+		application.StopReason = CorrectionStopInvariantMismatch
+		return current, application, nil
+	}
+	issues := placement.Validate(adjusted)
+	application.ValidationIssues = append([]reports.Issue(nil), issues...)
+	if reports.HasBlockingIssue(issues) {
+		application.StopReason = CorrectionStopAdjustedRequestInvalid
+		return current, application, nil
+	}
+	application.Applied = true
+	application.ProtectedInvariantsPreserved = true
+	return adjusted, application, nil
+}
+
+func autonomousCorrectionPlacementHints(actions []AutonomousCorrectionAction) []PlacementRetryHint {
+	hints := make([]PlacementRetryHint, 0, len(actions))
+	for _, action := range actions {
+		if !action.Authorized || action.PlacementHint == "" {
+			continue
+		}
+		hints = append(hints, PlacementRetryHint{
+			Category: action.PlacementHint, SourceCategory: autonomousCorrectionActionSourceCategory(action),
+			SourceAction: routing.ActionMoveComponents, Severity: reports.SeverityBlocked,
+			Refs: slices.Clone(action.Refs), Nets: slices.Clone(action.Nets),
+			SuggestedAction: placementRetryHintAction(action.PlacementHint), RetryEligible: true,
+			PlacementEvidence: []string{"autonomous_correction:" + string(action.Kind)},
+		})
+	}
+	return mergePlacementRetryHints(nil, hints...)
+}
+
+func autonomousCorrectionActionSourceCategory(action AutonomousCorrectionAction) routing.RepairCategory {
+	switch action.PlacementHint {
+	case PlacementRetryIncreaseSpacing:
+		return routing.RepairClearance
+	case PlacementRetryImproveFanout:
+		return routing.RepairPadAccess
+	case PlacementRetryMoveFromEdge:
+		return routing.RepairBoardBoundary
+	case PlacementRetryReduceDistance:
+		return routing.RepairLengthPolicy
+	default:
+		return routing.RepairUnknown
+	}
+}
+
+func autonomousCorrectionPlacementInvariantFingerprint(request placement.Request) (string, error) {
+	normalized := placement.NormalizeRequest(request)
+	rules := struct {
+		GridMM                   float64
+		BoardEdgeClearanceMM     float64
+		PreferTopLayer           bool
+		AllowBackLayer           bool
+		ConnectorEdgeClearanceMM float64
+	}{
+		GridMM: normalized.Rules.GridMM, BoardEdgeClearanceMM: normalized.Rules.BoardEdgeClearanceMM,
+		PreferTopLayer: normalized.Rules.PreferTopLayer, AllowBackLayer: normalized.Rules.AllowBackLayer,
+		ConnectorEdgeClearanceMM: normalized.Rules.ConnectorEdgeClearanceMM,
+	}
+	projection := struct {
+		Board         placement.BoardPlacementArea
+		Components    []placement.Component
+		Nets          []placement.Net
+		Groups        []placement.Group
+		Keepouts      []placement.Keepout
+		Mechanical    []placement.MechanicalConstraint
+		RegionRules   []placement.RegionRule
+		AdvancedRules placement.AdvancedPlacementRules
+		Existing      placement.ExistingPlacementPolicy
+		Rules         any
+	}{
+		Board: normalized.Board, Components: normalized.Components, Nets: normalized.Nets,
+		Groups: normalized.Groups, Keepouts: normalized.Keepouts, Mechanical: normalized.Mechanical,
+		RegionRules: normalized.RegionRules, AdvancedRules: normalized.AdvancedRules,
+		Existing: normalized.Existing, Rules: rules,
+	}
+	data, err := json.Marshal(projection)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:]), nil
 }
 
 // BuildAutonomousCorrectionDiagnostics converts subsystem issues into the
