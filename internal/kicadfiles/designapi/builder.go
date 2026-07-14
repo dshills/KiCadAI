@@ -159,6 +159,10 @@ type ConnectOptions struct {
 	Waypoints   []kicadfiles.Point
 	FromLabelAt *kicadfiles.Point
 	ToLabelAt   *kicadfiles.Point
+	// ReanchorFromLabel and ReanchorToLabel repair a generated label hint
+	// after collision avoidance moves a symbol from its layout point.
+	ReanchorFromLabel bool
+	ReanchorToLabel   bool
 }
 
 type LabelOptions struct {
@@ -230,6 +234,7 @@ type symbolState struct {
 	reference                    string
 	unit                         int
 	libraryID                    string
+	requestedPosition            kicadfiles.Point
 	position                     kicadfiles.Point
 	rotation                     kicadfiles.Angle
 	mirror                       schematic.SymbolMirror
@@ -361,7 +366,8 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 			pinSpecs = resolved
 		}
 	}
-	position := builder.safeSchematicSymbolPosition(options.Position, pinSpecs, rotation, mirror)
+	requestedPosition := options.Position
+	position := builder.safeSchematicSymbolPosition(requestedPosition, pinSpecs, rotation, mirror)
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", generationKey), libraryID, reference, value, position)
 	symbol.Unit = unit
 	symbol.Rotation = rotation
@@ -427,6 +433,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		reference:                    reference,
 		unit:                         unit,
 		libraryID:                    libraryID,
+		requestedPosition:            requestedPosition,
 		position:                     position,
 		rotation:                     rotation,
 		mirror:                       mirror,
@@ -628,15 +635,19 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	if err != nil {
 		return err
 	}
+	fromLabelAt := options.FromLabelAt
+	toLabelAt := options.ToLabelAt
 	if options.UseLabels == nil || !*options.UseLabels {
 		if err := validateSchematicWaypoints(options.Waypoints, start, end); err != nil {
 			return err
 		}
 	} else {
-		if err := validateSchematicLabelPoint(options.FromLabelAt, start); err != nil {
+		fromLabelAt, err = builder.resolveSchematicLabelPoint(from, fromLabelAt, start, options.ReanchorFromLabel)
+		if err != nil {
 			return err
 		}
-		if err := validateSchematicLabelPoint(options.ToLabelAt, end); err != nil {
+		toLabelAt, err = builder.resolveSchematicLabelPoint(to, toLabelAt, end, options.ReanchorToLabel)
+		if err != nil {
 			return err
 		}
 	}
@@ -670,10 +681,10 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	builder.design.ExpectedNets = appendUniqueNet(builder.design.ExpectedNets, netName)
 	if options.UseLabels != nil && *options.UseLabels {
 		if !options.SkipFromLabel {
-			builder.addSchematicLabelConnection(netName, from, start, end, options.FromLabelAt)
+			builder.addSchematicLabelConnection(netName, from, start, end, fromLabelAt)
 		}
 		if !options.SkipToLabel {
-			builder.addSchematicLabelConnection(netName, to, end, start, options.ToLabelAt)
+			builder.addSchematicLabelConnection(netName, to, end, start, toLabelAt)
 		}
 	} else if len(options.Waypoints) != 0 {
 		builder.addSchematicWirePointsWithOptions(netName, from, to, options.Waypoints, options.SuppressBendLabels)
@@ -1099,6 +1110,28 @@ func validateSchematicLabelPoint(position *kicadfiles.Point, anchor kicadfiles.P
 		return fmt.Errorf("schematic label stub must be orthogonal: label %s, anchor %s", formatPoint(*position), formatPoint(anchor))
 	}
 	return nil
+}
+
+func (builder *Builder) resolveSchematicLabelPoint(endpoint Endpoint, position *kicadfiles.Point, anchor kicadfiles.Point, reanchor bool) (*kicadfiles.Point, error) {
+	if position == nil {
+		return nil, nil
+	}
+	adjusted := *position
+	if reanchor {
+		state, err := builder.symbolStateForEndpoint(endpoint)
+		if err != nil {
+			return nil, err
+		}
+		adjusted.X += state.position.X - state.requestedPosition.X
+		adjusted.Y += state.position.Y - state.requestedPosition.Y
+	}
+	if err := validateSchematicLabelPoint(&adjusted, anchor); err != nil {
+		return nil, err
+	}
+	if adjusted == *position {
+		return position, nil
+	}
+	return &adjusted, nil
 }
 
 func (builder *Builder) orthogonalSchematicWirePoints(start, end kicadfiles.Point) []kicadfiles.Point {

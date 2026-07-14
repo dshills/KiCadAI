@@ -634,6 +634,8 @@ func applyOperation(builder *designapi.Builder, op Operation, opts ApplyOptions)
 			Waypoints:          waypoints,
 			FromLabelAt:        optionalPoint(payload.FromLabelAt),
 			ToLabelAt:          optionalPoint(payload.ToLabelAt),
+			ReanchorFromLabel:  true,
+			ReanchorToLabel:    true,
 		})
 	case OpAddLabel:
 		var payload AddLabelOperation

@@ -323,6 +323,53 @@ func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectReanchorsMovedMultiUnitLabelStub(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	state, err := builder.symbolStateForEndpoint(Endpoint{Reference: "R1", Pin: "2"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	state.requestedPosition = kicadfiles.Point{X: state.position.X - kicadfiles.MM(1.27), Y: state.position.Y}
+	staleFromLabel := kicadfiles.Point{X: start.X - kicadfiles.MM(6.35), Y: start.Y}
+	toLabel := kicadfiles.Point{X: end.X - kicadfiles.MM(5.08), Y: end.Y}
+	useLabels := true
+	if err := builder.ConnectWithOptions(
+		Endpoint{Reference: "R1", Pin: "2"},
+		Endpoint{Reference: "R2", Pin: "1"},
+		"SIG",
+		ConnectOptions{UseLabels: &useLabels, FromLabelAt: &staleFromLabel, ToLabelAt: &toLabel, ReanchorFromLabel: true},
+	); err != nil {
+		t.Fatalf("connect with moved-unit label point: %v", err)
+	}
+	wantFromLabel := kicadfiles.Point{X: start.X - kicadfiles.MM(5.08), Y: start.Y}
+	if got := builder.design.Schematic.Labels[0].Position; got != wantFromLabel {
+		t.Fatalf("reanchored label = %#v, want %#v", got, wantFromLabel)
+	}
+}
+
+func TestBuilderConnectRejectsDiagonalExplicitLabelStub(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(60.96), Y: kicadfiles.MM(40.64)})
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	fromLabel := kicadfiles.Point{X: start.X + kicadfiles.MM(1.27), Y: start.Y - kicadfiles.MM(3.81)}
+	toLabel := kicadfiles.Point{X: end.X - kicadfiles.MM(5.08), Y: end.Y}
+	useLabels := true
+	if err := builder.ConnectWithOptions(
+		Endpoint{Reference: "R1", Pin: "2"},
+		Endpoint{Reference: "R2", Pin: "1"},
+		"SIG",
+		ConnectOptions{UseLabels: &useLabels, FromLabelAt: &fromLabel, ToLabelAt: &toLabel},
+	); err == nil {
+		t.Fatal("expected diagonal explicit label rejection")
+	}
+}
+
 func TestBuilderConnectCanReplaceOneLocalLabel(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})

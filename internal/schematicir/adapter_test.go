@@ -875,6 +875,39 @@ func TestLayoutRouteHintsRejectCrossNetCoordinateConflicts(t *testing.T) {
 	}
 }
 
+func TestAppendNetsKeepsLayoutLabelRouteWhenConflictRemovesCoordinates(t *testing.T) {
+	document := validLEDDocument()
+	state, issues := newAdapterState(document, nil)
+	if len(issues) != 0 {
+		t.Fatalf("adapter state issues: %#v", issues)
+	}
+	net := document.Circuit.Nets[0]
+	fromID, fromPin, _ := net.Connect[0].Split()
+	toID, toPin, _ := net.Connect[1].Split()
+	state.routesByKey = map[string]schematiclayout.RoutedConnection{
+		schematicRouteKey(net.Name, net.Connect[0], net.Connect[1]): {
+			NetName:   net.Name,
+			From:      schematiclayout.Endpoint{Ref: fromID, Pin: fromPin},
+			To:        schematiclayout.Endpoint{Ref: toID, Pin: toPin},
+			UseLabels: true,
+		},
+	}
+	state.labelsByKey = map[string]kicadfiles.Point{}
+	transaction := transactions.Transaction{}
+	state.appendNets(&transaction)
+
+	for _, connect := range decodeOperations[transactions.ConnectOperation](t, transaction, transactions.OpConnect) {
+		if connect.NetName != net.Name {
+			continue
+		}
+		if connect.UseLabels == nil || !*connect.UseLabels {
+			t.Fatalf("conflict-cleared route = %#v, want preserved label routing", connect)
+		}
+		return
+	}
+	t.Fatalf("missing connect operation for net %s", net.Name)
+}
+
 func TestLabelPointForEndpointRepairsDiagonalLayoutHint(t *testing.T) {
 	component := Component{ID: "sensor", Symbol: "Test:Sensor", Pins: []Pin{{Number: "1"}}}
 	index := libraryresolver.LibraryIndex{Symbols: map[string]libraryresolver.SymbolRecord{

@@ -775,10 +775,12 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 			to := mappedEndpoints[endpointIndex]
 			var waypoints []transactions.Point
 			var fromLabelAt, toLabelAt *transactions.Point
+			layoutLabelsRequested := false
 			fromIR := net.Connect[endpointIndex-1]
 			toIR := net.Connect[endpointIndex]
 			if hint, exists := state.routesByKey[schematicRouteKey(net.Name, fromIR, toIR)]; exists {
 				if hint.UseLabels {
+					layoutLabelsRequested = true
 					value := true
 					useLabels = &value
 					fromLayout, toLayout := hint.FromLabelAt, hint.ToLabelAt
@@ -832,11 +834,11 @@ func (state *adapterState) appendNets(tx *transactions.Transaction) {
 						toLabelAt = &point
 					}
 				}
-				if (fromLabelAt == nil && !skipFromLabel) || (toLabelAt == nil && !skipToLabel) {
-					// A label route without both anchors cannot be applied by the
-					// transaction builder. Retain the electrical connection with
-					// the builder's deterministic direct-wire fallback instead of
-					// emitting an invalid label operation.
+				if !layoutLabelsRequested && ((fromLabelAt == nil && !skipFromLabel) || (toLabelAt == nil && !skipToLabel)) {
+					// Without layout route evidence, retain the deterministic
+					// direct-wire fallback. A layout-selected label route may keep
+					// nil coordinates: the builder derives safe stubs from its final
+					// post-collision pin anchors.
 					value := false
 					useLabels = &value
 					fromLabelAt = nil
