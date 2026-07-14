@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"kicadai/internal/libraryresolver"
+	"kicadai/internal/reports"
 )
 
 func TestCheckSchematicsSkipsWithoutSchematic(t *testing.T) {
@@ -37,6 +38,69 @@ func TestCheckSchematicsReportsDuplicateReferences(t *testing.T) {
 
 	_, checks := CheckSchematics(Target{SchematicFiles: []string{path}})
 	assertCheckIssueContains(t, checks, "duplicate schematic reference")
+}
+
+func TestCheckSchematicsAcceptsSharedReferenceWithDistinctUnits(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "multi-unit.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (symbol (lib_id "Amplifier_Operational:LM358") (at 10 10 0) (unit 1)
+    (property "Reference" "U1" (at 10 10 0))
+    (property "Value" "LM358" (at 10 12 0))
+    (property "Footprint" "Package_SO:SOIC-8" (at 10 14 0) hide)
+  )
+  (symbol (lib_id "Amplifier_Operational:LM358") (at 20 10 0) (unit 2)
+    (property "Reference" "U1" (at 20 10 0))
+    (property "Value" "LM358" (at 20 12 0))
+    (property "Footprint" "Package_SO:SOIC-8" (at 20 14 0) hide)
+  )
+`))
+
+	snapshot, checks := CheckSchematics(Target{SchematicFiles: []string{path}})
+	for _, check := range checks {
+		for _, issue := range check.Issues {
+			if issue.Code == reports.CodeDuplicateReference {
+				t.Fatalf("distinct units reported duplicate reference: %#v", checks)
+			}
+		}
+	}
+	if snapshot.SymbolCount != 2 || snapshot.BoardSymbolCount != 1 || len(snapshot.Files) != 1 || len(snapshot.Files[0].Symbols) != 2 {
+		t.Fatalf("multi-unit snapshot = %#v", snapshot)
+	}
+	if snapshot.Files[0].Symbols[0].Unit != 1 || snapshot.Files[0].Symbols[1].Unit != 2 {
+		t.Fatalf("multi-unit symbol snapshots = %#v", snapshot.Files[0].Symbols)
+	}
+}
+
+func TestCheckSchematicsReportsMissingSharedReferenceFootprintOnce(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "multi-unit-missing-footprint.kicad_sch")
+	writeFile(t, path, schematicWithBody(`
+  (symbol (lib_id "Amplifier_Operational:LM358") (at 10 10 0) (unit 1)
+    (property "Reference" "U1" (at 10 10 0))
+    (property "Value" "LM358" (at 10 12 0))
+  )
+  (symbol (lib_id "Amplifier_Operational:LM358") (at 20 10 0) (unit 2)
+    (property "Reference" "U1" (at 20 10 0))
+    (property "Value" "LM358" (at 20 12 0))
+  )
+`))
+
+	snapshot, checks := CheckSchematics(Target{SchematicFiles: []string{path}})
+	if len(snapshot.MissingFootprints) != 1 || snapshot.MissingFootprints[0] != "U1" {
+		t.Fatalf("missing shared-reference footprints = %#v", snapshot.MissingFootprints)
+	}
+	missingIssues := 0
+	for _, check := range checks {
+		for _, issue := range check.Issues {
+			if issue.Code == reports.CodeMissingFootprint {
+				missingIssues++
+			}
+		}
+	}
+	if missingIssues != 1 {
+		t.Fatalf("missing shared-reference footprint issues = %d, checks=%#v", missingIssues, checks)
+	}
 }
 
 func TestCheckSchematicsReportsMissingFootprint(t *testing.T) {

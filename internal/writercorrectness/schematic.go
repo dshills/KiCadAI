@@ -36,6 +36,7 @@ type SchematicFileSnapshot struct {
 
 type SymbolSnapshot struct {
 	Reference string `json:"reference"`
+	Unit      int    `json:"unit"`
 	LibraryID string `json:"library_id,omitempty"`
 	Footprint string `json:"footprint,omitempty"`
 	UUID      string `json:"uuid,omitempty"`
@@ -68,7 +69,13 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 
 	var parseIssues []reports.Issue
 	var connectivityIssues []reports.Issue
-	seenRefs := map[string]string{}
+	type referenceUnitKey struct {
+		reference string
+		unit      int
+	}
+	seenRefs := map[referenceUnitKey]string{}
+	seenBoardRefs := map[string]struct{}{}
+	missingBoardRefs := map[string]struct{}{}
 	hierarchicalLabelsByFile := map[string]map[string]struct{}{}
 	var sheetPinExpectations []sheetPinExpectation
 
@@ -88,9 +95,15 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 		}
 		for _, symbol := range file.Symbols {
 			ref := strings.TrimSpace(symbol.Reference)
+			upperRef := strings.ToUpper(ref)
+			unit := symbol.Unit
+			if unit <= 0 {
+				unit = 1
+			}
 			footprint := symbolFootprint(symbol)
 			fileSnapshot.Symbols = append(fileSnapshot.Symbols, SymbolSnapshot{
 				Reference: ref,
+				Unit:      unit,
 				LibraryID: strings.TrimSpace(symbol.LibraryID),
 				Footprint: footprint,
 				UUID:      string(symbol.UUID),
@@ -113,28 +126,36 @@ func CheckSchematicsWithOptions(target Target, opts Options) (SchematicSnapshot,
 			} else if opts.HasLibraryIndex {
 				connectivityIssues = append(connectivityIssues, resolverSymbolIssues(embeddedLibraryIDs, path, ref, libraryID, opts)...)
 			}
-			if previous, ok := seenRefs[strings.ToUpper(ref)]; ok && !strings.HasPrefix(ref, "#") {
+			refKey := referenceUnitKey{reference: upperRef, unit: unit}
+			if previous, ok := seenRefs[refKey]; ok && !strings.HasPrefix(ref, "#") {
 				connectivityIssues = append(connectivityIssues, reports.Issue{
 					Code:     reports.CodeDuplicateReference,
 					Severity: reports.SeverityError,
 					Path:     slashPath(path),
-					Message:  fmt.Sprintf("duplicate schematic reference %s also appears in %s", ref, previous),
+					Message:  fmt.Sprintf("duplicate schematic reference %s unit %d also appears in %s", ref, unit, previous),
 					Refs:     []string{ref},
 				})
 			} else {
-				seenRefs[strings.ToUpper(ref)] = slashPath(path)
+				seenRefs[refKey] = slashPath(path)
 			}
 			if boardBearingSymbol(symbol) {
-				snapshot.BoardSymbolCount++
+				boardRef := upperRef
+				if _, counted := seenBoardRefs[boardRef]; !counted {
+					seenBoardRefs[boardRef] = struct{}{}
+					snapshot.BoardSymbolCount++
+				}
 				if footprint == "" {
-					snapshot.MissingFootprints = append(snapshot.MissingFootprints, ref)
-					connectivityIssues = append(connectivityIssues, reports.Issue{
-						Code:     reports.CodeMissingFootprint,
-						Severity: reports.SeverityError,
-						Path:     slashPath(path) + ".symbols." + ref,
-						Message:  "PCB-bearing schematic symbol has no footprint assignment",
-						Refs:     []string{ref},
-					})
+					if _, reported := missingBoardRefs[boardRef]; !reported {
+						missingBoardRefs[boardRef] = struct{}{}
+						snapshot.MissingFootprints = append(snapshot.MissingFootprints, ref)
+						connectivityIssues = append(connectivityIssues, reports.Issue{
+							Code:     reports.CodeMissingFootprint,
+							Severity: reports.SeverityError,
+							Path:     slashPath(path) + ".symbols." + ref,
+							Message:  "PCB-bearing schematic symbol has no footprint assignment",
+							Refs:     []string{ref},
+						})
+					}
 				}
 			}
 		}
