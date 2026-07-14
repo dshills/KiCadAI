@@ -143,6 +143,7 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 func aiPromotionFixtureIDs() []string {
 	return []string{
 		"generic_dual_lmv321_signal_conditioner",
+		"generic_lm358_buffered_signal_conditioner",
 		"generic_lmv321_ac_gain_stage",
 		"generic_rc_filter",
 		"generic_usb_c_bmp280_breakout",
