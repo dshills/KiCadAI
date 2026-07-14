@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 
+	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
 )
@@ -43,6 +44,285 @@ type AutonomousCorrectionDiagnostic struct {
 	Evidence          []string                     `json:"evidence,omitempty"`
 	AutomaticAction   bool                         `json:"automatic_action"`
 	UnsupportedReason string                       `json:"unsupported_reason,omitempty"`
+}
+
+type AutonomousCorrectionActionKind string
+
+const (
+	CorrectionActionAdjustRelativeSpacing    AutonomousCorrectionActionKind = "adjust_relative_spacing"
+	CorrectionActionMoveWithinRegion         AutonomousCorrectionActionKind = "move_within_declared_region"
+	CorrectionActionImproveEndpointFanout    AutonomousCorrectionActionKind = "improve_endpoint_fanout"
+	CorrectionActionReduceEndpointDistance   AutonomousCorrectionActionKind = "reduce_endpoint_distance"
+	CorrectionActionRebuildRouteTree         AutonomousCorrectionActionKind = "rebuild_route_tree"
+	CorrectionActionReorderRouteTreeBranches AutonomousCorrectionActionKind = "reorder_route_tree_branches"
+	CorrectionActionInsertLayerTransition    AutonomousCorrectionActionKind = "insert_layer_transition"
+)
+
+type AutonomousCorrectionAction struct {
+	Kind          AutonomousCorrectionActionKind `json:"kind"`
+	Category      AutonomousCorrectionCategory   `json:"category"`
+	Refs          []string                       `json:"refs,omitempty"`
+	Nets          []string                       `json:"nets,omitempty"`
+	PlacementHint PlacementRetryHintCategory     `json:"placement_hint,omitempty"`
+	Authorized    bool                           `json:"authorized"`
+	Reason        string                         `json:"reason,omitempty"`
+}
+
+type AutonomousCorrectionPlan struct {
+	SchemaVersion        string                           `json:"schema_version"`
+	Attempt              int                              `json:"attempt"`
+	MaxAttempts          int                              `json:"max_attempts"`
+	RetryKey             string                           `json:"retry_key,omitempty"`
+	InvariantFingerprint string                           `json:"invariant_fingerprint,omitempty"`
+	PlacementStateHash   string                           `json:"placement_state_hash,omitempty"`
+	Diagnostics          []AutonomousCorrectionDiagnostic `json:"diagnostics,omitempty"`
+	Actions              []AutonomousCorrectionAction     `json:"actions,omitempty"`
+	Authorized           bool                             `json:"authorized"`
+	StopReason           string                           `json:"stop_reason,omitempty"`
+}
+
+type AutonomousCorrectionPlanOptions struct {
+	Attempt          int
+	MaxAttempts      int
+	AppliedRetryKeys []string
+}
+
+const (
+	CorrectionStopNotGeneric              = "not_generic_circuit"
+	CorrectionStopNotRequired             = "correction_not_required"
+	CorrectionStopBudgetExhausted         = "budget_exhausted"
+	CorrectionStopUnsupportedDiagnostic   = "unsupported_diagnostic"
+	CorrectionStopAmbiguousDiagnostics    = "ambiguous_diagnostics"
+	CorrectionStopFixedConstraintConflict = "fixed_constraint_conflict"
+	CorrectionStopRepeatedRetryKey        = "repeated_retry_key"
+)
+
+// PlanAutonomousCorrection is pure: it derives an authorized plan without
+// mutating the design request, placement request, placements, or diagnostics.
+func PlanAutonomousCorrection(request Request, placementRequest placement.Request, placements []placement.PlacementResult, diagnostics []AutonomousCorrectionDiagnostic, opts AutonomousCorrectionPlanOptions) (AutonomousCorrectionPlan, error) {
+	plan := AutonomousCorrectionPlan{
+		SchemaVersion: AutonomousCorrectionSchemaV1,
+		Attempt:       opts.Attempt,
+		MaxAttempts:   opts.MaxAttempts,
+		Diagnostics:   slices.Clone(diagnostics),
+	}
+	slices.SortFunc(plan.Diagnostics, compareAutonomousCorrectionDiagnostic)
+	if !IsGenericAutonomousCorrectionRequest(request) {
+		plan.StopReason = CorrectionStopNotGeneric
+		return plan, nil
+	}
+	if plan.Attempt < 2 {
+		plan.Attempt = 2
+	}
+	if plan.MaxAttempts < 1 || plan.Attempt > plan.MaxAttempts {
+		plan.StopReason = CorrectionStopBudgetExhausted
+		return plan, nil
+	}
+	fingerprint, err := AutonomousCorrectionInvariantFingerprint(request)
+	if err != nil {
+		return plan, err
+	}
+	plan.InvariantFingerprint = fingerprint
+	plan.PlacementStateHash = placementStateHash(placements)
+	blocking := blockingAutonomousCorrectionDiagnostics(plan.Diagnostics)
+	if len(blocking) == 0 {
+		plan.StopReason = CorrectionStopNotRequired
+		return plan, nil
+	}
+	for _, diagnostic := range blocking {
+		if !diagnostic.AutomaticAction {
+			plan.Actions = append(plan.Actions, autonomousCorrectionActionForDiagnostic(diagnostic))
+			plan.StopReason = CorrectionStopUnsupportedDiagnostic
+			return plan, nil
+		}
+		plan.Actions = append(plan.Actions, autonomousCorrectionActionsForDiagnostic(diagnostic)...)
+	}
+	plan.Actions = normalizeAutonomousCorrectionActions(plan.Actions)
+	for _, action := range plan.Actions {
+		if !action.Authorized {
+			plan.StopReason = CorrectionStopUnsupportedDiagnostic
+			return plan, nil
+		}
+	}
+	if autonomousCorrectionActionsAmbiguous(plan.Actions) {
+		plan.StopReason = CorrectionStopAmbiguousDiagnostics
+		return plan, nil
+	}
+	if autonomousCorrectionActionsFixed(placementRequest.Components, plan.Actions) {
+		plan.StopReason = CorrectionStopFixedConstraintConflict
+		return plan, nil
+	}
+	actionKinds := make([]string, 0, len(plan.Actions))
+	for _, action := range plan.Actions {
+		actionKinds = append(actionKinds, string(action.Kind))
+	}
+	plan.RetryKey = AutonomousCorrectionRetryKey(plan.Diagnostics, actionKinds, plan.InvariantFingerprint, plan.PlacementStateHash)
+	if slices.Contains(opts.AppliedRetryKeys, plan.RetryKey) {
+		plan.StopReason = CorrectionStopRepeatedRetryKey
+		return plan, nil
+	}
+	plan.Authorized = len(plan.Actions) > 0
+	if !plan.Authorized {
+		plan.StopReason = CorrectionStopUnsupportedDiagnostic
+	}
+	return plan, nil
+}
+
+func blockingAutonomousCorrectionDiagnostics(diagnostics []AutonomousCorrectionDiagnostic) []AutonomousCorrectionDiagnostic {
+	result := make([]AutonomousCorrectionDiagnostic, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		if diagnostic.Severity == reports.SeverityBlocked || diagnostic.Severity == reports.SeverityError {
+			result = append(result, diagnostic)
+		}
+	}
+	return result
+}
+
+func autonomousCorrectionActionsForDiagnostic(diagnostic AutonomousCorrectionDiagnostic) []AutonomousCorrectionAction {
+	action := autonomousCorrectionActionForDiagnostic(diagnostic)
+	if !action.Authorized {
+		return []AutonomousCorrectionAction{action}
+	}
+	actions := []AutonomousCorrectionAction{action}
+	if diagnostic.Category == CorrectionSameNetBranchMerge {
+		actions = append(actions, AutonomousCorrectionAction{
+			Kind: CorrectionActionRebuildRouteTree, Category: diagnostic.Category,
+			Refs: slices.Clone(diagnostic.Refs), Nets: slices.Clone(diagnostic.Nets),
+			Authorized: true, Reason: "rerun deterministic route-tree construction after endpoint-access correction",
+		})
+	}
+	return actions
+}
+
+func autonomousCorrectionActionForDiagnostic(diagnostic AutonomousCorrectionDiagnostic) AutonomousCorrectionAction {
+	action := AutonomousCorrectionAction{
+		Category: diagnostic.Category,
+		Refs:     slices.Clone(diagnostic.Refs),
+		Nets:     slices.Clone(diagnostic.Nets),
+	}
+	switch diagnostic.Category {
+	case CorrectionComponentOverlap:
+		action.Kind, action.PlacementHint, action.Authorized = CorrectionActionAdjustRelativeSpacing, PlacementRetryIncreaseSpacing, true
+	case CorrectionInaccessiblePad:
+		action.Kind, action.PlacementHint, action.Authorized = CorrectionActionImproveEndpointFanout, PlacementRetryImproveFanout, true
+	case CorrectionBlockedEscapeDirection:
+		action.Kind, action.PlacementHint, action.Authorized = CorrectionActionMoveWithinRegion, PlacementRetryMoveFromEdge, true
+	case CorrectionSameNetBranchMerge:
+		action.Kind, action.PlacementHint, action.Authorized = CorrectionActionImproveEndpointFanout, PlacementRetryImproveFanout, true
+	case CorrectionRequiredNetDisconnectedEndpoint:
+		switch diagnostic.SourceCategory {
+		case routing.RepairPadAccess, routing.RepairLayerAccess:
+			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionImproveEndpointFanout, PlacementRetryImproveFanout, true
+		case routing.RepairClearance:
+			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionAdjustRelativeSpacing, PlacementRetryIncreaseSpacing, true
+		default:
+			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionReduceEndpointDistance, PlacementRetryReduceDistance, true
+		}
+	case CorrectionRoutingRegionExhaustion:
+		if diagnostic.SourceCategory == routing.RepairLengthPolicy {
+			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionReduceEndpointDistance, PlacementRetryReduceDistance, true
+		} else {
+			action.Kind, action.PlacementHint, action.Authorized = CorrectionActionAdjustRelativeSpacing, PlacementRetryIncreaseSpacing, true
+		}
+	case CorrectionRouteTreeBranchOrder:
+		action.Kind, action.Reason = CorrectionActionReorderRouteTreeBranches, "route-tree branch reordering is reserved for a future correction contract"
+	case CorrectionMissingLayerTransition:
+		action.Kind, action.Reason = CorrectionActionInsertLayerTransition, "layer-transition insertion is not authorized in v1"
+	default:
+		action.Reason = "no deterministic correction is authorized for this geometry"
+	}
+	return action
+}
+
+func normalizeAutonomousCorrectionActions(actions []AutonomousCorrectionAction) []AutonomousCorrectionAction {
+	result := make([]AutonomousCorrectionAction, 0, len(actions))
+	seen := map[string]struct{}{}
+	for _, action := range actions {
+		action.Refs = correctionSortedStrings(action.Refs)
+		action.Nets = correctionSortedStrings(action.Nets)
+		key := autonomousCorrectionActionKey(action)
+		if _, exists := seen[key]; exists {
+			continue
+		}
+		seen[key] = struct{}{}
+		result = append(result, action)
+	}
+	slices.SortFunc(result, func(left, right AutonomousCorrectionAction) int {
+		if value := cmp.Compare(left.Kind, right.Kind); value != 0 {
+			return value
+		}
+		if value := cmp.Compare(left.Category, right.Category); value != 0 {
+			return value
+		}
+		if value := slices.Compare(left.Refs, right.Refs); value != 0 {
+			return value
+		}
+		return slices.Compare(left.Nets, right.Nets)
+	})
+	return result
+}
+
+func autonomousCorrectionActionKey(action AutonomousCorrectionAction) string {
+	hash := sha256.New()
+	writeHashBytes(hash, []byte(action.Kind))
+	writeHashBytes(hash, []byte(action.Category))
+	writeHashBytes(hash, []byte(action.PlacementHint))
+	writeHashBytes(hash, []byte("refs:"+strconv.Itoa(len(action.Refs))))
+	for _, ref := range action.Refs {
+		writeHashBytes(hash, []byte(ref))
+	}
+	writeHashBytes(hash, []byte("nets:"+strconv.Itoa(len(action.Nets))))
+	for _, net := range action.Nets {
+		writeHashBytes(hash, []byte(net))
+	}
+	return hex.EncodeToString(hash.Sum(nil))
+}
+
+func autonomousCorrectionActionsAmbiguous(actions []AutonomousCorrectionAction) bool {
+	byNet := map[string]map[AutonomousCorrectionActionKind]struct{}{}
+	for _, action := range actions {
+		if action.Kind != CorrectionActionAdjustRelativeSpacing && action.Kind != CorrectionActionReduceEndpointDistance {
+			continue
+		}
+		for _, net := range action.Nets {
+			if byNet[net] == nil {
+				byNet[net] = map[AutonomousCorrectionActionKind]struct{}{}
+			}
+			byNet[net][action.Kind] = struct{}{}
+		}
+	}
+	for _, kinds := range byNet {
+		if len(kinds) > 1 {
+			return true
+		}
+	}
+	return false
+}
+
+func autonomousCorrectionActionsFixed(components []placement.Component, actions []AutonomousCorrectionAction) bool {
+	movable, _ := placementRetryMobilityRefs(components)
+	if len(movable) == 0 {
+		return true
+	}
+	for _, action := range actions {
+		if action.Kind == CorrectionActionRebuildRouteTree {
+			continue
+		}
+		if len(action.Refs) == 0 {
+			continue
+		}
+		actionMovable := false
+		for _, ref := range action.Refs {
+			if _, ok := movable[ref]; ok {
+				actionMovable = true
+				break
+			}
+		}
+		if !actionMovable {
+			return true
+		}
+	}
+	return false
 }
 
 // BuildAutonomousCorrectionDiagnostics converts subsystem issues into the
