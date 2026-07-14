@@ -273,6 +273,16 @@ identity-neutral stress fixture.
   remain pass.
 - The stress case has clean configured KiCad evidence.
 
+### Completion evidence
+
+- The identity-neutral stress fixture fails with authoritative R_0805 pad
+  geometry, applies one deterministic spacing correction, and routes on attempt
+  2.
+- The configured KiCad stress lane passes ERC, strict DRC, writer correctness,
+  and normalized round-trip checks.
+- `TestAIProviderOptionalKiCadPromotion` passes all eight checked-in bounded and
+  generic provider fixtures with the configured KiCad 10 CLI and library roots.
+
 ### Rollback risk
 
 - High if a shared behavior regresses. Compare canonical circuit projections,
@@ -344,5 +354,5 @@ KICADAI_FOOTPRINTS_ROOT=/path/to/kicad-footprints \
 - [x] Phase 5 complete
 - [x] Phase 6 complete
 - [x] Phase 7 complete
-- [ ] Phase 8 complete
+- [x] Phase 8 complete
 - [ ] Phase 9 complete

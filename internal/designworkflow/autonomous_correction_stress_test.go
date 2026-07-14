@@ -2,19 +2,29 @@ package designworkflow
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
+	"time"
 
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/placement"
 	"kicadai/internal/reports"
 	"kicadai/internal/routing"
+	"kicadai/internal/writercorrectness"
 )
 
-const autonomousCorrectionStressFixtureDir = "testdata/generic_autonomous_correction"
+const (
+	autonomousCorrectionStressFixtureDir = "testdata/generic_autonomous_correction"
+	resistor0805PadOffsetNM              = 912_500
+	resistor0805PadWidthNM               = 1_025_000
+	resistor0805PadHeightNM              = 1_400_000
+)
 
 type autonomousCorrectionStressMetadata struct {
 	Schema                  string  `json:"schema"`
@@ -51,7 +61,7 @@ func TestAutonomousCorrectionStressFixtureRecoversRealRoutingFailure(t *testing.
 	if err != nil {
 		t.Fatal(err)
 	}
-	index := autonomousCorrectionStressLibraryIndex(request)
+	index := autonomousCorrectionStressLibraryIndex(t, request)
 	first := runAutonomousCorrectionStress(t, request, index, metadata.OffsetMM)
 	second := runAutonomousCorrectionStress(t, request, index, metadata.OffsetMM)
 
@@ -92,6 +102,111 @@ func TestAutonomousCorrectionStressFixtureRecoversRealRoutingFailure(t *testing.
 	renamedRun := runAutonomousCorrectionStress(t, renamed, index, metadata.OffsetMM)
 	if renamedRun.Report.StopReason != metadata.ExpectedStopReason || renamedRun.Report.SelectedAttempt != metadata.ExpectedSelectedAttempt || renamedRun.Report.InitialInvariantFingerprint != beforeInvariant {
 		t.Fatalf("project identity changed correction behavior: %#v", renamedRun.Report)
+	}
+}
+
+func TestAutonomousCorrectionStressOptionalKiCad(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping optional KiCad-backed autonomous correction stress lane in short mode")
+	}
+	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
+	if cliPath == "" {
+		t.Skipf("set %s to run the autonomous correction KiCad-backed stress lane", checks.EnvKiCadCLI)
+	}
+	roots, rootIssues := libraryresolver.ResolveRoots()
+	if strings.TrimSpace(roots.SymbolsRoot) == "" || strings.TrimSpace(roots.FootprintsRoot) == "" {
+		t.Skip("autonomous correction KiCad stress lane requires symbol and footprint roots")
+	}
+	if reports.HasBlockingIssue(rootIssues) {
+		t.Fatalf("library root issues = %#v", rootIssues)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Minute)
+	t.Cleanup(cancel)
+	fullIndex, loadIssues := libraryresolver.Load(ctx, roots, libraryresolver.LoadOptions{})
+	if err := ctx.Err(); err != nil {
+		t.Fatalf("load stress libraries: %v", err)
+	}
+	if len(fullIndex.Symbols) == 0 || len(fullIndex.Footprints) == 0 {
+		t.Fatalf("stress library index is empty; issues = %#v", loadIssues)
+	}
+	// The complete upstream libraries may report unrelated diagnostics. Resolve
+	// every record required by this fixture explicitly and fail if any is absent.
+	request := loadAutonomousCorrectionStressRequest(t)
+	symbols := make(map[string]libraryresolver.SymbolRecord)
+	for _, component := range request.ExplicitCircuit.Schematic.Circuit.Components {
+		record, ok := fullIndex.Symbols[component.Symbol]
+		if !ok {
+			t.Fatalf("stress symbol library record missing: %s", component.Symbol)
+		}
+		symbols[component.Symbol] = record
+	}
+	footprints := make(map[string]libraryresolver.FootprintRecord)
+	for _, component := range request.ExplicitCircuit.Components {
+		record, ok := fullIndex.Footprints[component.FootprintID]
+		if !ok {
+			t.Fatalf("stress footprint library record missing: %s", component.FootprintID)
+		}
+		footprints[component.FootprintID] = record
+	}
+	index := libraryresolver.LibraryIndex{
+		GeneratedAt: fullIndex.GeneratedAt,
+		Roots:       fullIndex.Roots,
+		Symbols:     symbols,
+		Footprints:  footprints,
+	}
+	metadata := loadAutonomousCorrectionStressMetadata(t)
+	stress := runAutonomousCorrectionStress(t, request, &index, metadata.OffsetMM)
+	if stress.SelectedRouted.Result.Status != routing.StatusRouted || stress.Report.SelectedAttempt != metadata.ExpectedSelectedAttempt {
+		t.Fatalf("stress correction did not select routed attempt: %#v", stress.Report)
+	}
+
+	schematicTx, schematicIssues := explicitSchematicTransaction(request, &index)
+	if reports.HasBlockingIssue(schematicIssues) {
+		t.Fatalf("stress schematic transaction issues = %#v", schematicIssues)
+	}
+	tx, transactionIssues := explicitCircuitTransaction(request, schematicTx, stress.SelectedPlaced, stress.SelectedRouted, true)
+	if reports.HasBlockingIssue(transactionIssues) {
+		t.Fatalf("stress project transaction issues = %#v", transactionIssues)
+	}
+	// KiCad on macOS requires a stable existing cwd; the ignored examples workspace
+	// avoids subprocess failures observed when Go removes temporary directories.
+	generatedRoot := filepath.Clean(filepath.Join("..", "..", "examples", ".generated"))
+	if err := os.MkdirAll(generatedRoot, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	outputDir, err := os.MkdirTemp(generatedRoot, "autonomous-correction-stress-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.RemoveAll(outputDir) })
+	written := writeExplicitCircuitProject(ctx, request, tx, CreateOptions{OutputDir: outputDir, Overwrite: true, LibraryIndex: &index})
+	if workflowStageBlocked(written.Stage) {
+		t.Fatalf("stress project write = %#v", written.Stage)
+	}
+	artifactDir := filepath.Join(outputDir, ".kicadai", "checks")
+	writer := CheckWriterCorrectnessWithOptions(ctx, &written, writercorrectness.Options{
+		RequireKiCadRoundTrip: true,
+		KiCadCLI:              cliPath,
+		KeepArtifacts:         true,
+		ArtifactDir:           artifactDir,
+		StrictDiffs:           true,
+		LibraryIndex:          index,
+		HasLibraryIndex:       true,
+		LibraryResolutionUsed: true,
+	})
+	if workflowStageBlocked(writer.Stage) || !writer.Writer.OK || !writerCheckPassed(writer.Writer, writercorrectness.CheckKiCadRoundTrip) {
+		t.Fatalf("stress writer correctness = stage %#v writer %#v", writer.Stage, writer.Writer)
+	}
+	validated := ValidateProject(ctx, &request, &written, ValidationOptions{})
+	if workflowStageBlocked(validated.Stage) {
+		t.Fatalf("stress internal validation = %#v", validated.Stage)
+	}
+	kicad := RunKiCadChecks(ctx, &request, &written, KiCadCheckOptions{
+		KiCadCLI: cliPath, RequireERC: true, RequireDRC: true,
+		KeepArtifacts: true, ArtifactDir: artifactDir,
+	})
+	if workflowStageBlocked(kicad.Stage) || kicad.ERC.Status != checks.CheckStatusPass || kicad.DRC.Status != checks.CheckStatusPass {
+		t.Fatalf("stress KiCad checks = stage %#v ERC %#v DRC %#v", kicad.Stage, kicad.ERC, kicad.DRC)
 	}
 }
 
@@ -164,10 +279,22 @@ func loadAutonomousCorrectionStressRequest(t *testing.T) Request {
 	return request
 }
 
-func autonomousCorrectionStressLibraryIndex(request Request) *libraryresolver.LibraryIndex {
+func autonomousCorrectionStressLibraryIndex(t *testing.T, request Request) *libraryresolver.LibraryIndex {
+	t.Helper()
 	index := &libraryresolver.LibraryIndex{Footprints: map[string]libraryresolver.FootprintRecord{}}
 	for _, component := range request.ExplicitCircuit.Components {
-		index.Footprints[component.FootprintID] = placementTestFootprint(component.FootprintID)
+		record := placementTestFootprint(component.FootprintID)
+		record.Pads = append([]libraryresolver.FootprintPad(nil), record.Pads...)
+		if len(record.Pads) < 2 {
+			t.Fatalf("stress footprint %s has %d pads; want at least 2", component.FootprintID, len(record.Pads))
+		}
+		record.Pads[0].Position.X = -resistor0805PadOffsetNM
+		record.Pads[0].Size.X = resistor0805PadWidthNM
+		record.Pads[0].Size.Y = resistor0805PadHeightNM
+		record.Pads[1].Position.X = resistor0805PadOffsetNM
+		record.Pads[1].Size.X = resistor0805PadWidthNM
+		record.Pads[1].Size.Y = resistor0805PadHeightNM
+		index.Footprints[component.FootprintID] = record
 	}
 	return index
 }
@@ -179,4 +306,13 @@ func canonicalStressJSON(t *testing.T, value any) []byte {
 		t.Fatal(err)
 	}
 	return data
+}
+
+func writerCheckPassed(result writercorrectness.Result, name string) bool {
+	for _, check := range result.Checks {
+		if check.Name == name {
+			return check.Status == writercorrectness.CheckPass
+		}
+	}
+	return false
 }
