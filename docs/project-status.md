@@ -61,12 +61,12 @@ LMV321 fixtures keep analog performance claims explicitly review-required. The
 protected USB-C LED currently carries recorded, rather than live,
 generic-provider pass evidence.
 
-Generic multi-unit lowering is now proven by a recorded LM358 fixture. One
-catalog-resolved physical LM358 package produces distinct KiCad units A, B, and
-P while retaining one reference, footprint, and BOM identity. Shared supply
-pins and unit-to-pad mappings are validated fail-closed. Its recorded lane has
-clean KiCad-backed pass evidence; the optional live provider lane remains the
-current promotion gate.
+Generic multi-unit lowering is now proven by recorded and live-provider LM358
+evidence. One catalog-resolved physical LM358 package produces distinct KiCad
+units A, B, and P while retaining one reference, footprint, and BOM identity.
+Shared supply pins and unit-to-pad mappings are validated fail-closed. Its recorded lane and
+semantically equivalent live-provider graph both have clean KiCad-backed pass
+evidence. Live provider execution remains optional and credential-gated.
 
 The generic contract is deliberately strict. It expands topology expression,
 but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or
@@ -147,10 +147,11 @@ treated as autonomous or fabrication-ready.
 ## Remaining Direction
 
 The next work should promote a graph that introduces a materially different
-generic capability, rather than another fixed analog stage count. Useful
-targets include controlled multi-unit parts, explicit hierarchy, or a circuit
-whose domain evidence requires simulation. Continue to broaden catalog and
-pin/function evidence only when a target exposes a concrete gap.
+generic capability, rather than another fixed analog stage count. Generic
+multi-unit parts are now covered; useful next targets include explicit
+hierarchy or a circuit whose domain evidence requires simulation. Continue to
+broaden catalog and pin/function evidence only when a target exposes a concrete
+gap.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

@@ -330,6 +330,14 @@ fixture retains the older generic `KICADAI_OPENAI_LIVE_GRAPH` name; the
 two-stage fixture uses `KICADAI_OPENAI_DUAL_LMV321_LIVE_GRAPH`.
 The LM358 fixture uses `KICADAI_OPENAI_LM358_LIVE_GRAPH`.
 
+The LM358 reference has both recorded and live-provider evidence. Its saved
+live graph is semantically equivalent to the checked-in recording and reaches
+AI status `ready` plus KiCad-backed promotion `pass` through clean ERC, strict
+DRC, required-net routing, writer correctness, and normalized round-trip
+checks. Provider timeouts and transport failures occur before graph generation
+and do not alter this deterministic evidence; rerun the optional live command
+or replay the saved graph through the recorded provider.
+
 Optional provider settings include `--model`, `--max-ai-attempts`, and
 `--ai-background`. Correction attempts are bounded and restricted to explicit
 schema/intent diagnostics. Authentication, refusal, unsupported topology, and

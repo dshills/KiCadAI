@@ -1,5 +1,9 @@
 # Generic Multi-Unit Components Implementation Plan
 
+Status: complete as of 2026-07-14. All phases were implemented and committed.
+The recorded fixture and a semantically equivalent live-provider graph reach
+KiCad-backed `pass`; live API execution remains optional and credential-gated.
+
 ## Phase 1: Contract And Fail-First Tests
 
 Files likely touched:
