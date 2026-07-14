@@ -1,0 +1,12 @@
+{
+  "schema": "kicadai.autonomous-correction-stress.v1",
+  "source_fixture": "generic_parallel_resistors",
+  "perturbation": "r2_offset_from_r1",
+  "offset_mm": 1.0,
+  "failure_category": "routing_region_exhaustion",
+  "expected_action": "adjust_relative_spacing",
+  "expected_stop_reason": "routed",
+  "expected_selected_attempt": 2,
+  "max_attempts": 3,
+  "identity_neutral": true
+}

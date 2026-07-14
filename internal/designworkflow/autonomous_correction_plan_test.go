@@ -71,6 +71,35 @@ func TestPlanAutonomousCorrectionStopsFailClosed(t *testing.T) {
 	}
 }
 
+func TestPlanAutonomousCorrectionPreservesCoveredTerminalDiagnostics(t *testing.T) {
+	request := correctionExplicitRequest()
+	placementRequest, placements := correctionPlacementState(false)
+	actionable := correctionDiagnostic(CorrectionRoutingRegionExhaustion, routing.RepairClearance, []string{"J1", "R1"}, []string{"SIG"})
+	disconnected := correctionDiagnostic(CorrectionRequiredNetDisconnectedEndpoint, routing.RepairConnectivity, nil, []string{"SIG"})
+	disconnected.IssueCode = reports.CodeDisconnectedPad
+	disconnected.AutomaticAction = false
+	terminal := correctionDiagnostic(CorrectionUnsupportedGeometry, routing.RepairUnknown, nil, []string{"SIG"})
+	terminal.IssueCode = reports.CodeValidationFailed
+	terminal.Path = "explicit_circuit.nets.SIG"
+	terminal.AutomaticAction = false
+
+	plan, err := PlanAutonomousCorrection(request, placementRequest, placements, []AutonomousCorrectionDiagnostic{actionable, disconnected, terminal}, AutonomousCorrectionPlanOptions{Attempt: 2, MaxAttempts: 3})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !plan.Authorized || plan.StopReason != "" || len(plan.Actions) != 1 || plan.Actions[0].Kind != CorrectionActionAdjustRelativeSpacing {
+		t.Fatalf("covered terminal plan = %#v", plan)
+	}
+	if len(plan.Diagnostics) != 3 {
+		t.Fatalf("plan discarded terminal evidence: %#v", plan.Diagnostics)
+	}
+
+	plan, err = PlanAutonomousCorrection(request, placementRequest, placements, []AutonomousCorrectionDiagnostic{terminal}, AutonomousCorrectionPlanOptions{Attempt: 2, MaxAttempts: 3})
+	if err != nil || plan.Authorized || plan.StopReason != CorrectionStopUnsupportedDiagnostic {
+		t.Fatalf("standalone terminal diagnostic did not fail closed: plan=%#v err=%v", plan, err)
+	}
+}
+
 func TestPlanAutonomousCorrectionStopsForFixedAndRepeatedState(t *testing.T) {
 	request := correctionExplicitRequest()
 	placementRequest, placements := correctionPlacementState(true)

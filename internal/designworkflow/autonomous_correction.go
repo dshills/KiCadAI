@@ -190,7 +190,7 @@ func PlanAutonomousCorrection(request Request, placementRequest placement.Reques
 		plan.StopReason = CorrectionStopNotRequired
 		return plan, nil
 	}
-	for _, diagnostic := range blocking {
+	for _, diagnostic := range autonomousCorrectionAuthorizationDiagnostics(blocking) {
 		if !diagnostic.AutomaticAction {
 			plan.Actions = append(plan.Actions, autonomousCorrectionActionForDiagnostic(diagnostic))
 			plan.StopReason = CorrectionStopUnsupportedDiagnostic
@@ -227,6 +227,43 @@ func PlanAutonomousCorrection(request Request, placementRequest placement.Reques
 		plan.StopReason = CorrectionStopUnsupportedDiagnostic
 	}
 	return plan, nil
+}
+
+func autonomousCorrectionAuthorizationDiagnostics(diagnostics []AutonomousCorrectionDiagnostic) []AutonomousCorrectionDiagnostic {
+	actionableNets := map[string]struct{}{}
+	for _, diagnostic := range diagnostics {
+		if !diagnostic.AutomaticAction || len(diagnostic.Refs) == 0 {
+			continue
+		}
+		for _, net := range diagnostic.Nets {
+			actionableNets[net] = struct{}{}
+		}
+	}
+	result := make([]AutonomousCorrectionDiagnostic, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		if autonomousCorrectionTerminalDiagnosticCovered(diagnostic, actionableNets) {
+			continue
+		}
+		result = append(result, diagnostic)
+	}
+	return result
+}
+
+func autonomousCorrectionTerminalDiagnosticCovered(diagnostic AutonomousCorrectionDiagnostic, actionableNets map[string]struct{}) bool {
+	if diagnostic.AutomaticAction || len(diagnostic.Refs) != 0 || len(diagnostic.Nets) == 0 {
+		return false
+	}
+	terminal := diagnostic.IssueCode == reports.CodeDisconnectedPad ||
+		diagnostic.IssueCode == reports.CodeValidationFailed && strings.HasPrefix(diagnostic.Path, "explicit_circuit.nets.")
+	if !terminal {
+		return false
+	}
+	for _, net := range diagnostic.Nets {
+		if _, covered := actionableNets[net]; !covered {
+			return false
+		}
+	}
+	return true
 }
 
 func blockingAutonomousCorrectionDiagnostics(diagnostics []AutonomousCorrectionDiagnostic) []AutonomousCorrectionDiagnostic {
