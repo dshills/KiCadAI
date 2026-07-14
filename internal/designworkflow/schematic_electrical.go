@@ -61,7 +61,7 @@ func schematicElectricalStageFromTransaction(tx transactions.Transaction) StageR
 func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (schematic.SchematicFile, schematicrules.Options, []reports.Issue) {
 	var file schematic.SchematicFile
 	opts := schematicrules.Options{Scope: schematicrules.ScopeGenerated, Acceptance: schematicrules.AcceptanceConnectivity}
-	symbolPins := map[string]map[string]kicadfiles.Point{}
+	symbolPins := map[schematicElectricalSymbolKey]map[string]kicadfiles.Point{}
 	labels := map[string]struct{}{}
 	var wireCandidates []schematicElectricalWireCandidate
 	var issues []reports.Issue
@@ -76,11 +76,12 @@ func schematicElectricalInputsFromTransaction(tx transactions.Transaction) (sche
 			symbol := schematic.SchematicSymbol{
 				LibraryID:  payload.LibraryID,
 				Reference:  payload.Ref,
+				Unit:       payload.Unit,
 				Value:      payload.Value,
 				Position:   position,
 				PinAnchors: schematicElectricalPinAnchors(position, payload.Pins),
 			}
-			symbolPins[payload.Ref] = schematicElectricalPinMap(position, payload.Pins)
+			symbolPins[schematicElectricalSymbolKey{reference: payload.Ref, unit: payload.Unit}] = schematicElectricalPinMap(position, payload.Pins)
 			file.Symbols = append(file.Symbols, symbol)
 			if strings.TrimSpace(payload.Value) != "" || !strings.HasPrefix(strings.TrimSpace(payload.Ref), "#") {
 				opts.ValueChecks = append(opts.ValueChecks, schematicrules.ValueCheck{
@@ -376,8 +377,13 @@ func schematicElectricalPinMap(position kicadfiles.Point, pins []transactions.Pi
 	return anchors
 }
 
-func schematicElectricalEndpointPoint(symbolPins map[string]map[string]kicadfiles.Point, endpoint transactions.Endpoint) (kicadfiles.Point, bool) {
-	pins, ok := symbolPins[endpoint.Ref]
+type schematicElectricalSymbolKey struct {
+	reference string
+	unit      int
+}
+
+func schematicElectricalEndpointPoint(symbolPins map[schematicElectricalSymbolKey]map[string]kicadfiles.Point, endpoint transactions.Endpoint) (kicadfiles.Point, bool) {
+	pins, ok := symbolPins[schematicElectricalSymbolKey{reference: endpoint.Ref, unit: endpoint.Unit}]
 	if !ok {
 		return kicadfiles.Point{}, false
 	}

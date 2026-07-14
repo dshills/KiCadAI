@@ -185,6 +185,29 @@ func TestSchematicElectricalInputsRespectLabelOnlyConnections(t *testing.T) {
 	}
 }
 
+func TestSchematicElectricalInputsResolveSharedReferenceByUnit(t *testing.T) {
+	addA := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"U1","unit":1,"value":"LM358","library_id":"Amplifier_Operational:LM358","at":{"x_mm":10,"y_mm":10},"pins":[{"number":"1","x_mm":2.54}]}`))
+	addB := transactions.NewOperation(transactions.OpAddSymbol, []byte(`{"op":"add_symbol","ref":"U1","unit":2,"value":"LM358","library_id":"Amplifier_Operational:LM358","at":{"x_mm":20,"y_mm":10},"pins":[{"number":"7","x_mm":2.54}]}`))
+	connect := transactions.NewOperation(transactions.OpConnect, []byte(`{"op":"connect","from":{"ref":"U1","pin":"1","unit":1},"to":{"ref":"U1","pin":"7","unit":2},"net_name":"BUFFERED"}`))
+
+	file, _, issues := schematicElectricalInputsFromTransaction(transactions.Transaction{Operations: []transactions.Operation{addA, addB, connect}})
+	if len(issues) != 0 {
+		t.Fatalf("multi-unit input issues = %#v", issues)
+	}
+	if len(file.Symbols) != 2 || file.Symbols[0].Unit != 1 || file.Symbols[1].Unit != 2 {
+		t.Fatalf("multi-unit symbols = %#v", file.Symbols)
+	}
+	if len(file.Wires) != 1 || len(file.Wires[0].Points) < 2 || file.Wires[0].Points[0] == file.Wires[0].Points[len(file.Wires[0].Points)-1] {
+		t.Fatalf("multi-unit wire = %#v", file.Wires)
+	}
+
+	wrongUnit := transactions.NewOperation(transactions.OpConnect, []byte(`{"op":"connect","from":{"ref":"U1","pin":"1","unit":2},"to":{"ref":"U1","pin":"7","unit":2},"net_name":"WRONG"}`))
+	_, _, issues = schematicElectricalInputsFromTransaction(transactions.Transaction{Operations: []transactions.Operation{addA, addB, wrongUnit}})
+	if len(issues) != 1 || issues[0].Path != "operations[2].from" {
+		t.Fatalf("wrong-unit issues = %#v", issues)
+	}
+}
+
 func TestSchematicElectricalInputsPreserveBusLabelAnchor(t *testing.T) {
 	addBus := transactions.NewOperation(transactions.OpAddBus, []byte(`{"op":"add_bus","points":[{"x_mm":10,"y_mm":10},{"x_mm":30,"y_mm":10}]}`))
 	addLabel := transactions.NewOperation(transactions.OpAddLabel, []byte(`{"op":"add_label","text":"I2C","at":{"x_mm":10,"y_mm":10},"kind":"local"}`))

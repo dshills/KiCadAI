@@ -1461,7 +1461,7 @@ func formatConnectOperationsForTest(t *testing.T, projectName string, plan Block
 	if err != nil {
 		return err.Error()
 	}
-	symbolPins := map[string]map[string]kicadfiles.Point{}
+	symbolPins := map[schematicElectricalSymbolKey]map[string]kicadfiles.Point{}
 	for index, operation := range tx.Operations {
 		if operation.Op != transactions.OpAddSymbol {
 			continue
@@ -1471,7 +1471,7 @@ func formatConnectOperationsForTest(t *testing.T, projectName string, plan Block
 			t.Fatalf("decode add_symbol operation %d: %v", index, err)
 		}
 		position := schematicElectricalPoint(payload.At)
-		symbolPins[payload.Ref] = schematicElectricalPinMap(position, payload.Pins)
+		symbolPins[schematicElectricalSymbolKey{reference: payload.Ref, unit: payload.Unit}] = schematicElectricalPinMap(position, payload.Pins)
 	}
 	var builder strings.Builder
 	for index, operation := range tx.Operations {
