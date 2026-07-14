@@ -78,7 +78,7 @@ func ToSchematicIR(resolved ResolvedDocument) (schematicir.Document, []reports.I
 		}
 		document.Circuit.Buses = append(document.Circuit.Buses, irBus)
 	}
-	document.Layout = schematicLayoutIntent(resolved.Source, unitIDs, unitsByComponent)
+	document.Layout = schematicLayoutIntent(resolved, unitIDs, unitsByComponent)
 	document.Layout.Buses = inferredSchematicBusLayouts(document.Circuit)
 	document = schematicir.NormalizeLayoutIntent(document)
 	issues = append(issues, schematicir.Validate(document)...)
@@ -158,20 +158,47 @@ func schematicUnitIDs(resolved ResolvedDocument) (map[schematicUnitKey]string, m
 			continue
 		}
 		unitsByComponent[component.Instance.ID] = units
+		namedUnitIDs := make(map[int]string, len(component.Units))
+		for _, namedUnit := range component.Units {
+			namedUnitIDs[namedUnit.Unit] = namedUnit.ID
+		}
 		for _, unit := range units {
-			id := component.Instance.ID
-			if len(units) > 1 {
+			id := ""
+			if namedUnitID := namedUnitIDs[unit]; namedUnitID != "" {
+				id = namedSchematicUnitID(component.Instance.ID, namedUnitID)
+			} else {
+				id = component.Instance.ID
+			}
+			if id == component.Instance.ID && len(units) > 1 {
 				id += "_u" + strconv.Itoa(unit)
 			}
-			if owner, exists := idOwners[id]; exists && owner != component.Instance.ID {
+			ownerID := component.Instance.ID + "/" + strconv.Itoa(unit)
+			if owner, exists := idOwners[id]; exists && owner != ownerID {
 				issues = append(issues, graphIssue(CodeSchematicLowering, "components."+component.Instance.ID+".id", "lowered schematic component id collides with "+owner))
 				continue
 			}
-			idOwners[id] = component.Instance.ID
+			idOwners[id] = ownerID
 			ids[schematicUnitKey{component: component.Instance.ID, unit: unit}] = id
 		}
 	}
 	return ids, unitsByComponent, issues
+}
+
+func namedSchematicUnitID(componentID, unitID string) string {
+	digest := sha256.Sum256([]byte("kicadai:schematic-unit:v1\x00" + componentID + "\x00" + canonicalUnitID(unitID)))
+	return "mu_" + hex.EncodeToString(digest[:])[:24]
+}
+
+func resolvedSchematicUnitIDs(component ResolvedComponent) []string {
+	if len(component.Units) == 0 {
+		return nil
+	}
+	ids := make([]string, 0, len(component.Units))
+	for _, unit := range component.Units {
+		ids = append(ids, namedSchematicUnitID(component.Instance.ID, unit.ID))
+	}
+	slices.Sort(ids)
+	return ids
 }
 
 func schematicReferences(resolved ResolvedDocument) (map[string]string, []reports.Issue) {
@@ -360,7 +387,8 @@ func inferredSchematicBusLayouts(circuit schematicir.Circuit) []schematicir.BusL
 	return layouts
 }
 
-func schematicLayoutIntent(source Document, unitIDs map[schematicUnitKey]string, unitsByComponent map[string][]int) schematicir.Layout {
+func schematicLayoutIntent(resolved ResolvedDocument, unitIDs map[schematicUnitKey]string, unitsByComponent map[string][]int) schematicir.Layout {
+	source := resolved.Source
 	layout := schematicir.Layout{
 		Flow: schematicir.FlowLeftToRight, Origin: schematicir.OriginCentered,
 		Lanes: schematicir.Lanes{Power: schematicir.LanePositionTop, Signals: schematicir.LanePositionMiddle, Ground: schematicir.LanePositionBottom},
@@ -380,7 +408,16 @@ func schematicLayoutIntent(source Document, unitIDs map[schematicUnitKey]string,
 		}
 		layout.Groups = append(layout.Groups, irGroup)
 	}
+	namedComponents := make(map[string]ResolvedComponent, len(resolved.Components))
+	for _, component := range resolved.Components {
+		if len(component.Units) != 0 {
+			namedComponents[component.Instance.ID] = component
+		}
+	}
 	for _, placement := range source.Schematic.Placements {
+		if _, named := namedComponents[placement.Component]; named {
+			continue
+		}
 		units := unitsByComponent[placement.Component]
 		for unitIndex, unit := range units {
 			target := unitIDs[schematicUnitKey{component: placement.Component, unit: unit}]
@@ -395,7 +432,97 @@ func schematicLayoutIntent(source Document, unitIDs map[schematicUnitKey]string,
 			layout.Placements = append(layout.Placements, irPlacement)
 		}
 	}
+	placementsByComponent := map[string][]SchematicPlacement{}
+	for _, placement := range source.Schematic.Placements {
+		if _, named := namedComponents[placement.Component]; named {
+			placementsByComponent[placement.Component] = append(placementsByComponent[placement.Component], placement)
+		}
+	}
+	for _, component := range resolved.Components {
+		if len(component.Units) == 0 || len(placementsByComponent[component.Instance.ID]) == 0 {
+			continue
+		}
+		var packagePlacement SchematicPlacement
+		unitPlacements := map[string]SchematicPlacement{}
+		for _, placement := range placementsByComponent[component.Instance.ID] {
+			if placement.Unit == "" {
+				packagePlacement = placement
+			} else {
+				unitPlacements[canonicalUnitID(placement.Unit)] = placement
+			}
+		}
+		for unitIndex, unit := range unitsByComponent[component.Instance.ID] {
+			unitID := resolvedUnitID(component, unit)
+			placement := mergeSchematicPlacement(packagePlacement, unitPlacements[canonicalUnitID(unitID)])
+			target := unitIDs[schematicUnitKey{component: component.Instance.ID, unit: unit}]
+			irPlacement := schematicir.Placement{Target: target, Group: placement.Group, Orientation: schematicir.Orientation(placement.Orientation), Mirror: schematicMirror(placement.Mirror)}
+			irPlacement.Near = optionalSchematicUnitRelation(placement.Near, placement.NearUnit, namedComponents, unitIDs, unitsByComponent)
+			irPlacement.Above = optionalSchematicUnitRelation(placement.Above, placement.AboveUnit, namedComponents, unitIDs, unitsByComponent)
+			irPlacement.RightOf = optionalSchematicUnitRelation(placement.RightOf, placement.RightOfUnit, namedComponents, unitIDs, unitsByComponent)
+			if unitIndex > 0 && len(irPlacement.Near) == 0 && len(irPlacement.Above) == 0 && len(irPlacement.RightOf) == 0 {
+				primary := unitIDs[schematicUnitKey{component: component.Instance.ID, unit: unitsByComponent[component.Instance.ID][0]}]
+				if primary != "" {
+					irPlacement.Near = []string{primary}
+				}
+			}
+			layout.Placements = append(layout.Placements, irPlacement)
+		}
+	}
 	return layout
+}
+
+func mergeSchematicPlacement(base, override SchematicPlacement) SchematicPlacement {
+	result := base
+	result.Unit = override.Unit
+	if override.Group != "" {
+		result.Group = override.Group
+	}
+	if override.Near != "" {
+		result.Near, result.NearUnit = override.Near, override.NearUnit
+	}
+	if override.Above != "" {
+		result.Above, result.AboveUnit = override.Above, override.AboveUnit
+	}
+	if override.RightOf != "" {
+		result.RightOf, result.RightOfUnit = override.RightOf, override.RightOfUnit
+	}
+	if override.Orientation != "" {
+		result.Orientation = override.Orientation
+	}
+	if override.Mirror != "" {
+		result.Mirror = override.Mirror
+	}
+	return result
+}
+
+func resolvedUnitID(component ResolvedComponent, unit int) string {
+	for _, candidate := range component.Units {
+		if candidate.Unit == unit {
+			return candidate.ID
+		}
+	}
+	return ""
+}
+
+func optionalSchematicUnitRelation(component, unitID string, namedComponents map[string]ResolvedComponent, unitIDs map[schematicUnitKey]string, unitsByComponent map[string][]int) []string {
+	if component == "" {
+		return nil
+	}
+	if canonical := canonicalUnitID(unitID); canonical != "" {
+		resolved, exists := namedComponents[component]
+		if !exists {
+			return nil
+		}
+		for _, unit := range resolved.Units {
+			if canonicalUnitID(unit.ID) == canonical {
+				if id := unitIDs[schematicUnitKey{component: component, unit: unit.Unit}]; id != "" {
+					return []string{id}
+				}
+			}
+		}
+		return nil
+	}
+	return optionalSchematicRelation(component, unitIDs, unitsByComponent)
 }
 
 func optionalSchematicRelation(component string, unitIDs map[schematicUnitKey]string, unitsByComponent map[string][]int) []string {

@@ -334,8 +334,8 @@ func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	doc := *NewDocument()
 	doc.Metadata.Name = "dual_unit"
 	doc.Circuit.Components = []Component{
-		{ID: "u1a", Ref: "U1", Unit: "1", Role: ComponentRoleIC, Symbol: "Device:R", Value: "DUAL", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
-		{ID: "u1b", Ref: "U1", Unit: "2", Role: ComponentRoleIC, Symbol: "Device:R", Value: "DUAL", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+		{ID: "u1a", Ref: "U1", Unit: "1", Role: ComponentRoleIC, Symbol: "Device:R", Value: "DUAL", Footprint: "Package_SO:SOIC-8", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
+		{ID: "u1b", Ref: "U1", Unit: "2", Role: ComponentRoleIC, Symbol: "Device:R", Value: "DUAL", Footprint: "Package_SO:SOIC-8", Pins: []Pin{{Number: "1"}, {Number: "2"}}},
 	}
 	doc.Circuit.Nets = []Net{{Name: "UNIT_LINK", Role: NetRoleSignal, Connect: []EndpointRef{"u1a.2", "u1b.1"}}}
 	tx, issues := ToTransaction(doc)
@@ -349,6 +349,10 @@ func TestToTransactionPreservesSharedReferenceUnits(t *testing.T) {
 	connects := decodeOperations[transactions.ConnectOperation](t, tx, transactions.OpConnect)
 	if len(connects) != 1 || connects[0].From.Unit != 1 || connects[0].To.Unit != 2 {
 		t.Fatalf("connect = %#v, want unit-aware endpoints", connects)
+	}
+	assigns := decodeOperations[transactions.AssignFootprintOperation](t, tx, transactions.OpAssignFootprint)
+	if len(assigns) != 1 || assigns[0].Ref != "U1" || assigns[0].FootprintID != "Package_SO:SOIC-8" {
+		t.Fatalf("shared-reference footprint assignments = %#v, want one U1 assignment", assigns)
 	}
 }
 

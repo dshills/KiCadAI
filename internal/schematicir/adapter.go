@@ -507,6 +507,7 @@ func (state *adapterState) appendCreateProject(tx *transactions.Transaction) {
 }
 
 func (state *adapterState) appendComponents(tx *transactions.Transaction) {
+	assignedFootprints := map[string]string{}
 	for _, component := range state.document.Circuit.Components {
 		ref := state.refsByID[component.ID]
 		if ref == "" {
@@ -541,6 +542,13 @@ func (state *adapterState) appendComponents(tx *transactions.Transaction) {
 			}, ref, "")
 		}
 		if component.Footprint != "" {
+			if assigned, exists := assignedFootprints[ref]; exists {
+				if assigned != component.Footprint {
+					state.addIssue("circuit.components."+component.ID+".footprint", "shared reference "+ref+" resolves to conflicting footprints")
+				}
+				continue
+			}
+			assignedFootprints[ref] = component.Footprint
 			// Retain explicit assignment evidence for transaction consumers even
 			// though AddSymbol also carries the hidden KiCad Footprint property
 			// needed by schematic-only project writes.

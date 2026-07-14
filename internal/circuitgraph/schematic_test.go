@@ -188,6 +188,87 @@ func TestToSchematicIRPreservesMultiUnitReference(t *testing.T) {
 	}
 }
 
+func TestToSchematicIRLowersNamedLM358UnitsDeterministically(t *testing.T) {
+	graph := namedLM358Document()
+	for index := range graph.Schematic.Placements {
+		placement := &graph.Schematic.Placements[index]
+		if placement.Component == "amplifier" && placement.Unit == "P" {
+			placement.Above = "amplifier"
+			placement.AboveUnit = "B"
+		}
+	}
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	document, issues := ToSchematicIR(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("schematic lowering issues = %#v", issues)
+	}
+	units := map[string]schematicir.Component{}
+	for _, component := range document.Circuit.Components {
+		if component.Ref == "U1" {
+			units[component.Unit] = component
+		}
+	}
+	if len(units) != 3 {
+		t.Fatalf("LM358 schematic units = %#v", units)
+	}
+	for unitID, unitNumber := range map[string]string{"A": "1", "B": "2", "P": "3"} {
+		component := units[unitNumber]
+		wantID := namedSchematicUnitID("amplifier", unitID)
+		if component.ID != wantID || component.Symbol != "Amplifier_Operational:LM358" || component.Footprint != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" {
+			t.Fatalf("LM358 unit %s = %#v, want id %s", unitID, component, wantID)
+		}
+	}
+	placements := map[string]schematicir.Placement{}
+	for _, placement := range document.Layout.Placements {
+		if placement.Target == units["1"].ID || placement.Target == units["2"].ID || placement.Target == units["3"].ID {
+			placements[placement.Target] = placement
+		}
+	}
+	if len(placements) != 3 {
+		t.Fatalf("LM358 placements = %#v", placements)
+	}
+	if got := placements[units["3"].ID].Above; !reflect.DeepEqual(got, []string{units["2"].ID}) {
+		t.Fatalf("power unit above relation = %#v, want unit B", got)
+	}
+	index := schematicTestLibraryIndex(resolved)
+	first, issues := schematicir.ToTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("transaction issues = %#v", issues)
+	}
+	second, issues := schematicir.ToTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) || !reflect.DeepEqual(first, second) {
+		t.Fatalf("named-unit transaction is not deterministic: issues=%#v", issues)
+	}
+	u1Symbols := 0
+	u1Assignments := 0
+	for _, operation := range first.Operations {
+		switch operation.Op {
+		case transactions.OpAddSymbol:
+			var payload transactions.AddSymbolOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Ref == "U1" {
+				u1Symbols++
+			}
+		case transactions.OpAssignFootprint:
+			var payload transactions.AssignFootprintOperation
+			if err := json.Unmarshal(operation.Raw, &payload); err != nil {
+				t.Fatal(err)
+			}
+			if payload.Ref == "U1" {
+				u1Assignments++
+			}
+		}
+	}
+	if u1Symbols != 3 || u1Assignments != 1 {
+		t.Fatalf("U1 operations: symbols=%d footprint assignments=%d, want 3 and 1", u1Symbols, u1Assignments)
+	}
+}
+
 func TestToSchematicIRRejectsGeneratedUnitIDCollision(t *testing.T) {
 	resolved, issues := NewResolver(ResolveOptions{Catalog: minimalResolvedCatalog()}).Resolve(context.Background(), minimalResolvedDocument())
 	if reports.HasBlockingIssue(issues) {

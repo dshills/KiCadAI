@@ -156,6 +156,43 @@ func TestValidateRequestRejectsExplicitPCBIntentOutsideBoard(t *testing.T) {
 	}
 }
 
+func TestValidateRequestAcceptsMultipleSchematicUnitsOwnedByOnePhysicalComponent(t *testing.T) {
+	request := validExplicitCircuitRequest()
+	physical := request.ExplicitCircuit.Components[0]
+	physical.ID = "u1"
+	physical.Reference = "U1"
+	physical.FootprintID = "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm"
+	physical.SchematicUnits = []string{"u1_a", "u1_b"}
+	physical.Pads = []ExplicitPadSpec{
+		{Name: "1", SymbolPin: "1", Net: "SIG"},
+		{Name: "7", SymbolPin: "7", Net: "SIG"},
+	}
+	request.ExplicitCircuit.Components = []ExplicitComponentSpec{physical}
+	request.ExplicitCircuit.Schematic.Circuit.Components = []schematicir.Component{
+		{ID: "u1_a", Ref: "U1", Unit: "A", Role: schematicir.ComponentRoleIC, Symbol: "Amplifier_Operational:LM358", Footprint: physical.FootprintID, Pins: []schematicir.Pin{{Number: "1"}}},
+		{ID: "u1_b", Ref: "U1", Unit: "B", Role: schematicir.ComponentRoleIC, Symbol: "Amplifier_Operational:LM358", Footprint: physical.FootprintID, Pins: []schematicir.Pin{{Number: "7"}}},
+	}
+	request.ExplicitCircuit.Schematic.Circuit.Nets = []schematicir.Net{{Name: "SIG", Role: schematicir.NetRoleSignal, Connect: []schematicir.EndpointRef{"u1_a.1", "u1_b.7"}}}
+	request.ExplicitCircuit.Schematic.Layout = schematicir.Layout{}
+	request.ExplicitCircuit.Schematic = schematicir.NormalizeLayoutIntent(request.ExplicitCircuit.Schematic)
+	request.ExplicitCircuit.Nets = []ExplicitNetSpec{{Name: "SIG", Endpoints: []ExplicitNetEndpoint{{Component: "u1", Pad: "1"}, {Component: "u1", Pad: "7"}}}}
+
+	if issues := ValidateRequest(request); len(issues) != 0 {
+		t.Fatalf("multi-unit ownership issues = %#v", issues)
+	}
+
+	conflict := request
+	conflict.ExplicitCircuit = cloneExplicitCircuit(request.ExplicitCircuit)
+	duplicate := conflict.ExplicitCircuit.Components[0]
+	duplicate.ID = "u2"
+	duplicate.Reference = "U2"
+	duplicate.SchematicUnits = []string{"u1_a"}
+	conflict.ExplicitCircuit.Components = append(conflict.ExplicitCircuit.Components, duplicate)
+	if issues := ValidateRequest(conflict); !hasDesignWorkflowIssuePath(issues, "explicit_circuit.components") {
+		t.Fatalf("conflicting ownership issues = %#v", issues)
+	}
+}
+
 func validExplicitCircuitRequest() Request {
 	document := *schematicir.NewDocument()
 	document.Metadata.Name = "explicit_test"

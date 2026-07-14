@@ -87,7 +87,8 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 		placement := placements[component.Instance.ID]
 		explicit.Components = append(explicit.Components, designworkflow.ExplicitComponentSpec{
 			ID: component.Instance.ID, Reference: references[component.Instance.ID], Role: string(component.Instance.Role),
-			Value: schematicValue(component, resolved.Source.Policy), FootprintID: component.FootprintID, Pads: pads,
+			Value: schematicValue(component, resolved.Source.Policy), FootprintID: component.FootprintID,
+			SchematicUnits: resolvedSchematicUnitIDs(component), Pads: pads,
 			Placement: designworkflow.ExplicitPlacementSpec{Region: placement.Region, Near: placement.Near, Edge: string(placement.Edge), Priority: placement.Priority, MaxDistanceMM: placement.MaxDistanceMM},
 		})
 	}

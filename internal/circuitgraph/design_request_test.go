@@ -63,6 +63,30 @@ func TestToDesignRequestPreservesBMP280PadNets(t *testing.T) {
 	}
 }
 
+func TestToDesignRequestKeepsNamedLM358AsOnePhysicalComponent(t *testing.T) {
+	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), namedLM358Document())
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	request, issues := ToDesignRequest(resolved)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("request issues = %#v", issues)
+	}
+	count := 0
+	for _, component := range request.ExplicitCircuit.Components {
+		if component.ID != "amplifier" {
+			continue
+		}
+		count++
+		if component.Reference != "U1" || component.FootprintID != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" || len(component.Pads) != 8 {
+			t.Fatalf("physical LM358 component = %#v", component)
+		}
+	}
+	if count != 1 {
+		t.Fatalf("physical LM358 component count = %d, want 1", count)
+	}
+}
+
 func TestToDesignRequestKeepsPowerFlagsOutOfPCBComponents(t *testing.T) {
 	graph := loadGraphExample(t, "usb_c_bmp280_breakout.json")
 	graph.PowerFlags = []PowerFlag{{Net: "VBUS_RAW"}, {Net: "GND"}}

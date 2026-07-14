@@ -72,13 +72,14 @@ type ExplicitSchematicSupportSpec struct {
 }
 
 type ExplicitComponentSpec struct {
-	ID          string                `json:"id"`
-	Reference   string                `json:"reference"`
-	Role        string                `json:"role,omitempty"`
-	Value       string                `json:"value,omitempty"`
-	FootprintID string                `json:"footprint_id"`
-	Pads        []ExplicitPadSpec     `json:"pads"`
-	Placement   ExplicitPlacementSpec `json:"placement,omitempty"`
+	ID             string                `json:"id"`
+	Reference      string                `json:"reference"`
+	Role           string                `json:"role,omitempty"`
+	Value          string                `json:"value,omitempty"`
+	FootprintID    string                `json:"footprint_id"`
+	SchematicUnits []string              `json:"schematic_units,omitempty"`
+	Pads           []ExplicitPadSpec     `json:"pads"`
+	Placement      ExplicitPlacementSpec `json:"placement,omitempty"`
 }
 
 type ExplicitPadSpec struct {
@@ -555,6 +556,7 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 	clone.SchematicSupport = append([]ExplicitSchematicSupportSpec(nil), source.SchematicSupport...)
 	clone.Components = append([]ExplicitComponentSpec(nil), source.Components...)
 	for index := range clone.Components {
+		clone.Components[index].SchematicUnits = append([]string(nil), source.Components[index].SchematicUnits...)
 		clone.Components[index].Pads = append([]ExplicitPadSpec(nil), source.Components[index].Pads...)
 	}
 	clone.Nets = append([]ExplicitNetSpec(nil), source.Nets...)
@@ -634,18 +636,36 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 	for _, component := range circuit.Schematic.Circuit.Components {
 		schematicComponents[component.ID] = component
 	}
+	schematicOwners := make(map[string]string, len(schematicComponents))
 	for id, component := range componentsByID {
-		schematicComponent, exists := schematicComponents[id]
-		if !exists {
-			issues = append(issues, issue("explicit_circuit.components", "component "+id+" is missing from schematic IR"))
-			continue
+		unitIDs := component.SchematicUnits
+		if len(unitIDs) == 0 {
+			unitIDs = []string{id}
 		}
-		if schematicComponent.Ref != component.Reference || schematicComponent.Footprint != component.FootprintID {
-			issues = append(issues, issue("explicit_circuit.components", "component "+id+" disagrees with schematic reference or footprint"))
+		seenUnits := map[string]struct{}{}
+		for _, unitID := range unitIDs {
+			if _, exists := seenUnits[unitID]; exists {
+				issues = append(issues, issue("explicit_circuit.components", "component "+id+" repeats schematic unit "+unitID))
+				continue
+			}
+			seenUnits[unitID] = struct{}{}
+			if owner, exists := schematicOwners[unitID]; exists && owner != id {
+				issues = append(issues, issue("explicit_circuit.components", "schematic unit "+unitID+" is already owned by component "+owner))
+				continue
+			}
+			schematicComponent, exists := schematicComponents[unitID]
+			if !exists {
+				issues = append(issues, issue("explicit_circuit.components", "component "+id+" schematic unit "+unitID+" is missing from schematic IR"))
+				continue
+			}
+			schematicOwners[unitID] = id
+			if schematicComponent.Ref != component.Reference || schematicComponent.Footprint != component.FootprintID {
+				issues = append(issues, issue("explicit_circuit.components", "component "+id+" schematic unit "+unitID+" disagrees with reference or footprint"))
+			}
 		}
 	}
 	for id := range schematicComponents {
-		if _, exists := componentsByID[id]; exists {
+		if _, exists := schematicOwners[id]; exists {
 			continue
 		}
 		support, exists := supportByID[id]
@@ -712,7 +732,11 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 					supportAttachments[component]++
 					continue
 				}
-				endpoints[component+"\x00"+pin] = struct{}{}
+				owner, exists := schematicOwners[component]
+				if !exists {
+					continue
+				}
+				endpoints[owner+"\x00"+pin] = struct{}{}
 			}
 		}
 		schematicNets[net.Name] = endpoints
