@@ -238,9 +238,14 @@ func resolveComponent(ctx context.Context, instance Component, options ResolveOp
 	if issue := componentConstraintIssue(path, instance, resolved); issue != nil {
 		return ResolvedComponent{}, []reports.Issue{*issue}
 	}
-	functions, functionIssues := resolveFunctions(path, resolved.Component.Symbols, resolved.Variant)
-	if reports.HasBlockingIssue(functionIssues) {
-		return ResolvedComponent{}, functionIssues
+	selectedSymbols, resolvedUnits, unitIssues := resolveComponentUnits(path, instance, resolved.Component.Symbols)
+	if reports.HasBlockingIssue(unitIssues) {
+		return ResolvedComponent{}, unitIssues
+	}
+	functions, functionIssues := resolveFunctions(path, selectedSymbols, resolved.Variant)
+	resolutionIssues := append(append([]reports.Issue(nil), unitIssues...), functionIssues...)
+	if reports.HasBlockingIssue(resolutionIssues) {
+		return ResolvedComponent{}, resolutionIssues
 	}
 	if libraryIssues := verifyLibraryEvidence(path, functions, resolved, options); len(libraryIssues) != 0 {
 		return ResolvedComponent{}, libraryIssues
@@ -255,9 +260,9 @@ func resolveComponent(ctx context.Context, instance Component, options ResolveOp
 		Family: resolved.Component.Family, Manufacturer: resolved.Component.Manufacturer,
 		MPN: firstNonEmpty(resolved.Variant.MPN, resolved.Component.MPN), Confidence: confidence,
 		SymbolID: symbolID, FootprintID: resolved.Variant.FootprintID, PinMapID: resolved.Variant.PinMapID,
-		Functions: functions, CatalogSources: append([]string(nil), resolved.Component.Verification.Sources...),
+		Functions: functions, Units: resolvedUnits, CatalogSources: append([]string(nil), resolved.Component.Verification.Sources...),
 		Warnings: warnings, Record: resolved.Component, Variant: resolved.Variant,
-		Symbols: append([]components.SymbolBinding(nil), resolved.Component.Symbols...),
+		Symbols: append([]components.SymbolBinding(nil), selectedSymbols...),
 	}
 	for _, function := range functions {
 		if evidence, exists := options.LibrarySymbols[function.SymbolID]; exists && evidence.Source != "" {
@@ -269,7 +274,76 @@ func resolveComponent(ctx context.Context, instance Component, options ResolveOp
 	if evidence, exists := options.LibraryFootprints[resolved.Variant.FootprintID]; exists && evidence.Source != "" {
 		component.FootprintSources = []string{evidence.Source}
 	}
-	return component, functionIssues
+	return component, resolutionIssues
+}
+
+func resolveComponentUnits(path string, instance Component, symbols []components.SymbolBinding) ([]components.SymbolBinding, []ResolvedUnit, []reports.Issue) {
+	named := map[string]components.SymbolBinding{}
+	anonymous := false
+	for index, symbol := range symbols {
+		unitID := canonicalUnitID(symbol.UnitID)
+		if unitID == "" {
+			anonymous = true
+			continue
+		}
+		if _, exists := named[unitID]; exists {
+			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, fmt.Sprintf("%s.catalog_symbols[%d].unit_id", path, index), "catalog contains duplicate named symbol unit "+unitID)}
+		}
+		named[unitID] = symbol
+	}
+	if len(named) == 0 {
+		if len(instance.Units) != 0 {
+			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "component declares named units but catalog record has only anonymous symbol units")}
+		}
+		return append([]components.SymbolBinding(nil), symbols...), nil, nil
+	}
+	if anonymous {
+		return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".catalog_symbols", "catalog must not mix named and anonymous symbol units")}
+	}
+	if len(instance.Units) == 0 {
+		return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "named multi-unit catalog component requires explicit unit declarations")}
+	}
+	declared := make(map[string]ComponentUnit, len(instance.Units))
+	for index, unit := range instance.Units {
+		unitID := canonicalUnitID(unit.ID)
+		if _, exists := named[unitID]; !exists {
+			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, fmt.Sprintf("%s.units[%d].id", path, index), "declared unit is absent from catalog evidence")}
+		}
+		if _, exists := declared[unitID]; exists {
+			return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, fmt.Sprintf("%s.units[%d].id", path, index), "duplicate declared component unit "+unitID)}
+		}
+		declared[unitID] = ComponentUnit{ID: unitID, Role: unit.Role}
+	}
+	var missingRequired []string
+	for unitID, symbol := range named {
+		if symbol.RequiredUnit {
+			if _, exists := declared[unitID]; !exists {
+				missingRequired = append(missingRequired, unitID)
+			}
+		}
+	}
+	if len(missingRequired) != 0 {
+		slices.Sort(missingRequired)
+		return nil, nil, []reports.Issue{graphIssue(CodeUnitInvalid, path+".units", "required catalog units are not declared: "+strings.Join(missingRequired, ", "))}
+	}
+	selected := make([]components.SymbolBinding, 0, len(declared))
+	units := make([]ResolvedUnit, 0, len(declared))
+	for unitID, declaration := range declared {
+		symbol := named[unitID]
+		selected = append(selected, symbol)
+		units = append(units, ResolvedUnit{
+			ID: unitID, Role: declaration.Role, Type: symbol.UnitType,
+			Required: symbol.RequiredUnit, Unit: symbol.Unit, SymbolID: symbol.SymbolID,
+		})
+	}
+	slices.SortStableFunc(selected, func(left, right components.SymbolBinding) int {
+		if left.Unit != right.Unit {
+			return left.Unit - right.Unit
+		}
+		return strings.Compare(left.UnitID, right.UnitID)
+	})
+	slices.SortStableFunc(units, func(left, right ResolvedUnit) int { return strings.Compare(left.ID, right.ID) })
+	return selected, units, nil
 }
 
 func explicitVariantID(record components.ComponentRecord, exists bool, requested string) (string, *reports.Issue) {
@@ -427,7 +501,7 @@ func resolveFunctions(path string, symbols []components.SymbolBinding, variant c
 				slices.Sort(aliases)
 				aliases = slices.Compact(aliases)
 				resolved = append(resolved, ResolvedFunction{
-					Function: function, Aliases: aliases, SymbolID: symbol.SymbolID, Unit: symbol.Unit,
+					Function: function, Aliases: aliases, SymbolID: symbol.SymbolID, Unit: symbol.Unit, UnitID: canonicalUnitID(symbol.UnitID),
 					SymbolPin: pin.SymbolPin, Pad: pad.Pad, Electrical: pin.Electrical,
 					Polarity: firstNonEmpty(pin.Polarity, pad.Polarity), Required: pin.Required,
 				})
@@ -481,7 +555,7 @@ func resolveEndpoint(path string, endpoint Endpoint, componentsByID map[string]R
 	if !exists {
 		return ResolvedEndpoint{}, []reports.Issue{graphIssue(CodePinUnresolved, path, "component was not resolved")}
 	}
-	unit, unitSpecified, unitOK := parseUnitSelector(endpoint.Unit)
+	unit, unitSpecified, unitOK := resolvedEndpointUnit(component, endpoint.Unit)
 	if !unitOK {
 		return ResolvedEndpoint{}, []reports.Issue{graphIssue(CodePinUnresolved, path+".unit", "unit selector is invalid")}
 	}
@@ -521,9 +595,25 @@ func resolveEndpoint(path string, endpoint Endpoint, componentsByID map[string]R
 	}
 	bindings := make([]ResolvedBinding, 0, len(matches))
 	for _, match := range matches {
-		bindings = append(bindings, ResolvedBinding{SymbolID: match.SymbolID, Unit: match.Unit, SymbolPin: match.SymbolPin, Pad: match.Pad, Electrical: match.Electrical, Polarity: match.Polarity})
+		bindings = append(bindings, ResolvedBinding{SymbolID: match.SymbolID, Unit: match.Unit, UnitID: match.UnitID, SymbolPin: match.SymbolPin, Pad: match.Pad, Electrical: match.Electrical, Polarity: match.Polarity})
 	}
 	return ResolvedEndpoint{Intent: endpoint, Function: functionName, Bindings: bindings}, nil
+}
+
+func resolvedEndpointUnit(component ResolvedComponent, value string) (int, bool, bool) {
+	if len(component.Units) == 0 {
+		return parseUnitSelector(value)
+	}
+	unitID := canonicalUnitID(value)
+	if unitID == "" {
+		return 0, false, false
+	}
+	for _, unit := range component.Units {
+		if unit.ID == unitID {
+			return unit.Unit, true, true
+		}
+	}
+	return 0, true, false
 }
 
 func canonicalFunction(functions []ResolvedFunction, requested string) (string, bool) {

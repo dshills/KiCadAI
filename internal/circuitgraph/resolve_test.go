@@ -47,6 +47,151 @@ func TestResolveCheckedInExamplesAgainstCatalog(t *testing.T) {
 	}
 }
 
+func TestResolveNamedMultiUnitLM358Package(t *testing.T) {
+	document := namedLM358Document()
+	resolver := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"})
+	first, issues := resolver.Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("resolve issues = %#v", issues)
+	}
+	second, issues := resolver.Resolve(context.Background(), document)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("second resolve issues = %#v", issues)
+	}
+	if first.ResolutionHash == "" || first.ResolutionHash != second.ResolutionHash {
+		t.Fatalf("resolution hashes = %q, %q", first.ResolutionHash, second.ResolutionHash)
+	}
+	var amplifier ResolvedComponent
+	for _, component := range first.Components {
+		if component.ComponentID == "opamp.ti.lm358.soic8" {
+			amplifier = component
+		}
+	}
+	if amplifier.Instance.ID == "" || amplifier.FootprintID != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" {
+		t.Fatalf("resolved amplifier = %#v", amplifier)
+	}
+	if len(amplifier.Units) != 3 || len(amplifier.Symbols) != 3 || len(amplifier.Functions) != 8 {
+		t.Fatalf("resolved LM358 units/symbols/functions = %d/%d/%d", len(amplifier.Units), len(amplifier.Symbols), len(amplifier.Functions))
+	}
+	unitNumbers := map[string]int{}
+	for _, unit := range amplifier.Units {
+		unitNumbers[unit.ID] = unit.Unit
+	}
+	if unitNumbers["A"] != 1 || unitNumbers["B"] != 2 || unitNumbers["P"] != 3 {
+		t.Fatalf("resolved LM358 unit numbers = %#v", unitNumbers)
+	}
+	for _, net := range first.Nets {
+		for _, endpoint := range net.Endpoints {
+			if endpoint.Intent.Component != "amplifier" {
+				continue
+			}
+			if len(endpoint.Bindings) != 1 || endpoint.Bindings[0].UnitID != endpoint.Intent.Unit {
+				t.Fatalf("unit-qualified endpoint = %#v", endpoint)
+			}
+		}
+	}
+}
+
+func TestResolveNamedMultiUnitLM358FailsClosed(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*Document)
+		code   reports.Code
+	}{
+		{
+			name: "missing required power unit",
+			mutate: func(document *Document) {
+				document.Components[0].Units = document.Components[0].Units[:2]
+				placements := document.Schematic.Placements[:0]
+				for _, placement := range document.Schematic.Placements {
+					if placement.Component != "amplifier" || placement.Unit != "P" {
+						placements = append(placements, placement)
+					}
+				}
+				document.Schematic.Placements = placements
+				nets := document.Nets[:0]
+				for _, net := range document.Nets {
+					if net.Name != "5V" && net.Name != "GND" {
+						nets = append(nets, net)
+					}
+				}
+				document.Nets = nets
+				document.PowerFlags = nil
+			},
+			code: CodeUnitInvalid,
+		},
+		{
+			name: "unit absent from catalog",
+			mutate: func(document *Document) {
+				document.Components[0].Units[1].ID = "Q"
+				for placementIndex := range document.Schematic.Placements {
+					placement := &document.Schematic.Placements[placementIndex]
+					if placement.Component == "amplifier" && placement.Unit == "B" {
+						placement.Unit = "Q"
+					}
+				}
+				for netIndex := range document.Nets {
+					for endpointIndex := range document.Nets[netIndex].Endpoints {
+						endpoint := &document.Nets[netIndex].Endpoints[endpointIndex]
+						if endpoint.Component == "amplifier" && endpoint.Unit == "B" {
+							endpoint.Unit = "Q"
+						}
+					}
+				}
+			},
+			code: CodeUnitInvalid,
+		},
+		{
+			name: "one physical pad on two nets",
+			mutate: func(document *Document) {
+				for netIndex := range document.Nets {
+					if document.Nets[netIndex].Name == "A_IN" {
+						document.Nets[netIndex].Endpoints = append(document.Nets[netIndex].Endpoints, Endpoint{Component: "amplifier", Unit: "A", SelectorKind: SelectorSymbolPin, Selector: "1"})
+					}
+				}
+			},
+			code: CodePinmapConflict,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			document := namedLM358Document()
+			tt.mutate(&document)
+			_, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t)}).Resolve(context.Background(), document)
+			assertGraphIssueCode(t, issues, tt.code)
+		})
+	}
+}
+
+func TestResolveNamedMultiUnitRejectsInvalidCatalogUnitSets(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*components.ComponentRecord)
+	}{
+		{name: "duplicate named unit", mutate: func(record *components.ComponentRecord) { record.Symbols[1].UnitID = "A" }},
+		{name: "mixed named and anonymous units", mutate: func(record *components.ComponentRecord) { record.Symbols[1].UnitID = "" }},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := loadGraphCatalog(t)
+			for index := range catalog.Records {
+				if catalog.Records[index].ID == "opamp.ti.lm358.soic8" {
+					tt.mutate(&catalog.Records[index])
+				}
+			}
+			_, issues := NewResolver(ResolveOptions{Catalog: catalog}).Resolve(context.Background(), namedLM358Document())
+			assertGraphIssueCode(t, issues, CodeUnitInvalid)
+		})
+	}
+}
+
+func TestResolveComponentUnitsDefensivelyRejectsDuplicateDeclarations(t *testing.T) {
+	symbols := []components.SymbolBinding{{SymbolID: "Amplifier:Dual", Unit: 1, UnitID: "A", UnitType: components.SymbolUnitFunctional}}
+	instance := Component{Units: []ComponentUnit{{ID: "A", Role: "first"}, {ID: "A", Role: "second"}}}
+	_, _, issues := resolveComponentUnits("components[0]", instance, symbols)
+	assertGraphIssueCode(t, issues, CodeUnitInvalid)
+}
+
 func TestResolveFailsClosedForUntrustedConstraints(t *testing.T) {
 	base := minimalResolvedDocument()
 	catalog := minimalResolvedCatalog()
@@ -348,6 +493,43 @@ func TestNilResolverAndCatalogFailClosed(t *testing.T) {
 	assertGraphIssueCode(t, issues, CodeComponentUnresolved)
 	_, issues = NewResolver(ResolveOptions{}).Resolve(context.Background(), document)
 	assertGraphIssueCode(t, issues, CodeComponentUnresolved)
+}
+
+func namedLM358Document() Document {
+	trueValue := true
+	falseValue := false
+	return Document{
+		Schema: SchemaID, Version: Version,
+		Project: Project{Name: "named_lm358", Acceptance: AcceptanceERCDRC, Board: Board{WidthMM: 50, HeightMM: 35, Layers: 2, EdgeClearanceMM: 0.5}},
+		Components: []Component{
+			{ID: "amplifier", Reference: "U1", Role: RoleIC, Units: []ComponentUnit{{ID: "A", Role: "reference_buffer"}, {ID: "B", Role: "gain_stage"}, {ID: "P", Role: "power"}}, ComponentID: "opamp.ti.lm358.soic8", VariantID: "soic8", Population: PopulationPopulate},
+			{ID: "power", Reference: "J1", Role: RoleInputConnector, ComponentID: "connector.pinheader.1x02.2_54mm", VariantID: "vertical", Population: PopulationPopulate},
+			{ID: "signal", Reference: "J2", Role: RoleInputConnector, ComponentID: "connector.pinheader.1x02.2_54mm", VariantID: "vertical", Population: PopulationPopulate},
+		},
+		Nets: []Net{
+			{Name: "5V", Role: NetRolePowerPos, Required: &trueValue, Endpoints: []Endpoint{{Component: "power", SelectorKind: SelectorFunction, Selector: "PIN_1"}, {Component: "amplifier", Unit: "P", SelectorKind: SelectorFunction, Selector: "V_PLUS"}}},
+			{Name: "GND", Role: NetRoleGround, Required: &trueValue, Endpoints: []Endpoint{{Component: "power", SelectorKind: SelectorFunction, Selector: "PIN_2"}, {Component: "amplifier", Unit: "P", SelectorKind: SelectorFunction, Selector: "V_MINUS"}}},
+			{Name: "A_IN", Role: NetRoleSignal, Required: &trueValue, Endpoints: []Endpoint{{Component: "signal", SelectorKind: SelectorFunction, Selector: "PIN_1"}, {Component: "amplifier", Unit: "A", SelectorKind: SelectorFunction, Selector: "IN_PLUS"}}},
+			{Name: "A_OUT", Role: NetRoleSignal, Required: &trueValue, Endpoints: []Endpoint{{Component: "amplifier", Unit: "A", SelectorKind: SelectorFunction, Selector: "OUT"}, {Component: "amplifier", Unit: "A", SelectorKind: SelectorFunction, Selector: "IN_MINUS"}}},
+			{Name: "B_IN", Role: NetRoleSignal, Required: &trueValue, Endpoints: []Endpoint{{Component: "signal", SelectorKind: SelectorFunction, Selector: "PIN_2"}, {Component: "amplifier", Unit: "B", SelectorKind: SelectorFunction, Selector: "IN_PLUS"}}},
+			{Name: "B_OUT", Role: NetRoleSignal, Required: &trueValue, Endpoints: []Endpoint{{Component: "amplifier", Unit: "B", SelectorKind: SelectorFunction, Selector: "OUT"}, {Component: "amplifier", Unit: "B", SelectorKind: SelectorFunction, Selector: "IN_MINUS"}}},
+		},
+		PowerFlags: []PowerFlag{{Net: "5V"}, {Net: "GND"}}, NoConnects: []Endpoint{}, Buses: []Bus{},
+		Schematic: SchematicIntent{
+			Flow: FlowLeftToRight, Origin: OriginCentered,
+			Groups:     []SchematicGroup{{ID: "analog", Role: "processing_stage", Members: []string{"amplifier", "power", "signal"}, Rank: 0}},
+			Lanes:      SchematicLanes{Power: LaneTop, Signals: LaneMiddle, Ground: LaneBottom},
+			Placements: []SchematicPlacement{{Component: "amplifier", Group: "analog"}, {Component: "amplifier", Unit: "A", Group: "analog"}, {Component: "amplifier", Unit: "B", Group: "analog"}, {Component: "amplifier", Unit: "P", Group: "analog"}, {Component: "power", Group: "analog"}, {Component: "signal", Group: "analog", RightOf: "power"}},
+			Rules:      SchematicRules{PositivePowerTop: &trueValue, GroundBottom: &trueValue, CenterOnPage: &trueValue, PreferLabelsForLongNets: &trueValue, AvoidWireCrossings: &trueValue, MinGroupSpacingMM: 12.7, MinComponentSpacingMM: 7.62},
+			Hierarchy:  HierarchyPolicy{Mode: "flat"},
+		},
+		PCB: PCBIntent{
+			Regions:    []PCBRegion{{ID: "main", Bounds: Bounds{XMM: 2, YMM: 2, WidthMM: 46, HeightMM: 31}}},
+			Placements: []PCBPlacement{{Component: "amplifier", Region: "main"}, {Component: "power", Region: "main"}, {Component: "signal", Region: "main"}},
+			Keepouts:   []PCBKeepout{}, Zones: []PCBZone{},
+		},
+		Policy: Policy{AllowReferenceAssignment: &trueValue, AllowValueNormalization: &trueValue, AllowLayoutInference: &trueValue, AllowSpacingAdjustment: &trueValue, AllowLabelInsertion: &trueValue, AllowPlacementAdjustment: &trueValue, AllowRouteRetry: &falseValue},
+	}
 }
 
 func minimalResolvedDocument() Document {

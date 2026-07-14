@@ -42,6 +42,7 @@ type ResolvedComponent struct {
 	FootprintID      string                     `json:"footprint_id"`
 	PinMapID         string                     `json:"pinmap_id,omitempty"`
 	Functions        []ResolvedFunction         `json:"functions"`
+	Units            []ResolvedUnit             `json:"units,omitempty"`
 	CatalogSources   []string                   `json:"catalog_sources,omitempty"`
 	SymbolSources    []string                   `json:"symbol_sources,omitempty"`
 	FootprintSources []string                   `json:"footprint_sources,omitempty"`
@@ -51,11 +52,21 @@ type ResolvedComponent struct {
 	Symbols          []components.SymbolBinding `json:"-"`
 }
 
+type ResolvedUnit struct {
+	ID       string                    `json:"id"`
+	Role     string                    `json:"role"`
+	Type     components.SymbolUnitType `json:"type"`
+	Required bool                      `json:"required"`
+	Unit     int                       `json:"unit"`
+	SymbolID string                    `json:"symbol_id"`
+}
+
 type ResolvedFunction struct {
 	Function   string   `json:"function"`
 	Aliases    []string `json:"aliases,omitempty"`
 	SymbolID   string   `json:"symbol_id"`
 	Unit       int      `json:"unit"`
+	UnitID     string   `json:"unit_id,omitempty"`
 	SymbolPin  string   `json:"symbol_pin"`
 	Pad        string   `json:"pad"`
 	Electrical string   `json:"electrical,omitempty"`
@@ -77,6 +88,7 @@ type ResolvedEndpoint struct {
 type ResolvedBinding struct {
 	SymbolID   string `json:"symbol_id"`
 	Unit       int    `json:"unit"`
+	UnitID     string `json:"unit_id,omitempty"`
 	SymbolPin  string `json:"symbol_pin"`
 	Pad        string `json:"pad"`
 	Electrical string `json:"electrical,omitempty"`
