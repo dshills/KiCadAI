@@ -16,6 +16,7 @@ const (
 	CodeLimitExceeded             reports.Code = "GRAPH_LIMIT_EXCEEDED"
 	CodeComponentDuplicate        reports.Code = "GRAPH_COMPONENT_DUPLICATE"
 	CodeComponentSelectionInvalid reports.Code = "GRAPH_COMPONENT_SELECTION_INVALID"
+	CodeUnitInvalid               reports.Code = "GRAPH_UNIT_INVALID"
 	CodeNetInvalid                reports.Code = "GRAPH_NET_INVALID"
 	CodePowerFlagInvalid          reports.Code = "GRAPH_POWER_FLAG_INVALID"
 	CodeEndpointDuplicate         reports.Code = "GRAPH_ENDPOINT_DUPLICATE"
@@ -45,8 +46,9 @@ func Validate(document Document) []reports.Issue {
 }
 
 type graphValidator struct {
-	document Document
-	issues   []reports.Issue
+	document         Document
+	issues           []reports.Issue
+	unitsByComponent map[string]map[string]struct{}
 }
 
 func (validator *graphValidator) add(code reports.Code, path, message string) {
@@ -91,6 +93,7 @@ func (validator *graphValidator) components() map[string]Component {
 		validator.add(CodeLimitExceeded, "components", "component count exceeds limit")
 	}
 	byID := make(map[string]Component, len(validator.document.Components))
+	validator.unitsByComponent = make(map[string]map[string]struct{}, len(validator.document.Components))
 	references := map[string]int{}
 	for index, component := range validator.document.Components {
 		path := fmt.Sprintf("components[%d]", index)
@@ -113,6 +116,25 @@ func (validator *graphValidator) components() map[string]Component {
 		}
 		if !validComponentRole(component.Role) {
 			validator.add(CodeSchemaInvalid, path+".role", "unsupported component role")
+		}
+		if len(component.Units) > MaxUnitsPerComponent {
+			validator.add(CodeLimitExceeded, path+".units", "component unit count exceeds limit")
+		}
+		unitIDs := map[string]struct{}{}
+		validator.unitsByComponent[component.ID] = unitIDs
+		for unitIndex, unit := range component.Units {
+			unitPath := fmt.Sprintf("%s.units[%d]", path, unitIndex)
+			unitID := canonicalUnitID(unit.ID)
+			if !graphIDPattern.MatchString(unitID) {
+				validator.add(CodeUnitInvalid, unitPath+".id", "unit id must be a safe identifier")
+			}
+			if _, exists := unitIDs[unitID]; exists {
+				validator.add(CodeUnitInvalid, unitPath+".id", "duplicate component unit "+unitID)
+			}
+			unitIDs[unitID] = struct{}{}
+			if !graphIDPattern.MatchString(unit.Role) {
+				validator.add(CodeUnitInvalid, unitPath+".role", "unit role must be a safe identifier")
+			}
 		}
 		hasID := strings.TrimSpace(component.ComponentID) != ""
 		hasQuery := component.Query != nil
@@ -313,11 +335,19 @@ func (validator *graphValidator) nets(componentsByID map[string]Component) (map[
 }
 
 func (validator *graphValidator) endpoint(path string, endpoint Endpoint, componentsByID map[string]Component) {
-	if _, exists := componentsByID[endpoint.Component]; !exists {
+	component, exists := componentsByID[endpoint.Component]
+	if !exists {
 		validator.add(CodeNetInvalid, path+".component", "endpoint references unknown component "+endpoint.Component)
 	}
 	if endpoint.Unit != "" && !graphIDPattern.MatchString(endpoint.Unit) {
 		validator.add(CodeNetInvalid, path+".unit", "endpoint unit must be a safe identifier")
+	}
+	if exists && len(component.Units) != 0 {
+		if endpoint.Unit == "" {
+			validator.add(CodeUnitInvalid, path+".unit", "endpoint unit is required for a named multi-unit component")
+		} else if !validator.componentHasUnit(component.ID, endpoint.Unit) {
+			validator.add(CodeUnitInvalid, path+".unit", "endpoint references undeclared component unit "+endpoint.Unit)
+		}
 	}
 	if endpoint.SelectorKind != SelectorFunction && endpoint.SelectorKind != SelectorAlias && endpoint.SelectorKind != SelectorSymbolPin {
 		validator.add(CodeNetInvalid, path+".selector_kind", "unsupported endpoint selector kind")
@@ -421,13 +451,23 @@ func (validator *graphValidator) schematic(componentsByID map[string]Component) 
 	placed := map[string]struct{}{}
 	for index, placement := range intent.Placements {
 		path := fmt.Sprintf("schematic.placements[%d]", index)
-		if _, exists := componentsByID[placement.Component]; !exists {
+		component, exists := componentsByID[placement.Component]
+		if !exists {
 			validator.add(CodeLayoutUnsupported, path+".component", "placement references unknown component")
 		}
-		if _, exists := placed[placement.Component]; exists {
-			validator.add(CodeLayoutUnsupported, path+".component", "duplicate component placement")
+		unitID := canonicalUnitID(placement.Unit)
+		placementID := placement.Component + "\x00" + unitID
+		if _, exists := placed[placementID]; exists {
+			validator.add(CodeLayoutUnsupported, path+".unit", "duplicate component unit placement")
 		}
-		placed[placement.Component] = struct{}{}
+		placed[placementID] = struct{}{}
+		if unitID != "" {
+			if !graphIDPattern.MatchString(unitID) {
+				validator.add(CodeLayoutUnsupported, path+".unit", "placement unit must be a safe identifier")
+			} else if exists && !validator.componentHasUnit(component.ID, unitID) {
+				validator.add(CodeLayoutUnsupported, path+".unit", "placement references undeclared component unit "+unitID)
+			}
+		}
 		if placement.Group != "" {
 			if _, exists := groups[placement.Group]; !exists {
 				validator.add(CodeLayoutUnsupported, path+".group", "placement references unknown group")
@@ -438,6 +478,28 @@ func (validator *graphValidator) schematic(componentsByID map[string]Component) 
 				if _, exists := componentsByID[target]; !exists {
 					validator.add(CodeLayoutUnsupported, path+"."+field, "placement references unknown component "+target)
 				}
+			}
+		}
+		for _, relation := range []struct {
+			field, target, unitField, unit string
+		}{
+			{field: "near", target: placement.Near, unitField: "near_unit", unit: placement.NearUnit},
+			{field: "above", target: placement.Above, unitField: "above_unit", unit: placement.AboveUnit},
+			{field: "right_of", target: placement.RightOf, unitField: "right_of_unit", unit: placement.RightOfUnit},
+		} {
+			unit := canonicalUnitID(relation.unit)
+			if unit == "" {
+				continue
+			}
+			if relation.target == "" {
+				validator.add(CodeLayoutUnsupported, path+"."+relation.unitField, relation.unitField+" requires "+relation.field)
+				continue
+			}
+			target, targetExists := componentsByID[relation.target]
+			if !graphIDPattern.MatchString(unit) {
+				validator.add(CodeLayoutUnsupported, path+"."+relation.unitField, "relationship unit must be a safe identifier")
+			} else if targetExists && !validator.componentHasUnit(target.ID, unit) {
+				validator.add(CodeLayoutUnsupported, path+"."+relation.unitField, "relationship references undeclared target unit "+unit)
 			}
 		}
 		if placement.Orientation != "" && placement.Orientation != "normal" && placement.Orientation != "rotated_90" && placement.Orientation != "rotated_180" && placement.Orientation != "rotated_270" {
@@ -453,6 +515,11 @@ func (validator *graphValidator) schematic(componentsByID map[string]Component) 
 	if intent.Hierarchy.MaxComponentsPerSheet < 0 || intent.Hierarchy.MaxComponentsPerSheet > MaxComponents {
 		validator.add(CodeLayoutUnsupported, "schematic.hierarchy.max_components_per_sheet", "hierarchy component limit is invalid")
 	}
+}
+
+func (validator *graphValidator) componentHasUnit(componentID, unitID string) bool {
+	_, exists := validator.unitsByComponent[componentID][canonicalUnitID(unitID)]
+	return exists
 }
 
 func (validator *graphValidator) pcb(componentsByID map[string]Component, netsByName map[string]Net) {

@@ -73,6 +73,58 @@ func TestNormalizeIsDeterministicAndDoesNotMutateCaller(t *testing.T) {
 	}
 }
 
+func TestNormalizeCanonicalizesNamedUnitsAndPlacements(t *testing.T) {
+	document := validTestDocument()
+	document.Components[0].Units = []ComponentUnit{{ID: "b", Role: "gain_stage"}, {ID: "a", Role: "reference_buffer"}}
+	document.Nets[0].Endpoints[0].Unit = "a"
+	document.Nets[1].Endpoints[0].Unit = "b"
+	document.Schematic.Placements = append(document.Schematic.Placements,
+		SchematicPlacement{Component: "j1", Unit: "b", Group: "signal"},
+		SchematicPlacement{Component: "j1", Unit: "a", Group: "signal"},
+	)
+	document.Schematic.Placements[1].RightOfUnit = "b"
+
+	normalized := Normalize(document)
+	if got := normalized.Components[0].Units; len(got) != 2 || got[0].ID != "A" || got[1].ID != "B" {
+		t.Fatalf("normalized units = %#v", got)
+	}
+	endpointUnits := map[string]string{}
+	for _, net := range normalized.Nets {
+		for _, endpoint := range net.Endpoints {
+			if endpoint.Component == "j1" {
+				endpointUnits[net.Name] = endpoint.Unit
+			}
+		}
+	}
+	if endpointUnits["IN"] != "A" || endpointUnits["GND"] != "B" {
+		t.Fatalf("normalized endpoint units = %#v", endpointUnits)
+	}
+	if got := normalized.Schematic.Placements; got[0].Component != "j1" || got[0].Unit != "" || got[1].Unit != "A" || got[2].Unit != "B" {
+		t.Fatalf("normalized placements = %#v", got)
+	}
+	if normalized.Schematic.Placements[3].RightOfUnit != "B" {
+		t.Fatalf("normalized relationship unit = %#v", normalized.Schematic.Placements[3])
+	}
+	if !reflect.DeepEqual(normalized, Normalize(normalized)) {
+		t.Fatal("named-unit normalization is not idempotent")
+	}
+}
+
+func TestValidateAcceptsNamedUnitsAndQualifiedRelationships(t *testing.T) {
+	document := validTestDocument()
+	document.Components[0].Units = []ComponentUnit{{ID: "A", Role: "reference_buffer"}, {ID: "B", Role: "gain_stage"}}
+	document.Nets[0].Endpoints[0].Unit = "A"
+	document.Nets[1].Endpoints[0].Unit = "B"
+	document.Schematic.Placements[1].RightOfUnit = "A"
+	document.Schematic.Placements = append(document.Schematic.Placements,
+		SchematicPlacement{Component: "j1", Unit: "A", Group: "signal"},
+		SchematicPlacement{Component: "j1", Unit: "B", Group: "signal"},
+	)
+	if issues := Validate(document); len(issues) != 0 {
+		t.Fatalf("named-unit graph issues = %#v", issues)
+	}
+}
+
 func TestValidateRejectsUnsafeGraphCases(t *testing.T) {
 	tests := []struct {
 		name string
@@ -93,6 +145,32 @@ func TestValidateRejectsUnsafeGraphCases(t *testing.T) {
 		{name: "signal power flag", edit: func(document *Document) { document.PowerFlags = []PowerFlag{{Net: "IN"}} }, code: string(CodePowerFlagInvalid), path: "power_flags[0].net"},
 		{name: "too many power flags", edit: func(document *Document) { document.PowerFlags = make([]PowerFlag, MaxPowerFlags+1) }, code: string(CodeLimitExceeded), path: "power_flags"},
 		{name: "reserved power flag reference", edit: func(document *Document) { document.Components[0].Reference = "#FLG01" }, code: string(CodePowerFlagInvalid), path: "components[0].reference"},
+		{name: "duplicate component unit", edit: func(document *Document) {
+			document.Components[0].Units = []ComponentUnit{{ID: "A", Role: "first"}, {ID: "a", Role: "second"}}
+		}, code: string(CodeUnitInvalid), path: "components[0].units[1].id"},
+		{name: "missing endpoint unit", edit: func(document *Document) {
+			document.Components[0].Units = []ComponentUnit{{ID: "A", Role: "first"}}
+		}, code: string(CodeUnitInvalid), path: "nets[0].endpoints[0].unit"},
+		{name: "undeclared endpoint unit", edit: func(document *Document) {
+			document.Components[0].Units = []ComponentUnit{{ID: "A", Role: "first"}}
+			document.Nets[0].Endpoints[0].Unit = "B"
+			document.Nets[1].Endpoints[0].Unit = "A"
+		}, code: string(CodeUnitInvalid), path: "nets[0].endpoints[0].unit"},
+		{name: "duplicate unit placement", edit: func(document *Document) {
+			document.Components[0].Units = []ComponentUnit{{ID: "A", Role: "first"}}
+			document.Nets[0].Endpoints[0].Unit = "A"
+			document.Nets[1].Endpoints[0].Unit = "A"
+			document.Schematic.Placements = append(document.Schematic.Placements, SchematicPlacement{Component: "j1"})
+		}, code: string(CodeLayoutUnsupported), path: "schematic.placements[2].unit"},
+		{name: "orphan relationship unit", edit: func(document *Document) {
+			document.Schematic.Placements[1].NearUnit = "A"
+		}, code: string(CodeLayoutUnsupported), path: "schematic.placements[1].near_unit"},
+		{name: "undeclared relationship unit", edit: func(document *Document) {
+			document.Components[0].Units = []ComponentUnit{{ID: "A", Role: "first"}}
+			document.Nets[0].Endpoints[0].Unit = "A"
+			document.Nets[1].Endpoints[0].Unit = "A"
+			document.Schematic.Placements[1].RightOfUnit = "B"
+		}, code: string(CodeLayoutUnsupported), path: "schematic.placements[1].right_of_unit"},
 		{name: "unknown group member", edit: func(document *Document) {
 			document.Schematic.Groups[0].Members = append(document.Schematic.Groups[0].Members, "missing")
 		}, code: string(CodeLayoutUnsupported), path: "schematic.groups[0].members[2]"},
@@ -108,6 +186,18 @@ func TestValidateRejectsUnsafeGraphCases(t *testing.T) {
 				t.Fatalf("issues = %#v, want code=%s path=%s", issues, test.code, test.path)
 			}
 		})
+	}
+}
+
+func TestProviderSchemaContainsNamedUnitContract(t *testing.T) {
+	data, err := json.Marshal(ProviderGraphSchema())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{`"units"`, `"unit"`, `"near_unit"`, `"above_unit"`, `"right_of_unit"`} {
+		if !bytes.Contains(data, []byte(field)) {
+			t.Fatalf("provider schema does not contain %s", field)
+		}
 	}
 }
 

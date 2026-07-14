@@ -136,10 +136,20 @@ type PackageVariant struct {
 type SymbolBinding struct {
 	SymbolID     string             `json:"symbol_id"`
 	Unit         int                `json:"unit,omitempty"`
+	UnitID       string             `json:"unit_id,omitempty"`
+	UnitType     SymbolUnitType     `json:"unit_type,omitempty"`
+	RequiredUnit bool               `json:"required_unit,omitempty"`
 	FunctionPins []FunctionPin      `json:"function_pins,omitempty"`
 	PinMapID     string             `json:"pinmap_id,omitempty"`
 	Verification VerificationRecord `json:"verification"`
 }
+
+type SymbolUnitType string
+
+const (
+	SymbolUnitFunctional SymbolUnitType = "functional"
+	SymbolUnitPower      SymbolUnitType = "power"
+)
 
 type FunctionPin struct {
 	Function   string   `json:"function"`

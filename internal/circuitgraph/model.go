@@ -14,17 +14,18 @@ const (
 )
 
 const (
-	MaxDocumentBytes    = 4 << 20
-	MaxComponents       = 512
-	MaxNets             = 1024
-	MaxEndpointsPerNet  = 512
-	MaxTotalEndpoints   = 32768
-	MaxNoConnects       = 16384
-	MaxBuses            = 128
-	MaxPowerFlags       = 64
-	MaxStringBytes      = 256
-	MaxDescriptionBytes = 2048
-	MaxBoardDimensionMM = 1000
+	MaxDocumentBytes     = 4 << 20
+	MaxComponents        = 512
+	MaxUnitsPerComponent = 32
+	MaxNets              = 1024
+	MaxEndpointsPerNet   = 512
+	MaxTotalEndpoints    = 32768
+	MaxNoConnects        = 16384
+	MaxBuses             = 128
+	MaxPowerFlags        = 64
+	MaxStringBytes       = 256
+	MaxDescriptionBytes  = 2048
+	MaxBoardDimensionMM  = 1000
 )
 
 type Document struct {
@@ -76,6 +77,7 @@ type Component struct {
 	ID                string                     `json:"id"`
 	Reference         string                     `json:"reference,omitempty"`
 	Role              ComponentRole              `json:"role"`
+	Units             []ComponentUnit            `json:"units,omitempty"`
 	ComponentID       string                     `json:"component_id,omitempty"`
 	VariantID         string                     `json:"variant_id,omitempty"`
 	Query             *ComponentQuery            `json:"query,omitempty"`
@@ -90,6 +92,11 @@ type Component struct {
 	Population        Population                 `json:"population"`
 	Properties        []Property                 `json:"properties,omitempty"`
 	Extensions        map[string]json.RawMessage `json:"extensions,omitempty"`
+}
+
+type ComponentUnit struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
 }
 
 type ComponentRole string
@@ -275,10 +282,14 @@ const (
 
 type SchematicPlacement struct {
 	Component   string `json:"component"`
+	Unit        string `json:"unit,omitempty"`
 	Group       string `json:"group,omitempty"`
 	Near        string `json:"near,omitempty"`
+	NearUnit    string `json:"near_unit,omitempty"`
 	Above       string `json:"above,omitempty"`
+	AboveUnit   string `json:"above_unit,omitempty"`
 	RightOf     string `json:"right_of,omitempty"`
+	RightOfUnit string `json:"right_of_unit,omitempty"`
 	Orientation string `json:"orientation,omitempty"`
 	Mirror      string `json:"mirror,omitempty"`
 }

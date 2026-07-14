@@ -36,10 +36,12 @@ func ProviderGraphSchema() map[string]any {
 		stringArray(256),
 	}}
 	parameter := strictObject(map[string]any{"name": identifier, "value": parameterValue})
+	componentUnit := strictObject(map[string]any{"id": identifier, "role": identifier})
 	component := strictObject(map[string]any{
 		"id":                 identifier,
 		"reference":          stringValue,
 		"role":               map[string]any{"type": "string", "enum": componentRoleValues()},
+		"units":              map[string]any{"type": "array", "maxItems": MaxUnitsPerComponent, "items": componentUnit},
 		"component_id":       stringValue,
 		"variant_id":         stringValue,
 		"query":              nullable(query),
@@ -85,8 +87,10 @@ func ProviderGraphSchema() map[string]any {
 		"side": map[string]any{"type": "string", "enum": []string{"", "left", "right", "top", "bottom"}},
 	})
 	schematicPlacement := strictObject(map[string]any{
-		"component": identifier, "group": stringValue, "near": stringValue,
-		"above": stringValue, "right_of": stringValue,
+		"component": identifier, "unit": identifier, "group": stringValue,
+		"near": stringValue, "near_unit": identifier,
+		"above": stringValue, "above_unit": identifier,
+		"right_of": stringValue, "right_of_unit": identifier,
 		"orientation": map[string]any{"type": "string", "enum": []string{"normal", "rotated_90", "rotated_180", "rotated_270"}},
 		"mirror":      map[string]any{"type": "string", "enum": []string{"", "none", "x", "y"}},
 	})

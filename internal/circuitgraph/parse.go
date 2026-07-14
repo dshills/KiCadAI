@@ -44,6 +44,12 @@ func Normalize(document Document) Document {
 		return strings.Compare(left.ID, right.ID)
 	})
 	for index := range normalized.Components {
+		for unitIndex := range normalized.Components[index].Units {
+			normalized.Components[index].Units[unitIndex].ID = canonicalUnitID(normalized.Components[index].Units[unitIndex].ID)
+		}
+		slices.SortStableFunc(normalized.Components[index].Units, func(left, right ComponentUnit) int {
+			return strings.Compare(left.ID, right.ID)
+		})
 		slices.SortStableFunc(normalized.Components[index].Parameters, func(left, right Parameter) int {
 			return strings.Compare(left.Name, right.Name)
 		})
@@ -65,7 +71,13 @@ func Normalize(document Document) Document {
 		return strings.Compare(left.Name, right.Name)
 	})
 	for index := range normalized.Nets {
+		for endpointIndex := range normalized.Nets[index].Endpoints {
+			normalized.Nets[index].Endpoints[endpointIndex].Unit = canonicalUnitID(normalized.Nets[index].Endpoints[endpointIndex].Unit)
+		}
 		slices.SortStableFunc(normalized.Nets[index].Endpoints, compareEndpoints)
+	}
+	for index := range normalized.NoConnects {
+		normalized.NoConnects[index].Unit = canonicalUnitID(normalized.NoConnects[index].Unit)
 	}
 	slices.SortStableFunc(normalized.NoConnects, compareEndpoints)
 	slices.SortStableFunc(normalized.PowerFlags, func(left, right PowerFlag) int {
@@ -91,8 +103,18 @@ func Normalize(document Document) Document {
 	for index := range normalized.Schematic.Groups {
 		slices.Sort(normalized.Schematic.Groups[index].Members)
 	}
+	for index := range normalized.Schematic.Placements {
+		placement := &normalized.Schematic.Placements[index]
+		placement.Unit = canonicalUnitID(placement.Unit)
+		placement.NearUnit = canonicalUnitID(placement.NearUnit)
+		placement.AboveUnit = canonicalUnitID(placement.AboveUnit)
+		placement.RightOfUnit = canonicalUnitID(placement.RightOfUnit)
+	}
 	slices.SortStableFunc(normalized.Schematic.Placements, func(left, right SchematicPlacement) int {
-		return strings.Compare(left.Component, right.Component)
+		if left.Component != right.Component {
+			return strings.Compare(left.Component, right.Component)
+		}
+		return strings.Compare(left.Unit, right.Unit)
 	})
 	slices.SortStableFunc(normalized.PCB.Regions, func(left, right PCBRegion) int {
 		return strings.Compare(left.ID, right.ID)
@@ -128,6 +150,10 @@ func compareEndpoints(left, right Endpoint) int {
 	return strings.Compare(left.Selector, right.Selector)
 }
 
+func canonicalUnitID(value string) string {
+	return strings.ToUpper(strings.TrimSpace(value))
+}
+
 func cloneDocument(document Document) Document {
 	cloned := document
 	cloned.Extensions = cloneRawMessages(document.Extensions)
@@ -147,6 +173,7 @@ func cloneDocument(document Document) Document {
 			component.Footprint = &constraint
 		}
 		component.Parameters = append([]Parameter(nil), document.Components[index].Parameters...)
+		component.Units = append([]ComponentUnit(nil), document.Components[index].Units...)
 		for parameterIndex := range component.Parameters {
 			component.Parameters[parameterIndex].Value = cloneParameterValue(document.Components[index].Parameters[parameterIndex].Value)
 		}
