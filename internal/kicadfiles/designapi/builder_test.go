@@ -323,6 +323,50 @@ func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
 	}
 }
 
+func TestBuilderConnectRelocatesConflictingExplicitLabelStub(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(40.64)})
+	addTwoPinSymbol(t, builder, "R3", "Device:R", "2k", kicadfiles.Point{X: kicadfiles.MM(30.48), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R4", "Device:R", "20k", kicadfiles.Point{X: kicadfiles.MM(30.48), Y: kicadfiles.MM(40.64)})
+
+	firstStart, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	firstEnd, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	secondStart, _ := builder.pinAnchor(Endpoint{Reference: "R3", Pin: "2"})
+	collisionPoint := kicadfiles.Point{X: secondStart.X, Y: firstStart.Y}
+	firstEndLabel := kicadfiles.Point{X: firstEnd.X + kicadfiles.MM(5.08), Y: firstEnd.Y}
+	useLabels := true
+	if err := builder.ConnectWithOptions(
+		Endpoint{Reference: "R1", Pin: "2"},
+		Endpoint{Reference: "R2", Pin: "1"},
+		"NET_A",
+		ConnectOptions{UseLabels: &useLabels, FromLabelAt: &collisionPoint, ToLabelAt: &firstEndLabel},
+	); err != nil {
+		t.Fatalf("connect first net: %v", err)
+	}
+
+	secondEnd, _ := builder.pinAnchor(Endpoint{Reference: "R4", Pin: "1"})
+	secondEndLabel := kicadfiles.Point{X: secondEnd.X - kicadfiles.MM(5.08), Y: secondEnd.Y}
+	if err := builder.ConnectWithOptions(
+		Endpoint{Reference: "R3", Pin: "2"},
+		Endpoint{Reference: "R4", Pin: "1"},
+		"NET_B",
+		ConnectOptions{UseLabels: &useLabels, FromLabelAt: &collisionPoint, ToLabelAt: &secondEndLabel},
+	); err != nil {
+		t.Fatalf("connect second net: %v", err)
+	}
+
+	var labelsAtCollision []string
+	for _, label := range builder.design.Schematic.Labels {
+		if label.Position == collisionPoint {
+			labelsAtCollision = append(labelsAtCollision, label.Text)
+		}
+	}
+	if len(labelsAtCollision) != 1 || labelsAtCollision[0] != "NET_A" {
+		t.Fatalf("labels at collision point = %v, want [NET_A]", labelsAtCollision)
+	}
+}
+
 func TestBuilderConnectReanchorsMovedMultiUnitLabelStub(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})

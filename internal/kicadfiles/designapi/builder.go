@@ -713,10 +713,32 @@ func (builder *Builder) addSchematicLabelConnection(netName string, endpoint End
 		return
 	}
 	position := *requested
+	if builder.schematicLabelConnectionConflicts(netName, anchor, position) {
+		preferred := kicadfiles.Point{X: position.X - anchor.X, Y: position.Y - anchor.Y}
+		if samePoint(preferred, kicadfiles.Point{}) {
+			preferred = builder.labelStubOffset(endpoint, anchor, other)
+		}
+		builder.addSchematicLabelStub(netName, endpoint, anchor, preferred)
+		return
+	}
 	if position != anchor {
 		builder.addSchematicWirePoints(netName, endpoint, endpoint, []kicadfiles.Point{anchor, position})
 	}
 	_ = builder.AddLabel(netName, position, schematic.LabelLocal)
+}
+
+func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor, position kicadfiles.Point) bool {
+	netName = strings.TrimSpace(netName)
+	for _, label := range builder.design.Schematic.Labels {
+		if samePoint(label.Position, position) && strings.TrimSpace(label.Text) != netName {
+			return true
+		}
+	}
+	if samePoint(position, anchor) {
+		return false
+	}
+	return schematicStubTouchesExistingWire(anchor, position, builder.design.Schematic.Wires) ||
+		builder.schematicSegmentTouchesOtherPinAnchor(anchor, position, anchor, anchor)
 }
 
 func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoint) bool {
