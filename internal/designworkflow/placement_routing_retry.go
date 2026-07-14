@@ -105,15 +105,12 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 	seenHintCategories := map[string]struct{}{}
 	for attempt := 2; attempt <= policy.MaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
-			summary.StopReason = "context_canceled"
+			summary.StopReason = CorrectionStopContextCanceled
 			break
 		}
 		if currentRouted.Result.Status == routing.StatusRouted {
-			summary.StopReason = "routed"
+			summary.StopReason = CorrectionStopRouted
 			break
-		}
-		if correctionReport != nil {
-			summary.Attempts = attempt
 		}
 		var hints []PlacementRetryHint
 		var adjustedRequest placement.Request
@@ -187,7 +184,7 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 		}
 		stateHash := placementStateHash(nextPlaced.Result.Placements)
 		if _, ok := seenStates[stateHash]; ok {
-			summary.StopReason = "repeated_placement_state"
+			summary.StopReason = CorrectionStopRepeatedPlacementState
 			if correctionReport != nil {
 				correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, RoutingStageResult{}))
 			}
@@ -197,9 +194,8 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 		nextPlaced, nextRouted := routeNext(nextPlaced)
 		if correctionReport != nil {
 			correctionReport.AttemptHistory = append(correctionReport.AttemptHistory, autonomousCorrectionAttemptForResult(attempt, correctionPlan, correctionApplication, nextPlaced, nextRouted))
-		} else {
-			summary.Attempts = attempt
 		}
+		summary.Attempts = attempt
 		summary.Applied++
 		ensureStageSummary(&nextRouted.Stage)
 		adjustmentSummary := PlacementRetryAdjustmentSummary(adjustment)
@@ -217,21 +213,21 @@ func maybeRetryPlacementRoutingWithRouter(ctx context.Context, request Request, 
 			bestAttempt = attemptSummary
 		}
 		summary.AttemptHistory = append(summary.AttemptHistory, attemptSummary)
-		if !improved && policy.StopOnNewBlockers && slices.Contains(attemptSummary.RegressionFlags, "drc_regression") {
-			summary.StopReason = "drc_regression"
+		if !improved && policy.StopOnNewBlockers && slices.Contains(attemptSummary.RegressionFlags, CorrectionStopDRCRegression) {
+			summary.StopReason = CorrectionStopDRCRegression
 			break
-		} else if !improved && policy.StopOnNewBlockers && slices.Contains(attemptSummary.RegressionFlags, "board_validation_regression") {
-			summary.StopReason = "board_validation_regression"
+		} else if !improved && policy.StopOnNewBlockers && slices.Contains(attemptSummary.RegressionFlags, CorrectionStopBoardValidationRegression) {
+			summary.StopReason = CorrectionStopBoardValidationRegression
 			break
 		} else if !improved && policy.StopOnNonImprovement {
-			summary.StopReason = "non_improving_retry"
+			summary.StopReason = CorrectionStopNonImprovingRetry
 			break
 		}
 		currentPlaced = nextPlaced
 		currentRouted = nextRouted
 	}
 	if summary.StopReason == "" {
-		summary.StopReason = "max_attempts"
+		summary.StopReason = CorrectionStopMaxAttempts
 	}
 	summary.SelectedAttempt = bestAttempt.Attempt
 	summary.SelectedReason = bestAttempt.SelectedReason

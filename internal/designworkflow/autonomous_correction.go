@@ -117,11 +117,14 @@ type AutonomousCorrectionAttempt struct {
 }
 
 type AutonomousCorrectionReport struct {
-	SchemaVersion                 string                        `json:"schema_version"`
-	Scope                         string                        `json:"scope"`
-	Enabled                       bool                          `json:"enabled"`
-	MaxAttempts                   int                           `json:"max_attempts"`
-	Attempts                      int                           `json:"attempts"`
+	SchemaVersion string `json:"schema_version"`
+	Scope         string `json:"scope"`
+	Enabled       bool   `json:"enabled"`
+	MaxAttempts   int    `json:"max_attempts"`
+	// Attempts counts the initial route plus retries that reached routing.
+	Attempts int `json:"attempts"`
+	// PlanEvaluations counts correction plans, including fail-closed plans.
+	PlanEvaluations               int                           `json:"plan_evaluations"`
 	Applied                       int                           `json:"applied"`
 	StopReason                    string                        `json:"stop_reason,omitempty"`
 	SelectedAttempt               int                           `json:"selected_attempt,omitempty"`
@@ -135,17 +138,24 @@ type AutonomousCorrectionReport struct {
 }
 
 const (
-	CorrectionStopNotGeneric              = "not_generic_circuit"
-	CorrectionStopNotRequired             = "correction_not_required"
-	CorrectionStopBudgetExhausted         = "budget_exhausted"
-	CorrectionStopUnsupportedDiagnostic   = "unsupported_diagnostic"
-	CorrectionStopAmbiguousDiagnostics    = "ambiguous_diagnostics"
-	CorrectionStopFixedConstraintConflict = "fixed_constraint_conflict"
-	CorrectionStopRepeatedRetryKey        = "repeated_retry_key"
-	CorrectionStopPlanNotAuthorized       = "plan_not_authorized"
-	CorrectionStopInvariantMismatch       = "invariant_mismatch"
-	CorrectionStopNoSafeAdjustment        = "no_safe_adjustment"
-	CorrectionStopAdjustedRequestInvalid  = "adjusted_request_invalid"
+	CorrectionStopNotGeneric                = "not_generic_circuit"
+	CorrectionStopNotRequired               = "correction_not_required"
+	CorrectionStopBudgetExhausted           = "budget_exhausted"
+	CorrectionStopUnsupportedDiagnostic     = "unsupported_diagnostic"
+	CorrectionStopAmbiguousDiagnostics      = "ambiguous_diagnostics"
+	CorrectionStopFixedConstraintConflict   = "fixed_constraint_conflict"
+	CorrectionStopRepeatedRetryKey          = "repeated_retry_key"
+	CorrectionStopPlanNotAuthorized         = "plan_not_authorized"
+	CorrectionStopInvariantMismatch         = "invariant_mismatch"
+	CorrectionStopNoSafeAdjustment          = "no_safe_adjustment"
+	CorrectionStopAdjustedRequestInvalid    = "adjusted_request_invalid"
+	CorrectionStopContextCanceled           = "context_canceled"
+	CorrectionStopRepeatedPlacementState    = "repeated_placement_state"
+	CorrectionStopNonImprovingRetry         = "non_improving_retry"
+	CorrectionStopMaxAttempts               = "max_attempts"
+	CorrectionStopRouted                    = "routed"
+	CorrectionStopDRCRegression             = "drc_regression"
+	CorrectionStopBoardValidationRegression = "board_validation_regression"
 )
 
 // PlanAutonomousCorrection is pure: it derives an authorized plan without
@@ -554,6 +564,12 @@ func finalizeAutonomousCorrectionReport(report *AutonomousCorrectionReport, requ
 	}
 	report.FinalInvariantFingerprint = finalFingerprint
 	report.Attempts = summary.Attempts
+	report.PlanEvaluations = 0
+	for _, attempt := range report.AttemptHistory {
+		if attempt.Plan != nil {
+			report.PlanEvaluations++
+		}
+	}
 	report.Applied = summary.Applied
 	report.StopReason = summary.StopReason
 	report.SelectedAttempt = summary.SelectedAttempt
