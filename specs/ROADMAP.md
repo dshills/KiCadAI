@@ -1053,12 +1053,16 @@ intent:
 
 ## Near-Term Recommended Sequence
 
-The first generic promotions are complete: RC filter, protected USB-C LED, and
-protected USB-C BMP280 all reach the optional KiCad-backed pass lane through
-the shared graph contract.
+The first generic promotions are complete: RC filter, protected USB-C LED,
+protected USB-C BMP280, single-stage LMV321 gain, and a composed two-stage
+LMV321 signal conditioner all reach the optional KiCad-backed pass lane through
+the shared graph contract. The two-stage fixture also has live provider pass
+evidence, semantic equivalence to its recorded critical graph, deterministic
+recorded transactions, and explicit analog-review limitations.
 
 1. Add a materially different generic graph only when it exposes a concrete
-   catalog, lowering, placement, routing, or validation gap.
+   catalog, lowering, hierarchy, placement, routing, simulation, or validation
+   gap; do not extend stage count merely to accumulate fixtures.
 2. Generalize bounded placement-routing correction from those observed
    failures without introducing fixture-identity logic.
 3. Expand calculated rating and fabrication evidence before claiming broader

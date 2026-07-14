@@ -49,13 +49,17 @@ routing, writer correctness, and zero unexpected normalized round-trip diffs.
 An explicit generic circuit-graph lane now resolves provider topology against
 the checked-in component catalog and lowers it through the same deterministic
 schematic and PCB workflow. Generic RC filter, protected USB-C LED, protected
-USB-C BMP280, and LMV321 AC-coupled gain-stage graphs have recorded
+USB-C BMP280, LMV321 AC-coupled gain-stage, and dual-LMV321 signal-conditioner
+graphs have recorded
 KiCad-backed pass evidence without topology-specific schemas. The generic
-RC filter, BMP280, and LMV321 lanes also have live OpenAI pass evidence through
-schematic generation, placement, complete required-net routing, writer
-correctness, strict ERC/DRC, and round-trip checks. The LMV321 fixture keeps
-analog performance claims explicitly review-required. The protected USB-C LED
-currently carries recorded, rather than live, generic-provider pass evidence.
+RC filter, BMP280, and both LMV321 lanes also have live OpenAI pass evidence
+through schematic generation, placement, complete required-net routing, writer
+correctness, strict ERC/DRC, and round-trip checks. The dual-stage fixture proves
+component multiplicity, topology-derived stage ordering, shared VREF/power
+trees, independent feedback loops, and deterministic inter-stage routing. Both
+LMV321 fixtures keep analog performance claims explicitly review-required. The
+protected USB-C LED currently carries recorded, rather than live,
+generic-provider pass evidence.
 
 The generic contract is deliberately strict. It expands topology expression,
 but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or
@@ -135,10 +139,11 @@ treated as autonomous or fabrication-ready.
 
 ## Remaining Direction
 
-The next work should broaden generic catalog and pin/function evidence, add
-feedback-aware schematic and PCB constraints where proven necessary, and
-exercise increasingly complex graphs through the same connectivity, ERC/DRC,
-writer, round-trip, and domain-specific evidence gates.
+The next work should promote a graph that introduces a materially different
+generic capability, rather than another fixed analog stage count. Useful
+targets include controlled multi-unit parts, explicit hierarchy, or a circuit
+whose domain evidence requires simulation. Continue to broaden catalog and
+pin/function evidence only when a target exposes a concrete gap.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

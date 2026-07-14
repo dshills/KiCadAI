@@ -30,11 +30,13 @@ The promoted generic references are:
 - `examples/ai/generic_rc_filter/`;
 - `examples/ai/generic_usb_c_led_indicator_protected/`;
 - `examples/ai/generic_usb_c_bmp280_breakout/`;
-- `examples/ai/generic_lmv321_ac_gain_stage/`.
+- `examples/ai/generic_lmv321_ac_gain_stage/`;
+- `examples/ai/generic_dual_lmv321_signal_conditioner/`.
 
 They prove passive, multi-branch protected-power, and regulated I2C sensor
-topologies plus a biased analog feedback stage through the common graph schema
-instead of topology-specific provider schemas.
+topologies plus single-stage and composed two-stage biased analog feedback
+circuits through the common graph schema instead of topology-specific provider
+schemas.
 
 Recorded, strict KiCad-backed run:
 
@@ -140,6 +142,24 @@ kicadai --prompt-file examples/ai/generic_lmv321_ac_gain_stage/prompt.txt \
   design create
 ```
 
+Recorded generic dual-LMV321 signal-conditioner run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_dual_lmv321_signal_conditioner/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_dual_lmv321_signal_conditioner/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/ai_generic_dual_lmv321 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
 ## OpenAI Provider
 
 Load `OPENAI_API_KEY` into the process environment from the user's shell
@@ -206,6 +226,27 @@ kicadai --prompt-file examples/ai/generic_lmv321_ac_gain_stage/prompt.txt \
   design create
 ```
 
+Live generic dual-LMV321 signal-conditioner run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_dual_lmv321_signal_conditioner/prompt.txt \
+  --provider openai --ai-background \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/live_generic_dual_lmv321 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted --max-ai-attempts 2 \
+  design create
+```
+
+The background option avoids the foreground response-body timeout on provider
+requests that need more than two minutes. It does not weaken schema validation,
+retry bounds, or any KiCad gate.
+
 The live and recorded semantic projection test can verify the saved live graph
 without another API call:
 
@@ -214,6 +255,20 @@ KICADAI_OPENAI_LIVE_TEST=1 \
 KICADAI_OPENAI_LIVE_GRAPH=./out/live_generic_lmv321/.kicadai/circuit-graph.json \
   go test ./internal/aiprovider -run '^TestOpenAILiveGenericLMV321Graph$' -count=1 -v
 ```
+
+For the two-stage fixture, compare its saved live graph with the checked-in
+recorded critical projection without making another provider request:
+
+```sh
+KICADAI_OPENAI_LIVE_TEST=1 \
+KICADAI_OPENAI_DUAL_LMV321_LIVE_GRAPH=./out/live_generic_dual_lmv321/.kicadai/circuit-graph.json \
+  go test ./internal/aiprovider -run '^TestOpenAILiveGenericDualLMV321Graph$' -count=1 -v
+```
+
+Each live semantic-projection test uses a fixture-specific graph-path variable
+so multiple saved live graphs can be tested in the same process. The single-stage
+fixture retains the older generic `KICADAI_OPENAI_LIVE_GRAPH` name; the
+two-stage fixture uses `KICADAI_OPENAI_DUAL_LMV321_LIVE_GRAPH`.
 
 Optional provider settings include `--model`, `--max-ai-attempts`, and
 `--ai-background`. Correction attempts are bounded and restricted to explicit
@@ -225,7 +280,7 @@ The live provider smoke test is opt-in:
 
 ```sh
 KICADAI_OPENAI_LIVE_TEST=1 \
-  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph|GenericUSBCBMP280Graph|GenericLMV321Graph)$' -count=1 -v
+  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph|GenericUSBCBMP280Graph|GenericLMV321Graph|GenericDualLMV321Graph)$' -count=1 -v
 ```
 
 ## Reproducible Promotion Test
@@ -278,9 +333,24 @@ For the LMV321 commands, inspect
 `./out/ai_generic_lmv321/.kicadai/` or
 `./out/live_generic_lmv321/.kicadai/`. The recorded and live lanes preserve
 the verified LMV321 symbol and SOT-23-5 footprint, required-net topology, and
-explicit review-required markers for stability, gain-bandwidth, output drive,
-noise, distortion, and load compatibility. Clean ERC/DRC and promotion `pass`
-do not prove those analog performance properties.
+explicit markers with value `review_required` for stability, gain-bandwidth,
+output drive, noise, distortion, and load compatibility. Clean ERC/DRC and
+promotion `pass` do not prove those analog performance properties.
+
+For the two-stage commands, use
+`./out/ai_generic_dual_lmv321/.kicadai/` and
+`./out/live_generic_dual_lmv321/.kicadai/`. Both LMV321 instances carry
+separate stage identity plus explicit `review_required` markers for stability,
+gain-bandwidth, output drive, noise, distortion, and load compatibility. The
+current reference also uses a high-impedance 100 kOhm VREF divider and routed
+ground traces without a plane. Those choices are accepted ERC/DRC fixture
+inputs, not proof of low-noise or low-distortion analog performance; revise and
+simulate them before using the design as an engineering reference.
+
+Repeated recorded runs are deterministic at the circuit graph, catalog
+resolution, lowered design request, and transaction layers. Manifests contain
+workspace-specific paths and are not expected to be byte-identical across
+different output directories.
 
 Plaintext prompts, API keys, authorization headers, and hidden provider
 reasoning are not persisted. The normalized intent plus the KiCadAI version is
@@ -305,7 +375,7 @@ The generic graph removes the architectural requirement for one provider
 schema per topology; it does not make every circuit routable or electrically
 proven. V1 is limited to catalog-resolvable parts and functions, flat graph
 topology, bounded relative layout intent, deterministic placement, and the
-current explicit-circuit router. The promoted generic fixtures prove four
+current explicit-circuit router. The promoted generic fixtures prove five
 specific topology classes, not arbitrary electronics. Dense boards, arbitrary
 hierarchy, analog performance, thermal/safe-operating-area analysis, safety
 isolation, and fabrication release still require additional evidence.
