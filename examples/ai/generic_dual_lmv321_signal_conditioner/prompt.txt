@@ -1,0 +1,13 @@
+Create a two-layer 80 mm by 50 mm catalog-resolved LMV321 AC-coupled signal-conditioner board that must pass KiCad ERC and strict DRC.
+
+Use only trusted catalog components and functions. Provide a two-pin 5 V power input, a two-pin signal input, and a two-pin signal output. Use two distinct instances of the verified TI LMV321 SOT-23-5 component. Preserve both amplifier identities, symbols, footprints, and pin mappings independently.
+
+Generate a shared 2.5 V virtual reference from 5 V using two 100 kOhm resistors and a 1 uF ceramic bypass capacitor. AC-couple the input with 1 uF and bias the first non-inverting input to VREF through 100 kOhm. Configure each LMV321 as an independent non-inverting stage with 100 kOhm feedback from output to inverting input and 10 kOhm from inverting input to VREF, for nominal gain near 11 per stage. Connect the first stage output directly to the second non-inverting input. AC-couple the final output with 1 uF and reference the connector side to ground through 100 kOhm. Place a separate 100 nF local supply-decoupling capacitor at each amplifier.
+
+Make 5V, GND, VREF, SIGNAL_IN, STAGE1_IN, STAGE1_FB, STAGE1_OUT, STAGE2_FB, STAGE2_OUT, and SIGNAL_OUT required nets. Use 0.5 mm tracks for 5 V and ground and 0.25 mm tracks for analog signals. Mark 5 V and ground as externally driven power nets.
+
+The schematic must flow left to right: input, first gain stage, second gain stage, output. Put positive power above, ground below, shared VREF near both stages, each feedback network adjacent to its owning amplifier, and each decoupling capacitor adjacent to its corresponding power pins. Keep the drawing centered, bounded, and readable.
+
+Place the power and signal inputs toward the left, the first amplifier before the second, and the output toward the right. Route the shared 5 V, ground, and VREF trees plus both feedback loops and the inter-stage signal deterministically. Do not add a copper zone.
+
+ERC and DRC do not prove analog performance. Record stability, gain-bandwidth, output-drive, noise, distortion, and load-compatibility evidence as review required for both amplifier instances. This is a small-signal conditioner, not a headphone or power-amplifier output.

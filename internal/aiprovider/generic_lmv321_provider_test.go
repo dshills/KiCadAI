@@ -67,7 +67,7 @@ func TestOpenAILiveGenericLMV321Graph(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	liveJSON := loadOrGenerateLiveLMV321Graph(t, prompt, capability)
+	liveJSON := loadOrGenerateLiveGraph(t, prompt, capability, "KICADAI_OPENAI_LIVE_GRAPH", "generic LMV321")
 	live := genericLMV321ProjectionFor(t, decodeAndResolveGraph(t, liveJSON, catalog))
 	recordedEnvelope, err := os.ReadFile(filepath.Join(fixtureDir, "recorded-response.json"))
 	if err != nil {
@@ -82,9 +82,9 @@ func TestOpenAILiveGenericLMV321Graph(t *testing.T) {
 	assertGenericLMV321CriticalEquivalence(t, live, recorded)
 }
 
-func loadOrGenerateLiveLMV321Graph(t *testing.T, prompt []byte, capability string) []byte {
+func loadOrGenerateLiveGraph(t *testing.T, prompt []byte, capability, artifactEnv, description string) []byte {
 	t.Helper()
-	if path := strings.TrimSpace(os.Getenv("KICADAI_OPENAI_LIVE_GRAPH")); path != "" {
+	if path := strings.TrimSpace(os.Getenv(artifactEnv)); path != "" {
 		graph, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("read live OpenAI graph: %v", err)
@@ -104,7 +104,7 @@ func loadOrGenerateLiveLMV321Graph(t *testing.T, prompt []byte, capability strin
 		SchemaVersion: EnvelopeSchemaV1, Attempt: 1,
 	})
 	if err != nil {
-		t.Fatalf("generate generic LMV321 graph: %v", err)
+		t.Fatalf("generate %s graph: %v", description, err)
 	}
 	return result.IntentJSON
 }

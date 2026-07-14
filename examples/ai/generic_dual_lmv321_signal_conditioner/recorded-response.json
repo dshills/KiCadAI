@@ -1,0 +1,116 @@
+{
+  "schema": "kicadai.ai.intent.v1",
+  "intent": {
+    "schema": "kicadai.circuit-graph.v1",
+    "version": 1,
+    "project": {
+      "name": "generic_dual_lmv321_signal_conditioner",
+      "title": "Dual LMV321 AC-Coupled Signal Conditioner",
+      "description": "Catalog-resolved two-stage LMV321 small-signal conditioner with shared bypassed virtual reference.",
+      "acceptance": "erc-drc",
+      "board": {"width_mm": 80, "height_mm": 50, "layers": 2, "edge_clearance_mm": 0.5}
+    },
+    "components": [
+      {"id":"power_input","reference":"J1","role":"input_connector","component_id":"connector.pinheader.1x02.2_54mm","variant_id":"vertical","value":"5V POWER","required_functions":["PIN_1","PIN_2"],"population":"populate"},
+      {"id":"signal_input","reference":"J2","role":"input_connector","component_id":"connector.pinheader.1x02.2_54mm","variant_id":"vertical","value":"SIGNAL IN","required_functions":["PIN_1","PIN_2"],"population":"populate"},
+      {"id":"signal_output","reference":"J3","role":"output_connector","component_id":"connector.pinheader.1x02.2_54mm","variant_id":"vertical","value":"SIGNAL OUT","required_functions":["PIN_1","PIN_2"],"population":"populate"},
+      {"id":"amplifier_stage_1","reference":"U1","role":"ic","component_id":"opamp.ti.lmv321.sot23_5","variant_id":"sot23_5","value":"LMV321","required_functions":["IN_MINUS","IN_PLUS","OUT","V_MINUS","V_PLUS"],"manufacturer":"Texas Instruments","mpn":"LMV321IDBVR","population":"populate","properties":[{"name":"stage","value":"1"},{"name":"stability_status","value":"review_required"},{"name":"gain_bandwidth_status","value":"review_required"},{"name":"output_drive_status","value":"review_required"},{"name":"noise_status","value":"review_required"},{"name":"distortion_status","value":"review_required"},{"name":"load_compatibility_status","value":"review_required"}]},
+      {"id":"amplifier_stage_2","reference":"U2","role":"ic","component_id":"opamp.ti.lmv321.sot23_5","variant_id":"sot23_5","value":"LMV321","required_functions":["IN_MINUS","IN_PLUS","OUT","V_MINUS","V_PLUS"],"manufacturer":"Texas Instruments","mpn":"LMV321IDBVR","population":"populate","properties":[{"name":"stage","value":"2"},{"name":"stability_status","value":"review_required"},{"name":"gain_bandwidth_status","value":"review_required"},{"name":"output_drive_status","value":"review_required"},{"name":"noise_status","value":"review_required"},{"name":"distortion_status","value":"review_required"},{"name":"load_compatibility_status","value":"review_required"}]},
+      {"id":"vref_top","reference":"R1","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"100k","required_functions":["A","B"],"population":"populate"},
+      {"id":"vref_bottom","reference":"R2","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"100k","required_functions":["A","B"],"population":"populate"},
+      {"id":"vref_bypass","reference":"C1","role":"decoupling_capacitor","component_id":"capacitor.ceramic.0805","variant_id":"0805","value":"1uF","required_functions":["A","B"],"population":"populate"},
+      {"id":"input_coupling","reference":"C2","role":"capacitor","component_id":"capacitor.ceramic.0805","variant_id":"0805","value":"1uF","required_functions":["A","B"],"population":"populate"},
+      {"id":"input_bias","reference":"R3","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"100k","required_functions":["A","B"],"population":"populate"},
+      {"id":"stage_1_feedback","reference":"R4","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"100k","required_functions":["A","B"],"population":"populate"},
+      {"id":"stage_1_gain","reference":"R5","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"10k","required_functions":["A","B"],"population":"populate"},
+      {"id":"stage_1_decoupling","reference":"C3","role":"decoupling_capacitor","component_id":"capacitor.ceramic.0603","variant_id":"0603","value":"100nF","required_functions":["A","B"],"population":"populate"},
+      {"id":"stage_2_feedback","reference":"R6","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"100k","required_functions":["A","B"],"population":"populate"},
+      {"id":"stage_2_gain","reference":"R7","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"10k","required_functions":["A","B"],"population":"populate"},
+      {"id":"stage_2_decoupling","reference":"C4","role":"decoupling_capacitor","component_id":"capacitor.ceramic.0603","variant_id":"0603","value":"100nF","required_functions":["A","B"],"population":"populate"},
+      {"id":"output_coupling","reference":"C5","role":"capacitor","component_id":"capacitor.ceramic.0805","variant_id":"0805","value":"1uF","required_functions":["A","B"],"population":"populate"},
+      {"id":"output_reference","reference":"R8","role":"resistor","component_id":"resistor.generic.0603","variant_id":"0603","value":"100k","required_functions":["A","B"],"population":"populate"}
+    ],
+    "nets": [
+      {"name":"5V","role":"power_pos","required":true,"voltage_domain":"5V","net_class":"power","width_mm":0.5,"clearance_mm":0.2,"endpoints":[{"component":"power_input","selector_kind":"function","selector":"PIN_1"},{"component":"amplifier_stage_1","selector_kind":"function","selector":"V_PLUS"},{"component":"amplifier_stage_2","selector_kind":"function","selector":"V_PLUS"},{"component":"vref_top","selector_kind":"function","selector":"A"},{"component":"stage_1_decoupling","selector_kind":"function","selector":"A"},{"component":"stage_2_decoupling","selector_kind":"function","selector":"A"}]},
+      {"name":"GND","role":"ground","required":true,"voltage_domain":"0V","net_class":"ground","width_mm":0.5,"clearance_mm":0.2,"endpoints":[{"component":"power_input","selector_kind":"function","selector":"PIN_2"},{"component":"signal_input","selector_kind":"function","selector":"PIN_2"},{"component":"signal_output","selector_kind":"function","selector":"PIN_2"},{"component":"amplifier_stage_1","selector_kind":"function","selector":"V_MINUS"},{"component":"amplifier_stage_2","selector_kind":"function","selector":"V_MINUS"},{"component":"vref_bottom","selector_kind":"function","selector":"B"},{"component":"vref_bypass","selector_kind":"function","selector":"B"},{"component":"stage_1_decoupling","selector_kind":"function","selector":"B"},{"component":"stage_2_decoupling","selector_kind":"function","selector":"B"},{"component":"output_reference","selector_kind":"function","selector":"B"}]},
+      {"name":"VREF","role":"bias","required":true,"voltage_domain":"2V5","net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"vref_top","selector_kind":"function","selector":"B"},{"component":"vref_bottom","selector_kind":"function","selector":"A"},{"component":"vref_bypass","selector_kind":"function","selector":"A"},{"component":"input_bias","selector_kind":"function","selector":"B"},{"component":"stage_1_gain","selector_kind":"function","selector":"B"},{"component":"stage_2_gain","selector_kind":"function","selector":"B"}]},
+      {"name":"SIGNAL_IN","role":"signal","required":true,"net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"signal_input","selector_kind":"function","selector":"PIN_1"},{"component":"input_coupling","selector_kind":"function","selector":"A"}]},
+      {"name":"STAGE1_IN","role":"signal","required":true,"voltage_domain":"2V5","net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"input_coupling","selector_kind":"function","selector":"B"},{"component":"input_bias","selector_kind":"function","selector":"A"},{"component":"amplifier_stage_1","selector_kind":"function","selector":"IN_PLUS"}]},
+      {"name":"STAGE1_FB","role":"feedback","required":true,"voltage_domain":"2V5","net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"amplifier_stage_1","selector_kind":"function","selector":"IN_MINUS"},{"component":"stage_1_feedback","selector_kind":"function","selector":"B"},{"component":"stage_1_gain","selector_kind":"function","selector":"A"}]},
+      {"name":"STAGE1_OUT","role":"signal","required":true,"voltage_domain":"2V5","net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"amplifier_stage_1","selector_kind":"function","selector":"OUT"},{"component":"stage_1_feedback","selector_kind":"function","selector":"A"},{"component":"amplifier_stage_2","selector_kind":"function","selector":"IN_PLUS"}]},
+      {"name":"STAGE2_FB","role":"feedback","required":true,"voltage_domain":"2V5","net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"amplifier_stage_2","selector_kind":"function","selector":"IN_MINUS"},{"component":"stage_2_feedback","selector_kind":"function","selector":"B"},{"component":"stage_2_gain","selector_kind":"function","selector":"A"}]},
+      {"name":"STAGE2_OUT","role":"signal","required":true,"voltage_domain":"2V5","net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"amplifier_stage_2","selector_kind":"function","selector":"OUT"},{"component":"stage_2_feedback","selector_kind":"function","selector":"A"},{"component":"output_coupling","selector_kind":"function","selector":"A"}]},
+      {"name":"SIGNAL_OUT","role":"signal","required":true,"net_class":"analog","width_mm":0.25,"clearance_mm":0.2,"endpoints":[{"component":"output_coupling","selector_kind":"function","selector":"B"},{"component":"output_reference","selector_kind":"function","selector":"A"},{"component":"signal_output","selector_kind":"function","selector":"PIN_1"}]}
+    ],
+    "power_flags": [{"net":"5V"},{"net":"GND"}],
+    "no_connects": [],
+    "buses": [],
+    "schematic": {
+      "flow": "left_to_right",
+      "origin": "centered",
+      "groups": [
+        {"id":"power_stage","label":"5 V Power","role":"power","members":["power_input"],"rank":0,"side":"left"},
+        {"id":"input_stage","label":"AC Input","role":"input","members":["signal_input","input_coupling","input_bias"],"rank":0,"side":"left"},
+        {"id":"bias_stage","label":"Shared Virtual Reference","role":"bias","members":["vref_top","vref_bottom","vref_bypass"],"rank":1},
+        {"id":"gain_stage_1","label":"LMV321 Stage 1","role":"processing","members":["amplifier_stage_1","stage_1_feedback","stage_1_gain","stage_1_decoupling"],"rank":2},
+        {"id":"gain_stage_2","label":"LMV321 Stage 2","role":"processing","members":["amplifier_stage_2","stage_2_feedback","stage_2_gain","stage_2_decoupling"],"rank":3},
+        {"id":"output_stage","label":"AC Output","role":"output","members":["output_coupling","output_reference","signal_output"],"rank":4,"side":"right"}
+      ],
+      "lanes": {"power":"top","signals":"middle","ground":"bottom"},
+      "placements": [
+        {"component":"power_input","group":"power_stage","orientation":"normal","mirror":"none"},
+        {"component":"signal_input","group":"input_stage","orientation":"normal","mirror":"none"},
+        {"component":"input_coupling","group":"input_stage","right_of":"signal_input","orientation":"normal","mirror":"none"},
+        {"component":"input_bias","group":"input_stage","near":"input_coupling","orientation":"rotated_90","mirror":"none"},
+        {"component":"vref_top","group":"bias_stage","above":"vref_bottom","orientation":"rotated_90","mirror":"none"},
+        {"component":"vref_bottom","group":"bias_stage","orientation":"rotated_90","mirror":"none"},
+        {"component":"vref_bypass","group":"bias_stage","near":"vref_bottom","orientation":"rotated_90","mirror":"none"},
+        {"component":"amplifier_stage_1","group":"gain_stage_1","right_of":"input_coupling","orientation":"normal","mirror":"none"},
+        {"component":"stage_1_feedback","group":"gain_stage_1","near":"amplifier_stage_1","orientation":"normal","mirror":"none"},
+        {"component":"stage_1_gain","group":"gain_stage_1","near":"amplifier_stage_1","orientation":"rotated_90","mirror":"none"},
+        {"component":"stage_1_decoupling","group":"gain_stage_1","near":"amplifier_stage_1","above":"amplifier_stage_1","orientation":"rotated_90","mirror":"none"},
+        {"component":"amplifier_stage_2","group":"gain_stage_2","right_of":"amplifier_stage_1","orientation":"normal","mirror":"none"},
+        {"component":"stage_2_feedback","group":"gain_stage_2","near":"amplifier_stage_2","orientation":"normal","mirror":"none"},
+        {"component":"stage_2_gain","group":"gain_stage_2","near":"amplifier_stage_2","orientation":"rotated_90","mirror":"none"},
+        {"component":"stage_2_decoupling","group":"gain_stage_2","near":"amplifier_stage_2","above":"amplifier_stage_2","orientation":"rotated_90","mirror":"none"},
+        {"component":"output_coupling","group":"output_stage","right_of":"amplifier_stage_2","orientation":"normal","mirror":"none"},
+        {"component":"output_reference","group":"output_stage","near":"output_coupling","orientation":"rotated_90","mirror":"none"},
+        {"component":"signal_output","group":"output_stage","right_of":"output_coupling","orientation":"normal","mirror":"none"}
+      ],
+      "rules": {"positive_power_top":true,"ground_bottom":true,"center_on_page":true,"prefer_labels_for_long_nets":true,"avoid_wire_crossings":true,"min_group_spacing_mm":20.32,"min_component_spacing_mm":5.08},
+      "hierarchy": {"mode":"flat","max_components_per_sheet":30}
+    },
+    "pcb": {
+      "regions": [
+        {"id":"power_input","role":"power input","bounds":{"x_mm":0,"y_mm":0,"width_mm":16,"height_mm":16}},
+        {"id":"signal_input","role":"signal input","bounds":{"x_mm":0,"y_mm":16,"width_mm":16,"height_mm":34}},
+        {"id":"analog_core","role":"analog core","bounds":{"x_mm":16,"y_mm":0,"width_mm":48,"height_mm":50}},
+        {"id":"signal_output","role":"signal output","bounds":{"x_mm":64,"y_mm":0,"width_mm":16,"height_mm":50}}
+      ],
+      "placements": [
+        {"component":"power_input","region":"power_input","edge":"left","priority":100},
+        {"component":"signal_input","region":"signal_input","edge":"left","priority":100},
+        {"component":"amplifier_stage_1","region":"analog_core","priority":100},
+        {"component":"amplifier_stage_2","region":"analog_core","near":"amplifier_stage_1","priority":99,"max_distance_mm":20},
+        {"component":"stage_1_decoupling","region":"analog_core","near":"amplifier_stage_1","priority":95,"max_distance_mm":3},
+        {"component":"stage_2_decoupling","region":"analog_core","near":"amplifier_stage_2","priority":95,"max_distance_mm":3},
+        {"component":"vref_top","region":"analog_core","near":"amplifier_stage_1","priority":85,"max_distance_mm":12},
+        {"component":"vref_bottom","region":"analog_core","near":"vref_top","priority":85,"max_distance_mm":5},
+        {"component":"vref_bypass","region":"analog_core","near":"vref_bottom","priority":90,"max_distance_mm":3},
+        {"component":"input_coupling","region":"signal_input","near":"signal_input","priority":85,"max_distance_mm":8},
+        {"component":"input_bias","region":"analog_core","near":"amplifier_stage_1","priority":90,"max_distance_mm":5},
+        {"component":"stage_1_feedback","region":"analog_core","near":"amplifier_stage_1","priority":95,"max_distance_mm":3},
+        {"component":"stage_1_gain","region":"analog_core","near":"amplifier_stage_1","priority":95,"max_distance_mm":3},
+        {"component":"stage_2_feedback","region":"analog_core","near":"amplifier_stage_2","priority":95,"max_distance_mm":3},
+        {"component":"stage_2_gain","region":"analog_core","near":"amplifier_stage_2","priority":95,"max_distance_mm":3},
+        {"component":"output_coupling","region":"signal_output","near":"amplifier_stage_2","priority":85,"max_distance_mm":15},
+        {"component":"output_reference","region":"signal_output","near":"output_coupling","priority":80,"max_distance_mm":5},
+        {"component":"signal_output","region":"signal_output","edge":"right","priority":100}
+      ],
+      "keepouts": [],
+      "zones": []
+    },
+    "policy": {"allow_reference_assignment":true,"allow_value_normalization":true,"allow_layout_inference":true,"allow_spacing_adjustment":true,"allow_label_insertion":true,"allow_placement_adjustment":true,"allow_route_retry":true},
+    "extensions": null
+  }
+}
