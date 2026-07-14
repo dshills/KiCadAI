@@ -24,7 +24,9 @@ path.
   single-stage and two-stage signal-conditioner fixtures reach recorded and
   live KiCad-backed `pass` through the shared catalog-resolved graph contract.
   The generic protected USB-C LED reaches recorded KiCad-backed `pass` through
-  the same contract. None requires a topology-specific provider schema.
+  the same contract. A recorded LM358 fixture also proves one-package,
+  multi-unit schematic lowering with one footprint and BOM identity. None
+  requires a topology-specific provider schema.
 - Arbitrary electronics generation is not yet guaranteed. Generic graphs fail
   closed on unknown parts, pins, ratings, placement, or routing capability.
 - Generated `pass` evidence is not automatically a fabrication-release claim.

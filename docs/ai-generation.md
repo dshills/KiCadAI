@@ -160,6 +160,39 @@ kicadai --prompt-file examples/ai/generic_dual_lmv321_signal_conditioner/prompt.
   design create
 ```
 
+Recorded generic LM358 multi-unit signal-conditioner run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_lm358_buffered_signal_conditioner/prompt.txt \
+  --provider recorded \
+  --provider-record examples/ai/generic_lm358_buffered_signal_conditioner/recorded-response.json \
+  --ai-profile generic-circuit-v1 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/ai_generic_lm358 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
+### Multi-Unit Components
+
+`generic-circuit-v1` models a multi-unit part as one physical component with a
+single reference, catalog identity, footprint, and BOM identity. Its `units`
+array declares the logical schematic units. Net endpoints and schematic
+placements select those units explicitly. For the verified LM358 record, `A`
+and `B` are amplifier units and required unit `P` owns the shared supply pins.
+
+Unit qualifiers are absent for ordinary single-unit components. Relative
+layout qualifiers such as `near_unit` are used only when their corresponding
+relationship targets a declared unit on a multi-unit component. KiCadAI fails
+closed on nonexistent or conflicting units, inconsistent shared-pin nets,
+missing required units, duplicate physical footprints, and ambiguous
+unit-to-pad mappings.
+
 ## OpenAI Provider
 
 Load `OPENAI_API_KEY` into the process environment from the user's shell
@@ -247,6 +280,23 @@ The background option avoids the foreground response-body timeout on provider
 requests that need more than two minutes. It does not weaken schema validation,
 retry bounds, or any KiCad gate.
 
+Live generic LM358 multi-unit run:
+
+```sh
+mkdir -p ./out
+kicadai --prompt-file examples/ai/generic_lm358_buffered_signal_conditioner/prompt.txt \
+  --provider openai --ai-background \
+  --ai-profile generic-circuit-v1 --max-ai-attempts 2 \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/live_generic_lm358 --overwrite \
+  --kicad-cli /path/to/kicad-cli \
+  --require-erc --require-drc --require-kicad-roundtrip \
+  --strict-diffs --strict-unrouted \
+  design create
+```
+
 The live and recorded semantic projection test can verify the saved live graph
 without another API call:
 
@@ -265,10 +315,20 @@ KICADAI_OPENAI_DUAL_LMV321_LIVE_GRAPH=./out/live_generic_dual_lmv321/.kicadai/ci
   go test ./internal/aiprovider -run '^TestOpenAILiveGenericDualLMV321Graph$' -count=1 -v
 ```
 
+For the LM358 fixture, verify one-package multi-unit identity and compare its
+saved live graph with the recorded critical projection:
+
+```sh
+KICADAI_OPENAI_LIVE_TEST=1 \
+KICADAI_OPENAI_LM358_LIVE_GRAPH=./out/live_generic_lm358/.kicadai/circuit-graph.json \
+  go test ./internal/aiprovider -run '^TestOpenAILiveGenericLM358Graph$' -count=1 -v
+```
+
 Each live semantic-projection test uses a fixture-specific graph-path variable
 so multiple saved live graphs can be tested in the same process. The single-stage
 fixture retains the older generic `KICADAI_OPENAI_LIVE_GRAPH` name; the
 two-stage fixture uses `KICADAI_OPENAI_DUAL_LMV321_LIVE_GRAPH`.
+The LM358 fixture uses `KICADAI_OPENAI_LM358_LIVE_GRAPH`.
 
 Optional provider settings include `--model`, `--max-ai-attempts`, and
 `--ai-background`. Correction attempts are bounded and restricted to explicit
@@ -280,7 +340,7 @@ The live provider smoke test is opt-in:
 
 ```sh
 KICADAI_OPENAI_LIVE_TEST=1 \
-  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph|GenericUSBCBMP280Graph|GenericLMV321Graph|GenericDualLMV321Graph)$' -count=1 -v
+  go test ./internal/aiprovider -run '^TestOpenAILive(BMP280Intent|ProtectedLEDIntent|GenericRCGraph|GenericUSBCBMP280Graph|GenericLMV321Graph|GenericDualLMV321Graph|GenericLM358Graph)$' -count=1 -v
 ```
 
 ## Reproducible Promotion Test
@@ -346,6 +406,17 @@ current reference also uses a high-impedance 100 kOhm VREF divider and routed
 ground traces without a plane. Those choices are accepted ERC/DRC fixture
 inputs, not proof of low-noise or low-distortion analog performance; revise and
 simulate them before using the design as an engineering reference.
+
+For the LM358 commands, use `./out/ai_generic_lm358/.kicadai/` and
+`./out/live_generic_lm358/.kicadai/`. In `circuit-graph.json`, U1 has logical
+units `A`, `B`, and `P`; in the lowered request and PCB artifacts, U1 remains
+one physical SOIC-8 component with one footprint and one BOM identity. Inspect
+`circuit-resolution.json`, `design-request.json`, `workflow-result.json`, and
+`design-promotion.json` together when auditing shared supply pins and pad nets.
+The fixture marks stability, gain-bandwidth, output swing, input common-mode
+range, output drive, noise, distortion, and load compatibility as
+`review_required`. Clean ERC, DRC, routing, writer, and round-trip evidence does
+not establish those analog properties.
 
 Repeated recorded runs are deterministic at the circuit graph, catalog
 resolution, lowered design request, and transaction layers. Manifests contain

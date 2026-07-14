@@ -61,6 +61,13 @@ LMV321 fixtures keep analog performance claims explicitly review-required. The
 protected USB-C LED currently carries recorded, rather than live,
 generic-provider pass evidence.
 
+Generic multi-unit lowering is now proven by a recorded LM358 fixture. One
+catalog-resolved physical LM358 package produces distinct KiCad units A, B, and
+P while retaining one reference, footprint, and BOM identity. Shared supply
+pins and unit-to-pad mappings are validated fail-closed. Its recorded lane has
+clean KiCad-backed pass evidence; the optional live provider lane remains the
+current promotion gate.
+
 The generic contract is deliberately strict. It expands topology expression,
 but does not bypass catalog, pinmap, placement, routing, ERC/DRC, writer, or
 round-trip gates.

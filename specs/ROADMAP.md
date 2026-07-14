@@ -1060,6 +1060,12 @@ the shared graph contract. The two-stage fixture also has live provider pass
 evidence, semantic equivalence to its recorded critical graph, deterministic
 recorded transactions, and explicit analog-review limitations.
 
+Generic multi-unit component contracts and lowering are implemented. A
+recorded LM358 buffered signal conditioner proves distinct A, B, and shared
+power units while retaining one physical reference, footprint, and BOM item.
+Its recorded KiCad-backed lane is pass; live-provider equivalence and promotion
+are the remaining evidence gate for that milestone.
+
 1. Add a materially different generic graph only when it exposes a concrete
    catalog, lowering, hierarchy, placement, routing, simulation, or validation
    gap; do not extend stage count merely to accumulate fixtures.
