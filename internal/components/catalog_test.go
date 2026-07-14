@@ -75,6 +75,53 @@ func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogLM358MultiUnitEvidence(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	record := requireCatalogRecord(t, catalog, "opamp.ti.lm358.soic8")
+	if record.MPN != "LM358DR" || record.Verification.Confidence != ConfidenceVerified {
+		t.Fatalf("LM358 identity = MPN:%q confidence:%q", record.MPN, record.Verification.Confidence)
+	}
+	wantUnits := map[string]struct {
+		unit     int
+		unitType SymbolUnitType
+		required bool
+		pins     []string
+	}{
+		"A": {unit: 1, unitType: SymbolUnitFunctional, pins: []string{"1", "2", "3"}},
+		"B": {unit: 2, unitType: SymbolUnitFunctional, pins: []string{"5", "6", "7"}},
+		"P": {unit: 3, unitType: SymbolUnitPower, required: true, pins: []string{"4", "8"}},
+	}
+	if len(record.Symbols) != len(wantUnits) {
+		t.Fatalf("LM358 symbol units = %d, want %d", len(record.Symbols), len(wantUnits))
+	}
+	for _, symbol := range record.Symbols {
+		want, exists := wantUnits[symbol.UnitID]
+		if !exists {
+			t.Fatalf("unexpected LM358 unit %#v", symbol)
+		}
+		if symbol.SymbolID != "Amplifier_Operational:LM358" || symbol.Unit != want.unit || symbol.UnitType != want.unitType || symbol.RequiredUnit != want.required {
+			t.Fatalf("LM358 unit %s = %#v", symbol.UnitID, symbol)
+		}
+		pins := make([]string, 0, len(symbol.FunctionPins))
+		for _, pin := range symbol.FunctionPins {
+			pins = append(pins, pin.SymbolPin)
+		}
+		slices.Sort(pins)
+		if !slices.Equal(pins, want.pins) {
+			t.Fatalf("LM358 unit %s pins = %v, want %v", symbol.UnitID, pins, want.pins)
+		}
+	}
+	if len(record.Packages) != 1 || record.Packages[0].FootprintID != "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm" || len(record.Packages[0].PadFunctions) != 8 {
+		t.Fatalf("LM358 package evidence = %#v", record.Packages)
+	}
+	if record.OpAmp == nil || record.OpAmp.OutputSwingStatus != "review_required" || record.OpAmp.NoiseStatus != "review_required" || record.OpAmp.DistortionStatus != "review_required" {
+		t.Fatalf("LM358 analog review evidence = %#v", record.OpAmp)
+	}
+}
+
 func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {
@@ -987,6 +1034,46 @@ func TestValidateCatalogOpAmpEvidenceRejectsMalformedMetadata(t *testing.T) {
 	}
 }
 
+func TestValidateCatalogRejectsInvalidNamedSymbolUnits(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*ComponentRecord)
+		path   string
+	}{
+		{name: "duplicate id after normalization", mutate: func(record *ComponentRecord) { record.Symbols[1].UnitID = "A" }, path: "records[0].symbols[1].unit_id"},
+		{name: "duplicate KiCad unit", mutate: func(record *ComponentRecord) { record.Symbols[1].Unit = 1 }, path: "records[0].symbols[1].unit"},
+		{name: "mixed named and anonymous", mutate: func(record *ComponentRecord) { record.Symbols[1].UnitID = ""; record.Symbols[1].UnitType = "" }, path: "records[0].symbols"},
+		{name: "missing power unit", mutate: func(record *ComponentRecord) { record.Symbols = record.Symbols[:2] }, path: "records[0].symbols"},
+		{name: "power unit is optional", mutate: func(record *ComponentRecord) { record.Symbols[2].RequiredUnit = false }, path: "records[0].symbols[2].required_unit"},
+		{name: "invalid unit type", mutate: func(record *ComponentRecord) { record.Symbols[0].UnitType = "magic" }, path: "records[0].symbols[0].unit_type"},
+		{name: "zero named unit", mutate: func(record *ComponentRecord) { record.Symbols[0].Unit = 0 }, path: "records[0].symbols[0].unit"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := validCatalog()
+			catalog.Records[0].Family = "opamp"
+			catalog.Families = append(catalog.Families, FamilyDefinition{ID: "opamp", Name: "Op-Amp"})
+			catalog.Records[0].Symbols = validNamedOpAmpSymbols()
+			tt.mutate(&catalog.Records[0])
+			result := ValidateCatalog(&catalog)
+			if result.OK {
+				t.Fatal("expected named unit validation failure")
+			}
+			assertIssueCode(t, result.Issues, CodeInvalidSymbolUnit)
+			assertIssuePath(t, result.Issues, tt.path)
+		})
+	}
+}
+
+func validNamedOpAmpSymbols() []SymbolBinding {
+	verification := VerificationRecord{Confidence: ConfidenceVerified, Sources: []string{"unit-test"}, PinMapChecked: true}
+	return []SymbolBinding{
+		{SymbolID: "Amplifier_Operational:LM358", Unit: 1, UnitID: "A", UnitType: SymbolUnitFunctional, FunctionPins: []FunctionPin{{Function: "OUT", SymbolPin: "1", Required: true}}, Verification: verification},
+		{SymbolID: "Amplifier_Operational:LM358", Unit: 2, UnitID: "B", UnitType: SymbolUnitFunctional, FunctionPins: []FunctionPin{{Function: "OUT", SymbolPin: "7", Required: true}}, Verification: verification},
+		{SymbolID: "Amplifier_Operational:LM358", Unit: 3, UnitID: "P", UnitType: SymbolUnitPower, RequiredUnit: true, FunctionPins: []FunctionPin{{Function: "V_PLUS", SymbolPin: "8", Required: true}}, Verification: verification},
+	}
+}
+
 func validAmplifierOutputEvidence() *AmplifierOutputEvidence {
 	return &AmplifierOutputEvidence{
 		DeviceClass:                "bjt",
@@ -1018,6 +1105,9 @@ func validOpAmpEvidence() *OpAmpEvidence {
 		GainBandwidthStatus:        "review_required",
 		StabilityStatus:            "review_required",
 		InputCommonModeStatus:      "proven",
+		OutputSwingStatus:          "review_required",
+		NoiseStatus:                "review_required",
+		DistortionStatus:           "review_required",
 		FabricationCandidateBlocks: true,
 	}
 }

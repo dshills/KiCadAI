@@ -272,6 +272,9 @@ type OpAmpEvidence struct {
 	GainBandwidthStatus        string   `json:"gain_bandwidth_status,omitempty"`
 	StabilityStatus            string   `json:"stability_status,omitempty"`
 	InputCommonModeStatus      string   `json:"input_common_mode_status,omitempty"`
+	OutputSwingStatus          string   `json:"output_swing_status,omitempty"`
+	NoiseStatus                string   `json:"noise_status,omitempty"`
+	DistortionStatus           string   `json:"distortion_status,omitempty"`
 	FabricationCandidateBlocks bool     `json:"fabrication_candidate_blocks,omitempty"`
 	ReviewNote                 string   `json:"review_note,omitempty"`
 }

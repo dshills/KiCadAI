@@ -21,6 +21,9 @@
         "gain_bandwidth_status": "review_required",
         "stability_status": "review_required",
         "input_common_mode_status": "proven",
+        "output_swing_status": "review_required",
+        "noise_status": "review_required",
+        "distortion_status": "review_required",
         "fabrication_candidate_blocks": true,
         "review_note": "LMV321 is selected as a low-voltage connectivity seed. Headphone-drive load, gain-bandwidth, compensation, and stability remain design-specific before fabrication-candidate use."
       },
@@ -54,6 +57,94 @@
         "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
       }],
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Amplifier_Operational:LMV321"], "pinmap_checked": true}
+    },
+    {
+      "id": "opamp.ti.lm358.soic8",
+      "family": "opamp",
+      "name": "TI LM358 dual op-amp SOIC-8",
+      "description": "One physical LM358 dual operational-amplifier package with two functional units and one required power unit.",
+      "generic": false,
+      "manufacturer": "Texas Instruments",
+      "mpn": "LM358DR",
+      "lifecycle": "active",
+      "tags": ["analog", "opamp", "dual", "multi_unit", "soic8"],
+      "ratings": [{"kind": "supply_voltage", "min": "3", "max": "30", "unit": "V"}],
+      "temperature": {"min": "0", "max": "70", "unit": "C"},
+      "companions": [{"id": "opamp.decoupling_capacitor", "family": "capacitor", "role": "decoupling_capacitor", "required": true, "description": "Place package supply decoupling close to pins 8 and 4."}],
+      "opamp_evidence": {
+        "intended_roles": ["input_buffer", "gain_stage"],
+        "supply_mode": "single_supply",
+        "output_drive_status": "review_required",
+        "load_compatibility_status": "review_required",
+        "gain_bandwidth_status": "review_required",
+        "stability_status": "review_required",
+        "input_common_mode_status": "review_required",
+        "output_swing_status": "review_required",
+        "noise_status": "review_required",
+        "distortion_status": "review_required",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Connectivity and package evidence do not prove analog performance. Stability, bandwidth, common-mode range, output swing and drive, noise, distortion, and load compatibility require design-specific review."
+      },
+      "placement_hints": [{"kind": "near", "target": "decoupling_capacitor", "value": "3", "unit": "mm"}],
+      "symbols": [
+        {
+          "symbol_id": "Amplifier_Operational:LM358",
+          "unit": 1,
+          "unit_id": "A",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "OUT", "symbol_pin": "1", "electrical": "output", "required": true},
+            {"function": "IN_MINUS", "symbol_pin": "2", "electrical": "input", "required": true},
+            {"function": "IN_PLUS", "symbol_pin": "3", "electrical": "input", "required": true}
+          ],
+          "verification": {"confidence": "verified", "sources": ["kicad-symbols:Amplifier_Operational:LM358", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:LM358",
+          "unit": 2,
+          "unit_id": "B",
+          "unit_type": "functional",
+          "function_pins": [
+            {"function": "IN_PLUS", "symbol_pin": "5", "electrical": "input", "required": true},
+            {"function": "IN_MINUS", "symbol_pin": "6", "electrical": "input", "required": true},
+            {"function": "OUT", "symbol_pin": "7", "electrical": "output", "required": true}
+          ],
+          "verification": {"confidence": "verified", "sources": ["kicad-symbols:Amplifier_Operational:LM358", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
+        },
+        {
+          "symbol_id": "Amplifier_Operational:LM358",
+          "unit": 3,
+          "unit_id": "P",
+          "unit_type": "power",
+          "required_unit": true,
+          "function_pins": [
+            {"function": "V_MINUS", "symbol_pin": "4", "electrical": "power_in", "required": true},
+            {"function": "V_PLUS", "symbol_pin": "8", "electrical": "power_in", "required": true}
+          ],
+          "verification": {"confidence": "verified", "sources": ["kicad-symbols:Amplifier_Operational:LM358", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
+        }
+      ],
+      "packages": [{
+        "id": "soic8",
+        "name": "SOIC-8 3.9 x 4.9 mm P1.27 mm",
+        "footprint_id": "Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "package_type": "soic8",
+        "mpn": "LM358DR",
+        "lifecycle": "active",
+        "pinmap_id": "Amplifier_Operational:LM358|Package_SO:SOIC-8_3.9x4.9mm_P1.27mm",
+        "pad_functions": [
+          {"function": "OUT", "pad": "1"},
+          {"function": "IN_MINUS", "pad": "2"},
+          {"function": "IN_PLUS", "pad": "3"},
+          {"function": "V_MINUS", "pad": "4"},
+          {"function": "IN_PLUS", "pad": "5"},
+          {"function": "IN_MINUS", "pad": "6"},
+          {"function": "OUT", "pad": "7"},
+          {"function": "V_PLUS", "pad": "8"}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "kicad-symbols:Amplifier_Operational:LM358", "kicad-footprints:Package_SO:SOIC-8_3.9x4.9mm_P1.27mm", "ti:lm358:datasheet:slos068"], "pinmap_checked": true}
     },
     {
       "id": "bjt.onsemi.mmbt3904.sot23",

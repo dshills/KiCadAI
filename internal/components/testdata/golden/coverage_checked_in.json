@@ -1,15 +1,15 @@
 {
-  "record_count": 51,
+  "record_count": 52,
   "family_count": 14,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 41
+    "verified": 42
   },
   "alternative_coverage": {
-    "concrete_records": 29,
+    "concrete_records": 30,
     "generic_fallback_records": 22,
     "equivalence_groups": 19
   },
@@ -221,21 +221,23 @@
     {
       "family": "opamp",
       "defined": true,
-      "record_count": 2,
-      "concrete_records": 1,
+      "record_count": 3,
+      "concrete_records": 2,
       "generic_fallback_records": 1,
       "equivalence_groups": 0,
-      "verified_records": 1,
+      "verified_records": 2,
       "library_derived_records": 0,
       "rule_inferred_records": 0,
       "placeholder_records": 1,
       "blocked_records": 0,
       "missing_resolver_evidence": [
         "opamp.generic.single.lmv321",
+        "opamp.ti.lm358.soic8",
         "opamp.ti.lmv321.sot23_5"
       ],
       "record_ids": [
         "opamp.generic.single.lmv321",
+        "opamp.ti.lm358.soic8",
         "opamp.ti.lmv321.sot23_5"
       ]
     },

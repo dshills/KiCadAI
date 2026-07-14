@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -33,7 +34,10 @@ const (
 	CodeInvalidComponentID      reports.Code = "COMPONENT_INVALID_ID"
 	CodeInvalidComponentFamily  reports.Code = "COMPONENT_INVALID_FAMILY"
 	CodeInvalidComponentPackage reports.Code = "COMPONENT_INVALID_PACKAGE"
+	CodeInvalidSymbolUnit       reports.Code = "COMPONENT_INVALID_SYMBOL_UNIT"
 )
+
+var symbolUnitIDPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_-]{0,62}$`)
 
 type LoadOptions struct {
 	CatalogDir string `json:"catalog_dir,omitempty"`
@@ -144,7 +148,7 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		if len(record.Packages) == 0 {
 			issues = append(issues, NewIssue(CodeMissingPackageVariant, reports.SeverityBlocked, path+".packages", "component record has no package variants"))
 		}
-		issues = append(issues, validateSymbols(path, record.Symbols)...)
+		issues = append(issues, validateSymbols(path, record.Family, record.Symbols)...)
 		issues = append(issues, validatePackages(path, record.Packages)...)
 		issues = append(issues, validateConstraints(path+".values", valueConstraintsAsGeneric(record.Values))...)
 		issues = append(issues, validateConstraints(path+".ratings", ratingConstraintsAsGeneric(record.Ratings))...)
@@ -198,8 +202,13 @@ func readCatalogFile(path string) (catalogFile, []reports.Issue) {
 	return file, nil
 }
 
-func validateSymbols(path string, symbols []SymbolBinding) []reports.Issue {
+func validateSymbols(path, family string, symbols []SymbolBinding) []reports.Issue {
 	var issues []reports.Issue
+	namedCount := 0
+	unitIDs := map[string]int{}
+	unitNumbers := map[int]int{}
+	symbolID := ""
+	powerUnits := 0
 	for i, symbol := range symbols {
 		symbolPath := fmt.Sprintf("%s.symbols[%d]", path, i)
 		if strings.TrimSpace(symbol.SymbolID) == "" {
@@ -208,12 +217,56 @@ func validateSymbols(path string, symbols []SymbolBinding) []reports.Issue {
 		if issue, ok := ValidateConfidenceIssue(symbolPath+".verification.confidence", symbol.Verification.Confidence); ok {
 			issues = append(issues, issue)
 		}
+		if symbol.Unit < 0 {
+			issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit", "symbol unit must not be negative"))
+		}
+		unitID := strings.ToUpper(strings.TrimSpace(symbol.UnitID))
+		if unitID != "" {
+			namedCount++
+			if symbol.UnitID != unitID || !symbolUnitIDPattern.MatchString(unitID) {
+				issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit_id", "named symbol unit id must be a canonical safe identifier"))
+			}
+			if first, exists := unitIDs[unitID]; exists {
+				issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit_id", fmt.Sprintf("unit id duplicates symbols[%d]", first)))
+			}
+			unitIDs[unitID] = i
+			if symbol.Unit <= 0 {
+				issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit", "named symbol unit requires a positive KiCad unit number"))
+			} else if first, exists := unitNumbers[symbol.Unit]; exists {
+				issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit", fmt.Sprintf("KiCad unit number duplicates symbols[%d]", first)))
+			} else {
+				unitNumbers[symbol.Unit] = i
+			}
+			switch symbol.UnitType {
+			case SymbolUnitFunctional:
+			case SymbolUnitPower:
+				powerUnits++
+				if !symbol.RequiredUnit {
+					issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".required_unit", "power symbol unit must be required"))
+				}
+			default:
+				issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit_type", "named symbol unit requires functional or power type"))
+			}
+			if symbolID == "" {
+				symbolID = symbol.SymbolID
+			} else if symbol.SymbolID != symbolID {
+				issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".symbol_id", "named units must share one KiCad symbol id"))
+			}
+		} else if symbol.UnitType != "" || symbol.RequiredUnit {
+			issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, symbolPath+".unit_id", "unit type and required flag require a named unit"))
+		}
 		for j, pin := range symbol.FunctionPins {
 			pinPath := fmt.Sprintf("%s.function_pins[%d]", symbolPath, j)
 			if strings.TrimSpace(pin.Function) == "" || strings.TrimSpace(pin.SymbolPin) == "" {
 				issues = append(issues, NewIssue(CodeInvalidFunctionPin, reports.SeverityBlocked, pinPath, "function pin requires function and symbol_pin"))
 			}
 		}
+	}
+	if namedCount != 0 && namedCount != len(symbols) {
+		issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, path+".symbols", "catalog record must not mix named and anonymous symbol units"))
+	}
+	if namedCount > 1 && family == "opamp" && powerUnits != 1 {
+		issues = append(issues, NewIssue(CodeInvalidSymbolUnit, reports.SeverityBlocked, path+".symbols", "named multi-unit op-amp requires exactly one power unit"))
 	}
 	return issues
 }
@@ -291,6 +344,9 @@ var opAmpStatusFields = []opAmpEvidenceTextField{
 	{pathSuffix: "gain_bandwidth_status", value: func(e *OpAmpEvidence) string { return e.GainBandwidthStatus }, label: "op-amp gain-bandwidth"},
 	{pathSuffix: "stability_status", value: func(e *OpAmpEvidence) string { return e.StabilityStatus }, label: "op-amp stability"},
 	{pathSuffix: "input_common_mode_status", value: func(e *OpAmpEvidence) string { return e.InputCommonModeStatus }, label: "op-amp input common-mode"},
+	{pathSuffix: "output_swing_status", value: func(e *OpAmpEvidence) string { return e.OutputSwingStatus }, label: "op-amp output-swing"},
+	{pathSuffix: "noise_status", value: func(e *OpAmpEvidence) string { return e.NoiseStatus }, label: "op-amp noise"},
+	{pathSuffix: "distortion_status", value: func(e *OpAmpEvidence) string { return e.DistortionStatus }, label: "op-amp distortion"},
 }
 
 func valueConstraintsAsGeneric(values []ValueConstraint) []genericConstraint {
