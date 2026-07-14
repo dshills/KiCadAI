@@ -367,6 +367,40 @@ func TestBuilderConnectRelocatesConflictingExplicitLabelStub(t *testing.T) {
 	}
 }
 
+func TestBuilderIndexesForeignWireLabelStubConflicts(t *testing.T) {
+	builder := newTestBuilder(t)
+	wireStart := kicadfiles.Point{X: kicadfiles.MM(30.48), Y: kicadfiles.MM(20.32)}
+	wireEnd := kicadfiles.Point{X: kicadfiles.MM(40.64), Y: kicadfiles.MM(20.32)}
+	builder.addSchematicWirePoints("NET_A", Endpoint{}, Endpoint{}, []kicadfiles.Point{wireStart, wireEnd})
+
+	crossingStart := kicadfiles.Point{X: kicadfiles.MM(30.48), Y: kicadfiles.MM(10.16)}
+	crossingEnd := kicadfiles.Point{X: kicadfiles.MM(30.48), Y: kicadfiles.MM(30.48)}
+	if !builder.schematicStubTouchesForeignWire("NET_B", crossingStart, crossingEnd) {
+		t.Fatal("expected foreign-net crossing to be detected")
+	}
+	if builder.schematicStubTouchesForeignWire("NET_A", crossingStart, crossingEnd) {
+		t.Fatal("same-net crossing should remain available")
+	}
+	if !builder.schematicStubTouchesForeignWire("NET_B", wireStart, kicadfiles.Point{X: wireStart.X, Y: wireStart.Y + kicadfiles.MM(5.08)}) {
+		t.Fatal("expected foreign wire at stub anchor to be detected")
+	}
+
+	offGrid := newTestBuilder(t)
+	diagonalStart := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(20)}
+	diagonalEnd := kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(30)}
+	offGrid.addSchematicWirePoints("NET_DIAGONAL", Endpoint{}, Endpoint{}, []kicadfiles.Point{diagonalStart, diagonalEnd})
+	if !offGrid.schematicStubTouchesForeignWire("NET_B", diagonalStart, kicadfiles.Point{X: diagonalStart.X, Y: diagonalStart.Y + kicadfiles.MM(5)}) {
+		t.Fatal("expected off-grid diagonal wire endpoint conflict to be detected")
+	}
+	if !offGrid.schematicStubTouchesForeignWire(
+		"NET_B",
+		kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(25)},
+		kicadfiles.Point{X: kicadfiles.MM(30), Y: kicadfiles.MM(25)},
+	) {
+		t.Fatal("expected off-grid diagonal wire crossing to be detected")
+	}
+}
+
 func TestBuilderConnectReanchorsMovedMultiUnitLabelStub(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})

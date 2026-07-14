@@ -36,12 +36,16 @@ type Builder struct {
 	symbolKeys        map[string]string
 	// schematicPinAnchors tracks generated schematic symbol pin coordinates so
 	// grid snapping can avoid creating exact anchor collisions between symbols.
-	schematicPinAnchors map[kicadfiles.Point]struct{}
-	schematicWireEnds   map[kicadfiles.Point]struct{}
-	footprints          map[string]int
-	pads                map[string]map[string][]int
-	routeViaCounts      map[string]int
-	hierarchy           *SchematicHierarchy
+	schematicPinAnchors  map[kicadfiles.Point]struct{}
+	schematicPinBuckets  map[kicadfiles.Point][]schematicPinAnchorRef
+	schematicWireEnds    map[kicadfiles.Point]struct{}
+	schematicWireNets    map[kicadfiles.UUID]string
+	schematicWires       map[kicadfiles.UUID]schematic.Wire
+	schematicWireBuckets map[kicadfiles.Point][]kicadfiles.UUID
+	footprints           map[string]int
+	pads                 map[string]map[string][]int
+	routeViaCounts       map[string]int
+	hierarchy            *SchematicHierarchy
 }
 
 type Options struct {
@@ -245,7 +249,14 @@ type symbolState struct {
 	footprintID                  string
 }
 
+type schematicPinAnchorRef struct {
+	state    *symbolState
+	pin      string
+	position kicadfiles.Point
+}
+
 const schematicConnectionGrid = kicadfiles.IU(1270000)
+const schematicWireBucketSize = schematicConnectionGrid * 4
 const usbCPowerOnlyConnectorLibraryID = "kicadai:USB_C_Receptacle_PowerOnly_6P"
 const usbCPowerOnlyFullConnectorLibraryID = "kicadai:usb_c_receptacle_poweronly_full"
 
@@ -267,20 +278,24 @@ func New(options Options) (*Builder, error) {
 		paper.Name = "A4"
 	}
 	builder := &Builder{
-		name:                name,
-		generator:           generator,
-		libraryIndex:        options.LibraryIndex,
-		resolverSymbolIDs:   map[string]struct{}{},
-		nets:                pcb.NewNetRegistry(),
-		netParents:          map[string]string{},
-		symbols:             map[string]*symbolState{},
-		symbolUnits:         map[string][]*symbolState{},
-		symbolKeys:          map[string]string{},
-		schematicPinAnchors: map[kicadfiles.Point]struct{}{},
-		schematicWireEnds:   map[kicadfiles.Point]struct{}{},
-		footprints:          map[string]int{},
-		pads:                map[string]map[string][]int{},
-		routeViaCounts:      map[string]int{},
+		name:                 name,
+		generator:            generator,
+		libraryIndex:         options.LibraryIndex,
+		resolverSymbolIDs:    map[string]struct{}{},
+		nets:                 pcb.NewNetRegistry(),
+		netParents:           map[string]string{},
+		symbols:              map[string]*symbolState{},
+		symbolUnits:          map[string][]*symbolState{},
+		symbolKeys:           map[string]string{},
+		schematicPinAnchors:  map[kicadfiles.Point]struct{}{},
+		schematicPinBuckets:  map[kicadfiles.Point][]schematicPinAnchorRef{},
+		schematicWireEnds:    map[kicadfiles.Point]struct{}{},
+		schematicWireNets:    map[kicadfiles.UUID]string{},
+		schematicWires:       map[kicadfiles.UUID]schematic.Wire{},
+		schematicWireBuckets: map[kicadfiles.Point][]kicadfiles.UUID{},
+		footprints:           map[string]int{},
+		pads:                 map[string]map[string][]int{},
+		routeViaCounts:       map[string]int{},
 	}
 	builder.design = kicaddesign.Design{
 		Name: name,
@@ -428,7 +443,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		Value:     symbol.Value,
 	}}
 	builder.design.Schematic.Symbols = append(builder.design.Schematic.Symbols, symbol)
-	builder.symbols[stateKey] = &symbolState{
+	state := &symbolState{
 		symbolIndex:                  len(builder.design.Schematic.Symbols) - 1,
 		reference:                    reference,
 		unit:                         unit,
@@ -442,6 +457,12 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		pinOrder:                     pinOrder,
 		pinNets:                      pinNets,
 	}
+	builder.symbols[stateKey] = state
+	for pin, anchor := range pins {
+		indexed := schematicPinAnchorRef{state: state, pin: pin, position: anchor}
+		bucket := schematicPointBucket(anchor)
+		builder.schematicPinBuckets[bucket] = append(builder.schematicPinBuckets[bucket], indexed)
+	}
 	refKey := referenceKey(reference)
 	states := builder.symbolUnits[refKey]
 	insertAt := sort.Search(len(states), func(index int) bool {
@@ -449,7 +470,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 	})
 	states = append(states, nil)
 	copy(states[insertAt+1:], states[insertAt:])
-	states[insertAt] = builder.symbols[stateKey]
+	states[insertAt] = state
 	builder.symbolUnits[refKey] = states
 	builder.symbolKeys[stateKey] = reference
 	builder.addKnownSymbolLibrary(libraryID)
@@ -737,8 +758,111 @@ func (builder *Builder) schematicLabelConnectionConflicts(netName string, anchor
 	if samePoint(position, anchor) {
 		return false
 	}
-	return schematicStubTouchesExistingWire(anchor, position, builder.design.Schematic.Wires) ||
-		builder.schematicSegmentTouchesOtherPinAnchor(anchor, position, anchor, anchor)
+	return builder.schematicStubTouchesForeignWire(netName, anchor, position) ||
+		builder.schematicSegmentTouchesForeignPinAnchor(netName, anchor, position, anchor)
+}
+
+func (builder *Builder) schematicStubTouchesForeignWire(netName string, anchor, labelPoint kicadfiles.Point) bool {
+	targetNet := builder.canonicalNet(netName)
+	seen := map[kicadfiles.UUID]struct{}{}
+	for _, bucket := range schematicSegmentBucketKeys(anchor, labelPoint) {
+		for _, wireUUID := range builder.schematicWireBuckets[bucket] {
+			if _, duplicate := seen[wireUUID]; duplicate {
+				continue
+			}
+			seen[wireUUID] = struct{}{}
+			wire := builder.schematicWires[wireUUID]
+			if !schematicStubTouchesWire(anchor, labelPoint, wire) {
+				continue
+			}
+			// Re-resolve the stored net because later connections may merge aliases.
+			existingNet := builder.canonicalNet(builder.schematicWireNets[wireUUID])
+			if existingNet == "" || existingNet != targetNet {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func schematicStubTouchesWire(anchor, labelPoint kicadfiles.Point, wire schematic.Wire) bool {
+	for index := 1; index < len(wire.Points); index++ {
+		if schematicSegmentsIntersect(anchor, labelPoint, wire.Points[index-1], wire.Points[index]) {
+			return true
+		}
+	}
+	return false
+}
+
+func schematicSegmentsIntersect(a, b, c, d kicadfiles.Point) bool {
+	if pointOnSchematicSegment(a, c, d) || pointOnSchematicSegment(b, c, d) ||
+		pointOnSchematicSegment(c, a, b) || pointOnSchematicSegment(d, a, b) {
+		return true
+	}
+	abc := schematicOrientationSign(a, b, c)
+	abd := schematicOrientationSign(a, b, d)
+	cda := schematicOrientationSign(c, d, a)
+	cdb := schematicOrientationSign(c, d, b)
+	return ((abc > 0 && abd < 0) || (abc < 0 && abd > 0)) &&
+		((cda > 0 && cdb < 0) || (cda < 0 && cdb > 0))
+}
+
+func schematicOrientationSign(a, b, c kicadfiles.Point) int {
+	var left big.Int
+	left.Mul(big.NewInt(int64(b.X-a.X)), big.NewInt(int64(c.Y-a.Y)))
+	var right big.Int
+	right.Mul(big.NewInt(int64(b.Y-a.Y)), big.NewInt(int64(c.X-a.X)))
+	return left.Cmp(&right)
+}
+
+func schematicSegmentBucketKeys(start, end kicadfiles.Point) []kicadfiles.Point {
+	minX, maxX := start.X, end.X
+	if minX > maxX {
+		minX, maxX = maxX, minX
+	}
+	minY, maxY := start.Y, end.Y
+	if minY > maxY {
+		minY, maxY = maxY, minY
+	}
+	minBucketX, maxBucketX := schematicWireBucketCoordinate(minX), schematicWireBucketCoordinate(maxX)
+	minBucketY, maxBucketY := schematicWireBucketCoordinate(minY), schematicWireBucketCoordinate(maxY)
+	keys := make([]kicadfiles.Point, 0, int((maxBucketX-minBucketX+1)*(maxBucketY-minBucketY+1)))
+	for x := minBucketX; x <= maxBucketX; x++ {
+		for y := minBucketY; y <= maxBucketY; y++ {
+			keys = append(keys, kicadfiles.Point{X: x, Y: y})
+		}
+	}
+	return keys
+}
+
+func schematicWireBucketCoordinate(value kicadfiles.IU) kicadfiles.IU {
+	coordinate := value / schematicWireBucketSize
+	if value < 0 && value%schematicWireBucketSize != 0 {
+		coordinate--
+	}
+	return coordinate
+}
+
+func schematicPointBucket(point kicadfiles.Point) kicadfiles.Point {
+	return kicadfiles.Point{
+		X: schematicWireBucketCoordinate(point.X),
+		Y: schematicWireBucketCoordinate(point.Y),
+	}
+}
+
+func (builder *Builder) schematicSegmentTouchesForeignPinAnchor(netName string, start, end kicadfiles.Point, except kicadfiles.Point) bool {
+	netName = builder.canonicalNet(netName)
+	for _, bucket := range schematicSegmentBucketKeys(start, end) {
+		for _, candidate := range builder.schematicPinBuckets[bucket] {
+			if samePoint(candidate.position, except) || !pointOnSchematicSegment(candidate.position, start, end) {
+				continue
+			}
+			if assigned := builder.canonicalNet(candidate.state.pinNets[candidate.pin]); assigned != "" && assigned != netName {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func (builder *Builder) schematicConnectionShouldUseDirectLabels(from, to Endpoint) bool {
@@ -1072,11 +1196,17 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 		builder.addSchematicEndpointJunction(netName, points[index])
 		builder.addSchematicEndpointJunction(netName, points[index+1])
 		wireOffset := len(builder.design.Schematic.Wires)
-		builder.design.Schematic.Wires = append(builder.design.Schematic.Wires, schematic.NewWire(
+		wire := schematic.NewWire(
 			builder.generator.New("root.schematic.wire", netName, fmt.Sprintf("%d", wireOffset), fmt.Sprintf("%d", index), from.Reference, from.Pin, to.Reference, to.Pin),
 			points[index],
 			points[index+1],
-		))
+		)
+		builder.design.Schematic.Wires = append(builder.design.Schematic.Wires, wire)
+		builder.schematicWireNets[wire.UUID] = builder.canonicalNet(netName)
+		builder.schematicWires[wire.UUID] = wire
+		for _, bucket := range schematicSegmentBucketKeys(points[index], points[index+1]) {
+			builder.schematicWireBuckets[bucket] = append(builder.schematicWireBuckets[bucket], wire.UUID)
+		}
 		builder.indexSchematicWireEndpoint(points[index])
 		builder.indexSchematicWireEndpoint(points[index+1])
 	}
