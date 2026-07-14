@@ -16,6 +16,12 @@ func ProviderGraphSchema() map[string]any {
 	nullable := func(schema map[string]any) map[string]any {
 		return map[string]any{"anyOf": []any{schema, map[string]any{"type": "null"}}}
 	}
+	nullableIdentifier := func(description string) map[string]any {
+		return map[string]any{
+			"description": description,
+			"anyOf":       []any{identifier, map[string]any{"type": "null"}},
+		}
+	}
 	emptyExtensions := strictObject(map[string]any{})
 
 	query := strictObject(map[string]any{
@@ -87,10 +93,21 @@ func ProviderGraphSchema() map[string]any {
 		"side": map[string]any{"type": "string", "enum": []string{"", "left", "right", "top", "bottom"}},
 	})
 	schematicPlacement := strictObject(map[string]any{
-		"component": identifier, "unit": identifier, "group": stringValue,
-		"near": stringValue, "near_unit": identifier,
-		"above": stringValue, "above_unit": identifier,
-		"right_of": stringValue, "right_of_unit": identifier,
+		"component": identifier,
+		"unit":      nullableIdentifier("Named unit declared by this component, or null for a single-unit component."),
+		"group":     stringValue,
+		"near":      stringValue,
+		"near_unit": nullableIdentifier(
+			"Named unit declared by the component in near, or null when near is empty or targets a single-unit component.",
+		),
+		"above": stringValue,
+		"above_unit": nullableIdentifier(
+			"Named unit declared by the component in above, or null when above is empty or targets a single-unit component.",
+		),
+		"right_of": stringValue,
+		"right_of_unit": nullableIdentifier(
+			"Named unit declared by the component in right_of, or null when right_of is empty or targets a single-unit component.",
+		),
 		"orientation": map[string]any{"type": "string", "enum": []string{"normal", "rotated_90", "rotated_180", "rotated_270"}},
 		"mirror":      map[string]any{"type": "string", "enum": []string{"", "none", "x", "y"}},
 	})

@@ -190,7 +190,8 @@ func TestValidateRejectsUnsafeGraphCases(t *testing.T) {
 }
 
 func TestProviderSchemaContainsNamedUnitContract(t *testing.T) {
-	data, err := json.Marshal(ProviderGraphSchema())
+	schema := ProviderGraphSchema()
+	data, err := json.Marshal(schema)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -199,6 +200,35 @@ func TestProviderSchemaContainsNamedUnitContract(t *testing.T) {
 			t.Fatalf("provider schema does not contain %s", field)
 		}
 	}
+
+	properties := requireSchemaMap(t, schema, "properties")
+	schematic := requireSchemaMap(t, requireSchemaMap(t, properties, "schematic"), "properties")
+	placements := requireSchemaMap(t, schematic, "placements")
+	placement := requireSchemaMap(t, requireSchemaMap(t, placements, "items"), "properties")
+	for _, field := range []string{"unit", "near_unit", "above_unit", "right_of_unit"} {
+		fieldSchema := requireSchemaMap(t, placement, field)
+		variants, ok := fieldSchema["anyOf"].([]any)
+		if !ok || len(variants) != 2 {
+			t.Fatalf("provider schema field %s is not nullable: %#v", field, fieldSchema)
+		}
+		nullVariant, ok := variants[1].(map[string]any)
+		if !ok || nullVariant["type"] != "null" {
+			t.Fatalf("provider schema field %s has no null variant: %#v", field, variants)
+		}
+		description, ok := fieldSchema["description"].(string)
+		if !ok || description == "" {
+			t.Fatalf("provider schema field %s has no usage description", field)
+		}
+	}
+}
+
+func requireSchemaMap(t *testing.T, parent map[string]any, key string) map[string]any {
+	t.Helper()
+	value, ok := parent[key].(map[string]any)
+	if !ok {
+		t.Fatalf("provider schema key %s is missing or not an object: %#v", key, parent[key])
+	}
+	return value
 }
 
 func TestParameterValueRejectsStructuredObjectsAndMixedArrays(t *testing.T) {
