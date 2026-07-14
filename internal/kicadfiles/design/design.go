@@ -186,6 +186,7 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 	}
 	symbolsByUnit := map[string]*schematic.SchematicSymbol{}
 	symbolRefs := map[string]struct{}{}
+	symbolPathsByRef := map[string]map[string]struct{}{}
 	symbolReferenceByRef := map[string]string{}
 	symbolFieldsByRef := map[string]string{}
 	addSymbols := func(prefix string, file *schematic.SchematicFile) {
@@ -210,6 +211,10 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 				symbolReferenceByRef[refKey] = strings.TrimSpace(symbol.Reference)
 			}
 			symbolRefs[refKey] = struct{}{}
+			if symbolPathsByRef[refKey] == nil {
+				symbolPathsByRef[refKey] = map[string]struct{}{}
+			}
+			symbolPathsByRef[refKey][symbol.Path] = struct{}{}
 			symbolFieldsByRef[key] = prefix + "[" + strconv.Itoa(i) + "].reference"
 		}
 	}
@@ -235,6 +240,7 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 		}
 	}
 	missingFootprintRefs := map[string]struct{}{}
+	validatedReferences := map[string]struct{}{}
 	keys := make([]string, 0, len(symbolsByUnit))
 	for key := range symbolsByUnit {
 		keys = append(keys, key)
@@ -245,18 +251,24 @@ func validateFootprintReferences(design Design) kicadfiles.ValidationErrors {
 		if symbol.OnBoard != nil && !*symbol.OnBoard {
 			continue
 		}
-		footprintIndexes, ok := footprintsByRef[referenceKey(symbol.Reference)]
+		refKey := referenceKey(symbol.Reference)
+		footprintIndexes, ok := footprintsByRef[refKey]
 		if !ok {
-			refKey := referenceKey(symbol.Reference)
 			if _, reported := missingFootprintRefs[refKey]; !reported {
 				errs = append(errs, designError(symbolFieldsByRef[key], "missing PCB footprint for schematic reference "+symbol.Reference))
 				missingFootprintRefs[refKey] = struct{}{}
 			}
 			continue
 		}
+		if _, validated := validatedReferences[refKey]; validated {
+			continue
+		}
+		validatedReferences[refKey] = struct{}{}
+		validPaths := symbolPathsByRef[refKey]
 		for _, footprintIndex := range footprintIndexes {
 			footprint := &design.PCB.Footprints[footprintIndex]
-			if symbol.Path != footprint.Path && !isKiCadPCBPath(footprint.Path) {
+			_, matchesUnitPath := validPaths[footprint.Path]
+			if !matchesUnitPath && !isKiCadPCBPath(footprint.Path) {
 				errs = append(errs, designError("pcb.footprints["+strconv.Itoa(footprintIndex)+"].path", "must match schematic symbol path for "+symbol.Reference))
 			}
 		}

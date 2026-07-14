@@ -118,6 +118,37 @@ func TestValidateAcceptsKiCadHierarchicalPCBFootprintPath(t *testing.T) {
 	}
 }
 
+func TestValidateFootprintReferenceAcceptsPathFromAnySharedReferenceUnit(t *testing.T) {
+	design := validLEDDesign(t)
+	footprint := design.PCB.Footprints[0]
+	var firstUnit schematic.SchematicSymbol
+	found := false
+	for _, symbol := range design.Schematic.Symbols {
+		if symbol.Reference == footprint.Reference {
+			firstUnit = symbol
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("missing schematic symbol for footprint %s", footprint.Reference)
+	}
+	firstUnit.Unit = 1
+	secondUnit := firstUnit
+	secondUnit.Unit = 2
+	secondUnit.Path = "shared-reference-unit-b"
+	design.Schematic.Symbols = append(design.Schematic.Symbols, secondUnit)
+
+	if errs := validateFootprintReferences(design); len(errs) != 0 {
+		t.Fatalf("shared-reference footprint path errors = %v", errs)
+	}
+
+	design.PCB.Footprints[0].Path = "not-a-unit-path"
+	if errs := validateFootprintReferences(design); len(errs) == 0 || !strings.Contains(errs.Error(), "must match schematic symbol path") {
+		t.Fatalf("mismatched shared-reference path errors = %v", errs)
+	}
+}
+
 func TestValidateRejectsProjectSchematicNameMismatch(t *testing.T) {
 	design := validLEDDesign(t)
 	design.Project.Name = "other"
