@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"kicadai/internal/reports"
@@ -47,6 +48,35 @@ func TestCircuitPreflightFailsClosedBeforeWrite(t *testing.T) {
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {
 		t.Fatalf("preflight wrote output: %v", err)
+	}
+}
+
+func TestCircuitPreflightFailsClosedForInvalidPinAndPlacement(t *testing.T) {
+	base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name string
+		edit func(string) string
+	}{
+		{name: "unknown_pin", edit: func(input string) string { return strings.Replace(input, `"selector": "1"`, `"selector": "999"`, 1) }},
+		{name: "invalid_region", edit: func(input string) string { return strings.Replace(input, `"width_mm": 12,`, `"width_mm": 120,`, 1) }},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			graph := filepath.Join(t.TempDir(), test.name+".json")
+			if err := os.WriteFile(graph, []byte(test.edit(string(base))), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			output := filepath.Join(t.TempDir(), "must-not-be-written")
+			result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--output", output})
+			if result.OK || preflightResultData(t, result).ReadyForWrite || len(result.Issues) == 0 {
+				t.Fatalf("invalid %s preflight = %#v", test.name, result)
+			}
+			if _, err := os.Stat(output); !os.IsNotExist(err) {
+				t.Fatalf("preflight wrote output: %v", err)
+			}
+		})
 	}
 }
 
