@@ -13,6 +13,7 @@ import (
 
 	"kicadai/internal/blocks"
 	"kicadai/internal/components"
+	"kicadai/internal/domain"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
 	"kicadai/internal/transactions"
@@ -22,14 +23,16 @@ const RequestVersion = "0.1.0"
 const maxRequestBytes = 1 << 20
 const anchorBindingGeometryEpsilonMM = 0.001
 
-type AcceptanceLevel string
+type AcceptanceLevel = domain.AcceptanceLevel
 
 const (
-	AcceptanceDraft                AcceptanceLevel = "draft"
-	AcceptanceStructural           AcceptanceLevel = "structural"
-	AcceptanceConnectivity         AcceptanceLevel = "connectivity"
-	AcceptanceERCDRC               AcceptanceLevel = "erc-drc"
-	AcceptanceFabricationCandidate AcceptanceLevel = "fabrication-candidate"
+	// These aliases preserve the workflow package API and its hyphen spellings
+	// while sharing the domain type.
+	AcceptanceDraft                = domain.AcceptanceDraft
+	AcceptanceStructural           = domain.AcceptanceStructural
+	AcceptanceConnectivity         = domain.AcceptanceConnectivity
+	AcceptanceERCDRC               = domain.AcceptanceERCDRC
+	AcceptanceFabricationCandidate = domain.AcceptanceFabricationCandidate
 )
 
 type Request struct {

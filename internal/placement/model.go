@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 
+	"kicadai/internal/domain"
 	"kicadai/internal/reports"
 	"kicadai/internal/transactions"
 )
@@ -49,16 +50,18 @@ const (
 	EdgeBottom EdgeConstraint = "bottom"
 )
 
-type NetRole string
+type NetRole = domain.NetRole
 
 const (
-	NetPower        NetRole = "power"
-	NetGround       NetRole = "ground"
-	NetSignal       NetRole = "signal"
-	NetClock        NetRole = "clock"
-	NetAnalog       NetRole = "analog"
-	NetDifferential NetRole = "differential"
-	NetUnknown      NetRole = "unknown"
+	// Placement names are compatibility aliases; the shared vocabulary remains
+	// the single source of role values.
+	NetPower        = domain.NetRolePower
+	NetGround       = domain.NetRoleGround
+	NetSignal       = domain.NetRoleSignal
+	NetClock        = domain.NetRoleClock
+	NetAnalog       = domain.NetRoleAnalog
+	NetDifferential = domain.NetRoleDifferential
+	NetUnknown      = domain.NetRoleUnknown
 )
 
 type IntentRole string

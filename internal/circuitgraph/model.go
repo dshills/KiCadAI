@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 
 	"kicadai/internal/components"
+	"kicadai/internal/domain"
 )
 
 const (
@@ -57,13 +58,15 @@ type Project struct {
 	Board       Board           `json:"board"`
 }
 
-type AcceptanceLevel string
+type AcceptanceLevel = domain.AcceptanceLevel
 
 const (
-	AcceptanceStructural           AcceptanceLevel = "structural"
-	AcceptanceConnectivity         AcceptanceLevel = "connectivity"
-	AcceptanceERCDRC               AcceptanceLevel = "erc-drc"
-	AcceptanceFabricationCandidate AcceptanceLevel = "fabrication-candidate"
+	// Package-local names remain source-compatible aliases to the shared
+	// vocabulary; graph JSON keeps its existing spellings.
+	AcceptanceStructural           = domain.AcceptanceStructural
+	AcceptanceConnectivity         = domain.AcceptanceConnectivity
+	AcceptanceERCDRC               = domain.AcceptanceERCDRC
+	AcceptanceFabricationCandidate = domain.AcceptanceFabricationCandidate
 )
 
 type Board struct {
@@ -99,37 +102,39 @@ type ComponentUnit struct {
 	Role string `json:"role"`
 }
 
-type ComponentRole string
+type ComponentRole = domain.ComponentRole
 
 const (
-	RoleConnector           ComponentRole = "connector"
-	RoleInputConnector      ComponentRole = "input_connector"
-	RoleOutputConnector     ComponentRole = "output_connector"
-	RoleResistor            ComponentRole = "resistor"
-	RoleCurrentLimiter      ComponentRole = "current_limiter"
-	RolePullup              ComponentRole = "pullup"
-	RoleCapacitor           ComponentRole = "capacitor"
-	RoleDecouplingCapacitor ComponentRole = "decoupling_capacitor"
-	RoleBulkCapacitor       ComponentRole = "bulk_capacitor"
-	RoleInductor            ComponentRole = "inductor"
-	RoleDiode               ComponentRole = "diode"
-	RoleIndicatorLED        ComponentRole = "indicator_led"
-	RoleIC                  ComponentRole = "ic"
-	RoleSensor              ComponentRole = "sensor"
-	RoleRegulator           ComponentRole = "regulator"
-	RoleTransistor          ComponentRole = "transistor"
-	RoleBJT                 ComponentRole = "bjt"
-	RoleMOSFET              ComponentRole = "mosfet"
-	RoleSwitch              ComponentRole = "switch"
-	RoleCrystal             ComponentRole = "crystal"
-	RoleOscillator          ComponentRole = "oscillator"
-	RoleProtection          ComponentRole = "protection"
-	RoleFuse                ComponentRole = "fuse"
-	RoleTVS                 ComponentRole = "tvs"
-	RolePowerSymbol         ComponentRole = "power_symbol"
-	RoleGroundSymbol        ComponentRole = "ground_symbol"
-	RoleTestpoint           ComponentRole = "testpoint"
-	RoleGeneric             ComponentRole = "generic"
+	// Role aliases preserve the circuit-graph API while eliminating a second
+	// component-role type definition.
+	RoleConnector           = domain.ComponentRoleConnector
+	RoleInputConnector      = domain.ComponentRoleInputConnector
+	RoleOutputConnector     = domain.ComponentRoleOutputConnector
+	RoleResistor            = domain.ComponentRoleResistor
+	RoleCurrentLimiter      = domain.ComponentRoleCurrentLimiter
+	RolePullup              = domain.ComponentRolePullup
+	RoleCapacitor           = domain.ComponentRoleCapacitor
+	RoleDecouplingCapacitor = domain.ComponentRoleDecouplingCapacitor
+	RoleBulkCapacitor       = domain.ComponentRoleBulkCapacitor
+	RoleInductor            = domain.ComponentRoleInductor
+	RoleDiode               = domain.ComponentRoleDiode
+	RoleIndicatorLED        = domain.ComponentRoleIndicatorLED
+	RoleIC                  = domain.ComponentRoleIC
+	RoleSensor              = domain.ComponentRoleSensor
+	RoleRegulator           = domain.ComponentRoleRegulator
+	RoleTransistor          = domain.ComponentRoleTransistor
+	RoleBJT                 = domain.ComponentRoleBJT
+	RoleMOSFET              = domain.ComponentRoleMOSFET
+	RoleSwitch              = domain.ComponentRoleSwitch
+	RoleCrystal             = domain.ComponentRoleCrystal
+	RoleOscillator          = domain.ComponentRoleOscillator
+	RoleProtection          = domain.ComponentRoleProtection
+	RoleFuse                = domain.ComponentRoleFuse
+	RoleTVS                 = domain.ComponentRoleTVS
+	RolePowerSymbol         = domain.ComponentRolePowerSymbol
+	RoleGroundSymbol        = domain.ComponentRoleGroundSymbol
+	RoleTestpoint           = domain.ComponentRoleTestpoint
+	RoleGeneric             = domain.ComponentRoleGeneric
 )
 
 type ComponentQuery struct {
@@ -189,18 +194,19 @@ type Net struct {
 	Endpoints        []Endpoint `json:"endpoints"`
 }
 
-type NetRole string
+type NetRole = domain.NetRole
 
 const (
-	NetRoleSignal   NetRole = "signal"
-	NetRolePower    NetRole = "power"
-	NetRolePowerPos NetRole = "power_pos"
-	NetRolePowerNeg NetRole = "power_neg"
-	NetRoleGround   NetRole = "ground"
-	NetRoleReturn   NetRole = "return"
-	NetRoleFeedback NetRole = "feedback"
-	NetRoleBias     NetRole = "bias"
-	NetRoleShield   NetRole = "shield"
+	// Net-role aliases preserve graph API names and wire values.
+	NetRoleSignal   = domain.NetRoleSignal
+	NetRolePower    = domain.NetRolePower
+	NetRolePowerPos = domain.NetRolePowerPos
+	NetRolePowerNeg = domain.NetRolePowerNeg
+	NetRoleGround   = domain.NetRoleGround
+	NetRoleReturn   = domain.NetRoleReturn
+	NetRoleFeedback = domain.NetRoleFeedback
+	NetRoleBias     = domain.NetRoleBias
+	NetRoleShield   = domain.NetRoleShield
 )
 
 type Endpoint struct {

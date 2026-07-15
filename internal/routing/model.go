@@ -6,6 +6,7 @@ import (
 	"math"
 	"strings"
 
+	"kicadai/internal/domain"
 	"kicadai/internal/pcbrules"
 	"kicadai/internal/reports"
 )
@@ -49,17 +50,19 @@ const (
 	PadThroughHole PadType = "through_hole"
 )
 
-type NetRole string
+type NetRole = domain.NetRole
 
 const (
-	NetPower        NetRole = "power"
-	NetGround       NetRole = "ground"
-	NetSignal       NetRole = "signal"
-	NetClock        NetRole = "clock"
-	NetAnalog       NetRole = "analog"
-	NetHighCurrent  NetRole = "high_current"
-	NetDifferential NetRole = "differential"
-	NetUnknown      NetRole = "unknown"
+	// Routing names are compatibility aliases; the shared vocabulary remains
+	// the single source of role values.
+	NetPower        = domain.NetRolePower
+	NetGround       = domain.NetRoleGround
+	NetSignal       = domain.NetRoleSignal
+	NetClock        = domain.NetRoleClock
+	NetAnalog       = domain.NetRoleAnalog
+	NetHighCurrent  = domain.NetRoleHighCurrent
+	NetDifferential = domain.NetRoleDifferential
+	NetUnknown      = domain.NetRoleUnknown
 )
 
 type CopperKind string

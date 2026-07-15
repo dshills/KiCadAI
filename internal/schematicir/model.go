@@ -3,6 +3,8 @@ package schematicir
 import (
 	"encoding/json"
 	"strings"
+
+	"kicadai/internal/domain"
 )
 
 const (
@@ -64,37 +66,39 @@ type BodyGeometry struct {
 	MaxYMM float64 `json:"max_y_mm"`
 }
 
-type ComponentRole string
+type ComponentRole = domain.ComponentRole
 
 const (
-	ComponentRoleConnector           ComponentRole = "connector"
-	ComponentRoleInputConnector      ComponentRole = "input_connector"
-	ComponentRoleOutputConnector     ComponentRole = "output_connector"
-	ComponentRoleResistor            ComponentRole = "resistor"
-	ComponentRoleCurrentLimiter      ComponentRole = "current_limiter"
-	ComponentRolePullup              ComponentRole = "pullup"
-	ComponentRoleCapacitor           ComponentRole = "capacitor"
-	ComponentRoleDecouplingCapacitor ComponentRole = "decoupling_capacitor"
-	ComponentRoleBulkCapacitor       ComponentRole = "bulk_capacitor"
-	ComponentRoleInductor            ComponentRole = "inductor"
-	ComponentRoleDiode               ComponentRole = "diode"
-	ComponentRoleIndicatorLED        ComponentRole = "indicator_led"
-	ComponentRoleIC                  ComponentRole = "ic"
-	ComponentRoleSensor              ComponentRole = "sensor"
-	ComponentRoleRegulator           ComponentRole = "regulator"
-	ComponentRoleTransistor          ComponentRole = "transistor"
-	ComponentRoleBJT                 ComponentRole = "bjt"
-	ComponentRoleMOSFET              ComponentRole = "mosfet"
-	ComponentRoleSwitch              ComponentRole = "switch"
-	ComponentRoleCrystal             ComponentRole = "crystal"
-	ComponentRoleOscillator          ComponentRole = "oscillator"
-	ComponentRoleProtection          ComponentRole = "protection"
-	ComponentRoleFuse                ComponentRole = "fuse"
-	ComponentRoleTVS                 ComponentRole = "tvs"
-	ComponentRolePowerSymbol         ComponentRole = "power_symbol"
-	ComponentRoleGroundSymbol        ComponentRole = "ground_symbol"
-	ComponentRoleTestpoint           ComponentRole = "testpoint"
-	ComponentRoleGeneric             ComponentRole = "generic"
+	// Package-local names remain source-compatible aliases to the shared
+	// vocabulary; schematic IR retains bus and no-connect values.
+	ComponentRoleConnector           = domain.ComponentRoleConnector
+	ComponentRoleInputConnector      = domain.ComponentRoleInputConnector
+	ComponentRoleOutputConnector     = domain.ComponentRoleOutputConnector
+	ComponentRoleResistor            = domain.ComponentRoleResistor
+	ComponentRoleCurrentLimiter      = domain.ComponentRoleCurrentLimiter
+	ComponentRolePullup              = domain.ComponentRolePullup
+	ComponentRoleCapacitor           = domain.ComponentRoleCapacitor
+	ComponentRoleDecouplingCapacitor = domain.ComponentRoleDecouplingCapacitor
+	ComponentRoleBulkCapacitor       = domain.ComponentRoleBulkCapacitor
+	ComponentRoleInductor            = domain.ComponentRoleInductor
+	ComponentRoleDiode               = domain.ComponentRoleDiode
+	ComponentRoleIndicatorLED        = domain.ComponentRoleIndicatorLED
+	ComponentRoleIC                  = domain.ComponentRoleIC
+	ComponentRoleSensor              = domain.ComponentRoleSensor
+	ComponentRoleRegulator           = domain.ComponentRoleRegulator
+	ComponentRoleTransistor          = domain.ComponentRoleTransistor
+	ComponentRoleBJT                 = domain.ComponentRoleBJT
+	ComponentRoleMOSFET              = domain.ComponentRoleMOSFET
+	ComponentRoleSwitch              = domain.ComponentRoleSwitch
+	ComponentRoleCrystal             = domain.ComponentRoleCrystal
+	ComponentRoleOscillator          = domain.ComponentRoleOscillator
+	ComponentRoleProtection          = domain.ComponentRoleProtection
+	ComponentRoleFuse                = domain.ComponentRoleFuse
+	ComponentRoleTVS                 = domain.ComponentRoleTVS
+	ComponentRolePowerSymbol         = domain.ComponentRolePowerSymbol
+	ComponentRoleGroundSymbol        = domain.ComponentRoleGroundSymbol
+	ComponentRoleTestpoint           = domain.ComponentRoleTestpoint
+	ComponentRoleGeneric             = domain.ComponentRoleGeneric
 )
 
 type Pin struct {
@@ -150,20 +154,21 @@ func (ref EndpointRef) Split() (componentID string, pinSelector string, ok bool)
 	return componentID, pinSelector, ok && componentID != "" && pinSelector != ""
 }
 
-type NetRole string
+type NetRole = domain.NetRole
 
 const (
-	NetRoleSignal    NetRole = "signal"
-	NetRolePower     NetRole = "power"
-	NetRolePowerPos  NetRole = "power_pos"
-	NetRolePowerNeg  NetRole = "power_neg"
-	NetRoleGround    NetRole = "ground"
-	NetRoleReturn    NetRole = "return"
-	NetRoleFeedback  NetRole = "feedback"
-	NetRoleBias      NetRole = "bias"
-	NetRoleShield    NetRole = "shield"
-	NetRoleBus       NetRole = "bus"
-	NetRoleNoConnect NetRole = "no_connect"
+	// Net-role aliases preserve schematic IR API names and wire values.
+	NetRoleSignal    = domain.NetRoleSignal
+	NetRolePower     = domain.NetRolePower
+	NetRolePowerPos  = domain.NetRolePowerPos
+	NetRolePowerNeg  = domain.NetRolePowerNeg
+	NetRoleGround    = domain.NetRoleGround
+	NetRoleReturn    = domain.NetRoleReturn
+	NetRoleFeedback  = domain.NetRoleFeedback
+	NetRoleBias      = domain.NetRoleBias
+	NetRoleShield    = domain.NetRoleShield
+	NetRoleBus       = domain.NetRoleBus
+	NetRoleNoConnect = domain.NetRoleNoConnect
 )
 
 type Port struct {

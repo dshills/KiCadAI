@@ -9,6 +9,7 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"kicadai/internal/domain"
 	"kicadai/internal/reports"
 )
 
@@ -25,14 +26,16 @@ const (
 	ConfidenceBlocked        ConfidenceLevel = "blocked"
 )
 
-type AcceptanceLevel string
+type AcceptanceLevel = domain.AcceptanceLevel
 
 const (
-	AcceptanceDraft                AcceptanceLevel = "draft"
-	AcceptanceStructural           AcceptanceLevel = "structural"
-	AcceptanceConnectivity         AcceptanceLevel = "connectivity"
-	AcceptanceERCDRC               AcceptanceLevel = "erc_drc"
-	AcceptanceFabricationCandidate AcceptanceLevel = "fabrication_candidate"
+	// These aliases preserve the components package API and historical
+	// underscore spellings while sharing the domain type.
+	AcceptanceDraft                = domain.AcceptanceDraft
+	AcceptanceStructural           = domain.AcceptanceStructural
+	AcceptanceConnectivity         = domain.AcceptanceConnectivity
+	AcceptanceERCDRC               = domain.AcceptanceERCDRCUnderscore
+	AcceptanceFabricationCandidate = domain.AcceptanceFabricationCandidateUnderscore
 )
 
 type EquivalenceRole string
