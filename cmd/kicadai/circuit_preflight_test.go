@@ -80,6 +80,35 @@ func TestCircuitPreflightFailsClosedForInvalidPinAndPlacement(t *testing.T) {
 	}
 }
 
+func TestCircuitPreflightFailsClosedForInvalidMultiUnitAssignment(t *testing.T) {
+	recorded, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", "generic_lm358_buffered_signal_conditioner", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Intent json.RawMessage `json:"intent"`
+	}
+	if err := json.Unmarshal(recorded, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	invalid := strings.Replace(string(envelope.Intent), `"unit":"B"`, `"unit":"Z"`, 1)
+	if invalid == string(envelope.Intent) {
+		t.Fatal("LM358 fixture does not contain unit B")
+	}
+	graph := filepath.Join(t.TempDir(), "invalid_multi_unit.json")
+	if err := os.WriteFile(graph, []byte(invalid), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "must-not-be-written")
+	result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--output", output})
+	if result.OK || preflightResultData(t, result).ReadyForWrite || len(result.Issues) == 0 {
+		t.Fatalf("invalid multi-unit preflight = %#v", result)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("preflight wrote output: %v", err)
+	}
+}
+
 func runCircuitPreflightCLI(t *testing.T, args []string) reports.Result {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
