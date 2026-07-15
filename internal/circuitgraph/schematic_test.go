@@ -188,6 +188,23 @@ func TestToSchematicIRPreservesMultiUnitReference(t *testing.T) {
 	}
 }
 
+func TestSchematicLayoutIntentDerivesNegativePowerLane(t *testing.T) {
+	resolved := ResolvedDocument{
+		Source: Document{Schematic: SchematicIntent{Rules: SchematicRules{}}},
+		Nets:   []ResolvedNet{{Intent: Net{Name: "VEE", Role: NetRolePowerNeg}}},
+	}
+	layout := schematicLayoutIntent(resolved, map[schematicUnitKey]string{}, map[string][]int{})
+	if layout.Lanes.PowerNegative != schematicir.LanePositionLower {
+		t.Fatalf("negative power lane = %q, want %q", layout.Lanes.PowerNegative, schematicir.LanePositionLower)
+	}
+
+	resolved.Nets[0].Intent.Role = NetRoleSignal
+	layout = schematicLayoutIntent(resolved, map[schematicUnitKey]string{}, map[string][]int{})
+	if layout.Lanes.PowerNegative != schematicir.LanePositionNone {
+		t.Fatalf("non-split layout negative power lane = %q, want omitted", layout.Lanes.PowerNegative)
+	}
+}
+
 func TestToSchematicIRLowersNamedLM358UnitsDeterministically(t *testing.T) {
 	graph := namedLM358Document()
 	for index := range graph.Schematic.Placements {
