@@ -3,6 +3,7 @@ package aiprovider
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -25,7 +26,7 @@ func TestOpenAIProviderSendsStrictResponsesRequest(t *testing.T) {
 		if body.Model != "test-model" || body.Text.Format.Type != "json_schema" || !body.Text.Format.Strict || body.Text.Format.Name != "kicadai_bmp280_intent_v1" {
 			t.Errorf("request body = %#v", body)
 		}
-		if body.Store || !body.Stream || body.MaxOutputTokens != openAIMaxOutputTokens || strings.Contains(body.Instructions, "sensor.bosch.bmp280.lga8") {
+		if body.Store || !body.Stream || body.MaxOutputTokens != DefaultReferenceOutputTokens || strings.Contains(body.Instructions, "sensor.bosch.bmp280.lga8") {
 			t.Errorf("request policy = %#v", body)
 		}
 		var input openAIInput
@@ -48,6 +49,30 @@ func TestOpenAIProviderSendsStrictResponsesRequest(t *testing.T) {
 	}
 	if result.Usage.TotalTokens != 15 {
 		t.Fatalf("usage = %#v", result.Usage)
+	}
+	if result.MaxOutputTokens != DefaultReferenceOutputTokens {
+		t.Fatalf("max output tokens = %d", result.MaxOutputTokens)
+	}
+}
+
+func TestOpenAIProviderUsesBoundedOutputTokenOverride(t *testing.T) {
+	client := clientWithRoundTrip(func(request *http.Request) (*http.Response, error) {
+		var body openAIRequest
+		if err := json.NewDecoder(request.Body).Decode(&body); err != nil {
+			t.Fatal(err)
+		}
+		if body.MaxOutputTokens != 24000 {
+			t.Fatalf("max output tokens = %d", body.MaxOutputTokens)
+		}
+		return jsonHTTPResponse(http.StatusOK, openAIResponseJSON(t, validEnvelope)), nil
+	})
+	provider, err := newOpenAIProvider(OpenAIOptions{APIKey: "test-key", HTTPClient: client, MaxOutputTokens: 24000}, openAIResponsesEndpoint)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := provider.GenerateIntent(context.Background(), openAITestRequest("x"))
+	if err != nil || result.MaxOutputTokens != 24000 {
+		t.Fatalf("result=%#v err=%v", result, err)
 	}
 }
 
@@ -171,6 +196,34 @@ func TestOpenAIProviderRejectsRefusalIncompleteAndMultipleOutput(t *testing.T) {
 	}
 }
 
+func TestOpenAIProviderReportsOutputTokenExhaustion(t *testing.T) {
+	for _, background := range []bool{false, true} {
+		t.Run(fmt.Sprintf("background_%t", background), func(t *testing.T) {
+			body := `{"id":"resp_limit","status":"incomplete","model":"test-model","error":null,"incomplete_details":{"reason":"max_output_tokens"},"output":[],"usage":{"input_tokens":120,"output_tokens":32768,"total_tokens":32888}}`
+			client := clientWithRoundTrip(func(_ *http.Request) (*http.Response, error) {
+				return jsonHTTPResponse(http.StatusOK, body), nil
+			})
+			provider, err := newOpenAIProvider(OpenAIOptions{APIKey: "test-key", HTTPClient: client, Background: background}, openAIResponsesEndpoint)
+			if err != nil {
+				t.Fatal(err)
+			}
+			request := openAITestRequest("x")
+			request.MaxOutputTokens = DefaultGenericOutputTokens
+			_, err = provider.GenerateIntent(context.Background(), request)
+			var providerErr *ProviderError
+			if !errors.As(err, &providerErr) {
+				t.Fatalf("error = %v", err)
+			}
+			if providerErr.Code != ErrorIncomplete || providerErr.IncompleteReason != "max_output_tokens" || providerErr.MaxOutputTokens != DefaultGenericOutputTokens || providerErr.Usage.OutputTokens != DefaultGenericOutputTokens || !providerErr.RetryAllowed {
+				t.Fatalf("provider error = %#v", providerErr)
+			}
+			if !strings.Contains(providerErr.Suggestion, "--ai-max-output-tokens") || !strings.Contains(providerErr.Error(), "limit=32768") {
+				t.Fatalf("provider guidance = %#v", providerErr)
+			}
+		})
+	}
+}
+
 func TestOpenAIProviderEnforcesResponseLimitAndTimeout(t *testing.T) {
 	t.Run("response limit", func(t *testing.T) {
 		client := clientWithRoundTrip(func(_ *http.Request) (*http.Response, error) {
@@ -198,6 +251,17 @@ func TestOpenAIProviderEnforcesResponseLimitAndTimeout(t *testing.T) {
 func TestNewOpenAIProviderRequiresKey(t *testing.T) {
 	if _, err := NewOpenAIProvider(OpenAIOptions{}); ErrorCodeOf(err) != ErrorConfiguration {
 		t.Fatalf("error = %v code=%q", err, ErrorCodeOf(err))
+	}
+}
+
+func TestOpenAIOptionsFromEnvironmentParsesOutputTokenLimit(t *testing.T) {
+	t.Setenv(EnvAIMaxOutputTokens, "24000")
+	if got := OpenAIOptionsFromEnvironment().MaxOutputTokens; got != 24000 {
+		t.Fatalf("max output tokens = %d", got)
+	}
+	t.Setenv(EnvAIMaxOutputTokens, "not-a-number")
+	if _, err := NewOpenAIProvider(OpenAIOptions{APIKey: "test-key", MaxOutputTokens: OpenAIOptionsFromEnvironment().MaxOutputTokens}); ErrorCodeOf(err) != ErrorConfiguration {
+		t.Fatalf("invalid environment limit error = %v", err)
 	}
 }
 
@@ -234,6 +298,7 @@ func openAITestRequest(prompt string) GenerateRequest {
 		OutputSchema:      BMP280ReferenceIntentEnvelopeSchema(),
 		SchemaVersion:     EnvelopeSchemaV1,
 		Attempt:           1,
+		MaxOutputTokens:   DefaultReferenceOutputTokens,
 	}
 }
 

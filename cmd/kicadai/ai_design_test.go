@@ -28,6 +28,7 @@ func TestParseAIDesignFlags(t *testing.T) {
 		"--ai-profile", "generic-circuit-v1",
 		"--model", "test-model",
 		"--max-ai-attempts", "2",
+		"--ai-max-output-tokens", "24000",
 		"--ai-background",
 		"design", "create",
 	}, &bytes.Buffer{})
@@ -37,8 +38,29 @@ func TestParseAIDesignFlags(t *testing.T) {
 	if command != "design" || len(opts.commandArgs) != 1 || opts.commandArgs[0] != "create" {
 		t.Fatalf("command=%q args=%#v", command, opts.commandArgs)
 	}
-	if opts.aiPrompt != "build bmp280" || opts.aiProvider != "recorded" || opts.aiProviderRecord != "response.json" || opts.aiProfile != "generic-circuit-v1" || opts.aiModel != "test-model" || opts.maxAIAttempts != 2 || !opts.aiBackground {
+	if opts.aiPrompt != "build bmp280" || opts.aiProvider != "recorded" || opts.aiProviderRecord != "response.json" || opts.aiProfile != "generic-circuit-v1" || opts.aiModel != "test-model" || opts.maxAIAttempts != 2 || opts.aiMaxOutputTokens != 24000 || !opts.aiBackground {
 		t.Fatalf("options = %#v", opts)
+	}
+}
+
+func TestOpenAIOptionsCLIOverridesEnvironment(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "test-key")
+	t.Setenv(aiprovider.EnvAIMaxOutputTokens, "12000")
+	options := openAIOptionsFromCLI(cliOptions{aiModel: "cli-model", aiMaxOutputTokens: 24000, aiBackground: true})
+	if options.APIKey != "test-key" || options.Model != "cli-model" || options.MaxOutputTokens != 24000 || !options.Background {
+		t.Fatalf("options = %#v", options)
+	}
+	options = openAIOptionsFromCLI(cliOptions{})
+	if options.MaxOutputTokens != 12000 {
+		t.Fatalf("environment max output tokens = %d", options.MaxOutputTokens)
+	}
+	profile := profileWithEffectiveOutputTokenLimit(cliOptions{aiProvider: "openai"}, aiprovider.GenericCircuitProfile("catalog"))
+	if profile.MaxOutputTokens != 12000 {
+		t.Fatalf("effective profile max output tokens = %d", profile.MaxOutputTokens)
+	}
+	profile = profileWithEffectiveOutputTokenLimit(cliOptions{aiProvider: "recorded", aiMaxOutputTokens: 24000}, aiprovider.GenericCircuitProfile("catalog"))
+	if profile.MaxOutputTokens != 24000 {
+		t.Fatalf("recorded profile explicit max output tokens = %d", profile.MaxOutputTokens)
 	}
 }
 
@@ -355,6 +377,16 @@ func TestRunAIDesignRecordedReferencePersistsSanitizedEvidence(t *testing.T) {
 	if readErr != nil {
 		t.Fatal(readErr)
 	}
+	var request aiRequestEvidence
+	readJSONFile(t, filepath.Join(output, ".kicadai", "ai-request.json"), &request)
+	if request.MaxOutputTokens != aiprovider.DefaultReferenceOutputTokens {
+		t.Fatalf("request output token evidence = %#v", request)
+	}
+	var attempts aiAttemptsEvidence
+	readJSONFile(t, filepath.Join(output, ".kicadai", "ai-attempts.json"), &attempts)
+	if len(attempts.Attempts) != 1 || attempts.Attempts[0].MaxOutputTokens != aiprovider.DefaultReferenceOutputTokens {
+		t.Fatalf("attempt output token evidence = %#v", attempts)
+	}
 	for _, forbidden := range []string{"protected USB-C", "OPENAI_API_KEY", "Authorization", "Bearer"} {
 		if strings.Contains(string(requestEvidence), forbidden) {
 			t.Fatalf("request evidence contains %q: %s", forbidden, requestEvidence)
@@ -447,6 +479,25 @@ func TestAIProviderIssueMapping(t *testing.T) {
 		if issue := aiProviderIssue(err); issue.Code != test.reportCode {
 			t.Fatalf("provider code %q mapped to %q, want %q", test.providerCode, issue.Code, test.reportCode)
 		}
+	}
+}
+
+func TestAIProviderIssueIncludesOutputTokenGuidance(t *testing.T) {
+	err := &aiprovider.ProviderError{
+		Code: aiprovider.ErrorIncomplete, Message: "incomplete (limit=32768, output_tokens=32768)",
+		IncompleteReason: "max_output_tokens", MaxOutputTokens: 32768, RetryAllowed: true,
+		Suggestion: "retry explicitly with --ai-max-output-tokens 48000",
+	}
+	issue := aiProviderIssue(err)
+	if issue.Code != reports.CodeAIProviderIncomplete || issue.Path != "provider.max_output_tokens" || !strings.Contains(issue.Suggestion, "--ai-max-output-tokens") {
+		t.Fatalf("issue = %#v", issue)
+	}
+}
+
+func TestAIDesignRejectsOutOfBoundsOutputTokenLimit(t *testing.T) {
+	issue := validateAIDesignOptions(cliOptions{output: "out", aiPrompt: "test", aiProvider: "openai", maxAIAttempts: 1, aiMaxOutputTokens: aiprovider.MaxOutputTokenLimit + 1})
+	if issue == nil || issue.Path != "ai_max_output_tokens" {
+		t.Fatalf("issue = %#v", issue)
 	}
 }
 

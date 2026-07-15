@@ -241,6 +241,14 @@ fixture, log, or evidence artifact. Live provider timeouts before graph
 generation do not invalidate recorded evidence. Replay a saved graph or rerun
 the optional live lane; never infer a graph from a timeout.
 
+Use the profile output-token default first: 8,192 for bounded reference
+profiles and 32,768 for `generic-circuit-v1`. If the CLI returns
+`AI_PROVIDER_INCOMPLETE` at `provider.max_output_tokens`, inspect its reported
+limit and usage, then perform at most one intentional retry with the suggested
+bounded `--ai-max-output-tokens` value. Never add a blind retry loop. The CLI
+flag overrides `KICADAI_AI_MAX_OUTPUT_TOKENS`; both are constrained to
+1,024-65,536 tokens and can increase provider cost and latency.
+
 To compare a saved live LM358 graph with the checked-in critical projection
 without another provider request:
 

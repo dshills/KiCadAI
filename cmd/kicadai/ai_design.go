@@ -39,15 +39,16 @@ type aiProviderSummary struct {
 }
 
 type aiRequestEvidence struct {
-	Schema       string `json:"schema"`
-	Profile      string `json:"profile,omitempty"`
-	Provider     string `json:"provider"`
-	Model        string `json:"model,omitempty"`
-	PromptSource string `json:"prompt_source"`
-	PromptHash   string `json:"prompt_hash"`
-	Attempt      int    `json:"attempt"`
-	MaxAttempts  int    `json:"max_attempts"`
-	Background   bool   `json:"background,omitempty"`
+	Schema          string `json:"schema"`
+	Profile         string `json:"profile,omitempty"`
+	Provider        string `json:"provider"`
+	Model           string `json:"model,omitempty"`
+	PromptSource    string `json:"prompt_source"`
+	PromptHash      string `json:"prompt_hash"`
+	Attempt         int    `json:"attempt"`
+	MaxAttempts     int    `json:"max_attempts"`
+	MaxOutputTokens int    `json:"max_output_tokens"`
+	Background      bool   `json:"background,omitempty"`
 }
 
 type aiResponseEvidence struct {
@@ -63,13 +64,17 @@ type aiResponseEvidence struct {
 }
 
 type aiAttemptEvidence struct {
-	Attempt     int                     `json:"attempt"`
-	Provider    string                  `json:"provider"`
-	Model       string                  `json:"model,omitempty"`
-	ResponseID  string                  `json:"response_id,omitempty"`
-	Status      string                  `json:"status"`
-	Diagnostics []aiprovider.Diagnostic `json:"diagnostics,omitempty"`
-	IntentHash  string                  `json:"intent_hash,omitempty"`
+	Attempt         int                     `json:"attempt"`
+	Provider        string                  `json:"provider"`
+	Model           string                  `json:"model,omitempty"`
+	ResponseID      string                  `json:"response_id,omitempty"`
+	Status          string                  `json:"status"`
+	Diagnostics     []aiprovider.Diagnostic `json:"diagnostics,omitempty"`
+	IntentHash      string                  `json:"intent_hash,omitempty"`
+	MaxOutputTokens int                     `json:"max_output_tokens,omitempty"`
+	Usage           aiprovider.Usage        `json:"usage,omitempty"`
+	FinishReason    string                  `json:"finish_reason,omitempty"`
+	RetryAllowed    bool                    `json:"retry_allowed,omitempty"`
 }
 
 type aiAttemptsEvidence struct {
@@ -82,7 +87,12 @@ func hasAIPromptSource(opts cliOptions) bool {
 }
 
 func aiDesignOptionsPresent(opts cliOptions) bool {
-	return hasAIPromptSource(opts) || strings.TrimSpace(opts.aiProvider) != "" || strings.TrimSpace(opts.aiProfile) != "" || strings.TrimSpace(opts.aiModel) != "" || strings.TrimSpace(opts.aiProviderRecord) != "" || opts.aiBackground || opts.maxAIAttempts != 1
+	providerConfigured := strings.TrimSpace(opts.aiProvider) != "" ||
+		strings.TrimSpace(opts.aiProfile) != "" ||
+		strings.TrimSpace(opts.aiModel) != "" ||
+		strings.TrimSpace(opts.aiProviderRecord) != ""
+	providerOptionsConfigured := opts.aiBackground || opts.aiMaxOutputTokens != 0 || opts.maxAIAttempts != 1
+	return hasAIPromptSource(opts) || providerConfigured || providerOptionsConfigured
 }
 
 func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -104,6 +114,7 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	if err != nil {
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
+	profile = profileWithEffectiveOutputTokenLimit(opts, profile)
 	providerResult, intent, plan, attempts, issues, err := generateValidatedAIIntent(ctx, provider, profile, prompt, opts.maxAIAttempts)
 	if err != nil {
 		return writeDesignFailure(stdout, aiProviderIssue(err))
@@ -282,15 +293,17 @@ func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider
 			SchemaVersion:     aiprovider.EnvelopeSchemaV1,
 			Attempt:           attempt,
 			Diagnostics:       diagnostics,
+			MaxOutputTokens:   profile.MaxOutputTokens,
 		})
 		if err != nil {
-			attempts = append(attempts, aiAttemptEvidence{Attempt: attempt, Provider: provider.Name(), Status: "provider_error", Diagnostics: append([]aiprovider.Diagnostic(nil), diagnostics...)})
+			attempts = append(attempts, aiProviderErrorAttempt(attempt, provider.Name(), profile.MaxOutputTokens, diagnostics, err))
 			if attempt < maxAttempts && aiProviderErrorRetryable(err) {
 				diagnostics = []aiprovider.Diagnostic{{Code: string(aiprovider.ErrorCodeOf(err)), Path: "provider", Message: boundedDiagnosticMessage(err.Error())}}
 				continue
 			}
 			return aiprovider.GenerateResult{}, intentplanner.Request{}, intentplanner.PlanResult{}, attempts, nil, err
 		}
+		result = providerResultWithOutputTokenLimit(result, profile.MaxOutputTokens)
 		intent, issues := aiprovider.DecodeIntent(result.IntentJSON)
 		intent = intentplanner.NormalizeRequest(intent)
 		var plan intentplanner.PlanResult
@@ -307,13 +320,16 @@ func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider
 			status = "invalid"
 		}
 		attempts = append(attempts, aiAttemptEvidence{
-			Attempt:     attempt,
-			Provider:    result.Provider,
-			Model:       result.Model,
-			ResponseID:  result.ResponseID,
-			Status:      status,
-			Diagnostics: append([]aiprovider.Diagnostic(nil), diagnostics...),
-			IntentHash:  hashBytes(intentData),
+			Attempt:         attempt,
+			Provider:        result.Provider,
+			Model:           result.Model,
+			ResponseID:      result.ResponseID,
+			Status:          status,
+			Diagnostics:     append([]aiprovider.Diagnostic(nil), diagnostics...),
+			IntentHash:      hashBytes(intentData),
+			MaxOutputTokens: result.MaxOutputTokens,
+			Usage:           result.Usage,
+			FinishReason:    result.FinishReason,
 		})
 		if status == "completed" {
 			return result, intent, plan, attempts, issues, nil
@@ -324,7 +340,33 @@ func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider
 		}
 		diagnostics = retryDiagnostics
 	}
-	return aiprovider.GenerateResult{}, intentplanner.Request{}, intentplanner.PlanResult{}, attempts, nil, &aiprovider.ProviderError{Code: aiprovider.ErrorIncomplete, Message: "AI intent attempts exhausted"}
+	return aiprovider.GenerateResult{}, intentplanner.Request{}, intentplanner.PlanResult{}, attempts, nil, &aiprovider.ProviderError{
+		Code: aiprovider.ErrorIncomplete, Message: "AI intent attempts exhausted", MaxOutputTokens: profile.MaxOutputTokens,
+	}
+}
+
+func providerResultWithOutputTokenLimit(result aiprovider.GenerateResult, fallback int) aiprovider.GenerateResult {
+	if result.MaxOutputTokens == 0 {
+		result.MaxOutputTokens = fallback
+	}
+	return result
+}
+
+func aiProviderErrorAttempt(attempt int, provider string, maxOutputTokens int, diagnostics []aiprovider.Diagnostic, err error) aiAttemptEvidence {
+	evidence := aiAttemptEvidence{
+		Attempt: attempt, Provider: provider, Status: "provider_error",
+		Diagnostics: append([]aiprovider.Diagnostic(nil), diagnostics...), MaxOutputTokens: maxOutputTokens,
+	}
+	var providerErr *aiprovider.ProviderError
+	if errors.As(err, &providerErr) {
+		evidence.Model = providerErr.Model
+		evidence.ResponseID = providerErr.ResponseID
+		evidence.MaxOutputTokens = providerErr.MaxOutputTokens
+		evidence.Usage = providerErr.Usage
+		evidence.FinishReason = providerErr.IncompleteReason
+		evidence.RetryAllowed = providerErr.RetryAllowed
+	}
+	return evidence
 }
 
 func aiProviderErrorRetryable(err error) bool {
@@ -384,6 +426,11 @@ func validateAIDesignOptions(opts cliOptions) *reports.Issue {
 	if opts.maxAIAttempts < 1 || opts.maxAIAttempts > 2 {
 		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "max_ai_attempts", Message: "--max-ai-attempts must be 1 or 2"}
 	}
+	if opts.aiMaxOutputTokens != 0 {
+		if err := aiprovider.ValidateOutputTokenLimit(opts.aiMaxOutputTokens); err != nil {
+			return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "ai_max_output_tokens", Message: err.Error()}
+		}
+	}
 	if profile := strings.TrimSpace(opts.aiProfile); profile != "" && profile != circuitgraph.ProviderProfileID {
 		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "ai_profile", Message: "unsupported --ai-profile " + profile}
 	}
@@ -422,14 +469,7 @@ func loadAIPrompt(opts cliOptions) (string, string, *reports.Issue) {
 func aiProviderFromOptions(opts cliOptions) (aiprovider.Provider, error) {
 	switch strings.ToLower(strings.TrimSpace(opts.aiProvider)) {
 	case "openai":
-		options := aiprovider.OpenAIOptionsFromEnvironment()
-		if strings.TrimSpace(opts.aiModel) != "" {
-			options.Model = strings.TrimSpace(opts.aiModel)
-		}
-		if opts.aiBackground {
-			options.Background = true
-		}
-		return aiprovider.NewOpenAIProvider(options)
+		return aiprovider.NewOpenAIProvider(openAIOptionsFromCLI(opts))
 	case "recorded":
 		data, err := readBoundedFile(opts.aiProviderRecord, aiprovider.MaxResponseBytes)
 		if err != nil {
@@ -439,6 +479,34 @@ func aiProviderFromOptions(opts cliOptions) (aiprovider.Provider, error) {
 	default:
 		return nil, &aiprovider.ProviderError{Code: aiprovider.ErrorConfiguration, Message: fmt.Sprintf("unsupported AI provider %q", opts.aiProvider)}
 	}
+}
+
+func openAIOptionsFromCLI(opts cliOptions) aiprovider.OpenAIOptions {
+	options := aiprovider.OpenAIOptionsFromEnvironment()
+	if strings.TrimSpace(opts.aiModel) != "" {
+		options.Model = strings.TrimSpace(opts.aiModel)
+	}
+	if opts.aiBackground {
+		options.Background = true
+	}
+	if opts.aiMaxOutputTokens != 0 {
+		options.MaxOutputTokens = opts.aiMaxOutputTokens
+	}
+	return options
+}
+
+func profileWithEffectiveOutputTokenLimit(opts cliOptions, profile aiprovider.ReferenceProfile) aiprovider.ReferenceProfile {
+	if opts.aiMaxOutputTokens != 0 {
+		profile.MaxOutputTokens = opts.aiMaxOutputTokens
+		return profile
+	}
+	if strings.EqualFold(strings.TrimSpace(opts.aiProvider), "openai") {
+		limit := openAIOptionsFromCLI(opts).MaxOutputTokens
+		if limit != 0 {
+			profile.MaxOutputTokens = limit
+		}
+	}
+	return profile
 }
 
 func readBoundedFile(path string, limit int) ([]byte, error) {
@@ -475,7 +543,15 @@ func aiProviderIssue(err error) reports.Issue {
 	case aiprovider.ErrorMalformed, aiprovider.ErrorSchema:
 		code = reports.CodeAIOutputInvalid
 	}
-	return reports.Issue{Code: code, Severity: reports.SeverityError, Path: "provider", Message: err.Error()}
+	issue := reports.Issue{Code: code, Severity: reports.SeverityError, Path: "provider", Message: err.Error()}
+	var providerErr *aiprovider.ProviderError
+	if errors.As(err, &providerErr) {
+		issue.Suggestion = providerErr.Suggestion
+		if providerErr.IncompleteReason == "max_output_tokens" {
+			issue.Path = "provider.max_output_tokens"
+		}
+	}
+	return issue
 }
 
 func writeAIDesignPreflightFailure(stdout io.Writer, providerResult aiprovider.GenerateResult, intent intentplanner.Request, plan intentplanner.PlanResult, issues []reports.Issue) error {
@@ -502,14 +578,15 @@ func writeAIProviderArtifacts(artifactDir string, opts cliOptions, promptSource 
 	}
 	intentHash := hashBytes(intentData)
 	requestEvidence := aiRequestEvidence{
-		Schema:       aiprovider.EnvelopeSchemaV1,
-		Provider:     strings.ToLower(strings.TrimSpace(opts.aiProvider)),
-		Model:        result.Model,
-		PromptSource: promptSource,
-		PromptHash:   promptHash,
-		Attempt:      len(attempts),
-		MaxAttempts:  opts.maxAIAttempts,
-		Background:   result.Background,
+		Schema:          aiprovider.EnvelopeSchemaV1,
+		Provider:        strings.ToLower(strings.TrimSpace(opts.aiProvider)),
+		Model:           result.Model,
+		PromptSource:    promptSource,
+		PromptHash:      promptHash,
+		Attempt:         len(attempts),
+		MaxAttempts:     opts.maxAIAttempts,
+		MaxOutputTokens: result.MaxOutputTokens,
+		Background:      result.Background,
 	}
 	responseEvidence := aiResponseEvidence{
 		Schema:       aiprovider.EnvelopeSchemaV1,

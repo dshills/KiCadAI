@@ -25,6 +25,7 @@ type ReferenceProfile struct {
 	ID                string
 	SchemaName        string
 	CapabilityContext string
+	MaxOutputTokens   int
 	schema            func() map[string]any
 }
 
@@ -37,6 +38,7 @@ func BMP280Profile() ReferenceProfile {
 		ID:                ReferenceProfileBMP280,
 		SchemaName:        BMP280ReferenceSchemaName,
 		CapabilityContext: BMP280ReferenceCapabilityContext,
+		MaxOutputTokens:   DefaultReferenceOutputTokens,
 		schema:            BMP280ReferenceIntentEnvelopeSchema,
 	}
 }
@@ -46,6 +48,7 @@ func ProtectedLEDProfile() ReferenceProfile {
 		ID:                ReferenceProfileProtectedLED,
 		SchemaName:        ProtectedLEDReferenceSchemaName,
 		CapabilityContext: ProtectedLEDReferenceCapabilityContext,
+		MaxOutputTokens:   DefaultReferenceOutputTokens,
 		schema:            ProtectedLEDReferenceIntentEnvelopeSchema,
 	}
 }
@@ -53,7 +56,7 @@ func ProtectedLEDProfile() ReferenceProfile {
 func GenericCircuitProfile(capabilityContext string) ReferenceProfile {
 	return ReferenceProfile{
 		ID: circuitgraph.ProviderProfileID, SchemaName: circuitgraph.ProviderSchemaName,
-		CapabilityContext: capabilityContext, schema: genericCircuitEnvelopeSchema,
+		CapabilityContext: capabilityContext, MaxOutputTokens: DefaultGenericOutputTokens, schema: genericCircuitEnvelopeSchema,
 	}
 }
 

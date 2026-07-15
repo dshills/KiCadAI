@@ -51,12 +51,13 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	if err != nil {
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
+	profile := profileWithEffectiveOutputTokenLimit(opts, aiprovider.GenericCircuitProfile(capability))
 	symbols, footprints := circuitgraph.LibraryEvidenceFromIndex(*createOpts.LibraryIndex)
 	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{
 		Catalog: catalog, CatalogID: "catalog:" + filepath.Base(filepath.Clean(opts.catalogDir)), LibrarySymbols: symbols,
 		LibraryFootprints: footprints, RequireLibraryEvidence: true,
 	})
-	providerResult, graph, resolved, request, attempts, issues, err := generateValidatedAIGraph(ctx, provider, aiprovider.GenericCircuitProfile(capability), resolver, prompt, opts.maxAIAttempts)
+	providerResult, graph, resolved, request, attempts, issues, err := generateValidatedAIGraph(ctx, provider, profile, resolver, prompt, opts.maxAIAttempts)
 	if err != nil {
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
@@ -145,16 +146,17 @@ func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider,
 		result, err := provider.GenerateIntent(ctx, aiprovider.GenerateRequest{
 			Prompt: prompt, CapabilityContext: profile.CapabilityContext, OutputSchemaName: profile.SchemaName,
 			OutputSchema: profile.IntentEnvelopeSchema(), SchemaVersion: aiprovider.EnvelopeSchemaV1,
-			Attempt: attempt, Diagnostics: diagnostics,
+			Attempt: attempt, Diagnostics: diagnostics, MaxOutputTokens: profile.MaxOutputTokens,
 		})
 		if err != nil {
-			attempts = append(attempts, aiAttemptEvidence{Attempt: attempt, Provider: provider.Name(), Status: "provider_error", Diagnostics: append([]aiprovider.Diagnostic(nil), diagnostics...)})
+			attempts = append(attempts, aiProviderErrorAttempt(attempt, provider.Name(), profile.MaxOutputTokens, diagnostics, err))
 			if attempt < maxAttempts && aiProviderErrorRetryable(err) {
 				diagnostics = []aiprovider.Diagnostic{{Code: string(aiprovider.ErrorCodeOf(err)), Path: "provider", Message: boundedDiagnosticMessage(err.Error())}}
 				continue
 			}
 			return aiprovider.GenerateResult{}, circuitgraph.Document{}, circuitgraph.ResolvedDocument{}, designworkflow.Request{}, attempts, nil, err
 		}
+		result = providerResultWithOutputTokenLimit(result, profile.MaxOutputTokens)
 		decode := circuitgraph.DecodeStrict
 		if result.Recorded {
 			decode = circuitgraph.DecodeRecordedStrict
@@ -182,6 +184,7 @@ func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider,
 		attempts = append(attempts, aiAttemptEvidence{
 			Attempt: attempt, Provider: result.Provider, Model: result.Model, ResponseID: result.ResponseID,
 			Status: status, Diagnostics: append([]aiprovider.Diagnostic(nil), diagnostics...), IntentHash: hashBytes(graphData),
+			MaxOutputTokens: result.MaxOutputTokens, Usage: result.Usage, FinishReason: result.FinishReason,
 		})
 		if status == "completed" {
 			return result, graph, resolved, request, attempts, issues, nil
@@ -191,7 +194,9 @@ func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider,
 			return result, graph, resolved, request, attempts, issues, nil
 		}
 	}
-	return aiprovider.GenerateResult{}, circuitgraph.Document{}, circuitgraph.ResolvedDocument{}, designworkflow.Request{}, attempts, nil, &aiprovider.ProviderError{Code: aiprovider.ErrorIncomplete, Message: "generic AI graph attempts exhausted"}
+	return aiprovider.GenerateResult{}, circuitgraph.Document{}, circuitgraph.ResolvedDocument{}, designworkflow.Request{}, attempts, nil, &aiprovider.ProviderError{
+		Code: aiprovider.ErrorIncomplete, Message: "generic AI graph attempts exhausted", MaxOutputTokens: profile.MaxOutputTokens,
+	}
 }
 
 func prefixAIGraphIssues(issues []reports.Issue) []reports.Issue {
@@ -265,6 +270,7 @@ func writeAIGraphProviderArtifacts(artifactDir string, opts cliOptions, promptSo
 	requestEvidence := aiRequestEvidence{
 		Schema: aiprovider.EnvelopeSchemaV1, Profile: circuitgraph.ProviderProfileID, Provider: strings.ToLower(strings.TrimSpace(opts.aiProvider)), Model: result.Model,
 		PromptSource: promptSource, PromptHash: hashText(prompt), Attempt: len(attempts), MaxAttempts: opts.maxAIAttempts, Background: result.Background,
+		MaxOutputTokens: result.MaxOutputTokens,
 	}
 	responseEvidence := struct {
 		Schema       string                `json:"schema"`

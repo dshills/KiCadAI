@@ -113,6 +113,7 @@ Global flags:
   --model string         AI provider model override
   --provider-record string Recorded AI response fixture path
   --max-ai-attempts int  Maximum AI intent attempts: 1 or 2 (default 1)
+  --ai-max-output-tokens int Maximum provider output tokens; profile default when omitted
   --ai-background        Use OpenAI background polling (requires temporary provider storage)
   --format string        Output format for supported commands: json or text (default json)
   --strict              Treat blocking draft clarifications as command errors
@@ -228,6 +229,7 @@ type cliOptions struct {
 	aiModel                     string
 	aiProviderRecord            string
 	maxAIAttempts               int
+	aiMaxOutputTokens           int
 	aiBackground                bool
 	outputFormat                string
 	strictDraft                 bool
@@ -432,6 +434,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")
 	flags.StringVar(&opts.aiProviderRecord, "provider-record", "", "recorded AI response fixture path")
 	flags.IntVar(&opts.maxAIAttempts, "max-ai-attempts", 1, "maximum AI intent attempts")
+	flags.IntVar(&opts.aiMaxOutputTokens, "ai-max-output-tokens", 0, "maximum AI provider output tokens")
 	flags.BoolVar(&opts.aiBackground, "ai-background", false, "use OpenAI background polling")
 	flags.StringVar(&opts.outputFormat, "format", "json", "output format: json or text")
 	flags.BoolVar(&opts.strictDraft, "strict", false, "treat blocking draft clarifications as command errors")

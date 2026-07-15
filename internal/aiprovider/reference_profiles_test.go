@@ -61,3 +61,14 @@ func TestReferenceProfilesReturnFreshStrictSchemas(t *testing.T) {
 		}
 	}
 }
+
+func TestReferenceProfileOutputTokenDefaults(t *testing.T) {
+	for _, profile := range []ReferenceProfile{BMP280Profile(), ProtectedLEDProfile()} {
+		if profile.MaxOutputTokens != DefaultReferenceOutputTokens {
+			t.Fatalf("profile %q limit = %d", profile.ID, profile.MaxOutputTokens)
+		}
+	}
+	if profile := GenericCircuitProfile("catalog"); profile.MaxOutputTokens != DefaultGenericOutputTokens {
+		t.Fatalf("generic profile limit = %d", profile.MaxOutputTokens)
+	}
+}

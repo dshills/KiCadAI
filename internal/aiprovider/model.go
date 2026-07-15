@@ -15,6 +15,11 @@ const (
 	MaxDiagnostics     = 8
 	MaxDiagnosticLen   = 512
 	MaxCapabilityBytes = 64 << 10
+
+	DefaultReferenceOutputTokens = 8192
+	DefaultGenericOutputTokens   = 32768
+	MinOutputTokenLimit          = 1024
+	MaxOutputTokenLimit          = 65536
 )
 
 type Provider interface {
@@ -30,6 +35,7 @@ type GenerateRequest struct {
 	SchemaVersion     string         `json:"schema_version"`
 	Attempt           int            `json:"attempt"`
 	Diagnostics       []Diagnostic   `json:"diagnostics,omitempty"`
+	MaxOutputTokens   int            `json:"-"`
 }
 
 type Diagnostic struct {
@@ -39,14 +45,15 @@ type Diagnostic struct {
 }
 
 type GenerateResult struct {
-	Provider     string          `json:"provider"`
-	Model        string          `json:"model,omitempty"`
-	ResponseID   string          `json:"response_id,omitempty"`
-	IntentJSON   json.RawMessage `json:"intent"`
-	Usage        Usage           `json:"usage,omitempty"`
-	FinishReason string          `json:"finish_reason,omitempty"`
-	Recorded     bool            `json:"recorded,omitempty"`
-	Background   bool            `json:"background,omitempty"`
+	Provider        string          `json:"provider"`
+	Model           string          `json:"model,omitempty"`
+	ResponseID      string          `json:"response_id,omitempty"`
+	IntentJSON      json.RawMessage `json:"intent"`
+	Usage           Usage           `json:"usage,omitempty"`
+	FinishReason    string          `json:"finish_reason,omitempty"`
+	MaxOutputTokens int             `json:"max_output_tokens,omitempty"`
+	Recorded        bool            `json:"recorded,omitempty"`
+	Background      bool            `json:"background,omitempty"`
 }
 
 type Usage struct {
@@ -70,9 +77,17 @@ const (
 )
 
 type ProviderError struct {
-	Code    ErrorCode
-	Message string
-	cause   error
+	Code             ErrorCode
+	Message          string
+	Provider         string
+	Model            string
+	ResponseID       string
+	IncompleteReason string
+	MaxOutputTokens  int
+	Usage            Usage
+	RetryAllowed     bool
+	Suggestion       string
+	cause            error
 }
 
 func (err *ProviderError) Error() string {
@@ -118,6 +133,11 @@ func ValidateGenerateRequest(request GenerateRequest) error {
 	if request.Attempt < 1 || request.Attempt > 2 {
 		return newProviderError(ErrorConfiguration, "AI attempt must be 1 or 2", nil)
 	}
+	if request.MaxOutputTokens != 0 {
+		if err := ValidateOutputTokenLimit(request.MaxOutputTokens); err != nil {
+			return err
+		}
+	}
 	if len(request.Diagnostics) > MaxDiagnostics {
 		return newProviderError(ErrorConfiguration, fmt.Sprintf("AI correction accepts at most %d diagnostics", MaxDiagnostics), nil)
 	}
@@ -128,6 +148,17 @@ func ValidateGenerateRequest(request GenerateRequest) error {
 		if len(diagnostic.Code) > MaxDiagnosticLen || len(diagnostic.Path) > MaxDiagnosticLen || len(diagnostic.Message) > MaxDiagnosticLen {
 			return newProviderError(ErrorConfiguration, fmt.Sprintf("AI diagnostic %d exceeds field size limit", index), nil)
 		}
+	}
+	return nil
+}
+
+func ValidateOutputTokenLimit(limit int) error {
+	if limit < MinOutputTokenLimit || limit > MaxOutputTokenLimit {
+		return newProviderError(
+			ErrorConfiguration,
+			fmt.Sprintf("AI max output tokens must be between %d and %d", MinOutputTokenLimit, MaxOutputTokenLimit),
+			nil,
+		)
 	}
 	return nil
 }

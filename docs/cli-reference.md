@@ -118,6 +118,13 @@ profile or accepts provider-defined libraries and geometry. See
 [AI Generation](ai-generation.md) for strict KiCad-backed commands and the
 artifact contract.
 
+Provider output budgets are profile-aware: 8,192 tokens for bounded reference
+profiles and 32,768 for `generic-circuit-v1`. Override them with
+`--ai-max-output-tokens N` or `KICADAI_AI_MAX_OUTPUT_TOKENS`; the CLI flag wins
+and the accepted range is 1,024 through 65,536. Token exhaustion is reported as
+`AI_PROVIDER_INCOMPLETE` at `provider.max_output_tokens` with usage and manual
+retry guidance. It never causes an automatic paid retry.
+
 ### Schematic IR Commands
 
 `schematic-ir` is the first AI-facing schematic design/layout IR entry point.

@@ -346,8 +346,19 @@ checks. Provider timeouts and transport failures occur before graph generation
 and do not alter this deterministic evidence; rerun the optional live command
 or replay the saved graph through the recorded provider.
 
-Optional provider settings include `--model`, `--max-ai-attempts`, and
-`--ai-background`. Correction attempts are bounded and restricted to explicit
+Optional provider settings include `--model`, `--max-ai-attempts`,
+`--ai-max-output-tokens`, and `--ai-background`. Bounded reference profiles
+default to 8,192 output tokens; `generic-circuit-v1` defaults to 32,768 because
+its strict graph envelopes are larger. The explicit token limit must be from
+1,024 through 65,536. `--ai-max-output-tokens` overrides
+`KICADAI_AI_MAX_OUTPUT_TOKENS`, which overrides the profile default. Increasing
+the limit can increase provider cost and latency.
+
+When OpenAI returns `incomplete_details.reason=max_output_tokens`, the
+structured issue path is `provider.max_output_tokens`. Its message includes the
+selected limit and reported output/total usage, and its suggestion provides an
+explicit bounded retry flag. KiCadAI does not automatically retry token
+exhaustion. Correction attempts remain bounded and restricted to explicit
 schema/intent diagnostics. Authentication, refusal, unsupported topology, and
 post-generation engineering failures are not sent back to the model for
 unbounded retries.
