@@ -9,6 +9,7 @@ import (
 
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/kicadfiles/design"
+	"kicadai/internal/kicadfiles/roundtrip"
 	"kicadai/internal/reports"
 )
 
@@ -61,8 +62,41 @@ func TestGenericCompositionAcceptanceCorpus(t *testing.T) {
 			if written.Schematic == nil || written.PCB == nil || len(written.PCB.Tracks) == 0 {
 				t.Fatalf("written project lacks readable schematic, PCB, or routed copper: %#v", written)
 			}
+			secondOutput := filepath.Join(t.TempDir(), "project")
+			secondWorkflow := designworkflow.Create(context.Background(), request, designworkflow.CreateOptions{OutputDir: secondOutput, Overwrite: true, LibraryIndex: &index})
+			if stage := graphWorkflowStage(secondWorkflow, designworkflow.StageWriterCorrect); stage == nil || stage.Status == designworkflow.StageStatusBlocked || stage.Status == designworkflow.StageStatusSkipped {
+				t.Fatalf("second writer correctness stage = %#v", stage)
+			}
+			for _, suffix := range []string{".kicad_sch", ".kicad_pcb"} {
+				first, err := os.ReadFile(filepath.Join(output, request.Name+suffix))
+				if err != nil {
+					t.Fatal(err)
+				}
+				second, err := os.ReadFile(filepath.Join(secondOutput, request.Name+suffix))
+				if err != nil {
+					t.Fatal(err)
+				}
+				firstNormalized := roundtrip.NormalizeBytes(first)
+				secondNormalized := roundtrip.NormalizeBytes(second)
+				if firstNormalized != secondNormalized {
+					t.Fatalf("normalized %s differs across repeated generic writes at byte %d", suffix, firstDifferenceOffset(firstNormalized, secondNormalized))
+				}
+			}
 		})
 	}
+}
+
+func firstDifferenceOffset(first, second string) int {
+	limit := len(first)
+	if len(second) < limit {
+		limit = len(second)
+	}
+	for index := 0; index < limit; index++ {
+		if first[index] != second[index] {
+			return index
+		}
+	}
+	return limit
 }
 
 func TestGenericCompositionAcceptanceCorpusFailsBeforeProjectWrite(t *testing.T) {
