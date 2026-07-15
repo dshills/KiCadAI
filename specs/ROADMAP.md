@@ -35,6 +35,12 @@ from validation feedback to safe automatic repair.
 ### Implemented Foundations
 
 - Direct KiCad project, schematic, and PCB writers.
+- Review-follow-up foundation with offline GitHub Actions quality gates,
+  embedded default component catalog loading, fail-closed routing retry
+  configuration, a tested workflow stage contract, and an explicit generic
+  versus bounded generation capability matrix. Historical review findings are
+  tracked by reproducible status in
+  `specs/kicadai-review-followup/HISTORICAL_REGRESSION_STATUS.md`.
 - Project directory structure generation and inspection.
 - KiCad IPC client for connection, version, document, and capability probes.
 - Transaction model with validation, planning, apply, operation IDs, and
