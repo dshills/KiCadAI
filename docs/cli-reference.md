@@ -192,6 +192,20 @@ perform final validation. Absence of an option is intentional: ambiguous,
 electrical, thermal, fabrication, ERC/DRC, and immutable-identity findings
 require review rather than an executable repair.
 
+### Generic Circuit Repair Plan
+
+```sh
+kicadai circuit repair-plan --request ./broken-graph.json
+```
+
+This read-only command returns preflight evidence plus `data.plan`. `ready`
+means the graph already passes preflight. `repair_available` contains one
+validated patch for the caller to save and pass to `circuit patch`.
+`needs_review` means zero or competing candidates exist. `blocked` reports
+malformed input, a repeated normalized graph hash, or the attempt ceiling.
+Supply prior hashes through repeatable `--previous-hash` for multi-step agent
+loops.
+
 Provider output budgets are profile-aware: 8,192 tokens for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. Override them with
 `--ai-max-output-tokens N` or `KICADAI_AI_MAX_OUTPUT_TOKENS`; the CLI flag wins

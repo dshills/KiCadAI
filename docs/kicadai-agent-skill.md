@@ -98,6 +98,11 @@ retry scope. Use an option only when its disposition is `agent_selectable`.
 Do not invent a patch when no option exists: that is a fail-closed review
 boundary for ambiguous or electrical evidence.
 
+Use `kicadai circuit repair-plan --request broken-graph.json` before writing a
+patch. Apply `data.plan.patch` only when `data.plan.state` is
+`repair_available`; retain `data.plan.input_hash` and provide it through
+`--previous-hash` on later attempts to prevent a repair loop.
+
 Patch operations are constrained to existing graph identities. The response
 contains the input hash, normalized operations, corrected graph, before/after
 critical projection, changed paths, re-preflight evidence, and
