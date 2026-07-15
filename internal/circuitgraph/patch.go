@@ -37,6 +37,131 @@ type PatchOperation struct {
 	Enabled     *bool         `json:"enabled,omitempty"`
 }
 
+// ApplyPatch mutates only an internal clone. The corrected graph is validated
+// through DecodeStrict so normal graph invariants remain the final authority.
+func ApplyPatch(document Document, patch PatchDocument) (Document, []reports.Issue) {
+	if issues := ValidatePatch(patch); reports.HasBlockingIssue(issues) {
+		return Document{}, issues
+	}
+	working := cloneDocument(document)
+	for index, operation := range patch.Operations {
+		if issue := applyPatchOperation(&working, operation); issue != nil {
+			issue.Path = "patch.operations[" + strconv.Itoa(index) + "]"
+			return Document{}, []reports.Issue{*issue}
+		}
+	}
+	encoded, err := json.Marshal(working)
+	if err != nil {
+		return Document{}, []reports.Issue{graphIssue(CodePatchInvalid, "patch", "encode corrected graph: "+err.Error())}
+	}
+	corrected, issues := DecodeStrict(bytes.NewReader(encoded))
+	return corrected, issues
+}
+
+func applyPatchOperation(document *Document, operation PatchOperation) *reports.Issue {
+	findNet := func(name string) *Net {
+		for i := range document.Nets {
+			if document.Nets[i].Name == name {
+				return &document.Nets[i]
+			}
+		}
+		return nil
+	}
+	contains := func(entries []Endpoint, endpoint Endpoint) int {
+		for i := range entries {
+			if compareEndpoints(entries[i], endpoint) == 0 {
+				return i
+			}
+		}
+		return -1
+	}
+	switch operation.Op {
+	case "replace_endpoint":
+		net := findNet(operation.Net)
+		if net == nil {
+			return issuePatch("net", "target net does not exist")
+		}
+		index := contains(net.Endpoints, *operation.Endpoint)
+		if index < 0 {
+			return issuePatch("endpoint", "target endpoint does not exist")
+		}
+		net.Endpoints[index] = *operation.Replacement
+	case "add_net_endpoint":
+		net := findNet(operation.Net)
+		if net == nil {
+			return issuePatch("net", "target net does not exist")
+		}
+		if contains(net.Endpoints, *operation.Endpoint) >= 0 {
+			return issuePatch("endpoint", "endpoint already exists")
+		}
+		net.Endpoints = append(net.Endpoints, *operation.Endpoint)
+	case "remove_net_endpoint":
+		net := findNet(operation.Net)
+		if net == nil {
+			return issuePatch("net", "target net does not exist")
+		}
+		index := contains(net.Endpoints, *operation.Endpoint)
+		if index < 0 {
+			return issuePatch("endpoint", "target endpoint does not exist")
+		}
+		net.Endpoints = append(net.Endpoints[:index], net.Endpoints[index+1:]...)
+	case "add_no_connect":
+		if contains(document.NoConnects, *operation.Endpoint) >= 0 {
+			return issuePatch("endpoint", "no-connect already exists")
+		}
+		document.NoConnects = append(document.NoConnects, *operation.Endpoint)
+	case "remove_no_connect":
+		index := contains(document.NoConnects, *operation.Endpoint)
+		if index < 0 {
+			return issuePatch("endpoint", "no-connect does not exist")
+		}
+		document.NoConnects = append(document.NoConnects[:index], document.NoConnects[index+1:]...)
+	case "replace_pcb_placement":
+		for i := range document.PCB.Placements {
+			if document.PCB.Placements[i].Component == operation.Component {
+				replacement := *operation.Placement
+				replacement.Component = operation.Component
+				document.PCB.Placements[i] = replacement
+				return nil
+			}
+		}
+		return issuePatch("component", "PCB placement does not exist")
+	case "replace_pcb_region":
+		for i := range document.PCB.Regions {
+			if document.PCB.Regions[i].ID == operation.Region {
+				document.PCB.Regions[i].Bounds = *operation.Bounds
+				return nil
+			}
+		}
+		return issuePatch("region", "PCB region does not exist")
+	case "replace_policy":
+		switch operation.Policy {
+		case "allow_reference_assignment":
+			document.Policy.AllowReferenceAssignment = operation.Enabled
+		case "allow_value_normalization":
+			document.Policy.AllowValueNormalization = operation.Enabled
+		case "allow_layout_inference":
+			document.Policy.AllowLayoutInference = operation.Enabled
+		case "allow_spacing_adjustment":
+			document.Policy.AllowSpacingAdjustment = operation.Enabled
+		case "allow_label_insertion":
+			document.Policy.AllowLabelInsertion = operation.Enabled
+		case "allow_placement_adjustment":
+			document.Policy.AllowPlacementAdjustment = operation.Enabled
+		case "allow_route_retry":
+			document.Policy.AllowRouteRetry = operation.Enabled
+		}
+	default:
+		return issuePatch("op", "unsupported patch operation")
+	}
+	return nil
+}
+
+func issuePatch(path, message string) *reports.Issue {
+	issue := graphIssue(CodePatchInvalid, path, message)
+	return &issue
+}
+
 func DecodePatchStrict(reader io.Reader) (PatchDocument, []reports.Issue) {
 	var buffer bytes.Buffer
 	if _, err := io.Copy(&buffer, io.LimitReader(reader, MaxPatchBytes+1)); err != nil {
