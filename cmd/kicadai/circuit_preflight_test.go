@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/circuitgraph"
 	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
@@ -328,6 +329,19 @@ func TestCircuitPatchFailsClosedWithoutOutput(t *testing.T) {
 	}
 }
 
+func TestCircuitRepairPlanReadyAndRepeatedHash(t *testing.T) {
+	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
+	ready := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", graph})
+	data := circuitRepairPlanResultData(t, ready)
+	if !ready.OK || data.Plan.State != circuitgraph.RepairPlanReady || data.Plan.Patch != nil || data.Plan.InputHash == "" {
+		t.Fatalf("ready repair plan = %#v", ready)
+	}
+	repeated := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", graph, "--previous-hash", data.Plan.InputHash})
+	if got := circuitRepairPlanResultData(t, repeated).Plan; got.State != circuitgraph.RepairPlanBlocked || got.StopReason != "repeated_input_hash" || got.Patch != nil {
+		t.Fatalf("repeated repair plan = %#v", got)
+	}
+}
+
 func TestCircuitPatchRejectsUnsupportedSubstitutionWithoutOutput(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
 	patch := filepath.Join(t.TempDir(), "unsupported-substitution.json")
@@ -379,6 +393,19 @@ func circuitPatchResultData(t *testing.T, result reports.Result) circuitPatchDat
 		t.Fatal(err)
 	}
 	return patch
+}
+
+func circuitRepairPlanResultData(t *testing.T, result reports.Result) circuitRepairPlanData {
+	t.Helper()
+	data, err := json.Marshal(result.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var plan circuitRepairPlanData
+	if err := json.Unmarshal(data, &plan); err != nil {
+		t.Fatal(err)
+	}
+	return plan
 }
 
 func runCircuitCreateCLI(t *testing.T, args []string) (reports.Result, error) {

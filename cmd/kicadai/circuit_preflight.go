@@ -73,6 +73,12 @@ type circuitPatchProjection struct {
 	After  circuitgraph.Document `json:"after"`
 }
 
+type circuitRepairPlanData struct {
+	Preflight           circuitPreflightData    `json:"preflight"`
+	Plan                circuitgraph.RepairPlan `json:"plan"`
+	OutstandingEvidence []string                `json:"outstanding_evidence"`
+}
+
 func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: preflight or create", Suggestion: "run kicadai circuit preflight --request graph.json"})
@@ -84,9 +90,56 @@ func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return runCircuitCreate(ctx, opts, stdout)
 	case "patch":
 		return runCircuitPatch(ctx, opts, stdout)
+	case "repair-plan":
+		return runCircuitRepairPlan(ctx, opts, stdout)
 	default:
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "unsupported circuit subcommand " + opts.commandArgs[0], Suggestion: "run kicadai circuit preflight or circuit create"})
 	}
+}
+
+func runCircuitRepairPlan(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	previous, issue := parseCircuitRepairPlanArgs(&opts)
+	if issue != nil {
+		return writeReportFailure(stdout, "circuit.repair-plan", *issue)
+	}
+	evaluation := evaluateCircuitPreflight(ctx, opts)
+	data := circuitRepairPlanData{Preflight: evaluation.Data, OutstandingEvidence: circuitOutstandingEvidence(evaluation.Data)}
+	if evaluation.Data.Graph == nil {
+		data.Plan = circuitgraph.RepairPlan{HashVersion: circuitgraph.RepairPlanHashVersion, State: circuitgraph.RepairPlanBlocked, StopReason: "graph_unavailable", Issues: evaluation.Issues}
+	} else {
+		data.Plan = circuitgraph.PlanRepair(*evaluation.Data.Graph, evaluation.Data.ReadyForWrite, evaluation.Data.RepairOptions, evaluation.Issues, previous, 3)
+	}
+	return writeReportJSON(stdout, reports.ResultWithIssues("circuit.repair-plan", data, evaluation.Issues, nil))
+}
+
+func parseCircuitRepairPlanArgs(opts *cliOptions) ([]string, *reports.Issue) {
+	if len(opts.commandArgs) == 0 || opts.commandArgs[0] != "repair-plan" {
+		return nil, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: repair-plan"}
+	}
+	previous := []string{}
+	for i := 1; i < len(opts.commandArgs); i++ {
+		switch opts.commandArgs[i] {
+		case "--json":
+		case "--request":
+			if i+1 >= len(opts.commandArgs) || opts.requestPath != "" {
+				return nil, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "repair-plan requires exactly one --request"}
+			}
+			i++
+			opts.requestPath = opts.commandArgs[i]
+		case "--previous-hash":
+			if i+1 >= len(opts.commandArgs) {
+				return nil, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "previous_hash", Message: "repair-plan requires a hash value"}
+			}
+			i++
+			previous = append(previous, opts.commandArgs[i])
+		default:
+			return nil, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit.repair-plan", Message: "unsupported repair-plan argument " + opts.commandArgs[i]}
+		}
+	}
+	if opts.requestPath == "" {
+		return nil, &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "repair-plan requires --request graph.json"}
+	}
+	return previous, nil
 }
 
 func runCircuitPatch(ctx context.Context, opts cliOptions, stdout io.Writer) error {
