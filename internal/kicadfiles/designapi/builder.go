@@ -660,7 +660,22 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	toLabelAt := options.ToLabelAt
 	if options.UseLabels == nil || !*options.UseLabels {
 		if err := validateSchematicWaypoints(options.Waypoints, start, end); err != nil {
-			return err
+			// A malformed path whose endpoints already sit on the authoritative pin
+			// anchors (e.g. a non-orthogonal or degenerate segment) is a genuine
+			// caller error and stays rejected.
+			if schematicWaypointsTerminateAt(options.Waypoints, start, end) {
+				return err
+			}
+			// Otherwise the bend path may have been baked against the router's
+			// placement snapshot before the builder moved a symbol to avoid a pin
+			// anchor collision. A uniform translation is the only safe compatibility
+			// repair because it preserves the complete routed shape. Any other drift
+			// remains fail-closed rather than silently replacing caller geometry.
+			if repaired, ok := reanchorSchematicWaypoints(options.Waypoints, start, end); ok {
+				options.Waypoints = repaired
+			} else {
+				return err
+			}
 		}
 	} else {
 		fromLabelAt, err = builder.resolveSchematicLabelPoint(from, fromLabelAt, start, options.ReanchorFromLabel)
@@ -1231,6 +1246,46 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 			points[index],
 		))
 	}
+}
+
+// schematicWaypointsTerminateAt reports whether a bend path already begins and
+// ends exactly on the supplied pin anchors. It distinguishes a caller error in
+// the path geometry (endpoints correct, interior malformed) from an anchor drift
+// (endpoints off), which are handled differently on validation failure.
+func schematicWaypointsTerminateAt(points []kicadfiles.Point, start, end kicadfiles.Point) bool {
+	if len(points) < 2 {
+		return false
+	}
+	return samePoint(points[0], start) && samePoint(points[len(points)-1], end)
+}
+
+// reanchorSchematicWaypoints repairs a bend path whose endpoints have drifted
+// off the authoritative pin anchors by a constant translation. When the leading
+// and trailing endpoint deltas match, every point is shifted by that delta so
+// the path terminates exactly on start and end while preserving its shape and
+// orthogonality. It returns ok=false when the path is empty, too short, or the
+// divergence is not a clean uniform translation, signalling the caller to reject
+// the stale geometry.
+func reanchorSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles.Point) ([]kicadfiles.Point, bool) {
+	if len(points) < 2 {
+		return nil, false
+	}
+	deltaStart := kicadfiles.Point{X: start.X - points[0].X, Y: start.Y - points[0].Y}
+	deltaEnd := kicadfiles.Point{X: end.X - points[len(points)-1].X, Y: end.Y - points[len(points)-1].Y}
+	if deltaStart != deltaEnd {
+		return nil, false
+	}
+	if deltaStart == (kicadfiles.Point{}) {
+		return nil, false
+	}
+	shifted := make([]kicadfiles.Point, len(points))
+	for index, point := range points {
+		shifted[index] = kicadfiles.Point{X: point.X + deltaStart.X, Y: point.Y + deltaStart.Y}
+	}
+	if err := validateSchematicWaypoints(shifted, start, end); err != nil {
+		return nil, false
+	}
+	return shifted, true
 }
 
 func validateSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles.Point) error {

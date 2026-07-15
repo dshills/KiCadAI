@@ -303,6 +303,78 @@ func TestBuilderConnectRejectsDiagonalWaypoints(t *testing.T) {
 	}
 }
 
+// TestBuilderConnectRepairsDriftedWaypoints covers the case where an upstream
+// router bakes an orthogonal bend path against a placement snapshot that has
+// since been grid-snapped, so the supplied waypoints are a uniform translation
+// of the builder's authoritative pin anchors. The connection must succeed by
+// re-anchoring the path rather than failing the whole design.
+func TestBuilderConnectRepairsDriftedWaypoints(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(40.64), Y: kicadfiles.MM(20.32)})
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	// Drift both endpoints (and thus every interior bend) by one grid unit in X
+	// and Y, mimicking a stale placement snapshot. The path stays orthogonal.
+	drift := kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)}
+	drifted := []kicadfiles.Point{
+		{X: start.X + drift.X, Y: start.Y + drift.Y},
+		{X: end.X + drift.X, Y: end.Y + drift.Y},
+	}
+	useLabels := false
+	if err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG", ConnectOptions{UseLabels: &useLabels, Waypoints: drifted}); err != nil {
+		t.Fatalf("drifted waypoints should be repaired, got error: %v", err)
+	}
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "R1", Pin: "2"}, "SIG")
+	assertSchematicPinNet(t, builder, Endpoint{Reference: "R2", Pin: "1"}, "SIG")
+}
+
+func TestBuilderConnectRejectsNonUniformDriftedWaypoints(t *testing.T) {
+	builder := newTestBuilder(t)
+	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
+	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(40.64), Y: kicadfiles.MM(20.32)})
+	start, _ := builder.pinAnchor(Endpoint{Reference: "R1", Pin: "2"})
+	end, _ := builder.pinAnchor(Endpoint{Reference: "R2", Pin: "1"})
+	drift := kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)}
+	waypoints := []kicadfiles.Point{{X: start.X + drift.X, Y: start.Y + drift.Y}, end}
+	useLabels := false
+	err := builder.ConnectWithOptions(
+		Endpoint{Reference: "R1", Pin: "2"},
+		Endpoint{Reference: "R2", Pin: "1"},
+		"SIG",
+		ConnectOptions{UseLabels: &useLabels, Waypoints: waypoints},
+	)
+	if err == nil {
+		t.Fatal("nonuniform waypoint drift must remain fail-closed")
+	}
+	if got := builder.assignedPinNet(Endpoint{Reference: "R1", Pin: "2"}); got != "" {
+		t.Fatalf("failed connection assigned source net %q", got)
+	}
+}
+
+func TestReanchorSchematicWaypoints(t *testing.T) {
+	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
+	end := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
+	drift := kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)}
+	uniform := []kicadfiles.Point{
+		{X: start.X + drift.X, Y: start.Y + drift.Y},
+		{X: end.X + drift.X, Y: end.Y + drift.Y},
+	}
+	if repaired, ok := reanchorSchematicWaypoints(uniform, start, end); !ok {
+		t.Fatal("uniform drift should be repairable")
+	} else if repaired[0] != start || repaired[len(repaired)-1] != end {
+		t.Fatalf("repaired endpoints = %#v/%#v, want %#v/%#v", repaired[0], repaired[len(repaired)-1], start, end)
+	}
+	// Non-uniform drift (only the start endpoint moved) is not a clean translation.
+	nonUniform := []kicadfiles.Point{
+		{X: start.X + drift.X, Y: start.Y + drift.Y},
+		{X: end.X, Y: end.Y},
+	}
+	if _, ok := reanchorSchematicWaypoints(nonUniform, start, end); ok {
+		t.Fatal("non-uniform drift must not be reported as repairable")
+	}
+}
+
 func TestBuilderConnectUsesExplicitLabelStubPositions(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
