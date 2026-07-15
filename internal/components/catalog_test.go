@@ -122,6 +122,35 @@ func TestCheckedInCatalogLM358MultiUnitEvidence(t *testing.T) {
 	}
 }
 
+func TestCheckedInCatalogBJTLibraryIdentityIsConsistent(t *testing.T) {
+	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	for _, test := range []struct {
+		recordID string
+		symbolID string
+	}{
+		{recordID: "bjt.onsemi.mmbt3904.sot23", symbolID: "Transistor_BJT:Q_NPN_BEC"},
+		{recordID: "bjt.onsemi.mmbt3906.sot23", symbolID: "Transistor_BJT:Q_PNP_BEC"},
+	} {
+		record := requireCatalogRecord(t, catalog, test.recordID)
+		wantEvidence := "builtin_pinmap:" + test.symbolID
+		if record.AmplifierOutput == nil || record.AmplifierOutput.SymbolID != test.symbolID || record.AmplifierOutput.PinmapEvidence != wantEvidence {
+			t.Fatalf("%s amplifier output identity is inconsistent: %+v", test.recordID, record.AmplifierOutput)
+		}
+		if len(record.Symbols) != 1 || record.Symbols[0].SymbolID != test.symbolID || !slices.Contains(record.Symbols[0].Verification.Sources, wantEvidence) {
+			t.Fatalf("%s symbol identity is inconsistent: %+v", test.recordID, record.Symbols)
+		}
+		if len(record.Packages) != 1 || record.Packages[0].PinMapID != test.symbolID+"|Package_TO_SOT_SMD:SOT-23" || !slices.Contains(record.Packages[0].Verification.Sources, wantEvidence) {
+			t.Fatalf("%s package pinmap identity is inconsistent: %+v", test.recordID, record.Packages)
+		}
+		if !slices.Contains(record.Verification.Sources, wantEvidence) {
+			t.Fatalf("%s record evidence does not include %q: %+v", test.recordID, wantEvidence, record.Verification.Sources)
+		}
+	}
+}
+
 func TestCheckedInCatalogRegulatorSliceEvidence(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

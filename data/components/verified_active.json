@@ -168,9 +168,9 @@
         "polarity": "npn",
         "intended_roles": ["headphone_output", "small_signal_driver"],
         "package": "SOT-23",
-        "symbol_id": "Device:Q_NPN_BEC",
+        "symbol_id": "Transistor_BJT:Q_NPN_BEC",
         "footprint_id": "Package_TO_SOT_SMD:SOT-23",
-        "pinmap_evidence": "builtin_pinmap:Device:Q_NPN_BEC",
+        "pinmap_evidence": "builtin_pinmap:Transistor_BJT:Q_NPN_BEC",
         "complementary_group": "mmbt390x_sot23",
         "control_terminal": "BASE",
         "upper_or_lower_terminal": "COLLECTOR",
@@ -184,13 +184,13 @@
         "review_note": "Low-current headphone or bias seed only; SOA, thermal dissipation, and distortion remain design-specific before fabrication-candidate use."
       },
       "symbols": [{
-        "symbol_id": "Device:Q_NPN_BEC",
+        "symbol_id": "Transistor_BJT:Q_NPN_BEC",
         "function_pins": [
           {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
           {"function": "EMITTER", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["E"]},
           {"function": "COLLECTOR", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["C"]}
         ],
-        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "sot23",
@@ -199,15 +199,15 @@
         "package_type": "sot23",
         "mpn": "MMBT3904LT1G",
         "lifecycle": "active",
-        "pinmap_id": "Device:Q_NPN_BEC|Package_TO_SOT_SMD:SOT-23",
+        "pinmap_id": "Transistor_BJT:Q_NPN_BEC|Package_TO_SOT_SMD:SOT-23",
         "pad_functions": [
           {"function": "BASE", "pad": "1", "aliases": ["B"]},
           {"function": "EMITTER", "pad": "2", "aliases": ["E"]},
           {"function": "COLLECTOR", "pad": "3", "aliases": ["C"]}
         ],
-        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Transistor_BJT:Q_NPN_BEC", "curated_part:onsemi:MMBT3904LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
     },
     {
       "id": "bjt.onsemi.mmbt3906.sot23",
@@ -231,9 +231,9 @@
         "polarity": "pnp",
         "intended_roles": ["headphone_output", "small_signal_driver"],
         "package": "SOT-23",
-        "symbol_id": "Device:Q_PNP_BEC",
+        "symbol_id": "Transistor_BJT:Q_PNP_BEC",
         "footprint_id": "Package_TO_SOT_SMD:SOT-23",
-        "pinmap_evidence": "builtin_pinmap:Device:Q_PNP_BEC",
+        "pinmap_evidence": "builtin_pinmap:Transistor_BJT:Q_PNP_BEC",
         "complementary_group": "mmbt390x_sot23",
         "control_terminal": "BASE",
         "upper_or_lower_terminal": "COLLECTOR",
@@ -247,13 +247,13 @@
         "review_note": "Low-current headphone or bias seed only; SOA, thermal dissipation, and distortion remain design-specific before fabrication-candidate use."
       },
       "symbols": [{
-        "symbol_id": "Device:Q_PNP_BEC",
+        "symbol_id": "Transistor_BJT:Q_PNP_BEC",
         "function_pins": [
           {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
           {"function": "EMITTER", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["E"]},
           {"function": "COLLECTOR", "symbol_pin": "3", "electrical": "passive", "required": true, "aliases": ["C"]}
         ],
-        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
       }],
       "packages": [{
         "id": "sot23",
@@ -262,15 +262,15 @@
         "package_type": "sot23",
         "mpn": "MMBT3906LT1G",
         "lifecycle": "active",
-        "pinmap_id": "Device:Q_PNP_BEC|Package_TO_SOT_SMD:SOT-23",
+        "pinmap_id": "Transistor_BJT:Q_PNP_BEC|Package_TO_SOT_SMD:SOT-23",
         "pad_functions": [
           {"function": "BASE", "pad": "1", "aliases": ["B"]},
           {"function": "EMITTER", "pad": "2", "aliases": ["E"]},
           {"function": "COLLECTOR", "pad": "3", "aliases": ["C"]}
         ],
-        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Device:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
+        "verification": {"confidence": "verified", "sources": ["builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true}
       }],
-      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Device:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
+      "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "builtin_pinmap:Transistor_BJT:Q_PNP_BEC", "curated_part:onsemi:MMBT3906LT1G"], "pinmap_checked": true, "notes": ["Analog bias, gain, noise, and distortion performance remain design-specific."]}
     },
     {
       "id": "bjt.placeholder.npn_power_output.to220",
@@ -285,7 +285,7 @@
         "polarity": "npn",
         "intended_roles": ["blocked_power_output"],
         "package": "TO-220",
-        "symbol_id": "Device:Q_NPN_BEC",
+        "symbol_id": "Transistor_BJT:Q_NPN_BEC",
         "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
         "pinmap_evidence": "blocked:power_bjt_needs_pinout_thermal_soa",
         "complementary_group": "blocked_power_output_to220",
@@ -301,7 +301,7 @@
         "review_note": "Placeholder documents the required evidence for future power-output parts and must not be selected for fabrication."
       },
       "symbols": [{
-        "symbol_id": "Device:Q_NPN_BEC",
+        "symbol_id": "Transistor_BJT:Q_NPN_BEC",
         "function_pins": [
           {"function": "BASE", "symbol_pin": "1", "electrical": "passive", "required": true, "aliases": ["B"]},
           {"function": "EMITTER", "symbol_pin": "2", "electrical": "passive", "required": true, "aliases": ["E"]},
@@ -314,7 +314,7 @@
         "name": "TO-220",
         "footprint_id": "Package_TO_SOT_THT:TO-220-3_Vertical",
         "package_type": "to220",
-        "pinmap_id": "Device:Q_NPN_BEC|Package_TO_SOT_THT:TO-220-3_Vertical",
+        "pinmap_id": "Transistor_BJT:Q_NPN_BEC|Package_TO_SOT_THT:TO-220-3_Vertical",
         "pad_functions": [
           {"function": "BASE", "pad": "1", "aliases": ["B"]},
           {"function": "COLLECTOR", "pad": "2", "aliases": ["C"]},
