@@ -8,7 +8,7 @@ KiCadAI is a Go toolkit and CLI for AI-assisted KiCad design: ~265K LOC (171K pr
 
 ## The domain model
 
-Two entry lanes — structured intent and an LLM circuit-graph lane — converge on one deterministic backend, `designworkflow.Create`, which runs an explicit staged, fail-closed pipeline: planning → component selection → schematic → electrical checks → PCB → placement → routing → writers → correctness → ERC/DRC. Fail-closed is real, not aspirational: strict `DisallowUnknownFields` at every input boundary, blocking issues instead of silent defaults, bounded inputs (max components, max document bytes), and a uniform `{ok, issues[], artifacts[]}` result envelope. The `reports` package as a zero-dependency shared kernel (in-degree 361) is the right foundation, and the dependency graph is fully acyclic — with deliberate adapter packages keeping `placement` and `routing` mutually ignorant. That's taste, not accident.
+Two entry lanes — structured intent and an LLM circuit-graph lane — converge on one deterministic backend, `designworkflow.Create`, which runs an explicit staged, fail-closed pipeline: planning → component selection → schematic → electrical checks → PCB → placement → routing → writers → correctness → ERC/DRC. Fail-closed is real, not aspirational: strict `DisallowUnknownFields` at every input boundary, blocking issues instead of silent defaults, bounded inputs (max components, max document bytes), and a uniform `{ok, issues[], artifacts[]}` result envelope. The `reports` package is a zero-dependency shared kernel imported by roughly 373 Go files, and the dependency graph is fully acyclic — with deliberate adapter packages keeping `placement` and `routing` mutually ignorant. That's taste, not accident.
 
 ## Where it's genuinely strong
 
@@ -24,7 +24,7 @@ Two entry lanes — structured intent and an LLM circuit-graph lane — converge
 
 **The enum drift is the highest-value refactor.** `AcceptanceLevel` is defined four times, `NetRole` four times, `ComponentRole` twice — and the *string spellings* have diverged across contexts (`"erc_clean"` vs `"erc-drc"` vs `"erc_drc"`), bridged by hand-written `case` maps where a typo mis-maps silently instead of failing to compile. A bounded-context defense exists, but the execution undercuts it. This is the finding to act on first — promote these into a shared kernel next to `reports`.
 
-**`designworkflow` is a god package.** 22K LOC, 50 files, importing 22 of the 42 internal packages, mixing orchestration with a 48K-line interblock routing engine, 42K of autonomous correction, and schematic layout inference. It's the biggest maintainability risk. Relatedly, `cmd/kicadai/main.go` is a 5,710-line hand-rolled dispatcher with ~80 global flags that must precede subcommands.
+**`designworkflow` is a god package.** Roughly 42K production LOC across 50 files, importing 22 of the 42 internal packages, it mixes orchestration with a roughly 2K-line routing coordinator, a roughly 1K-line autonomous-correction implementation, and schematic layout inference. It's the biggest maintainability risk. Relatedly, `cmd/kicadai/main.go` is a roughly 5,700-line hand-rolled dispatcher with ~80 global flags that must precede subcommands.
 
 **The router and placer are greedy one-pass.** Real A*, but net-by-net with no rip-up-and-reroute — completeness is order-sensitive. Worse, `Strategy.RipupRetryLimit` is declared but never consumed anywhere: a dead field implying capability the router doesn't have. The placer computes HPWL but never optimizes it, and dual legacy/new scoring paths coexist. The docs are upfront that this isn't a general autorouter, but the dead field isn't.
 
@@ -62,4 +62,4 @@ After that, the generic-circuit lane is the long pole — and it's a domain-know
 | License | MIT (vendored KiCad protos retain upstream licenses) |
 | Tests | 335 test files, ~3,200 test/bench/fuzz funcs, 75% coverage floor, golden + recorded-fixture replay |
 | CI | None (`.github/` absent); Makefile gates only |
-| Known hotspots | `designworkflow` (22K LOC, 22 imports), `cmd/kicadai/main.go` (5,710 lines), `intentplanner/map.go` (~2,000 lines hardcoded topologies) |
+| Known hotspots | `designworkflow` (~42K production LOC, 22 imports), `cmd/kicadai/main.go` (~5,700 lines), `intentplanner/map.go` (~2,000 lines hardcoded topologies) |
