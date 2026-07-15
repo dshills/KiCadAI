@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 func TestRouteEmitsOrthogonalSegments(t *testing.T) {
@@ -24,6 +25,43 @@ func TestRouteEmitsOrthogonalSegments(t *testing.T) {
 		if wire.From.X != wire.To.X && wire.From.Y != wire.To.Y {
 			t.Fatalf("diagonal wire = %#v", wire)
 		}
+	}
+}
+
+func TestRouteSelfLoopUsesCanonicalPinAnchors(t *testing.T) {
+	component := PlacedComponent{
+		Component: Component{Ref: "u1_a", Pins: []Pin{
+			{Number: "1", At: kicadfiles.Point{X: -kicadfiles.MM(2.54)}},
+			{Number: "2", At: kicadfiles.Point{X: kicadfiles.MM(2.54)}},
+		}},
+		PlacedAt: kicadfiles.Point{X: kicadfiles.MM(40.1), Y: kicadfiles.MM(30.9)},
+	}
+	result := Route(Request{Nets: []Net{{Name: "FB", Endpoints: []Endpoint{{Ref: "u1_a", Pin: "1"}, {Ref: "u1_a", Pin: "2"}}}}}, Result{Components: []PlacedComponent{component}})
+	if len(result.Connections) != 1 || len(result.Connections[0].Points) < 2 {
+		t.Fatalf("self-loop route = %#v", result.Connections)
+	}
+	points := result.Connections[0].Points
+	wantStart := schematic.CanonicalConnectionAnchor(component.PlacedAt, component.Pins[0].At, 0, schematic.SymbolMirrorNone)
+	wantEnd := schematic.CanonicalConnectionAnchor(component.PlacedAt, component.Pins[1].At, 0, schematic.SymbolMirrorNone)
+	if points[0] != wantStart || points[len(points)-1] != wantEnd {
+		t.Fatalf("self-loop endpoints = %#v/%#v, want %#v/%#v", points[0], points[len(points)-1], wantStart, wantEnd)
+	}
+}
+
+func TestRouteAcrossPackageUnitsUsesCanonicalPinAnchors(t *testing.T) {
+	components := []PlacedComponent{
+		{Component: Component{Ref: "u1_a", Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: kicadfiles.MM(3.81)}}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(30.1), Y: kicadfiles.MM(30.9)}},
+		{Component: Component{Ref: "u1_b", Pins: []Pin{{Number: "1", At: kicadfiles.Point{X: -kicadfiles.MM(3.81)}}}}, PlacedAt: kicadfiles.Point{X: kicadfiles.MM(60.1), Y: kicadfiles.MM(30.9)}},
+	}
+	result := Route(Request{Nets: []Net{{Name: "INTERSTAGE", Endpoints: []Endpoint{{Ref: "u1_a", Pin: "1"}, {Ref: "u1_b", Pin: "1"}}}}}, Result{Components: components})
+	if len(result.Connections) != 1 || len(result.Connections[0].Points) < 2 {
+		t.Fatalf("cross-unit route = %#v", result.Connections)
+	}
+	points := result.Connections[0].Points
+	wantStart := schematic.CanonicalConnectionAnchor(components[0].PlacedAt, components[0].Pins[0].At, 0, schematic.SymbolMirrorNone)
+	wantEnd := schematic.CanonicalConnectionAnchor(components[1].PlacedAt, components[1].Pins[0].At, 0, schematic.SymbolMirrorNone)
+	if points[0] != wantStart || points[len(points)-1] != wantEnd {
+		t.Fatalf("cross-unit endpoints = %#v/%#v, want %#v/%#v", points[0], points[len(points)-1], wantStart, wantEnd)
 	}
 }
 

@@ -116,6 +116,15 @@ resolver-backed metadata if callers expect generated-connectivity checks to
 prove connections. This conservative default avoids pretending an unsupported
 library symbol has known electrical anchors.
 
+Generated schematic placement, routing, and writing share one canonical pin
+anchor operation. It applies the selected unit's library offset, KiCad's
+mirror-then-rotate transform, and the 1.27 mm connection-grid normalization at
+one boundary. Collision-free symbol positions are resolved before routing in
+the same deterministic component order used by the builder. Consequently,
+explicit route waypoints must already terminate at the final pin anchors;
+uniform, nonuniform, diagonal, duplicate, and stale paths fail closed instead
+of being translated or replaced during writing.
+
 Current KiCad-backed caveat: the optional block-corpus KiCad smoke tests still
 record expected failures for richer ERC/DRC proof. The generated LED schematic
 now has better local pin-anchor alignment, but current optional KiCad CLI smoke

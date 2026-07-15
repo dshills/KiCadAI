@@ -981,14 +981,14 @@ func (state *adapterState) portEndpointAnchor(endpoint EndpointRef) (transaction
 		if pin.Number != pinNumber {
 			continue
 		}
-		offset := schematic.TransformConnectionAnchor(
+		anchor := schematic.CanonicalConnectionAnchor(
+			kicadfiles.Point{X: kicadfiles.MM(origin.XMM), Y: kicadfiles.MM(origin.YMM)},
 			kicadfiles.Point{X: kicadfiles.MM(pin.XMM), Y: kicadfiles.MM(pin.YMM)},
-			kicadfiles.Angle(state.rotationByID[componentID]),
-			schematic.SymbolMirror(state.mirrorByID[componentID]),
+			kicadfiles.Angle(state.rotationByID[componentID]), schematic.SymbolMirror(state.mirrorByID[componentID]),
 		)
 		return transactions.Point{
-			XMM: origin.XMM + float64(offset.X)/float64(kicadfiles.MM(1)),
-			YMM: origin.YMM + float64(offset.Y)/float64(kicadfiles.MM(1)),
+			XMM: float64(anchor.X) / float64(kicadfiles.MM(1)),
+			YMM: float64(anchor.Y) / float64(kicadfiles.MM(1)),
 		}, true
 	}
 	return transactions.Point{}, false
@@ -1070,12 +1070,11 @@ func (state *adapterState) indexSchematicCollisionAnchors() {
 			continue
 		}
 		for _, pin := range transactionPinsWithLibraryIndex(component, state.libraryIndex) {
-			offset := schematic.TransformConnectionAnchor(
+			point := schematic.CanonicalConnectionAnchor(
+				kicadfiles.Point{X: kicadfiles.MM(origin.XMM), Y: kicadfiles.MM(origin.YMM)},
 				kicadfiles.Point{X: kicadfiles.MM(pin.XMM), Y: kicadfiles.MM(pin.YMM)},
-				kicadfiles.Angle(state.rotationByID[componentID]),
-				schematic.SymbolMirror(state.mirrorByID[componentID]),
+				kicadfiles.Angle(state.rotationByID[componentID]), schematic.SymbolMirror(state.mirrorByID[componentID]),
 			)
-			point := kicadfiles.Point{X: kicadfiles.MM(origin.XMM) + offset.X, Y: kicadfiles.MM(origin.YMM) + offset.Y}
 			indexed := indexedSchematicAnchor{point: point, componentID: componentID, pinNumber: pin.Number, netName: pinNets[componentID][pin.Number]}
 			state.pinAnchorsByX[point.X] = append(state.pinAnchorsByX[point.X], indexed)
 			state.pinAnchorsByY[point.Y] = append(state.pinAnchorsByY[point.Y], indexed)

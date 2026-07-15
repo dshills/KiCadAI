@@ -255,7 +255,7 @@ type schematicPinAnchorRef struct {
 	position kicadfiles.Point
 }
 
-const schematicConnectionGrid = kicadfiles.IU(1270000)
+const schematicConnectionGrid = schematic.ConnectionGrid
 const schematicWireBucketSize = schematicConnectionGrid * 4
 const usbCPowerOnlyConnectorLibraryID = "kicadai:USB_C_Receptacle_PowerOnly_6P"
 const usbCPowerOnlyFullConnectorLibraryID = "kicadai:usb_c_receptacle_poweronly_full"
@@ -381,8 +381,18 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 			pinSpecs = resolved
 		}
 	}
+	if usePhysicalConnectionAnchors && !resolverOwned {
+		for index := range pinSpecs {
+			if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, pinSpecs[index].Number); ok {
+				pinSpecs[index].Offset = offset
+			}
+		}
+	}
 	requestedPosition := options.Position
-	position := builder.safeSchematicSymbolPosition(requestedPosition, pinSpecs, rotation, mirror)
+	position, positionOK := builder.safeSchematicSymbolPosition(requestedPosition, pinSpecs, rotation, mirror)
+	if !positionOK {
+		return SymbolHandle{}, fmt.Errorf("symbol %s has no collision-free canonical pin-anchor position", reference)
+	}
 	symbol := schematic.NewSymbol(builder.generator.New("root.schematic.symbol", generationKey), libraryID, reference, value, position)
 	symbol.Unit = unit
 	symbol.Rotation = rotation
@@ -418,14 +428,7 @@ func (builder *Builder) AddSymbol(options SymbolOptions) (SymbolHandle, error) {
 		if _, ok := pins[number]; ok {
 			return SymbolHandle{}, fmt.Errorf("duplicate pin %s on %s", number, reference)
 		}
-		anchorOffset := pin.Offset
-		if usePhysicalConnectionAnchors && !resolverOwned {
-			if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(libraryID, number); ok {
-				anchorOffset = offset
-			}
-		}
-		anchorOffset = schematic.TransformConnectionAnchor(anchorOffset, rotation, mirror)
-		anchor := schematicSymbolPinAnchor(position, anchorOffset)
+		anchor := schematic.CanonicalConnectionAnchor(position, pin.Offset, rotation, mirror)
 		pins[number] = anchor
 		builder.schematicPinAnchors[anchor] = struct{}{}
 		pinOrder = append(pinOrder, number)
@@ -660,22 +663,7 @@ func (builder *Builder) ConnectWithOptions(from, to Endpoint, netName string, op
 	toLabelAt := options.ToLabelAt
 	if options.UseLabels == nil || !*options.UseLabels {
 		if err := validateSchematicWaypoints(options.Waypoints, start, end); err != nil {
-			// A malformed path whose endpoints already sit on the authoritative pin
-			// anchors (e.g. a non-orthogonal or degenerate segment) is a genuine
-			// caller error and stays rejected.
-			if schematicWaypointsTerminateAt(options.Waypoints, start, end) {
-				return err
-			}
-			// Otherwise the bend path may have been baked against the router's
-			// placement snapshot before the builder moved a symbol to avoid a pin
-			// anchor collision. A uniform translation is the only safe compatibility
-			// repair because it preserves the complete routed shape. Any other drift
-			// remains fail-closed rather than silently replacing caller geometry.
-			if repaired, ok := reanchorSchematicWaypoints(options.Waypoints, start, end); ok {
-				options.Waypoints = repaired
-			} else {
-				return err
-			}
+			return err
 		}
 	} else {
 		fromLabelAt, err = builder.resolveSchematicLabelPoint(from, fromLabelAt, start, options.ReanchorFromLabel)
@@ -1246,46 +1234,6 @@ func (builder *Builder) addSchematicWirePointsWithOptions(netName string, from, 
 			points[index],
 		))
 	}
-}
-
-// schematicWaypointsTerminateAt reports whether a bend path already begins and
-// ends exactly on the supplied pin anchors. It distinguishes a caller error in
-// the path geometry (endpoints correct, interior malformed) from an anchor drift
-// (endpoints off), which are handled differently on validation failure.
-func schematicWaypointsTerminateAt(points []kicadfiles.Point, start, end kicadfiles.Point) bool {
-	if len(points) < 2 {
-		return false
-	}
-	return samePoint(points[0], start) && samePoint(points[len(points)-1], end)
-}
-
-// reanchorSchematicWaypoints repairs a bend path whose endpoints have drifted
-// off the authoritative pin anchors by a constant translation. When the leading
-// and trailing endpoint deltas match, every point is shifted by that delta so
-// the path terminates exactly on start and end while preserving its shape and
-// orthogonality. It returns ok=false when the path is empty, too short, or the
-// divergence is not a clean uniform translation, signalling the caller to reject
-// the stale geometry.
-func reanchorSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles.Point) ([]kicadfiles.Point, bool) {
-	if len(points) < 2 {
-		return nil, false
-	}
-	deltaStart := kicadfiles.Point{X: start.X - points[0].X, Y: start.Y - points[0].Y}
-	deltaEnd := kicadfiles.Point{X: end.X - points[len(points)-1].X, Y: end.Y - points[len(points)-1].Y}
-	if deltaStart != deltaEnd {
-		return nil, false
-	}
-	if deltaStart == (kicadfiles.Point{}) {
-		return nil, false
-	}
-	shifted := make([]kicadfiles.Point, len(points))
-	for index, point := range points {
-		shifted[index] = kicadfiles.Point{X: point.X + deltaStart.X, Y: point.Y + deltaStart.Y}
-	}
-	if err := validateSchematicWaypoints(shifted, start, end); err != nil {
-		return nil, false
-	}
-	return shifted, true
 }
 
 func validateSchematicWaypoints(points []kicadfiles.Point, start, end kicadfiles.Point) error {
@@ -2208,7 +2156,7 @@ func (builder *Builder) pinAnchorForState(state *symbolState, reference string, 
 			return anchor, nil
 		}
 		if offset, ok := schematic.EmbeddedSymbolConnectionPinOffset(state.libraryID, pin); ok {
-			return schematicSymbolPinAnchor(state.position, schematic.TransformConnectionAnchor(offset, state.rotation, state.mirror)), nil
+			return schematic.CanonicalConnectionAnchor(state.position, offset, state.rotation, state.mirror), nil
 		}
 	}
 	return anchor, nil
@@ -2640,94 +2588,15 @@ func addPoint(point, offset kicadfiles.Point) kicadfiles.Point {
 	return kicadfiles.Point{X: point.X + offset.X, Y: point.Y + offset.Y}
 }
 
-func snapSchematicPointToConnectionGrid(point kicadfiles.Point) kicadfiles.Point {
-	return kicadfiles.Point{
-		X: snapSchematicIUToConnectionGrid(point.X),
-		Y: snapSchematicIUToConnectionGrid(point.Y),
-	}
-}
-
-func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, mirror schematic.SymbolMirror) kicadfiles.Point {
-	position := snapSchematicPointToConnectionGrid(requested)
+func (builder *Builder) safeSchematicSymbolPosition(requested kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, mirror schematic.SymbolMirror) (kicadfiles.Point, bool) {
 	if builder == nil {
-		return position
+		return schematic.CanonicalConnectionPoint(requested), true
 	}
-	occupied := builder.schematicPinAnchors
-	if !schematicSymbolPinAnchorsCollide(position, pins, rotation, mirror, occupied) {
-		return position
-	}
-	for radius := kicadfiles.IU(1); radius <= 8; radius++ {
-		for _, offset := range schematicGridPerimeterOffsets(radius) {
-			candidate := addPoint(position, offset)
-			if !schematicSymbolPinAnchorsCollide(candidate, pins, rotation, mirror, occupied) {
-				return candidate
-			}
-		}
-	}
-	return position
-}
-
-func schematicSymbolPinAnchorsCollide(position kicadfiles.Point, pins []PinSpec, rotation kicadfiles.Angle, mirror schematic.SymbolMirror, occupied map[kicadfiles.Point]struct{}) bool {
-	if len(pins) == 0 || len(occupied) == 0 {
-		return false
-	}
+	offsets := make([]kicadfiles.Point, 0, len(pins))
 	for _, pin := range pins {
-		if _, ok := occupied[schematicSymbolPinAnchor(position, schematic.TransformConnectionAnchor(pin.Offset, rotation, mirror))]; ok {
-			return true
-		}
+		offsets = append(offsets, pin.Offset)
 	}
-	return false
-}
-
-func schematicGridPerimeterOffsets(radius kicadfiles.IU) []kicadfiles.Point {
-	if radius <= 0 {
-		return nil
-	}
-	offsets := make([]kicadfiles.Point, 0, int(radius)*8)
-	step := schematicConnectionGrid
-	addOffset := func(x, y kicadfiles.IU) {
-		offsets = append(offsets, kicadfiles.Point{X: x * step, Y: y * step})
-	}
-	for x := -radius; x <= radius; x++ {
-		addOffset(x, -radius)
-	}
-	for y := -radius + 1; y <= radius; y++ {
-		addOffset(radius, y)
-	}
-	for x := radius - 1; x >= -radius; x-- {
-		addOffset(x, radius)
-	}
-	for y := radius - 1; y > -radius; y-- {
-		addOffset(-radius, y)
-	}
-	return offsets
-}
-
-func schematicSymbolPinAnchor(position, offset kicadfiles.Point) kicadfiles.Point {
-	return snapSchematicPointToConnectionGrid(addPoint(position, offset))
-}
-
-func snapSchematicIUToConnectionGrid(value kicadfiles.IU) kicadfiles.IU {
-	remainder := value % schematicConnectionGrid
-	if remainder == 0 {
-		return value
-	}
-	down := value - remainder
-	up := down + schematicConnectionGrid
-	if value < 0 {
-		up = down - schematicConnectionGrid
-	}
-	if absSchematicIU(value-down) <= absSchematicIU(up-value) {
-		return down
-	}
-	return up
-}
-
-func absSchematicIU(value kicadfiles.IU) kicadfiles.IU {
-	if value < 0 {
-		return -value
-	}
-	return value
+	return schematic.CollisionFreeSymbolPosition(requested, offsets, rotation, mirror, builder.schematicPinAnchors)
 }
 
 func defaultIU(value, fallback kicadfiles.IU) kicadfiles.IU {

@@ -284,6 +284,32 @@ func TestToSchematicIRLowersNamedLM358UnitsDeterministically(t *testing.T) {
 	if u1Symbols != 3 || u1Assignments != 1 {
 		t.Fatalf("U1 operations: symbols=%d footprint assignments=%d, want 3 and 1", u1Symbols, u1Assignments)
 	}
+	projectTx, issues := schematicir.ToProjectTransactionWithLibraryIndex(document, &index)
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("LM358 project transaction issues = %#v", issues)
+	}
+	outputDir := filepath.Join(t.TempDir(), document.Metadata.Name)
+	apply := transactions.Apply(projectTx, transactions.ApplyOptions{
+		OutputDir: outputDir, Overwrite: true, LibraryIndex: &index,
+		SuppressExplicitPinSymbolErrors: true,
+	})
+	if reports.HasBlockingIssue(apply.Issues) {
+		t.Fatalf("LM358 canonical-anchor apply issues = %#v", apply.Issues)
+	}
+	schematicPath := filepath.Join(outputDir, document.Metadata.Name+".kicad_sch")
+	generated, err := schematic.ReadFile(schematicPath)
+	if err != nil {
+		t.Fatalf("read LM358 schematic: %v", err)
+	}
+	generatedUnits := 0
+	for _, symbol := range generated.Symbols {
+		if symbol.Reference == "U1" {
+			generatedUnits++
+		}
+	}
+	if generatedUnits != 3 {
+		t.Fatalf("generated LM358 units = %d, want 3", generatedUnits)
+	}
 }
 
 func TestToSchematicIRRejectsGeneratedUnitIDCollision(t *testing.T) {

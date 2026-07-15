@@ -1017,17 +1017,17 @@ func TestLabelPointForEndpointAvoidsForeignPinAnchor(t *testing.T) {
 	if point == (transactions.Point{XMM: 14.92, YMM: 30}) {
 		t.Fatalf("foreign pin collision was retained: %#v", point)
 	}
-	if point != (transactions.Point{XMM: 16.19, YMM: 30}) {
+	if point != (transactions.Point{XMM: 16.51, YMM: 30.48}) {
 		t.Fatalf("label fallback = %#v, want shortened outward stub", point)
 	}
 	anchor, ok := state.portEndpointAnchor("source.1")
 	if !ok {
 		t.Fatal("source pin anchor was not resolved")
 	}
-	if busStub, ok := state.busPinStub(anchor, "source.1", "SDA"); !ok || busStub != (transactions.Point{XMM: 16.19, YMM: 30}) {
+	if busStub, ok := state.busPinStub(anchor, "source.1", "SDA"); !ok || busStub != (transactions.Point{XMM: 16.51, YMM: 30.48}) {
 		t.Fatalf("bus pin stub = %#v/%v, want shortened outward stub", busStub, ok)
 	}
-	state.labelsByKey[schematicEndpointLabelKey("VCC", "neighbor.1")] = kicadfiles.Point{X: kicadfiles.MM(16.19), Y: kicadfiles.MM(30)}
+	state.labelsByKey[schematicEndpointLabelKey("VCC", "neighbor.1")] = kicadfiles.Point{X: kicadfiles.MM(16.51), Y: kicadfiles.MM(30.48)}
 	state.indexSchematicCollisionAnchors()
 	if busStub, ok := state.busPinStub(anchor, "source.1", "SDA"); ok {
 		t.Fatalf("cross-net bus pin stub = %#v/%v, want fail-closed result", busStub, ok)

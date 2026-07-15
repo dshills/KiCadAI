@@ -4,6 +4,7 @@ import (
 	"sort"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 func Place(request Request) Result {
@@ -39,12 +40,52 @@ func Place(request Request) Result {
 		}
 		result.Report.CenterOffset = offset
 	}
+	var anchorDiagnostics []Diagnostic
+	result.Components, anchorDiagnostics = resolveCanonicalPinAnchorPositions(result.Components)
+	result.Diagnostics = append(result.Diagnostics, anchorDiagnostics...)
 	result.Report.IslandCount = islandCount
 	result.Report.RankCount = rankCount
 	result.Report.OccupiedBounds = placementDrawingBounds(result.Components)
 	result = Validate(result, request)
 	result.Diagnostics = append(result.Diagnostics, placementDiagnostics(result.Components, request.Sheet)...)
 	return NormalizeResult(result, rules)
+}
+
+func resolveCanonicalPinAnchorPositions(components []PlacedComponent) ([]PlacedComponent, []Diagnostic) {
+	resolved := append([]PlacedComponent(nil), components...)
+	order := make([]int, len(resolved))
+	for index := range order {
+		order[index] = index
+	}
+	sort.SliceStable(order, func(left, right int) bool {
+		a, b := resolved[order[left]], resolved[order[right]]
+		if a.OriginalOrdinal != b.OriginalOrdinal {
+			return a.OriginalOrdinal < b.OriginalOrdinal
+		}
+		return a.Ref < b.Ref
+	})
+	occupied := map[kicadfiles.Point]struct{}{}
+	var diagnostics []Diagnostic
+	for _, index := range order {
+		component := &resolved[index]
+		offsets := make([]kicadfiles.Point, 0, len(component.Pins))
+		for _, pin := range component.Pins {
+			offsets = append(offsets, pin.At)
+		}
+		position, ok := schematic.CollisionFreeSymbolPosition(component.PlacedAt, offsets, component.Rotation, schematic.SymbolMirror(component.Mirror), occupied)
+		if !ok {
+			diagnostics = append(diagnostics, Diagnostic{Severity: SeverityError, Code: "pin_anchor_collision_unresolved", Ref: component.Ref, Message: "no collision-free canonical pin-anchor position", Repair: "increase component spacing or provide a different relative placement"})
+			continue
+		}
+		if position != component.PlacedAt {
+			diagnostics = append(diagnostics, Diagnostic{Severity: SeverityInfo, Code: "pin_anchor_collision_adjusted", Ref: component.Ref, Message: "moved symbol to preserve distinct canonical pin anchors"})
+			component.PlacedAt = position
+		}
+		for _, offset := range offsets {
+			occupied[schematic.CanonicalConnectionAnchor(component.PlacedAt, offset, component.Rotation, schematic.SymbolMirror(component.Mirror))] = struct{}{}
+		}
+	}
+	return resolved, diagnostics
 }
 
 func enforceRelativePlacement(components []Component, positions map[string]kicadfiles.Point, rules Rules) bool {

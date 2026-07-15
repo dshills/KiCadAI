@@ -11,6 +11,11 @@ import (
 
 var embeddedUnitBodyStylePattern = regexp.MustCompile(`_(\d+)_(\d+)$`)
 
+// ConnectionGrid is KiCadAI's canonical schematic connection grid. Symbol
+// positions and absolute pin anchors are normalized to this grid exactly once
+// before layout routing or project writing consumes them.
+const ConnectionGrid = kicadfiles.IU(1270000)
+
 // TransformConnectionAnchor maps a symbol-local physical pin offset to its
 // schematic-space position. It follows KiCad's mirror-then-rotate ordering
 // used while parsing and writing a symbol instance.
@@ -32,6 +37,102 @@ func TransformConnectionAnchor(offset kicadfiles.Point, rotation kicadfiles.Angl
 		X: kicadfiles.IU(math.Round(x*cos - y*sin)),
 		Y: kicadfiles.IU(math.Round(x*sin + y*cos)),
 	}
+}
+
+// CanonicalConnectionPoint snaps a schematic coordinate to ConnectionGrid.
+func CanonicalConnectionPoint(point kicadfiles.Point) kicadfiles.Point {
+	return kicadfiles.Point{X: canonicalConnectionIU(point.X), Y: canonicalConnectionIU(point.Y)}
+}
+
+// CanonicalConnectionAnchor computes the authoritative absolute pin anchor
+// from a symbol position and an untransformed library pin offset.
+func CanonicalConnectionAnchor(position, offset kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror) kicadfiles.Point {
+	position = CanonicalConnectionPoint(position)
+	offset = TransformConnectionAnchor(offset, rotation, mirror)
+	return CanonicalConnectionPoint(kicadfiles.Point{X: position.X + offset.X, Y: position.Y + offset.Y})
+}
+
+// CollisionFreeSymbolPosition returns the first deterministic grid position
+// whose canonical pin anchors do not overlap occupied anchors.
+func CollisionFreeSymbolPosition(requested kicadfiles.Point, pinOffsets []kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror, occupied map[kicadfiles.Point]struct{}) (kicadfiles.Point, bool) {
+	position := CanonicalConnectionPoint(requested)
+	if !symbolAnchorsCollide(position, pinOffsets, rotation, mirror, occupied) {
+		return position, true
+	}
+	for radius := kicadfiles.IU(1); radius <= 8; radius++ {
+		for _, offset := range connectionGridPerimeterOffsets(radius) {
+			candidate := kicadfiles.Point{X: position.X + offset.X, Y: position.Y + offset.Y}
+			if !symbolAnchorsCollide(candidate, pinOffsets, rotation, mirror, occupied) {
+				return candidate, true
+			}
+		}
+	}
+	return position, false
+}
+
+func symbolAnchorsCollide(position kicadfiles.Point, pinOffsets []kicadfiles.Point, rotation kicadfiles.Angle, mirror SymbolMirror, occupied map[kicadfiles.Point]struct{}) bool {
+	local := make(map[kicadfiles.Point]kicadfiles.Point, len(pinOffsets))
+	for _, offset := range pinOffsets {
+		transformed := TransformConnectionAnchor(offset, rotation, mirror)
+		anchor := CanonicalConnectionAnchor(position, offset, rotation, mirror)
+		if prior, exists := local[anchor]; exists {
+			// KiCad libraries intentionally stack aliases such as USB-C VBUS pins
+			// at one exact physical connection point. Only reject distinct physical
+			// offsets that accidentally collapse during grid normalization.
+			if prior != transformed {
+				return true
+			}
+			continue
+		}
+		if _, exists := occupied[anchor]; exists {
+			return true
+		}
+		local[anchor] = transformed
+	}
+	return false
+}
+
+func connectionGridPerimeterOffsets(radius kicadfiles.IU) []kicadfiles.Point {
+	offsets := make([]kicadfiles.Point, 0, int(radius)*8)
+	add := func(x, y kicadfiles.IU) {
+		offsets = append(offsets, kicadfiles.Point{X: x * ConnectionGrid, Y: y * ConnectionGrid})
+	}
+	for x := -radius; x <= radius; x++ {
+		add(x, -radius)
+	}
+	for y := -radius + 1; y <= radius; y++ {
+		add(radius, y)
+	}
+	for x := radius - 1; x >= -radius; x-- {
+		add(x, radius)
+	}
+	for y := radius - 1; y > -radius; y-- {
+		add(-radius, y)
+	}
+	return offsets
+}
+
+func canonicalConnectionIU(value kicadfiles.IU) kicadfiles.IU {
+	remainder := value % ConnectionGrid
+	if remainder == 0 {
+		return value
+	}
+	down := value - remainder
+	up := down + ConnectionGrid
+	if value < 0 {
+		up = down - ConnectionGrid
+	}
+	if absConnectionIU(value-down) <= absConnectionIU(up-value) {
+		return down
+	}
+	return up
+}
+
+func absConnectionIU(value kicadfiles.IU) kicadfiles.IU {
+	if value < 0 {
+		return -value
+	}
+	return value
 }
 
 // CanonicalSymbolTransform selects the representation KiCad itself emits for

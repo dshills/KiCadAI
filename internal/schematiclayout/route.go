@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"kicadai/internal/kicadfiles"
+	"kicadai/internal/kicadfiles/schematic"
 )
 
 const routeHardPenalty int64 = 1_000_000_000_000
@@ -642,11 +643,9 @@ func pinAnchors(components []PlacedComponent) map[Endpoint]kicadfiles.Point {
 			continue
 		}
 		for _, pin := range component.Pins {
-			offset := TransformPoint(pin.At, component.Rotation, component.Mirror)
-			anchors[Endpoint{Ref: component.Ref, Pin: pin.Number}] = kicadfiles.Point{
-				X: component.PlacedAt.X + offset.X,
-				Y: component.PlacedAt.Y + offset.Y,
-			}
+			anchors[Endpoint{Ref: component.Ref, Pin: pin.Number}] = schematic.CanonicalConnectionAnchor(
+				component.PlacedAt, pin.At, component.Rotation, schematic.SymbolMirror(component.Mirror),
+			)
 		}
 	}
 	return anchors

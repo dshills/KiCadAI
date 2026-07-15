@@ -253,6 +253,42 @@ func TestBuilderRotatesExplicitSymbolPinAnchors(t *testing.T) {
 	}
 }
 
+func TestBuilderCanonicalMultiUnitPinAnchors(t *testing.T) {
+	builder := newTestBuilder(t)
+	tests := []struct {
+		unit     int
+		position kicadfiles.Point
+		rotation kicadfiles.Angle
+		mirror   schematic.SymbolMirror
+	}{
+		{unit: 1, position: kicadfiles.Point{X: kicadfiles.MM(20.1), Y: kicadfiles.MM(30.9)}},
+		{unit: 2, position: kicadfiles.Point{X: kicadfiles.MM(60.1), Y: kicadfiles.MM(30.9)}, rotation: 90, mirror: schematic.SymbolMirrorX},
+		{unit: 3, position: kicadfiles.Point{X: kicadfiles.MM(100.1), Y: kicadfiles.MM(30.9)}, rotation: 270, mirror: schematic.SymbolMirrorY},
+	}
+	offset := kicadfiles.Point{X: kicadfiles.MM(3.81), Y: -kicadfiles.MM(2.54)}
+	for _, test := range tests {
+		if _, err := builder.AddSymbol(SymbolOptions{
+			Reference: "U1", Unit: test.unit, LibraryID: "kicadai:test_multi_unit",
+			Position: test.position, Rotation: test.rotation, Mirror: test.mirror,
+			Pins: []PinSpec{{Number: "1", Offset: offset}},
+		}); err != nil {
+			t.Fatalf("add unit %d: %v", test.unit, err)
+		}
+		state, err := builder.symbolStateForEndpoint(Endpoint{Reference: "U1", Unit: test.unit, Pin: "1"})
+		if err != nil {
+			t.Fatalf("unit %d state: %v", test.unit, err)
+		}
+		anchor, err := builder.pinAnchor(Endpoint{Reference: "U1", Unit: test.unit, Pin: "1"})
+		if err != nil {
+			t.Fatalf("unit %d anchor: %v", test.unit, err)
+		}
+		want := schematic.CanonicalConnectionAnchor(state.position, offset, state.rotation, state.mirror)
+		if anchor != want {
+			t.Fatalf("unit %d anchor = %#v, want %#v", test.unit, anchor, want)
+		}
+	}
+}
+
 func TestSymbolPinSpecsUsePhysicalConnectionAnchors(t *testing.T) {
 	pins := symbolPinSpecs("Connector_Generic:Conn_01x02", nil)
 	if len(pins) != 2 {
@@ -303,12 +339,7 @@ func TestBuilderConnectRejectsDiagonalWaypoints(t *testing.T) {
 	}
 }
 
-// TestBuilderConnectRepairsDriftedWaypoints covers the case where an upstream
-// router bakes an orthogonal bend path against a placement snapshot that has
-// since been grid-snapped, so the supplied waypoints are a uniform translation
-// of the builder's authoritative pin anchors. The connection must succeed by
-// re-anchoring the path rather than failing the whole design.
-func TestBuilderConnectRepairsDriftedWaypoints(t *testing.T) {
+func TestBuilderConnectRejectsUniformDriftedWaypoints(t *testing.T) {
 	builder := newTestBuilder(t)
 	addTwoPinSymbol(t, builder, "R1", "Device:R", "1k", kicadfiles.Point{X: kicadfiles.MM(20.32), Y: kicadfiles.MM(20.32)})
 	addTwoPinSymbol(t, builder, "R2", "Device:R", "10k", kicadfiles.Point{X: kicadfiles.MM(40.64), Y: kicadfiles.MM(20.32)})
@@ -322,11 +353,9 @@ func TestBuilderConnectRepairsDriftedWaypoints(t *testing.T) {
 		{X: end.X + drift.X, Y: end.Y + drift.Y},
 	}
 	useLabels := false
-	if err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG", ConnectOptions{UseLabels: &useLabels, Waypoints: drifted}); err != nil {
-		t.Fatalf("drifted waypoints should be repaired, got error: %v", err)
+	if err := builder.ConnectWithOptions(Endpoint{Reference: "R1", Pin: "2"}, Endpoint{Reference: "R2", Pin: "1"}, "SIG", ConnectOptions{UseLabels: &useLabels, Waypoints: drifted}); err == nil {
+		t.Fatal("stale uniformly drifted waypoints must fail closed")
 	}
-	assertSchematicPinNet(t, builder, Endpoint{Reference: "R1", Pin: "2"}, "SIG")
-	assertSchematicPinNet(t, builder, Endpoint{Reference: "R2", Pin: "1"}, "SIG")
 }
 
 func TestBuilderConnectRejectsNonUniformDriftedWaypoints(t *testing.T) {
@@ -349,29 +378,6 @@ func TestBuilderConnectRejectsNonUniformDriftedWaypoints(t *testing.T) {
 	}
 	if got := builder.assignedPinNet(Endpoint{Reference: "R1", Pin: "2"}); got != "" {
 		t.Fatalf("failed connection assigned source net %q", got)
-	}
-}
-
-func TestReanchorSchematicWaypoints(t *testing.T) {
-	start := kicadfiles.Point{X: kicadfiles.MM(10), Y: kicadfiles.MM(10)}
-	end := kicadfiles.Point{X: kicadfiles.MM(20), Y: kicadfiles.MM(10)}
-	drift := kicadfiles.Point{X: kicadfiles.MM(1.27), Y: kicadfiles.MM(1.27)}
-	uniform := []kicadfiles.Point{
-		{X: start.X + drift.X, Y: start.Y + drift.Y},
-		{X: end.X + drift.X, Y: end.Y + drift.Y},
-	}
-	if repaired, ok := reanchorSchematicWaypoints(uniform, start, end); !ok {
-		t.Fatal("uniform drift should be repairable")
-	} else if repaired[0] != start || repaired[len(repaired)-1] != end {
-		t.Fatalf("repaired endpoints = %#v/%#v, want %#v/%#v", repaired[0], repaired[len(repaired)-1], start, end)
-	}
-	// Non-uniform drift (only the start endpoint moved) is not a clean translation.
-	nonUniform := []kicadfiles.Point{
-		{X: start.X + drift.X, Y: start.Y + drift.Y},
-		{X: end.X, Y: end.Y},
-	}
-	if _, ok := reanchorSchematicWaypoints(nonUniform, start, end); ok {
-		t.Fatal("non-uniform drift must not be reported as repairable")
 	}
 }
 

@@ -17,8 +17,8 @@ instead of inventing provider evidence.
 | Reported change | Classification | Resolution |
 | --- | --- | --- |
 | MMBT3904/MMBT3906 `Device` symbol nicknames | Accepted after revision | Corrected all catalog, pinmap, and verification identities to the symbols verified under `Transistor_BJT`; added catalog consistency tests. |
-| Implicit `power_neg` schematic lane | Needs revision | Retained only as an interim lowering compatibility behavior. Phase 4 adds an explicit provider contract and rejects ambiguous legacy inference. |
-| Multi-unit waypoint direct fallback | Superseded | Removed the direct-route fallback. Only a validated uniform translation is temporarily repairable; malformed and nonuniform paths remain fail-closed pending canonical anchors in Phase 5. |
+| Implicit `power_neg` schematic lane | Accepted after revision | Phase 4 requires an explicit nullable provider field, permits one warning-backed legacy recorded inference, and rejects ambiguous implicit rails. |
+| Multi-unit waypoint direct fallback | Superseded | Phase 5 moved transform, connection-grid snapping, and collision-free symbol placement into one shared canonical anchor contract. Uniform and nonuniform stale waypoints now both fail closed. |
 | Global 32,768 provider output-token constant | Rejected | Restored the bounded 8,192 default. Phase 6 introduces profile-aware, bounded configuration and structured incomplete-response evidence. |
 | Metadata-only output after failed `--overwrite` | Unproven | Phase 1 covers provider/preflight preservation. Phase 9 expands fault injection across all commit boundaries and changes production code only if loss is reproduced. |
 
