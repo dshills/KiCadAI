@@ -71,6 +71,7 @@ Commands:
   block         List, inspect, and validate built-in circuit blocks
   fabrication   List, show, and validate fabrication profiles
   component     List, inspect, select, validate, and report component catalog records
+	  circuit       Preflight strict generic circuit graphs for AI agents
   check         Run KiCad CLI ERC/DRC checks
   design        Create AI design workflow projects
   writer        Check generated writer correctness
@@ -369,6 +370,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return runLibrary(ctx, opts, stdout)
 	case "component":
 		return runComponent(ctx, opts, stdout)
+	case "circuit":
+		return runCircuitPreflight(ctx, opts, stdout)
 	case "check":
 		return runCheckCommand(ctx, opts, stdout)
 	case "design":
