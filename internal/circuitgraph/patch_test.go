@@ -38,3 +38,15 @@ func TestApplyPatchReturnsNormalizedCorrectedGraph(t *testing.T) {
 		t.Fatalf("corrected=%#v original=%#v issues=%#v", corrected, document, issues)
 	}
 }
+
+func TestApplyPatchReplacesOnlyCatalogSelector(t *testing.T) {
+	document, issues := DecodeStrict(strings.NewReader(`{"schema":"kicadai.circuit-graph.v1","version":1,"project":{"name":"demo","acceptance":"structural","board":{"width_mm":20,"height_mm":20,"layers":2}},"components":[{"id":"r1","reference":"R1","role":"resistor","component_id":"unsupported.component","population":"populate"},{"id":"r2","reference":"R2","role":"resistor","component_id":"resistor.generic.0805","population":"populate"}],"nets":[{"name":"N","role":"signal","required":true,"endpoints":[{"component":"r1","selector_kind":"function","selector":"A"},{"component":"r2","selector_kind":"function","selector":"A"}]}],"no_connects":[],"buses":[],"schematic":{"flow":"left_to_right","origin":"centered","groups":[{"id":"g","members":["r1","r2"],"rank":0}],"lanes":{"power":"top","signals":"middle","ground":"bottom"},"placements":[{"component":"r1","group":"g"},{"component":"r2","group":"g"}],"rules":{"positive_power_top":true,"ground_bottom":true,"center_on_page":true,"prefer_labels_for_long_nets":true,"avoid_wire_crossings":true,"min_group_spacing_mm":1,"min_component_spacing_mm":1},"hierarchy":{"mode":"flat"}},"pcb":{"regions":[{"id":"main","bounds":{"x_mm":0,"y_mm":0,"width_mm":20,"height_mm":20}}],"placements":[{"component":"r1","region":"main"},{"component":"r2","region":"main"}],"keepouts":[],"zones":[]},"policy":{"allow_reference_assignment":true,"allow_value_normalization":true,"allow_layout_inference":true,"allow_spacing_adjustment":true,"allow_label_insertion":true,"allow_placement_adjustment":true,"allow_route_retry":true}}`))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatal(issues)
+	}
+	componentID := "resistor.generic.0805"
+	corrected, issues := ApplyPatch(document, PatchDocument{Schema: PatchSchemaID, Version: PatchVersion, Operations: []PatchOperation{{Op: "replace_component", Component: "r1", ComponentPatch: &ComponentPatch{ComponentID: &componentID}}}})
+	if reports.HasBlockingIssue(issues) || corrected.Components[0].ComponentID != componentID || corrected.Components[0].Reference != "R1" {
+		t.Fatalf("corrected=%#v issues=%#v", corrected, issues)
+	}
+}

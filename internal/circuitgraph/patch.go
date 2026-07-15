@@ -25,16 +25,27 @@ type PatchDocument struct {
 }
 
 type PatchOperation struct {
-	Op          string        `json:"op"`
-	Component   string        `json:"component,omitempty"`
-	Net         string        `json:"net,omitempty"`
-	Endpoint    *Endpoint     `json:"endpoint,omitempty"`
-	Replacement *Endpoint     `json:"replacement,omitempty"`
-	Region      string        `json:"region,omitempty"`
-	Placement   *PCBPlacement `json:"placement,omitempty"`
-	Bounds      *Bounds       `json:"bounds,omitempty"`
-	Policy      string        `json:"policy,omitempty"`
-	Enabled     *bool         `json:"enabled,omitempty"`
+	Op             string          `json:"op"`
+	Component      string          `json:"component,omitempty"`
+	Net            string          `json:"net,omitempty"`
+	Endpoint       *Endpoint       `json:"endpoint,omitempty"`
+	Replacement    *Endpoint       `json:"replacement,omitempty"`
+	Region         string          `json:"region,omitempty"`
+	Placement      *PCBPlacement   `json:"placement,omitempty"`
+	Bounds         *Bounds         `json:"bounds,omitempty"`
+	Policy         string          `json:"policy,omitempty"`
+	Enabled        *bool           `json:"enabled,omitempty"`
+	ComponentPatch *ComponentPatch `json:"component_patch,omitempty"`
+}
+
+type ComponentPatch struct {
+	ComponentID *string            `json:"component_id,omitempty"`
+	VariantID   *string            `json:"variant_id,omitempty"`
+	Query       *ComponentQuery    `json:"query,omitempty"`
+	Value       *string            `json:"value,omitempty"`
+	Symbol      *LibraryConstraint `json:"symbol,omitempty"`
+	Footprint   *LibraryConstraint `json:"footprint,omitempty"`
+	Units       *[]ComponentUnit   `json:"units,omitempty"`
 }
 
 // ApplyPatch mutates only an internal clone. The corrected graph is validated
@@ -76,6 +87,39 @@ func applyPatchOperation(document *Document, operation PatchOperation) *reports.
 		return -1
 	}
 	switch operation.Op {
+	case "replace_component":
+		for i := range document.Components {
+			if document.Components[i].ID != operation.Component {
+				continue
+			}
+			patch := operation.ComponentPatch
+			if patch.ComponentID != nil {
+				document.Components[i].ComponentID = *patch.ComponentID
+				document.Components[i].Query = nil
+			}
+			if patch.Query != nil {
+				document.Components[i].Query = patch.Query
+				document.Components[i].ComponentID = ""
+				document.Components[i].VariantID = ""
+			}
+			if patch.VariantID != nil {
+				document.Components[i].VariantID = *patch.VariantID
+			}
+			if patch.Value != nil {
+				document.Components[i].Value = *patch.Value
+			}
+			if patch.Symbol != nil {
+				document.Components[i].Symbol = patch.Symbol
+			}
+			if patch.Footprint != nil {
+				document.Components[i].Footprint = patch.Footprint
+			}
+			if patch.Units != nil {
+				document.Components[i].Units = append([]ComponentUnit(nil), (*patch.Units)...)
+			}
+			return nil
+		}
+		return issuePatch("component", "component does not exist")
 	case "replace_endpoint":
 		net := findNet(operation.Net)
 		if net == nil {
@@ -197,6 +241,21 @@ func ValidatePatch(patch PatchDocument) []reports.Issue {
 	for index, operation := range patch.Operations {
 		path := "patch.operations[" + strconvItoa(index) + "]"
 		switch operation.Op {
+		case "replace_component":
+			if operation.Component == "" || operation.ComponentPatch == nil {
+				issues = append(issues, graphIssue(CodePatchInvalid, path, "replace_component requires component and component_patch"))
+				continue
+			}
+			selectionCount := 0
+			if operation.ComponentPatch.ComponentID != nil {
+				selectionCount++
+			}
+			if operation.ComponentPatch.Query != nil {
+				selectionCount++
+			}
+			if selectionCount != 1 {
+				issues = append(issues, graphIssue(CodePatchInvalid, path+".component_patch", "replace_component requires exactly one of component_id or query"))
+			}
 		case "replace_endpoint":
 			if operation.Net == "" || operation.Endpoint == nil || operation.Replacement == nil || operation.Component != "" || operation.Region != "" {
 				issues = append(issues, graphIssue(CodePatchInvalid, path, "replace_endpoint requires net, endpoint, and replacement only"))
