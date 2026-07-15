@@ -55,6 +55,44 @@ func TestLoadCatalogMergesDeterministically(t *testing.T) {
 	}
 }
 
+func TestLoadCatalogUsesEmbeddedDefaultOutsideRepository(t *testing.T) {
+	originalDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("get working directory: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Errorf("restore working directory: %v", err)
+		}
+	})
+	if err := os.Chdir(t.TempDir()); err != nil {
+		t.Fatalf("change working directory: %v", err)
+	}
+
+	embedded, err := LoadCatalog(context.Background(), LoadOptions{})
+	if err != nil {
+		t.Fatalf("load embedded catalog: %v", err)
+	}
+	checkedIn, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
+	if err != nil {
+		t.Fatalf("load checked-in catalog: %v", err)
+	}
+	if reports.HasBlockingIssue(embedded.Diagnostics) {
+		t.Fatalf("embedded catalog diagnostics: %+v", embedded.Diagnostics)
+	}
+	if !slices.Equal(catalogRecordIDs(embedded), catalogRecordIDs(checkedIn)) {
+		t.Fatalf("embedded record IDs = %v, want %v", catalogRecordIDs(embedded), catalogRecordIDs(checkedIn))
+	}
+}
+
+func catalogRecordIDs(catalog *Catalog) []string {
+	ids := make([]string, 0, len(catalog.Records))
+	for _, record := range catalog.Records {
+		ids = append(ids, record.ID)
+	}
+	return ids
+}
+
 func TestCheckedInCatalogLoadsAndValidates(t *testing.T) {
 	catalog, err := LoadCatalog(context.Background(), LoadOptions{CatalogDir: checkedInCatalogDir(t)})
 	if err != nil {

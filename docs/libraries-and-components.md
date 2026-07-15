@@ -5,10 +5,11 @@ Component catalog, pinmap, and KiCad library resolver reference.
 ### Component Intelligence
 
 Component intelligence provides a deterministic catalog and selection layer for
-AI-facing generation. The default catalog lives in `data/components/` and can be
-overridden with `--catalog-dir`. Records include KiCad symbol IDs, package
-variants, footprint IDs, function pins, pad functions, ratings, values, and
-verification confidence.
+AI-facing generation. The checked-in default catalog lives in `data/components/`
+and is embedded in released binaries, so it does not depend on the caller's
+working directory. It can be overridden with `--catalog-dir`. Records include
+KiCad symbol IDs, package variants, footprint IDs, function pins, pad functions,
+ratings, values, and verification confidence.
 
 Confidence levels are:
 

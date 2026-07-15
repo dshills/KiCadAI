@@ -7,16 +7,17 @@ level, selection blocks before schematic or PCB files are written.
 
 ## Catalog Location
 
-The default catalog lives in:
+The checked-in source catalog lives in:
 
 ```text
 data/components/
 ```
 
-The catalog is split across deterministic JSON files. Each file can define
-families and component records. Records contain symbol bindings, package
-variants, footprint IDs, function pins, pad functions, ratings, values, and
-verification metadata.
+The catalog is split across deterministic JSON files and is embedded in released
+KiCadAI binaries. A normal command therefore uses the embedded default catalog
+regardless of its current working directory. Each file can define families and
+component records. Records contain symbol bindings, package variants, footprint
+IDs, function pins, pad functions, ratings, values, and verification metadata.
 
 Use a custom catalog with:
 

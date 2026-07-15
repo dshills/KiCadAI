@@ -4,8 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"math"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -72,10 +70,6 @@ func SelectWorkflowComponents(ctx context.Context, registry blocks.Registry, pla
 	sourceDir := componentSourceDir(plan.Request.Components, opts)
 	catalog := opts.Catalog
 	if catalog == nil {
-		if _, err := os.Stat(catalogDir); err != nil {
-			issue := reports.Issue{Code: components.CodeCatalogReadFailed, Severity: reports.SeverityBlocked, Path: "component_policy.catalog_dir", Message: err.Error()}
-			return ComponentSelectionResult{CatalogDir: catalogDir, SourceDir: sourceDir, Stage: NewStageResult(StageComponentSelection, []reports.Issue{issue})}
-		}
 		loaded, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: catalogDir})
 		if err != nil {
 			issue := reports.Issue{Code: components.CodeCatalogReadFailed, Severity: reports.SeverityBlocked, Path: "component_policy.catalog_dir", Message: err.Error()}
@@ -335,7 +329,7 @@ func componentCatalogDir(policy ComponentPolicySpec, opts ComponentSelectionOpti
 	if strings.TrimSpace(opts.CatalogDir) != "" && opts.CatalogDir != components.DefaultCatalogDir {
 		return opts.CatalogDir
 	}
-	return discoverDefaultComponentCatalogDir()
+	return ""
 }
 
 func componentSourceDir(policy ComponentPolicySpec, opts ComponentSelectionOptions) string {
@@ -346,26 +340,6 @@ func componentSourceDir(policy ComponentPolicySpec, opts ComponentSelectionOptio
 		return strings.TrimSpace(opts.SourceDir)
 	}
 	return ""
-}
-
-func discoverDefaultComponentCatalogDir() string {
-	if _, err := os.Stat(components.DefaultCatalogDir); err == nil {
-		return components.DefaultCatalogDir
-	}
-	wd, err := os.Getwd()
-	if err != nil {
-		return components.DefaultCatalogDir
-	}
-	for dir := wd; ; dir = filepath.Dir(dir) {
-		candidate := filepath.Join(dir, components.DefaultCatalogDir)
-		if _, err := os.Stat(candidate); err == nil {
-			return candidate
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return components.DefaultCatalogDir
-		}
-	}
 }
 
 func componentAcceptanceForRequest(request Request) components.AcceptanceLevel {

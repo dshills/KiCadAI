@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -12,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	assets "kicadai"
 	"kicadai/internal/reports"
 )
 
@@ -52,7 +55,7 @@ type catalogFile struct {
 func LoadCatalog(ctx context.Context, opts LoadOptions) (*Catalog, error) {
 	dir := strings.TrimSpace(opts.CatalogDir)
 	if dir == "" {
-		dir = DefaultCatalogDir
+		return loadEmbeddedCatalog(ctx)
 	}
 	cleanDir, err := cleanCatalogDir(dir)
 	if err != nil {
@@ -71,6 +74,32 @@ func LoadCatalog(ctx context.Context, opts LoadOptions) (*Catalog, error) {
 		files = append(files, filepath.Join(dir, entry.Name()))
 	}
 	sort.Strings(files)
+	return loadCatalogFiles(ctx, dir, files, readCatalogFile)
+}
+
+func loadEmbeddedCatalog(ctx context.Context) (*Catalog, error) {
+	entries, err := fs.ReadDir(assets.DefaultComponentCatalog, DefaultCatalogDir)
+	if err != nil {
+		return nil, err
+	}
+	files := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || path.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		files = append(files, path.Join(DefaultCatalogDir, entry.Name()))
+	}
+	sort.Strings(files)
+	return loadCatalogFiles(ctx, "embedded:"+DefaultCatalogDir, files, func(file string) (catalogFile, []reports.Issue) {
+		body, err := fs.ReadFile(assets.DefaultComponentCatalog, file)
+		if err != nil {
+			return catalogFile{}, []reports.Issue{NewIssue(CodeCatalogReadFailed, reports.SeverityBlocked, file, err.Error())}
+		}
+		return parseCatalogFile(file, body)
+	})
+}
+
+func loadCatalogFiles(ctx context.Context, source string, files []string, readFile func(string) (catalogFile, []reports.Issue)) (*Catalog, error) {
 	now := time.Now().UTC()
 	catalog := &Catalog{
 		Version:     CatalogVersion,
@@ -80,14 +109,14 @@ func LoadCatalog(ctx context.Context, opts LoadOptions) (*Catalog, error) {
 		Diagnostics: []reports.Issue{},
 	}
 	if len(files) == 0 {
-		catalog.Diagnostics = append(catalog.Diagnostics, NewIssue(CodeCatalogEmpty, reports.SeverityWarning, dir, "component catalog directory contains no JSON files"))
+		catalog.Diagnostics = append(catalog.Diagnostics, NewIssue(CodeCatalogEmpty, reports.SeverityWarning, source, "component catalog directory contains no JSON files"))
 		return catalog, nil
 	}
 	for _, file := range files {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
-		partial, issues := readCatalogFile(file)
+		partial, issues := readFile(file)
 		catalog.Diagnostics = append(catalog.Diagnostics, issues...)
 		if partial.Version != "" && catalog.Version == CatalogVersion {
 			catalog.Version = partial.Version
@@ -195,6 +224,10 @@ func readCatalogFile(path string) (catalogFile, []reports.Issue) {
 	if err != nil {
 		return catalogFile{}, []reports.Issue{NewIssue(CodeCatalogReadFailed, reports.SeverityBlocked, path, err.Error())}
 	}
+	return parseCatalogFile(path, body)
+}
+
+func parseCatalogFile(path string, body []byte) (catalogFile, []reports.Issue) {
 	var file catalogFile
 	if err := json.Unmarshal(body, &file); err != nil {
 		return catalogFile{}, []reports.Issue{NewIssue(CodeCatalogParseFailed, reports.SeverityBlocked, path, err.Error())}
