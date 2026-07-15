@@ -92,6 +92,12 @@ kicadai circuit patch --request broken-graph.json \
 kicadai --request corrected-graph.json circuit preflight
 ```
 
+First inspect `data.repair_options`. An option supplies the diagnostic,
+`operation_template`, `required_values`, `allowed_values`, rationale, stage, and
+retry scope. Use an option only when its disposition is `agent_selectable`.
+Do not invent a patch when no option exists: that is a fail-closed review
+boundary for ambiguous or electrical evidence.
+
 Patch operations are constrained to existing graph identities. The response
 contains the input hash, normalized operations, corrected graph, before/after
 critical projection, changed paths, re-preflight evidence, and

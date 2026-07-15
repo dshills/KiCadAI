@@ -1,7 +1,7 @@
 # Generic Circuit Repair Guidance Plan
 
 Date: 2026-07-15
-Status: Proposed
+Status: Complete
 
 ## Phase 1: Contract and Data Model
 
@@ -75,3 +75,12 @@ commit each completed phase.
 worktree is clean.
 
 **Risk:** Low.
+
+## Completion Evidence
+
+- Phase 1: `1f82e3a` defined the public repair contract and delivery plan.
+- Phases 2-3: `bd85fe8` added deterministic graph-derived options, capability
+  metadata, and preflight integration.
+- Phase 4: `f0db449` added repairable preflight corpus coverage.
+- Phase 5: documentation, full offline verification, and staged Prism review
+  accompany the final completion commit.

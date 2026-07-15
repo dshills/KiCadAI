@@ -182,6 +182,16 @@ critical graph projection, changed paths, and re-preflight evidence. KiCad
 ERC/DRC and normalized KiCad round-trip remain external requirements until
 explicitly invoked during creation or promotion.
 
+When a failed preflight has an unambiguous safe correction, its JSON
+`data.repair_options` contains the candidates. Each option identifies the
+source diagnostic, provides a partial `operation_template`, lists
+`required_values` and `allowed_values`, and includes the rationale, stage, and
+retry scope. Construct a standard
+`kicadai.circuit-patch.v1` document from one option, then let `circuit patch`
+perform final validation. Absence of an option is intentional: ambiguous,
+electrical, thermal, fabrication, ERC/DRC, and immutable-identity findings
+require review rather than an executable repair.
+
 Provider output budgets are profile-aware: 8,192 tokens for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. Override them with
 `--ai-max-output-tokens N` or `KICADAI_AI_MAX_OUTPUT_TOKENS`; the CLI flag wins
