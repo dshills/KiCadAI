@@ -8,7 +8,6 @@ linters:
   default: none
   enable:
     - govet
-
-issues:
-  exclude-dirs:
-    - internal/kiapi/gen
+  exclusions:
+    paths:
+      - internal/kiapi/gen
