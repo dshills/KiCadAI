@@ -2,6 +2,15 @@
 
 *Reviewed 2026-07-15 · repo: [github.com/dshills/KiCadAI](https://github.com/dshills/KiCadAI) · reviewed at HEAD `7f39a4c`*
 
+> **Disposition (2026-07-15):** This review is a historical snapshot. The
+> evidence-based status and remediation sequence are maintained in
+> [`kicadai-review-followup/SPEC.md`](kicadai-review-followup/SPEC.md) and
+> [`kicadai-review-followup/PLAN.md`](kicadai-review-followup/PLAN.md). In
+> particular, shared vocabulary duplication has been addressed; the reported
+> 82 lint issues are not reproducible under the current declared lint policy;
+> and the remaining CI, catalog-packaging, routing-contract, and workflow-seam
+> findings are active work.
+
 ## What it is
 
 KiCadAI is a Go toolkit and CLI for AI-assisted KiCad design: ~265K LOC (171K prod, 94K test), 42 internal packages, 1,294 commits — all in about five weeks, single author, clearly agent-driven development with a spec-first process (127 spec folders, mostly SPEC.md + PLAN.md pairs that map cleanly to real packages). The dependency footprint is remarkably small for the size: protobuf and mangos for KiCad IPC, and that's essentially it — all the EDA logic is first-party. MIT licensed, with KiCad's API protos properly vendored and attributed.
