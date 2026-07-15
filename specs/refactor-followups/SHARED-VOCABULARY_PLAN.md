@@ -7,6 +7,16 @@ and PCB net roles while preserving every existing JSON spelling and package
 constant name. The shared vocabulary is a type-identity refactor, not a
 schema migration.
 
+## Status
+
+Completed in commit `b8b4cb3`:
+
+- The dependency-free vocabulary kernel was added.
+- Acceptance-level, component-role, and net-role type declarations now alias
+  the shared types while retaining package-local constant names.
+- Exact legacy wire spellings are covered by tests.
+- `go test ./...` and `make lint` pass.
+
 ## Phase 1: Add the vocabulary kernel
 
 - Add `internal/domain/vocabulary.go` with dependency-free string types and the
