@@ -194,6 +194,11 @@ accepts a structured `routing.Request`, routes intentional nets, validates
 connectivity and clearance in-process, and returns route segments, vias,
 metrics, issues, AI-facing repair diagnostics, and route-shaped operations.
 
+Routing is currently ordered and bounded; it is not a general rip-up-and-reroute
+autorouter. `strategy.ripup_retry_limit` remains accepted for request
+compatibility, but any non-zero value is rejected with a structured unsupported
+operation diagnostic rather than being silently ignored.
+
 Run routing from JSON:
 
 ```sh

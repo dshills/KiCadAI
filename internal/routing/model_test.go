@@ -70,6 +70,16 @@ func TestValidateRejectsInvalidRules(t *testing.T) {
 	assertIssuePath(t, issues, "rules.via_drill_mm")
 }
 
+func TestValidateRejectsUnsupportedRipupRetryLimit(t *testing.T) {
+	request := minimalRequest()
+	request.Strategy.RipupRetryLimit = 1
+
+	NormalizeRequest(&request)
+	issues := Validate(&request)
+	assertIssueCode(t, issues, reports.CodeUnsupportedOperation)
+	assertIssuePath(t, issues, "strategy.ripup_retry_limit")
+}
+
 func TestValidateRejectsDuplicateReferencesAndPads(t *testing.T) {
 	request := minimalRequest()
 	request.Components = append(request.Components, request.Components[0])

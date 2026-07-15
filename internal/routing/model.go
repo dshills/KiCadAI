@@ -244,8 +244,11 @@ type NetRule struct {
 }
 
 type Strategy struct {
-	Mode             RouteMode         `json:"mode,omitempty"`
-	NetOrder         string            `json:"net_order,omitempty"`
+	Mode     RouteMode `json:"mode,omitempty"`
+	NetOrder string    `json:"net_order,omitempty"`
+	// RipupRetryLimit is retained for request compatibility. Rip-up routing is
+	// not implemented, so non-zero values fail validation instead of being
+	// silently ignored.
 	RipupRetryLimit  int               `json:"ripup_retry_limit,omitempty"`
 	AllowPartial     bool              `json:"allow_partial,omitempty"`
 	PreserveExisting bool              `json:"preserve_existing,omitempty"`
@@ -521,6 +524,9 @@ func Validate(request *Request) []reports.Issue {
 	}
 	if !supportedMode(request.Strategy.Mode) {
 		issues = append(issues, issue(reports.CodeUnsupportedOperation, reports.SeverityBlocked, "strategy.mode", fmt.Sprintf("unsupported routing mode %q", request.Strategy.Mode)))
+	}
+	if request.Strategy.RipupRetryLimit != 0 {
+		issues = append(issues, issue(reports.CodeUnsupportedOperation, reports.SeverityBlocked, "strategy.ripup_retry_limit", "rip-up retry routing is not implemented; use zero"))
 	}
 	for name, netClass := range request.Rules.NetClasses {
 		prefix := fmt.Sprintf("rules.net_classes[%s]", name)
