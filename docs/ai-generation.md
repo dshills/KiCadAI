@@ -25,6 +25,26 @@ Their checked-in provider inputs are under
 `examples/ai/usb_c_bmp280_breakout/` and
 `examples/ai/usb_c_led_indicator_protected/`.
 
+### Generation Capability Matrix
+
+KiCadAI publishes its current provider/planner contract in
+`internal/generationcapability`. It distinguishes the strict generic graph path
+from bounded natural-language reference profiles rather than treating all
+successful fixtures as arbitrary-circuit support.
+
+| Path | Input contract | Current boundary |
+| --- | --- | --- |
+| `generic-circuit-v1` | `kicadai.circuit-graph.v1` | Catalog-resolved components and explicit graph/layout intent. Ambiguous resolution, unsupported functions, and incomplete intent fail closed. |
+| `usb_c_bmp280` | `kicadai_bmp280_intent_v1` | Bounded USB-C BMP280 reference composition. |
+| `usb_c_led_protected` | `kicadai_usb_c_led_intent_v1` | Bounded protected USB-C LED reference composition. |
+
+All paths require the evidence appropriate to their requested acceptance level:
+strict graph or request validation, trusted component resolution, schematic
+electrical/readability checks, required-net routing, writer correctness,
+round-trip preservation, and KiCad ERC/DRC where requested. This matrix is not
+a claim that arbitrary dense, high-speed, RF, thermal, or analog-performance
+requirements can be generated without engineering review.
+
 Generic circuit graphs express schematic lanes explicitly. `power`, `signals`,
 and `ground` are fixed to `top`, `middle`, and `bottom`. Provider output must set
 `power_negative` to `lower` when any net has role `power_neg`, and to `null`
