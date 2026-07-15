@@ -46,8 +46,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	plan := PlanBlocks(ctx, opts.BlockRegistry, normalized)
 	stages := []StageResult{plan.Stage}
 	if workflowStageBlocked(plan.Stage) {
-		stages = append(stages, skippedWorkflowStages("block planning did not complete", StageComponentSelection, StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StageBlockPlanning, "block planning did not complete")
 	}
 	componentSelections := SelectWorkflowComponents(ctx, opts.BlockRegistry, plan, opts.Components)
 	if !workflowStageBlocked(componentSelections.Stage) {
@@ -59,26 +58,22 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	}
 	stages = append(stages, componentSelections.Stage)
 	if workflowStageBlocked(componentSelections.Stage) {
-		stages = append(stages, skippedWorkflowStages("component selection did not complete", StageSchematic, StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StageComponentSelection, "component selection did not complete")
 	}
 	schematicStage := schematicStageFromPlan(plan)
 	stages = append(stages, schematicStage)
 	if workflowStageBlocked(schematicStage) {
-		stages = append(stages, skippedWorkflowStages("schematic generation did not complete", StageSchematicElectrical, StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StageSchematic, "schematic generation did not complete")
 	}
 	schematicElectricalStage := SchematicElectricalStage(plan)
 	stages = append(stages, schematicElectricalStage)
 	if workflowStageBlocked(schematicElectricalStage) {
-		stages = append(stages, skippedWorkflowStages("schematic electrical rules did not pass", StagePCBRealization, StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StageSchematicElectrical, "schematic electrical rules did not pass")
 	}
 	fragments := RealizePCBFragments(ctx, opts.BlockRegistry, plan)
 	stages = append(stages, fragments.Stage)
 	if workflowStageBlocked(fragments.Stage) {
-		stages = append(stages, skippedWorkflowStages("PCB realization did not complete", StagePlacement, StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StagePCBRealization, "PCB realization did not complete")
 	}
 	placementOpts := opts.Placement
 	placementOpts.ComponentSelections = componentSelections.Selections
@@ -86,8 +81,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	placementStageIndex := len(stages)
 	stages = append(stages, placed.Stage)
 	if workflowStageBlocked(placed.Stage) {
-		stages = append(stages, skippedWorkflowStages("placement did not complete", StageRouting, StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StagePlacement, "placement did not complete")
 	}
 	routingOpts := opts.Routing
 	routingOpts.ComponentSelections = componentSelections.Selections
@@ -97,8 +91,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	stages[placementStageIndex] = placed.Stage
 	stages = append(stages, routed.Stage)
 	if workflowStageBlocked(routed.Stage) {
-		stages = append(stages, skippedWorkflowStages("routing did not complete", StageProjectWrite, StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StageRouting, "routing did not complete")
 	}
 	written := WriteProject(ctx, &normalized, &plan, &placed, &routed, ProjectWriteOptions{
 		OutputDir:                 opts.OutputDir,
@@ -109,8 +102,7 @@ func Create(ctx context.Context, request Request, opts CreateOptions) WorkflowRe
 	})
 	stages = append(stages, written.Stage)
 	if workflowStageBlocked(written.Stage) {
-		stages = append(stages, skippedWorkflowStages("project write did not complete", StageWriterCorrect, StageValidation, StageKiCadChecks)...)
-		return BuildWorkflowResult(ProjectSummary{Name: normalized.Name, OutputDir: opts.OutputDir}, normalized.Validation.Acceptance, stages)
+		return blockedCreateResult(normalized, opts, stages, StageProjectWrite, "project write did not complete")
 	}
 	writerChecked := CheckWriterCorrectnessWithOptions(ctx, &written, opts.Writer)
 	stages = append(stages, writerChecked.Stage)

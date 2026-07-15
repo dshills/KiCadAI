@@ -93,6 +93,10 @@ writer geometry.
 Key packages:
 
 - `cmd/kicadai`: CLI entrypoint.
+- `internal/designworkflow`: deterministic project-generation orchestration.
+  Its block-planned creation path has an explicit stage contract from planning
+  through KiCad checks; a blocked stage marks only its declared downstream
+  stages as skipped.
 - `internal/kiapi`: live KiCad IPC client and transport boundary.
 - `internal/kicadfiles/project`: `.kicad_pro` reader/writer.
 - `internal/kicadfiles/schematic`: `.kicad_sch` reader/writer and validation.
