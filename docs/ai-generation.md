@@ -28,8 +28,18 @@ Their checked-in provider inputs are under
 ### Generation Capability Matrix
 
 KiCadAI publishes its current provider/planner contract in
-`internal/generationcapability`. It distinguishes the strict generic graph path
-from bounded natural-language reference profiles rather than treating all
+`internal/generationcapability`. Query the installed binary rather than relying
+on repository source or documentation that may be older than the binary:
+
+```sh
+kicadai capability generation --json
+```
+
+The command returns the profile matrix, required evidence, limitations, and the
+catalog-derived generic component/function vocabulary. The generic provider
+prompt uses this same serialized document, so the AI-facing contract and CLI
+output cannot drift independently. It distinguishes the strict generic graph
+path from bounded natural-language reference profiles rather than treating all
 successful fixtures as arbitrary-circuit support.
 
 | Path | Input contract | Current boundary |
@@ -44,6 +54,13 @@ electrical/readability checks, required-net routing, writer correctness,
 round-trip preservation, and KiCad ERC/DRC where requested. This matrix is not
 a claim that arbitrary dense, high-speed, RF, thermal, or analog-performance
 requirements can be generated without engineering review.
+
+The offline generic-composition acceptance corpus exercises the checked-in RC
+filter and transistor-switch graphs through strict decode, catalog resolution,
+schematic/electrical checks, deterministic placement, routing, project writing,
+and writer correctness. An unknown catalog component is rejected before a
+project is written. KiCad ERC/DRC promotion remains separately optional and
+environment-gated.
 
 Generic circuit graphs express schematic lanes explicitly. `power`, `signals`,
 and `ground` are fixed to `top`, `middle`, and `bottom`. Provider output must set

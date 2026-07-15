@@ -13,6 +13,7 @@ kicadai ping
 kicadai version
 kicadai documents
 kicadai capabilities
+kicadai capability generation --json
 ```
 
 Connection flags:
@@ -117,6 +118,18 @@ strict catalog-resolved graph contract; it never falls back to a bounded
 profile or accepts provider-defined libraries and geometry. See
 [AI Generation](ai-generation.md) for strict KiCad-backed commands and the
 artifact contract.
+
+Before asking an agent for a generic circuit, query its installed contract:
+
+```sh
+kicadai capability generation --json
+```
+
+Use `data.capabilities` for generic versus bounded profile distinctions,
+limitations, and required evidence. Use `data.generic_graph_contract` as the
+catalog-resolved component/function vocabulary for `generic-circuit-v1`.
+Unsupported graph data must be treated as a fail-closed preflight result; no
+KiCad project should be written after a blocking diagnostic.
 
 Provider output budgets are profile-aware: 8,192 tokens for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. Override them with

@@ -53,6 +53,18 @@ the workflow evidence explicitly supports that claim.
 
 ## Capability Boundaries
 
+Query the binary before constructing a generic graph:
+
+```sh
+kicadai capability generation --json
+```
+
+The response is the source of truth for supported generic graph features,
+bounded profile distinctions, evidence gates, limitations, and the installed
+catalog's component/function vocabulary. Feed that result into the provider
+prompt and fail closed on any structured diagnostic; do not infer support from
+fixture names or repository paths.
+
 Current strong paths:
 
 - direct KiCad project, schematic, and PCB file writing;
