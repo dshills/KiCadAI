@@ -69,8 +69,15 @@ func repairOption(document Document, catalog *components.Catalog, issue reports.
 			base.AllowedValues = map[string][]string{"replacement.unit": units}
 			base.Rationale = "endpoint unit is not declared by its component"
 		} else {
-			base.RequiredValues = []string{"replacement.selector"}
-			base.Rationale = "endpoint selector did not resolve; choose a verified selector from capability output"
+			pins := availableSymbolPins(document, catalog, endpoint.Component, net.Name)
+			if len(pins) == 1 {
+				base.OperationTemplate.Replacement.Selector = pins[0]
+				base.Rationale = "one verified symbol pin remains unused by this component's other graph connections"
+			} else {
+				base.RequiredValues = []string{"replacement.selector"}
+				base.AllowedValues = map[string][]string{"replacement.selector": pins}
+				base.Rationale = "endpoint selector did not resolve; choose a verified selector from capability output"
+			}
 		}
 		return base, true
 	}
@@ -83,6 +90,51 @@ func repairOption(document Document, catalog *components.Catalog, issue reports.
 		return base, true
 	}
 	return RepairOption{}, false
+}
+
+func availableSymbolPins(document Document, catalog *components.Catalog, componentID, netName string) []string {
+	var component Component
+	for _, candidate := range document.Components {
+		if candidate.ID == componentID {
+			component = candidate
+			break
+		}
+	}
+	if component.ComponentID == "" || catalog == nil {
+		return nil
+	}
+	known := map[string]struct{}{}
+	for _, record := range catalog.Records {
+		if record.ID != component.ComponentID {
+			continue
+		}
+		for _, symbol := range record.Symbols {
+			for _, pin := range symbol.FunctionPins {
+				if pin.SymbolPin != "" {
+					known[pin.SymbolPin] = struct{}{}
+				}
+			}
+		}
+	}
+	used := map[string]struct{}{}
+	for _, net := range document.Nets {
+		if net.Name == netName {
+			continue
+		}
+		for _, endpoint := range net.Endpoints {
+			if endpoint.Component == componentID && endpoint.SelectorKind == SelectorSymbolPin {
+				used[endpoint.Selector] = struct{}{}
+			}
+		}
+	}
+	result := []string{}
+	for pin := range known {
+		if _, exists := used[pin]; !exists {
+			result = append(result, pin)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 
 func componentIndex(path string) (int, bool) { return indexedPath(path, "components[") }

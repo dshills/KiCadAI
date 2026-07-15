@@ -342,6 +342,22 @@ func TestCircuitRepairPlanReadyAndRepeatedHash(t *testing.T) {
 	}
 }
 
+func TestCircuitRepairPlanDerivesUniqueSelectorPatch(t *testing.T) {
+	base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := filepath.Join(t.TempDir(), "broken.json")
+	if err := os.WriteFile(broken, []byte(strings.Replace(string(base), `"selector": "1"`, `"selector": "999"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	result := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", broken})
+	plan := circuitRepairPlanResultData(t, result).Plan
+	if plan.State != circuitgraph.RepairPlanAvailable || plan.Patch == nil || len(plan.Patch.Operations) != 1 || plan.Patch.Operations[0].Replacement == nil || plan.Patch.Operations[0].Replacement.Selector != "1" {
+		t.Fatalf("selector repair plan = %#v", plan)
+	}
+}
+
 func TestCircuitPatchRejectsUnsupportedSubstitutionWithoutOutput(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
 	patch := filepath.Join(t.TempDir(), "unsupported-substitution.json")
