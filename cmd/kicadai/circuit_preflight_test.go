@@ -29,6 +29,14 @@ func TestCircuitPreflightReadyAndDeterministic(t *testing.T) {
 	}
 }
 
+func TestCircuitPreflightAcceptsDocumentedArgumentOrder(t *testing.T) {
+	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
+	result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--json"})
+	if !result.OK || !preflightResultData(t, result).ReadyForWrite {
+		t.Fatalf("documented argument order result = %#v", result)
+	}
+}
+
 func TestCircuitPreflightFailsClosedBeforeWrite(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "unsupported_unknown_component.json")
 	output := filepath.Join(t.TempDir(), "must-not-be-written")

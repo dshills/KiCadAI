@@ -38,8 +38,21 @@ type circuitPreflightData struct {
 }
 
 func runCircuitPreflight(ctx context.Context, opts cliOptions, stdout io.Writer) error {
-	if len(opts.commandArgs) != 1 || strings.TrimSpace(opts.commandArgs[0]) != "preflight" {
+	if len(opts.commandArgs) == 0 || strings.TrimSpace(opts.commandArgs[0]) != "preflight" {
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: preflight", Suggestion: "run kicadai circuit preflight --request graph.json"})
+	}
+	for index := 1; index < len(opts.commandArgs); index++ {
+		switch strings.TrimSpace(opts.commandArgs[index]) {
+		case "--json":
+		case "--request":
+			if index+1 >= len(opts.commandArgs) || strings.TrimSpace(opts.requestPath) != "" {
+				return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit preflight requires exactly one --request graph.json"})
+			}
+			index++
+			opts.requestPath = opts.commandArgs[index]
+		default:
+			return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit.preflight", Message: "unsupported circuit preflight argument " + opts.commandArgs[index]})
+		}
 	}
 	if strings.TrimSpace(opts.requestPath) == "" {
 		return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit preflight requires --request graph.json"})
