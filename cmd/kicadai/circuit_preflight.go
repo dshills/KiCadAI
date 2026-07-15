@@ -37,64 +37,88 @@ type circuitPreflightData struct {
 	ReadyForWrite     bool                                 `json:"ready_for_write"`
 }
 
+type circuitPreflightEvaluation struct {
+	Data         circuitPreflightData
+	Issues       []reports.Issue
+	LibraryIndex *libraryresolver.LibraryIndex
+}
+
 func runCircuitPreflight(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if issue := parseCircuitPreflightArgs(&opts); issue != nil {
+		return writeReportFailure(stdout, "circuit.preflight", *issue)
+	}
+	evaluation := evaluateCircuitPreflight(ctx, opts)
+	return writeCircuitPreflightResult(stdout, evaluation.Data, evaluation.Issues)
+}
+
+func parseCircuitPreflightArgs(opts *cliOptions) *reports.Issue {
 	if len(opts.commandArgs) == 0 || strings.TrimSpace(opts.commandArgs[0]) != "preflight" {
-		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: preflight", Suggestion: "run kicadai circuit preflight --request graph.json"})
+		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: preflight or create", Suggestion: "run kicadai circuit preflight --request graph.json"}
 	}
 	for index := 1; index < len(opts.commandArgs); index++ {
 		switch strings.TrimSpace(opts.commandArgs[index]) {
 		case "--json":
 		case "--request":
 			if index+1 >= len(opts.commandArgs) || strings.TrimSpace(opts.requestPath) != "" {
-				return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit preflight requires exactly one --request graph.json"})
+				return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit preflight requires exactly one --request graph.json"}
 			}
 			index++
 			opts.requestPath = opts.commandArgs[index]
 		default:
-			return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit.preflight", Message: "unsupported circuit preflight argument " + opts.commandArgs[index]})
+			return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit.preflight", Message: "unsupported circuit preflight argument " + opts.commandArgs[index]}
 		}
 	}
 	if strings.TrimSpace(opts.requestPath) == "" {
-		return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit preflight requires --request graph.json"})
+		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit preflight requires --request graph.json"}
 	}
+	return nil
+}
 
+func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPreflightEvaluation {
 	data := circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}}
+	result := circuitPreflightEvaluation{Data: data, Issues: []reports.Issue{}}
 	catalogDir := opts.catalogDir
 	if strings.TrimSpace(catalogDir) == components.DefaultCatalogDir {
 		catalogDir = ""
 	}
 	catalog, err := components.LoadCatalog(ctx, components.LoadOptions{CatalogDir: catalogDir})
 	if err != nil {
-		return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()})
+		result.Issues = []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "catalog", Message: err.Error()}}
+		return result
 	}
 	_, err = generationcapability.BuildDocument(catalog)
 	if err != nil {
-		return writeReportFailure(stdout, "circuit.preflight", reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "capability", Message: err.Error()})
+		result.Issues = []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "capability", Message: err.Error()}}
+		return result
 	}
-	data.CapabilityProfile = generationcapability.ProfileGenericCircuit
+	result.Data.CapabilityProfile = generationcapability.ProfileGenericCircuit
 	if generic, ok := generationcapability.Lookup(generationcapability.ProfileGenericCircuit); ok {
-		data.InputContract = generic.InputContract
-		data.RequiredEvidence = generic.RequiredEvidence
+		result.Data.InputContract = generic.InputContract
+		result.Data.RequiredEvidence = generic.RequiredEvidence
 	}
 
 	contents, err := os.Open(opts.requestPath)
 	if err != nil {
-		return writeCircuitPreflightResult(stdout, data, []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()}})
+		result.Issues = []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()}}
+		return result
 	}
 	defer contents.Close()
 	graph, issues := circuitgraph.DecodeStrict(contents)
-	data.Gates = append(data.Gates, preflightGate("strict_decode", issues, designworkflow.StageParseRequest))
+	result.Data.Gates = append(result.Data.Gates, preflightGate("strict_decode", issues, designworkflow.StageParseRequest))
 	if reports.HasBlockingIssue(issues) {
-		return writeCircuitPreflightResult(stdout, data, preflightIssues(designworkflow.StageParseRequest, issues))
+		result.Issues = preflightIssues(designworkflow.StageParseRequest, issues)
+		return result
 	}
-	data.Graph = &graph
+	result.Data.Graph = &graph
 
 	libraryIndex, libraryIssues := circuitPreflightLibraryIndex(ctx, opts)
 	issues = append(issues, preflightIssues(designworkflow.StageLibraryContext, libraryIssues)...)
 	if reports.HasBlockingIssue(libraryIssues) {
-		data.Gates = append(data.Gates, preflightGate("library_context", libraryIssues, designworkflow.StageLibraryContext))
-		return writeCircuitPreflightResult(stdout, data, issues)
+		result.Data.Gates = append(result.Data.Gates, preflightGate("library_context", libraryIssues, designworkflow.StageLibraryContext))
+		result.Issues = issues
+		return result
 	}
+	result.LibraryIndex = libraryIndex
 	var symbols map[string]circuitgraph.LibrarySymbolEvidence
 	var footprints map[string]circuitgraph.LibraryFootprintEvidence
 	if libraryIndex != nil {
@@ -104,55 +128,61 @@ func runCircuitPreflight(ctx context.Context, opts cliOptions, stdout io.Writer)
 	resolved, resolveIssues := resolver.Resolve(ctx, graph)
 	resolveIssues = preflightIssues(designworkflow.StageComponentSelection, resolveIssues)
 	issues = append(issues, resolveIssues...)
-	data.Gates = append(data.Gates, preflightGate("catalog_resolution", resolveIssues, designworkflow.StageComponentSelection))
+	result.Data.Gates = append(result.Data.Gates, preflightGate("catalog_resolution", resolveIssues, designworkflow.StageComponentSelection))
 	if reports.HasBlockingIssue(resolveIssues) {
-		return writeCircuitPreflightResult(stdout, data, issues)
+		result.Issues = issues
+		return result
 	}
-	data.Resolution = &resolved
+	result.Data.Resolution = &resolved
 
 	request, lowerIssues := circuitgraph.ToDesignRequest(resolved)
 	lowerIssues = preflightIssues(designworkflow.StageSchematic, lowerIssues)
 	issues = append(issues, lowerIssues...)
 	if reports.HasBlockingIssue(lowerIssues) {
-		data.Gates = append(data.Gates, preflightGate("schematic_lowering", lowerIssues, designworkflow.StageSchematic))
-		return writeCircuitPreflightResult(stdout, data, issues)
+		result.Data.Gates = append(result.Data.Gates, preflightGate("schematic_lowering", lowerIssues, designworkflow.StageSchematic))
+		result.Issues = issues
+		return result
 	}
-	data.Request = &request
-	data.Gates = append(data.Gates, preflightGate("schematic_lowering", lowerIssues, designworkflow.StageSchematic))
+	result.Data.Request = &request
+	result.Data.Gates = append(result.Data.Gates, preflightGate("schematic_lowering", lowerIssues, designworkflow.StageSchematic))
 
 	schematicIssues := schematicir.Validate(request.ExplicitCircuit.Schematic)
 	schematicIssues = preflightIssues(designworkflow.StageSchematicElectrical, schematicIssues)
-	data.SchematicIssues = schematicIssues
+	result.Data.SchematicIssues = schematicIssues
 	issues = append(issues, schematicIssues...)
-	data.Gates = append(data.Gates, preflightGate("schematic_electrical_and_readability", schematicIssues, designworkflow.StageSchematicElectrical))
+	result.Data.Gates = append(result.Data.Gates, preflightGate("schematic_electrical_and_readability", schematicIssues, designworkflow.StageSchematicElectrical))
 	if reports.HasBlockingIssue(schematicIssues) {
-		return writeCircuitPreflightResult(stdout, data, issues)
+		result.Issues = issues
+		return result
 	}
 
 	placed := designworkflow.PlaceExplicitCircuit(ctx, request, designworkflow.PlacementOptions{LibraryIndex: libraryIndex})
 	placementIssues := preflightIssues(designworkflow.StagePlacement, placed.Stage.Issues)
 	placed.Stage.Issues = placementIssues
-	data.Placement = &placed
+	result.Data.Placement = &placed
 	issues = append(issues, placementIssues...)
-	data.Gates = append(data.Gates, preflightGate("placement", placementIssues, designworkflow.StagePlacement))
+	result.Data.Gates = append(result.Data.Gates, preflightGate("placement", placementIssues, designworkflow.StagePlacement))
 	if reports.HasBlockingIssue(placementIssues) || placed.Stage.Status == designworkflow.StageStatusSkipped {
-		return writeCircuitPreflightResult(stdout, data, issues)
+		result.Issues = issues
+		return result
 	}
 
 	routed := designworkflow.RouteExplicitCircuit(ctx, request, placed, designworkflow.RoutingOptions{})
 	routingIssues := preflightIssues(designworkflow.StageRouting, routed.Stage.Issues)
 	routed.Stage.Issues = routingIssues
-	data.Routing = &routed
+	result.Data.Routing = &routed
 	issues = append(issues, routingIssues...)
-	data.Gates = append(data.Gates, preflightGate("required_net_routing", routingIssues, designworkflow.StageRouting))
+	result.Data.Gates = append(result.Data.Gates, preflightGate("required_net_routing", routingIssues, designworkflow.StageRouting))
 	if reports.HasBlockingIssue(routingIssues) || routed.Stage.Status == designworkflow.StageStatusSkipped {
-		return writeCircuitPreflightResult(stdout, data, issues)
+		result.Issues = issues
+		return result
 	}
 
-	data.Gates = append(data.Gates, circuitPreflightGate{Name: "kicad_erc", Status: externalEvidenceStatus(request.Validation.RequireERC), External: request.Validation.RequireERC})
-	data.Gates = append(data.Gates, circuitPreflightGate{Name: "kicad_drc", Status: externalEvidenceStatus(request.Validation.RequireDRC), External: request.Validation.RequireDRC})
-	data.ReadyForWrite = !reports.HasBlockingIssue(issues)
-	return writeCircuitPreflightResult(stdout, data, issues)
+	result.Data.Gates = append(result.Data.Gates, circuitPreflightGate{Name: "kicad_erc", Status: externalEvidenceStatus(request.Validation.RequireERC), External: request.Validation.RequireERC})
+	result.Data.Gates = append(result.Data.Gates, circuitPreflightGate{Name: "kicad_drc", Status: externalEvidenceStatus(request.Validation.RequireDRC), External: request.Validation.RequireDRC})
+	result.Data.ReadyForWrite = !reports.HasBlockingIssue(issues)
+	result.Issues = issues
+	return result
 }
 
 func circuitPreflightLibraryIndex(ctx context.Context, opts cliOptions) (*libraryresolver.LibraryIndex, []reports.Issue) {
