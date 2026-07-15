@@ -358,6 +358,65 @@ func TestCircuitRepairPlanDerivesUniqueSelectorPatch(t *testing.T) {
 	}
 }
 
+func TestCircuitRepairPlanConvergesRCGraphToDirectCreate(t *testing.T) {
+	base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, issues := circuitgraph.DecodeStrict(bytes.NewReader(base))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode base graph issues=%#v", issues)
+	}
+	modified := false
+	for netIndex := range graph.Nets {
+		if graph.Nets[netIndex].Name != "FILTER_IN" {
+			continue
+		}
+		for endpointIndex := range graph.Nets[netIndex].Endpoints {
+			if graph.Nets[netIndex].Endpoints[endpointIndex].Component == "input" {
+				graph.Nets[netIndex].Endpoints[endpointIndex].Selector = "999"
+				modified = true
+			}
+		}
+	}
+	if !modified {
+		t.Fatal("RC fixture no longer exposes FILTER_IN input endpoint")
+	}
+	brokenContents, err := json.Marshal(graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := t.TempDir()
+	broken := filepath.Join(tmpDir, "broken.json")
+	if err := os.WriteFile(broken, brokenContents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	planResult := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", broken})
+	plan := circuitRepairPlanResultData(t, planResult).Plan
+	if plan.State != circuitgraph.RepairPlanAvailable || plan.Patch == nil {
+		t.Fatalf("repair plan = %#v", plan)
+	}
+	patchContents, err := json.Marshal(plan.Patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patchPath := filepath.Join(tmpDir, "repair.json")
+	if err := os.WriteFile(patchPath, patchContents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corrected := filepath.Join(tmpDir, "corrected.json")
+	patchResult, patchErr := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", broken, "--patch", patchPath, "--output", corrected})
+	if patchErr != nil || !patchResult.OK || !circuitPatchResultData(t, patchResult).ReadyForWrite {
+		t.Fatalf("apply plan err=%v result=%#v", patchErr, patchResult)
+	}
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	project := filepath.Join(tmpDir, "project")
+	created, createErr := runCircuitCreateCLI(t, []string{"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot, "circuit", "create", "--request", corrected, "--output", project, "--overwrite"})
+	if createErr != nil || !created.OK {
+		t.Fatalf("create corrected graph err=%v result=%#v", createErr, created)
+	}
+}
+
 func TestCircuitPatchRejectsUnsupportedSubstitutionWithoutOutput(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
 	patch := filepath.Join(t.TempDir(), "unsupported-substitution.json")
