@@ -267,15 +267,17 @@ const (
 )
 
 type SchematicLanes struct {
-	Power   Lane `json:"power"`
-	Signals Lane `json:"signals"`
-	Ground  Lane `json:"ground"`
+	Power         Lane  `json:"power"`
+	PowerNegative *Lane `json:"power_negative"`
+	Signals       Lane  `json:"signals"`
+	Ground        Lane  `json:"ground"`
 }
 
 type Lane string
 
 const (
 	LaneTop    Lane = "top"
+	LaneLower  Lane = "lower"
 	LaneMiddle Lane = "middle"
 	LaneBottom Lane = "bottom"
 )

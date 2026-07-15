@@ -145,9 +145,10 @@ func ProviderGraphSchema() map[string]any {
 			"origin": map[string]any{"type": "string", "const": string(OriginCentered)},
 			"groups": map[string]any{"type": "array", "items": group},
 			"lanes": strictObject(map[string]any{
-				"power":   map[string]any{"type": "string", "const": string(LaneTop)},
-				"signals": map[string]any{"type": "string", "const": string(LaneMiddle)},
-				"ground":  map[string]any{"type": "string", "const": string(LaneBottom)},
+				"power":          map[string]any{"type": "string", "const": string(LaneTop)},
+				"power_negative": nullable(map[string]any{"type": "string", "const": string(LaneLower)}),
+				"signals":        map[string]any{"type": "string", "const": string(LaneMiddle)},
+				"ground":         map[string]any{"type": "string", "const": string(LaneBottom)},
 			}),
 			"placements": map[string]any{"type": "array", "items": schematicPlacement},
 			"rules": strictObject(map[string]any{

@@ -11,6 +11,17 @@ import (
 )
 
 func DecodeStrict(reader io.Reader) (Document, []reports.Issue) {
+	return decodeStrict(reader, false)
+}
+
+// DecodeRecordedStrict accepts the one legacy split-supply omission that was
+// emitted by recorded provider fixtures before power_negative became explicit.
+// Live provider output must use DecodeStrict and provide the lane itself.
+func DecodeRecordedStrict(reader io.Reader) (Document, []reports.Issue) {
+	return decodeStrict(reader, true)
+}
+
+func decodeStrict(reader io.Reader, allowLegacyNegativeLane bool) (Document, []reports.Issue) {
 	var buffer bytes.Buffer
 	limited := io.LimitReader(reader, MaxDocumentBytes+1)
 	if _, err := io.Copy(&buffer, limited); err != nil {
@@ -32,10 +43,29 @@ func DecodeStrict(reader io.Reader) (Document, []reports.Issue) {
 		}
 		return document, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "decode trailing circuit graph data: "+err.Error())}
 	}
-	if issues := Validate(document); len(issues) != 0 {
+	var compatibilityIssues []reports.Issue
+	if allowLegacyNegativeLane && document.Schematic.Lanes.PowerNegative == nil {
+		negativeRails := map[string]struct{}{}
+		for _, net := range document.Nets {
+			if net.Role == NetRolePowerNeg {
+				negativeRails[net.Name] = struct{}{}
+			}
+		}
+		if len(negativeRails) == 1 {
+			lower := LaneLower
+			document.Schematic.Lanes.PowerNegative = &lower
+			compatibilityIssues = append(compatibilityIssues, reports.Issue{
+				Code: CodeLegacyLaneInferred, Severity: reports.SeverityWarning,
+				Path:    "schematic.lanes.power_negative",
+				Message: "inferred lower lane for one legacy power_neg net; new provider output must set power_negative explicitly",
+			})
+		}
+	}
+	issues := append(compatibilityIssues, Validate(document)...)
+	if reports.HasBlockingIssue(issues) {
 		return document, issues
 	}
-	return Normalize(document), nil
+	return Normalize(document), issues
 }
 
 func Normalize(document Document) Document {

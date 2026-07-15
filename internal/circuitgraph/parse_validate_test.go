@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"reflect"
+	"slices"
 	"strings"
 	"testing"
 
@@ -222,6 +223,79 @@ func TestProviderSchemaContainsNamedUnitContract(t *testing.T) {
 	}
 }
 
+func TestProviderSchemaRequiresNullableNegativePowerLane(t *testing.T) {
+	schema := ProviderGraphSchema()
+	properties := requireSchemaMap(t, schema, "properties")
+	schematic := requireSchemaMap(t, requireSchemaMap(t, properties, "schematic"), "properties")
+	lanes := requireSchemaMap(t, requireSchemaMap(t, schematic, "lanes"), "properties")
+	powerNegative := requireSchemaMap(t, lanes, "power_negative")
+	variants, ok := powerNegative["anyOf"].([]any)
+	if !ok || len(variants) != 2 {
+		t.Fatalf("power_negative schema = %#v", powerNegative)
+	}
+	required, ok := requireSchemaMap(t, schematic, "lanes")["required"].([]string)
+	if !ok || !slices.Contains(required, "power_negative") {
+		t.Fatalf("lane required fields = %#v", requireSchemaMap(t, schematic, "lanes")["required"])
+	}
+}
+
+func TestSplitSupplyRequiresExplicitNegativePowerLane(t *testing.T) {
+	document := splitSupplyTestDocument()
+	document.Schematic.Lanes.PowerNegative = nil
+	data, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, issues := DecodeStrict(bytes.NewReader(data))
+	if !hasIssue(issues, string(CodeLayoutUnsupported), "schematic.lanes.power_negative") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestRecordedSplitSupplyInfersOneLegacyNegativePowerLane(t *testing.T) {
+	document := splitSupplyTestDocument()
+	document.Schematic.Lanes.PowerNegative = nil
+	data, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, issues := DecodeRecordedStrict(bytes.NewReader(data))
+	if reports.HasBlockingIssue(issues) || len(issues) != 1 || issues[0].Code != CodeLegacyLaneInferred {
+		t.Fatalf("issues = %#v", issues)
+	}
+	if decoded.Schematic.Lanes.PowerNegative == nil || *decoded.Schematic.Lanes.PowerNegative != LaneLower {
+		t.Fatalf("power_negative = %#v", decoded.Schematic.Lanes.PowerNegative)
+	}
+}
+
+func TestRecordedSplitSupplyRejectsAmbiguousImplicitNegativeLanes(t *testing.T) {
+	document := splitSupplyTestDocument()
+	document.Schematic.Lanes.PowerNegative = nil
+	document.Nets = append(document.Nets, Net{
+		Name: "VEE_AUX", Role: NetRolePowerNeg, Required: document.Nets[0].Required,
+		Endpoints: []Endpoint{
+			{Component: "j1", SelectorKind: SelectorSymbolPin, Selector: "3"},
+			{Component: "r1", SelectorKind: SelectorSymbolPin, Selector: "3"},
+		},
+	})
+	data, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, issues := DecodeRecordedStrict(bytes.NewReader(data))
+	if !hasIssue(issues, string(CodeLayoutUnsupported), "schematic.lanes.power_negative") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
+func TestNegativePowerLaneRejectedWithoutNegativeRail(t *testing.T) {
+	document := validTestDocument()
+	document.Schematic.Lanes.PowerNegative = lanePointer(LaneLower)
+	if issues := Validate(document); !hasIssue(issues, string(CodeLayoutUnsupported), "schematic.lanes.power_negative") {
+		t.Fatalf("issues = %#v", issues)
+	}
+}
+
 func requireSchemaMap(t *testing.T, parent map[string]any, key string) map[string]any {
 	t.Helper()
 	value, ok := parent[key].(map[string]any)
@@ -301,4 +375,16 @@ func validTestDocument() Document {
 		},
 		Policy: Policy{AllowReferenceAssignment: &trueValue, AllowValueNormalization: &trueValue, AllowLayoutInference: &trueValue, AllowSpacingAdjustment: &trueValue, AllowLabelInsertion: &trueValue, AllowPlacementAdjustment: &trueValue, AllowRouteRetry: &falseValue},
 	}
+}
+
+func splitSupplyTestDocument() Document {
+	document := validTestDocument()
+	document.Nets[1].Name = "VEE"
+	document.Nets[1].Role = NetRolePowerNeg
+	document.Schematic.Lanes.PowerNegative = lanePointer(LaneLower)
+	return document
+}
+
+func lanePointer(value Lane) *Lane {
+	return &value
 }

@@ -23,6 +23,7 @@ const (
 	CodeLayoutUnsupported         reports.Code = "GRAPH_LAYOUT_UNSUPPORTED"
 	CodePCBConstraintInvalid      reports.Code = "GRAPH_PCB_CONSTRAINT_INVALID"
 	CodeRepairForbidden           reports.Code = "GRAPH_REPAIR_FORBIDDEN"
+	CodeLegacyLaneInferred        reports.Code = "GRAPH_LEGACY_LANE_INFERRED"
 )
 
 var (
@@ -417,6 +418,18 @@ func (validator *graphValidator) schematic(componentsByID map[string]Component) 
 	}
 	if intent.Lanes.Power != LaneTop || intent.Lanes.Signals != LaneMiddle || intent.Lanes.Ground != LaneBottom {
 		validator.add(CodeLayoutUnsupported, "schematic.lanes", "v1 requires power top, signals middle, and ground bottom")
+	}
+	negativeRails := map[string]struct{}{}
+	for _, net := range validator.document.Nets {
+		if net.Role == NetRolePowerNeg {
+			negativeRails[net.Name] = struct{}{}
+		}
+	}
+	if len(negativeRails) == 0 && intent.Lanes.PowerNegative != nil {
+		validator.add(CodeLayoutUnsupported, "schematic.lanes.power_negative", "power_negative must be null when the graph has no power_neg net")
+	}
+	if len(negativeRails) != 0 && (intent.Lanes.PowerNegative == nil || *intent.Lanes.PowerNegative != LaneLower) {
+		validator.add(CodeLayoutUnsupported, "schematic.lanes.power_negative", "power_negative must be lower when the graph has a power_neg net")
 	}
 	if intent.Rules.PositivePowerTop == nil || intent.Rules.GroundBottom == nil || intent.Rules.CenterOnPage == nil || intent.Rules.PreferLabelsForLongNets == nil || intent.Rules.AvoidWireCrossings == nil {
 		validator.add(CodeLayoutUnsupported, "schematic.rules", "all schematic rule booleans are required")

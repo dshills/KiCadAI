@@ -399,16 +399,8 @@ func schematicLayoutIntent(resolved ResolvedDocument, unitIDs map[schematicUnitK
 			MinGroupSpacingMM:  floatPointer(source.Schematic.Rules.MinGroupSpacingMM), MinComponentSpacingMM: floatPointer(source.Schematic.Rules.MinComponentSpacingMM),
 		},
 	}
-	// Split-supply designs carry a negative rail. The circuit-graph schema has no
-	// dedicated power_negative lane field, but the IR layout validator requires an
-	// explicit power_negative lane whenever a power_neg net exists. Derive it here
-	// from the resolved net roles and seat it in the lower band, between the
-	// signal lane and the ground lane at the bottom.
-	for _, net := range resolved.Nets {
-		if net.Intent.Role == NetRolePowerNeg {
-			layout.Lanes.PowerNegative = schematicir.LanePositionLower
-			break
-		}
+	if source.Schematic.Lanes.PowerNegative != nil && *source.Schematic.Lanes.PowerNegative == LaneLower {
+		layout.Lanes.PowerNegative = schematicir.LanePositionLower
 	}
 	for _, group := range source.Schematic.Groups {
 		irGroup := schematicir.Group{ID: group.ID, Label: group.Label, Role: schematicir.GroupRole(group.Role), Rank: group.Rank, Side: schematicir.Side(group.Side)}

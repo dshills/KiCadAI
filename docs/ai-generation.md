@@ -25,6 +25,14 @@ Their checked-in provider inputs are under
 `examples/ai/usb_c_bmp280_breakout/` and
 `examples/ai/usb_c_led_indicator_protected/`.
 
+Generic circuit graphs express schematic lanes explicitly. `power`, `signals`,
+and `ground` are fixed to `top`, `middle`, and `bottom`. Provider output must set
+`power_negative` to `lower` when any net has role `power_neg`, and to `null`
+otherwise. Live provider output fails closed when a negative rail omits this
+lane. Recorded legacy responses may infer `lower` only when exactly one distinct
+negative rail exists; the run includes a compatibility warning, and multiple
+implicit negative rails remain invalid.
+
 The promoted generic references are:
 
 - `examples/ai/generic_rc_filter/`;

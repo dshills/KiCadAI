@@ -188,9 +188,9 @@ func TestToSchematicIRPreservesMultiUnitReference(t *testing.T) {
 	}
 }
 
-func TestSchematicLayoutIntentDerivesNegativePowerLane(t *testing.T) {
+func TestSchematicLayoutIntentPreservesExplicitNegativePowerLane(t *testing.T) {
 	resolved := ResolvedDocument{
-		Source: Document{Schematic: SchematicIntent{Rules: SchematicRules{}}},
+		Source: Document{Schematic: SchematicIntent{Lanes: SchematicLanes{PowerNegative: lanePointer(LaneLower)}, Rules: SchematicRules{}}},
 		Nets:   []ResolvedNet{{Intent: Net{Name: "VEE", Role: NetRolePowerNeg}}},
 	}
 	layout := schematicLayoutIntent(resolved, map[schematicUnitKey]string{}, map[string][]int{})
@@ -198,7 +198,7 @@ func TestSchematicLayoutIntentDerivesNegativePowerLane(t *testing.T) {
 		t.Fatalf("negative power lane = %q, want %q", layout.Lanes.PowerNegative, schematicir.LanePositionLower)
 	}
 
-	resolved.Nets[0].Intent.Role = NetRoleSignal
+	resolved.Source.Schematic.Lanes.PowerNegative = nil
 	layout = schematicLayoutIntent(resolved, map[schematicUnitKey]string{}, map[string][]int{})
 	if layout.Lanes.PowerNegative != schematicir.LanePositionNone {
 		t.Fatalf("non-split layout negative power lane = %q, want omitted", layout.Lanes.PowerNegative)

@@ -155,7 +155,11 @@ func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider,
 			}
 			return aiprovider.GenerateResult{}, circuitgraph.Document{}, circuitgraph.ResolvedDocument{}, designworkflow.Request{}, attempts, nil, err
 		}
-		graph, issues := circuitgraph.DecodeStrict(bytes.NewReader(result.IntentJSON))
+		decode := circuitgraph.DecodeStrict
+		if result.Recorded {
+			decode = circuitgraph.DecodeRecordedStrict
+		}
+		graph, issues := decode(bytes.NewReader(result.IntentJSON))
 		var resolved circuitgraph.ResolvedDocument
 		var request designworkflow.Request
 		if !reports.HasBlockingIssue(issues) {
