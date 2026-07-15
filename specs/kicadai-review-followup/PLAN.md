@@ -6,6 +6,21 @@ not treat every review observation as a code defect: the enum work is already
 complete, the HPWL observation is documented as a limitation, and historical
 metrics are not implementation phases.
 
+## Implementation Status
+
+Completed 2026-07-15:
+
+| Phase | Commit | Result |
+| --- | --- | --- |
+| 0. Baseline and finding ledger | `c75f07c` | Review disposition and measured baseline recorded. |
+| 1. Offline CI | `c2c8917` | GitHub Actions runs formatting, lint, tests, and coverage. |
+| 2. Embedded catalog | `4998355` | Default catalog is embedded; explicit filesystem overrides remain supported. |
+| 3. Routing contract | `de7861f` | Non-zero rip-up retries now fail closed. |
+| 4. Workflow seams | `44c5afc` | Block-planned stage dependencies are centralized and tested. |
+| 5. Capability matrix | `f426506` | Generic, bounded, and unknown provider paths are explicit. |
+| 6. Quality policy | `12b0e96` | Placement/HPWL and error-boundary contracts are documented. |
+| 7. Historical corpus | `4c9782b` | Historical findings have reproducible status and evidence links. |
+
 ## Phase 0: Baseline and Finding Ledger
 
 **Objective:** Freeze reproducible evidence for the review dispositions before
@@ -311,7 +326,9 @@ For every implementation phase:
 6. Commit the phase independently and record the evidence paths.
 7. Stop and reassess the next phase if the evidence contradicts this plan.
 
-The project is complete for this review follow-up when Phases 1-3 are done,
-Phase 4 has at least one safe seam extracted, and the remaining architectural
-limitations are represented by the capability matrix and regression evidence.
-
+This review follow-up is complete: the offline quality and catalog deployment
+gaps are closed, the routing contract and workflow stage boundary are explicit,
+and the remaining architectural limitations are represented by the capability
+matrix and historical regression ledger. Future general autorouting, global
+placement optimization, and arbitrary imported-project preservation remain
+separate capability work rather than untracked review debt.
