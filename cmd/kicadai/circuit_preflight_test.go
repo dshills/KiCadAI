@@ -417,6 +417,94 @@ func TestCircuitRepairPlanConvergesRCGraphToDirectCreate(t *testing.T) {
 	}
 }
 
+func TestCircuitRepairPlanDerivesLM358UnitPatch(t *testing.T) {
+	recorded, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", "generic_lm358_buffered_signal_conditioner", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Intent json.RawMessage `json:"intent"`
+	}
+	if err := json.Unmarshal(recorded, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	brokenContents := strings.Replace(string(envelope.Intent), `"unit":"B"`, `"unit":"Z"`, 1)
+	if brokenContents == string(envelope.Intent) {
+		t.Fatal("LM358 fixture no longer exposes a unit B endpoint")
+	}
+	tmpDir := t.TempDir()
+	broken := filepath.Join(tmpDir, "invalid-multi-unit.json")
+	if err := os.WriteFile(broken, []byte(brokenContents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	planned := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", broken})
+	plan := circuitRepairPlanResultData(t, planned).Plan
+	if plan.State != circuitgraph.RepairPlanAvailable || plan.Patch == nil || len(plan.Patch.Operations) != 1 || plan.Patch.Operations[0].Replacement == nil || plan.Patch.Operations[0].Replacement.Unit != "B" {
+		t.Fatalf("LM358 repair plan = %#v", plan)
+	}
+	patch, err := json.Marshal(plan.Patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patchPath := filepath.Join(tmpDir, "repair.json")
+	if err := os.WriteFile(patchPath, patch, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corrected := filepath.Join(tmpDir, "corrected.json")
+	patched, patchErr := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", broken, "--patch", patchPath, "--output", corrected})
+	if patchErr != nil || !patched.OK || !circuitPatchResultData(t, patched).ReadyForWrite {
+		t.Fatalf("apply LM358 plan err=%v result=%#v", patchErr, patched)
+	}
+}
+
+func TestCircuitRepairPlanDerivesBoundedRegionPatch(t *testing.T) {
+	base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, issues := circuitgraph.DecodeStrict(bytes.NewReader(base))
+	if reports.HasBlockingIssue(issues) {
+		t.Fatalf("decode RC graph issues=%#v", issues)
+	}
+	modified := false
+	for index := range graph.PCB.Regions {
+		if graph.PCB.Regions[index].ID == "filter" {
+			graph.PCB.Regions[index].Bounds.WidthMM = 120
+			modified = true
+		}
+	}
+	if !modified {
+		t.Fatal("RC fixture no longer exposes the bounded filter region")
+	}
+	brokenContents, err := json.Marshal(graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tmpDir := t.TempDir()
+	broken := filepath.Join(tmpDir, "invalid-region.json")
+	if err := os.WriteFile(broken, brokenContents, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	planned := runCircuitPreflightCLI(t, []string{"circuit", "repair-plan", "--request", broken})
+	plan := circuitRepairPlanResultData(t, planned).Plan
+	if plan.State != circuitgraph.RepairPlanAvailable || plan.Patch == nil || len(plan.Patch.Operations) != 1 || plan.Patch.Operations[0].Bounds == nil {
+		t.Fatalf("region repair plan = %#v", plan)
+	}
+	patch, err := json.Marshal(plan.Patch)
+	if err != nil {
+		t.Fatal(err)
+	}
+	patchPath := filepath.Join(tmpDir, "repair.json")
+	if err := os.WriteFile(patchPath, patch, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corrected := filepath.Join(tmpDir, "corrected.json")
+	patched, patchErr := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", broken, "--patch", patchPath, "--output", corrected})
+	if patchErr != nil || !patched.OK || !circuitPatchResultData(t, patched).ReadyForWrite {
+		t.Fatalf("apply region plan err=%v result=%#v", patchErr, patched)
+	}
+}
+
 func TestCircuitPatchRejectsUnsupportedSubstitutionWithoutOutput(t *testing.T) {
 	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
 	patch := filepath.Join(t.TempDir(), "unsupported-substitution.json")
