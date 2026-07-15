@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/kicadfiles/checks"
 	"kicadai/internal/reports"
 )
 
@@ -147,6 +148,67 @@ func TestCircuitCreateFailsClosedBeforeWrite(t *testing.T) {
 	}
 }
 
+func TestCircuitCreateRCGraphIsDeterministic(t *testing.T) {
+	graph := writeCircuitCreateRCGraph(t)
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	create := func(name string) (circuitCreateData, string) {
+		t.Helper()
+		output := filepath.Join(t.TempDir(), name)
+		result, err := runCircuitCreateCLI(t, []string{
+			"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+			"circuit", "create", "--request", graph, "--output", output, "--overwrite",
+		})
+		if err != nil || !result.OK {
+			t.Fatalf("circuit create %s err=%v result=%#v", name, err, result)
+		}
+		data := circuitCreateResultData(t, result)
+		return data, output
+	}
+	first, firstOutput := create("first")
+	second, secondOutput := create("second")
+	if string(mustJSON(t, first.Preflight.Graph)) != string(mustJSON(t, second.Preflight.Graph)) ||
+		string(mustJSON(t, first.Preflight.Request)) != string(mustJSON(t, second.Preflight.Request)) ||
+		string(mustJSON(t, first.Preflight.Placement)) != string(mustJSON(t, second.Preflight.Placement)) ||
+		string(mustJSON(t, first.Preflight.Routing)) != string(mustJSON(t, second.Preflight.Routing)) {
+		t.Fatalf("direct circuit create preflight evidence is not deterministic")
+	}
+	for _, file := range []string{"generic_rc_filter.kicad_pro", "generic_rc_filter.kicad_sch", "generic_rc_filter.kicad_pcb"} {
+		firstContents, err := os.ReadFile(filepath.Join(firstOutput, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		secondContents, err := os.ReadFile(filepath.Join(secondOutput, file))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if string(firstContents) != string(secondContents) {
+			t.Fatalf("generated %s is not deterministic", file)
+		}
+	}
+}
+
+func TestCircuitCreateOptionalKiCadBMP280(t *testing.T) {
+	cliPath := strings.TrimSpace(os.Getenv(checks.EnvKiCadCLI))
+	symbolsRoot := strings.TrimSpace(os.Getenv("KICADAI_SYMBOLS_ROOT"))
+	footprintsRoot := strings.TrimSpace(os.Getenv("KICADAI_FOOTPRINTS_ROOT"))
+	if cliPath == "" || symbolsRoot == "" || footprintsRoot == "" {
+		t.Skip("set KICADAI_KICAD_CLI, KICADAI_SYMBOLS_ROOT, and KICADAI_FOOTPRINTS_ROOT to run direct BMP280 KiCad promotion")
+	}
+	output := filepath.Join(t.TempDir(), "project")
+	result, err := runCircuitCreateCLI(t, []string{
+		"--kicad-cli", cliPath, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"--catalog-dir", filepath.Join("..", "..", "data", "components"),
+		"--require-kicad-roundtrip", "--strict-diffs",
+		"circuit", "create", "--request", filepath.Join("..", "..", "examples", "circuit-graph", "usb_c_bmp280_breakout.json"), "--output", output, "--overwrite",
+	})
+	if err != nil || !result.OK {
+		t.Fatalf("direct BMP280 KiCad promotion err=%v result=%#v", err, result)
+	}
+	if !circuitCreateResultData(t, result).Preflight.ReadyForWrite {
+		t.Fatal("direct BMP280 create did not preserve preflight readiness")
+	}
+}
+
 func runCircuitPreflightCLI(t *testing.T, args []string) reports.Result {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
@@ -270,4 +332,13 @@ func writeCircuitCreateLibraryFixture(t *testing.T) (string, string) {
 		writeTestFile(t, filepath.Join(footprints, fixture.path), fixture.body)
 	}
 	return symbols, footprints
+}
+
+func mustJSON(t *testing.T, value any) []byte {
+	t.Helper()
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return encoded
 }
