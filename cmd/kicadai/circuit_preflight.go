@@ -39,6 +39,7 @@ type circuitPreflightData struct {
 	Routing           *designworkflow.RoutingStageResult   `json:"routing,omitempty"`
 	RequiredEvidence  []string                             `json:"required_evidence"`
 	Gates             []circuitPreflightGate               `json:"gates"`
+	RepairOptions     []circuitgraph.RepairOption          `json:"repair_options"`
 	ReadyForWrite     bool                                 `json:"ready_for_write"`
 }
 
@@ -410,7 +411,7 @@ func parseCircuitPreflightArgs(opts *cliOptions) *reports.Issue {
 }
 
 func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPreflightEvaluation {
-	data := circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}}
+	data := circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}, RepairOptions: []circuitgraph.RepairOption{}}
 	result := circuitPreflightEvaluation{Data: data, Issues: []reports.Issue{}}
 	catalogDir := opts.catalogDir
 	if strings.TrimSpace(catalogDir) == components.DefaultCatalogDir {
@@ -440,11 +441,12 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	defer contents.Close()
 	graph, issues := circuitgraph.DecodeStrict(contents)
 	result.Data.Gates = append(result.Data.Gates, preflightGate("strict_decode", issues, designworkflow.StageParseRequest))
+	result.Data.Graph = &graph
 	if reports.HasBlockingIssue(issues) {
 		result.Issues = preflightIssues(designworkflow.StageParseRequest, issues)
+		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
 	}
-	result.Data.Graph = &graph
 
 	libraryIndex, libraryIssues := circuitPreflightLibraryIndex(ctx, opts)
 	issues = append(issues, preflightIssues(designworkflow.StageLibraryContext, libraryIssues)...)
@@ -466,6 +468,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	result.Data.Gates = append(result.Data.Gates, preflightGate("catalog_resolution", resolveIssues, designworkflow.StageComponentSelection))
 	if reports.HasBlockingIssue(resolveIssues) {
 		result.Issues = issues
+		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
 	}
 	result.Data.Resolution = &resolved
@@ -476,6 +479,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	if reports.HasBlockingIssue(lowerIssues) {
 		result.Data.Gates = append(result.Data.Gates, preflightGate("schematic_lowering", lowerIssues, designworkflow.StageSchematic))
 		result.Issues = issues
+		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
 	}
 	result.Data.Request = &request
@@ -488,6 +492,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	result.Data.Gates = append(result.Data.Gates, preflightGate("schematic_electrical_and_readability", schematicIssues, designworkflow.StageSchematicElectrical))
 	if reports.HasBlockingIssue(schematicIssues) {
 		result.Issues = issues
+		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
 	}
 
@@ -499,6 +504,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	result.Data.Gates = append(result.Data.Gates, preflightGate("placement", placementIssues, designworkflow.StagePlacement))
 	if reports.HasBlockingIssue(placementIssues) || placed.Stage.Status == designworkflow.StageStatusSkipped {
 		result.Issues = issues
+		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
 	}
 
@@ -510,6 +516,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	result.Data.Gates = append(result.Data.Gates, preflightGate("required_net_routing", routingIssues, designworkflow.StageRouting))
 	if reports.HasBlockingIssue(routingIssues) || routed.Stage.Status == designworkflow.StageStatusSkipped {
 		result.Issues = issues
+		result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 		return result
 	}
 
@@ -517,6 +524,7 @@ func evaluateCircuitPreflight(ctx context.Context, opts cliOptions) circuitPrefl
 	result.Data.Gates = append(result.Data.Gates, circuitPreflightGate{Name: "kicad_drc", Status: externalEvidenceStatus(request.Validation.RequireDRC), External: request.Validation.RequireDRC})
 	result.Data.ReadyForWrite = !reports.HasBlockingIssue(issues)
 	result.Issues = issues
+	result.Data.RepairOptions = circuitgraph.RepairOptions(graph, catalog, result.Issues)
 	return result
 }
 
