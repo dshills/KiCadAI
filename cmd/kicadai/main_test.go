@@ -1724,7 +1724,7 @@ func TestRunComponentValidateWithSourceDir(t *testing.T) {
 		t.Fatalf("result data = %#v", result.Data)
 	}
 	// Source snapshots intentionally cover concrete purchasable parts, not blocked placeholders.
-	if got, ok := data["source_record_count"].(float64); !ok || got != 22 {
+	if got, ok := data["source_record_count"].(float64); !ok || got != 23 {
 		t.Fatalf("source_record_count = %#v in %#v", data["source_record_count"], data)
 	}
 }

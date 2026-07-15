@@ -71,6 +71,25 @@
       }
     },
     {
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFR1C221",
+      "lifecycle": {
+        "status": "active",
+        "source": "manufacturer",
+        "source_date": "2026-07-15",
+        "confidence": "curated"
+      },
+      "availability": {
+        "status": "not_checked",
+        "source": "curated",
+        "source_date": "2026-07-15",
+        "confidence": "not_checked"
+      },
+      "notes": [
+        "Panasonic product data verifies identity and lifecycle; no live distributor availability is implied."
+      ]
+    },
+    {
       "manufacturer": "Lite-On",
       "mpn": "LTST-C170KGKT",
       "lifecycle": {

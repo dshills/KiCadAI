@@ -51,6 +51,9 @@ generated parts, plus explicit blocked placeholders for unsupported power
 devices:
 
 - 0603/0805 resistor and capacitor seeds;
+- Panasonic EEUFR1C221 220 uF/16 V polarized radial capacitor with verified
+  KiCad pin/pad polarity; fabrication use still requires ESR, ripple-current,
+  lifetime, and derating review;
 - 1x02 through 1x06 Samtec pin headers;
 - 0603/0805 Lite-On indicator LEDs;
 - Signal and Schottky diodes plus a SOD-323 ESD/TVS protection diode;

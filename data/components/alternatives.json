@@ -86,6 +86,56 @@
       "verification": {"confidence": "verified", "sources": ["curated_seed_catalog", "curated_part:Murata:GRM21BR71H104KA01L", "builtin_pinmap:Device:C"], "pinmap_checked": true, "notes": ["Voltage derating remains design-specific."]}
     },
     {
+      "id": "capacitor.panasonic.eeufr1c221.radial",
+      "family": "capacitor",
+      "name": "Panasonic EEUFR1C221 220uF 16V radial electrolytic capacitor",
+      "description": "Concrete polarized 220 uF radial aluminum electrolytic capacitor for connectivity-proven bulk and AC-coupling paths.",
+      "generic": false,
+      "manufacturer": "Panasonic",
+      "mpn": "EEUFR1C221",
+      "lifecycle": "active",
+      "tags": ["passive", "through_hole", "radial", "polarized", "electrolytic", "220u", "16v"],
+      "values": [{"kind": "capacitance", "typ": "220u", "unit": "F"}],
+      "ratings": [{"kind": "voltage", "max": "16", "unit": "V"}],
+      "tolerances": [{"kind": "capacitance", "typ": "20", "unit": "%"}],
+      "temperature": {"min": "-40", "max": "105", "unit": "C"},
+      "capacitor_evidence": {
+        "dielectric": "aluminum_electrolytic",
+        "nominal_capacitance": "220u",
+        "capacitance_unit": "F",
+        "voltage_rating": "16",
+        "voltage_unit": "V",
+        "dc_bias_review": "not_applicable",
+        "effective_capacitance_review": "review_required",
+        "esr_review": "review_required",
+        "fabrication_candidate_blocks": true,
+        "review_note": "Polarity, nominal value, voltage, body diameter, height, and lead pitch are verified. Applied ripple current, ESR, lifetime, temperature derating, and circuit-specific voltage margin require engineering review."
+      },
+      "symbols": [{
+        "symbol_id": "Device:C_Polarized",
+        "function_pins": [
+          {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
+          {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}
+        ],
+        "verification": {"confidence": "verified", "sources": ["kicad-symbol:Device:C_Polarized", "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221"], "pinmap_checked": true}
+      }],
+      "packages": [{
+        "id": "radial_d6_3_p2_5",
+        "name": "Radial 6.3 mm, 2.5 mm pitch",
+        "footprint_id": "Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
+        "package_type": "radial",
+        "pinmap_id": "Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm",
+        "pad_functions": [
+          {"function": "POSITIVE", "pad": "1", "polarity": "positive"},
+          {"function": "NEGATIVE", "pad": "2", "polarity": "negative"}
+        ],
+        "dimensions_mm": {"width": 6.3, "height": 6.3},
+        "height_mm": 11.2,
+        "verification": {"confidence": "verified", "sources": ["kicad-footprint:Capacitor_THT:CP_Radial_D6.3mm_P2.50mm", "https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221"], "pinmap_checked": true}
+      }],
+      "verification": {"confidence": "verified", "sources": ["https://industrial.panasonic.com/ww/products/pt/aluminum-cap-lead/models/EEUFR1C221", "https://industrial.panasonic.com/cdbs/www-data/pdf/RDF0000/ABA0000C1259.pdf", "kicad-pinmap:Device:C_Polarized|Capacitor_THT:CP_Radial_D6.3mm_P2.50mm"], "resolver_checked": true, "pinmap_checked": true, "tests": ["catalog_polarized_capacitor_selection", "catalog_library_validation"], "notes": ["Fabrication-candidate use remains blocked pending circuit-specific ESR, ripple-current, lifetime, and derating review."]}
+    },
+    {
       "id": "led.liteon.ltst_c170kgkt.0805",
       "family": "led",
       "name": "Lite-On LTST-C170KGKT green 0805 LED",

@@ -142,6 +142,58 @@ func TestSelectConcrete0603CapacitorByPackage(t *testing.T) {
 	}
 }
 
+func TestSelectVerifiedPolarizedCapacitorForConnectivity(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	selection, result := Select(context.Background(), catalog, SelectionRequest{
+		Query: Query{
+			Family:    "capacitor",
+			Package:   "radial_d6_3_p2_5",
+			ValueKind: "capacitance",
+			Value:     "220u",
+		},
+		Acceptance:        AcceptanceConnectivity,
+		RequireConcrete:   true,
+		RequiredFunctions: []string{"POSITIVE", "NEGATIVE"},
+		RequiredRatings:   []RequiredRating{{Kind: "voltage", Value: "12", Unit: "V"}},
+	})
+	if !result.OK {
+		t.Fatalf("select polarized capacitor failed: %+v", result.Issues)
+	}
+	symbol := selection.Component.Symbols[0]
+	if selection.Component.ID != "capacitor.panasonic.eeufr1c221.radial" || symbol.SymbolID != "Device:C_Polarized" || selection.Variant.FootprintID != "Capacitor_THT:CP_Radial_D6.3mm_P2.50mm" {
+		t.Fatalf("polarized capacitor selection = %+v", selection)
+	}
+	var positivePin, positivePad string
+	for _, pin := range symbol.FunctionPins {
+		if pin.Function == "POSITIVE" {
+			positivePin = pin.Polarity
+		}
+	}
+	for _, pad := range selection.Variant.PadFunctions {
+		if pad.Function == "POSITIVE" {
+			positivePad = pad.Polarity
+		}
+	}
+	if positivePin != "positive" || positivePad != "positive" {
+		t.Fatalf("positive pin/pad mapping = %+v / %+v", symbol.FunctionPins, selection.Variant.PadFunctions)
+	}
+}
+
+func TestSelectPolarizedCapacitorBlocksFabricationPendingReview(t *testing.T) {
+	catalog := loadCheckedInCatalog(t)
+	_, result := Select(context.Background(), catalog, SelectionRequest{
+		Query:             Query{Family: "capacitor", Package: "radial_d6_3_p2_5", ValueKind: "capacitance", Value: "220u"},
+		Acceptance:        AcceptanceFabricationCandidate,
+		RequireConcrete:   true,
+		RequiredFunctions: []string{"POSITIVE", "NEGATIVE"},
+	})
+	if result.OK {
+		t.Fatal("expected polarized capacitor fabrication selection to require engineering review")
+	}
+	assertIssueCode(t, result.Issues, CodeComponentReviewRequired)
+	assertIssuePath(t, result.Issues, "component.capacitor.panasonic.eeufr1c221.radial.capacitor_evidence.esr_review")
+}
+
 func TestSelectRegulatorCompanionCapacitorWithRatings(t *testing.T) {
 	catalog := loadCheckedInCatalog(t)
 	selection, result := Select(context.Background(), catalog, SelectionRequest{

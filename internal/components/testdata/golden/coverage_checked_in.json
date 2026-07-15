@@ -1,15 +1,15 @@
 {
-  "record_count": 52,
+  "record_count": 53,
   "family_count": 14,
   "confidence_counts": {
     "blocked": 1,
     "library_derived": 0,
     "placeholder": 4,
     "rule_inferred": 5,
-    "verified": 42
+    "verified": 43
   },
   "alternative_coverage": {
-    "concrete_records": 30,
+    "concrete_records": 31,
     "generic_fallback_records": 22,
     "equivalence_groups": 19
   },
@@ -40,11 +40,11 @@
     {
       "family": "capacitor",
       "defined": true,
-      "record_count": 6,
-      "concrete_records": 3,
+      "record_count": 7,
+      "concrete_records": 4,
       "generic_fallback_records": 3,
       "equivalence_groups": 3,
-      "verified_records": 3,
+      "verified_records": 4,
       "library_derived_records": 0,
       "rule_inferred_records": 2,
       "placeholder_records": 1,
@@ -63,7 +63,8 @@
         "capacitor.electrolytic.radial",
         "capacitor.murata.grm188r71h104ka93d.0603",
         "capacitor.murata.grm21br61a106ke19l.0805",
-        "capacitor.murata.grm21br71h104ka01l.0805"
+        "capacitor.murata.grm21br71h104ka01l.0805",
+        "capacitor.panasonic.eeufr1c221.radial"
       ]
     },
     {
