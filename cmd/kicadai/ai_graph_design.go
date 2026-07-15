@@ -14,6 +14,7 @@ import (
 	"kicadai/internal/circuitgraph"
 	"kicadai/internal/components"
 	"kicadai/internal/designworkflow"
+	"kicadai/internal/generationcapability"
 	"kicadai/internal/intentplanner"
 	"kicadai/internal/reports"
 )
@@ -43,7 +44,7 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "catalog_dir", Message: err.Error()})
 	}
-	capability, err := circuitgraph.ProviderCapabilityContext(catalog, aiprovider.MaxCapabilityBytes)
+	capability, err := generationcapability.ProviderCapabilityContext(catalog, aiprovider.MaxCapabilityBytes)
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "provider.capability", Message: err.Error()})
 	}

@@ -4,9 +4,12 @@
 package generationcapability
 
 import (
+	"encoding/json"
+	"fmt"
 	"slices"
 
 	"kicadai/internal/circuitgraph"
+	"kicadai/internal/components"
 )
 
 type Kind string
@@ -31,6 +34,14 @@ type Capability struct {
 	Supports         []string `json:"supports"`
 	Limitations      []string `json:"limitations"`
 	RequiredEvidence []string `json:"required_evidence"`
+}
+
+// Document is the machine-readable AI generation contract. It combines the
+// stable profile matrix with the catalog-derived generic graph vocabulary that
+// an AI provider must obey for this installation.
+type Document struct {
+	Capabilities         []Capability    `json:"capabilities"`
+	GenericGraphContract json.RawMessage `json:"generic_graph_contract"`
 }
 
 var commonRequiredEvidence = []string{
@@ -104,6 +115,41 @@ func Lookup(profileID string) (Capability, bool) {
 		}
 	}
 	return Capability{}, false
+}
+
+// BuildDocument returns the single capability representation shared by the
+// CLI and generic provider prompt construction. The catalog contract remains
+// opaque here so circuitgraph remains the authority for graph vocabulary.
+func BuildDocument(catalog *components.Catalog) (Document, error) {
+	genericContract, err := circuitgraph.ProviderCapabilityContext(catalog, 0)
+	if err != nil {
+		return Document{}, err
+	}
+	document := Document{
+		Capabilities:         All(),
+		GenericGraphContract: json.RawMessage(genericContract),
+	}
+	if !json.Valid(document.GenericGraphContract) {
+		return Document{}, fmt.Errorf("generic graph capability contract is not valid JSON")
+	}
+	return document, nil
+}
+
+// ProviderCapabilityContext serializes BuildDocument for the provider prompt
+// and enforces the profile's capability-context size limit.
+func ProviderCapabilityContext(catalog *components.Catalog, maxBytes int) (string, error) {
+	document, err := BuildDocument(catalog)
+	if err != nil {
+		return "", err
+	}
+	data, err := json.Marshal(document)
+	if err != nil {
+		return "", fmt.Errorf("encode generation capability document: %w", err)
+	}
+	if maxBytes > 0 && len(data) > maxBytes {
+		return "", fmt.Errorf("generation capability document is %d bytes, exceeds %d-byte provider limit", len(data), maxBytes)
+	}
+	return string(data), nil
 }
 
 func clone(capability Capability) Capability {

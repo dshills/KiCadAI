@@ -61,6 +61,7 @@ Usage:
 
 Commands:
   capabilities  Report detected KiCad API capabilities
+	capability    Report AI generation capability contracts
   config        Print resolved connection configuration
   documents     List open KiCad documents
   draw-led-demo Execute the LED indicator schematic plan when supported
@@ -348,6 +349,8 @@ func (a app) run(args []string, stdout io.Writer, stderr io.Writer) error {
 		return nil
 	case "capabilities":
 		return a.runCapabilities(opts, stdout)
+	case "capability":
+		return runGenerationCapability(ctx, opts, stdout)
 	case "config":
 		return runConfig(opts, stdout)
 	case "documents":
