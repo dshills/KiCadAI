@@ -657,6 +657,61 @@ func TestGenerateValidatedAIIntentDoesNotRetryAuthentication(t *testing.T) {
 	}
 }
 
+func TestGenerateValidatedAIGraphReturnsAggregatedPreflightDiagnostics(t *testing.T) {
+	recordedData, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", "generic_parallel_resistors", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	intent, err := aiprovider.DecodeEnvelope(recordedData)
+	if err != nil {
+		t.Fatal(err)
+	}
+	graph, decodeIssues := circuitgraph.DecodeRecordedStrict(bytes.NewReader(intent))
+	if reports.HasBlockingIssue(decodeIssues) {
+		t.Fatalf("decode issues = %#v", decodeIssues)
+	}
+	graph.Components[0].ComponentID = ""
+	graph.Components[0].VariantID = ""
+	graph.Nets[0].Role = circuitgraph.NetRole("invalid")
+	graph.Schematic.Groups[0].Members = append(graph.Schematic.Groups[0].Members, "missing")
+	graph.PCB.Zones = append(graph.PCB.Zones, circuitgraph.PCBZone{Net: "missing", Layers: []string{"F.Cu"}})
+	graph.Policy.AllowRouteRetry = nil
+	invalid, err := json.Marshal(graph)
+	if err != nil {
+		t.Fatal(err)
+	}
+	provider := &sequenceAIProvider{results: []aiprovider.GenerateResult{
+		{Provider: "sequence", IntentJSON: invalid},
+		{Provider: "sequence", IntentJSON: invalid},
+	}}
+	_, _, _, _, attempts, issues, err := generateValidatedAIGraph(
+		context.Background(), provider, aiprovider.GenericCircuitProfile("catalog"),
+		circuitgraph.NewResolver(circuitgraph.ResolveOptions{}), "invalid graph", 2,
+	)
+	if err != nil || len(attempts) != 2 || !reports.HasBlockingIssue(issues) || len(provider.requests) != 2 {
+		t.Fatalf("err=%v attempts=%#v issues=%#v requests=%d", err, attempts, issues, len(provider.requests))
+	}
+	diagnostics := provider.requests[1].Diagnostics
+	if len(diagnostics) != 5 || len(diagnostics) > aiprovider.MaxDiagnostics {
+		t.Fatalf("diagnostics = %#v", diagnostics)
+	}
+	scopes := map[string]bool{}
+	for _, diagnostic := range diagnostics {
+		if diagnostic.IssueID == "" || diagnostic.RetryScope == "" || diagnostic.SuggestedAction == "" || diagnostic.RootCauseID != "" {
+			t.Fatalf("incomplete diagnostic metadata: %#v", diagnostic)
+		}
+		if len(diagnostic.SuggestedAction) >= aiprovider.MaxDiagnosticLen {
+			t.Fatalf("built-in suggested action reached the provider truncation bound: %#v", diagnostic)
+		}
+		scopes[diagnostic.RetryScope] = true
+	}
+	for _, scope := range []string{"component", "connectivity", "schematic", "pcb", "policy"} {
+		if !scopes[scope] {
+			t.Fatalf("missing retry scope %q in %#v", scope, diagnostics)
+		}
+	}
+}
+
 func TestPrepareAIWorkflowRequestEnablesBoundedPlacementRepair(t *testing.T) {
 	original := designworkflow.Request{
 		Blocks: []designworkflow.BlockInstanceSpec{

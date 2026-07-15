@@ -39,9 +39,13 @@ type GenerateRequest struct {
 }
 
 type Diagnostic struct {
-	Code    string `json:"code"`
-	Path    string `json:"path,omitempty"`
-	Message string `json:"message"`
+	Code            string `json:"code"`
+	Path            string `json:"path,omitempty"`
+	Message         string `json:"message"`
+	IssueID         string `json:"issue_id,omitempty"`
+	RootCauseID     string `json:"root_cause_id,omitempty"`
+	RetryScope      string `json:"retry_scope,omitempty"`
+	SuggestedAction string `json:"suggested_action,omitempty"`
 }
 
 type GenerateResult struct {
@@ -147,6 +151,9 @@ func ValidateGenerateRequest(request GenerateRequest) error {
 		}
 		if len(diagnostic.Code) > MaxDiagnosticLen || len(diagnostic.Path) > MaxDiagnosticLen || len(diagnostic.Message) > MaxDiagnosticLen {
 			return newProviderError(ErrorConfiguration, fmt.Sprintf("AI diagnostic %d exceeds field size limit", index), nil)
+		}
+		if len(diagnostic.IssueID) > MaxDiagnosticLen || len(diagnostic.RootCauseID) > MaxDiagnosticLen || len(diagnostic.RetryScope) > MaxDiagnosticLen || len(diagnostic.SuggestedAction) > MaxDiagnosticLen {
+			return newProviderError(ErrorConfiguration, fmt.Sprintf("AI diagnostic %d metadata exceeds field size limit", index), nil)
 		}
 	}
 	return nil

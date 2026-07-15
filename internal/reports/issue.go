@@ -57,14 +57,18 @@ const (
 )
 
 type Issue struct {
-	Code       Code     `json:"code"`
-	Severity   Severity `json:"severity"`
-	Path       string   `json:"path,omitempty"`
-	Message    string   `json:"message"`
-	UUIDs      []string `json:"uuids,omitempty"`
-	Refs       []string `json:"refs,omitempty"`
-	Nets       []string `json:"nets,omitempty"`
-	Suggestion string   `json:"suggestion,omitempty"`
+	Code        Code     `json:"code"`
+	Severity    Severity `json:"severity"`
+	IssueID     string   `json:"issue_id,omitempty"`
+	RootCauseID string   `json:"root_cause_id,omitempty"`
+	Stage       string   `json:"stage,omitempty"`
+	RetryScope  string   `json:"retry_scope,omitempty"`
+	Path        string   `json:"path,omitempty"`
+	Message     string   `json:"message"`
+	UUIDs       []string `json:"uuids,omitempty"`
+	Refs        []string `json:"refs,omitempty"`
+	Nets        []string `json:"nets,omitempty"`
+	Suggestion  string   `json:"suggestion,omitempty"`
 	// OperationID links this issue to a planned transaction operation when available.
 	OperationID string `json:"operation_id,omitempty"`
 }

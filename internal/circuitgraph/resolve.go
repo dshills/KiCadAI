@@ -66,6 +66,11 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		result.CatalogID = "catalog"
 	}
 	resolvedByID := make(map[string]ResolvedComponent, len(normalized.Components))
+	type unresolvedRoot struct {
+		issueID    string
+		retryScope string
+	}
+	unresolvedRoots := make(map[string]unresolvedRoot)
 	var issues []reports.Issue
 	for index, instance := range normalized.Components {
 		if err := ctx.Err(); err != nil {
@@ -77,10 +82,9 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		if !reports.HasBlockingIssue(componentIssues) {
 			result.Components = append(result.Components, component)
 			resolvedByID[instance.ID] = component
+		} else if root := firstGraphRootIssue(componentIssues); root.IssueID != "" {
+			unresolvedRoots[instance.ID] = unresolvedRoot{issueID: root.IssueID, retryScope: root.RetryScope}
 		}
-	}
-	if reports.HasBlockingIssue(issues) {
-		return result, issues
 	}
 	usedBindings := map[physicalBindingID]struct{}{}
 	physicalOwners := map[physicalBindingID]string{}
@@ -88,6 +92,10 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 		resolvedNet := ResolvedNet{Intent: net}
 		for endpointIndex, endpoint := range net.Endpoints {
 			path := fmt.Sprintf("nets[%d].endpoints[%d]", netIndex, endpointIndex)
+			if root := unresolvedRoots[endpoint.Component]; root.issueID != "" {
+				issues = append(issues, graphDependentIssue(CodePinUnresolved, path, "endpoint depends on an unresolved component", root.issueID, root.retryScope))
+				continue
+			}
 			resolvedEndpoint, endpointIssues := resolveEndpoint(path, endpoint, resolvedByID)
 			issues = append(issues, endpointIssues...)
 			if len(endpointIssues) == 0 {
@@ -101,6 +109,10 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 	issues = append(issues, validateResolvedPowerFlags(result.Source.PowerFlags, result.Nets)...)
 	for endpointIndex, endpoint := range normalized.NoConnects {
 		path := fmt.Sprintf("no_connects[%d]", endpointIndex)
+		if root := unresolvedRoots[endpoint.Component]; root.issueID != "" {
+			issues = append(issues, graphDependentIssue(CodePinUnresolved, path, "no-connect depends on an unresolved component", root.issueID, root.retryScope))
+			continue
+		}
 		resolvedEndpoint, endpointIssues := resolveEndpoint(path, endpoint, resolvedByID)
 		issues = append(issues, endpointIssues...)
 		if len(endpointIssues) == 0 {
@@ -131,7 +143,16 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 	if !reports.HasBlockingIssue(issues) {
 		result.ResolutionHash = resolvedHash(result)
 	}
-	return result, issues
+	return result, finalizeGraphIssues(issues)
+}
+
+func firstGraphRootIssue(issues []reports.Issue) reports.Issue {
+	for _, issue := range issues {
+		if issue.Blocking() && issue.RootCauseID == "" {
+			return issue
+		}
+	}
+	return reports.Issue{}
 }
 
 func validateResolvedPowerFlags(flags []PowerFlag, nets []ResolvedNet) []reports.Issue {
@@ -775,20 +796,5 @@ func weakerGraphConfidence(left, right components.ConfidenceLevel) components.Co
 }
 
 func dedupeGraphIssues(issues []reports.Issue) []reports.Issue {
-	type issueKey struct {
-		code    reports.Code
-		path    string
-		message string
-	}
-	seen := map[issueKey]struct{}{}
-	result := make([]reports.Issue, 0, len(issues))
-	for _, issue := range issues {
-		key := issueKey{code: issue.Code, path: issue.Path, message: issue.Message}
-		if _, exists := seen[key]; exists {
-			continue
-		}
-		seen[key] = struct{}{}
-		result = append(result, issue)
-	}
-	return result
+	return finalizeGraphIssues(issues)
 }

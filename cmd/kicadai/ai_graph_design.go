@@ -226,7 +226,11 @@ func aiGraphRetryDiagnostics(issues []reports.Issue) []aiprovider.Diagnostic {
 		if !issue.Blocking() || !strings.HasPrefix(issue.Path, "provider.graph") {
 			continue
 		}
-		diagnostics = append(diagnostics, aiprovider.Diagnostic{Code: string(issue.Code), Path: issue.Path, Message: boundedDiagnosticMessage(issue.Message)})
+		diagnostics = append(diagnostics, aiprovider.Diagnostic{
+			Code: string(issue.Code), Path: issue.Path, Message: boundedDiagnosticMessage(issue.Message),
+			IssueID: issue.IssueID, RootCauseID: issue.RootCauseID, RetryScope: issue.RetryScope,
+			SuggestedAction: boundedDiagnosticMessage(issue.Suggestion),
+		})
 		if len(diagnostics) == aiprovider.MaxDiagnostics {
 			break
 		}

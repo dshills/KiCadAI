@@ -43,7 +43,7 @@ func Validate(document Document) []reports.Issue {
 	validator.schematic(componentsByID)
 	validator.pcb(componentsByID, netsByName)
 	validator.policy()
-	return validator.issues
+	return finalizeGraphIssues(validator.issues)
 }
 
 type graphValidator struct {
@@ -635,7 +635,7 @@ func (validator *graphValidator) boundedString(path, value string, limit int) {
 }
 
 func graphIssue(code reports.Code, path, message string) reports.Issue {
-	return reports.Issue{Code: code, Severity: reports.SeverityError, Path: path, Message: message}
+	return annotateGraphIssue(reports.Issue{Code: code, Severity: reports.SeverityError, Path: path, Message: message})
 }
 
 func finiteInRange(value, minimum, maximum float64, allowMinimum bool) bool {
