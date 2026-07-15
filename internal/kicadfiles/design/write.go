@@ -53,12 +53,6 @@ func WriteProjectDirectory(root string, design Design, opts WriteOptions) (Write
 	if err := validateFileComponent(base); err != nil {
 		return WriteResult{}, fmt.Errorf("target directory name: %w", err)
 	}
-	journalPath := filepath.Join(parent, "."+base+".kicadai-journal")
-	if _, err := os.Stat(journalPath); err == nil {
-		return WriteResult{}, fmt.Errorf("recovery journal exists: %s", journalPath)
-	} else if err != nil && !errors.Is(err, os.ErrNotExist) {
-		return WriteResult{}, err
-	}
 	targetInfo, targetErr := os.Stat(target)
 	targetExists := targetErr == nil
 	if targetExists && !targetInfo.IsDir() {
@@ -90,73 +84,14 @@ func WriteProjectDirectory(root string, design Design, opts WriteOptions) (Write
 	if err != nil {
 		return result, err
 	}
-
-	if !targetExists {
-		if err := os.Rename(tempProjectDir, target); err != nil {
-			return result, err
-		}
-		if err := syncDir(parent); err != nil {
-			return result, err
-		}
-		result.WrittenFiles = finalWrittenFiles(target, writtenNames)
-		cleanupTemp = false
-		_ = os.RemoveAll(tempDir)
-		return result, nil
-	}
-
-	backupContainer, err := os.MkdirTemp(parent, ".kicadai-backup-*")
+	commitResult, err := CommitPreparedDirectory(target, tempProjectDir, opts.Overwrite)
 	if err != nil {
 		return result, err
 	}
-	backupChild := filepath.Join(backupContainer, base)
-	result.BackupDir = backupContainer
-	result.JournalPath = journalPath
-	if err := writeSyncedFile(journalPath, []byte("phase=move-existing\n"), 0o600, true); err != nil {
-		_ = os.RemoveAll(backupContainer)
-		return result, err
-	}
-	if err := os.Rename(target, backupChild); err != nil {
-		_ = os.Remove(journalPath)
-		_ = os.RemoveAll(backupContainer)
-		return result, err
-	}
-	if err := syncDir(parent); err != nil {
-		return result, err
-	}
-	if err := writeSyncedFile(journalPath, []byte("phase=move-new\n"), 0o600, false); err != nil {
-		if rollbackErr := os.Rename(backupChild, target); rollbackErr != nil {
-			return result, errors.Join(err, fmt.Errorf("rollback failed: %w", rollbackErr))
-		}
-		_ = syncDir(parent)
-		_ = os.Remove(journalPath)
-		_ = os.RemoveAll(backupContainer)
-		return result, err
-	}
-	if err := os.Rename(tempProjectDir, target); err != nil {
-		if rollbackErr := os.Rename(backupChild, target); rollbackErr != nil {
-			return result, errors.Join(err, fmt.Errorf("rollback failed: %w", rollbackErr))
-		}
-		_ = os.Remove(journalPath)
-		_ = os.RemoveAll(backupContainer)
-		result.BackupDir = ""
-		result.JournalPath = ""
-		return result, err
-	}
-	if err := syncDir(parent); err != nil {
-		return result, err
-	}
+	result.Warnings = append(result.Warnings, commitResult.Warnings...)
 	result.WrittenFiles = finalWrittenFiles(target, writtenNames)
 	cleanupTemp = false
 	_ = os.RemoveAll(tempDir)
-	if err := os.RemoveAll(backupContainer); err != nil {
-		result.Warnings = append(result.Warnings, err.Error())
-	}
-	result.BackupDir = ""
-	if err := os.Remove(journalPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-		result.Warnings = append(result.Warnings, err.Error())
-		return result, nil
-	}
-	result.JournalPath = ""
 	return result, nil
 }
 

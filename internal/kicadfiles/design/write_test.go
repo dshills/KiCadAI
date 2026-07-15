@@ -249,7 +249,7 @@ func TestWriteProjectDirectoryRejectsInvalidArtifactExtension(t *testing.T) {
 	}
 }
 
-func TestWriteProjectDirectoryRefusesExistingJournal(t *testing.T) {
+func TestWriteProjectDirectoryRejectsInvalidLegacyJournal(t *testing.T) {
 	dir := t.TempDir()
 	root := filepath.Join(dir, "led_indicator")
 	journal := filepath.Join(dir, ".led_indicator.kicadai-journal")
@@ -261,8 +261,118 @@ func TestWriteProjectDirectoryRefusesExistingJournal(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error")
 	}
-	if !strings.Contains(err.Error(), "recovery journal exists") {
+	if !strings.Contains(err.Error(), "invalid recovery journal") {
 		t.Fatalf("error = %v", err)
+	}
+}
+
+func TestCommitPreparedDirectoryReplacesWholeProject(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "demo")
+	prepared := filepath.Join(dir, "attempt", "project")
+	writeCommitTestFile(t, filepath.Join(target, "demo.kicad_sch"), "old")
+	writeCommitTestFile(t, filepath.Join(prepared, "demo.kicad_sch"), "new")
+	writeCommitTestFile(t, filepath.Join(prepared, ".kicadai", "manifest.json"), "complete")
+
+	result, err := CommitPreparedDirectory(target, prepared, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.BackupDir != "" || result.JournalPath != "" || len(result.Warnings) != 0 {
+		t.Fatalf("commit result = %#v", result)
+	}
+	for name, want := range map[string]string{
+		"demo.kicad_sch": "new", filepath.Join(".kicadai", "manifest.json"): "complete",
+	} {
+		data, readErr := os.ReadFile(filepath.Join(target, name))
+		if readErr != nil || string(data) != want {
+			t.Fatalf("%s = %q, %v; want %q", name, data, readErr, want)
+		}
+	}
+	for _, path := range []string{filepath.Join(dir, ".demo.kicadai-journal"), filepath.Join(dir, ".demo.kicadai-backup")} {
+		if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+			t.Fatalf("cleanup path remains: %s (%v)", path, statErr)
+		}
+	}
+}
+
+func TestCommitPreparedDirectoryRecoversInterruptedStates(t *testing.T) {
+	for _, test := range []struct {
+		name       string
+		phase      string
+		targetData string
+		backupData string
+		want       string
+	}{
+		{name: "restore existing", phase: directoryCommitMoveExisting, backupData: "old", want: "old"},
+		{name: "complete replacement", phase: directoryCommitMoveNew, targetData: "new", backupData: "old", want: "new"},
+		{name: "rollback missing replacement", phase: directoryCommitMoveNew, backupData: "old", want: "old"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			target := filepath.Join(dir, "demo")
+			backup := filepath.Join(dir, ".demo.kicadai-backup")
+			journalPath := filepath.Join(dir, ".demo.kicadai-journal")
+			prepared := filepath.Join(dir, "attempt", "project")
+			if test.targetData != "" {
+				writeCommitTestFile(t, filepath.Join(target, "state"), test.targetData)
+			}
+			if test.backupData != "" {
+				writeCommitTestFile(t, filepath.Join(backup, "state"), test.backupData)
+			}
+			writeCommitTestFile(t, filepath.Join(prepared, "state"), "prepared")
+			journal := directoryCommitJournal{Version: directoryCommitJournalVersion, Phase: test.phase, Target: target, Prepared: prepared, Backup: backup}
+			data, err := json.Marshal(journal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(journalPath, data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if err := recoverDirectoryCommit(target, journalPath, backup); err != nil {
+				t.Fatal(err)
+			}
+			got, err := os.ReadFile(filepath.Join(target, "state"))
+			if err != nil || string(got) != test.want {
+				t.Fatalf("recovered state = %q, %v; want %q", got, err, test.want)
+			}
+			for _, path := range []string{journalPath, backup} {
+				if _, statErr := os.Stat(path); !os.IsNotExist(statErr) {
+					t.Fatalf("recovery path remains: %s (%v)", path, statErr)
+				}
+			}
+		})
+	}
+}
+
+func TestCommitPreparedDirectorySerializesRecovery(t *testing.T) {
+	dir := t.TempDir()
+	target := filepath.Join(dir, "demo")
+	prepared := filepath.Join(dir, "attempt", "project")
+	writeCommitTestFile(t, filepath.Join(target, "state"), "old")
+	writeCommitTestFile(t, filepath.Join(prepared, "state"), "new")
+	lock, err := acquireDirectoryCommitLock(filepath.Join(dir, ".demo.kicadai-lock"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+
+	if _, err := CommitPreparedDirectory(target, prepared, true); err == nil || !strings.Contains(err.Error(), "commit lock") {
+		t.Fatalf("concurrent commit error = %v", err)
+	}
+	data, err := os.ReadFile(filepath.Join(target, "state"))
+	if err != nil || string(data) != "old" {
+		t.Fatalf("target changed during concurrent commit: %q, %v", data, err)
+	}
+}
+
+func writeCommitTestFile(t *testing.T, path, contents string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
 	}
 }
 

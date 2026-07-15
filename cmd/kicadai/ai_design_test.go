@@ -3,7 +3,10 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"slices"
@@ -251,7 +254,11 @@ func TestInvalidGenericGraphPreflightRetainsSecretFreeReplay(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected invalid graph preflight failure")
 	}
-	replayPath := filepath.Join(output, filepath.FromSlash(aiReplayArtifactRelativePath))
+	replayMatches, globErr := filepath.Glob(filepath.Join(root, ".invalid-project.kicadai-attempts", "*", "project", filepath.FromSlash(aiReplayArtifactRelativePath)))
+	if globErr != nil || len(replayMatches) != 1 {
+		t.Fatalf("retained replay matches = %v, %v", replayMatches, globErr)
+	}
+	replayPath := replayMatches[0]
 	replayData, readErr := os.ReadFile(replayPath)
 	if readErr != nil {
 		t.Fatalf("read retained replay: %v", readErr)
@@ -414,6 +421,164 @@ func TestRunAIDesignMalformedRecordPreservesExistingOutput(t *testing.T) {
 			t.Fatalf("%s changed after failed overwrite: got %q want %q", name, got, want)
 		}
 	}
+}
+
+func TestRunAIDesignPostWriteFailurePreservesManagedProject(t *testing.T) {
+	root := t.TempDir()
+	output := filepath.Join(root, "project")
+	fixtureDir := filepath.Join("..", "..", "examples", "ai", "usb_c_bmp280_breakout")
+	baseArgs := []string{
+		"--prompt-file", filepath.Join(fixtureDir, "prompt.txt"),
+		"--provider", "recorded",
+		"--provider-record", filepath.Join(fixtureDir, "recorded-response.json"),
+		"--output", output, "--overwrite",
+	}
+	var first bytes.Buffer
+	if err := run(append(append([]string(nil), baseArgs...), "design", "create"), &first, &bytes.Buffer{}); err != nil {
+		t.Fatalf("create known-good project: %v\n%s", err, first.String())
+	}
+	before := managedProjectHashes(t, output)
+
+	missingCLI := filepath.Join(root, "missing-kicad-cli")
+	failingArgs := append(append([]string(nil), baseArgs...), "--kicad-cli", missingCLI, "--require-drc", "design", "create")
+	var failed bytes.Buffer
+	if err := run(failingArgs, &failed, &bytes.Buffer{}); err == nil {
+		t.Fatalf("expected post-write KiCad failure: %s", failed.String())
+	}
+	after := managedProjectHashes(t, output)
+	if !slices.EqualFunc(sortedHashEntries(before), sortedHashEntries(after), func(left, right managedHashEntry) bool { return left == right }) {
+		t.Fatalf("managed project changed after failed overwrite\nbefore=%v\nafter=%v", before, after)
+	}
+	attempts, err := filepath.Glob(filepath.Join(root, ".project.kicadai-attempts", "*", "failure-result.json"))
+	if err != nil || len(attempts) != 1 {
+		t.Fatalf("failed-attempt evidence = %v, %v", attempts, err)
+	}
+}
+
+type managedHashEntry struct {
+	Path string
+	Hash [sha256.Size]byte
+}
+
+func managedProjectHashes(t *testing.T, root string) map[string][sha256.Size]byte {
+	t.Helper()
+	hashes := map[string][sha256.Size]byte{}
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		if !managedProjectArtifact(rel) {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		hashes[filepath.ToSlash(rel)] = sha256.Sum256(data)
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return hashes
+}
+
+func managedProjectArtifact(path string) bool {
+	path = filepath.ToSlash(path)
+	base := filepath.Base(path)
+	return strings.HasSuffix(base, ".kicad_pro") || strings.HasSuffix(base, ".kicad_sch") ||
+		strings.HasSuffix(base, ".kicad_pcb") || strings.HasSuffix(base, ".kicad_sym") ||
+		strings.HasSuffix(base, ".kicad_mod") || base == "sym-lib-table" || base == "fp-lib-table" ||
+		path == ".kicadai/manifest.json"
+}
+
+func sortedHashEntries(values map[string][sha256.Size]byte) []managedHashEntry {
+	entries := make([]managedHashEntry, 0, len(values))
+	for path, hash := range values {
+		entries = append(entries, managedHashEntry{Path: path, Hash: hash})
+	}
+	slices.SortFunc(entries, func(left, right managedHashEntry) int { return strings.Compare(left.Path, right.Path) })
+	return entries
+}
+
+func TestAIFailedAttemptRetentionIsBounded(t *testing.T) {
+	output := filepath.Join(t.TempDir(), "project")
+	for index := 0; index < aiFailedAttemptRetention+2; index++ {
+		attempt, issue := beginAIOutputAttempt(output, true)
+		if issue != nil {
+			t.Fatal(issue.Message)
+		}
+		resultPath := filepath.Join(attempt.attemptRoot, ".command-result.tmp")
+		if err := os.WriteFile(resultPath, []byte(`{"ok":false}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := attempt.preserveFailure(resultPath); err != nil {
+			t.Fatal(err)
+		}
+	}
+	entries, err := os.ReadDir(filepath.Join(filepath.Dir(output), ".project.kicadai-attempts"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != aiFailedAttemptRetention {
+		t.Fatalf("retained attempts = %d, want %d", len(entries), aiFailedAttemptRetention)
+	}
+}
+
+func TestByteReplacingWriterHandlesChunkBoundary(t *testing.T) {
+	var output bytes.Buffer
+	writer := newByteReplacingWriter(&output, []byte("staged/project"), []byte("final/project"))
+	for _, chunk := range []string{"prefix staged/", "pro", "ject suffix"} {
+		if _, err := writer.Write([]byte(chunk)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if got, want := output.String(), "prefix final/project suffix"; got != want {
+		t.Fatalf("rewritten output = %q, want %q", got, want)
+	}
+}
+
+func TestByteReplacingWriterPassesThroughEmptyPattern(t *testing.T) {
+	var output bytes.Buffer
+	writer := newByteReplacingWriter(&output, nil, []byte("unused"))
+	if _, err := writer.Write([]byte("unchanged")); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if output.String() != "unchanged" {
+		t.Fatalf("pass-through output = %q", output.String())
+	}
+}
+
+func TestByteReplacingWriterRemainsFailed(t *testing.T) {
+	writer := newByteReplacingWriter(shortWriter{}, []byte("old"), []byte("new"))
+	if _, err := writer.Write([]byte("old value")); !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("first error = %v", err)
+	}
+	if _, err := writer.Write([]byte("retry")); !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("retry error = %v", err)
+	}
+}
+
+type shortWriter struct{}
+
+func (shortWriter) Write(data []byte) (int, error) {
+	if len(data) == 0 {
+		return 0, nil
+	}
+	return len(data) - 1, nil
 }
 
 func TestRunAIDesignRejectsUnsupportedProfilesBeforeProviderOrOutput(t *testing.T) {

@@ -98,7 +98,7 @@ func aiDesignOptionsPresent(opts cliOptions) bool {
 	return hasAIPromptSource(opts) || providerConfigured || providerOptionsConfigured
 }
 
-func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+func runAIDesignCreateAttempt(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if !hasAIPromptSource(opts) {
 		var replayIssue *reports.Issue
 		opts, replayIssue = applyRecordedReplayMetadata(opts)
