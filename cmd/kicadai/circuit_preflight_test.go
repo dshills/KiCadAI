@@ -209,6 +209,49 @@ func TestCircuitCreateOptionalKiCadBMP280(t *testing.T) {
 	}
 }
 
+func TestCircuitPatchRepairsThenPreflights(t *testing.T) {
+	base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	broken := filepath.Join(t.TempDir(), "broken.json")
+	if err := os.WriteFile(broken, []byte(strings.Replace(string(base), `"selector": "1"`, `"selector": "999"`, 1)), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	patch := filepath.Join(t.TempDir(), "patch.json")
+	if err := os.WriteFile(patch, []byte(`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_endpoint","net":"FILTER_IN","endpoint":{"component":"input","selector_kind":"symbol_pin","selector":"999"},"replacement":{"component":"input","selector_kind":"symbol_pin","selector":"1"}}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corrected := filepath.Join(t.TempDir(), "corrected.json")
+	result, err := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", broken, "--patch", patch, "--output", corrected})
+	if err != nil || !result.OK {
+		t.Fatalf("patch err=%v result=%#v", err, result)
+	}
+	if _, err := os.Stat(corrected); err != nil {
+		t.Fatal(err)
+	}
+	preflight := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", corrected})
+	if !preflight.OK || !preflightResultData(t, preflight).ReadyForWrite {
+		t.Fatalf("corrected preflight=%#v", preflight)
+	}
+}
+
+func TestCircuitPatchFailsClosedWithoutOutput(t *testing.T) {
+	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
+	patch := filepath.Join(t.TempDir(), "unsafe.json")
+	if err := os.WriteFile(patch, []byte(`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_project"}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "must-not-exist.json")
+	result, err := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", graph, "--patch", patch, "--output", output})
+	if err == nil || result.OK {
+		t.Fatalf("unsafe patch err=%v result=%#v", err, result)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("patch wrote output: %v", err)
+	}
+}
+
 func runCircuitPreflightCLI(t *testing.T, args []string) reports.Result {
 	t.Helper()
 	var stdout, stderr bytes.Buffer
@@ -240,6 +283,17 @@ func runCircuitCreateCLI(t *testing.T, args []string) (reports.Result, error) {
 	var result reports.Result
 	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
 		t.Fatalf("decode circuit create: %v\n%s", decodeErr, stdout.String())
+	}
+	return result, err
+}
+
+func runCircuitPatchCLI(t *testing.T, args []string) (reports.Result, error) {
+	t.Helper()
+	var stdout, stderr bytes.Buffer
+	err := run(args, &stdout, &stderr)
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode circuit patch: %v\n%s", decodeErr, stdout.String())
 	}
 	return result, err
 }

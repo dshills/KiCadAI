@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -52,6 +55,15 @@ type circuitCreateData struct {
 	OutstandingEvidence []string                       `json:"outstanding_evidence"`
 }
 
+type circuitPatchData struct {
+	InputGraphHash string                      `json:"input_graph_hash"`
+	Patch          *circuitgraph.PatchDocument `json:"patch,omitempty"`
+	Graph          *circuitgraph.Document      `json:"graph,omitempty"`
+	ChangedPaths   []string                    `json:"changed_paths"`
+	Preflight      circuitPreflightData        `json:"preflight"`
+	ReadyForWrite  bool                        `json:"ready_for_write"`
+}
+
 func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 	if len(opts.commandArgs) == 0 {
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: preflight or create", Suggestion: "run kicadai circuit preflight --request graph.json"})
@@ -61,9 +73,174 @@ func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
 		return runCircuitPreflight(ctx, opts, stdout)
 	case "create":
 		return runCircuitCreate(ctx, opts, stdout)
+	case "patch":
+		return runCircuitPatch(ctx, opts, stdout)
 	default:
 		return writeReportFailure(stdout, "circuit", reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "unsupported circuit subcommand " + opts.commandArgs[0], Suggestion: "run kicadai circuit preflight or circuit create"})
 	}
+}
+
+func runCircuitPatch(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	patchPath, outputPath, issue := parseCircuitPatchArgs(&opts)
+	if issue != nil {
+		return writeReportFailure(stdout, "circuit.patch", *issue)
+	}
+	input, err := os.ReadFile(opts.requestPath)
+	if err != nil {
+		return writeReportFailure(stdout, "circuit.patch", reports.Issue{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: opts.requestPath, Message: err.Error()})
+	}
+	hash := sha256.Sum256(input)
+	data := circuitPatchData{InputGraphHash: hex.EncodeToString(hash[:]), ChangedPaths: []string{}, Preflight: circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}}}
+	graph, issues := circuitgraph.DecodeStrict(strings.NewReader(string(input)))
+	if reports.HasBlockingIssue(issues) {
+		return writeCircuitPatchResult(stdout, data, issues)
+	}
+	patchInput, err := os.Open(patchPath)
+	if err != nil {
+		return writeCircuitPatchResult(stdout, data, []reports.Issue{{Code: reports.CodeMissingFile, Severity: reports.SeverityError, Path: patchPath, Message: err.Error()}})
+	}
+	defer patchInput.Close()
+	patch, issues := circuitgraph.DecodePatchStrict(patchInput)
+	data.Patch = &patch
+	if reports.HasBlockingIssue(issues) {
+		return writeCircuitPatchResult(stdout, data, issues)
+	}
+	corrected, issues := circuitgraph.ApplyPatch(graph, patch)
+	if reports.HasBlockingIssue(issues) {
+		return writeCircuitPatchResult(stdout, data, issues)
+	}
+	data.Graph = &corrected
+	data.ChangedPaths = circuitPatchChangedPaths(patch)
+	evaluation := evaluatePatchedCircuitPreflight(ctx, opts, corrected)
+	data.Preflight = evaluation.Data
+	data.ReadyForWrite = evaluation.Data.ReadyForWrite
+	issues = append(issues, evaluation.Issues...)
+	if !data.ReadyForWrite {
+		return writeCircuitPatchResult(stdout, data, issues)
+	}
+	encoded, err := json.MarshalIndent(corrected, "", "  ")
+	if err != nil {
+		return writeCircuitPatchResult(stdout, data, append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "output", Message: err.Error()}))
+	}
+	if err := writeCircuitPatchGraph(outputPath, encoded); err != nil {
+		return writeCircuitPatchResult(stdout, data, append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: outputPath, Message: err.Error()}))
+	}
+	return writeCircuitPatchResult(stdout, data, issues)
+}
+
+func parseCircuitPatchArgs(opts *cliOptions) (string, string, *reports.Issue) {
+	var patchPath string
+	if len(opts.commandArgs) == 0 || opts.commandArgs[0] != "patch" {
+		return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit", Message: "circuit requires subcommand: patch"}
+	}
+	for index := 1; index < len(opts.commandArgs); index++ {
+		arg := opts.commandArgs[index]
+		switch arg {
+		case "--json":
+		case "--request", "--patch", "--output":
+			if index+1 >= len(opts.commandArgs) {
+				return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: strings.TrimPrefix(arg, "--"), Message: "circuit patch requires a value for " + arg}
+			}
+			index++
+			value := opts.commandArgs[index]
+			switch arg {
+			case "--request":
+				if opts.requestPath != "" {
+					return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "request", Message: "circuit patch requires exactly one --request"}
+				}
+				opts.requestPath = value
+			case "--patch":
+				if patchPath != "" {
+					return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "patch", Message: "circuit patch requires exactly one --patch"}
+				}
+				patchPath = value
+			case "--output":
+				if opts.output != "" {
+					return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "output", Message: "circuit patch requires exactly one --output"}
+				}
+				opts.output = value
+			}
+		default:
+			return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit.patch", Message: "unsupported circuit patch argument " + arg}
+		}
+	}
+	if opts.requestPath == "" || patchPath == "" || opts.output == "" {
+		return "", "", &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "circuit.patch", Message: "circuit patch requires --request, --patch, and --output"}
+	}
+	return patchPath, opts.output, nil
+}
+
+func evaluatePatchedCircuitPreflight(ctx context.Context, opts cliOptions, graph circuitgraph.Document) circuitPreflightEvaluation {
+	encoded, err := json.Marshal(graph)
+	if err != nil {
+		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
+	}
+	file, err := os.CreateTemp("", "kicadai-circuit-patch-*.json")
+	if err != nil {
+		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
+	}
+	temporaryPath := file.Name()
+	defer os.Remove(temporaryPath)
+	if _, err := file.Write(encoded); err != nil {
+		file.Close()
+		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
+	}
+	file.Close()
+	opts.requestPath = temporaryPath
+	evaluation := evaluateCircuitPreflight(ctx, opts)
+	evaluation.Data.InputPath = opts.requestPath
+	return evaluation
+}
+
+func circuitPatchChangedPaths(patch circuitgraph.PatchDocument) []string {
+	result := make([]string, 0, len(patch.Operations))
+	for _, operation := range patch.Operations {
+		if operation.Net != "" {
+			result = append(result, "nets."+operation.Net)
+		} else if operation.Component != "" {
+			result = append(result, "components."+operation.Component)
+		} else if operation.Region != "" {
+			result = append(result, "pcb.regions."+operation.Region)
+		} else {
+			result = append(result, "policy."+operation.Policy)
+		}
+	}
+	return result
+}
+
+func writeCircuitPatchGraph(path string, contents []byte) error {
+	if _, err := os.Stat(path); err == nil {
+		return errors.New("output already exists")
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		return err
+	}
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".kicadai-patch-*")
+	if err != nil {
+		return err
+	}
+	temporaryPath := temporary.Name()
+	defer os.Remove(temporaryPath)
+	if _, err = temporary.Write(append(contents, '\n')); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err = temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryPath, path)
+}
+
+func writeCircuitPatchResult(stdout io.Writer, data circuitPatchData, issues []reports.Issue) error {
+	result := reports.ResultWithIssues("circuit.patch", data, issues, nil)
+	result.OK = data.ReadyForWrite && !reports.HasBlockingIssue(issues)
+	if err := writeReportJSON(stdout, result); err != nil {
+		return err
+	}
+	if !result.OK {
+		return errors.New("circuit patch reported blocking issues")
+	}
+	return nil
 }
 
 func runCircuitPreflight(ctx context.Context, opts cliOptions, stdout io.Writer) error {
