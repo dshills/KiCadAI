@@ -199,6 +199,17 @@ autorouter. `strategy.ripup_retry_limit` remains accepted for request
 compatibility, but any non-zero value is rejected with a structured unsupported
 operation diagnostic rather than being silently ignored.
 
+### Placement Quality Contract
+
+Placement is deterministic candidate selection with optional semantic scoring;
+it is not a global placement optimizer. HPWL is emitted as a quality metric and
+the candidate-scoring regression suite requires an enabled scoring run not to
+worsen HPWL relative to the same deterministic request with scoring disabled.
+Scoring also considers role, group, electrical, timing, thermal, congestion,
+and clearance dimensions where the request supplies that intent. A favorable
+HPWL or score is routing-readiness evidence, not a fabrication or analog
+performance claim.
+
 Run routing from JSON:
 
 ```sh

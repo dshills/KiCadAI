@@ -177,6 +177,16 @@ KICAD_CLI=/path/to/kicad-cli \
 go test -tags=integration ./internal/kicadfiles/design
 ```
 
+## Error Boundaries
+
+Use `%w` when a package-boundary error has a cause that a caller may classify
+with `errors.Is` or `errors.As`, such as filesystem, parser, external-tool, or
+typed validation failures. Keep independently formatted user-facing validation
+diagnostics unwrapped when their structured `reports.Issue` code/path/severity
+is the classification contract. Do not perform mechanical wrapping changes that
+hide those diagnostics or alter a stable CLI message solely to increase a
+wrapping metric.
+
 Round-trip fixture validation:
 
 ```sh
