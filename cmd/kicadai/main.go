@@ -1708,6 +1708,23 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 		return writeComponentReport(stdout, result)
 	case "validate":
 		result := components.ValidateCatalog(catalog)
+		roots := libraryRootsFromOptions(opts)
+		if strings.TrimSpace(roots.SymbolsRoot) != "" || strings.TrimSpace(roots.FootprintsRoot) != "" {
+			index, _ := libraryresolver.Load(ctx, roots, libraryresolver.LoadOptions{CachePath: opts.libraryCache, Refresh: opts.refreshLibraryCache})
+			librarySummary, catalogLibraryIssues := components.ValidateCatalogLibraries(catalog, index)
+			result.Issues = append(result.Issues, catalogLibraryIssues...)
+			data := map[string]any{
+				"family_count":       len(catalog.Families),
+				"record_count":       len(catalog.Records),
+				"library_validation": librarySummary,
+			}
+			if existing, ok := result.Data.(map[string]any); ok {
+				for key, value := range existing {
+					data[key] = value
+				}
+			}
+			result.Data = data
+		}
 		if sources != nil {
 			result.Issues = append(sourceIssues, result.Issues...)
 			data := map[string]any{
@@ -1722,6 +1739,7 @@ func runComponent(ctx context.Context, opts cliOptions, stdout io.Writer) error 
 			data["source_record_count"] = len(sources.Records)
 			result.Data = data
 		}
+		result.OK = !reports.HasBlockingIssue(result.Issues)
 		return writeComponentReport(stdout, result)
 	case "coverage":
 		_, result := components.ComponentCoverage(catalog, components.CoverageOptions{Sources: sources})

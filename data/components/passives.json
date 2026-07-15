@@ -175,7 +175,7 @@
       "values": [{"kind": "capacitance", "min": "1u", "max": "1000u", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "16", "unit": "V"}],
       "symbols": [{
-        "symbol_id": "Device:CP",
+        "symbol_id": "Device:C_Polarized",
         "function_pins": [
           {"function": "POSITIVE", "symbol_pin": "1", "polarity": "positive", "required": true},
           {"function": "NEGATIVE", "symbol_pin": "2", "polarity": "negative", "required": true}

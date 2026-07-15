@@ -34,6 +34,18 @@ kicadai --request examples/components/select_concrete_resistor.json component se
 kicadai component validate
 ```
 
+When symbol or footprint roots are configured, `component validate` also
+resolves every selectable catalog binding against those KiCad libraries. It
+fails before provider execution on missing symbols, units, pins, footprints,
+or pads and reports a deterministic `library_validation` summary. Explicitly
+blocked records remain excluded.
+
+```sh
+kicadai --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  component validate
+```
+
 The catalog includes a verified first-slice alternative set for common
 generated parts, plus explicit blocked placeholders for unsupported power
 devices:
@@ -84,7 +96,7 @@ kicadai pinmap validate ./examples/01_led_indicator
 ```
 
 Current built-in mappings include common resistors, capacitors, LEDs, simple
-headers, and `Device:Q_NPN_BEC` to a TO-92 inline footprint. Missing mappings,
+headers, and verified `Transistor_BJT:Q_NPN_BEC` mappings. Missing mappings,
 pin-count mismatches, pin-name mismatches, and unflattened hierarchical sheets
 block pinmap fabrication readiness.
 

@@ -15,6 +15,7 @@ import (
 	"strings"
 	"testing"
 
+	"kicadai/internal/components"
 	"kicadai/internal/config"
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/intentplanner"
@@ -1792,6 +1793,44 @@ func TestRunComponentValidateJSON(t *testing.T) {
 	}
 	if !strings.Contains(stdout.String(), `"record_count"`) {
 		t.Fatalf("unexpected output: %s", stdout.String())
+	}
+}
+
+func TestRunComponentValidateUsesConfiguredLibraryRoots(t *testing.T) {
+	root := t.TempDir()
+	symbols := filepath.Join(root, "symbols")
+	footprints := filepath.Join(root, "footprints")
+	if err := os.MkdirAll(symbols, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(footprints, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	var stdout bytes.Buffer
+	err := run([]string{
+		"--json",
+		"--catalog-dir", testComponentCatalogDir(t),
+		"--symbols-root", symbols,
+		"--footprints-root", footprints,
+		"component", "validate",
+	}, &stdout, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected empty configured libraries to block catalog validation")
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || !strings.Contains(stdout.String(), string(components.CodeLibrarySymbolMissing)) || !strings.Contains(stdout.String(), string(components.CodeLibraryFootprintMissing)) {
+		t.Fatalf("configured library validation result = %#v", result)
+	}
+	data, ok := result.Data.(map[string]any)
+	if !ok {
+		t.Fatalf("result data = %#v", result.Data)
+	}
+	librarySummary, ok := data["library_validation"].(map[string]any)
+	if !ok || librarySummary["configured"] != true {
+		t.Fatalf("library summary = %#v", data["library_validation"])
 	}
 }
 

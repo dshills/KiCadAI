@@ -289,7 +289,7 @@
       "tags": ["sensor", "i2c", "placeholder"],
       "ratings": [{"kind": "supply_voltage", "min": "1.8", "max": "5.5", "unit": "V"}],
       "symbols": [{
-        "symbol_id": "Sensor:Generic_I2C",
+        "symbol_id": "Connector_Generic:Conn_01x05",
         "function_pins": [
           {"function": "VCC", "symbol_pin": "1", "required": true},
           {"function": "GND", "symbol_pin": "2", "required": true},
