@@ -65,6 +65,19 @@ catalog's component/function vocabulary. Feed that result into the provider
 prompt and fail closed on any structured diagnostic; do not infer support from
 fixture names or repository paths.
 
+Use the generic graph loop before project creation:
+
+```sh
+kicadai capability generation --json
+kicadai --request graph.json circuit preflight
+# Correct only the structured diagnostics returned by preflight.
+kicadai --request corrected-graph.json circuit preflight
+kicadai --request corrected-graph.json --output ./out/project --overwrite design create
+```
+
+`ready_for_write: true` is preflight evidence only. It does not replace the
+writer, normalized round-trip, or optional KiCad ERC/DRC promotion gates.
+
 Current strong paths:
 
 - direct KiCad project, schematic, and PCB file writing;

@@ -131,6 +131,24 @@ catalog-resolved component/function vocabulary for `generic-circuit-v1`.
 Unsupported graph data must be treated as a fail-closed preflight result; no
 KiCad project should be written after a blocking diagnostic.
 
+### Generic Circuit Preflight
+
+Agents can validate a `generic-circuit-v1` graph before invoking a provider or
+writing a KiCad project:
+
+```sh
+kicadai capability generation --json
+kicadai --request ./graph.json circuit preflight
+kicadai --request ./corrected-graph.json circuit preflight
+kicadai --request ./corrected-graph.json --output ./out/project --overwrite design create
+```
+
+`circuit preflight` is read-only. It returns normalized graph and catalog
+resolution evidence, the lowered request, schematic validation, deterministic
+placement/routing plans, stage-tagged diagnostics, and `ready_for_write`.
+`kicad_erc` and `kicad_drc` gates are reported as external evidence rather than
+claimed by preflight.
+
 Provider output budgets are profile-aware: 8,192 tokens for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. Override them with
 `--ai-max-output-tokens N` or `KICADAI_AI_MAX_OUTPUT_TOKENS`; the CLI flag wins
