@@ -153,6 +153,12 @@ make coverage-check
 protobuf code under `internal/kiapi/gen/**`. `make coverage-check` fails if the
 generated-excluded total drops below `COVERAGE_THRESHOLD`, defaulting to `75.0`.
 
+The required GitHub Actions workflow runs formatting, `go vet`, the declared
+golangci-lint policy, `make test`, and `make coverage-check` for pull requests
+and pushes to `main`. It is intentionally offline: KiCad-backed checks and
+OpenAI provider execution remain opt-in local or release evidence, not required
+CI dependencies.
+
 Live integration tests are opt-in:
 
 ```sh

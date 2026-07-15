@@ -101,8 +101,8 @@ make lint
 make coverage-check
 ```
 
-The workflow shall pin action/tool versions sufficiently to make failures
-diagnosable. It shall not require KiCad, an OpenAI key, a local catalog path, or
+The workflow shall pin action versions and record the Go and lint versions used
+by each run. It shall not require KiCad, an OpenAI key, a local catalog path, or
 network access after dependencies are available. Optional KiCad-backed jobs may
 be added separately and must be explicitly environment-gated.
 

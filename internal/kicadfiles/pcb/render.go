@@ -1185,7 +1185,7 @@ func viaTopLayer(via Via) kicadfiles.BoardLayer {
 }
 
 func netCodeSet(nets []Net) map[int]struct{} {
-	codes := map[int]struct{}{0: struct{}{}}
+	codes := map[int]struct{}{0: {}}
 	for _, net := range nets {
 		codes[net.Code] = struct{}{}
 	}

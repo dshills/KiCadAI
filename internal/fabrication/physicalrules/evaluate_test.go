@@ -1034,8 +1034,8 @@ func physicalRuleTestBoard() pcbfiles.PCBFile {
 			Reference: "U1",
 			Position:  point(5, 5),
 			Graphics: []pcbfiles.FootprintGraphic{
-				pcbfiles.FootprintGraphic{UUID: kicadfiles.UUID("21000000-0000-4000-8000-000000000001"), Layer: kicadfiles.LayerFCrtYd, Rect: &pcbfiles.RectDrawing{Start: point(-1, -1), End: point(1, 1), Width: kicadfiles.MM(0.05)}},
-				pcbfiles.FootprintGraphic{UUID: kicadfiles.UUID("22000000-0000-4000-8000-000000000001"), Layer: kicadfiles.LayerFSilkS, Rect: &pcbfiles.RectDrawing{Start: point(-0.8, -0.8), End: point(0.8, 0.8), Width: kicadfiles.MM(0.1)}},
+				{UUID: kicadfiles.UUID("21000000-0000-4000-8000-000000000001"), Layer: kicadfiles.LayerFCrtYd, Rect: &pcbfiles.RectDrawing{Start: point(-1, -1), End: point(1, 1), Width: kicadfiles.MM(0.05)}},
+				{UUID: kicadfiles.UUID("22000000-0000-4000-8000-000000000001"), Layer: kicadfiles.LayerFSilkS, Rect: &pcbfiles.RectDrawing{Start: point(-0.8, -0.8), End: point(0.8, 0.8), Width: kicadfiles.MM(0.1)}},
 			},
 			Pads: []pcbfiles.Pad{{
 				UUID:     kicadfiles.UUID("30000000-0000-4000-8000-000000000001"),
