@@ -1669,7 +1669,7 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 	ordinalByID := schematicLayoutOrdinals(document)
 	rules := schematiclayout.DefaultRules(schematiclayout.ProfileStandard)
 	if document.Layout.Rules.MinComponentSpacingMM != nil {
-		rules.MinComponentSpacing = kicadfiles.MM(*document.Layout.Rules.MinComponentSpacingMM)
+		rules.MinComponentSpacing = kicadfiles.MM(effectiveMinComponentSpacingMM(document))
 	}
 	if document.Layout.Rules.MinGroupSpacingMM != nil {
 		rules.MinStageSpacing = kicadfiles.MM(*document.Layout.Rules.MinGroupSpacingMM)
@@ -1767,6 +1767,14 @@ func schematicLayoutWithLibraryIndexAndPreferences(document Document, index *lib
 		}
 	}
 	return result
+}
+
+func effectiveMinComponentSpacingMM(document Document) float64 {
+	spacing := *document.Layout.Rules.MinComponentSpacingMM
+	if document.Policy.Repair.AllowGroupSpacingAdjustment && spacing < DefaultMinComponentSpacingMM {
+		return DefaultMinComponentSpacingMM
+	}
+	return spacing
 }
 
 func schematicLayoutOrdinals(document Document) map[string]int {
@@ -2391,7 +2399,11 @@ func transactionSymbolProperties(component Component) []transactions.SymbolPrope
 			continue
 		}
 		seen[normalizedKey] = struct{}{}
-		properties = append(properties, transactions.SymbolProperty{Name: trimmedKey, Value: component.Properties[key]})
+		// AI/catalog provenance and part metadata must remain available in the
+		// KiCad file without competing with the human-facing reference and value.
+		// Reference and Value are replaced with explicitly positioned visible
+		// properties by transactionSymbolPropertiesWithLayout below.
+		properties = append(properties, transactions.SymbolProperty{Name: trimmedKey, Value: component.Properties[key], Hidden: true})
 	}
 	if footprint != "" {
 		properties = append(properties, transactions.SymbolProperty{

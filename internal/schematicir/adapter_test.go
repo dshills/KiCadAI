@@ -702,6 +702,40 @@ func TestToTransactionAssignsFootprintsAndProperties(t *testing.T) {
 	if footprint.Name != "Footprint" || footprint.Value != "Resistor_SMD:R_0603_1608Metric" || !footprint.Hidden {
 		t.Fatalf("footprint was not emitted as a hidden symbol property: %+v", footprint)
 	}
+	for _, property := range symbols[1].Properties {
+		switch property.Name {
+		case "Reference", "Value":
+			if property.Hidden {
+				t.Fatalf("human-facing property %s should remain visible: %+v", property.Name, property)
+			}
+		default:
+			if !property.Hidden {
+				t.Fatalf("custom property %s should be hidden metadata: %+v", property.Name, property)
+			}
+		}
+	}
+}
+
+func TestSchematicLayoutClampsRepairableComponentSpacingToReadableMinimum(t *testing.T) {
+	doc := validLEDDocument()
+	requested := 2.54
+	doc.Layout.Rules.MinComponentSpacingMM = &requested
+	doc.Policy.Repair.AllowGroupSpacingAdjustment = true
+
+	if got := effectiveMinComponentSpacingMM(doc); got != DefaultMinComponentSpacingMM {
+		t.Fatalf("effective spacing = %v, want readable minimum %v", got, DefaultMinComponentSpacingMM)
+	}
+}
+
+func TestSchematicLayoutPreservesExplicitSpacingWhenRepairIsDisabled(t *testing.T) {
+	doc := validLEDDocument()
+	requested := 2.54
+	doc.Layout.Rules.MinComponentSpacingMM = &requested
+	doc.Policy.Repair.AllowGroupSpacingAdjustment = false
+
+	if got := effectiveMinComponentSpacingMM(doc); got != requested {
+		t.Fatalf("effective spacing = %v, want explicit spacing %v", got, requested)
+	}
 }
 
 func TestToTransactionPreservesGenericFootprintPropertyWithoutExplicitFootprint(t *testing.T) {
@@ -720,7 +754,7 @@ func TestToTransactionPreservesGenericFootprintPropertyWithoutExplicitFootprint(
 		t.Fatalf("expected footprint and two layout properties, got %+v", symbols[1].Properties)
 	}
 	footprint := symbolPropertyByName(t, symbols[1].Properties, "Footprint")
-	if footprint.Name != "Footprint" || footprint.Value != "Resistor_SMD:R_0603_1608Metric" || footprint.Hidden {
+	if footprint.Name != "Footprint" || footprint.Value != "Resistor_SMD:R_0603_1608Metric" || !footprint.Hidden {
 		t.Fatalf("generic footprint property was not preserved: %+v", footprint)
 	}
 }
@@ -741,7 +775,7 @@ func TestToTransactionDeduplicatesPropertyNamesCaseInsensitively(t *testing.T) {
 		t.Fatalf("expected deduped MPN and two layout properties, got %+v", symbols[1].Properties)
 	}
 	mpn := symbolPropertyByName(t, symbols[1].Properties, "MPN")
-	if mpn.Value != "first" {
+	if mpn.Value != "first" || !mpn.Hidden {
 		t.Fatalf("unexpected deduped property: %+v", mpn)
 	}
 }
