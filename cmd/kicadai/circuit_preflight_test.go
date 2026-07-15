@@ -44,7 +44,7 @@ func TestCircuitPreflightFailsClosedBeforeWrite(t *testing.T) {
 	output := filepath.Join(t.TempDir(), "must-not-be-written")
 	result := runCircuitPreflightCLI(t, []string{"--request", graph, "--output", output, "circuit", "preflight"})
 	data := preflightResultData(t, result)
-	if result.OK || data.ReadyForWrite || len(result.Issues) == 0 || result.Issues[0].RetryScope == "" {
+	if result.OK || data.ReadyForWrite || len(result.Issues) == 0 || result.Issues[0].RetryScope == "" || len(data.RepairOptions) == 0 || data.RepairOptions[0].OperationTemplate.Op != "replace_component" {
 		t.Fatalf("unsupported preflight = %#v", result)
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {
@@ -62,7 +62,7 @@ func TestCircuitPreflightFailsClosedForInvalidPinAndPlacement(t *testing.T) {
 		edit func(string) string
 	}{
 		{name: "unknown_pin", edit: func(input string) string { return strings.Replace(input, `"selector": "1"`, `"selector": "999"`, 1) }},
-		{name: "invalid_region", edit: func(input string) string { return strings.Replace(input, `"width_mm": 12,`, `"width_mm": 120,`, 1) }},
+		{name: "invalid_region", edit: func(input string) string { return strings.Replace(input, `"width_mm": 24,`, `"width_mm": 120,`, 1) }},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			graph := filepath.Join(t.TempDir(), test.name+".json")
@@ -70,8 +70,9 @@ func TestCircuitPreflightFailsClosedForInvalidPinAndPlacement(t *testing.T) {
 				t.Fatal(err)
 			}
 			output := filepath.Join(t.TempDir(), "must-not-be-written")
-			result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--output", output})
-			if result.OK || preflightResultData(t, result).ReadyForWrite || len(result.Issues) == 0 {
+			result := runCircuitPreflightCLI(t, []string{"--request", graph, "--output", output, "circuit", "preflight"})
+			data := preflightResultData(t, result)
+			if result.OK || data.ReadyForWrite || len(result.Issues) == 0 || len(data.RepairOptions) == 0 {
 				t.Fatalf("invalid %s preflight = %#v", test.name, result)
 			}
 			if _, err := os.Stat(output); !os.IsNotExist(err) {
@@ -101,8 +102,9 @@ func TestCircuitPreflightFailsClosedForInvalidMultiUnitAssignment(t *testing.T) 
 		t.Fatal(err)
 	}
 	output := filepath.Join(t.TempDir(), "must-not-be-written")
-	result := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", graph, "--output", output})
-	if result.OK || preflightResultData(t, result).ReadyForWrite || len(result.Issues) == 0 {
+	result := runCircuitPreflightCLI(t, []string{"--request", graph, "--output", output, "circuit", "preflight"})
+	data := preflightResultData(t, result)
+	if result.OK || data.ReadyForWrite || len(result.Issues) == 0 || len(data.RepairOptions) == 0 || data.RepairOptions[0].OperationTemplate.Op != "replace_endpoint" {
 		t.Fatalf("invalid multi-unit preflight = %#v", result)
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {
