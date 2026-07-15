@@ -230,6 +230,52 @@ func TestRunAIDesignMalformedRecordCreatesNoOutput(t *testing.T) {
 	}
 }
 
+func TestRunAIDesignMalformedRecordPreservesExistingOutput(t *testing.T) {
+	root := t.TempDir()
+	record := filepath.Join(root, "bad-response.json")
+	if err := os.WriteFile(record, []byte(`{"schema":"wrong","intent":{}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(root, "existing-project")
+	files := map[string][]byte{
+		"existing-project.kicad_pro":               []byte("project-before\n"),
+		"existing-project.kicad_sch":               []byte("schematic-before\n"),
+		"existing-project.kicad_pcb":               []byte("pcb-before\n"),
+		filepath.Join(".kicadai", "manifest.json"): []byte("manifest-before\n"),
+	}
+	for name, data := range files {
+		path := filepath.Join(output, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, data, 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var stdout bytes.Buffer
+	err := run([]string{
+		"--prompt", "build a split-supply amplifier",
+		"--provider", "recorded",
+		"--provider-record", record,
+		"--output", output,
+		"--overwrite",
+		"design", "create",
+	}, &stdout, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected provider validation failure")
+	}
+	for name, want := range files {
+		got, readErr := os.ReadFile(filepath.Join(output, name))
+		if readErr != nil {
+			t.Fatalf("read preserved %s: %v", name, readErr)
+		}
+		if !bytes.Equal(got, want) {
+			t.Fatalf("%s changed after failed overwrite: got %q want %q", name, got, want)
+		}
+	}
+}
+
 func TestRunAIDesignRejectsUnsupportedProfilesBeforeProviderOrOutput(t *testing.T) {
 	for _, prompt := range []string{
 		"Create a USB-C motor controller",
