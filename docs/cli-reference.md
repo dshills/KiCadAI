@@ -140,7 +140,9 @@ writing a KiCad project:
 kicadai capability generation --json
 kicadai --request ./graph.json circuit preflight
 kicadai --request ./corrected-graph.json circuit preflight
-kicadai --request ./corrected-graph.json --output ./out/project --overwrite design create
+kicadai --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  circuit create --request ./corrected-graph.json --output ./out/project --overwrite
 ```
 
 `circuit preflight` is read-only. It returns normalized graph and catalog
@@ -148,6 +150,14 @@ resolution evidence, the lowered request, schematic validation, deterministic
 placement/routing plans, stage-tagged diagnostics, and `ready_for_write`.
 `kicad_erc` and `kicad_drc` gates are reported as external evidence rather than
 claimed by preflight.
+
+`circuit create` consumes the same strict decode, catalog resolution, lowering,
+placement, routing, and diagnostics used by preflight. It refuses to create an
+output directory for a graph that is not `ready_for_write`. Successful output
+includes writer-correctness and internal-connectivity evidence. To require
+authoritative KiCad evidence, add `--kicad-cli`, `--require-erc`,
+`--require-drc`, `--require-kicad-roundtrip`, and `--strict-diffs` as needed.
+Those checks remain environment-gated and are never inferred from preflight.
 
 Provider output budgets are profile-aware: 8,192 tokens for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. Override them with

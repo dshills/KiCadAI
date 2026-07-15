@@ -116,6 +116,16 @@ replace the recorded-provider flags with `--provider openai`. Provider output is
 strict-decoded and remains untrusted until deterministic and KiCad-backed gates
 pass.
 
+Agents that already have a valid `generic-circuit-v1` graph can avoid a provider:
+
+```sh
+kicadai capability generation --json
+kicadai --request ./graph.json circuit preflight
+kicadai --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  circuit create --request ./graph.json --output ./out/project --overwrite
+```
+
 See [AI Generation](docs/ai-generation.md) for bounded and generic modes, live
 commands, evidence files, failure behavior, and current limits. AI agents
 should also follow the [KiCadAI Agent Skill](docs/kicadai-agent-skill.md).

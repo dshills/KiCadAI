@@ -72,11 +72,16 @@ kicadai capability generation --json
 kicadai --request graph.json circuit preflight
 # Correct only the structured diagnostics returned by preflight.
 kicadai --request corrected-graph.json circuit preflight
-kicadai --request corrected-graph.json --output ./out/project --overwrite design create
+kicadai --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  circuit create --request corrected-graph.json --output ./out/project --overwrite
 ```
 
 `ready_for_write: true` is preflight evidence only. It does not replace the
 writer, normalized round-trip, or optional KiCad ERC/DRC promotion gates.
+`circuit create` returns the preflight evidence with written paths only after a
+successful preflight, plus writer-correctness, internal-connectivity, and
+remaining external-evidence requirements. It never invokes a provider.
 
 Current strong paths:
 
