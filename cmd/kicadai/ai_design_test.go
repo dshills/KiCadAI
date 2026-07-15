@@ -137,7 +137,7 @@ func TestRunRecordedGenericCircuitCLIEndToEnd(t *testing.T) {
 	if !payload.OK || payload.Data.Graph.Project.Name != "generic_parallel_resistors" || payload.Data.Request.ExplicitCircuit == nil || payload.Data.AIStatus == nil || payload.Data.AIStatus.Status != aiLaneStatusCandidate {
 		t.Fatalf("generic CLI payload = %#v", payload)
 	}
-	for _, name := range []string{"circuit-graph.json", "circuit-resolution.json", "design-request.json", "ai-request.json", "ai-response.json", "ai-attempts.json", "workflow-result.json", "autonomous-correction.json"} {
+	for _, name := range []string{"circuit-graph.json", "circuit-resolution.json", "design-request.json", "ai-request.json", "ai-response.json", "ai-attempts.json", "ai-provider-replay.json", "workflow-result.json", "autonomous-correction.json"} {
 		if _, err := os.Stat(filepath.Join(output, ".kicadai", name)); err != nil {
 			t.Fatalf("missing %s: %v", name, err)
 		}
@@ -149,6 +149,62 @@ func TestRunRecordedGenericCircuitCLIEndToEnd(t *testing.T) {
 	}
 	if correction.Attempts != 1 || correction.Applied != 0 || correction.StopReason != "routed" || correction.SelectedAttempt != 1 || !correction.ProtectedInvariantsPreserved || !correction.AllAttemptInvariantsPreserved {
 		t.Fatalf("autonomous correction result evidence = %#v", correction)
+	}
+	replayPath := filepath.Join(output, filepath.FromSlash(aiReplayArtifactRelativePath))
+	if payload.Data.Provider.ReplayArtifact != aiReplayArtifactRelativePath || !strings.Contains(payload.Data.Provider.ReplayCommand, "--provider-record") || !strings.Contains(payload.Data.Provider.ReplayCommand, replayPath) || len(payload.Data.Provider.ReplayArgv) == 0 {
+		t.Fatalf("provider replay evidence = %#v", payload.Data.Provider)
+	}
+	var replayArtifact aiprovider.ReplayArtifact
+	replayData, err := os.ReadFile(replayPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decodedReplay, replay, err := aiprovider.DecodeReplayArtifact(replayData)
+	if err != nil || !replay || decodedReplay.Profile != circuitgraph.ProviderProfileID {
+		t.Fatalf("decode replay=%t artifact=%#v err=%v", replay, decodedReplay, err)
+	}
+	replayArtifact = decodedReplay
+	if replayArtifact.EnvelopeHash == "" {
+		t.Fatal("replay envelope hash is empty")
+	}
+	replayOutput := filepath.Join(t.TempDir(), "replayed-project")
+	stdout.Reset()
+	err = run([]string{
+		"--provider", "recorded", "--provider-record", replayPath,
+		"--catalog-dir", catalogDir, "--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"--output", replayOutput, "--overwrite", "design", "create",
+	}, &stdout, &bytes.Buffer{})
+	if err != nil {
+		t.Fatalf("offline replay: %v\n%s", err, stdout.String())
+	}
+	var replayPayload struct {
+		OK   bool                      `json:"ok"`
+		Data aiGraphDesignCreateResult `json:"data"`
+	}
+	if err := json.Unmarshal(stdout.Bytes(), &replayPayload); err != nil {
+		t.Fatal(err)
+	}
+	firstGraph, _ := json.Marshal(payload.Data.Graph)
+	secondGraph, _ := json.Marshal(replayPayload.Data.Graph)
+	if !replayPayload.OK || !bytes.Equal(firstGraph, secondGraph) {
+		t.Fatalf("captured/replayed graph differs\nfirst=%s\nsecond=%s", firstGraph, secondGraph)
+	}
+}
+
+func TestAIReplayCommandUsesPOSIXSafeQuotingAndExactArgv(t *testing.T) {
+	path := "/tmp/replay $HOME 'quoted' $(touch bad).json"
+	command, argv := aiReplayCommand(cliOptions{output: "/tmp/output $HOME"}, circuitgraph.ProviderProfileID, path)
+	if len(argv) < 5 || argv[4] != path {
+		t.Fatalf("argv = %#v", argv)
+	}
+	if !strings.Contains(command, shellQuoteArgument(path)) || !strings.Contains(command, "'\"'\"'") {
+		t.Fatalf("quoted command = %s", command)
+	}
+	if got := aiReplayOutputPath("."); got != "replay" {
+		t.Fatalf("dot replay output = %q", got)
+	}
+	if got := aiReplayOutputPath("/tmp/project/"); got != "/tmp/project-replay" {
+		t.Fatalf("trailing-separator replay output = %q", got)
 	}
 }
 
@@ -169,6 +225,68 @@ func TestGenericCircuitProfileRejectsUnknownFieldBeforeWorkflow(t *testing.T) {
 	if err != nil || !reports.HasBlockingIssue(issues) || request.ExplicitCircuit != nil || !strings.HasPrefix(issues[0].Path, "provider.graph") {
 		t.Fatalf("invalid graph err=%v issues=%#v request=%#v", err, issues, request)
 	}
+}
+
+func TestInvalidGenericGraphPreflightRetainsSecretFreeReplay(t *testing.T) {
+	root := t.TempDir()
+	record := filepath.Join(root, "invalid-response.json")
+	invalidEnvelope := []byte(`{"schema":"kicadai.ai.intent.v1","intent":{"schema":"kicadai.circuit-graph.v1","version":1,"unexpected":true}}`)
+	if err := os.WriteFile(record, invalidEnvelope, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	symbolsRoot, footprintsRoot := writeCLILibraryFixture(t)
+	catalogDir, err := filepath.Abs(filepath.Join("..", "..", "data", "components"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(root, "invalid-project")
+	const promptSentinel = "RAW-PROMPT-SENTINEL-MUST-NOT-PERSIST"
+	var stdout bytes.Buffer
+	err = run([]string{
+		"--prompt", promptSentinel, "--provider", "recorded", "--provider-record", record,
+		"--ai-profile", circuitgraph.ProviderProfileID, "--catalog-dir", catalogDir,
+		"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"--output", output, "design", "create",
+	}, &stdout, &bytes.Buffer{})
+	if err == nil {
+		t.Fatal("expected invalid graph preflight failure")
+	}
+	replayPath := filepath.Join(output, filepath.FromSlash(aiReplayArtifactRelativePath))
+	replayData, readErr := os.ReadFile(replayPath)
+	if readErr != nil {
+		t.Fatalf("read retained replay: %v", readErr)
+	}
+	for _, forbidden := range []string{promptSentinel, "OPENAI_API_KEY", "Authorization", "Bearer"} {
+		if bytes.Contains(replayData, []byte(forbidden)) {
+			t.Fatalf("replay contains %q: %s", forbidden, replayData)
+		}
+	}
+	provider, providerErr := aiprovider.NewRecordedProvider("invalid-replay", replayData)
+	if providerErr != nil {
+		t.Fatal(providerErr)
+	}
+	replayed, providerErr := provider.GenerateIntent(context.Background(), aiprovider.GenerateRequest{
+		Prompt: "offline replay", SchemaVersion: aiprovider.EnvelopeSchemaV1, Attempt: 1,
+	})
+	if providerErr != nil || !bytes.Equal(replayed.IntentJSON, json.RawMessage(`{"schema":"kicadai.circuit-graph.v1","unexpected":true,"version":1}`)) {
+		t.Fatalf("replayed=%s err=%v", replayed.IntentJSON, providerErr)
+	}
+	var result reports.Result
+	if decodeErr := json.Unmarshal(stdout.Bytes(), &result); decodeErr != nil {
+		t.Fatalf("decode preflight result: %v\n%s", decodeErr, stdout.String())
+	}
+	if result.OK || !testArtifactPathExists(result.Artifacts, aiReplayArtifactRelativePath) || !strings.Contains(stdout.String(), "replay_command") {
+		t.Fatalf("preflight replay evidence missing: %#v", result)
+	}
+}
+
+func testArtifactPathExists(artifacts []reports.Artifact, path string) bool {
+	for _, artifact := range artifacts {
+		if artifact.Path == path {
+			return true
+		}
+	}
+	return false
 }
 
 func genericResistorLibraryIndex() libraryresolver.LibraryIndex {

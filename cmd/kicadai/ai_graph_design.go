@@ -52,19 +52,23 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
 	profile := profileWithEffectiveOutputTokenLimit(opts, aiprovider.GenericCircuitProfile(capability))
+	replayCapture := newAIReplayCapture(opts, profile.ID)
 	symbols, footprints := circuitgraph.LibraryEvidenceFromIndex(*createOpts.LibraryIndex)
 	resolver := circuitgraph.NewResolver(circuitgraph.ResolveOptions{
 		Catalog: catalog, CatalogID: "catalog:" + filepath.Base(filepath.Clean(opts.catalogDir)), LibrarySymbols: symbols,
 		LibraryFootprints: footprints, RequireLibraryEvidence: true,
 	})
-	providerResult, graph, resolved, request, attempts, issues, err := generateValidatedAIGraph(ctx, provider, profile, resolver, prompt, opts.maxAIAttempts)
+	providerResult, graph, resolved, request, attempts, issues, err := generateValidatedAIGraph(ctx, provider, profile, resolver, prompt, opts.maxAIAttempts, replayCapture.Capture)
 	if err != nil {
-		return writeDesignFailure(stdout, aiProviderIssue(err))
+		return writeAIProviderFailure(stdout, aiProviderIssue(err), replayCapture)
 	}
 	if reports.HasBlockingIssue(issues) || request.ExplicitCircuit == nil {
-		return writeAIGraphPreflightFailure(stdout, providerResult, graph, resolved, attempts, issues)
+		return writeAIGraphPreflightFailure(stdout, providerResult, graph, resolved, attempts, issues, replayCapture)
 	}
 	workflow := designworkflow.Create(ctx, request, createOpts)
+	if err := replayCapture.Restore(); err != nil {
+		return writeAIProviderFailure(stdout, aiProviderIssue(err), replayCapture)
+	}
 	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
 	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
@@ -89,6 +93,7 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	artifacts = append(artifacts, graphArtifacts...)
 	artifactIssues = append(artifactIssues, graphIssues...)
 	providerArtifacts, providerIssues := writeAIGraphProviderArtifacts(artifactDir, opts, promptSource, prompt, graph, providerResult, attempts)
+	providerArtifacts = append(providerArtifacts, replayCapture.Artifacts()...)
 	artifacts = append(artifacts, providerArtifacts...)
 	artifactIssues = append(artifactIssues, providerIssues...)
 	allIssues := append([]reports.Issue(nil), issues...)
@@ -102,7 +107,7 @@ func runAIGenericCircuitCreate(ctx context.Context, opts cliOptions, prompt, pro
 	allIssues = append(allIssues, aiArtifactIssues...)
 	status.ArtifactPaths = artifactPaths(artifacts)
 	data := aiGraphDesignCreateResult{
-		Provider: aiProviderSummary{Name: providerResult.Provider, Model: providerResult.Model, ResponseID: providerResult.ResponseID, Recorded: providerResult.Recorded},
+		Provider: replayCapture.ProviderSummary(providerResult),
 		Graph:    graph, Resolution: resolved, Request: request, Workflow: workflow, AIStatus: &status,
 	}
 	result := reports.Result{
@@ -139,7 +144,7 @@ func writeAutonomousCorrectionArtifact(artifactDir string, request designworkflo
 	)
 }
 
-func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider, profile aiprovider.ReferenceProfile, resolver *circuitgraph.Resolver, prompt string, maxAttempts int) (aiprovider.GenerateResult, circuitgraph.Document, circuitgraph.ResolvedDocument, designworkflow.Request, []aiAttemptEvidence, []reports.Issue, error) {
+func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider, profile aiprovider.ReferenceProfile, resolver *circuitgraph.Resolver, prompt string, maxAttempts int, captures ...aiProviderCaptureFunc) (aiprovider.GenerateResult, circuitgraph.Document, circuitgraph.ResolvedDocument, designworkflow.Request, []aiAttemptEvidence, []reports.Issue, error) {
 	var diagnostics []aiprovider.Diagnostic
 	var attempts []aiAttemptEvidence
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -157,6 +162,9 @@ func generateValidatedAIGraph(ctx context.Context, provider aiprovider.Provider,
 			return aiprovider.GenerateResult{}, circuitgraph.Document{}, circuitgraph.ResolvedDocument{}, designworkflow.Request{}, attempts, nil, err
 		}
 		result = providerResultWithOutputTokenLimit(result, profile.MaxOutputTokens)
+		if err := runAIProviderCaptures(captures, result); err != nil {
+			return aiprovider.GenerateResult{}, circuitgraph.Document{}, circuitgraph.ResolvedDocument{}, designworkflow.Request{}, attempts, nil, err
+		}
 		decode := circuitgraph.DecodeStrict
 		if result.Recorded {
 			decode = circuitgraph.DecodeRecordedStrict
@@ -226,14 +234,14 @@ func aiGraphRetryDiagnostics(issues []reports.Issue) []aiprovider.Diagnostic {
 	return diagnostics
 }
 
-func writeAIGraphPreflightFailure(stdout io.Writer, provider aiprovider.GenerateResult, graph circuitgraph.Document, resolved circuitgraph.ResolvedDocument, attempts []aiAttemptEvidence, issues []reports.Issue) error {
+func writeAIGraphPreflightFailure(stdout io.Writer, provider aiprovider.GenerateResult, graph circuitgraph.Document, resolved circuitgraph.ResolvedDocument, attempts []aiAttemptEvidence, issues []reports.Issue, capture *aiReplayCapture) error {
 	result := reports.Result{
 		OK: false, Command: "design", Version: reports.Version,
 		Data: map[string]any{
-			"provider": aiProviderSummary{Name: provider.Provider, Model: provider.Model, ResponseID: provider.ResponseID, Recorded: provider.Recorded},
+			"provider": capture.ProviderSummary(provider),
 			"graph":    graph, "resolution": resolved, "attempts": attempts,
 		},
-		Issues: issues, Artifacts: []reports.Artifact{},
+		Issues: issues, Artifacts: capture.Artifacts(),
 	}
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err

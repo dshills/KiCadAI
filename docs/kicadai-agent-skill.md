@@ -241,6 +241,15 @@ fixture, log, or evidence artifact. Live provider timeouts before graph
 generation do not invalidate recorded evidence. Replay a saved graph or rerun
 the optional live lane; never infer a graph from a timeout.
 
+After any provider envelope decodes, execute `data.provider.replay_argv`
+directly without a shell, or use the POSIX-escaped
+`data.provider.replay_command` interactively. KiCadAI has already persisted the secret-free envelope as
+`.kicadai/ai-provider-replay.json`, even when downstream preflight rejects the
+graph. Run the emitted command for deterministic offline diagnosis; it needs no
+prompt, makes no network request, and preserves the captured graph semantics.
+Do not transform the artifact with `jq`, and do not put raw prompts or API keys
+into replay fixtures.
+
 Use the profile output-token default first: 8,192 for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. If the CLI returns
 `AI_PROVIDER_INCOMPLETE` at `provider.max_output_tokens`, inspect its reported

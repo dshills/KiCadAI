@@ -125,6 +125,12 @@ and the accepted range is 1,024 through 65,536. Token exhaustion is reported as
 `AI_PROVIDER_INCOMPLETE` at `provider.max_output_tokens` with usage and manual
 retry guidance. It never causes an automatic paid retry.
 
+After envelope decode, provider-backed runs write the strict, secret-free
+`.kicadai/ai-provider-replay.json` artifact and return an exact replay command
+in `data.provider.replay_command`. The replay artifact supplies its profile, so
+the emitted recorded-provider command needs no prompt and makes no network
+request. Plain fixture envelopes remain backward compatible.
+
 ### Schematic IR Commands
 
 `schematic-ir` is the first AI-facing schematic design/layout IR entry point.

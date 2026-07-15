@@ -363,6 +363,37 @@ schema/intent diagnostics. Authentication, refusal, unsupported topology, and
 post-generation engineering failures are not sent back to the model for
 unbounded retries.
 
+### Capture Once, Replay Offline
+
+Every successfully decoded provider envelope is immediately captured at
+`.kicadai/ai-provider-replay.json`, before graph or intent preflight. The
+versioned `kicadai.ai.replay.v1` artifact contains the selected profile,
+sanitized provider metadata and usage, a canonical intent envelope, and an
+integrity hash. It excludes raw user and correction prompts, credentials,
+headers, and provider instructions. Invalid downstream graphs retain this
+artifact so the same failure can be debugged without another provider call.
+
+CLI JSON includes `data.provider.replay_artifact` and an exact
+`data.provider.replay_command`. Integrations should execute
+`data.provider.replay_argv` directly without a shell; the command string is
+POSIX-shell escaped for interactive use. The replay uses the recorded provider,
+requires no prompt, and performs no network request. A direct form is:
+
+```sh
+kicadai \
+  --provider recorded \
+  --provider-record ./out/live/.kicadai/ai-provider-replay.json \
+  --catalog-dir ./data/components \
+  --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  --output ./out/replay --overwrite \
+  design create
+```
+
+The replay artifact supplies the original schema profile. Plain checked-in
+`recorded-response.json` envelopes remain supported and still require an
+explicit prompt/profile as shown in the fixture commands above.
+
 ## Generic Placement And Routing Correction
 
 After a `generic-circuit-v1` graph strict-decodes, resolves through the trusted

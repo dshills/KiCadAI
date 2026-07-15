@@ -60,6 +60,17 @@ func GenericCircuitProfile(capabilityContext string) ReferenceProfile {
 	}
 }
 
+func ReferenceProfileByID(id string) (ReferenceProfile, error) {
+	switch strings.TrimSpace(id) {
+	case ReferenceProfileBMP280:
+		return BMP280Profile(), nil
+	case ReferenceProfileProtectedLED:
+		return ProtectedLEDProfile(), nil
+	default:
+		return ReferenceProfile{}, ErrUnsupportedReferencePrompt
+	}
+}
+
 func genericCircuitEnvelopeSchema() map[string]any {
 	return map[string]any{
 		"type": "object",

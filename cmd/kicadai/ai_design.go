@@ -32,10 +32,13 @@ type aiDesignCreateResult struct {
 }
 
 type aiProviderSummary struct {
-	Name       string `json:"name"`
-	Model      string `json:"model,omitempty"`
-	ResponseID string `json:"response_id,omitempty"`
-	Recorded   bool   `json:"recorded,omitempty"`
+	Name           string   `json:"name"`
+	Model          string   `json:"model,omitempty"`
+	ResponseID     string   `json:"response_id,omitempty"`
+	Recorded       bool     `json:"recorded,omitempty"`
+	ReplayArtifact string   `json:"replay_artifact,omitempty"`
+	ReplayCommand  string   `json:"replay_command,omitempty"`
+	ReplayArgv     []string `json:"replay_argv,omitempty"`
 }
 
 type aiRequestEvidence struct {
@@ -96,6 +99,13 @@ func aiDesignOptionsPresent(opts cliOptions) bool {
 }
 
 func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) error {
+	if !hasAIPromptSource(opts) {
+		var replayIssue *reports.Issue
+		opts, replayIssue = applyRecordedReplayMetadata(opts)
+		if replayIssue != nil {
+			return writeDesignFailure(stdout, *replayIssue)
+		}
+	}
 	if issue := validateAIDesignOptions(opts); issue != nil {
 		return writeDesignFailure(stdout, *issue)
 	}
@@ -106,7 +116,13 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	if strings.TrimSpace(opts.aiProfile) == circuitgraph.ProviderProfileID {
 		return runAIGenericCircuitCreate(ctx, opts, prompt, promptSource, stdout)
 	}
-	profile, err := aiprovider.SelectReferenceProfile(prompt)
+	var profile aiprovider.ReferenceProfile
+	var err error
+	if strings.TrimSpace(opts.aiProfile) != "" {
+		profile, err = aiprovider.ReferenceProfileByID(opts.aiProfile)
+	} else {
+		profile, err = aiprovider.SelectReferenceProfile(prompt)
+	}
 	if err != nil {
 		return writeDesignFailure(stdout, reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "prompt", Message: err.Error()})
 	}
@@ -115,12 +131,13 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 		return writeDesignFailure(stdout, aiProviderIssue(err))
 	}
 	profile = profileWithEffectiveOutputTokenLimit(opts, profile)
-	providerResult, intent, plan, attempts, issues, err := generateValidatedAIIntent(ctx, provider, profile, prompt, opts.maxAIAttempts)
+	replayCapture := newAIReplayCapture(opts, profile.ID)
+	providerResult, intent, plan, attempts, issues, err := generateValidatedAIIntent(ctx, provider, profile, prompt, opts.maxAIAttempts, replayCapture.Capture)
 	if err != nil {
-		return writeDesignFailure(stdout, aiProviderIssue(err))
+		return writeAIProviderFailure(stdout, aiProviderIssue(err), replayCapture)
 	}
 	if reports.HasBlockingIssue(issues) || plan.GeneratedRequest == nil || plan.Status == intentplanner.PlanStatusBlocked || plan.Status == intentplanner.PlanStatusNeedsClarification {
-		return writeAIDesignPreflightFailure(stdout, providerResult, intent, plan, issues)
+		return writeAIDesignPreflightFailure(stdout, providerResult, intent, plan, issues, replayCapture)
 	}
 	checkOpts, err := checkOptions(opts)
 	if err != nil {
@@ -133,6 +150,9 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	request := prepareAIWorkflowRequest(*plan.GeneratedRequest)
 	plan.GeneratedRequest = &request
 	workflow := designworkflow.Create(ctx, request, createOpts)
+	if err := replayCapture.Restore(); err != nil {
+		return writeAIProviderFailure(stdout, aiProviderIssue(err), replayCapture)
+	}
 	promotion := designworkflow.BuildInternalPromotionReport(designPromotionFixture(opts, request, workflow), workflow)
 	workflow.Promotion = promotionSummaryPointer(designworkflow.PromotionSummaryFromReport(promotion, designworkflow.PromotionReportArtifactPath))
 	promotionArtifact, promotionIssue := designworkflow.WritePromotionReportArtifact(opts.output, promotion, opts.overwrite)
@@ -156,6 +176,7 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 		artifacts = append(artifacts, reports.Artifact{Kind: reports.ArtifactValidationReport, Path: ".kicadai/workflow-result.json", Description: "AI design workflow result"})
 	}
 	providerArtifacts, providerArtifactIssues := writeAIProviderArtifacts(artifactDir, opts, promptSource, prompt, intent, providerResult, attempts)
+	providerArtifacts = append(providerArtifacts, replayCapture.Artifacts()...)
 	artifacts = append(artifacts, providerArtifacts...)
 	artifactIssues = append(artifactIssues, providerArtifactIssues...)
 	allIssues := append([]reports.Issue(nil), issues...)
@@ -168,7 +189,7 @@ func runAIDesignCreate(ctx context.Context, opts cliOptions, stdout io.Writer) e
 	allIssues = append(allIssues, aiArtifactIssues...)
 	status.ArtifactPaths = artifactPaths(artifacts)
 	data := aiDesignCreateResult{
-		Provider: aiProviderSummary{Name: providerResult.Provider, Model: providerResult.Model, ResponseID: providerResult.ResponseID, Recorded: providerResult.Recorded},
+		Provider: replayCapture.ProviderSummary(providerResult),
 		Intent:   intent,
 		Plan:     plan,
 		Workflow: workflow,
@@ -281,7 +302,7 @@ func aiEndpointNeedsLocalRouteProtection(endpoint blocks.PortRef, blocksByID map
 	return slices.Contains(definition.PCBRealization.InterBlockObstaclePorts, port)
 }
 
-func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider, profile aiprovider.ReferenceProfile, prompt string, maxAttempts int) (aiprovider.GenerateResult, intentplanner.Request, intentplanner.PlanResult, []aiAttemptEvidence, []reports.Issue, error) {
+func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider, profile aiprovider.ReferenceProfile, prompt string, maxAttempts int, captures ...aiProviderCaptureFunc) (aiprovider.GenerateResult, intentplanner.Request, intentplanner.PlanResult, []aiAttemptEvidence, []reports.Issue, error) {
 	var diagnostics []aiprovider.Diagnostic
 	var attempts []aiAttemptEvidence
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -304,6 +325,9 @@ func generateValidatedAIIntent(ctx context.Context, provider aiprovider.Provider
 			return aiprovider.GenerateResult{}, intentplanner.Request{}, intentplanner.PlanResult{}, attempts, nil, err
 		}
 		result = providerResultWithOutputTokenLimit(result, profile.MaxOutputTokens)
+		if err := runAIProviderCaptures(captures, result); err != nil {
+			return aiprovider.GenerateResult{}, intentplanner.Request{}, intentplanner.PlanResult{}, attempts, nil, err
+		}
 		intent, issues := aiprovider.DecodeIntent(result.IntentJSON)
 		intent = intentplanner.NormalizeRequest(intent)
 		var plan intentplanner.PlanResult
@@ -432,7 +456,9 @@ func validateAIDesignOptions(opts cliOptions) *reports.Issue {
 		}
 	}
 	if profile := strings.TrimSpace(opts.aiProfile); profile != "" && profile != circuitgraph.ProviderProfileID {
-		return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "ai_profile", Message: "unsupported --ai-profile " + profile}
+		if _, err := aiprovider.ReferenceProfileByID(profile); err != nil {
+			return &reports.Issue{Code: reports.CodeInvalidArgument, Severity: reports.SeverityError, Path: "ai_profile", Message: "unsupported --ai-profile " + profile}
+		}
 	}
 	if strings.EqualFold(strings.TrimSpace(opts.aiProvider), "recorded") && strings.TrimSpace(opts.aiProviderRecord) == "" {
 		return &reports.Issue{Code: reports.CodeAIProviderConfiguration, Severity: reports.SeverityError, Path: "provider_record", Message: "--provider-record is required for the recorded provider"}
@@ -554,13 +580,13 @@ func aiProviderIssue(err error) reports.Issue {
 	return issue
 }
 
-func writeAIDesignPreflightFailure(stdout io.Writer, providerResult aiprovider.GenerateResult, intent intentplanner.Request, plan intentplanner.PlanResult, issues []reports.Issue) error {
+func writeAIDesignPreflightFailure(stdout io.Writer, providerResult aiprovider.GenerateResult, intent intentplanner.Request, plan intentplanner.PlanResult, issues []reports.Issue, capture *aiReplayCapture) error {
 	data := aiDesignCreateResult{
-		Provider: aiProviderSummary{Name: providerResult.Provider, Model: providerResult.Model, ResponseID: providerResult.ResponseID, Recorded: providerResult.Recorded},
+		Provider: capture.ProviderSummary(providerResult),
 		Intent:   intent,
 		Plan:     plan,
 	}
-	result := reports.ResultWithIssues("design", data, issues, nil)
+	result := reports.ResultWithIssues("design", data, issues, capture.Artifacts())
 	if err := writeReportJSON(stdout, result); err != nil {
 		return err
 	}
