@@ -152,7 +152,10 @@ a separate reviewed contract.
 
 ## Safety And Validation
 
-1. Strict-decode the input graph and patch independently.
+1. Parse the input graph with strict JSON, size, and unknown-field checks, and
+   strict-decode the patch independently. Repairable semantic graph findings
+   are retained only long enough for a supported patch to correct them; the
+   input graph is never lowered or written in that state.
 2. Normalize and validate patch operation IDs and immutable-field boundaries.
 3. Apply each operation to an in-memory clone only.
 4. Strict-encode and strict-decode the corrected graph to enforce the same

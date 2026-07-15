@@ -56,12 +56,20 @@ type circuitCreateData struct {
 }
 
 type circuitPatchData struct {
-	InputGraphHash string                      `json:"input_graph_hash"`
-	Patch          *circuitgraph.PatchDocument `json:"patch,omitempty"`
-	Graph          *circuitgraph.Document      `json:"graph,omitempty"`
-	ChangedPaths   []string                    `json:"changed_paths"`
-	Preflight      circuitPreflightData        `json:"preflight"`
-	ReadyForWrite  bool                        `json:"ready_for_write"`
+	InputGraphHash            string                        `json:"input_graph_hash"`
+	NormalizedPatchOperations []circuitgraph.PatchOperation `json:"normalized_patch_operations,omitempty"`
+	Graph                     *circuitgraph.Document        `json:"graph,omitempty"`
+	ChangedPaths              []string                      `json:"changed_paths"`
+	CriticalDesignProjection  *circuitPatchProjection       `json:"critical_design_projection,omitempty"`
+	Preflight                 circuitPreflightData          `json:"preflight"`
+	ReadyForWrite             bool                          `json:"ready_for_write"`
+}
+
+// circuitPatchProjection makes the graph changes that can affect a generated
+// design explicit without claiming that external KiCad evidence has run.
+type circuitPatchProjection struct {
+	Before circuitgraph.Document `json:"before"`
+	After  circuitgraph.Document `json:"after"`
 }
 
 func runCircuit(ctx context.Context, opts cliOptions, stdout io.Writer) error {
@@ -91,7 +99,7 @@ func runCircuitPatch(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	hash := sha256.Sum256(input)
 	data := circuitPatchData{InputGraphHash: hex.EncodeToString(hash[:]), ChangedPaths: []string{}, Preflight: circuitPreflightData{InputPath: opts.requestPath, SchematicIssues: []reports.Issue{}, Gates: []circuitPreflightGate{}}}
-	graph, issues := circuitgraph.DecodeStrict(strings.NewReader(string(input)))
+	graph, issues := circuitgraph.DecodePatchInputStrict(strings.NewReader(string(input)))
 	if reports.HasBlockingIssue(issues) {
 		return writeCircuitPatchResult(stdout, data, issues)
 	}
@@ -101,7 +109,7 @@ func runCircuitPatch(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	defer patchInput.Close()
 	patch, issues := circuitgraph.DecodePatchStrict(patchInput)
-	data.Patch = &patch
+	data.NormalizedPatchOperations = append([]circuitgraph.PatchOperation(nil), patch.Operations...)
 	if reports.HasBlockingIssue(issues) {
 		return writeCircuitPatchResult(stdout, data, issues)
 	}
@@ -111,6 +119,7 @@ func runCircuitPatch(ctx context.Context, opts cliOptions, stdout io.Writer) err
 	}
 	data.Graph = &corrected
 	data.ChangedPaths = circuitPatchChangedPaths(patch)
+	data.CriticalDesignProjection = &circuitPatchProjection{Before: graph, After: corrected}
 	evaluation := evaluatePatchedCircuitPreflight(ctx, opts, corrected)
 	data.Preflight = evaluation.Data
 	data.ReadyForWrite = evaluation.Data.ReadyForWrite
@@ -171,6 +180,7 @@ func parseCircuitPatchArgs(opts *cliOptions) (string, string, *reports.Issue) {
 }
 
 func evaluatePatchedCircuitPreflight(ctx context.Context, opts cliOptions, graph circuitgraph.Document) circuitPreflightEvaluation {
+	inputPath := opts.requestPath
 	encoded, err := json.Marshal(graph)
 	if err != nil {
 		return circuitPreflightEvaluation{Data: circuitPreflightData{InputPath: opts.requestPath}, Issues: []reports.Issue{{Code: reports.CodeValidationFailed, Severity: reports.SeverityError, Path: "graph", Message: err.Error()}}}
@@ -188,7 +198,7 @@ func evaluatePatchedCircuitPreflight(ctx context.Context, opts cliOptions, graph
 	file.Close()
 	opts.requestPath = temporaryPath
 	evaluation := evaluateCircuitPreflight(ctx, opts)
-	evaluation.Data.InputPath = opts.requestPath
+	evaluation.Data.InputPath = inputPath
 	return evaluation
 }
 
@@ -211,6 +221,8 @@ func circuitPatchChangedPaths(patch circuitgraph.PatchDocument) []string {
 func writeCircuitPatchGraph(path string, contents []byte) error {
 	if _, err := os.Stat(path); err == nil {
 		return errors.New("output already exists")
+	} else if !os.IsNotExist(err) {
+		return err
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err

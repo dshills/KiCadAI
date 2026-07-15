@@ -126,6 +126,10 @@ kicadai --symbols-root /path/to/kicad-symbols \
   circuit create --request ./graph.json --output ./out/project --overwrite
 ```
 
+For bounded agent corrections, run `circuit patch` before re-preflight; see the
+[CLI reference](docs/cli-reference.md#generic-circuit-patch) for the strict
+patch contract and evidence boundary.
+
 See [AI Generation](docs/ai-generation.md) for bounded and generic modes, live
 commands, evidence files, failure behavior, and current limits. AI agents
 should also follow the [KiCadAI Agent Skill](docs/kicadai-agent-skill.md).

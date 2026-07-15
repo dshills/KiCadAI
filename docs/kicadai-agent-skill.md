@@ -83,6 +83,22 @@ writer, normalized round-trip, or optional KiCad ERC/DRC promotion gates.
 successful preflight, plus writer-correctness, internal-connectivity, and
 remaining external-evidence requirements. It never invokes a provider.
 
+For a graph rejected by preflight, use a typed correction document rather than
+editing generated KiCad files:
+
+```sh
+kicadai circuit patch --request broken-graph.json \
+  --patch changes.json --output corrected-graph.json
+kicadai --request corrected-graph.json circuit preflight
+```
+
+Patch operations are constrained to existing graph identities. The response
+contains the input hash, normalized operations, corrected graph, before/after
+critical projection, changed paths, re-preflight evidence, and
+`ready_for_write`; use `circuit create` only after it is true. A patch input
+may contain repairable semantic graph errors, but malformed JSON, unknown
+fields, and unsafe patch operations still fail closed.
+
 Current strong paths:
 
 - direct KiCad project, schematic, and PCB file writing;

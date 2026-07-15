@@ -91,6 +91,11 @@ from validation feedback to safe automatic repair.
   attempt 2 with clean KiCad ERC/DRC, writer correctness, and normalized
   round-trip evidence; the existing provider-backed promotion suite remains
   in a passing state.
+- Agent-facing generic graph repair loop: capability discovery, strict direct
+  graph preflight, constrained typed patching, deterministic re-preflight, and
+  provider-free project creation. The patch contract is fail-closed, preserves
+  immutable graph identity, emits critical before/after graph evidence, and
+  never claims external KiCad evidence before it is actually run.
 - Connectivity-first board validation for pad nets, unrouted nets, route
   completion, outlines, zones, and DRC evidence hooks.
 - ERC/DRC feedback loop foundation using `kicad-cli` where configured.

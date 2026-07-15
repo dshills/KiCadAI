@@ -41,6 +41,22 @@ func TestDecodeStrictRejectsUnknownAndTrailingJSON(t *testing.T) {
 	}
 }
 
+func TestDecodePatchInputStrictDefersSemanticValidation(t *testing.T) {
+	document := validTestDocument()
+	document.Nets[0].Endpoints[0].Component = "missing"
+	data, err := json.Marshal(document)
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, issues := DecodePatchInputStrict(bytes.NewReader(data))
+	if len(issues) != 0 || decoded.Nets[0].Endpoints[0].Component != "missing" {
+		t.Fatalf("patch input decode = %#v issues=%#v", decoded, issues)
+	}
+	if _, issues := DecodeStrict(bytes.NewReader(data)); len(issues) == 0 {
+		t.Fatal("normal strict decode accepted repairable semantic error")
+	}
+}
+
 func TestDecodeStrictRejectsOversizedDocument(t *testing.T) {
 	data := bytes.Repeat([]byte(" "), MaxDocumentBytes+1)
 	if _, issues := DecodeStrict(bytes.NewReader(data)); len(issues) != 1 || issues[0].Code != CodeLimitExceeded {

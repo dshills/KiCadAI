@@ -1,7 +1,7 @@
 # Generic Circuit Graph Patch Implementation Plan
 
 Date: 2026-07-15
-Status: Proposed
+Status: Complete
 
 ## Delivery Rules
 
@@ -81,3 +81,15 @@ offline quality gates and inspect existing provider/direct fixture regressions.
 all quality gates and Prism pass, and the worktree is clean.
 
 **Risk:** Low.
+
+## Completion Evidence
+
+- Phase 1: `6bb2c31` defined the contract and implementation plan.
+- Phase 2: `dee8bba` and `004b794` added the strict model and clone-only
+  applier.
+- Phase 3: `fd65169` added the provider-free CLI and shared re-preflight path.
+- Phase 4: `2f5cc19` added selector repair; the final completion commit adds
+  semantic-repair decoding, projection evidence, the full repair corpus, and
+  direct create-loop coverage.
+- Phase 5: documentation and roadmap updates accompany complete offline test,
+  lint, coverage, and staged Prism review evidence.

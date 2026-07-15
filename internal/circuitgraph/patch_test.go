@@ -19,6 +19,8 @@ func TestDecodePatchStrictRejectsUnsafeOperations(t *testing.T) {
 		`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_project"}]}`,
 		`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_endpoint","net":"N","endpoint":{"component":"r1","selector_kind":"symbol_pin","selector":"1"},"replacement":{"component":"r2","selector_kind":"symbol_pin","selector":"1"}}]}`,
 		`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_policy","policy":"require_drc","enabled":true}]}`,
+		`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_component","component":"r1","component_patch":{"reference":"R9"}}]}`,
+		`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_component","component":"r1","component_patch":{"value":"10k"}}]}`,
 	} {
 		_, issues := DecodePatchStrict(strings.NewReader(input))
 		if !reports.HasBlockingIssue(issues) || issues[0].Code != CodePatchInvalid {
@@ -48,5 +50,17 @@ func TestApplyPatchReplacesOnlyCatalogSelector(t *testing.T) {
 	corrected, issues := ApplyPatch(document, PatchDocument{Schema: PatchSchemaID, Version: PatchVersion, Operations: []PatchOperation{{Op: "replace_component", Component: "r1", ComponentPatch: &ComponentPatch{ComponentID: &componentID}}}})
 	if reports.HasBlockingIssue(issues) || corrected.Components[0].ComponentID != componentID || corrected.Components[0].Reference != "R1" {
 		t.Fatalf("corrected=%#v issues=%#v", corrected, issues)
+	}
+}
+
+func TestApplyPatchRejectsDestructiveNetMutation(t *testing.T) {
+	document := validTestDocument()
+	patch := PatchDocument{Schema: PatchSchemaID, Version: PatchVersion, Operations: []PatchOperation{{
+		Op:       "remove_net_endpoint",
+		Net:      "IN",
+		Endpoint: &Endpoint{Component: "j1", SelectorKind: SelectorSymbolPin, Selector: "1"},
+	}}}
+	if _, issues := ApplyPatch(document, patch); !reports.HasBlockingIssue(issues) || issues[0].Code != CodeNetInvalid {
+		t.Fatalf("destructive patch issues=%#v", issues)
 	}
 }

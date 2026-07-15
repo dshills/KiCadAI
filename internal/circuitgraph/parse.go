@@ -14,6 +14,14 @@ func DecodeStrict(reader io.Reader) (Document, []reports.Issue) {
 	return decodeStrict(reader, false)
 }
 
+// DecodePatchInputStrict rejects malformed or unbounded JSON but intentionally
+// defers semantic graph validation. It is only for the patch command, whose
+// final ApplyPatch validation remains fail-closed before any corrected graph is
+// returned or written.
+func DecodePatchInputStrict(reader io.Reader) (Document, []reports.Issue) {
+	return decodeDocumentStrict(reader)
+}
+
 // DecodeRecordedStrict accepts the one legacy split-supply omission that was
 // emitted by recorded provider fixtures before power_negative became explicit.
 // Live provider output must use DecodeStrict and provide the lane itself.
@@ -22,26 +30,9 @@ func DecodeRecordedStrict(reader io.Reader) (Document, []reports.Issue) {
 }
 
 func decodeStrict(reader io.Reader, allowLegacyNegativeLane bool) (Document, []reports.Issue) {
-	var buffer bytes.Buffer
-	limited := io.LimitReader(reader, MaxDocumentBytes+1)
-	if _, err := io.Copy(&buffer, limited); err != nil {
-		return Document{}, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "read circuit graph: "+err.Error())}
-	}
-	if buffer.Len() > MaxDocumentBytes {
-		return Document{}, []reports.Issue{graphIssue(CodeLimitExceeded, "document", "circuit graph exceeds maximum encoded size")}
-	}
-	decoder := json.NewDecoder(bytes.NewReader(buffer.Bytes()))
-	decoder.DisallowUnknownFields()
-	var document Document
-	if err := decoder.Decode(&document); err != nil {
-		return Document{}, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "decode circuit graph: "+err.Error())}
-	}
-	var trailing any
-	if err := decoder.Decode(&trailing); err != io.EOF {
-		if err == nil {
-			return document, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "circuit graph contains trailing JSON value")}
-		}
-		return document, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "decode trailing circuit graph data: "+err.Error())}
+	document, decodeIssues := decodeDocumentStrict(reader)
+	if reports.HasBlockingIssue(decodeIssues) {
+		return document, decodeIssues
 	}
 	var compatibilityIssues []reports.Issue
 	if allowLegacyNegativeLane && document.Schematic.Lanes.PowerNegative == nil {
@@ -66,6 +57,31 @@ func decodeStrict(reader io.Reader, allowLegacyNegativeLane bool) (Document, []r
 		return document, issues
 	}
 	return Normalize(document), issues
+}
+
+func decodeDocumentStrict(reader io.Reader) (Document, []reports.Issue) {
+	var buffer bytes.Buffer
+	limited := io.LimitReader(reader, MaxDocumentBytes+1)
+	if _, err := io.Copy(&buffer, limited); err != nil {
+		return Document{}, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "read circuit graph: "+err.Error())}
+	}
+	if buffer.Len() > MaxDocumentBytes {
+		return Document{}, []reports.Issue{graphIssue(CodeLimitExceeded, "document", "circuit graph exceeds maximum encoded size")}
+	}
+	decoder := json.NewDecoder(bytes.NewReader(buffer.Bytes()))
+	decoder.DisallowUnknownFields()
+	var document Document
+	if err := decoder.Decode(&document); err != nil {
+		return Document{}, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "decode circuit graph: "+err.Error())}
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); err != io.EOF {
+		if err == nil {
+			return document, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "circuit graph contains trailing JSON value")}
+		}
+		return document, []reports.Issue{graphIssue(CodeSchemaInvalid, "document", "decode trailing circuit graph data: "+err.Error())}
+	}
+	return document, nil
 }
 
 func Normalize(document Document) Document {

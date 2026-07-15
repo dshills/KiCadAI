@@ -159,6 +159,29 @@ authoritative KiCad evidence, add `--kicad-cli`, `--require-erc`,
 `--require-drc`, `--require-kicad-roundtrip`, and `--strict-diffs` as needed.
 Those checks remain environment-gated and are never inferred from preflight.
 
+### Generic Circuit Patch
+
+Agents can repair a rejected graph with the bounded, provider-free patch
+contract, then preflight and create the corrected graph:
+
+```sh
+kicadai circuit patch --request ./broken-graph.json \
+  --patch ./changes.json --output ./corrected-graph.json
+kicadai --request ./corrected-graph.json circuit preflight
+kicadai --symbols-root /path/to/kicad-symbols \
+  --footprints-root /path/to/kicad-footprints \
+  circuit create --request ./corrected-graph.json --output ./out/project --overwrite
+```
+
+`circuit patch` accepts only typed component selector, endpoint, explicit
+no-connect, PCB placement/region, and policy corrections. It fails closed on
+unknown operations or immutable graph changes, writes no KiCad files, and only
+writes the corrected graph after the shared preflight gates pass. Its JSON
+result includes the input graph hash, normalized operations, before/after
+critical graph projection, changed paths, and re-preflight evidence. KiCad
+ERC/DRC and normalized KiCad round-trip remain external requirements until
+explicitly invoked during creation or promotion.
+
 Provider output budgets are profile-aware: 8,192 tokens for bounded reference
 profiles and 32,768 for `generic-circuit-v1`. Override them with
 `--ai-max-output-tokens N` or `KICADAI_AI_MAX_OUTPUT_TOKENS`; the CLI flag wins

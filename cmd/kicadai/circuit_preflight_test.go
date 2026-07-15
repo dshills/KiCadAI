@@ -230,9 +230,83 @@ func TestCircuitPatchRepairsThenPreflights(t *testing.T) {
 	if _, err := os.Stat(corrected); err != nil {
 		t.Fatal(err)
 	}
+	patchData := circuitPatchResultData(t, result)
+	if len(patchData.NormalizedPatchOperations) != 1 || patchData.CriticalDesignProjection == nil || patchData.CriticalDesignProjection.Before.Nets[0].Endpoints[0].Selector != "999" || patchData.CriticalDesignProjection.After.Nets[0].Endpoints[0].Selector != "1" {
+		t.Fatalf("patch result omitted deterministic corrected projection: %#v", patchData)
+	}
 	preflight := runCircuitPreflightCLI(t, []string{"circuit", "preflight", "--request", corrected})
 	if !preflight.OK || !preflightResultData(t, preflight).ReadyForWrite {
 		t.Fatalf("corrected preflight=%#v", preflight)
+	}
+	symbolsRoot, footprintsRoot := writeCircuitCreateLibraryFixture(t)
+	project := filepath.Join(t.TempDir(), "project")
+	created, createErr := runCircuitCreateCLI(t, []string{
+		"--symbols-root", symbolsRoot, "--footprints-root", footprintsRoot,
+		"circuit", "create", "--request", corrected, "--output", project, "--overwrite",
+	})
+	if createErr != nil || !created.OK {
+		t.Fatalf("corrected circuit create err=%v result=%#v", createErr, created)
+	}
+}
+
+func TestCircuitPatchRepairsCatalogSelectorAndPlacement(t *testing.T) {
+	t.Run("catalog_selector", func(t *testing.T) {
+		graph := filepath.Join("..", "..", "examples", "circuit-graph", "unsupported_unknown_component.json")
+		patch := filepath.Join(t.TempDir(), "catalog-selector.json")
+		if err := os.WriteFile(patch, []byte(`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_component","component":"r1","component_patch":{"component_id":"resistor.generic.0805","variant_id":"0805"}}]}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		corrected := filepath.Join(t.TempDir(), "corrected.json")
+		result, err := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", graph, "--patch", patch, "--output", corrected})
+		if err != nil || !result.OK || !circuitPatchResultData(t, result).ReadyForWrite {
+			t.Fatalf("catalog selector patch err=%v result=%#v", err, result)
+		}
+	})
+	t.Run("placement_region", func(t *testing.T) {
+		base, err := os.ReadFile(filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		broken := filepath.Join(t.TempDir(), "invalid-placement.json")
+		if err := os.WriteFile(broken, []byte(strings.Replace(string(base), `"width_mm": 12,`, `"width_mm": 120,`, 1)), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		patch := filepath.Join(t.TempDir(), "placement.json")
+		if err := os.WriteFile(patch, []byte(`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_pcb_region","region":"filter","bounds":{"x_mm":8,"y_mm":0,"width_mm":24,"height_mm":25}}]}`), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		corrected := filepath.Join(t.TempDir(), "corrected.json")
+		result, err := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", broken, "--patch", patch, "--output", corrected})
+		if err != nil || !result.OK || !circuitPatchResultData(t, result).ReadyForWrite {
+			t.Fatalf("placement patch err=%v result=%#v", err, result)
+		}
+	})
+}
+
+func TestCircuitPatchRepairsInvalidMultiUnitAssignment(t *testing.T) {
+	recorded, err := os.ReadFile(filepath.Join("..", "..", "examples", "ai", "generic_lm358_buffered_signal_conditioner", "recorded-response.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var envelope struct {
+		Intent json.RawMessage `json:"intent"`
+	}
+	if err := json.Unmarshal(recorded, &envelope); err != nil {
+		t.Fatal(err)
+	}
+	brokenContents := strings.Replace(string(envelope.Intent), `"unit":"B"`, `"unit":"Z"`, 1)
+	broken := filepath.Join(t.TempDir(), "invalid-multi-unit.json")
+	if err := os.WriteFile(broken, []byte(brokenContents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	patch := filepath.Join(t.TempDir(), "multi-unit.json")
+	if err := os.WriteFile(patch, []byte(`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_endpoint","net":"GAIN_INPUT","endpoint":{"component":"amplifier","unit":"Z","selector_kind":"function","selector":"IN_PLUS"},"replacement":{"component":"amplifier","unit":"B","selector_kind":"function","selector":"IN_PLUS"}}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	corrected := filepath.Join(t.TempDir(), "corrected.json")
+	result, err := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", broken, "--patch", patch, "--output", corrected})
+	if err != nil || !result.OK || !circuitPatchResultData(t, result).ReadyForWrite {
+		t.Fatalf("multi-unit patch err=%v result=%#v", err, result)
 	}
 }
 
@@ -249,6 +323,22 @@ func TestCircuitPatchFailsClosedWithoutOutput(t *testing.T) {
 	}
 	if _, err := os.Stat(output); !os.IsNotExist(err) {
 		t.Fatalf("patch wrote output: %v", err)
+	}
+}
+
+func TestCircuitPatchRejectsUnsupportedSubstitutionWithoutOutput(t *testing.T) {
+	graph := filepath.Join("..", "..", "examples", "circuit-graph", "rc_filter.json")
+	patch := filepath.Join(t.TempDir(), "unsupported-substitution.json")
+	if err := os.WriteFile(patch, []byte(`{"schema":"kicadai.circuit-patch.v1","version":1,"operations":[{"op":"replace_component","component":"r1","component_patch":{"component_id":"unsupported.component"}}]}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	output := filepath.Join(t.TempDir(), "must-not-exist.json")
+	result, err := runCircuitPatchCLI(t, []string{"circuit", "patch", "--request", graph, "--patch", patch, "--output", output})
+	if err == nil || result.OK || circuitPatchResultData(t, result).ReadyForWrite || len(result.Issues) == 0 {
+		t.Fatalf("unsupported substitution err=%v result=%#v", err, result)
+	}
+	if _, err := os.Stat(output); !os.IsNotExist(err) {
+		t.Fatalf("patch wrote unsupported substitution: %v", err)
 	}
 }
 
@@ -274,6 +364,19 @@ func preflightResultData(t *testing.T, result reports.Result) circuitPreflightDa
 		t.Fatal(err)
 	}
 	return preflight
+}
+
+func circuitPatchResultData(t *testing.T, result reports.Result) circuitPatchData {
+	t.Helper()
+	data, err := json.Marshal(result.Data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var patch circuitPatchData
+	if err := json.Unmarshal(data, &patch); err != nil {
+		t.Fatal(err)
+	}
+	return patch
 }
 
 func runCircuitCreateCLI(t *testing.T, args []string) (reports.Result, error) {
