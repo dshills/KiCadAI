@@ -3,6 +3,7 @@ package generationcapability
 import (
 	"context"
 	"encoding/json"
+	"reflect"
 	"testing"
 
 	"kicadai/internal/components"
@@ -54,9 +55,16 @@ func TestBuildDocumentIncludesGenericCatalogContract(t *testing.T) {
 	if !json.Valid(document.GenericGraphContract) || len(document.Capabilities) == 0 {
 		t.Fatalf("document = %#v", document)
 	}
-	context, err := ProviderCapabilityContext(catalog, 0)
-	if err != nil || !json.Valid([]byte(context)) {
-		t.Fatalf("provider context = %q, %v", context, err)
+	providerContext, err := ProviderCapabilityContext(catalog, 0)
+	if err != nil || !json.Valid([]byte(providerContext)) {
+		t.Fatalf("provider context = %q, %v", providerContext, err)
+	}
+	var providerDocument Document
+	if err := json.Unmarshal([]byte(providerContext), &providerDocument); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(document, providerDocument) {
+		t.Fatalf("provider document differs from CLI document\nCLI: %#v\nprovider: %#v", document, providerDocument)
 	}
 	if _, err := ProviderCapabilityContext(catalog, 1); err == nil {
 		t.Fatal("expected capability size limit failure")

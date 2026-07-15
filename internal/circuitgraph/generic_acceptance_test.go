@@ -100,8 +100,7 @@ func firstDifferenceOffset(first, second string) int {
 }
 
 func TestGenericCompositionAcceptanceCorpusFailsBeforeProjectWrite(t *testing.T) {
-	document := loadGraphExample(t, "rc_filter.json")
-	document.Components[0].ComponentID = "unsupported.component"
+	document := loadGraphExample(t, "unsupported_unknown_component.json")
 	output := filepath.Join(t.TempDir(), "must-not-exist")
 	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "generic-acceptance"}).Resolve(context.Background(), document)
 	if !reports.HasBlockingIssue(issues) || resolved.ResolutionHash != "" {
