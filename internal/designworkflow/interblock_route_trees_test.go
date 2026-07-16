@@ -67,6 +67,24 @@ func TestBuildInterBlockRouteTreesSelectsDuplicateTargetsDeterministically(t *te
 	}
 }
 
+func TestBuildInterBlockRouteTreesRoutesEveryPhysicalDuplicatePadTarget(t *testing.T) {
+	groups, issues := BuildInterBlockRouteGroups([]InterBlockRouteCandidate{{
+		NetName: "VCC", Status: InterBlockRouteCandidateRoutable,
+		Endpoints: []InterBlockRouteEndpoint{{Ref: "U1", Pin: "2"}, {Ref: "U1", Pin: "2#2"}, {Ref: "J1", Pin: "1"}},
+	}})
+	if len(issues) != 0 || len(groups) != 1 {
+		t.Fatalf("groups=%#v issues=%#v", groups, issues)
+	}
+	tree := BuildInterBlockRouteTrees(groups, InterBlockContactEvidence{Targets: []InterBlockContactTarget{
+		{NetName: "VCC", EndpointID: "U1.2", Kind: InterBlockContactTargetPad, Ref: "U1", Pad: "2", Point: transactions.Point{XMM: 0}, Layer: "F.Cu", Confidence: InterBlockContactConfidenceHigh},
+		{NetName: "VCC", EndpointID: "U1.2#2", Kind: InterBlockContactTargetPad, Ref: "U1", Pad: "2#2", Point: transactions.Point{XMM: 5}, Layer: "F.Cu", Confidence: InterBlockContactConfidenceHigh},
+		{NetName: "VCC", EndpointID: "J1.1", Kind: InterBlockContactTargetPad, Ref: "J1", Pad: "1", Point: transactions.Point{XMM: 10}, Layer: "F.Cu", Confidence: InterBlockContactConfidenceHigh},
+	}})[0]
+	if tree.RequiredEndpointCount != 3 || tree.TargetCount != 3 || len(tree.MissingEndpointIDs) != 0 || len(tree.Branches) != 2 {
+		t.Fatalf("tree=%#v, want all physical pad targets routed", tree)
+	}
+}
+
 func TestBuildInterBlockRouteTreesI2CSensorBreakoutPrunesLocallyRoutedPassives(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()

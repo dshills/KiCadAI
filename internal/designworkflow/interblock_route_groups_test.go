@@ -98,6 +98,9 @@ func TestBuildInterBlockRouteGroupsCollapsesSyntheticDuplicatePadAliases(t *test
 	if len(groups[0].RequiredEndpoints) != 2 || groups[0].ExpectedRequired != 2 {
 		t.Fatalf("group=%#v, want duplicate pad aliases counted once", groups[0])
 	}
+	if len(groups[0].PhysicalEndpoints) != 3 || groups[0].PhysicalEndpoints[0].ID != "J1.1" || groups[0].PhysicalEndpoints[1].ID != "U1.2" || groups[0].PhysicalEndpoints[2].ID != "U1.2#2" {
+		t.Fatalf("physical endpoints=%#v, want both physical U1 pad shapes retained", groups[0].PhysicalEndpoints)
+	}
 }
 
 func TestBuildInterBlockRouteGroupsReportsUnresolvedRequiredEndpoints(t *testing.T) {

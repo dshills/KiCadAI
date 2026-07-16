@@ -44,10 +44,14 @@ func BuildInterBlockRouteTrees(groups []InterBlockRouteGroup, evidence InterBloc
 }
 
 func BuildInterBlockRouteTree(group InterBlockRouteGroup, targets map[string]InterBlockContactTarget) InterBlockRouteTree {
-	endpoints, missing := routeTreeEndpoints(group, targets)
+	routeEndpoints := group.PhysicalEndpoints
+	if len(routeEndpoints) == 0 {
+		routeEndpoints = group.RequiredEndpoints
+	}
+	endpoints, missing := routeTreeEndpoints(routeEndpoints, targets)
 	tree := InterBlockRouteTree{
 		NetName:               group.NetName,
-		RequiredEndpointCount: len(group.RequiredEndpoints),
+		RequiredEndpointCount: len(routeEndpoints),
 		TargetCount:           len(endpoints),
 		MissingEndpointIDs:    missing,
 	}
@@ -61,10 +65,10 @@ func BuildInterBlockRouteTree(group InterBlockRouteGroup, targets map[string]Int
 	return tree
 }
 
-func routeTreeEndpoints(group InterBlockRouteGroup, targets map[string]InterBlockContactTarget) ([]routeTreeEndpoint, []string) {
+func routeTreeEndpoints(requiredEndpoints []InterBlockRouteGroupEndpoint, targets map[string]InterBlockContactTarget) ([]routeTreeEndpoint, []string) {
 	var endpoints []routeTreeEndpoint
 	var missing []string
-	for _, endpoint := range group.RequiredEndpoints {
+	for _, endpoint := range requiredEndpoints {
 		key := routeTreeEndpointKey(endpoint.Ref, endpoint.Pin)
 		target, ok := targets[key]
 		if !ok {

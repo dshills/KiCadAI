@@ -1067,8 +1067,12 @@ func routeBranchCancellationIssue(netName string, branchIndex int, err error) re
 }
 
 func interBlockRouteGroupEndpointsByID(group InterBlockRouteGroup) map[string]InterBlockRouteGroupEndpoint {
-	endpoints := make(map[string]InterBlockRouteGroupEndpoint, len(group.RequiredEndpoints)+len(group.OptionalEndpoints))
-	for _, endpoint := range group.RequiredEndpoints {
+	routeEndpoints := group.PhysicalEndpoints
+	if len(routeEndpoints) == 0 {
+		routeEndpoints = group.RequiredEndpoints
+	}
+	endpoints := make(map[string]InterBlockRouteGroupEndpoint, len(routeEndpoints)+len(group.OptionalEndpoints))
+	for _, endpoint := range routeEndpoints {
 		endpoints[endpoint.ID] = endpoint
 	}
 	for _, endpoint := range group.OptionalEndpoints {

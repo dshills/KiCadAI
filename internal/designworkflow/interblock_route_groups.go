@@ -20,6 +20,7 @@ type InterBlockRouteGroup struct {
 	NetName                string                         `json:"net_name"`
 	Status                 InterBlockRouteStatus          `json:"status"`
 	RequiredEndpoints      []InterBlockRouteGroupEndpoint `json:"required_endpoints,omitempty"`
+	PhysicalEndpoints      []InterBlockRouteGroupEndpoint `json:"physical_endpoints,omitempty"`
 	OptionalEndpoints      []InterBlockRouteGroupEndpoint `json:"optional_endpoints,omitempty"`
 	InstanceIDs            []string                       `json:"instance_ids,omitempty"`
 	BlockIDs               []string                       `json:"block_ids,omitempty"`
@@ -43,6 +44,7 @@ func BuildInterBlockRouteGroups(candidates []InterBlockRouteCandidate) ([]InterB
 	groupIndex := map[string]int{}
 	groups := []InterBlockRouteGroup{}
 	endpointKeys := map[string]map[string]bool{}
+	physicalEndpointKeys := map[string]map[string]bool{}
 	var issues []reports.Issue
 	for candidateIndex, candidate := range candidates {
 		netName := strings.TrimSpace(candidate.NetName)
@@ -62,6 +64,7 @@ func BuildInterBlockRouteGroups(candidates []InterBlockRouteCandidate) ([]InterB
 			groupIndex[netName] = groupOffset
 			groups = append(groups, InterBlockRouteGroup{NetName: netName, Status: candidate.Status})
 			endpointKeys[netName] = map[string]bool{}
+			physicalEndpointKeys[netName] = map[string]bool{}
 		} else {
 			groups[groupOffset].Status = mergeInterBlockRouteStatus(groups[groupOffset].Status, candidate.Status)
 		}
@@ -76,6 +79,12 @@ func BuildInterBlockRouteGroups(candidates []InterBlockRouteCandidate) ([]InterB
 			groupEndpoint := interBlockRouteGroupEndpoint(endpoint, InterBlockRouteEndpointRequired)
 			if groupEndpoint.Ref == "" || groupEndpoint.Pin == "" {
 				continue
+			}
+			physicalEndpoint := interBlockPhysicalRouteGroupEndpoint(endpoint, InterBlockRouteEndpointRequired)
+			physicalKey := routePhysicalEndpointKey(physicalEndpoint)
+			if !physicalEndpointKeys[netName][physicalKey] {
+				physicalEndpointKeys[netName][physicalKey] = true
+				group.PhysicalEndpoints = append(group.PhysicalEndpoints, physicalEndpoint)
 			}
 			key := routeGroupEndpointKey(groupEndpoint)
 			if endpointKeys[netName][key] {
@@ -128,6 +137,25 @@ func uniqueCandidateEndpointCount(endpoints []InterBlockRouteEndpoint) int {
 func interBlockRouteGroupEndpoint(endpoint InterBlockRouteEndpoint, requirement InterBlockRouteEndpointRequirement) InterBlockRouteGroupEndpoint {
 	ref := strings.TrimSpace(endpoint.Ref)
 	pin := strings.TrimSpace(endpoint.Pin)
+	sortKey := logicalRouteGroupEndpointKey(ref, pin)
+	return InterBlockRouteGroupEndpoint{
+		ID:          sortKey,
+		Ref:         ref,
+		Pin:         pin,
+		InstanceID:  strings.TrimSpace(endpoint.InstanceID),
+		BlockID:     strings.TrimSpace(endpoint.BlockID),
+		Requirement: requirement,
+		Source:      "inter_block_candidate",
+		SortKey:     sortKey,
+	}
+}
+
+// interBlockPhysicalRouteGroupEndpoint preserves every placed copper shape
+// represented by a deterministic duplicate-pad alias. Logical validation folds
+// aliases, while route trees must reach each physical pad shape for KiCad DRC.
+func interBlockPhysicalRouteGroupEndpoint(endpoint InterBlockRouteEndpoint, requirement InterBlockRouteEndpointRequirement) InterBlockRouteGroupEndpoint {
+	ref := strings.TrimSpace(endpoint.Ref)
+	pin := strings.TrimSpace(endpoint.Pin)
 	sortKey := normalizedRouteGroupEndpointKey(ref, pin)
 	return InterBlockRouteGroupEndpoint{
 		ID:          sortKey,
@@ -145,10 +173,21 @@ func routeGroupEndpointKey(endpoint InterBlockRouteGroupEndpoint) string {
 	if endpoint.SortKey != "" {
 		return endpoint.SortKey
 	}
+	return logicalRouteGroupEndpointKey(endpoint.Ref, endpoint.Pin)
+}
+
+func routePhysicalEndpointKey(endpoint InterBlockRouteGroupEndpoint) string {
+	if endpoint.ID != "" {
+		return endpoint.ID
+	}
 	return normalizedRouteGroupEndpointKey(endpoint.Ref, endpoint.Pin)
 }
 
 func normalizedRouteGroupEndpointKey(ref string, pin string) string {
+	return strings.ToUpper(strings.TrimSpace(ref)) + "." + strings.ToUpper(strings.TrimSpace(pin))
+}
+
+func logicalRouteGroupEndpointKey(ref string, pin string) string {
 	return strings.ToUpper(strings.TrimSpace(ref)) + "." + strings.ToUpper(logicalRoutingPadName(pin))
 }
 
@@ -175,6 +214,7 @@ func sortInterBlockRouteGroup(group *InterBlockRouteGroup) {
 	group.InstanceIDs = compactSortedNonEmptyStrings(group.InstanceIDs)
 	group.BlockIDs = compactSortedNonEmptyStrings(group.BlockIDs)
 	slices.SortFunc(group.RequiredEndpoints, compareInterBlockRouteGroupEndpoint)
+	slices.SortFunc(group.PhysicalEndpoints, compareInterBlockPhysicalRouteGroupEndpoint)
 	slices.SortFunc(group.OptionalEndpoints, compareInterBlockRouteGroupEndpoint)
 }
 
@@ -229,4 +269,8 @@ func compactSortedNonEmptyStrings(values []string) []string {
 
 func compareInterBlockRouteGroupEndpoint(left, right InterBlockRouteGroupEndpoint) int {
 	return strings.Compare(routeGroupEndpointKey(left), routeGroupEndpointKey(right))
+}
+
+func compareInterBlockPhysicalRouteGroupEndpoint(left, right InterBlockRouteGroupEndpoint) int {
+	return strings.Compare(routePhysicalEndpointKey(left), routePhysicalEndpointKey(right))
 }
