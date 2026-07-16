@@ -2,7 +2,7 @@
   "id": "usb_c_i2c_sensor_3v3_protected",
   "request": "usb_c_i2c_sensor_3v3_protected.json",
   "tier": "block-composition",
-  "readiness": "expected_fail",
+  "readiness": "pass",
   "acceptance": "erc-drc",
   "require_erc": true,
   "require_drc": true,
@@ -23,10 +23,6 @@
     "validation",
     "kicad_checks"
   ],
-  "known_gaps": [
-    "Current deterministic generation blocks before project write because the VCC_3v3 route tree cannot complete all required contacts after placement.",
-    "The rail3v3 VOUT anchor has no resolved physical endpoint, and VCC_3v3 contacts for the I2C header and regulator remain in separate same-net route graph components.",
-    "KiCad ERC/DRC and normalized round-trip pass claims are not current evidence until the VCC_3v3 routing blocker is resolved and the fixture is rerun."
-  ],
-  "notes": "Medium-complexity protected USB-C I2C fixture retained as an expected-fail route-tree regression. It combines USB-C power, an AMS1117 3.3 V regulator rail, I2C sensor, pull-ups, decoupling, and a header. Fabrication-candidate work also requires manufacturer-specific AMS1117 ESR, effective-capacitance, and thermal review."
+  "known_gaps": [],
+  "notes": "Promoted KiCad-backed protected USB-C I2C pass fixture with an AMS1117 3.3 V rail, I2C sensor, pull-ups, decoupling, and header. VCC_3v3 contact proof retains each physical regulator pad shape, uses deterministic left-to-right fragment flow on the declared board, and routes only physical regulator bypass copper. Strict KiCad 10.0.3 ERC and DRC are clean when run outside the restricted macOS sandbox. Fabrication release still requires manufacturer-specific AMS1117 ESR, effective-capacitance, and thermal review."
 }

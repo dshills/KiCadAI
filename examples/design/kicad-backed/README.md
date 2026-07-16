@@ -57,7 +57,7 @@ kicadai \
 | `sensor_bmp280_breakout` | `pass` | Reproduces the concrete BMP280 structured-intent result through the environment-gated design fixture lane with verified Bosch identity, LGA-8 footprint/pad mapping, complete required-net routing, and clean KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_pass` | `pass` | Tracks a USB-C powered LED indicator generated from natural-language intent using `usb_c_power` plus `led_indicator`, project-local USB-C symbol export, verified USB4125 pad transfer, routed VBUS/GND connectivity, and clean required KiCad ERC/DRC evidence. |
 | `usb_c_led_indicator_protected` | `pass` | Tracks the protected USB-C LED variant with fuse, TVS, and bulk capacitance enabled. Its schematic layout is inferred from component roles and non-ground topology, with no hand-authored layout coordinates. The checked-in metadata promotes it through the optional KiCad-backed fixture lane; the latest reproduced run is documented below. |
-| `usb_c_i2c_sensor_3v3_protected` | `expected_fail` | Tracks the medium-complexity protected USB-C, AMS1117, and I2C sensor composition. Current deterministic generation blocks on VCC_3v3 route-tree contact completion before project-write or KiCad evidence; it must be repaired and rerun before claiming `erc-drc` pass. |
+| `usb_c_i2c_sensor_3v3_protected` | `pass` | Tracks the medium-complexity protected USB-C, AMS1117, and I2C sensor composition with complete physical VCC_3v3 route-tree contact proof, clean strict KiCad ERC/DRC, writer correctness, and normalized round-trip evidence. |
 | `class_ab_headphone_protected` | `expected_fail` | Tracks the protected Class AB headphone amplifier path with verified LMV321/op-amp and output transistor selections plus `headphone_output_protection`; schematic electrical validation, PCB realization, placement, endpoint binding, project write, and writer-correctness evidence now run. The current blocker is structural validation evidence for schematic label/connectivity issues and unrouted or partially routed PCB nets before KiCad ERC/DRC promotion. Fabrication promotion still also requires active output fault protection, speaker/bridge/power-amplifier load safety, LOAD_REF/GND net-tie evidence, promoted thermal/SOA evidence, and analog stability/layout proof. |
 | `opamp_headphone_buffer_kicad_candidate` | `expected_fail` | Tracks the draft op-amp headphone-buffer seed when promoted to fabrication-candidate requirements; current blockers are missing verified amplifier component evidence, migration to the protected Class AB headphone output path, active fault-protection proof, analog layout proof, and KiCad ERC/DRC promotion evidence. |
 
@@ -107,11 +107,12 @@ USB-C connector, fuse, indicator resistor, and LED in left-to-right power-flow
 order while keeping CC pull-downs, TVS protection, and bulk capacitance below
 and near their owning power stages.
 
-## Protected USB-C I2C 3.3 V Current Evidence
+## Protected USB-C I2C 3.3 V Pass Evidence
 
-The medium-complexity protected USB-C I2C fixture is currently an
-`expected_fail` route-tree regression. Run it from the repository root to
-reproduce its current evidence:
+The medium-complexity protected USB-C I2C fixture is a checked-in
+KiCad-backed `pass` fixture. Run it from the repository root outside the
+restricted sandbox to reproduce strict ERC, DRC, and normalized round-trip
+evidence:
 
 ```sh
 make build
@@ -129,13 +130,17 @@ KICADAI_KICAD_CLI=/path/to/kicad-cli
   design create
 ```
 
-Current blocker: the regulator VOUT anchor has no resolved physical endpoint,
-and the VCC_3v3 route tree leaves the I2C header and regulator in separate
-same-net contact graph components. The command therefore stops before a
-project, ERC/DRC, or round-trip artifact can constitute current pass evidence.
+The route tree binds `rail3v3.vout` to the regulator's physical VOUT pad shape
+and proves every required VCC_3v3 endpoint in one contact-graph component.
+The regulator realization emits only physical bypass copper; inter-block route
+trees provide the rail connections without virtual anchor copper. On the
+declared 100 mm board, fragment placement uses deterministic left-to-right
+flow, which preserves clearance around the regulator rail.
+
 Read `examples/.generated/usb_c_i2c_sensor_3v3_protected/.kicadai/design-promotion.json`
-after a run for the exact route-tree diagnostics. Do not treat historical
-artifacts as current ERC/DRC pass evidence until this fixture is repaired.
+after a run. A current strict KiCad 10.0.3 run reports promotion `pass`, zero
+ERC violations, zero DRC violations, zero unconnected items, writer correctness
+pass, and zero normalized schematic and PCB round-trip diffs.
 
 ## BMP280 Structured-Intent Pass Evidence
 

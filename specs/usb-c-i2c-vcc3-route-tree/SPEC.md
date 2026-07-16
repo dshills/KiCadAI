@@ -5,18 +5,18 @@
 Promote `usb_c_i2c_sensor_3v3_protected` from `expected_fail` to reproducible
 KiCad-backed `pass` without relaxing electrical, routing, writer, or DRC gates.
 
-## Current Evidence
+## Completion Evidence
 
-- `rail3v3.vout` now resolves after placement.
-- VCC_3v3 now has exactly three logical netlist endpoints: regulator, sensor,
-  and header. Duplicate KiCad pad-number aliases are one netlist target; pad
-  hydration and writer validation still retain every physical pad shape for
-  DRC and footprint-current checks.
-- With all fixture-local copper protected, the regulator-to-sensor/header
-  branch has no legal path.
-- Making the sensor movable completes VCC_3v3 but causes a GND tree failure.
-- Removing all local-power obstacles permits routes but produces real
-  connectivity and DRC violations. It is explicitly not an acceptable fix.
+- `rail3v3.vout` resolves to a physical AMS1117 VOUT pad shape after placement.
+- VCC_3v3 retains logical endpoint deduplication while route trees and contact
+  proof retain every physical duplicate pad shape.
+- The target's regulator, output capacitor, sensor, and header VCC_3v3
+  endpoints are one proven route-contact graph component.
+- Regulator local realization emits physical bypass routes only; virtual entry
+  anchors are not emitted as copper.
+- A declared wide board places fragments in deterministic left-to-right flow.
+- The current outside-sandbox KiCad 10.0.3 run reports clean ERC and strict
+  DRC, with writer correctness and normalized schematic/PCB round trips clean.
 
 ## Required Behavior
 
