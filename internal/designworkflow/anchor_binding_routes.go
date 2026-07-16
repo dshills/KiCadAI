@@ -33,6 +33,13 @@ func AddAnchorBindingRoutes(summary AnchorBindingSummary, opts AnchorBindingRout
 		if binding.Status != AnchorBindingStatusBound {
 			continue
 		}
+		// Optional anchors record placement/topology evidence. They are not a
+		// copper contract: materializing an unconnected conceptual point creates
+		// a dangling track in the written board.
+		if !binding.Required {
+			binding.RouteStatus = AnchorRouteStatusSkipped
+			continue
+		}
 		if binding.RouteStatus == AnchorRouteStatusRouted {
 			continue
 		}
