@@ -3928,12 +3928,7 @@ func designPromotionFixture(opts cliOptions, request designworkflow.Request, wor
 	if designworkflow.AcceptanceSatisfied(request.Validation.Acceptance, workflow.Acceptance.Achieved) && designworkflow.AcceptanceSatisfied(designworkflow.AcceptanceFabricationCandidate, workflow.Acceptance.Achieved) {
 		readiness = designworkflow.PromotionReadinessPass
 	}
-	if metadataReadiness, ok, err := designPromotionReadinessFromRequestMetadata(opts.requestPath); err != nil {
-		return designworkflow.PromotionFixture{}, err
-	} else if ok {
-		readiness = metadataReadiness
-	}
-	return designworkflow.PromotionFixture{
+	fixture := designworkflow.PromotionFixture{
 		ID:                designworkflow.NormalizeProjectName(request.Name),
 		Request:           requestName,
 		Tier:              "cli",
@@ -3943,35 +3938,106 @@ func designPromotionFixture(opts cliOptions, request designworkflow.Request, wor
 		RequireDRC:        opts.requireDRC || request.Validation.RequireDRC,
 		ExpectedArtifacts: []string{".kicadai/transaction.json", ".kicadai/manifest.json"},
 		ExpectedStages:    designPromotionExpectedStages(workflow),
-	}, nil
+	}
+	metadata, ok, err := designPromotionMetadataFromRequest(opts.requestPath)
+	if err != nil {
+		return designworkflow.PromotionFixture{}, err
+	}
+	if !ok {
+		return fixture, nil
+	}
+	if metadata.Request != requestName {
+		return designworkflow.PromotionFixture{}, fmt.Errorf("promotion metadata request %q does not match input request %q", metadata.Request, requestName)
+	}
+	expectedArtifacts := fixture.ExpectedArtifacts
+	if metadata.ExpectedArtifacts != nil {
+		expectedArtifacts = append([]string(nil), metadata.ExpectedArtifacts...)
+	}
+	expectedStages := fixture.ExpectedStages
+	if metadata.ExpectedStages != nil {
+		expectedStages = append([]designworkflow.StageName(nil), metadata.ExpectedStages...)
+	}
+	fixture.ID = designworkflow.NormalizeProjectName(metadata.ID)
+	fixture.Tier = metadata.Tier
+	fixture.DeclaredReadiness = metadata.Readiness
+	fixture.Acceptance = metadata.Acceptance
+	fixture.RequireERC = metadata.RequireERC
+	fixture.RequireDRC = metadata.RequireDRC
+	fixture.ExpectedArtifacts = expectedArtifacts
+	fixture.ExpectedStages = expectedStages
+	fixture.KnownGaps = append([]string(nil), metadata.KnownGaps...)
+	return fixture, nil
 }
 
 type designPromotionRequestMetadata struct {
-	Readiness designworkflow.PromotionReadiness `json:"readiness"`
+	ID                string                            `json:"id"`
+	Request           string                            `json:"request"`
+	Tier              string                            `json:"tier"`
+	Readiness         designworkflow.PromotionReadiness `json:"readiness"`
+	Acceptance        designworkflow.AcceptanceLevel    `json:"acceptance"`
+	RequireERC        bool                              `json:"require_erc"`
+	RequireDRC        bool                              `json:"require_drc"`
+	ExpectedArtifacts []string                          `json:"expected_artifacts"`
+	ExpectedStages    []designworkflow.StageName        `json:"expected_stages"`
+	KnownGaps         []string                          `json:"known_gaps"`
 }
 
-func designPromotionReadinessFromRequestMetadata(requestPath string) (designworkflow.PromotionReadiness, bool, error) {
+func designPromotionMetadataFromRequest(requestPath string) (designPromotionRequestMetadata, bool, error) {
 	requestPath = strings.TrimSpace(requestPath)
 	if requestPath == "" || !strings.EqualFold(filepath.Ext(requestPath), ".json") {
-		return "", false, nil
+		return designPromotionRequestMetadata{}, false, nil
 	}
 	metadataPath := strings.TrimSuffix(requestPath, filepath.Ext(requestPath)) + ".metadata.json"
 	data, err := os.ReadFile(metadataPath)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			return "", false, nil
+			return designPromotionRequestMetadata{}, false, nil
 		}
-		return "", false, fmt.Errorf("read promotion metadata %q: %w", metadataPath, err)
+		return designPromotionRequestMetadata{}, false, fmt.Errorf("read promotion metadata %q: %w", metadataPath, err)
 	}
 	var metadata designPromotionRequestMetadata
 	if err := json.Unmarshal(data, &metadata); err != nil {
-		return "", false, fmt.Errorf("decode promotion metadata %q: %w", metadataPath, err)
+		return designPromotionRequestMetadata{}, false, fmt.Errorf("decode promotion metadata %q: %w", metadataPath, err)
+	}
+	if err := metadata.validate(); err != nil {
+		return designPromotionRequestMetadata{}, false, fmt.Errorf("promotion metadata %q: %w", metadataPath, err)
+	}
+	return metadata, true, nil
+}
+
+func (metadata designPromotionRequestMetadata) validate() error {
+	if strings.TrimSpace(metadata.ID) == "" || strings.TrimSpace(metadata.Request) == "" || strings.TrimSpace(metadata.Tier) == "" {
+		return errors.New("id, request, and tier are required")
 	}
 	switch metadata.Readiness {
 	case designworkflow.PromotionReadinessExpectedFail, designworkflow.PromotionReadinessCandidate, designworkflow.PromotionReadinessPass, designworkflow.PromotionReadinessBlocked:
-		return metadata.Readiness, true, nil
 	default:
-		return "", false, fmt.Errorf("promotion metadata %q has unsupported readiness %q", metadataPath, metadata.Readiness)
+		return fmt.Errorf("unsupported readiness %q", metadata.Readiness)
+	}
+	switch metadata.Acceptance {
+	case designworkflow.AcceptanceDraft, designworkflow.AcceptanceStructural, designworkflow.AcceptanceConnectivity, designworkflow.AcceptanceERCDRC, designworkflow.AcceptanceFabricationCandidate:
+	default:
+		return fmt.Errorf("unsupported acceptance %q", metadata.Acceptance)
+	}
+	for _, stage := range metadata.ExpectedStages {
+		if !validDesignPromotionStage(stage) {
+			return fmt.Errorf("unsupported expected stage %q", stage)
+		}
+	}
+	for _, artifact := range metadata.ExpectedArtifacts {
+		if strings.TrimSpace(artifact) == "" {
+			return errors.New("expected artifacts cannot contain empty paths")
+		}
+	}
+	return nil
+}
+
+func validDesignPromotionStage(stage designworkflow.StageName) bool {
+	switch stage {
+	case designworkflow.StageParseRequest, designworkflow.StageLibraryContext, designworkflow.StageBlockPlanning, designworkflow.StageComponentSelection, designworkflow.StageSchematic, designworkflow.StageSchematicElectrical, designworkflow.StagePCBRealization, designworkflow.StageSchematicToPCB, designworkflow.StagePlacement, designworkflow.StageRouting, designworkflow.StageProjectWrite, designworkflow.StageWriterCorrect, designworkflow.StageValidation, designworkflow.StageValidationRepair, designworkflow.StageKiCadChecks, designworkflow.StageSimulation, designworkflow.StageFabricationReady, designworkflow.StageFeedback:
+		return true
+	default:
+		return false
 	}
 }
 

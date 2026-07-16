@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"slices"
 	"strconv"
@@ -1396,23 +1397,109 @@ func TestRunDesignCreateFullBoardRetryEvidenceSnapshot(t *testing.T) {
 	}
 }
 
-func TestDesignPromotionReadinessFromRequestMetadata(t *testing.T) {
+func TestDesignPromotionMetadataFromRequest(t *testing.T) {
 	requestPath := filepath.Join(t.TempDir(), "protected.json")
 	metadataPath := strings.TrimSuffix(requestPath, ".json") + ".metadata.json"
-	if err := os.WriteFile(metadataPath, []byte(fmt.Sprintf(`{"readiness":%q}`, designworkflow.PromotionReadinessPass)), 0o644); err != nil {
+	want := designPromotionRequestMetadata{
+		ID:                "Protected Fixture",
+		Request:           "protected.json",
+		Tier:              "block-composition",
+		Readiness:         designworkflow.PromotionReadinessPass,
+		Acceptance:        designworkflow.AcceptanceERCDRC,
+		RequireERC:        true,
+		RequireDRC:        true,
+		ExpectedArtifacts: []string{".kicadai/design-promotion.json"},
+		ExpectedStages:    []designworkflow.StageName{designworkflow.StageBlockPlanning, designworkflow.StageKiCadChecks},
+		KnownGaps:         []string{"none"},
+	}
+	data, err := json.Marshal(want)
+	if err != nil {
 		t.Fatal(err)
 	}
-	if readiness, ok, err := designPromotionReadinessFromRequestMetadata(requestPath); err != nil || !ok || readiness != designworkflow.PromotionReadinessPass {
-		t.Fatalf("metadata readiness = %q, %v, %v; want pass, true, nil", readiness, ok, err)
+	if err := os.WriteFile(metadataPath, data, 0o644); err != nil {
+		t.Fatal(err)
 	}
-	if _, ok, err := designPromotionReadinessFromRequestMetadata(filepath.Join(t.TempDir(), "ordinary.json")); err != nil || ok {
+	got, ok, err := designPromotionMetadataFromRequest(requestPath)
+	if err != nil || !ok {
+		t.Fatalf("metadata = %#v, %v, %v; want complete metadata, true, nil", got, ok, err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("metadata = %#v, want %#v", got, want)
+	}
+	if _, ok, err := designPromotionMetadataFromRequest(filepath.Join(t.TempDir(), "ordinary.json")); err != nil || ok {
 		t.Fatal("missing metadata unexpectedly supplied readiness")
 	}
 	if err := os.WriteFile(metadataPath, []byte(`{`), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := designPromotionReadinessFromRequestMetadata(requestPath); err == nil {
+	if _, _, err := designPromotionMetadataFromRequest(requestPath); err == nil {
 		t.Fatal("malformed metadata did not return an error")
+	}
+}
+
+func TestDesignPromotionFixtureFallsBackWithoutRequestMetadata(t *testing.T) {
+	fixture, err := designPromotionFixture(cliOptions{requestPath: filepath.Join(t.TempDir(), "ordinary.json")}, designworkflow.Request{Name: "ordinary"}, designworkflow.WorkflowResult{Acceptance: designworkflow.AcceptanceResult{Requested: designworkflow.AcceptanceStructural, Achieved: designworkflow.AcceptanceStructural}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.ID != "ordinary" || fixture.Tier != "cli" || fixture.DeclaredReadiness != designworkflow.PromotionReadinessCandidate || fixture.Acceptance != designworkflow.AcceptanceStructural {
+		t.Fatalf("fallback fixture = %#v", fixture)
+	}
+}
+
+func TestDesignPromotionFixtureUsesRequestMetadataContract(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "protected.json")
+	metadata := designPromotionRequestMetadata{
+		ID:                "Protected Fixture",
+		Request:           "protected.json",
+		Tier:              "block-composition",
+		Readiness:         designworkflow.PromotionReadinessPass,
+		Acceptance:        designworkflow.AcceptanceERCDRC,
+		RequireERC:        true,
+		RequireDRC:        true,
+		ExpectedArtifacts: []string{".kicadai/design-promotion.json"},
+		ExpectedStages:    []designworkflow.StageName{designworkflow.StageBlockPlanning, designworkflow.StageKiCadChecks},
+		KnownGaps:         []string{"review connector grounding"},
+	}
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(requestPath, ".json")+".metadata.json", data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	fixture, err := designPromotionFixture(cliOptions{requestPath: requestPath}, designworkflow.Request{Name: "unrelated"}, designworkflow.WorkflowResult{Acceptance: designworkflow.AcceptanceResult{Requested: designworkflow.AcceptanceStructural, Achieved: designworkflow.AcceptanceStructural}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.ID != designworkflow.NormalizeProjectName(metadata.ID) || fixture.Request != metadata.Request || fixture.Tier != metadata.Tier || fixture.DeclaredReadiness != metadata.Readiness || fixture.Acceptance != metadata.Acceptance || fixture.RequireERC != metadata.RequireERC || fixture.RequireDRC != metadata.RequireDRC || !slices.Equal(fixture.ExpectedArtifacts, metadata.ExpectedArtifacts) || !slices.Equal(fixture.ExpectedStages, metadata.ExpectedStages) || !slices.Equal(fixture.KnownGaps, metadata.KnownGaps) {
+		t.Fatalf("fixture = %#v, want metadata contract %#v", fixture, metadata)
+	}
+}
+
+func TestDesignPromotionFixtureUsesDefaultsForOmittedMetadataLists(t *testing.T) {
+	requestPath := filepath.Join(t.TempDir(), "partial.json")
+	metadata := designPromotionRequestMetadata{
+		ID:         "partial_fixture",
+		Request:    "partial.json",
+		Tier:       "block-composition",
+		Readiness:  designworkflow.PromotionReadinessCandidate,
+		Acceptance: designworkflow.AcceptanceStructural,
+	}
+	data, err := json.Marshal(metadata)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(strings.TrimSuffix(requestPath, ".json")+".metadata.json", data, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	workflow := designworkflow.WorkflowResult{Acceptance: designworkflow.AcceptanceResult{Requested: designworkflow.AcceptanceStructural, Achieved: designworkflow.AcceptanceStructural}, Stages: []designworkflow.StageResult{{Name: designworkflow.StageRouting}}}
+	fixture, err := designPromotionFixture(cliOptions{requestPath: requestPath}, designworkflow.Request{Name: "partial"}, workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(fixture.ExpectedArtifacts, []string{".kicadai/transaction.json", ".kicadai/manifest.json"}) || !slices.Equal(fixture.ExpectedStages, []designworkflow.StageName{designworkflow.StageRouting}) {
+		t.Fatalf("fixture defaults = %#v", fixture)
 	}
 }
 
