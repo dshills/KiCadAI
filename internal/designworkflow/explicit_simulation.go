@@ -6,49 +6,45 @@ import (
 	"path/filepath"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
-const explicitSimulationArtifactPath = ".kicadai/simulation.json"
-
-type explicitSimulationModel struct {
-	minHeadroomV     float64
-	maxLoadCurrentMA float64
-}
-
-var explicitSimulationModels = map[string]explicitSimulationModel{
-	"linear_regulator_ideal_v1": {minHeadroomV: 0.2, maxLoadCurrentMA: 600},
-}
+const ExplicitSimulationArtifactPath = ".kicadai/simulation.json"
 
 func runExplicitSimulation(request Request, outputDir string, overwrite bool) StageResult {
 	if request.ExplicitCircuit == nil || request.ExplicitCircuit.Simulation == nil {
 		return NewStageResult(StageSimulation, nil)
 	}
-	s := request.ExplicitCircuit.Simulation
-	issues := []reports.Issue{}
-	output := s.OutputNominalV
-	model, trusted := explicitSimulationModels[s.ModelID]
-	if !trusted || s.InputVoltageV < s.OutputNominalV+model.minHeadroomV || s.LoadCurrentMA > model.maxLoadCurrentMA || output < s.OutputMinV || output > s.OutputMaxV {
-		issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: "trusted regulator simulation constraints were not satisfied"})
+	report, diagnostics := simmodel.Evaluate(*request.ExplicitCircuit.Simulation)
+	issues := make([]reports.Issue, 0, len(diagnostics)+1)
+	for _, diagnostic := range diagnostics {
+		issues = append(issues, reports.Issue{
+			Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked,
+			Path: "simulation." + diagnostic.Path, Message: diagnostic.Message, Suggestion: diagnostic.Suggestion,
+		})
 	}
-	report := map[string]any{"model_id": s.ModelID, "component": s.Component, "input_voltage_v": s.InputVoltageV, "load_current_ma": s.LoadCurrentMA, "output_voltage_v": output, "output_min_v": s.OutputMinV, "output_max_v": s.OutputMaxV}
 	data, err := json.MarshalIndent(report, "", "  ")
 	if err != nil {
-		issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: err.Error()})
+		issues = append(issues, simulationArtifactIssue(err))
 	} else if err := os.MkdirAll(filepath.Join(outputDir, ".kicadai"), 0o755); err != nil {
-		issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: err.Error()})
+		issues = append(issues, simulationArtifactIssue(err))
 	} else if !overwrite {
-		if _, err := os.Stat(filepath.Join(outputDir, explicitSimulationArtifactPath)); err == nil {
-			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: "simulation artifact already exists"})
+		if _, err := os.Stat(filepath.Join(outputDir, ExplicitSimulationArtifactPath)); err == nil {
+			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: "simulation artifact already exists", Suggestion: "use overwrite only when replacing the complete generated project"})
 		}
 	}
 	if len(issues) == 0 {
-		if err := os.WriteFile(filepath.Join(outputDir, explicitSimulationArtifactPath), append(data, '\n'), 0o644); err != nil {
-			issues = append(issues, reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: err.Error()})
+		if err := os.WriteFile(filepath.Join(outputDir, ExplicitSimulationArtifactPath), append(data, '\n'), 0o644); err != nil {
+			issues = append(issues, simulationArtifactIssue(err))
 		}
 	}
 	stage := NewStageResult(StageSimulation, issues)
 	if len(issues) == 0 {
-		stage.Artifacts = []reports.Artifact{{Kind: reports.ArtifactSimulationReport, Path: explicitSimulationArtifactPath, Description: "Trusted generic regulator simulation"}}
+		stage.Artifacts = []reports.Artifact{{Kind: reports.ArtifactSimulationReport, Path: ExplicitSimulationArtifactPath, Description: "Catalog-backed trusted simulation report"}}
 	}
 	return stage
+}
+
+func simulationArtifactIssue(err error) reports.Issue {
+	return reports.Issue{Code: reports.CodeValidationFailed, Severity: reports.SeverityBlocked, Path: "simulation", Message: err.Error(), Suggestion: "verify the output directory and regenerate the complete project"}
 }

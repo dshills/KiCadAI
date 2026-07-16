@@ -19,6 +19,14 @@
         {"kind": "input_voltage", "max": "12", "unit": "V"},
         {"kind": "output_current", "max": "800", "unit": "mA"}
       ],
+      "simulation_models": [{
+        "model_id": "linear_regulator_ideal_v1",
+        "parameters": [
+          {"name": "output_voltage_v", "value": 3.3},
+          {"name": "min_headroom_v", "value": 1.1},
+          {"name": "max_load_current_ma", "value": 800}
+        ]
+      }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
         {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "description": "Input bypass capacitor placed near VIN and GND."},
@@ -97,6 +105,14 @@
         {"kind": "enable_voltage_abs_max", "max": "6.5", "unit": "V"},
         {"kind": "power_dissipation_max", "max": "250", "unit": "mW"}
       ],
+      "simulation_models": [{
+        "model_id": "linear_regulator_ideal_v1",
+        "parameters": [
+          {"name": "output_voltage_v", "value": 3.3},
+          {"name": "min_headroom_v", "value": 0.4},
+          {"name": "max_load_current_ma", "value": 600}
+        ]
+      }],
       "temperature": {"min": "-40", "max": "85", "unit": "C"},
       "companions": [
         {"id": "regulator.input_capacitor", "family": "capacitor", "role": "input_capacitor", "required": true, "description": "Input bypass capacitor placed near VIN and GND."},

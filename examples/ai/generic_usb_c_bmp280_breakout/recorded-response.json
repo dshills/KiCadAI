@@ -873,12 +873,16 @@
     },
     "simulation": {
       "model_id": "linear_regulator_ideal_v1",
-      "component": "regulator_3v3",
-      "input_voltage_v": 5,
-      "load_current_ma": 20,
-      "output_nominal_v": 3.3,
-      "output_min_v": 3.2,
-      "output_max_v": 3.4
+      "bindings": [
+        {"role": "regulator", "component": "regulator_3v3"}
+      ],
+      "inputs": [
+        {"name": "input_voltage_v", "value": 5},
+        {"name": "load_current_ma", "value": 20}
+      ],
+      "assertions": [
+        {"metric": "output_voltage_v", "min": 3.2, "max": 3.4}
+      ]
     },
     "policy": {
       "allow_reference_assignment": true,

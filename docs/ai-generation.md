@@ -431,6 +431,23 @@ The replay artifact supplies the original schema profile. Plain checked-in
 `recorded-response.json` envelopes remain supported and still require an
 explicit prompt/profile as shown in the fixture commands above.
 
+## Catalog-Backed Trusted Simulation
+
+`generic-circuit-v1` simulation requests select a KiCadAI-owned trusted model
+ID, bind named model roles to graph components, provide bounded scalar inputs,
+and assert bounds on registered metrics. The provider cannot supply model code,
+files, include paths, commands, or expressions. Strict decoding and registry
+validation reject unknown fields and unsupported or incompatible requests.
+
+The registry currently supports catalog-parameterized ideal fixed linear
+regulators, unloaded resistor-divider DC behavior, and ideal first-order RC
+low-pass AC magnitude. Component compatibility and regulator limits come from
+the resolved catalog snapshot; passive values come from catalog-validated
+instance values. The deterministic `.kicadai/simulation.json` report records
+the registry digest, catalog ID/hash, resolved bindings, inputs, measurements,
+assertions, and status. This is narrow functional evidence, not parasitic,
+thermal, tolerance, stability, transient, or fabrication signoff.
+
 ## Generic Placement And Routing Correction
 
 After a `generic-circuit-v1` graph strict-decodes, resolves through the trusted

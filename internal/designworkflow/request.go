@@ -16,6 +16,7 @@ import (
 	"kicadai/internal/domain"
 	"kicadai/internal/reports"
 	"kicadai/internal/schematicir"
+	"kicadai/internal/simmodel"
 	"kicadai/internal/transactions"
 )
 
@@ -59,23 +60,13 @@ type ExplicitCircuitSpec struct {
 	CatalogHash      string                         `json:"catalog_hash"`
 	Schematic        schematicir.Document           `json:"schematic"`
 	AutoHierarchy    bool                           `json:"auto_hierarchy,omitempty"`
-	Simulation       *ExplicitSimulationSpec        `json:"simulation,omitempty"`
+	Simulation       *simmodel.Plan                 `json:"simulation,omitempty"`
 	SchematicSupport []ExplicitSchematicSupportSpec `json:"schematic_support,omitempty"`
 	Components       []ExplicitComponentSpec        `json:"components"`
 	Nets             []ExplicitNetSpec              `json:"nets"`
 	Regions          []ExplicitRegionSpec           `json:"regions,omitempty"`
 	Keepouts         []ExplicitKeepoutSpec          `json:"keepouts,omitempty"`
 	Zones            []ExplicitZoneSpec             `json:"zones,omitempty"`
-}
-
-type ExplicitSimulationSpec struct {
-	ModelID        string  `json:"model_id"`
-	Component      string  `json:"component"`
-	InputVoltageV  float64 `json:"input_voltage_v"`
-	LoadCurrentMA  float64 `json:"load_current_ma"`
-	OutputNominalV float64 `json:"output_nominal_v"`
-	OutputMinV     float64 `json:"output_min_v"`
-	OutputMaxV     float64 `json:"output_max_v"`
 }
 
 const ExplicitSchematicSupportPowerFlag = "power_flag"
@@ -570,7 +561,7 @@ func cloneExplicitCircuit(source *ExplicitCircuitSpec) *ExplicitCircuitSpec {
 	clone.Schematic = schematicir.Normalize(source.Schematic)
 	clone.SchematicSupport = append([]ExplicitSchematicSupportSpec(nil), source.SchematicSupport...)
 	if source.Simulation != nil {
-		simulation := *source.Simulation
+		simulation := simmodel.ClonePlan(*source.Simulation)
 		clone.Simulation = &simulation
 	}
 	clone.Components = append([]ExplicitComponentSpec(nil), source.Components...)
@@ -829,6 +820,19 @@ func validateExplicitCircuit(circuit ExplicitCircuitSpec) []reports.Issue {
 		path := fmt.Sprintf("explicit_circuit.zones[%d]", index)
 		if _, exists := seenNets[zone.Net]; !exists || len(zone.Layers) == 0 || zone.ClearanceMM < 0 || !finiteScalar(zone.ClearanceMM) {
 			issues = append(issues, issue(path, "zone must reference a resolved net and have layers and non-negative clearance"))
+		}
+	}
+	if circuit.Simulation != nil {
+		if circuit.Simulation.CatalogID != circuit.CatalogID || circuit.Simulation.CatalogHash != circuit.CatalogHash {
+			issues = append(issues, issue("explicit_circuit.simulation.catalog", "simulation plan catalog evidence must match the resolved circuit catalog"))
+		}
+		for _, diagnostic := range simmodel.ValidatePlan(*circuit.Simulation) {
+			issues = append(issues, issue("explicit_circuit.simulation."+diagnostic.Path, diagnostic.Message))
+		}
+		for _, binding := range circuit.Simulation.Bindings {
+			if _, exists := componentsByID[binding.Component]; !exists {
+				issues = append(issues, issue("explicit_circuit.simulation.bindings", "simulation binding references missing explicit component "+binding.Component))
+			}
 		}
 	}
 	return issues

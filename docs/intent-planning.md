@@ -396,6 +396,13 @@ Treat `simulation: pass` as narrow headphone-slice evidence only; fabrication
 or power-amplifier claims still require clean KiCad ERC/DRC, physical-rule,
 SOA, thermal, and protection evidence.
 
+Explicit `generic-circuit-v1` graphs use a separate always-deterministic trusted
+model registry. Model compatibility and parameters resolve from the immutable
+component catalog; the provider supplies only model ID, component-role
+bindings, bounded scalar inputs, and metric bounds. Supported ideal families
+are fixed linear regulators, resistor dividers, and RC low-pass filters.
+Unsupported models and missing or incompatible catalog evidence fail closed.
+
 Current gaps for autonomous one-shot schematic + PCB generation:
 
 - end-to-end autonomous design still depends on the planner's structured intent

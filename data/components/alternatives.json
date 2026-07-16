@@ -15,6 +15,7 @@
       "values": [{"kind": "resistance", "typ": "10k", "unit": "ohm"}],
       "ratings": [{"kind": "power", "max": "0.125", "unit": "W"}],
       "tolerances": [{"kind": "resistance", "typ": "1", "unit": "%"}],
+      "simulation_models": [{"model_id": "rc_lowpass_ac_v1"}],
       "symbols": [{
         "symbol_id": "Device:R",
         "function_pins": [
@@ -51,6 +52,7 @@
       "values": [{"kind": "capacitance", "typ": "100n", "unit": "F"}],
       "ratings": [{"kind": "voltage", "max": "50", "unit": "V"}],
       "tolerances": [{"kind": "capacitance", "typ": "10", "unit": "%"}],
+      "simulation_models": [{"model_id": "rc_lowpass_ac_v1"}],
       "capacitor_evidence": {
         "dielectric": "X7R",
         "nominal_capacitance": "100n",

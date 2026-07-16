@@ -5,6 +5,7 @@ import (
 
 	"kicadai/internal/components"
 	"kicadai/internal/domain"
+	"kicadai/internal/simmodel"
 )
 
 const (
@@ -45,20 +46,11 @@ type Document struct {
 	Extensions map[string]json.RawMessage `json:"extensions,omitempty"`
 }
 
-// SimulationIntent declares a catalog-resolved functional model. It is
-// intentionally graph-level so providers cannot smuggle simulator-specific
-// geometry or untrusted model files into the project writer.
-const SimulationModelLinearRegulatorIdealV1 = "linear_regulator_ideal_v1"
+// SimulationIntent is a provider-safe alias for the trusted registry request.
+// It contains no executable model content, file references, or expressions.
+type SimulationIntent = simmodel.Intent
 
-type SimulationIntent struct {
-	ModelID        string  `json:"model_id"`
-	Component      string  `json:"component"`
-	InputVoltageV  float64 `json:"input_voltage_v"`
-	LoadCurrentMA  float64 `json:"load_current_ma"`
-	OutputNominalV float64 `json:"output_nominal_v"`
-	OutputMinV     float64 `json:"output_min_v"`
-	OutputMaxV     float64 `json:"output_max_v"`
-}
+const SimulationModelLinearRegulatorIdealV1 = simmodel.ModelLinearRegulatorIdealV1
 
 // PowerFlag declares that an existing power or return net is driven by a
 // source outside the modeled circuit. It lowers to a schematic-only PWR_FLAG.

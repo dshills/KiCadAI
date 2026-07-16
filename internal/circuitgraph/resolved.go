@@ -3,6 +3,7 @@ package circuitgraph
 import (
 	"kicadai/internal/components"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 const (
@@ -15,6 +16,7 @@ const (
 	CodePinmapConflict      reports.Code = "GRAPH_PINMAP_CONFLICT"
 	CodeRequiredPinOpen     reports.Code = "GRAPH_REQUIRED_PIN_UNCONNECTED"
 	CodeSchematicLowering   reports.Code = "GRAPH_SCHEMATIC_LOWERING_INVALID"
+	CodeSimulationInvalid   reports.Code = "GRAPH_SIMULATION_INVALID"
 )
 
 type ResolvedDocument struct {
@@ -24,6 +26,7 @@ type ResolvedDocument struct {
 	Components     []ResolvedComponent `json:"components"`
 	Nets           []ResolvedNet       `json:"nets"`
 	NoConnects     []ResolvedEndpoint  `json:"no_connects"`
+	Simulation     *simmodel.Plan      `json:"simulation,omitempty"`
 	CatalogID      string              `json:"catalog_id"`
 	CatalogHash    string              `json:"catalog_hash"`
 	LibraryHash    string              `json:"library_hash,omitempty"`

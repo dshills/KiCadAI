@@ -1,0 +1,1 @@
+Create a catalog-resolved 5 V filtered half-scale resistor-divider breakout with input and output headers. Use a trusted DC divider model, require automatic hierarchy partitioning, and require clean ERC, strict DRC, complete routing, writer correctness, deterministic round trips, and replay.

@@ -290,9 +290,10 @@ loop confidence:
 - amplifier generation is currently evidence-oriented rather than
   fabrication-ready. The draft op-amp headphone-buffer request uses supported
   blocks, but Class A/Class AB output stages, headphone DC-blocking/protection,
-  stability networks, verified output-device selection, load-drive limits, and
-  simulation artifacts are still limited to the narrow low-voltage headphone
-  slice. Thermal/current layout proof, active protection, speaker/power loads,
+  stability networks, verified output-device selection, and load-drive limits
+  remain limited to the narrow low-voltage headphone slice. A separate trusted
+  generic registry now covers ideal regulators, resistor dividers, and RC
+  filters, but not amplifier stability or drive proof. Thermal/current layout proof, active protection, speaker/power loads,
   and optional KiCad ERC/DRC-clean promotion are still open blockers.
 
 ## Roadmap Principles

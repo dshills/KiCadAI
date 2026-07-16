@@ -4,9 +4,9 @@
     "schema": "kicadai.circuit-graph.v1",
     "version": 1,
     "project": {
-      "name": "generic_rc_filter",
-      "title": "RC Low-Pass Filter",
-      "description": "Catalog-resolved passive low-pass filter with input and output connectors.",
+      "name": "generic_filtered_divider_hierarchy",
+      "title": "Filtered Half-Scale Divider",
+      "description": "Catalog-resolved 5 V resistor divider with a DC-open filter capacitor, input/output headers, trusted functional evidence, and automatic hierarchy.",
       "acceptance": "erc-drc",
       "board": {
         "width_mm": 40,
@@ -28,13 +28,17 @@
         "id": "r1",
         "reference": "R1",
         "role": "resistor",
-        "query": {
-          "family": "resistor",
-          "package": "0805",
-          "value_kind": "resistance",
-          "value": "10k",
-          "minimum_confidence": "rule_inferred"
-        },
+        "component_id": "resistor.generic.0805",
+        "variant_id": "0805",
+        "value": "10k",
+        "population": "populate"
+      },
+      {
+        "id": "r2",
+        "reference": "R2",
+        "role": "resistor",
+        "component_id": "resistor.generic.0805",
+        "variant_id": "0805",
         "value": "10k",
         "population": "populate"
       },
@@ -42,13 +46,8 @@
         "id": "c1",
         "reference": "C1",
         "role": "capacitor",
-        "query": {
-          "family": "capacitor",
-          "package": "0805",
-          "value_kind": "capacitance",
-          "value": "100nF",
-          "minimum_confidence": "rule_inferred"
-        },
+        "component_id": "capacitor.ceramic.0805",
+        "variant_id": "0805",
         "value": "100nF",
         "population": "populate"
       },
@@ -98,6 +97,11 @@
             "component": "output",
             "selector_kind": "symbol_pin",
             "selector": "1"
+          },
+          {
+            "component": "r2",
+            "selector_kind": "symbol_pin",
+            "selector": "1"
           }
         ]
       },
@@ -118,6 +122,11 @@
           },
           {
             "component": "output",
+            "selector_kind": "symbol_pin",
+            "selector": "2"
+          },
+          {
+            "component": "r2",
             "selector_kind": "symbol_pin",
             "selector": "2"
           }
@@ -144,6 +153,7 @@
           "role": "processing_stage",
           "members": [
             "r1",
+            "r2",
             "c1"
           ],
           "rank": 1
@@ -185,6 +195,13 @@
           "mirror": "none"
         },
         {
+          "component": "r2",
+          "group": "filter_stage",
+          "near": "c1",
+          "orientation": "normal",
+          "mirror": "none"
+        },
+        {
           "component": "output",
           "group": "output_stage",
           "right_of": "r1",
@@ -202,7 +219,8 @@
         "min_component_spacing_mm": 7.62
       },
       "hierarchy": {
-        "mode": "flat"
+        "mode": "auto",
+        "max_components_per_sheet": 2
       }
     },
     "pcb": {
@@ -259,6 +277,13 @@
           "max_distance_mm": 8
         },
         {
+          "component": "r2",
+          "region": "filter",
+          "near": "c1",
+          "priority": 80,
+          "max_distance_mm": 8
+        },
+        {
           "component": "output",
           "region": "output",
           "priority": 100
@@ -268,17 +293,17 @@
       "zones": []
     },
     "simulation": {
-      "model_id": "rc_lowpass_ac_v1",
+      "model_id": "resistor_divider_dc_v1",
       "bindings": [
-        {"role": "resistor", "component": "r1"},
-        {"role": "capacitor", "component": "c1"}
+        {"role": "upper_resistor", "component": "r1"},
+        {"role": "lower_resistor", "component": "r2"}
       ],
       "inputs": [
-        {"name": "frequency_hz", "value": 1000}
+        {"name": "input_voltage_v", "value": 5}
       ],
       "assertions": [
-        {"metric": "cutoff_frequency_hz", "min": 159, "max": 160},
-        {"metric": "gain_ratio", "min": 0.15, "max": 0.16}
+        {"metric": "output_voltage_v", "min": 2.49, "max": 2.51},
+        {"metric": "source_current_ma", "min": 0.24, "max": 0.26}
       ]
     },
     "policy": {

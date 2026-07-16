@@ -11,6 +11,7 @@ import (
 
 	"kicadai/internal/domain"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 const CatalogVersion = "0.1.0"
@@ -82,36 +83,37 @@ type FamilyDefinition struct {
 }
 
 type ComponentRecord struct {
-	ID              string                   `json:"id"`
-	Family          string                   `json:"family"`
-	Name            string                   `json:"name"`
-	Description     string                   `json:"description,omitempty"`
-	Generic         bool                     `json:"generic"`
-	Manufacturer    string                   `json:"manufacturer,omitempty"`
-	MPN             string                   `json:"mpn,omitempty"`
-	Lifecycle       string                   `json:"lifecycle,omitempty"`
-	Equivalence     *EquivalenceMetadata     `json:"equivalence,omitempty"`
-	Tags            []string                 `json:"tags,omitempty"`
-	Values          []ValueConstraint        `json:"values,omitempty"`
-	Ratings         []RatingConstraint       `json:"ratings,omitempty"`
-	Tolerances      []ToleranceConstraint    `json:"tolerances,omitempty"`
-	Temperature     *TemperatureRange        `json:"temperature,omitempty"`
-	ElectricalRoles []ElectricalRole         `json:"electrical_roles,omitempty"`
-	Symbols         []SymbolBinding          `json:"symbols,omitempty"`
-	Packages        []PackageVariant         `json:"packages,omitempty"`
-	Companions      []CompanionRequirement   `json:"companions,omitempty"`
-	DeratingRules   []DeratingRule           `json:"derating_rules,omitempty"`
-	Regulator       *RegulatorEvidence       `json:"regulator_evidence,omitempty"`
-	Capacitor       *CapacitorEvidence       `json:"capacitor_evidence,omitempty"`
-	OpAmp           *OpAmpEvidence           `json:"opamp_evidence,omitempty"`
-	Sensor          *SensorEvidence          `json:"sensor_evidence,omitempty"`
-	AmplifierOutput *AmplifierOutputEvidence `json:"amplifier_output_evidence,omitempty"`
-	PlacementHints  []PlacementHint          `json:"placement_hints,omitempty"`
-	RoutingHints    []RoutingHint            `json:"routing_hints,omitempty"`
-	Properties      []SchematicProperty      `json:"properties,omitempty"`
-	SelectionRules  []SelectionRule          `json:"selection_rules,omitempty"`
-	Verification    VerificationRecord       `json:"verification"`
-	SearchText      string                   `json:"-"`
+	ID               string                     `json:"id"`
+	Family           string                     `json:"family"`
+	Name             string                     `json:"name"`
+	Description      string                     `json:"description,omitempty"`
+	Generic          bool                       `json:"generic"`
+	Manufacturer     string                     `json:"manufacturer,omitempty"`
+	MPN              string                     `json:"mpn,omitempty"`
+	Lifecycle        string                     `json:"lifecycle,omitempty"`
+	Equivalence      *EquivalenceMetadata       `json:"equivalence,omitempty"`
+	Tags             []string                   `json:"tags,omitempty"`
+	Values           []ValueConstraint          `json:"values,omitempty"`
+	Ratings          []RatingConstraint         `json:"ratings,omitempty"`
+	Tolerances       []ToleranceConstraint      `json:"tolerances,omitempty"`
+	Temperature      *TemperatureRange          `json:"temperature,omitempty"`
+	ElectricalRoles  []ElectricalRole           `json:"electrical_roles,omitempty"`
+	Symbols          []SymbolBinding            `json:"symbols,omitempty"`
+	Packages         []PackageVariant           `json:"packages,omitempty"`
+	Companions       []CompanionRequirement     `json:"companions,omitempty"`
+	DeratingRules    []DeratingRule             `json:"derating_rules,omitempty"`
+	Regulator        *RegulatorEvidence         `json:"regulator_evidence,omitempty"`
+	Capacitor        *CapacitorEvidence         `json:"capacitor_evidence,omitempty"`
+	OpAmp            *OpAmpEvidence             `json:"opamp_evidence,omitempty"`
+	Sensor           *SensorEvidence            `json:"sensor_evidence,omitempty"`
+	AmplifierOutput  *AmplifierOutputEvidence   `json:"amplifier_output_evidence,omitempty"`
+	SimulationModels []simmodel.CatalogEvidence `json:"simulation_models,omitempty"`
+	PlacementHints   []PlacementHint            `json:"placement_hints,omitempty"`
+	RoutingHints     []RoutingHint              `json:"routing_hints,omitempty"`
+	Properties       []SchematicProperty        `json:"properties,omitempty"`
+	SelectionRules   []SelectionRule            `json:"selection_rules,omitempty"`
+	Verification     VerificationRecord         `json:"verification"`
+	SearchText       string                     `json:"-"`
 }
 
 type EquivalenceMetadata struct {
@@ -567,6 +569,14 @@ func ValidateAcceptanceIssue(path string, level AcceptanceLevel) (reports.Issue,
 
 func sortRecord(record *ComponentRecord) {
 	sort.Strings(record.Tags)
+	sort.SliceStable(record.SimulationModels, func(i, j int) bool {
+		return record.SimulationModels[i].ModelID < record.SimulationModels[j].ModelID
+	})
+	for index := range record.SimulationModels {
+		sort.SliceStable(record.SimulationModels[index].Parameters, func(i, j int) bool {
+			return record.SimulationModels[index].Parameters[i].Name < record.SimulationModels[index].Parameters[j].Name
+		})
+	}
 	sortVerification(&record.Verification)
 	sortValueConstraints(record.Values)
 	sortRatingConstraints(record.Ratings)

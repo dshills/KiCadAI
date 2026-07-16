@@ -7,6 +7,7 @@ import (
 
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 func TestToDesignRequestCheckedInExamples(t *testing.T) {
@@ -159,7 +160,10 @@ func TestToDesignRequestCarriesAutomaticHierarchyPolicy(t *testing.T) {
 
 func TestToDesignRequestLowersSimulationContract(t *testing.T) {
 	graph := loadGraphExample(t, "usb_c_bmp280_breakout.json")
-	graph.Simulation = &SimulationIntent{ModelID: "linear_regulator_ideal_v1", Component: "regulator", InputVoltageV: 5, LoadCurrentMA: 20, OutputNominalV: 3.3, OutputMinV: 3.2, OutputMaxV: 3.4}
+	graph.Simulation = &SimulationIntent{ModelID: simmodel.ModelLinearRegulatorIdealV1,
+		Bindings:   []simmodel.Binding{{Role: "regulator", Component: "regulator"}},
+		Inputs:     []simmodel.NamedValue{{Name: "input_voltage_v", Value: 5}, {Name: "load_current_ma", Value: 20}},
+		Assertions: []simmodel.Assertion{{Metric: "output_voltage_v", Min: 3.2, Max: 3.4}}}
 	resolved, issues := NewResolver(ResolveOptions{Catalog: loadGraphCatalog(t), CatalogID: "checked-in"}).Resolve(context.Background(), graph)
 	if reports.HasBlockingIssue(issues) {
 		t.Fatalf("resolve issues = %#v", issues)
@@ -168,7 +172,7 @@ func TestToDesignRequestLowersSimulationContract(t *testing.T) {
 	if reports.HasBlockingIssue(issues) || request.ExplicitCircuit.Simulation == nil {
 		t.Fatalf("simulation lowering = %#v issues %#v", request.ExplicitCircuit, issues)
 	}
-	if got := request.ExplicitCircuit.Simulation; got.ModelID != graph.Simulation.ModelID || got.Component != graph.Simulation.Component {
+	if got := request.ExplicitCircuit.Simulation; got.ModelID != graph.Simulation.ModelID || len(got.Bindings) != 1 || got.Bindings[0].Component != "regulator" || got.CatalogHash == "" || got.RegistryHash == "" {
 		t.Fatalf("simulation = %#v", got)
 	}
 }

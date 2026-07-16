@@ -6,11 +6,13 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strings"
 	"testing"
 
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/kicadfiles/checks"
+	"kicadai/internal/simmodel"
 )
 
 const aiPromotionFixtureSchema = "kicadai.ai.promotion-fixture.v1"
@@ -149,6 +151,9 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 				if !promotion.MatchesExpectation {
 					t.Fatal("promotion does not match declared pass readiness")
 				}
+				if id == "generic_filtered_divider_hierarchy" {
+					assertTrustedHierarchyReplay(t, output, cliPath, repoRoot, metadata)
+				}
 				return
 			}
 			if result.OK || result.Data.AIStatus.Stage != metadata.ExpectedStage || string(result.Data.AIStatus.IssueCode) != metadata.ExpectedIssue || promotion.Status == designworkflow.PromotionStatusPass {
@@ -158,9 +163,120 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 	}
 }
 
+func assertTrustedHierarchyReplay(t *testing.T, output, cliPath, repoRoot string, metadata aiPromotionFixtureMetadata) {
+	t.Helper()
+	var promotion designworkflow.PromotionReport
+	readJSONFile(t, filepath.Join(output, designworkflow.PromotionReportArtifactPath), &promotion)
+	gates := make(map[string]designworkflow.PromotionGate, len(promotion.Gates))
+	for _, gate := range promotion.Gates {
+		gates[gate.ID] = gate
+	}
+	for _, id := range []string{"connectivity", "kicad_checks", "route_completion", "schematic_electrical", "simulation", "stages", "writer_correctness"} {
+		if gates[id].Status != designworkflow.PromotionGateStatusPass {
+			t.Fatalf("required held-out promotion gate %s = %#v", id, gates[id])
+		}
+	}
+	var simulation simmodel.Report
+	readJSONFile(t, filepath.Join(output, designworkflow.ExplicitSimulationArtifactPath), &simulation)
+	if simulation.Status != "pass" || simulation.ModelID != simmodel.ModelResistorDividerDCV1 || simulation.RegistryHash != simmodel.RegistryHash() || simulation.CatalogHash == "" {
+		t.Fatalf("trusted simulation evidence = %#v", simulation)
+	}
+	files := generatedKiCadFiles(t, output)
+	childCount := 0
+	for _, relative := range files {
+		if strings.HasPrefix(filepath.ToSlash(relative), "sch/") && strings.HasSuffix(relative, ".kicad_sch") {
+			childCount++
+		}
+	}
+	if childCount < 2 {
+		t.Fatalf("automatic hierarchy child count = %d, files=%v", childCount, files)
+	}
+	replayPath := filepath.Join(output, filepath.FromSlash(aiReplayArtifactRelativePath))
+	replayOutput := filepath.Join(t.TempDir(), "recorded-replay")
+	replayArgs := []string{
+		"--provider", "recorded", "--provider-record", replayPath,
+		"--ai-profile", genericCircuitPromotionProfile,
+		"--catalog-dir", filepath.Join(repoRoot, "data", "components"),
+		"--promotion-readiness", metadata.Readiness,
+		"--output", replayOutput, "--overwrite", "--kicad-cli", cliPath,
+		"--require-kicad-roundtrip", "--require-erc", "--require-drc", "--strict-diffs",
+		"design", "create",
+	}
+	var stdout bytes.Buffer
+	if err := run(replayArgs, &stdout, &bytes.Buffer{}); err != nil {
+		t.Fatalf("recorded replay failed: %v\n%s", err, stdout.String())
+	}
+	replayFiles := generatedKiCadFiles(t, replayOutput)
+	if strings.Join(files, "\n") != strings.Join(replayFiles, "\n") {
+		t.Fatalf("recorded replay file set differs\nfirst=%v\nreplay=%v", files, replayFiles)
+	}
+	for _, relative := range files {
+		first, err := os.ReadFile(filepath.Join(output, relative))
+		if err != nil {
+			t.Fatal(err)
+		}
+		second, err := os.ReadFile(filepath.Join(replayOutput, relative))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(first, second) {
+			t.Fatalf("recorded replay differs for %s", relative)
+		}
+	}
+	firstSimulation, err := os.ReadFile(filepath.Join(output, designworkflow.ExplicitSimulationArtifactPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondSimulation, err := os.ReadFile(filepath.Join(replayOutput, designworkflow.ExplicitSimulationArtifactPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(firstSimulation, secondSimulation) {
+		t.Fatal("recorded replay trusted simulation artifact differs")
+	}
+}
+
+func generatedKiCadFiles(t *testing.T, root string) []string {
+	t.Helper()
+	var files []string
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		extension := filepath.Ext(path)
+		if _, tracked := generatedKiCadExtensions[extension]; !tracked {
+			return nil
+		}
+		relative, err := filepath.Rel(root, path)
+		if err != nil {
+			return err
+		}
+		files = append(files, filepath.ToSlash(relative))
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	sort.Strings(files)
+	return files
+}
+
+var generatedKiCadExtensions = map[string]struct{}{
+	".kicad_sch": {},
+	".kicad_pcb": {},
+	".kicad_pro": {},
+	".kicad_prl": {},
+	".kicad_dru": {},
+	".kicad_wks": {},
+}
+
 func aiPromotionFixtureIDs() []string {
 	return []string{
 		"generic_dual_lmv321_signal_conditioner",
+		"generic_filtered_divider_hierarchy",
 		"generic_lm358_buffered_signal_conditioner",
 		"generic_lmv321_ac_gain_stage",
 		"generic_rc_filter",

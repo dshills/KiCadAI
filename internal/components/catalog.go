@@ -16,6 +16,7 @@ import (
 
 	assets "kicadai"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 const DefaultCatalogDir = "data/components"
@@ -190,6 +191,9 @@ func ValidateCatalog(catalog *Catalog) reports.Result {
 		issues = append(issues, validateOpAmpEvidence(path+".opamp_evidence", record.OpAmp)...)
 		issues = append(issues, validateSensorEvidence(path+".sensor_evidence", record)...)
 		issues = append(issues, validateAmplifierOutputEvidence(path+".amplifier_output_evidence", record)...)
+		for _, diagnostic := range simmodel.ValidateCatalogEvidence(record.Family, record.SimulationModels) {
+			issues = append(issues, NewIssue(CodeInvalidMetadata, reports.SeverityBlocked, path+"."+diagnostic.Path, diagnostic.Message))
+		}
 		issues = append(issues, validatePlacementHints(path+".placement_hints", record.PlacementHints)...)
 		issues = append(issues, validateRoutingHints(path+".routing_hints", record.RoutingHints)...)
 		issues = append(issues, validateSchematicProperties(path+".properties", record.Properties)...)

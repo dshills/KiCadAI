@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 func DecodeStrict(reader io.Reader) (Document, []reports.Issue) {
@@ -86,6 +87,17 @@ func decodeDocumentStrict(reader io.Reader) (Document, []reports.Issue) {
 
 func Normalize(document Document) Document {
 	normalized := cloneDocument(document)
+	if normalized.Simulation != nil {
+		slices.SortStableFunc(normalized.Simulation.Bindings, func(left, right simmodel.Binding) int {
+			return strings.Compare(left.Role, right.Role)
+		})
+		slices.SortStableFunc(normalized.Simulation.Inputs, func(left, right simmodel.NamedValue) int {
+			return strings.Compare(left.Name, right.Name)
+		})
+		slices.SortStableFunc(normalized.Simulation.Assertions, func(left, right simmodel.Assertion) int {
+			return strings.Compare(left.Metric, right.Metric)
+		})
+	}
 	slices.SortStableFunc(normalized.Components, func(left, right Component) int {
 		return strings.Compare(left.ID, right.ID)
 	})
@@ -202,6 +214,13 @@ func canonicalUnitID(value string) string {
 
 func cloneDocument(document Document) Document {
 	cloned := document
+	if document.Simulation != nil {
+		simulation := *document.Simulation
+		simulation.Bindings = append([]simmodel.Binding(nil), document.Simulation.Bindings...)
+		simulation.Inputs = append([]simmodel.NamedValue(nil), document.Simulation.Inputs...)
+		simulation.Assertions = append([]simmodel.Assertion(nil), document.Simulation.Assertions...)
+		cloned.Simulation = &simulation
+	}
 	cloned.Extensions = cloneRawMessages(document.Extensions)
 	cloned.Components = append([]Component(nil), document.Components...)
 	for index := range cloned.Components {

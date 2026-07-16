@@ -14,6 +14,7 @@ import (
 	"kicadai/internal/components"
 	"kicadai/internal/libraryresolver"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 // Resolver binds graphs against one immutable catalog and library-evidence
@@ -140,10 +141,36 @@ func (resolver *Resolver) Resolve(ctx context.Context, document Document) (Resol
 			}
 		}
 	}
+	if !reports.HasBlockingIssue(issues) && normalized.Simulation != nil {
+		plan, simulationIssues := resolveSimulation(*normalized.Simulation, result)
+		issues = append(issues, simulationIssues...)
+		if !reports.HasBlockingIssue(simulationIssues) {
+			result.Simulation = &plan
+		}
+	}
 	if !reports.HasBlockingIssue(issues) {
 		result.ResolutionHash = resolvedHash(result)
 	}
 	return result, finalizeGraphIssues(issues)
+}
+
+func resolveSimulation(intent simmodel.Intent, resolved ResolvedDocument) (simmodel.Plan, []reports.Issue) {
+	evidence := make([]simmodel.ComponentEvidence, 0, len(resolved.Components))
+	for _, component := range resolved.Components {
+		value, hasValue := components.ParseEngineeringValue(component.Instance.Value)
+		evidence = append(evidence, simmodel.ComponentEvidence{
+			InstanceID: component.Instance.ID, CatalogID: component.ComponentID, Family: component.Family,
+			ValueSI: value, HasValueSI: hasValue, ModelClaims: component.Record.SimulationModels,
+		})
+	}
+	plan, diagnostics := simmodel.Resolve(intent, resolved.CatalogID, resolved.CatalogHash, evidence)
+	issues := make([]reports.Issue, 0, len(diagnostics))
+	for _, diagnostic := range diagnostics {
+		issue := graphIssue(CodeSimulationInvalid, "simulation."+diagnostic.Path, diagnostic.Message)
+		issue.Suggestion = diagnostic.Suggestion
+		issues = append(issues, issue)
+	}
+	return plan, issues
 }
 
 func firstGraphRootIssue(issues []reports.Issue) reports.Issue {

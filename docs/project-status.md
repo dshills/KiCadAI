@@ -123,6 +123,17 @@ capability reporting. KiCad's exposed write API remains too limited to be the
 primary generation mechanism, so KiCadAI writes native project files and uses
 `kicad-cli` for external validation.
 
+## Generic Functional Evidence
+
+Generic graphs can now resolve ideal fixed-regulator, resistor-divider DC, and
+RC low-pass AC models through a deterministic trusted registry. Compatibility,
+component values, and regulator limits come from the immutable component
+catalog; provider input cannot contain model code or files. The held-out
+filtered-divider fixture combines this evidence with automatic hierarchy,
+clean KiCad ERC/DRC, strict writer/round-trip gates, and byte-identical recorded
+replay. These analytic models are functional checks, not fabrication or analog
+corner signoff.
+
 ## Amplifier Coverage
 
 Class A, Class AB, and op-amp headphone examples provide schematic readability,
@@ -146,12 +157,10 @@ treated as autonomous or fabrication-ready.
 
 ## Remaining Direction
 
-The next work should promote a graph that introduces a materially different
-generic capability, rather than another fixed analog stage count. Generic
-multi-unit parts are now covered; useful next targets include explicit
-hierarchy or a circuit whose domain evidence requires simulation. Continue to
-broaden catalog and pin/function evidence only when a target exposes a concrete
-gap.
+The next work should extend the same catalog-backed trust boundary to a
+materially different behavior such as a bounded op-amp transfer/stability
+contract, then prove it on another held-out graph. Continue to broaden catalog
+and pin/function evidence only when a target exposes a concrete gap.
 
 See the [Roadmap](../specs/ROADMAP.md) for prioritized work and the
 [Development Reference](development.md) for repository-level limitations and

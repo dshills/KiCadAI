@@ -6,6 +6,7 @@ import (
 
 	"kicadai/internal/designworkflow"
 	"kicadai/internal/reports"
+	"kicadai/internal/simmodel"
 )
 
 func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []reports.Issue) {
@@ -40,12 +41,9 @@ func ToDesignRequest(resolved ResolvedDocument) (designworkflow.Request, []repor
 		Components:    make([]designworkflow.ExplicitComponentSpec, 0, len(resolved.Components)),
 		Nets:          make([]designworkflow.ExplicitNetSpec, 0, len(resolved.Nets)),
 	}
-	if simulation := resolved.Source.Simulation; simulation != nil {
-		explicit.Simulation = &designworkflow.ExplicitSimulationSpec{
-			ModelID: simulation.ModelID, Component: simulation.Component,
-			InputVoltageV: simulation.InputVoltageV, LoadCurrentMA: simulation.LoadCurrentMA, OutputNominalV: simulation.OutputNominalV,
-			OutputMinV: simulation.OutputMinV, OutputMaxV: simulation.OutputMaxV,
-		}
+	if resolved.Simulation != nil {
+		simulation := simmodel.ClonePlan(*resolved.Simulation)
+		explicit.Simulation = &simulation
 	}
 	for _, flag := range resolved.Source.PowerFlags {
 		explicit.SchematicSupport = append(explicit.SchematicSupport, designworkflow.ExplicitSchematicSupportSpec{
