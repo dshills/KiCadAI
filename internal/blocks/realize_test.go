@@ -245,6 +245,9 @@ func TestRealizeBlockPCBUsesConcreteI2CSensorPortPins(t *testing.T) {
 			t.Fatalf("route %s to = %#v, want sensor pin %s", routeID, route.To, wantPin)
 		}
 	}
+	if route := routes["gnd_decoupling"]; route.Layer != "B.Cu" {
+		t.Fatalf("I2C ground bypass layer = %q, want B.Cu to keep the local return clear of the VCC trunk", route.Layer)
+	}
 	if route := routes["bmp280_vddio_tie"]; route.From.Pin != "6" || route.To.Pin != "8" || route.Layer != "B.Cu" || !route.FromEndpointDogbone || !route.ToEndpointDogbone || len(route.Points) != 5 {
 		t.Fatalf("BMP280 VDDIO tie = %#v -> %#v", route.From, route.To)
 	}
