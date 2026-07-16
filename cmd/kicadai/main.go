@@ -112,6 +112,7 @@ Global flags:
   --prompt-file string   AI-provider request file (avoids shell history)
   --provider string      AI intent provider: openai or recorded
   --ai-profile string    Explicit AI schema profile, including generic-circuit-v1
+  --promotion-readiness string Declared promotion readiness: expected_fail, candidate, pass, or blocked
   --model string         AI provider model override
   --provider-record string Recorded AI response fixture path
   --max-ai-attempts int  Maximum AI intent attempts: 1 or 2 (default 1)
@@ -228,6 +229,7 @@ type cliOptions struct {
 	aiPromptFile                string
 	aiProvider                  string
 	aiProfile                   string
+	promotionReadiness          string
 	aiModel                     string
 	aiProviderRecord            string
 	maxAIAttempts               int
@@ -437,6 +439,7 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 	flags.StringVar(&opts.aiPromptFile, "prompt-file", "", "AI-provider request file")
 	flags.StringVar(&opts.aiProvider, "provider", "", "AI intent provider: openai or recorded")
 	flags.StringVar(&opts.aiProfile, "ai-profile", "", "explicit AI schema profile, including generic-circuit-v1")
+	flags.StringVar(&opts.promotionReadiness, "promotion-readiness", "", "declared promotion readiness: expected_fail, candidate, pass, or blocked")
 	flags.StringVar(&opts.aiModel, "model", "", "AI provider model override")
 	flags.StringVar(&opts.aiProviderRecord, "provider-record", "", "recorded AI response fixture path")
 	flags.IntVar(&opts.maxAIAttempts, "max-ai-attempts", 1, "maximum AI intent attempts")
@@ -514,6 +517,15 @@ func parse(args []string, stderr io.Writer) (cliOptions, string, error) {
 		}
 
 		return cliOptions{}, "", err
+	}
+	readiness, readinessConfigured, err := parsePromotionReadiness(opts.promotionReadiness)
+	if err != nil {
+		return cliOptions{}, "", err
+	}
+	if readinessConfigured {
+		opts.promotionReadiness = string(readiness)
+	} else {
+		opts.promotionReadiness = ""
 	}
 
 	formatFlagSet := false
@@ -3944,7 +3956,7 @@ func designPromotionFixture(opts cliOptions, request designworkflow.Request, wor
 		return designworkflow.PromotionFixture{}, err
 	}
 	if !ok {
-		return fixture, nil
+		return applyPromotionReadinessOverride(fixture, opts.promotionReadiness)
 	}
 	if metadata.Request != requestName {
 		return designworkflow.PromotionFixture{}, fmt.Errorf("promotion metadata request %q does not match input request %q", metadata.Request, requestName)
@@ -3966,7 +3978,33 @@ func designPromotionFixture(opts cliOptions, request designworkflow.Request, wor
 	fixture.ExpectedArtifacts = expectedArtifacts
 	fixture.ExpectedStages = expectedStages
 	fixture.KnownGaps = append([]string(nil), metadata.KnownGaps...)
+	return applyPromotionReadinessOverride(fixture, opts.promotionReadiness)
+}
+
+func applyPromotionReadinessOverride(fixture designworkflow.PromotionFixture, value string) (designworkflow.PromotionFixture, error) {
+	readiness, configured, err := parsePromotionReadiness(value)
+	if err != nil {
+		return designworkflow.PromotionFixture{}, err
+	}
+	if !configured {
+		return fixture, nil
+	}
+	fixture.DeclaredReadiness = readiness
 	return fixture, nil
+}
+
+func parsePromotionReadiness(value string) (designworkflow.PromotionReadiness, bool, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "", false, nil
+	}
+	readiness := designworkflow.PromotionReadiness(value)
+	switch readiness {
+	case designworkflow.PromotionReadinessExpectedFail, designworkflow.PromotionReadinessCandidate, designworkflow.PromotionReadinessPass, designworkflow.PromotionReadinessBlocked:
+		return readiness, true, nil
+	default:
+		return "", false, fmt.Errorf("unsupported promotion readiness %q; valid values are expected_fail, candidate, pass, and blocked", value)
+	}
 }
 
 type designPromotionRequestMetadata struct {

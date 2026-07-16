@@ -47,6 +47,8 @@ Acceptance: no hierarchy warning can mask an unchecked child sheet.
   only if it introduces necessary coverage.
 - Require `linear_regulator_ideal_v1` simulation evidence and add promotion
   metadata for the simulation artifact/stage.
+- Pass the fixture's declared readiness through the promotion run and replay;
+  assert declared and achieved `pass` plus `matches_expectation: true`.
 - Run strict ERC, DRC, routing, connectivity, writer correctness, and all
   round-trip checks.
 

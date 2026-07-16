@@ -119,6 +119,11 @@ profile or accepts provider-defined libraries and geometry. See
 [AI Generation](ai-generation.md) for strict KiCad-backed commands and the
 artifact contract.
 
+Promotion harnesses may pass `--promotion-readiness expected_fail|candidate|pass|blocked`
+to declare the expected readiness recorded in the promotion report. This flag
+does not change achieved readiness or bypass any workflow, ERC, DRC, routing,
+writer, simulation, or round-trip gate. Recorded replay commands preserve it.
+
 Before asking an agent for a generic circuit, query its installed contract:
 
 ```sh

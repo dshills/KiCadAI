@@ -127,6 +127,7 @@ func aiReplayCommand(opts cliOptions, profile, replayPath string) (string, []str
 	appendStringFlag("--footprints-root", opts.footprintsRoot)
 	appendStringFlag("--library-cache", opts.libraryCache)
 	appendStringFlag("--kicad-cli", opts.kicadCLI)
+	appendStringFlag("--promotion-readiness", opts.promotionReadiness)
 	if opts.requireERC {
 		args = append(args, "--require-erc")
 	}

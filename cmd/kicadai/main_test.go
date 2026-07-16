@@ -1447,6 +1447,20 @@ func TestDesignPromotionFixtureFallsBackWithoutRequestMetadata(t *testing.T) {
 	}
 }
 
+func TestDesignPromotionFixtureUsesExplicitReadiness(t *testing.T) {
+	workflow := designworkflow.WorkflowResult{Acceptance: designworkflow.AcceptanceResult{Requested: designworkflow.AcceptanceERCDRC, Achieved: designworkflow.AcceptanceERCDRC}}
+	fixture, err := designPromotionFixture(cliOptions{aiPrompt: "generate", promotionReadiness: "pass"}, designworkflow.Request{Name: "promoted"}, workflow)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fixture.DeclaredReadiness != designworkflow.PromotionReadinessPass {
+		t.Fatalf("declared readiness = %q, want pass", fixture.DeclaredReadiness)
+	}
+	if _, err := designPromotionFixture(cliOptions{aiPrompt: "generate", promotionReadiness: "untrusted"}, designworkflow.Request{Name: "promoted"}, workflow); err == nil {
+		t.Fatal("unsupported explicit readiness did not fail closed")
+	}
+}
+
 func TestDesignPromotionFixtureUsesRequestMetadataContract(t *testing.T) {
 	requestPath := filepath.Join(t.TempDir(), "protected.json")
 	metadata := designPromotionRequestMetadata{

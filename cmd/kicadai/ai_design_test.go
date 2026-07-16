@@ -31,6 +31,7 @@ func TestParseAIDesignFlags(t *testing.T) {
 		"--provider", "recorded",
 		"--provider-record", "response.json",
 		"--ai-profile", "generic-circuit-v1",
+		"--promotion-readiness", " pass ",
 		"--model", "test-model",
 		"--max-ai-attempts", "2",
 		"--ai-max-output-tokens", "24000",
@@ -43,8 +44,14 @@ func TestParseAIDesignFlags(t *testing.T) {
 	if command != "design" || len(opts.commandArgs) != 1 || opts.commandArgs[0] != "create" {
 		t.Fatalf("command=%q args=%#v", command, opts.commandArgs)
 	}
-	if opts.aiPrompt != "build bmp280" || opts.aiProvider != "recorded" || opts.aiProviderRecord != "response.json" || opts.aiProfile != "generic-circuit-v1" || opts.aiModel != "test-model" || opts.maxAIAttempts != 2 || opts.aiMaxOutputTokens != 24000 || !opts.aiBackground {
+	if opts.aiPrompt != "build bmp280" || opts.aiProvider != "recorded" || opts.aiProviderRecord != "response.json" || opts.aiProfile != "generic-circuit-v1" || opts.promotionReadiness != "pass" || opts.aiModel != "test-model" || opts.maxAIAttempts != 2 || opts.aiMaxOutputTokens != 24000 || !opts.aiBackground {
 		t.Fatalf("options = %#v", opts)
+	}
+}
+
+func TestParseRejectsUnsupportedPromotionReadiness(t *testing.T) {
+	if _, _, err := parse([]string{"--promotion-readiness", "untrusted", "design", "create"}, &bytes.Buffer{}); err == nil || !strings.Contains(err.Error(), "valid values") {
+		t.Fatalf("invalid promotion readiness error = %v", err)
 	}
 }
 
@@ -198,11 +205,18 @@ func TestRunRecordedGenericCircuitCLIEndToEnd(t *testing.T) {
 
 func TestAIReplayCommandUsesPOSIXSafeQuotingAndExactArgv(t *testing.T) {
 	path := "/tmp/replay $HOME 'quoted' $(touch bad).json"
-	command, argv := aiReplayCommand(cliOptions{output: "/tmp/output $HOME"}, circuitgraph.ProviderProfileID, path)
+	command, argv := aiReplayCommand(cliOptions{output: "/tmp/output $HOME", promotionReadiness: "pass"}, circuitgraph.ProviderProfileID, path)
 	if len(argv) < 5 || argv[4] != path {
 		t.Fatalf("argv = %#v", argv)
 	}
-	if !strings.Contains(command, shellQuoteArgument(path)) || !strings.Contains(command, "'\"'\"'") {
+	foundReadiness := false
+	for index := 0; index+1 < len(argv); index++ {
+		if argv[index] == "--promotion-readiness" && argv[index+1] == "pass" {
+			foundReadiness = true
+			break
+		}
+	}
+	if !strings.Contains(command, shellQuoteArgument(path)) || !strings.Contains(command, "'\"'\"'") || !foundReadiness {
 		t.Fatalf("quoted command = %s", command)
 	}
 	if got := aiReplayOutputPath("."); got != "replay" {

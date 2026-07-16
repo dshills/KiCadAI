@@ -66,4 +66,6 @@ For a recorded `generic-circuit-v1` protected regulated-power graph:
 - strict KiCad ERC/DRC reports zero errors and unconnected items;
 - route completion, connectivity, project writer correctness, and every
   root/child normalized round-trip diff are clean;
+- the promotion harness supplies the fixture's declared readiness explicitly,
+  without changing achieved gates, and deterministic replay preserves it;
 - the promotion report is `pass` and matches its metadata.

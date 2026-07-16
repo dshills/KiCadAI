@@ -94,6 +94,9 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 					"--catalog-dir", filepath.Join(repoRoot, "data", "components"),
 				)
 			}
+			if strings.TrimSpace(metadata.Readiness) != "" {
+				args = append(args, "--promotion-readiness", metadata.Readiness)
+			}
 			if metadata.RequireRoundTrip {
 				args = append(args, "--require-kicad-roundtrip")
 			}
@@ -128,8 +131,23 @@ func TestAIProviderOptionalKiCadPromotion(t *testing.T) {
 			var promotion designworkflow.PromotionReport
 			readJSONFile(t, filepath.Join(output, designworkflow.PromotionReportArtifactPath), &promotion)
 			if metadata.Readiness == "pass" {
-				if !result.OK || result.Data.AIStatus.Status != aiLaneStatusReady || promotion.Status != designworkflow.PromotionStatusPass {
-					t.Fatalf("promotion result ok=%v status=%#v promotion=%q", result.OK, result.Data.AIStatus, promotion.Status)
+				if !result.OK {
+					t.Fatalf("promotion result ok=false status=%#v", result.Data.AIStatus)
+				}
+				if result.Data.AIStatus.Status != aiLaneStatusReady {
+					t.Fatalf("AI status = %#v, want ready", result.Data.AIStatus)
+				}
+				if promotion.Status != designworkflow.PromotionStatusPass {
+					t.Fatalf("promotion status = %q, want pass", promotion.Status)
+				}
+				if promotion.DeclaredReadiness != designworkflow.PromotionReadinessPass {
+					t.Fatalf("declared readiness = %q, want pass", promotion.DeclaredReadiness)
+				}
+				if promotion.AchievedReadiness != designworkflow.PromotionReadinessPass {
+					t.Fatalf("achieved readiness = %q, want pass", promotion.AchievedReadiness)
+				}
+				if !promotion.MatchesExpectation {
+					t.Fatal("promotion does not match declared pass readiness")
 				}
 				return
 			}
